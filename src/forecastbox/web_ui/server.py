@@ -7,9 +7,12 @@ endpoints:
   [get]  /jobs/{job_id}	=> returns job.html with JobStatus / JobResult
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Form
+from typing import Annotated
 from starlette.responses import FileResponse
+import logging
 
+logger = logging.getLogger(__name__)
 app = FastAPI()
 
 
@@ -21,3 +24,9 @@ def status() -> str:
 @app.get("/")
 def index() -> FileResponse:
 	return FileResponse("static/index.html")
+
+
+@app.post("/submit")
+def submit(start_date: Annotated[str, Form()], end_date: Annotated[str, Form()]) -> str:
+	logger.info(f"form params: {start_date=}, {end_date=}")
+	return "ok"

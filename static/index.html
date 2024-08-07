@@ -1,5 +1,14 @@
 <!doctype html><title>Forecast In A Box</title>
 
-<p>
-Enter parameters of the job to submit:
-</p>
+Enter parameters of the job to submit:<br>
+cacheng
+
+<form action="/submit" method="post">
+	<label for="start_date">Start Date:</label><br>
+	<input type="text" id="start_date" name="start_date"><br>
+
+	<label for="end_date">End Date:</label><br>
+	<input type="text" id="end_date" name="end_date"><br>
+
+	<input type="submit" value="Submit">
+</form>
