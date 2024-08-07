@@ -8,6 +8,8 @@ setup:
 	pip install uv
 	uv pip install --upgrade -r requirements.txt
 	uv pip install --upgrade -r requirements-dev.txt
+	uv pip install pre-commit
+	pre-commit install
 
 # TODO checksum of requirements, store file inside venv, run pip --upgrade if change detected as a dependency task for `val`
 
