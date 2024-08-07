@@ -1,6 +1,11 @@
+"""
+As served by the controller.server
+"""
+
 from pydantic import BaseModel, Field
 from enum import Enum
 import datetime as dt
+from typing import Any, Optional
 
 
 class JobDefinition(BaseModel):
@@ -24,6 +29,7 @@ class JobStatus(BaseModel):
 	created_at: dt.datetime
 	updated_at: dt.datetime
 	status: JobStatusEnum
+	result: Optional[Any]
 
 
 # TODO workers api

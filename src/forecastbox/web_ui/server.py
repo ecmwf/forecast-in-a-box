@@ -7,7 +7,7 @@ endpoints:
   [get]  /jobs/{job_id}	=> returns job.html with JobStatus / JobResult
 """
 
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, Form, Request, HTTPException
 from typing import Annotated
 from starlette.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -46,7 +46,7 @@ async def submit(request: Request, start_date: Annotated[str, Form()], end_date:
 		if response_raw.status_code != httpx.codes.OK:
 			logger.error(response_raw.status_code)
 			logger.error(response_raw.text)
-			# TODO return error
+			raise HTTPException(status_code=500, detail="Internal Server Error")
 		response_json = response_raw.json()  # TODO how is this parsed? Orjson?
 		job_status = JobStatus(**response_json)
 	# redirect_url = request.url_for("job_status", job_id=job_status.job_id.job_id)
@@ -61,7 +61,7 @@ async def job_status(request: Request, job_id: str) -> HTMLResponse:
 		if response_raw.status_code != httpx.codes.OK:
 			logger.error(response_raw.status_code)
 			logger.error(response_raw.text)
-			# TODO return error
+			raise HTTPException(status_code=500, detail="Internal Server Error")
 		response_json = response_raw.json()  # TODO how is this parsed? Orjson?
 		job_status = JobStatus(**response_json)
 	return templates.TemplateResponse(request=request, name="job.html", context=job_status.dict())

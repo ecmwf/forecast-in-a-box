@@ -11,11 +11,10 @@ endpoints:
   [post] update(worker_id: WorkerId, job_id: JobId, job_status: JobStatus) -> Ok
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 import logging
-import uuid
-from forecastbox.api.controller import JobDefinition, JobStatus, JobId, JobStatusEnum
-import datetime as dt
+from forecastbox.api.controller import JobDefinition, JobStatus, JobId
+import forecastbox.controller.db as db
 
 logger = logging.getLogger("uvicorn." + __name__)  # TODO instead configure uvicorn the same as the app
 app = FastAPI()
@@ -28,23 +27,16 @@ async def status_check() -> str:
 
 @app.api_route("/jobs/submit", methods=["PUT"])
 async def job_submit(definition: JobDefinition) -> JobStatus:
-	return JobStatus(
-		job_id=JobId(job_id=str(uuid.uuid4())),
-		created_at=dt.datetime.utcnow(),
-		updated_at=dt.datetime.utcnow(),
-		status=JobStatusEnum.submitted,
-	)
+	return db.new_job(definition)
 
 
 @app.api_route("/jobs/status/{job_id}", methods=["GET"])
 async def job_status(job_id: str) -> JobStatus:
-	# TODO fetch from some inmemory db
-	return JobStatus(
-		job_id=JobId(job_id=job_id),
-		created_at=dt.datetime.utcnow(),
-		updated_at=dt.datetime.utcnow(),
-		status=JobStatusEnum.submitted,
-	)
+	maybe_status = db.get_status(JobId(job_id=job_id))
+	if maybe_status is None:
+		raise HTTPException(status_code=404, detail="JobId not known")
+	else:
+		return maybe_status
 
 
 # TODO workers api: register, update
