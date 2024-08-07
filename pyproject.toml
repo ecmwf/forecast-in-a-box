@@ -21,6 +21,7 @@ where = ["src"]
 
 [tool.ruff]
 line-length = 140
+ignore = ["E731"]
 
 [tool.ruff.format]
 indent-style = "tab"
