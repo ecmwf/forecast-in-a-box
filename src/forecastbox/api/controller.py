@@ -24,3 +24,6 @@ class JobStatus(BaseModel):
 	created_at: dt.datetime
 	updated_at: dt.datetime
 	status: JobStatusEnum
+
+
+# TODO workers api

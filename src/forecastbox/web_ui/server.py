@@ -34,7 +34,7 @@ async def index() -> FileResponse:
 
 
 job_submit_url = f"{os.environ['FIAB_CTR_URL']}/jobs/submit"
-job_status_url = lambda job_id: f"{os.environ['FIAB_CTR_URL']}/jobs/{job_id}"
+job_status_url = lambda job_id: f"{os.environ['FIAB_CTR_URL']}/jobs/status/{job_id}"
 
 
 @app.post("/submit")
@@ -51,10 +51,17 @@ async def submit(request: Request, start_date: Annotated[str, Form()], end_date:
 		job_status = JobStatus(**response_json)
 	# redirect_url = request.url_for("job_status", job_id=job_status.job_id.job_id)
 	# return RedirectResponse(redirect_url, status_code=status.HTTP_303_SEE_OTHER)
-	return templates.TemplateResponse(request=request, name="job.html", context={"job_id": job_status.job_id.job_id})
+	return templates.TemplateResponse(request=request, name="job.html", context=job_status.dict())
 
 
 @app.get("/jobs/{job_id}", response_class=HTMLResponse)
 async def job_status(request: Request, job_id: str) -> HTMLResponse:
-	# TODO controller request, fill in context
-	return templates.TemplateResponse(request=request, name="job.html", context={"job_id": job_id})
+	async with httpx.AsyncClient() as client:  # TODO pool the client
+		response_raw = await client.get(job_status_url(job_id))
+		if response_raw.status_code != httpx.codes.OK:
+			logger.error(response_raw.status_code)
+			logger.error(response_raw.text)
+			# TODO return error
+		response_json = response_raw.json()  # TODO how is this parsed? Orjson?
+		job_status = JobStatus(**response_json)
+	return templates.TemplateResponse(request=request, name="job.html", context=job_status.dict())

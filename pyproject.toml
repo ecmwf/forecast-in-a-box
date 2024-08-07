@@ -21,6 +21,8 @@ where = ["src"]
 
 [tool.ruff]
 line-length = 140
+
+[tool.ruff.lint]
 ignore = ["E731"]
 
 [tool.ruff.format]

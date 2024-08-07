@@ -34,3 +34,17 @@ async def job_submit(definition: JobDefinition) -> JobStatus:
 		updated_at=dt.datetime.utcnow(),
 		status=JobStatusEnum.submitted,
 	)
+
+
+@app.api_route("/jobs/status/{job_id}", methods=["GET"])
+async def job_status(job_id: str) -> JobStatus:
+	# TODO fetch from some inmemory db
+	return JobStatus(
+		job_id=JobId(job_id=job_id),
+		created_at=dt.datetime.utcnow(),
+		updated_at=dt.datetime.utcnow(),
+		status=JobStatusEnum.submitted,
+	)
+
+
+# TODO workers api: register, update
