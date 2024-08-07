@@ -4,8 +4,9 @@ Project is in experimental stage. Don't use this yet.
 
 ## Developer Experience
 ### Local Development
-Use the commands defined in the [justfile](./justfile) -- firstly, install `just` via e.g. `brew install just`.
-Then you once run `just setup` (this creates a `.venv` and install both package and devel requirements) -- only ensure that `python` in your system is something like 3.10+.
+Use the commands defined in the [justfile](./justfile) -- firstly, install `just` via e.g. `brew install just`, unless you have it already on your system.
+It's just a bit fancier Makefile, nothing magical.
+Then you once run `just setup` in this repo (this creates a `.venv` and installs both package and devel requirements) -- only ensure that `python` in your system is something like 3.10+.
 And whenever you want to test your local changes, just run `just val` -- no need to activate your local venv/conda.
 
 ### Linting and Formatting

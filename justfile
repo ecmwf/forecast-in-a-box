@@ -8,6 +8,7 @@ setup:
 	pip install uv
 	uv pip install --upgrade -r requirements.txt
 	uv pip install --upgrade -r requirements-dev.txt
+	uv pip install -e .
 	uv pip install pre-commit
 	pre-commit install
 
@@ -18,5 +19,11 @@ val:
 	mypy src --ignore-missing-imports
 	mypy tests --ignore-missing-imports
 	pytest tests
+
+run_webui:
+	fastapi dev src/forecastbox/web_ui/server.py
+
+run_all:
+	python -m forecastbox.standalone.entrypoint
 
 # TODO build
