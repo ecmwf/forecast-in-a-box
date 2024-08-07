@@ -22,17 +22,17 @@ templates = Jinja2Templates(directory="static")
 
 
 @app.api_route("/status", methods=["GET", "HEAD"])
-def status_check() -> str:
+async def status_check() -> str:
 	return "ok"
 
 
 @app.get("/")
-def index() -> FileResponse:
+async def index() -> FileResponse:
 	return FileResponse("static/index.html")
 
 
 @app.post("/submit")
-def submit(request: Request, start_date: Annotated[str, Form()], end_date: Annotated[str, Form()]) -> str:
+async def submit(request: Request, start_date: Annotated[str, Form()], end_date: Annotated[str, Form()]) -> str:
 	logger.debug(f"form params: {start_date=}, {end_date=}")
 	# TODO controller request, obtain job_id
 	job_id = "123"
@@ -42,6 +42,6 @@ def submit(request: Request, start_date: Annotated[str, Form()], end_date: Annot
 
 
 @app.get("/jobs/{job_id}", response_class=HTMLResponse)
-def job_status(request: Request, job_id: str) -> HTMLResponse:
+async def job_status(request: Request, job_id: str) -> HTMLResponse:
 	# TODO controller request, fill in context
 	return templates.TemplateResponse(request=request, name="job.html", context={"job_id": job_id})
