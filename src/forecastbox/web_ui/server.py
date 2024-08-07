@@ -8,10 +8,16 @@ endpoints:
 """
 
 from fastapi import FastAPI
+from starlette.responses import FileResponse
 
 app = FastAPI()
 
 
+@app.api_route("/status", methods=["GET", "HEAD"])
+def status() -> str:
+	return "ok"
+
+
 @app.get("/")
-def index() -> dict[str, str]:
-	return {"hello": "world"}
+def index() -> FileResponse:
+	return FileResponse("static/index.html")

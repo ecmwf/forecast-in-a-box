@@ -27,3 +27,6 @@ run_all:
 	python -m forecastbox.standalone.entrypoint
 
 # TODO build
+# - requirements
+# - src/forecastbox
+# - static (? via manifest of the package)
