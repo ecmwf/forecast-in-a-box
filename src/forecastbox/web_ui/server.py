@@ -12,7 +12,7 @@ from typing import Annotated
 from starlette.responses import FileResponse
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn." + __name__)  # TODO instead configure uvicorn the same as the app
 app = FastAPI()
 
 
@@ -28,5 +28,5 @@ def index() -> FileResponse:
 
 @app.post("/submit")
 def submit(start_date: Annotated[str, Form()], end_date: Annotated[str, Form()]) -> str:
-	logger.info(f"form params: {start_date=}, {end_date=}")
+	logger.debug(f"form params: {start_date=}, {end_date=}")
 	return "ok"
