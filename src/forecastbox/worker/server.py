@@ -40,6 +40,9 @@ class AppContext:
 			response = client.put(f"{self.controller_url}/workers/register", json=registration.model_dump())
 			self.worker_id = WorkerId(**response.json())
 
+	def callback_context(self) -> job_manager.CallbackContext:
+		return job_manager.CallbackContext(worker_id=self.worker_id.worker_id, controller_url=self.controller_url, self_url=self.self_url)
+
 
 @app.api_route("/status", methods=["GET", "HEAD"])
 async def status_check() -> str:
@@ -55,7 +58,7 @@ async def init() -> str:
 
 @app.api_route("/jobs/submit/{job_id}", methods=["PUT"])
 async def job_submit(job_id: str, definition: JobDefinition) -> str:
-	if job_manager.job_submit(job_id, definition):
+	if job_manager.job_submit(AppContext.get().callback_context(), job_id, definition):
 		return "ok"
 	else:
 		raise HTTPException(status_code=500, detail="Internal Server Error")

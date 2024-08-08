@@ -5,14 +5,21 @@ As served by the controller.server
 from pydantic import BaseModel, Field
 from enum import Enum
 import datetime as dt
-from typing import Optional
+from typing import Optional, Any
 from typing_extensions import Self
 import base64
 
 
 # jobs
+class JobFunctionEnum(str, Enum):
+	"""Cascade Job Catalog"""
+
+	hello_world = "hello_world"
+	predict_weather = "predict_weather"
+
+
 class JobDefinition(BaseModel):
-	function_name: str = Field(description="an item from the Cascade Job Catalog")
+	function_name: JobFunctionEnum
 	function_parameters: dict[str, str]
 
 
@@ -34,6 +41,13 @@ class JobStatus(BaseModel):
 	updated_at: dt.datetime
 	status: JobStatusEnum
 	result: Optional[str] = Field(description="URL where the result can be streamed from")
+
+
+class JobStatusUpdate(BaseModel):
+	job_id: JobId
+	update: dict[str, Any]
+
+	# TODO validate update does not contain job_id, updated_at, created_at
 
 
 # workers

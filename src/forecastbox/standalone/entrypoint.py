@@ -4,6 +4,10 @@ import httpx
 import uvicorn
 import os
 from multiprocessing import Process, connection, set_start_method, freeze_support
+import forecastbox.worker.job_manager as worker_job_manager
+
+
+logger = logging.getLogger(__name__)
 
 
 def setup_process(env_context: dict[str, str]):
@@ -26,6 +30,7 @@ def launch_controller(env_context: dict[str, str]):
 
 def launch_worker(env_context: dict[str, str]):
 	setup_process(env_context)
+	worker_job_manager.setup()
 	port = int(env_context["FIAB_WRK_URL"].rsplit(":", 1)[1])
 	uvicorn.run("forecastbox.worker.server:app", host="0.0.0.0", port=port, log_level="info", workers=1)
 
@@ -47,10 +52,9 @@ def wait_for(client: httpx.Client, root_url: str) -> None:
 
 if __name__ == "__main__":
 	freeze_support()
-
-	print("main process starting")
 	set_start_method("forkserver")
 	setup_process({})
+	logger.info("main process starting")
 	context = {
 		"FIAB_WEB_URL": "http://localhost:8000",
 		"FIAB_CTR_URL": "http://localhost:8001",

@@ -10,7 +10,7 @@ import httpx
 import uuid
 from dataclasses import dataclass
 from typing import Optional
-from forecastbox.api.controller import JobDefinition, JobStatus, JobId, JobStatusEnum, WorkerId
+from forecastbox.api.controller import JobDefinition, JobStatus, JobId, JobStatusEnum, WorkerId, JobStatusUpdate
 import datetime as dt
 
 logger = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ def job_status(job_id: JobId) -> Optional[JobStatus]:
 
 
 def job_submit(definition: JobDefinition) -> JobStatus:
-	job_id = str(uuid.uuid4())
+	job_id = str(uuid.uuid4())[:23]  # we use job_id for opening shared memory, and https://trac.macports.org/ticket/64806
 	status = JobStatus(
 		job_id=JobId(job_id=job_id),
 		created_at=dt.datetime.utcnow(),
@@ -77,16 +77,15 @@ async def job_assign(job_id: str) -> None:
 			logger.error(f"failed to submit to worker: {response}")
 			return
 	job_db[job_id].worker_id = WorkerId(worker_id=worker_id)
-	update = {
-		"status": JobStatusEnum.assigned,
-		"updated_at": dt.datetime.utcnow(),
-	}
-	job_update(job_db[job_id].status.model_copy(update=update))
+	update = JobStatusUpdate(job_id=JobId(job_id=job_id), update={"status": JobStatusEnum.assigned})
+	job_update(update)
 
 
-def job_update(job_status: JobStatus) -> JobStatus:
-	job_db[job_status.job_id.job_id].status = job_status
-	return job_status
+def job_update(job_status: JobStatusUpdate) -> JobStatus:
+	new = job_db[job_status.job_id.job_id].status.model_copy(update=job_status.update)
+	new.updated_at = dt.datetime.utcnow()
+	job_db[job_status.job_id.job_id].status = new
+	return new
 
 
 def worker_register(url: str) -> WorkerId:

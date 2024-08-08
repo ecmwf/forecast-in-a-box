@@ -13,7 +13,7 @@ from typing import Annotated, Optional
 from starlette.responses import HTMLResponse
 import jinja2
 import pkgutil
-from forecastbox.api.controller import JobDefinition, JobStatus
+from forecastbox.api.controller import JobDefinition, JobStatus, JobFunctionEnum
 import logging
 import os
 import httpx
@@ -69,8 +69,10 @@ async def index() -> str:
 
 @app.post("/submit", response_class=HTMLResponse)
 async def submit(request: Request, start_date: Annotated[str, Form()], end_date: Annotated[str, Form()]) -> str:
-	logger.debug(f"form params: {start_date=}, {end_date=}")
-	job_definition = JobDefinition(function_name="hello_world", function_parameters={"start_date": start_date, "end_date": end_date})
+	# TODO read job function enum from some dropdown/choice in the Form
+	job_definition = JobDefinition(
+		function_name=JobFunctionEnum.hello_world, function_parameters={"start_date": start_date, "end_date": end_date}
+	)
 	async with httpx.AsyncClient() as client:  # TODO pool the client
 		response_raw = await client.put(StaticExecutionContext.get().job_submit_url, json=job_definition.model_dump())
 		if response_raw.status_code != httpx.codes.OK:

@@ -13,7 +13,7 @@ endpoints:
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 import logging
-from forecastbox.api.controller import JobDefinition, JobStatus, JobId, WorkerId, WorkerRegistration
+from forecastbox.api.controller import JobDefinition, JobStatus, JobId, WorkerId, WorkerRegistration, JobStatusUpdate
 import forecastbox.controller.db as db
 
 logger = logging.getLogger("uvicorn." + __name__)  # TODO instead configure uvicorn the same as the app
@@ -47,7 +47,7 @@ async def worker_register(worker_registration: WorkerRegistration) -> WorkerId:
 
 
 @app.api_route("/jobs/update/{worker_id}", methods=["POST"])
-def job_update(job_status: JobStatus) -> JobStatus:
+def job_update(job_status: JobStatusUpdate) -> JobStatus:
 	# TODO consistency check on the worker-job assignment
 	# TODO heartbeat for the worker
 	return db.job_update(job_status)
