@@ -84,7 +84,8 @@ async def submit(request: Request, start_date: Annotated[str, Form()], end_date:
 	# TODO we dont really want to redirect since we *have* the status, but it would be nice to change the url for easier refresh
 	# redirect_url = request.url_for("job_status", job_id=job_status.job_id.job_id)
 	# return RedirectResponse(redirect_url, status_code=status.HTTP_303_SEE_OTHER)
-	return StaticExecutionContext.get().template_job.render(job_status.model_dump())
+	template_params = {**job_status.model_dump(), "refresh_url": f"jobs/{job_status.job_id.job_id}"}
+	return StaticExecutionContext.get().template_job.render(template_params)
 
 
 @app.get("/jobs/{job_id}", response_class=HTMLResponse)
@@ -97,4 +98,5 @@ async def job_status(request: Request, job_id: str) -> str:
 			raise HTTPException(status_code=500, detail="Internal Server Error")
 		response_json = response_raw.json()  # TODO how is this parsed? Orjson?
 		job_status = JobStatus(**response_json)
-	return StaticExecutionContext.get().template_job.render(job_status.model_dump())
+	template_params = {**job_status.model_dump(), "refresh_url": f"../jobs/{job_status.job_id.job_id}"}
+	return StaticExecutionContext.get().template_job.render(template_params)
