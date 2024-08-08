@@ -4,5 +4,8 @@
 __pycache__
 *.py[co]
 *.egg-info
+
+# pyinstaller build files
 /build
 /dist
+entrypoint.spec
