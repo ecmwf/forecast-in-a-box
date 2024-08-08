@@ -43,6 +43,7 @@ run_dist:
 
 # deletes temporary files, build files, caches
 clean:
+	find . -name '*.egg-info' -exec rm -fr {} +
+	find . -name '__pycache__' -exec rm -fr {} +
 	rm -rf build dist
 	rm entrypoint.spec # NOTE we may want to actually preserve this, presumably after `dist` refactor. Don't forget to remove from .gitignore then
-	# TODO clean pycache and pyc
