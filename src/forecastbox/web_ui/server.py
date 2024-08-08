@@ -72,7 +72,7 @@ async def submit(request: Request, start_date: Annotated[str, Form()], end_date:
 	logger.debug(f"form params: {start_date=}, {end_date=}")
 	job_definition = JobDefinition(function_name="hello_world", function_parameters={"start_date": start_date, "end_date": end_date})
 	async with httpx.AsyncClient() as client:  # TODO pool the client
-		response_raw = await client.put(StaticExecutionContext.get().job_submit_url, json=job_definition.dict())
+		response_raw = await client.put(StaticExecutionContext.get().job_submit_url, json=job_definition.model_dump())
 		if response_raw.status_code != httpx.codes.OK:
 			logger.error(response_raw.status_code)
 			logger.error(response_raw.text)
@@ -81,7 +81,7 @@ async def submit(request: Request, start_date: Annotated[str, Form()], end_date:
 		job_status = JobStatus(**response_json)
 	# redirect_url = request.url_for("job_status", job_id=job_status.job_id.job_id)
 	# return RedirectResponse(redirect_url, status_code=status.HTTP_303_SEE_OTHER)
-	return StaticExecutionContext.get().template_job.render(job_status.dict())
+	return StaticExecutionContext.get().template_job.render(job_status.model_dump())
 
 
 @app.get("/jobs/{job_id}", response_class=HTMLResponse)
@@ -94,4 +94,4 @@ async def job_status(request: Request, job_id: str) -> str:
 			raise HTTPException(status_code=500, detail="Internal Server Error")
 		response_json = response_raw.json()  # TODO how is this parsed? Orjson?
 		job_status = JobStatus(**response_json)
-	return StaticExecutionContext.get().template_job.render(job_status.dict())
+	return StaticExecutionContext.get().template_job.render(job_status.model_dump())

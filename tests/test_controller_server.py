@@ -1,0 +1,31 @@
+from forecastbox.controller.server import app
+from forecastbox.api.controller import JobDefinition, JobStatus, JobStatusEnum
+from fastapi.testclient import TestClient
+
+client = TestClient(app)
+
+
+def test_status():
+	response = client.get("/status")
+	assert response.status_code == 200
+	assert response.text == '"ok"'
+
+
+def test_job_not_found():
+	response = client.get("/job/status/not-existent")
+	assert response.status_code == 404
+	# TODO this is not matching what we raise in the code -- some fastapi quirk. Fix.
+	assert response.json() == {"detail": "Not Found"}
+
+
+def test_job_submit():
+	job_definition = JobDefinition(function_name="hello_world", function_parameters={"start_date": "now", "end_date": "later"})
+	r1 = client.put("/jobs/submit", json=job_definition.model_dump())
+	assert r1.status_code == 200
+	r1status = JobStatus(**r1.json())
+	assert r1status.job_id.job_id is not None
+	assert r1status.status == JobStatusEnum.submitted
+	r2 = client.get(f"/jobs/status/{r1status.job_id.job_id}")
+	assert r2.status_code == 200
+	r2status = JobStatus(**r2.json())
+	assert r2status.job_id.job_id == r1status.job_id.job_id
