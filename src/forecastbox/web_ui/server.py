@@ -79,6 +79,7 @@ async def submit(request: Request, start_date: Annotated[str, Form()], end_date:
 			raise HTTPException(status_code=500, detail="Internal Server Error")
 		response_json = response_raw.json()  # TODO how is this parsed? Orjson?
 		job_status = JobStatus(**response_json)
+	# TODO we dont really want to redirect since we *have* the status, but it would be nice to change the url for easier refresh
 	# redirect_url = request.url_for("job_status", job_id=job_status.job_id.job_id)
 	# return RedirectResponse(redirect_url, status_code=status.HTTP_303_SEE_OTHER)
 	return StaticExecutionContext.get().template_job.render(job_status.model_dump())

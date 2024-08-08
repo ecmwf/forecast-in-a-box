@@ -1,4 +1,6 @@
 import logging
+import time
+import httpx
 import uvicorn
 import os
 from multiprocessing import Process, connection, set_start_method, freeze_support
@@ -22,6 +24,27 @@ def launch_controller(env_context: dict[str, str]):
 	uvicorn.run("forecastbox.controller.server:app", host="0.0.0.0", port=port, log_level="info", workers=1)
 
 
+def launch_worker(env_context: dict[str, str]):
+	setup_process(env_context)
+	port = int(env_context["FIAB_WRK_URL"].rsplit(":", 1)[1])
+	uvicorn.run("forecastbox.worker.server:app", host="0.0.0.0", port=port, log_level="info", workers=1)
+
+
+def wait_for(client: httpx.Client, root_url: str) -> None:
+	"""Calls /status endpoint, retry on ConnectError"""
+	i = 0
+	while i < 3:
+		try:
+			rc = client.get(f"{root_url}/status")
+			if not rc.status_code == 200:
+				raise ValueError(f"failed to start {root_url}: {rc}")
+			return
+		except httpx.ConnectError:
+			i += 1
+			time.sleep(1)
+	raise ValueError(f"failed to start {root_url}: no more retries")
+
+
 if __name__ == "__main__":
 	freeze_support()
 
@@ -37,15 +60,25 @@ if __name__ == "__main__":
 	controller = Process(target=launch_controller, args=(context,))
 	controller.start()
 
-	# TODO launch worker.server
+	worker = Process(target=launch_worker, args=(context,))
+	worker.start()
 
 	web_ui = Process(target=launch_web_ui, args=(context,))
 	web_ui.start()
 
-	# TODO check for status=ok of each service, then launch browser window
+	with httpx.Client() as client:
+		for root_url in context.values():
+			wait_for(client, root_url)
+		ri = client.post(f"{context['FIAB_WRK_URL']}/init")
+		if not ri.status_code == 200:
+			raise ValueError("failed to register worker")
+
+	# TODO launch browser window automatically
+
 	connection.wait(
 		(
 			controller.sentinel,
+			worker.sentinel,
 			web_ui.sentinel,
 		)
 	)
