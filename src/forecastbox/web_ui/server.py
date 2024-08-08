@@ -33,8 +33,9 @@ async def index() -> FileResponse:
 	return FileResponse("static/index.html")
 
 
-job_submit_url = f"{os.environ['FIAB_CTR_URL']}/jobs/submit"
-job_status_url = lambda job_id: f"{os.environ['FIAB_CTR_URL']}/jobs/status/{job_id}"
+# NOTE we use the safer `get` to make this module importible outside execution context
+job_submit_url = f"{os.environ.get('FIAB_CTR_URL', '')}/jobs/submit"
+job_status_url = lambda job_id: f"{os.environ.get('FIAB_CTR_URL', '')}/jobs/status/{job_id}"
 
 
 @app.post("/submit")

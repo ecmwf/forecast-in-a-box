@@ -23,10 +23,16 @@ val:
 run_webui:
 	fastapi dev src/forecastbox/web_ui/server.py
 
-run_all:
+run_venv:
 	python -m forecastbox.standalone.entrypoint
 
-# TODO build
-# - requirements
-# - src/forecastbox
-# - static (? via manifest of the package)
+dist:
+	pyinstaller --collect-submodules=forecastbox -F ./src/forecastbox/standalone/entrypoint.py
+	# TODO include static
+
+run_dist:
+	./dist/entrypoint
+
+clean:
+	rm -rf build dist
+	# TODO clean pycache and pyc

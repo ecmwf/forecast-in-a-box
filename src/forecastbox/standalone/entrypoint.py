@@ -1,7 +1,7 @@
 import logging
 import uvicorn
 import os
-from multiprocessing import Process, connection, set_start_method
+from multiprocessing import Process, connection, set_start_method, freeze_support
 
 
 def setup_process(env_context: dict[str, str]):
@@ -23,9 +23,11 @@ def launch_controller(env_context: dict[str, str]):
 
 
 if __name__ == "__main__":
+	freeze_support()
+
+	print("main process starting")
 	set_start_method("forkserver")
 	setup_process({})
-
 	context = {
 		"FIAB_WEB_URL": "http://localhost:8000",
 		"FIAB_CTR_URL": "http://localhost:8001",
