@@ -9,14 +9,17 @@ The fast-api server providing the worker's rest api
 #   [post] read_from(hostname: str, job_id: str) -> Ok
 #      ↑ issued by controller so that this worker can obtain its inputs via `hostname::results(job_id)` call
 
+import atexit
 import logging
 import httpx
 from typing import Optional
 from typing_extensions import Self
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 import os
 from forecastbox.api.controller import JobDefinition, WorkerId, WorkerRegistration
 import forecastbox.worker.job_manager as job_manager
+from multiprocessing import Manager
 
 logger = logging.getLogger("uvicorn." + __name__)  # TODO instead configure uvicorn the same as the app
 app = FastAPI()
@@ -39,9 +42,25 @@ class AppContext:
 			registration = WorkerRegistration.from_raw(self.self_url)
 			response = client.put(f"{self.controller_url}/workers/register", json=registration.model_dump())
 			self.worker_id = WorkerId(**response.json())
+		self.mem_manager = Manager()
+		self.db_context = job_manager.DbContext(
+			mem_db=job_manager.MemDb(self.mem_manager),
+			job_db=job_manager.JobDb(),
+		)
 
 	def callback_context(self) -> job_manager.CallbackContext:
 		return job_manager.CallbackContext(worker_id=self.worker_id.worker_id, controller_url=self.controller_url, self_url=self.self_url)
+
+	@classmethod
+	def shutdown(cls):
+		# TODO register into some fastapi hook instead -- this does not seem to be called at the end
+		if cls._instance:
+			job_manager.wait_all(cls._instance.db_context)
+
+	@classmethod
+	def setup_hook(cls):
+		# TODO register into some fastapi hook instead -- this does not seem to be called at the end
+		atexit.register(cls.shutdown)
 
 
 @app.api_route("/status", methods=["GET", "HEAD"])
@@ -58,7 +77,17 @@ async def init() -> str:
 
 @app.api_route("/jobs/submit/{job_id}", methods=["PUT"])
 async def job_submit(job_id: str, definition: JobDefinition) -> str:
-	if job_manager.job_submit(AppContext.get().callback_context(), job_id, definition):
+	ctx = AppContext.get()
+	if job_manager.job_submit(ctx.callback_context(), ctx.db_context, job_id, definition):
 		return "ok"
 	else:
 		raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+@app.api_route("/data/{data_id}", methods=["GET"])
+async def data_get(data_id: str) -> StreamingResponse:
+	try:
+		return StreamingResponse(job_manager.data_stream(AppContext.get().db_context.mem_db, data_id))
+	except (KeyError, FileNotFoundError):  # TODO this doesnt catch it as the streaming response is lazy
+		logger.exception("data retrieval failure")
+		raise HTTPException(status_code=404, detail=f"{data_id=} not found")
