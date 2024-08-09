@@ -68,10 +68,11 @@ async def index() -> str:
 
 
 @app.post("/submit")
-async def submit(request: Request, start_date: Annotated[str, Form()], end_date: Annotated[str, Form()]) -> RedirectResponse:
-	# TODO read job function enum from some dropdown/choice in the Form
+async def submit(
+	request: Request, start_date: Annotated[str, Form()], end_date: Annotated[str, Form()], job_function: Annotated[str, Form()]
+) -> RedirectResponse:
 	job_definition = JobDefinition(
-		function_name=JobFunctionEnum.hello_torch, function_parameters={"start_date": start_date, "end_date": end_date}
+		function_name=JobFunctionEnum(job_function), function_parameters={"start_date": start_date, "end_date": end_date}
 	)
 	async with httpx.AsyncClient() as client:  # TODO pool the client
 		response_raw = await client.put(StaticExecutionContext.get().job_submit_url, json=job_definition.model_dump())

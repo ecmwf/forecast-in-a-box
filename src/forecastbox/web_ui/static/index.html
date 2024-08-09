@@ -3,6 +3,12 @@
 Enter parameters of the job to submit:<br>
 
 <form action="/submit" method="post">
+	<input type="radio" id="hello_world" name="job_function" value="hello_world">
+	<label for="hello_world">Hello World</label><br>
+
+	<input type="radio" id="hello_torch" name="job_function" value="hello_torch">
+	<label for="hello_torch">Hello Torch</label><br>
+
 	<label for="start_date">Start Date:</label><br>
 	<input type="text" id="start_date" name="start_date"><br>
 
