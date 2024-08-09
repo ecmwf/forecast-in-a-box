@@ -1,4 +1,5 @@
 import logging
+import webbrowser
 import time
 import httpx
 import uvicorn
@@ -11,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def setup_process(env_context: dict[str, str]):
 	"""Invoke at the start of each new process. Configures logging etc"""
-	logging.basicConfig(level=logging.INFO)
+	logging.basicConfig(level=logging.INFO)  # TODO replace with config
 	os.environ.update(env_context)
 
 
@@ -72,7 +73,7 @@ if __name__ == "__main__":
 		for root_url in context.values():
 			wait_for(client, root_url)
 
-	# TODO launch browser window automatically
+	webbrowser.open(context["FIAB_WEB_URL"])
 
 	connection.wait(
 		(

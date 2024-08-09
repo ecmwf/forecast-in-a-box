@@ -62,7 +62,7 @@ def notify_update(callback_context: CallbackContext, job_id: str, status: JobSta
 
 
 def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str, definition: JobDefinition) -> None:
-	logging.basicConfig(level=logging.DEBUG)
+	logging.basicConfig(level=logging.INFO)  # TODO replace with config
 	notify_update(callback_context, job_id, JobStatusEnum.running, True)
 	# TODO handle input
 	target = get_process_target(definition.function_name)
