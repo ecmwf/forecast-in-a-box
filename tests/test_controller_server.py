@@ -1,5 +1,5 @@
 from forecastbox.controller.server import app
-from forecastbox.api.controller import JobDefinition, JobStatus, JobStatusEnum, WorkerRegistration, WorkerId
+from forecastbox.api.common import JobDefinition, JobStatus, JobStatusEnum, WorkerRegistration, WorkerId
 from fastapi.testclient import TestClient
 
 client = TestClient(app)

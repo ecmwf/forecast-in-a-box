@@ -6,7 +6,7 @@ from typing import Iterator, cast
 from multiprocessing.shared_memory import SharedMemory
 from dataclasses import dataclass
 import logging
-from forecastbox.api.controller import JobDefinition, JobStatusEnum, JobStatusUpdate, JobId
+from forecastbox.api.common import JobDefinition, JobStatusEnum, JobStatusUpdate, JobId
 from forecastbox.jobs.lookup import get_process_target
 from multiprocessing import Process, connection
 from multiprocessing.managers import SyncManager
@@ -16,12 +16,12 @@ logger = logging.getLogger(__name__)
 
 
 class MemDb:
-	def __init__(self, m: SyncManager):
+	def __init__(self, m: SyncManager) -> None:
 		self.memory: dict[str, int] = cast(dict[str, int], m.dict())
 
 
 class JobDb:
-	def __init__(self):
+	def __init__(self) -> None:
 		self.jobs: dict[str, Process] = {}
 
 

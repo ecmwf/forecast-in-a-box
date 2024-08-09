@@ -15,7 +15,7 @@ class JobFunctionEnum(str, Enum):
 	"""Cascade Job Catalog"""
 
 	hello_world = "hello_world"
-	predict_weather = "predict_weather"
+	hello_torch = "hello_torch"
 
 
 class JobDefinition(BaseModel):

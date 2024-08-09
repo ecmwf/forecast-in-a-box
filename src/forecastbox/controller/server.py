@@ -13,7 +13,7 @@ endpoints:
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 import logging
-from forecastbox.api.controller import JobDefinition, JobStatus, JobId, WorkerId, WorkerRegistration, JobStatusUpdate
+from forecastbox.api.common import JobDefinition, JobStatus, JobId, WorkerId, WorkerRegistration, JobStatusUpdate
 import forecastbox.controller.db as db
 
 logger = logging.getLogger("uvicorn." + __name__)  # TODO instead configure uvicorn the same as the app

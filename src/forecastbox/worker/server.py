@@ -17,7 +17,7 @@ from typing_extensions import Self
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 import os
-from forecastbox.api.controller import JobDefinition, WorkerId, WorkerRegistration
+from forecastbox.api.common import JobDefinition, WorkerId, WorkerRegistration
 import forecastbox.worker.job_manager as job_manager
 from multiprocessing import Manager
 

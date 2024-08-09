@@ -10,7 +10,7 @@ import httpx
 import uuid
 from dataclasses import dataclass
 from typing import Optional
-from forecastbox.api.controller import JobDefinition, JobStatus, JobId, JobStatusEnum, WorkerId, JobStatusUpdate
+from forecastbox.api.common import JobDefinition, JobStatus, JobId, JobStatusEnum, WorkerId, JobStatusUpdate
 import datetime as dt
 
 logger = logging.getLogger(__name__)
