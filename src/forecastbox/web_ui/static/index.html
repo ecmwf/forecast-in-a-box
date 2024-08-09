@@ -3,11 +3,10 @@
 Enter parameters of the job to submit:<br>
 
 <form action="/submit" method="post">
-	<input type="radio" id="hello_world" name="job_function" value="hello_world">
-	<label for="hello_world">Hello World</label><br>
-
-	<input type="radio" id="hello_torch" name="job_function" value="hello_torch">
-	<label for="hello_torch">Hello Torch</label><br>
+	{% for e in jobs %}
+		<input type="radio" id="{{ e }}" name="job_function" value="{{ e }}">
+		<label for="{{ e }}">{{ e }}</label><br>
+	{% endfor %}
 
 	<label for="start_date">Start Date:</label><br>
 	<input type="text" id="start_date" name="start_date"><br>
