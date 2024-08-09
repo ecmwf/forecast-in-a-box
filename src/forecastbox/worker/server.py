@@ -9,7 +9,7 @@ The fast-api server providing the worker's rest api
 #   [post] read_from(hostname: str, job_id: str) -> Ok
 #      ↑ issued by controller so that this worker can obtain its inputs via `hostname::results(job_id)` call
 
-import atexit
+from contextlib import asynccontextmanager
 import logging
 import httpx
 from typing import Optional
@@ -22,11 +22,9 @@ import forecastbox.worker.job_manager as job_manager
 from multiprocessing import Manager
 
 logger = logging.getLogger("uvicorn." + __name__)  # TODO instead configure uvicorn the same as the app
-app = FastAPI()
 
 
 class AppContext:
-	# TODO use some fastapi tooling for this
 	_instance: Optional[Self] = None
 
 	@classmethod
@@ -48,19 +46,19 @@ class AppContext:
 			job_db=job_manager.JobDb(),
 		)
 
+	@property
 	def callback_context(self) -> job_manager.CallbackContext:
 		return job_manager.CallbackContext(worker_id=self.worker_id.worker_id, controller_url=self.controller_url, self_url=self.self_url)
 
-	@classmethod
-	def shutdown(cls):
-		# TODO register into some fastapi hook instead -- this does not seem to be called at the end
-		if cls._instance:
-			job_manager.wait_all(cls._instance.db_context)
 
-	@classmethod
-	def setup_hook(cls):
-		# TODO register into some fastapi hook instead -- this does not seem to be called at the end
-		atexit.register(cls.shutdown)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+	instance = AppContext.get()
+	yield
+	job_manager.wait_all(instance.db_context)
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.api_route("/status", methods=["GET", "HEAD"])
@@ -68,17 +66,10 @@ async def status_check() -> str:
 	return "ok"
 
 
-@app.api_route("/init", methods=["POST"])
-async def init() -> str:
-	# TODO replace with some fastapi hook
-	AppContext().get()
-	return "ok"
-
-
 @app.api_route("/jobs/submit/{job_id}", methods=["PUT"])
 async def job_submit(job_id: str, definition: JobDefinition) -> str:
 	ctx = AppContext.get()
-	if job_manager.job_submit(ctx.callback_context(), ctx.db_context, job_id, definition):
+	if job_manager.job_submit(ctx.callback_context, ctx.db_context, job_id, definition):
 		return "ok"
 	else:
 		raise HTTPException(status_code=500, detail="Internal Server Error")
