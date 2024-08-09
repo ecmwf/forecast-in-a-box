@@ -6,7 +6,9 @@
   <li>created at: {{ created_at }}</li>
   <li>updated at: {{ updated_at }}</li>
   <li>status: {{ status }}</li>
-  <li><a href="{{ result }}">result</a></li>
+  {% if result %}
+    <li><a href="{{ result }}">result</a></li>
+  {% endif %}
 </ul>
 
 <!-- TODO some support for result display in case of images -->
