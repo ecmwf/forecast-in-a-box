@@ -1,5 +1,6 @@
 from forecastbox.jobs.hello_world import entrypoint as hello_world
 from forecastbox.jobs.hello_torch import entrypoint as hello_torch
+from forecastbox.jobs.hello_image import entrypoint as hello_image
 from forecastbox.api.common import JobFunctionEnum
 from typing import Callable, NoReturn, Any
 
@@ -14,5 +15,7 @@ def get_process_target(job_function: JobFunctionEnum) -> Callable:
 			return hello_world
 		case JobFunctionEnum.hello_torch:
 			return hello_torch
+		case JobFunctionEnum.hello_image:
+			return hello_image
 		case s:
 			assert_never(s)

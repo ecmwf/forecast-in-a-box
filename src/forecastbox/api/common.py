@@ -16,6 +16,7 @@ class JobFunctionEnum(str, Enum):
 
 	hello_world = "hello_world"
 	hello_torch = "hello_torch"
+	hello_image = "hello_image"
 
 
 class JobDefinition(BaseModel):

@@ -78,6 +78,8 @@ async def job_submit(job_id: str, definition: JobDefinition) -> str:
 @app.api_route("/data/{data_id}", methods=["GET"])
 async def data_get(data_id: str) -> StreamingResponse:
 	try:
+		# NOTE we should probably set some mime type here -- but it seems that just dumping bytes works,
+		# at least for textual and png bytestreams
 		return StreamingResponse(job_manager.data_stream(AppContext.get().db_context.mem_db, data_id))
 	except (KeyError, FileNotFoundError):  # TODO this doesnt catch it as the streaming response is lazy
 		logger.exception("data retrieval failure")
