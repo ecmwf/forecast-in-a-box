@@ -17,7 +17,7 @@ from typing_extensions import Self
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 import os
-from forecastbox.api.common import JobDefinition, WorkerId, WorkerRegistration
+from forecastbox.api.common import TaskDAG, WorkerId, WorkerRegistration
 import forecastbox.worker.job_manager as job_manager
 from multiprocessing import Manager
 
@@ -67,7 +67,7 @@ async def status_check() -> str:
 
 
 @app.api_route("/jobs/submit/{job_id}", methods=["PUT"])
-async def job_submit(job_id: str, definition: JobDefinition) -> str:
+async def job_submit(job_id: str, definition: TaskDAG) -> str:
 	ctx = AppContext.get()
 	if job_manager.job_submit(ctx.callback_context, ctx.db_context, job_id, definition):
 		return "ok"

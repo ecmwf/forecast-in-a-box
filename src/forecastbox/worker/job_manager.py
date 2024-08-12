@@ -2,11 +2,11 @@
 Keeps track of locally-spawned processes which run individual jobs
 """
 
-from typing import Iterator, cast
+from typing import Iterator, cast, Optional
 from multiprocessing.shared_memory import SharedMemory
 from dataclasses import dataclass
 import logging
-from forecastbox.api.common import JobDefinition, JobStatusEnum, JobStatusUpdate, JobId
+from forecastbox.api.common import JobStatusEnum, JobStatusUpdate, JobId, TaskDAG
 from forecastbox.jobs.lookup import get_process_target
 from multiprocessing import Process, connection
 from multiprocessing.managers import SyncManager
@@ -45,12 +45,12 @@ class CallbackContext:
 		return f"{self.controller_url}/jobs/update/{self.worker_id}"
 
 
-def notify_update(callback_context: CallbackContext, job_id: str, status: JobStatusEnum, result: bool) -> bool:
+def notify_update(callback_context: CallbackContext, job_id: str, status: JobStatusEnum, result: Optional[str] = None) -> bool:
 	logger.info(f"process for {job_id=} is in {status=}")
 	# TODO put to different module
 	update = JobStatusUpdate(job_id=JobId(job_id=job_id), update={"status": status})
 	if result:
-		update.update["result"] = callback_context.data_url(job_id)
+		update.update["result"] = callback_context.data_url(result)
 
 	with httpx.Client() as client:
 		response = client.post(callback_context.update_url, json=update.model_dump())
@@ -61,28 +61,50 @@ def notify_update(callback_context: CallbackContext, job_id: str, status: JobSta
 	return True
 
 
-def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str, definition: JobDefinition) -> None:
+def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str, definition: TaskDAG) -> None:
+	# TODO we launch process per job / task dag -- it would be safer to have process per task. Requires
+	# refactor of the notify_update API
 	logging.basicConfig(level=logging.INFO)  # TODO replace with config
-	notify_update(callback_context, job_id, JobStatusEnum.running, True)
-	# TODO handle input
-	target = get_process_target(definition.function_name)
+	notify_update(callback_context, job_id, JobStatusEnum.running)
+
 	try:
-		result = target(**{**definition.function_parameters, "input": None})
+		for task in definition.tasks:
+			target = get_process_target(task.function_name)
+			params: dict[str, str | memoryview] = {}
+			params.update(task.static_params)
+			mems = {}
+			for param_name, dataset_id in task.dataset_inputs.items():
+				if dataset_id.dataset_id not in mems:
+					mems[job_id + dataset_id.dataset_id] = SharedMemory(name=dataset_id.dataset_id, create=False)
+				params[param_name] = mems[job_id + dataset_id.dataset_id].buf
+
+			result = target(**params)
+			logger.debug(f"finished task {task.function_name} in {job_id=}")
+
+			for mem in mems.values():
+				mem.close()
+
+			if task.output_name:
+				L = len(result)
+				logger.debug(f"result of len {L} from {job_id=}")
+				mem = SharedMemory(name=job_id + task.output_name.dataset_id, create=True, size=L)
+				mem.buf[:L] = result
+				mem.close()
+				mem_db.memory[job_id + task.output_name.dataset_id] = L
+
 		logger.debug(f"finished {job_id=}")
-		if result:
-			L = len(result)
-			logger.debug(f"result of len {L} from {job_id=}")
-			mem = SharedMemory(name=job_id, create=True, size=L)
-			mem.buf[:L] = result
-			mem.close()
-			mem_db.memory[job_id] = L
-		notify_update(callback_context, job_id, JobStatusEnum.finished, True)
+		if definition.output_id:
+			output_name = job_id + definition.output_id.dataset_id
+		else:
+			output_name = None
+		notify_update(callback_context, job_id, JobStatusEnum.finished, output_name)
 	except Exception:
+		# TODO free all datasets
 		logger.exception(f"job with {job_id=} failed")
-		notify_update(callback_context, job_id, JobStatusEnum.failed, False)
+		notify_update(callback_context, job_id, JobStatusEnum.failed)
 
 
-def job_submit(callback_context: CallbackContext, db_context: DbContext, job_id: str, definition: JobDefinition) -> bool:
+def job_submit(callback_context: CallbackContext, db_context: DbContext, job_id: str, definition: TaskDAG) -> bool:
 	params = {
 		"callback_context": callback_context,
 		"mem_db": db_context.mem_db,

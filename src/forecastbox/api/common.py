@@ -10,18 +10,21 @@ from typing_extensions import Self
 import base64
 
 
-# jobs
+# controller: jobs
 class JobFunctionEnum(str, Enum):
 	"""Cascade Job Catalog"""
 
 	hello_world = "hello_world"
 	hello_torch = "hello_torch"
 	hello_image = "hello_image"
+	# hello_tasks = "hello_tasks"
 
 
 class JobDefinition(BaseModel):
 	function_name: JobFunctionEnum
 	function_parameters: dict[str, str]
+
+	# TODO validate function_name-function_parameters?
 
 
 class JobId(BaseModel):
@@ -29,6 +32,7 @@ class JobId(BaseModel):
 
 
 class JobStatusEnum(str, Enum):
+	# TODO this is on the whole job (ie, task dag) level. Granularize into task level
 	submitted = "submitted"
 	assigned = "assigned"
 	running = "running"
@@ -51,7 +55,7 @@ class JobStatusUpdate(BaseModel):
 	# TODO validate update does not contain job_id, updated_at, created_at
 
 
-# workers
+# controller: workers
 class WorkerId(BaseModel):
 	worker_id: str
 
@@ -65,3 +69,34 @@ class WorkerRegistration(BaseModel):
 
 	def url_raw(self) -> str:
 		return base64.b64decode(self.url_base64.encode()).decode()
+
+
+# worker: jobs and tasks
+# a job is an atom submittable/retrievable by the user. It becomes DAG of tasks executed by workers
+
+
+class DatasetId(BaseModel):
+	dataset_id: str
+
+
+class TaskFunctionEnum(str, Enum):
+	hello_world = "hello_world"
+	hello_torch = "hello_torch"
+	hello_image = "hello_image"
+	# hello_tasks_S1 = "hello_tasks_S1"
+	# hello_tasks_S2 = "hello_tasks_S2"
+
+
+class Task(BaseModel):
+	static_params: dict[str, str]
+	dataset_inputs: dict[str, DatasetId]
+	function_name: TaskFunctionEnum
+	output_name: Optional[DatasetId]
+
+
+class TaskDAG(BaseModel):
+	tasks: list[Task]  # assumed to be in topological (ie, computable) order -- eg, schedule
+	output_id: Optional[DatasetId]
+	# TODO validate consistency: outputs unique, subset of set(output_name), topological
+	# TODO add in free(dataset_id) events into the tasks
+	# TODO add some mechanism for freeing the output_name(dataset_id) as well

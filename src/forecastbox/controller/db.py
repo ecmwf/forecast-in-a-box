@@ -11,6 +11,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Optional
 from forecastbox.api.common import JobDefinition, JobStatus, JobId, JobStatusEnum, WorkerId, JobStatusUpdate
+import forecastbox.controller.scheduler as scheduler
 import datetime as dt
 
 logger = logging.getLogger(__name__)
@@ -65,9 +66,12 @@ async def job_assign(job_id: str) -> None:
 	worker_id = list(worker_db.keys())[0]
 	url = worker_db[worker_id].url
 	definition = job_db[job_id].definition
+
+	task_dag = scheduler.build(definition)
+
 	async with httpx.AsyncClient() as client:  # TODO pool the client
 		try:
-			response = await client.put(f"{url}/jobs/submit/{job_id}", json=definition.model_dump())
+			response = await client.put(f"{url}/jobs/submit/{job_id}", json=task_dag.model_dump())
 		except Exception:
 			# TODO sleep-retry-or-fail
 			logger.exception("failed to submit to worker")
