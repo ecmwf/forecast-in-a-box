@@ -9,11 +9,13 @@ setup:
 	uv pip install --upgrade -r requirements.txt
 	uv pip install --upgrade -r requirements-dev.txt
 	uv pip install -e .
+
+# installs and configures pre-commit package
+setup-precommit:
 	uv pip install pre-commit
 	pre-commit install
 
 # TODO checksum of requirements, store file inside venv, run pip --upgrade if change detected as a dependency task for `val`
-# TODO consider pre-commit install as a separate action
 
 # runs validation suite: mypy, tests
 val:
@@ -40,6 +42,14 @@ dist:
 # runs the single executable
 run_dist:
 	./dist/entrypoint
+
+# builds ubuntu docker image
+build_docker:
+	docker build -f fiab:ubuntu .
+
+# runs ubuntu docker image
+run_docker:
+	docker run -p 8000:8000 -p 8002:8002 --rm -it --entrypoint just fiab:ubuntu run_dist
 
 # deletes temporary files, build files, caches
 clean:
