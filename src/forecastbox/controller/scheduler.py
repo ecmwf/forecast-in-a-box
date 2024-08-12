@@ -36,6 +36,21 @@ def build(job_definition: JobDefinition) -> TaskDAG:
 					output_name=DatasetId(dataset_id="output"),
 				)
 			]
+		case JobFunctionEnum.hello_tasks:
+			tasks = [
+				Task(
+					static_params=job_definition.function_parameters,
+					dataset_inputs={},
+					function_name=TaskFunctionEnum.hello_tasks_step1,
+					output_name=DatasetId(dataset_id="intermediate"),
+				),
+				Task(
+					static_params={},
+					dataset_inputs={"intermediate": DatasetId(dataset_id="intermediate")},
+					function_name=TaskFunctionEnum.hello_tasks_step2,
+					output_name=DatasetId(dataset_id="output"),
+				),
+			]
 		case s:
 			assert_never(s)
 

@@ -2,6 +2,7 @@
 Keeps track of locally-spawned processes which run individual jobs
 """
 
+import hashlib
 from typing import Iterator, cast, Optional
 from multiprocessing.shared_memory import SharedMemory
 from dataclasses import dataclass
@@ -61,10 +62,17 @@ def notify_update(callback_context: CallbackContext, job_id: str, status: JobSta
 	return True
 
 
+def shmid(job_id: str, dataset_id: str) -> str:
+	# we cant use too long file names for shm, https://trac.macports.org/ticket/64806
+	h = hashlib.new("md5", usedforsecurity=False)
+	h.update((job_id + dataset_id).encode())
+	return h.hexdigest()[:24]
+
+
 def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str, definition: TaskDAG) -> None:
 	# TODO we launch process per job / task dag -- it would be safer to have process per task. Requires
 	# refactor of the notify_update API
-	logging.basicConfig(level=logging.INFO)  # TODO replace with config
+	logging.basicConfig(level=logging.DEBUG)  # TODO replace with config
 	notify_update(callback_context, job_id, JobStatusEnum.running)
 
 	try:
@@ -74,10 +82,12 @@ def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str
 			params.update(task.static_params)
 			mems = {}
 			for param_name, dataset_id in task.dataset_inputs.items():
+				key = shmid(job_id, dataset_id.dataset_id)
 				if dataset_id.dataset_id not in mems:
-					mems[job_id + dataset_id.dataset_id] = SharedMemory(name=dataset_id.dataset_id, create=False)
-				params[param_name] = mems[job_id + dataset_id.dataset_id].buf
+					mems[key] = SharedMemory(name=key, create=False)
+				params[param_name] = mems[key].buf
 
+			logger.debug(f"running task {task.function_name} in {job_id=} with kwarg keys {','.join(params.keys())}")
 			result = target(**params)
 			logger.debug(f"finished task {task.function_name} in {job_id=}")
 
@@ -87,14 +97,15 @@ def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str
 			if task.output_name:
 				L = len(result)
 				logger.debug(f"result of len {L} from {job_id=}")
-				mem = SharedMemory(name=job_id + task.output_name.dataset_id, create=True, size=L)
+				key = shmid(job_id, task.output_name.dataset_id)
+				mem = SharedMemory(name=key, create=True, size=L)
 				mem.buf[:L] = result
 				mem.close()
-				mem_db.memory[job_id + task.output_name.dataset_id] = L
+				mem_db.memory[key] = L
 
 		logger.debug(f"finished {job_id=}")
 		if definition.output_id:
-			output_name = job_id + definition.output_id.dataset_id
+			output_name = shmid(job_id, definition.output_id.dataset_id)
 		else:
 			output_name = None
 		notify_update(callback_context, job_id, JobStatusEnum.finished, output_name)

@@ -17,7 +17,7 @@ class JobFunctionEnum(str, Enum):
 	hello_world = "hello_world"
 	hello_torch = "hello_torch"
 	hello_image = "hello_image"
-	# hello_tasks = "hello_tasks"
+	hello_tasks = "hello_tasks"
 
 
 class JobDefinition(BaseModel):
@@ -83,8 +83,8 @@ class TaskFunctionEnum(str, Enum):
 	hello_world = "hello_world"
 	hello_torch = "hello_torch"
 	hello_image = "hello_image"
-	# hello_tasks_S1 = "hello_tasks_S1"
-	# hello_tasks_S2 = "hello_tasks_S2"
+	hello_tasks_step1 = "hello_tasks_step1"
+	hello_tasks_step2 = "hello_tasks_step2"
 
 
 class Task(BaseModel):

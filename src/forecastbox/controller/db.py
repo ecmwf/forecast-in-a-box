@@ -44,7 +44,7 @@ def job_status(job_id: JobId) -> Optional[JobStatus]:
 
 
 def job_submit(definition: JobDefinition) -> JobStatus:
-	job_id = str(uuid.uuid4())[:23]  # we use job_id for opening shared memory, and https://trac.macports.org/ticket/64806
+	job_id = str(uuid.uuid4())
 	status = JobStatus(
 		job_id=JobId(job_id=job_id),
 		created_at=dt.datetime.utcnow(),
