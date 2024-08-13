@@ -18,6 +18,7 @@ class JobFunctionEnum(str, Enum):
 	hello_torch = "hello_torch"
 	hello_image = "hello_image"
 	hello_tasks = "hello_tasks"
+	hello_earth = "hello_earth"
 
 
 class JobDefinition(BaseModel):
@@ -85,6 +86,7 @@ class TaskFunctionEnum(str, Enum):
 	hello_image = "hello_image"
 	hello_tasks_step1 = "hello_tasks_step1"
 	hello_tasks_step2 = "hello_tasks_step2"
+	earthkit_querymars = "earthkit_querymars"
 
 
 class Task(BaseModel):

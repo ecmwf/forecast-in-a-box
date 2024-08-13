@@ -51,6 +51,15 @@ def build(job_definition: JobDefinition) -> TaskDAG:
 					output_name=DatasetId(dataset_id="output"),
 				),
 			]
+		case JobFunctionEnum.hello_earth:
+			tasks = [
+				Task(
+					static_params=job_definition.function_parameters,
+					dataset_inputs={},
+					function_name=TaskFunctionEnum.earthkit_querymars,
+					output_name=DatasetId(dataset_id="output"),
+				)
+			]
 		case s:
 			assert_never(s)
 
