@@ -37,7 +37,7 @@ def launch_worker(env_context: dict[str, str]):
 def wait_for(client: httpx.Client, root_url: str) -> None:
 	"""Calls /status endpoint, retry on ConnectError"""
 	i = 0
-	while i < 7:
+	while i < 10:
 		try:
 			rc = client.get(f"{root_url}/status")
 			if not rc.status_code == 200:
@@ -45,7 +45,7 @@ def wait_for(client: httpx.Client, root_url: str) -> None:
 			return
 		except httpx.ConnectError:
 			i += 1
-			time.sleep(1)
+			time.sleep(2)
 	raise ValueError(f"failed to start {root_url}: no more retries")
 
 
