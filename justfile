@@ -45,11 +45,11 @@ run_dist:
 
 # builds ubuntu docker image
 build_docker:
-	docker build -f fiab:ubuntu .
+	docker build -t fiab:ubuntu .
 
 # runs ubuntu docker image
 run_docker:
-	docker run -p 8000:8000 -p 8002:8002 --rm -it --entrypoint just fiab:ubuntu run_dist
+	docker run -p 8000:8000 -p 8002:8002 --rm -it fiab:ubuntu
 
 # deletes temporary files, build files, caches
 clean:
