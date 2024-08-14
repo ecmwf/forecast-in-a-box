@@ -60,6 +60,21 @@ def build(job_definition: JobDefinition) -> TaskDAG:
 					output_name=DatasetId(dataset_id="output"),
 				)
 			]
+		case JobFunctionEnum.temperature_nbeats:
+			tasks = [
+				Task(
+					static_params=job_definition.function_parameters,
+					dataset_inputs={},
+					function_name=TaskFunctionEnum.tp_nb_get,
+					output_name=DatasetId(dataset_id="data"),
+				),
+				Task(
+					static_params={},
+					dataset_inputs={"data": DatasetId(dataset_id="data")},
+					function_name=TaskFunctionEnum.tp_nb_pred,
+					output_name=DatasetId(dataset_id="output"),
+				),
+			]
 		case s:
 			assert_never(s)
 

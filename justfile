@@ -36,6 +36,7 @@ dist:
 	pyinstaller \
 		--collect-submodules=forecastbox \
 		--add-data "src/forecastbox/web_ui/static/*html:forecastbox/web_ui/static" \
+		--add-data "src/forecastbox/jobs/models/nbeats.nf:forecastbox/jobs/models" \
 		-F ./src/forecastbox/standalone/entrypoint.py
 	# cf https://pyinstaller.org/en/stable/spec-files.html#adding-files-to-the-bundle once you need dlls
 
