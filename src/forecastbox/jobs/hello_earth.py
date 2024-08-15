@@ -13,11 +13,11 @@ logger = logging.getLogger(__name__)
 
 def entrypoint_marsquery(**kwargs) -> bytes:
 	i1 = kwargs["start_date"].__hash__() % 7
-	i2 = kwargs["end_date"].__hash__() % 24
+	i2 = kwargs["end_date"].__hash__() % 2
 
 	# TODO proper start date, step, bounding box
 	date = (dt.datetime.utcnow().date() - dt.timedelta(days=(1 + i1))).strftime("%Y-%m-%d")
-	time = i2
+	time = i2 * 12
 	grib_reader = earthkit.data.from_source(
 		"mars",
 		stream="enfo",

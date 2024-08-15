@@ -10,8 +10,8 @@ authors = [
   { name = "European Centre for Medium-Range Weather Forecasts (ECMWF)", email = "software.support@ecmwf.int" },
 ]
 license = { text = "Apache License Version 2.0" }
-requires-python=">=3.10"
-# depedencies = [ "fastapi[standard]" ] # TODO uncommenting this breaks `install -e .` -- reconcile!
+requires-python=">=3.10,<3.12"
+# depedencies = # TODO providing dependencies here breaks `install -e .` -- reconcile!
 
 [project.urls]
 "Source code" = "https://github.com/ecmwf/forecast-in-a-box"
