@@ -33,11 +33,16 @@ run_venv:
 
 # builds the single executable
 dist:
+	# NOTE collect all (default, earthkit) + metadata copy (earthkit) is needed to make earthkit even importible
 	pyinstaller \
 		--collect-submodules=forecastbox \
 		--add-data "src/forecastbox/web_ui/static/*html:forecastbox/web_ui/static" \
-		--add-data "src/forecastbox/jobs/models/nbeats.nf:forecastbox/jobs/models" \
+		--collect-all=default \
+		--collect-all=earthkit \
+		--recursive-copy-metadata=earthkit \
 		-F ./src/forecastbox/standalone/entrypoint.py
+	# NOTE disabled until install works
+	#	--add-data "src/forecastbox/jobs/models/nbeats.nf:forecastbox/jobs/models" \
 	# cf https://pyinstaller.org/en/stable/spec-files.html#adding-files-to-the-bundle once you need dlls
 
 # runs the single executable
