@@ -2,7 +2,7 @@
 Demonstrates aifs inference
 """
 
-from typing import Callable
+from typing import Callable, Optional
 import io
 import earthkit.plots
 import earthkit.data
@@ -112,37 +112,50 @@ class MarsInput(RequestBasedInput):
 
 
 def entrypoint_forecast(**kwargs) -> bytes:
-	ckpt_path = forecastbox.jobs.models.get_path("aifs-small.ckpt")
-	runner = DefaultRunner(str(ckpt_path))
+	# config TODO read from kwargs
+	model_path = forecastbox.jobs.models.get_path("aifs-small.ckpt")
+	relative_delay = dt.timedelta(days=1)  # TODO how to get a reliable date for which data would be available?
+	save_to_path: Optional[str] = None  # "/tmp/output.grib"
+	desired_param = "2t"
+	desired_step = 6  # in hours... should be divisible by 6, presumably <= 240
 
-	# TODO how to get a reliable date for which data would be available?
-	n = dt.datetime.now() - dt.timedelta(days=1)
+	# prep clasess
+	n = dt.datetime.now() - relative_delay
 	d1 = n - dt.timedelta(hours=n.hour % 6, minutes=n.minute, seconds=n.second, microseconds=n.microsecond)
 	d2 = d1 - dt.timedelta(hours=6)
 	f: Callable[[dt.datetime], tuple[int, int]] = lambda d: (
 		int(d.strftime("%Y%m%d")),
 		d.hour,
 	)
+	runner = DefaultRunner(str(model_path))
 	mars_input = MarsInput(runner.checkpoint, dates=[f(d2), f(d1)])
-
-	# 10 day forecast
-	lead_time = 240  # hours
-
+	lead_time = desired_step
 	grib_keys = {
 		"stream": "oper",
 		"expver": 0,
 		"class": "rd",
 	}
-	output = cml.new_grib_output("/tmp/output.grib", **grib_keys)
+	if save_to_path:
+		output_f = cml.new_grib_output(save_to_path, **grib_keys)
+	obuf = io.BytesIO()
+	output_m = cml.new_grib_output(obuf, **grib_keys)
 
 	def output_callback(*args, **kwargs):
+		# example1 kwargs: {'template': GribField(tcw,None,20240815,1200,0,0), 'step': 240, 'check_nans': True}
+		# example2 kwargs: {'stepType': 'accum', 'template': GribField(2t,None,20240815,1200,0,0), 'startStep': 0, 'endStep': 240, 'param': 'tp', 'check_nans': True}
+		# example template metadata: {'param': '2t', 'levelist': None, 'validityDate': 20240815, 'validityTime': 1200, 'valid_datetime': '2024-08-15T12:00:00'}
+		# args is a tuple with args[0] being numpy data
 		if "step" in kwargs or "endStep" in kwargs:
 			data = args[0]
 			template = kwargs.pop("template")
+			if template._metadata.get("param", "") == desired_param and kwargs.get("step", -1) == desired_step:
+				output_m.write(data, template=template, **kwargs)
 
-			# TODO save to memory instead
-			output.write(data, template=template, **kwargs)
+			if save_to_path:
+				output_f.write(data, template=template, **kwargs)
 
+	# run
+	# TODO how to propagate output field projection?
 	runner.run(
 		input_fields=mars_input.all_fields,
 		lead_time=lead_time,
@@ -153,26 +166,29 @@ def entrypoint_forecast(**kwargs) -> bytes:
 		progress_callback=tqdm.tqdm,
 	)
 
-	return b"placeholder"
+	return obuf.getvalue()
 
 
 def entrypoint_plot(**kwargs) -> bytes:
-	grib_reader = earthkit.data.from_source(
-		"file",
-		path="/tmp/output.grib",  # TODO from memory instead
-	)
+	# config
+	plot_idx = 0
+	domain = [-15, 35, 32, 72]
+	# NOTE ideally we'd distinguish, based on some kwarg, whether to plot from file or mem
 
-	buf = io.BytesIO()
+	# data
+	# grib_reader = earthkit.data.from_source("file", path="/tmp/output.grib")
+	ibuf = io.BytesIO(kwargs["data"])
+	grib_reader = earthkit.data.from_source("stream", ibuf, read_all=True)
 
 	figure = earthkit.plots.Figure()
 	# TODO configurable bounding box
-	chart = earthkit.plots.Map(domain=[-15, 35, 32, 72])
+	chart = earthkit.plots.Map(domain=domain)
 	# TODO configurable param
-	chart.block(grib_reader[0])
+	chart.block(grib_reader[plot_idx])
 	chart.coastlines()
 	chart.gridlines()
-
 	figure.add_map(chart)
-	figure.save(buf)
 
-	return buf.getvalue()
+	obuf = io.BytesIO()
+	figure.save(obuf)
+	return obuf.getvalue()

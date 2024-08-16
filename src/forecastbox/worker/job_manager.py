@@ -85,23 +85,26 @@ def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str
 				key = shmid(job_id, dataset_id.dataset_id)
 				if dataset_id.dataset_id not in mems:
 					mems[key] = SharedMemory(name=key, create=False)
-				params[param_name] = mems[key].buf
+				params[param_name] = mems[key].buf[: mem_db.memory[key]]  # .tobytes()
 
 			logger.debug(f"running task {task.function_name} in {job_id=} with kwarg keys {','.join(params.keys())}")
 			result = target(**params)
 			logger.debug(f"finished task {task.function_name} in {job_id=}")
 
-			for mem in mems.values():
-				mem.close()
-
 			if task.output_name:
 				L = len(result)
-				logger.debug(f"result of len {L} from {job_id=}")
 				key = shmid(job_id, task.output_name.dataset_id)
+				logger.debug(f"result of len {L} from {job_id=} storetd as {key}")
 				mem = SharedMemory(name=key, create=True, size=L)
 				mem.buf[:L] = result
 				mem.close()
 				mem_db.memory[key] = L
+
+			for key, mem in mems.items():
+				try:
+					mem.close()
+				except BufferError:
+					logger.exception(f"gotten buffer error when closing shm {key}")
 
 		logger.debug(f"finished {job_id=}")
 		if definition.output_id:
