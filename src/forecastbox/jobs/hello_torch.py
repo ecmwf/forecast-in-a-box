@@ -4,11 +4,13 @@ from typing import cast
 
 logger = logging.getLogger(__name__)
 
+# TODO get rid of the type: ignore for mps (the linux torch doesnt even have that module)
+
 
 def get_device() -> torch.device:
 	if torch.cuda.device_count() > 0 and torch.cuda.is_available():
 		dvc = "cuda"
-	elif torch.mps.device_count() > 0:
+	elif torch.mps.device_count() > 0:  # type: ignore
 		dvc = "mps"
 	else:
 		dvc = "cpu"
@@ -20,8 +22,8 @@ def get_device() -> torch.device:
 def get_info() -> tuple[str, int]:
 	if torch.cuda.device_count() > 0 and torch.cuda.is_available():
 		return "cuda", -1
-	elif torch.mps.device_count() > 0:
-		return "mps", torch.mps.current_allocated_memory()
+	elif torch.mps.device_count() > 0:  # type: ignore
+		return "mps", torch.mps.current_allocated_memory()  # type: ignore
 	else:
 		return "cpu", -1
 

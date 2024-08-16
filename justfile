@@ -28,11 +28,11 @@ run_webui:
 	fastapi dev src/forecastbox/web_ui/server.py
 
 # runs the whole app (webui+controller+worker)
-run_venv:
-	python -m forecastbox.standalone.entrypoint
+run_venv model_repo:
+	FIAB_MODEL_REPO={{model_repo}} python -m forecastbox.standalone.entrypoint
 
 # builds the single executable
-dist:
+dist model_repo:
 	# NOTE collect all (default, earthkit) + metadata copy (earthkit) is needed to make earthkit even importible
 	# NOTE climetlab, aifs, torch_geometric, pil and einops are needed for aifs suite to work
 	pyinstaller \
@@ -44,6 +44,7 @@ dist:
 		--collect-all=torch_geometric --collect-submodule=torch_geometric \
 		--collect-all=einops --collect-submodule=einops \
 		--collect-all=PIL --collect-submodule=PIL \
+		--add-data "{{model_repo}}:forecastbox/jobs/models" \
 		./src/forecastbox/standalone/entrypoint.py
 	# NOTE add -F to build a single executable -- but prolongs build time by about 10 min and can crash due to size
 	# NOTE disabled until nbeats supported

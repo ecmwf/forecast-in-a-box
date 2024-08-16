@@ -12,6 +12,7 @@ from functools import cached_property
 import climetlab as cml
 import tqdm
 from anemoi.inference.runner import DefaultRunner
+import forecastbox.jobs.models
 
 logger = logging.getLogger(__name__)
 
@@ -111,9 +112,8 @@ class MarsInput(RequestBasedInput):
 
 
 def entrypoint_forecast(**kwargs) -> bytes:
-	# TODO read from package
-	ckpt = "/home/vojta/warehouse/ecmwf/aifs-small.ckpt"
-	runner = DefaultRunner(ckpt)
+	ckpt_path = forecastbox.jobs.models.get_path("aifs-small.ckpt")
+	runner = DefaultRunner(str(ckpt_path))
 
 	# TODO how to get a reliable date for which data would be available?
 	n = dt.datetime.now() - dt.timedelta(days=1)
