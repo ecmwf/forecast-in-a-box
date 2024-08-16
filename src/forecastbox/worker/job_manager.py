@@ -85,7 +85,12 @@ def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str
 				key = shmid(job_id, dataset_id.dataset_id)
 				if dataset_id.dataset_id not in mems:
 					mems[key] = SharedMemory(name=key, create=False)
-				params[param_name] = mems[key].buf[: mem_db.memory[key]]  # .tobytes()
+				# NOTE it would be tempting to do just buf[:L] here. Alas, that would trigger exception
+				# later when closing the shm -- python would sorta leak the pointer via the dictionary.
+				# We need the _len param because the buffer is padded by zeros, and the formats generally
+				# don't have a stop word.
+				params[param_name] = mems[key].buf
+				params[param_name + "_len"] = mem_db.memory[key]
 
 			logger.debug(f"running task {task.function_name} in {job_id=} with kwarg keys {','.join(params.keys())}")
 			result = target(**params)
@@ -101,10 +106,8 @@ def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str
 				mem_db.memory[key] = L
 
 			for key, mem in mems.items():
-				try:
-					mem.close()
-				except BufferError:
-					logger.exception(f"gotten buffer error when closing shm {key}")
+				logger.debug(f"closing shm {key}")
+				mem.close()
 
 		logger.debug(f"finished {job_id=}")
 		if definition.output_id:

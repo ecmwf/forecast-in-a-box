@@ -177,7 +177,10 @@ def entrypoint_plot(**kwargs) -> bytes:
 
 	# data
 	# grib_reader = earthkit.data.from_source("file", path="/tmp/output.grib")
-	ibuf = io.BytesIO(kwargs["data"])
+	imemview = kwargs["data"]
+	imemviewL = kwargs["data_len"]
+	# NOTE the buffer is padded by zeroes due to how shm works, so we need to trim by length
+	ibuf = io.BytesIO(imemview[:imemviewL])
 	grib_reader = earthkit.data.from_source("stream", ibuf, read_all=True)
 
 	figure = earthkit.plots.Figure()
