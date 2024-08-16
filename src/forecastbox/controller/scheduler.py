@@ -75,6 +75,21 @@ def build(job_definition: JobDefinition) -> TaskDAG:
 					output_name=DatasetId(dataset_id="output"),
 				),
 			]
+		case JobFunctionEnum.hello_aifsl:
+			tasks = [
+				Task(
+					static_params=job_definition.function_parameters,
+					dataset_inputs={},
+					function_name=TaskFunctionEnum.aifsl_pred,
+					output_name=DatasetId(dataset_id="data"),
+				),
+				Task(
+					static_params=job_definition.function_parameters,
+					dataset_inputs={"data": DatasetId(dataset_id="data")},
+					function_name=TaskFunctionEnum.aifsl_plot,
+					output_name=DatasetId(dataset_id="output"),
+				),
+			]
 		case s:
 			assert_never(s)
 

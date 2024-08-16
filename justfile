@@ -34,20 +34,25 @@ run_venv:
 # builds the single executable
 dist:
 	# NOTE collect all (default, earthkit) + metadata copy (earthkit) is needed to make earthkit even importible
+	# NOTE climetlab, aifs, torch_geometric, pil and einops are needed for aifs suite to work
 	pyinstaller \
-		--collect-submodules=forecastbox \
-		--add-data "src/forecastbox/web_ui/static/*html:forecastbox/web_ui/static" \
-		--collect-all=default \
-		--collect-all=earthkit \
-		--recursive-copy-metadata=earthkit \
-		-F ./src/forecastbox/standalone/entrypoint.py
-	# NOTE disabled until install works
+		--noconfirm \
+		--collect-submodules=forecastbox --add-data "src/forecastbox/web_ui/static/*html:forecastbox/web_ui/static" \
+		--collect-all=default --collect-all=earthkit --recursive-copy-metadata=earthkit \
+		--collect-all=climetlab --recursive-copy-metadata=climetlab \
+		--collect-all=aifs --collect-submodule=aifs \
+		--collect-all=torch_geometric --collect-submodule=torch_geometric \
+		--collect-all=einops --collect-submodule=einops \
+		--collect-all=PIL --collect-submodule=PIL \
+		./src/forecastbox/standalone/entrypoint.py
+	# NOTE add -F to build a single executable -- but prolongs build time by about 10 min and can crash due to size
+	# NOTE disabled until nbeats supported
 	#	--add-data "src/forecastbox/jobs/models/nbeats.nf:forecastbox/jobs/models" \
-	# cf https://pyinstaller.org/en/stable/spec-files.html#adding-files-to-the-bundle once you need dlls
+	# https://pyinstaller.org/en/stable/spec-files.html#adding-files-to-the-bundle once you need dlls
 
 # runs the single executable
 run_dist:
-	./dist/entrypoint
+	./dist/entrypoint/entrypoint
 
 # builds ubuntu docker image
 build_docker:

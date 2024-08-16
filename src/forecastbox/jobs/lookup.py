@@ -46,5 +46,13 @@ def get_process_target(job_function: TaskFunctionEnum) -> Callable:
 			import forecastbox.jobs.temperature_nbeats as tp_nb
 
 			return tp_nb.predict
+		case TaskFunctionEnum.aifsl_pred:
+			import forecastbox.jobs.hello_aifs as hello_aifs
+
+			return hello_aifs.entrypoint_forecast
+		case TaskFunctionEnum.aifsl_plot:
+			import forecastbox.jobs.hello_aifs as hello_aifs
+
+			return hello_aifs.entrypoint_plot
 		case s:
 			assert_never(s)
