@@ -55,6 +55,7 @@ class AppContext:
 async def lifespan(app: FastAPI):
 	instance = AppContext.get()
 	yield
+	logger.debug("invoking job manager shutdown")
 	job_manager.wait_all(instance.db_context)
 
 

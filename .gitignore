@@ -9,3 +9,6 @@ __pycache__
 /build
 /dist
 entrypoint.spec
+
+# pytorch
+lightning_logs

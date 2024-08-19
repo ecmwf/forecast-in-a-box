@@ -78,7 +78,7 @@ def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str
 	try:
 		for task in definition.tasks:
 			target = get_process_target(task.function_name)
-			params: dict[str, str | memoryview] = {}
+			params: dict[str, str | memoryview | int] = {}
 			params.update(task.static_params)
 			mems = {}
 			for param_name, dataset_id in task.dataset_inputs.items():
@@ -151,3 +151,4 @@ def wait_all(db_context: DbContext) -> None:
 		m = SharedMemory(name=k, create=False)
 		m.close()
 		m.unlink()
+	# TODO join/kill spawned processes
