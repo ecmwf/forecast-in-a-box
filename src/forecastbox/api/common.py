@@ -1,6 +1,8 @@
 """
-As served by the controller.server
+Pydantic models for interchanges between ui, controller and worker
 """
+
+# TODO split into submodules
 
 from pydantic import BaseModel, Field
 from enum import Enum
@@ -34,12 +36,23 @@ class DatasetId(BaseModel):
 	dataset_id: str
 
 
+class TaskParameter(BaseModel):
+	# NOTE this would ideally be a pydantic class
+	# that would however introduce a requirement for jobs not to be text but bytecode
+	# but we may want to do it anyway because we'd need custom validations, esp for the rich classes etc
+	# Or we could introduce custom subtypes like lat, lon, latLonBox, marsParam, ...
+	name: str
+	clazz: str  # must be eval-uable... primitive type or collection, nested eval/generics not supported. Used to de-serialize
+	default: str = ""  # always string because we put it to html form... will be deserd via type_name
+
+
 class TaskDefinition(BaseModel):
 	"""Used for generating input forms and parameter validation"""
 
 	entrypoint: str = Field(description="python_module.function_name")
-	param_names: list[str]  # TODO uniq validation
-	# TODO param types, default values, output metadata, reqs on dynamic params, ... Some pydantic usage?
+	user_params: list[TaskParameter]  # TODO uniq validation
+	output_class: str  # not eval'd, can be anything
+	dynamic_param_classes: list[tuple[str, str]] = Field(default_factory=list)  # TODO uniq validation
 	# TODO environment
 
 

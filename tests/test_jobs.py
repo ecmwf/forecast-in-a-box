@@ -1,4 +1,4 @@
-import forecastbox.jobs.hello_tasks as hello_tasks
+import forecastbox.external.hello_tasks as hello_tasks
 
 
 def test_tasks():
