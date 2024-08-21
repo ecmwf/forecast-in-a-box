@@ -22,6 +22,7 @@ import httpx
 
 logger = logging.getLogger("uvicorn." + __name__)  # TODO instead configure uvicorn the same as the app
 app = FastAPI()
+client_error = lambda e: HTTPException(status_code=400, detail=e)
 
 
 class StaticExecutionContext:
@@ -89,7 +90,7 @@ async def select(request: Request, job_type: Annotated[str, Form()]) -> Redirect
 @app.get("/prepare/{job_type}", response_class=HTMLResponse)
 async def prepare(job_type: str) -> str:
 	"""The form for filling out job parameters and submitting the job itself"""
-	job_template = plugin_lookup.prepare(JobTypeEnum(job_type))
+	job_template = plugin_lookup.prepare(JobTypeEnum(job_type)).get_or_raise(client_error)
 	template_params = {
 		"job_type": job_type,
 		"params": [
@@ -107,8 +108,8 @@ async def prepare(job_type: str) -> str:
 @app.post("/submit")
 async def submit(request: Request) -> RedirectResponse:
 	params = {k: v for k, v in (await request.form()).items() if isinstance(v, str)}
-	job_template = plugin_lookup.prepare(JobTypeEnum(params.pop("job_type")))
-	task_dag = scheduler.build(job_template, params)
+	job_template = plugin_lookup.prepare(JobTypeEnum(params.pop("job_type"))).get_or_raise(client_error)
+	task_dag = scheduler.build(job_template, params).get_or_raise(client_error)
 	async with httpx.AsyncClient() as client:  # TODO pool the client
 		response_raw = await client.put(StaticExecutionContext.get().job_submit_url, json=task_dag.model_dump())
 		if response_raw.status_code != httpx.codes.OK:
