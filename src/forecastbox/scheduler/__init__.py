@@ -4,6 +4,8 @@ Converts high level input of the user into an execution plan (sequence of indivi
 
 from forecastbox.api.common import JobTemplate, TaskDAG, Task, DatasetId
 from collections import defaultdict
+from forecastbox.utils import Either
+import forecastbox.api.validation as validation
 
 
 def linearize(job_definition: TaskDAG) -> TaskDAG:
@@ -11,7 +13,8 @@ def linearize(job_definition: TaskDAG) -> TaskDAG:
 	return job_definition
 
 
-def build(job_template: JobTemplate, params: dict[str, str]) -> TaskDAG:
+def build(job_template: JobTemplate, params: dict[str, str]) -> Either[TaskDAG, str]:
+	# TODO wrap in try catch
 	params_per_task: dict[str, dict[str, str]] = defaultdict(dict)
 	for k, v in params.items():
 		task, param = k.split(".", 1)
@@ -26,4 +29,5 @@ def build(job_template: JobTemplate, params: dict[str, str]) -> TaskDAG:
 		)
 		for task_name, task_definition in job_template.tasks
 	]
-	return TaskDAG(tasks=tasks, output_id=DatasetId(dataset_id=job_template.final_output_at), job_type=job_template.job_type)
+	task_dag = TaskDAG(tasks=tasks, output_id=DatasetId(dataset_id=job_template.final_output_at), job_type=job_template.job_type)
+	return validation.of_dag(task_dag)

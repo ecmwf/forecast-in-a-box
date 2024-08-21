@@ -5,12 +5,14 @@ Currently all is hardcoded, but will be replaced by reading from external, eithe
 """
 
 from forecastbox.api.common import JobTemplate, TaskDefinition, JobTypeEnum, TaskParameter
-from forecastbox.utils import assert_never
+import forecastbox.api.validation as validation
+from forecastbox.utils import assert_never, Either
 
 
-def prepare(job_type: JobTypeEnum) -> JobTemplate:
+def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 	"""Looks up a job template -- for retrieving the list of user params / filling it with params
 	to obtain a job definition"""
+	# TODO wrap in try catch
 	tasks: list[tuple[str, TaskDefinition]]
 	match job_type:
 		case JobTypeEnum.hello_world:
@@ -154,4 +156,5 @@ def prepare(job_type: JobTypeEnum) -> JobTemplate:
 			dynamic_task_inputs = {"plot": [("input_grib", "fetch_and_predict")]}
 		case s:
 			assert_never(s)
-	return JobTemplate(job_type=job_type, tasks=tasks, dynamic_task_inputs=dynamic_task_inputs, final_output_at=final_output_at)
+	rv = JobTemplate(job_type=job_type, tasks=tasks, dynamic_task_inputs=dynamic_task_inputs, final_output_at=final_output_at)
+	return validation.of_template(rv)

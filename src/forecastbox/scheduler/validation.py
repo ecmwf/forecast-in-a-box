@@ -1,3 +1,0 @@
-"""
-Validates TaskDAGs for consistency
-"""
