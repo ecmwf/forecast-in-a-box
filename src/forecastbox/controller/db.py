@@ -10,7 +10,7 @@ import httpx
 import uuid
 from dataclasses import dataclass
 from typing import Optional
-from forecastbox.api.common import JobDefinition, JobStatus, JobId, JobStatusEnum, WorkerId, JobStatusUpdate
+from forecastbox.api.common import TaskDAG, JobStatus, JobId, JobStatusEnum, WorkerId, JobStatusUpdate
 import forecastbox.scheduler as scheduler
 import datetime as dt
 
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Job:
 	status: JobStatus
-	definition: JobDefinition
+	definition: TaskDAG
 	worker_id: Optional[WorkerId]
 
 
@@ -43,7 +43,7 @@ def job_status(job_id: JobId) -> Optional[JobStatus]:
 		return maybe_job.status
 
 
-def job_submit(definition: JobDefinition) -> JobStatus:
+def job_submit(definition: TaskDAG) -> JobStatus:
 	job_id = str(uuid.uuid4())
 	status = JobStatus(
 		job_id=JobId(job_id=job_id),
@@ -65,13 +65,13 @@ async def job_assign(job_id: str) -> None:
 		return
 	worker_id = list(worker_db.keys())[0]
 	url = worker_db[worker_id].url
-	definition = job_db[job_id].definition
+	task_dag = job_db[job_id].definition
 
-	task_dag = scheduler.build(definition)
+	schedule = scheduler.linearize(task_dag)
 
 	async with httpx.AsyncClient() as client:  # TODO pool the client
 		try:
-			response = await client.put(f"{url}/jobs/submit/{job_id}", json=task_dag.model_dump())
+			response = await client.put(f"{url}/jobs/submit/{job_id}", json=schedule.model_dump())
 		except Exception:
 			# TODO sleep-retry-or-fail
 			logger.exception("failed to submit to worker")

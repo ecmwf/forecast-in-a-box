@@ -1,0 +1,14 @@
+<!doctype html><title>Forecast In A Box: Prepare A Job</title>
+
+Enter Job Parameters:
+<form action="/submit" method="post">
+	<label for="job_type">Job:</label><br>
+	<input type="text" id="job_type" name="job_type" value="{{ job_type }}" readonly><br>
+
+	{% for e in params %}
+		<label for="{{ e }}">{{ e }}:</label><br>
+		<input type="text" id="{{ e }}" name="{{ e }}"><br>
+	{% endfor %}
+
+	<input type="submit" value="Submit">
+</form>

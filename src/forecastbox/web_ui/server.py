@@ -13,7 +13,8 @@ from typing import Annotated, Optional
 from starlette.responses import HTMLResponse, RedirectResponse
 import jinja2
 import pkgutil
-from forecastbox.api.common import JobDefinition, JobStatus, JobFunctionEnum
+from forecastbox.api.common import JobStatus, JobTypeEnum
+import forecastbox.scheduler as scheduler
 import logging
 import os
 import httpx
@@ -57,6 +58,7 @@ class StaticExecutionContext:
 
 		self.template_job = get_template("job.html")
 		self.template_index = get_template("index.html")
+		self.template_prepare = get_template("prepare.html")
 
 		# from fastapi.staticfiles import StaticFiles
 		# app.mount("/static", StaticFiles(directory="static"), name="static") # TODO for styles.css etc
@@ -69,21 +71,40 @@ async def status_check() -> str:
 
 @app.get("/", response_class=HTMLResponse)
 async def index() -> str:
+	"""The user selects which job type to submit"""
 	template_params = {
-		"jobs": [e.value for e in JobFunctionEnum],
+		"jobs": [e.value for e in JobTypeEnum],
 	}
 	return StaticExecutionContext.get().template_index.render(template_params)
 
 
+@app.post("/select")
+async def select(request: Request, job_type: Annotated[str, Form()]) -> RedirectResponse:
+	"""Takes job type, returns redirect to form for filling out job parameters"""
+	redirect_url = request.url_for("prepare", job_type=job_type)
+	return RedirectResponse(redirect_url, status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.get("/prepare/{job_type}", response_class=HTMLResponse)
+async def prepare(job_type: str) -> str:
+	"""The form for filling out job parameters and submitting the job itself"""
+	job_template = scheduler.prepare(JobTypeEnum(job_type))
+	template_params = {
+		"job_type": job_type,
+		"params": [
+			f"{task_name}.{param_name}" for task_name, task_definition in job_template.tasks for param_name in task_definition.param_names
+		],
+	}
+	return StaticExecutionContext.get().template_prepare.render(template_params)
+
+
 @app.post("/submit")
-async def submit(
-	request: Request, start_date: Annotated[str, Form()], end_date: Annotated[str, Form()], job_function: Annotated[str, Form()]
-) -> RedirectResponse:
-	job_definition = JobDefinition(
-		function_name=JobFunctionEnum(job_function), function_parameters={"start_date": start_date, "end_date": end_date}
-	)
+async def submit(request: Request) -> RedirectResponse:
+	params = {k: v for k, v in (await request.form()).items() if isinstance(v, str)}
+	job_template = scheduler.prepare(JobTypeEnum(params.pop("job_type")))
+	task_dag = scheduler.build(job_template, params)
 	async with httpx.AsyncClient() as client:  # TODO pool the client
-		response_raw = await client.put(StaticExecutionContext.get().job_submit_url, json=job_definition.model_dump())
+		response_raw = await client.put(StaticExecutionContext.get().job_submit_url, json=task_dag.model_dump())
 		if response_raw.status_code != httpx.codes.OK:
 			logger.error(response_raw.status_code)
 			logger.error(response_raw.text)

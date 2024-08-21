@@ -116,8 +116,8 @@ def entrypoint_forecast(**kwargs) -> bytes:
 	model_path = forecastbox.jobs.models.get_path("aifs-small.ckpt")
 	relative_delay = dt.timedelta(days=1)  # TODO how to get a reliable date for which data would be available?
 	save_to_path: Optional[str] = None  # "/tmp/output.grib"
-	desired_param = "2t"
-	desired_step = 6  # in hours... should be divisible by 6, presumably <= 240
+	predicted_param = kwargs["predicted_param"]
+	target_step = int(kwargs["target_step"])
 
 	# prep clasess
 	n = dt.datetime.now() - relative_delay
@@ -129,7 +129,7 @@ def entrypoint_forecast(**kwargs) -> bytes:
 	)
 	runner = DefaultRunner(str(model_path))
 	mars_input = MarsInput(runner.checkpoint, dates=[f(d2), f(d1)])
-	lead_time = desired_step
+	lead_time = target_step
 	grib_keys = {
 		"stream": "oper",
 		"expver": 0,
@@ -148,7 +148,7 @@ def entrypoint_forecast(**kwargs) -> bytes:
 		if "step" in kwargs or "endStep" in kwargs:
 			data = args[0]
 			template = kwargs.pop("template")
-			if template._metadata.get("param", "") == desired_param and kwargs.get("step", -1) == desired_step:
+			if template._metadata.get("param", "") == predicted_param and kwargs.get("step", -1) == target_step:
 				output_m.write(data, template=template, **kwargs)
 
 			if save_to_path:
@@ -172,8 +172,7 @@ def entrypoint_forecast(**kwargs) -> bytes:
 def entrypoint_plot(**kwargs) -> bytes:
 	# config
 	plot_idx = 0
-	domain = [-15, 35, 32, 72]
-	# NOTE ideally we'd distinguish, based on some kwarg, whether to plot from file or mem
+	domain = [-15, 35, 32, 72]  # TODO param
 
 	# data
 	# grib_reader = earthkit.data.from_source("file", path="/tmp/output.grib")
