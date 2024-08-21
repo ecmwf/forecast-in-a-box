@@ -6,6 +6,13 @@
   <li>created at: {{ created_at }}</li>
   <li>updated at: {{ updated_at }}</li>
   <li>status: {{ status }}</li>
+  {% if stages %}
+  <ul>
+  {% for e in stages %}
+    <li>{{ e[0] }} -- {{ e[1] }}</li>
+  {% endfor %}
+  </ul>
+  {% endif %}
   {% if result %}
     <li><a href="{{ result }}">result</a></li>
   {% endif %}

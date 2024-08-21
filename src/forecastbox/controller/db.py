@@ -11,7 +11,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Optional
 from forecastbox.api.common import JobDefinition, JobStatus, JobId, JobStatusEnum, WorkerId, JobStatusUpdate
-import forecastbox.controller.scheduler as scheduler
+import forecastbox.scheduler as scheduler
 import datetime as dt
 
 logger = logging.getLogger(__name__)
@@ -81,15 +81,21 @@ async def job_assign(job_id: str) -> None:
 			logger.error(f"failed to submit to worker: {response}")
 			return
 	job_db[job_id].worker_id = WorkerId(worker_id=worker_id)
-	update = JobStatusUpdate(job_id=JobId(job_id=job_id), update={"status": JobStatusEnum.assigned})
+	update = JobStatusUpdate(job_id=JobId(job_id=job_id), status=JobStatusEnum.assigned)
 	job_update(update)
 
 
-def job_update(job_status: JobStatusUpdate) -> JobStatus:
-	new = job_db[job_status.job_id.job_id].status.model_copy(update=job_status.update)
-	new.updated_at = dt.datetime.utcnow()
-	job_db[job_status.job_id.job_id].status = new
-	return new
+def job_update(status_update: JobStatusUpdate) -> JobStatus:
+	status = job_db[status_update.job_id.job_id].status  # or copy and then replace?
+	if status_update.task_name:
+		status.stages[status_update.task_name] = status_update.status
+	else:
+		status.status = status_update.status  # whoa, what a stately line
+	status.updated_at = dt.datetime.utcnow()
+	if status_update.result:
+		status.result = status_update.result
+
+	return status
 
 
 def worker_register(url: str) -> WorkerId:

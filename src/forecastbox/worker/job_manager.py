@@ -46,12 +46,17 @@ class CallbackContext:
 		return f"{self.controller_url}/jobs/update/{self.worker_id}"
 
 
-def notify_update(callback_context: CallbackContext, job_id: str, status: JobStatusEnum, result: Optional[str] = None) -> bool:
+def notify_update(
+	callback_context: CallbackContext, job_id: str, status: JobStatusEnum, result: Optional[str] = None, task_name: Optional[str] = None
+) -> bool:
 	logger.info(f"process for {job_id=} is in {status=}")
 	# TODO put to different module
-	update = JobStatusUpdate(job_id=JobId(job_id=job_id), update={"status": status})
+	result_url: Optional[str]
 	if result:
-		update.update["result"] = callback_context.data_url(result)
+		result_url = callback_context.data_url(result)
+	else:
+		result_url = None
+	update = JobStatusUpdate(job_id=JobId(job_id=job_id), status=status, task_name=task_name, result=result_url)
 
 	with httpx.Client() as client:
 		response = client.post(callback_context.update_url, json=update.model_dump())
@@ -70,14 +75,15 @@ def shmid(job_id: str, dataset_id: str) -> str:
 
 
 def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str, definition: TaskDAG) -> None:
-	# TODO we launch process per job / task dag -- it would be safer to have process per task. Requires
+	# TODO we launch process per job (whole task dag) -- refactor to process per task in the dag
 	# refactor of the notify_update API
 	logging.basicConfig(level=logging.DEBUG)  # TODO replace with config
-	notify_update(callback_context, job_id, JobStatusEnum.running)
+	notify_update(callback_context, job_id, JobStatusEnum.running, task_name=None)
 
 	try:
 		for task in definition.tasks:
-			target = get_process_target(task.function_name)
+			notify_update(callback_context, job_id, JobStatusEnum.running, task_name=task.name)
+			target = get_process_target(task)
 			params: dict[str, str | memoryview | int] = {}
 			params.update(task.static_params)
 			mems = {}
@@ -92,9 +98,10 @@ def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str
 				params[param_name] = mems[key].buf
 				params[param_name + "_len"] = mem_db.memory[key]
 
-			logger.debug(f"running task {task.function_name} in {job_id=} with kwarg keys {','.join(params.keys())}")
+			logger.debug(f"running task {task.name} in {job_id=} with kwarg keys {','.join(params.keys())}")
 			result = target(**params)
-			logger.debug(f"finished task {task.function_name} in {job_id=}")
+			logger.debug(f"finished task {task.name} in {job_id=}")
+			notify_update(callback_context, job_id, JobStatusEnum.finished, task_name=task.name)
 
 			if task.output_name:
 				L = len(result)
@@ -114,7 +121,7 @@ def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str
 			output_name = shmid(job_id, definition.output_id.dataset_id)
 		else:
 			output_name = None
-		notify_update(callback_context, job_id, JobStatusEnum.finished, output_name)
+		notify_update(callback_context, job_id, JobStatusEnum.finished, result=output_name, task_name=None)
 	except Exception:
 		# TODO free all datasets
 		logger.exception(f"job with {job_id=} failed")

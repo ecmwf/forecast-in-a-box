@@ -108,5 +108,13 @@ async def job_status(request: Request, job_id: str) -> str:
 			raise HTTPException(status_code=500, detail="Internal Server Error")
 		response_json = response_raw.json()  # TODO how is this parsed? Orjson?
 		job_status = JobStatus(**response_json)
-	template_params = {**job_status.model_dump(), "refresh_url": f"../jobs/{job_status.job_id.job_id}"}
+	job_status_dump = job_status.model_dump()
+	job_status_dump["stages"] = list(
+		(
+			k,
+			v,
+		)
+		for k, v in job_status_dump["stages"].items()
+	)
+	template_params = {**job_status_dump, "refresh_url": f"../jobs/{job_status.job_id.job_id}"}
 	return StaticExecutionContext.get().template_job.render(template_params)
