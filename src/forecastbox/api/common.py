@@ -5,7 +5,7 @@ As served by the controller.server
 from pydantic import BaseModel, Field
 from enum import Enum
 import datetime as dt
-from typing import Optional, Any
+from typing import Optional
 from typing_extensions import Self
 import base64
 
@@ -49,14 +49,15 @@ class JobStatus(BaseModel):
 	created_at: dt.datetime
 	updated_at: dt.datetime
 	status: JobStatusEnum
+	stages: dict[str, JobStatusEnum] = Field(default_factory=dict)
 	result: Optional[str] = Field(description="URL where the result can be streamed from")
 
 
 class JobStatusUpdate(BaseModel):
 	job_id: JobId
-	update: dict[str, Any]
-
-	# TODO validate update does not contain job_id, updated_at, created_at
+	status: JobStatusEnum
+	task_name: Optional[str] = None
+	result: Optional[str] = None
 
 
 # controller: workers
@@ -83,29 +84,44 @@ class DatasetId(BaseModel):
 	dataset_id: str
 
 
-class TaskFunctionEnum(str, Enum):
-	hello_world = "hello_world"
-	hello_torch = "hello_torch"
-	hello_image = "hello_image"
-	hello_tasks_step1 = "hello_tasks_step1"
-	hello_tasks_step2 = "hello_tasks_step2"
-	earthkit_querymars = "earthkit_querymars"
-	tp_nb_get = "tp_nb_get"
-	tp_nb_pred = "tp_nb_pred"
-	aifsl_pred = "aifsl_pred"
-	aifsl_plot = "aifsl_plot"
+# NOTE eventually put to docs:
+# 1. user selects from TaskDefinition list
+# 2. webui generates form from the TaskDefinition
+# 3. user fills it, becomes TaskDag
+# 4. worker executes the Tasks in the TaskDag in a sequence (or as prescribed by the execution plan)
+
+
+class TaskDefinition(BaseModel):
+	"""Used for generating input forms and parameter validation"""
+
+	entrypoint: str = Field(description="python_module.function_name")
+	param_names: list[str]  # TODO uniq validation
+	# TODO param types
+	# TODO output type
+	# TODO deal with static vs dataset params
+	# TODO environment
+
+
+# TODO TaskDefinitionDAG?
 
 
 class Task(BaseModel):
+	"""Represents an atomic computation done in a single process.
+	Created from user's input (validated via TaskDefinition)"""
+
+	name: str  # name of the task within the DAG
 	static_params: dict[str, str]
 	dataset_inputs: dict[str, DatasetId]
-	function_name: TaskFunctionEnum
+	entrypoint: str = Field(description="python_module.submodules.function_name")
 	output_name: Optional[DatasetId]
 
 
 class TaskDAG(BaseModel):
+	"""Represents a complete (distributed) computation, consisting of atomic Tasks.
+	Needs no further user input, finishes with the output that the user specified."""
+
 	tasks: list[Task]  # assumed to be in topological (ie, computable) order -- eg, schedule
 	output_id: Optional[DatasetId]
-	# TODO validate consistency: outputs unique, subset of set(output_name), topological
+	# TODO validate consistency: outputs unique, subset of set(output_name), topological, task.name unique
 	# TODO add in free(dataset_id) events into the tasks
 	# TODO add some mechanism for freeing the output_name(dataset_id) as well
