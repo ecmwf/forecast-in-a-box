@@ -9,10 +9,16 @@ from typing import Optional
 from typing_extensions import Self
 import base64
 
+# NOTE eventually put to docs:
+# 1. user selects from JobType list
+# 2. webui generates form from the JobTemplate
+# 3. user fills it so that JobTemplate becomes TaskDag
+# 4. controller converts the schedule-agnostic TaskDag into a (linear) execution plan
+# 4. worker executes the Tasks in the execution plan
 
-# controller: jobs
-class JobFunctionEnum(str, Enum):
-	"""Cascade Job Catalog"""
+
+class JobTypeEnum(str, Enum):
+	"""Job Catalog"""
 
 	hello_world = "hello_world"
 	hello_torch = "hello_torch"
@@ -24,11 +30,48 @@ class JobFunctionEnum(str, Enum):
 	temperature_nbeats = "temperature_nbeats"
 
 
-class JobDefinition(BaseModel):
-	function_name: JobFunctionEnum
-	function_parameters: dict[str, str]
+class DatasetId(BaseModel):
+	dataset_id: str
 
-	# TODO validate function_name-function_parameters?
+
+class TaskDefinition(BaseModel):
+	"""Used for generating input forms and parameter validation"""
+
+	entrypoint: str = Field(description="python_module.function_name")
+	param_names: list[str]  # TODO uniq validation
+	# TODO param types, default values, output metadata, reqs on dynamic params, ... Some pydantic usage?
+	# TODO environment
+
+
+class Task(BaseModel):
+	"""Represents an atomic computation done in a single process.
+	Created from user's input (validated via TaskDefinition)"""
+
+	name: str  # name of the task within the DAG
+	static_params: dict[str, str]
+	dataset_inputs: dict[str, DatasetId]
+	entrypoint: str = Field(description="python_module.submodules.function_name")
+	output_name: Optional[DatasetId]
+
+
+class TaskDAG(BaseModel):
+	"""Represents a complete (distributed) computation, consisting of atomic Tasks.
+	Needs no further user input, finishes with the output that the user specified."""
+
+	job_type: JobTypeEnum
+	tasks: list[Task]  # assumed to be in topological (ie, computable) order -- eg, schedule
+	output_id: Optional[DatasetId]
+	# TODO validate consistency: outputs unique, subset of set(output_name), topological, task.name unique
+	# TODO add in free(dataset_id) events into the tasks
+	# TODO add some mechanism for freeing the output_name(dataset_id) as well
+
+
+class JobTemplate(BaseModel):
+	job_type: JobTypeEnum
+	tasks: list[tuple[str, TaskDefinition]]
+	dynamic_task_inputs: dict[str, list[tuple[str, str]]]  # param_name: data_source
+	final_output_at: str
+	# TODO validate consistency (somehow shared with TaskDAG?)
 
 
 class JobId(BaseModel):
@@ -74,54 +117,3 @@ class WorkerRegistration(BaseModel):
 
 	def url_raw(self) -> str:
 		return base64.b64decode(self.url_base64.encode()).decode()
-
-
-# worker: jobs and tasks
-# a job is an atom submittable/retrievable by the user. It becomes DAG of tasks executed by workers
-
-
-class DatasetId(BaseModel):
-	dataset_id: str
-
-
-# NOTE eventually put to docs:
-# 1. user selects from TaskDefinition list
-# 2. webui generates form from the TaskDefinition
-# 3. user fills it, becomes TaskDag
-# 4. worker executes the Tasks in the TaskDag in a sequence (or as prescribed by the execution plan)
-
-
-class TaskDefinition(BaseModel):
-	"""Used for generating input forms and parameter validation"""
-
-	entrypoint: str = Field(description="python_module.function_name")
-	param_names: list[str]  # TODO uniq validation
-	# TODO param types
-	# TODO output type
-	# TODO deal with static vs dataset params
-	# TODO environment
-
-
-# TODO TaskDefinitionDAG?
-
-
-class Task(BaseModel):
-	"""Represents an atomic computation done in a single process.
-	Created from user's input (validated via TaskDefinition)"""
-
-	name: str  # name of the task within the DAG
-	static_params: dict[str, str]
-	dataset_inputs: dict[str, DatasetId]
-	entrypoint: str = Field(description="python_module.submodules.function_name")
-	output_name: Optional[DatasetId]
-
-
-class TaskDAG(BaseModel):
-	"""Represents a complete (distributed) computation, consisting of atomic Tasks.
-	Needs no further user input, finishes with the output that the user specified."""
-
-	tasks: list[Task]  # assumed to be in topological (ie, computable) order -- eg, schedule
-	output_id: Optional[DatasetId]
-	# TODO validate consistency: outputs unique, subset of set(output_name), topological, task.name unique
-	# TODO add in free(dataset_id) events into the tasks
-	# TODO add some mechanism for freeing the output_name(dataset_id) as well

@@ -1,18 +1,12 @@
-<!doctype html><title>Forecast In A Box</title>
+<!doctype html><title>Forecast In A Box: Submit A Job</title>
 
-Enter parameters of the job to submit:<br>
+Select which job type you'd like to submit:<br>
 
-<form action="/submit" method="post">
+<form action="/select" method="post">
 	{% for e in jobs %}
-		<input type="radio" id="{{ e }}" name="job_function" value="{{ e }}">
+		<input type="radio" id="{{ e }}" name="job_type" value="{{ e }}">
 		<label for="{{ e }}">{{ e }}</label><br>
 	{% endfor %}
 
-	<label for="start_date">Start Date:</label><br>
-	<input type="text" id="start_date" name="start_date"><br>
-
-	<label for="end_date">End Date:</label><br>
-	<input type="text" id="end_date" name="end_date"><br>
-
-	<input type="submit" value="Submit">
+	<input type="submit" value="Select">
 </form>

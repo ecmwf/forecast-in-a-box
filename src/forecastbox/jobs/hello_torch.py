@@ -40,9 +40,9 @@ def torch_sum(i1: int, i2: int) -> tuple[int, str, int]:
 
 
 def entrypoint(**kwargs) -> bytes:
-	b1 = (f"hello torch from {kwargs['start_date']} to {kwargs['end_date']}").encode()
-	i1 = kwargs["start_date"].__hash__() % 16
-	i2 = kwargs["end_date"].__hash__() % 16
+	b1 = (f"hello torch with {kwargs['tensor_0']} and {kwargs['tensor_1']}").encode()
+	i1 = int(kwargs["tensor_0"])
+	i2 = int(kwargs["tensor_1"])
 	result = torch_sum(i1, i2)
 	b2 = (f"\nresult of {i1} + {i2} is {result[0]}").encode()
 	b3 = (f"\nwe used device {result[1]} with memory {result[2]}").encode()

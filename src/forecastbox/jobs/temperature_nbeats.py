@@ -15,8 +15,8 @@ def get_data(**kwargs) -> bytes:
 	# NOTE we import here to keep it localized to the worker process only -- there is some fork issues otherwise
 	import earthkit.data
 
-	lat = int(kwargs["start_date"])
-	lon = int(kwargs["end_date"])
+	lat = int(kwargs["lat"])
+	lon = int(kwargs["lon"])
 
 	area = [lat + 5, lon - 5, lat - 5, lon + 5]
 	now = dt.datetime.utcnow() - dt.timedelta(days=1)
@@ -36,7 +36,7 @@ def predict(**kwargs) -> bytes:
 	# NOTE we import here to keep it localized to the worker process only -- there is some fork issues otherwise
 	from neuralforecast.core import NeuralForecast
 
-	raw = kwargs["data"][: kwargs["data_len"]]
+	raw = kwargs["input_df"][: kwargs["input_df_len"]]
 	# NOTE update the dtype when changing data -- the correct is given in the output of `df.to_records(index=False).__repr__()`
 	df = pd.DataFrame(np.frombuffer(raw, dtype=[("unique_id", "<i8"), ("ds", "<M8[ns]"), ("y", "<f8")]))
 

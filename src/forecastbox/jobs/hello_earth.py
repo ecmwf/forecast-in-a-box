@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 def entrypoint_marsquery(**kwargs) -> bytes:
-	i1 = kwargs["start_date"].__hash__() % 7
-	i2 = kwargs["end_date"].__hash__() % 2
+	i1 = int(kwargs["days_ago"])
+	i2 = int(kwargs["midnight_or_noon"])
 
 	# TODO proper start date, step, bounding box
 	date = (dt.datetime.utcnow().date() - dt.timedelta(days=(1 + i1))).strftime("%Y-%m-%d")
