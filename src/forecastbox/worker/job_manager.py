@@ -2,16 +2,25 @@
 Keeps track of locally-spawned processes which run individual jobs
 """
 
+# TODO separate into multiple submodules:
+# - comms with all the httpx
+# - job wrapper with the entrypoint, to be target, handling some kwargy things
+# - dbs/contexts
+# - the rest that puts everything together
+
 import hashlib
 from typing import Iterator, cast, Optional
 from multiprocessing.shared_memory import SharedMemory
 from dataclasses import dataclass
 import logging
 from forecastbox.api.common import JobStatusEnum, JobStatusUpdate, JobId, TaskDAG
-from forecastbox.jobs.lookup import get_process_target
 from multiprocessing import Process, connection
 from multiprocessing.managers import SyncManager
 import httpx
+from forecastbox.api.common import Task
+import importlib
+from typing import Callable
+
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +81,12 @@ def shmid(job_id: str, dataset_id: str) -> str:
 	h = hashlib.new("md5", usedforsecurity=False)
 	h.update((job_id + dataset_id).encode())
 	return h.hexdigest()[:24]
+
+
+def get_process_target(task: Task) -> Callable:
+	module_name, function_name = task.entrypoint.rsplit(".", 1)
+	module = importlib.import_module(module_name)
+	return module.__dict__[function_name]
 
 
 def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str, definition: TaskDAG) -> None:

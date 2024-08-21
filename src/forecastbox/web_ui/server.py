@@ -15,6 +15,7 @@ import jinja2
 import pkgutil
 from forecastbox.api.common import JobStatus, JobTypeEnum
 import forecastbox.scheduler as scheduler
+import forecastbox.plugins.lookup as plugin_lookup
 import logging
 import os
 import httpx
@@ -88,11 +89,13 @@ async def select(request: Request, job_type: Annotated[str, Form()]) -> Redirect
 @app.get("/prepare/{job_type}", response_class=HTMLResponse)
 async def prepare(job_type: str) -> str:
 	"""The form for filling out job parameters and submitting the job itself"""
-	job_template = scheduler.prepare(JobTypeEnum(job_type))
+	job_template = plugin_lookup.prepare(JobTypeEnum(job_type))
 	template_params = {
 		"job_type": job_type,
 		"params": [
-			f"{task_name}.{param_name}" for task_name, task_definition in job_template.tasks for param_name in task_definition.param_names
+			f"{task_name}.{user_param.name}"
+			for task_name, task_definition in job_template.tasks
+			for user_param in task_definition.user_params
 		],
 	}
 	return StaticExecutionContext.get().template_prepare.render(template_params)
@@ -101,7 +104,7 @@ async def prepare(job_type: str) -> str:
 @app.post("/submit")
 async def submit(request: Request) -> RedirectResponse:
 	params = {k: v for k, v in (await request.form()).items() if isinstance(v, str)}
-	job_template = scheduler.prepare(JobTypeEnum(params.pop("job_type")))
+	job_template = plugin_lookup.prepare(JobTypeEnum(params.pop("job_type")))
 	task_dag = scheduler.build(job_template, params)
 	async with httpx.AsyncClient() as client:  # TODO pool the client
 		response_raw = await client.put(StaticExecutionContext.get().job_submit_url, json=task_dag.model_dump())
