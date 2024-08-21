@@ -93,7 +93,10 @@ async def prepare(job_type: str) -> str:
 	template_params = {
 		"job_type": job_type,
 		"params": [
-			f"{task_name}.{user_param.name}"
+			(
+				f"{task_name}.{user_param.name}",
+				user_param.default,
+			)
 			for task_name, task_definition in job_template.tasks
 			for user_param in task_definition.user_params
 		],
