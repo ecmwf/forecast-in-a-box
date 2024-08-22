@@ -12,7 +12,7 @@ from functools import cached_property
 import climetlab as cml
 import tqdm
 from anemoi.inference.runner import DefaultRunner
-import forecastbox.jobs.models
+import forecastbox.external.models
 
 logger = logging.getLogger(__name__)
 
@@ -111,13 +111,11 @@ class MarsInput(RequestBasedInput):
 		return cml.load_source("mars", kwargs)
 
 
-def entrypoint_forecast(**kwargs) -> bytes:
+def entrypoint_forecast(predicted_param: str, target_step: int) -> bytes:
 	# config TODO read from kwargs
-	model_path = forecastbox.jobs.models.get_path("aifs-small.ckpt")
+	model_path = forecastbox.external.models.get_path("aifs-small.ckpt")
 	relative_delay = dt.timedelta(days=1)  # TODO how to get a reliable date for which data would be available?
 	save_to_path: Optional[str] = None  # "/tmp/output.grib"
-	predicted_param = kwargs["predicted_param"]
-	target_step = int(kwargs["target_step"])
 
 	# prep clasess
 	n = dt.datetime.now() - relative_delay
@@ -169,17 +167,15 @@ def entrypoint_forecast(**kwargs) -> bytes:
 	return obuf.getvalue()
 
 
-def entrypoint_plot(**kwargs) -> bytes:
+def entrypoint_plot(inmemview: memoryview, inmemview_len: int) -> bytes:
 	# config
 	plot_idx = 0
 	domain = [-15, 35, 32, 72]  # TODO param
 
 	# data
 	# grib_reader = earthkit.data.from_source("file", path="/tmp/output.grib")
-	imemview = kwargs["data"]
-	imemviewL = kwargs["data_len"]
 	# NOTE the buffer is padded by zeroes due to how shm works, so we need to trim by length
-	ibuf = io.BytesIO(imemview[:imemviewL])
+	ibuf = io.BytesIO(inmemview[:inmemview_len])
 	grib_reader = earthkit.data.from_source("stream", ibuf, read_all=True)
 
 	figure = earthkit.plots.Figure()

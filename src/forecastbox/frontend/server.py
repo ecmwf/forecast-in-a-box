@@ -76,7 +76,11 @@ async def status_check() -> str:
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request, exc):
 	# TODO perhaps a simple HTMLResponse instead
-	return PlainTextResponse(str(exc.detail), status_code=exc.status_code)
+	if isinstance(exc.detail, list):
+		s = "\n".join(exc.detail)
+	else:
+		s = str(exc.detail)
+	return PlainTextResponse(s, status_code=exc.status_code)
 
 
 @app.get("/", response_class=HTMLResponse)
