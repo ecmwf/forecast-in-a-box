@@ -46,7 +46,7 @@ class StaticExecutionContext:
 		self.job_status_url = lambda job_id: f"{os.environ.get('FIAB_CTR_URL', '')}/jobs/status/{job_id}"
 
 		# static html
-		# index_html_raw = pkgutil.get_data("forecastbox.web_ui.static", "index.html")
+		# index_html_raw = pkgutil.get_data("forecastbox.frontend.static", "index.html")
 		# if not index_html_raw:
 		# raise FileNotFoundError("index.html")
 		# self.index_html = index_html_raw.decode()
@@ -55,7 +55,7 @@ class StaticExecutionContext:
 		template_env = jinja2.Environment()
 
 		def get_template(fname: str) -> jinja2.Template:
-			template_raw = pkgutil.get_data("forecastbox.web_ui.static", fname)
+			template_raw = pkgutil.get_data("forecastbox.frontend.static", fname)
 			if not template_raw:
 				raise FileNotFoundError(fname)
 			return template_env.from_string(template_raw.decode())
@@ -75,6 +75,7 @@ async def status_check() -> str:
 
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request, exc):
+	# TODO perhaps a simple HTMLResponse instead
 	return PlainTextResponse(str(exc.detail), status_code=exc.status_code)
 
 
