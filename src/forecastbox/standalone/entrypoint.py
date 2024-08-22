@@ -16,10 +16,10 @@ def setup_process(env_context: dict[str, str]):
 	os.environ.update(env_context)
 
 
-def launch_web_ui(env_context: dict[str, str]):
+def launch_frontend(env_context: dict[str, str]):
 	setup_process(env_context)
 	port = int(env_context["FIAB_WEB_URL"].rsplit(":", 1)[1])
-	uvicorn.run("forecastbox.web_ui.server:app", host="0.0.0.0", port=port, log_level="info", workers=1)
+	uvicorn.run("forecastbox.frontend.server:app", host="0.0.0.0", port=port, log_level="info", workers=1)
 
 
 def launch_controller(env_context: dict[str, str]):
@@ -66,8 +66,8 @@ if __name__ == "__main__":
 	worker = Process(target=launch_worker, args=(context,))
 	worker.start()
 
-	web_ui = Process(target=launch_web_ui, args=(context,))
-	web_ui.start()
+	frontend = Process(target=launch_frontend, args=(context,))
+	frontend.start()
 
 	with httpx.Client() as client:
 		for root_url in context.values():
@@ -79,6 +79,6 @@ if __name__ == "__main__":
 		(
 			controller.sentinel,
 			worker.sentinel,
-			web_ui.sentinel,
+			frontend.sentinel,
 		)
 	)

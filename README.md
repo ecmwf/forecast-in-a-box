@@ -12,7 +12,7 @@ The job templates are currently hardcoded, but we will eventually support a plug
 The implementations of the Tasks themselves are [here](src/forecastbox/external), while the templates are [here](src/forecastbox/plugins/lookup.py).
 
 There are three server components in total:
- * [UI](src/forecastbox/ui) -- a FastAPI server for providing html responses / accepting filled HTML forms. Light on business logic, just frontend.
+ * [UI](src/forecastbox/frontend) -- a FastAPI server for providing html responses / accepting filled HTML forms. Light on business logic, just frontend.
  * [Worker](src/forecastbox/worker) -- a FastAPI server that launches and monitors a process for every Task, manages the shared memory for passing outputs of Tasks as inputs to other Tasks.
  * [Controller](src/forecastbox/controller) -- a FastAPI server that glues between UI and Worker. Note that there will eventually be more Workers, eg in a cluser setting, as well as more UIs, but there will always be one Controller. Holds the business logic of building Task schedules, keeps track of what is running where, et cetera.
 
