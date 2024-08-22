@@ -11,16 +11,12 @@ from typing import Optional
 from typing_extensions import Self
 import base64
 
-# NOTE eventually put to docs:
-# 1. user selects from JobType list
-# 2. webui generates form from the JobTemplate
-# 3. user fills it so that JobTemplate becomes TaskDag
-# 4. controller converts the schedule-agnostic TaskDag into a (linear) execution plan
-# 4. worker executes the Tasks in the execution plan
-
 
 class JobTypeEnum(str, Enum):
 	"""Job Catalog"""
+
+	# NOTE this will get eventually replaced by external import/lookup system
+	# See plugin/lookup.py
 
 	hello_world = "hello_world"
 	hello_torch = "hello_torch"
