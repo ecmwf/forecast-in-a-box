@@ -1,4 +1,4 @@
-from forecastbox.web_ui.server import app
+from forecastbox.frontend.server import app
 from fastapi.testclient import TestClient
 
 client = TestClient(app)

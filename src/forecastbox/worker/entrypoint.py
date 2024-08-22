@@ -1,79 +1,22 @@
 """
-Keeps track of locally-spawned processes which run individual jobs
+Target for a new launched process corresponding to a single task
 """
 
-# TODO separate into multiple submodules:
-# - comms with all the httpx
-# - job wrapper with the entrypoint, to be target, handling some kwargy things
-# - dbs/contexts
-# - the rest that puts everything together
+# TODO we launch process per job (whole task dag) -- refactor to process per task in the dag. Would split this in two files
+# TODO move some of the memory management parts into worker/db.py
 
-import hashlib
-from typing import Iterator, cast, Optional
+from forecastbox.worker.reporting import notify_update, CallbackContext
+from forecastbox.api.common import Task, TaskDAG, JobStatusEnum
+from forecastbox.worker.db import DbContext
+from multiprocessing import Process
 from multiprocessing.shared_memory import SharedMemory
-from dataclasses import dataclass
-import logging
-from forecastbox.api.common import JobStatusEnum, JobStatusUpdate, JobId, TaskDAG
-from multiprocessing import Process, connection
-from multiprocessing.managers import SyncManager
-import httpx
-from forecastbox.api.common import Task
-import importlib
+from forecastbox.worker.db import MemDb
 from typing import Callable
-
+import importlib
+import logging
+import hashlib
 
 logger = logging.getLogger(__name__)
-
-
-class MemDb:
-	def __init__(self, m: SyncManager) -> None:
-		self.memory: dict[str, int] = cast(dict[str, int], m.dict())
-
-
-class JobDb:
-	def __init__(self) -> None:
-		self.jobs: dict[str, Process] = {}
-
-
-@dataclass
-class DbContext:
-	mem_db: MemDb
-	job_db: JobDb
-
-
-@dataclass
-class CallbackContext:
-	self_url: str
-	controller_url: str
-	worker_id: str
-
-	def data_url(self, job_id: str) -> str:
-		return f"{self.self_url}/data/{job_id}"
-
-	@property
-	def update_url(self) -> str:
-		return f"{self.controller_url}/jobs/update/{self.worker_id}"
-
-
-def notify_update(
-	callback_context: CallbackContext, job_id: str, status: JobStatusEnum, result: Optional[str] = None, task_name: Optional[str] = None
-) -> bool:
-	logger.info(f"process for {job_id=} is in {status=}")
-	# TODO put to different module
-	result_url: Optional[str]
-	if result:
-		result_url = callback_context.data_url(result)
-	else:
-		result_url = None
-	update = JobStatusUpdate(job_id=JobId(job_id=job_id), status=status, task_name=task_name, result=result_url)
-
-	with httpx.Client() as client:
-		response = client.post(callback_context.update_url, json=update.model_dump())
-		if response.status_code != httpx.codes.OK:
-			logger.error(f"failed to notify update: {response}")
-			return False
-			# TODO background submit some retry
-	return True
 
 
 def shmid(job_id: str, dataset_id: str) -> str:
@@ -90,8 +33,6 @@ def get_process_target(task: Task) -> Callable:
 
 
 def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str, definition: TaskDAG) -> None:
-	# TODO we launch process per job (whole task dag) -- refactor to process per task in the dag
-	# refactor of the notify_update API
 	logging.basicConfig(level=logging.DEBUG)  # TODO replace with config
 	notify_update(callback_context, job_id, JobStatusEnum.running, task_name=None)
 
@@ -144,34 +85,11 @@ def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str
 		notify_update(callback_context, job_id, JobStatusEnum.failed)
 
 
-def job_submit(callback_context: CallbackContext, db_context: DbContext, job_id: str, definition: TaskDAG) -> bool:
+def job_factory(callback_context: CallbackContext, db_context: DbContext, job_id: str, definition: TaskDAG) -> Process:
 	params = {
 		"callback_context": callback_context,
 		"mem_db": db_context.mem_db,
 		"job_id": job_id,
 		"definition": definition,
 	}
-	db_context.job_db.jobs[job_id] = Process(target=job_entrypoint, kwargs=params)
-	db_context.job_db.jobs[job_id].start()
-	return True
-
-
-def data_stream(mem_db: MemDb, data_id: str) -> Iterator[bytes]:
-	# TODO logging doesnt work here? Probably we run in some fastapi thread
-	if (L := mem_db.memory.get(data_id, -1)) < 0:
-		raise KeyError(f"{data_id=} not present")
-	m = SharedMemory(name=data_id, create=False)
-	i = 0
-	block_len = 1024
-	while i < L:
-		yield bytes(m.buf[i : min(L, i + block_len)])
-		i += block_len
-
-
-def wait_all(db_context: DbContext) -> None:
-	connection.wait(p.sentinel for p in db_context.job_db.jobs.values())
-	for k in db_context.mem_db.memory:
-		m = SharedMemory(name=k, create=False)
-		m.close()
-		m.unlink()
-	# TODO join/kill spawned processes
+	return Process(target=job_entrypoint, kwargs=params)
