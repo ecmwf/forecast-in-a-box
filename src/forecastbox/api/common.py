@@ -48,7 +48,7 @@ class TaskDefinition(BaseModel):
 	entrypoint: str = Field(description="python_module.function_name")
 	user_params: list[TaskParameter]  # TODO uniq validation
 	output_class: str  # not eval'd, can be anything
-	dynamic_param_classes: list[tuple[str, str]] = Field(default_factory=list)  # TODO uniq validation
+	dynamic_param_classes: dict[str, str] = Field(default_factory=dict)
 	# TODO environment
 
 
@@ -77,10 +77,9 @@ class TaskDAG(BaseModel):
 
 class JobTemplate(BaseModel):
 	job_type: JobTypeEnum
-	tasks: list[tuple[str, TaskDefinition]]
-	dynamic_task_inputs: dict[str, list[tuple[str, str]]]  # param_name: data_source
+	tasks: list[tuple[str, TaskDefinition]]  # NOTE already assumed to be in (some) topological order
+	dynamic_task_inputs: dict[str, dict[str, str]]  # task_name: {param_name: data_source}
 	final_output_at: str
-	# TODO validate consistency (somehow shared with TaskDAG?)
 
 
 class JobId(BaseModel):
