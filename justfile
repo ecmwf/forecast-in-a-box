@@ -42,7 +42,7 @@ dist model_repo:
 		--collect-all=torch_geometric --collect-submodule=torch_geometric \
 		--collect-all=einops --collect-submodule=einops \
 		--collect-all=PIL --collect-submodule=PIL \
-		--add-data "{{model_repo}}:forecastbox/jobs/models" \
+		--add-data "{{model_repo}}:forecastbox/external/models" \
 		./src/forecastbox/standalone/entrypoint.py
 	# NOTE add -F to build a single executable -- but prolongs build time by about 10 min and can crash due to size
 	# NOTE disabled until nbeats supported

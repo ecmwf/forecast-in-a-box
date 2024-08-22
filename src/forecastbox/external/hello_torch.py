@@ -39,11 +39,9 @@ def torch_sum(i1: int, i2: int) -> tuple[int, str, int]:
 	return cast(int, tr.tolist()), *device_info
 
 
-def entrypoint(**kwargs) -> bytes:
-	b1 = (f"hello torch with {kwargs['tensor_0']} and {kwargs['tensor_1']}").encode()
-	i1 = int(kwargs["tensor_0"])
-	i2 = int(kwargs["tensor_1"])
-	result = torch_sum(i1, i2)
-	b2 = (f"\nresult of {i1} + {i2} % 128 is {result[0]}").encode()
+def entrypoint(tensor_0: int, tensor_1: int) -> bytes:
+	b1 = (f"hello torch with {tensor_0} and {tensor_1}").encode()
+	result = torch_sum(tensor_0, tensor_1)
+	b2 = (f"\nresult of {tensor_0} + {tensor_1} % 128 is {result[0]}").encode()
 	b3 = (f"\nwe used device {result[1]} with memory {result[2]}").encode()
 	return b1 + b2 + b3

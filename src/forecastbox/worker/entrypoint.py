@@ -11,7 +11,7 @@ from forecastbox.worker.db import DbContext
 from multiprocessing import Process
 from multiprocessing.shared_memory import SharedMemory
 from forecastbox.worker.db import MemDb
-from typing import Callable
+from typing import Callable, Any
 import importlib
 import logging
 import hashlib
@@ -40,7 +40,7 @@ def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str
 		for task in definition.tasks:
 			notify_update(callback_context, job_id, JobStatusEnum.running, task_name=task.name)
 			target = get_process_target(task)
-			params: dict[str, str | memoryview | int] = {}
+			params: dict[str, Any] = {}
 			params.update(task.static_params)
 			mems = {}
 			for param_name, dataset_id in task.dataset_inputs.items():

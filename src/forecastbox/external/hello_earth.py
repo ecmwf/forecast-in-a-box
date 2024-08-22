@@ -11,13 +11,10 @@ import datetime as dt
 logger = logging.getLogger(__name__)
 
 
-def entrypoint_marsquery(**kwargs) -> bytes:
-	i1 = int(kwargs["days_ago"])
-	i2 = int(kwargs["midnight_or_noon"])
-
+def entrypoint_marsquery(days_ago: int, midnight_or_noon: int) -> bytes:
 	# TODO proper start date, step, bounding box
-	date = (dt.datetime.utcnow().date() - dt.timedelta(days=(1 + i1))).strftime("%Y-%m-%d")
-	time = i2 * 12
+	date = (dt.datetime.utcnow().date() - dt.timedelta(days=(1 + days_ago))).strftime("%Y-%m-%d")
+	time = midnight_or_noon * 12
 	grib_reader = earthkit.data.from_source(
 		"mars",
 		stream="enfo",

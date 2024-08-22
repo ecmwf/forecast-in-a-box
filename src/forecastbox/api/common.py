@@ -7,7 +7,7 @@ Pydantic models for interchanges between ui, controller and worker
 from pydantic import BaseModel, Field
 from enum import Enum
 import datetime as dt
-from typing import Optional
+from typing import Optional, Any
 from typing_extensions import Self
 import base64
 
@@ -37,7 +37,7 @@ class TaskParameter(BaseModel):
 	# that would however introduce a requirement for jobs not to be text but bytecode
 	# but we may want to do it anyway because we'd need custom validations, esp for the rich classes etc
 	# Or we could introduce custom subtypes like lat, lon, latLonBox, marsParam, ...
-	clazz: str  # must be eval-uable... primitive type or collection, nested eval/generics not supported. Used to de-serialize
+	clazz: str  # see api.type_system on whats supported
 	default: str = ""  # always string because we put it to html form... will be deserd via type_name
 
 
@@ -56,7 +56,7 @@ class Task(BaseModel):
 	Created from user's input (validated via TaskDefinition)"""
 
 	name: str  # name of the task within the DAG
-	static_params: dict[str, str]  # name, value
+	static_params: dict[str, Any]  # name, value
 	dataset_inputs: dict[str, DatasetId]
 	entrypoint: str = Field(description="python_module.submodules.function_name")
 	output_name: Optional[DatasetId]  # TODO maybe replace with a method yielding just name

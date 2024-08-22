@@ -85,9 +85,10 @@ def test_taskdag_ok():
 	assert result.e is not None, "there should have been errors"
 	expected = {
 		"value failsToSer for param p1 of task step1 failed to serialize to int because of invalid literal for int() with base 10: 'failsToSer'",
-		"task step1 is missing user params p3",
+		"task step1 is missing user params p1, p3",
+		"found param p1 for task step0, but no such task was defined",
 	}
-	errors = set(result.e.split("\n"))
+	errors = set(result.e)
 	extra = errors - expected
 	assert extra == set(), "no extra errors should have been found"
 	not_found = expected - errors
