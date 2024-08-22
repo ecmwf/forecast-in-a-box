@@ -52,11 +52,12 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 						],
 						entrypoint="forecastbox.external.hello_tasks.entrypoint_step2",
 						output_class="str",
+						dynamic_param_classes={"intertaskParam": "ndarray"},
 					),
 				),
 			]
 			final_output_at = "display_data"
-			dynamic_task_inputs = {"display_data": [("intertaskParam", "create_data")]}
+			dynamic_task_inputs = {"display_data": {"intertaskParam": "create_data"}}
 		case JobTypeEnum.hello_torch:
 			tasks = [
 				(
@@ -125,11 +126,12 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 						user_params=[],
 						entrypoint="forecastbox.external.temperature_nbeats.predict",
 						output_class="str",
+						dynamic_param_classes={"input_df": "ndarray"},
 					),
 				),
 			]
 			final_output_at = "predict"
-			dynamic_task_inputs = {"predict": [("input_df", "get_data")]}
+			dynamic_task_inputs = {"predict": {"input_df": "get_data"}}
 		case JobTypeEnum.hello_aifsl:
 			tasks = [
 				(
@@ -149,11 +151,12 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 						user_params=[],
 						entrypoint="forecastbox.external.hello_aifs.entrypoint_plot",
 						output_class="png",  # I guess
+						dynamic_param_classes={"input_grib": "grib"},
 					),
 				),
 			]
 			final_output_at = "plot"
-			dynamic_task_inputs = {"plot": [("input_grib", "fetch_and_predict")]}
+			dynamic_task_inputs = {"plot": {"input_grib": "fetch_and_predict"}}
 		case s:
 			assert_never(s)
 	rv = JobTemplate(job_type=job_type, tasks=tasks, dynamic_task_inputs=dynamic_task_inputs, final_output_at=final_output_at)

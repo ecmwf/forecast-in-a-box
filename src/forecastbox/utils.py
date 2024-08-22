@@ -25,7 +25,7 @@ class Either(Generic[T, E]):
 	def error(cls, e: E) -> Self:
 		return cls(e=e)
 
-	def get_or_raise(self, raiser: Optional[Callable[[E], BaseException]]) -> T:
+	def get_or_raise(self, raiser: Optional[Callable[[E], BaseException]] = None) -> T:
 		if self.e:
 			if not raiser:
 				raise ValueError(self.e)
