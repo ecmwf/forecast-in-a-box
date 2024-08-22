@@ -30,4 +30,5 @@ def build(job_template: JobTemplate, params: dict[str, str]) -> Either[TaskDAG, 
 		for task_name, task_definition in job_template.tasks
 	]
 	task_dag = TaskDAG(tasks=tasks, output_id=DatasetId(dataset_id=job_template.final_output_at), job_type=job_template.job_type)
-	return validation.of_dag(task_dag)
+	return validation.of_dag(task_dag, job_template)
+	# TODO if extra params (both on task and on dag level), append errors here

@@ -3,7 +3,7 @@ Validations of TaskDAGs and JobTemplates for consistency
 """
 
 import logging
-from forecastbox.api.common import JobTemplate, TaskDAG
+from forecastbox.api.common import JobTemplate, TaskDAG, TaskDefinition
 from forecastbox.utils import Either
 
 logger = logging.getLogger(__name__)
@@ -47,5 +47,31 @@ def of_template(template: JobTemplate) -> Either[JobTemplate, str]:
 	return Either.error("\n".join(errors))
 
 
-def of_dag(task_dag: TaskDAG) -> Either[TaskDAG, str]:
-	return Either.ok(task_dag)
+def of_dag(task_dag: TaskDAG, job_template: JobTemplate) -> Either[TaskDAG, str]:
+	# NOTE: Assumes the respective template has already been validated, and that the task dag was built from it
+
+	errors: list[str] = []
+
+	try:
+		task_defin: dict[str, TaskDefinition] = dict(job_template.tasks)
+		for task in task_dag.tasks:
+			defin = task_defin[task.name]
+			for param, value in task.static_params.items():
+				if param not in defin.user_params:
+					errors.append(f"task {task.name} is fed with param {param} but expects no such")
+					continue
+				clazz = defin.user_params[param].clazz
+				try:
+					_ = eval(f"{clazz}('{value}')")
+				except Exception as e:
+					errors.append(f"value {value[:32]} for param {param} of task {task.name} failed to serialize to {clazz} because of {e}")
+			missing = defin.user_params.keys() - task.static_params.keys()
+			if missing:
+				errors.append(f"task {task.name} is missing user params {', '.join(missing)}")
+		if not errors:
+			return Either.ok(task_dag)
+	except Exception as e:
+		logger.exception("validation failed exceptionally")
+		errors.append(f"exception during validation: {e}")
+
+	return Either.error("\n".join(errors))

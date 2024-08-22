@@ -95,11 +95,12 @@ async def prepare(job_type: str) -> str:
 		"job_type": job_type,
 		"params": [
 			(
-				f"{task_name}.{user_param.name}",
-				user_param.default,
+				f"{task_name}.{param_name}",
+				param.clazz,
+				param.default,
 			)
 			for task_name, task_definition in job_template.tasks
-			for user_param in task_definition.user_params
+			for param_name, param in task_definition.user_params.items()
 		],
 	}
 	return StaticExecutionContext.get().template_prepare.render(template_params)
