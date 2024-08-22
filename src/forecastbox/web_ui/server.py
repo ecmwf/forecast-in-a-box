@@ -19,6 +19,8 @@ import forecastbox.plugins.lookup as plugin_lookup
 import logging
 import os
 import httpx
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi.responses import PlainTextResponse
 
 logger = logging.getLogger("uvicorn." + __name__)  # TODO instead configure uvicorn the same as the app
 app = FastAPI()
@@ -69,6 +71,11 @@ class StaticExecutionContext:
 @app.api_route("/status", methods=["GET", "HEAD"])
 async def status_check() -> str:
 	return "ok"
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request, exc):
+	return PlainTextResponse(str(exc.detail), status_code=exc.status_code)
 
 
 @app.get("/", response_class=HTMLResponse)

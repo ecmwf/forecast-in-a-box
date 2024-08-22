@@ -105,6 +105,7 @@ def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str
 			for param_name, dataset_id in task.dataset_inputs.items():
 				key = shmid(job_id, dataset_id.dataset_id)
 				if dataset_id.dataset_id not in mems:
+					logger.debug(f"opening dataset id {dataset_id.dataset_id} in {job_id=}")
 					mems[key] = SharedMemory(name=key, create=False)
 				# NOTE it would be tempting to do just buf[:L] here. Alas, that would trigger exception
 				# later when closing the shm -- python would sorta leak the pointer via the dictionary.
@@ -121,7 +122,7 @@ def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str
 			if task.output_name:
 				L = len(result)
 				key = shmid(job_id, task.output_name.dataset_id)
-				logger.debug(f"result of len {L} from {job_id=} storetd as {key}")
+				logger.debug(f"result of len {L} from {job_id=}'s {task.output_name.dataset_id} stored as {key}")
 				mem = SharedMemory(name=key, create=True, size=L)
 				mem.buf[:L] = result
 				mem.close()
