@@ -23,10 +23,6 @@ val:
 	mypy tests --ignore-missing-imports
 	pytest tests
 
-# runs just the webui fastapi server in development mode (eg with file reloads)
-run_webui:
-	fastapi dev src/forecastbox/web_ui/server.py
-
 # runs the whole app (webui+controller+worker)
 run_venv model_repo:
 	FIAB_MODEL_REPO={{model_repo}} python -m forecastbox.standalone.entrypoint
@@ -38,7 +34,7 @@ dist model_repo:
 	# NOTE coreforecast (needed by neuralforecast lib) by default misses libcoreforecast.so
 	pyinstaller \
 		--noconfirm \
-		--collect-submodules=forecastbox --add-data "src/forecastbox/web_ui/static/*html:forecastbox/web_ui/static" \
+		--collect-submodules=forecastbox --add-data "src/forecastbox/frontend/static/*html:forecastbox/frontend/static" \
 		--collect-all=default --collect-all=earthkit --recursive-copy-metadata=earthkit \
 		--collect-all=climetlab --recursive-copy-metadata=climetlab \
 		--collect-all=aifs --collect-submodule=aifs \
