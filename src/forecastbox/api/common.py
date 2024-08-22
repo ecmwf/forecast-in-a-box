@@ -37,7 +37,6 @@ class TaskParameter(BaseModel):
 	# that would however introduce a requirement for jobs not to be text but bytecode
 	# but we may want to do it anyway because we'd need custom validations, esp for the rich classes etc
 	# Or we could introduce custom subtypes like lat, lon, latLonBox, marsParam, ...
-	name: str
 	clazz: str  # must be eval-uable... primitive type or collection, nested eval/generics not supported. Used to de-serialize
 	default: str = ""  # always string because we put it to html form... will be deserd via type_name
 
@@ -46,7 +45,7 @@ class TaskDefinition(BaseModel):
 	"""Used for generating input forms and parameter validation"""
 
 	entrypoint: str = Field(description="python_module.function_name")
-	user_params: list[TaskParameter]  # TODO uniq validation
+	user_params: dict[str, TaskParameter]
 	output_class: str  # not eval'd, can be anything
 	dynamic_param_classes: dict[str, str] = Field(default_factory=dict)
 	# TODO environment
@@ -57,10 +56,10 @@ class Task(BaseModel):
 	Created from user's input (validated via TaskDefinition)"""
 
 	name: str  # name of the task within the DAG
-	static_params: dict[str, str]
+	static_params: dict[str, str]  # name, value
 	dataset_inputs: dict[str, DatasetId]
 	entrypoint: str = Field(description="python_module.submodules.function_name")
-	output_name: Optional[DatasetId]
+	output_name: Optional[DatasetId]  # TODO maybe replace with a method yielding just name
 
 
 class TaskDAG(BaseModel):
@@ -70,7 +69,6 @@ class TaskDAG(BaseModel):
 	job_type: JobTypeEnum
 	tasks: list[Task]  # assumed to be in topological (ie, computable) order -- eg, schedule
 	output_id: Optional[DatasetId]
-	# TODO validate consistency: outputs unique, subset of set(output_name), topological, task.name unique
 	# TODO add in free(dataset_id) events into the tasks
 	# TODO add some mechanism for freeing the output_name(dataset_id) as well
 

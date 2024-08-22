@@ -6,8 +6,8 @@ Enter Job Parameters:
 	<input type="text" id="job_type" name="job_type" value="{{ job_type }}" readonly><br>
 
 	{% for e in params %}
-		<label for="{{ e[0] }}">{{ e[0] }}:</label><br>
-		<input type="text" id="{{ e[0] }}" name="{{ e[0] }}" value="{{ e[1] }}"><br>
+		<label for="{{ e[0] }}">{{ e[0] }} (of type {{ e[1] }}:</label><br>
+		<input type="text" id="{{ e[0] }}" name="{{ e[0] }}" value="{{ e[2] }}"><br>
 	{% endfor %}
 
 	<input type="submit" value="Submit">

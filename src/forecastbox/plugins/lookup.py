@@ -20,10 +20,10 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 				(
 					"hello_world",
 					TaskDefinition(
-						user_params=[
-							TaskParameter(name="param1", clazz="str"),
-							TaskParameter(name="param2", clazz="str"),
-						],
+						user_params={
+							"param1": TaskParameter(clazz="str"),
+							"param2": TaskParameter(clazz="str"),
+						},
 						entrypoint="forecastbox.external.hello_world.entrypoint",
 						output_class="str",
 					),
@@ -36,10 +36,10 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 				(
 					"create_data",
 					TaskDefinition(
-						user_params=[
-							TaskParameter(name="adhocParam1", clazz="int", default="0"),
-							TaskParameter(name="adhocParam2", clazz="int", default="1"),
-						],
+						user_params={
+							"adhocParam1": TaskParameter(clazz="int", default="0"),
+							"adhocParam2": TaskParameter(clazz="int", default="1"),
+						},
 						entrypoint="forecastbox.external.hello_tasks.entrypoint_step1",
 						output_class="ndarray",
 					),
@@ -47,9 +47,9 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 				(
 					"display_data",
 					TaskDefinition(
-						user_params=[
-							TaskParameter(name="adhocParam3", clazz="str", default="hello"),
-						],
+						user_params={
+							"adhocParam3": TaskParameter(clazz="str", default="hello"),
+						},
 						entrypoint="forecastbox.external.hello_tasks.entrypoint_step2",
 						output_class="str",
 						dynamic_param_classes={"intertaskParam": "ndarray"},
@@ -63,10 +63,10 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 				(
 					"hello_torch",
 					TaskDefinition(
-						user_params=[
-							TaskParameter(name="tensor_0", clazz="int", default="42"),
-							TaskParameter(name="tensor_1", clazz="int", default="128"),
-						],
+						user_params={
+							"tensor_0": TaskParameter(clazz="int", default="42"),
+							"tensor_1": TaskParameter(clazz="int", default="128"),
+						},
 						entrypoint="forecastbox.external.hello_torch.entrypoint",
 						output_class="str",
 					),
@@ -79,11 +79,11 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 				(
 					"hello_image",
 					TaskDefinition(
-						user_params=[
-							TaskParameter(name="red", clazz="int"),
-							TaskParameter(name="green", clazz="int"),
-							TaskParameter(name="blue", clazz="int"),
-						],
+						user_params={
+							"red": TaskParameter(clazz="int"),
+							"green": TaskParameter(clazz="int"),
+							"blue": TaskParameter(clazz="int"),
+						},
 						entrypoint="forecastbox.external.hello_image.entrypoint",
 						output_class="png",
 					),
@@ -96,10 +96,10 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 				(
 					"hello_earth",
 					TaskDefinition(
-						user_params=[
-							TaskParameter(name="days_ago", clazz="int"),
-							TaskParameter(name="midnight_or_noon", clazz="int"),
-						],
+						user_params={
+							"days_ago": TaskParameter(clazz="int"),
+							"midnight_or_noon": TaskParameter(clazz="int"),
+						},
 						entrypoint="forecastbox.external.hello_earth.entrypoint_marsquery",
 						output_class="png",  # I guess
 					),
@@ -112,10 +112,10 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 				(
 					"get_data",
 					TaskDefinition(
-						user_params=[
-							TaskParameter(name="lat", clazz="int"),
-							TaskParameter(name="lon", clazz="int"),
-						],
+						user_params={
+							"lat": TaskParameter(clazz="int"),
+							"lon": TaskParameter(clazz="int"),
+						},
 						entrypoint="forecastbox.external.temperature_nbeats.get_data",
 						output_class="ndarray",
 					),
@@ -123,7 +123,7 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 				(
 					"predict",
 					TaskDefinition(
-						user_params=[],
+						user_params={},
 						entrypoint="forecastbox.external.temperature_nbeats.predict",
 						output_class="str",
 						dynamic_param_classes={"input_df": "ndarray"},
@@ -137,10 +137,10 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 				(
 					"fetch_and_predict",
 					TaskDefinition(
-						user_params=[
-							TaskParameter(name="predicted_param", clazz="str"),  # 2t
-							TaskParameter(name="target_step", clazz="int"),  # hours, div by 6
-						],
+						user_params={
+							"predicted_param": TaskParameter(clazz="str"),  # 2t
+							"target_step": TaskParameter(clazz="int"),  # hours, div by 6
+						},
 						entrypoint="forecastbox.external.hello_aifs.entrypoint_forecast",
 						output_class="grib",
 					),
@@ -148,7 +148,7 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 				(
 					"plot",
 					TaskDefinition(
-						user_params=[],
+						user_params={},
 						entrypoint="forecastbox.external.hello_aifs.entrypoint_plot",
 						output_class="png",  # I guess
 						dynamic_param_classes={"input_grib": "grib"},
