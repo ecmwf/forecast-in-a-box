@@ -17,7 +17,9 @@ import sys
 def prepare(job_id: str, environment: TaskEnvironment) -> Optional[tempfile.TemporaryDirectory]:
 	if environment.packages:
 		td = tempfile.TemporaryDirectory()
-		subprocess.run(["uv", "pip", "install", "--target", td.name] + environment.packages, check=True)
+		uv_command = ["uv", "pip", "install", "--target", td.name]
+		uv_command.extend(set(environment.packages))
+		subprocess.run(uv_command, check=True)
 		sys.path.append(td.name)
 		return td
 	else:

@@ -42,6 +42,7 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 						},
 						entrypoint="forecastbox.external.hello_tasks.entrypoint_step1",
 						output_class="ndarray",
+						environment=TaskEnvironment(packages=["numpy"]),
 					),
 				),
 				(
@@ -53,6 +54,7 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 						entrypoint="forecastbox.external.hello_tasks.entrypoint_step2",
 						output_class="str",
 						dynamic_param_classes={"intertaskParam": "ndarray"},
+						environment=TaskEnvironment(packages=["numpy"]),
 					),
 				),
 			]
@@ -87,6 +89,7 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 						},
 						entrypoint="forecastbox.external.hello_image.entrypoint",
 						output_class="png",
+						environment=TaskEnvironment(packages=["Pillow"]),
 					),
 				)
 			]
