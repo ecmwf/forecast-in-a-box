@@ -10,6 +10,11 @@ from multiprocessing import Process, connection, set_start_method, freeze_suppor
 logger = logging.getLogger(__name__)
 
 
+def dummy_import():
+	"""This is just to persuade pyinstaller to include more of stdlib than is officially declared,
+	so that later uv pip installs work fine. Eventually we'll move this to the .spec file or somewhere"""
+
+
 def setup_process(env_context: dict[str, str]):
 	"""Invoke at the start of each new process. Configures logging etc"""
 	logging.basicConfig(level=logging.INFO)  # TODO replace with config

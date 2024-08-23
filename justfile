@@ -28,7 +28,7 @@ run_venv model_repo:
 	FIAB_MODEL_REPO={{model_repo}} python -m forecastbox.standalone.entrypoint
 
 # builds the single executable
-dist model_repo:
+dist_full model_repo:
 	# NOTE collect all (default, earthkit) + metadata copy (earthkit) is needed to make earthkit even importible
 	# NOTE climetlab, aifs, torch_geometric, pil and einops are needed for aifs suite to work
 	# NOTE coreforecast (needed by neuralforecast lib) by default misses libcoreforecast.so
@@ -45,8 +45,31 @@ dist model_repo:
 		--add-data "{{model_repo}}:forecastbox/external/models" \
 		./src/forecastbox/standalone/entrypoint.py
 	# NOTE add -F to build a single executable -- but prolongs build time by about 10 min and can crash due to size
-	# NOTE disabled until nbeats supported
 	# NOTE once dlls etc needed https://pyinstaller.org/en/stable/spec-files.html#adding-files-to-the-bundle
+
+dist model_repo:
+	# like dist_full, but assumes all tasks install their own env using the TaskEnvironment
+	# NOTE we exclude a few of things, but that will vanish once forecastbox.external will become truly external
+	pyinstaller \
+		--noconfirm \
+		--collect-submodules=forecastbox --add-data "src/forecastbox/frontend/static/*html:forecastbox/frontend/static" \
+		--exclude-module=torch \
+		--exclude-module=numpy \
+		--exclude-module=PIL \
+		--exclude-module=earthkit \
+		--exclude-module=climetlab \
+		--exclude-module=anemoi \
+		--exclude-module=dask \
+		--exclude-module=gribapi \
+		--exclude-module=IPython \
+		--exclude-module=ecmwflibs \
+		--exclude-module=pandas \
+		--exclude-module=numcodecs \
+		--exclude-module=netCDF4 \
+		--add-binary ./.venv/bin/uv:uv \
+		--add-data "{{model_repo}}:forecastbox/external/models" \
+		./src/forecastbox/standalone/entrypoint.py
+	# NOTE add -F to build a single executable -- but prolongs both build and run times
 
 # runs the single executable
 run_dist:
