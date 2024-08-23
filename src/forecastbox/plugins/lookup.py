@@ -106,6 +106,7 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 						},
 						entrypoint="forecastbox.external.hello_earth.entrypoint_marsquery",
 						output_class="png",  # I guess
+						environment=TaskEnvironment(packages=["numpy<2.0.0", "ecmwf-api-client", "earthkit-data", "earthkit-plots"]),
 					),
 				)
 			]
@@ -147,6 +148,14 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 						},
 						entrypoint="forecastbox.external.hello_aifs.entrypoint_forecast",
 						output_class="grib",
+						environment=TaskEnvironment(
+							packages=[
+								"numpy<2.0.0",
+								"torch",
+								"climetlab",
+								"anemoi-inference",
+							]
+						),  # NOTE this doesnt work yet because the aifs mono aint pypi accessible
 					),
 				),
 				(
@@ -156,6 +165,7 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 						entrypoint="forecastbox.external.hello_aifs.entrypoint_plot",
 						output_class="png",  # I guess
 						dynamic_param_classes={"input_grib": "grib"},
+						environment=TaskEnvironment(packages=["numpy<2.0.0", "earthkit-data", "earthkit-plots"]),
 					),
 				),
 			]

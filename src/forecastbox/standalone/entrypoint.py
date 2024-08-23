@@ -1,3 +1,5 @@
+# ruff: noqa: F401
+
 import logging
 import webbrowser
 import time
@@ -13,6 +15,21 @@ logger = logging.getLogger(__name__)
 def dummy_import():
 	"""This is just to persuade pyinstaller to include more of stdlib than is officially declared,
 	so that later uv pip installs work fine. Eventually we'll move this to the .spec file or somewhere"""
+	# fmt: off
+	# torch
+	import pdb
+	import timeit
+	import difflib
+	import cmath
+	import pickletools
+	import unittest.mock
+	# earthkit
+	import fileinput
+	import zoneinfo
+	import sqlite3
+	import plistlib
+	import ctypes.util
+	# fmt: on
 
 
 def setup_process(env_context: dict[str, str]):
