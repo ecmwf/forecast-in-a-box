@@ -12,7 +12,7 @@ from multiprocessing import Process
 from multiprocessing.shared_memory import SharedMemory
 from forecastbox.worker.db import MemDb
 import forecastbox.worker.environment_manager as environment_manager
-from typing import Callable, Any
+from typing import Callable, Any, cast
 import importlib
 import logging
 import hashlib
@@ -36,7 +36,9 @@ def get_process_target(task: Task) -> Callable:
 def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str, definition: TaskDAG) -> None:
 	logging.basicConfig(level=logging.DEBUG)  # TODO replace with config
 	notify_update(callback_context, job_id, JobStatusEnum.preparing, task_name=None)
-	env_context = environment_manager.prepare(job_id, sum((task.environment for task in definition.tasks), TaskEnvironment()))
+	# mypy bug
+	environment = cast(TaskEnvironment, sum((task.environment for task in definition.tasks), TaskEnvironment()))
+	env_context = environment_manager.prepare(job_id, environment)
 	notify_update(callback_context, job_id, JobStatusEnum.running, task_name=None)
 
 	try:
