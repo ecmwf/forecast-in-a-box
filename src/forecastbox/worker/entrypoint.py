@@ -6,11 +6,12 @@ Target for a new launched process corresponding to a single task
 # TODO move some of the memory management parts into worker/db.py
 
 from forecastbox.worker.reporting import notify_update, CallbackContext
-from forecastbox.api.common import Task, TaskDAG, JobStatusEnum
+from forecastbox.api.common import Task, TaskDAG, JobStatusEnum, TaskEnvironment
 from forecastbox.worker.db import DbContext
 from multiprocessing import Process
 from multiprocessing.shared_memory import SharedMemory
 from forecastbox.worker.db import MemDb
+import forecastbox.worker.environment_manager as environment_manager
 from typing import Callable, Any
 import importlib
 import logging
@@ -34,6 +35,8 @@ def get_process_target(task: Task) -> Callable:
 
 def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str, definition: TaskDAG) -> None:
 	logging.basicConfig(level=logging.DEBUG)  # TODO replace with config
+	notify_update(callback_context, job_id, JobStatusEnum.preparing, task_name=None)
+	env_context = environment_manager.prepare(job_id, sum((task.environment for task in definition.tasks), TaskEnvironment()))
 	notify_update(callback_context, job_id, JobStatusEnum.running, task_name=None)
 
 	try:
@@ -83,6 +86,9 @@ def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str
 		# TODO free all datasets
 		logger.exception(f"job with {job_id=} failed")
 		notify_update(callback_context, job_id, JobStatusEnum.failed)
+	finally:
+		if env_context is not None:
+			env_context.cleanup()
 
 
 def job_factory(callback_context: CallbackContext, db_context: DbContext, job_id: str, definition: TaskDAG) -> Process:

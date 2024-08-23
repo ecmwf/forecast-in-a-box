@@ -41,6 +41,14 @@ class TaskParameter(BaseModel):
 	default: str = ""  # always string because we put it to html form... will be deserd via type_name
 
 
+class TaskEnvironment(BaseModel):
+	packages: list[str] = Field(description="module names + optionally versions, in the pip format", default_factory=list)
+
+	def __add__(self, other: Self) -> Self:
+		# consider using pyrsistent here
+		return self.__class__(packages=self.packages + other.packages)
+
+
 class TaskDefinition(BaseModel):
 	"""Used for generating input forms and parameter validation"""
 
@@ -48,7 +56,7 @@ class TaskDefinition(BaseModel):
 	user_params: dict[str, TaskParameter]
 	output_class: str  # not eval'd, can be anything
 	dynamic_param_classes: dict[str, str] = Field(default_factory=dict)
-	# TODO environment
+	environment: TaskEnvironment = Field(default_factory=TaskEnvironment)
 
 
 class Task(BaseModel):
@@ -60,6 +68,7 @@ class Task(BaseModel):
 	dataset_inputs: dict[str, DatasetId]
 	entrypoint: str = Field(description="python_module.submodules.function_name")
 	output_name: Optional[DatasetId]  # TODO maybe replace with a method yielding just name
+	environment: TaskEnvironment
 
 
 class TaskDAG(BaseModel):
@@ -85,12 +94,18 @@ class JobId(BaseModel):
 
 
 class JobStatusEnum(str, Enum):
-	# TODO this is on the whole job (ie, task dag) level. Granularize into task level
 	submitted = "submitted"
 	assigned = "assigned"
+	preparing = "preparing"
 	running = "running"
 	failed = "failed"
 	finished = "finished"
+
+	@classmethod
+	def valid_transition(cls, before: Optional[Self], after: Self) -> bool:
+		# maybe mixin int (for ordinality), but be careful about pydantic serde
+		lookup = list(cls)  # maybe cache
+		return before is None or lookup.index(before) < lookup.index(after)
 
 
 class JobStatus(BaseModel):

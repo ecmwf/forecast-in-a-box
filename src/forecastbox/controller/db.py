@@ -86,15 +86,19 @@ async def job_assign(job_id: str) -> None:
 
 
 def job_update(status_update: JobStatusUpdate) -> JobStatus:
-	status = job_db[status_update.job_id.job_id].status  # or copy and then replace?
+	status = job_db[status_update.job_id.job_id].status  # or copy and then replace? Use pyrsistent?
 	if status_update.task_name:
-		status.stages[status_update.task_name] = status_update.status
+		if JobStatusEnum.valid_transition(status.stages.get(status_update.task_name, None), status_update.status):
+			status.stages[status_update.task_name] = status_update.status
 	else:
-		status.status = status_update.status  # whoa, what a stately line
-	status.updated_at = dt.datetime.utcnow()
+		if JobStatusEnum.valid_transition(status.status, status_update.status):
+			status.status = status_update.status
 	if status_update.result:
 		status.result = status_update.result
 
+	# we may change `updated_at` even if no data have changed, but thats intentional
+	# other option would be to also have `worker_updated_at`, but thats harder to reason about
+	status.updated_at = dt.datetime.utcnow()
 	return status
 
 

@@ -41,6 +41,7 @@ def build(job_template: JobTemplate, params: dict[str, str]) -> Either[TaskDAG, 
 			dataset_inputs={k: DatasetId(dataset_id=v) for k, v in job_template.dynamic_task_inputs.get(task_name, {}).items()},
 			entrypoint=task_definition.entrypoint,
 			output_name=DatasetId(dataset_id=task_name),
+			environment=task_definition.environment,
 		)
 		for task_name, task_definition in job_template.tasks
 	]
