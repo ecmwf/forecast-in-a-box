@@ -4,7 +4,7 @@ Utils for converting user inputs into schedulable job template
 Currently all is hardcoded, but will be replaced by reading from external, either as code or as config
 """
 
-from forecastbox.api.common import JobTemplate, TaskDefinition, JobTypeEnum, TaskParameter
+from forecastbox.api.common import JobTemplate, TaskDefinition, JobTypeEnum, TaskParameter, TaskEnvironment
 import forecastbox.api.validation as validation
 from forecastbox.utils import assert_never, Either
 
@@ -69,6 +69,7 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 						},
 						entrypoint="forecastbox.external.hello_torch.entrypoint",
 						output_class="str",
+						environment=TaskEnvironment(packages=["torch"]),
 					),
 				)
 			]

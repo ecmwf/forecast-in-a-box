@@ -11,12 +11,14 @@ from forecastbox.api.common import TaskEnvironment
 import tempfile
 import subprocess
 from typing import Optional
+import sys
 
 
 def prepare(job_id: str, environment: TaskEnvironment) -> Optional[tempfile.TemporaryDirectory]:
 	if environment.packages:
 		td = tempfile.TemporaryDirectory()
 		subprocess.run(["uv", "pip", "install", "--target", td.name] + environment.packages, check=True)
+		sys.path.append(td.name)
 		return td
 	else:
 		return None
