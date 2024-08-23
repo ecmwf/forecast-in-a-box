@@ -167,7 +167,7 @@ def entrypoint_forecast(predicted_param: str, target_step: int) -> bytes:
 	return obuf.getvalue()
 
 
-def entrypoint_plot(inmemview: memoryview, inmemview_len: int) -> bytes:
+def entrypoint_plot(input_grib: memoryview, input_grib_len: int) -> bytes:
 	# config
 	plot_idx = 0
 	domain = [-15, 35, 32, 72]  # TODO param
@@ -175,7 +175,7 @@ def entrypoint_plot(inmemview: memoryview, inmemview_len: int) -> bytes:
 	# data
 	# grib_reader = earthkit.data.from_source("file", path="/tmp/output.grib")
 	# NOTE the buffer is padded by zeroes due to how shm works, so we need to trim by length
-	ibuf = io.BytesIO(inmemview[:inmemview_len])
+	ibuf = io.BytesIO(input_grib[:input_grib_len])
 	grib_reader = earthkit.data.from_source("stream", ibuf, read_all=True)
 
 	figure = earthkit.plots.Figure()

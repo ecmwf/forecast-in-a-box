@@ -155,7 +155,7 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 								"climetlab",
 								"anemoi-inference",
 							]
-						),  # NOTE this doesnt work yet because the aifs mono aint pypi accessible
+						),  # NOTE this doesnt work yet because the aifs mono aint pypi accessible; venv needed
 					),
 				),
 				(
