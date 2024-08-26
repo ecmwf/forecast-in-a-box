@@ -38,10 +38,10 @@ class RegisteredTask(str, Enum):
 	display_numpy_array = "display_numpy_array"
 	hello_torch = "hello_torch"
 	hello_image = "hello_image"
-	query_mars_grib_plot = "query_mars_grib_plot"
+	mars_oper_sfc_box = "mars_oper_sfc_box"
+	mars_enfo_range_temp = "mars_enfo_range_temp"
 	aifs_fetch_and_predict = "aifs_fetch_and_predict"
 	plot_single_grib = "plot_single_grib"
-	query_mars_numpy = "query_mars_numpy"
 	nbeats_predict = "nbeats_predict"
 
 

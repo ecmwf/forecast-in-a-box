@@ -64,17 +64,17 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 				output_class="png",
 				environment=TaskEnvironment(packages=["Pillow"]),
 			)
-		case RegisteredTask.query_mars_grib_plot:
+		case RegisteredTask.mars_oper_sfc_box:
 			return TaskDefinition(
 				user_params={
 					"days_ago": TaskParameter(clazz="int"),
-					"midnight_or_noon": TaskParameter(clazz="int"),
+					"step": TaskParameter(clazz="int"),
 					"box_center_lat": TaskParameter(clazz="latitude"),
 					"box_center_lon": TaskParameter(clazz="longitude"),
-					"param": TaskParameter(clazz="marsParam"),
+					"params": TaskParameter(clazz="marsParams"),
 				},
-				entrypoint="forecastbox.external.hello_earth.entrypoint_marsquery",
-				output_class="png",  # I guess
+				entrypoint="forecastbox.external.mars.oper_sfc_box_query",
+				output_class="grib",
 				environment=TaskEnvironment(packages=["numpy<2.0.0", "ecmwf-api-client", "earthkit-data", "earthkit-plots"]),
 			)
 		case RegisteredTask.aifs_fetch_and_predict:
@@ -99,19 +99,20 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 				user_params={
 					"box_center_lat": TaskParameter(clazz="latitude"),
 					"box_center_lon": TaskParameter(clazz="longitude"),
+					"grib_idx": TaskParameter(clazz="int", default="0"),
 				},
 				entrypoint="forecastbox.external.plotting.plot_single_grib",
 				output_class="png",  # I guess
 				dynamic_param_classes={"input_grib": "grib"},
 				environment=TaskEnvironment(packages=["numpy<2.0.0", "earthkit-data", "earthkit-plots"]),
 			)
-		case RegisteredTask.query_mars_numpy:
+		case RegisteredTask.mars_enfo_range_temp:
 			return TaskDefinition(
 				user_params={
 					"lat": TaskParameter(clazz="latitude"),
 					"lon": TaskParameter(clazz="longitude"),
 				},
-				entrypoint="forecastbox.external.temperature_nbeats.get_data",
+				entrypoint="forecastbox.external.mars.enfo_range_temp_query",
 				output_class="ndarray",
 			)
 		case RegisteredTask.nbeats_predict:
@@ -178,9 +179,9 @@ def resolve_example(job_type: JobTemplateExample) -> Either[JobTemplate, str]:
 		case JobTemplateExample.hello_image:
 			return resolve_builder_linear([RegisteredTask.hello_image])
 		case JobTemplateExample.hello_earth:
-			return resolve_builder_linear([RegisteredTask.query_mars_grib_plot])
+			return resolve_builder_linear([RegisteredTask.mars_oper_sfc_box, RegisteredTask.plot_single_grib])
 		case JobTemplateExample.temperature_nbeats:
-			return resolve_builder_linear([RegisteredTask.query_mars_numpy, RegisteredTask.nbeats_predict])
+			return resolve_builder_linear([RegisteredTask.mars_enfo_range_temp, RegisteredTask.nbeats_predict])
 		case JobTemplateExample.hello_aifsl:
 			return resolve_builder_linear([RegisteredTask.aifs_fetch_and_predict, RegisteredTask.plot_single_grib])
 		case s:

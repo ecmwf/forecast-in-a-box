@@ -22,12 +22,12 @@ def longitude(value: str) -> float:
 	return f
 
 
-def marsParam(value: str) -> str:
-	# TODO more params, perhaps also some granularity... is this even valid?
-	marsParams = ["2t", "q"]
-	if value not in marsParams:
-		raise TypeError(f"Not a valid mars parameter: {value}")
-	return value
+def marsParams(value: str) -> list[str]:
+	# TODO can we even hardcode this?
+	# marsParams = ["2t", "q"]
+	# if value not in marsParams:
+	# raise TypeError(f"Not a valid mars parameter: {value}")
+	return [e.strip() for e in value.split(",")]
 
 
 def convert(into: str, value: str) -> Either[Any, str]:
