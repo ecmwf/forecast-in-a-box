@@ -3,30 +3,11 @@ A very simplistic ML model for forecasting temperature using NBEATS
 """
 
 import logging
-import datetime as dt
 import pandas as pd
 import numpy as np
 import forecastbox.external.models
 
 logger = logging.getLogger(__name__)
-
-
-def get_data(lat: float, lon: float) -> bytes:
-	# NOTE we import here to keep it localized to the worker process only -- there is some fork issues otherwise
-	import earthkit.data
-
-	area = [lat + 5, lon - 5, lat - 5, lon + 5]
-	now = dt.datetime.utcnow() - dt.timedelta(days=1)
-	dates = [(now - dt.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(10)]
-	dates.reverse()
-	raw = earthkit.data.from_source(
-		"mars", step=0, stream="enfo", grid="O96", area=area, type="pf", number=1, date=dates, time=[0, 12], param="167.128", levtype="sfc"
-	)
-
-	means = raw.to_pandas().groupby(["datetime"]).value.mean().reset_index().rename(columns={"datetime": "ds", "value": "y"})
-	means.insert(0, "unique_id", 1)
-
-	return means.to_records(index=False).tobytes()
 
 
 def predict(input_df: memoryview, input_df_len: int) -> bytes:

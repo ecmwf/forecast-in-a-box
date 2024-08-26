@@ -109,7 +109,7 @@ class MarsInput(RequestBasedInput):
 		return cml.load_source("mars", kwargs)
 
 
-def entrypoint_forecast(predicted_param: str, target_step: int) -> bytes:
+def entrypoint_forecast(predicted_params: list[str], target_step: int) -> bytes:
 	# config TODO read from kwargs
 	model_path = forecastbox.external.models.get_path("aifs-small.ckpt")
 	relative_delay = dt.timedelta(days=1)  # TODO how to get a reliable date for which data would be available?
@@ -144,7 +144,7 @@ def entrypoint_forecast(predicted_param: str, target_step: int) -> bytes:
 		if "step" in kwargs or "endStep" in kwargs:
 			data = args[0]
 			template = kwargs.pop("template")
-			if template._metadata.get("param", "") == predicted_param and kwargs.get("step", -1) == target_step:
+			if template._metadata.get("param", "") in predicted_params and kwargs.get("step", -1) == target_step:
 				output_m.write(data, template=template, **kwargs)
 
 			if save_to_path:
