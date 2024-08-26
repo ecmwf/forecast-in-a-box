@@ -15,7 +15,7 @@ from starlette.responses import HTMLResponse, RedirectResponse
 from starlette.datastructures import UploadFile
 import jinja2
 import pkgutil
-from forecastbox.api.common import JobStatus, JobTypeEnum, TaskDAG
+from forecastbox.api.common import JobStatus, JobTemplateExample, TaskDAG, JobTemplate, RegisteredTask
 import forecastbox.scheduler as scheduler
 import forecastbox.plugins.lookup as plugin_lookup
 import logging
@@ -89,33 +89,47 @@ async def http_exception_handler(request, exc):
 async def index() -> str:
 	"""The user selects which job type to submit"""
 	template_params = {
-		"jobs": [e.value for e in JobTypeEnum],
+		"jobs": [e.value for e in JobTemplateExample],
 	}
 	return StaticExecutionContext.get().template_index.render(template_params)
 
 
 @app.post("/select")
-async def select(request: Request, job_type: Annotated[str, Form()]) -> RedirectResponse:
+async def select(request: Request, example_name: Annotated[str, Form()]) -> RedirectResponse:
 	"""Takes job type, returns redirect to form for filling out job parameters"""
-	redirect_url = request.url_for("prepare", job_type=job_type)
+	redirect_url = request.url_for("prepare_example", example_name=example_name)
 	return RedirectResponse(redirect_url, status_code=status.HTTP_303_SEE_OTHER)
 
 
-@app.get("/prepare/{job_type}", response_class=HTMLResponse)
-async def prepare(job_type: str) -> str:
-	"""The form for filling out job parameters and submitting the job itself"""
-	job_template = plugin_lookup.prepare(JobTypeEnum(job_type)).get_or_raise(client_error)
+def template_to_form_params(job_template: JobTemplate) -> list[tuple[str, str, str]]:
+	return [
+		(
+			f"{task_name}.{param_name}",
+			param.clazz,
+			param.default,
+		)
+		for task_name, task_definition in job_template.tasks
+		for param_name, param in task_definition.user_params.items()
+	]
+
+
+@app.get("/prepare_example/{example_name}", response_class=HTMLResponse)
+async def prepare_example(example_name: str) -> str:
+	"""The form for filling out job parameters and submitting the job itself, via a job template"""
+	job_template = plugin_lookup.resolve_example(JobTemplateExample(example_name)).get_or_raise(client_error)
+	template_params = {"job_name": example_name, "job_type": "example", "params": template_to_form_params(job_template)}
+	return StaticExecutionContext.get().template_prepare.render(template_params)
+
+
+@app.post("/prepare_builder", response_class=HTMLResponse)
+async def prepare_builder(job_pipeline: Annotated[str, Form()]) -> str:
+	"""The form for filling out job parameters and submitting the job itself, via custom built job"""
+	tasks = [RegisteredTask(e.strip()) for e in job_pipeline.split("->")]
+	template = plugin_lookup.resolve_builder_linear(tasks).get_or_raise(client_error)
 	template_params = {
-		"job_type": job_type,
-		"params": [
-			(
-				f"{task_name}.{param_name}",
-				param.clazz,
-				param.default,
-			)
-			for task_name, task_definition in job_template.tasks
-			for param_name, param in task_definition.user_params.items()
-		],
+		"job_name": job_pipeline,
+		"job_type": "custom",
+		"params": template_to_form_params(template),
 	}
 	return StaticExecutionContext.get().template_prepare.render(template_params)
 
@@ -136,7 +150,14 @@ async def submit_int(task_dag: TaskDAG) -> str:
 async def submit_form(request: Request) -> Union[RedirectResponse, TaskDAG]:
 	form = await request.form()
 	params = {k: v for k, v in form.items() if isinstance(v, str) and not k.startswith("fiab.int.")}
-	job_template = plugin_lookup.prepare(JobTypeEnum(params.pop("job_type"))).get_or_raise(client_error)
+	job_type, job_name = params.pop("job_type"), params.pop("job_name")
+	if job_type == "example":
+		job_template = plugin_lookup.resolve_example(JobTemplateExample(job_name)).get_or_raise(client_error)
+	elif job_type == "custom":
+		tasks = [RegisteredTask(e.strip()) for e in job_name.split("->")]
+		job_template = plugin_lookup.resolve_builder_linear(tasks).get_or_raise(client_error)
+	else:
+		raise NotImplementedError(job_type)
 	task_dag = scheduler.build(job_template, params).get_or_raise(client_error)
 	if "fiab.int.action.launch" in form:
 		job_id = await submit_int(task_dag)

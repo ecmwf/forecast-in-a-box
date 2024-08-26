@@ -31,6 +31,8 @@ def entrypoint_marsquery(days_ago: int, midnight_or_noon: int, box_center_lat: f
 		param=param,
 	)
 
+	# TODO split in two
+
 	buf = io.BytesIO()
 
 	figure = earthkit.plots.Figure()

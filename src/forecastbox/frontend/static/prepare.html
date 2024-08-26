@@ -2,8 +2,9 @@
 
 Enter Job Parameters:
 <form action="/submit_form" method="post">
-	<label for="job_type">Job:</label><br>
-	<input type="text" id="job_type" name="job_type" value="{{ job_type }}" readonly><br>
+	<label for="job_name">Job:</label><br>
+	<input type="text" id="job_name" name="job_name" value="{{ job_name }}" readonly><br>
+	<input type="hidden" id="job_type" name="job_type" value="{{ job_type }}">
 
 	{% for e in params %}
 		<label for="{{ e[0] }}">{{ e[0] }} (of type {{ e[1] }}):</label><br>

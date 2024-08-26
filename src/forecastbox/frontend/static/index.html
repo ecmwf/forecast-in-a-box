@@ -1,9 +1,12 @@
 <!doctype html><title>Forecast In A Box: Submit A Job</title>
 
+<h2> Choose your Destiny </h2>
+
+<h3> Prepare a job based on example template </h3>
 <form action="/select" method="post">
 	Select which job type you'd like to submit:<br>
 	{% for e in jobs %}
-		<input type="radio" id="{{ e }}" name="job_type" value="{{ e }}">
+		<input type="radio" id="{{ e }}" name="example_name" value="{{ e }}">
 		<label for="{{ e }}">{{ e }}</label><br>
 	{% endfor %}
 
@@ -12,6 +15,21 @@
 
 <br>
 <br>
+
+<h3> Prepare a job using Fancy Interactive Action Builder </h3>
+
+<form action="/prepare_builder" method="post">
+	(Pretend this is JavaScript)<br>
+  	<label for="job_pipeline">Fill in the job pipeline:</label>
+	<input type="text" id="job_pipeline" name="job_pipeline">
+	<br>
+	<input type="submit" value="Build Job Pipeline">
+</form>
+
+<br>
+<br>
+
+<h3> Submit a job using existing configuration file </h3>
 
 <form action="/submit_file" enctype="multipart/form-data" method="post">
 	Or launch a job from a prepared config:<br>

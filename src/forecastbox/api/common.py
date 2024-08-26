@@ -12,7 +12,7 @@ from typing_extensions import Self
 import base64
 
 
-class JobTypeEnum(str, Enum):
+class JobTemplateExample(str, Enum):
 	"""Job Catalog"""
 
 	# NOTE this will get eventually replaced by external import/lookup system
@@ -24,8 +24,25 @@ class JobTypeEnum(str, Enum):
 	hello_tasks = "hello_tasks"
 	hello_earth = "hello_earth"
 	hello_aifsl = "hello_aifsl"
-
 	temperature_nbeats = "temperature_nbeats"
+
+
+class RegisteredTask(str, Enum):
+	"""Job Catalog"""
+
+	# NOTE this will get eventually replaced by external import/lookup system
+	# See plugin/lookup.py
+
+	hello_world = "hello_world"
+	create_numpy_array = "create_numpy_array"
+	display_numpy_array = "display_numpy_array"
+	hello_torch = "hello_torch"
+	hello_image = "hello_image"
+	query_mars_grib_plot = "query_mars_grib_plot"
+	aifs_fetch_and_predict = "aifs_fetch_and_predict"
+	plot_single_grib = "plot_single_grib"
+	query_mars_numpy = "query_mars_numpy"
+	nbeats_predict = "nbeats_predict"
 
 
 class DatasetId(BaseModel):
@@ -75,7 +92,6 @@ class TaskDAG(BaseModel):
 	"""Represents a complete (distributed) computation, consisting of atomic Tasks.
 	Needs no further user input, finishes with the output that the user specified."""
 
-	job_type: JobTypeEnum
 	tasks: list[Task]  # assumed to be in topological (ie, computable) order -- eg, schedule
 	output_id: Optional[DatasetId]
 	# TODO add in free(dataset_id) events into the tasks
@@ -83,7 +99,6 @@ class TaskDAG(BaseModel):
 
 
 class JobTemplate(BaseModel):
-	job_type: JobTypeEnum
 	tasks: list[tuple[str, TaskDefinition]]  # NOTE already assumed to be in (some) topological order
 	dynamic_task_inputs: dict[str, dict[str, str]]  # task_name: {param_name: data_source}
 	final_output_at: str
