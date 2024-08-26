@@ -1,12 +1,22 @@
 <!doctype html><title>Forecast In A Box: Submit A Job</title>
 
-Select which job type you'd like to submit:<br>
-
 <form action="/select" method="post">
+	Select which job type you'd like to submit:<br>
 	{% for e in jobs %}
 		<input type="radio" id="{{ e }}" name="job_type" value="{{ e }}">
 		<label for="{{ e }}">{{ e }}</label><br>
 	{% endfor %}
 
-	<input type="submit" value="Select">
+	<input type="submit" value="Select Job Template">
+</form>
+
+<br>
+<br>
+
+<form action="/submit_file" enctype="multipart/form-data" method="post">
+	Or launch a job from a prepared config:<br>
+	<label for="config_file">Upload a file with config:</label>
+	<input type="file" id="config_file" name="config_file">
+	<br>
+	<input type="submit" value="Launch Job">
 </form>

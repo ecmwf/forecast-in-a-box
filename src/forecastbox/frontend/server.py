@@ -7,13 +7,15 @@ endpoints:
   [get]  /jobs/{job_id}	=> returns job.html with JobStatus / JobResult
 """
 
-from typing_extensions import Self
+import orjson
+from typing_extensions import Self, Union
 from fastapi import FastAPI, Form, Request, HTTPException, status
 from typing import Annotated, Optional
 from starlette.responses import HTMLResponse, RedirectResponse
+from starlette.datastructures import UploadFile
 import jinja2
 import pkgutil
-from forecastbox.api.common import JobStatus, JobTypeEnum
+from forecastbox.api.common import JobStatus, JobTypeEnum, TaskDAG
 import forecastbox.scheduler as scheduler
 import forecastbox.plugins.lookup as plugin_lookup
 import logging
@@ -118,11 +120,7 @@ async def prepare(job_type: str) -> str:
 	return StaticExecutionContext.get().template_prepare.render(template_params)
 
 
-@app.post("/submit")
-async def submit(request: Request) -> RedirectResponse:
-	params = {k: v for k, v in (await request.form()).items() if isinstance(v, str)}
-	job_template = plugin_lookup.prepare(JobTypeEnum(params.pop("job_type"))).get_or_raise(client_error)
-	task_dag = scheduler.build(job_template, params).get_or_raise(client_error)
+async def submit_int(task_dag: TaskDAG) -> str:
 	async with httpx.AsyncClient() as client:  # TODO pool the client
 		response_raw = await client.put(StaticExecutionContext.get().job_submit_url, json=task_dag.model_dump())
 		if response_raw.status_code != httpx.codes.OK:
@@ -131,12 +129,39 @@ async def submit(request: Request) -> RedirectResponse:
 			raise HTTPException(status_code=500, detail="Internal Server Error")
 		response_json = response_raw.json()  # TODO how is this parsed? Orjson?
 		job_status = JobStatus(**response_json)
-	redirect_url = request.url_for("job_status", job_id=job_status.job_id.job_id)
+	return job_status.job_id.job_id
+
+
+@app.post("/submit_form", response_model=None)
+async def submit_form(request: Request) -> Union[RedirectResponse, TaskDAG]:
+	form = await request.form()
+	params = {k: v for k, v in form.items() if isinstance(v, str) and not k.startswith("fiab.int.")}
+	job_template = plugin_lookup.prepare(JobTypeEnum(params.pop("job_type"))).get_or_raise(client_error)
+	task_dag = scheduler.build(job_template, params).get_or_raise(client_error)
+	if "fiab.int.action.launch" in form:
+		job_id = await submit_int(task_dag)
+		redirect_url = request.url_for("job_status", job_id=job_id)
+		return RedirectResponse(redirect_url, status_code=status.HTTP_303_SEE_OTHER)
+		# NOTE we dont really want to redirect since we *have* the status.
+		# The code below returns that templated, but doesnt change URL so refresh wont work. Dont forget to add response_class=HTMLResponse
+		# template_params = {**job_status.model_dump(), "refresh_url": f"jobs/{job_status.job_id.job_id}"}
+		# return StaticExecutionContext.get().template_job.render(template_params)
+	elif "fiab.int.action.store" in form:
+		return task_dag
+	else:
+		raise NotImplementedError("not found any support form action")
+
+
+@app.post("/submit_file")
+async def submit_file(request: Request) -> RedirectResponse:
+	form = await request.form()
+	if not isinstance(form["config_file"], UploadFile):
+		raise TypeError(type(form["config_file"]))
+	contents = orjson.loads(await form["config_file"].read())
+	task_dag = TaskDAG(**contents)
+	job_id = await submit_int(task_dag)
+	redirect_url = request.url_for("job_status", job_id=job_id)
 	return RedirectResponse(redirect_url, status_code=status.HTTP_303_SEE_OTHER)
-	# NOTE we dont really want to redirect since we *have* the status.
-	# The code below returns that templated, but doesnt change URL so refresh wont work. Dont forget to add response_class=HTMLResponse
-	# template_params = {**job_status.model_dump(), "refresh_url": f"jobs/{job_status.job_id.job_id}"}
-	# return StaticExecutionContext.get().template_job.render(template_params)
 
 
 @app.get("/jobs/{job_id}", response_class=HTMLResponse)
