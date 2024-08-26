@@ -1,12 +1,15 @@
 """
 Utils for converting user inputs into schedulable job template
 
-Currently all is hardcoded, but will be replaced by reading from external, either as code or as config
+Currently most is hardcoded, but will be replaced by reading from external, either as code or as config
 """
 
+import logging
 from forecastbox.api.common import RegisteredTask, JobTemplate, TaskDefinition, JobTemplateExample, TaskParameter, TaskEnvironment
 import forecastbox.api.validation as validation
 from forecastbox.utils import assert_never, Either
+
+logger = logging.getLogger(__name__)
 
 
 def get_task(task: RegisteredTask) -> TaskDefinition:
@@ -120,6 +123,23 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 			)
 		case s:
 			assert_never(s)
+
+
+def build_pipeline(job_pipeline: str) -> Either[list[RegisteredTask], list[str]]:
+	# NOTE this would probably become a javascript thingy
+	tasks: list[RegisteredTask] = []
+	errors: list[str] = []
+	for task in job_pipeline.split("->"):
+		try:
+			tasks.append(RegisteredTask(task.strip()))
+		except Exception as e:
+			emsg = f"failed to parse task {task[:32]} due to {repr(e)}"
+			logger.exception(emsg)
+			errors.append(emsg)
+	if errors:
+		return Either.error(errors)
+	else:
+		return Either.ok(tasks)
 
 
 def resolve_builder_linear(task_names: list[RegisteredTask]) -> Either[JobTemplate, str]:

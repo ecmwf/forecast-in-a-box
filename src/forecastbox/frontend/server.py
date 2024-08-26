@@ -15,7 +15,7 @@ from starlette.responses import HTMLResponse, RedirectResponse
 from starlette.datastructures import UploadFile
 import jinja2
 import pkgutil
-from forecastbox.api.common import JobStatus, JobTemplateExample, TaskDAG, JobTemplate, RegisteredTask
+from forecastbox.api.common import JobStatus, JobTemplateExample, TaskDAG, JobTemplate
 import forecastbox.scheduler as scheduler
 import forecastbox.plugins.lookup as plugin_lookup
 import logging
@@ -124,8 +124,8 @@ async def prepare_example(example_name: str) -> str:
 @app.post("/prepare_builder", response_class=HTMLResponse)
 async def prepare_builder(job_pipeline: Annotated[str, Form()]) -> str:
 	"""The form for filling out job parameters and submitting the job itself, via custom built job"""
-	tasks = [RegisteredTask(e.strip()) for e in job_pipeline.split("->")]
-	template = plugin_lookup.resolve_builder_linear(tasks).get_or_raise(client_error)
+	task_pipeline = plugin_lookup.build_pipeline(job_pipeline).get_or_raise(client_error)
+	template = plugin_lookup.resolve_builder_linear(task_pipeline).get_or_raise(client_error)
 	template_params = {
 		"job_name": job_pipeline,
 		"job_type": "custom",
@@ -154,8 +154,8 @@ async def submit_form(request: Request) -> Union[RedirectResponse, TaskDAG]:
 	if job_type == "example":
 		job_template = plugin_lookup.resolve_example(JobTemplateExample(job_name)).get_or_raise(client_error)
 	elif job_type == "custom":
-		tasks = [RegisteredTask(e.strip()) for e in job_name.split("->")]
-		job_template = plugin_lookup.resolve_builder_linear(tasks).get_or_raise(client_error)
+		task_pipeline = plugin_lookup.build_pipeline(job_name).get_or_raise(client_error)
+		job_template = plugin_lookup.resolve_builder_linear(task_pipeline).get_or_raise(client_error)
 	else:
 		raise NotImplementedError(job_type)
 	task_dag = scheduler.build(job_template, params).get_or_raise(client_error)
