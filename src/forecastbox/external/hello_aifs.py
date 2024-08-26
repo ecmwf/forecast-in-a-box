@@ -167,10 +167,10 @@ def entrypoint_forecast(predicted_param: str, target_step: int) -> bytes:
 	return obuf.getvalue()
 
 
-def entrypoint_plot(input_grib: memoryview, input_grib_len: int) -> bytes:
-	# config
-	plot_idx = 0
-	domain = [-15, 35, 32, 72]  # TODO param
+def entrypoint_plot(input_grib: memoryview, input_grib_len: int, box_center_lat: float, box_center_lon: float) -> bytes:
+	plot_idx = 0  # determined by the forecast step in the prev step
+	# plot_box = [-15, 35, 32, 72]
+	plot_box = [box_center_lon - 20, box_center_lon + 20, box_center_lat - 20, box_center_lat + 20]
 
 	# data
 	# grib_reader = earthkit.data.from_source("file", path="/tmp/output.grib")
@@ -179,9 +179,7 @@ def entrypoint_plot(input_grib: memoryview, input_grib_len: int) -> bytes:
 	grib_reader = earthkit.data.from_source("stream", ibuf, read_all=True)
 
 	figure = earthkit.plots.Figure()
-	# TODO configurable bounding box
-	chart = earthkit.plots.Map(domain=domain)
-	# TODO configurable param
+	chart = earthkit.plots.Map(domain=plot_box)
 	chart.block(grib_reader[plot_idx])
 	chart.coastlines()
 	chart.gridlines()

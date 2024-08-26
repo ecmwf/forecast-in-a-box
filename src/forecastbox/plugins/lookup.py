@@ -103,6 +103,9 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 						user_params={
 							"days_ago": TaskParameter(clazz="int"),
 							"midnight_or_noon": TaskParameter(clazz="int"),
+							"box_center_lat": TaskParameter(clazz="latitude"),
+							"box_center_lon": TaskParameter(clazz="longitude"),
+							"param": TaskParameter(clazz="marsParam"),
 						},
 						entrypoint="forecastbox.external.hello_earth.entrypoint_marsquery",
 						output_class="png",  # I guess
@@ -118,8 +121,8 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 					"get_data",
 					TaskDefinition(
 						user_params={
-							"lat": TaskParameter(clazz="int"),
-							"lon": TaskParameter(clazz="int"),
+							"lat": TaskParameter(clazz="latitude"),
+							"lon": TaskParameter(clazz="longitude"),
 						},
 						entrypoint="forecastbox.external.temperature_nbeats.get_data",
 						output_class="ndarray",
@@ -143,7 +146,7 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 					"fetch_and_predict",
 					TaskDefinition(
 						user_params={
-							"predicted_param": TaskParameter(clazz="str"),  # 2t
+							"predicted_param": TaskParameter(clazz="marsParam"),
 							"target_step": TaskParameter(clazz="int"),  # hours, div by 6
 						},
 						entrypoint="forecastbox.external.hello_aifs.entrypoint_forecast",
@@ -161,7 +164,10 @@ def prepare(job_type: JobTypeEnum) -> Either[JobTemplate, str]:
 				(
 					"plot",
 					TaskDefinition(
-						user_params={},
+						user_params={
+							"box_center_lat": TaskParameter(clazz="latitude"),
+							"box_center_lon": TaskParameter(clazz="longitude"),
+						},
 						entrypoint="forecastbox.external.hello_aifs.entrypoint_plot",
 						output_class="png",  # I guess
 						dynamic_param_classes={"input_grib": "grib"},

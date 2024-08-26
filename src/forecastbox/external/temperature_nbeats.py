@@ -11,7 +11,7 @@ import forecastbox.external.models
 logger = logging.getLogger(__name__)
 
 
-def get_data(lat: int, lon: int) -> bytes:
+def get_data(lat: float, lon: float) -> bytes:
 	# NOTE we import here to keep it localized to the worker process only -- there is some fork issues otherwise
 	import earthkit.data
 
