@@ -87,5 +87,5 @@ run_docker:
 clean:
 	find . -name '*.egg-info' -exec rm -fr {} +
 	find . -name '__pycache__' -exec rm -fr {} +
-	rm -rf build dist
+	rm -rf build dist lightning_logs
 	rm entrypoint.spec # NOTE we may want to actually preserve this, presumably after `dist` refactor. Don't forget to remove from .gitignore then
