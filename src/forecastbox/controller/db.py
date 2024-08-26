@@ -50,6 +50,7 @@ def job_submit(definition: TaskDAG) -> JobStatus:
 		created_at=dt.datetime.utcnow(),
 		updated_at=dt.datetime.utcnow(),
 		status=JobStatusEnum.submitted,
+		status_detail="",
 		result=None,
 	)
 	job_db[job_id] = Job(status=status, definition=definition, worker_id=None)
@@ -95,6 +96,8 @@ def job_update(status_update: JobStatusUpdate) -> JobStatus:
 			status.status = status_update.status
 	if status_update.result:
 		status.result = status_update.result
+	if status_update.status_detail:
+		status.status_detail = status_update.status_detail
 
 	# we may change `updated_at` even if no data have changed, but thats intentional
 	# other option would be to also have `worker_updated_at`, but thats harder to reason about

@@ -113,6 +113,7 @@ class JobStatus(BaseModel):
 	created_at: dt.datetime
 	updated_at: dt.datetime
 	status: JobStatusEnum
+	status_detail: str
 	stages: dict[str, JobStatusEnum] = Field(default_factory=dict)
 	result: Optional[str] = Field(description="URL where the result can be streamed from")
 
@@ -122,6 +123,7 @@ class JobStatusUpdate(BaseModel):
 	status: JobStatusEnum
 	task_name: Optional[str] = None
 	result: Optional[str] = None
+	status_detail: Optional[str] = None
 
 
 # controller: workers
