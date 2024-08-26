@@ -6,7 +6,7 @@ from forecastbox.api.common import (
 	WorkerId,
 	TaskDAG,
 	Task,
-	JobTypeEnum,
+	JobTemplateExample,
 	DatasetId,
 	TaskEnvironment,
 )
@@ -37,7 +37,7 @@ def test_job_submit():
 		output_name=DatasetId(dataset_id="output"),
 		environment=TaskEnvironment(),
 	)
-	job_definition = TaskDAG(job_type=JobTypeEnum.hello_world, tasks=[task], output_id=DatasetId(dataset_id="output"))
+	job_definition = TaskDAG(job_type=JobTemplateExample.hello_world, tasks=[task], output_id=DatasetId(dataset_id="output"))
 	r1 = client.put("/jobs/submit", json=job_definition.model_dump())
 	assert r1.status_code == 200
 	r1status = JobStatus(**r1.json())

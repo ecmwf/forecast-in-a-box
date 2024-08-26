@@ -5,8 +5,8 @@ import forecastbox.scheduler as scheduler
 
 
 def test_jobtemplates_examples():
-	for e in api.JobTypeEnum:
-		result = plugins_lookup.prepare(e)  # calls validation
+	for e in api.JobTemplateExample:
+		result = plugins_lookup.resolve_example(e)  # calls validation
 		assert result.e is None, f"builtin example {e} should be ok"
 
 
@@ -32,7 +32,7 @@ def test_jobtemplates_failure():
 	]
 	dynamic_task_inputs = {"step2": {"p1": "step1", "p2": "step3", "p4": "step1"}}
 	final_output_at = "output"
-	job_type = api.JobTypeEnum.hello_world
+	job_type = api.JobTemplateExample.hello_world
 	jt = api.JobTemplate(job_type=job_type, tasks=tasks, dynamic_task_inputs=dynamic_task_inputs, final_output_at=final_output_at)
 	result = validation.of_template(jt)
 	assert result.e is not None, "there should have been errors"
@@ -60,7 +60,7 @@ def test_taskdag_ok():
 			),
 		]
 		final_output_at = "step1"
-		job_type = api.JobTypeEnum.hello_world
+		job_type = api.JobTemplateExample.hello_world
 		jt = api.JobTemplate(job_type=job_type, tasks=tasks, dynamic_task_inputs={}, final_output_at=final_output_at)
 		return validation.of_template(jt).get_or_raise()
 
