@@ -5,7 +5,7 @@
   <li>ID: {{ job_id.job_id }}</li>
   <li>created at: {{ created_at }}</li>
   <li>updated at: {{ updated_at }}</li>
-  <li>status: {{ status }}</li>
+  <li>status: {{ status }}{{ status_detail }}</li>
   {% if stages %}
   <ul>
   {% for e in stages %}

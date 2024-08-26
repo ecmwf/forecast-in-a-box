@@ -84,10 +84,10 @@ def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str
 		else:
 			output_name = None
 		notify_update(callback_context, job_id, JobStatusEnum.finished, result=output_name, task_name=None)
-	except Exception:
-		# TODO free all datasets
+	except Exception as e:
+		# TODO free all datasets?
 		logger.exception(f"job with {job_id=} failed")
-		notify_update(callback_context, job_id, JobStatusEnum.failed)
+		notify_update(callback_context, job_id, JobStatusEnum.failed, status_detail=f" -- Failed because {repr(e)}")
 	finally:
 		if env_context is not None:
 			env_context.cleanup()

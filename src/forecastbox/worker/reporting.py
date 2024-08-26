@@ -26,7 +26,12 @@ class CallbackContext:
 
 
 def notify_update(
-	callback_context: CallbackContext, job_id: str, status: api.JobStatusEnum, result: Optional[str] = None, task_name: Optional[str] = None
+	callback_context: CallbackContext,
+	job_id: str,
+	status: api.JobStatusEnum,
+	result: Optional[str] = None,
+	task_name: Optional[str] = None,
+	status_detail: Optional[str] = None,
 ) -> bool:
 	logger.info(f"process for {job_id=} is in {status=}")
 	result_url: Optional[str]
@@ -34,7 +39,13 @@ def notify_update(
 		result_url = callback_context.data_url(result)
 	else:
 		result_url = None
-	update = api.JobStatusUpdate(job_id=api.JobId(job_id=job_id), status=status, task_name=task_name, result=result_url)
+	update = api.JobStatusUpdate(
+		job_id=api.JobId(job_id=job_id),
+		status=status,
+		task_name=task_name,
+		result=result_url,
+		status_detail=status_detail,
+	)
 
 	with httpx.Client() as client:
 		response = client.post(callback_context.update_url, json=update.model_dump())
