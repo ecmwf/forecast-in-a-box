@@ -93,7 +93,13 @@ build_docker_uv: wheel
 
 # runs ubuntu docker image with uv-based bootstrap and a mounted local dir with ml models
 run_docker_uv model_repo:
-	docker run --rm -it --network host -v {{model_repo}}:/fiab/models:ro fiab-runner-base python -m forecastbox.standalone.entrypoint
+	docker run \
+		--rm -it \
+		--network host \
+		-v {{model_repo}}:/fiab/models:ro \
+		-v ~/.ecmwfapirc:/root/.ecmwfapirc:ro \
+		fiab-runner-base \
+		python -m forecastbox.standalone.entrypoint
 
 # deletes temporary files, build files, caches
 clean:
