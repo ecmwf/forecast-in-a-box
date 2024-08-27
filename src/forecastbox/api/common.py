@@ -33,16 +33,22 @@ class RegisteredTask(str, Enum):
 	# NOTE this will get eventually replaced by external import/lookup system
 	# See plugin/lookup.py
 
-	hello_world = "hello_world"
-	create_numpy_array = "create_numpy_array"
-	display_numpy_array = "display_numpy_array"
-	hello_torch = "hello_torch"
-	hello_image = "hello_image"
+	# data sources
 	mars_oper_sfc_box = "mars_oper_sfc_box"
 	mars_enfo_range_temp = "mars_enfo_range_temp"
+	create_numpy_array = "create_numpy_array"
 	aifs_fetch_and_predict = "aifs_fetch_and_predict"
+
+	# data sinks
+	grib_to_file = "grib_to_file"
 	plot_single_grib = "plot_single_grib"
+	display_numpy_array = "display_numpy_array"
 	nbeats_predict = "nbeats_predict"
+
+	# hybrids
+	hello_world = "hello_world"
+	hello_torch = "hello_torch"
+	hello_image = "hello_image"
 
 
 class DatasetId(BaseModel):
@@ -74,6 +80,10 @@ class TaskDefinition(BaseModel):
 	output_class: str  # not eval'd, can be anything
 	dynamic_param_classes: dict[str, str] = Field(default_factory=dict)
 	environment: TaskEnvironment = Field(default_factory=TaskEnvironment)
+
+	def signature_repr(self) -> str:
+		dparams = ",".join(self.dynamic_param_classes.values())
+		return f"({dparams}) -> {self.output_class}"
 
 
 class Task(BaseModel):

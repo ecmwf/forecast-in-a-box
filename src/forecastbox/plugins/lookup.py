@@ -73,7 +73,7 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 					"box_center_lon": TaskParameter(clazz="longitude"),
 					"params": TaskParameter(clazz="marsParams"),
 				},
-				entrypoint="forecastbox.external.mars.oper_sfc_box_query",
+				entrypoint="forecastbox.external.data_sources.oper_sfc_box_query",
 				output_class="grib",
 				environment=TaskEnvironment(packages=["numpy<2.0.0", "ecmwf-api-client", "earthkit-data", "earthkit-plots"]),
 			)
@@ -101,10 +101,20 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 					"box_center_lon": TaskParameter(clazz="longitude"),
 					"grib_idx": TaskParameter(clazz="int", default="0"),
 				},
-				entrypoint="forecastbox.external.plotting.plot_single_grib",
+				entrypoint="forecastbox.external.data_sinks.plot_single_grib",
 				output_class="png",  # I guess
 				dynamic_param_classes={"input_grib": "grib"},
 				environment=TaskEnvironment(packages=["numpy<2.0.0", "earthkit-data", "earthkit-plots"]),
+			)
+		case RegisteredTask.grib_to_file:
+			return TaskDefinition(
+				user_params={
+					"path": TaskParameter(clazz="str"),
+				},
+				entrypoint="forecastbox.external.data_sinks.grib_to_file",
+				output_class="str",
+				dynamic_param_classes={"input_grib": "grib"},
+				environment=TaskEnvironment(packages=["numpy<2.0.0", "earthkit-data"]),
 			)
 		case RegisteredTask.mars_enfo_range_temp:
 			return TaskDefinition(
@@ -112,7 +122,7 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 					"lat": TaskParameter(clazz="latitude"),
 					"lon": TaskParameter(clazz="longitude"),
 				},
-				entrypoint="forecastbox.external.mars.enfo_range_temp_query",
+				entrypoint="forecastbox.external.data_sources.enfo_range_temp_query",
 				output_class="ndarray",
 			)
 		case RegisteredTask.nbeats_predict:

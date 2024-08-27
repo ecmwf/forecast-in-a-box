@@ -21,9 +21,17 @@
 <form action="/prepare_builder" method="post">
 	(Pretend this is JavaScript)<br>
   	<label for="job_pipeline">Fill in the job pipeline:</label>
-	<input type="text" id="job_pipeline" name="job_pipeline">
+	<input type="text" id="job_pipeline" name="job_pipeline" size=50>
 	<br>
 	<input type="submit" value="Build Job Pipeline">
+
+	<br>
+	(Fancy Docs)<br>
+	<ul>
+	{% for e in tasks %}
+		<li>{{ e }}</li>
+	{% endfor %}
+	</ul>
 </form>
 
 <br>

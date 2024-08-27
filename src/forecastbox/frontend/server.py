@@ -15,7 +15,7 @@ from starlette.responses import HTMLResponse, RedirectResponse
 from starlette.datastructures import UploadFile
 import jinja2
 import pkgutil
-from forecastbox.api.common import JobStatus, JobTemplateExample, TaskDAG, JobTemplate
+from forecastbox.api.common import JobStatus, JobTemplateExample, TaskDAG, JobTemplate, RegisteredTask
 import forecastbox.scheduler as scheduler
 import forecastbox.plugins.lookup as plugin_lookup
 import logging
@@ -90,6 +90,7 @@ async def index() -> str:
 	"""The user selects which job type to submit"""
 	template_params = {
 		"jobs": [e.value for e in JobTemplateExample],
+		"tasks": [f"{e.value}: {plugin_lookup.get_task(e).signature_repr()}" for e in RegisteredTask],
 	}
 	return StaticExecutionContext.get().template_index.render(template_params)
 

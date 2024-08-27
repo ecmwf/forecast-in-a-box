@@ -1,7 +1,7 @@
 from ubuntu:noble-20240801 as eccodes-build
 workdir /eccodes
 run apt update && apt install -y cmake clang libaec0 libaec-dev fcc curl
-# TODO Or package into the wheel? With/without aec support?
+# TODO Or package into the wheel, similarly to conda? With/without aec support?
 run curl https://confluence.ecmwf.int/download/attachments/45757960/eccodes-2.35.1-Source.tar.gz?api=v2 --output eccodes.tar.gz && tar xzf eccodes.tar.gz && mkdir -p build /fiab/eccodes && cd build && cmake -DCMAKE_INSTALL_PREFIX=/fiab/eccodes ../eccodes-2.35.1-Source && make && make install
 # NOTE tis a bit clunky, eccodes path of install needs to be the same in both the build and the runner images
 
@@ -10,7 +10,7 @@ from ubuntu:noble-20240801
 # system/docker setup
 workdir /fiab
 arg model_repo 
-run apt update && apt install -y curl libaec0
+run apt update && apt install -y curl libaec0 # libaec is for eccodes
 copy --from=eccodes-build /fiab/eccodes /fiab/eccodes/
 
 # uv setup # TODO replace with a bootstrap script that can rely on existing uv installation
