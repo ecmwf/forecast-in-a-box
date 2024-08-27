@@ -1,0 +1,21 @@
+from ubuntu:noble-20240801
+
+# system/docker setup
+workdir /fiab
+arg model_repo 
+run apt update && apt install -y curl
+
+# uv setup # TODO replace with a bootstrap script that can rely on existing uv installation
+run curl -LsSf https://astral.sh/uv/install.sh | sh
+env PATH="$PATH:~/.cargo/bin"
+run ~/.cargo/bin/uv python install 3.11 # TODO why do we need the full path? TODO check whether exists first
+
+# fiab fetch
+copy dist/forecast_in_a_box-0.0.1-py3-none-any.whl forecast_in_a_box-0.0.1-py3-none-any.whl
+
+# fiab install
+run ~/.cargo/bin/uv venv # TODO check the right python is active
+env VIRTUAL_ENV="/fiab/.venv"
+env PATH="/fiab/.venv/bin:$PATH"
+env FIAB_MODEL_REPO=/fiab/models
+run ~/.cargo/bin/uv pip install ./forecast_in_a_box-0.0.1-py3-none-any.whl

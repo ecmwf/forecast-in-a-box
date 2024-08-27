@@ -83,9 +83,22 @@ build_docker:
 run_docker:
 	docker run -p 8000:8000 -p 8002:8002 --rm -it fiab:ubuntu
 
+# builds a regular python wheel
+wheel:
+	python -m build --installer uv
+
+# builds ubuntu docker image with uv-based bootstrap
+build_docker_uv: wheel
+	docker build -f Dockerfile-uv -t fiab-runner-base .
+
+# runs ubuntu docker image with uv-based bootstrap and a mounted local dir with ml models
+run_docker_uv model_repo:
+	docker run --rm -it --network host -v {{model_repo}}:/fiab/models:ro fiab-runner-base python -m forecastbox.standalone.entrypoint
+
 # deletes temporary files, build files, caches
 clean:
 	find . -name '*.egg-info' -exec rm -fr {} +
 	find . -name '__pycache__' -exec rm -fr {} +
 	rm -rf build dist lightning_logs
-	rm entrypoint.spec # NOTE we may want to actually preserve this, presumably after `dist` refactor. Don't forget to remove from .gitignore then
+	rm -f entrypoint.spec # NOTE we may want to actually preserve this, presumably after `dist` refactor. Don't forget to remove from .gitignore then
+

@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "forecast-in-a-box"
@@ -11,13 +11,21 @@ authors = [
 ]
 license = { text = "Apache License Version 2.0" }
 requires-python=">=3.10,<3.12"
-# depedencies = # TODO providing dependencies here breaks `install -e .` -- reconcile!
+# just a minimal set of dependencies to run the servers. Individual tasks install their runtime dependencies on their own
+dependencies = [
+	"fastapi",
+	"httpx",
+	"jinja2",
+	"orjson",
+	"python-multipart",
+	"uvicorn",
+]
 
 [project.urls]
 "Source code" = "https://github.com/ecmwf/forecast-in-a-box"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/forecastbox"]
 
 [tool.ruff]
 line-length = 140
