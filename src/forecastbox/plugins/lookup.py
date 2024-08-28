@@ -5,7 +5,7 @@ Currently most is hardcoded, but will be replaced by reading from external, eith
 """
 
 import logging
-from forecastbox.api.common import RegisteredTask, JobTemplate, TaskDefinition, JobTemplateExample, TaskParameter, TaskEnvironment
+from forecastbox.api.common import RegisteredTask, TaskDAGBuilder, TaskDefinition, JobTemplateExample, TaskParameter, TaskEnvironment
 import forecastbox.api.validation as validation
 from forecastbox.utils import assert_never, Either
 
@@ -156,7 +156,7 @@ def build_pipeline(job_pipeline: str) -> Either[list[RegisteredTask], list[str]]
 		return Either.ok(tasks)
 
 
-def resolve_builder_linear(task_names: list[RegisteredTask]) -> Either[JobTemplate, str]:
+def resolve_builder_linear(task_names: list[RegisteredTask]) -> Either[TaskDAGBuilder, str]:
 	# TODO wrap in try catch, extend the validation
 	tasks: list[tuple[str, TaskDefinition]] = []
 	dynamic_task_inputs = {}
@@ -175,11 +175,11 @@ def resolve_builder_linear(task_names: list[RegisteredTask]) -> Either[JobTempla
 			)
 		)
 	final_output_at = task_names[-1].value
-	rv = JobTemplate(tasks=tasks, dynamic_task_inputs=dynamic_task_inputs, final_output_at=final_output_at)
-	return validation.of_template(rv)
+	rv = TaskDAGBuilder(tasks=tasks, dynamic_task_inputs=dynamic_task_inputs, final_output_at=final_output_at)
+	return validation.of_builder(rv)
 
 
-def resolve_example(job_type: JobTemplateExample) -> Either[JobTemplate, str]:
+def resolve_example(job_type: JobTemplateExample) -> Either[TaskDAGBuilder, str]:
 	"""Looks up a job template -- for retrieving the list of user params / filling it with params
 	to obtain a job definition"""
 	match job_type:
