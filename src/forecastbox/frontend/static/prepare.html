@@ -1,5 +1,32 @@
 <!doctype html><title>Forecast In A Box: Prepare A Job</title>
 
+<script>
+window.addEventListener("load", function() {
+    var now = new Date();
+    var utcString = now.toISOString().substring(0,19);
+    var year = now.getFullYear();
+    var month = now.getMonth() + 1;
+    var day = now.getDate();
+    var hour = now.getHours();
+    var minute = now.getMinutes();
+    // var second = now.getSeconds();
+    var localDatetime = year + "-" +
+                      (month < 10 ? "0" + month.toString() : month) + "-" +
+                      (day < 10 ? "0" + day.toString() : day) + "T" +
+                      (hour < 10 ? "0" + hour.toString() : hour) + ":" +
+                      (minute < 10 ? "0" + minute.toString() : minute); // +
+                      // utcString.substring(16,19);
+    var datetimeField = document.getElementById("d1");
+    var elems = document.querySelectorAll('input[type=datetime-local]');
+    var elemsL = elems.length;
+    for (i=0; i<elemsL; i++) {
+        elems[i].value = localDatetime;
+    }
+});
+</script>
+
+
+<body>
 Enter Job Parameters:
 <form action="/submit_form" method="post">
 	<label for="job_name">Job:</label><br>
@@ -8,9 +35,14 @@ Enter Job Parameters:
 
 	{% for e in params %}
 		<label for="{{ e[0] }}">{{ e[0] }} (of type {{ e[1] }}):</label><br>
-		<input type="text" id="{{ e[0] }}" name="{{ e[0] }}" value="{{ e[2] }}"><br>
+		{% if e[1] == 'datetime' %}
+			<input type="datetime-local" id="{{ e[0] }}" name="{{ e[0] }}"><br>
+		{% else %}
+			<input type="text" id="{{ e[0] }}" name="{{ e[0] }}" value="{{ e[2] }}"><br>
+		{% endif %}
 	{% endfor %}
 
 	<input type="submit" name="fiab.int.action.launch" value="Launch Job">
 	<input type="submit" name="fiab.int.action.store" value="Store Config">
 </form>
+</body>

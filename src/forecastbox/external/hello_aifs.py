@@ -11,6 +11,7 @@ import climetlab as cml
 import tqdm
 from anemoi.inference.runner import DefaultRunner
 import forecastbox.external.models
+from forecastbox.api.type_system import datetime as datetime_convert
 
 logger = logging.getLogger(__name__)
 
@@ -109,16 +110,17 @@ class MarsInput(RequestBasedInput):
 		return cml.load_source("mars", kwargs)
 
 
-def entrypoint_forecast(predicted_params: list[str], target_step: int) -> bytes:
+def entrypoint_forecast(predicted_params: list[str], target_step: int, start_date: str) -> bytes:
+	start_date = datetime_convert(start_date)  # NOTE unfortunate quirk of json/pydantic serde
 	# config TODO read from kwargs
 	model_path = forecastbox.external.models.get_path("aifs-small.ckpt")
-	relative_delay = dt.timedelta(days=1)  # TODO how to get a reliable date for which data would be available?
 	save_to_path: Optional[str] = None  # "/tmp/output.grib"
 
 	# prep clasess
-	n = dt.datetime.now() - relative_delay
+	n = start_date
 	d1 = n - dt.timedelta(hours=n.hour % 6, minutes=n.minute, seconds=n.second, microseconds=n.microsecond)
 	d2 = d1 - dt.timedelta(hours=6)
+	# TODO validate that d1 is not too recent?
 	f: Callable[[dt.datetime], tuple[int, int]] = lambda d: (
 		int(d.strftime("%Y%m%d")),
 		d.hour,

@@ -137,7 +137,7 @@ async def prepare_builder(job_pipeline: Annotated[str, Form()]) -> str:
 
 async def submit_int(task_dag: TaskDAG) -> str:
 	async with httpx.AsyncClient() as client:  # TODO pool the client
-		response_raw = await client.put(StaticExecutionContext.get().job_submit_url, json=task_dag.model_dump())
+		response_raw = await client.put(StaticExecutionContext.get().job_submit_url, content=task_dag.model_dump_json().encode())
 		if response_raw.status_code != httpx.codes.OK:
 			logger.error(response_raw.status_code)
 			logger.error(response_raw.text)

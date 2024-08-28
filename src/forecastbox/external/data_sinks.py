@@ -7,8 +7,11 @@ import earthkit.plots
 import earthkit.data
 
 
-def plot_single_grib(input_grib: memoryview, input_grib_len: int, box_center_lat: float, box_center_lon: float, grib_idx: int) -> bytes:
-	plot_box = [box_center_lon - 20, box_center_lon + 20, box_center_lat - 20, box_center_lat + 20]
+def plot_single_grib(
+	input_grib: memoryview, input_grib_len: int, box_lat1: float, box_lat2: float, box_lon1: float, box_lon2: float, grib_idx: int
+) -> bytes:
+	plot_box = [box_lon1, box_lon2, box_lat1, box_lat2]
+	# plot_box = [box_center_lon - 20, box_center_lon + 20, box_center_lat - 20, box_center_lat + 20]
 
 	# NOTE the buffer is padded by zeroes due to how shm works, so we need to trim by length
 	ibuf = io.BytesIO(input_grib[:input_grib_len])
