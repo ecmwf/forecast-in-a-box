@@ -111,14 +111,15 @@ class MarsInput(RequestBasedInput):
 
 
 def entrypoint_forecast(predicted_params: list[str], target_step: int, start_date: str) -> bytes:
-	start_date = datetime_convert(start_date)  # NOTE unfortunate quirk of json/pydantic serde
+	start_dt = datetime_convert(start_date)  # NOTE unfortunate quirk of json/pydantic serde
 	# config TODO read from kwargs
 	model_path = forecastbox.external.models.get_path("aifs-small.ckpt")
 	save_to_path: Optional[str] = None  # "/tmp/output.grib"
 
 	# prep clasess
-	n = start_date
-	d1 = n - dt.timedelta(hours=n.hour % 6, minutes=n.minute, seconds=n.second, microseconds=n.microsecond)
+	d1 = start_dt - dt.timedelta(
+		hours=start_dt.hour % 6, minutes=start_dt.minute, seconds=start_dt.second, microseconds=start_dt.microsecond
+	)
 	d2 = d1 - dt.timedelta(hours=6)
 	# TODO validate that d1 is not too recent?
 	f: Callable[[dt.datetime], tuple[int, int]] = lambda d: (

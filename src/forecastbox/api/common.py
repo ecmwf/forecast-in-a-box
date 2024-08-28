@@ -108,7 +108,9 @@ class TaskDAG(BaseModel):
 	# TODO add some mechanism for freeing the output_name(dataset_id) as well
 
 
-class JobTemplate(BaseModel):
+class TaskDAGBuilder(BaseModel):
+	"""Used to build html form for parameter inputting, and then together with that the TaskDAG itself"""
+
 	tasks: list[tuple[str, TaskDefinition]]  # NOTE already assumed to be in (some) topological order
 	dynamic_task_inputs: dict[str, dict[str, str]]  # task_name: {param_name: data_source}
 	final_output_at: str

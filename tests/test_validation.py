@@ -33,8 +33,8 @@ def test_jobtemplates_failure():
 	dynamic_task_inputs = {"step2": {"p1": "step1", "p2": "step3", "p4": "step1"}}
 	final_output_at = "output"
 	job_type = api.JobTemplateExample.hello_world
-	jt = api.JobTemplate(job_type=job_type, tasks=tasks, dynamic_task_inputs=dynamic_task_inputs, final_output_at=final_output_at)
-	result = validation.of_template(jt)
+	jt = api.TaskDAGBuilder(job_type=job_type, tasks=tasks, dynamic_task_inputs=dynamic_task_inputs, final_output_at=final_output_at)
+	result = validation.of_builder(jt)
 	assert result.e is not None, "there should have been errors"
 	errors = set(result.e.split("\n"))
 	expected = {
@@ -43,7 +43,7 @@ def test_jobtemplates_failure():
 		"task step2 needs param p4 from step1 which does not come before in the schedule",
 		"task step2 is missing dynamic inputs p3",
 		"task step2 is supposed to received param p2 from step3 but no such task is known",
-		"task step2 does not declare input p4 yet template fills it",
+		"task step2 does not declare input p4 yet builder fills it",
 	}
 	extra = errors - expected
 	assert extra == set(), "no extra errors should have been found"
@@ -61,8 +61,8 @@ def test_taskdag_ok():
 		]
 		final_output_at = "step1"
 		job_type = api.JobTemplateExample.hello_world
-		jt = api.JobTemplate(job_type=job_type, tasks=tasks, dynamic_task_inputs={}, final_output_at=final_output_at)
-		return validation.of_template(jt).get_or_raise()
+		tdb = api.TaskDAGBuilder(job_type=job_type, tasks=tasks, dynamic_task_inputs={}, final_output_at=final_output_at)
+		return validation.of_builder(tdb).get_or_raise()
 
 	td = scheduler.build(jt_with_params({}), {})
 	assert td.e is None, "job with no params should be ok"

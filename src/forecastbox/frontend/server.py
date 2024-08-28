@@ -15,7 +15,7 @@ from starlette.responses import HTMLResponse, RedirectResponse
 from starlette.datastructures import UploadFile
 import jinja2
 import pkgutil
-from forecastbox.api.common import JobStatus, JobTemplateExample, TaskDAG, JobTemplate, RegisteredTask
+from forecastbox.api.common import JobStatus, JobTemplateExample, TaskDAG, TaskDAGBuilder, RegisteredTask
 import forecastbox.scheduler as scheduler
 import forecastbox.plugins.lookup as plugin_lookup
 import logging
@@ -108,14 +108,14 @@ async def select(request: Request, example_name: Annotated[str, Form()]) -> Redi
 	return RedirectResponse(redirect_url, status_code=status.HTTP_303_SEE_OTHER)
 
 
-def template_to_form_params(job_template: JobTemplate) -> list[tuple[str, str, str]]:
+def builder_to_form_params(builder: TaskDAGBuilder) -> list[tuple[str, str, str]]:
 	return [
 		(
 			f"{task_name}.{param_name}",
 			param.clazz,
 			param.default,
 		)
-		for task_name, task_definition in job_template.tasks
+		for task_name, task_definition in builder.tasks
 		for param_name, param in task_definition.user_params.items()
 	]
 
@@ -123,8 +123,8 @@ def template_to_form_params(job_template: JobTemplate) -> list[tuple[str, str, s
 @app.get("/prepare_example/{example_name}", response_class=HTMLResponse)
 async def prepare_example(example_name: str) -> str:
 	"""The form for filling out job parameters and submitting the job itself, via a job template"""
-	job_template = plugin_lookup.resolve_example(JobTemplateExample(example_name)).get_or_raise(client_error)
-	template_params = {"job_name": example_name, "job_type": "example", "params": template_to_form_params(job_template)}
+	builder = plugin_lookup.resolve_example(JobTemplateExample(example_name)).get_or_raise(client_error)
+	template_params = {"job_name": example_name, "job_type": "example", "params": builder_to_form_params(builder)}
 	return StaticExecutionContext.get().template_prepare.render(template_params)
 
 
@@ -132,11 +132,11 @@ async def prepare_example(example_name: str) -> str:
 async def prepare_builder(job_pipeline: Annotated[str, Form()]) -> str:
 	"""The form for filling out job parameters and submitting the job itself, via custom built job"""
 	task_pipeline = plugin_lookup.build_pipeline(job_pipeline).get_or_raise(client_error)
-	template = plugin_lookup.resolve_builder_linear(task_pipeline).get_or_raise(client_error)
+	builder = plugin_lookup.resolve_builder_linear(task_pipeline).get_or_raise(client_error)
 	template_params = {
 		"job_name": job_pipeline,
 		"job_type": "custom",
-		"params": template_to_form_params(template),
+		"params": builder_to_form_params(builder),
 	}
 	return StaticExecutionContext.get().template_prepare.render(template_params)
 
@@ -159,13 +159,13 @@ async def submit_form(request: Request) -> Union[RedirectResponse, TaskDAG]:
 	params = {k: v for k, v in form.items() if isinstance(v, str) and not k.startswith("fiab.int.")}
 	job_type, job_name = params.pop("job_type"), params.pop("job_name")
 	if job_type == "example":
-		job_template = plugin_lookup.resolve_example(JobTemplateExample(job_name)).get_or_raise(client_error)
+		builder = plugin_lookup.resolve_example(JobTemplateExample(job_name)).get_or_raise(client_error)
 	elif job_type == "custom":
 		task_pipeline = plugin_lookup.build_pipeline(job_name).get_or_raise(client_error)
-		job_template = plugin_lookup.resolve_builder_linear(task_pipeline).get_or_raise(client_error)
+		builder = plugin_lookup.resolve_builder_linear(task_pipeline).get_or_raise(client_error)
 	else:
 		raise NotImplementedError(job_type)
-	task_dag = scheduler.build(job_template, params).get_or_raise(client_error)
+	task_dag = scheduler.build(builder, params).get_or_raise(client_error)
 	if "fiab.int.action.launch" in form:
 		job_id = await submit_int(task_dag)
 		redirect_url = request.url_for("job_status", job_id=job_id)
