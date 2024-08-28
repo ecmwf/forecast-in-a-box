@@ -5,7 +5,7 @@ Currently most is hardcoded, but will be replaced by reading from external, eith
 """
 
 import logging
-from forecastbox.api.common import RegisteredTask, TaskDAGBuilder, TaskDefinition, JobTemplateExample, TaskParameter, TaskEnvironment
+from forecastbox.api.common import RegisteredTask, TaskDAGBuilder, TaskDefinition, TaskParameter, TaskEnvironment
 import forecastbox.api.validation as validation
 from forecastbox.utils import assert_never, Either
 
@@ -177,25 +177,3 @@ def resolve_builder_linear(task_names: list[RegisteredTask]) -> Either[TaskDAGBu
 	final_output_at = task_names[-1].value
 	rv = TaskDAGBuilder(tasks=tasks, dynamic_task_inputs=dynamic_task_inputs, final_output_at=final_output_at)
 	return validation.of_builder(rv)
-
-
-def resolve_example(job_type: JobTemplateExample) -> Either[TaskDAGBuilder, str]:
-	"""Looks up a job template -- for retrieving the list of user params / filling it with params
-	to obtain a job definition"""
-	match job_type:
-		case JobTemplateExample.hello_world:
-			return resolve_builder_linear([RegisteredTask.hello_world])
-		case JobTemplateExample.hello_tasks:
-			return resolve_builder_linear([RegisteredTask.create_numpy_array, RegisteredTask.display_numpy_array])
-		case JobTemplateExample.hello_torch:
-			return resolve_builder_linear([RegisteredTask.hello_torch])
-		case JobTemplateExample.hello_image:
-			return resolve_builder_linear([RegisteredTask.hello_image])
-		case JobTemplateExample.hello_earth:
-			return resolve_builder_linear([RegisteredTask.mars_oper_sfc_box, RegisteredTask.plot_single_grib])
-		case JobTemplateExample.temperature_nbeats:
-			return resolve_builder_linear([RegisteredTask.mars_enfo_range_temp, RegisteredTask.nbeats_predict])
-		case JobTemplateExample.hello_aifsl:
-			return resolve_builder_linear([RegisteredTask.aifs_fetch_and_predict, RegisteredTask.plot_single_grib])
-		case s:
-			assert_never(s)
