@@ -30,5 +30,5 @@ env ECCODES_DIR=/fiab/eccodes
 env FIAB_MODEL_REPO=/fiab/models
 run ~/.cargo/bin/uv pip install ./forecast_in_a_box-0.0.1-py3-none-any.whl
 
-
-# ecc notes cmake clang libaec0 libaec-dev fcc
+# entrypoint (see justfile run_docker_uv)
+# python -m forecastbox.standalone.entrypoint
