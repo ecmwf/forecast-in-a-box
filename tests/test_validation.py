@@ -1,12 +1,12 @@
 import forecastbox.api.validation as validation
-import forecastbox.plugins.lookup as plugins_lookup
+import forecastbox.plugins.examples as plugins_examples
 import forecastbox.api.common as api
 import forecastbox.scheduler as scheduler
 
 
 def test_jobtemplates_examples():
 	for e in api.JobTemplateExample:
-		result = plugins_lookup.resolve_example(e)  # calls validation
+		result = plugins_examples.to_builder(e)  # calls validation
 		assert result.e is None, f"builtin example {e} should be ok"
 
 
