@@ -71,7 +71,7 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 					"step": TaskParameter(clazz="int"),
 					"box_center_lat": TaskParameter(clazz="latitude"),
 					"box_center_lon": TaskParameter(clazz="longitude"),
-					"params": TaskParameter(clazz="marsParams"),
+					"params": TaskParameter(clazz="marsParamList"),
 				},
 				entrypoint="forecastbox.external.data_sources.oper_sfc_box_query",
 				output_class="grib",
@@ -80,7 +80,7 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 		case RegisteredTask.aifs_fetch_and_predict:
 			return TaskDefinition(
 				user_params={
-					"predicted_param": TaskParameter(clazz="marsParam"),
+					"predicted_params": TaskParameter(clazz="marsParamList"),
 					"target_step": TaskParameter(clazz="int"),  # hours, div by 6
 				},
 				entrypoint="forecastbox.external.hello_aifs.entrypoint_forecast",

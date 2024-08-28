@@ -1,0 +1,416 @@
+FIAB_MODEL_REPO=/home/vojta/warehouse/ecmwf/models python -m forecastbox.standalone.entrypoint
+INFO:__main__:main process starting
+INFO:     Started server process [12398]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+INFO:     Started server process [12399]
+INFO:     Waiting for application startup.
+INFO:     127.0.0.1:41214 - "PUT /workers/register HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: PUT http://localhost:8001/workers/register "HTTP/1.1 200 OK"
+INFO:     Started server process [12400]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8002 (Press CTRL+C to quit)
+INFO:     127.0.0.1:56668 - "GET /status HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET http://localhost:8000/status "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54588 - "GET /status HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET http://localhost:8001/status "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:39936 - "GET /status HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET http://localhost:8002/status "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56674 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54590 - "PUT /jobs/submit HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: PUT http://localhost:8001/jobs/submit "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56674 - "POST /submit_form HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:39948 - "PUT /jobs/submit/60333f83-9a28-418b-ad08-f15d96641ba9 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: PUT http://localhost:8002/jobs/submit/60333f83-9a28-418b-ad08-f15d96641ba9 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54606 - "GET /jobs/status/60333f83-9a28-418b-ad08-f15d96641ba9 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET http://localhost:8001/jobs/status/60333f83-9a28-418b-ad08-f15d96641ba9 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56674 - "GET /jobs/60333f83-9a28-418b-ad08-f15d96641ba9 HTTP/1.1" 200 OK
+INFO:forecastbox.worker.reporting:process for job_id='60333f83-9a28-418b-ad08-f15d96641ba9' is in status=<JobStatusEnum.preparing: 'preparing'>
+INFO:     127.0.0.1:54616 - "POST /jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST http://localhost:8001/jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 "HTTP/1.1 200 OK"
+Resolved 100 packages in 21ms
+Installed 100 packages in 176ms
+ + adjusttext==1.2.0
+ + anemoi-inference==0.1.10
+ + anemoi-utils==0.3.15
+ + antlr4-python3-runtime==4.7.2
+ + anytree==2.12.1
+ + attrs==24.2.0
+ + branca==0.7.2
+ + cads-api-client==1.2.0
+ + cartopy==0.23.0
+ + cdsapi==0.7.1
+ + certifi==2024.7.4
+ + cf-units==3.2.0
+ + cffi==1.17.0
+ + cfgrib==0.9.14.0
+ + cftime==1.6.4
+ + charset-normalizer==3.3.2
+ + click==8.1.7
+ + climetlab==0.24.0
+ + cloudpickle==3.0.0
+ + contourpy==1.3.0
+ + cycler==0.12.1
+ + dask==2024.8.1
+ + earthkit-data==0.9.4
+ + earthkit-geo==0.2.0
+ + earthkit-meteo==0.1.1
+ + earthkit-plots==0.1.2
+ + earthkit-plots-default-styles==0.0.1
+ + eccodes==1.7.1
+ + ecmwf-api-client==1.6.3
+ + ecmwf-opendata==0.3.8
+ + ecmwflibs==0.6.3
+ + entrypoints==0.4
+ + filelock==3.15.4
+ + findlibs==0.0.5
+ + fonttools==4.53.1
+ + fsspec==2024.6.1
+ + idna==3.8
+ + imageio==2.35.1
+ + importlib-metadata==8.4.0
+ + isodate==0.6.1
+ + jinja2==3.1.4
+ + jsonschema==4.23.0
+ + jsonschema-specifications==2023.12.1
+ + kiwisolver==1.4.5
+ + locket==1.0.0
+ + lru-dict==1.3.0
+ + magics==1.5.8
+ + markdown==3.7
+ + markupsafe==2.1.5
+ + matplotlib==3.9.2
+ + mpmath==1.3.0
+ + multiurl==0.3.1
+ + netcdf4==1.7.1.post2
+ + networkx==3.3
+ + numpngw==0.1.4
+ + numpy==1.26.4
+ + nvidia-cublas-cu12==12.1.3.1
+ + nvidia-cuda-cupti-cu12==12.1.105
+ + nvidia-cuda-nvrtc-cu12==12.1.105
+ + nvidia-cuda-runtime-cu12==12.1.105
+ + nvidia-cudnn-cu12==9.1.0.70
+ + nvidia-cufft-cu12==11.0.2.54
+ + nvidia-curand-cu12==10.3.2.106
+ + nvidia-cusolver-cu12==11.4.5.107
+ + nvidia-cusparse-cu12==12.1.0.106
+ + nvidia-nccl-cu12==2.20.5
+ + nvidia-nvjitlink-cu12==12.6.20
+ + nvidia-nvtx-cu12==12.1.105
+ + packaging==24.1
+ + pandas==2.2.2
+ + partd==1.4.2
+ + pdbufr==0.11.0
+ + pillow==10.4.0
+ + pycparser==2.22
+ + pyodc==1.4.1
+ + pyparsing==3.1.4
+ + pyproj==3.6.1
+ + pyshp==2.3.1
+ + python-dateutil==2.9.0.post0
+ + pytz==2024.1
+ + pyyaml==6.0.2
+ + referencing==0.35.1
+ + requests==2.32.3
+ + rpds-py==0.20.0
+ + scipy==1.14.1
+ + semantic-version==2.10.0
+ + shapely==2.0.6
+ + six==1.16.0
+ + sympy==1.13.2
+ + termcolor==2.4.0
+ + tomli==2.0.1
+ + toolz==0.12.1
+ + torch==2.4.0
+ + tqdm==4.66.5
+ + triton==3.0.0
+ + typing-extensions==4.12.2
+ + tzdata==2024.1
+ + urllib3==2.2.2
+ + xarray==2024.7.0
+ + zipp==3.20.1
+INFO:forecastbox.worker.reporting:process for job_id='60333f83-9a28-418b-ad08-f15d96641ba9' is in status=<JobStatusEnum.running: 'running'>
+INFO:     127.0.0.1:54626 - "POST /jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST http://localhost:8001/jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 "HTTP/1.1 200 OK"
+INFO:forecastbox.worker.reporting:process for job_id='60333f83-9a28-418b-ad08-f15d96641ba9' is in status=<JobStatusEnum.running: 'running'>
+INFO:     127.0.0.1:54642 - "POST /jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST http://localhost:8001/jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 "HTTP/1.1 200 OK"
+ERROR:forecastbox.external.hello_aifs:predicted params are 2t
+INFO:anemoi.inference.checkpoint.metadata:Versions: checkpoint=1.0.0 dataset=0.6.1
+INFO:forecastbox.external.hello_aifs:Loading surface fields from MARS
+INFO:forecastbox.external.hello_aifs:Loading pressure fields from MARS
+INFO:anemoi.inference.runner:Loading input: 180 fields (lagged=2)
+INFO:anemoi.inference.checkpoint.metadata:Computed constants: ['cos_latitude', 'cos_longitude', 'sin_latitude', 'sin_longitude']
+INFO:anemoi.inference.checkpoint.metadata:Constants from input: ['lsm', 'sdor', 'slor', 'z']
+INFO:anemoi.inference.checkpoint.metadata:Computed forcings: ['cos_julian_day', 'cos_local_time', 'sin_julian_day', 'sin_local_time', 'insolation']
+INFO:anemoi.inference.runner:Input tensor shape: (2, 99, 40320)
+INFO:anemoi.utils.timer:Loading /home/vojta/warehouse/ecmwf/models/aifs-small.ckpt: 1 second.
+INFO:anemoi.inference.runner:Using autocast torch.float16
+(180, 40320)
+FORCINGS ['lsm', 'sdor', 'slor', 'z', 'cos_latitude', 'cos_longitude', 'sin_latitude', 'sin_longitude', 'cos_julian_day', 'cos_local_time', 'sin_julian_day', 'sin_local_time', 'insolation']
+0it [00:00, ?it/s]0it [00:00, ?it/s]
+INFO:forecastbox.worker.reporting:process for job_id='60333f83-9a28-418b-ad08-f15d96641ba9' is in status=<JobStatusEnum.finished: 'finished'>
+INFO:     127.0.0.1:54654 - "POST /jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST http://localhost:8001/jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 "HTTP/1.1 200 OK"
+ERROR:forecastbox.worker.entrypoint:job with job_id='60333f83-9a28-418b-ad08-f15d96641ba9' failed
+Traceback (most recent call last):
+  File "/home/vojta/src/forecast-in-a-box/src/forecastbox/worker/entrypoint.py", line 72, in job_entrypoint
+    mem = SharedMemory(name=key, create=True, size=L)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/vojta/bin/miniconda3/envs/py3.11.8/lib/python3.11/multiprocessing/shared_memory.py", line 81, in __init__
+    raise ValueError("'size' must be a positive number different from zero")
+ValueError: 'size' must be a positive number different from zero
+INFO:forecastbox.worker.reporting:process for job_id='60333f83-9a28-418b-ad08-f15d96641ba9' is in status=<JobStatusEnum.failed: 'failed'>
+INFO:     127.0.0.1:54662 - "POST /jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST http://localhost:8001/jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56754 - "PUT /jobs/submit HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: PUT http://localhost:8001/jobs/submit "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:47548 - "POST /submit_form HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:47988 - "PUT /jobs/submit/28c19ee5-95f5-4e07-a0f5-692e507bce50 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: PUT http://localhost:8002/jobs/submit/28c19ee5-95f5-4e07-a0f5-692e507bce50 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56770 - "GET /jobs/status/28c19ee5-95f5-4e07-a0f5-692e507bce50 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET http://localhost:8001/jobs/status/28c19ee5-95f5-4e07-a0f5-692e507bce50 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:47548 - "GET /jobs/28c19ee5-95f5-4e07-a0f5-692e507bce50 HTTP/1.1" 200 OK
+INFO:forecastbox.worker.reporting:process for job_id='28c19ee5-95f5-4e07-a0f5-692e507bce50' is in status=<JobStatusEnum.preparing: 'preparing'>
+INFO:     127.0.0.1:56774 - "POST /jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST http://localhost:8001/jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 "HTTP/1.1 200 OK"
+Resolved 100 packages in 23ms
+Installed 100 packages in 177ms
+ + adjusttext==1.2.0
+ + anemoi-inference==0.1.10
+ + anemoi-utils==0.3.15
+ + antlr4-python3-runtime==4.7.2
+ + anytree==2.12.1
+ + attrs==24.2.0
+ + branca==0.7.2
+ + cads-api-client==1.2.0
+ + cartopy==0.23.0
+ + cdsapi==0.7.1
+ + certifi==2024.7.4
+ + cf-units==3.2.0
+ + cffi==1.17.0
+ + cfgrib==0.9.14.0
+ + cftime==1.6.4
+ + charset-normalizer==3.3.2
+ + click==8.1.7
+ + climetlab==0.24.0
+ + cloudpickle==3.0.0
+ + contourpy==1.3.0
+ + cycler==0.12.1
+ + dask==2024.8.1
+ + earthkit-data==0.9.4
+ + earthkit-geo==0.2.0
+ + earthkit-meteo==0.1.1
+ + earthkit-plots==0.1.2
+ + earthkit-plots-default-styles==0.0.1
+ + eccodes==1.7.1
+ + ecmwf-api-client==1.6.3
+ + ecmwf-opendata==0.3.8
+ + ecmwflibs==0.6.3
+ + entrypoints==0.4
+ + filelock==3.15.4
+ + findlibs==0.0.5
+ + fonttools==4.53.1
+ + fsspec==2024.6.1
+ + idna==3.8
+ + imageio==2.35.1
+ + importlib-metadata==8.4.0
+ + isodate==0.6.1
+ + jinja2==3.1.4
+ + jsonschema==4.23.0
+ + jsonschema-specifications==2023.12.1
+ + kiwisolver==1.4.5
+ + locket==1.0.0
+ + lru-dict==1.3.0
+ + magics==1.5.8
+ + markdown==3.7
+ + markupsafe==2.1.5
+ + matplotlib==3.9.2
+ + mpmath==1.3.0
+ + multiurl==0.3.1
+ + netcdf4==1.7.1.post2
+ + networkx==3.3
+ + numpngw==0.1.4
+ + numpy==1.26.4
+ + nvidia-cublas-cu12==12.1.3.1
+ + nvidia-cuda-cupti-cu12==12.1.105
+ + nvidia-cuda-nvrtc-cu12==12.1.105
+ + nvidia-cuda-runtime-cu12==12.1.105
+ + nvidia-cudnn-cu12==9.1.0.70
+ + nvidia-cufft-cu12==11.0.2.54
+ + nvidia-curand-cu12==10.3.2.106
+ + nvidia-cusolver-cu12==11.4.5.107
+ + nvidia-cusparse-cu12==12.1.0.106
+ + nvidia-nccl-cu12==2.20.5
+ + nvidia-nvjitlink-cu12==12.6.20
+ + nvidia-nvtx-cu12==12.1.105
+ + packaging==24.1
+ + pandas==2.2.2
+ + partd==1.4.2
+ + pdbufr==0.11.0
+ + pillow==10.4.0
+ + pycparser==2.22
+ + pyodc==1.4.1
+ + pyparsing==3.1.4
+ + pyproj==3.6.1
+ + pyshp==2.3.1
+ + python-dateutil==2.9.0.post0
+ + pytz==2024.1
+ + pyyaml==6.0.2
+ + referencing==0.35.1
+ + requests==2.32.3
+ + rpds-py==0.20.0
+ + scipy==1.14.1
+ + semantic-version==2.10.0
+ + shapely==2.0.6
+ + six==1.16.0
+ + sympy==1.13.2
+ + termcolor==2.4.0
+ + tomli==2.0.1
+ + toolz==0.12.1
+ + torch==2.4.0
+ + tqdm==4.66.5
+ + triton==3.0.0
+ + typing-extensions==4.12.2
+ + tzdata==2024.1
+ + urllib3==2.2.2
+ + xarray==2024.7.0
+ + zipp==3.20.1
+INFO:forecastbox.worker.reporting:process for job_id='28c19ee5-95f5-4e07-a0f5-692e507bce50' is in status=<JobStatusEnum.running: 'running'>
+INFO:     127.0.0.1:56790 - "POST /jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST http://localhost:8001/jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 "HTTP/1.1 200 OK"
+INFO:forecastbox.worker.reporting:process for job_id='28c19ee5-95f5-4e07-a0f5-692e507bce50' is in status=<JobStatusEnum.running: 'running'>
+INFO:     127.0.0.1:56794 - "POST /jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST http://localhost:8001/jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:56810 - "GET /jobs/status/28c19ee5-95f5-4e07-a0f5-692e507bce50 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET http://localhost:8001/jobs/status/28c19ee5-95f5-4e07-a0f5-692e507bce50 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:47548 - "GET /jobs/28c19ee5-95f5-4e07-a0f5-692e507bce50 HTTP/1.1" 200 OK
+ERROR:forecastbox.external.hello_aifs:predicted params are 2t
+INFO:anemoi.inference.checkpoint.metadata:Versions: checkpoint=1.0.0 dataset=0.6.1
+INFO:forecastbox.external.hello_aifs:Loading surface fields from MARS
+INFO:forecastbox.external.hello_aifs:Loading pressure fields from MARS
+INFO:anemoi.inference.runner:Loading input: 180 fields (lagged=2)
+INFO:anemoi.inference.checkpoint.metadata:Computed constants: ['cos_latitude', 'cos_longitude', 'sin_latitude', 'sin_longitude']
+INFO:anemoi.inference.checkpoint.metadata:Constants from input: ['lsm', 'sdor', 'slor', 'z']
+INFO:anemoi.inference.checkpoint.metadata:Computed forcings: ['cos_julian_day', 'cos_local_time', 'sin_julian_day', 'sin_local_time', 'insolation']
+INFO:anemoi.inference.runner:Input tensor shape: (2, 99, 40320)
+INFO:anemoi.utils.timer:Loading /home/vojta/warehouse/ecmwf/models/aifs-small.ckpt: 1 second.
+INFO:anemoi.inference.runner:Using autocast torch.float16
+(180, 40320)
+FORCINGS ['lsm', 'sdor', 'slor', 'z', 'cos_latitude', 'cos_longitude', 'sin_latitude', 'sin_longitude', 'cos_julian_day', 'cos_local_time', 'sin_julian_day', 'sin_local_time', 'insolation']
+  0%|          | 0/1 [00:00<?, ?it/s]ERROR:forecastbox.external.hello_aifs:considering q
+ERROR:forecastbox.external.hello_aifs:considering q
+ERROR:forecastbox.external.hello_aifs:considering q
+ERROR:forecastbox.external.hello_aifs:considering q
+ERROR:forecastbox.external.hello_aifs:considering q
+ERROR:forecastbox.external.hello_aifs:considering q
+ERROR:forecastbox.external.hello_aifs:considering q
+ERROR:forecastbox.external.hello_aifs:considering q
+ERROR:forecastbox.external.hello_aifs:considering q
+ERROR:forecastbox.external.hello_aifs:considering q
+ERROR:forecastbox.external.hello_aifs:considering q
+ERROR:forecastbox.external.hello_aifs:considering q
+ERROR:forecastbox.external.hello_aifs:considering q
+ERROR:forecastbox.external.hello_aifs:considering t
+ERROR:forecastbox.external.hello_aifs:considering t
+ERROR:forecastbox.external.hello_aifs:considering t
+ERROR:forecastbox.external.hello_aifs:considering t
+ERROR:forecastbox.external.hello_aifs:considering t
+ERROR:forecastbox.external.hello_aifs:considering t
+ERROR:forecastbox.external.hello_aifs:considering t
+ERROR:forecastbox.external.hello_aifs:considering t
+ERROR:forecastbox.external.hello_aifs:considering t
+ERROR:forecastbox.external.hello_aifs:considering t
+ERROR:forecastbox.external.hello_aifs:considering t
+ERROR:forecastbox.external.hello_aifs:considering t
+ERROR:forecastbox.external.hello_aifs:considering t
+ERROR:forecastbox.external.hello_aifs:considering u
+ERROR:forecastbox.external.hello_aifs:considering u
+ERROR:forecastbox.external.hello_aifs:considering u
+ERROR:forecastbox.external.hello_aifs:considering u
+ERROR:forecastbox.external.hello_aifs:considering u
+ERROR:forecastbox.external.hello_aifs:considering u
+ERROR:forecastbox.external.hello_aifs:considering u
+ERROR:forecastbox.external.hello_aifs:considering u
+ERROR:forecastbox.external.hello_aifs:considering u
+ERROR:forecastbox.external.hello_aifs:considering u
+ERROR:forecastbox.external.hello_aifs:considering u
+ERROR:forecastbox.external.hello_aifs:considering u
+ERROR:forecastbox.external.hello_aifs:considering u
+ERROR:forecastbox.external.hello_aifs:considering v
+ERROR:forecastbox.external.hello_aifs:considering v
+ERROR:forecastbox.external.hello_aifs:considering v
+ERROR:forecastbox.external.hello_aifs:considering v
+ERROR:forecastbox.external.hello_aifs:considering v
+ERROR:forecastbox.external.hello_aifs:considering v
+ERROR:forecastbox.external.hello_aifs:considering v
+ERROR:forecastbox.external.hello_aifs:considering v
+ERROR:forecastbox.external.hello_aifs:considering v
+ERROR:forecastbox.external.hello_aifs:considering v
+ERROR:forecastbox.external.hello_aifs:considering v
+ERROR:forecastbox.external.hello_aifs:considering v
+ERROR:forecastbox.external.hello_aifs:considering v
+ERROR:forecastbox.external.hello_aifs:considering w
+ERROR:forecastbox.external.hello_aifs:considering w
+ERROR:forecastbox.external.hello_aifs:considering w
+ERROR:forecastbox.external.hello_aifs:considering w
+ERROR:forecastbox.external.hello_aifs:considering w
+ERROR:forecastbox.external.hello_aifs:considering w
+ERROR:forecastbox.external.hello_aifs:considering w
+ERROR:forecastbox.external.hello_aifs:considering w
+ERROR:forecastbox.external.hello_aifs:considering w
+ERROR:forecastbox.external.hello_aifs:considering w
+ERROR:forecastbox.external.hello_aifs:considering w
+ERROR:forecastbox.external.hello_aifs:considering w
+ERROR:forecastbox.external.hello_aifs:considering w
+ERROR:forecastbox.external.hello_aifs:considering z
+ERROR:forecastbox.external.hello_aifs:considering z
+ERROR:forecastbox.external.hello_aifs:considering z
+ERROR:forecastbox.external.hello_aifs:considering z
+ERROR:forecastbox.external.hello_aifs:considering z
+ERROR:forecastbox.external.hello_aifs:considering z
+ERROR:forecastbox.external.hello_aifs:considering z
+ERROR:forecastbox.external.hello_aifs:considering z
+ERROR:forecastbox.external.hello_aifs:considering z
+ERROR:forecastbox.external.hello_aifs:considering z
+ERROR:forecastbox.external.hello_aifs:considering z
+ERROR:forecastbox.external.hello_aifs:considering z
+ERROR:forecastbox.external.hello_aifs:considering z
+ERROR:forecastbox.external.hello_aifs:considering 10u
+ERROR:forecastbox.external.hello_aifs:considering 10v
+ERROR:forecastbox.external.hello_aifs:considering 2d
+ERROR:forecastbox.external.hello_aifs:considering 2t
+ERROR:forecastbox.external.hello_aifs:considering msl
+ERROR:forecastbox.external.hello_aifs:considering skt
+ERROR:forecastbox.external.hello_aifs:considering sp
+ERROR:forecastbox.external.hello_aifs:considering tcw
+ERROR:forecastbox.external.hello_aifs:considering 2t
+ERROR:forecastbox.external.hello_aifs:considering 2t
+100%|██████████| 1/1 [00:01<00:00,  1.69s/it]100%|██████████| 1/1 [00:01<00:00,  1.69s/it]
+INFO:forecastbox.worker.reporting:process for job_id='28c19ee5-95f5-4e07-a0f5-692e507bce50' is in status=<JobStatusEnum.finished: 'finished'>
+INFO:     127.0.0.1:47818 - "POST /jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST http://localhost:8001/jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 "HTTP/1.1 200 OK"
+INFO:forecastbox.worker.reporting:process for job_id='28c19ee5-95f5-4e07-a0f5-692e507bce50' is in status=<JobStatusEnum.running: 'running'>
+INFO:     127.0.0.1:47832 - "POST /jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST http://localhost:8001/jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:47842 - "GET /jobs/status/28c19ee5-95f5-4e07-a0f5-692e507bce50 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET http://localhost:8001/jobs/status/28c19ee5-95f5-4e07-a0f5-692e507bce50 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50924 - "GET /jobs/28c19ee5-95f5-4e07-a0f5-692e507bce50 HTTP/1.1" 200 OK
+INFO:forecastbox.worker.reporting:process for job_id='28c19ee5-95f5-4e07-a0f5-692e507bce50' is in status=<JobStatusEnum.finished: 'finished'>
+INFO:     127.0.0.1:47848 - "POST /jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST http://localhost:8001/jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 "HTTP/1.1 200 OK"
+INFO:forecastbox.worker.reporting:process for job_id='28c19ee5-95f5-4e07-a0f5-692e507bce50' is in status=<JobStatusEnum.finished: 'finished'>
+INFO:     127.0.0.1:47854 - "POST /jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST http://localhost:8001/jobs/update/6349e35b-770f-4062-bda6-74e11b031c67 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:47866 - "GET /jobs/status/28c19ee5-95f5-4e07-a0f5-692e507bce50 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET http://localhost:8001/jobs/status/28c19ee5-95f5-4e07-a0f5-692e507bce50 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:50924 - "GET /jobs/28c19ee5-95f5-4e07-a0f5-692e507bce50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42776 - "GET /data/e5e9c570092b8572399a2b45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42776 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:46792 - "GET /data/e5e9c570092b8572399a2b45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37526 - "GET / HTTP/1.1" 200 OK
