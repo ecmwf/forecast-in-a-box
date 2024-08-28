@@ -4,6 +4,7 @@ For declaring types of dynamic and user parameters of the jobs, and converting u
 
 from forecastbox.utils import Either
 from typing import Any
+import datetime as dt
 
 # NOTE we probably want an enum of supported types, each member yielding conv function & class
 
@@ -32,6 +33,13 @@ def marsParam(value: str) -> str:
 
 def marsParamList(value: str) -> list[str]:
 	return [marsParam(e.strip()) for e in value.split(",")]
+
+
+def datetime(value: str) -> dt.datetime:
+	try:
+		return dt.datetime.strptime(value, "%Y-%m-%dT%H:%M")
+	except ValueError:
+		return dt.datetime.strptime(value, "%Y-%m-%dT%H:%M:%S")
 
 
 def convert(into: str, value: str) -> Either[Any, str]:

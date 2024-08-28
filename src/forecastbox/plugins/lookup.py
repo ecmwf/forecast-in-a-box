@@ -82,6 +82,7 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 				user_params={
 					"predicted_params": TaskParameter(clazz="marsParamList"),
 					"target_step": TaskParameter(clazz="int"),  # hours, div by 6
+					"start_date": TaskParameter(clazz="datetime"),
 				},
 				entrypoint="forecastbox.external.hello_aifs.entrypoint_forecast",
 				output_class="grib",
@@ -97,8 +98,10 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 		case RegisteredTask.plot_single_grib:
 			return TaskDefinition(
 				user_params={
-					"box_center_lat": TaskParameter(clazz="latitude"),
-					"box_center_lon": TaskParameter(clazz="longitude"),
+					"box_lat1": TaskParameter(clazz="latitude"),
+					"box_lat2": TaskParameter(clazz="latitude"),
+					"box_lon1": TaskParameter(clazz="longitude"),
+					"box_lon2": TaskParameter(clazz="longitude"),
 					"grib_idx": TaskParameter(clazz="int", default="0"),
 				},
 				entrypoint="forecastbox.external.data_sinks.plot_single_grib",
