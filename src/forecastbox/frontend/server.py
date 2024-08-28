@@ -85,8 +85,14 @@ async def http_exception_handler(request, exc):
 	return PlainTextResponse(s, status_code=exc.status_code)
 
 
-@app.get("/", response_class=HTMLResponse)
-async def index() -> str:
+@app.get("/")
+async def default_job(request: Request) -> RedirectResponse:
+	redirect_url = request.url_for("prepare_example", example_name="hello_aifsl")
+	return RedirectResponse(redirect_url, status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.get("/main", response_class=HTMLResponse)
+async def main_menu() -> str:
 	"""The user selects which job type to submit"""
 	template_params = {
 		"jobs": [e.value for e in JobTemplateExample],
