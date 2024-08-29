@@ -103,12 +103,17 @@ def to_form_params_aifs() -> Either[dict[str, Any], list[str]]:
 		("postprocessing", "dropdown", "Postprocessing function", ["None", "None, but different"]),
 	]
 	output = [
-		("output_type", "checkbox", "how to save the results", [("output_type_file", "As a grib file"), ("output_type_plot", "As a plot")]),
-		("box_lat1", "text", "Latitude left"),
-		("box_lat2", "text", "Latitude right"),
-		("box_lon1", "text", "Longitude top"),
-		("box_lon2", "text", "Longitude bottom"),
-		("filepath", "text", "Path"),
+		(
+			"output_type",
+			"checkbox",
+			"how to save the results",
+			[("output_type_file", "As a grib file", "tp_file_"), ("output_type_plot", "As a plot", "tp_plot_")],
+		),
+		("tp_plot_box_lat1", "text", "Latitude left"),
+		("tp_plot_box_lat2", "text", "Latitude right"),
+		("tp_plot_box_lon1", "text", "Longitude top"),
+		("tp_plot_box_lon2", "text", "Longitude bottom"),
+		("tp_file_filepath", "text", "Path"),
 	]
 	return Either.ok(
 		{
@@ -130,16 +135,16 @@ def from_form_params_aifs(form_params: dict[str, str]) -> Either[dict[str, str],
 	if "output_type_plot" in form_params:
 		mapped.update(
 			{
-				f"{RegisteredTask.plot_single_grib.value}.box_lat1": form_params.get("box_lat1", ""),
-				f"{RegisteredTask.plot_single_grib.value}.box_lat2": form_params.get("box_lat2", ""),
-				f"{RegisteredTask.plot_single_grib.value}.box_lon1": form_params.get("box_lon1", ""),
-				f"{RegisteredTask.plot_single_grib.value}.box_lon2": form_params.get("box_lon2", ""),
+				f"{RegisteredTask.plot_single_grib.value}.box_lat1": form_params.get("tp_plot_box_lat1", ""),
+				f"{RegisteredTask.plot_single_grib.value}.box_lat2": form_params.get("tp_plot_box_lat2", ""),
+				f"{RegisteredTask.plot_single_grib.value}.box_lon1": form_params.get("tp_plot_box_lon1", ""),
+				f"{RegisteredTask.plot_single_grib.value}.box_lon2": form_params.get("tp_plot_box_lon2", ""),
 				f"{RegisteredTask.plot_single_grib.value}.grib_idx": "0",
 				f"{RegisteredTask.plot_single_grib.value}.grib_param": form_params.get("predicted_params", ""),
 			}
 		)
 	if "output_type_file" in form_params:
-		path = form_params.get("filepath", "")
+		path = form_params.get("tp_file_filepath", "")
 		if not path:
 			errors.append("output path for grib file must be non-empty and writeable")
 		elif not os.access(pathlib.Path(path).parent, os.W_OK):
