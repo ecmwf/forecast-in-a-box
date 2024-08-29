@@ -51,6 +51,7 @@ window.addEventListener("load", function() {
 				<option value="{{ ee }}">{{ ee }}</option>
 			{% endfor %}
 			</select>
+			<br>
 		{% else %}
 			<input type="text" id="{{ e[0] }}" name="{{ e[0] }}" value="{{ e[3] }}"><br>
 		{% endif %}
@@ -58,8 +59,16 @@ window.addEventListener("load", function() {
 
 	<h4>Output configuration:</h4>
 	{% for e in output %}
-		<label for="{{ e[0] }}">{{ e[2] }}:</label><br>
-		<input type="text" id="{{ e[0] }}" name="{{ e[0] }}" value="{{ e[3] }}"><br>
+		{% if e[1] == 'checkbox' %}
+			Select {{ e[2] }}:<br>
+			{% for ee in e[3] %}
+			<input type="checkbox" id="{{ ee[0] }}" name="{{ ee[0] }}" value="{{ ee[1] }}">
+			<label for="{{ e[1] }}">{{ ee[1] }}</label><br>
+			{% endfor %}
+		{% else %}
+			<label for="{{ e[0] }}">{{ e[2] }}:</label><br>
+			<input type="text" id="{{ e[0] }}" name="{{ e[0] }}" value="{{ e[3] }}"><br>
+		{% endif %}
 	{% endfor %}
 
 

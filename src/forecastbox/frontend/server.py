@@ -158,7 +158,7 @@ async def submit_form(request: Request) -> Union[RedirectResponse, TaskDAG]:
 	job_type, job_name = params.pop("job_type"), params.pop("job_name")
 	if job_type == "example":
 		example = JobTemplateExample(job_name)
-		maybe_builder = plugin_examples.to_builder(example)
+		maybe_builder = plugin_examples.to_builder(example, params)
 		maybe_params = plugin_examples.from_form_params(example, params)
 		builder = maybe_builder.append(maybe_params.e).get_or_raise(client_error)
 		params_resolved = maybe_params.get_or_raise(client_error)

@@ -6,7 +6,7 @@ import forecastbox.scheduler as scheduler
 
 def test_jobtemplates_examples():
 	for e in api.JobTemplateExample:
-		result = plugins_examples.to_builder(e)  # calls validation
+		result = plugins_examples.to_builder(e, {})  # calls validation
 		assert result.e is None, f"builtin example {e} should be ok"
 
 
