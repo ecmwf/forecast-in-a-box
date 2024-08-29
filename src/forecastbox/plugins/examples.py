@@ -4,18 +4,23 @@ Focuses on working with JobTemplateExamples:
  - converting the selected example + HTML form result into a TaskDAGBuilder
 """
 
-from forecastbox.api.common import RegisteredTask, TaskDAGBuilder, JobTemplateExample, JinjaTemplate, TaskParameter
+from forecastbox.api.common import RegisteredTask, TaskDAGBuilder, JobTemplateExample, JinjaTemplate, TaskParameter, TaskDefinition
+import forecastbox.api.validation as validation
 from forecastbox.utils import assert_never, Either
-from forecastbox.plugins.lookup import resolve_builder_linear
+from forecastbox.plugins.lookup import resolve_builder_linear, get_task
 from typing import Any, Iterable
 import logging
+import os
+import pathlib
 
 logger = logging.getLogger(__name__)
 
 
-def to_builder(job_type: JobTemplateExample) -> Either[TaskDAGBuilder, list[str]]:
+def to_builder(job_type: JobTemplateExample, params: dict[str, str]) -> Either[TaskDAGBuilder, list[str]]:
 	"""Looks up a job template -- for retrieving the list of user params / filling it with params
 	to obtain a job definition"""
+	# NOTE it's a bit unfortunate: for the aifs we call this only *after* we have the params already,
+	# whereas for the other examples we call this *before* the params, so the semantics is confusing
 	match job_type:
 		case JobTemplateExample.hello_world:
 			return resolve_builder_linear([RegisteredTask.hello_world])
@@ -30,7 +35,38 @@ def to_builder(job_type: JobTemplateExample) -> Either[TaskDAGBuilder, list[str]
 		case JobTemplateExample.temperature_nbeats:
 			return resolve_builder_linear([RegisteredTask.mars_enfo_range_temp, RegisteredTask.nbeats_predict])
 		case JobTemplateExample.hello_aifsl:
-			return resolve_builder_linear([RegisteredTask.aifs_fetch_and_predict, RegisteredTask.plot_single_grib])
+			tasks: list[tuple[str, TaskDefinition]] = []
+			dynamic_task_inputs = {}
+			T0 = RegisteredTask.aifs_fetch_and_predict
+			tasks.append(
+				(
+					T0.value,
+					get_task(T0),
+				)
+			)
+			final_output_at: str = ""
+			sinks = [
+				(
+					"output_type_file",
+					RegisteredTask.grib_to_file,
+				),
+				(
+					"output_type_plot",
+					RegisteredTask.plot_single_grib,
+				),
+			]
+			for prefix, task in sinks:
+				if prefix in params:
+					tasks.append(
+						(
+							task.value,
+							get_task(task),
+						)
+					)
+					dynamic_task_inputs[task.value] = {"input_grib": T0.value}
+					final_output_at = task.value
+			rv = TaskDAGBuilder(tasks=tasks, dynamic_task_inputs=dynamic_task_inputs, final_output_at=final_output_at)
+			return validation.of_builder(rv)
 		case s:
 			assert_never(s)
 
@@ -54,14 +90,9 @@ def params_to_jinja(task_name_prefix: str, params: Iterable[tuple[str, TaskParam
 	]
 
 
-def to_form_params_aifs(builder: TaskDAGBuilder) -> Either[dict[str, Any], list[str]]:
+def to_form_params_aifs() -> Either[dict[str, Any], list[str]]:
 	"""Used for aifs special template"""
 	# A bit hardcoded / coupled to the dag structure which is declared elsewhere... we need a different abstraction here
-	tasks = dict(builder.tasks)
-	if extra_keys := set(tasks.keys()) - {RegisteredTask.aifs_fetch_and_predict, RegisteredTask.plot_single_grib}:
-		logger.error(f"found extra task keys: {extra_keys}")
-		return Either.error(["internal issue: failed to construct input"])
-
 	initial = [
 		("start_date", "datetime", "Initial conditions from"),
 	]
@@ -69,12 +100,15 @@ def to_form_params_aifs(builder: TaskDAGBuilder) -> Either[dict[str, Any], list[
 		("target_step", "text", "Target step", "6"),
 		("predicted_params", "text", "Parameters", "2t"),
 		("model_id", "dropdown", "Model ID", ["aifs-small"]),
+		("postprocessing", "dropdown", "Postprocessing function", ["None", "None, but different"]),
 	]
 	output = [
+		("output_type", "checkbox", "how to save the results", [("output_type_file", "As a grib file"), ("output_type_plot", "As a plot")]),
 		("box_lat1", "text", "Latitude left"),
 		("box_lat2", "text", "Latitude right"),
 		("box_lon1", "text", "Longitude top"),
 		("box_lon2", "text", "Longitude bottom"),
+		("filepath", "text", "Path"),
 	]
 	return Either.ok(
 		{
@@ -86,37 +120,56 @@ def to_form_params_aifs(builder: TaskDAGBuilder) -> Either[dict[str, Any], list[
 
 
 def from_form_params_aifs(form_params: dict[str, str]) -> Either[dict[str, str], list[str]]:
+	errors = []
 	mapped = {
 		f"{RegisteredTask.aifs_fetch_and_predict.value}.predicted_params": form_params.get("predicted_params", ""),
 		f"{RegisteredTask.aifs_fetch_and_predict.value}.target_step": form_params.get("target_step", ""),
 		f"{RegisteredTask.aifs_fetch_and_predict.value}.start_date": form_params.get("start_date", ""),
 		f"{RegisteredTask.aifs_fetch_and_predict.value}.model_id": form_params.get("model_id", ""),
-		f"{RegisteredTask.plot_single_grib.value}.box_lat1": form_params.get("box_lat1", ""),
-		f"{RegisteredTask.plot_single_grib.value}.box_lat2": form_params.get("box_lat2", ""),
-		f"{RegisteredTask.plot_single_grib.value}.box_lon1": form_params.get("box_lon1", ""),
-		f"{RegisteredTask.plot_single_grib.value}.box_lon2": form_params.get("box_lon2", ""),
-		f"{RegisteredTask.plot_single_grib.value}.grib_idx": "0",
-		f"{RegisteredTask.plot_single_grib.value}.grib_param": form_params.get("predicted_params", ""),
 	}
+	if "output_type_plot" in form_params:
+		mapped.update(
+			{
+				f"{RegisteredTask.plot_single_grib.value}.box_lat1": form_params.get("box_lat1", ""),
+				f"{RegisteredTask.plot_single_grib.value}.box_lat2": form_params.get("box_lat2", ""),
+				f"{RegisteredTask.plot_single_grib.value}.box_lon1": form_params.get("box_lon1", ""),
+				f"{RegisteredTask.plot_single_grib.value}.box_lon2": form_params.get("box_lon2", ""),
+				f"{RegisteredTask.plot_single_grib.value}.grib_idx": "0",
+				f"{RegisteredTask.plot_single_grib.value}.grib_param": form_params.get("predicted_params", ""),
+			}
+		)
+	if "output_type_file" in form_params:
+		path = form_params.get("filepath", "")
+		if not path:
+			errors.append("output path for grib file must be non-empty and writeable")
+		elif not os.access(pathlib.Path(path).parent, os.W_OK):
+			errors.append(f"output path for grib file is not writeable: {path}")
+		else:
+			mapped[f"{RegisteredTask.grib_to_file.value}.path"] = path
+	if "output_type_plot" not in form_params and "output_type_file" not in form_params:
+		errors.append("missing output specification: neither Plot nor File were chosen")
 
-	return Either.ok(mapped)
+	if errors:
+		return Either.error(errors)
+	else:
+		return Either.ok(mapped)
 
 
 def to_form_params(example: JobTemplateExample) -> Either[dict[str, Any], list[str]]:
 	"""Returns data used to building the HTML form"""
-	maybe_builder = to_builder(example)
-	if maybe_builder.e:
-		return Either.error(maybe_builder.e)
-	builder = maybe_builder.get_or_raise()
 	params: dict[str, Any]
 	match example:
 		case JobTemplateExample.hello_aifsl:
-			maybe_params = to_form_params_aifs(builder)
+			maybe_params = to_form_params_aifs()
 			if maybe_params.e:
 				return Either.error(maybe_params.e)
 			else:
 				params = maybe_params.get_or_raise()
 		case _:
+			maybe_builder = to_builder(example, {})
+			if maybe_builder.e:
+				return Either.error(maybe_builder.e)
+			builder = maybe_builder.get_or_raise()
 			job_params_gen = (
 				params_to_jinja(task_name, task_definition.user_params.items()) for task_name, task_definition in builder.tasks
 			)
