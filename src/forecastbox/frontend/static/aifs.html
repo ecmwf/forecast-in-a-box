@@ -23,6 +23,21 @@ window.addEventListener("load", function() {
         elems[i].value = localDatetime;
     }
 });
+
+function toggleVisibilityElement(element) {
+  if ( element.style.display!='none' ) {
+    element.style.display='none';
+  } else {
+    element.style.display='';
+  }
+}
+
+function toggleVisibility(prefix) {
+  var elements = document.querySelectorAll('[id^="' + prefix + '"]');
+  for (var i = 0; i < elements.length; i++) {
+    toggleVisibilityElement(elements[i]);
+  }
+}
 </script>
 
 
@@ -62,16 +77,19 @@ window.addEventListener("load", function() {
 		{% if e[1] == 'checkbox' %}
 			Select {{ e[2] }}:<br>
 			{% for ee in e[3] %}
-			<input type="checkbox" id="{{ ee[0] }}" name="{{ ee[0] }}" value="{{ ee[1] }}">
+			<input type="checkbox" id="{{ ee[0] }}" name="{{ ee[0] }}" value="{{ e[1] }}" onchange="toggleVisibility('{{ ee[2] }}');" checked>
 			<label for="{{ e[1] }}">{{ ee[1] }}</label><br>
 			{% endfor %}
 		{% else %}
-			<label for="{{ e[0] }}">{{ e[2] }}:</label><br>
+			<div id="{{ e[0] }}Div">
+			<label for="{{ e[0] }}" id="{{ e[0] }}Label">{{ e[2] }}:</label><br>
 			<input type="text" id="{{ e[0] }}" name="{{ e[0] }}" value="{{ e[3] }}"><br>
+			</div>
 		{% endif %}
 	{% endfor %}
 
 
+	<br>
 	<input type="submit" name="fiab.int.action.launch" value="Launch Job">
 	<input type="submit" name="fiab.int.action.store" value="Store Config">
 </form>
