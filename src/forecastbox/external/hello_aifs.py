@@ -2,7 +2,7 @@
 Demonstrates aifs inference
 """
 
-from typing import Callable, Optional
+from typing import Callable
 import io
 import logging
 import datetime as dt
@@ -110,11 +110,10 @@ class MarsInput(RequestBasedInput):
 		return cml.load_source("mars", kwargs)
 
 
-def entrypoint_forecast(predicted_params: list[str], target_step: int, start_date: str) -> bytes:
+def entrypoint_forecast(predicted_params: list[tuple[str, int]], target_step: int, start_date: str) -> bytes:
 	start_dt = datetime_convert(start_date)  # NOTE unfortunate quirk of json/pydantic serde
 	# config TODO read from kwargs
 	model_path = forecastbox.external.models.get_path("aifs-small.ckpt")
-	save_to_path: Optional[str] = None  # "/tmp/output.grib"
 
 	# prep clasess
 	d1 = start_dt - dt.timedelta(
@@ -134,8 +133,6 @@ def entrypoint_forecast(predicted_params: list[str], target_step: int, start_dat
 		"expver": 0,
 		"class": "rd",
 	}
-	if save_to_path:
-		output_f = cml.new_grib_output(save_to_path, **grib_keys)
 	obuf = io.BytesIO()
 	output_m = cml.new_grib_output(obuf, **grib_keys)
 
@@ -147,11 +144,13 @@ def entrypoint_forecast(predicted_params: list[str], target_step: int, start_dat
 		if "step" in kwargs or "endStep" in kwargs:
 			data = args[0]
 			template = kwargs.pop("template")
-			if template._metadata.get("param", "") in predicted_params and kwargs.get("step", -1) == target_step:
+			if (
+				(param := template._metadata.get("param", ""))
+				and (level := template._metadata.get("level", -1)) >= 0
+				and ((param, level) in predicted_params)
+				and kwargs.get("step", -1) == target_step
+			):
 				output_m.write(data, template=template, **kwargs)
-
-			if save_to_path:
-				output_f.write(data, template=template, **kwargs)
 
 	# run
 	# TODO how to propagate output field projection?
