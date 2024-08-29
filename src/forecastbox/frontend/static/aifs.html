@@ -33,31 +33,33 @@ window.addEventListener("load", function() {
 	<input type="hidden" id="job_type" name="job_type" value="{{ job_type }}">
 
 	<h4>Input specifications:</h4>
-	{% for e in input_params %}
-		<label for="{{ e[0] }}">{{ e[3] }}:</label><br>
+	{% for e in initial %}
+		<label for="{{ e[0] }}">{{ e[2] }}:</label><br>
 		{% if e[1] == 'datetime' %}
 			<input type="datetime-local" id="{{ e[0] }}" name="{{ e[0] }}"><br>
 		{% else %}
-			<input type="text" id="{{ e[0] }}" name="{{ e[0] }}" value="{{ e[2] }}"><br>
+			<input type="text" id="{{ e[0] }}" name="{{ e[0] }}" value="{{ e[3] }}"><br>
 		{% endif %}
 	{% endfor %}
 
-	<h4>Model parameters:</h4>
-	{% for e in model_params %}
-		<label for="{{ e[0] }}">{{ e[3] }}:</label><br>
-		<input type="text" id="{{ e[0] }}" name="{{ e[0] }}" value="{{ e[2] }}"><br>
-	{% endfor %}
-
-	<h4>Postprocessing parameters:</h4>
-	{% for e in postproc_params %}
-		<label for="{{ e[0] }}">{{ e[3] }}:</label><br>
-		<input type="text" id="{{ e[0] }}" name="{{ e[0] }}" value="{{ e[2] }}"><br>
+	<h4>Processing parameters:</h4>
+	{% for e in model %}
+		<label for="{{ e[0] }}">{{ e[2] }}:</label><br>
+		{% if e[1] == 'dropdown' %}
+			<select name="{{ e[0] }}" id="{{ e[0] }}">
+			{% for ee in e[3] %}
+				<option value="{{ ee }}">{{ ee }}</option>
+			{% endfor %}
+			</select>
+		{% else %}
+			<input type="text" id="{{ e[0] }}" name="{{ e[0] }}" value="{{ e[3] }}"><br>
+		{% endif %}
 	{% endfor %}
 
 	<h4>Output configuration:</h4>
-	{% for e in output_params %}
-		<label for="{{ e[0] }}">{{ e[3] }}:</label><br>
-		<input type="text" id="{{ e[0] }}" name="{{ e[0] }}" value="{{ e[2] }}"><br>
+	{% for e in output %}
+		<label for="{{ e[0] }}">{{ e[2] }}:</label><br>
+		<input type="text" id="{{ e[0] }}" name="{{ e[0] }}" value="{{ e[3] }}"><br>
 	{% endfor %}
 
 
