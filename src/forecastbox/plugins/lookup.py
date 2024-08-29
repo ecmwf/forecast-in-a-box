@@ -80,9 +80,9 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 		case RegisteredTask.aifs_fetch_and_predict:
 			return TaskDefinition(
 				user_params={
-					"predicted_params": TaskParameter(clazz="marsParamList"),
-					"target_step": TaskParameter(clazz="int"),  # hours, div by 6
-					"start_date": TaskParameter(clazz="datetime"),
+					"predicted_params": TaskParameter(clazz="marsParamList", display="Predicted variables", default="2t, q"),
+					"target_step": TaskParameter(clazz="int", display="Target step"),  # hours, div by 6
+					"start_date": TaskParameter(clazz="datetime", display="Initial conditions from"),
 				},
 				entrypoint="forecastbox.external.hello_aifs.entrypoint_forecast",
 				output_class="grib",
@@ -98,11 +98,12 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 		case RegisteredTask.plot_single_grib:
 			return TaskDefinition(
 				user_params={
-					"box_lat1": TaskParameter(clazz="latitude"),
-					"box_lat2": TaskParameter(clazz="latitude"),
-					"box_lon1": TaskParameter(clazz="longitude"),
-					"box_lon2": TaskParameter(clazz="longitude"),
+					"box_lat1": TaskParameter(clazz="latitude", display="Latitude left"),
+					"box_lat2": TaskParameter(clazz="latitude", display="Latitude right"),
+					"box_lon1": TaskParameter(clazz="longitude", display="Longitude top"),
+					"box_lon2": TaskParameter(clazz="longitude", display="Longitude bottom"),
 					"grib_idx": TaskParameter(clazz="int", default="0"),
+					"grib_param": TaskParameter(clazz="marsParam", default="", display="Parameter to plot"),
 				},
 				entrypoint="forecastbox.external.data_sinks.plot_single_grib",
 				output_class="png",  # I guess
@@ -156,18 +157,19 @@ def build_pipeline(job_pipeline: str) -> Either[list[RegisteredTask], list[str]]
 		return Either.ok(tasks)
 
 
-def resolve_builder_linear(task_names: list[RegisteredTask]) -> Either[TaskDAGBuilder, str]:
+def resolve_builder_linear(task_names: list[RegisteredTask]) -> Either[TaskDAGBuilder, list[str]]:
 	# TODO wrap in try catch, extend the validation
 	tasks: list[tuple[str, TaskDefinition]] = []
 	dynamic_task_inputs = {}
+	errors = []
 	for i, e in enumerate(task_names):
 		task = get_task(e)
 		dyn_params = len(task.dynamic_param_classes)
 		if dyn_params == 1:
 			dynamic_task_inputs[e.value] = {list(task.dynamic_param_classes.keys())[0]: tasks[i - 1][0]}
 		elif dyn_params > 1:
-			# TODO append to val
-			raise ValueError(f"task {e.value} at position {i} in the sequence needs >1 dyn params, unsupported")
+			errors.append(f"task {e.value} at position {i} in the sequence needs >1 dyn params, unsupported")
+			continue
 		tasks.append(
 			(
 				e.value,
@@ -176,4 +178,4 @@ def resolve_builder_linear(task_names: list[RegisteredTask]) -> Either[TaskDAGBu
 		)
 	final_output_at = task_names[-1].value
 	rv = TaskDAGBuilder(tasks=tasks, dynamic_task_inputs=dynamic_task_inputs, final_output_at=final_output_at)
-	return validation.of_builder(rv)
+	return validation.of_builder(rv).append(errors)

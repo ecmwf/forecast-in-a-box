@@ -4,13 +4,16 @@ Focuses on working with JobTemplateExamples:
  - converting the selected example + HTML form result into a TaskDAGBuilder
 """
 
-from forecastbox.api.common import RegisteredTask, TaskDAGBuilder, JobTemplateExample, JinjaTemplate
+from forecastbox.api.common import RegisteredTask, TaskDAGBuilder, JobTemplateExample, JinjaTemplate, TaskParameter
 from forecastbox.utils import assert_never, Either
-from forecastbox.plugins.lookup import resolve_builder_linear
-from typing import Any
+from forecastbox.plugins.lookup import resolve_builder_linear, get_task
+from typing import Any, Iterable
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-def to_builder(job_type: JobTemplateExample) -> Either[TaskDAGBuilder, str]:
+def to_builder(job_type: JobTemplateExample) -> Either[TaskDAGBuilder, list[str]]:
 	"""Looks up a job template -- for retrieving the list of user params / filling it with params
 	to obtain a job definition"""
 	match job_type:
@@ -40,26 +43,99 @@ def to_jinja_template(example: JobTemplateExample) -> JinjaTemplate:
 			return JinjaTemplate.prepare
 
 
-def to_form_params(example: JobTemplateExample) -> Either[dict[str, Any], str]:
+def params_to_jinja(task_name_prefix: str, params: Iterable[tuple[str, TaskParameter]]) -> list[tuple[str, str, str, str]]:
+	def param_text(task_name: str, param_name: str, param: TaskParameter) -> str:
+		if not param.display:
+			return f"{task_name}.{param_name}"
+		else:
+			return param.display
+
+	return [
+		(
+			f"{task_name_prefix}.{param_name}",
+			param.clazz,
+			param.default,
+			param_text(task_name_prefix, param_name, param),
+		)
+		for param_name, param in params
+	]
+
+
+aifs_hidden_defaults = {RegisteredTask.plot_single_grib: {"grib_idx"}}
+
+
+def to_form_params_aifs(builder: TaskDAGBuilder) -> Either[dict[str, Any], list[str]]:
+	"""Used for aifs special template"""
+	# A bit hardcoded / coupled to the dag structure which is declared elsewhere... we need a different abstraction here
+	tasks = dict(builder.tasks)
+	if extra_keys := set(tasks.keys()) - {RegisteredTask.aifs_fetch_and_predict, RegisteredTask.plot_single_grib}:
+		logger.error(f"found extra task keys: {extra_keys}")
+		return Either.error(["internal issue: failed to construct input"])
+	input_task = tasks[RegisteredTask.aifs_fetch_and_predict]
+	output_task = tasks[RegisteredTask.plot_single_grib]
+	return Either.ok(
+		{
+			"input_params": params_to_jinja(RegisteredTask.aifs_fetch_and_predict.value, input_task.user_params.items()),
+			"model_params": [],
+			"postproc_params": [],
+			"output_params": params_to_jinja(
+				RegisteredTask.plot_single_grib.value,
+				filter(lambda e: (e[0] not in aifs_hidden_defaults[RegisteredTask.plot_single_grib]), output_task.user_params.items()),
+			),
+		}
+	)
+
+
+def from_form_params_aifs(form_params: dict[str, str]) -> Either[dict[str, str], list[str]]:
+	defaults = {
+		f"{task.value}.{param_name}": get_task(task).user_params[param_name].default
+		for task, params in aifs_hidden_defaults.items()
+		for param_name in params
+	}
+	result = {**form_params, **defaults}
+	grib_param_plot = result[f"{RegisteredTask.plot_single_grib.value}.grib_param"]
+	grib_param_idx = result[f"{RegisteredTask.plot_single_grib.value}.grib_idx"]
+	predicted_params = result[f"{RegisteredTask.aifs_fetch_and_predict.value}.predicted_params"]
+	errors = []
+	if not predicted_params:
+		errors.append("no predction params were specified")
+	if grib_param_plot and grib_param_plot not in predicted_params:
+		errors.append(f"specified parameter {grib_param_plot} for plotting but no such parameter present in {predicted_params}")
+	if not grib_param_plot and int(grib_param_idx) > (params_available := len(predicted_params.split(","))):
+		errors.append(f"specified plotting of {grib_param_idx}th param, but only {params_available} are available")
+	if errors:
+		return Either.error(errors)
+	else:
+		return Either.ok(result)
+
+
+def to_form_params(example: JobTemplateExample) -> Either[dict[str, Any], list[str]]:
 	"""Returns data used to building the HTML form"""
 	maybe_builder = to_builder(example)
 	if maybe_builder.e:
 		return Either.error(maybe_builder.e)
 	builder = maybe_builder.get_or_raise()
-	job_params = [
-		(
-			f"{task_name}.{param_name}",
-			param.clazz,
-			param.default,
-			f"Fancy name for {task_name}.{param_name}",
-		)
-		for task_name, task_definition in builder.tasks
-		for param_name, param in task_definition.user_params.items()
-	]
-	form_params = {"job_name": example.value, "job_type": "example", "params": job_params}
+	params: dict[str, Any]
+	match example:
+		case JobTemplateExample.hello_aifsl:
+			maybe_params = to_form_params_aifs(builder)
+			if maybe_params.e:
+				return Either.error(maybe_params.e)
+			else:
+				params = maybe_params.get_or_raise()
+		case _:
+			job_params_gen = (
+				params_to_jinja(task_name, task_definition.user_params.items()) for task_name, task_definition in builder.tasks
+			)
+			params = {"params": sum(job_params_gen, [])}
+	form_params = {"job_name": example.value, "job_type": "example", **params}
 	return Either.ok(form_params)
 
 
-def from_form_params(example: JobTemplateExample, form_params: dict[str, str]) -> dict[str, str]:
+def from_form_params(example: JobTemplateExample, form_params: dict[str, str]) -> Either[dict[str, str], list[str]]:
 	"""From the filled HTML form creates a dictionary that the TaskDAGBuilder can process"""
-	return form_params
+	match example:
+		case JobTemplateExample.hello_aifsl:
+			return from_form_params_aifs(form_params)
+		case _:
+			return Either.ok(form_params)

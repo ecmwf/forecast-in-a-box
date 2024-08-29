@@ -36,7 +36,7 @@ def test_jobtemplates_failure():
 	jt = api.TaskDAGBuilder(job_type=job_type, tasks=tasks, dynamic_task_inputs=dynamic_task_inputs, final_output_at=final_output_at)
 	result = validation.of_builder(jt)
 	assert result.e is not None, "there should have been errors"
-	errors = set(result.e.split("\n"))
+	errors = set(result.e)
 	expected = {
 		"task step2 needs param p1 from step1 which does not come before in the schedule",
 		"task step2 needs param p1 to be classX but step1 outputs class1",

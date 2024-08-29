@@ -8,7 +8,14 @@ import earthkit.data
 
 
 def plot_single_grib(
-	input_grib: memoryview, input_grib_len: int, box_lat1: float, box_lat2: float, box_lon1: float, box_lon2: float, grib_idx: int
+	input_grib: memoryview,
+	input_grib_len: int,
+	box_lat1: float,
+	box_lat2: float,
+	box_lon1: float,
+	box_lon2: float,
+	grib_idx: int,
+	grib_param: str,
 ) -> bytes:
 	plot_box = [box_lon1, box_lon2, box_lat1, box_lat2]
 	# plot_box = [box_center_lon - 20, box_center_lon + 20, box_center_lat - 20, box_center_lat + 20]
@@ -19,6 +26,8 @@ def plot_single_grib(
 
 	figure = earthkit.plots.Figure()
 	chart = earthkit.plots.Map(domain=plot_box)
+	if grib_param:
+		raise NotImplementedError(grib_param)
 	chart.block(grib_reader[grib_idx])
 	chart.coastlines()
 	chart.gridlines()

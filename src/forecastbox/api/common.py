@@ -69,6 +69,7 @@ class TaskParameter(BaseModel):
 	# Or we could introduce custom subtypes like lat, lon, latLonBox, marsParam, ...
 	clazz: str  # see api.type_system on whats supported
 	default: str = ""  # always string because we put it to html form... will be deserd via type_name
+	display: str = ""  # may be used in template
 
 
 class TaskEnvironment(BaseModel):
