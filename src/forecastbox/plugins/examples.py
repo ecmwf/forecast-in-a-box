@@ -4,7 +4,7 @@ Focuses on working with JobTemplateExamples:
  - converting the selected example + HTML form result into a TaskDAGBuilder
 """
 
-from forecastbox.api.common import RegisteredTask, TaskDAGBuilder, JobTemplateExample
+from forecastbox.api.common import RegisteredTask, TaskDAGBuilder, JobTemplateExample, JinjaTemplate
 from forecastbox.utils import assert_never, Either
 from forecastbox.plugins.lookup import resolve_builder_linear
 from typing import Any
@@ -30,6 +30,14 @@ def to_builder(job_type: JobTemplateExample) -> Either[TaskDAGBuilder, str]:
 			return resolve_builder_linear([RegisteredTask.aifs_fetch_and_predict, RegisteredTask.plot_single_grib])
 		case s:
 			assert_never(s)
+
+
+def to_jinja_template(example: JobTemplateExample) -> JinjaTemplate:
+	match example:
+		case JobTemplateExample.hello_aifsl:
+			return JinjaTemplate.aifs
+		case _:
+			return JinjaTemplate.prepare
 
 
 def to_form_params(example: JobTemplateExample) -> Either[dict[str, Any], str]:

@@ -27,6 +27,13 @@ class JobTemplateExample(str, Enum):
 	temperature_nbeats = "temperature_nbeats"
 
 
+class JinjaTemplate(str, Enum):
+	job = "job.html"
+	main = "index.html"  # index is existing enum field
+	prepare = "prepare.html"
+	aifs = "aifs.html"
+
+
 class RegisteredTask(str, Enum):
 	"""Job Catalog"""
 
