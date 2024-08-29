@@ -5,6 +5,7 @@ Focuses on working with JobTemplateExamples:
 """
 
 from forecastbox.api.common import RegisteredTask, TaskDAGBuilder, JobTemplateExample, JinjaTemplate, TaskParameter
+from forecastbox.api.type_system import convert
 from forecastbox.utils import assert_never, Either
 from forecastbox.plugins.lookup import resolve_builder_linear, get_task
 from typing import Any, Iterable
@@ -61,7 +62,12 @@ def params_to_jinja(task_name_prefix: str, params: Iterable[tuple[str, TaskParam
 	]
 
 
-aifs_hidden_defaults = {RegisteredTask.plot_single_grib: {"grib_idx"}}
+aifs_hidden_calculated = {
+	RegisteredTask.aifs_fetch_and_predict: {"predicted_params"},
+}
+aifs_hidden_defaults = {
+	RegisteredTask.plot_single_grib: {"grib_idx"},
+}
 
 
 def to_form_params_aifs(builder: TaskDAGBuilder) -> Either[dict[str, Any], list[str]]:
@@ -71,38 +77,44 @@ def to_form_params_aifs(builder: TaskDAGBuilder) -> Either[dict[str, Any], list[
 	if extra_keys := set(tasks.keys()) - {RegisteredTask.aifs_fetch_and_predict, RegisteredTask.plot_single_grib}:
 		logger.error(f"found extra task keys: {extra_keys}")
 		return Either.error(["internal issue: failed to construct input"])
-	input_task = tasks[RegisteredTask.aifs_fetch_and_predict]
-	output_task = tasks[RegisteredTask.plot_single_grib]
+
+	def get_param_list(task: RegisteredTask) -> list[tuple[str, str, str, str]]:
+		task_definition = tasks[task]
+		filtered_params = filter(
+			lambda e: (e[0] not in aifs_hidden_defaults.get(task, set()).union(aifs_hidden_calculated.get(task, set()))),
+			task_definition.user_params.items(),
+		)
+		return params_to_jinja(task.value, filtered_params)
+
 	return Either.ok(
 		{
-			"input_params": params_to_jinja(RegisteredTask.aifs_fetch_and_predict.value, input_task.user_params.items()),
+			"input_params": get_param_list(RegisteredTask.aifs_fetch_and_predict),
 			"model_params": [],
 			"postproc_params": [],
-			"output_params": params_to_jinja(
-				RegisteredTask.plot_single_grib.value,
-				filter(lambda e: (e[0] not in aifs_hidden_defaults[RegisteredTask.plot_single_grib]), output_task.user_params.items()),
-			),
+			"output_params": get_param_list(RegisteredTask.plot_single_grib),
 		}
 	)
 
 
 def from_form_params_aifs(form_params: dict[str, str]) -> Either[dict[str, str], list[str]]:
+	# NOTE a lot of job-specific validation happening here... consider moving something to type_system
+	errors = []
+
 	defaults = {
 		f"{task.value}.{param_name}": get_task(task).user_params[param_name].default
 		for task, params in aifs_hidden_defaults.items()
 		for param_name in params
 	}
 	result = {**form_params, **defaults}
-	grib_param_plot = result[f"{RegisteredTask.plot_single_grib.value}.grib_param"]
-	grib_param_idx = result[f"{RegisteredTask.plot_single_grib.value}.grib_idx"]
-	predicted_params = result[f"{RegisteredTask.aifs_fetch_and_predict.value}.predicted_params"]
-	errors = []
-	if not predicted_params:
-		errors.append("no predction params were specified")
-	if grib_param_plot and grib_param_plot not in predicted_params:
-		errors.append(f"specified parameter {grib_param_plot} for plotting but no such parameter present in {predicted_params}")
-	if not grib_param_plot and int(grib_param_idx) > (params_available := len(predicted_params.split(","))):
-		errors.append(f"specified plotting of {grib_param_idx}th param, but only {params_available} are available")
+
+	# computed params
+	grib_param_plot_raw = result[f"{RegisteredTask.plot_single_grib.value}.grib_param"]
+	grib_param_plot_maybe = convert("aifsOutputParamList", grib_param_plot_raw)
+	if grib_param_plot_maybe.e:
+		errors.append(grib_param_plot_maybe.e)
+	else:
+		result[f"{RegisteredTask.aifs_fetch_and_predict.value}.predicted_params"] = grib_param_plot_raw
+
 	if errors:
 		return Either.error(errors)
 	else:

@@ -2,6 +2,7 @@
 Atomic Tasks for sinks -- data plots, saves to files, ...
 """
 
+from typing import Optional
 import io
 import earthkit.plots
 import earthkit.data
@@ -15,7 +16,7 @@ def plot_single_grib(
 	box_lon1: float,
 	box_lon2: float,
 	grib_idx: int,
-	grib_param: str,
+	grib_param: Optional[tuple[str, int]],
 ) -> bytes:
 	plot_box = [box_lon1, box_lon2, box_lat1, box_lat2]
 	# plot_box = [box_center_lon - 20, box_center_lon + 20, box_center_lat - 20, box_center_lat + 20]
@@ -27,8 +28,12 @@ def plot_single_grib(
 	figure = earthkit.plots.Figure()
 	chart = earthkit.plots.Map(domain=plot_box)
 	if grib_param:
-		raise NotImplementedError(grib_param)
-	chart.block(grib_reader[grib_idx])
+		if grib_idx != 0:
+			raise ValueError(f"both grib idx and grib param specified: {grib_idx=}, {grib_param=}")
+		data = grib_reader.sel(param=grib_param[0], level=grib_param[1])
+	else:
+		data = grib_reader[grib_idx]
+	chart.block(data)
 	chart.coastlines()
 	chart.gridlines()
 	figure.add_map(chart)

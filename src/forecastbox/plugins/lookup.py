@@ -80,7 +80,7 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 		case RegisteredTask.aifs_fetch_and_predict:
 			return TaskDefinition(
 				user_params={
-					"predicted_params": TaskParameter(clazz="marsParamList", display="Predicted variables", default="2t, q"),
+					"predicted_params": TaskParameter(clazz="aifsOutputParamList", display="Predicted variables", default="2t, q"),
 					"target_step": TaskParameter(clazz="int", display="Target step"),  # hours, div by 6
 					"start_date": TaskParameter(clazz="datetime", display="Initial conditions from"),
 				},
@@ -103,7 +103,7 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 					"box_lon1": TaskParameter(clazz="longitude", display="Longitude top"),
 					"box_lon2": TaskParameter(clazz="longitude", display="Longitude bottom"),
 					"grib_idx": TaskParameter(clazz="int", default="0"),
-					"grib_param": TaskParameter(clazz="marsParam", default="", display="Parameter to plot"),
+					"grib_param": TaskParameter(clazz="Optional[marsParam]", default="", display="Parameter to plot"),
 				},
 				entrypoint="forecastbox.external.data_sinks.plot_single_grib",
 				output_class="png",  # I guess
