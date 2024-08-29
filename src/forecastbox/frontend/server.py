@@ -15,7 +15,7 @@ from starlette.responses import HTMLResponse, RedirectResponse
 from starlette.datastructures import UploadFile
 import jinja2
 import pkgutil
-from forecastbox.api.common import JobStatus, JobTemplateExample, TaskDAG, RegisteredTask
+from forecastbox.api.common import JobStatus, JobTemplateExample, TaskDAG, RegisteredTask, JinjaTemplate
 import forecastbox.scheduler as scheduler
 import forecastbox.plugins.lookup as plugin_lookup
 import forecastbox.plugins.examples as plugin_examples
@@ -63,9 +63,7 @@ class StaticExecutionContext:
 				raise FileNotFoundError(fname)
 			return template_env.from_string(template_raw.decode())
 
-		self.template_job = get_template("job.html")
-		self.template_index = get_template("index.html")
-		self.template_prepare = get_template("prepare.html")
+		self.templates: dict[JinjaTemplate, jinja2.Template] = {e: get_template(e.value) for e in JinjaTemplate}
 
 		# from fastapi.staticfiles import StaticFiles
 		# app.mount("/static", StaticFiles(directory="static"), name="static") # TODO for styles.css etc
@@ -99,7 +97,7 @@ async def main_menu() -> str:
 		"jobs": [e.value for e in JobTemplateExample],
 		"tasks": [f"{e.value}: {plugin_lookup.get_task(e).signature_repr()}" for e in RegisteredTask],
 	}
-	return StaticExecutionContext.get().template_index.render(template_params)
+	return StaticExecutionContext.get().templates[JinjaTemplate.main].render(template_params)
 
 
 @app.post("/select")
@@ -114,7 +112,8 @@ async def prepare_example(example_name: str) -> str:
 	"""The form for filling out job parameters and submitting the job itself, via a job template"""
 	example = JobTemplateExample(example_name)
 	template_params = plugin_examples.to_form_params(example).get_or_raise(client_error)
-	return StaticExecutionContext.get().template_prepare.render(template_params)
+	template_name = plugin_examples.to_jinja_template(example)
+	return StaticExecutionContext.get().templates[template_name].render(template_params)
 
 
 @app.post("/prepare_builder", response_class=HTMLResponse)
@@ -137,7 +136,7 @@ async def prepare_builder(job_pipeline: Annotated[str, Form()]) -> str:
 		"job_type": "custom",
 		"params": job_params,
 	}
-	return StaticExecutionContext.get().template_prepare.render(template_params)
+	return StaticExecutionContext.get().templates[JinjaTemplate.prepare].render(template_params)
 
 
 async def submit_int(task_dag: TaskDAG) -> str:
@@ -175,7 +174,7 @@ async def submit_form(request: Request) -> Union[RedirectResponse, TaskDAG]:
 		# NOTE we dont really want to redirect since we *have* the status.
 		# The code below returns that templated, but doesnt change URL so refresh wont work. Dont forget to add response_class=HTMLResponse
 		# template_params = {**job_status.model_dump(), "refresh_url": f"jobs/{job_status.job_id.job_id}"}
-		# return StaticExecutionContext.get().template_job.render(template_params)
+		# return StaticExecutionContext.get().templates[JinjaTemplate.job].render(template_params)
 	elif "fiab.int.action.store" in form:
 		return task_dag
 	else:
@@ -213,4 +212,4 @@ async def job_status(request: Request, job_id: str) -> str:
 		for k, v in job_status_dump["stages"].items()
 	)
 	template_params = {**job_status_dump, "refresh_url": f"../jobs/{job_status.job_id.job_id}"}
-	return StaticExecutionContext.get().template_job.render(template_params)
+	return StaticExecutionContext.get().templates[JinjaTemplate.job].render(template_params)
