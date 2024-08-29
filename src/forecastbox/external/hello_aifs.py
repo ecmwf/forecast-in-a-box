@@ -110,10 +110,10 @@ class MarsInput(RequestBasedInput):
 		return cml.load_source("mars", kwargs)
 
 
-def entrypoint_forecast(predicted_params: list[tuple[str, int]], target_step: int, start_date: str) -> bytes:
+def entrypoint_forecast(predicted_params: list[tuple[str, int]], target_step: int, start_date: str, model_id: str) -> bytes:
 	start_dt = datetime_convert(start_date)  # NOTE unfortunate quirk of json/pydantic serde
 	# config TODO read from kwargs
-	model_path = forecastbox.external.models.get_path("aifs-small.ckpt")
+	model_path = forecastbox.external.models.get_path(f"{model_id}.ckpt")
 
 	# prep clasess
 	d1 = start_dt - dt.timedelta(

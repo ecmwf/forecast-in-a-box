@@ -5,9 +5,8 @@ Focuses on working with JobTemplateExamples:
 """
 
 from forecastbox.api.common import RegisteredTask, TaskDAGBuilder, JobTemplateExample, JinjaTemplate, TaskParameter
-from forecastbox.api.type_system import convert
 from forecastbox.utils import assert_never, Either
-from forecastbox.plugins.lookup import resolve_builder_linear, get_task
+from forecastbox.plugins.lookup import resolve_builder_linear
 from typing import Any, Iterable
 import logging
 
@@ -44,30 +43,15 @@ def to_jinja_template(example: JobTemplateExample) -> JinjaTemplate:
 			return JinjaTemplate.prepare
 
 
-def params_to_jinja(task_name_prefix: str, params: Iterable[tuple[str, TaskParameter]]) -> list[tuple[str, str, str, str]]:
-	def param_text(task_name: str, param_name: str, param: TaskParameter) -> str:
-		if not param.display:
-			return f"{task_name}.{param_name}"
-		else:
-			return param.display
-
+def params_to_jinja(task_name_prefix: str, params: Iterable[tuple[str, TaskParameter]]) -> list[tuple[str, str, str]]:
 	return [
 		(
 			f"{task_name_prefix}.{param_name}",
 			param.clazz,
 			param.default,
-			param_text(task_name_prefix, param_name, param),
 		)
 		for param_name, param in params
 	]
-
-
-aifs_hidden_calculated = {
-	RegisteredTask.aifs_fetch_and_predict: {"predicted_params"},
-}
-aifs_hidden_defaults = {
-	RegisteredTask.plot_single_grib: {"grib_idx"},
-}
 
 
 def to_form_params_aifs(builder: TaskDAGBuilder) -> Either[dict[str, Any], list[str]]:
@@ -78,47 +62,44 @@ def to_form_params_aifs(builder: TaskDAGBuilder) -> Either[dict[str, Any], list[
 		logger.error(f"found extra task keys: {extra_keys}")
 		return Either.error(["internal issue: failed to construct input"])
 
-	def get_param_list(task: RegisteredTask) -> list[tuple[str, str, str, str]]:
-		task_definition = tasks[task]
-		filtered_params = filter(
-			lambda e: (e[0] not in aifs_hidden_defaults.get(task, set()).union(aifs_hidden_calculated.get(task, set()))),
-			task_definition.user_params.items(),
-		)
-		return params_to_jinja(task.value, filtered_params)
-
+	initial = [
+		("start_date", "datetime", "Initial conditions from"),
+	]
+	model = [
+		("target_step", "text", "Target step", "6"),
+		("predicted_params", "text", "Parameters", "2t"),
+		("model_id", "dropdown", "Model ID", ["aifs-small"]),
+	]
+	output = [
+		("box_lat1", "text", "Latitude left"),
+		("box_lat2", "text", "Latitude right"),
+		("box_lon1", "text", "Longitude top"),
+		("box_lon2", "text", "Longitude bottom"),
+	]
 	return Either.ok(
 		{
-			"input_params": get_param_list(RegisteredTask.aifs_fetch_and_predict),
-			"model_params": [],
-			"postproc_params": [],
-			"output_params": get_param_list(RegisteredTask.plot_single_grib),
+			"initial": initial,
+			"model": model,
+			"output": output,
 		}
 	)
 
 
 def from_form_params_aifs(form_params: dict[str, str]) -> Either[dict[str, str], list[str]]:
-	# NOTE a lot of job-specific validation happening here... consider moving something to type_system
-	errors = []
-
-	defaults = {
-		f"{task.value}.{param_name}": get_task(task).user_params[param_name].default
-		for task, params in aifs_hidden_defaults.items()
-		for param_name in params
+	mapped = {
+		f"{RegisteredTask.aifs_fetch_and_predict.value}.predicted_params": form_params.get("predicted_params", ""),
+		f"{RegisteredTask.aifs_fetch_and_predict.value}.target_step": form_params.get("target_step", ""),
+		f"{RegisteredTask.aifs_fetch_and_predict.value}.start_date": form_params.get("start_date", ""),
+		f"{RegisteredTask.aifs_fetch_and_predict.value}.model_id": form_params.get("model_id", ""),
+		f"{RegisteredTask.plot_single_grib.value}.box_lat1": form_params.get("box_lat1", ""),
+		f"{RegisteredTask.plot_single_grib.value}.box_lat2": form_params.get("box_lat2", ""),
+		f"{RegisteredTask.plot_single_grib.value}.box_lon1": form_params.get("box_lon1", ""),
+		f"{RegisteredTask.plot_single_grib.value}.box_lon2": form_params.get("box_lon2", ""),
+		f"{RegisteredTask.plot_single_grib.value}.grib_idx": "0",
+		f"{RegisteredTask.plot_single_grib.value}.grib_param": form_params.get("predicted_params", ""),
 	}
-	result = {**form_params, **defaults}
 
-	# computed params
-	grib_param_plot_raw = result[f"{RegisteredTask.plot_single_grib.value}.grib_param"]
-	grib_param_plot_maybe = convert("aifsOutputParamList", grib_param_plot_raw)
-	if grib_param_plot_maybe.e:
-		errors.append(grib_param_plot_maybe.e)
-	else:
-		result[f"{RegisteredTask.aifs_fetch_and_predict.value}.predicted_params"] = grib_param_plot_raw
-
-	if errors:
-		return Either.error(errors)
-	else:
-		return Either.ok(result)
+	return Either.ok(mapped)
 
 
 def to_form_params(example: JobTemplateExample) -> Either[dict[str, Any], list[str]]:

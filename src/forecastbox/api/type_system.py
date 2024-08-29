@@ -74,6 +74,13 @@ def datetime(value: str) -> dt.datetime:
 		return dt.datetime.strptime(value, "%Y-%m-%dT%H:%M:%S")
 
 
+def six_hours(value: str) -> int:
+	v = int(value)
+	if v <= 0 or v % 6 != 0:
+		raise TypeError(f"value must be a positive multiple of six: {value}")
+	return v
+
+
 def convert(into: str, value: str) -> Either[Any, str]:
 	try:
 		# TODO either introduce a grammar (eg parsimonious), or parse with python proper
@@ -82,10 +89,14 @@ def convert(into: str, value: str) -> Either[Any, str]:
 			if value == "":
 				return Either.ok(None)
 			else:
-				into_t = m.groups()[0]
-		else:
-			into_t = into
-		value = eval(f"{into_t}('{value}')")
+				into = m.groups()[0]
+		enum_re = r"enum\[(.*)\]"
+		if m := re.match(enum_re, into):
+			if value in m.groups()[0]:
+				return Either.ok(value)
+			else:
+				return Either.error(f"value {value[:32]} not a member of {into}")
+		value = eval(f"{into}('{value}')")
 		return Either.ok(value)
 	except Exception as e:
 		return Either.error(str(e))

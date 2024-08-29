@@ -80,9 +80,10 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 		case RegisteredTask.aifs_fetch_and_predict:
 			return TaskDefinition(
 				user_params={
-					"predicted_params": TaskParameter(clazz="aifsOutputParamList", display="Predicted variables", default="2t, q"),
-					"target_step": TaskParameter(clazz="int", display="Target step"),  # hours, div by 6
-					"start_date": TaskParameter(clazz="datetime", display="Initial conditions from"),
+					"predicted_params": TaskParameter(clazz="aifsOutputParamList", default="2t, q"),
+					"target_step": TaskParameter(clazz="six_hours"),
+					"start_date": TaskParameter(clazz="datetime"),
+					"model_id": TaskParameter(clazz="enum[aifs-small]"),
 				},
 				entrypoint="forecastbox.external.hello_aifs.entrypoint_forecast",
 				output_class="grib",
@@ -98,12 +99,12 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 		case RegisteredTask.plot_single_grib:
 			return TaskDefinition(
 				user_params={
-					"box_lat1": TaskParameter(clazz="latitude", display="Latitude left"),
-					"box_lat2": TaskParameter(clazz="latitude", display="Latitude right"),
-					"box_lon1": TaskParameter(clazz="longitude", display="Longitude top"),
-					"box_lon2": TaskParameter(clazz="longitude", display="Longitude bottom"),
+					"box_lat1": TaskParameter(clazz="latitude"),
+					"box_lat2": TaskParameter(clazz="latitude"),
+					"box_lon1": TaskParameter(clazz="longitude"),
+					"box_lon2": TaskParameter(clazz="longitude"),
 					"grib_idx": TaskParameter(clazz="int", default="0"),
-					"grib_param": TaskParameter(clazz="Optional[marsParam]", default="", display="Parameter to plot"),
+					"grib_param": TaskParameter(clazz="Optional[marsParam]", default=""),
 				},
 				entrypoint="forecastbox.external.data_sinks.plot_single_grib",
 				output_class="png",  # I guess
