@@ -52,7 +52,7 @@ class Either(Generic[T, E]):
 		else:
 			return f(cast(T, self.t))
 
-	def append(self, other: E) -> Self:
+	def append(self, other: Optional[E]) -> Self:
 		if other:
 			if not self.e:
 				return self.error(other)

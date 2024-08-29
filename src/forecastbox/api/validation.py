@@ -9,7 +9,7 @@ from forecastbox.utils import Either
 logger = logging.getLogger(__name__)
 
 
-def of_builder(builder: TaskDAGBuilder) -> Either[TaskDAGBuilder, str]:
+def of_builder(builder: TaskDAGBuilder) -> Either[TaskDAGBuilder, list[str]]:
 	errors: list[str] = []
 
 	try:
@@ -44,7 +44,7 @@ def of_builder(builder: TaskDAGBuilder) -> Either[TaskDAGBuilder, str]:
 		logger.exception("validation failed exceptionally")
 		errors.append(f"exception during validation: {e}")
 
-	return Either.error("\n".join(errors))
+	return Either.error(errors)
 
 
 def of_dag(task_dag: TaskDAG, builder: TaskDAGBuilder) -> Either[TaskDAG, list[str]]:
