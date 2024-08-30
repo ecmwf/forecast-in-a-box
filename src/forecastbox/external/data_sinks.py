@@ -2,10 +2,13 @@
 Atomic Tasks for sinks -- data plots, saves to files, ...
 """
 
+import logging
 from typing import Optional
 import io
 import earthkit.plots
 import earthkit.data
+
+logger = logging.getLogger(__name__)
 
 
 def plot_single_grib(
@@ -30,7 +33,8 @@ def plot_single_grib(
 	if grib_param:
 		if grib_idx != 0:
 			raise ValueError(f"both grib idx and grib param specified: {grib_idx=}, {grib_param=}")
-		data = grib_reader.sel(param=grib_param[0], level=grib_param[1])
+		level_sel = grib_param[1] if grib_param[1] != 0 else None  # quirk of grib_reader
+		data = grib_reader.sel(param=grib_param[0], level=level_sel)
 	else:
 		data = grib_reader[grib_idx]
 	chart.block(data)
