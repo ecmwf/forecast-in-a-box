@@ -112,7 +112,7 @@ class MarsInput(RequestBasedInput):
 
 def entrypoint_forecast(predicted_params: list[tuple[str, int]], target_step: int, start_date: str, model_id: str) -> bytes:
 	start_dt = datetime_convert(start_date)  # NOTE unfortunate quirk of json/pydantic serde
-	# config TODO read from kwargs
+	# NOTE predicted params is actually list[list], due to unfortunate quirk of json/pydantic serde
 	model_path = forecastbox.external.models.get_path(f"{model_id}.ckpt")
 
 	# prep clasess
@@ -144,12 +144,10 @@ def entrypoint_forecast(predicted_params: list[tuple[str, int]], target_step: in
 		if "step" in kwargs or "endStep" in kwargs:
 			data = args[0]
 			template = kwargs.pop("template")
-			if (
-				(param := template._metadata.get("param", ""))
-				and (level := template._metadata.get("level", -1)) >= 0
-				and ((param, level) in predicted_params)
-				and kwargs.get("step", -1) == target_step
-			):
+			param = template._metadata.get("param", "")
+			level = template._metadata.get("levelist", 0)
+			level = level if level else 0  # getting around None
+			if param and ([param, level] in predicted_params) and kwargs.get("step", -1) == target_step:
 				output_m.write(data, template=template, **kwargs)
 
 	# run

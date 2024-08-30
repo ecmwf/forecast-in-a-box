@@ -109,10 +109,10 @@ def to_form_params_aifs() -> Either[dict[str, Any], list[str]]:
 			"how to save the results",
 			[("output_type_file", "As a grib file", "tp_file_"), ("output_type_plot", "As a plot", "tp_plot_")],
 		),
-		("tp_plot_box_lat1", "text", "Latitude left"),
-		("tp_plot_box_lat2", "text", "Latitude right"),
-		("tp_plot_box_lon1", "text", "Longitude top"),
-		("tp_plot_box_lon2", "text", "Longitude bottom"),
+		("tp_plot_box_lat1", "text", "Latitude top"),
+		("tp_plot_box_lat2", "text", "Latitude bottom"),
+		("tp_plot_box_lon1", "text", "Longitude left"),
+		("tp_plot_box_lon2", "text", "Longitude right"),
 		("tp_file_filepath", "text", "Path"),
 	]
 	return Either.ok(
