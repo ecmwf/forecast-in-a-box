@@ -52,6 +52,9 @@ class RegisteredTask(str, Enum):
 	display_numpy_array = "display_numpy_array"
 	nbeats_predict = "nbeats_predict"
 
+	# postproc
+	grib_mir = "grib_mir"
+
 	# hybrids
 	hello_world = "hello_world"
 	hello_torch = "hello_torch"

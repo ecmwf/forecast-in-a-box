@@ -137,6 +137,15 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 				output_class="str",
 				dynamic_param_classes={"input_df": "ndarray"},
 			)
+		case RegisteredTask.grib_mir:
+			return TaskDefinition(
+				user_params={
+					"area": TaskParameter(clazz="latlonArea"),  # eventually Optional
+				},
+				entrypoint="forecastbox.external.grib_mir.transform",
+				output_class="grib",
+				dynamic_param_classes={"input_grib": "grib"},
+			)
 		case s:
 			assert_never(s)
 

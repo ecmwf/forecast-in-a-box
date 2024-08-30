@@ -24,27 +24,21 @@ def longitude(value: str) -> float:
 	return f
 
 
-aifs_params_level = [
-	"q",
-	"t",
-	"u",
-	"v",
-	"w",
-	"z",
-]
+def latlonArea(value: str) -> str:
+	n, w, s, e = value.split("/")
+	errors = []
+	if latitude(n) <= latitude(s):
+		errors.append(f"north lat {n} is under south lat {s}")
+	if longitude(w) >= longitude(e):
+		errors.append(f"west lat {n} is over south lat {s}")
+	if errors:
+		raise TypeError(";".join(errors))
+	return value
+
+
+aifs_params_level = ["q", "t", "u", "v", "w", "z"]
 aifs_levels = ["50", "100", "150", "200", "250", "300", "400", "500", "600", "700", "850", "925", "1000"]
-aifs_params_surface = [
-	"10u",
-	"10v",
-	"2d",
-	"2t",
-	"msl",
-	"skt",
-	"sp",
-	"tcw",
-	"cp",
-	"tp",
-]
+aifs_params_surface = ["10u", "10v", "2d", "2t", "msl", "skt", "sp", "tcw", "cp", "tp"]
 
 
 def marsParam(value: str) -> tuple[str, int]:

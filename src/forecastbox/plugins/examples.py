@@ -38,33 +38,21 @@ def to_builder(job_type: JobTemplateExample, params: dict[str, str]) -> Either[T
 			tasks: list[tuple[str, TaskDefinition]] = []
 			dynamic_task_inputs = {}
 			T0 = RegisteredTask.aifs_fetch_and_predict
-			tasks.append(
-				(
-					T0.value,
-					get_task(T0),
-				)
-			)
+			tasks.append((T0.value, get_task(T0)))
 			final_output_at: str = ""
-			sinks = [
-				(
-					"output_type_file",
-					RegisteredTask.grib_to_file,
-				),
-				(
-					"output_type_plot",
-					RegisteredTask.plot_single_grib,
-				),
-			]
-			for prefix, task in sinks:
-				if prefix in params:
-					tasks.append(
-						(
-							task.value,
-							get_task(task),
-						)
-					)
-					dynamic_task_inputs[task.value] = {"input_grib": T0.value}
-					final_output_at = task.value
+			if "output_type_file" in params:
+				Ts = RegisteredTask.grib_to_file
+				tasks.append((Ts.value, get_task(Ts)))
+				dynamic_task_inputs[Ts.value] = {"input_grib": T0.value}
+				final_output_at = Ts.value  # may get overwritten but thats legit
+			if "output_type_plot" in params:
+				T1 = RegisteredTask.grib_mir
+				tasks.append((T1.value, get_task(T1)))
+				T2 = RegisteredTask.plot_single_grib
+				tasks.append((T2.value, get_task(T2)))
+				dynamic_task_inputs[T1.value] = {"input_grib": T0.value}
+				dynamic_task_inputs[T2.value] = {"input_grib": T1.value}
+				final_output_at = T2.value
 			rv = TaskDAGBuilder(tasks=tasks, dynamic_task_inputs=dynamic_task_inputs, final_output_at=final_output_at)
 			return validation.of_builder(rv)
 		case s:
@@ -133,14 +121,19 @@ def from_form_params_aifs(form_params: dict[str, str]) -> Either[dict[str, str],
 		f"{RegisteredTask.aifs_fetch_and_predict.value}.model_id": form_params.get("model_id", ""),
 	}
 	if "output_type_plot" in form_params:
+		n = form_params.get("tp_plot_box_lat1", "")
+		s = form_params.get("tp_plot_box_lat2", "")
+		w = form_params.get("tp_plot_box_lon1", "")
+		e = form_params.get("tp_plot_box_lon2", "")
 		mapped.update(
 			{
-				f"{RegisteredTask.plot_single_grib.value}.box_lat1": form_params.get("tp_plot_box_lat1", ""),
-				f"{RegisteredTask.plot_single_grib.value}.box_lat2": form_params.get("tp_plot_box_lat2", ""),
-				f"{RegisteredTask.plot_single_grib.value}.box_lon1": form_params.get("tp_plot_box_lon1", ""),
-				f"{RegisteredTask.plot_single_grib.value}.box_lon2": form_params.get("tp_plot_box_lon2", ""),
+				f"{RegisteredTask.plot_single_grib.value}.box_lat1": n,
+				f"{RegisteredTask.plot_single_grib.value}.box_lat2": s,
+				f"{RegisteredTask.plot_single_grib.value}.box_lon1": w,
+				f"{RegisteredTask.plot_single_grib.value}.box_lon2": e,
 				f"{RegisteredTask.plot_single_grib.value}.grib_idx": "0",
 				f"{RegisteredTask.plot_single_grib.value}.grib_param": form_params.get("predicted_params", ""),
+				f"{RegisteredTask.grib_mir.value}.area": f"{n}/{w}/{s}/{e}",
 			}
 		)
 	if "output_type_file" in form_params:
