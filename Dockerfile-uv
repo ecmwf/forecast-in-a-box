@@ -10,7 +10,7 @@ env ECCODES_DIR=/fiab/eccodes
 copy --from=eccodes-build /fiab/eccodes /fiab/eccodes/
 
 # system prep
-run apt update && apt install -y curl libaec0 # NOTE libaec is for eccodes
+run apt update && apt install -y curl libaec0 vim # NOTE libaec is for eccodes, vim for me
 
 # runtime dependency: assumes to be mounted, as is .ecmwfapirc
 env FIAB_MODEL_REPO=/fiab/models

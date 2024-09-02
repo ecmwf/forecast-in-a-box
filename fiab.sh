@@ -13,10 +13,7 @@ check() {
 
 maybeInstallUv() {
 	# checks whether uv binary exists on the system, exports UV_PATH to hold the binary's path
-	if [ -n "$(which uv || :)" ] ; then
-		echo "'uv' found, using that"
-	elif [ -n "$UV_PATH" ] ; then
-		# NOTE consider checking UV_PATH first over `which uv`
+	if [ -n "$UV_PATH" ] ; then
 		if [ -x "$UV_PATH" ] ; then
 			echo "using 'uv' on $UV_PATH"
 		else
@@ -24,19 +21,24 @@ maybeInstallUv() {
 			exit 1
 		fi
 		export PATH="$UV_PATH:$PATH"
+	elif [ -d "$FIAB_ROOT/uvdir" ] ; then
+		echo "using 'uv' in $FIAB_ROOT/uvdir"
+		export PATH="$FIAB_ROOT/uvdir/bin:$PATH"
+	elif [ -n "$(which uv || :)" ] ; then
+		echo "'uv' found, using that"
 	else
-		curl -LsSf https://astral.sh/uv/install.sh | sh
-		# TODO install to custom directory instead?
-		export PATH="$HOME/.cargo/bin:$PATH" # TODO more reliable
+		curl -LsSf https://astral.sh/uv/install.sh > "$FIAB_ROOT/uvinstaller.sh"
+		CARGO_DIST_FORCE_INSTALL_DIR="$FIAB_ROOT/uvdir" sh "$FIAB_ROOT/uvinstaller.sh"
+		export PATH="$FIAB_ROOT/uvdir/bin:$PATH"
 	fi
 }
 
 maybeInstallPython() {
 	# checks whether py3.11 is present on the system, uv-installs if not, exports UV_PYTHON to hold the binary's path
-	MAYBE_PYTHON="$(uv python list | grep python3.11 | sed 's/ \+/;/g' | cut -f 2 -d ';' || :)"
+	MAYBE_PYTHON="$(uv python list | grep python3.11 | sed 's/ \+/;/g' | cut -f 2 -d ';' | head -n 1 || :)"
 	if [ -z "$MAYBE_PYTHON" ] ; then
 		uv python install 3.11 # TODO install to custom directory instead?
-		export UV_PY="$(uv python list | grep python3.11 | sed 's/ \+/;/g' | cut -f 2 -d ';')"
+		export UV_PY="$(uv python list | grep python3.11 | sed 's/ \+/;/g' | cut -f 2 -d ';' | head -n 1)"
 	else
 		export UV_PY="$MAYBE_PYTHON"
 	fi
