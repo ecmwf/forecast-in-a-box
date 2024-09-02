@@ -1,4 +1,6 @@
-# ruff: noqa: F401
+"""
+Entrypoint for the standalone fiab execution (frontend, controller and worker spawned by a single process)
+"""
 
 import logging
 import webbrowser
@@ -10,26 +12,6 @@ from multiprocessing import Process, connection, set_start_method, freeze_suppor
 
 
 logger = logging.getLogger(__name__)
-
-
-def dummy_import():
-	"""This is just to persuade pyinstaller to include more of stdlib than is officially declared,
-	so that later uv pip installs work fine. Eventually we'll move this to the .spec file or somewhere"""
-	# fmt: off
-	# torch
-	import pdb
-	import timeit
-	import difflib
-	import cmath
-	import pickletools
-	import unittest.mock
-	# earthkit
-	import fileinput
-	import zoneinfo
-	import sqlite3
-	import plistlib
-	import ctypes.util
-	# fmt: on
 
 
 def setup_process(env_context: dict[str, str]):

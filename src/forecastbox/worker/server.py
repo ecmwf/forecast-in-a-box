@@ -20,7 +20,6 @@ import os
 from forecastbox.api.common import TaskDAG, WorkerId, WorkerRegistration
 import forecastbox.worker.reporting as reporting
 import forecastbox.worker.entrypoint as entrypoint
-import forecastbox.worker.environment_manager as environment_manager
 import forecastbox.worker.db as db
 from multiprocessing import Manager
 
@@ -39,7 +38,6 @@ class AppContext:
 	def __init__(self) -> None:
 		self.controller_url = os.environ["FIAB_CTR_URL"]
 		self.self_url = os.environ["FIAB_WRK_URL"]
-		environment_manager.set_up_python()
 		with httpx.Client() as client:  # TODO pool the client
 			registration = WorkerRegistration.from_raw(self.self_url)
 			response = client.put(f"{self.controller_url}/workers/register", json=registration.model_dump())
