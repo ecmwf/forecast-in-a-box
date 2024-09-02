@@ -99,8 +99,7 @@ run_docker_uv model_repo:
 		--network host \
 		-v {{model_repo}}:/fiab/models:ro \
 		-v ~/.ecmwfapirc:/root/.ecmwfapirc:ro \
-		fiab-runner-base \
-		python -m forecastbox.standalone.entrypoint
+		fiab-runner-base
 
 # deletes temporary files, build files, caches
 clean:

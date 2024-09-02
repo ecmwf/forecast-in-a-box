@@ -1,34 +1,23 @@
 from ubuntu:noble-20240801 as eccodes-build
+# TODO remove after eccodes in wheel
 workdir /eccodes
 run apt update && apt install -y cmake clang libaec0 libaec-dev fcc curl
-# TODO Or package into the wheel, similarly to conda? With/without aec support?
 run curl https://confluence.ecmwf.int/download/attachments/45757960/eccodes-2.35.1-Source.tar.gz?api=v2 --output eccodes.tar.gz && tar xzf eccodes.tar.gz && mkdir -p build /fiab/eccodes && cd build && cmake -DCMAKE_INSTALL_PREFIX=/fiab/eccodes ../eccodes-2.35.1-Source && make && make install
-# NOTE tis a bit clunky, eccodes path of install needs to be the same in both the build and the runner images
 
 from ubuntu:noble-20240801
-
-# system/docker setup
-workdir /fiab
-arg model_repo 
-run apt update && apt install -y curl libaec0 # libaec is for eccodes
+# TODO remove after eccodes in wheel
+env ECCODES_DIR=/fiab/eccodes
 copy --from=eccodes-build /fiab/eccodes /fiab/eccodes/
 
-# uv setup # TODO replace with a bootstrap script that can rely on existing uv installation
-run curl -LsSf https://astral.sh/uv/install.sh | sh
-env PATH="$PATH:/root/.cargo/bin"
-run ~/.cargo/bin/uv python install 3.11 # TODO why do we need the full path? TODO check whether exists first
+# system prep
+run apt update && apt install -y curl libaec0 # NOTE libaec is for eccodes
 
-# fiab fetch
-copy dist/forecast_in_a_box-0.0.1-py3-none-any.whl forecast_in_a_box-0.0.1-py3-none-any.whl
-
-# fiab install
-run ~/.cargo/bin/uv venv # TODO check the right python is active
-env VIRTUAL_ENV="/fiab/.venv"
-env PATH="/fiab/.venv/bin:$PATH"
-env ECCODES_DIR=/fiab/eccodes
-# runtime dependency -- here assumed to be mounted. Similarly ecmwfapirc
+# runtime dependency: assumes to be mounted, as is .ecmwfapirc
 env FIAB_MODEL_REPO=/fiab/models
-run ~/.cargo/bin/uv pip install ./forecast_in_a_box-0.0.1-py3-none-any.whl
 
-# entrypoint (see justfile run_docker_uv)
-# python -m forecastbox.standalone.entrypoint
+# TODO eventually remove: wheel should be pip installed, fiab.sh curl-downloaded
+copy dist/forecast_in_a_box-0.0.1-py3-none-any.whl forecast_in_a_box-0.0.1-py3-none-any.whl
+copy fiab.sh fiab.sh
+
+# entrypoint
+entrypoint ["/fiab.sh"]
