@@ -20,7 +20,11 @@ def prepare(job_id: str, environment: TaskEnvironment) -> Optional[tempfile.Temp
 	version -- as provided by `fiab.sh`"""
 	if environment.packages:
 		td = tempfile.TemporaryDirectory()
-		install_command = ["uv", "pip", "install", "--target", td.name]
+		venv_command = ["uv", "venv", td.name]
+		# NOTE we create a venv instead of just plain directory, because some of the packages create files
+		# outside of site-packages. Thus we then install with --prefix, not with --target
+		subprocess.run(venv_command, check=True)
+		install_command = ["uv", "pip", "install", "--prefix", td.name]
 		if os.environ.get("FIAB_OFFLINE", "") == "YES":
 			install_command += ["--offline"]
 		if cache_dir := os.environ.get("FIAB_CACHE", ""):
@@ -30,7 +34,8 @@ def prepare(job_id: str, environment: TaskEnvironment) -> Optional[tempfile.Temp
 		# derive it from `job_id` only
 		install_command.extend(set(environment.packages))
 		subprocess.run(install_command, check=True)
-		sys.path.append(td.name)
+		# TODO wee bit fragile -- try to obtain it from {td.name}/bin/activate?
+		sys.path.append(f"{td.name}/lib/python3.11/site-packages/")
 		return td
 	else:
 		return None

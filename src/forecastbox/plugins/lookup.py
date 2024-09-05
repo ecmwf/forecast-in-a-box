@@ -145,6 +145,11 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 				entrypoint="forecastbox.external.grib_mir.transform",
 				output_class="grib",
 				dynamic_param_classes={"input_grib": "grib"},
+				environment=TaskEnvironment(
+					packages=[
+						"mir-python"  # until pypi'd, use eg "~/src/mir-python/dist/mir_python-0.2.0-cp311-cp311-linux_x86_64.whl"
+					]
+				),
 			)
 		case s:
 			assert_never(s)
