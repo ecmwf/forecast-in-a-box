@@ -1,5 +1,15 @@
 from forecastbox.controller.server import app
-from forecastbox.api.common import JobDefinition, JobStatus, JobStatusEnum, WorkerRegistration, WorkerId
+from forecastbox.api.common import (
+	JobStatus,
+	JobStatusEnum,
+	WorkerRegistration,
+	WorkerId,
+	TaskDAG,
+	Task,
+	JobTemplateExample,
+	DatasetId,
+	TaskEnvironment,
+)
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
@@ -19,7 +29,15 @@ def test_job_not_found():
 
 
 def test_job_submit():
-	job_definition = JobDefinition(function_name="hello_world", function_parameters={"start_date": "now", "end_date": "later"})
+	task = Task(
+		name="step1",
+		static_params={},
+		dataset_inputs={},
+		entrypoint="entrypoint",
+		output_name=DatasetId(dataset_id="output"),
+		environment=TaskEnvironment(),
+	)
+	job_definition = TaskDAG(job_type=JobTemplateExample.hello_world, tasks=[task], output_id=DatasetId(dataset_id="output"))
 	r1 = client.put("/jobs/submit", json=job_definition.model_dump())
 	assert r1.status_code == 200
 	r1status = JobStatus(**r1.json())

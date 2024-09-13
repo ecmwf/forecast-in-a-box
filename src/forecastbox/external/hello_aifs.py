@@ -4,15 +4,13 @@ Demonstrates aifs inference
 
 from typing import Callable, Optional
 import io
-import earthkit.plots
-import earthkit.data
 import logging
 import datetime as dt
 from functools import cached_property
 import climetlab as cml
 import tqdm
 from anemoi.inference.runner import DefaultRunner
-import forecastbox.jobs.models
+import forecastbox.external.models
 
 logger = logging.getLogger(__name__)
 
@@ -111,13 +109,11 @@ class MarsInput(RequestBasedInput):
 		return cml.load_source("mars", kwargs)
 
 
-def entrypoint_forecast(**kwargs) -> bytes:
+def entrypoint_forecast(predicted_params: list[str], target_step: int) -> bytes:
 	# config TODO read from kwargs
-	model_path = forecastbox.jobs.models.get_path("aifs-small.ckpt")
+	model_path = forecastbox.external.models.get_path("aifs-small.ckpt")
 	relative_delay = dt.timedelta(days=1)  # TODO how to get a reliable date for which data would be available?
 	save_to_path: Optional[str] = None  # "/tmp/output.grib"
-	desired_param = "2t"
-	desired_step = 6  # in hours... should be divisible by 6, presumably <= 240
 
 	# prep clasess
 	n = dt.datetime.now() - relative_delay
@@ -129,7 +125,7 @@ def entrypoint_forecast(**kwargs) -> bytes:
 	)
 	runner = DefaultRunner(str(model_path))
 	mars_input = MarsInput(runner.checkpoint, dates=[f(d2), f(d1)])
-	lead_time = desired_step
+	lead_time = target_step
 	grib_keys = {
 		"stream": "oper",
 		"expver": 0,
@@ -148,7 +144,7 @@ def entrypoint_forecast(**kwargs) -> bytes:
 		if "step" in kwargs or "endStep" in kwargs:
 			data = args[0]
 			template = kwargs.pop("template")
-			if template._metadata.get("param", "") == desired_param and kwargs.get("step", -1) == desired_step:
+			if template._metadata.get("param", "") in predicted_params and kwargs.get("step", -1) == target_step:
 				output_m.write(data, template=template, **kwargs)
 
 			if save_to_path:
@@ -166,32 +162,4 @@ def entrypoint_forecast(**kwargs) -> bytes:
 		progress_callback=tqdm.tqdm,
 	)
 
-	return obuf.getvalue()
-
-
-def entrypoint_plot(**kwargs) -> bytes:
-	# config
-	plot_idx = 0
-	domain = [-15, 35, 32, 72]
-	# NOTE ideally we'd distinguish, based on some kwarg, whether to plot from file or mem
-
-	# data
-	# grib_reader = earthkit.data.from_source("file", path="/tmp/output.grib")
-	imemview = kwargs["data"]
-	imemviewL = kwargs["data_len"]
-	# NOTE the buffer is padded by zeroes due to how shm works, so we need to trim by length
-	ibuf = io.BytesIO(imemview[:imemviewL])
-	grib_reader = earthkit.data.from_source("stream", ibuf, read_all=True)
-
-	figure = earthkit.plots.Figure()
-	# TODO configurable bounding box
-	chart = earthkit.plots.Map(domain=domain)
-	# TODO configurable param
-	chart.block(grib_reader[plot_idx])
-	chart.coastlines()
-	chart.gridlines()
-	figure.add_map(chart)
-
-	obuf = io.BytesIO()
-	figure.save(obuf)
 	return obuf.getvalue()

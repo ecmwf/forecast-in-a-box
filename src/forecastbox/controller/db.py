@@ -10,8 +10,8 @@ import httpx
 import uuid
 from dataclasses import dataclass
 from typing import Optional
-from forecastbox.api.common import JobDefinition, JobStatus, JobId, JobStatusEnum, WorkerId, JobStatusUpdate
-import forecastbox.controller.scheduler as scheduler
+from forecastbox.api.common import TaskDAG, JobStatus, JobId, JobStatusEnum, WorkerId, JobStatusUpdate
+import forecastbox.scheduler as scheduler
 import datetime as dt
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Job:
 	status: JobStatus
-	definition: JobDefinition
+	definition: TaskDAG
 	worker_id: Optional[WorkerId]
 
 
@@ -43,13 +43,14 @@ def job_status(job_id: JobId) -> Optional[JobStatus]:
 		return maybe_job.status
 
 
-def job_submit(definition: JobDefinition) -> JobStatus:
+def job_submit(definition: TaskDAG) -> JobStatus:
 	job_id = str(uuid.uuid4())
 	status = JobStatus(
 		job_id=JobId(job_id=job_id),
 		created_at=dt.datetime.utcnow(),
 		updated_at=dt.datetime.utcnow(),
 		status=JobStatusEnum.submitted,
+		status_detail="",
 		result=None,
 	)
 	job_db[job_id] = Job(status=status, definition=definition, worker_id=None)
@@ -65,13 +66,13 @@ async def job_assign(job_id: str) -> None:
 		return
 	worker_id = list(worker_db.keys())[0]
 	url = worker_db[worker_id].url
-	definition = job_db[job_id].definition
+	task_dag = job_db[job_id].definition
 
-	task_dag = scheduler.build(definition)
+	schedule = scheduler.linearize(task_dag)
 
 	async with httpx.AsyncClient() as client:  # TODO pool the client
 		try:
-			response = await client.put(f"{url}/jobs/submit/{job_id}", json=task_dag.model_dump())
+			response = await client.put(f"{url}/jobs/submit/{job_id}", json=schedule.model_dump())
 		except Exception:
 			# TODO sleep-retry-or-fail
 			logger.exception("failed to submit to worker")
@@ -81,15 +82,27 @@ async def job_assign(job_id: str) -> None:
 			logger.error(f"failed to submit to worker: {response}")
 			return
 	job_db[job_id].worker_id = WorkerId(worker_id=worker_id)
-	update = JobStatusUpdate(job_id=JobId(job_id=job_id), update={"status": JobStatusEnum.assigned})
+	update = JobStatusUpdate(job_id=JobId(job_id=job_id), status=JobStatusEnum.assigned)
 	job_update(update)
 
 
-def job_update(job_status: JobStatusUpdate) -> JobStatus:
-	new = job_db[job_status.job_id.job_id].status.model_copy(update=job_status.update)
-	new.updated_at = dt.datetime.utcnow()
-	job_db[job_status.job_id.job_id].status = new
-	return new
+def job_update(status_update: JobStatusUpdate) -> JobStatus:
+	status = job_db[status_update.job_id.job_id].status  # or copy and then replace? Use pyrsistent?
+	if status_update.task_name:
+		if JobStatusEnum.valid_transition(status.stages.get(status_update.task_name, None), status_update.status):
+			status.stages[status_update.task_name] = status_update.status
+	else:
+		if JobStatusEnum.valid_transition(status.status, status_update.status):
+			status.status = status_update.status
+	if status_update.result:
+		status.result = status_update.result
+	if status_update.status_detail:
+		status.status_detail = status_update.status_detail
+
+	# we may change `updated_at` even if no data have changed, but thats intentional
+	# other option would be to also have `worker_updated_at`, but thats harder to reason about
+	status.updated_at = dt.datetime.utcnow()
+	return status
 
 
 def worker_register(url: str) -> WorkerId:

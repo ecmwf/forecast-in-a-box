@@ -13,7 +13,7 @@ endpoints:
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 import logging
-from forecastbox.api.common import JobDefinition, JobStatus, JobId, WorkerId, WorkerRegistration, JobStatusUpdate
+from forecastbox.api.common import TaskDAG, JobStatus, JobId, WorkerId, WorkerRegistration, JobStatusUpdate
 import forecastbox.controller.db as db
 
 logger = logging.getLogger("uvicorn." + __name__)  # TODO instead configure uvicorn the same as the app
@@ -26,7 +26,7 @@ async def status_check() -> str:
 
 
 @app.api_route("/jobs/submit", methods=["PUT"])
-async def job_submit(definition: JobDefinition, background_tasks: BackgroundTasks) -> JobStatus:
+async def job_submit(definition: TaskDAG, background_tasks: BackgroundTasks) -> JobStatus:
 	status = db.job_submit(definition)
 	background_tasks.add_task(db.job_assign, status.job_id.job_id)
 	return status

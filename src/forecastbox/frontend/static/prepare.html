@@ -1,0 +1,16 @@
+<!doctype html><title>Forecast In A Box: Prepare A Job</title>
+
+Enter Job Parameters:
+<form action="/submit_form" method="post">
+	<label for="job_name">Job:</label><br>
+	<input type="text" id="job_name" name="job_name" value="{{ job_name }}" readonly><br>
+	<input type="hidden" id="job_type" name="job_type" value="{{ job_type }}">
+
+	{% for e in params %}
+		<label for="{{ e[0] }}">{{ e[0] }} (of type {{ e[1] }}):</label><br>
+		<input type="text" id="{{ e[0] }}" name="{{ e[0] }}" value="{{ e[2] }}"><br>
+	{% endfor %}
+
+	<input type="submit" name="fiab.int.action.launch" value="Launch Job">
+	<input type="submit" name="fiab.int.action.store" value="Store Config">
+</form>

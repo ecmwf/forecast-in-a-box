@@ -1,6 +1,8 @@
 """
-As served by the controller.server
+Pydantic models for interchanges between ui, controller and worker
 """
+
+# TODO split into submodules
 
 from pydantic import BaseModel, Field
 from enum import Enum
@@ -10,9 +12,11 @@ from typing_extensions import Self
 import base64
 
 
-# controller: jobs
-class JobFunctionEnum(str, Enum):
-	"""Cascade Job Catalog"""
+class JobTemplateExample(str, Enum):
+	"""Job Catalog"""
+
+	# NOTE this will get eventually replaced by external import/lookup system
+	# See plugin/lookup.py
 
 	hello_world = "hello_world"
 	hello_torch = "hello_torch"
@@ -20,15 +24,94 @@ class JobFunctionEnum(str, Enum):
 	hello_tasks = "hello_tasks"
 	hello_earth = "hello_earth"
 	hello_aifsl = "hello_aifsl"
-
 	temperature_nbeats = "temperature_nbeats"
 
 
-class JobDefinition(BaseModel):
-	function_name: JobFunctionEnum
-	function_parameters: dict[str, str]
+class RegisteredTask(str, Enum):
+	"""Job Catalog"""
 
-	# TODO validate function_name-function_parameters?
+	# NOTE this will get eventually replaced by external import/lookup system
+	# See plugin/lookup.py
+
+	# data sources
+	mars_oper_sfc_box = "mars_oper_sfc_box"
+	mars_enfo_range_temp = "mars_enfo_range_temp"
+	create_numpy_array = "create_numpy_array"
+	aifs_fetch_and_predict = "aifs_fetch_and_predict"
+
+	# data sinks
+	grib_to_file = "grib_to_file"
+	plot_single_grib = "plot_single_grib"
+	display_numpy_array = "display_numpy_array"
+	nbeats_predict = "nbeats_predict"
+
+	# hybrids
+	hello_world = "hello_world"
+	hello_torch = "hello_torch"
+	hello_image = "hello_image"
+
+
+class DatasetId(BaseModel):
+	dataset_id: str
+
+
+class TaskParameter(BaseModel):
+	# NOTE this would ideally be a pydantic class
+	# that would however introduce a requirement for jobs not to be text but bytecode
+	# but we may want to do it anyway because we'd need custom validations, esp for the rich classes etc
+	# Or we could introduce custom subtypes like lat, lon, latLonBox, marsParam, ...
+	clazz: str  # see api.type_system on whats supported
+	default: str = ""  # always string because we put it to html form... will be deserd via type_name
+
+
+class TaskEnvironment(BaseModel):
+	packages: list[str] = Field(description="module names + optionally versions, in the pip format", default_factory=list)
+
+	def __add__(self, other: Self) -> Self:
+		# consider using pyrsistent here
+		return self.__class__(packages=self.packages + other.packages)
+
+
+class TaskDefinition(BaseModel):
+	"""Used for generating input forms and parameter validation"""
+
+	entrypoint: str = Field(description="python_module.function_name")
+	user_params: dict[str, TaskParameter]
+	output_class: str  # not eval'd, can be anything
+	dynamic_param_classes: dict[str, str] = Field(default_factory=dict)
+	environment: TaskEnvironment = Field(default_factory=TaskEnvironment)
+
+	def signature_repr(self) -> str:
+		dparams = ",".join(self.dynamic_param_classes.values())
+		return f"({dparams}) -> {self.output_class}"
+
+
+class Task(BaseModel):
+	"""Represents an atomic computation done in a single process.
+	Created from user's input (validated via TaskDefinition)"""
+
+	name: str  # name of the task within the DAG
+	static_params: dict[str, Any]  # name, value
+	dataset_inputs: dict[str, DatasetId]
+	entrypoint: str = Field(description="python_module.submodules.function_name")
+	output_name: Optional[DatasetId]  # TODO maybe replace with a method yielding just name
+	environment: TaskEnvironment
+
+
+class TaskDAG(BaseModel):
+	"""Represents a complete (distributed) computation, consisting of atomic Tasks.
+	Needs no further user input, finishes with the output that the user specified."""
+
+	tasks: list[Task]  # assumed to be in topological (ie, computable) order -- eg, schedule
+	output_id: Optional[DatasetId]
+	# TODO add in free(dataset_id) events into the tasks
+	# TODO add some mechanism for freeing the output_name(dataset_id) as well
+
+
+class JobTemplate(BaseModel):
+	tasks: list[tuple[str, TaskDefinition]]  # NOTE already assumed to be in (some) topological order
+	dynamic_task_inputs: dict[str, dict[str, str]]  # task_name: {param_name: data_source}
+	final_output_at: str
 
 
 class JobId(BaseModel):
@@ -36,12 +119,18 @@ class JobId(BaseModel):
 
 
 class JobStatusEnum(str, Enum):
-	# TODO this is on the whole job (ie, task dag) level. Granularize into task level
 	submitted = "submitted"
 	assigned = "assigned"
+	preparing = "preparing"
 	running = "running"
 	failed = "failed"
 	finished = "finished"
+
+	@classmethod
+	def valid_transition(cls, before: Optional[Self], after: Self) -> bool:
+		# maybe mixin int (for ordinality), but be careful about pydantic serde
+		lookup = list(cls)  # maybe cache
+		return before is None or lookup.index(before) < lookup.index(after)
 
 
 class JobStatus(BaseModel):
@@ -49,14 +138,17 @@ class JobStatus(BaseModel):
 	created_at: dt.datetime
 	updated_at: dt.datetime
 	status: JobStatusEnum
+	status_detail: str
+	stages: dict[str, JobStatusEnum] = Field(default_factory=dict)
 	result: Optional[str] = Field(description="URL where the result can be streamed from")
 
 
 class JobStatusUpdate(BaseModel):
 	job_id: JobId
-	update: dict[str, Any]
-
-	# TODO validate update does not contain job_id, updated_at, created_at
+	status: JobStatusEnum
+	task_name: Optional[str] = None
+	result: Optional[str] = None
+	status_detail: Optional[str] = None
 
 
 # controller: workers
@@ -73,39 +165,3 @@ class WorkerRegistration(BaseModel):
 
 	def url_raw(self) -> str:
 		return base64.b64decode(self.url_base64.encode()).decode()
-
-
-# worker: jobs and tasks
-# a job is an atom submittable/retrievable by the user. It becomes DAG of tasks executed by workers
-
-
-class DatasetId(BaseModel):
-	dataset_id: str
-
-
-class TaskFunctionEnum(str, Enum):
-	hello_world = "hello_world"
-	hello_torch = "hello_torch"
-	hello_image = "hello_image"
-	hello_tasks_step1 = "hello_tasks_step1"
-	hello_tasks_step2 = "hello_tasks_step2"
-	earthkit_querymars = "earthkit_querymars"
-	tp_nb_get = "tp_nb_get"
-	tp_nb_pred = "tp_nb_pred"
-	aifsl_pred = "aifsl_pred"
-	aifsl_plot = "aifsl_plot"
-
-
-class Task(BaseModel):
-	static_params: dict[str, str]
-	dataset_inputs: dict[str, DatasetId]
-	function_name: TaskFunctionEnum
-	output_name: Optional[DatasetId]
-
-
-class TaskDAG(BaseModel):
-	tasks: list[Task]  # assumed to be in topological (ie, computable) order -- eg, schedule
-	output_id: Optional[DatasetId]
-	# TODO validate consistency: outputs unique, subset of set(output_name), topological
-	# TODO add in free(dataset_id) events into the tasks
-	# TODO add some mechanism for freeing the output_name(dataset_id) as well

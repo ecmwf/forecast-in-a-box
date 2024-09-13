@@ -1,3 +1,5 @@
+# ruff: noqa: F401
+
 import logging
 import webbrowser
 import time
@@ -10,16 +12,36 @@ from multiprocessing import Process, connection, set_start_method, freeze_suppor
 logger = logging.getLogger(__name__)
 
 
+def dummy_import():
+	"""This is just to persuade pyinstaller to include more of stdlib than is officially declared,
+	so that later uv pip installs work fine. Eventually we'll move this to the .spec file or somewhere"""
+	# fmt: off
+	# torch
+	import pdb
+	import timeit
+	import difflib
+	import cmath
+	import pickletools
+	import unittest.mock
+	# earthkit
+	import fileinput
+	import zoneinfo
+	import sqlite3
+	import plistlib
+	import ctypes.util
+	# fmt: on
+
+
 def setup_process(env_context: dict[str, str]):
 	"""Invoke at the start of each new process. Configures logging etc"""
 	logging.basicConfig(level=logging.INFO)  # TODO replace with config
 	os.environ.update(env_context)
 
 
-def launch_web_ui(env_context: dict[str, str]):
+def launch_frontend(env_context: dict[str, str]):
 	setup_process(env_context)
 	port = int(env_context["FIAB_WEB_URL"].rsplit(":", 1)[1])
-	uvicorn.run("forecastbox.web_ui.server:app", host="0.0.0.0", port=port, log_level="info", workers=1)
+	uvicorn.run("forecastbox.frontend.server:app", host="0.0.0.0", port=port, log_level="info", workers=1)
 
 
 def launch_controller(env_context: dict[str, str]):
@@ -66,8 +88,8 @@ if __name__ == "__main__":
 	worker = Process(target=launch_worker, args=(context,))
 	worker.start()
 
-	web_ui = Process(target=launch_web_ui, args=(context,))
-	web_ui.start()
+	frontend = Process(target=launch_frontend, args=(context,))
+	frontend.start()
 
 	with httpx.Client() as client:
 		for root_url in context.values():
@@ -79,6 +101,6 @@ if __name__ == "__main__":
 		(
 			controller.sentinel,
 			worker.sentinel,
-			web_ui.sentinel,
+			frontend.sentinel,
 		)
 	)
