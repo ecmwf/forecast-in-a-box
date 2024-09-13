@@ -10,9 +10,10 @@ from forecastbox.api.common import TaskDAG, JobStatusEnum, TaskEnvironment, Data
 from forecastbox.worker.db import DbContext
 from multiprocessing import Process
 from multiprocessing.shared_memory import SharedMemory
+import multiprocessing.resource_tracker as resource_tracker
 from forecastbox.worker.db import MemDb
 import forecastbox.worker.environment_manager as environment_manager
-from typing import Callable, Any, cast, Iterable
+from typing import Callable, Any, cast, Iterable, Optional
 import importlib
 import logging
 import hashlib
@@ -34,13 +35,19 @@ def get_process_target(entrypoint: str) -> Callable:
 
 
 def task_entrypoint(
-	entrypoint: str, output_mem_key: str, mem_db: MemDb, job_id: str, params: dict, dsids: Iterable[tuple[str, DatasetId]]
+	entrypoint: Optional[str],
+	func: Optional[Callable],
+	output_mem_key: str,
+	mem_db: MemDb,
+	job_id: str,
+	params: dict,
+	dsids: Iterable[tuple[str, DatasetId]],
 ) -> None:
 	mems = {}
 	for param_name, dataset_id in dsids:
 		key = shmid(job_id, dataset_id.dataset_id)
 		if dataset_id.dataset_id not in mems:
-			logger.debug(f"opening dataset id {dataset_id.dataset_id} in {job_id=}")
+			logger.debug(f"opening dataset id {dataset_id.dataset_id} in {job_id=} with {key=}")
 			mems[key] = SharedMemory(name=key, create=False)
 		# NOTE it would be tempting to do just buf[:L] here. Alas, that would trigger exception
 		# later when closing the shm -- python would sorta leak the pointer via the dictionary.
@@ -49,7 +56,12 @@ def task_entrypoint(
 		params[param_name] = mems[key].buf
 		params[param_name + "_len"] = mem_db.memory[key]
 
-	target = get_process_target(entrypoint)
+	if func is not None:
+		target = func
+	else:
+		if not entrypoint:
+			raise TypeError("neither entrypoint nor func given")
+		target = get_process_target(entrypoint)
 	result = target(**params)
 
 	if output_mem_key:
@@ -57,15 +69,18 @@ def task_entrypoint(
 		logger.debug(f"result of len {L} in {job_id=} stored as {output_mem_key}")
 		mem = SharedMemory(name=output_mem_key, create=True, size=L)
 		mem.buf[:L] = result
+		logger.debug(f"closing output shm {output_mem_key}")
+		resource_tracker.unregister(mem._name, "shared_memory")  # to prevent it calling unlink
 		mem.close()
 		mem_db.memory[output_mem_key] = L
 
 	for key, mem in mems.items():
-		logger.debug(f"closing shm {key}")
+		logger.debug(f"closing input shm {key}")
+		resource_tracker.unregister(mem._name, "shared_memory")  # to prevent it calling unlink
 		mem.close()
 
 
-def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str, definition: TaskDAG) -> None:
+def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str, definition: TaskDAG) -> bool:
 	logging.basicConfig(level=logging.DEBUG)  # TODO replace with config
 	logging.getLogger("httpcore").setLevel(logging.ERROR)
 	logging.getLogger("httpx").setLevel(logging.ERROR)
@@ -87,11 +102,11 @@ def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str
 			else:
 				key = ""
 			dsids = task.dataset_inputs.items()
-			task_process = Process(target=task_entrypoint, args=(task.entrypoint, key, mem_db, job_id, params, dsids))
-			logger.debug(f"launching process {task_process.pid}")
+			task_process = Process(target=task_entrypoint, args=(task.entrypoint, task.func, key, mem_db, job_id, params, dsids))
+			logger.debug(f"launching process for {task.name}")
 			task_process.start()
 			task_process.join()
-			logger.debug(f"finished task {task.name} with {task_process.exitcode} in {job_id=}")
+			logger.debug(f"finished task {task.name} in pid {task_process.pid} with {task_process.exitcode} in {job_id=}")
 			if task_process.exitcode != 0:
 				raise ValueError("problem")  # TODO propagate some error message from within the process
 			notify_update(callback_context, job_id, JobStatusEnum.finished, task_name=task.name)
@@ -106,9 +121,11 @@ def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str
 		# TODO free all datasets?
 		logger.exception(f"job with {job_id=} failed")
 		notify_update(callback_context, job_id, JobStatusEnum.failed, status_detail=f" -- Failed because {repr(e)}")
+		return False
 	finally:
 		if env_context is not None:
 			env_context.cleanup()
+	return True
 
 
 def job_factory(callback_context: CallbackContext, db_context: DbContext, job_id: str, definition: TaskDAG) -> Process:

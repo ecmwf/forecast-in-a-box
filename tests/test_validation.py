@@ -60,8 +60,7 @@ def test_taskdag_ok():
 			),
 		]
 		final_output_at = "step1"
-		job_type = api.JobTemplateExample.hello_world
-		tdb = api.TaskDAGBuilder(job_type=job_type, tasks=tasks, dynamic_task_inputs={}, final_output_at=final_output_at)
+		tdb = api.TaskDAGBuilder(tasks=tasks, dynamic_task_inputs={}, final_output_at=final_output_at)
 		return validation.of_builder(tdb).get_or_raise()
 
 	td = scheduler.build(jt_with_params({}), {})

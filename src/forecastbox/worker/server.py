@@ -5,9 +5,9 @@ The fast-api server providing the worker's rest api
 # endpoints:
 #   [put] submit(job_id: str, job_name: str/enum, job_params: dict[str, Any]) -> Ok
 #   [get] results(job_id: str, page: int) -> DataBlock
-#      ↑ used by either frontend to get results, or by other worker to obtain inputs for itself
+# ↑ used by either frontend to get results, or by other worker to obtain inputs for itself
 #   [post] read_from(hostname: str, job_id: str) -> Ok
-#      ↑ issued by controller so that this worker can obtain its inputs via `hostname::results(job_id)` call
+# ↑ issued by controller so that this worker can obtain its inputs via `hostname::results(job_id)` call
 
 from contextlib import asynccontextmanager
 import logging
@@ -22,6 +22,7 @@ import forecastbox.worker.reporting as reporting
 import forecastbox.worker.entrypoint as entrypoint
 import forecastbox.worker.db as db
 from multiprocessing import Manager
+import time
 
 logger = logging.getLogger("uvicorn." + __name__)  # TODO instead configure uvicorn the same as the app
 
@@ -40,8 +41,16 @@ class AppContext:
 		self.self_url = os.environ["FIAB_WRK_URL"]
 		with httpx.Client() as client:  # TODO pool the client
 			registration = WorkerRegistration.from_raw(self.self_url)
-			response = client.put(f"{self.controller_url}/workers/register", json=registration.model_dump())
-			self.worker_id = WorkerId(**response.json())
+			for i in range(3):  # TODO proper @retry
+				try:
+					response = client.put(f"{self.controller_url}/workers/register", json=registration.model_dump())
+					self.worker_id = WorkerId(**response.json())
+					break
+				except Exception:
+					logger.exception("failed to register, sleeping and retrying")
+					time.sleep(2)
+			if not self.worker_id:
+				raise ValueError("no more retries, failed to register")
 		self.mem_manager = Manager()
 		self.db_context = db.DbContext(
 			mem_db=db.MemDb(self.mem_manager),

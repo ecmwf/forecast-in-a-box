@@ -11,6 +11,8 @@ import uuid
 from dataclasses import dataclass
 from typing import Optional
 from forecastbox.api.common import TaskDAG, JobStatus, JobId, JobStatusEnum, WorkerId, JobStatusUpdate
+from forecastbox.api.adapter import cascade2fiab
+from cascade.v2.core import JobInstance, Schedule
 import forecastbox.scheduler as scheduler
 import datetime as dt
 
@@ -20,7 +22,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Job:
 	status: JobStatus
-	definition: TaskDAG
+	definition: Optional[TaskDAG]
 	worker_id: Optional[WorkerId]
 
 
@@ -43,6 +45,32 @@ def job_status(job_id: JobId) -> Optional[JobStatus]:
 		return maybe_job.status
 
 
+def cascade_submit(job_instance: JobInstance, schedule: Schedule) -> JobStatus:
+	job_id = str(uuid.uuid4())
+	status = JobStatus(
+		job_id=JobId(job_id=job_id),
+		created_at=dt.datetime.utcnow(),
+		updated_at=dt.datetime.utcnow(),
+		status=JobStatusEnum.submitted,
+		status_detail="",
+		result=None,
+	)
+
+	if missing := set(schedule.host_task_queues.keys()) - worker_db.keys():
+		status.status = JobStatusEnum.failed
+		status.status_detail = f"unknown workers in schedule: {', '.join(missing)}"
+		return status
+
+	maybe_dag = cascade2fiab(job_instance, schedule)
+	if maybe_dag.e:
+		status.status = JobStatusEnum.failed
+		status.status_detail = f"failure in conversion: {', '.join(maybe_dag.e)}"
+		return status
+
+	job_db[job_id] = Job(status, definition=maybe_dag.t, worker_id=None)
+	return status
+
+
 def job_submit(definition: TaskDAG) -> JobStatus:
 	job_id = str(uuid.uuid4())
 	status = JobStatus(
@@ -63,10 +91,16 @@ async def job_assign(job_id: str) -> None:
 	if not worker_db:
 		# TODO sleep-retry-or-fail
 		logger.error("not enough workers")
+		# TODO some counter/issue
 		return
 	worker_id = list(worker_db.keys())[0]
 	url = worker_db[worker_id].url
 	task_dag = job_db[job_id].definition
+	if not task_dag:
+		# TODO some counter/issue
+		if job_db[job_id].status.status != JobStatusEnum.failed:
+			logger.error(f"job without task but not failed: {job_id}")
+		return
 
 	schedule = scheduler.linearize(task_dag)
 

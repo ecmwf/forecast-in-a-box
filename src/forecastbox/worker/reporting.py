@@ -47,10 +47,14 @@ def notify_update(
 		status_detail=status_detail,
 	)
 
-	with httpx.Client() as client:
-		response = client.post(callback_context.update_url, json=update.model_dump())
-		if response.status_code != httpx.codes.OK:
-			logger.error(f"failed to notify update: {response}")
-			return False
-			# TODO background submit some retry
-	return True
+	if callback_context.controller_url:
+		with httpx.Client() as client:
+			response = client.post(callback_context.update_url, json=update.model_dump())
+			if response.status_code != httpx.codes.OK:
+				logger.error(f"failed to notify update: {response}")
+				return False
+				# TODO background submit some retry
+		return True
+	else:
+		logger.warning("no update url provided, assuming offline/test")
+		return True

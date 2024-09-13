@@ -5,7 +5,7 @@ endpoints:
   /jobs
   [put] submit(job_name: str/enum, job_params: dict[str, Any]) -> JobId
   [get] status(job_id: JobId) -> JobStatus
-    ↑ does not retrieve the result itself. Instead, JobStatus contains optional url where results can be retrieved from
+	↑ does not retrieve the result itself. Instead, JobStatus contains optional url where results can be retrieved from
   /workers
   [put] register(hostname: str) -> WorkerId
   [post] update(worker_id: WorkerId, job_id: JobId, job_status: JobStatus) -> Ok
@@ -14,6 +14,8 @@ endpoints:
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 import logging
 from forecastbox.api.common import TaskDAG, JobStatus, JobId, WorkerId, WorkerRegistration, JobStatusUpdate
+from cascade.v2.core import JobInstance, Host, Environment
+import cascade.v2.scheduler as scheduler
 import forecastbox.controller.db as db
 
 logger = logging.getLogger("uvicorn." + __name__)  # TODO instead configure uvicorn the same as the app
@@ -28,6 +30,16 @@ async def status_check() -> str:
 @app.api_route("/jobs/submit", methods=["PUT"])
 async def job_submit(definition: TaskDAG, background_tasks: BackgroundTasks) -> JobStatus:
 	status = db.job_submit(definition)
+	background_tasks.add_task(db.job_assign, status.job_id.job_id)
+	return status
+
+
+@app.api_route("/jobs/cascade_submit", methods=["PUT"])
+async def cascade_submit(job_instance: JobInstance, background_tasks: BackgroundTasks) -> JobStatus:
+	# TODO proper env discovery/registration
+	environment = Environment(hosts={k: Host(memory_mb=1024) for k in db.worker_db.keys()})
+	schedule = scheduler.schedule(job_instance, environment).get_or_raise()
+	status = db.cascade_submit(job_instance, schedule)
 	background_tasks.add_task(db.job_assign, status.job_id.job_id)
 	return status
 

@@ -7,7 +7,7 @@ Pydantic models for interchanges between ui, controller and worker
 from pydantic import BaseModel, Field
 from enum import Enum
 import datetime as dt
-from typing import Optional, Any
+from typing import Optional, Any, Callable
 from typing_extensions import Self
 import base64
 
@@ -103,7 +103,11 @@ class Task(BaseModel):
 	name: str  # name of the task within the DAG
 	static_params: dict[str, Any]  # name, value
 	dataset_inputs: dict[str, DatasetId]
-	entrypoint: str = Field(description="python_module.submodules.function_name")
+	entrypoint: Optional[str] = Field(description="python_module.submodules.function_name")
+	func: Optional[Callable] = Field(
+		None,
+		description="a Callable, must be cloud-picklable. Prefered over `entrypoint` if given",
+	)
 	output_name: Optional[DatasetId]  # TODO maybe replace with a method yielding just name
 	environment: TaskEnvironment
 
