@@ -11,7 +11,7 @@ from cascade.v2.core import JobInstance, Schedule, TaskInstance as CascadeTask
 from cascade.v2.views import param_source
 from forecastbox.api.common import DatasetId, TaskDAG, Task as FiabTask, TaskEnvironment
 from forecastbox.utils import Either, maybe_head
-from typing import Optional
+from typing import Optional, cast
 
 
 def param2dsid(task_name: str, param_name: Optional[str]) -> Optional[DatasetId]:
@@ -44,7 +44,7 @@ def cascade2fiab(job_instance: JobInstance, schedule: Schedule) -> Either[TaskDA
 			name=name,
 			static_params=task.static_input,
 			dataset_inputs={
-				input_param: param2dsid(source_task, source_output)
+				input_param: cast(DatasetId, param2dsid(source_task, source_output))
 				for input_param, (source_task, source_output) in inputs_lookup[name].items()
 			},
 			entrypoint=task.definition.entrypoint,

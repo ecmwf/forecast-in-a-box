@@ -3,15 +3,14 @@ Target for a new launched process corresponding to a single task
 """
 
 # TODO we launch process per job (whole task dag) -- refactor to process per task in the dag. Would split this in two files
-# TODO move some of the memory management parts into worker/db.py
+# TODO move some of the memory management parts into worker/db.p
 
 from forecastbox.worker.reporting import notify_update, CallbackContext
 from forecastbox.api.common import TaskDAG, JobStatusEnum, TaskEnvironment, DatasetId
 from forecastbox.worker.db import DbContext
 from multiprocessing import Process
 from multiprocessing.shared_memory import SharedMemory
-import multiprocessing.resource_tracker as resource_tracker
-from forecastbox.worker.db import MemDb
+from forecastbox.worker.db import MemDb, shm_worker_close
 import forecastbox.worker.environment_manager as environment_manager
 from typing import Callable, Any, cast, Iterable, Optional
 import importlib
@@ -69,15 +68,11 @@ def task_entrypoint(
 		logger.debug(f"result of len {L} in {job_id=} stored as {output_mem_key}")
 		mem = SharedMemory(name=output_mem_key, create=True, size=L)
 		mem.buf[:L] = result
-		logger.debug(f"closing output shm {output_mem_key}")
-		resource_tracker.unregister(mem._name, "shared_memory")  # to prevent it calling unlink
-		mem.close()
+		shm_worker_close(mem)
 		mem_db.memory[output_mem_key] = L
 
 	for key, mem in mems.items():
-		logger.debug(f"closing input shm {key}")
-		resource_tracker.unregister(mem._name, "shared_memory")  # to prevent it calling unlink
-		mem.close()
+		shm_worker_close(mem)
 
 
 def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str, definition: TaskDAG) -> bool:

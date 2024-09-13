@@ -40,6 +40,7 @@ def build(builder: TaskDAGBuilder, params: dict[str, str]) -> Either[TaskDAG, li
 			static_params=params_per_task[task_name],
 			dataset_inputs={k: DatasetId(dataset_id=v) for k, v in builder.dynamic_task_inputs.get(task_name, {}).items()},
 			entrypoint=task_definition.entrypoint,
+			func=None,
 			output_name=DatasetId(dataset_id=task_name),
 			environment=task_definition.environment,
 		)
