@@ -30,6 +30,10 @@ logger = logging.getLogger("uvicorn." + __name__)  # TODO instead configure uvic
 class AppContext:
 	_instance: Optional[Self] = None
 
+	# NOTE no need to overdo now; consider @retry for serious usecases
+	register_retry_count: int = 3
+	register_sleep_secs: int = 1
+
 	@classmethod
 	def get(cls) -> Self:
 		if not cls._instance:
@@ -39,16 +43,16 @@ class AppContext:
 	def __init__(self) -> None:
 		self.controller_url = os.environ["FIAB_CTR_URL"]
 		self.self_url = os.environ["FIAB_WRK_URL"]
-		with httpx.Client() as client:  # TODO pool the client
+		with httpx.Client() as client:
 			registration = WorkerRegistration.from_raw(self.self_url)
-			for i in range(3):  # TODO proper @retry
+			for i in range(self.register_retry_count):
 				try:
 					response = client.put(f"{self.controller_url}/workers/register", json=registration.model_dump())
 					self.worker_id = WorkerId(**response.json())
 					break
-				except Exception:
-					logger.exception("failed to register, sleeping and retrying")
-					time.sleep(2)
+				except httpx.ConnectError:
+					logger.warning("failed to register, sleeping and retrying")
+					time.sleep(self.register_sleep_secs)
 			if not self.worker_id:
 				raise ValueError("no more retries, failed to register")
 		self.mem_manager = Manager()

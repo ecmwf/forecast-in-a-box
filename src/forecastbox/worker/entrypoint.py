@@ -8,8 +8,9 @@ Target for a new launched process corresponding to a single task
 from forecastbox.worker.reporting import notify_update, CallbackContext
 from forecastbox.api.common import TaskDAG, JobStatusEnum, TaskEnvironment, DatasetId, Task
 from forecastbox.worker.db import DbContext
-from multiprocessing import Process
+from multiprocessing import Process, Pipe
 from multiprocessing.shared_memory import SharedMemory
+from multiprocessing.connection import Connection
 from forecastbox.worker.db import MemDb, shm_worker_close
 import forecastbox.worker.environment_manager as environment_manager
 from typing import Callable, Any, cast, Iterable, Optional
@@ -41,38 +42,50 @@ def task_entrypoint(
 	job_id: str,
 	params: dict,
 	dsids: Iterable[tuple[str, DatasetId]],
+	ex_pipe: Connection,
 ) -> None:
-	mems = {}
-	for param_name, dataset_id in dsids:
-		key = shmid(job_id, dataset_id.dataset_id)
-		if dataset_id.dataset_id not in mems:
-			logger.debug(f"opening dataset id {dataset_id.dataset_id} in {job_id=} with {key=}")
-			mems[key] = SharedMemory(name=key, create=False)
-		# NOTE it would be tempting to do just buf[:L] here. Alas, that would trigger exception
-		# later when closing the shm -- python would sorta leak the pointer via the dictionary.
-		# We need the _len param because the buffer is padded by zeros, and the formats generally
-		# don't have a stop word.
-		params[param_name] = mems[key].buf
-		params[param_name + "_len"] = mem_db.memory[key]
+	try:
+		mems = {}
+		for param_name, dataset_id in dsids:
+			key = shmid(job_id, dataset_id.dataset_id)
+			if dataset_id.dataset_id not in mems:
+				logger.debug(f"opening dataset id {dataset_id.dataset_id} in {job_id=} with {key=}")
+				mems[key] = SharedMemory(name=key, create=False)
+			# NOTE it would be tempting to do just buf[:L] here. Alas, that would trigger exception
+			# later when closing the shm -- python would sorta leak the pointer via the dictionary.
+			# We need the _len param because the buffer is padded by zeros, and the formats generally
+			# don't have a stop word.
+			params[param_name] = mems[key].buf
+			params[param_name + "_len"] = mem_db.memory[key]
 
-	if func is not None:
-		target = Task.func_dec(func)
-	else:
-		if not entrypoint:
-			raise TypeError("neither entrypoint nor func given")
-		target = get_process_target(entrypoint)
-	result = target(**params)
+		if func is not None:
+			target = Task.func_dec(func)
+		else:
+			if not entrypoint:
+				raise TypeError("neither entrypoint nor func given")
+			target = get_process_target(entrypoint)
+		result = target(**params)
 
-	if output_mem_key:
-		L = len(result)
-		logger.debug(f"result of len {L} in {job_id=} stored as {output_mem_key}")
-		mem = SharedMemory(name=output_mem_key, create=True, size=L)
-		mem.buf[:L] = result
-		shm_worker_close(mem)
-		mem_db.memory[output_mem_key] = L
+		if output_mem_key:
+			L = len(result)
+			logger.debug(f"result of len {L} in {job_id=} stored as {output_mem_key}")
+			mem = SharedMemory(name=output_mem_key, create=True, size=L)
+			mem.buf[:L] = result
+			shm_worker_close(mem)
+			mem_db.memory[output_mem_key] = L
 
-	for key, mem in mems.items():
-		shm_worker_close(mem)
+		for key, mem in mems.items():
+			shm_worker_close(mem)
+	except Exception as e:
+		ex_pipe.send(repr(e))
+		raise
+
+
+class TaskExecutionException(Exception):
+	def __init__(self, task, exception):
+		self.task = task
+		self.exception = exception
+		super().__init__(f"{task}: {exception}")
 
 
 def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str, definition: TaskDAG) -> bool:
@@ -97,13 +110,17 @@ def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str
 			else:
 				key = ""
 			dsids = task.dataset_inputs.items()
-			task_process = Process(target=task_entrypoint, args=(task.entrypoint, task.func, key, mem_db, job_id, params, dsids))
+			ex_src, ex_snk = Pipe(duplex=False)
+			task_process = Process(target=task_entrypoint, args=(task.entrypoint, task.func, key, mem_db, job_id, params, dsids, ex_snk))
 			logger.debug(f"launching process for {task.name}")
 			task_process.start()
 			task_process.join()
 			logger.debug(f"finished task {task.name} in pid {task_process.pid} with {task_process.exitcode} in {job_id=}")
 			if task_process.exitcode != 0:
-				raise ValueError("problem")  # TODO propagate some error message from within the process
+				if ex_src.poll(1):
+					raise TaskExecutionException(f"{task.name}", ex_src.recv())
+				else:
+					raise TaskExecutionException(f"{task.name}", "unable to diagnose the problem")
 			notify_update(callback_context, job_id, JobStatusEnum.finished, task_name=task.name)
 
 		logger.debug(f"finished {job_id=}")
@@ -112,14 +129,20 @@ def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str
 		else:
 			output_name = None
 		notify_update(callback_context, job_id, JobStatusEnum.finished, result=output_name, task_name=None)
-	except Exception as e:
-		# TODO free all datasets?
-		logger.exception(f"job with {job_id=} failed")
+	except TaskExecutionException as e:
+		m = repr(e.exception)
+		logger.exception(f"job with {job_id=} failed with {m}")
+		notify_update(callback_context, job_id, JobStatusEnum.failed, status_detail=f" -- Failed in {e.task} with {m}")
+		return False
+	except ValueError as e:
+		logger.exception(f"job with {job_id=} failed *unfathomably*")
 		notify_update(callback_context, job_id, JobStatusEnum.failed, status_detail=f" -- Failed because {repr(e)}")
 		return False
 	finally:
+		# TODO free all datasets?
 		if env_context is not None:
 			env_context.cleanup()
+		callback_context.close()
 	return True
 
 
