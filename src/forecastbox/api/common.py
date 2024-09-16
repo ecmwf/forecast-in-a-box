@@ -7,9 +7,10 @@ Pydantic models for interchanges between ui, controller and worker
 from pydantic import BaseModel, Field
 from enum import Enum
 import datetime as dt
-from typing import Optional, Any, Callable
+from typing import Optional, Any, Callable, cast
 from typing_extensions import Self
-import base64
+from base64 import b64encode, b64decode
+import cloudpickle
 
 
 class JobTemplateExample(str, Enum):
@@ -104,12 +105,17 @@ class Task(BaseModel):
 	static_params: dict[str, Any]  # name, value
 	dataset_inputs: dict[str, DatasetId]
 	entrypoint: Optional[str] = Field(description="python_module.submodules.function_name")
-	func: Optional[Callable] = Field(
-		None,
-		description="a Callable, must be cloud-picklable. Prefered over `entrypoint` if given",
-	)
+	func: Optional[str] = Field(None, description="b64 cloud-pickled Callable. Prefered over `entrypoint` if given")
 	output_name: Optional[DatasetId]  # TODO maybe replace with a method yielding just name
 	environment: TaskEnvironment
+
+	@staticmethod
+	def func_dec(f: str) -> Callable:
+		return cast(Callable, cloudpickle.loads(b64decode(f)))
+
+	@staticmethod
+	def func_enc(f: Callable) -> str:
+		return b64encode(cloudpickle.dumps(f)).decode("ascii")
 
 
 class TaskDAG(BaseModel):
@@ -177,7 +183,7 @@ class WorkerRegistration(BaseModel):
 
 	@classmethod
 	def from_raw(cls, url: str) -> Self:
-		return cls(url_base64=base64.b64encode(url.encode()).decode())
+		return cls(url_base64=b64encode(url.encode()).decode())
 
 	def url_raw(self) -> str:
-		return base64.b64decode(self.url_base64.encode()).decode()
+		return b64decode(self.url_base64.encode()).decode()

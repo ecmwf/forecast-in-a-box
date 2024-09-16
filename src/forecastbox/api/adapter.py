@@ -48,7 +48,7 @@ def cascade2fiab(job_instance: JobInstance, schedule: Schedule) -> Either[TaskDA
 				for input_param, (source_task, source_output) in inputs_lookup[name].items()
 			},
 			entrypoint=task.definition.entrypoint,
-			func=task.definition.func,
+			func=None if not task.definition.func else FiabTask.func_enc(task.definition.func),
 			output_name=param2dsid(name, output_name(task.definition)),
 			environment=TaskEnvironment(packages=task.definition.environment),
 		)

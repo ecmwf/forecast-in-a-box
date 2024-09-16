@@ -6,7 +6,7 @@ Target for a new launched process corresponding to a single task
 # TODO move some of the memory management parts into worker/db.p
 
 from forecastbox.worker.reporting import notify_update, CallbackContext
-from forecastbox.api.common import TaskDAG, JobStatusEnum, TaskEnvironment, DatasetId
+from forecastbox.api.common import TaskDAG, JobStatusEnum, TaskEnvironment, DatasetId, Task
 from forecastbox.worker.db import DbContext
 from multiprocessing import Process
 from multiprocessing.shared_memory import SharedMemory
@@ -35,7 +35,7 @@ def get_process_target(entrypoint: str) -> Callable:
 
 def task_entrypoint(
 	entrypoint: Optional[str],
-	func: Optional[Callable],
+	func: Optional[str],
 	output_mem_key: str,
 	mem_db: MemDb,
 	job_id: str,
@@ -56,7 +56,7 @@ def task_entrypoint(
 		params[param_name + "_len"] = mem_db.memory[key]
 
 	if func is not None:
-		target = func
+		target = Task.func_dec(func)
 	else:
 		if not entrypoint:
 			raise TypeError("neither entrypoint nor func given")
