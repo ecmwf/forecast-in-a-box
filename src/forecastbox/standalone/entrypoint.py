@@ -33,7 +33,12 @@ def launch_controller(env_context: dict[str, str]):
 
 
 def launch_worker(env_context: dict[str, str]):
-	setup_process(env_context)
+	setup_process(
+		{
+			**env_context,
+			**{"FIAB_WRK_MEM_MB": "2048"},  # doesnt really matter now
+		}
+	)
 	port = int(env_context["FIAB_WRK_URL"].rsplit(":", 1)[1])
 	uvicorn.run("forecastbox.worker.server:app", host="0.0.0.0", port=port, log_level="info", workers=1)
 
@@ -62,7 +67,6 @@ if __name__ == "__main__":
 		"FIAB_WEB_URL": "http://localhost:8000",
 		"FIAB_CTR_URL": "http://localhost:8001",
 		"FIAB_WRK_URL": "http://localhost:8002",
-		"FIAB_WRK_MEM_MB": "2048",  # doesnt really matter now
 	}
 
 	controller = Process(target=launch_controller, args=(context,))
