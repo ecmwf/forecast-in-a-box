@@ -7,6 +7,7 @@ endpoints:
   [get]  /jobs/{job_id}	=> returns job.html with JobStatus / JobResult
 """
 
+from cascade.v2.core import JobInstance
 import orjson
 from typing_extensions import Self, Union
 from fastapi import FastAPI, Form, Request, HTTPException, status
@@ -17,6 +18,7 @@ import jinja2
 import pkgutil
 from forecastbox.api.common import JobStatus, JobTemplateExample, TaskDAG, RegisteredTask, JinjaTemplate
 import forecastbox.scheduler as scheduler
+import forecastbox.frontend.cascade.catalog as catalog
 import forecastbox.plugins.lookup as plugin_lookup
 import forecastbox.plugins.examples as plugin_examples
 import logging
@@ -46,6 +48,7 @@ class StaticExecutionContext:
 	def __init__(self) -> None:
 		# urls
 		self.job_submit_url = f"{os.environ['FIAB_CTR_URL']}/jobs/submit"
+		self.cascade_submit_url = f"{os.environ['FIAB_CTR_URL']}/jobs/cascade_submit"
 		self.job_status_url = lambda job_id: f"{os.environ.get('FIAB_CTR_URL', '')}/jobs/status/{job_id}"
 
 		# static html
@@ -94,7 +97,7 @@ async def default_job(request: Request) -> RedirectResponse:
 async def main_menu() -> str:
 	"""The user selects which job type to submit"""
 	template_params = {
-		"jobs": [e.value for e in JobTemplateExample],
+		"jobs": [e.value for e in JobTemplateExample] + list(catalog.get_registered_jobs()),
 		"tasks": [f"{e.value}: {plugin_lookup.get_task(e).signature_repr()}" for e in RegisteredTask],
 	}
 	return StaticExecutionContext.get().templates[JinjaTemplate.main].render(template_params)
@@ -103,8 +106,21 @@ async def main_menu() -> str:
 @app.post("/select")
 async def select(request: Request, example_name: Annotated[str, Form()]) -> RedirectResponse:
 	"""Takes job type, returns redirect to form for filling out job parameters"""
-	redirect_url = request.url_for("prepare_example", example_name=example_name)
+	if catalog.get_cascade(example_name) is not None:
+		redirect_url = request.url_for("prepare_cascade", example_name=example_name)
+	else:
+		redirect_url = request.url_for("prepare_example", example_name=example_name)
 	return RedirectResponse(redirect_url, status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.get("/prepare_cascade/{example_name}", response_class=HTMLResponse)
+async def prepare_cascade(example_name: str) -> str:
+	cascade_job = catalog.get_cascade(example_name)
+	if cascade_job is None:
+		raise ValueError(f"not a cascade job: {example_name}")
+	template_params = cascade_job.form_builder.params
+	template_name = cascade_job.form_builder.template
+	return StaticExecutionContext.get().templates[template_name].render(template_params)
 
 
 @app.get("/prepare_example/{example_name}", response_class=HTMLResponse)
@@ -139,9 +155,9 @@ async def prepare_builder(job_pipeline: Annotated[str, Form()]) -> str:
 	return StaticExecutionContext.get().templates[JinjaTemplate.prepare].render(template_params)
 
 
-async def submit_int(task_dag: TaskDAG) -> str:
+async def submit_int(data: TaskDAG | JobInstance, url: str) -> str:
 	async with httpx.AsyncClient() as client:  # TODO pool the client
-		response_raw = await client.put(StaticExecutionContext.get().job_submit_url, content=task_dag.model_dump_json().encode())
+		response_raw = await client.put(url, content=data.model_dump_json().encode())
 		if response_raw.status_code != httpx.codes.OK:
 			logger.error(response_raw.status_code)
 			logger.error(response_raw.text)
@@ -166,11 +182,24 @@ async def submit_form(request: Request) -> Union[RedirectResponse, TaskDAG]:
 		task_pipeline = plugin_lookup.build_pipeline(job_name).get_or_raise(client_error)
 		builder = plugin_lookup.resolve_builder_linear(task_pipeline).get_or_raise(client_error)
 		params_resolved = params
+	elif job_type == "cascade":
+		if "fiab.int.action.store" in form:
+			raise NotImplementedError("cascade jobs dont support this")
+		elif "fiab.int.action.launch" not in form:
+			raise NotImplementedError("not found any support form action")
+		cascade_job = catalog.get_cascade(job_name)
+		if cascade_job is None:
+			raise ValueError(f"not a cascade job: {job_name}")
+		job_instance = cascade_job.job_builder(params)
+		logger.error(job_instance)
+		job_id = await submit_int(job_instance, StaticExecutionContext.get().cascade_submit_url)
+		redirect_url = request.url_for("job_status", job_id=job_id)
+		return RedirectResponse(redirect_url, status_code=status.HTTP_303_SEE_OTHER)
 	else:
 		raise NotImplementedError(job_type)
 	task_dag = scheduler.build(builder, params_resolved).get_or_raise(client_error)
 	if "fiab.int.action.launch" in form:
-		job_id = await submit_int(task_dag)
+		job_id = await submit_int(task_dag, StaticExecutionContext.get().job_submit_url)
 		redirect_url = request.url_for("job_status", job_id=job_id)
 		return RedirectResponse(redirect_url, status_code=status.HTTP_303_SEE_OTHER)
 		# NOTE we dont really want to redirect since we *have* the status.
@@ -190,7 +219,7 @@ async def submit_file(request: Request) -> RedirectResponse:
 		raise TypeError(type(form["config_file"]))
 	contents = orjson.loads(await form["config_file"].read())
 	task_dag = TaskDAG(**contents)
-	job_id = await submit_int(task_dag)
+	job_id = await submit_int(task_dag, StaticExecutionContext.get().job_submit_url)
 	redirect_url = request.url_for("job_status", job_id=job_id)
 	return RedirectResponse(redirect_url, status_code=status.HTTP_303_SEE_OTHER)
 
