@@ -180,10 +180,11 @@ class WorkerId(BaseModel):
 
 class WorkerRegistration(BaseModel):
 	url_base64: str
+	memory_mb: int
 
 	@classmethod
-	def from_raw(cls, url: str) -> Self:
-		return cls(url_base64=b64encode(url.encode()).decode())
+	def from_raw(cls, url: str, memory_mb: int) -> Self:
+		return cls(url_base64=b64encode(url.encode()).decode(), memory_mb=memory_mb)
 
 	def url_raw(self) -> str:
 		return b64decode(self.url_base64.encode()).decode()

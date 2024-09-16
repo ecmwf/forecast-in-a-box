@@ -50,7 +50,7 @@ def test_job_submit():
 
 
 def test_worker_registration():
-	registration = WorkerRegistration.from_raw("http://localhost:8000")
+	registration = WorkerRegistration.from_raw("http://localhost:8000", 1024)
 	response_raw = client.put("/workers/register", json=registration.model_dump())
 	assert response_raw.status_code == 200
 	worker_id = WorkerId(**response_raw.json())

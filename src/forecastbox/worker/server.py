@@ -43,8 +43,9 @@ class AppContext:
 	def __init__(self) -> None:
 		self.controller_url = os.environ["FIAB_CTR_URL"]
 		self.self_url = os.environ["FIAB_WRK_URL"]
+		self.memory_mb = int(os.environ["FIAB_WRK_MEM_MB"])
 		with httpx.Client() as client:
-			registration = WorkerRegistration.from_raw(self.self_url)
+			registration = WorkerRegistration.from_raw(self.self_url, self.memory_mb)
 			for i in range(self.register_retry_count):
 				try:
 					response = client.put(f"{self.controller_url}/workers/register", json=registration.model_dump())

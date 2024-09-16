@@ -62,6 +62,7 @@ if __name__ == "__main__":
 		"FIAB_WEB_URL": "http://localhost:8000",
 		"FIAB_CTR_URL": "http://localhost:8001",
 		"FIAB_WRK_URL": "http://localhost:8002",
+		"FIAB_WRK_MEM_MB": "2048",  # doesnt really matter now
 	}
 
 	controller = Process(target=launch_controller, args=(context,))

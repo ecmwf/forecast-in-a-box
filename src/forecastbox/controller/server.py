@@ -36,8 +36,7 @@ async def job_submit(definition: TaskDAG, background_tasks: BackgroundTasks) -> 
 
 @app.api_route("/jobs/cascade_submit", methods=["PUT"])
 async def cascade_submit(job_instance: JobInstance, background_tasks: BackgroundTasks) -> JobStatus:
-	# TODO proper env discovery/registration
-	environment = Environment(hosts={k: Host(memory_mb=1024) for k in db.worker_db.keys()})
+	environment = Environment(hosts={k: v.params for k, v in db.worker_db.items()})
 	schedule = scheduler.schedule(job_instance, environment).get_or_raise()
 	status = db.cascade_submit(job_instance, schedule)
 	background_tasks.add_task(db.job_assign, status.job_id.job_id)
@@ -55,7 +54,13 @@ async def job_status(job_id: str) -> JobStatus:
 
 @app.api_route("/workers/register", methods=["PUT"])
 async def worker_register(worker_registration: WorkerRegistration) -> WorkerId:
-	return db.worker_register(worker_registration.url_raw())
+	worker = db.Worker(
+		url=worker_registration.url_raw(),
+		params=Host(
+			memory_mb=worker_registration.memory_mb,
+		),
+	)
+	return db.worker_register(worker)
 
 
 @app.api_route("/jobs/update/{worker_id}", methods=["POST"])
@@ -63,6 +68,3 @@ def job_update(job_status: JobStatusUpdate) -> JobStatus:
 	# TODO consistency check on the worker-job assignment
 	# TODO heartbeat for the worker
 	return db.job_update(job_status)
-
-
-# TODO some workers heartbeat?

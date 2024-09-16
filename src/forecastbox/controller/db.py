@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Optional
 from forecastbox.api.common import TaskDAG, JobStatus, JobId, JobStatusEnum, WorkerId, JobStatusUpdate
 from forecastbox.api.adapter import cascade2fiab
-from cascade.v2.core import JobInstance, Schedule
+from cascade.v2.core import JobInstance, Schedule, Host
 import forecastbox.scheduler as scheduler
 import datetime as dt
 
@@ -32,6 +32,7 @@ job_db: dict[str, Job] = {}
 @dataclass
 class Worker:
 	url: str
+	params: Host
 
 
 worker_db: dict[str, Worker] = {}
@@ -139,7 +140,7 @@ def job_update(status_update: JobStatusUpdate) -> JobStatus:
 	return status
 
 
-def worker_register(url: str) -> WorkerId:
+def worker_register(worker: Worker) -> WorkerId:
 	worker_id = str(uuid.uuid4())
-	worker_db[worker_id] = Worker(url=url)
+	worker_db[worker_id] = worker
 	return WorkerId(worker_id=worker_id)
