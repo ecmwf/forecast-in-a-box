@@ -20,16 +20,30 @@ def setup_process(env_context: dict[str, str]):
 	os.environ.update(env_context)
 
 
+def uvicorn_run(app_name: str, port: int) -> None:
+	# NOTE we pass None to log config to not interfere with original logging setting
+	config = uvicorn.Config(
+		app_name,
+		port=port,
+		host="0.0.0.0",
+		log_config=None,
+		log_level=None,
+		workers=1,
+	)
+	server = uvicorn.Server(config)
+	server.run()
+
+
 def launch_frontend(env_context: dict[str, str]):
 	setup_process(env_context)
 	port = int(env_context["FIAB_WEB_URL"].rsplit(":", 1)[1])
-	uvicorn.run("forecastbox.frontend.server:app", host="0.0.0.0", port=port, log_level="info", workers=1)
+	uvicorn_run("forecastbox.frontend.server:app", port)
 
 
 def launch_controller(env_context: dict[str, str]):
 	setup_process(env_context)
 	port = int(env_context["FIAB_CTR_URL"].rsplit(":", 1)[1])
-	uvicorn.run("forecastbox.controller.server:app", host="0.0.0.0", port=port, log_level="info", workers=1)
+	uvicorn_run("forecastbox.controller.server:app", port)
 
 
 def launch_worker(env_context: dict[str, str]):
@@ -40,7 +54,7 @@ def launch_worker(env_context: dict[str, str]):
 		}
 	)
 	port = int(env_context["FIAB_WRK_URL"].rsplit(":", 1)[1])
-	uvicorn.run("forecastbox.worker.server:app", host="0.0.0.0", port=port, log_level="info", workers=1)
+	uvicorn_run("forecastbox.worker.server:app", port)
 
 
 def wait_for(client: httpx.Client, root_url: str) -> None:

@@ -24,7 +24,7 @@ import forecastbox.worker.db as db
 from multiprocessing import Manager
 import time
 
-logger = logging.getLogger("uvicorn." + __name__)  # TODO instead configure uvicorn the same as the app
+logger = logging.getLogger(__name__)
 
 
 class AppContext:

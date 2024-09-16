@@ -28,7 +28,7 @@ import httpx
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.responses import PlainTextResponse
 
-logger = logging.getLogger("uvicorn." + __name__)  # TODO instead configure uvicorn the same as the app
+logger = logging.getLogger(__name__)
 client_error = lambda e: HTTPException(status_code=400, detail=e)
 
 

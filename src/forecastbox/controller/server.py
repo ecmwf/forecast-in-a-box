@@ -18,7 +18,7 @@ from cascade.v2.core import JobInstance, Host, Environment
 import cascade.v2.scheduler as scheduler
 import forecastbox.controller.db as db
 
-logger = logging.getLogger("uvicorn." + __name__)  # TODO instead configure uvicorn the same as the app
+logger = logging.getLogger(__name__)
 app = FastAPI()
 
 
