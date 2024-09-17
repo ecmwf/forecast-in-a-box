@@ -46,6 +46,7 @@ class AppContext:
 		self.memory_mb = int(os.environ["FIAB_WRK_MEM_MB"])
 		with httpx.Client() as client:
 			registration = WorkerRegistration.from_raw(self.self_url, self.memory_mb)
+			logger.info(f"registering worker {self.self_url} to controller {self.controller_url}")
 			for i in range(self.register_retry_count):
 				try:
 					response = client.put(f"{self.controller_url}/workers/register", json=registration.model_dump())

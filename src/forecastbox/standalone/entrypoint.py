@@ -3,20 +3,22 @@ Entrypoint for the standalone fiab execution (frontend, controller and worker sp
 """
 
 import logging
+import logging.config
 import webbrowser
 import time
 import httpx
 import uvicorn
 import os
 from multiprocessing import Process, connection, set_start_method, freeze_support
+from forecastbox.utils import logging_config
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__ if __name__ != "__main__" else "forecastbox.standalone.entrypoint")
 
 
 def setup_process(env_context: dict[str, str]):
 	"""Invoke at the start of each new process. Configures logging etc"""
-	logging.basicConfig(level=logging.INFO)  # TODO replace with config
+	logging.config.dictConfig(logging_config)
 	os.environ.update(env_context)
 
 
@@ -31,7 +33,10 @@ def uvicorn_run(app_name: str, port: int) -> None:
 		workers=1,
 	)
 	server = uvicorn.Server(config)
-	server.run()
+	try:
+		server.run()
+	except KeyboardInterrupt:
+		pass  # no need to spew stacktrace to log
 
 
 def launch_frontend(env_context: dict[str, str]):
@@ -98,10 +103,14 @@ if __name__ == "__main__":
 
 	webbrowser.open(context["FIAB_WEB_URL"])
 
-	connection.wait(
-		(
-			controller.sentinel,
-			worker.sentinel,
-			frontend.sentinel,
+	try:
+		connection.wait(
+			(
+				controller.sentinel,
+				worker.sentinel,
+				frontend.sentinel,
+			)
 		)
-	)
+	except KeyboardInterrupt:
+		logger.info("keyboard interrupt, application shutting down")
+		pass  # no need to spew stacktrace to log

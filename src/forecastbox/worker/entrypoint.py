@@ -16,6 +16,7 @@ import forecastbox.worker.environment_manager as environment_manager
 from typing import Callable, Any, cast, Iterable, Optional
 import importlib
 import logging
+from forecastbox.utils import logging_config
 import hashlib
 
 logger = logging.getLogger(__name__)
@@ -89,7 +90,7 @@ class TaskExecutionException(Exception):
 
 
 def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str, definition: TaskDAG) -> bool:
-	logging.basicConfig(level=logging.DEBUG)  # TODO replace with config
+	logging.config.dictConfig(logging_config)
 	logging.getLogger("httpcore").setLevel(logging.ERROR)
 	logging.getLogger("httpx").setLevel(logging.ERROR)
 	notify_update(callback_context, job_id, JobStatusEnum.preparing, task_name=None)
