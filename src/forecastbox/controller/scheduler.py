@@ -21,7 +21,7 @@ class MaintenanceScheduler:
 
 	async def close(self) -> None:
 		self.stop = True
-		await self.task
+		self.task.cancel()
 
 	async def heartbeat_workers(self):
 		while not self.stop:

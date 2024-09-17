@@ -1,8 +1,9 @@
 from typing import Iterable, Optional
 from forecastbox.frontend.cascade.contract import CascadeJob
 from forecastbox.frontend.cascade.hello_cascade import HelloCascade
+from forecastbox.frontend.cascade.hello_mars import HelloMars
 
-catalog = {"hello_cascade": HelloCascade}
+catalog = {"hello_cascade": HelloCascade, "hello_mars": HelloMars}
 
 
 def get_registered_jobs() -> Iterable[str]:
