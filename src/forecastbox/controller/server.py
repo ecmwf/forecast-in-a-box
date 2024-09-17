@@ -17,9 +17,39 @@ from forecastbox.api.common import TaskDAG, JobStatus, JobId, WorkerId, WorkerRe
 from cascade.v2.core import JobInstance, Host, Environment
 import cascade.v2.scheduler as scheduler
 import forecastbox.controller.db as db
+from forecastbox.controller.comm import WorkerComm
+from contextlib import asynccontextmanager
+import datetime as dt
+from typing import Optional
+from typing_extensions import Self
 
 logger = logging.getLogger(__name__)
-app = FastAPI()
+
+
+class AppContext:
+	_instance: Optional[Self] = None
+
+	@classmethod
+	def get(cls) -> Self:
+		if not cls._instance:
+			cls._instance = cls()
+		return cls._instance
+
+	def __init__(self) -> None:
+		self.worker_comm = WorkerComm()
+
+	async def close(self) -> None:
+		await self.worker_comm.close()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+	instance = AppContext.get()
+	yield
+	await instance.close()
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.api_route("/status", methods=["GET", "HEAD"])
@@ -30,16 +60,16 @@ async def status_check() -> str:
 @app.api_route("/jobs/submit", methods=["PUT"])
 async def job_submit(definition: TaskDAG, background_tasks: BackgroundTasks) -> JobStatus:
 	status = db.job_submit(definition)
-	background_tasks.add_task(db.job_assign, status.job_id.job_id)
+	background_tasks.add_task(db.job_assign, status.job_id.job_id, AppContext.get().worker_comm)
 	return status
 
 
 @app.api_route("/jobs/cascade_submit", methods=["PUT"])
 async def cascade_submit(job_instance: JobInstance, background_tasks: BackgroundTasks) -> JobStatus:
-	environment = Environment(hosts={k: v.params for k, v in db.worker_db.items()})
+	environment = Environment(hosts={k: v.params for k, v in db.worker_db.all()})
 	schedule = scheduler.schedule(job_instance, environment).get_or_raise()
 	status = db.cascade_submit(job_instance, schedule)
-	background_tasks.add_task(db.job_assign, status.job_id.job_id)
+	background_tasks.add_task(db.job_assign, status.job_id.job_id, AppContext.get().worker_comm)
 	return status
 
 
@@ -59,6 +89,7 @@ async def worker_register(worker_registration: WorkerRegistration) -> WorkerId:
 		params=Host(
 			memory_mb=worker_registration.memory_mb,
 		),
+		last_seen=dt.datetime.now(),
 	)
 	return db.worker_register(worker)
 
@@ -67,4 +98,8 @@ async def worker_register(worker_registration: WorkerRegistration) -> WorkerId:
 def job_update(job_status: JobStatusUpdate) -> JobStatus:
 	# TODO consistency check on the worker-job assignment
 	# TODO heartbeat for the worker
-	return db.job_update(job_status)
+	rv = db.job_update(job_status)
+	if rv is None:
+		raise ValueError(f"failed to update job status of job {job_status.job_id}")
+	else:
+		return rv

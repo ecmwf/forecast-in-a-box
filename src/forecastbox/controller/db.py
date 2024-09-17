@@ -1,20 +1,21 @@
 """
 In-memory persistence for keeping track of workers (their hostname, status) and jobs (worker they run on, status).
 
-Not immediately scalable -- we'd need to launch this as a standalone process to separate from the uvicorn workers.
-Or rewrite controller to rust
+Bottleneck for scalability -- adding more uvicorn workers would introduce inconsistency. We'd have to run this
+as a standalone process, so that more workers wont add more dbs.
 """
 
 import logging
-import httpx
 import uuid
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, replace
+from typing import Optional, Any
 from forecastbox.api.common import TaskDAG, JobStatus, JobId, JobStatusEnum, WorkerId, JobStatusUpdate
 from forecastbox.api.adapter import cascade2fiab
+from forecastbox.db import KVStore, KVStorePyrsistent
 from cascade.v2.core import JobInstance, Schedule, Host
 import forecastbox.scheduler as scheduler
 import datetime as dt
+from forecastbox.controller.comm import WorkerComm
 
 logger = logging.getLogger(__name__)
 
@@ -26,20 +27,21 @@ class Job:
 	worker_id: Optional[WorkerId]
 
 
-job_db: dict[str, Job] = {}
+job_db: KVStore[Job] = KVStorePyrsistent[Job]()
 
 
 @dataclass
 class Worker:
 	url: str
+	last_seen: dt.datetime
 	params: Host
 
 
-worker_db: dict[str, Worker] = {}
+worker_db: KVStore[Worker] = KVStorePyrsistent()
 
 
 def job_status(job_id: JobId) -> Optional[JobStatus]:
-	maybe_job = job_db.get(job_id.job_id, None)
+	maybe_job = job_db.get(job_id.job_id)
 	if maybe_job is None:
 		return None
 	else:
@@ -57,7 +59,7 @@ def cascade_submit(job_instance: JobInstance, schedule: Schedule) -> JobStatus:
 		result=None,
 	)
 
-	if missing := set(schedule.host_task_queues.keys()) - worker_db.keys():
+	if missing := set(schedule.host_task_queues.keys()) - set(e[0] for e in worker_db.all()):
 		status.status = JobStatusEnum.failed
 		status.status_detail = f"unknown workers in schedule: {', '.join(missing)}"
 		return status
@@ -68,7 +70,8 @@ def cascade_submit(job_instance: JobInstance, schedule: Schedule) -> JobStatus:
 		status.status_detail = f"failure in conversion: {', '.join(maybe_dag.e)}"
 		return status
 
-	job_db[job_id] = Job(status, definition=maybe_dag.t, worker_id=None)
+	# TODO actually assign the job / tasks correctly
+	job_db.update(job_id, Job(status, definition=maybe_dag.t, worker_id=None))
 	return status
 
 
@@ -82,47 +85,60 @@ def job_submit(definition: TaskDAG) -> JobStatus:
 		status_detail="",
 		result=None,
 	)
-	job_db[job_id] = Job(status=status, definition=definition, worker_id=None)
+	job_db.update(job_id, Job(status=status, definition=definition, worker_id=None))
 
 	return status
 
 
-async def job_assign(job_id: str) -> None:
-	# TODO the httpx part should not be in this module
+async def job_assign(job_id: str, worker_comm: WorkerComm) -> None:
+	"""Actual communication with Worker to make it run the job in question"""
+	# NOTE error handling here is tricky because we are in a background task.
+	# So we can't "just raise" to end up with http exception in frontend
 	if not worker_db:
 		# TODO sleep-retry-or-fail
 		logger.error("not enough workers")
 		# TODO some counter/issue
 		return
-	worker_id = list(worker_db.keys())[0]
-	url = worker_db[worker_id].url
-	task_dag = job_db[job_id].definition
+	job = job_db.get(job_id)
+	if job is None:
+		logger.error(f"unexpected internal state: {job_id} not found")
+		# TODO some counter/issue
+		return
+	worker_id = list(e[0] for e in worker_db.all())[0]
+	worker = worker_db.get(worker_id)
+	if worker is None:
+		logger.error("internal issue: worker {worker_id} not found")
+		# TODO some counter/issue
+		return
+	task_dag = job.definition
 	if not task_dag:
 		# TODO some counter/issue
-		if job_db[job_id].status.status != JobStatusEnum.failed:
+		if job.status.status != JobStatusEnum.failed:
 			logger.error(f"job without task but not failed: {job_id}")
 		return
 
 	schedule = scheduler.linearize(task_dag)
 
-	async with httpx.AsyncClient() as client:  # TODO pool the client
-		try:
-			response = await client.put(f"{url}/jobs/submit/{job_id}", json=schedule.model_dump())
-		except Exception:
-			# TODO sleep-retry-or-fail
-			logger.exception("failed to submit to worker")
-			return
-		if response.status_code != httpx.codes.OK:
-			# TODO sleep-retry-or-fail
-			logger.error(f"failed to submit to worker: {response}")
-			return
-	job_db[job_id].worker_id = WorkerId(worker_id=worker_id)
+	result = await worker_comm.call_submit(worker.url, job_id, schedule.model_dump())
+	if not result:
+		# TODO some counter/issue
+		logger.error(f"failed to communicate with worker {worker.url} to assign job")
+		return
+
 	update = JobStatusUpdate(job_id=JobId(job_id=job_id), status=JobStatusEnum.assigned)
-	job_update(update)
+	rv = job_update(update, WorkerId(worker_id=worker_id))
+	if not rv:
+		logger.error(f"failed to update {job_id}")
+		# TODO some counter/issue
 
 
-def job_update(status_update: JobStatusUpdate) -> JobStatus:
-	status = job_db[status_update.job_id.job_id].status  # or copy and then replace? Use pyrsistent?
+def job_update(status_update: JobStatusUpdate, worker_id: Optional[WorkerId] = None) -> Optional[JobStatus]:
+	job = job_db.get(status_update.job_id.job_id)
+	if job is None:
+		logger.error(f"unexpected internal state: {status_update.job_id} not found")
+		return None
+	status = job.status.model_copy()  # TODO pyrsistent inside, and then model_copy(updates=...)?
+
 	if status_update.task_name:
 		if JobStatusEnum.valid_transition(status.stages.get(status_update.task_name, None), status_update.status):
 			status.stages[status_update.task_name] = status_update.status
@@ -137,10 +153,16 @@ def job_update(status_update: JobStatusUpdate) -> JobStatus:
 	# we may change `updated_at` even if no data have changed, but thats intentional
 	# other option would be to also have `worker_updated_at`, but thats harder to reason about
 	status.updated_at = dt.datetime.utcnow()
+
+	replacer: dict[str, Any] = {"status": status}
+	if worker_id is not None:
+		replacer["worker_id"] = WorkerId
+	job_db.update(status_update.job_id.job_id, replace(job, **replacer))
+
 	return status
 
 
 def worker_register(worker: Worker) -> WorkerId:
 	worker_id = str(uuid.uuid4())
-	worker_db[worker_id] = worker
+	worker_db.update(worker_id, worker)
 	return WorkerId(worker_id=worker_id)
