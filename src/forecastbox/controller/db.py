@@ -152,14 +152,30 @@ def job_update(status_update: JobStatusUpdate, worker_id: Optional[WorkerId] = N
 
 	# we may change `updated_at` even if no data have changed, but thats intentional
 	# other option would be to also have `worker_updated_at`, but thats harder to reason about
-	status.updated_at = dt.datetime.utcnow()
+	ref_time = dt.datetime.utcnow()
+	status.updated_at = ref_time
 
 	replacer: dict[str, Any] = {"status": status}
 	if worker_id is not None:
-		replacer["worker_id"] = WorkerId
+		replacer["worker_id"] = worker_id
+		worker_heartbeat(worker_id.worker_id, ref_time)
+	elif job.worker_id is not None:
+		worker_heartbeat(job.worker_id.worker_id, ref_time)
+	else:
+		logger.warning(f"unclear worker assignment in job id {status_update.job_id}, skipping heartbeat")
 	job_db.update(status_update.job_id.job_id, replace(job, **replacer))
 
 	return status
+
+
+def worker_heartbeat(worker_id: str, last_seen: dt.datetime) -> None:
+	worker = worker_db.get(worker_id)
+	if worker is None:
+		logger.warning(f"attempted to updated non-existing worker {worker_id}, calmly carrying on")
+		return
+	if worker.last_seen >= last_seen:
+		return
+	worker_db.update(worker_id, replace(worker, last_seen=last_seen))
 
 
 def worker_register(worker: Worker) -> WorkerId:

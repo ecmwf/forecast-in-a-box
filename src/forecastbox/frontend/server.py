@@ -205,7 +205,6 @@ async def submit_form(request: Request) -> Union[RedirectResponse, TaskDAG]:
 		if cascade_job is None:
 			raise ValueError(f"not a cascade job: {job_name}")
 		job_instance = cascade_job.job_builder(params)
-		logger.error(job_instance)
 		job_id = await submit_int(job_instance, AppContext.get().cascade_submit_url)
 		redirect_url = request.url_for("job_status", job_id=job_id)
 		return RedirectResponse(redirect_url, status_code=status.HTTP_303_SEE_OTHER)

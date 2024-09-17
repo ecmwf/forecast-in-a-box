@@ -17,6 +17,7 @@ from forecastbox.api.common import TaskDAG, JobStatus, JobId, WorkerId, WorkerRe
 from cascade.v2.core import JobInstance, Host, Environment
 import cascade.v2.scheduler as scheduler
 import forecastbox.controller.db as db
+from forecastbox.controller.scheduler import MaintenanceScheduler
 from forecastbox.controller.comm import WorkerComm
 from contextlib import asynccontextmanager
 import datetime as dt
@@ -37,9 +38,11 @@ class AppContext:
 
 	def __init__(self) -> None:
 		self.worker_comm = WorkerComm()
+		self.maintenance_scheduler = MaintenanceScheduler(self.worker_comm)
 
 	async def close(self) -> None:
 		await self.worker_comm.close()
+		await self.maintenance_scheduler.close()
 
 
 @asynccontextmanager
@@ -97,7 +100,6 @@ async def worker_register(worker_registration: WorkerRegistration) -> WorkerId:
 @app.api_route("/jobs/update/{worker_id}", methods=["POST"])
 def job_update(job_status: JobStatusUpdate) -> JobStatus:
 	# TODO consistency check on the worker-job assignment
-	# TODO heartbeat for the worker
 	rv = db.job_update(job_status)
 	if rv is None:
 		raise ValueError(f"failed to update job status of job {job_status.job_id}")

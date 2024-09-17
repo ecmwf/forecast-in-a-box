@@ -2,6 +2,7 @@
 Entrypoint for the standalone fiab execution (frontend, controller and worker spawned by a single process)
 """
 
+import asyncio
 import logging
 import logging.config
 import webbrowser
@@ -22,7 +23,7 @@ def setup_process(env_context: dict[str, str]):
 	os.environ.update(env_context)
 
 
-def uvicorn_run(app_name: str, port: int) -> None:
+async def uvicorn_run(app_name: str, port: int) -> None:
 	# NOTE we pass None to log config to not interfere with original logging setting
 	config = uvicorn.Config(
 		app_name,
@@ -33,22 +34,25 @@ def uvicorn_run(app_name: str, port: int) -> None:
 		workers=1,
 	)
 	server = uvicorn.Server(config)
-	try:
-		server.run()
-	except KeyboardInterrupt:
-		pass  # no need to spew stacktrace to log
+	await server.serve()
 
 
 def launch_frontend(env_context: dict[str, str]):
 	setup_process(env_context)
 	port = int(env_context["FIAB_WEB_URL"].rsplit(":", 1)[1])
-	uvicorn_run("forecastbox.frontend.server:app", port)
+	try:
+		asyncio.run(uvicorn_run("forecastbox.frontend.server:app", port))
+	except KeyboardInterrupt:
+		pass  # no need to spew stacktrace to log
 
 
 def launch_controller(env_context: dict[str, str]):
 	setup_process(env_context)
 	port = int(env_context["FIAB_CTR_URL"].rsplit(":", 1)[1])
-	uvicorn_run("forecastbox.controller.server:app", port)
+	try:
+		asyncio.run(uvicorn_run("forecastbox.controller.server:app", port))
+	except KeyboardInterrupt:
+		pass  # no need to spew stacktrace to log
 
 
 def launch_worker(env_context: dict[str, str]):
@@ -59,7 +63,10 @@ def launch_worker(env_context: dict[str, str]):
 		}
 	)
 	port = int(env_context["FIAB_WRK_URL"].rsplit(":", 1)[1])
-	uvicorn_run("forecastbox.worker.server:app", port)
+	try:
+		asyncio.run(uvicorn_run("forecastbox.worker.server:app", port))
+	except KeyboardInterrupt:
+		pass  # no need to spew stacktrace to log
 
 
 def wait_for(client: httpx.Client, root_url: str) -> None:
