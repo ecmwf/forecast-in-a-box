@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 def plot_single_grib(
 	input_grib: memoryview,
-	input_grib_len: int,
 	box_lat1: float,
 	box_lat2: float,
 	box_lon1: float,
@@ -24,8 +23,7 @@ def plot_single_grib(
 	plot_box = [box_lon1, box_lon2, box_lat1, box_lat2]
 	# plot_box = [box_center_lon - 20, box_center_lon + 20, box_center_lat - 20, box_center_lat + 20]
 
-	# NOTE the buffer is padded by zeroes due to how shm works, so we need to trim by length
-	ibuf = io.BytesIO(input_grib[:input_grib_len])
+	ibuf = io.BytesIO(input_grib)
 	grib_reader = earthkit.data.from_source("stream", ibuf, read_all=True)
 
 	figure = earthkit.plots.Figure()
@@ -47,9 +45,8 @@ def plot_single_grib(
 	return obuf.getvalue()
 
 
-def grib_to_file(input_grib: memoryview, input_grib_len: int, path: str) -> bytes:
-	# NOTE the buffer is padded by zeroes due to how shm works, so we need to trim by length
-	ibuf = io.BytesIO(input_grib[:input_grib_len])
+def grib_to_file(input_grib: memoryview, path: str) -> bytes:
+	ibuf = io.BytesIO(input_grib)
 	grib_reader = earthkit.data.from_source("stream", ibuf, read_all=True)
 
 	output_f = earthkit.data.new_grib_output(path)

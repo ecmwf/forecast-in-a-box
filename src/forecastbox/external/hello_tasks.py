@@ -9,6 +9,6 @@ def entrypoint_step1(adhocParam1: int, adhocParam2: int) -> bytes:
 	return np.array([adhocParam1, adhocParam2]).tobytes()
 
 
-def entrypoint_step2(intertaskParam: memoryview, intertaskParam_len: int, adhocParam3: str) -> bytes:
+def entrypoint_step2(intertaskParam: memoryview, adhocParam3: str) -> bytes:
 	input_npy = np.frombuffer(intertaskParam, dtype=int, count=2)
 	return (f"hello world from {input_npy} and {adhocParam3}").encode()

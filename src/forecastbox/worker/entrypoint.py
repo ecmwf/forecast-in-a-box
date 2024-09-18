@@ -52,12 +52,7 @@ def task_entrypoint(
 			if dataset_id.dataset_id not in mems:
 				logger.debug(f"opening dataset id {dataset_id.dataset_id} in {job_id=} with {key=}")
 				mems[key] = SharedMemory(name=key, create=False)
-			# NOTE it would be tempting to do just buf[:L] here. Alas, that would trigger exception
-			# later when closing the shm -- python would sorta leak the pointer via the dictionary.
-			# We need the _len param because the buffer is padded by zeros, and the formats generally
-			# don't have a stop word.
-			params[param_name] = mems[key].buf
-			params[param_name + "_len"] = mem_db.memory[key]
+			params[param_name] = mems[key].buf[: mem_db.memory[key]]
 
 		if func is not None:
 			target = Task.func_dec(func)
@@ -74,8 +69,14 @@ def task_entrypoint(
 			mem.buf[:L] = result
 			shm_worker_close(mem)
 			mem_db.memory[output_mem_key] = L
+		del result
+
+		# this is required so that the Shm can be properly freed
+		for param_name, dataset_id in dsids:
+			del params[param_name]
 
 		for key, mem in mems.items():
+			mem.buf.release()
 			shm_worker_close(mem)
 	except Exception as e:
 		ex_pipe.send(repr(e))

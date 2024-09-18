@@ -10,13 +10,12 @@ import forecastbox.external.models
 logger = logging.getLogger(__name__)
 
 
-def predict(input_df: memoryview, input_df_len: int) -> bytes:
+def predict(input_df: memoryview) -> bytes:
 	# NOTE we import here to keep it localized to the worker process only -- there is some fork issues otherwise
 	from neuralforecast.core import NeuralForecast
 
-	raw = input_df[:input_df_len]
 	# NOTE update the dtype when changing data -- the correct is given in the output of `df.to_records(index=False).__repr__()`
-	df = pd.DataFrame(np.frombuffer(raw, dtype=[("unique_id", "<i8"), ("ds", "<M8[ns]"), ("y", "<f8")]))
+	df = pd.DataFrame(np.frombuffer(input_df, dtype=[("unique_id", "<i8"), ("ds", "<M8[ns]"), ("y", "<f8")]))
 
 	model_path = str(forecastbox.external.models.get_path("nbeats.nf"))
 	model = NeuralForecast.load(model_path)
