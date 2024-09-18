@@ -5,14 +5,34 @@ Communication to controller / other workers
 import logging
 import httpx
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Protocol, runtime_checkable
 import forecastbox.api.common as api
 
 logger = logging.getLogger(__name__)
 
 
+@runtime_checkable
+class CallbackContext(Protocol):
+	"""Contract between worker-server and worker-entrypoint, for notifying
+	controller about individual job progress / job results"""
+
+	def data_url(self, job_id: str) -> str:
+		"""Formats the url for retrieving job's result"""
+		raise NotImplementedError
+
+	def post(self, data: dict) -> bool:
+		"""Calls the controller endpoint for job status update"""
+		raise NotImplementedError
+
+	def close(self) -> None:
+		"""Cleanup methods"""
+		raise NotImplementedError
+
+
 @dataclass
-class CallbackContext:
+class HttpxCallbackContext:
+	"""Httpx-based callback/client for CallbackContext"""
+
 	self_url: str
 	controller_url: str
 	worker_id: str
@@ -28,11 +48,6 @@ class CallbackContext:
 		return f"{self.controller_url}/jobs/update/{self.worker_id}"
 
 	def post(self, data: dict) -> bool:
-		if not self.controller_url:
-			# TODO rather somehow mock, this is just for tests
-			logger.warning("no update url provided, assuming offline/test")
-			return True
-
 		if self._client is None:
 			self._client = httpx.Client()
 		response = self._client.post(self.update_url, json=data)
@@ -46,6 +61,19 @@ class CallbackContext:
 	def close(self) -> None:
 		if self._client is not None:
 			self._client.close()
+
+
+class SilentCallbackContext:
+	"""For offline/testing usage"""
+
+	def data_url(self, job_id: str) -> str:
+		return "nowhere"
+
+	def post(self, data: dict) -> bool:
+		return True
+
+	def close(self) -> None:
+		pass
 
 
 def notify_update(

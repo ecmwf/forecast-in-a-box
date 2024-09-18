@@ -3,7 +3,7 @@ from cascade.v2.fluent import graph2job
 from cascade.v2.core import Environment, Host
 import cascade.v2.scheduler as scheduler
 from forecastbox.api.adapter import cascade2fiab
-from forecastbox.worker.reporting import CallbackContext
+from forecastbox.worker.reporting import SilentCallbackContext
 from forecastbox.worker.entrypoint import job_entrypoint
 from forecastbox.worker.db import MemDb
 from multiprocessing.shared_memory import SharedMemory
@@ -28,12 +28,7 @@ def test_cascade_adapter() -> None:
 	maybe_dag = cascade2fiab(job_instance, maybe_schedule.get_or_raise())
 	assert maybe_dag.e is None
 
-	# rather a stub for the notify_update instead
-	test_callback_context = CallbackContext(
-		self_url="",
-		controller_url="",
-		worker_id="",
-	)
+	test_callback_context = SilentCallbackContext()
 	test_manager = Manager()
 	test_mem_db = MemDb(test_manager)
 

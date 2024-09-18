@@ -65,7 +65,9 @@ class AppContext:
 
 	@property
 	def callback_context(self) -> reporting.CallbackContext:
-		return reporting.CallbackContext(worker_id=self.worker_id.worker_id, controller_url=self.controller_url, self_url=self.self_url)
+		return reporting.HttpxCallbackContext(
+			worker_id=self.worker_id.worker_id, controller_url=self.controller_url, self_url=self.self_url
+		)
 
 
 @asynccontextmanager
