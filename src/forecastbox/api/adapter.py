@@ -42,10 +42,17 @@ def cascade2fiab(job_instance: JobInstance, schedule: Schedule) -> Either[TaskDA
 	worker_queue_f: list[FiabTask] = [
 		FiabTask(
 			name=name,
-			static_params=task.static_input,
-			dataset_inputs={
+			static_params_kw=task.static_input_kw,
+			static_params_ps=task.static_input_ps,
+			dataset_inputs_kw={
 				input_param: cast(DatasetId, param2dsid(source_task, source_output))
 				for input_param, (source_task, source_output) in inputs_lookup[name].items()
+				if isinstance(input_param, str)
+			},
+			dataset_inputs_ps={
+				input_param: cast(DatasetId, param2dsid(source_task, source_output))
+				for input_param, (source_task, source_output) in inputs_lookup[name].items()
+				if isinstance(input_param, int)
 			},
 			entrypoint=task.definition.entrypoint,
 			func=task.definition.func,

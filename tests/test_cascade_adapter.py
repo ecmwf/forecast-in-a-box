@@ -18,6 +18,7 @@ def test_cascade_adapter() -> None:
 	w = Node("writer", input=p, payload=(lambda input: bytes(input), ["input"], {}))
 	g = Graph([w])  # NOTE w is not a sink from cascade's pow
 	job_instance = graph2job(g)
+	print(job_instance)
 
 	environment = Environment(hosts={"h1": Host(memory_mb=1024)})
 	maybe_schedule = scheduler.schedule(job_instance, environment)

@@ -37,8 +37,10 @@ def test_job_submit():
 
 	task = Task(
 		name="step1",
-		static_params={},
-		dataset_inputs={},
+		static_params_kw={},
+		static_params_ps={},
+		dataset_inputs_kw={},
+		dataset_inputs_ps={},
 		entrypoint="entrypoint",
 		output_name=DatasetId(dataset_id="output"),
 		environment=TaskEnvironment(),

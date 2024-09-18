@@ -16,7 +16,7 @@ import forecastbox.worker.environment_manager as environment_manager
 from typing import Callable, Any, cast, Iterable, Optional
 import importlib
 import logging
-from forecastbox.utils import logging_config
+from forecastbox.utils import logging_config, ensure
 import hashlib
 
 logger = logging.getLogger(__name__)
@@ -41,18 +41,27 @@ def task_entrypoint(
 	output_mem_key: str,
 	mem_db: MemDb,
 	job_id: str,
-	params: dict,
-	dsids: Iterable[tuple[str, DatasetId]],
+	args: list,
+	kwargs: dict,
+	dsids_kw: Iterable[tuple[str, DatasetId]],
+	dsids_ps: Iterable[tuple[int, DatasetId]],
 	ex_pipe: Connection,
 ) -> None:
 	try:
 		mems = {}
-		for param_name, dataset_id in dsids:
+		for param_name, dataset_id in dsids_kw:
 			key = shmid(job_id, dataset_id.dataset_id)
 			if dataset_id.dataset_id not in mems:
 				logger.debug(f"opening dataset id {dataset_id.dataset_id} in {job_id=} with {key=}")
 				mems[key] = SharedMemory(name=key, create=False)
-			params[param_name] = mems[key].buf[: mem_db.memory[key]]
+			kwargs[param_name] = mems[key].buf[: mem_db.memory[key]]
+		for param_pos, dataset_id in dsids_ps:
+			key = shmid(job_id, dataset_id.dataset_id)
+			if dataset_id.dataset_id not in mems:
+				logger.debug(f"opening dataset id {dataset_id.dataset_id} in {job_id=} with {key=}")
+				mems[key] = SharedMemory(name=key, create=False)
+			ensure(args, param_pos)
+			args[param_pos] = mems[key].buf[: mem_db.memory[key]]
 
 		if func is not None:
 			target = Task.func_dec(func)
@@ -60,7 +69,7 @@ def task_entrypoint(
 			if not entrypoint:
 				raise TypeError("neither entrypoint nor func given")
 			target = get_process_target(entrypoint)
-		result = target(**params)
+		result = target(*args, **kwargs)
 
 		if output_mem_key:
 			L = len(result)
@@ -72,8 +81,10 @@ def task_entrypoint(
 		del result
 
 		# this is required so that the Shm can be properly freed
-		for param_name, dataset_id in dsids:
-			del params[param_name]
+		for param_name, dataset_id in dsids_kw:
+			del kwargs[param_name]
+		for param_pos, dataset_id in dsids_ps:
+			del args[param_pos]
 
 		for key, mem in mems.items():
 			mem.buf.release()
@@ -103,17 +114,23 @@ def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str
 	try:
 		for task in definition.tasks:
 			notify_update(callback_context, job_id, JobStatusEnum.running, task_name=task.name)
-			params: dict[str, Any] = {}
-			params.update(task.static_params)
+			kwargs: dict[str, Any] = task.static_params_kw.copy()
+			args: list[Any] = []
+			for k, v in task.static_params_ps.items():
+				ensure(args, k)
+				args[k] = v
 
-			logger.debug(f"running task {task.name} in {job_id=} with kwarg keys {','.join(params.keys())}")
+			logger.debug(f"running task {task.name} in {job_id=} with {len(args)} args and kwarg keys {','.join(kwargs.keys())}")
 			if task.output_name:
 				key = shmid(job_id, task.output_name.dataset_id)
 			else:
 				key = ""
-			dsids = task.dataset_inputs.items()
+			dsids_kw = task.dataset_inputs_kw.items()
+			dsids_ps = task.dataset_inputs_ps.items()
 			ex_src, ex_snk = Pipe(duplex=False)
-			task_process = Process(target=task_entrypoint, args=(task.entrypoint, task.func, key, mem_db, job_id, params, dsids, ex_snk))
+			task_process = Process(
+				target=task_entrypoint, args=(task.entrypoint, task.func, key, mem_db, job_id, args, kwargs, dsids_kw, dsids_ps, ex_snk)
+			)
 			logger.debug(f"launching process for {task.name}")
 			task_process.start()
 			task_process.join()

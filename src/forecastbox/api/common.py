@@ -102,8 +102,10 @@ class Task(BaseModel):
 	Created from user's input (validated via TaskDefinition)"""
 
 	name: str  # name of the task within the DAG
-	static_params: dict[str, Any]  # name, value
-	dataset_inputs: dict[str, DatasetId]
+	static_params_kw: dict[str, Any]  # name, value
+	static_params_ps: dict[int, Any]  # position, value
+	dataset_inputs_ps: dict[int, DatasetId]
+	dataset_inputs_kw: dict[str, DatasetId]
 	entrypoint: Optional[str] = Field(description="python_module.submodules.function_name")
 	func: Optional[str] = Field(None, description="b64 cloud-pickled Callable. Prefered over `entrypoint` if given")
 	output_name: Optional[DatasetId]  # TODO maybe replace with a method yielding just name

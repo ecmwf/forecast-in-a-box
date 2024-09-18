@@ -15,7 +15,8 @@ def job_builder(params: dict[str, str]) -> JobInstance:
 				entrypoint="forecastbox.external.data_sources.oper_sfc_box_query",
 				func=None,
 				environment=["numpy<2.0.0", "ecmwf-api-client", "earthkit-data", "earthkit-plots"],
-				input_schema={
+				input_schema_ps={},
+				input_schema_kw={
 					"days_ago": "int",
 					"step": "int",
 					"box_center_lat": "latitude",
@@ -24,7 +25,8 @@ def job_builder(params: dict[str, str]) -> JobInstance:
 				},
 				output_schema={"__default__": "grib"},
 			),
-			static_input={
+			static_input_ps={},
+			static_input_kw={
 				"days_ago": int(params.get("days_ago", "1")),
 				"step": int(params.get("step", "1")),
 				"box_center_lat": int(params.get("box_center_lat", "50")),
@@ -41,10 +43,12 @@ def job_builder(params: dict[str, str]) -> JobInstance:
 				entrypoint="forecastbox.external.grib_mir.transform",
 				func=None,
 				environment=[str(pathlib.Path.home() / "src/mir-python/dist/mir_python-0.2.0-cp311-cp311-linux_x86_64.whl")],
-				input_schema={"area": "latlonArea", "input_grib": "grib"},
+				input_schema_ps={},
+				input_schema_kw={"area": "latlonArea", "input_grib": "grib"},
 				output_schema={"__default__": "grib"},
 			),
-			static_input={"area": params.get("cropArea", "60/40/40/60")},
+			static_input_ps={},
+			static_input_kw={"area": params.get("cropArea", "60/40/40/60")},
 		).model_dump(),
 	)
 	o = Node(
@@ -55,7 +59,8 @@ def job_builder(params: dict[str, str]) -> JobInstance:
 				entrypoint="forecastbox.external.data_sinks.plot_single_grib",
 				func=None,
 				environment=["numpy<2.0.0", "earthkit-data", "earthkit-plots"],
-				input_schema={
+				input_schema_ps={},
+				input_schema_kw={
 					"input_grib": "grib",
 					"box_lat1": "latitude",
 					"box_lat2": "latitude",
@@ -66,7 +71,8 @@ def job_builder(params: dict[str, str]) -> JobInstance:
 				},
 				output_schema={"__default__": "png"},
 			),
-			static_input={
+			static_input_ps={},
+			static_input_kw={
 				"box_lat1": 40,
 				"box_lat2": 60,
 				"box_lon1": 40,
@@ -80,8 +86,12 @@ def job_builder(params: dict[str, str]) -> JobInstance:
 	j = graph2job(g)
 	# TODO fix cascade fluent convertor
 	j.edges = [
-		Task2TaskEdge(source_task="reader", source_output="__default__", sink_task="transform", sink_input="input_grib"),
-		Task2TaskEdge(source_task="transform", source_output="__default__", sink_task="plot", sink_input="input_grib"),
+		Task2TaskEdge(
+			source_task="reader", source_output="__default__", sink_task="transform", sink_input_kw="input_grib", sink_input_ps=None
+		),
+		Task2TaskEdge(
+			source_task="transform", source_output="__default__", sink_task="plot", sink_input_kw="input_grib", sink_input_ps=None
+		),
 	]
 	return j
 

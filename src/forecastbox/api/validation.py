@@ -57,7 +57,7 @@ def of_dag(task_dag: TaskDAG, builder: TaskDAGBuilder) -> Either[TaskDAG, list[s
 		task_defin: dict[str, TaskDefinition] = dict(builder.tasks)
 		for task in task_dag.tasks:
 			defin = task_defin[task.name]
-			missing = defin.user_params.keys() - task.static_params.keys()
+			missing = defin.user_params.keys() - task.static_params_ps.keys() - task.static_params_kw.keys()
 			if missing:
 				errors.append(f"task {task.name} is missing user params {', '.join(sorted(missing))}")
 		if not errors:
