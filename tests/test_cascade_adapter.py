@@ -6,9 +6,7 @@ from forecastbox.api.adapter import cascade2fiab
 from forecastbox.worker.reporting import SilentCallbackContext
 from forecastbox.worker.entrypoint import job_entrypoint
 from forecastbox.worker.db import MemDb
-from multiprocessing.shared_memory import SharedMemory
 from multiprocessing import Manager
-import logging
 
 
 def test_cascade_adapter() -> None:
@@ -32,12 +30,8 @@ def test_cascade_adapter() -> None:
 	test_manager = Manager()
 	test_mem_db = MemDb(test_manager)
 
-	logging.basicConfig(level="DEBUG", force=True)
 	result = job_entrypoint(test_callback_context, test_mem_db, "job_id", maybe_dag.get_or_raise())
 
-	for k in test_mem_db.memory:
-		m = SharedMemory(name=k, create=False)
-		m.close()
-		m.unlink()
+	test_mem_db.close_all()
 
 	assert result

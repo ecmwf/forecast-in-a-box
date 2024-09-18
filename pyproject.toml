@@ -19,6 +19,8 @@ dependencies = [
 	"orjson",
 	"python-multipart",
 	"uvicorn",
+	"cloudpickle",
+	"pyrsistent",
 ]
 
 [project.urls]

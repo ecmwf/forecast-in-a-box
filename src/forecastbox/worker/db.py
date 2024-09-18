@@ -42,6 +42,12 @@ class MemDb:
 			i += block_len
 		m.close()
 
+	def close_all(self):
+		for k in self.memory:
+			m = SharedMemory(name=k, create=False)
+			m.close()
+			m.unlink()
+
 	# TODO consider moving some logic from entrypoints in here
 
 
@@ -63,8 +69,5 @@ class DbContext:
 	def wait_all(self) -> None:
 		if self.job_db.jobs:
 			connection.wait(p.sentinel for p in self.job_db.jobs.values())
-		for k in self.mem_db.memory:
-			m = SharedMemory(name=k, create=False)
-			m.close()
-			m.unlink()
+		self.mem_db.close_all()
 		# TODO join/kill spawned processes
