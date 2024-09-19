@@ -75,7 +75,7 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 					"params": TaskParameter(clazz="marsParamList"),
 				},
 				entrypoint="forecastbox.external.data_sources.oper_sfc_box_query",
-				output_class="grib",
+				output_class="grib.earthkit",
 				environment=TaskEnvironment(packages=["numpy<2.0.0", "ecmwf-api-client", "earthkit-data", "earthkit-plots"]),
 			)
 		case RegisteredTask.aifs_fetch_and_predict:
@@ -87,7 +87,7 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 					"model_id": TaskParameter(clazz="enum[aifs-small]"),
 				},
 				entrypoint="forecastbox.external.hello_aifs.entrypoint_forecast",
-				output_class="grib",
+				output_class="grib.earthkit",
 				environment=TaskEnvironment(
 					packages=[
 						"numpy<2.0.0",
@@ -109,7 +109,7 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 				},
 				entrypoint="forecastbox.external.data_sinks.plot_single_grib",
 				output_class="png",  # I guess
-				dynamic_param_classes={"input_grib": "grib"},
+				dynamic_param_classes={"input_grib": "grib.earthkit"},
 				environment=TaskEnvironment(packages=["numpy<2.0.0", "earthkit-data", "earthkit-plots"]),
 			)
 		case RegisteredTask.grib_to_file:
@@ -119,7 +119,7 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 				},
 				entrypoint="forecastbox.external.data_sinks.grib_to_file",
 				output_class="str",
-				dynamic_param_classes={"input_grib": "grib"},
+				dynamic_param_classes={"input_grib": "grib.earthkit"},
 				environment=TaskEnvironment(packages=["numpy<2.0.0", "earthkit-data"]),
 			)
 		case RegisteredTask.mars_enfo_range_temp:
@@ -144,8 +144,8 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 					"area": TaskParameter(clazz="latlonArea"),  # eventually Optional
 				},
 				entrypoint="forecastbox.external.grib_mir.transform",
-				output_class="grib",
-				dynamic_param_classes={"input_grib": "grib"},
+				output_class="grib.mir",
+				dynamic_param_classes={"input_grib": "grib.mir"},
 				environment=TaskEnvironment(
 					packages=[
 						str(pathlib.Path.home() / "src/mir-python/dist/mir_python-0.2.0-cp311-cp311-linux_x86_64.whl")

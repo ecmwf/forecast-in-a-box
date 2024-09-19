@@ -17,7 +17,7 @@ def job_builder(params: dict[str, str]) -> JobInstance:
 			"box_center_lon": "longitude",
 			"params": "marsParamList",
 		},
-		output_class="grib",
+		output_class="grib.earthkit",
 	).with_values(
 		days_ago=int(params.get("days_ago", "1")),
 		step=int(params.get("step", "1")),
@@ -29,15 +29,15 @@ def job_builder(params: dict[str, str]) -> JobInstance:
 	transform = TaskBuilder.from_entrypoint(
 		entrypoint="forecastbox.external.grib_mir.transform",
 		environment=[str(pathlib.Path.home() / "src/mir-python/dist/mir_python-0.2.0-cp311-cp311-linux_x86_64.whl")],
-		input_schema={"area": "latlonArea", "input_grib": "grib"},
-		output_class="grib",
+		input_schema={"area": "latlonArea", "input_grib": "grib.mir"},
+		output_class="grib.mir",
 	).with_values(area=params.get("cropArea", "60/40/40/60"))
 
 	plot = TaskBuilder.from_entrypoint(
 		entrypoint="forecastbox.external.data_sinks.plot_single_grib",
 		environment=["numpy<2.0.0", "earthkit-data", "earthkit-plots"],
 		input_schema={
-			"input_grib": "grib",
+			"input_grib": "grib.earthkit",
 			"box_lat1": "latitude",
 			"box_lat2": "latitude",
 			"box_lon1": "longitude",

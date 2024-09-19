@@ -4,8 +4,6 @@ Support for automated serde for Task outputs and dynamic inputs
 
 from typing import Any, Protocol, runtime_checkable, Callable, Optional, Type, cast
 from dataclasses import dataclass
-import numpy as np
-import cloudpickle
 import logging
 
 logger = logging.getLogger(__name__)
@@ -35,6 +33,9 @@ class SerDerDc:
 
 # TODO this should be a plugin, not core part of fiab
 def np_to_bytes(v: Any) -> bytes:
+	import numpy as np
+	import cloudpickle
+
 	arr = cast(np.ndarray, v)
 	dtype = cloudpickle.dumps(arr.dtype)
 	d_len = len(dtype).to_bytes(4, "big")
@@ -44,6 +45,9 @@ def np_to_bytes(v: Any) -> bytes:
 
 
 def np_from_bytes(v: memoryview) -> Any:
+	import numpy as np
+	import cloudpickle
+
 	d_len = int.from_bytes(v[:4], "big")
 	dtype = cloudpickle.loads(v[4 : 4 + d_len])
 	s_len = int.from_bytes(v[4 + d_len : 4 + d_len + 4])
@@ -52,12 +56,30 @@ def np_from_bytes(v: memoryview) -> Any:
 	return raw.reshape(shape)
 
 
+# TODO grib deserialisers are not supported, beacuse they are io buf based.
+# Wed need more support from mir-python/earthkit
+def ekd_grib_from_bytes(v: memoryview) -> Any:
+	import io
+	import earthkit.data
+
+	ibuf = io.BytesIO(v)
+	grib_reader = earthkit.data.from_source("stream", ibuf, read_all=True)
+	return grib_reader
+
+
+def mir_grib_from_bytes(v: memoryview) -> Any:
+	import mir
+
+	return mir.GribMemoryInput(v)
+
+
 registry: dict[str, SerDer] = {
 	"bytes": SerDerDc(ser=lambda b: b, des=lambda b: b),
 	"str": SerDerDc(ser=lambda s: s.encode("ascii"), des=lambda b: bytes(b).decode("ascii")),
 	"int": SerDerDc(ser=lambda i: i.to_bytes(4, "big"), des=lambda b: int.from_bytes(b, "big")),
 	"ndarray": SerDerDc(ser=np_to_bytes, des=np_from_bytes),
-	"grib": SerDerDc(ser=lambda b: b, des=lambda b: b),  # TODO proper
+	"grib.earthkit": SerDerDc(ser=lambda b: b, des=ekd_grib_from_bytes),
+	"grib.mir": SerDerDc(ser=lambda b: b, des=mir_grib_from_bytes),
 }
 
 
