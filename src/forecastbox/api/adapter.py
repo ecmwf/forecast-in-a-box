@@ -54,9 +54,20 @@ def cascade2fiab(job_instance: JobInstance, schedule: Schedule) -> Either[TaskDA
 				for input_param, (source_task, source_output) in inputs_lookup[name].items()
 				if isinstance(input_param, int)
 			},
+			classes_inputs_kw={
+				input_param: task.definition.input_schema[input_param]
+				for input_param in inputs_lookup[name].keys()
+				if isinstance(input_param, str)
+			},
+			classes_inputs_ps={
+				input_param: "Any"  # TODO cascade does not expose this properly yet
+				for input_param in inputs_lookup[name].keys()
+				if isinstance(input_param, int)
+			},
 			entrypoint=task.definition.entrypoint,
 			func=task.definition.func,
 			output_name=param2dsid(name, output_name(task.definition)),
+			output_class=cast(str, maybe_head(task.definition.output_schema.values())),
 			environment=TaskEnvironment(packages=task.definition.environment),
 		)
 		for name, task in worker_queue_c

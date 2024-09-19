@@ -18,6 +18,7 @@ import importlib
 import logging
 from forecastbox.utils import logging_config, ensure
 import hashlib
+from forecastbox.worker import serde
 
 logger = logging.getLogger(__name__)
 
@@ -39,14 +40,18 @@ def task_entrypoint(
 	entrypoint: Optional[str],
 	func: Optional[str],
 	output_mem_key: str,
+	output_annotation: Optional[str],
 	mem_db: MemDb,
 	job_id: str,
 	args: list,
 	kwargs: dict,
 	dsids_kw: Iterable[tuple[str, DatasetId]],
 	dsids_ps: Iterable[tuple[int, DatasetId]],
+	dscls_kw: dict[str, str],
+	dscls_ps: dict[int, str],
 	ex_pipe: Connection,
 ) -> None:
+	# the arglist here is getting unwieldy... maybe just put the TaskInstance in here as well as the logic
 	try:
 		mems = {}
 		for param_name, dataset_id in dsids_kw:
@@ -69,13 +74,18 @@ def task_entrypoint(
 			if not entrypoint:
 				raise TypeError("neither entrypoint nor func given")
 			target = get_process_target(entrypoint)
+		for pn, pc in dscls_kw.items():
+			kwargs[pn] = serde.from_bytes(kwargs[pn], pc)
+		for pp, pc in dscls_ps.items():
+			args[pp] = serde.from_bytes(args[pp], pc)
 		result = target(*args, **kwargs)
 
 		if output_mem_key:
-			L = len(result)
+			result_ser = serde.to_bytes(result, output_annotation)
+			L = len(result_ser)
 			logger.debug(f"result of len {L} in {job_id=} stored as {output_mem_key}")
 			mem = SharedMemory(name=output_mem_key, create=True, size=L)
-			mem.buf[:L] = result
+			mem.buf[:L] = result_ser
 			shm_worker_close(mem)
 			mem_db.memory[output_mem_key] = L
 		del result
@@ -127,9 +137,26 @@ def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str
 				key = ""
 			dsids_kw = task.dataset_inputs_kw.items()
 			dsids_ps = task.dataset_inputs_ps.items()
+			dscls_kw = task.classes_inputs_kw
+			dscls_ps = task.classes_inputs_ps
 			ex_src, ex_snk = Pipe(duplex=False)
 			task_process = Process(
-				target=task_entrypoint, args=(task.entrypoint, task.func, key, mem_db, job_id, args, kwargs, dsids_kw, dsids_ps, ex_snk)
+				target=task_entrypoint,
+				args=(
+					task.entrypoint,
+					task.func,
+					key,
+					task.output_class,
+					mem_db,
+					job_id,
+					args,
+					kwargs,
+					dsids_kw,
+					dsids_ps,
+					dscls_kw,
+					dscls_ps,
+					ex_snk,
+				),
 			)
 			logger.debug(f"launching process for {task.name}")
 			task_process.start()

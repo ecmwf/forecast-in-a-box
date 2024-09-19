@@ -88,7 +88,7 @@ class TaskDefinition(BaseModel):
 
 	entrypoint: str = Field(description="python_module.function_name")
 	user_params: dict[str, TaskParameter]
-	output_class: str  # not eval'd, can be anything
+	output_class: str  # used for serde
 	dynamic_param_classes: dict[str, str] = Field(default_factory=dict)
 	environment: TaskEnvironment = Field(default_factory=TaskEnvironment)
 
@@ -106,9 +106,12 @@ class Task(BaseModel):
 	static_params_ps: dict[int, Any]  # position, value
 	dataset_inputs_ps: dict[int, DatasetId]
 	dataset_inputs_kw: dict[str, DatasetId]
+	classes_inputs_kw: dict[str, str]
+	classes_inputs_ps: dict[int, str]
 	entrypoint: Optional[str] = Field(description="python_module.submodules.function_name")
 	func: Optional[str] = Field(None, description="b64 cloud-pickled Callable. Prefered over `entrypoint` if given")
-	output_name: Optional[DatasetId]  # TODO maybe replace with a method yielding just name
+	output_name: Optional[DatasetId]
+	output_class: str  # used for serde
 	environment: TaskEnvironment
 
 	@staticmethod

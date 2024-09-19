@@ -5,6 +5,7 @@ Currently most is hardcoded, but will be replaced by reading from external, eith
 """
 
 import logging
+import pathlib
 from forecastbox.api.common import RegisteredTask, TaskDAGBuilder, TaskDefinition, TaskParameter, TaskEnvironment
 import forecastbox.api.validation as validation
 from forecastbox.utils import assert_never, Either
@@ -147,7 +148,8 @@ def get_task(task: RegisteredTask) -> TaskDefinition:
 				dynamic_param_classes={"input_grib": "grib"},
 				environment=TaskEnvironment(
 					packages=[
-						"mir-python"  # until pypi'd, use eg "~/src/mir-python/dist/mir_python-0.2.0-cp311-cp311-linux_x86_64.whl"
+						str(pathlib.Path.home() / "src/mir-python/dist/mir_python-0.2.0-cp311-cp311-linux_x86_64.whl")
+						# "mir-python" # not published yet
 					]
 				),
 			)

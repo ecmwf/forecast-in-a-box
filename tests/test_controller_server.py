@@ -41,8 +41,11 @@ def test_job_submit():
 		static_params_ps={},
 		dataset_inputs_kw={},
 		dataset_inputs_ps={},
+		classes_inputs_kw={},
+		classes_inputs_ps={},
 		entrypoint="entrypoint",
 		output_name=DatasetId(dataset_id="output"),
+		output_class="bytes",
 		environment=TaskEnvironment(),
 	)
 	job_definition = TaskDAG(job_type=JobTemplateExample.hello_world, tasks=[task], output_id=DatasetId(dataset_id="output"))
