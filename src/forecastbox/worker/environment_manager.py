@@ -4,9 +4,10 @@ and cleaning up afterwards.
 """
 
 from forecastbox.api.common import TaskEnvironment
+from contextlib import contextmanager
 import tempfile
 import subprocess
-from typing import Optional
+from typing import Optional, Iterator
 import sys
 import os
 import logging
@@ -14,10 +15,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def prepare(job_id: str, environment: TaskEnvironment) -> Optional[tempfile.TemporaryDirectory]:
+@contextmanager
+def Environment(environment: TaskEnvironment) -> Iterator[int]:
 	"""Installs given packages into a temporary directory, just for this job -- a lightweight venv.
 	Assumes `uv` binary is available, and that we are already in a usable venv of the right python
 	version -- as provided by `fiab.sh`"""
+	td: Optional[tempfile.TemporaryDirectory] = None
+	# TODO consider sending notify_update(preparing, running) here, instead of from the invoker, for granularity
 	if environment.packages:
 		td = tempfile.TemporaryDirectory()
 		venv_command = ["uv", "venv", td.name]
@@ -36,6 +40,8 @@ def prepare(job_id: str, environment: TaskEnvironment) -> Optional[tempfile.Temp
 		subprocess.run(install_command, check=True)
 		# TODO wee bit fragile -- try to obtain it from {td.name}/bin/activate?
 		sys.path.append(f"{td.name}/lib/python3.11/site-packages/")
-		return td
-	else:
-		return None
+	try:
+		yield 1  # dummy for contextmanager protocol
+	finally:
+		if td is not None:
+			td.cleanup()

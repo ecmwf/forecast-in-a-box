@@ -2,18 +2,18 @@
 Entrypoint for the uv cache warmup -- will populate the cache with all dependencies for currently known tasks
 """
 
-from forecastbox.worker.environment_manager import prepare
+from forecastbox.worker.environment_manager import Environment
 from forecastbox.plugins.lookup import get_task
 from forecastbox.api.common import RegisteredTask
 import logging
+import logging.config
+from forecastbox.utils import logging_config
 
 logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
-	logging.basicConfig(level=logging.INFO)  # TODO replace with config
+	logging.config.dictConfig(logging_config)
 
 	for task in RegisteredTask:
-		logger.info(f"warming up {task=}")
-		tmpdir = prepare("warmup_job", get_task(task).environment)
-		if tmpdir:
-			tmpdir.cleanup()
+		with Environment(get_task(task).environment):
+			logger.info(f"warming up {task=}")

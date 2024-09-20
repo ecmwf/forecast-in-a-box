@@ -5,17 +5,20 @@ Target for a new launched process corresponding to a single task
 # TODO we launch process per job (whole task dag) -- refactor to process per task in the dag. Would split this in two files
 # TODO move some of the memory management parts into worker/db.p
 
+from contextlib import AbstractContextManager, contextmanager
+from dataclasses import dataclass
 from forecastbox.worker.reporting import notify_update, CallbackContext
-from forecastbox.api.common import TaskDAG, JobStatusEnum, TaskEnvironment, DatasetId, Task
+from forecastbox.api.common import TaskDAG, JobStatusEnum, TaskEnvironment, Task
 from forecastbox.worker.db import DbContext
 from multiprocessing import Process, Pipe
 from multiprocessing.shared_memory import SharedMemory
 from multiprocessing.connection import Connection
 from forecastbox.worker.db import MemDb, shm_worker_close
-import forecastbox.worker.environment_manager as environment_manager
-from typing import Callable, Any, cast, Iterable, Optional
+from forecastbox.worker.environment_manager import Environment
+from typing import Callable, Any, Optional, Iterator, Literal
 import importlib
 import logging
+import logging.config
 from forecastbox.utils import logging_config, ensure
 import hashlib
 from forecastbox.worker import serde
@@ -30,78 +33,116 @@ def shmid(job_id: str, dataset_id: str) -> str:
 	return h.hexdigest()[:24]
 
 
-def get_process_target(entrypoint: str) -> Callable:
-	module_name, function_name = entrypoint.rsplit(".", 1)
-	module = importlib.import_module(module_name)
-	return module.__dict__[function_name]
+@dataclass
+class DynamicDataset:
+	key: str
+	annotation: str
 
 
-def task_entrypoint(
-	entrypoint: Optional[str],
-	func: Optional[str],
-	output_mem_key: str,
-	output_annotation: Optional[str],
-	mem_db: MemDb,
-	job_id: str,
-	args: list,
-	kwargs: dict,
-	dsids_kw: Iterable[tuple[str, DatasetId]],
-	dsids_ps: Iterable[tuple[int, DatasetId]],
-	dscls_kw: dict[str, str],
-	dscls_ps: dict[int, str],
-	ex_pipe: Connection,
-) -> None:
-	# the arglist here is getting unwieldy... maybe just put the TaskInstance in here as well as the logic
-	try:
-		mems = {}
-		for param_name, dataset_id in dsids_kw:
-			key = shmid(job_id, dataset_id.dataset_id)
-			if dataset_id.dataset_id not in mems:
-				logger.debug(f"opening dataset id {dataset_id.dataset_id} in {job_id=} with {key=}")
-				mems[key] = SharedMemory(name=key, create=False)
-			kwargs[param_name] = mems[key].buf[: mem_db.memory[key]]
-		for param_pos, dataset_id in dsids_ps:
-			key = shmid(job_id, dataset_id.dataset_id)
-			if dataset_id.dataset_id not in mems:
-				logger.debug(f"opening dataset id {dataset_id.dataset_id} in {job_id=} with {key=}")
-				mems[key] = SharedMemory(name=key, create=False)
-			ensure(args, param_pos)
-			args[param_pos] = mems[key].buf[: mem_db.memory[key]]
+@dataclass
+class ExecutionPayload:
+	"""Passed from worker-main-process to worker-task-process, contains all info to fully execute a task"""
 
-		if func is not None:
-			target = Task.func_dec(func)
-		else:
-			if not entrypoint:
-				raise TypeError("neither entrypoint nor func given")
-			target = get_process_target(entrypoint)
-		for pn, pc in dscls_kw.items():
-			kwargs[pn] = serde.from_bytes(kwargs[pn], pc)
-		for pp, pc in dscls_ps.items():
-			args[pp] = serde.from_bytes(args[pp], pc)
-		result = target(*args, **kwargs)
+	entrypoint: Optional[str]
+	func: Optional[str]
+	output: Optional[DynamicDataset]
+	st_kwargs: dict[str, Any]
+	st_args: dict[int, Any]
+	dn_kwargs: dict[str, DynamicDataset]
+	dn_args: dict[int, DynamicDataset]
+	environment: TaskEnvironment
 
-		if output_mem_key:
-			result_ser = serde.to_bytes(result, output_annotation)
-			L = len(result_ser)
-			logger.debug(f"result of len {L} in {job_id=} stored as {output_mem_key}")
-			mem = SharedMemory(name=output_mem_key, create=True, size=L)
-			mem.buf[:L] = result_ser
+
+@dataclass
+class ExecutionContext:
+	"""Objects needed during execution but not related to the task itself"""
+
+	mem_db: MemDb
+	ex_pipe: Connection
+
+
+class ExecutionMemoryManager(AbstractContextManager):
+	"""Handles opening and closing of SharedMemory objects, including their SerDe, within single task execution"""
+
+	mems: dict[str, SharedMemory]
+
+	def __init__(self, mem_db: MemDb) -> None:
+		self.mems = {}
+		self.mem_db = mem_db
+
+	def get(self, dataset: DynamicDataset) -> Any:
+		if dataset.key not in self.mem_db.memory:
+			raise ValueError(f"attempted to open non-registered dataset {dataset}")
+		if dataset.key not in self.mems:
+			logger.debug(f"opening dataset {dataset}")
+			self.mems[dataset.key] = SharedMemory(name=dataset.key, create=False)
+		raw = self.mems[dataset.key].buf[: self.mem_db.memory[dataset.key]]
+		return serde.from_bytes(raw, dataset.annotation)
+
+	def put(self, data: Any, dataset: DynamicDataset) -> None:
+		result_ser = serde.to_bytes(data, dataset.annotation)
+		L = len(result_ser)
+		logger.debug(f"storing result of len {L} as {dataset}")
+		mem = SharedMemory(name=dataset.key, create=True, size=L)
+		mem.buf[:L] = result_ser
+		shm_worker_close(mem)
+		self.mem_db.memory[dataset.key] = L
+
+	def __exit__(self, exc_type, exc_val, exc_tb) -> Literal[False]:
+		for key, mem in self.mems.items():
+			mem.buf.release()
 			shm_worker_close(mem)
-			mem_db.memory[output_mem_key] = L
+		return False
+
+
+@contextmanager
+def ExceptionReporter(connection: Connection) -> Iterator[int]:
+	try:
+		yield 1  # dummy for contextmanager protocol
+	except Exception as e:
+		connection.send(repr(e))
+		raise
+
+
+def get_callable(target: ExecutionPayload) -> Callable:
+	if target.func is not None:
+		return Task.func_dec(target.func)
+	elif target.entrypoint is not None:
+		module_name, function_name = target.entrypoint.rsplit(".", 1)
+		module = importlib.import_module(module_name)
+		return module.__dict__[function_name]
+	else:
+		raise TypeError("neither entrypoint nor func given")
+
+
+def task_entrypoint(payload: ExecutionPayload, context: ExecutionContext) -> None:
+	with ExceptionReporter(context.ex_pipe), Environment(payload.environment), ExecutionMemoryManager(context.mem_db) as mems:
+		logging.config.dictConfig(logging_config)
+
+		args: list[Any] = []
+		for idx, param in payload.st_args.items():
+			ensure(args, idx)
+			args[idx] = param
+		for idx, param in payload.dn_args.items():
+			ensure(args, idx)
+			args[idx] = mems.get(param)
+		kwargs: dict[str, Any] = {}
+		kwargs.update(payload.st_kwargs)
+		for key, param in payload.dn_kwargs.items():
+			kwargs[key] = mems.get(param)
+
+		kallable = get_callable(payload)
+		result = kallable(*args, **kwargs)
+
+		if payload.output is not None:
+			mems.put(result, payload.output)
 		del result
 
 		# this is required so that the Shm can be properly freed
-		for param_name, dataset_id in dsids_kw:
-			del kwargs[param_name]
-		for param_pos, dataset_id in dsids_ps:
-			del args[param_pos]
-
-		for key, mem in mems.items():
-			mem.buf.release()
-			shm_worker_close(mem)
-	except Exception as e:
-		ex_pipe.send(repr(e))
-		raise
+		for name in payload.dn_kwargs.keys():
+			del kwargs[name]
+		for idx in payload.dn_args.keys():
+			del args[idx]
 
 
 class TaskExecutionException(Exception):
@@ -112,50 +153,43 @@ class TaskExecutionException(Exception):
 
 
 def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str, definition: TaskDAG) -> bool:
-	logging.config.dictConfig(logging_config)
-	logging.getLogger("httpcore").setLevel(logging.ERROR)
-	logging.getLogger("httpx").setLevel(logging.ERROR)
-	notify_update(callback_context, job_id, JobStatusEnum.preparing, task_name=None)
-	# mypy bug
-	environment = cast(TaskEnvironment, sum((task.environment for task in definition.tasks), TaskEnvironment()))
-	env_context = environment_manager.prepare(job_id, environment)
 	notify_update(callback_context, job_id, JobStatusEnum.running, task_name=None)
 
 	try:
 		for task in definition.tasks:
 			notify_update(callback_context, job_id, JobStatusEnum.running, task_name=task.name)
-			kwargs: dict[str, Any] = task.static_params_kw.copy()
-			args: list[Any] = []
-			for k, v in task.static_params_ps.items():
-				ensure(args, k)
-				args[k] = v
 
-			logger.debug(f"running task {task.name} in {job_id=} with {len(args)} args and kwarg keys {','.join(kwargs.keys())}")
-			if task.output_name:
-				key = shmid(job_id, task.output_name.dataset_id)
-			else:
-				key = ""
-			dsids_kw = task.dataset_inputs_kw.items()
-			dsids_ps = task.dataset_inputs_ps.items()
-			dscls_kw = task.classes_inputs_kw
-			dscls_ps = task.classes_inputs_ps
+			output = None if not task.output_name else DynamicDataset(shmid(job_id, task.output_name.dataset_id), task.output_class)
+			payload = ExecutionPayload(
+				entrypoint=task.entrypoint,
+				func=task.func,
+				output=output,
+				st_kwargs=task.static_params_kw,
+				st_args=task.static_params_ps,
+				dn_kwargs={
+					param: DynamicDataset(
+						shmid(job_id, dsid.dataset_id),
+						task.classes_inputs_kw[param],
+					)
+					for param, dsid in task.dataset_inputs_kw.items()
+				},
+				dn_args={
+					idx: DynamicDataset(
+						shmid(job_id, dsid.dataset_id),
+						task.classes_inputs_ps[idx],
+					)
+					for idx, dsid in task.dataset_inputs_ps.items()
+				},
+				environment=task.environment,
+			)
+
+			logger.debug(f"running task {task.name} in {job_id=}")
 			ex_src, ex_snk = Pipe(duplex=False)
 			task_process = Process(
 				target=task_entrypoint,
 				args=(
-					task.entrypoint,
-					task.func,
-					key,
-					task.output_class,
-					mem_db,
-					job_id,
-					args,
-					kwargs,
-					dsids_kw,
-					dsids_ps,
-					dscls_kw,
-					dscls_ps,
-					ex_snk,
+					payload,
+					ExecutionContext(mem_db, ex_snk),
 				),
 			)
 			logger.debug(f"launching process for {task.name}")
@@ -186,8 +220,6 @@ def job_entrypoint(callback_context: CallbackContext, mem_db: MemDb, job_id: str
 		return False
 	finally:
 		# TODO free all datasets?
-		if env_context is not None:
-			env_context.cleanup()
 		callback_context.close()
 	return True
 

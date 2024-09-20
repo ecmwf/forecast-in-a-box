@@ -22,6 +22,8 @@ logging_config = {
 	"loggers": {
 		"uvicorn": {"level": "INFO"},
 		"forecastbox": {"level": "INFO"},
+		"httpcore": {"level": "ERROR"},
+		"httpx": {"level": "ERROR"},
 		"": {"level": "WARNING", "handlers": ["default"]},
 	},
 }
