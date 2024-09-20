@@ -1,9 +1,9 @@
 from forecastbox.frontend.cascade.contract import CascadeJob, FormBuilder
-from cascade.v2.builders import JobBuilder, TaskBuilder, JobInstance
+from cascade.v2.builders import JobBuilder, TaskBuilder
 from forecastbox.api.common import JinjaTemplate
 
 
-def job_builder(params: dict[str, str]) -> JobInstance:
+def job_builder(params: dict[str, str]) -> JobBuilder:
 	N = int(params["jobs.total"])
 
 	b2i = lambda b: (int.from_bytes(b, "big"))
@@ -21,7 +21,7 @@ def job_builder(params: dict[str, str]) -> JobInstance:
 		prev = thys
 	job = builder.with_node("writer", writer).with_edge(prev, "writer", "b")
 
-	return job.build()
+	return job
 
 
 HelloCascade = CascadeJob(

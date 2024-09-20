@@ -27,7 +27,7 @@ def test_cascade_adapter() -> None:
 		thys = f"process-{i}"
 		builder = builder.with_node(thys, processor).with_edge(prev, thys, "b")
 		prev = thys
-	job_instance = builder.with_node("writer", writer).with_edge(prev, "writer", "b").build()
+	job_instance = builder.with_node("writer", writer).with_edge(prev, "writer", "b").build().get_or_raise()
 
 	# create "cluster" and schedule
 	environment = Environment(hosts={"h1": Host(memory_mb=1024)})

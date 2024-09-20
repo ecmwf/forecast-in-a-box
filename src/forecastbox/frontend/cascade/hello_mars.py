@@ -1,12 +1,11 @@
 from forecastbox.frontend.cascade.contract import CascadeJob, FormBuilder
 import pathlib
 from cascade.v2.builders import JobBuilder, TaskBuilder
-from cascade.v2.core import JobInstance
 from forecastbox.api.common import JinjaTemplate
 from forecastbox.api.type_system import marsParamList
 
 
-def job_builder(params: dict[str, str]) -> JobInstance:
+def job_builder(params: dict[str, str]) -> JobBuilder:
 	reader = TaskBuilder.from_entrypoint(
 		entrypoint="forecastbox.external.data_sources.oper_sfc_box_query",
 		environment=["numpy<2.0.0", "ecmwf-api-client", "earthkit-data", "earthkit-plots"],
@@ -63,7 +62,7 @@ def job_builder(params: dict[str, str]) -> JobInstance:
 		.with_node("plot", plot)
 		.with_edge("transform", "plot", "input_grib")
 	)
-	return builder.build()
+	return builder
 
 
 HelloMars = CascadeJob(
