@@ -1,4 +1,4 @@
-from cascade.v2.func import *  # noqa: F403
+from cascade.low.func import *  # noqa: F403
 
 # NOTE possibly make ext configurable
 # NOTE this is not the most visually appealing -- to restore original uvicorn color based logging, use

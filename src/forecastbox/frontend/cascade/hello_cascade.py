@@ -1,5 +1,5 @@
 from forecastbox.frontend.cascade.contract import CascadeJob, FormBuilder
-from cascade.v2.builders import JobBuilder, TaskBuilder
+from cascade.low.builders import JobBuilder, TaskBuilder
 from forecastbox.api.common import JinjaTemplate
 
 

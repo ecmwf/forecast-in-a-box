@@ -1,7 +1,7 @@
 from forecastbox.api.common import JinjaTemplate
 from typing import Callable, Any
 from dataclasses import dataclass
-from cascade.v2.builders import JobBuilder
+from cascade.low.builders import JobBuilder
 
 # TODO better contract on params? But then its tied to Template anyway...
 

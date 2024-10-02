@@ -7,8 +7,8 @@ execution context of fiab
 # profound need. We'll eventually make parts of the original fiab interface go away, which will
 # simplify this
 
-from cascade.v2.core import JobInstance, Schedule, TaskInstance as CascadeTask
-from cascade.v2.views import param_source
+from cascade.low.core import JobInstance, Schedule, TaskInstance as CascadeTask
+from cascade.low.views import param_source
 from forecastbox.api.common import DatasetId, TaskDAG, Task as FiabTask, TaskEnvironment
 from forecastbox.utils import Either, maybe_head
 from typing import Optional, cast

@@ -8,7 +8,7 @@ endpoints:
 """
 
 from contextlib import asynccontextmanager
-from cascade.v2.core import JobInstance
+from cascade.low.core import JobInstance
 import orjson
 from typing_extensions import Self, Union
 from fastapi import FastAPI, Form, Request, HTTPException, status

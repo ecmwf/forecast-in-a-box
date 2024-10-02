@@ -12,7 +12,7 @@ from typing import Optional, Any
 from forecastbox.api.common import TaskDAG, JobStatus, JobId, JobStatusEnum, WorkerId, JobStatusUpdate
 from forecastbox.api.adapter import cascade2fiab
 from forecastbox.db import KVStore, KVStorePyrsistent
-from cascade.v2.core import JobInstance, Schedule, Host
+from cascade.low.core import JobInstance, Schedule, Host
 import forecastbox.scheduler as scheduler
 import datetime as dt
 from forecastbox.controller.comm import WorkerComm

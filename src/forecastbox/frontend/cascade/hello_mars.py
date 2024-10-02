@@ -1,6 +1,6 @@
 from forecastbox.frontend.cascade.contract import CascadeJob, FormBuilder
 import pathlib
-from cascade.v2.builders import JobBuilder, TaskBuilder
+from cascade.low.builders import JobBuilder, TaskBuilder
 from forecastbox.api.common import JinjaTemplate
 from forecastbox.api.type_system import marsParamList
 

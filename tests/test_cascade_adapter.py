@@ -1,6 +1,6 @@
-from cascade.v2.builders import JobBuilder, TaskBuilder
-from cascade.v2.core import Environment, Host
-import cascade.v2.scheduler as scheduler
+from cascade.low.builders import JobBuilder, TaskBuilder
+from cascade.low.core import Environment, Host
+import cascade.low.scheduler as scheduler
 from forecastbox.api.adapter import cascade2fiab
 from forecastbox.worker.reporting import SilentCallbackContext
 from forecastbox.worker.entrypoint import job_entrypoint

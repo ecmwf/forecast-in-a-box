@@ -14,8 +14,8 @@ endpoints:
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 import logging
 from forecastbox.api.common import TaskDAG, JobStatus, JobId, WorkerId, WorkerRegistration, JobStatusUpdate
-from cascade.v2.core import JobInstance, Host, Environment
-import cascade.v2.scheduler as scheduler
+from cascade.low.core import JobInstance, Host, Environment
+import cascade.low.scheduler as scheduler
 import forecastbox.controller.db as db
 from forecastbox.controller.scheduler import MaintenanceScheduler
 from forecastbox.controller.comm import WorkerComm
