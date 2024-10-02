@@ -104,13 +104,13 @@ def to_bytes(v: Any, annotation: Optional[str] = None) -> bytes:
 	if isinstance(v, bytes):
 		# presumed to be untyped lambda / unsupported serde -> done on user level
 		return v
-	elif annotation is None:
+	elif annotation is None or annotation == "Any":
 		klazz = v.__class__
 	else:
 		klazz = annotation
 	serder = find_registry(klazz)
 	if not serder:
-		raise ValueError(f"failed to serialize {v.__class__}")
+		raise ValueError(f"failed to serialize {v.__class__} with {annotation=}")
 	return serder.to_bytes(v)
 
 

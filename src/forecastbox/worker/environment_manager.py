@@ -3,7 +3,6 @@ Responsible for installing python modules required by a Task/Job in an isolated 
 and cleaning up afterwards.
 """
 
-from forecastbox.api.common import TaskEnvironment
 from contextlib import contextmanager
 import tempfile
 import subprocess
@@ -16,13 +15,13 @@ logger = logging.getLogger(__name__)
 
 
 @contextmanager
-def Environment(environment: TaskEnvironment) -> Iterator[int]:
+def Environment(packages: list[str]) -> Iterator[int]:
 	"""Installs given packages into a temporary directory, just for this job -- a lightweight venv.
 	Assumes `uv` binary is available, and that we are already in a usable venv of the right python
 	version -- as provided by `fiab.sh`"""
 	td: Optional[tempfile.TemporaryDirectory] = None
 	# TODO consider sending notify_update(preparing, running) here, instead of from the invoker, for granularity
-	if environment.packages:
+	if packages:
 		td = tempfile.TemporaryDirectory()
 		venv_command = ["uv", "venv", td.name]
 		# NOTE we create a venv instead of just plain directory, because some of the packages create files
@@ -36,7 +35,7 @@ def Environment(environment: TaskEnvironment) -> Iterator[int]:
 		# NOTE sadly python doesn't offer `tempfile.get_temporary_directory_location` or similar
 		# We thus need to return the tempfile object for a later cleanup, instead of being able to
 		# derive it from `job_id` only
-		install_command.extend(set(environment.packages))
+		install_command.extend(set(packages))
 		subprocess.run(install_command, check=True)
 		# TODO wee bit fragile -- try to obtain it from {td.name}/bin/activate?
 		sys.path.append(f"{td.name}/lib/python3.11/site-packages/")

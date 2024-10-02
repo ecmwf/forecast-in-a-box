@@ -7,6 +7,7 @@ endpoints:
   [get]  /jobs/{job_id}	=> returns job.html with JobStatus / JobResult
 """
 
+from fastapi.responses import StreamingResponse
 from contextlib import asynccontextmanager
 from cascade.low.core import JobInstance
 import orjson
@@ -27,6 +28,7 @@ import os
 import httpx
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.responses import PlainTextResponse
+from forecastbox.executor.ctrlmngr import ControllerManager
 
 logger = logging.getLogger(__name__)
 client_error = lambda e: HTTPException(status_code=400, detail=e)
@@ -51,6 +53,7 @@ class AppContext:
 		self.cascade_submit_url = f"{os.environ['FIAB_CTR_URL']}/jobs/cascade_submit"
 		self.job_status_url = lambda job_id: f"{os.environ.get('FIAB_CTR_URL', '')}/jobs/status/{job_id}"
 		self.client = httpx.AsyncClient()
+		self.ctrlmngr = ControllerManager()
 
 		# static html
 		# index_html_raw = pkgutil.get_data("forecastbox.frontend.static", "index.html")
@@ -205,9 +208,17 @@ async def submit_form(request: Request) -> Union[RedirectResponse, TaskDAG]:
 		if cascade_job is None:
 			raise ValueError(f"not a cascade job: {job_name}")
 		job_instance = cascade_job.job_builder(params).build().get_or_raise(client_error)
-		job_id = await submit_int(job_instance, AppContext.get().cascade_submit_url)
-		redirect_url = request.url_for("job_status", job_id=job_id)
-		return RedirectResponse(redirect_url, status_code=status.HTTP_303_SEE_OTHER)
+		controller = form.get("fiab.int.cascade.controller", "")
+		if controller == "fiab":
+			job_id = await submit_int(job_instance, AppContext.get().cascade_submit_url)
+			redirect_url = request.url_for("job_status", job_id=job_id)
+			return RedirectResponse(redirect_url, status_code=status.HTTP_303_SEE_OTHER)
+		elif controller == "cascade":
+			AppContext.get().ctrlmngr.newJob(job_instance)
+			redirect_url = request.url_for("cascade_controller_status")
+			return RedirectResponse(redirect_url, status_code=status.HTTP_303_SEE_OTHER)
+		else:
+			raise ValueError("unable to determine {controller = }")
 	else:
 		raise NotImplementedError(job_type)
 	task_dag = scheduler.build(builder, params_resolved).get_or_raise(client_error)
@@ -257,3 +268,26 @@ async def job_status(request: Request, job_id: str) -> str:
 	)
 	template_params = {**job_status_dump, "refresh_url": f"../jobs/{job_status.job_id.job_id}"}
 	return AppContext.get().templates[JinjaTemplate.job].render(template_params)
+
+
+@app.get("/caco/status", response_class=HTMLResponse)
+async def cascade_controller_status(request: Request) -> str:
+	status = AppContext.get().ctrlmngr.status()
+	if status == "Finished":
+		results = [
+			(
+				f.taskName,
+				f.outputName,
+				f"../caco/status/{f.asShmId()}",
+			)
+			for f in AppContext.get().ctrlmngr.outputs
+		]
+	else:
+		results = []
+	params = {"status": status, "results": results, "refresh_url": "../caco/status"}
+	return AppContext.get().templates[JinjaTemplate.caco_result].render(params)
+
+
+@app.get("/caco/status/{shmid}")
+async def cascade_controller_result(request: Request, shmid: str) -> StreamingResponse:
+	return StreamingResponse(AppContext.get().ctrlmngr.stream(shmid))

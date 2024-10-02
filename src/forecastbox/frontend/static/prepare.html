@@ -30,6 +30,7 @@ window.addEventListener("load", function() {
 <form action="/submit_form" method="post">
 	Job Template: <b>{{ job_name }}</b>
 	<input type="hidden" id="job_name" name="job_name" value="{{ job_name }}" readonly><br>
+	<input type="hidden" id="controller_impl" name="fiab.int.cascade.controller" value="cascade" readonly><br>
 	<h4>Enter Job Parameters:</h4>
 	<input type="hidden" id="job_type" name="job_type" value="{{ job_type }}">
 

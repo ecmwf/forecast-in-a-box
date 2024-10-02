@@ -33,6 +33,7 @@ class JinjaTemplate(str, Enum):
 	main = "index.html"  # index is existing enum field
 	prepare = "prepare.html"
 	aifs = "aifs.html"
+	caco_result = "caco_result.html"
 
 
 class RegisteredTask(str, Enum):

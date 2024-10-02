@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 if __name__ == "__main__":
 	logging.config.dictConfig(logging_config)
 
+	# TODO cover cascade as well
 	for task in RegisteredTask:
-		with Environment(get_task(task).environment):
+		with Environment(get_task(task).environment.packages):
 			logger.info(f"warming up {task=}")

@@ -116,7 +116,7 @@ def get_callable(target: ExecutionPayload) -> Callable:
 
 
 def task_entrypoint(payload: ExecutionPayload, context: ExecutionContext) -> None:
-	with ExceptionReporter(context.ex_pipe), Environment(payload.environment), ExecutionMemoryManager(context.mem_db) as mems:
+	with ExceptionReporter(context.ex_pipe), Environment(payload.environment.packages), ExecutionMemoryManager(context.mem_db) as mems:
 		logging.config.dictConfig(logging_config)
 
 		args: list[Any] = []

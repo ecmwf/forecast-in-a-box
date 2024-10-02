@@ -1,0 +1,13 @@
+<!doctype html><title>Forecast In A Box: Job Details</title>
+
+<h2><a href="{{ refresh_url }}">Job Status</a></h2>
+
+status: {{ status }}</br>
+
+{% if results %}
+<ul>
+	{% for e in stages %}
+	<li>{{ e[0] }}.{{ e[1] }}: <a href="{{ e[2] }}">link</a></li>
+	{% endfor %}
+</ul>
+{% endif %}

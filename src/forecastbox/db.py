@@ -18,6 +18,12 @@ class KVStore(Protocol[T]):
 	def get(self, key: str) -> Optional[T]:
 		raise NotImplementedError
 
+	def contains(self, key: str) -> bool:
+		raise NotImplementedError
+
+	def remove(self, key: str) -> None:
+		raise NotImplementedError
+
 
 class KVStorePyrsistent(Generic[T]):
 	"""Pyrsistent-based, lock-free implementation -- assuming assignment is atomic"""
@@ -35,3 +41,9 @@ class KVStorePyrsistent(Generic[T]):
 
 	def get(self, key: str) -> Optional[T]:
 		return self.d.get(key, None)
+
+	def contains(self, key: str) -> bool:
+		return key in self.d
+
+	def remove(self, key: str) -> None:
+		self.d = self.d.remove(key)
