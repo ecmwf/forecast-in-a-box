@@ -9,7 +9,6 @@ Currently supports only one active instance at a time
 
 from cascade.low.core import JobInstance
 from cascade.controller.impl import CascadeController
-from cascade.controller.api import PurgingPolicy
 from forecastbox.executor.executor import SingleHostExecutor
 from forecastbox.executor.futures import DataFuture
 from cascade.low.scheduler import schedule as scheduler
@@ -28,9 +27,8 @@ def job_entrypoint(job: JobInstance, shmd: DictProxy) -> None:
 	logger.debug(job)
 	controller = CascadeController()
 	executor = SingleHostExecutor(shmd)
-	policy = PurgingPolicy()
 	schedule = scheduler(job, executor.get_environment()).get_or_raise()
-	controller.submit(job, schedule, executor, policy)
+	controller.submit(job, schedule, executor)
 	executor.procwatch.join()
 
 

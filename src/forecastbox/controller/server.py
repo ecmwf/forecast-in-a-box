@@ -89,9 +89,7 @@ async def job_status(job_id: str) -> JobStatus:
 async def worker_register(worker_registration: WorkerRegistration) -> WorkerId:
 	worker = db.Worker(
 		url=worker_registration.url_raw(),
-		params=Host(
-			memory_mb=worker_registration.memory_mb,
-		),
+		params=Host(memory_mb=worker_registration.memory_mb, cpu=1, gpu=0),  # TODO cpu gpu
 		last_seen=dt.datetime.now(),
 	)
 	return db.worker_register(worker)

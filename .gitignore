@@ -13,3 +13,5 @@ entrypoint.spec
 
 # pytorch
 lightning_logs
+
+.dmypy.json

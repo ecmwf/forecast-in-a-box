@@ -22,6 +22,7 @@ def shm_worker_close(shm: SharedMemory):
 	unlink at its end. However, just calling `close` on shm does not cause it to unregister, so we have to unregister
 	manually. We don't need to call this in the main (ie, non-worker) process, because there we unlink (which happens
 	to unregister)."""
+	# TODO eleminate in favour of track=False, once we are on python 3.13+
 	logger.debug(f"closing worker's shm {shm.name}")
 	resource_tracker.unregister(shm._name, "shared_memory")  # type: ignore # _name is private
 	shm.close()

@@ -2,9 +2,12 @@
 Keeps track of what shared memory has been registerd
 """
 
+import logging
 from multiprocessing.shared_memory import SharedMemory
 from multiprocessing.managers import DictProxy
 from typing import Iterator
+
+logger = logging.getLogger(__name__)
 
 
 def _unlink_shm(shmid: str):
@@ -43,3 +46,13 @@ class ShmDb:
 
 	def contains(self, shmid: str) -> bool:
 		return shmid in self.d
+
+	@staticmethod
+	def put(d: DictProxy, key: str, b: bytes) -> None:
+		L = len(b)
+		logger.debug(f"storing result of len {L} as {key}")
+		mem = SharedMemory(name=key, create=True, size=L)
+		mem.buf[:L] = b
+		mem.close()
+		d[key] = L
+		logger.debug(f"stored result of len {L} as {key}")

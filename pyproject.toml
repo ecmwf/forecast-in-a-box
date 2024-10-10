@@ -37,3 +37,6 @@ ignore = ["E731"]
 
 [tool.ruff.format]
 indent-style = "tab"
+
+[tool.mypy]
+plugins = "pydantic.mypy"

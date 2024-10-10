@@ -7,6 +7,7 @@ The wrapper for executing ExecutableTaskInstance with various contexts
 import time
 from typing import Callable, Any, Literal
 from forecastbox.executor.futures import DataFuture
+from forecastbox.executor.shmdb import ShmDb
 from cascade.controller.api import ExecutableTaskInstance
 from cascade.low.core import TaskDefinition
 from multiprocessing.shared_memory import SharedMemory
@@ -38,6 +39,8 @@ def get_callable(task: TaskDefinition) -> Callable:
 class ExecutionMemoryManager(AbstractContextManager):
 	"""Handles opening and closing of SharedMemory objects, including their SerDe, within single task execution"""
 
+	# TODO this should somehow merge with the shmdb
+
 	mems: dict[str, SharedMemory]
 
 	def __init__(self, shmdb: DictProxy) -> None:
@@ -64,13 +67,7 @@ class ExecutionMemoryManager(AbstractContextManager):
 
 	def put(self, data: Any, shmid: str, annotation: str) -> None:
 		result_ser = serde.to_bytes(data, annotation)
-		L = len(result_ser)
-		logger.debug(f"storing result of len {L} as {shmid}")
-		mem = SharedMemory(name=shmid, create=True, size=L)
-		mem.buf[:L] = result_ser
-		shm_worker_close(mem)
-		self.shmdb[shmid] = L
-		logger.debug(f"stored result of len {L} as {shmid}")
+		ShmDb.put(self.shmdb, shmid, result_ser)
 
 	def __exit__(self, exc_type, exc_val, exc_tb) -> Literal[False]:
 		for key, mem in self.mems.items():

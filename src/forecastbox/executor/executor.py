@@ -28,7 +28,7 @@ class SingleHostExecutor:
 			raise ValueError(f"unknown workers: {extra}")
 
 	def get_environment(self) -> Environment:
-		return Environment(hosts={"worker": Host(memory_mb=1)})  # TODO get the memory right
+		return Environment(hosts={"worker": Host(memory_mb=1, cpu=1, gpu=0)})  # TODO get the memory right
 
 	def run_at(self, task: ExecutableTaskInstance, host: str) -> str:
 		self._validate_hosts({host})
