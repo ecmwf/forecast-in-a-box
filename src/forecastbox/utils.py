@@ -22,7 +22,10 @@ logging_config = {
 	"loggers": {
 		"uvicorn": {"level": "INFO"},
 		"forecastbox": {"level": "INFO"},
+		"forecastbox.worker": {"level": "DEBUG"},
 		"forecastbox.executor": {"level": "DEBUG"},
+		"cascade": {"level": "INFO"},
+		"cascade.shm": {"level": "DEBUG"},
 		"httpcore": {"level": "ERROR"},
 		"httpx": {"level": "ERROR"},
 		"": {"level": "WARNING", "handlers": ["default"]},

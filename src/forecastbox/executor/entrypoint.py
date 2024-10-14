@@ -4,19 +4,15 @@ The wrapper for executing ExecutableTaskInstance with various contexts
 
 # TODO unify this with worker/entrypoint
 
-import time
 from typing import Callable, Any, Literal
+import cascade.shm.client as shm_client
 from forecastbox.executor.futures import DataFuture
-from forecastbox.executor.shmdb import ShmDb
 from cascade.controller.api import ExecutableTaskInstance
 from cascade.low.core import TaskDefinition
-from multiprocessing.shared_memory import SharedMemory
-from multiprocessing.managers import DictProxy
 from contextlib import AbstractContextManager
 from multiprocessing.connection import Connection
 from forecastbox.worker.environment_manager import Environment
 from forecastbox.worker.entrypoint import ExceptionReporter
-from forecastbox.worker.db import shm_worker_close
 import forecastbox.worker.serde as serde
 from forecastbox.utils import logging_config, ensure, maybe_head
 import logging
@@ -41,44 +37,36 @@ class ExecutionMemoryManager(AbstractContextManager):
 
 	# TODO this should somehow merge with the shmdb
 
-	mems: dict[str, SharedMemory]
+	mems: dict[str, shm_client.AllocatedBuffer]
 
-	def __init__(self, shmdb: DictProxy) -> None:
-		self.mems: dict[str, SharedMemory] = {}
-		self.shmdb = shmdb
+	def __init__(self) -> None:
+		self.mems: dict[str, shm_client.AllocatedBuffer] = {}
 
 	def get(self, shmid: str, annotation: str) -> Any:
-		tries = 0
-		while tries < 3:
-			if shmid not in self.shmdb:
-				# the memory manager dict does not synchronize fast enough
-				logger.error(f"didnt find {shmid}, sleeping")
-				time.sleep(0.1)
-				tries += 1
-			else:
-				break
-		if shmid not in self.shmdb:
-			raise ValueError(f"attempted to open non-registered dataset {shmid}")
 		if shmid not in self.mems:
 			logger.debug(f"opening dataset {shmid}")
-			self.mems[shmid] = SharedMemory(name=shmid, create=False)
-		raw = self.mems[shmid].buf[: self.shmdb[shmid]]
-		return serde.from_bytes(raw, annotation)
+			self.mems[shmid] = shm_client.get(shmid)
+		raw = self.mems[shmid].view()
+		rv = serde.from_bytes(raw, annotation)
+		logger.debug(f"deser into {annotation} done")
+		return rv
 
 	def put(self, data: Any, shmid: str, annotation: str) -> None:
 		result_ser = serde.to_bytes(data, annotation)
-		ShmDb.put(self.shmdb, shmid, result_ser)
+		l = len(result_ser)
+		rbuf = shm_client.allocate(shmid, l)
+		rbuf.view()[:l] = result_ser
+		rbuf.close()
 
 	def __exit__(self, exc_type, exc_val, exc_tb) -> Literal[False]:
-		for key, mem in self.mems.items():
-			mem.buf.release()
-			shm_worker_close(mem)
+		for mem in self.mems.values():
+			mem.close()
 		return False
 
 
-def entrypoint(task: ExecutableTaskInstance, ex_pipe: Connection, shmdb: DictProxy) -> None:
+def entrypoint(task: ExecutableTaskInstance, ex_pipe: Connection) -> None:
 	environment = task.task.definition.environment
-	with ExceptionReporter(ex_pipe), Environment(environment), ExecutionMemoryManager(shmdb) as mems:
+	with ExceptionReporter(ex_pipe), Environment(environment), ExecutionMemoryManager() as mems:
 		logging.config.dictConfig(logging_config)
 
 		args: list[Any] = []

@@ -10,7 +10,6 @@ from multiprocessing import Process, Pipe
 from dataclasses import dataclass
 from multiprocessing.connection import Connection
 from forecastbox.executor.entrypoint import entrypoint
-from multiprocessing.managers import DictProxy
 from forecastbox.executor.futures import TaskFuture
 import logging
 
@@ -27,12 +26,12 @@ class ProcWatch:
 	def __init__(self) -> None:
 		self.p: KVStore[ProcessHandle] = KVStorePyrsistent()
 
-	def spawn(self, task: ExecutableTaskInstance, shmdb: DictProxy) -> str:
+	def spawn(self, task: ExecutableTaskInstance) -> str:
 		ex_snk, ex_src = Pipe(duplex=False)
-		p = Process(target=entrypoint, kwargs={"task": task, "ex_pipe": ex_src, "shmdb": shmdb})
+		p = Process(target=entrypoint, kwargs={"task": task, "ex_pipe": ex_src})
 		f = TaskFuture(taskName=task.name)
 		self.p.update(f.asProcId(), ProcessHandle(p=p, e=ex_snk))
-		logger.debug(f"about to start {task.name}, with shmdb state {shmdb.keys()}")
+		logger.debug(f"about to start {task.name}")
 		p.start()
 		return f.asCtrlId()
 
