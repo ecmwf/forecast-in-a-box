@@ -49,7 +49,12 @@ class ProcWatch:
 		return set(e for e in procIds if self._get(e).p.exitcode is not None)
 
 	def is_done(self, procId: str) -> bool:
-		return self._get(procId).p.exitcode is not None
+		ex = self._get(procId).p.exitcode
+		if ex is None:
+			return False
+		if ex != 0:
+			raise ValueError(f"{procId=} failed with exit code {ex}")
+		return True
 
 	def join(self) -> None:
 		# TODO lock?

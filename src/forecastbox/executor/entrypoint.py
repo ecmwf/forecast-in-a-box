@@ -83,6 +83,7 @@ def entrypoint(task: ExecutableTaskInstance, ex_pipe: Connection) -> None:
 			if wiring.intoKwarg is not None:
 				kwargs[wiring.intoKwarg] = mems.get(shmid, wiring.annotation)
 
+		logger.debug(f"running {task.name} with {args=} and {kwargs=}")
 		kallable = get_callable(task.task.definition)
 		result = kallable(*args, **kwargs)
 
@@ -95,8 +96,6 @@ def entrypoint(task: ExecutableTaskInstance, ex_pipe: Connection) -> None:
 		del result
 
 		# this is required so that the Shm can be properly freed
-		for wiring in task.wirings:
-			if wiring.intoPosition is not None:
-				del args[wiring.intoPosition]
-			if wiring.intoKwarg is not None:
-				del kwargs[wiring.intoKwarg]
+		# if you ever get 'pointers cannot be closed' bug, deleting args[i] individually etc
+		del args
+		del kwargs
