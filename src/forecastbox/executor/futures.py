@@ -10,24 +10,24 @@ import hashlib
 
 @dataclass
 class TaskFuture:
-	taskName: str
-	# NOTE add retries?
+	# taskNames: list[str]
+	pid: int
 
 	def asCtrlId(self) -> str:
-		return f"task-{self.taskName}"
+		return f"task-{self.pid}"
 
 	@classmethod
 	def fromCtrlId(cls, id_: str) -> Optional[Self]:
 		if id_[:4] != "task":
 			return None
-		return cls(taskName=id_[5:])
+		return cls(pid=int(id_[5:]))
 
 	def asProcId(self) -> str:
-		return self.taskName
+		return str(self.pid)
 
 	@classmethod
 	def fromProcId(cls, procId: str) -> Self:
-		return cls(taskName=procId)
+		return cls(pid=int(procId))
 
 
 @dataclass

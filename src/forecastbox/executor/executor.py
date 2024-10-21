@@ -8,7 +8,7 @@ Notes:
 
 from typing import Any
 
-from cascade.controller.api import ExecutableTaskInstance
+from cascade.controller.api import ExecutableSubgraph
 from cascade.low.core import Environment, Host
 from cascade.low.func import assert_never
 import cascade.shm.client as shm_client
@@ -29,9 +29,9 @@ class SingleHostExecutor:
 	def get_environment(self) -> Environment:
 		return Environment(hosts={"worker": Host(memory_mb=1, cpu=1, gpu=0)})  # TODO get the memory right
 
-	def run_at(self, task: ExecutableTaskInstance, host: str) -> str:
+	def run_at(self, subgraph: ExecutableSubgraph, host: str) -> str:
 		self._validate_hosts({host})
-		return self.procwatch.spawn(task)
+		return self.procwatch.spawn(subgraph)
 
 	def scatter(self, taskName: str, outputName: str, hosts: set[str]) -> str:
 		self._validate_hosts(hosts)

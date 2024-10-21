@@ -34,10 +34,11 @@ def cascade2fiab(job_instance: JobInstance, schedule: Schedule) -> Either[TaskDA
 
 	worker_queue_c: list[tuple[str, CascadeTask]] = [
 		(
-			e,
-			job_instance.tasks[e],
+			task,
+			job_instance.tasks[task],
 		)
-		for e in next(iter(schedule.host_task_queues.values()))
+		for subgraph in next(iter(schedule.host_task_queues.values()))
+		for task in subgraph
 	]
 	worker_queue_f: list[FiabTask] = [
 		FiabTask(

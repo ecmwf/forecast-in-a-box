@@ -3,7 +3,7 @@ Spawns new procesess and keeps track of them
 """
 
 from typing import Iterable
-from cascade.controller.api import ExecutableTaskInstance
+from cascade.controller.api import ExecutableSubgraph
 from forecastbox.db import KVStore, KVStorePyrsistent
 from multiprocessing.connection import wait
 from multiprocessing import Process, Pipe
@@ -26,13 +26,15 @@ class ProcWatch:
 	def __init__(self) -> None:
 		self.p: KVStore[ProcessHandle] = KVStorePyrsistent()
 
-	def spawn(self, task: ExecutableTaskInstance) -> str:
+	def spawn(self, subgraph: ExecutableSubgraph) -> str:
 		ex_snk, ex_src = Pipe(duplex=False)
-		p = Process(target=entrypoint, kwargs={"task": task, "ex_pipe": ex_src})
-		f = TaskFuture(taskName=task.name)
-		self.p.update(f.asProcId(), ProcessHandle(p=p, e=ex_snk))
-		logger.debug(f"about to start {task.name}")
+		p = Process(target=entrypoint, kwargs={"subgraph": subgraph, "ex_pipe": ex_src})
 		p.start()
+		if not p.pid:
+			raise ValueError(f"failed to spawn a process for {subgraph=}")
+		f = TaskFuture(pid=p.pid)
+		self.p.update(f.asProcId(), ProcessHandle(p=p, e=ex_snk))
+		logger.debug(f"about to start {subgraph=}")
 		return f.asCtrlId()
 
 	def _get(self, procId: str) -> ProcessHandle:

@@ -1,14 +1,15 @@
 """
-The wrapper for executing ExecutableTaskInstance with various contexts
+The wrapper for executing ExecutableSubgraph with various contexts
 """
 
 # TODO unify this with worker/entrypoint
 
+import time
 from typing import Callable, Any, Literal
 import cascade.shm.client as shm_client
 from forecastbox.executor.futures import DataFuture
-from cascade.controller.api import ExecutableTaskInstance
-from cascade.low.core import TaskDefinition
+from cascade.controller.api import ExecutableSubgraph, ExecutableTaskInstance
+from cascade.low.core import TaskDefinition, NO_OUTPUT_PLACEHOLDER
 from contextlib import AbstractContextManager
 from multiprocessing.connection import Connection
 from forecastbox.worker.environment_manager import Environment
@@ -64,38 +65,74 @@ class ExecutionMemoryManager(AbstractContextManager):
 		return False
 
 
-def entrypoint(task: ExecutableTaskInstance, ex_pipe: Connection) -> None:
-	environment = task.task.definition.environment
-	with ExceptionReporter(ex_pipe), Environment(environment), ExecutionMemoryManager() as mems:
-		logging.config.dictConfig(logging_config)
+def task_entrypoint(task: ExecutableTaskInstance, local_mems: dict[tuple[str, str], Any], sh_mems: ExecutionMemoryManager) -> None:
+	start = time.perf_counter_ns()
 
-		args: list[Any] = []
-		for idx, arg in task.task.static_input_ps.items():
-			ensure(args, idx)
-			args[idx] = arg
-		kwargs: dict[str, Any] = {}
-		kwargs.update(task.task.static_input_kw)
-		for wiring in task.wirings:
+	args: list[Any] = []
+	for idx, arg in task.task.static_input_ps.items():
+		ensure(args, idx)
+		args[idx] = arg
+	kwargs: dict[str, Any] = {}
+	kwargs.update(task.task.static_input_kw)
+	for wiring in task.wirings:
+		if (wiring.sourceTask, wiring.sourceOutput) in local_mems:
+			value = local_mems[(wiring.sourceTask, wiring.sourceOutput)]
+		else:
 			shmid = DataFuture(taskName=wiring.sourceTask, outputName=wiring.sourceOutput).asShmId()
-			if wiring.intoPosition is not None:
-				ensure(args, wiring.intoPosition)
-				args[wiring.intoPosition] = mems.get(shmid, wiring.annotation)
-			if wiring.intoKwarg is not None:
-				kwargs[wiring.intoKwarg] = mems.get(shmid, wiring.annotation)
+			value = sh_mems.get(shmid, wiring.annotation)
+		if wiring.intoPosition is not None:
+			ensure(args, wiring.intoPosition)
+			args[wiring.intoPosition] = value
+		if wiring.intoKwarg is not None:
+			kwargs[wiring.intoKwarg] = value
 
-		logger.debug(f"running {task.name} with {args=} and {kwargs=}")
-		kallable = get_callable(task.task.definition)
-		result = kallable(*args, **kwargs)
+	if len(task.task.definition.output_schema) > 1:
+		raise NotImplementedError("multiple outputs not supported yet")
+	output_key = maybe_head(task.task.definition.output_schema.keys())
+	if not output_key:
+		raise ValueError(f"no output key for task {task.name}")
 
-		if len(task.task.definition.output_schema) > 1:
-			raise NotImplementedError("multiple outputs not supported yet")
-		output_key = maybe_head(task.task.definition.output_schema.keys())
-		if output_key is not None:
-			shmid = DataFuture(task.name, output_key).asShmId()
-			mems.put(result, shmid, task.task.definition.output_schema[output_key])
-		del result
+	prep_end = time.perf_counter_ns()
+	logger.debug(f"running {task.name} with {args=} and {kwargs=}")
+	kallable = get_callable(task.task.definition)
+	result = kallable(*args, **kwargs)
+	run_end = time.perf_counter_ns()
 
-		# this is required so that the Shm can be properly freed
-		# if you ever get 'pointers cannot be closed' bug, deleting args[i] individually etc
-		del args
-		del kwargs
+	output_schema = task.task.definition.output_schema[output_key]
+	if output_key == NO_OUTPUT_PLACEHOLDER:
+		if result is not None:
+			logger.warning(f"gotten output of type {type(result)} where none was expected, updating annotation")
+			output_schema = "Any"
+		else:
+			result = "ok"
+	local_mems[(task.name, output_key)] = result
+	if output_key in task.published_outputs:
+		shmid = DataFuture(task.name, output_key).asShmId()
+		sh_mems.put(result, shmid, output_schema)
+
+	# this is required so that the Shm can be properly freed
+	# if you ever get 'pointers cannot be closed' bug, deleting args[i] individually etc
+	del args
+	del kwargs
+
+	end = time.perf_counter_ns()
+
+	logger.debug(f"outer elapsed {(end-start)/1e9: .5f} s in {task.name}")
+	logger.debug(f"prep elapsed {(prep_end-start)/1e9: .5f} s in {task.name}")
+	logger.debug(f"inner elapsed {(run_end-prep_end)/1e9: .5f} s in {task.name}")
+	logger.debug(f"post elapsed {(end-run_end)/1e9: .5f} s in {task.name}")
+
+
+def entrypoint(subgraph: ExecutableSubgraph, ex_pipe: Connection) -> None:
+	start = time.perf_counter_ns()
+	local_mems: dict[tuple[str, str], Any] = {}
+	with ExceptionReporter(ex_pipe), ExecutionMemoryManager() as sh_mems:
+		logging.config.dictConfig(logging_config)
+		for task in subgraph.tasks:
+			environment = task.task.definition.environment
+			with Environment(environment):
+				task_entrypoint(task, local_mems, sh_mems)
+				# TODO del local_mems items that wont be needed later
+
+	end = time.perf_counter_ns()
+	logger.debug(f"subgraph elapsed {(end-start)/1e9: .5f} s")
