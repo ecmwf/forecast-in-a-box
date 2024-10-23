@@ -10,10 +10,10 @@ Currently supports only one active instance at a time
 from cascade.low.core import JobInstance
 from forecastbox.utils import logging_config
 from cascade.controller.impl import CascadeController
-from forecastbox.executor.executor import SingleHostExecutor
+from forecastbox.executor.executor import SingleHostExecutor, Config as ExecutorConfig
 import cascade.shm.api as shm_api
 from forecastbox.executor.futures import DataFuture
-from cascade.low.scheduler import schedule as scheduler
+from cascade.scheduler import schedule as scheduler
 from multiprocessing import Process
 from cascade.low.views import dependants
 import cascade.shm.server as shm_server
@@ -28,7 +28,7 @@ def job_entrypoint(job: JobInstance) -> None:
 	logger.debug(job)
 	shm_client.ensure()
 	controller = CascadeController()
-	executor = SingleHostExecutor()
+	executor = SingleHostExecutor(ExecutorConfig(1, 2048))  # TODO get the memory right
 	schedule = scheduler(job, executor.get_environment()).get_or_raise()
 	controller.submit(job, schedule, executor)
 	executor.procwatch.join()

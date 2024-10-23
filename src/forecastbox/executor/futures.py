@@ -22,12 +22,12 @@ class TaskFuture:
 			return None
 		return cls(pid=int(id_[5:]))
 
-	def asProcId(self) -> str:
-		return str(self.pid)
+	def asProcId(self) -> int:
+		return self.pid
 
 	@classmethod
-	def fromProcId(cls, procId: str) -> Self:
-		return cls(pid=int(procId))
+	def fromProcId(cls, procId: int) -> Self:
+		return cls(pid=procId)
 
 
 @dataclass

@@ -6,6 +6,7 @@ Notes:
  - data interchange is done via shared memory
 """
 
+from dataclasses import dataclass
 from typing import Any
 
 from cascade.controller.api import ExecutableSubgraph
@@ -18,20 +19,36 @@ from forecastbox.executor.procwatch import ProcWatch
 from forecastbox.executor.futures import TaskFuture, DataFuture, ctrl_id2future
 
 
+@dataclass
+class Config:
+	process_count: int
+	mbs_per_process: int  # for capacity allocation purposes, not really tracked
+
+	def worker_name(self, i: int) -> str:
+		return f"worker{i}"
+
+	def to_env(self) -> Environment:
+		return Environment(
+			hosts={self.worker_name(i): Host(memory_mb=self.mbs_per_process, cpu=1, gpu=0) for i in range(self.process_count)}
+		)
+
+
 class SingleHostExecutor:
-	def __init__(self):
-		self.procwatch = ProcWatch()
+	def __init__(self, config: Config):
+		self.config = config
+		self.procwatch = ProcWatch(self.config.process_count)
 
 	def _validate_hosts(self, hosts: set[str]) -> None:
-		if extra := hosts - {"worker"}:
+		if extra := hosts - set(self.config.to_env().hosts):
 			raise ValueError(f"unknown workers: {extra}")
 
 	def get_environment(self) -> Environment:
-		return Environment(hosts={"worker": Host(memory_mb=1, cpu=1, gpu=0)})  # TODO get the memory right
+		return self.config.to_env()
 
 	def run_at(self, subgraph: ExecutableSubgraph, host: str) -> str:
 		self._validate_hosts({host})
-		return self.procwatch.spawn(subgraph)
+		# NOTE we ignore the host assignment because the hosts are ~equivalent
+		return TaskFuture.fromProcId(self.procwatch.submit(subgraph)).asCtrlId()
 
 	def scatter(self, taskName: str, outputName: str, hosts: set[str]) -> str:
 		self._validate_hosts(hosts)
