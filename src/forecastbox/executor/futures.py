@@ -3,6 +3,7 @@ Ids for representation of future results. Most of the code is just serde and tra
 """
 
 from typing import Optional
+from cascade.low.core import DatasetId
 from dataclasses import dataclass
 from typing_extensions import Self
 import hashlib
@@ -32,11 +33,16 @@ class TaskFuture:
 
 @dataclass
 class DataFuture:
+	# NOTE this class predates DatasetId and is made a bit redundant by it -- consider removing
 	taskName: str
 	outputName: str
 
 	def asCtrlId(self) -> str:
 		return f"data{len(self.taskName)}-{self.taskName}-{self.outputName}"
+
+	@classmethod
+	def fromDsId(cls, dataset_id: DatasetId) -> Self:
+		return cls(taskName=dataset_id.task, outputName=dataset_id.output)
 
 	@classmethod
 	def fromCtrlId(cls, id_: str) -> Optional[Self]:

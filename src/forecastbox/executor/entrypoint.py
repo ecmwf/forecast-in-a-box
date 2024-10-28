@@ -8,8 +8,8 @@ import time
 from typing import Callable, Any, Literal
 import cascade.shm.client as shm_client
 from forecastbox.executor.futures import DataFuture
-from cascade.controller.api import ExecutableSubgraph, ExecutableTaskInstance
-from cascade.low.core import TaskDefinition, NO_OUTPUT_PLACEHOLDER
+from cascade.executors.dask_futures import ExecutableSubgraph, ExecutableTaskInstance
+from cascade.low.core import TaskDefinition, NO_OUTPUT_PLACEHOLDER, DatasetId
 from contextlib import AbstractContextManager
 from multiprocessing.connection import Connection
 from forecastbox.worker.environment_manager import Environment
@@ -65,7 +65,9 @@ class ExecutionMemoryManager(AbstractContextManager):
 		return False
 
 
-def task_entrypoint(task: ExecutableTaskInstance, local_mems: dict[tuple[str, str], Any], sh_mems: ExecutionMemoryManager) -> None:
+def task_entrypoint(
+	task: ExecutableTaskInstance, local_mems: dict[DatasetId, Any], sh_mems: ExecutionMemoryManager, published_outputs: set[DatasetId]
+) -> None:
 	start = time.perf_counter_ns()
 
 	args: list[Any] = []
@@ -75,10 +77,10 @@ def task_entrypoint(task: ExecutableTaskInstance, local_mems: dict[tuple[str, st
 	kwargs: dict[str, Any] = {}
 	kwargs.update(task.task.static_input_kw)
 	for wiring in task.wirings:
-		if (wiring.sourceTask, wiring.sourceOutput) in local_mems:
-			value = local_mems[(wiring.sourceTask, wiring.sourceOutput)]
+		if wiring.source in local_mems:
+			value = local_mems[wiring.source]
 		else:
-			shmid = DataFuture(taskName=wiring.sourceTask, outputName=wiring.sourceOutput).asShmId()
+			shmid = DataFuture.fromDsId(wiring.source).asShmId()
 			value = sh_mems.get(shmid, wiring.annotation)
 		if wiring.intoPosition is not None:
 			ensure(args, wiring.intoPosition)
@@ -105,9 +107,10 @@ def task_entrypoint(task: ExecutableTaskInstance, local_mems: dict[tuple[str, st
 			output_schema = "Any"
 		else:
 			result = "ok"
-	local_mems[(task.name, output_key)] = result
-	if output_key in task.published_outputs:
-		shmid = DataFuture(task.name, output_key).asShmId()
+	output_dsid = DatasetId(task.name, output_key)
+	local_mems[output_dsid] = result
+	if output_dsid in published_outputs:
+		shmid = DataFuture.fromDsId(output_dsid).asShmId()
 		sh_mems.put(result, shmid, output_schema)
 
 	# this is required so that the Shm can be properly freed
@@ -125,13 +128,13 @@ def task_entrypoint(task: ExecutableTaskInstance, local_mems: dict[tuple[str, st
 
 def entrypoint(subgraph: ExecutableSubgraph, ex_pipe: Connection) -> None:
 	start = time.perf_counter_ns()
-	local_mems: dict[tuple[str, str], Any] = {}
+	local_mems: dict[DatasetId, Any] = {}
 	with ExceptionReporter(ex_pipe), ExecutionMemoryManager() as sh_mems:
 		logging.config.dictConfig(logging_config)
 		for task in subgraph.tasks:
 			environment = task.task.definition.environment
 			with Environment(environment):
-				task_entrypoint(task, local_mems, sh_mems)
+				task_entrypoint(task, local_mems, sh_mems, subgraph.published_outputs)
 				# TODO del local_mems items that wont be needed later
 
 	end = time.perf_counter_ns()

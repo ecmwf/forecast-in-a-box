@@ -7,13 +7,13 @@ Currently supports only one active instance at a time
 # to have something better, we'd need better monitoring capabilities on the executor/controller interfaces first
 # afterwards, we'll extend message passing from the Process here to this class, and accordingly server endpoints
 
-from cascade.low.core import JobInstance
+from cascade.low.core import JobInstance, JobExecutionRecord, DatasetId
+from cascade.controller.impl import run
 from forecastbox.utils import logging_config
-from cascade.controller.impl import CascadeController
 from forecastbox.executor.executor import SingleHostExecutor, Config as ExecutorConfig
 import cascade.shm.api as shm_api
 from forecastbox.executor.futures import DataFuture
-from cascade.scheduler import schedule as scheduler
+from cascade.scheduler.impl import naive_bfs_layers
 from multiprocessing import Process
 from cascade.low.views import dependants
 import cascade.shm.server as shm_server
@@ -27,10 +27,10 @@ logger = logging.getLogger(__name__)
 def job_entrypoint(job: JobInstance) -> None:
 	logger.debug(job)
 	shm_client.ensure()
-	controller = CascadeController()
-	executor = SingleHostExecutor(ExecutorConfig(1, 2048))  # TODO get the memory right
-	schedule = scheduler(job, executor.get_environment()).get_or_raise()
-	controller.submit(job, schedule, executor)
+	mem = 2048  #  TODO get the memory right
+	executor = SingleHostExecutor(ExecutorConfig(1, mem), job)
+	schedule = naive_bfs_layers(job, JobExecutionRecord(), set()).get_or_raise()
+	run(job, executor, schedule)
 	executor.procwatch.join()
 
 
@@ -59,7 +59,7 @@ class ControllerManager:
 			DataFuture(taskName=taskName, outputName=outputName)
 			for taskName, taskInstance in job.tasks.items()
 			for outputName in taskInstance.definition.output_schema.keys()
-			if not outputDependants[(taskName, outputName)]
+			if not outputDependants[DatasetId(taskName, outputName)]
 		]
 
 	def status(self) -> str:

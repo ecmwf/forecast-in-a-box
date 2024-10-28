@@ -6,8 +6,7 @@ for more control on queueing/reporting, and with process lifetime
 spanning only single task.
 """
 
-from typing import Iterable
-from cascade.controller.api import ExecutableSubgraph
+from cascade.executors.dask_futures import ExecutableSubgraph
 from multiprocessing.connection import wait
 from multiprocessing import Process, Pipe
 from dataclasses import dataclass
@@ -73,35 +72,30 @@ class ProcWatch:
 			raise ValueError(f"failed to spawn a process for {subgraph=}")
 		return ProcessHandle(p, ex_snk)
 
-	def wait_some(self, procIds: Iterable[int], timeout_sec: int | None) -> set[int]:
+	def wait_some(self, timeout_sec: int | None) -> tuple[list[int], list[int]]:
 		"""Checks whether given have finished, freeing up capacity to run more and possibly spawning enqueued ones"""
-		statuses = {pid: self.status[pid] for pid in procIds}
-		logger.debug(f"wait some with {statuses=}")
-		if done := {k for k, v in statuses.items() if v in {Status.succeeded, Status.failed}}:
-			return done
-		if running := {k for k, v in statuses.items() if v in {Status.running}}:
-			sentinels = [self.running[k].p.sentinel for k in running]
-			rv1 = wait(sentinels, timeout_sec)  # we ignore rv1 because more may have finished
-			logger.debug(f"wait some returned with {rv1}")
-			rv2: set[int] = set()
-			for k in running:
-				if (ex := self.running[k].p.exitcode) is not None:
-					# TODO report exceptions from pipe, join?
-					rv2.add(k)
-					self.exit_codes[k] = ex
-					self.running.pop(k)
-					self.status[k] = Status.succeeded if ex == 0 else Status.failed
-			self.spawn_available()
-			return rv2
-		raise ValueError("nothing running!")
+		running = list(self.running.keys())
+		if not running:
+			return [], []
+		sentinels = [self.running[k].p.sentinel for k in running]
+		logger.debug(f"wait for {running=}")
+		_ = wait(sentinels, timeout_sec)
+		ok: list[int] = list()
+		fail: list[int] = list()
 
-	def is_done(self, procId: int) -> bool:
-		ex = self.exit_codes.get(procId, None)
-		if ex is None:
-			return False
-		if ex != 0:
-			raise ValueError(f"{procId=} failed with exit code {ex}")
-		return True
+		for k in running:
+			if (ex := self.running[k].p.exitcode) is not None:
+				# TODO report exceptions from pipe, join?
+				self.exit_codes[k] = ex
+				self.running.pop(k)
+				if ex == 0:
+					ok.append(k)
+					self.status[k] = Status.succeeded
+				else:
+					fail.append(k)
+					self.status[k] = Status.failed
+		self.spawn_available()
+		return ok, fail
 
 	def join(self) -> None:
 		for k, h in self.running.items():
