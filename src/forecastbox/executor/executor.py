@@ -12,7 +12,7 @@ import logging
 
 from cascade.low.core import Environment, Worker, JobInstance, DatasetId
 from cascade.low.views import param_source
-from cascade.controller.core import Event, ActionDatasetTransmit, ActionSubmit, ActionDatasetPurge
+from cascade.controller.core import Event, ActionDatasetTransmit, ActionSubmit, ActionDatasetPurge, WorkerId
 from cascade.executors.dask_futures import build_subgraph
 from cascade.executors.instant import SimpleEventQueue
 import cascade.shm.client as shm_client
@@ -62,19 +62,26 @@ class SingleHostExecutor:
 
 	def transmit(self, action: ActionDatasetTransmit) -> None:
 		# no-op because single shm
-		self._validate_workers(action.fr.union(action.to))
+		self._validate_workers(set(action.fr + action.to))
 		self.eq.transmit_done(action)
 
 	def purge(self, action: ActionDatasetPurge) -> None:
-		self._validate_workers(action.at)
+		self._validate_workers(set(action.at))
 		for ds in action.ds:
 			shm_client.purge(DataFuture.fromDsId(ds).asShmId())
 
-	def fetch_as_url(self, dataset_id: DatasetId) -> str:
+	def fetch_as_url(self, worker: WorkerId, dataset_id: DatasetId) -> str:
 		return DataFuture.fromDsId(dataset_id).asUrl()
 
-	def fetch_as_value(self, dataset_id: DatasetId) -> Any:
+	def fetch_as_value(self, worker: WorkerId, dataset_id: DatasetId) -> Any:
 		return shm_client.get(DataFuture.fromDsId(dataset_id).asShmId())
+
+	def store_value(self, worker: WorkerId, dataset_id: DatasetId, data: bytes) -> None:
+		shmid = DataFuture.fromDsId(dataset_id).asShmId()
+		l = len(data)
+		rbuf = shm_client.allocate(shmid, l)
+		rbuf.view()[:l] = data
+		rbuf.close()
 
 	def wait_some(self, timeout_sec: int | None = None) -> list[Event]:
 		if self.eq.any():

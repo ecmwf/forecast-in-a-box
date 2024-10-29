@@ -40,3 +40,7 @@ indent-style = "tab"
 
 [tool.mypy]
 plugins = "pydantic.mypy"
+
+[tool.pytest.ini_options]
+log_cli = true
+log_cli_level = "DEBUG"
