@@ -78,8 +78,10 @@ def task_entrypoint(
 	kwargs.update(task.task.static_input_kw)
 	for wiring in task.wirings:
 		if wiring.source in local_mems:
+			logger.debug(f"obtaining input {wiring.source} from proc memory")
 			value = local_mems[wiring.source]
 		else:
+			logger.debug(f"obtaining input {wiring.source} from shm")
 			shmid = DataFuture.fromDsId(wiring.source).asShmId()
 			value = sh_mems.get(shmid, wiring.annotation)
 		if wiring.intoPosition is not None:

@@ -79,9 +79,14 @@ class SingleHostExecutor:
 	def store_value(self, worker: WorkerId, dataset_id: DatasetId, data: bytes) -> None:
 		shmid = DataFuture.fromDsId(dataset_id).asShmId()
 		l = len(data)
-		rbuf = shm_client.allocate(shmid, l)
-		rbuf.view()[:l] = data
-		rbuf.close()
+		try:
+			rbuf = shm_client.allocate(shmid, l)
+		except Exception:
+			# TODO remove, temporary hack until scheduler correctly aware
+			logger.exception(f"store of {dataset_id} failed, presumably already computed")
+		else:
+			rbuf.view()[:l] = data
+			rbuf.close()
 
 	def wait_some(self, timeout_sec: int | None = None) -> list[Event]:
 		if self.eq.any():
@@ -89,8 +94,9 @@ class SingleHostExecutor:
 
 		ok, finished = self.procwatch.wait_some(timeout_sec)
 		for e in finished:
+			# TODO read exception, propagate
 			logger.error(f"future {e} corresponding to {self.fid2action[e]} failed")
-			raise ValueError(e)
+			self.eq.submit_failed(self.fid2action.pop(e))
 		for e in ok:
 			self.eq.submit_done(self.fid2action.pop(e))
 		return self.eq.drain()
