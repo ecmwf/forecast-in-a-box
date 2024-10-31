@@ -14,8 +14,8 @@ endpoints:
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 import logging
 from forecastbox.api.common import TaskDAG, JobStatus, JobId, WorkerId, WorkerRegistration, JobStatusUpdate
-from cascade.low.core import JobInstance, Host, Environment
-import cascade.low.scheduler as scheduler
+from cascade.low.core import JobInstance, Worker as CascadeWorker, JobExecutionRecord
+from cascade.scheduler.impl import naive_bfs_layers
 import forecastbox.controller.db as db
 from forecastbox.controller.scheduler import MaintenanceScheduler
 from forecastbox.controller.comm import WorkerComm
@@ -69,8 +69,7 @@ async def job_submit(definition: TaskDAG, background_tasks: BackgroundTasks) -> 
 
 @app.api_route("/jobs/cascade_submit", methods=["PUT"])
 async def cascade_submit(job_instance: JobInstance, background_tasks: BackgroundTasks) -> JobStatus:
-	environment = Environment(hosts={k: v.params for k, v in db.worker_db.all()})
-	schedule = scheduler.schedule(job_instance, environment).get_or_raise()
+	schedule = naive_bfs_layers(job_instance, JobExecutionRecord(), set()).get_or_raise()
 	status = db.cascade_submit(job_instance, schedule)
 	background_tasks.add_task(db.job_assign, status.job_id.job_id, AppContext.get().worker_comm)
 	return status
@@ -89,7 +88,7 @@ async def job_status(job_id: str) -> JobStatus:
 async def worker_register(worker_registration: WorkerRegistration) -> WorkerId:
 	worker = db.Worker(
 		url=worker_registration.url_raw(),
-		params=Host(memory_mb=worker_registration.memory_mb, cpu=1, gpu=0),  # TODO cpu gpu
+		params=CascadeWorker(memory_mb=worker_registration.memory_mb, cpu=1, gpu=0),  # TODO cpu gpu
 		last_seen=dt.datetime.now(),
 	)
 	return db.worker_register(worker)

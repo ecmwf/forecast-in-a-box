@@ -7,7 +7,8 @@ execution context of fiab
 # profound need. We'll eventually make parts of the original fiab interface go away, which will
 # simplify this
 
-from cascade.low.core import JobInstance, Schedule, TaskInstance as CascadeTask
+from cascade.low.core import JobInstance, TaskInstance as CascadeTask
+from cascade.scheduler.core import Schedule
 from cascade.low.views import param_source
 from forecastbox.api.common import DatasetId, TaskDAG, Task as FiabTask, TaskEnvironment
 from forecastbox.utils import Either, maybe_head
@@ -22,8 +23,6 @@ def param2dsid(task_name: str, param_name: Optional[str]) -> Optional[DatasetId]
 
 def cascade2fiab(job_instance: JobInstance, schedule: Schedule) -> Either[TaskDAG, list[str]]:
 	errs = []
-	if len(schedule.host_task_queues) > 1:
-		errs.append("fiab supports only one worker")
 	if culprits := [name for name, instance in job_instance.tasks.items() if len(instance.definition.output_schema) > 1]:
 		errs.append(f"tasks have multiple outputs, unsupported: {', '.join(culprits)}")
 	if errs:
@@ -37,8 +36,8 @@ def cascade2fiab(job_instance: JobInstance, schedule: Schedule) -> Either[TaskDA
 			task,
 			job_instance.tasks[task],
 		)
-		for subgraph in next(iter(schedule.host_task_queues.values()))
-		for task in subgraph
+		for layer in schedule.layers
+		for task in layer  # we bfs through layers, likely subopt but this part of code should vanish anyway
 	]
 	worker_queue_f: list[FiabTask] = [
 		FiabTask(
@@ -46,13 +45,13 @@ def cascade2fiab(job_instance: JobInstance, schedule: Schedule) -> Either[TaskDA
 			static_params_kw=task.static_input_kw,
 			static_params_ps=task.static_input_ps,
 			dataset_inputs_kw={
-				input_param: cast(DatasetId, param2dsid(source_task, source_output))
-				for input_param, (source_task, source_output) in inputs_lookup[name].items()
+				input_param: cast(DatasetId, param2dsid(source.task, source.output))
+				for input_param, source in inputs_lookup[name].items()
 				if isinstance(input_param, str)
 			},
 			dataset_inputs_ps={
-				input_param: cast(DatasetId, param2dsid(source_task, source_output))
-				for input_param, (source_task, source_output) in inputs_lookup[name].items()
+				input_param: cast(DatasetId, param2dsid(source.task, source.output))
+				for input_param, source in inputs_lookup[name].items()
 				if isinstance(input_param, int)
 			},
 			classes_inputs_kw={

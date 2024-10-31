@@ -12,7 +12,8 @@ from typing import Optional, Any
 from forecastbox.api.common import TaskDAG, JobStatus, JobId, JobStatusEnum, WorkerId, JobStatusUpdate
 from forecastbox.api.adapter import cascade2fiab
 from forecastbox.db import KVStore, KVStorePyrsistent
-from cascade.low.core import JobInstance, Schedule, Host
+from cascade.low.core import JobInstance, Worker as CascadeWorker
+from cascade.scheduler.core import Schedule
 import forecastbox.scheduler as scheduler
 import datetime as dt
 from forecastbox.controller.comm import WorkerComm
@@ -34,7 +35,7 @@ job_db: KVStore[Job] = KVStorePyrsistent[Job]()
 class Worker:
 	url: str
 	last_seen: dt.datetime
-	params: Host
+	params: CascadeWorker
 
 
 worker_db: KVStore[Worker] = KVStorePyrsistent()
@@ -58,11 +59,6 @@ def cascade_submit(job_instance: JobInstance, schedule: Schedule) -> JobStatus:
 		status_detail="",
 		result=None,
 	)
-
-	if missing := set(schedule.host_task_queues.keys()) - set(e[0] for e in worker_db.all()):
-		status.status = JobStatusEnum.failed
-		status.status_detail = f"unknown workers in schedule: {', '.join(missing)}"
-		return status
 
 	maybe_dag = cascade2fiab(job_instance, schedule)
 	if maybe_dag.e:
