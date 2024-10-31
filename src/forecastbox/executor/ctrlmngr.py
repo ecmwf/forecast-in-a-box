@@ -28,7 +28,7 @@ def job_entrypoint(job: JobInstance) -> None:
 	logger.debug(job)
 	shm_client.ensure()
 	mem = 2048  #  TODO get the memory right
-	executor = SingleHostExecutor(ExecutorConfig(1, mem), job)
+	executor = SingleHostExecutor(ExecutorConfig(1, mem), job, {"host": "fiab"})
 	schedule = naive_bfs_layers(job, JobExecutionRecord(), set()).get_or_raise()
 	run(job, executor, schedule)
 	executor.procwatch.join()

@@ -18,6 +18,7 @@ import forecastbox.worker.serde as serde
 from forecastbox.utils import logging_config, ensure, maybe_head
 import logging
 import importlib
+from cascade.controller.tracing import mark, label
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,7 @@ class ExecutionMemoryManager(AbstractContextManager):
 def task_entrypoint(
 	task: ExecutableTaskInstance, local_mems: dict[DatasetId, Any], sh_mems: ExecutionMemoryManager, published_outputs: set[DatasetId]
 ) -> None:
+	mark({"task": task.name, "action": "taskStarted"})
 	start = time.perf_counter_ns()
 
 	args: list[Any] = []
@@ -122,13 +124,16 @@ def task_entrypoint(
 
 	end = time.perf_counter_ns()
 
+	mark({"task": task.name, "action": "taskFinished"})
 	logger.debug(f"outer elapsed {(end-start)/1e9: .5f} s in {task.name}")
 	logger.debug(f"prep elapsed {(prep_end-start)/1e9: .5f} s in {task.name}")
 	logger.debug(f"inner elapsed {(run_end-prep_end)/1e9: .5f} s in {task.name}")
 	logger.debug(f"post elapsed {(end-run_end)/1e9: .5f} s in {task.name}")
 
 
-def entrypoint(subgraph: ExecutableSubgraph, ex_pipe: Connection) -> None:
+def entrypoint(subgraph: ExecutableSubgraph, ex_pipe: Connection, tracingCtx: dict[str, str]) -> None:
+	for k, v in tracingCtx.items():
+		label(k, v)
 	start = time.perf_counter_ns()
 	local_mems: dict[DatasetId, Any] = {}
 	with ExceptionReporter(ex_pipe), ExecutionMemoryManager() as sh_mems:

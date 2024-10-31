@@ -26,6 +26,7 @@ logging_config = {
 		"forecastbox.executor": {"level": "DEBUG"},
 		"cascade": {"level": "INFO"},
 		"cascade.shm": {"level": "DEBUG"},
+		"cascade.controller": {"level": "DEBUG"},
 		"httpcore": {"level": "ERROR"},
 		"httpx": {"level": "ERROR"},
 		"": {"level": "WARNING", "handlers": ["default"]},

@@ -16,6 +16,7 @@ from cascade.controller.core import Event, ActionDatasetTransmit, ActionSubmit, 
 from cascade.executors.dask_futures import build_subgraph
 from cascade.executors.instant import SimpleEventQueue
 import cascade.shm.client as shm_client
+from cascade.controller.tracing import mark, label
 
 from forecastbox.executor.procwatch import ProcWatch
 from forecastbox.executor.futures import DataFuture
@@ -38,13 +39,16 @@ class Config:
 
 
 class SingleHostExecutor:
-	def __init__(self, config: Config, job: JobInstance):
+	def __init__(self, config: Config, job: JobInstance, tracingCtx: dict[str, str]):
 		self.config = config
 		self.procwatch = ProcWatch(self.config.process_count)
 		self.eq = SimpleEventQueue()
 		self.job = job
 		self.param_source = param_source(job.edges)
 		self.fid2action: dict[int, ActionSubmit] = {}
+		for k, v in tracingCtx.items():
+			label(k, v)
+		self.tracingCtx = tracingCtx
 
 	def _validate_workers(self, workers: set[str]) -> None:
 		if extra := workers - set(self.config.to_env().workers):
@@ -57,13 +61,18 @@ class SingleHostExecutor:
 		self._validate_workers({action.at})
 		# NOTE we ignore the host assignment because the hosts are ~equivalent
 		subgraph = build_subgraph(action, self.job, self.param_source)
-		id_ = self.procwatch.submit(subgraph)
+		for task in subgraph.tasks:
+			mark({"task": task.name, "action": "taskEnqueued", "worker": action.at})
+		id_ = self.procwatch.submit(subgraph, {**self.tracingCtx, **{"worker": action.at}})
 		self.fid2action[id_] = action
 
 	def transmit(self, action: ActionDatasetTransmit) -> None:
 		# no-op because single shm
 		self._validate_workers(set(action.fr + action.to))
 		self.eq.transmit_done(action)
+		for worker in action.to:
+			for dataset in action.ds:
+				mark({"dataset": dataset.task, "action": "transmitFinished", "worker": worker, "mode": "local"})
 
 	def purge(self, action: ActionDatasetPurge) -> None:
 		self._validate_workers(set(action.at))
@@ -83,10 +92,12 @@ class SingleHostExecutor:
 			rbuf = shm_client.allocate(shmid, l)
 		except Exception:
 			# TODO remove, temporary hack until scheduler correctly aware
+			mark({"dataset": dataset_id.task, "action": "transmitFinished", "worker": worker, "mode": "redundant"})
 			logger.exception(f"store of {dataset_id} failed, presumably already computed")
 		else:
 			rbuf.view()[:l] = data
 			rbuf.close()
+			mark({"dataset": dataset_id.task, "action": "transmitFinished", "worker": worker, "mode": "remote"})
 
 	def wait_some(self, timeout_sec: int | None = None) -> list[Event]:
 		if self.eq.any():

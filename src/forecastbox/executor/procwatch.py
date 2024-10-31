@@ -6,9 +6,10 @@ for more control on queueing/reporting, and with process lifetime
 spanning only single task.
 """
 
+from typing import cast
 from cascade.executors.dask_futures import ExecutableSubgraph
 from multiprocessing.connection import wait
-from multiprocessing import Process, Pipe
+from multiprocessing import Process, get_context
 from dataclasses import dataclass
 from multiprocessing.connection import Connection
 from forecastbox.executor.entrypoint import entrypoint
@@ -35,17 +36,17 @@ class ProcWatch:
 	def __init__(self, size: int) -> None:
 		self.running: dict[int, ProcessHandle] = {}
 		self.status: dict[int, Status] = {}
-		self.subgraphs: dict[int, ExecutableSubgraph] = {}
+		self.subgraphs: dict[int, tuple[ExecutableSubgraph, dict[str, str]]] = {}
 		self.exit_codes: dict[int, int] = {}
 		self.last_inserted = -1
 		self.first_enqueued = 0
 		self.size = size
 
-	def submit(self, subgraph: ExecutableSubgraph) -> int:
+	def submit(self, subgraph: ExecutableSubgraph, tracingCtx: dict[str, str]) -> int:
 		"""May run if capacity, otherwise just enqueues and returns procId"""
 		self.last_inserted += 1  # we could have gone with uuid, but not really needed
 		self.status[self.last_inserted] = Status.enqueued
-		self.subgraphs[self.last_inserted] = subgraph
+		self.subgraphs[self.last_inserted] = (subgraph, tracingCtx)
 		self.spawn_available()
 		return self.last_inserted
 
@@ -58,19 +59,20 @@ class ProcWatch:
 				continue
 			if len(self.running) >= self.size:
 				break
-			handle = self.spawn(self.subgraphs.pop(self.first_enqueued))
+			handle = self.spawn(*self.subgraphs.pop(self.first_enqueued))
 			self.running[self.first_enqueued] = handle
 			self.status[self.first_enqueued] = Status.running
 			self.first_enqueued += 1
 
-	def spawn(self, subgraph: ExecutableSubgraph) -> ProcessHandle:
-		ex_snk, ex_src = Pipe(duplex=False)
-		p = Process(target=entrypoint, kwargs={"subgraph": subgraph, "ex_pipe": ex_src})
+	def spawn(self, subgraph: ExecutableSubgraph, tracingCtx: dict[str, str]) -> ProcessHandle:
+		ctx = get_context("fork")  # so far works, but switch to forkspawn if not
+		ex_snk, ex_src = ctx.Pipe(duplex=False)
+		p = ctx.Process(target=entrypoint, kwargs={"subgraph": subgraph, "ex_pipe": ex_src, "tracingCtx": tracingCtx})
 		logger.debug(f"about to start {subgraph=}")
 		p.start()
 		if not p.pid:
 			raise ValueError(f"failed to spawn a process for {subgraph=}")
-		return ProcessHandle(p, ex_snk)
+		return ProcessHandle(cast(Process, p), ex_snk)
 
 	def wait_some(self, timeout_sec: int | None) -> tuple[list[int], list[int]]:
 		"""Checks whether given have finished, freeing up capacity to run more and possibly spawning enqueued ones"""
