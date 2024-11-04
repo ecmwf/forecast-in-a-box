@@ -97,6 +97,7 @@ def task_entrypoint(
 	output_key = maybe_head(task.task.definition.output_schema.keys())
 	if not output_key:
 		raise ValueError(f"no output key for task {task.name}")
+	mark({"task": task.name, "action": "taskLoaded"})
 
 	prep_end = time.perf_counter_ns()
 	logger.debug(f"running {task.name} with {args=} and {kwargs=}")

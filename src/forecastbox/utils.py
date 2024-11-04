@@ -27,6 +27,7 @@ logging_config = {
 		"cascade": {"level": "INFO"},
 		"cascade.shm": {"level": "DEBUG"},
 		"cascade.controller": {"level": "DEBUG"},
+		"cascade.executors": {"level": "DEBUG"},
 		"httpcore": {"level": "ERROR"},
 		"httpx": {"level": "ERROR"},
 		"": {"level": "WARNING", "handlers": ["default"]},

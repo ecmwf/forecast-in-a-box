@@ -9,10 +9,11 @@ Notes:
 from dataclasses import dataclass
 from typing import Any
 import logging
+from threading import Condition
 
 from cascade.low.core import Environment, Worker, JobInstance, DatasetId
 from cascade.low.views import param_source
-from cascade.controller.core import Event, ActionDatasetTransmit, ActionSubmit, ActionDatasetPurge, WorkerId
+from cascade.controller.core import ActionDatasetTransmit, ActionSubmit, ActionDatasetPurge, WorkerId, Event
 from cascade.executors.dask_futures import build_subgraph
 from cascade.executors.instant import SimpleEventQueue
 import cascade.shm.client as shm_client
@@ -34,7 +35,8 @@ class Config:
 
 	def to_env(self) -> Environment:
 		return Environment(
-			workers={self.worker_name(i): Worker(memory_mb=self.mbs_per_process, cpu=1, gpu=0) for i in range(self.process_count)}
+			workers={self.worker_name(i): Worker(memory_mb=self.mbs_per_process, cpu=1, gpu=0) for i in range(self.process_count)},
+			colocations=[{self.worker_name(i) for i in range(self.process_count)}],
 		)
 
 
@@ -49,6 +51,7 @@ class SingleHostExecutor:
 		for k, v in tracingCtx.items():
 			label(k, v)
 		self.tracingCtx = tracingCtx
+		self.lock = Condition()
 
 	def _validate_workers(self, workers: set[str]) -> None:
 		if extra := workers - set(self.config.to_env().workers):
@@ -58,13 +61,22 @@ class SingleHostExecutor:
 		return self.config.to_env()
 
 	def submit(self, action: ActionSubmit) -> None:
-		self._validate_workers({action.at})
-		# NOTE we ignore the host assignment because the hosts are ~equivalent
-		subgraph = build_subgraph(action, self.job, self.param_source)
-		for task in subgraph.tasks:
-			mark({"task": task.name, "action": "taskEnqueued", "worker": action.at})
-		id_ = self.procwatch.submit(subgraph, {**self.tracingCtx, **{"worker": action.at}})
-		self.fid2action[id_] = action
+		logger.debug(f"acquiring lock on {action=}")
+		self.lock.acquire()
+		try:
+			logger.debug(f"acquired lock on {action=}")
+			self._validate_workers({action.at})
+			# NOTE we ignore the host assignment because the hosts are ~equivalent
+			subgraph = build_subgraph(action, self.job, self.param_source)
+			for task in subgraph.tasks:
+				mark({"task": task.name, "action": "taskEnqueued", "worker": action.at})
+			id_ = self.procwatch.submit(subgraph, {**self.tracingCtx, **{"worker": action.at}})
+			self.fid2action[id_] = action
+		finally:
+			logger.debug("about to notify on condition")
+			self.lock.notify()
+			logger.debug("about to release on condition")
+			self.lock.release()
 
 	def transmit(self, action: ActionDatasetTransmit) -> None:
 		# no-op because single shm
@@ -86,28 +98,48 @@ class SingleHostExecutor:
 		return shm_client.get(DataFuture.fromDsId(dataset_id).asShmId())
 
 	def store_value(self, worker: WorkerId, dataset_id: DatasetId, data: bytes) -> None:
-		shmid = DataFuture.fromDsId(dataset_id).asShmId()
-		l = len(data)
+		logger.debug(f"acquiring lock on store value {dataset_id=} {worker=}")
+		self.lock.acquire()
 		try:
-			rbuf = shm_client.allocate(shmid, l)
-		except Exception:
-			# TODO remove, temporary hack until scheduler correctly aware
-			mark({"dataset": dataset_id.task, "action": "transmitFinished", "worker": worker, "mode": "redundant"})
-			logger.exception(f"store of {dataset_id} failed, presumably already computed")
-		else:
-			rbuf.view()[:l] = data
-			rbuf.close()
-			mark({"dataset": dataset_id.task, "action": "transmitFinished", "worker": worker, "mode": "remote"})
+			logger.debug(f"acquired lock on store value {dataset_id=} {worker=}")
+			shmid = DataFuture.fromDsId(dataset_id).asShmId()
+			l = len(data)
+			try:
+				rbuf = shm_client.allocate(shmid, l)
+			except Exception:
+				# TODO remove, temporary hack until planner correctly fuses transmits
+				mark({"dataset": dataset_id.task, "action": "transmitFinished", "worker": worker, "mode": "redundant"})
+				logger.exception(f"store of {dataset_id} failed, presumably already computed")
+			else:
+				rbuf.view()[:l] = data
+				rbuf.close()
+				mark({"dataset": dataset_id.task, "action": "transmitFinished", "worker": worker, "mode": "remote"})
+			self.procwatch.available_datasets.add(dataset_id)
+			self.procwatch.spawn_available()
+		finally:
+			logger.debug("about to notify on condition")
+			self.lock.notify()
+			logger.debug("about to release on condition")
+			self.lock.release()
 
 	def wait_some(self, timeout_sec: int | None = None) -> list[Event]:
-		if self.eq.any():
-			return self.eq.drain()
+		logger.debug("acquiring lock on wait_some")
+		self.lock.acquire()
+		try:
+			logger.debug("acquired lock on wait_some")
+			if self.eq.any():
+				return self.eq.drain()
 
-		ok, finished = self.procwatch.wait_some(timeout_sec)
-		for e in finished:
-			# TODO read exception, propagate
-			logger.error(f"future {e} corresponding to {self.fid2action[e]} failed")
-			self.eq.submit_failed(self.fid2action.pop(e))
-		for e in ok:
-			self.eq.submit_done(self.fid2action.pop(e))
-		return self.eq.drain()
+			ok, finished = self.procwatch.wait_some(timeout_sec, self.lock)
+			for e in finished:
+				# TODO read exception, propagate
+				logger.error(f"future {e} corresponding to {self.fid2action[e]} failed")
+				self.eq.submit_failed(self.fid2action.pop(e))
+			for e in ok:
+				self.eq.submit_done(self.fid2action.pop(e))
+			return self.eq.drain()
+		finally:
+			logger.debug("about to notify on condition")
+			self.lock.notify()
+			logger.debug("about to release on condition")
+			self.lock.release()
