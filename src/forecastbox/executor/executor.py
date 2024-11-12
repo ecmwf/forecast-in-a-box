@@ -7,7 +7,7 @@ Notes:
 """
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 import logging
 from threading import Condition
 
@@ -29,9 +29,10 @@ logger = logging.getLogger(__name__)
 class Config:
 	process_count: int
 	mbs_per_process: int  # for capacity allocation purposes, not really tracked
+	host_id: str
 
 	def worker_name(self, i: int) -> str:
-		return f"worker{i}"
+		return f"{self.host_id}:w{i}"
 
 	def to_env(self) -> Environment:
 		return Environment(
@@ -41,16 +42,14 @@ class Config:
 
 
 class SingleHostExecutor:
-	def __init__(self, config: Config, job: JobInstance, tracingCtx: dict[str, str]):
+	def __init__(self, config: Config, job: JobInstance):
 		self.config = config
 		self.procwatch = ProcWatch(self.config.process_count)
 		self.eq = SimpleEventQueue()
 		self.job = job
 		self.param_source = param_source(job.edges)
 		self.fid2action: dict[int, ActionSubmit] = {}
-		for k, v in tracingCtx.items():
-			label(k, v)
-		self.tracingCtx = tracingCtx
+		label("host", config.host_id)
 		self.lock = Condition()
 
 	def _validate_workers(self, workers: set[str]) -> None:
@@ -70,7 +69,7 @@ class SingleHostExecutor:
 			subgraph = build_subgraph(action, self.job, self.param_source)
 			for task in subgraph.tasks:
 				mark({"task": task.name, "action": "taskEnqueued", "worker": action.at})
-			id_ = self.procwatch.submit(subgraph, {**self.tracingCtx, **{"worker": action.at}})
+			id_ = self.procwatch.submit(subgraph, {"worker": action.at})
 			self.fid2action[id_] = action
 		finally:
 			logger.debug("about to notify on condition")
@@ -122,6 +121,9 @@ class SingleHostExecutor:
 			logger.debug("about to release on condition")
 			self.lock.release()
 
+	def shutdown(self) -> None:
+		self.procwatch.join()
+
 	def wait_some(self, timeout_sec: int | None = None) -> list[Event]:
 		logger.debug("acquiring lock on wait_some")
 		self.lock.acquire()
@@ -143,3 +145,6 @@ class SingleHostExecutor:
 			self.lock.notify()
 			logger.debug("about to release on condition")
 			self.lock.release()
+
+	def register_event_callback(self, callback: Callable[[Event], None]) -> None:
+		self.procwatch.event_callbacks.append(callback)

@@ -10,6 +10,7 @@ import cascade.shm.client as shm_client
 from forecastbox.executor.futures import DataFuture
 from cascade.executors.dask_futures import ExecutableSubgraph, ExecutableTaskInstance
 from cascade.low.core import TaskDefinition, NO_OUTPUT_PLACEHOLDER, DatasetId
+from cascade.controller.core import Event, TaskStatus, DatasetStatus
 from contextlib import AbstractContextManager
 from multiprocessing.connection import Connection
 from forecastbox.worker.environment_manager import Environment
@@ -132,18 +133,39 @@ def task_entrypoint(
 	logger.debug(f"post elapsed {(end-run_end)/1e9: .5f} s in {task.name}")
 
 
-def entrypoint(subgraph: ExecutableSubgraph, ex_pipe: Connection, tracingCtx: dict[str, str]) -> None:
-	for k, v in tracingCtx.items():
-		label(k, v)
-	start = time.perf_counter_ns()
-	local_mems: dict[DatasetId, Any] = {}
-	with ExceptionReporter(ex_pipe), ExecutionMemoryManager() as sh_mems:
-		logging.config.dictConfig(logging_config)
-		for task in subgraph.tasks:
-			environment = task.task.definition.environment
-			with Environment(environment):
-				task_entrypoint(task, local_mems, sh_mems, subgraph.published_outputs)
-				# TODO del local_mems items that wont be needed later
+def entrypoint(
+	subgraph: ExecutableSubgraph, ex_pipe: Connection, tracingCtx: dict[str, str], event_callbacks: list[Callable[[Event], None]]
+) -> None:
+	worker = "unknown"
+	try:
+		worker = tracingCtx["worker"]
+		for k, v in tracingCtx.items():
+			label(k, v)
+		start = time.perf_counter_ns()
+		local_mems: dict[DatasetId, Any] = {}
+		with ExceptionReporter(ex_pipe), ExecutionMemoryManager() as sh_mems:
+			logging.config.dictConfig(logging_config)
+			for task in subgraph.tasks:
+				environment = task.task.definition.environment
+				with Environment(environment):
+					task_entrypoint(task, local_mems, sh_mems, subgraph.published_outputs)
+					# TODO del local_mems items that wont be needed later
 
-	end = time.perf_counter_ns()
-	logger.debug(f"subgraph elapsed {(end-start)/1e9: .5f} s")
+		end = time.perf_counter_ns()
+		logger.debug(f"subgraph elapsed {(end-start)/1e9: .5f} s")
+
+		event = Event(
+			at=worker,
+			ts_trans=[(task.name, TaskStatus.succeeded) for task in subgraph.tasks],
+			ds_trans=[(dataset, DatasetStatus.available) for dataset in subgraph.published_outputs],
+		)
+		for callback in event_callbacks:
+			callback(event)
+	except Exception:
+		event = Event(
+			at=worker,
+			ts_trans=[(task.name, TaskStatus.failed) for task in subgraph.tasks],
+			ds_trans=[],
+		)
+		for callback in event_callbacks:
+			callback(event)

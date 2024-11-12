@@ -6,7 +6,11 @@ for more control on queueing/reporting, and with process lifetime
 spanning only single task.
 """
 
-from typing import cast
+# TODO this class got quite messy with the introduction of callbacks and is highly coupled
+# with executor. Clear out responsibilities, break out into isolated queue classes, etc
+
+from cascade.controller.core import Event
+from typing import cast, Callable
 from cascade.executors.dask_futures import ExecutableSubgraph
 from cascade.low.core import DatasetId
 from multiprocessing.connection import wait
@@ -49,6 +53,9 @@ class ProcWatch:
 		self.last_inserted = -1
 		self.first_enqueued = 0
 		self.size = size
+		self.event_callbacks: list[Callable[[Event], None]] = []
+		self.finished_ok: list[int] = []
+		self.finished_fail: list[int] = []
 
 	def submit(self, subgraph: ExecutableSubgraph, tracingCtx: dict[str, str]) -> int:
 		"""May run if capacity, otherwise just enqueues and returns procId"""
@@ -66,16 +73,43 @@ class ProcWatch:
 			else:
 				break
 
-	def spawn_available(self) -> None:
+	def _consolidate_running(self, should_wait: set[int] = set()) -> None:
+		running = list(self.running.keys())
+		logger.debug(f"consolidate running of {running}")
+		for k in running:
+			# TODO this join is sadly necessary for the zmq backbone case with too fast roundtrips
+			# refactor things so that a callback is introduced to properly comm here too
+			if k in should_wait:
+				self.running[k].p.join()
+			logger.debug(f"the exit code is {self.running[k].p.exitcode}")
+			if (ex := self.running[k].p.exitcode) is not None:
+				logger.debug(f"{k} finished with {ex}")
+				# TODO report exceptions from pipe, join?
+				self.exit_codes[k] = ex
+				self.running.pop(k)
+				if ex == 0:
+					self.finished_ok.append(k)
+					self.status[k] = Status.succeeded
+					self.available_datasets.update(self.subgraphs[k][0].published_outputs)
+				else:
+					self.finished_fail.append(k)
+					self.status[k] = Status.failed
+				self.subgraphs.pop(k)
+
+	def spawn_available(self, should_wait: set[int] = set()) -> None:
 		"""Spawns new processes until `size` of them running / none enqueued"""
-		logger.debug(f"checking spawn available with {self.first_enqueued=}, {self.last_inserted=}, and {len(self.running)=}")
 		self._advance_enqueued()
+		self._consolidate_running(should_wait)
+		logger.debug(f"checking spawn available with {self.first_enqueued=}, {self.last_inserted=}, and {len(self.running)=}")
 		i = self.first_enqueued
+
 		while i <= self.last_inserted:
+			logger.debug(f"considering {i} with status {self.status[i]}")
 			if self.status[i] != Status.enqueued:
 				i += 1
 				continue
 			if not runnable(self.available_datasets, self.subgraphs[i][0]):
+				logger.debug(f"{i} is not runnable due to datasets: {self.available_datasets} and {self.subgraphs[i][0]}")
 				i += 1
 				continue
 			if len(self.running) >= self.size:
@@ -87,7 +121,10 @@ class ProcWatch:
 	def spawn(self, subgraph: ExecutableSubgraph, tracingCtx: dict[str, str]) -> ProcessHandle:
 		ctx = get_context("fork")  # so far works, but switch to forkspawn if not
 		ex_snk, ex_src = ctx.Pipe(duplex=False)
-		p = ctx.Process(target=entrypoint, kwargs={"subgraph": subgraph, "ex_pipe": ex_src, "tracingCtx": tracingCtx})
+		p = ctx.Process(
+			target=entrypoint,
+			kwargs={"subgraph": subgraph, "ex_pipe": ex_src, "tracingCtx": tracingCtx, "event_callbacks": self.event_callbacks},
+		)
 		logger.debug(f"about to start {subgraph=}")
 		p.start()
 		if not p.pid:
@@ -97,41 +134,30 @@ class ProcWatch:
 	def wait_some(self, timeout_sec: int | None, condition: Condition) -> tuple[list[int], list[int]]:
 		"""Checks whether given have finished, freeing up capacity to run more and possibly spawning enqueued ones"""
 		while True:
-			while True:
-				running = list(self.running.keys())
-				if len(running) == 0:
-					self._advance_enqueued()
-					if self.first_enqueued >= self.last_inserted:
-						logger.debug("nothing enqueued and nothing running -- empty wait")
-						return [], []
-					else:
-						logger.debug("wait until something is enqueued")
-						logger.debug(f"still in queue: {self.status[self.first_enqueued]}, {self.subgraphs[self.first_enqueued]}")
-						condition.wait()
-						logger.debug("condition satisfied, resuming")
-				else:
+			if len(self.running) == 0:
+				self._advance_enqueued()
+				if self.first_enqueued >= self.last_inserted:
+					logger.debug("nothing enqueued and nothing running -- empty wait")
 					break
-			sentinels = [self.running[k].p.sentinel for k in running]
-			logger.debug(f"wait for {running=}")
+				else:
+					logger.debug("wait until something is enqueued")
+					logger.debug(f"still in queue: {self.status[self.first_enqueued]}, {self.subgraphs[self.first_enqueued]}")
+					condition.wait()
+					logger.debug("condition satisfied, resuming")
+			else:
+				break
+		sentinels = [self.running[k].p.sentinel for k in self.running]
+		if sentinels:
+			logger.debug(f"wait for {len(sentinels)=} processes")
 			_ = wait(sentinels, timeout_sec)
-			ok: list[int] = list()
-			fail: list[int] = list()
 
-			for k in running:
-				if (ex := self.running[k].p.exitcode) is not None:
-					# TODO report exceptions from pipe, join?
-					self.exit_codes[k] = ex
-					self.running.pop(k)
-					if ex == 0:
-						ok.append(k)
-						self.status[k] = Status.succeeded
-						self.available_datasets.update(self.subgraphs[k][0].published_outputs)
-					else:
-						fail.append(k)
-						self.status[k] = Status.failed
-					self.subgraphs.pop(k)
-			self.spawn_available()
-			return ok, fail
+		self._consolidate_running()
+		self.spawn_available()
+		ok = self.finished_ok
+		fail = self.finished_fail
+		self.finished_ok = []
+		self.finished_fail = []
+		return ok, fail
 
 	def join(self) -> None:
 		for k, h in self.running.items():
