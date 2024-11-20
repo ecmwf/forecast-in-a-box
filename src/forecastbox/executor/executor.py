@@ -17,7 +17,7 @@ from cascade.controller.core import ActionDatasetTransmit, ActionSubmit, ActionD
 from cascade.executors.dask_futures import build_subgraph
 from cascade.executors.instant import SimpleEventQueue
 import cascade.shm.client as shm_client
-from cascade.controller.tracing import mark, label
+from cascade.controller.tracing import mark, label, TaskLifecycle, TransmitLifecycle
 
 from forecastbox.executor.procwatch import ProcWatch
 from forecastbox.executor.futures import DataFuture
@@ -68,7 +68,7 @@ class SingleHostExecutor:
 			# NOTE we ignore the host assignment because the hosts are ~equivalent
 			subgraph = build_subgraph(action, self.job, self.param_source)
 			for task in subgraph.tasks:
-				mark({"task": task.name, "action": "taskEnqueued", "worker": action.at})
+				mark({"task": task.name, "action": TaskLifecycle.enqueued, "worker": action.at})
 			id_ = self.procwatch.submit(subgraph, {"worker": action.at})
 			self.fid2action[id_] = action
 		finally:
@@ -83,7 +83,8 @@ class SingleHostExecutor:
 		self.eq.transmit_done(action)
 		for worker in action.to:
 			for dataset in action.ds:
-				mark({"dataset": dataset.task, "action": "transmitFinished", "worker": worker, "mode": "local"})
+				mark({"dataset": dataset.task, "action": TransmitLifecycle.received, "worker": worker, "mode": "local"})
+				mark({"dataset": dataset.task, "action": TransmitLifecycle.unloaded, "worker": worker, "mode": "local"})
 
 	def purge(self, action: ActionDatasetPurge) -> None:
 		self._validate_workers(set(action.at))
@@ -97,6 +98,7 @@ class SingleHostExecutor:
 		return shm_client.get(DataFuture.fromDsId(dataset_id).asShmId())
 
 	def store_value(self, worker: WorkerId, dataset_id: DatasetId, data: bytes) -> None:
+		mark({"dataset": dataset_id.task, "action": TransmitLifecycle.received, "target": worker})
 		logger.debug(f"acquiring lock on store value {dataset_id=} {worker=}")
 		self.lock.acquire()
 		try:
@@ -106,13 +108,14 @@ class SingleHostExecutor:
 			try:
 				rbuf = shm_client.allocate(shmid, l)
 			except Exception:
-				# TODO remove, temporary hack until planner correctly fuses transmits
-				mark({"dataset": dataset_id.task, "action": "transmitFinished", "worker": worker, "mode": "redundant"})
+				# NOTE this branch is for situations where the controller issued redundantly two transmits
+				# TODO check that the exception is truly a Conflict, or even better, remove this branch altogether
+				mark({"dataset": dataset_id.task, "action": TransmitLifecycle.unloaded, "target": worker, "mode": "redundant"})
 				logger.exception(f"store of {dataset_id} failed, presumably already computed")
 			else:
 				rbuf.view()[:l] = data
 				rbuf.close()
-				mark({"dataset": dataset_id.task, "action": "transmitFinished", "worker": worker, "mode": "remote"})
+				mark({"dataset": dataset_id.task, "action": TransmitLifecycle.unloaded, "target": worker, "mode": "remote"})
 			self.procwatch.available_datasets.add(dataset_id)
 			self.procwatch.spawn_available()
 		finally:

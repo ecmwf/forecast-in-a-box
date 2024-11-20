@@ -19,7 +19,7 @@ import forecastbox.worker.serde as serde
 from forecastbox.utils import logging_config, ensure, maybe_head
 import logging
 import importlib
-from cascade.controller.tracing import mark, label
+from cascade.controller.tracing import mark, label, TaskLifecycle, Microtrace, timer, trace
 
 logger = logging.getLogger(__name__)
 
@@ -50,12 +50,12 @@ class ExecutionMemoryManager(AbstractContextManager):
 			logger.debug(f"opening dataset {shmid}")
 			self.mems[shmid] = shm_client.get(shmid)
 		raw = self.mems[shmid].view()
-		rv = serde.from_bytes(raw, annotation)
+		rv = timer(serde.from_bytes, Microtrace.wrk_deser)(raw, annotation)
 		logger.debug(f"deser into {annotation} done")
 		return rv
 
 	def put(self, data: Any, shmid: str, annotation: str) -> None:
-		result_ser = serde.to_bytes(data, annotation)
+		result_ser = timer(serde.to_bytes, Microtrace.wrk_ser)(data, annotation)
 		l = len(result_ser)
 		rbuf = shm_client.allocate(shmid, l)
 		rbuf.view()[:l] = result_ser
@@ -70,7 +70,7 @@ class ExecutionMemoryManager(AbstractContextManager):
 def task_entrypoint(
 	task: ExecutableTaskInstance, local_mems: dict[DatasetId, Any], sh_mems: ExecutionMemoryManager, published_outputs: set[DatasetId]
 ) -> None:
-	mark({"task": task.name, "action": "taskStarted"})
+	mark({"task": task.name, "action": TaskLifecycle.started})
 	start = time.perf_counter_ns()
 
 	args: list[Any] = []
@@ -98,13 +98,14 @@ def task_entrypoint(
 	output_key = maybe_head(task.task.definition.output_schema.keys())
 	if not output_key:
 		raise ValueError(f"no output key for task {task.name}")
-	mark({"task": task.name, "action": "taskLoaded"})
+	mark({"task": task.name, "action": TaskLifecycle.loaded})
 
 	prep_end = time.perf_counter_ns()
 	logger.debug(f"running {task.name} with {args=} and {kwargs=}")
 	kallable = get_callable(task.task.definition)
 	result = kallable(*args, **kwargs)
 	run_end = time.perf_counter_ns()
+	mark({"task": task.name, "action": TaskLifecycle.computed})
 
 	output_schema = task.task.definition.output_schema[output_key]
 	if output_key == NO_OUTPUT_PLACEHOLDER:
@@ -126,10 +127,14 @@ def task_entrypoint(
 
 	end = time.perf_counter_ns()
 
-	mark({"task": task.name, "action": "taskFinished"})
+	mark({"task": task.name, "action": TaskLifecycle.published})
+	trace(Microtrace.wrk_task, end - start)
 	logger.debug(f"outer elapsed {(end-start)/1e9: .5f} s in {task.name}")
+	trace(Microtrace.wrk_load, prep_end - start)
 	logger.debug(f"prep elapsed {(prep_end-start)/1e9: .5f} s in {task.name}")
+	trace(Microtrace.wrk_compute, run_end - prep_end)
 	logger.debug(f"inner elapsed {(run_end-prep_end)/1e9: .5f} s in {task.name}")
+	trace(Microtrace.wrk_publish, end - run_end)
 	logger.debug(f"post elapsed {(end-run_end)/1e9: .5f} s in {task.name}")
 
 
