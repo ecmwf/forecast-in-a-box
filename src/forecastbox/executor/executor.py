@@ -13,7 +13,7 @@ from threading import Condition
 
 from cascade.low.core import Environment, Worker, JobInstance, DatasetId
 from cascade.low.views import param_source
-from cascade.controller.core import ActionDatasetTransmit, ActionSubmit, ActionDatasetPurge, WorkerId, Event
+from cascade.controller.core import ActionDatasetTransmit, ActionSubmit, ActionDatasetPurge, WorkerId, Event, DatasetStatus
 from cascade.executors.dask_futures import build_subgraph
 from cascade.executors.instant import SimpleEventQueue
 import cascade.shm.client as shm_client
@@ -116,8 +116,15 @@ class SingleHostExecutor:
 				rbuf.view()[:l] = data
 				rbuf.close()
 				mark({"dataset": dataset_id.task, "action": TransmitLifecycle.unloaded, "target": worker, "mode": "remote"})
+			event = Event(at=worker, ts_trans=[], ds_trans=[(dataset_id, DatasetStatus.available)])
+			for callback in self.procwatch.event_callbacks:
+				callback(event)
 			self.procwatch.available_datasets.add(dataset_id)
 			self.procwatch.spawn_available()
+		except Exception as ex:
+			event = Event(failures=[f"data transmit of {dataset_id} failed with {repr(ex)}"], at=worker)
+			for callback in self.procwatch.event_callbacks:
+				callback(event)
 		finally:
 			logger.debug("about to notify on condition")
 			self.lock.notify()
