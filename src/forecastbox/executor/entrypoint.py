@@ -5,6 +5,7 @@ The wrapper for executing ExecutableSubgraph with various contexts
 # TODO unify this with worker/entrypoint
 
 import time
+import os
 from typing import Callable, Any, Literal
 import cascade.shm.client as shm_client
 from forecastbox.executor.futures import DataFuture
@@ -138,12 +139,23 @@ def task_entrypoint(
 	logger.debug(f"post elapsed {(end-run_end)/1e9: .5f} s in {task.name}")
 
 
+def gpu_torch_quickwin(self, worker_id: str) -> None:
+	# TODO drop this and solve properly in cascade.worker. The existence
+	# of gpu should be declared in the config.sh, affect the slurm queue *and*
+	# zmq spec, which should propagate to Environment, from which it should end up
+	# here, including properly derived id
+	if os.environ.get("CASCADE_GPU") == "WOOHOO":
+		gpu_id = worker_id.split(":", 1)[1][1:]
+		os.environ["CUDA_VISIBLE_DEVICES"] = gpu_id
+
+
 def entrypoint(
 	subgraph: ExecutableSubgraph, ex_pipe: Connection, tracingCtx: dict[str, str], event_callbacks: list[Callable[[Event], None]]
 ) -> None:
 	worker = "unknown"
 	try:
 		worker = tracingCtx["worker"]
+		gpu_torch_quickwin(worker)
 		for k, v in tracingCtx.items():
 			label(k, v)
 		start = time.perf_counter_ns()
