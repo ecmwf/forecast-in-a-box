@@ -179,6 +179,9 @@ def entrypoint(
 		for callback in event_callbacks:
 			callback(event)
 	except Exception:
+		# TODO log becomes redundant once the ExceptionReporter's other end starts reporting/reacting -- remove by then
+		# NOTE ideally rething the whole interaction between Callback and ExceptionReporter -- combine/coop?
+		logger.exception("about to report task crash because of exception")
 		event = Event(
 			at=worker,
 			ts_trans=[(task.name, TaskStatus.failed) for task in subgraph.tasks],
