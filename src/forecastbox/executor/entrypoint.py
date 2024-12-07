@@ -139,7 +139,7 @@ def task_entrypoint(
 	logger.debug(f"post elapsed {(end-run_end)/1e9: .5f} s in {task.name}")
 
 
-def gpu_torch_quickwin(self, worker_id: str) -> None:
+def gpu_torch_quickwin(worker_id: str) -> None:
 	# TODO drop this and solve properly in cascade.worker. The existence
 	# of gpu should be declared in the config.sh, affect the slurm queue *and*
 	# zmq spec, which should propagate to Environment, from which it should end up
