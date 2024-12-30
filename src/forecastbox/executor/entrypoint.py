@@ -20,7 +20,7 @@ import forecastbox.worker.serde as serde
 from forecastbox.utils import logging_config, ensure, maybe_head
 import logging
 import importlib
-from cascade.controller.tracing import mark, label, TaskLifecycle, Microtrace, timer, trace
+from cascade.low.tracing import mark, label, TaskLifecycle, Microtrace, timer, trace
 
 logger = logging.getLogger(__name__)
 

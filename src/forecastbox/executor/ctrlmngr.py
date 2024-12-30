@@ -7,13 +7,13 @@ Currently supports only one active instance at a time
 # to have something better, we'd need better monitoring capabilities on the executor/controller interfaces first
 # afterwards, we'll extend message passing from the Process here to this class, and accordingly server endpoints
 
-from cascade.low.core import JobInstance, JobExecutionRecord, DatasetId
+from cascade.low.core import JobInstance, DatasetId
 from cascade.controller.impl import run
 from forecastbox.utils import logging_config
 from forecastbox.executor.executor import SingleHostExecutor, Config as ExecutorConfig
 import cascade.shm.api as shm_api
 from forecastbox.executor.futures import DataFuture
-from cascade.scheduler.impl import naive_bfs_layers
+from cascade.scheduler.graph import precompute
 from multiprocessing import Process
 from cascade.low.views import dependants
 import cascade.shm.server as shm_server
@@ -29,8 +29,8 @@ def job_entrypoint(job: JobInstance) -> None:
 	shm_client.ensure()
 	mem = 2048  #  TODO get the memory right
 	executor = SingleHostExecutor(ExecutorConfig(1, mem, "Fiab"), job)
-	schedule = naive_bfs_layers(job, JobExecutionRecord(), set()).get_or_raise()
-	run(job, executor, schedule)
+	preschedule = precompute(job)
+	run(job, executor, preschedule)
 
 
 class ControllerManager:
