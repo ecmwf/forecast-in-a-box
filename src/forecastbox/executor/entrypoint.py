@@ -10,7 +10,7 @@ from typing import Callable, Any, Literal
 import cascade.shm.client as shm_client
 from forecastbox.executor.futures import DataFuture
 from cascade.executors.dask_futures import ExecutableSubgraph, ExecutableTaskInstance
-from cascade.low.core import TaskDefinition, NO_OUTPUT_PLACEHOLDER, DatasetId
+from cascade.low.core import TaskDefinition, NO_OUTPUT_PLACEHOLDER, DatasetId, WorkerId
 from cascade.controller.core import Event, TaskStatus, DatasetStatus
 from contextlib import AbstractContextManager
 from multiprocessing.connection import Connection
@@ -139,13 +139,13 @@ def task_entrypoint(
 	logger.debug(f"post elapsed {(end-run_end)/1e9: .5f} s in {task.name}")
 
 
-def gpu_torch_quickwin(worker_id: str) -> None:
+def gpu_torch_quickwin(worker_id: WorkerId) -> None:
 	# TODO drop this and solve properly in cascade.worker. The existence
 	# of gpu should be declared in the config.sh, affect the slurm queue *and*
 	# zmq spec, which should propagate to Environment, from which it should end up
 	# here, including properly derived id
 	if os.environ.get("CASCADE_GPU") == "WOOHOO":
-		gpu_id = worker_id.split(":", 1)[1][1:]
+		gpu_id = worker_id.worker_num()
 		os.environ["CUDA_VISIBLE_DEVICES"] = gpu_id
 
 
@@ -154,7 +154,7 @@ def entrypoint(
 ) -> None:
 	worker = "unknown"
 	try:
-		worker = tracingCtx["worker"]
+		worker = WorkerId.from_repr(tracingCtx["worker"])
 		gpu_torch_quickwin(worker)
 		for k, v in tracingCtx.items():
 			label(k, v)

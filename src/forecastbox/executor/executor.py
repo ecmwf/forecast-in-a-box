@@ -11,9 +11,9 @@ from typing import Any, Callable
 import logging
 from threading import Condition
 
-from cascade.low.core import Environment, Worker, JobInstance, DatasetId
+from cascade.low.core import Environment, Worker, JobInstance, DatasetId, WorkerId
 from cascade.low.views import param_source
-from cascade.controller.core import ActionDatasetTransmit, ActionSubmit, ActionDatasetPurge, WorkerId, Event, DatasetStatus
+from cascade.controller.core import ActionDatasetTransmit, ActionSubmit, ActionDatasetPurge, Event, DatasetStatus
 from cascade.executors.dask_futures import build_subgraph
 from cascade.executors.instant import SimpleEventQueue
 import cascade.shm.client as shm_client
@@ -31,13 +31,12 @@ class Config:
 	mbs_per_process: int  # for capacity allocation purposes, not really tracked
 	host_id: str
 
-	def worker_name(self, i: int) -> str:
-		return f"{self.host_id}:w{i}"
+	def worker_name(self, i: int) -> WorkerId:
+		return WorkerId(f"{self.host_id}", f"w{i}")
 
 	def to_env(self) -> Environment:
 		return Environment(
 			workers={self.worker_name(i): Worker(memory_mb=self.mbs_per_process, cpu=1, gpu=0) for i in range(self.process_count)},
-			colocations=[{self.worker_name(i) for i in range(self.process_count)}],
 		)
 
 
@@ -64,7 +63,7 @@ class SingleHostExecutor:
 			subgraph = build_subgraph(action, self.job, self.param_source)
 			for task in subgraph.tasks:
 				mark({"task": task.name, "action": TaskLifecycle.enqueued, "worker": repr(action.at)})
-			id_ = self.procwatch.submit(subgraph, {"worker": action.at.worker})
+			id_ = self.procwatch.submit(subgraph, {"worker": repr(action.at)})
 			self.fid2action[id_] = action
 		finally:
 			logger.debug("about to notify on condition")
