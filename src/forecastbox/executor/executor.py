@@ -103,7 +103,7 @@ class SingleHostExecutor:
 				# NOTE this branch is for situations where the controller issued redundantly two transmits
 				# TODO check that the exception is truly a Conflict, or even better, remove this branch altogether
 				mark({"dataset": dataset_id.task, "action": TransmitLifecycle.unloaded, "target": repr(worker), "mode": "redundant"})
-				logger.exception(f"store of {dataset_id} failed, presumably already computed")
+				logger.warning(f"store of {dataset_id} failed, presumably already computed; continuing")
 			else:
 				rbuf.view()[:l] = data
 				rbuf.close()
