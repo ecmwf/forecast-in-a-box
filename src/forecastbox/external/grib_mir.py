@@ -12,6 +12,9 @@ def transform(
 	input_grib: mir.GribMemoryInput,
 	area: str,
 ) -> bytes:
+	if not isinstance(input_grib, mir.GribMemoryInput):
+		# NOTE this is because the grib mir job is not compatible with no-implicit-casting in cascade
+		raise TypeError
 	logger.error(f"starting mir transform with {area=}")
 	logger.error("constructed input")
 	buf = bytearray(64 * 1024 * 1024)  # TODO what is the optimal size? Should we calculate it? Cant the mir allocate dynamically?

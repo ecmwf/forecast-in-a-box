@@ -5,6 +5,7 @@ Support for automated serde for Task outputs and dynamic inputs
 from typing import Any, Protocol, runtime_checkable, Callable, Optional, Type, cast
 from dataclasses import dataclass
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,20 @@ def mir_grib_from_bytes(v: memoryview) -> Any:
 	return mir.GribMemoryInput(v)
 
 
+def eka_to_bytes(v: Any) -> bytes:
+	# hack for cascade jobs
+	import cloudpickle
+
+	return cloudpickle.dumps(v)
+
+
+def eka_from_bytes(v: memoryview) -> Any:
+	# hack for cascade jobs
+	import cloudpickle
+
+	return cloudpickle.loads(v)
+
+
 registry: dict[str, SerDer] = {
 	"bytes": SerDerDc(ser=lambda b: b, des=lambda b: b),
 	"str": SerDerDc(ser=lambda s: s.encode("ascii"), des=lambda b: bytes(b).decode("ascii")),
@@ -80,6 +95,7 @@ registry: dict[str, SerDer] = {
 	"ndarray": SerDerDc(ser=np_to_bytes, des=np_from_bytes),
 	"grib.earthkit": SerDerDc(ser=lambda b: b, des=ekd_grib_from_bytes),
 	"grib.mir": SerDerDc(ser=lambda b: b, des=mir_grib_from_bytes),
+	"ArrayFieldList": SerDerDc(ser=eka_to_bytes, des=eka_from_bytes),
 }
 
 
@@ -110,14 +126,23 @@ def to_bytes(v: Any, annotation: Optional[str] = None) -> bytes:
 		klazz = annotation
 	serder = find_registry(klazz)
 	if not serder:
-		raise ValueError(f"failed to serialize {v.__class__} with {annotation=}")
+		raise ValueError(f"failed to serialize {v.__class__} with {annotation=} and {v.__class__.__name__=}")
 	return serder.to_bytes(v)
+
+
+def default_deser(b: memoryview) -> Any:
+	if os.environ.get("CLOUDPICKLE", "no") == "yes":  # hack for cascade jobs
+		import cloudpickle
+
+		return cloudpickle.loads(b)
+	else:
+		return b
 
 
 def from_bytes(b: memoryview, annotation: str) -> Any:
 	if annotation == "Any":
 		# presumed to be untyped lambda / unsupported serde -> done on user level
-		return b
+		return default_deser(b)
 	serder = find_registry(annotation)
 	if not serder:
 		raise ValueError(f"failed to deserialize {annotation}")

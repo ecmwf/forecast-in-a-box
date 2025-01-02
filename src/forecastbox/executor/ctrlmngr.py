@@ -7,36 +7,40 @@ Currently supports only one active instance at a time
 # to have something better, we'd need better monitoring capabilities on the executor/controller interfaces first
 # afterwards, we'll extend message passing from the Process here to this class, and accordingly server endpoints
 
-from cascade.low.core import JobInstance
-from cascade.controller.impl import CascadeController
-from forecastbox.executor.executor import SingleHostExecutor
+from cascade.low.core import JobInstance, JobExecutionRecord, DatasetId
+from cascade.controller.impl import run
+from forecastbox.utils import logging_config
+from forecastbox.executor.executor import SingleHostExecutor, Config as ExecutorConfig
+import cascade.shm.api as shm_api
 from forecastbox.executor.futures import DataFuture
-from cascade.low.scheduler import schedule as scheduler
-from multiprocessing.managers import DictProxy
-from forecastbox.executor.shmdb import ShmDb
+from cascade.scheduler.impl import naive_bfs_layers
 from multiprocessing import Process
-from multiprocessing import Manager
 from cascade.low.views import dependants
+import cascade.shm.server as shm_server
+import cascade.shm.client as shm_client
 from typing import Iterator
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-def job_entrypoint(job: JobInstance, shmd: DictProxy) -> None:
+def job_entrypoint(job: JobInstance) -> None:
 	logger.debug(job)
-	controller = CascadeController()
-	executor = SingleHostExecutor(shmd)
-	schedule = scheduler(job, executor.get_environment()).get_or_raise()
-	controller.submit(job, schedule, executor)
-	executor.procwatch.join()
+	shm_client.ensure()
+	mem = 2048  #  TODO get the memory right
+	executor = SingleHostExecutor(ExecutorConfig(1, mem, "Fiab"), job)
+	schedule = naive_bfs_layers(job, JobExecutionRecord(), set()).get_or_raise()
+	run(job, executor, schedule)
 
 
 class ControllerManager:
 	def __init__(self) -> None:
 		self.p: Process | None = None
-		self.mem_manager = Manager()
-		self.shmd = self.mem_manager.dict()
+		gb4 = 4 * (1024**3)
+		port = 12345
+		shm_api.publish_client_port(port)
+		self.shm = Process(target=shm_server.entrypoint, args=(port, gb4, logging_config))
+		self.shm.start()
 		self.outputs: list[DataFuture] = []
 
 	def newJob(self, job: JobInstance) -> None:
@@ -44,11 +48,9 @@ class ControllerManager:
 			if self.p.exitcode is None:
 				raise ValueError("there is a job in progress")
 			else:
-				# NOTE perhaps more fine grained teardown
 				self.p.join()
-				ShmDb(self.shmd).purge_all()
 
-		self.p = Process(target=job_entrypoint, kwargs={"job": job, "shmd": self.shmd})
+		self.p = Process(target=job_entrypoint, kwargs={"job": job})
 		self.p.start()
 
 		outputDependants = dependants(job.edges)
@@ -56,7 +58,7 @@ class ControllerManager:
 			DataFuture(taskName=taskName, outputName=outputName)
 			for taskName, taskInstance in job.tasks.items()
 			for outputName in taskInstance.definition.output_schema.keys()
-			if not outputDependants[(taskName, outputName)]
+			if not outputDependants[DatasetId(taskName, outputName)]
 		]
 
 	def status(self) -> str:
@@ -69,5 +71,15 @@ class ControllerManager:
 		else:
 			return "Failed"
 
-	def stream(self, shmid: str) -> Iterator[bytes]:
-		return ShmDb(self.shmd).stream(shmid)
+	def close(self) -> None:
+		shm_client.shutdown()
+		self.shm.join()
+
+	def stream(self, key: str) -> Iterator[bytes]:
+		buf = shm_client.get(key)
+		i = 0
+		block_len = 1024
+		while i < buf.l:
+			yield bytes(buf.view()[i : min(buf.l, i + block_len)])
+			i += block_len
+		buf.close()

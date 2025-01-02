@@ -6,7 +6,7 @@ status: {{ status }}</br>
 
 {% if results %}
 <ul>
-	{% for e in stages %}
+	{% for e in results %}
 	<li>{{ e[0] }}.{{ e[1] }}: <a href="{{ e[2] }}">link</a></li>
 	{% endfor %}
 </ul>

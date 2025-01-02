@@ -100,6 +100,7 @@ def ExceptionReporter(connection: Connection) -> Iterator[int]:
 	try:
 		yield 1  # dummy for contextmanager protocol
 	except Exception as e:
+		logger.exception("reporting task crash")
 		connection.send(repr(e))
 		raise
 

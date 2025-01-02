@@ -33,10 +33,14 @@ packages = ["src/forecastbox"]
 line-length = 140
 
 [tool.ruff.lint]
-ignore = ["E731"]
+ignore = ["E731", "E741"]
 
 [tool.ruff.format]
 indent-style = "tab"
 
 [tool.mypy]
 plugins = "pydantic.mypy"
+
+[tool.pytest.ini_options]
+log_cli = true
+log_cli_level = "DEBUG"

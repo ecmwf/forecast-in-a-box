@@ -2,7 +2,6 @@ from cascade.low.builders import JobBuilder, TaskBuilder
 import forecastbox.worker.serde as serde
 from cascade.low.core import JobInstance
 from forecastbox.executor.ctrlmngr import ControllerManager
-from forecastbox.executor.shmdb import ShmDb
 
 
 def test_e2e():
@@ -39,5 +38,4 @@ def test_e2e():
 		result = serde.from_bytes(result_raw, "int")
 		assert expected == result
 	finally:
-		shmdb = ShmDb(ctrlmngr.shmd)
-		shmdb.purge_all()
+		ctrlmngr.close()

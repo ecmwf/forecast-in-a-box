@@ -77,6 +77,11 @@ class AppContext:
 
 	async def close(self) -> None:
 		await self.client.aclose()
+		try:
+			self.ctrlmngr.close()
+		except ConnectionRefusedError:
+			# python seems to stop processes in unfavourable order, but its not a problem
+			logger.debug("assuming ctrlmngr shut down on its own and has freed its resources")
 
 
 @asynccontextmanager
