@@ -11,13 +11,13 @@ from typing import Any, Callable
 import logging
 from threading import Condition
 
-from cascade.low.core import Environment, Worker, JobInstance, DatasetId
+from cascade.low.core import Environment, Worker, JobInstance, DatasetId, WorkerId
 from cascade.low.views import param_source
-from cascade.controller.core import ActionDatasetTransmit, ActionSubmit, ActionDatasetPurge, WorkerId, Event, DatasetStatus
+from cascade.controller.core import ActionDatasetTransmit, ActionSubmit, ActionDatasetPurge, Event, DatasetStatus
 from cascade.executors.dask_futures import build_subgraph
 from cascade.executors.instant import SimpleEventQueue
 import cascade.shm.client as shm_client
-from cascade.controller.tracing import mark, label, TaskLifecycle, TransmitLifecycle
+from cascade.low.tracing import mark, label, TaskLifecycle, TransmitLifecycle
 
 from forecastbox.executor.procwatch import ProcWatch
 from forecastbox.executor.futures import DataFuture
@@ -31,13 +31,12 @@ class Config:
 	mbs_per_process: int  # for capacity allocation purposes, not really tracked
 	host_id: str
 
-	def worker_name(self, i: int) -> str:
-		return f"{self.host_id}:w{i}"
+	def worker_name(self, i: int) -> WorkerId:
+		return WorkerId(f"{self.host_id}", f"w{i}")
 
 	def to_env(self) -> Environment:
 		return Environment(
 			workers={self.worker_name(i): Worker(memory_mb=self.mbs_per_process, cpu=1, gpu=0) for i in range(self.process_count)},
-			colocations=[{self.worker_name(i) for i in range(self.process_count)}],
 		)
 
 
@@ -52,10 +51,6 @@ class SingleHostExecutor:
 		label("host", config.host_id)
 		self.lock = Condition()
 
-	def _validate_workers(self, workers: set[str]) -> None:
-		if extra := workers - set(self.config.to_env().workers):
-			raise ValueError(f"unknown workers: {extra}")
-
 	def get_environment(self) -> Environment:
 		return self.config.to_env()
 
@@ -64,12 +59,11 @@ class SingleHostExecutor:
 		self.lock.acquire()
 		try:
 			logger.debug(f"acquired lock on {action=}")
-			self._validate_workers({action.at})
 			# NOTE we ignore the host assignment because the hosts are ~equivalent
 			subgraph = build_subgraph(action, self.job, self.param_source)
 			for task in subgraph.tasks:
-				mark({"task": task.name, "action": TaskLifecycle.enqueued, "worker": action.at})
-			id_ = self.procwatch.submit(subgraph, {"worker": action.at})
+				mark({"task": task.name, "action": TaskLifecycle.enqueued, "worker": repr(action.at)})
+			id_ = self.procwatch.submit(subgraph, {"worker": repr(action.at)})
 			self.fid2action[id_] = action
 		finally:
 			logger.debug("about to notify on condition")
@@ -79,26 +73,24 @@ class SingleHostExecutor:
 
 	def transmit(self, action: ActionDatasetTransmit) -> None:
 		# no-op because single shm
-		self._validate_workers(set(action.fr + action.to))
 		self.eq.transmit_done(action)
 		for worker in action.to:
 			for dataset in action.ds:
-				mark({"dataset": dataset.task, "action": TransmitLifecycle.received, "worker": worker, "mode": "local"})
-				mark({"dataset": dataset.task, "action": TransmitLifecycle.unloaded, "worker": worker, "mode": "local"})
+				mark({"dataset": dataset.task, "action": TransmitLifecycle.received, "worker": repr(worker), "mode": "local"})
+				mark({"dataset": dataset.task, "action": TransmitLifecycle.unloaded, "worker": repr(worker), "mode": "local"})
 
 	def purge(self, action: ActionDatasetPurge) -> None:
-		self._validate_workers(set(action.at))
 		for ds in action.ds:
 			shm_client.purge(DataFuture.fromDsId(ds).asShmId())
 
 	def fetch_as_url(self, worker: WorkerId, dataset_id: DatasetId) -> str:
 		return DataFuture.fromDsId(dataset_id).asUrl()
 
-	def fetch_as_value(self, worker: WorkerId, dataset_id: DatasetId) -> Any:
+	def fetch_as_value(self, dataset_id: DatasetId) -> Any:
 		return shm_client.get(DataFuture.fromDsId(dataset_id).asShmId())
 
 	def store_value(self, worker: WorkerId, dataset_id: DatasetId, data: bytes) -> None:
-		mark({"dataset": dataset_id.task, "action": TransmitLifecycle.received, "target": worker})
+		mark({"dataset": dataset_id.task, "action": TransmitLifecycle.received, "target": repr(worker)})
 		logger.debug(f"acquiring lock on store value {dataset_id=} {worker=}")
 		self.lock.acquire()
 		try:
@@ -110,12 +102,12 @@ class SingleHostExecutor:
 			except Exception:
 				# NOTE this branch is for situations where the controller issued redundantly two transmits
 				# TODO check that the exception is truly a Conflict, or even better, remove this branch altogether
-				mark({"dataset": dataset_id.task, "action": TransmitLifecycle.unloaded, "target": worker, "mode": "redundant"})
-				logger.exception(f"store of {dataset_id} failed, presumably already computed")
+				mark({"dataset": dataset_id.task, "action": TransmitLifecycle.unloaded, "target": repr(worker), "mode": "redundant"})
+				logger.warning(f"store of {dataset_id} failed, presumably already computed; continuing")
 			else:
 				rbuf.view()[:l] = data
 				rbuf.close()
-				mark({"dataset": dataset_id.task, "action": TransmitLifecycle.unloaded, "target": worker, "mode": "remote"})
+				mark({"dataset": dataset_id.task, "action": TransmitLifecycle.unloaded, "target": repr(worker), "mode": "remote"})
 			event = Event(at=worker, ts_trans=[], ds_trans=[(dataset_id, DatasetStatus.available)])
 			for callback in self.procwatch.event_callbacks:
 				callback(event)
