@@ -16,7 +16,7 @@ function Configuration({ apiPath, selected, submitTarget, initial}: Configuratio
   if (!selected) {
     return (
       <Card>
-        <p>No selection made</p>
+        <p>Select Product to configure</p>
       </Card>
     );
   }
@@ -94,23 +94,12 @@ function Configuration({ apiPath, selected, submitTarget, initial}: Configuratio
     }
   }, [initial]);
 
-  const [activeTab, setActiveTab] = useState<string | null>(Object.keys(formData)[0] || null);
 
   return (
-    <Card>
-      <Tabs value={activeTab} onChange={setActiveTab} orientation='vertical' classNames={classes}>
-        <Tabs.List>
-          {options && Object.entries(options).map(([key, item]: [string, any]) => (
-            <Tabs.Tab key={key} value={key} disabled={item.values && item.values.length === 0}>
-              {item.label}
-            </Tabs.Tab>
-          ))}
-        </Tabs.List>
-
+    <Card padding='sm'>
         {options && Object.entries(options).map(([key, item]: [string, any]) => (
-          <Tabs.Panel key={key} value={key}>
-            {item.example ? (
-              <TextInput label={item.label} description={item.description} placeholder={item.example} />
+            item.example ? (
+              <TextInput key={key} label={item.label} description={item.description} placeholder={item.example} />
             ) : item.values ? (
               <Select
                 key={key}
@@ -118,16 +107,13 @@ function Configuration({ apiPath, selected, submitTarget, initial}: Configuratio
                 label={item.label}
                 placeholder={`Select ${key}`}
                 value={formData[key]}
-                disabled={item.values.length === 0}
+                disabled={item.values && item.values.length === 0}
                 onChange={(value) => handleChange(key, value)}
                 data={item.values || []}
                 searchable
-                clearable
               />
-            ) : null}
-          </Tabs.Panel>
+            ) : null
         ))}
-      </Tabs>
       <Group w='100%' align='center'>
         <Button type='submit' onClick={() => submitTarget({...formData, product: selected})}>Submit</Button>
       </Group>

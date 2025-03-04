@@ -13,7 +13,7 @@ const Header = () => {
       <Container size="xl">
         <Group justify="space-between">
           <a href=""><IconBox/><h2></h2></a>
-          <Group gap={40}>
+          {/* <Group gap={40}>
             <a href='./products'>
               <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="xl">products</Button>
             </a>
@@ -21,7 +21,7 @@ const Header = () => {
             <a href='https://earthkit.readthedocs.io/en/latest' target='_blank'>
               <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="xl">account</Button>
             </a>
-          </Group>
+          </Group> */}
         </Group>
       </Container>
       <Space h="xl" />

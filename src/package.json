@@ -1,9 +1,9 @@
 {
-  "name": "nextjs-fastapi",
-  "version": "0.2.0",
+  "name": "FIAB",
+  "version": "0.0.0",
   "private": true,
   "scripts": {
-    "fastapi-dev": "uv run uvicorn forecastbox.api:app --reload",
+    "fastapi-dev": "uv run uvicorn forecastbox.entrypoint:app --reload --log-level warning",
     "next-dev": "next dev",
     "dev": "concurrently \"npm run next-dev\" \"npm run fastapi-dev\"",
     "setup": "uv add fastapi",

@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
-import { Button, Box, ScrollArea, Card, Text, Group, Modal, Divider } from '@mantine/core';
+import { Button, ActionIcon, ScrollArea, Card, Text, Group, Modal, Divider } from '@mantine/core';
 
 import Configuration from './configuration';
+import { IconX, IconPencil} from '@tabler/icons-react';
 
 const Cart = ({ products, setProducts }) => {
   
@@ -38,18 +39,14 @@ const Cart = ({ products, setProducts }) => {
                 <Group justify='space-between' mt="xs" mb="xs">
                     <Text size='xl'>{products[id].product}</Text>
                     <Group>
-                    <Button color="green" onClick={() => openModal(id)} size="xs">
-                        Edit
-                    </Button>
-                    <Button color="red" onClick={() => handleRemove(id)} size="xs">
-                        Remove
-                    </Button>
+                    <ActionIcon color="green" onClick={() => openModal(id)} size="lg"><IconPencil/></ActionIcon>
+                    <ActionIcon color="red" onClick={() => handleRemove(id)} size="lg"><IconX/></ActionIcon>
                     </Group>
                 </Group>
             </Card.Section>
             <Modal opened={modalOpen} onClose={() => setModalOpen(false)} title="Edit">
                 {selectedProduct !== null && (
-                    <Configuration apiPath="/api/products/configuration" selected={products[selectedProduct]} submitTarget={handleEdit}  /> //initial={products[selectedProduct]}
+                    <Configuration apiPath="/api/py/products/configuration" selected={products[selectedProduct]} submitTarget={handleEdit}  /> //initial={products[selectedProduct]}
                 )}
             </Modal>
             {/* <Text size='sm' c='dimmed'>
@@ -61,9 +58,9 @@ const Cart = ({ products, setProducts }) => {
     ));
     
     return (
-      <Card shadow="sm" padding="lg" radius="md" withBorder h="600px" w="100%">
+      <Card shadow="sm" padding="lg" radius="md" withBorder h="70vh" w="25vw" mih="300px">
         <ScrollArea h='inherit'>
-            {rows}
+          {rows}
         </ScrollArea>        
       </Card>
     );

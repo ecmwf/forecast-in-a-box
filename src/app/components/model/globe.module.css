@@ -1,0 +1,15 @@
+.globe-container {
+    position: relative;
+    /* width: 100%;
+    height: 80%; */
+}
+
+.reticle {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border: 2px solid red;
+    border-radius: 50%;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+}
