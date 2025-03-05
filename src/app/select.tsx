@@ -6,6 +6,8 @@ import { Card, Stepper } from "@mantine/core";
 import ProductConfiguration from './components/products/products'
 import Model from "./components/model/model";
 
+import { IconWorldCog, IconCircleCheck, IconShoppingCartCode, IconRocket } from '@tabler/icons-react';
+
 const Packages = () => {    
     const [active, setActive] = useState(0);
     const nextStep = () => setActive((current) => (current < 3 ? current + 1 : current));
@@ -26,14 +28,14 @@ const Packages = () => {
 
     return(
       <Card>
-        <Stepper active={active} onStepClick={setActive} allowNextStepsSelect={false}>
-            <Stepper.Step label="Model" description="Configure the Model" allowStepSelect={true}>
+        <Stepper active={active} onStepClick={setActive} allowNextStepsSelect={false} completedIcon={<IconCircleCheck size={18} />}>
+            <Stepper.Step label="Model" description="Configure the Model" allowStepSelect={true} icon={<IconWorldCog/>}>
                 <Model selectedModel={selectedModel} setSelectedModel={setSelectedModel} coordinates={coords} setCoordinates={setCoordinates} submit={setSubmittedModel}/>
             </Stepper.Step>
-            <Stepper.Step label="Products" description="Choose Products" allowStepSelect={true}>
+            <Stepper.Step label="Products" description="Choose Products" allowStepSelect={true} icon={<IconShoppingCartCode/>}>
                 <ProductConfiguration selectedModel={selectedModel} products={products} setProducts={setProducts}/>
             </Stepper.Step>
-            <Stepper.Step label="Confirm" description="Execute the graph" allowStepSelect={true}>
+            <Stepper.Step label="Confirm" description="Execute the graph" allowStepSelect={true} icon={<IconRocket/>}>
                 Step 3 content: Get full access
             </Stepper.Step>
         </Stepper>

@@ -50,10 +50,9 @@ const Model: React.FC<ModelProps> = ({ selectedModel, setSelectedModel, coordina
             </Group>
 
             {showGlobeSelect && (
-                <>
+                <Group>
                     <Button onClick={() => setModalOpened(true)}>Open Globe</Button>
                     <Group>
-                    <p>Selected Location:</p>
                     {coordinates && (
                         <>
                         <p>Latitude: {coordinates.lat}</p>
@@ -61,7 +60,7 @@ const Model: React.FC<ModelProps> = ({ selectedModel, setSelectedModel, coordina
                         </>
                     )}
                     </Group>
-                </>
+                </Group>
             )}
             <Modal
                 opened={modalOpened}

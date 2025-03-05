@@ -27,17 +27,11 @@ const ProductConfiguration: React.FC<ProductConfigurationProps> = ({selectedMode
       };
 
     return (
-        <>
-        <Grid align="flex-start">
-            <Grid.Col span={5}><h2>Categories</h2><Categories apiPath="/api/py/products/categories" setSelected={setSelectedProduct} /></Grid.Col>
+        <Grid align="flex-start" justify="space-around">
+            <Grid.Col span={4}><h2>Categories</h2><Categories apiPath="/api/py/products/categories" setSelected={setSelectedProduct} /></Grid.Col>
             <Grid.Col span={4}><h2>Configuration</h2><Configuration apiPath="/api/py/products/configuration" selected={selected} submitTarget={addProduct} /></Grid.Col>
+            <Grid.Col span={4}><h2>Selected</h2><Cart products={products} setProducts={setProducts}/></Grid.Col>
         </Grid>
-
-        <Affix position={{ top: 190, right: 0 }}>
-          <h2>Selected</h2>
-          <Cart products={products} setProducts={setProducts}/>
-        </Affix>
-    </>
     );
 }
 

@@ -67,6 +67,11 @@ const GlobeSelect: React.FC<GlobeSelectProps> = ({ handleSubmit, setSelectedLoca
         }
     };
 
+    const filterEvents = (e) => {
+        // Filter out polygon clicks
+        return true;
+    }
+
 
     // Countries
     const [countries, setCountries] = useState({ features: []});
@@ -90,9 +95,13 @@ const GlobeSelect: React.FC<GlobeSelectProps> = ({ handleSubmit, setSelectedLoca
             <Card.Section>
                 <Globe
                     {...globeProps}
+                    globeTileEngineUrl={(x: number, y: number, z: number) => `https://cdn.lima-labs.com/${z}/${x}/${y}.png?api=demo`}
+                    // globeTileEngineUrl={(x: number, y: number, l: number) => `https://tile.openstreetmap.org/${l}/${x}/${y}.png`}
                     globeImageUrl="/globe/earth-blue-marble.jpg"
                     backgroundColor="#ffffff"
                     onGlobeClick={markLocation}
+
+                    pointerEventsFilter={filterEvents}
 
                     onPolygonClick={markLocation}
                     // polygonsData={countries.features.filter(d => d.properties.ISO_A2 !== 'AQ')} // Issues with clicking on the polygons not the map
@@ -100,6 +109,8 @@ const GlobeSelect: React.FC<GlobeSelectProps> = ({ handleSubmit, setSelectedLoca
                     polygonAltitude={-0.0001}
                     polygonStrokeColor={() => 'rgba(255, 255, 255, 0.5)'}
                     polygonCapColor={() => 'rgba(0, 100, 0, 0)'}
+
+                    // pointOfView = {{ lat: 54.5260, lng: 15.2551, altitude: 3 }} // Not working
                     
                     ringsData={ringsData}
                     ringColor={() => t => `rgba(255,255,255,${1-t})`}

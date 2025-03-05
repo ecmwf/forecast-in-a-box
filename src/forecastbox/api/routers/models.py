@@ -55,12 +55,10 @@ async def download(model_name):
 @router.get("/info/{model_name}")
 async def get_model_info(model_name: str) -> dict[str, Any]:
     ckpt = open_checkpoint(model_name)
+    anemoi_versions = {key: val for key, val in ckpt.provenance_training()['module_versions'].items() if key.startswith("anemoi")}
 
-    variables = [
-        *ckpt.diagnostic_variables,
-        *ckpt.prognostic_variables,
-    ]
-    return {"timestep": ckpt.timestep, "params": variables, "local_area": True}
+
+    return {"timestep": ckpt.timestep, "diagnostics": ckpt.diagnostic_variables,  "prognostics": ckpt.prognostic_variables, "area": ckpt.area , "local_area": True, 'grid':ckpt.grid, 'versions':anemoi_versions}
 
 
 @lru_cache

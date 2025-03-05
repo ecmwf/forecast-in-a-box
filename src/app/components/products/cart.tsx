@@ -58,7 +58,7 @@ const Cart = ({ products, setProducts }) => {
     ));
     
     return (
-      <Card shadow="sm" padding="lg" radius="md" withBorder h="70vh" w="25vw" mih="300px">
+      <Card shadow="sm" padding="lg" radius="md" withBorder h="60vh" w="25vw" mih="200px">
         <ScrollArea h='inherit'>
           {rows}
         </ScrollArea>        
