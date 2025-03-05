@@ -421,7 +421,7 @@ requires-dist = [
     { name = "orjson" },
     { name = "pyrsistent" },
     { name = "python-multipart" },
-    { name = "qubed", specifier = ">=0.1.11" },
+    { name = "qubed", git = "https://github.com/ecmwf/qubed.git?rev=fiab" },
     { name = "uvicorn" },
 ]
 
@@ -943,6 +943,21 @@ wheels = [
 ]
 
 [[package]]
+name = "psutil"
+version = "7.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/2a/80/336820c1ad9286a4ded7e845b2eccfcb27851ab8ac6abece774a6ff4d3de/psutil-7.0.0.tar.gz", hash = "sha256:7be9c3eba38beccb6495ea33afd982a44074b78f28c434a1f51cc07fd315c456", size = 497003 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ed/e6/2d26234410f8b8abdbf891c9da62bee396583f713fb9f3325a4760875d22/psutil-7.0.0-cp36-abi3-macosx_10_9_x86_64.whl", hash = "sha256:101d71dc322e3cffd7cea0650b09b3d08b8e7c4109dd6809fe452dfd00e58b25", size = 238051 },
+    { url = "https://files.pythonhosted.org/packages/04/8b/30f930733afe425e3cbfc0e1468a30a18942350c1a8816acfade80c005c4/psutil-7.0.0-cp36-abi3-macosx_11_0_arm64.whl", hash = "sha256:39db632f6bb862eeccf56660871433e111b6ea58f2caea825571951d4b6aa3da", size = 239535 },
+    { url = "https://files.pythonhosted.org/packages/2a/ed/d362e84620dd22876b55389248e522338ed1bf134a5edd3b8231d7207f6d/psutil-7.0.0-cp36-abi3-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:1fcee592b4c6f146991ca55919ea3d1f8926497a713ed7faaf8225e174581e91", size = 275004 },
+    { url = "https://files.pythonhosted.org/packages/bf/b9/b0eb3f3cbcb734d930fdf839431606844a825b23eaf9a6ab371edac8162c/psutil-7.0.0-cp36-abi3-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4b1388a4f6875d7e2aff5c4ca1cc16c545ed41dd8bb596cefea80111db353a34", size = 277986 },
+    { url = "https://files.pythonhosted.org/packages/eb/a2/709e0fe2f093556c17fbafda93ac032257242cabcc7ff3369e2cb76a97aa/psutil-7.0.0-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:a5f098451abc2828f7dc6b58d44b532b22f2088f4999a937557b603ce72b1993", size = 279544 },
+    { url = "https://files.pythonhosted.org/packages/50/e6/eecf58810b9d12e6427369784efe814a1eec0f492084ce8eb8f4d89d6d61/psutil-7.0.0-cp37-abi3-win32.whl", hash = "sha256:ba3fcef7523064a6c9da440fc4d6bd07da93ac726b5733c29027d7dc95b39d99", size = 241053 },
+    { url = "https://files.pythonhosted.org/packages/50/1b/6921afe68c74868b4c9fa424dad3be35b095e16687989ebbb50ce4fceb7c/psutil-7.0.0-cp37-abi3-win_amd64.whl", hash = "sha256:4cf3d4eb1aa9b348dec30105c55cd9b7d4629285735a102beb4441e38db90553", size = 244885 },
+]
+
+[[package]]
 name = "pycparser"
 version = "2.22"
 source = { registry = "https://pypi.org/simple" }
@@ -1063,30 +1078,14 @@ wheels = [
 
 [[package]]
 name = "qubed"
-version = "0.1.11"
-source = { registry = "https://pypi.org/simple" }
+version = "0.0.0"
+source = { git = "https://github.com/ecmwf/qubed.git?rev=fiab#624300b2abd39e97d969f629d34d3ce4998eb273" }
 dependencies = [
     { name = "click" },
     { name = "frozendict" },
     { name = "numpy" },
+    { name = "psutil" },
     { name = "rich" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/27/20/f2016aeabe462a851255dd4f4ce97388bf599f9039627d4378dca705eadf/qubed-0.1.11.tar.gz", hash = "sha256:e9eaf06c78ce14550d03bb66dd98ef4b3631761d72cecadb185b06c6d6e4497b", size = 251887 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9b/c3/5cee59041ee17ec9cdcaa55ba9143111ab287cc4f4fc8e3a70d5d99d015e/qubed-0.1.11-cp311-cp311-macosx_10_12_x86_64.whl", hash = "sha256:c79c9ff907081ccc79dc0d7cded8d8a5663de4341f4df0b0a7f00b0a92f64f1a", size = 220599 },
-    { url = "https://files.pythonhosted.org/packages/75/b5/9fe738a1d9585a1c2a75fff5a8b823fdbf3274826d34678738285f2d9f27/qubed-0.1.11-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:b5657d617a8ea71ddb2a5ed19e553f6aeb8ab8a6342fb0a508829aa3803ff6a3", size = 215956 },
-    { url = "https://files.pythonhosted.org/packages/d4/7a/0e3c2908cd241fca6b31cc0256d3c55b5451ba015b27fa1b19bfd9ee0aca/qubed-0.1.11-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:6bf1e07b6f2046ecd582369ad3596f1f1d189ad8b025b0a2ae137abc255d1f36", size = 240243 },
-    { url = "https://files.pythonhosted.org/packages/d5/32/fbc454aa677e50f8b51d47a8ac03a0ac59c3e4df43d02bc36305ad22b452/qubed-0.1.11-cp311-cp311-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:37f3a4e4ca478347109fae4d0a4bcee47a413b8a5ce0a4d911ad50b50525117d", size = 248048 },
-    { url = "https://files.pythonhosted.org/packages/dc/5c/a7e70ccd5bef54f313a90f9052702669f0030aafdb52e41b1aa869687797/qubed-0.1.11-cp311-cp311-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:c0cfce001cb9630df4d79f37001417f5b0725261ef4d23480a5260f8bfc70d43", size = 297057 },
-    { url = "https://files.pythonhosted.org/packages/d4/4d/f25b013cf3b09bb4ce933843342827e569573e2cc503eeccab90fe207369/qubed-0.1.11-cp311-cp311-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:fedd391dea08ed7e4c07c32a91eb404d50b617c2cf9809ca58aa74ff0c0b69a0", size = 277846 },
-    { url = "https://files.pythonhosted.org/packages/5f/fb/bf3ee16e8ec5fa1e754c9e49a8b92250d533728364be33f30bc8f2b9f51b/qubed-0.1.11-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d96a446cb558e9e8f91a2033ab52561de86c0fcd5eddabd2fbe0e112aa837e4d", size = 241095 },
-    { url = "https://files.pythonhosted.org/packages/52/00/16980c6d1e090085cd30ce8c8c05f47f975cb32d8dcf60c38a7514562973/qubed-0.1.11-cp311-cp311-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:db29d2f93645a4408daf118c941c13976dfd86138df0731992669a84ffd0d776", size = 254916 },
-    { url = "https://files.pythonhosted.org/packages/51/20/c55476b324cab2c7446abe743722722874aaabb642ac99b2c6d87ec2d6d1/qubed-0.1.11-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:6d436ed2760e8ea842eafbd819947b799ec7409cd5add4851d7e5f68ec164653", size = 418678 },
-    { url = "https://files.pythonhosted.org/packages/fc/e8/a8b07e12afbc2de9b55fb1c49328b0afe6894aba0d4327644211be3cbc32/qubed-0.1.11-cp311-cp311-musllinux_1_2_armv7l.whl", hash = "sha256:f276a0ff66e92822017b04aac3d3ef12f7597611d8e36563c31dca15800a361b", size = 510692 },
-    { url = "https://files.pythonhosted.org/packages/65/9e/e34f6648303298454a8ea3c36bbff99ba1723285e3b4933cb9fb9b709c53/qubed-0.1.11-cp311-cp311-musllinux_1_2_i686.whl", hash = "sha256:041a23f190474aba84e59425c85d52766a800285aee6d4cca362485646a4fa2c", size = 436334 },
-    { url = "https://files.pythonhosted.org/packages/d2/7a/34dba7a37291b81e8b628cfda0997128be2b6a32a35346c0288daff65245/qubed-0.1.11-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:93387c193ef1ac169bf42ff17f82caf5a98ece56681ceb2a4ffb8b4bb23ae248", size = 411839 },
-    { url = "https://files.pythonhosted.org/packages/fe/4b/15b3fb600eea0107da8c55cbb8ba647623a810bef488c396245197e5c93f/qubed-0.1.11-cp311-cp311-win32.whl", hash = "sha256:a2e1d08f5077b2a588c17bb4a76378126dc65c90730bc79d893af241d8f1edaf", size = 108696 },
-    { url = "https://files.pythonhosted.org/packages/d4/9d/527d4e0455f6e792dc32862f0682c3175aa712e72bcb43a0717955481910/qubed-0.1.11-cp311-cp311-win_amd64.whl", hash = "sha256:f9fd0a4ef6f7fce9dd2d0b04cc99ebc5ccad9f5c012117a41b0dcc1a40fe5ba4", size = 113033 },
 ]
 
 [[package]]
