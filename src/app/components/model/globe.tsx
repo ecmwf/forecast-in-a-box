@@ -23,18 +23,18 @@ const GlobeSelect: React.FC<GlobeSelectProps> = ({ handleSubmit, setSelectedLoca
     const [ringsData, setRingsData] = useState([]);
     const [markerData, setMarkerData] = useState([]);
 
-    const [latitude, setLatitude] = useState<string | number>('');
-    const [longitude, setLongitude] = useState<string | number>('');
+    const [latitude, setLatitude] = useState<number>(0);
+    const [longitude, setLongitude] = useState<number>(0);
 
-    const markLocation = useCallback((coords) => {
+    const markLocation = useCallback((coords: { lat: any; lng: any; }) => {
         const { lat: startLat, lng: startlon } = coords;
 
         // add and remove start rings
-        const srcRing = { lat: startLat, lon: startlon };
+        const srcRing = { lat: startLat, lng: startlon };
         setRingsData(curRingsData => [...curRingsData, srcRing]);
         setTimeout(() => setRingsData(curRingsData => curRingsData.filter(r => r !== srcRing)), FLIGHT_TIME * ARC_REL_LEN);
 
-        const currentMarker = { lat: startLat, lon: startlon, size: 50, color: 'red' };
+        const currentMarker = { lat: startLat, lng: startlon, size: 30, color: 'red' };
         setMarkerData(curMarkerData => [...curMarkerData, currentMarker]);
         setMarkerData(curMarkerData => curMarkerData.filter(marker => marker === currentMarker));
 
@@ -43,22 +43,32 @@ const GlobeSelect: React.FC<GlobeSelectProps> = ({ handleSubmit, setSelectedLoca
         
     }, []);
 
+    // Handlers for changing the latitude and longitude
     const handleLatChange = (e: number) => {
         const newLat = e;
         setLatitude(newLat);
-        if (!isNaN(newLat)) {
-            markLocation({ lat: newLat, lon: parseFloat(longitude.toString()) });
+        if (!isNaN(newLat) && !isNaN(longitude)) {
+            markLocation({ lat: newLat, lng: longitude });
         }
     };
 
     const handlelonChange = (e: number) => {
         const newlon = e;
         setLongitude(newlon);
-        if (!isNaN(newlon) && !isNaN(parseFloat(latitude.toString()))) {
-            markLocation({ lat: parseFloat(latitude.toString()), lon: newlon });
+        if (!isNaN(newlon) && !isNaN(latitude)) {
+            markLocation({ lat: latitude, lng: newlon });
+        }
+    };
+    
+    const handleSubmitClick = () => {
+        if (latitude && longitude) {
+            setSelectedLocation({ lat: parseFloat(latitude.toString()), lon: parseFloat(longitude.toString()) });
+            handleSubmit();
         }
     };
 
+
+    // Countries
     const [countries, setCountries] = useState({ features: []});
 
     useEffect(() => {
@@ -74,12 +84,6 @@ const GlobeSelect: React.FC<GlobeSelectProps> = ({ handleSubmit, setSelectedLoca
         <line x1="18" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth="4" />
     </svg>`;
 
-    const handleSubmitClick = () => {
-        if (latitude && longitude) {
-            setSelectedLocation({ lat: parseFloat(latitude.toString()), lon: parseFloat(longitude.toString()) });
-            handleSubmit();
-        }
-    };
 
     return (
         <Card className={classes['globe-container']} {...cardProps}>
