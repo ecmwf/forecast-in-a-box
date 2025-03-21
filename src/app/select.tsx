@@ -6,7 +6,7 @@ import { Card, Stepper, Divider } from "@mantine/core";
 import ProductConfiguration from './components/products/products'
 import Model from "./components/model/model";
 
-import { IconWorldCog, IconCircleCheck, IconShoppingCartCode, IconRocket } from '@tabler/icons-react';
+import { IconWorldCog, IconCircleCheck, IconShoppingCartCode, IconRocket, IconTerminal2 } from '@tabler/icons-react';
 
 const Packages = () => {    
     const [active, setActive] = useState(0);
@@ -40,6 +40,10 @@ const Packages = () => {
             <Stepper.Step label="Products" description="Choose Products" allowStepSelect={true} icon={<IconShoppingCartCode/>}>
                 <Divider my="md" />
                 <ProductConfiguration selectedModel={selectedModel} products={products} setProducts={setSubmittedProducts}/>
+            </Stepper.Step>
+            <Stepper.Step label="Environment" description="Configure Execution Environment" allowStepSelect={true} icon={<IconTerminal2/>}>
+                <Divider my="md" />
+                Step 3 content: Get full access
             </Stepper.Step>
             <Stepper.Step label="Confirm" description="Execute the graph" allowStepSelect={true} icon={<IconRocket/>}>
                 <Divider my="md" />

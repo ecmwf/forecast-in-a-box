@@ -2,13 +2,13 @@
   param: 2t
   threshold: 
     - 273.15
-  # frequency: '*'
+  
 - levtype: sfc
   param: [10u, 10v]
   threshold: 
     - 10
     - 15
-  # frequency: '*'
+
 - levtype: sfc
   param: tp
   threshold: 
@@ -20,10 +20,9 @@
     - 25
     - 50
     - 100
-  # frequency: '*'
 
 - levtype: pl
-  param: t
+  param: 't'
   levelist: '850'
   threshold: 
     - 2

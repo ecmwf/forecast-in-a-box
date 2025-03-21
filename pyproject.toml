@@ -23,6 +23,7 @@ dependencies = [
 	"pyrsistent",
 	"anemoi-inference[huggingface]>=0.4.10",
 	"qubed @ git+https://github.com/ecmwf/qubed.git",
+	"ruff>=0.11.2",
 ]
 
 [project.urls]

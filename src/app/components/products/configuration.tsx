@@ -1,19 +1,21 @@
 "use client";
 
-import { Tabs, Card, TextInput, Select, Button, LoadingOverlay, Stack, Group} from '@mantine/core';
+import { Tabs, Card, TextInput, Select, Button, LoadingOverlay, MultiSelect, Group} from '@mantine/core';
 import { useState, useEffect } from 'react';
 
 import classes from './configuration.module.css';
 
 interface ConfigurationProps {
-  apiPath: string;
   selectedProduct: string | null;
   selectedModel: string ;
   submitTarget?;
   initial?: Record<string, any>;
 }
+interface ConfigRecord{
+  label: string; description: string; example?: string; values?: string[], multiple: boolean
+}
 
-function Configuration({ apiPath, selectedProduct, selectedModel, submitTarget, initial}: ConfigurationProps) {
+function Configuration({ selectedProduct, selectedModel, submitTarget, initial}: ConfigurationProps) {
   if (!selectedProduct) {
     return (
       <Card>
@@ -23,7 +25,7 @@ function Configuration({ apiPath, selectedProduct, selectedModel, submitTarget, 
   }
 
   const [formData, setFormData] = useState<Record<string, any>>({});
-  const [options, setOptions] = useState<Record<string, { label: string; description: string; example?: string; values?: string[], multiple?: boolean}>>({});
+  const [options, setOptions] = useState<Record<string, ConfigRecord>>({});
   const [loading, setLoading] = useState(true);
 
   // Handle select field changes
@@ -37,7 +39,7 @@ function Configuration({ apiPath, selectedProduct, selectedModel, submitTarget, 
   const fetchInitialOptions = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${apiPath}/${selectedProduct}`, {
+      const response = await fetch(`/api/py/products/configuration/${selectedProduct}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 'model': selectedModel, 'spec': {} }), // Empty request for initial load
@@ -65,7 +67,7 @@ function Configuration({ apiPath, selectedProduct, selectedModel, submitTarget, 
     const fetchUpdatedOptions = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`${apiPath}/${selectedProduct}`, {
+        const response = await fetch(`/api/py/products/configuration/${selectedProduct}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 'model': selectedModel, 'spec': formData }),
@@ -96,8 +98,8 @@ function Configuration({ apiPath, selectedProduct, selectedModel, submitTarget, 
 
 
   const isFormValid = () => {
-    console.log(formData);
-    const isValid = Object.keys(formData).every(key => formData[key] !== undefined && formData[key] !== "");
+    // console.log(formData);
+    const isValid = Object.keys(options).every(key => formData[key] !== undefined && formData[key] !== "");
     if (!isValid) {
       alert("Please fill out all required fields.");
     }
@@ -106,33 +108,52 @@ function Configuration({ apiPath, selectedProduct, selectedModel, submitTarget, 
 
   const handleSubmit = () => {
     if (isFormValid()) {
-      submitTarget({ ...formData, product: selectedProduct });
+      const filteredFormData = Object.keys(formData)
+        .filter(key => key in options)
+        .reduce((acc, key) => {
+          acc[key] = formData[key];
+          return acc;
+        }, {});
+      submitTarget({ ...filteredFormData, product: selectedProduct });
     }
   };
-
+  console.log(options);
   return (
     <Card padding='sm'>
       <LoadingOverlay visible={loading} />
-        {options && Object.entries(options).map(([key, item]: [string, any]) => (
-            item.values ? (
+        {options && Object.entries(options).map(([key, item]: [string, ConfigRecord]) => (
+              item.values ? (
+                item.multiple ? (
+                  <MultiSelect
+                    key={`${selectedProduct}_${key}`}
+                    description={item.description}
+                    label={item.label}
+                    placeholder={`${key}`}
+                    // value={formData[key]}
+                    disabled={item.values && item.values.length === 0}
+                    onChange={(value) => handleChange(key, value)}
+                    data={item.values || []}
+                    searchable
+                  />
+                ) : (
               <Select
-                key={key}
+                key={`${selectedProduct}_${key}`}
                 description={item.description}
                 label={item.label}
                 placeholder={`Select ${key}`}
-                value={formData[key]}
+                // value={formData[key]}
                 disabled={item.values && item.values.length === 0}
                 onChange={(value) => handleChange(key, value)}
                 data={item.values || []}
                 searchable
               />
-            ) : item.example ? (
+            )) : item.example ? (
               <TextInput 
-                key={key} 
+                key={`${selectedProduct}_${key}`}
                 label={item.label} 
                 description={item.description} 
                 placeholder={item.example} 
-                value={formData[key] || ""}
+                // value={formData[key] || ""}
                 onChange={(event) => handleChange(key, event.currentTarget.value)}
               />
             ) : null

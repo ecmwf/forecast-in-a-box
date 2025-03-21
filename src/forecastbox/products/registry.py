@@ -2,82 +2,91 @@
 Registry of products
 """
 
+from dataclasses import dataclass
 from typing import Callable, Type
 
 from .product import Product
 
 PRODUCTS: dict[str, "CategoryRegistry"] = {}
 
+@dataclass
+class Category:
+	"""Category information"""
+	title: str
+	description: str
+	options: list[str]
+
 
 class CategoryRegistry:
-    def __init__(self, category: str, description: str, title: str | None = None):
-        """
-        Register a product category.
+	def __init__(self, category: str, description: str, title: str | None = None):
+		"""
+		Register a product category.
 
-        Parameters
-        ----------
-        category : str
-            Category name
-        description : str
-            Category description
-        title : str, optional
-            Category title, by default None
+		Parameters
+		----------
+		category : str
+		    Category name
+		description : str
+		    Category description
+		title : str, optional
+		    Category title, by default None
 
-        Returns
-        -------
-        Callable
-            Decorator Function
-        """
-        PRODUCTS[category] = self
-        self._products: dict[str, Type[Product]] = {}
+		Returns
+		-------
+		Callable
+		    Decorator Function
+		"""
+		PRODUCTS[category] = self
+		self._products: dict[str, Type[Product]] = {}
 
-        self._description = description
-        self._title = title
+		self._description = description
+		self._title = title or category
 
-    def to_dict(self) -> dict:
-        return {
-            "title": self._title,
-            "description": self._description,
-            "options": list(map(str, self._products.keys()))
-        }
-        
-    def __call__(self, product: str) -> Callable:
-        """
-        Register a product.
+	def to_category_info(self) -> Category:
+		return Category(title=self._title, description=self._description, options=list(map(str, self._products.keys()))) #{"title": self._title, "description": self._description, "options": list(map(str, self._products.keys()))}
 
-        Parameters
-        ----------
-        product : str
-            Product name
+	def __call__(self, product: str) -> Callable:
+		"""
+		Register a product.
 
-        Returns
-        -------
-        Callable
-            Decorator Function
-        """
-        def decorator(func: type[Product]) -> type[Product]:
-            self._products[product] = func
-            return func
-        return decorator
-    
-    @property
-    def products(self) -> dict[str, Type[Product]]:
-        return self._products
-    
-    def __getitem__(self, key: str) -> Type[Product]:
-        return self._products[key]
-    
-    def __contains__(self, key: str) -> bool:
-        return key in self._products
+		Parameters
+		----------
+		product : str
+		    Product name
 
-def get_categories() -> dict[str, dict[str, str]]:
-    """Get category information."""
-    return {key: val.to_dict() for key, val in PRODUCTS.items()}
+		Returns
+		-------
+		Callable
+		    Decorator Function
+		"""
+
+		def decorator(func: type[Product]) -> type[Product]:
+			self._products[product] = func
+			return func
+
+		return decorator
+
+	@property
+	def products(self) -> dict[str, Type[Product]]:
+		return self._products
+
+	def __getitem__(self, key: str) -> Type[Product]:
+		return self._products[key]
+
+	def __contains__(self, key: str) -> bool:
+		return key in self._products
+
+
+def get_categories() -> dict[str, Category]:
+	"""Get category information."""
+	return {key: val.to_category_info() for key, val in sorted(PRODUCTS.items(), key=lambda x: x[0])}
+
 
 def get_product_list(category: str) -> list[str]:
-    """Get products for a category."""
-    return list(PRODUCTS[category].products.keys())
+	"""Get products for a category."""
+	return sorted(PRODUCTS[category].products.keys())
+
 
 def get_product(category: str, product: str) -> Product:
-    """Get a product."""
-    return PRODUCTS[category][product]()
+	"""Get a product."""
+	return PRODUCTS[category][product]()
