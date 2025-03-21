@@ -60,7 +60,7 @@ const InformationWindow: React.FC<InformationProps> = ({ selected }) => {
                     {typeof value === 'object' && !Array.isArray(value) && value !== null ? (
                         <Stack maw='80%' style={{ marginLeft: '10px' }}>
                             {Object.entries(value).map(([subKey, subValue]) => (
-                                <Text key={subKey} lineClamp={3}>{subKey}: {JSON.stringify(subValue, null, 2)}</Text>
+                                <Text p='' m='' key={subKey} lineClamp={3}>{subKey}: {JSON.stringify(subValue, null, 2)}</Text>
                             ))}
                         </Stack>
                     ) : (

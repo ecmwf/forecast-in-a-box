@@ -81,7 +81,7 @@ const GlobeSelect: React.FC<GlobeSelectProps> = ({ handleSubmit, setSelectedLoca
         fetch('/globe/ne_110m_countries.geojson').then(res => res.json()).then(setCountries);
     }, []);
 
-    const markerSvg = `<svg viewBox="0 0 24 24" width="36" height="36" xmlns="http://www.w3.org/2000/svg" style="display: block; margin: auto;">
+    const markerSvg = `<svg viewBox="2 0 24 24" width="37" height="36" xmlns="http://www.w3.org/2000/svg" style="display: block; margin: auto;">
         <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="10" fill="none" />
         <line x1="12" y1="2" x2="12" y2="6" stroke="currentColor" strokeWidth="4" />
         <line x1="12" y1="18" x2="12" y2="22" stroke="currentColor" strokeWidth="4" />

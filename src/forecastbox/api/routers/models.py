@@ -54,7 +54,7 @@ async def download(model_name):
 @lru_cache
 @router.get("/info/{model_name}")
 async def get_model_info(model_name: str) -> dict[str, Any]:
-    ckpt = open_checkpoint(model_name)
+    ckpt = await open_checkpoint(model_name)
     anemoi_versions = {key: val for key, val in ckpt.provenance_training()['module_versions'].items() if key.startswith("anemoi")}
 
 
@@ -65,6 +65,6 @@ async def get_model_info(model_name: str) -> dict[str, Any]:
 @router.get("/spec/{model_name}")
 async def get_model_spec(model_name: str) -> dict[str, Any]:
     """Get Qubed model Spec"""
-    ckpt = open_checkpoint(model_name)
+    ckpt = await open_checkpoint(model_name)
     return convert_to_model_spec(ckpt).to_json()
 

@@ -1,19 +1,20 @@
 "use client";
 
-import { Tabs, Card, TextInput, Select, Button, Loader, Stack, Group} from '@mantine/core';
+import { Tabs, Card, TextInput, Select, Button, LoadingOverlay, Stack, Group} from '@mantine/core';
 import { useState, useEffect } from 'react';
 
 import classes from './configuration.module.css';
 
 interface ConfigurationProps {
   apiPath: string;
-  selected: string | null;
+  selectedProduct: string | null;
+  selectedModel: string ;
   submitTarget?;
   initial?: Record<string, any>;
 }
 
-function Configuration({ apiPath, selected, submitTarget, initial}: ConfigurationProps) {
-  if (!selected) {
+function Configuration({ apiPath, selectedProduct, selectedModel, submitTarget, initial}: ConfigurationProps) {
+  if (!selectedProduct) {
     return (
       <Card>
         <p>Select Product to configure</p>
@@ -29,35 +30,34 @@ function Configuration({ apiPath, selected, submitTarget, initial}: Configuratio
   const handleChange = (name: string, value: any) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
-
   useEffect(() => {
-    const fetchInitialOptions = async () => {
-      setLoading(true);
-      try {
-        const response = await fetch(`${apiPath}/${selected}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}), // Empty request for initial load
-        });
-
-        const data = await response.json();
-
-        // Extract keys from API response to set formData and options dynamically
-        const initialFormData = Object.keys(data).reduce((acc, key) => {
-          acc[key] = ""; // Initialize all fields with empty values
-          return acc;
-        }, {});
-
-        setFormData(initialFormData);
-        setOptions(data);
-      } catch (error) {
-        console.error("Error fetching options:", error);
-      }
-      setLoading(false);
-    };
-
     fetchInitialOptions();
-  }, [selected]); // Run only on component mount
+  }, [selectedProduct]); // Run only on component mount
+
+  const fetchInitialOptions = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${apiPath}/${selectedProduct}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 'model': selectedModel, 'spec': {} }), // Empty request for initial load
+      });
+
+      const data = await response.json();
+
+      // Extract keys from API response to set formData and options dynamically
+      const initialFormData = Object.keys(data).reduce((acc, key) => {
+        acc[key] = ""; // Initialize all fields with empty values
+        return acc;
+      }, {});
+
+      setFormData(initialFormData);
+      setOptions(data);
+    } catch (error) {
+      console.error("Error fetching options:", error);
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
     if (Object.keys(formData).length === 0) return; // Prevent unnecessary fetch
@@ -65,14 +65,15 @@ function Configuration({ apiPath, selected, submitTarget, initial}: Configuratio
     const fetchUpdatedOptions = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`${apiPath}/${selected}`, {
+        const response = await fetch(`${apiPath}/${selectedProduct}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
+          body: JSON.stringify({ 'model': selectedModel, 'spec': formData }),
         });
 
         const data = await response.json();
         setOptions(data);
+        
       } catch (error) {
         console.error("Error fetching updated options:", error);
       }
@@ -83,7 +84,6 @@ function Configuration({ apiPath, selected, submitTarget, initial}: Configuratio
   }, [formData]); // Update options when formData changes
 
 
-  console.log(initial)
   useEffect(() => {
     if (initial) {
       const initialFormData = Object.keys(initial).reduce((acc, key) => {
@@ -95,12 +95,26 @@ function Configuration({ apiPath, selected, submitTarget, initial}: Configuratio
   }, [initial]);
 
 
+  const isFormValid = () => {
+    console.log(formData);
+    const isValid = Object.keys(formData).every(key => formData[key] !== undefined && formData[key] !== "");
+    if (!isValid) {
+      alert("Please fill out all required fields.");
+    }
+    return isValid;
+  };
+
+  const handleSubmit = () => {
+    if (isFormValid()) {
+      submitTarget({ ...formData, product: selectedProduct });
+    }
+  };
+
   return (
     <Card padding='sm'>
+      <LoadingOverlay visible={loading} />
         {options && Object.entries(options).map(([key, item]: [string, any]) => (
-            item.example ? (
-              <TextInput key={key} label={item.label} description={item.description} placeholder={item.example} />
-            ) : item.values ? (
+            item.values ? (
               <Select
                 key={key}
                 description={item.description}
@@ -112,10 +126,20 @@ function Configuration({ apiPath, selected, submitTarget, initial}: Configuratio
                 data={item.values || []}
                 searchable
               />
+            ) : item.example ? (
+              <TextInput 
+                key={key} 
+                label={item.label} 
+                description={item.description} 
+                placeholder={item.example} 
+                value={formData[key] || ""}
+                onChange={(event) => handleChange(key, event.currentTarget.value)}
+              />
             ) : null
         ))}
-      <Group w='100%' align='center'>
-        <Button type='submit' onClick={() => submitTarget({...formData, product: selected})}>Submit</Button>
+      <Group w='100%' align='center' mt='lg'>
+        <Button type='submit' onClick={handleSubmit} disabled={!isFormValid}>Submit</Button>
+        <Button type='button' onClick={() => { setFormData({}); setOptions({}); fetchInitialOptions(); }}>Clear</Button>
       </Group>
     </Card>
   );

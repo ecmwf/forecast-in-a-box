@@ -12,11 +12,3 @@ from .api.routers import products
 
 app.include_router(models.router, prefix="/api/py/models")
 app.include_router(products.router, prefix="/api/py/products")
-
-@app.get("/api/py/helloFastApi")
-def hello_fast_api():
-    return {"message": "Hello from FastAPI"}
-    
-@app.get("/api/py")
-async def root():
-    return {"message": "Testing"}

@@ -421,7 +421,7 @@ requires-dist = [
     { name = "orjson" },
     { name = "pyrsistent" },
     { name = "python-multipart" },
-    { name = "qubed", git = "https://github.com/ecmwf/qubed.git?rev=fiab" },
+    { name = "qubed", git = "https://github.com/ecmwf/qubed.git" },
     { name = "uvicorn" },
 ]
 
@@ -1079,7 +1079,7 @@ wheels = [
 [[package]]
 name = "qubed"
 version = "0.0.0"
-source = { git = "https://github.com/ecmwf/qubed.git?rev=fiab#624300b2abd39e97d969f629d34d3ce4998eb273" }
+source = { git = "https://github.com/ecmwf/qubed.git#c31467fb0494b592fd3746f938ecfaabcc6837d6" }
 dependencies = [
     { name = "click" },
     { name = "frozendict" },

@@ -14,7 +14,7 @@ TESTING_LOOKUP = {
     'aifs-single-0.2.1': {'huggingface':'ecmwf/aifs-single-0.2.1'},
 }
 
-def open_checkpoint(model_name: str) -> "Checkpoint":
+async def open_checkpoint(model_name: str) -> "Checkpoint":
     """Open an anemoi checkpoint."""
 
     from anemoi.inference.checkpoint import Checkpoint
@@ -50,8 +50,8 @@ def convert_to_model_spec(ckpt: "Checkpoint") -> Qube:
             {
                 "levtype": "pl",
                 "param": variable,
-                "level": levels,
-                "frequency": ckpt.timestep,
+                "levelist": levels,
+                # "frequency": ckpt.timestep,
             }
         )
 
@@ -60,7 +60,7 @@ def convert_to_model_spec(ckpt: "Checkpoint") -> Qube:
             {
                 "levtype": "sfc",
                 "param": variable,
-                "frequency": ckpt.timestep,
+                # "frequency": ckpt.timestep,
             }
         )
 

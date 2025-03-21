@@ -44,7 +44,7 @@ function Categories({ apiPath, cardProps, tabProps, setSelected }: CategoriesPro
                                 <p>{item.description}</p>
                                 <Stack justify="center">
                                     {item.options.map((option, idx) => (
-                                        <Button key={idx} style={{ margin: '5px' }} onClick={() => setSelected(option)}>
+                                        <Button key={idx} style={{ margin: '5px' }} onClick={() => setSelected(`${key}/${option}`)}>
                                             {option}
                                         </Button>
                                     ))}
