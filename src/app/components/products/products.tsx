@@ -7,35 +7,36 @@ import Categories from "./categories";
 import Configuration from "./configuration";
 import Cart from "./cart";
 
-import {CategoriesInterface} from './interface'
+import {CategoriesType, ProductConfiguration} from './interface'
+import sha256 from 'crypto-js/sha256';
 
 
 interface ProductConfigurationProps {
-    selectedModel: string;
-    products: string;
-    setProducts: (Any: any) => void;
+    model: string;
+    products: Record<string, ProductConfiguration>;
+    setProducts: (products: Record<string, ProductConfiguration>) => void;
 }
 
 
-const ProductConfiguration: React.FC<ProductConfigurationProps> = ({selectedModel, products, setProducts}) => {
+const ProductConfigurator: React.FC<ProductConfigurationProps> = ({model, products, setProducts}) => {
     const [selected, setSelectedProduct] = useState<string | null>(null);
     const [internal_products, internal_setProducts] = useState(products);
 
-    const addProduct = (specification: any) => {
-        console.log(specification);
+    const addProduct = (conf: ProductConfiguration) => {
         setSelectedProduct(null);
+
         internal_setProducts((prev: any) => ({
-          ...prev,
-          [btoa(JSON.stringify(specification))]: specification,
+            ...prev,
+            [sha256(JSON.stringify(conf)).toString()]: conf,
         }));
         console.log(products);
       };
 
-      const [categories, setCategories] = useState<CategoriesInterface>({});
+      const [categories, setCategories] = useState<CategoriesType>({});
       const [loading, setLoading] = useState(true);
   
       useEffect(() => {
-          fetch(`/api/py/products/valid-categories/${selectedModel}`)
+          fetch(`/api/py/products/valid-categories/${model}`)
               .then((res) => res.json())
               .then((data) => {
                   setCategories(data);
@@ -49,13 +50,13 @@ const ProductConfiguration: React.FC<ProductConfigurationProps> = ({selectedMode
 
             <Grid align="flex-start" justify="space-around" w="100%">
                 <Grid.Col span={4}><h2>Categories</h2><Categories categories={categories} setSelected={setSelectedProduct} /></Grid.Col>
-                <Grid.Col span={4}><h2>Configuration</h2><Configuration selectedProduct={selected} selectedModel={selectedModel} submitTarget={addProduct} /></Grid.Col>
+                <Grid.Col span={4}><h2>Configuration</h2><Configuration selectedProduct={selected} selectedModel={model} submitTarget={addProduct} /></Grid.Col>
                 <Grid.Col span={4}><h2>Selected</h2><Cart products={internal_products} setProducts={internal_setProducts}/></Grid.Col>
             </Grid>
-            <Button onClick={() => setProducts(internal_products)} disabled={!selectedModel}>Submit</Button>
+            <Button onClick={() => setProducts(internal_products)} disabled={!model}>Submit</Button>
         </Card>
 
     );
 }
 
-export default ProductConfiguration;
+export default ProductConfigurator;

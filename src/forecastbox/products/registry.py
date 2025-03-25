@@ -2,7 +2,7 @@
 Registry of products
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable, Type
 
 from .product import Product
@@ -15,6 +15,9 @@ class Category:
 	title: str
 	description: str
 	options: list[str]
+	unavailable_options: list[str] = field(default_factory=list)
+
+	available: bool = None
 
 
 class CategoryRegistry:

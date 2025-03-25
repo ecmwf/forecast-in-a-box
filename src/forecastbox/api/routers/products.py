@@ -24,7 +24,7 @@ CONFIG_ORDER = ["param", "levtype", "levelist"]
 
 
 @dataclass
-class ConfigEntry:
+class ConfigSpecification:
 	"""Configuration Entry"""
 
 	label: str
@@ -37,6 +37,8 @@ class ConfigEntry:
 	"""Example value for the configuration entry"""
 	multiple: bool = False
 	"""Whether the configuration entry is a multiple select"""
+	constrained_by: list[str] = None
+	"""List of configuration entries that this entry is constrained by""" # TODO
 
 	def __post_init__(self):
 		if USER_DEFINED in self.values:
@@ -56,12 +58,12 @@ class ConfigEntry:
 		self.values = list(map(str, sorted(self.values, key=lambda x: str(x).lower())))
 
 @dataclass
-class ProductConfig:
+class ProductSpecification:
 	"""Product Configuration"""
 
 	product: str
 	"""Product name"""
-	entries: dict[str, ConfigEntry]
+	entries: dict[str, ConfigSpecification]
 	"""Configuration entries"""
 
 	def __post_init__(self):
@@ -81,13 +83,14 @@ def select_from_params(available_spec: Qube, params: dict[str, Any]) -> Qube:
 	for key, val in params.items():
 		if not val:
 			continue
-		if key in available_spec.axes() and USER_DEFINED in available_spec.axes().get(key, []):
+		if key in available_spec.axes() and USER_DEFINED in available_spec.span(key):
 			# Dont select if open ended
 			continue
-		available_spec = available_spec.select({key: val})
+		available_spec = available_spec.select({key: str(val) if not isinstance(val, (list, tuple)) else list(map(str, val))})
+
 	return available_spec
 
-async def product_to_config(product: Product, selected_model: str, params: dict[str, Any]) -> ProductConfig:
+async def product_to_config(product: Product, selected_model: str, params: dict[str, Any]) -> dict[str, ConfigSpecification]:
 	"""Convert a product to a configuration."""
 
 	from qubed import Qube
@@ -98,34 +101,37 @@ async def product_to_config(product: Product, selected_model: str, params: dict[
 	model_spec = Model(ckpt)
 	model_qube = model_spec.qube(product.model_assumptions)
 
-	selected_spec = Qube.from_datacube({k: v for k, v in params.items() if v})
-
 	available_product_spec = product.model_intersection(model_spec)
 	subsetted_spec = select_from_params(model_qube & product_spec, params)
-
-	if len(subsetted_spec.axes()) == 0 and selected_spec:
-		subsetted_spec = selected_spec
 
 	axes = subsetted_spec.axes()
 
 	entries = {}
 	for key, val in axes.items():
 		# Add back in other options when selected
-		if key in params and (len(val) == 1 or product.multiselect.get(key, False)):
-			val = select_from_params(available_product_spec, {k: v for k, v in params.items() if not k == key}).axes().get(key, val)
+		constrained = []
+		for k, v in params.items():
+			if k == key or not k in params:
+				continue
+
+			if sorted(select_from_params(available_product_spec, {}).span(key)) != sorted(select_from_params(available_product_spec, {k: v}).span(key)):
+				constrained.append(product.label.get(k, k))
+				
+		val = select_from_params(available_product_spec, {k: v for k, v in params.items() if not k == key}).axes().get(key, val)
 		
-		entries[key] = ConfigEntry(
+		entries[key] = ConfigSpecification(
 			label=product.label.get(key, key),
 			description=product.description.get(key, None),
 			values=list(val),
 			example=product.example.get(key, None),
 			multiple=product.multiselect.get(key, False),
+			constrained_by = constrained,
 		)
 
 	for key in model_spec.ignore_in_select:
 		entries.pop(key, None)
 
-	return ProductConfig(product.__class__.__name__, entries)
+	return entries
 
 
 @router.get("/categories")
@@ -136,29 +142,26 @@ async def api_get_categories():
 async def get_valid_categories(model_name: str) -> dict[str, Category]:
 	ckpt = await open_checkpoint(model_name)
 	
-
-	valid_categories = {}
-	for category, products in get_categories().items():
-		valid_products = []
-		for product in products.options:
-			prod = get_product(category, product)
+	categories = get_categories()
+	for key, category in categories.items():
+		for product in category.options:
+			prod = get_product(key, product)
 
 			model_spec = Model(ckpt)
 			if prod.validate_intersection(prod.model_intersection(model_spec)):
-				valid_products.append(product)
-				
-		if valid_products:
-			valid_categories[category] = products
-			valid_categories[category].options = valid_products
+				category.available = True
+			else:
+				category.options.remove(product)
+				category.unavailable_options.append(product)
 
-	return valid_categories
+	return categories
 
 @router.post("/configuration/{category}/{product}")
-async def get_product_configuration(category, product: str, params: dict) -> dict[str, ConfigEntry]:
+async def get_product_configuration(category, product: str, params: dict) -> ProductSpecification:
 	selected_model = params["model"]
 	spec = params["spec"]
 
 	prod = get_product(category, product)
 
-	conf = await product_to_config(prod, selected_model, spec)
-	return conf.entries
+	entries = await product_to_config(prod, selected_model, spec)
+	return ProductSpecification(product=f"{category}/{product}", entries=entries)

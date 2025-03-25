@@ -1,29 +1,56 @@
+/**
+ * Type representing a product category.
+ */
+export type CategoryType = {
+  /**
+   * The title of the category.
+   */
+  title: string;
 
+  /**
+   * A brief description of the category.
+   */
+  description: string;
+
+  /**
+   * An array of options available within the category.
+   */
+  options: string[];
+
+  /**
+   * An array of options unavailable within the category.
+   */
+  unavailable_options: string[];
+
+  /**
+   * Availability of the category
+   */
+  available: boolean;
+};
 
 /**
- * Interface representing a product category.
+ * Type representing a collection of categories.
+ * Each key is a string that maps to a CategoryType object.
  */
-export interface CategoryInterface {
-    /**
-     * The title of the category.
-     */
-    title: string;
+export type CategoriesType = {
+  [key: string]: CategoryType;
+};
 
-    /**
-     * A brief description of the category.
-     */
-    description: string;
+export type ConfigSpecification = {
+  label: string;
+  description: string;
+  example?: string;
+  values?: string[];
+  multiple: boolean;
+  constrained_by: string[];
+};
 
-    /**
-     * An array of options available within the category.
-     */
-    options: string[];
-}
+export type ProductSpecification = {
+  product: string;
+  entries: Record<string, ConfigSpecification>;
+};
 
-/**
- * Interface representing a collection of categories.
- * Each key is a string that maps to a CategoryInterface object.
- */
-export interface CategoriesInterface{
-    [key: string]: CategoryInterface
-}
+export type ProductConfiguration = {
+  product: string;
+  options: Record<string, string>;
+};

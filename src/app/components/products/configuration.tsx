@@ -1,21 +1,32 @@
 "use client";
 
-import { Tabs, Card, TextInput, Select, Button, LoadingOverlay, MultiSelect, Group} from '@mantine/core';
 import { useState, useEffect } from 'react';
 
+import { Card, TextInput, Select, Button, LoadingOverlay, MultiSelect, Group,} from '@mantine/core';
+
+import {
+  showNotification, // notifications.show
+} from '@mantine/notifications';
+
+import {IconX} from '@tabler/icons-react'
+
 import classes from './configuration.module.css';
+
+import {ProductSpecification, ProductConfiguration, ConfigSpecification} from './interface'
 
 interface ConfigurationProps {
   selectedProduct: string | null;
   selectedModel: string ;
-  submitTarget?;
-  initial?: Record<string, any>;
-}
-interface ConfigRecord{
-  label: string; description: string; example?: string; values?: string[], multiple: boolean
+  submitTarget: (conf: ProductConfiguration) => void;
 }
 
-function Configuration({ selectedProduct, selectedModel, submitTarget, initial}: ConfigurationProps) {
+function write_description({ description, constraints }: { description: string; constraints: string[] }) {
+  if (!constraints.length) return <>{description}</>;
+  const constraintText = <span style={{ color: 'red' }}>Constraints: {constraints.join(", ")}</span>;
+  return description ? <>{description} - {constraintText}</> : constraintText;
+}
+
+function Configuration({ selectedProduct, selectedModel, submitTarget}: ConfigurationProps) {
   if (!selectedProduct) {
     return (
       <Card>
@@ -25,17 +36,16 @@ function Configuration({ selectedProduct, selectedModel, submitTarget, initial}:
   }
 
   const [formData, setFormData] = useState<Record<string, any>>({});
-  const [options, setOptions] = useState<Record<string, ConfigRecord>>({});
+  const [productSpec, updateProductSpec] = useState<ProductSpecification>({ product: selectedProduct, entries: {} });
   const [loading, setLoading] = useState(true);
 
   // Handle select field changes
   const handleChange = (name: string, value: any) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
-  useEffect(() => {
-    fetchInitialOptions();
-  }, [selectedProduct]); // Run only on component mount
+  
 
+  // Fetch initial options
   const fetchInitialOptions = async () => {
     setLoading(true);
     try {
@@ -45,21 +55,26 @@ function Configuration({ selectedProduct, selectedModel, submitTarget, initial}:
         body: JSON.stringify({ 'model': selectedModel, 'spec': {} }), // Empty request for initial load
       });
 
-      const data = await response.json();
+      const productSpec: ProductSpecification = await response.json();
 
       // Extract keys from API response to set formData and options dynamically
-      const initialFormData = Object.keys(data).reduce((acc, key) => {
+      const initialFormData: Record<string, string> = Object.keys(productSpec.entries).reduce((acc: Record<string, string>, key: string) => {
         acc[key] = ""; // Initialize all fields with empty values
         return acc;
       }, {});
 
       setFormData(initialFormData);
-      setOptions(data);
+      updateProductSpec(productSpec);
     } catch (error) {
       console.error("Error fetching options:", error);
     }
     setLoading(false);
   };
+  // Fetch initial options on component mount
+  useEffect(() => {
+    fetchInitialOptions();
+  }, [selectedProduct]); // Run only on component mount
+
 
   useEffect(() => {
     if (Object.keys(formData).length === 0) return; // Prevent unnecessary fetch
@@ -73,8 +88,8 @@ function Configuration({ selectedProduct, selectedModel, submitTarget, initial}:
           body: JSON.stringify({ 'model': selectedModel, 'spec': formData }),
         });
 
-        const data = await response.json();
-        setOptions(data);
+        const productSpec: ProductSpecification = await response.json();
+        updateProductSpec(productSpec);
         
       } catch (error) {
         console.error("Error fetching updated options:", error);
@@ -85,23 +100,23 @@ function Configuration({ selectedProduct, selectedModel, submitTarget, initial}:
     fetchUpdatedOptions();
   }, [formData]); // Update options when formData changes
 
-
-  useEffect(() => {
-    if (initial) {
-      const initialFormData = Object.keys(initial).reduce((acc, key) => {
-        acc[key] = initial[key];
-        return acc;
-      }, {});
-      setFormData(initialFormData);
-    }
-  }, [initial]);
-
-
   const isFormValid = () => {
     // console.log(formData);
-    const isValid = Object.keys(options).every(key => formData[key] !== undefined && formData[key] !== "");
+    const isValid = Object.keys(productSpec.entries).every(key => formData[key] !== undefined && formData[key] !== "");
     if (!isValid) {
-      alert("Please fill out all required fields.");
+      showNotification({
+        id: 'invalid-form',
+        position: 'bottom-center',
+        withCloseButton: true,
+        autoClose: 5000,
+        title: "Fill in all fields",
+        message: 'Please fill in all fields before submitting',
+        color: 'red',
+        icon: <IconX />,
+        className: 'my-notification-class',
+        // style: { backgroundColor: 'red' },
+        loading: false,
+      });
     }
     return isValid;
   };
@@ -109,24 +124,25 @@ function Configuration({ selectedProduct, selectedModel, submitTarget, initial}:
   const handleSubmit = () => {
     if (isFormValid()) {
       const filteredFormData = Object.keys(formData)
-        .filter(key => key in options)
-        .reduce((acc, key) => {
+        .filter(key => key in productSpec.entries)
+        .reduce((acc: Record<string, any>, key) => {
           acc[key] = formData[key];
           return acc;
         }, {});
-      submitTarget({ ...filteredFormData, product: selectedProduct });
+        
+      submitTarget({ product: selectedProduct, options: filteredFormData });
     }
   };
-  console.log(options);
+
   return (
     <Card padding='sm'>
       <LoadingOverlay visible={loading} />
-        {options && Object.entries(options).map(([key, item]: [string, ConfigRecord]) => (
+        {productSpec && Object.entries(productSpec.entries).map(([key, item]: [string, ConfigSpecification]) => (
               item.values ? (
                 item.multiple ? (
                   <MultiSelect
                     key={`${selectedProduct}_${key}`}
-                    description={item.description}
+                    description={write_description({ description: item.description, constraints: item.constrained_by })}
                     label={item.label}
                     placeholder={`${key}`}
                     // value={formData[key]}
@@ -138,7 +154,7 @@ function Configuration({ selectedProduct, selectedModel, submitTarget, initial}:
                 ) : (
               <Select
                 key={`${selectedProduct}_${key}`}
-                description={item.description}
+                description={write_description({ description: item.description, constraints: item.constrained_by })}
                 label={item.label}
                 placeholder={`Select ${key}`}
                 // value={formData[key]}
@@ -160,7 +176,7 @@ function Configuration({ selectedProduct, selectedModel, submitTarget, initial}:
         ))}
       <Group w='100%' align='center' mt='lg'>
         <Button type='submit' onClick={handleSubmit} disabled={!isFormValid}>Submit</Button>
-        <Button type='button' onClick={() => { setFormData({}); setOptions({}); fetchInitialOptions(); }}>Clear</Button>
+        <Button type='button' onClick={() => { setFormData({}); updateProductSpec({ product: selectedProduct, entries: {} }); fetchInitialOptions(); }}>Clear</Button>
       </Group>
     </Card>
   );
