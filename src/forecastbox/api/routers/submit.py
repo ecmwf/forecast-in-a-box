@@ -55,8 +55,8 @@ async def convert_to_cascade(spec: SubmitSpecification) -> Cascade:
     return product_cascade
 
 
-@router.post("/get_graph", response_model=str)
-async def get_graph(spec: SubmitSpecification):
+@router.post("/visualise", response_model=str)
+async def get_graph_visualise(spec: SubmitSpecification):
     """Submit a full configuration."""
     graph = await convert_to_cascade(spec)
 
@@ -65,7 +65,20 @@ async def get_graph(spec: SubmitSpecification):
     dest = tempfile.NamedTemporaryFile(suffix=".html", dir = graph_dir)
     GRAPHS.add(dest)
     visualised = graph.visualise(dest.name, preset = 'blob')
-
     assert visualised is not None
     parent_path = str(Path(graph_dir).absolute().resolve()).replace(graph_dir.removesuffix('/'), '')
     return Response(str(Path(dest.name).relative_to(parent_path)), media_type="text")
+
+
+
+
+@router.post("/serialise", response_model=bytes)
+async def get_graph_serialised(spec: SubmitSpecification):
+    """Submit a full configuration."""
+    graph = await convert_to_cascade(spec)
+
+    from cascade.graph.export import serialise
+    from cascade.graph.deduplicate import deduplicate_nodes
+    import dill
+    graph_bytes = dill.dumps(serialise(deduplicate_nodes(graph._graph)))
+    return Response(graph_bytes, media_type="application/octet-stream")

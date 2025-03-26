@@ -54,23 +54,49 @@ function Confirm({ model, products, setProducts, setSlider}: ConfirmProps) {
         }
         console.log(submitData);
 
-        const submit = async () => {
+        async function retrieveFileBlob() {
             try {
-                const response = await fetch(`/api/py/submit/`, {
+                const ftch = await fetch( // this will request the file information for the download (whether an image, PDF, etc.)
+                    `/api/py/submit/serialise`,
+                    {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(submitData),
-                });
-        
-                const runId: number = await response.json();
-                
-            } catch (error) {
-                console.error("Error submitting:", error);
+                        headers: {
+                            "Content-type": "application/json"
+                        },
+                        body: JSON.stringify(submitData)
+                    },
+                )
+                const fileBlob = await ftch.blob()
+                console.log(fileBlob)
+
+                // this works and prompts for download
+                var link = document.createElement('a')  // once we have the file buffer BLOB from the post request we simply need to send a GET request to retrieve the file data
+                link.href = window.URL.createObjectURL(fileBlob)
+                link.setAttribute("download", 'cascade_blob.dill');
+                link.click()
+                link.remove();  //afterwards we remove the element  
+            } catch (e) {
+                console.log({ "message": e, status: 400 })  // handle error
             }
+
+        // const submit = async () => {
+        //     try {
+        //         const response = await fetch(`/api/py/submit/`, {
+        //             method: "POST",
+        //             headers: { "Content-Type": "application/json" },
+        //             body: JSON.stringify(submitData),
+        //         });
+        
+        //         const runId: number = await response.json();
+                
+        //     } catch (error) {
+        //         console.error("Error submitting:", error);
+        //     }
         };
+        retrieveFileBlob();
     }
-    const [graphUrl, setGraphUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [graphUrl, setGraphUrl] = useState<string | null>(null);
 
     const getGraph = () => {
         const submitData: SubmitSpecification = {
@@ -84,7 +110,7 @@ function Confirm({ model, products, setProducts, setSlider}: ConfirmProps) {
             setLoading(true);
             (async () => {
                 try {
-                    const response = await fetch(`/api/py/submit/get_graph/`, {
+                    const response = await fetch(`/api/py/submit/visualise`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(submitData),
