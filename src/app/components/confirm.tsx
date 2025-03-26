@@ -20,24 +20,19 @@ interface ConfirmProps {
 }
 
 
-function GraphModal({ graphUrl, setGraphUrl, loading }: { graphUrl: string | null, setGraphUrl: (url: string | null) => void, loading: boolean }) {
+function GraphModal({ graphContent, setGraphContent, loading }: { graphContent: string, setGraphContent: (content: string) => void, loading: boolean }) {
     return (
         <Modal
-            opened={!!graphUrl || loading}
-            onClose={() => setGraphUrl(null)}
+            opened={!!graphContent || loading}
+            onClose={() => setGraphContent("")}
             title={loading ? "Loading..." : "Graph"}
-            size={loading ? "xs" : "70vw"}
+            size={loading ? "xs" : "60vw"}
         >
-            {loading && 
-            <Center>
-                <Loader />
-            </Center>
-            }
-            {!loading && graphUrl &&
+            {loading && <Center><Loader /></Center>}
+            {!loading && graphContent &&
                 <iframe
-                    src={graphUrl.replace(/^public/, '')}
-                    title="Graph"
-                    style={{ width: '100%', height: '620px', border: 'none' }}
+                    srcDoc={graphContent} // Use srcDoc to inject the full HTML document
+                    style={{ width: "100%", height: "60vh", border: "none" }}
                 />
             }
         </Modal>
@@ -45,7 +40,7 @@ function GraphModal({ graphUrl, setGraphUrl, loading }: { graphUrl: string | nul
 }
 
 function Confirm({ model, products, setProducts, setSlider}: ConfirmProps) {
-
+    
     const handleSubmit = () => {
         const submitData: SubmitSpecification = {
             model: model,
@@ -59,7 +54,7 @@ function Confirm({ model, products, setProducts, setSlider}: ConfirmProps) {
                 const ftch = await fetch( // this will request the file information for the download (whether an image, PDF, etc.)
                     `/api/py/submit/serialise`,
                     {
-                    method: "POST",
+                        method: "POST",
                         headers: {
                             "Content-type": "application/json"
                         },
@@ -95,6 +90,8 @@ function Confirm({ model, products, setProducts, setSlider}: ConfirmProps) {
         };
         retrieveFileBlob();
     }
+
+    const [graphContent, setGraphContent] = useState<string>("");
     const [loading, setLoading] = useState(false);
     const [graphUrl, setGraphUrl] = useState<string | null>(null);
 
@@ -118,7 +115,7 @@ function Confirm({ model, products, setProducts, setSlider}: ConfirmProps) {
 
                     const graph: string = await response.text();
                     console.log(graph);
-                    setGraphUrl(graph);
+                    setGraphContent(graph);
                 } catch (error) {
                     console.error("Error getting graph:", error);
                 } finally {
@@ -168,7 +165,7 @@ function Confirm({ model, products, setProducts, setSlider}: ConfirmProps) {
                 <Button onClick={handleSubmit}>Submit</Button>
             </SimpleGrid>
             
-            <GraphModal graphUrl={graphUrl} setGraphUrl={setGraphUrl} loading={loading}/>
+            <GraphModal graphContent={graphContent} setGraphContent={setGraphContent} loading={loading}/>
             
         </>
     );

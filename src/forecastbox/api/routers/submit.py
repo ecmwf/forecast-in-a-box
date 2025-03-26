@@ -21,21 +21,6 @@ router = APIRouter(
 	responses={404: {"description": "Not found"}},
 )
 
-class FileRegister:
-    def __init__(self):
-        self.files = []
-
-    def add(self, file):
-        self.files.append(file)
-
-    def clear(self):
-        for file in self.files:
-            file.close()
-
-    def __del__(self):
-        self.clear()
-
-GRAPHS = FileRegister()
 
 async def convert_to_cascade(spec: SubmitSpecification) -> Cascade:
     """Convert a specification to a cascade."""
@@ -59,18 +44,12 @@ async def convert_to_cascade(spec: SubmitSpecification) -> Cascade:
 async def get_graph_visualise(spec: SubmitSpecification):
     """Submit a full configuration."""
     graph = await convert_to_cascade(spec)
+    
+    with tempfile.NamedTemporaryFile(suffix=".html") as dest:
+        graph.visualise(dest.name, preset = 'blob')
 
-    graph_dir = os.environ.get('FIAB_GRAPH_DIR', tempfile.gettempdir())
-
-    dest = tempfile.NamedTemporaryFile(suffix=".html", dir = graph_dir)
-    GRAPHS.add(dest)
-    visualised = graph.visualise(dest.name, preset = 'blob')
-    assert visualised is not None
-    parent_path = str(Path(graph_dir).absolute().resolve()).replace(graph_dir.removesuffix('/'), '')
-    return Response(str(Path(dest.name).relative_to(parent_path)), media_type="text")
-
-
-
+        with open(dest.name, 'r') as f:
+            return Response(f.read(), media_type="text/html")
 
 @router.post("/serialise", response_model=bytes)
 async def get_graph_serialised(spec: SubmitSpecification):
