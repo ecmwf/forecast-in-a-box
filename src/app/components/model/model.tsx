@@ -1,21 +1,28 @@
 "use client"; // Required for client-side fetching
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Modal, Group } from '@mantine/core';
+import { Card, Button, Modal, Group, TextInput, NumberInput } from '@mantine/core';
 import GlobeSelect from './globe';
 import Options from './options';
 import InformationWindow from './information';
 
+import { ModelSpecification } from '../interface';
+
 interface ModelProps {
-    selectedModel: string | null;
-    setSelectedModel: (value: string | null) => void;
-    coordinates: {lat: number, lon: number} | null;
-    setCoordinates: (coords: {lat: number, lon: number} | null) => void;
-    submit: () => void;
+    selectedModel: ModelSpecification;
+    submit: (val: ModelSpecification) => void;
+    coordinates: { lat: number; lon: number } | null;
+    setCoordinates: (coords: { lat: number; lon: number } | null) => void;
 }
-const Model: React.FC<ModelProps> = ({ selectedModel, setSelectedModel, coordinates, setCoordinates, submit }) => {
-    
-    const [showGlobeSelect, setShowGlobeSelect] = useState(false);
+
+function Model({ selectedModel, coordinates, setCoordinates, submit }: ModelProps) {
+    const [model, setModel] = useState<string>(selectedModel.model);
     const [modalOpened, setModalOpened] = useState(false);
+    const [showGlobeSelect, setShowGlobeSelect] = useState(false);
+
+    // State for form inputs
+    const [date, setDate] = useState<string>('20200101');
+    const [leadTime, setLeadTime] = useState<number>(72);
+    const [ensembleMembers, setEnsembleMembers] = useState<number>(4);
 
     const handleGlobeSubmit = () => {
         if (coordinates) {
@@ -27,9 +34,14 @@ const Model: React.FC<ModelProps> = ({ selectedModel, setSelectedModel, coordina
         setModalOpened(false);
     };
 
+    const handleModelSubmit = () => {
+        console.log('Submitting model:', model);
+        submit({ model: model, date: date, lead_time: leadTime, ensemble_members: ensembleMembers });
+    };
+
     useEffect(() => {
-        if (selectedModel) {
-            fetch(`/api/py/models/info/${selectedModel}`)
+        if (model) {
+            fetch(`/api/py/models/info/${model}`)
                 .then((res) => res.json())
                 .then((modelOptions) => {
                     if (modelOptions.local_area) {
@@ -39,26 +51,28 @@ const Model: React.FC<ModelProps> = ({ selectedModel, setSelectedModel, coordina
                     }
                 });
         }
-    }, [selectedModel]);
-
+    }, [model]);
 
     return (
-        <Card padding=''>
+        <Card padding="">
             <Group justify="space-between" grow align="flex-start">
-                <Options cardProps={{w: '30vw' }} setSelected={setSelectedModel}/>
-                <InformationWindow selected={selectedModel}/>
+                <Options cardProps={{ w: '30vw' }} setSelected={setModel} />
+                <Card padding="md">
+                    <h2>Information</h2>
+                    <InformationWindow selected={model} />
+                </Card>
             </Group>
 
             {showGlobeSelect && (
                 <Group>
                     <Button onClick={() => setModalOpened(true)}>Open Globe</Button>
                     <Group>
-                    {coordinates && (
-                        <>
-                        <p>Latitude: {coordinates.lat}</p>
-                        <p>Longitude: {coordinates.lon}</p>
-                        </>
-                    )}
+                        {coordinates && (
+                            <>
+                                <p>Latitude: {coordinates.lat}</p>
+                                <p>Longitude: {coordinates.lon}</p>
+                            </>
+                        )}
                     </Group>
                 </Group>
             )}
@@ -66,13 +80,39 @@ const Model: React.FC<ModelProps> = ({ selectedModel, setSelectedModel, coordina
                 opened={modalOpened}
                 onClose={() => setModalOpened(false)}
                 title="Select centre of LAM"
-                size='auto'
+                size="auto"
             >
-                <GlobeSelect handleSubmit={handleGlobeSubmit} setSelectedLocation={setCoordinates} globeProps={{ width: 600, height: 450 }}/>
+                <GlobeSelect handleSubmit={handleGlobeSubmit} setSelectedLocation={setCoordinates} globeProps={{ width: 600, height: 450 }} />
             </Modal>
-            <Button onClick={submit} disabled={!selectedModel}>Submit</Button>
+
+            {/* Form for setting variables */}
+            <Card padding="md" mt="md">
+                <h2>Model Parameters</h2>
+                <TextInput
+                    label="Date"
+                    placeholder="YYYYMMDD"
+                    value={date}
+                    onChange={(event) => setDate(event.currentTarget.value)}
+                />
+                <NumberInput
+                    label="Lead Time (hours)"
+                    value={leadTime}
+                    onChange={(value) => setLeadTime(value || 0)}
+                    min={0}
+                />
+                <NumberInput
+                    label="Ensemble Members"
+                    value={ensembleMembers}
+                    onChange={(value) => setEnsembleMembers(value || 0)}
+                    min={1}
+                />
+            </Card>
+
+            <Button onClick={handleModelSubmit} disabled={!model} mt="md">
+                Submit
+            </Button>
         </Card>
     );
-};
+}
 
 export default Model;

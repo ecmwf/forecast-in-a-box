@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "fastapi-dev": "uv run uvicorn forecastbox.entrypoint:app --reload --log-level info",
+    "fastapi-dev": "export FIAB_GRAPH_DIR=public/graphs/;uv run uvicorn forecastbox.entrypoint:app --reload --log-level info",
     "next-dev": "next dev",
     "dev": "concurrently \"npm run next-dev\" \"npm run fastapi-dev\"",
     "setup": "uv add fastapi",

@@ -1,10 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Card, LoadingOverlay, Text, Stack, Title, Paper} from '@mantine/core';
+import { SimpleGrid, Flex, Divider, LoadingOverlay, Text, Stack, Title, Paper} from '@mantine/core';
+
+
+import {ModelSpecification} from '../interface'
+
 
 interface InformationProps {
     selected: string | null;
 }
-const InformationWindow: React.FC<InformationProps> = ({ selected }) => {
+
+function InformationWindow({ selected }: InformationProps) {
     const [information, setInformation] = useState<string | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
 
@@ -27,12 +32,7 @@ const InformationWindow: React.FC<InformationProps> = ({ selected }) => {
 
     if (!selected) {
         return (
-            <Card shadow="" padding="md">
-            <Card.Section>
-                <h2>Information</h2>
                 <p>Select a model for information</p>
-            </Card.Section>
-            </Card>
         )
     }
 
@@ -42,23 +42,21 @@ const InformationWindow: React.FC<InformationProps> = ({ selected }) => {
     }
 
     return (
-        <Card shadow="" padding="xs">
-            <Card.Section>
-                <h2>Information</h2>
-                {/* <p>Model Information</p> */}
-            </Card.Section>
+        <>
             <Title order={3} p=''>{selected}</Title>
             <LoadingOverlay visible={loading}/>
-            <Stack mih={50}
+            {/* <Stack mih={50}
                 gap="xs"
                 justify="flex-start"
                 align="stretch"
-            >
+            > */}
+            <SimpleGrid cols={1}>
+
             {information && Object.entries(information).map(([key, value]) => (
-                <Paper style={{ display: 'flex'}} shadow="xs" p="xs">
-                    <Title w='100px' order={5} style={{ display: 'inline-block', width: '150px' }}>{key}:</Title>
+                <Paper shadow="xs" p="xs">
+                    <Title order={5}>{key}:</Title>
                     {typeof value === 'object' && !Array.isArray(value) && value !== null ? (
-                        <Stack maw='80%' style={{ marginLeft: '10px' }}>
+                        <Stack maw='80%' style={{ marginLeft: '10px' }} gap='xs'>
                             {Object.entries(value).map(([subKey, subValue]) => (
                                 <Text p='' m='' key={subKey} lineClamp={3}>{subKey}: {JSON.stringify(subValue, null, 2)}</Text>
                             ))}
@@ -68,8 +66,9 @@ const InformationWindow: React.FC<InformationProps> = ({ selected }) => {
                     )}
                 </Paper>
             ))}
-            </Stack>
-        </Card>
+            </SimpleGrid>
+            {/* </Stack> */}
+        </>
     );
 };
 

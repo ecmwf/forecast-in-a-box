@@ -1,22 +1,21 @@
 
 import React, { useState } from 'react';
-import { Button, ActionIcon, ScrollArea, Card, Text, Group, Modal, Divider, Stack} from '@mantine/core';
+import { Button, ActionIcon, ScrollArea, Card, Text, Group, Paper, Modal, Divider, Stack, Container} from '@mantine/core';
 
 import Configuration from './configuration';
 import { IconX, IconPencil} from '@tabler/icons-react';
 
-import {CategoriesType, ProductConfiguration} from './interface'
+import {CategoriesType, ProductSpecification} from '../interface'
 import sha256 from 'crypto-js/sha256';
 
 
 interface CartProps {
-    products: Record<string, ProductConfiguration>;
-    setProducts: (products: Record<string, ProductConfiguration>) => void;
+    products: Record<string, ProductSpecification>;
+    setProducts: (products: Record<string, ProductSpecification>) => void;
 }
 
 
-const Cart: React.FC<CartProps> = ({products, setProducts}) => {
-
+function Cart({products, setProducts}: CartProps) {
     const handleRemove = (id: string) => {
       const updatedProducts = { ...products };
       delete updatedProducts[id];
@@ -31,7 +30,7 @@ const Cart: React.FC<CartProps> = ({products, setProducts}) => {
       setModalOpen(true);
     };
 
-    const handleEdit = (conf: ProductConfiguration) => {
+    const handleEdit = (conf: ProductSpecification) => {
         setModalOpen(false);
         handleRemove(selectedProduct);
 
@@ -59,7 +58,7 @@ const Cart: React.FC<CartProps> = ({products, setProducts}) => {
                 )}
             </Modal> */}
             <Stack maw='90%' p='' m='' gap='xs'>
-              {Object.entries(products[id].options).map(([subKey, subValue]) => (
+              {Object.entries(products[id].specification).map(([subKey, subValue]) => (
                 subKey !== 'product' && (
                   <Text size='xs' p='' m='' key={subKey} lineClamp={1}>{subKey}: {JSON.stringify(subValue)}</Text>
                 )
@@ -71,11 +70,11 @@ const Cart: React.FC<CartProps> = ({products, setProducts}) => {
     ));
     
     return (
-      <Card shadow="sm" padding="lg" radius="md" withBorder h="60vh" w="25vw" mih="200px" maw="400px">
+      <Paper shadow="sm" p="lg" radius="md" withBorder h="60vh" w="inherit" mah="80vh">
         <ScrollArea h='inherit' type="always">
           {rows}
         </ScrollArea>        
-      </Card>
+      </Paper>
     );
   };
   

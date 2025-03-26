@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import classes from './categories.module.css';
 
-import {CategoriesType} from './interface'
+import {CategoriesType} from '../interface'
 
 interface CategoriesProps {
     categories: CategoriesType;

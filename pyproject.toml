@@ -22,8 +22,10 @@ dependencies = [
 	"cloudpickle",
 	"pyrsistent",
 	"anemoi-inference[huggingface]>=0.4.10",
-	"qubed @ git+https://github.com/ecmwf/qubed.git",
+	"qubed",
 	"ruff>=0.11.2",
+	"cascade-python",
+	"anemoi-cascade",
 ]
 
 [project.urls]
@@ -43,6 +45,11 @@ indent-style = "tab"
 
 [tool.mypy]
 plugins = "pydantic.mypy"
+
+[tool.uv.sources]
+cascade-python = { git = "https://github.com/ecmwf/cascade.git", rev = "develop" }
+qubed = { git = "ssh://git@github.com/ecmwf/qubed.git" }
+anemoi-cascade = { git = "ssh://git@github.com/ecmwf/anemoi-cascade" }
 
 [tool.hatch.metadata]
 allow-direct-references = true

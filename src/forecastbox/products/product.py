@@ -1,11 +1,14 @@
 from abc import ABC, abstractmethod
 
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from qubed import Qube
 from forecastbox.models import Model
 
 from .definitions import DESCRIPTIONS, LABELS
+
+if TYPE_CHECKING:
+	from cascade.fluent import Action
 
 class Product(ABC):
 	"""Base Product Class"""
@@ -51,11 +54,11 @@ class Product(ABC):
 		return intersection
 
 	@abstractmethod
-	def mars_request(self, **kwargs) -> dict[str, Any]:
+	def mars_request(self, specification: dict[str, Any]) -> dict[str, Any]:
 		raise NotImplementedError()
 
 	@abstractmethod
-	def to_graph(self, source):
+	def to_graph(self, specification: dict[str, Any], source: "Action") -> "Action":
 		pass
 
 
@@ -95,6 +98,16 @@ class GenericParamProduct(Product):
 				**kwargs,
 			}
 		)
+	
+	def select_on_specification(self, specification: dict[str, Any], source: 'Action') -> 'Action':
+		"""Select on a specification."""
+		for key, value in specification.items():
+			if not value:
+				continue
+			if key not in source.nodes.dims:
+				continue
+			source = source.sel(**{key: value})
+		return source
 
 
 USER_DEFINED = "USER_DEFINED"

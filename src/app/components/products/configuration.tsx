@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 
-import { Card, TextInput, Select, Button, LoadingOverlay, MultiSelect, Group,} from '@mantine/core';
+import { Card, TextInput, Select, Button, LoadingOverlay, MultiSelect, Group, Text} from '@mantine/core';
 
 import {
   showNotification, // notifications.show
@@ -12,12 +12,12 @@ import {IconX} from '@tabler/icons-react'
 
 import classes from './configuration.module.css';
 
-import {ProductSpecification, ProductConfiguration, ConfigSpecification} from './interface'
+import {ProductSpecification, ProductConfiguration, ConfigEntry} from '../interface'
 
 interface ConfigurationProps {
   selectedProduct: string | null;
   selectedModel: string ;
-  submitTarget: (conf: ProductConfiguration) => void;
+  submitTarget: (conf: ProductSpecification) => void;
 }
 
 function write_description({ description, constraints }: { description: string; constraints: string[] }) {
@@ -36,7 +36,7 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
   }
 
   const [formData, setFormData] = useState<Record<string, any>>({});
-  const [productSpec, updateProductSpec] = useState<ProductSpecification>({ product: selectedProduct, entries: {} });
+  const [productConfig, updateProductConfig] = useState<ProductConfiguration>({ product: selectedProduct, options: {} });
   const [loading, setLoading] = useState(true);
 
   // Handle select field changes
@@ -55,16 +55,16 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
         body: JSON.stringify({ 'model': selectedModel, 'spec': {} }), // Empty request for initial load
       });
 
-      const productSpec: ProductSpecification = await response.json();
+      const productSpec: ProductConfiguration = await response.json();
 
       // Extract keys from API response to set formData and options dynamically
-      const initialFormData: Record<string, string> = Object.keys(productSpec.entries).reduce((acc: Record<string, string>, key: string) => {
+      const initialFormData: Record<string, string> = Object.keys(productSpec.options).reduce((acc: Record<string, string>, key: string) => {
         acc[key] = ""; // Initialize all fields with empty values
         return acc;
       }, {});
 
       setFormData(initialFormData);
-      updateProductSpec(productSpec);
+      updateProductConfig(productSpec);
     } catch (error) {
       console.error("Error fetching options:", error);
     }
@@ -88,8 +88,8 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
           body: JSON.stringify({ 'model': selectedModel, 'spec': formData }),
         });
 
-        const productSpec: ProductSpecification = await response.json();
-        updateProductSpec(productSpec);
+        const productSpec: ProductConfiguration = await response.json();
+        updateProductConfig(productSpec);
         
       } catch (error) {
         console.error("Error fetching updated options:", error);
@@ -102,7 +102,7 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
 
   const isFormValid = () => {
     // console.log(formData);
-    const isValid = Object.keys(productSpec.entries).every(key => formData[key] !== undefined && formData[key] !== "");
+    const isValid = Object.keys(productConfig.options).every(key => formData[key] !== undefined && formData[key] !== "");
     if (!isValid) {
       showNotification({
         id: 'invalid-form',
@@ -124,20 +124,21 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
   const handleSubmit = () => {
     if (isFormValid()) {
       const filteredFormData = Object.keys(formData)
-        .filter(key => key in productSpec.entries)
+        .filter(key => key in productConfig.options)
         .reduce((acc: Record<string, any>, key) => {
           acc[key] = formData[key];
           return acc;
         }, {});
         
-      submitTarget({ product: selectedProduct, options: filteredFormData });
+      submitTarget({ product: selectedProduct, specification: filteredFormData });
     }
   };
 
   return (
     <Card padding='sm'>
       <LoadingOverlay visible={loading} />
-        {productSpec && Object.entries(productSpec.entries).map(([key, item]: [string, ConfigSpecification]) => (
+        {productConfig && productConfig.product && <Text pb='md'>{productConfig.product}</Text>}
+        {productConfig && Object.entries(productConfig.options).map(([key, item]: [string, ConfigEntry]) => (
               item.values ? (
                 item.multiple ? (
                   <MultiSelect
@@ -176,7 +177,7 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
         ))}
       <Group w='100%' align='center' mt='lg'>
         <Button type='submit' onClick={handleSubmit} disabled={!isFormValid}>Submit</Button>
-        <Button type='button' onClick={() => { setFormData({}); updateProductSpec({ product: selectedProduct, entries: {} }); fetchInitialOptions(); }}>Clear</Button>
+        <Button type='button' onClick={() => { setFormData({}); updateProductConfig({ product: selectedProduct, options: {} }); fetchInitialOptions(); }}>Clear</Button>
       </Group>
     </Card>
   );

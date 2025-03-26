@@ -2,8 +2,7 @@
 
 from fastapi import APIRouter
 
-from typing import Any, Optional
-from dataclasses import dataclass
+from typing import Any
 
 from forecastbox.products.product import Product, USER_DEFINED
 
@@ -12,7 +11,7 @@ from forecastbox.models import Model
 
 from ..models import open_checkpoint
 
-
+from ..types import ConfigEntry, ProductConfiguration
 from qubed import Qube
 
 router = APIRouter(
@@ -23,62 +22,6 @@ router = APIRouter(
 CONFIG_ORDER = ["param", "levtype", "levelist"]
 
 
-@dataclass
-class ConfigSpecification:
-	"""Configuration Entry"""
-
-	label: str
-	"""Label of the configuration entry"""
-	description: str | None
-	"""Description of the configuration entry"""
-	values: Optional[list[str]] = None
-	"""Available values for the configuration entry"""
-	example: Optional[str] = None
-	"""Example value for the configuration entry"""
-	multiple: bool = False
-	"""Whether the configuration entry is a multiple select"""
-	constrained_by: list[str] = None
-	"""List of configuration entries that this entry is constrained by""" # TODO
-
-	def __post_init__(self):
-		if USER_DEFINED in self.values:
-			self.values = None
-
-		if self.values is None:
-			self.select = False
-			self.multiple = False
-		else:
-			self._sort_values()
-
-	def _sort_values(self):
-		"""Sort values."""
-		if all(str(x).isdigit() for x in self.values):
-			self.values = list(map(str, sorted(self.values, key=float)))
-			return
-		self.values = list(map(str, sorted(self.values, key=lambda x: str(x).lower())))
-
-@dataclass
-class ProductSpecification:
-	"""Product Configuration"""
-
-	product: str
-	"""Product name"""
-	entries: dict[str, ConfigSpecification]
-	"""Configuration entries"""
-
-	def __post_init__(self):
-		new_entries = {}
-		for key in CONFIG_ORDER:
-			if key in self.entries:
-				new_entries[key] = self.entries[key]
-
-		for key in self.entries:
-			if key not in new_entries:
-				new_entries[key] = self.entries[key]
-
-		self.entries = new_entries
-
-
 def select_from_params(available_spec: Qube, params: dict[str, Any]) -> Qube:
 	for key, val in params.items():
 		if not val:
@@ -86,14 +29,13 @@ def select_from_params(available_spec: Qube, params: dict[str, Any]) -> Qube:
 		if key in available_spec.axes() and USER_DEFINED in available_spec.span(key):
 			# Dont select if open ended
 			continue
-		available_spec = available_spec.select({key: str(val) if not isinstance(val, (list, tuple)) else list(map(str, val))})
+
+		available_spec = available_spec.select({key: str(val) if not isinstance(val, (list, tuple)) else list(map(str, val))}, consume=False)
 
 	return available_spec
 
-async def product_to_config(product: Product, selected_model: str, params: dict[str, Any]) -> dict[str, ConfigSpecification]:
+async def product_to_config(product: Product, selected_model: str, params: dict[str, Any]) -> dict[str, ConfigEntry]:
 	"""Convert a product to a configuration."""
-
-	from qubed import Qube
 
 	product_spec = product.qube
 
@@ -119,7 +61,7 @@ async def product_to_config(product: Product, selected_model: str, params: dict[
 				
 		val = select_from_params(available_product_spec, {k: v for k, v in params.items() if not k == key}).axes().get(key, val)
 		
-		entries[key] = ConfigSpecification(
+		entries[key] = ConfigEntry(
 			label=product.label.get(key, key),
 			description=product.description.get(key, None),
 			values=list(val),
@@ -157,11 +99,11 @@ async def get_valid_categories(model_name: str) -> dict[str, Category]:
 	return categories
 
 @router.post("/configuration/{category}/{product}")
-async def get_product_configuration(category, product: str, params: dict) -> ProductSpecification:
+async def get_product_configuration(category, product: str, params: dict) -> ProductConfiguration:
 	selected_model = params["model"]
 	spec = params["spec"]
 
 	prod = get_product(category, product)
 
 	entries = await product_to_config(prod, selected_model, spec)
-	return ProductSpecification(product=f"{category}/{product}", entries=entries)
+	return ProductConfiguration(product=f"{category}/{product}", options=entries)

@@ -7,6 +7,7 @@ from qubed import Qube
 
 if TYPE_CHECKING:
 	from anemoi.inference.checkpoint import Checkpoint
+	from cascade.fluent import Action
 
 class Model:
 	"""Model Specification"""
@@ -15,6 +16,11 @@ class Model:
 
 	def qube(self, assumptions: dict[str, Any] = None) -> Qube:
 		return convert_to_model_spec(self.ckpt, assumptions=assumptions)
+	
+	def graph(self, initial_conditions, lead_time, **kwargs) -> "Action":
+		from anemoi.cascade.fluent import from_initial_conditions, from_input
+
+		return from_input(self.ckpt.path, 'mars', lead_time=lead_time, **kwargs)
 
 	@property
 	def ignore_in_select(self) -> list[str]:
@@ -48,7 +54,7 @@ def convert_to_model_spec(ckpt: "Checkpoint", assumptions: dict[str, Any] = None
 				"frequency": ckpt.timestep,
 				"levtype": "pl",
 				"param": variable,
-				"levelist": list(map(str, levels)),
+				# "levelist": list(map(str, levels)),
 				**assumptions,
 			}
 		)

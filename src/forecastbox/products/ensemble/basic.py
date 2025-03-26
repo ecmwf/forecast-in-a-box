@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, TYPE_CHECKING
 from . import ensemble_registry
 from ..product import Product, GenericParamProduct, USER_DEFINED
 from ..generic import generic_registry
@@ -7,8 +7,10 @@ from qubed import Qube
 import yaml
 from pathlib import Path
 
-
 from forecastbox.products.definitions import DESCRIPTIONS, LABELS
+
+if TYPE_CHECKING:
+	from cascade.fluent import Action
 
 class BaseThresholdProbability(Product):
 	"""Base Threshold Probability Product"""
@@ -21,7 +23,7 @@ class BaseThresholdProbability(Product):
 		**LABELS,
 		"threshold": "Threshold",
 	}
-
+	
 	@property
 	def model_assumptions(self):
 		return {"threshold": "*"}
@@ -29,17 +31,33 @@ class BaseThresholdProbability(Product):
 	def mars_request(self, **kwargs) -> dict[str, Any]:
 		return super().mars_request(**kwargs)  # type: ignore
 
-	def to_graph(self, **kwargs):
-		return super().to_graph(**kwargs)
+	def to_graph(self, specification: dict[str, Any], source: "Action") -> "Action":
+		from anemoi.cascade.fluent import ENSEMBLE_DIMENSION_NAME
+		from cascade import backends, fluent
 
+		source = source.sel(param = specification['param'])
+		if 'levlist' in specification:
+			source = source.sel(levlist = specification['levlist'])
+		
+		payload = fluent.Payload(
+            backends.threshold,
+            (
+                fluent.Node.input_name(0),
+                '<',
+                float(specification['threshold']),
+            ),
+        )
+		
+		return source.map(payload).multiply(100).mean(ENSEMBLE_DIMENSION_NAME)
 
 @generic_registry("Threshold Probability")
 class GenericThresholdProbability(BaseThresholdProbability, GenericParamProduct):
 	example = {
 		"threshold": "10",
 	}
-	
-
+	multiselect = {
+		"param": True,
+	}
 	@property
 	def qube(self):
 		return self.make_generic_qube(threshold=USER_DEFINED)
@@ -47,12 +65,9 @@ class GenericThresholdProbability(BaseThresholdProbability, GenericParamProduct)
 	def mars_request(self, **kwargs) -> dict[str, Any]:
 		return super().mars_request(**kwargs)  # type: ignore
 
-	def to_graph(self, **kwargs):
-		return super().to_graph(**kwargs)
-
-
 @ensemble_registry("Threshold Probability")
 class DefinedThresholdProbability(BaseThresholdProbability):
+
 	@property
 	def qube(self):
 		defined = yaml.safe_load(open(Path(__file__).parent / "defined_threshold_probability.yaml"))
@@ -64,9 +79,6 @@ class DefinedThresholdProbability(BaseThresholdProbability):
 
 	def mars_request(self, **kwargs) -> dict[str, Any]:
 		return super().mars_request(**kwargs)  # type: ignore
-
-	def to_graph(self, **kwargs):
-		return super().to_graph(**kwargs)
 
 
 class BaseQuantiles(Product):
@@ -80,6 +92,10 @@ class BaseQuantiles(Product):
 		**LABELS,
 		"quantile": "Quantile",
 	}
+	multiselect = {
+		"quantile": True,
+		"param": True,
+	}
 
 	@property
 	def model_assumptions(self):
@@ -88,9 +104,19 @@ class BaseQuantiles(Product):
 	def mars_request(self, **kwargs) -> dict[str, Any]:
 		return super().mars_request(**kwargs)  # type: ignore
 
-	def to_graph(self, **kwargs):
-		return super().to_graph(**kwargs)
+	def to_graph(self, specification: dict[str, Any], source: "Action") -> "Action":
+		from ..transforms import _quantiles_transform
+		from anemoi.cascade.fluent import ENSEMBLE_DIMENSION_NAME
 
+		params = [
+            (float(x), "quantile", None)
+            for x in (specification['quantile'] if isinstance(specification['quantile'], list) else specification['quantile'].split(","))
+        ]
+		source = source.sel(param = specification['param'])
+		if 'levlist' in specification:
+			source = source.sel(levlist = specification['levlist'])
+		
+		return source.concatenate(ENSEMBLE_DIMENSION_NAME).transform(_quantiles_transform, params, "quantile")
 
 @ensemble_registry("Quantiles")
 class Quantiles(BaseQuantiles):
@@ -106,24 +132,10 @@ class Quantiles(BaseQuantiles):
 		)
 		return q
 
-@ensemble_registry("BadProduct")
-class BadProduct(BaseQuantiles):
-	@property
-	def qube(self):
-		q = Qube.from_datacube(
-			{
-				"frequency": "*",
-				"levtype": "sfc",
-				"param": ["capeefe"],
-				"quantile": list(map(str, range(0, 101, 1))),
-			}
-		)
-		return q
-
 @generic_registry("Quantiles")
 class GenericQuantiles(BaseQuantiles, GenericParamProduct):
 	example = {
-		"quantile": "99.5",
+		"quantile": "99.0, 99.5",
 	}
 
 	@property
@@ -133,8 +145,6 @@ class GenericQuantiles(BaseQuantiles, GenericParamProduct):
 	def mars_request(self, **kwargs) -> dict[str, Any]:
 		return super().mars_request(**kwargs)  # type: ignore
 
-	def to_graph(self, **kwargs):
-		return super().to_graph(**kwargs)
 
 
 @ensemble_registry("Ensemble Mean")
@@ -151,8 +161,12 @@ class ENSMS(GenericParamProduct):
 	def mars_request(self, **kwargs) -> dict[str, Any]:
 		return super().mars_request(**kwargs)  # type: ignore
 
-	def to_graph(self, **kwargs):
-		return super().to_graph(**kwargs)
+	def to_graph(self, specification: dict[str, Any], source: "Action") -> "Action":
+		from anemoi.cascade.fluent import ENSEMBLE_DIMENSION_NAME
+		
+		source = self.select_on_specification(specification, source)
+		return source.mean(ENSEMBLE_DIMENSION_NAME)
+
 
 @ensemble_registry("Ensemble Standard Deviation")
 class ENSSTD(GenericParamProduct):
@@ -168,5 +182,9 @@ class ENSSTD(GenericParamProduct):
 	def mars_request(self, **kwargs) -> dict[str, Any]:
 		return super().mars_request(**kwargs)  # type: ignore
 
-	def to_graph(self, **kwargs):
-		return super().to_graph(**kwargs)
+	def to_graph(self, specification: dict[str, Any], source: "Action") -> "Action":
+		from anemoi.cascade.fluent import ENSEMBLE_DIMENSION_NAME
+
+		source = self.select_on_specification(specification, source)
+		return source.std(ENSEMBLE_DIMENSION_NAME)
+

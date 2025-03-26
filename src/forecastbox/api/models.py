@@ -1,6 +1,6 @@
 import os
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
 	from anemoi.inference.checkpoint import Checkpoint
