@@ -64,14 +64,13 @@ async def get_graph_serialised(spec: GraphSpecification) -> JobInstance:
     return graph2job(graph._graph)
 
 @router.post("/execute")
-async def execute(spec: GraphSpecification) -> Union[JobId, None]:
+async def execute(spec: GraphSpecification) -> api.SubmitJobResponse:
     """Get serialised dump of product graph."""
     graph = await convert_to_cascade(spec)
     job =  graph2job(graph._graph)
 
     r = api.SubmitJobRequest(job=api.JobSpec(benchmark_name=None, workers_per_host=2, hosts=2, envvars={}, use_slurm=False, job_instance=job))
-    response: api.SubmitJobResponse = client.request_response(r, f"{SETTINGS.cascade_url}") # type: ignore
-    return response.job_id
+    return = client.request_response(r, f"{SETTINGS.cascade_url}") # type: ignore
 
 @router.post('/progress')
 async def get_progress(id: JobId) -> api.JobProgressResponse:
