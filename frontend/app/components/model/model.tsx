@@ -1,7 +1,7 @@
 "use client"; // Required for client-side fetching
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Modal, Group, TextInput, NumberInput } from '@mantine/core';
-import GlobeSelect from './globe';
+// import GlobeSelect from './globe';
 import Options from './options';
 import InformationWindow from './information';
 
@@ -84,7 +84,7 @@ function Model({ selectedModel, coordinates, setCoordinates, modelSpec, submit }
                 title="Select centre of LAM"
                 size="auto"
             >
-                <GlobeSelect handleSubmit={handleGlobeSubmit} setSelectedLocation={setCoordinates} globeProps={{ width: 600, height: 450 }} />
+                {/* <GlobeSelect handleSubmit={handleGlobeSubmit} setSelectedLocation={setCoordinates} globeProps={{ width: 600, height: 450 }} /> */}
             </Modal>
 
             {/* Form for setting variables */}
