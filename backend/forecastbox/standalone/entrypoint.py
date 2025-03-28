@@ -10,6 +10,7 @@ import time
 import httpx
 import uvicorn
 import os
+
 from multiprocessing import Process, connection, set_start_method, freeze_support
 from forecastbox.utils import logging_config
 
@@ -32,13 +33,15 @@ async def uvicorn_run(app_name: str, port: int) -> None:
 		log_config=None,
 		log_level=None,
 		workers=1,
+		reload=True,
+		reload_dirs=["backend/forecastbox"],
 	)
 	server = uvicorn.Server(config)
 	await server.serve()
 
-async def cascade_run(url: str, port: int) -> None:
+async def cascade_run(url: str) -> None:
 	from cascade.gateway.server import serve
-	serve(f"{url}:{port}")
+	serve(url)
 
 def launch_api(env_context: dict[str, str]):
 	setup_process(env_context)
@@ -51,9 +54,8 @@ def launch_api(env_context: dict[str, str]):
 
 def launch_cascade(env_context: dict[str, str]):
 	setup_process(env_context)
-	port = int(env_context["CASCADE_URL"].rsplit(":", 1)[1])
 	try:
-		asyncio.run(uvicorn_run("forecastbox.controller.server:app", port))
+		asyncio.run(cascade_run(env_context["CASCADE_URL"]))
 	except KeyboardInterrupt:
 		pass  # no need to spew stacktrace to log
 
@@ -79,12 +81,12 @@ if __name__ == "__main__":
 	setup_process({})
 	logger.info("main process starting")
 
-	from forecastbox.setting import get_settings
+	from forecastbox.settings import get_settings
 	settings = get_settings()
 	context = {
-		"WEB_URL": settings.WEB_URL,
-		"API_URL": settings.API_URL,
-		"CASCADE_URL": settings.CASCADE_URL,
+		"WEB_URL": settings.web_url,
+		"API_URL": settings.api_url,
+		"CASCADE_URL": settings.cascade_url,
 	}
 
 	cascade = Process(target=launch_cascade, args=(context,))
@@ -93,11 +95,11 @@ if __name__ == "__main__":
 	api = Process(target=launch_api, args=(context,))
 	api.start()
 
-	# with httpx.Client() as client:
-	# 	for root_url in context.values():
-	# 		wait_for(client, root_url)
+	with httpx.Client() as client:
+		for root_url in [context['API_URL']]:
+			wait_for(client, root_url)
 
-	webbrowser.open(context["FIAB_WEB_URL"])
+	webbrowser.open(context["WEB_URL"])
 
 	try:
 		connection.wait(

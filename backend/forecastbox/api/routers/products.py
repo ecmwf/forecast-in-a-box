@@ -1,6 +1,7 @@
 """Products API Router."""
 
 from fastapi import APIRouter
+from functools import lru_cache
 
 from typing import Any
 
@@ -14,6 +15,8 @@ from .models import get_model_path
 from ..types import ConfigEntry, ProductConfiguration, ModelSpecification
 from qubed import Qube
 
+from dataclasses import asdict
+
 router = APIRouter(
 	tags=["products"],
 	responses={404: {"description": "Not found"}},
@@ -21,6 +24,13 @@ router = APIRouter(
 
 CONFIG_ORDER = ["param", "levtype", "levelist"]
 
+@lru_cache
+def get_model(model: ModelSpecification) -> Model:
+	"""Get the model from the model repository."""
+
+	model_dict = asdict(model)
+	model_path = get_model_path(model_dict.pop('model').replace("_", "/"))
+	return Model(model_path, **model_dict)
 
 def select_from_params(available_spec: Qube, params: dict[str, Any]) -> Qube:
 	for key, val in params.items():
@@ -39,9 +49,7 @@ async def product_to_config(product: Product, modelspec: ModelSpecification, par
 
 	product_spec = product.qube
 
-	model_dict = dict(lead_time =modelspec.lead_time, date = modelspec.date, ensemble_members = modelspec.ensemble_members)
-	model_spec = Model(get_model_path(modelspec.model), **model_dict)
-
+	model_spec = get_model(modelspec)
 	model_qube = model_spec.qube(product.model_assumptions)
 
 	available_product_spec = product.model_intersection(model_spec)
@@ -85,9 +93,8 @@ async def api_get_categories():
 @router.post("/valid-categories")
 async def get_valid_categories(modelspec: ModelSpecification) -> dict[str, Category]:
 
-	model_dict = dict(lead_time =modelspec.lead_time, date = modelspec.date, ensemble_members = modelspec.ensemble_members)
-	model_spec = Model(get_model_path(modelspec.model), **model_dict)
-	
+	model_spec = get_model(modelspec)
+
 	categories = get_categories()
 	for key, category in categories.items():
 

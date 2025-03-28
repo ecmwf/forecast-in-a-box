@@ -15,7 +15,11 @@ from forecastbox.models import Model
 from forecastbox.settings import get_settings
 from forecastbox.models import Model
 
+import httpx
 import requests
+import tempfile
+import shutil
+
 SETTINGS = get_settings()
 
 router = APIRouter(
@@ -71,19 +75,21 @@ async def download(model: str) -> str:
 	model = model.replace("_", "/")
 	model_path = f"{repo}/{model}.ckpt"
 
-	model_download_path = get_model_path(model.replace("_", "/"))
-	
+	model_download_path = Path(get_model_path(model.replace("_", "/")))
 	model_download_path.parent.mkdir(parents=True, exist_ok=True)
 
 	if model_download_path.exists():
 		return str(model_download_path)
 
-	with requests.get(model_path, stream=True) as r:
-		r.raise_for_status()
-		with open(model_download_path, "wb") as f:
-			for chunk in r.iter_content(chunk_size=8192):
-				f.write(chunk)
+	temp_download_path = tempfile.NamedTemporaryFile(suffix=".ckpt.tmp")
 	
+	async with httpx.AsyncClient() as client:
+		response = await client.get(model_path)
+		with open(temp_download_path.name, "wb") as f:
+			async for chunk in response.aiter_bytes(chunk_size=8192):
+				f.write(chunk)
+
+	shutil.copy(temp_download_path.name, model_download_path)
 	return str(model_download_path)
 
 
@@ -106,7 +112,7 @@ async def get_model_info(modelname: str) -> dict[str, Any]:
 	"""
 	
 	from anemoi.inference.checkpoint import Checkpoint
-	ckpt = Checkpoint(get_model_path(modelname.replace('_', '/')))
+	ckpt = Checkpoint(str(get_model_path(modelname.replace('_', '/'))))
 	
 	anemoi_versions = {key: val for key, val in ckpt.provenance_training()["module_versions"].items() if key.startswith("anemoi")}
 

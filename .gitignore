@@ -2,8 +2,8 @@
 .venv
 *.swp
 
-src/lib
-src/data_dir
+lib
+data_dir
 *.ckpt
 
 __pycache__

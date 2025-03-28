@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, Response
 
+from typing import Union
 
 from forecastbox.products.registry import get_categories, get_product
 from forecastbox.models import Model
@@ -11,7 +12,11 @@ from ..types import GraphSpecification
 
 from cascade import Cascade
 from cascade.low.into import graph2job
-from cascade.low.core import JobInstance
+from cascade.low.core import JobInstance, DatasetId
+from cascade.controller.report import JobId, JobProgress
+
+import cascade.gateway.api as api
+import cascade.gateway.client as client
 
 import tempfile
 from forecastbox.settings import get_settings
@@ -59,17 +64,21 @@ async def get_graph_serialised(spec: GraphSpecification) -> JobInstance:
     return graph2job(graph._graph)
 
 @router.post("/execute")
-async def execute(spec: GraphSpecification):
+async def execute(spec: GraphSpecification) -> Union[JobId, None]:
     """Get serialised dump of product graph."""
     graph = await convert_to_cascade(spec)
     job =  graph2job(graph._graph)
 
-    import cascade.gateway.api as api
-    import cascade.gateway.client as client
-    import os
-    os.environ["GENERATORS_N"] = "8"
-    os.environ["GENERATORS_K"] = "10"
-    os.environ["GENERATORS_L"] = "4"
-
     r = api.SubmitJobRequest(job=api.JobSpec(benchmark_name=None, workers_per_host=2, hosts=2, envvars={}, use_slurm=False, job_instance=job))
-    return client.request_response(r, f"tcp://{SETTINGS.cascade_gateway}")
+    response: api.SubmitJobResponse = client.request_response(r, f"{SETTINGS.cascade_url}") # type: ignore
+    return response.job_id
+
+@router.post('/progress')
+async def get_progress(id: JobId) -> api.JobProgressResponse:
+    request = api.JobProgressRequest(job_id=id)
+    return client.request_response(request, f"{SETTINGS.cascade_url}") # type: ignore
+
+@router.post('/result')
+async def get_result(id: JobId, result: DatasetId) -> api.ResultRetrievalResponse:
+    request = api.ResultRetrievalRequest(job_id=id, dataset_id=result)
+    return client.request_response(request, f"{SETTINGS.cascade_url}") # type: ignore

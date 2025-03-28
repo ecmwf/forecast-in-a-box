@@ -39,6 +39,9 @@ plots = [
     "earthkit-plots-default-styles",
     "earthkit-plots>=0.2.8",
 ]
+all = [
+	"forecast-in-a-box[plots,thermo]"
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["backend/forecastbox"]

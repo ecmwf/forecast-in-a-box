@@ -15,3 +15,10 @@ from .api.routers import graph
 app.include_router(models.router, prefix="/api/py/models")
 app.include_router(products.router, prefix="/api/py/products")
 app.include_router(graph.router, prefix="/api/py/graph")
+
+@app.get("/status", tags=["status"])
+def status():
+    """
+    Status endpoint
+    """
+    return {"status": "ok"}
