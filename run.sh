@@ -1,4 +1,4 @@
 
 cd src
-yarn setup
-yarn dev
+npm run setup
+npm run dev

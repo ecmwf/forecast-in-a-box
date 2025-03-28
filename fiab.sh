@@ -73,7 +73,6 @@ maybeInstallPython() {
 }
 
 VENV="${FIAB_ROOT}/venv"
-FIAB_WHEEL="./forecast_in_a_box-0.0.1-py3-none-any.whl" # TODO replace once on pypi
 maybeCreateVenv() {
 	# checks whether the correct venv exists, installing via uv if not, and source-activates
 	if [ -d "$VENV" ] ; then
@@ -82,12 +81,8 @@ maybeCreateVenv() {
 	else
 		uv venv -p "$UV_PY" "$VENV"
 		source "${VENV}/bin/activate" # or export the paths?
-		uv pip install "$FIAB_WHEEL"
+		uv pip install "./"
 	fi
-}
-
-maybeInstallYarn() {
-	# TODO
 }
 
 for arg in "$@"; do
@@ -98,7 +93,7 @@ for arg in "$@"; do
 			;;
 		"--warmup")
 			export FIAB_CACHE="${FIAB_ROOT}/uvcache"
-			yarn setup;
+			# yarn setup;
 			;;
 		"--offline")
 			export FIAB_CACHE="${FIAB_ROOT}/uvcache"
@@ -111,6 +106,5 @@ check
 maybeInstallUv
 maybeInstallPython
 maybeCreateVenv
-maybeInstallYarn
 
-yarn dev
+npm run dev

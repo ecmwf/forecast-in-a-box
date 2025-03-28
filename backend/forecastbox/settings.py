@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     data_path: str
     model_repository: str
     cascade_gateway: str
+    api: str
 
     model_config = SettingsConfigDict(env_file=".env")
 

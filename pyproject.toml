@@ -23,7 +23,6 @@ dependencies = [
 	"pyrsistent",
 	"anemoi-inference[huggingface]>=0.4.10",
 	"qubed",
-	"ruff>=0.11.2",
 	"cascade-python",
 	"anemoi-cascade",
 	"pydantic-settings",
@@ -42,7 +41,10 @@ plots = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/forecastbox"]
+packages = ["backend/forecastbox"]
+
+[tool.setuptools.packages.find]
+where = ["backend"]
 
 [tool.ruff]
 line-length = 140

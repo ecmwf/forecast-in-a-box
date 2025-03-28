@@ -36,35 +36,24 @@ async def uvicorn_run(app_name: str, port: int) -> None:
 	server = uvicorn.Server(config)
 	await server.serve()
 
+async def cascade_run(url: str, port: int) -> None:
+	from cascade.gateway.server import serve
+	serve(f"{url}:{port}")
 
-def launch_frontend(env_context: dict[str, str]):
+def launch_api(env_context: dict[str, str]):
 	setup_process(env_context)
-	port = int(env_context["FIAB_WEB_URL"].rsplit(":", 1)[1])
+	port = int(env_context["API_URL"].rsplit(":", 1)[1])
 	try:
-		asyncio.run(uvicorn_run("forecastbox.frontend.server:app", port))
+		asyncio.run(uvicorn_run("forecastbox.entrypoint:app", port))
 	except KeyboardInterrupt:
 		pass  # no need to spew stacktrace to log
 
 
-def launch_controller(env_context: dict[str, str]):
+def launch_cascade(env_context: dict[str, str]):
 	setup_process(env_context)
-	port = int(env_context["FIAB_CTR_URL"].rsplit(":", 1)[1])
+	port = int(env_context["CASCADE_URL"].rsplit(":", 1)[1])
 	try:
 		asyncio.run(uvicorn_run("forecastbox.controller.server:app", port))
-	except KeyboardInterrupt:
-		pass  # no need to spew stacktrace to log
-
-
-def launch_worker(env_context: dict[str, str]):
-	setup_process(
-		{
-			**env_context,
-			**{"FIAB_WRK_MEM_MB": "2048"},  # doesnt really matter now
-		}
-	)
-	port = int(env_context["FIAB_WRK_URL"].rsplit(":", 1)[1])
-	try:
-		asyncio.run(uvicorn_run("forecastbox.worker.server:app", port))
 	except KeyboardInterrupt:
 		pass  # no need to spew stacktrace to log
 
@@ -89,33 +78,32 @@ if __name__ == "__main__":
 	set_start_method("forkserver")
 	setup_process({})
 	logger.info("main process starting")
+
+	from forecastbox.setting import get_settings
+	settings = get_settings()
 	context = {
-		"FIAB_WEB_URL": "http://localhost:8000",
-		"FIAB_CTR_URL": "http://localhost:8001",
-		"FIAB_WRK_URL": "http://localhost:8002",
+		"WEB_URL": settings.WEB_URL,
+		"API_URL": settings.API_URL,
+		"CASCADE_URL": settings.CASCADE_URL,
 	}
 
-	controller = Process(target=launch_controller, args=(context,))
-	controller.start()
+	cascade = Process(target=launch_cascade, args=(context,))
+	cascade.start()
 
-	worker = Process(target=launch_worker, args=(context,))
-	worker.start()
+	api = Process(target=launch_api, args=(context,))
+	api.start()
 
-	frontend = Process(target=launch_frontend, args=(context,))
-	frontend.start()
-
-	with httpx.Client() as client:
-		for root_url in context.values():
-			wait_for(client, root_url)
+	# with httpx.Client() as client:
+	# 	for root_url in context.values():
+	# 		wait_for(client, root_url)
 
 	webbrowser.open(context["FIAB_WEB_URL"])
 
 	try:
 		connection.wait(
 			(
-				controller.sentinel,
-				worker.sentinel,
-				frontend.sentinel,
+				cascade.sentinel,
+				api.sentinel,
 			)
 		)
 	except KeyboardInterrupt:
