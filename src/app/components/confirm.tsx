@@ -49,10 +49,19 @@ function Confirm({ model, products, setProducts, setSlider}: ConfirmProps) {
         }
         console.log(submitData);
 
+    }
+    const handleDownload = () => {
+        const submitData: SubmitSpecification = {
+            model: model,
+            products: Object.values(products),
+            environment: {}
+        }
+        console.log(submitData);
+
         async function retrieveFileBlob() {
             try {
                 const ftch = await fetch( // this will request the file information for the download (whether an image, PDF, etc.)
-                    `/api/py/submit/serialise`,
+                    `/api/py/graph/serialise`,
                     {
                         method: "POST",
                         headers: {
@@ -61,39 +70,30 @@ function Confirm({ model, products, setProducts, setSlider}: ConfirmProps) {
                         body: JSON.stringify(submitData)
                     },
                 )
-                const fileBlob = await ftch.blob()
-                console.log(fileBlob)
+                if (!ftch.ok) {
+                    alert("Error: " + ftch.status + " " + ftch.statusText);
+                    throw new Error(`Could not download graph: ${ftch.status} - ${ftch.statusText}`);
+                }
+                const fileBlob = await ftch.json();
+                
+                console.log(fileBlob);
 
                 // this works and prompts for download
                 var link = document.createElement('a')  // once we have the file buffer BLOB from the post request we simply need to send a GET request to retrieve the file data
-                link.href = window.URL.createObjectURL(fileBlob)
-                link.setAttribute("download", 'cascade_blob.dill');
+                const blob = new Blob([JSON.stringify(fileBlob, null, 2)], { type: 'application/json' });
+                link.href = URL.createObjectURL(blob);
+                link.setAttribute("download", 'products.json');
                 link.click()
                 link.remove();  //afterwards we remove the element  
             } catch (e) {
                 console.log({ "message": e, status: 400 })  // handle error
             }
-
-        // const submit = async () => {
-        //     try {
-        //         const response = await fetch(`/api/py/submit/`, {
-        //             method: "POST",
-        //             headers: { "Content-Type": "application/json" },
-        //             body: JSON.stringify(submitData),
-        //         });
-        
-        //         const runId: number = await response.json();
-                
-        //     } catch (error) {
-        //         console.error("Error submitting:", error);
-        //     }
         };
         retrieveFileBlob();
     }
 
     const [graphContent, setGraphContent] = useState<string>("");
     const [loading, setLoading] = useState(false);
-    const [graphUrl, setGraphUrl] = useState<string | null>(null);
 
     const getGraph = () => {
         const submitData: SubmitSpecification = {
@@ -107,7 +107,7 @@ function Confirm({ model, products, setProducts, setSlider}: ConfirmProps) {
             setLoading(true);
             (async () => {
                 try {
-                    const response = await fetch(`/api/py/submit/visualise`, {
+                    const response = await fetch(`/api/py/graph/visualise`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(submitData),
@@ -158,10 +158,11 @@ function Confirm({ model, products, setProducts, setSlider}: ConfirmProps) {
                 </Card>
             </Group>
             <Divider p='md'/>
-            <SimpleGrid cols={2}>
+            <SimpleGrid cols={3}>
                 <Button onClick={getGraph} disabled={loading}>
-                    {loading ? "Loading..." : "Graph?"}
+                    {loading ? "Loading..." : "Visualise"}
                 </Button>
+                <Button onClick={handleDownload}>Download</Button>
                 <Button onClick={handleSubmit}>Submit</Button>
             </SimpleGrid>
             

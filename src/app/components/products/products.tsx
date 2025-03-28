@@ -7,18 +7,17 @@ import Categories from "./categories";
 import Configuration from "./configuration";
 import Cart from "./cart";
 
-import {CategoriesType, ProductSpecification} from '../interface'
+import {CategoriesType, ProductSpecification, ModelSpecification} from '../interface'
 import sha256 from 'crypto-js/sha256';
 
 
 interface ProductConfigurationProps {
-    model: string;
+    model: ModelSpecification;
     products: Record<string, ProductSpecification>;
     setProducts: (products: Record<string, ProductSpecification>) => void;
-    back: () => void;
 }
 
-function ProductConfigurator({model, products, setProducts, back}: ProductConfigurationProps) {
+function ProductConfigurator({model, products, setProducts}: ProductConfigurationProps) {
     const [selected, setSelectedProduct] = useState<string | null>(null);
     const [internal_products, internal_setProducts] = useState(products);
 
@@ -35,14 +34,37 @@ function ProductConfigurator({model, products, setProducts, back}: ProductConfig
       const [categories, setCategories] = useState<CategoriesType>({});
       const [loading, setLoading] = useState(true);
   
-      useEffect(() => {
-          fetch(`/api/py/products/valid-categories/${model}`)
-              .then((res) => res.json())
-              .then((data) => {
-                  setCategories(data);
-                  setLoading(false);
-              });
-      }, []);
+    //   useEffect(() => {
+    //       fetch(`/api/py/products/valid-categories/${model}`)
+    //           .then((res) => res.json())
+    //           .then((data) => {
+    //               setCategories(data);
+    //               setLoading(false);
+    //           });
+    //   }, []);
+
+    useEffect(() => {
+        const fetchUpdatedOptions = async () => {
+        setLoading(true);
+        console.log("Fetching categories for model: ", model);
+        try {
+            const response = await fetch(`/api/py/products/valid-categories/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(model),
+            });
+    
+            const categories: CategoriesType = await response.json();
+            setCategories(categories);
+            
+        } catch (error) {
+            console.error("Error fetching categories:", error);
+        }
+        setLoading(false);
+        };
+    
+        fetchUpdatedOptions();
+    }, [model]); // Update options when formData changes
 
     return (
         <Container p='md' size='xl'>
@@ -53,8 +75,7 @@ function ProductConfigurator({model, products, setProducts, back}: ProductConfig
                 <Grid.Col span={4}><h2>Selected ({Object.keys(internal_products).length})</h2><Cart products={internal_products} setProducts={internal_setProducts}/></Grid.Col>
             </Grid>
             <Divider p='md'/>
-            <SimpleGrid cols={2}>
-                <Button onClick={back}>Back</Button>
+            <SimpleGrid cols={1}>
                 <Button onClick={() => setProducts(internal_products)} disabled={!model}>Submit</Button>
             </SimpleGrid>
         </Container>

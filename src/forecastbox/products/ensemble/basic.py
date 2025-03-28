@@ -1,4 +1,6 @@
 from typing import Any, TYPE_CHECKING
+
+from forecastbox.models import Model
 from . import ensemble_registry
 from ..product import Product, GenericParamProduct, USER_DEFINED
 from ..generic import generic_registry
@@ -12,7 +14,16 @@ from forecastbox.products.definitions import DESCRIPTIONS, LABELS
 if TYPE_CHECKING:
 	from cascade.fluent import Action
 
-class BaseThresholdProbability(Product):
+class BaseEnsembleProduct(Product):
+	"""Base Ensemble Product"""
+
+	def validate_intersection(self, model: Model) -> bool:
+		result = super().validate_intersection(model)
+		if model.ensemble_members == 1:
+			return False
+		return result & True
+
+class BaseThresholdProbability(BaseEnsembleProduct):
 	"""Base Threshold Probability Product"""
 
 	description = {
@@ -81,7 +92,7 @@ class DefinedThresholdProbability(BaseThresholdProbability):
 		return super().mars_request(**kwargs)  # type: ignore
 
 
-class BaseQuantiles(Product):
+class BaseQuantiles(BaseEnsembleProduct):
 	"""Base Quantiles Product"""
 
 	description = {
@@ -105,7 +116,7 @@ class BaseQuantiles(Product):
 		return super().mars_request(**kwargs)  # type: ignore
 
 	def to_graph(self, specification: dict[str, Any], source: "Action") -> "Action":
-		from ..transforms import _quantiles_transform
+		from .transforms import _quantiles_transform
 		from anemoi.cascade.fluent import ENSEMBLE_DIMENSION_NAME
 
 		params = [
@@ -148,7 +159,7 @@ class GenericQuantiles(BaseQuantiles, GenericParamProduct):
 
 
 @ensemble_registry("Ensemble Mean")
-class ENSMS(GenericParamProduct):
+class ENSMS(BaseEnsembleProduct, GenericParamProduct):
 
 	multiselect = {
 		"param": True,
@@ -169,7 +180,7 @@ class ENSMS(GenericParamProduct):
 
 
 @ensemble_registry("Ensemble Standard Deviation")
-class ENSSTD(GenericParamProduct):
+class ENSSTD(BaseEnsembleProduct, GenericParamProduct):
 	
 	multiselect = {
 		"param": True,

@@ -18,7 +18,7 @@ function Categories({categories, setSelected }: CategoriesProps) {
         <>
         {Object.entries(categories).map(([key, item]) => (
             item.available && (
-            <Paper shadow='sm' className={classes['option-group']} key={key} m='md' p='sm' ml=''>
+            <Paper shadow='sm' className={classes['option-group']} key={key} m='sm' p='xs' ml=''>
                 <Text className={classes['heading']}>{item.title}</Text>
                 <Text className={classes['description']}>{item.description}</Text>
                 {item.options.map((option: string, idx: number) => (
@@ -31,12 +31,12 @@ function Categories({categories, setSelected }: CategoriesProps) {
         ))}
         {Object.entries(categories).map(([key, item]) => (
             !item.available && (
-            <Paper shadow='sm' className={classes['option-group']} key={key} m='md' p='sm' ml='' bg='#F3F3F3'>
+            <Paper shadow='sm' className={classes['option-group']} key={key} m='sm' p='xs' ml='' bg='#F3F3F3'>
                 <Text className={classes['heading']}>{item.title}</Text>
                 <Text className={classes['description']}>{item.description}</Text>
                 <Text className={classes['description']}>Unavailable</Text>
-                {item.options.map((option: string, idx: number) => (
-                    <Button key={idx} p='' className={classes['button']} disabled>
+                {item.unavailable_options.map((option: string, idx: number) => (
+                    <Button className={`${classes['button']} ${classes['button--disabled']}`} key={idx} p='' m='' disabled>
                         {option}
                     </Button>
                 ))}

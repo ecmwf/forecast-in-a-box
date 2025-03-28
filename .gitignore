@@ -3,6 +3,8 @@
 *.swp
 
 src/lib
+src/data_dir
+*.ckpt
 
 __pycache__
 *.py[co]

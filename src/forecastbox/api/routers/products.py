@@ -9,9 +9,9 @@ from forecastbox.products.product import Product, USER_DEFINED
 from forecastbox.products.registry import get_categories, get_product, Category
 from forecastbox.models import Model
 
-from ..models import open_checkpoint
+from .models import get_model_path
 
-from ..types import ConfigEntry, ProductConfiguration
+from ..types import ConfigEntry, ProductConfiguration, ModelSpecification
 from qubed import Qube
 
 router = APIRouter(
@@ -30,20 +30,22 @@ def select_from_params(available_spec: Qube, params: dict[str, Any]) -> Qube:
 			# Dont select if open ended
 			continue
 
-		available_spec = available_spec.select({key: str(val) if not isinstance(val, (list, tuple)) else list(map(str, val))}, consume=False)
+		available_spec = available_spec.select({key: str(val) if not isinstance(val, (list, tuple)) else list(map(str, val))}, consume=True)
 
 	return available_spec
 
-async def product_to_config(product: Product, selected_model: str, params: dict[str, Any]) -> dict[str, ConfigEntry]:
+async def product_to_config(product: Product, modelspec: ModelSpecification, params: dict[str, Any]) -> dict[str, ConfigEntry]:
 	"""Convert a product to a configuration."""
 
 	product_spec = product.qube
 
-	ckpt = await open_checkpoint(selected_model)
-	model_spec = Model(ckpt)
+	model_dict = dict(lead_time =modelspec.lead_time, date = modelspec.date, ensemble_members = modelspec.ensemble_members)
+	model_spec = Model(get_model_path(modelspec.model), **model_dict)
+
 	model_qube = model_spec.qube(product.model_assumptions)
 
 	available_product_spec = product.model_intersection(model_spec)
+
 	subsetted_spec = select_from_params(model_qube & product_spec, params)
 
 	axes = subsetted_spec.axes()
@@ -80,30 +82,30 @@ async def product_to_config(product: Product, selected_model: str, params: dict[
 async def api_get_categories():
 	return get_categories()
 
-@router.get("/valid-categories/{model_name}")
-async def get_valid_categories(model_name: str) -> dict[str, Category]:
-	ckpt = await open_checkpoint(model_name)
+@router.post("/valid-categories")
+async def get_valid_categories(modelspec: ModelSpecification) -> dict[str, Category]:
+
+	model_dict = dict(lead_time =modelspec.lead_time, date = modelspec.date, ensemble_members = modelspec.ensemble_members)
+	model_spec = Model(get_model_path(modelspec.model), **model_dict)
 	
 	categories = get_categories()
 	for key, category in categories.items():
+
+		options = []
 		for product in category.options:
 			prod = get_product(key, product)
-
-			model_spec = Model(ckpt)
-			if prod.validate_intersection(prod.model_intersection(model_spec)):
+			
+			if prod.validate_intersection(model_spec):
 				category.available = True
+				options.append(product)
 			else:
-				category.options.remove(product)
 				category.unavailable_options.append(product)
-
+		category.options = options
 	return categories
 
 @router.post("/configuration/{category}/{product}")
-async def get_product_configuration(category, product: str, params: dict) -> ProductConfiguration:
-	selected_model = params["model"]
-	spec = params["spec"]
+async def get_product_configuration(category, product: str, model: ModelSpecification, spec: dict) -> ProductConfiguration:
 
 	prod = get_product(category, product)
-
-	entries = await product_to_config(prod, selected_model, spec)
+	entries = await product_to_config(prod, model, spec)
 	return ProductConfiguration(product=f"{category}/{product}", options=entries)

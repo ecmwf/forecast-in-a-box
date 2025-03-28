@@ -17,7 +17,7 @@ class Category:
 	options: list[str]
 	unavailable_options: list[str] = field(default_factory=list)
 
-	available: bool = None
+	available: bool = False
 
 
 class CategoryRegistry:

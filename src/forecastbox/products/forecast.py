@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 class BaseForecast(GenericParamProduct):
 	"""Base Forecast Product"""
 
-	_statistic: str = None
+	_statistic: str | None = None
 	"""Statistic to apply"""
 
 	multiselect = {

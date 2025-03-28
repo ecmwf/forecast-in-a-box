@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Container, Space, Image, Button, Group } from '@mantine/core';
+import { Container, Space, Image, Button, Group, Title} from '@mantine/core';
 
 import { IconBox } from '@tabler/icons-react';
 
@@ -12,7 +12,8 @@ const Header = () => {
       <Space h="xl" />
       <Container size="xl">
         <Group justify="space-between">
-          <a href=""><IconBox/><h2></h2></a>
+          <a style={{"color":"white"}} href=""><IconBox/><h2></h2></a>
+          <Title style={{"color":"white"}}>Forecast In a Box</Title>
           {/* <Group gap={40}>
             <a href='./products'>
               <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="xl">products</Button>

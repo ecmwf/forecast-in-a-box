@@ -36,12 +36,13 @@ class Product(ABC):
 		"""Model assumptions for the product."""
 		return {}
 	
-	def validate_intersection(self, model_intersection: Qube) -> bool:
+	def validate_intersection(self, model: Model) -> bool:
 		"""Validate the intersection of the model and product qubes.
 
 		By default, if `model_assumptions` are provided, the intersection must contain all of them.
 		Otherwise, the intersection must be non-empty.		
 		"""
+		model_intersection = self.model_intersection(model)
 
 		if self.model_assumptions:
 			return all(k in model_intersection.axes() for k in self.model_assumptions.keys())
@@ -78,8 +79,9 @@ class GenericParamProduct(Product):
 			"levelist": "*",
 		}
 	
-	def validate_intersection(self, model_intersection):
-		return all(k in model_intersection.axes() for k in self.generic_params if not k == 'levelist')
+	def validate_intersection(self, model: Model) -> bool:
+		"""Validate the intersection of the model and product qubes."""
+		return all(k in self.model_intersection(model).axes() for k in self.generic_params if not k == 'levelist')
 
 	def make_generic_qube(self, **kwargs) -> "Qube":
 		"""Make a generic Qube, including the intersection of pl and sfc."""

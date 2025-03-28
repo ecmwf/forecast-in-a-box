@@ -26,10 +26,20 @@ dependencies = [
 	"ruff>=0.11.2",
 	"cascade-python",
 	"anemoi-cascade",
+	"pydantic-settings",
 ]
 
 [project.urls]
 "Source code" = "https://github.com/ecmwf/forecast-in-a-box"
+
+[project.optional-dependencies]
+thermo = [
+    "thermofeel>=2.1.1",
+]
+plots = [
+    "earthkit-plots-default-styles",
+    "earthkit-plots>=0.2.8",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/forecastbox"]
@@ -47,9 +57,11 @@ indent-style = "tab"
 plugins = "pydantic.mypy"
 
 [tool.uv.sources]
-cascade-python = { git = "https://github.com/ecmwf/cascade.git", rev = "develop" }
+cascade-python = { git = "https://github.com/ecmwf/cascade", rev = "FIAB" }
 qubed = { git = "ssh://git@github.com/ecmwf/qubed.git" }
-anemoi-cascade = { git = "ssh://git@github.com/ecmwf/anemoi-cascade" }
+earthkit-plots = { git = "ssh://git@github.com/ecmwf/earthkit-plots", rev = "experimental" }
+earthkit-plots-default-styles = { git = "ssh://git@github.com/ecmwf/earthkit-plots-default-styles", rev = "experimental" }
+anemoi-cascade = { git = "ssh://git@github.com/ecmwf/anemoi-cascade.git", rev = "fix/move_to_basic_objects" }
 
 [tool.hatch.metadata]
 allow-direct-references = true

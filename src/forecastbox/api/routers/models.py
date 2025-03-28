@@ -7,9 +7,16 @@ import os
 from functools import lru_cache
 
 from typing import TYPE_CHECKING, Any
+from pathlib import Path
 
-from ..models import open_checkpoint, MODEL_CHECKPOINT_PATH, TESTING_LOOKUP
+from ..types import ModelSpecification
 from forecastbox.models import Model
+
+from forecastbox.settings import get_settings
+from forecastbox.models import Model
+
+import requests
+SETTINGS = get_settings()
 
 router = APIRouter(
 	tags=["models"],
@@ -17,45 +24,90 @@ router = APIRouter(
 )
 
 
+def get_model_path(model: str) -> Path:
+	"""Get the path to a model."""
+	return (Path(SETTINGS.data_path) / model).with_suffix(".ckpt").absolute()
+
+
 # Model Availability
 @router.get("/available")
 async def get_available_models() -> dict[str, list[str]]:
-	models = defaultdict(list)
-	if not os.path.exists(MODEL_CHECKPOINT_PATH):
-		return {"testing": list(TESTING_LOOKUP.keys())}
+	"""
+	Get a list of available models sorted into categories.
 
-	for subdir in os.listdir(MODEL_CHECKPOINT_PATH):
-		subdir_path = os.path.join(MODEL_CHECKPOINT_PATH, subdir)
-		if os.path.isdir(subdir_path):
-			for model in os.listdir(subdir_path):
-				if model.endswith(".ckpt"):
-					models[subdir].append(model)
+	Returns
+	-------
+	dict[str, list[str]]
+		Dictionary containing model categories and their models
+	"""
+
+	manifest_path = os.path.join(SETTINGS.model_repository, "MANIFEST")
+
+	response = requests.get(manifest_path)
+	if response.status_code != 200:
+		raise Exception(f"Failed to fetch manifest from {manifest_path}")
+	
+	models = defaultdict(list)
+
+	for model in response.text.split('\n'):
+		cat, name = model.split('/')
+		models[cat].append(name)
 	return models
 
+@router.get("/downloaded/{model}")
+async def check_if_downloaded(model: str) -> bool:
+	"""Check if a model has been downloaded."""
 
-@router.get("/registry")
-async def registry():
-	"""Check registry."""
-	raise NotImplementedError("Checking model registry is not yet implemented")
+	model_path = get_model_path(model.replace("_", "/"))
 
-
-# Model Downloading
-@router.get("/downloaded/{model_name}")
-async def check_if_downloaded(model_name):
-	return {"downloaded": os.path.exists(os.path.join(MODEL_CHECKPOINT_PATH, model_name))}
+	return model_path.exists()
 
 
-@router.get("/download/{model_name}")
-async def download(model_name):
+@router.get("/download/{model}")
+async def download(model: str) -> str:
 	"""Download a model."""
-	raise NotImplementedError("Downloading models is not yet implemented")
+	repo = SETTINGS.model_repository
+
+	model = model.replace("_", "/")
+	model_path = f"{repo}/{model}.ckpt"
+
+	model_download_path = get_model_path(model.replace("_", "/"))
+	
+	model_download_path.parent.mkdir(parents=True, exist_ok=True)
+
+	if model_download_path.exists():
+		return str(model_download_path)
+
+	with requests.get(model_path, stream=True) as r:
+		r.raise_for_status()
+		with open(model_download_path, "wb") as f:
+			for chunk in r.iter_content(chunk_size=8192):
+				f.write(chunk)
+	
+	return str(model_download_path)
 
 
 # Model Info
 @lru_cache
-@router.get("/info/{model_name}")
-async def get_model_info(model_name: str) -> dict[str, Any]:
-	ckpt = await open_checkpoint(model_name)
+@router.get("/info/{modelname}")
+async def get_model_info(modelname: str) -> dict[str, Any]:
+	"""
+	Get basic information about a model.
+
+	Parameters
+	----------
+	modelname : str
+		Model to load, directory separated by underscores
+
+	Returns
+	-------
+	dict[str, Any]
+		Dictionary containing model information
+	"""
+	
+	from anemoi.inference.checkpoint import Checkpoint
+	ckpt = Checkpoint(get_model_path(modelname.replace('_', '/')))
+	
 	anemoi_versions = {key: val for key, val in ckpt.provenance_training()["module_versions"].items() if key.startswith("anemoi")}
 
 	return {
@@ -69,9 +121,23 @@ async def get_model_info(model_name: str) -> dict[str, Any]:
 	}
 
 
-@lru_cache
-@router.get("/spec/{model_name}")
-async def get_model_spec(model_name: str) -> dict[str, Any]:
-	"""Get Qubed model Spec"""
-	ckpt = await open_checkpoint(model_name)
-	return Model(ckpt).qube().to_json()
+
+@router.post("/spec/{model}")
+async def get_model_spec(modelspec: ModelSpecification) -> dict[str, Any]:
+	"""
+	Get the Qubed model spec as a json.
+
+	Parameters
+	----------
+	modelspec : ModelSpecification
+		Model Specification
+
+	Returns
+	-------
+	dict[str, Any]
+		Json Dump of the Qubed model spec
+	"""	
+	
+	model_dict = dict(lead_time = modelspec.lead_time, date = modelspec.date, ensemble_members = modelspec.ensemble_members)
+
+	return Model(get_model_path(modelspec.model), **model_dict).qube().to_json()

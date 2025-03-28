@@ -9,20 +9,22 @@ import { ModelSpecification } from '../interface';
 
 interface ModelProps {
     selectedModel: ModelSpecification;
-    submit: (val: ModelSpecification) => void;
     coordinates: { lat: number; lon: number } | null;
     setCoordinates: (coords: { lat: number; lon: number } | null) => void;
+    modelSpec: ModelSpecification;
+    submit: (val: ModelSpecification) => void;
 }
 
-function Model({ selectedModel, coordinates, setCoordinates, submit }: ModelProps) {
+
+function Model({ selectedModel, coordinates, setCoordinates, modelSpec, submit }: ModelProps) {
     const [model, setModel] = useState<string>(selectedModel.model);
     const [modalOpened, setModalOpened] = useState(false);
     const [showGlobeSelect, setShowGlobeSelect] = useState(false);
 
     // State for form inputs
-    const [date, setDate] = useState<string>('20200101');
-    const [leadTime, setLeadTime] = useState<number>(72);
-    const [ensembleMembers, setEnsembleMembers] = useState<number>(4);
+    const [date, setDate] = useState<string | null>(selectedModel.date || null);
+    const [leadTime, setLeadTime] = useState<number>(selectedModel.lead_time || 72);
+    const [ensembleMembers, setEnsembleMembers] = useState<number>(selectedModel.ensemble_members || 1);
 
     const handleGlobeSubmit = () => {
         if (coordinates) {
@@ -97,18 +99,18 @@ function Model({ selectedModel, coordinates, setCoordinates, submit }: ModelProp
                 <NumberInput
                     label="Lead Time (hours)"
                     value={leadTime}
-                    onChange={(value) => setLeadTime(value || 0)}
+                    onChange={(value) => setLeadTime(value)}
                     min={0}
                 />
                 <NumberInput
                     label="Ensemble Members"
                     value={ensembleMembers}
-                    onChange={(value) => setEnsembleMembers(value || 0)}
+                    onChange={(value) => setEnsembleMembers(value)}
                     min={1}
                 />
             </Card>
 
-            <Button onClick={handleModelSubmit} disabled={!model} mt="md">
+            <Button onClick={handleModelSubmit} disabled={!model || !date} mt="md">
                 Submit
             </Button>
         </Card>

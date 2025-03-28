@@ -12,11 +12,11 @@ import {IconX} from '@tabler/icons-react'
 
 import classes from './configuration.module.css';
 
-import {ProductSpecification, ProductConfiguration, ConfigEntry} from '../interface'
+import {ProductSpecification, ProductConfiguration, ConfigEntry, ModelSpecification} from '../interface'
 
 interface ConfigurationProps {
   selectedProduct: string | null;
-  selectedModel: string ;
+  selectedModel: ModelSpecification ;
   submitTarget: (conf: ProductSpecification) => void;
 }
 

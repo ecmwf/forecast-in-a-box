@@ -1,3 +1,5 @@
+"""API """
+
 from typing import Optional, Any
 from dataclasses import dataclass, field
 
@@ -19,9 +21,11 @@ class ModelSpecification():
     """Lead time"""
     ensemble_members: int
     """Number of ensemble members"""
-
     entries: dict[str, str] = field(default_factory=dict)
     """Configuration entries"""
+
+    def __post_init__(self):
+       self.model = self.model.lower().replace('_', '/')
 
 EnvironmentSpecification = dict[str, str]
 
@@ -94,7 +98,7 @@ class ProductSpecification:
     
 
 @dataclass
-class SubmitSpecification:
+class GraphSpecification:
 	model: ModelSpecification
 	"""Model Configuration"""
 	products: list[ProductSpecification]

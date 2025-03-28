@@ -1,29 +1,52 @@
 
 
-.button {
-    display: flow-root list-item;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    margin-left: 10px;
-    transition: background-color 0.3s ease;
-    color: black;
-    background-color: transparent;
-}
-
-.button:hover {
-    background-color: grey;
-}
-
-/* .option-group {
-    border-bottom: 2px solid rgb(164, 164, 164);
-} */
-
-.option-list {
-    /* background-color: rgba(208, 208, 208, 0.969); */
-}
 
 .heading {
     font-size: large;
     color: rgba(102, 101, 101, 0.94);
 }
+
+.option {
+    display: flex;
+}
+
+/* Base button styles */
+.button {
+    justify-content: center;
+    /* margin-left: 5px; */
+    transition: background-color 0.3s ease;
+    color: black;
+    background-color: transparent;
+    font-size: small;
+    cursor: pointer;
+  }
+  
+  /* Hover state */
+  .button:hover {
+    background-color: grey;
+  }
+  
+  /* Disabled button styles */
+  .button--disabled {
+    color: darkgray;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  
+  /* Additional button states can be added here */
+  .button--primary {
+    background-color: blue;
+    color: white;
+  }
+  
+  .button--secondary {
+    background-color: white;
+    color: black;
+    border: 1px solid black;
+  }
+  
+  .heading {
+    font-size: large;
+    color: rgba(102, 101, 101, 0.94);
+  }
+  
