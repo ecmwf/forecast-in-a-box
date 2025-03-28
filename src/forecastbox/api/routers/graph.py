@@ -14,12 +14,14 @@ from cascade.low.into import graph2job
 from cascade.low.core import JobInstance
 
 import tempfile
+from forecastbox.settings import get_settings
 
 router = APIRouter(
 	tags=["graph"],
 	responses={404: {"description": "Not found"}},
 )
 
+SETTINGS = get_settings()
 
 async def convert_to_cascade(spec: GraphSpecification) -> Cascade:
     """Convert a specification to a cascade."""
@@ -51,7 +53,7 @@ async def get_graph_visualise(spec: GraphSpecification):
             return Response(f.read(), media_type="text/html")
 
 @router.post("/serialise")
-async def get_graph_serialised(spec: GraphSpecification):
+async def get_graph_serialised(spec: GraphSpecification) -> JobInstance:
     """Get serialised dump of product graph."""
     graph = await convert_to_cascade(spec)
     return graph2job(graph._graph)
@@ -60,4 +62,14 @@ async def get_graph_serialised(spec: GraphSpecification):
 async def execute(spec: GraphSpecification):
     """Get serialised dump of product graph."""
     graph = await convert_to_cascade(spec)
-    return graph2job(graph._graph)
+    job =  graph2job(graph._graph)
+
+    import cascade.gateway.api as api
+    import cascade.gateway.client as client
+    import os
+    os.environ["GENERATORS_N"] = "8"
+    os.environ["GENERATORS_K"] = "10"
+    os.environ["GENERATORS_L"] = "4"
+
+    r = api.SubmitJobRequest(job=api.JobSpec(benchmark_name=None, workers_per_host=2, hosts=2, envvars={}, use_slurm=False, job_instance=job))
+    return client.request_response(r, f"tcp://{SETTINGS.cascade_gateway}")

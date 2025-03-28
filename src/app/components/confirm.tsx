@@ -49,6 +49,26 @@ function Confirm({ model, products, setProducts, setSlider}: ConfirmProps) {
         }
         console.log(submitData);
 
+        const execute = async () => {
+            (async () => {
+                try {
+                    const response = await fetch(`/api/py/graph/execute`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(submitData),
+                    });
+
+                    const result: string = await response.text();
+                    console.log(result);
+                    alert(result)
+                } catch (error) {
+                    console.error("Error executing:", error);
+                } finally {
+                }
+            })();
+        };
+        execute();
+
     }
     const handleDownload = () => {
         const submitData: SubmitSpecification = {
@@ -103,7 +123,7 @@ function Confirm({ model, products, setProducts, setSlider}: ConfirmProps) {
         };
         console.log(submitData);
 
-        const submit = async () => {
+        const getGraphHtml = async () => {
             setLoading(true);
             (async () => {
                 try {
@@ -123,7 +143,7 @@ function Confirm({ model, products, setProducts, setSlider}: ConfirmProps) {
                 }
             })();
         };
-        submit();
+        getGraphHtml();
     };
 
     return (

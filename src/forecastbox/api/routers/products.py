@@ -30,7 +30,7 @@ def select_from_params(available_spec: Qube, params: dict[str, Any]) -> Qube:
 			# Dont select if open ended
 			continue
 
-		available_spec = available_spec.select({key: str(val) if not isinstance(val, (list, tuple)) else list(map(str, val))}, consume=True)
+		available_spec = available_spec.select({key: str(val) if not isinstance(val, (list, tuple)) else list(map(str, val))}, consume=False)
 
 	return available_spec
 
@@ -104,7 +104,7 @@ async def get_valid_categories(modelspec: ModelSpecification) -> dict[str, Categ
 	return categories
 
 @router.post("/configuration/{category}/{product}")
-async def get_product_configuration(category, product: str, model: ModelSpecification, spec: dict) -> ProductConfiguration:
+async def get_product_configuration(category: str, product: str, model: ModelSpecification, spec: dict[str, str]) -> ProductConfiguration:
 
 	prod = get_product(category, product)
 	entries = await product_to_config(prod, model, spec)

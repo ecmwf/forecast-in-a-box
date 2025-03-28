@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "fastapi-dev": "uv run --frozen uvicorn forecastbox.entrypoint:app --reload --log-level info",
+    "cascade-dev": "uv run --frozen --module cascade.gateway tcp://localhost:8079",
     "next-dev": "next dev",
-    "dev": "concurrently \"npm run next-dev\" \"npm run fastapi-dev\"",
+    "dev": "concurrently \"npm run next-dev\" \"npm run fastapi-dev\" \"npm run cascade-dev\"",
     "setup": "uv add fastapi",
     "build": "next build",
     "start": "next start",

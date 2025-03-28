@@ -4,6 +4,7 @@ from functools import lru_cache
 class Settings(BaseSettings):
     data_path: str
     model_repository: str
+    cascade_gateway: str
 
     model_config = SettingsConfigDict(env_file=".env")
 
