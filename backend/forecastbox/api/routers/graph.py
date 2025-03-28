@@ -70,7 +70,7 @@ async def execute(spec: GraphSpecification) -> api.SubmitJobResponse:
     job =  graph2job(graph._graph)
 
     r = api.SubmitJobRequest(job=api.JobSpec(benchmark_name=None, workers_per_host=2, hosts=2, envvars={}, use_slurm=False, job_instance=job))
-    return = client.request_response(r, f"{SETTINGS.cascade_url}") # type: ignore
+    return client.request_response(r, f"{SETTINGS.cascade_url}") # type: ignore
 
 @router.get('/progress/{id}')
 async def get_progress(id: JobId) -> api.JobProgressResponse:
