@@ -73,7 +73,7 @@ async def execute(spec: GraphSpecification) -> Union[JobId, None]:
     response: api.SubmitJobResponse = client.request_response(r, f"{SETTINGS.cascade_url}") # type: ignore
     return response.job_id
 
-@router.post('/progress')
+@router.get('/progress/{id}')
 async def get_progress(id: JobId) -> api.JobProgressResponse:
     request = api.JobProgressRequest(job_id=id)
     return client.request_response(request, f"{SETTINGS.cascade_url}") # type: ignore
