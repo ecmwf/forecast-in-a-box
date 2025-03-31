@@ -24,7 +24,6 @@ router = APIRouter(
 
 CONFIG_ORDER = ["param", "levtype", "levelist"]
 
-@lru_cache
 def get_model(model: ModelSpecification) -> Model:
 	"""Get the model from the model repository."""
 

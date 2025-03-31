@@ -26,8 +26,9 @@ Running the server
 ```bash
 npm run next-dev &
 
-uv run --module forecastbox.standalone.entrypoint 
+python -m forecastbox.standalone.entrypoint 
 # or 
-uv run uvicorn forecastbox.entrypoint:app --reload --log-level info & 
-uv run --module cascade.gateway CASCADE_URL
+
+uvicorn forecastbox.entrypoint:app --reload --log-level info 
+python -m cascade.gateway tcp://localhost:8067
 ```
