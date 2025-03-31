@@ -24,7 +24,6 @@ router = APIRouter(
 
 CONFIG_ORDER = ["param", "levtype", "levelist"]
 
-@lru_cache
 def get_model(model: ModelSpecification) -> Model:
 	"""Get the model from the model repository."""
 
@@ -111,7 +110,7 @@ async def get_valid_categories(modelspec: ModelSpecification) -> dict[str, Categ
 	return categories
 
 @router.post("/configuration/{category}/{product}")
-async def get_product_configuration(category: str, product: str, model: ModelSpecification, spec: dict[str, str]) -> ProductConfiguration:
+async def get_product_configuration(category: str, product: str, model: ModelSpecification, spec: dict[str, Any]) -> ProductConfiguration:
 
 	prod = get_product(category, product)
 	entries = await product_to_config(prod, model, spec)

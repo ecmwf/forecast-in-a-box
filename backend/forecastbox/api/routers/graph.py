@@ -12,6 +12,7 @@ from ..types import GraphSpecification
 
 from cascade import Cascade
 from cascade.low.into import graph2job
+
 from cascade.low.core import JobInstance, DatasetId
 from cascade.controller.report import JobId, JobProgress
 
@@ -67,17 +68,20 @@ async def get_graph_serialised(spec: GraphSpecification) -> JobInstance:
 async def execute(spec: GraphSpecification) -> api.SubmitJobResponse:
     """Get serialised dump of product graph."""
     graph = await convert_to_cascade(spec)
-    job =  graph2job(graph._graph)
+    job = graph2job(graph._graph)
 
+    # Manual GPU allocation
+    for task_id, task in job.tasks.items():
+        if task_id.startswith('run_as_earthkit'):
+            task.definition.needs_gpu = True
+            
     r = api.SubmitJobRequest(job=api.JobSpec(benchmark_name=None, workers_per_host=2, hosts=2, envvars={}, use_slurm=False, job_instance=job))
     return client.request_response(r, f"{SETTINGS.cascade_url}") # type: ignore
 
-@router.get('/progress/{id}')
-async def get_progress(id: JobId) -> api.JobProgressResponse:
-    request = api.JobProgressRequest(job_id=id)
+@router.post('/progress')
+async def get_progress(request: api.JobProgressRequest) -> api.JobProgressResponse:
     return client.request_response(request, f"{SETTINGS.cascade_url}") # type: ignore
 
 @router.post('/result')
-async def get_result(id: JobId, result: DatasetId) -> api.ResultRetrievalResponse:
-    request = api.ResultRetrievalRequest(job_id=id, dataset_id=result)
+async def get_result(request: api.ResultRetrievalRequest) -> api.ResultRetrievalResponse:
     return client.request_response(request, f"{SETTINGS.cascade_url}") # type: ignore
