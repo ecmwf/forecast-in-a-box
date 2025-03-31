@@ -17,6 +17,7 @@ interface ConfirmProps {
     products: Record<string, ProductSpecification>;
     setProducts: (products: Record<string, ProductSpecification>) => void;
     setSlider: (value: number) => void;
+    setJobId: (value: string) => void;
 }
 
 
@@ -39,7 +40,7 @@ function GraphModal({ graphContent, setGraphContent, loading }: { graphContent: 
     );
 }
 
-function Confirm({ model, products, setProducts, setSlider}: ConfirmProps) {
+function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmProps) {
     
     const handleSubmit = () => {
         const submitData: SubmitSpecification = {
@@ -58,9 +59,14 @@ function Confirm({ model, products, setProducts, setSlider}: ConfirmProps) {
                         body: JSON.stringify(submitData),
                     });
 
-                    const result: string = await response.text();
+                    const result = await response.json();
+                    if (!response.ok) {
+                        alert("Error: " + response.status + " " + response.statusText);
+                        throw new Error(`Error: ${response.status} - ${response.statusText}`);
+                    }
                     console.log(result);
-                    alert(result)
+                    setJobId(result.job_id);
+                    setSlider(3);
                 } catch (error) {
                     console.error("Error executing:", error);
                 } finally {

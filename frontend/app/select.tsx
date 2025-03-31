@@ -6,7 +6,9 @@ import { SimpleGrid, Stepper, Divider, Button, Alert, Container} from "@mantine/
 import ProductConfigurator from './components/products/products'
 import Model from "./components/model/model";
 
-import Confirm from './components/confirm'
+import Confirm from './components/confirm';
+import ProgressVisualizer from "./components/visualise/progress";
+
 import {ModelSpecification, ProductSpecification, EnvironmentSpecification} from './components/interface'
 
 import { IconWorldCog, IconCircleCheck, IconShoppingCartCode, IconRocket, IconTerminal2, IconLogs, IconMap } from '@tabler/icons-react';
@@ -26,6 +28,7 @@ const Packages = () => {
     }
 
     const [products, setProducts] = useState({} as Record<string, ProductSpecification>);
+    const [jobId, setJobId] = useState("");
 
     const setSubmittedProducts = (prod: Record<string, ProductSpecification>) => {
         console.log("Submitted products: ", prod);
@@ -58,7 +61,7 @@ const Packages = () => {
             <Stepper.Step label="Confirm" description="Execute the graph" allowStepSelect={!!selectedModel.model} icon={<IconRocket/>}>
                 <Divider my="md" />
                 {products && selectedModel ? (
-                    <Confirm model={selectedModel} products={products} setProducts={setProducts} setSlider={setActive}/>
+                    <Confirm model={selectedModel} products={products} setProducts={setProducts} setSlider={setActive} setJobId={setJobId}/>
                 ) : (
                     <>
                         <Alert>Select products first</Alert>
@@ -67,6 +70,7 @@ const Packages = () => {
                 )}
             </Stepper.Step>
             <Stepper.Step label="Monitoring" allowStepSelect={false} icon={<IconLogs/>}>
+                <ProgressVisualizer id={jobId} />
             </Stepper.Step>
             <Stepper.Step label="Visualisation" allowStepSelect={false} icon={<IconMap/>}>
             </Stepper.Step>
