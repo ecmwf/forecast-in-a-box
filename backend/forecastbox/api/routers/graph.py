@@ -11,9 +11,11 @@ from .models import get_model_path
 from ..types import GraphSpecification
 
 from cascade import Cascade
+from cascade.graph.pyvis import PRESET_OPTIONS
 from cascade.low.into import graph2job
 
 from cascade.low.core import JobInstance, DatasetId
+from cascade.low import views as cascade_views
 from cascade.controller.report import JobId, JobProgress
 
 import cascade.gateway.api as api
@@ -28,6 +30,9 @@ router = APIRouter(
 )
 
 SETTINGS = get_settings()
+
+class SubmitResponse(api.SubmitJobResponse):
+    output_ids: set[DatasetId]
 
 async def convert_to_cascade(spec: GraphSpecification) -> Cascade:
     """Convert a specification to a cascade."""
@@ -48,12 +53,12 @@ async def convert_to_cascade(spec: GraphSpecification) -> Cascade:
 
 
 @router.post("/visualise", response_model=str)
-async def get_graph_visualise(spec: GraphSpecification):
+async def get_graph_visualise(spec: GraphSpecification, preset: PRESET_OPTIONS = 'blob') -> Response:
     """Get an HTML visualisation of the product graph."""
     graph = await convert_to_cascade(spec)
     
     with tempfile.NamedTemporaryFile(suffix=".html") as dest:
-        graph.visualise(dest.name, preset = 'blob')
+        graph.visualise(dest.name, preset = preset)
 
         with open(dest.name, 'r') as f:
             return Response(f.read(), media_type="text/html")
@@ -65,7 +70,7 @@ async def get_graph_serialised(spec: GraphSpecification) -> JobInstance:
     return graph2job(graph._graph)
 
 @router.post("/execute")
-async def execute(spec: GraphSpecification) -> api.SubmitJobResponse:
+async def execute(spec: GraphSpecification) -> SubmitResponse:
     """Get serialised dump of product graph."""
     graph = await convert_to_cascade(spec)
     job = graph2job(graph._graph)
@@ -74,9 +79,14 @@ async def execute(spec: GraphSpecification) -> api.SubmitJobResponse:
     for task_id, task in job.tasks.items():
         if task_id.startswith('run_as_earthkit'):
             task.definition.needs_gpu = True
+
+    sinks = cascade_views.sinks(job)
             
-    r = api.SubmitJobRequest(job=api.JobSpec(benchmark_name=None, workers_per_host=2, hosts=2, envvars={}, use_slurm=False, job_instance=job))
-    return client.request_response(r, f"{SETTINGS.cascade_url}") # type: ignore
+    request = api.SubmitJobRequest(job=api.JobSpec(benchmark_name=None, workers_per_host=2, hosts=2, envvars={}, use_slurm=False, job_instance=job))
+    response = client.request_response(request, f"{SETTINGS.cascade_url}")
+
+    submit_response = SubmitResponse(**response.model_dump(), output_ids=sinks)
+    return submit_response
 
 @router.post('/progress')
 async def get_progress(request: api.JobProgressRequest) -> api.JobProgressResponse:
