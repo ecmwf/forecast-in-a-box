@@ -1,16 +1,12 @@
 """Products API Router."""
 
-from datetime import datetime
-import time
 from fastapi import APIRouter, Response
 
 from typing import Union
-import tempfile
 
 from forecastbox.products.registry import get_categories, get_product
 from forecastbox.models import Model
 
-from .models import get_model_path
 from ..types import GraphSpecification
 
 from cascade.low.core import JobInstance, DatasetId

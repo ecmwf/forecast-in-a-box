@@ -23,10 +23,10 @@ dependencies = [
 	"pyrsistent",
 	"anemoi-inference[huggingface]>=0.4.10",
 	"qubed",
-	"cascade-python",
 	"anemoi-cascade",
 	"pydantic-settings",
 	"pymongo",
+	"earthkit-workflows",
 ]
 
 [project.urls]
@@ -63,11 +63,11 @@ indent-style = "tab"
 plugins = "pydantic.mypy"
 
 [tool.uv.sources]
-cascade-python = { git = "https://github.com/ecmwf/cascade", rev = "FIAB" }
 qubed = { git = "ssh://git@github.com/ecmwf/qubed.git" }
 earthkit-plots = { git = "ssh://git@github.com/ecmwf/earthkit-plots", rev = "experimental" }
 earthkit-plots-default-styles = { git = "ssh://git@github.com/ecmwf/earthkit-plots-default-styles", rev = "experimental" }
-anemoi-cascade = { git = "ssh://git@github.com/ecmwf/anemoi-cascade.git", rev = "fix/move_to_basic_objects" }
+anemoi-cascade = { git = "ssh://git@github.com/ecmwf/anemoi-cascade.git" }
+earthkit-workflows = { git = "https://github.com/ecmwf/earthkit-workflows" }
 
 [tool.hatch.metadata]
 allow-direct-references = true

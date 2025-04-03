@@ -1,7 +1,6 @@
 """Products API Router."""
 
 from datetime import datetime
-import time
 from fastapi import APIRouter, Response
 
 from typing import Union
@@ -13,7 +12,7 @@ from forecastbox.models import Model
 from .models import get_model_path
 from ..types import GraphSpecification
 
-from cascade import Cascade
+from earthkit.workflows import Cascade
 from cascade.low.into import graph2job
 from cascade.low import views as cascade_views
 
