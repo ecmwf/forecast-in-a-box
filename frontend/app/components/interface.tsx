@@ -72,3 +72,16 @@ export type SubmitSpecification = {
 };
 
 
+export type DatasetId = {
+  task: string;
+  output: string;
+};
+
+export type SubmitResponse = {
+  job_id: string;
+  error: string;
+  output_ids: DatasetId[];
+};
+
+
+

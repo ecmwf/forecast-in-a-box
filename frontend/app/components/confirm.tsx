@@ -4,7 +4,7 @@ import { Button, Card, Title, Group, Modal, Divider, SimpleGrid, Center, ScrollA
 
 import { IconX, IconPencil} from '@tabler/icons-react';
 
-import {ModelSpecification, ProductSpecification, SubmitSpecification} from './interface'
+import {ModelSpecification, ProductSpecification, SubmitSpecification, SubmitResponse} from './interface'
 
 import InformationWindow from './model/information'
 import Cart from './products/cart'
@@ -17,7 +17,7 @@ interface ConfirmProps {
     products: Record<string, ProductSpecification>;
     setProducts: (products: Record<string, ProductSpecification>) => void;
     setSlider: (value: number) => void;
-    setJobId: (value: string) => void;
+    setJobId: (value: SubmitResponse) => void;
 }
 
 
@@ -27,7 +27,7 @@ function GraphModal({ graphContent, setGraphContent, loading }: { graphContent: 
             opened={!!graphContent || loading}
             onClose={() => setGraphContent("")}
             title={loading ? "Loading..." : "Graph"}
-            size={loading ? "xs" : "60vw"}
+            size={loading ? "xs" : "70vw"}
         >
             {loading && <Center><Loader /></Center>}
             {!loading && graphContent &&
@@ -53,19 +53,19 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
         const execute = async () => {
             (async () => {
                 try {
-                    const response = await fetch(`/api/py/graph/execute`, {
+                    const response = await fetch(`/api/py/execution/execute`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(submitData),
                     });
 
-                    const result = await response.json();
+                    const result: SubmitResponse = await response.json();
                     if (!response.ok) {
                         alert("Error: " + response.status + " " + response.statusText);
                         throw new Error(`Error: ${response.status} - ${response.statusText}`);
                     }
                     console.log(result);
-                    setJobId(result.job_id);
+                    setJobId(result);
                     setSlider(3);
                 } catch (error) {
                     console.error("Error executing:", error);
@@ -87,7 +87,7 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
         async function retrieveFileBlob() {
             try {
                 const ftch = await fetch( // this will request the file information for the download (whether an image, PDF, etc.)
-                    `/api/py/graph/serialise`,
+                    `/api/py/execution/serialise`,
                     {
                         method: "POST",
                         headers: {
@@ -133,7 +133,7 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
             setLoading(true);
             (async () => {
                 try {
-                    const response = await fetch(`/api/py/graph/visualise`, {
+                    const response = await fetch(`/api/py/execution/visualise`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(submitData),

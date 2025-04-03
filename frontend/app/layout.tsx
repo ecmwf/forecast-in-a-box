@@ -10,6 +10,10 @@ import { Notifications } from '@mantine/notifications';
 
 import { theme } from "../theme";
 
+import Header from './components/header';
+import Footer from './components/footer';
+
+
 export const metadata = {
   title: "Forecast in a Box",
   description: "Pain",
@@ -27,7 +31,12 @@ export default function RootLayout({ children }: { children: any }) {
         />
       </head>
       <body>
-      <MantineProvider theme={theme}><Notifications/>{children}</MantineProvider>
+      <MantineProvider theme={theme}>
+        <Notifications/>
+          <Header />
+          {children}
+          <Footer />
+        </MantineProvider>
       </body>
     </html>
   );

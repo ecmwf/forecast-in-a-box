@@ -26,6 +26,7 @@ dependencies = [
 	"cascade-python",
 	"anemoi-cascade",
 	"pydantic-settings",
+	"pymongo",
 ]
 
 [project.urls]

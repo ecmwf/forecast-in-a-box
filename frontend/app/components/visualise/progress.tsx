@@ -1,19 +1,24 @@
 import { useEffect, useState } from 'react';
-import { Progress, Container, Title, Text, Button} from '@mantine/core';
+import { Progress, Container, Title, Text, ScrollArea, Divider, Flex, ActionIcon} from '@mantine/core';
 
-const ProgressVisualizer = ({ id }: { id: string }) => {
+import { SubmitResponse, DatasetId } from './../interface';
+
+
+import {IconSearch} from '@tabler/icons-react';
+
+const ProgressVisualizer = ({ job }: { job: SubmitResponse }) => {
     const [progressResponse, setProgressResponse] = useState<string>();
     const [progress, setProgress] = useState<number | null>(null);
 
     useEffect(() => {
         const fetchProgress = async () => {
             try {
-                const response = await fetch(`/api/py/graph/progress/`, {
+                const response = await fetch(`/api/py/execution/progress/`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({'job_id': id}),
+                    body: JSON.stringify({'job_id': job.job_id}),
                 });
                 if (!response.ok) {
                     throw new Error(`HTTP error! Status: ${response.status}`);
@@ -31,12 +36,12 @@ const ProgressVisualizer = ({ id }: { id: string }) => {
         fetchProgress(); // Initial fetch
 
         return () => clearInterval(interval); // Cleanup on component unmount
-    }, [id]);
+    }, [job]);
 
     return (
         <Container>
             <Title order={1}>Progress</Title>
-            <Title order={4}>{id}</Title>
+            <Title order={4}>{job.job_id}</Title>
             {progress === null ? (
                 <>
                 <Title pb='xl' order={6}>Waiting for Cascade...</Title>
@@ -45,6 +50,21 @@ const ProgressVisualizer = ({ id }: { id: string }) => {
             ) : (
                 <>
                 <Progress value={progress || 0} striped animated key={progress}/>
+                <Text>{progress}%</Text>
+
+                <Divider my='lg' />
+
+                <Title order={4}>Output IDs</Title>
+                <ScrollArea h='50vh' type="always">
+                <Container bg='000000'>
+                {job.output_ids.map((id: DatasetId, index: number) => (
+                    <Flex gap='md' justify='space-between'>
+                    <Text>{id.task}</Text>
+                    <ActionIcon mb='xs' size='lg' mr='21px' disabled={progress != 100} onClick={() => console.log(`Clicked on task: ${id.task}`)}><IconSearch scale='30%'/></ActionIcon>
+                    </Flex>
+                ))}
+                </Container>
+                </ScrollArea>
                 </>
             )}
         </Container>

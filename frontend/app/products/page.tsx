@@ -3,17 +3,17 @@
 import React, { useState } from "react";
 import { SimpleGrid, Stepper, Divider, Button, Alert, Container} from "@mantine/core";
 
-import ProductConfigurator from './components/products/products'
-import Model from "./components/model/model";
+import ProductConfigurator from './../components/products/products'
+import Model from "./../components/model/model";
 
-import Confirm from './components/confirm';
-import ProgressVisualizer from "./components/visualise/progress";
+import Confirm from './../components/confirm';
+import ProgressVisualizer from "./../components/visualise/progress";
 
-import {ModelSpecification, ProductSpecification, EnvironmentSpecification} from './components/interface'
+import {ModelSpecification, ProductSpecification, SubmitResponse} from './../components/interface'
 
 import { IconWorldCog, IconCircleCheck, IconShoppingCartCode, IconRocket, IconTerminal2, IconLogs, IconMap } from '@tabler/icons-react';
 
-const Packages = () => {    
+const ProductsPage = () => {    
     const [active, setActive] = useState(0);
     const nextStep = () => setActive((current) => (current < 3 ? current + 1 : current));
     const prevStep = () => setActive((current) => (current > 0 ? current - 1 : current));
@@ -28,7 +28,7 @@ const Packages = () => {
     }
 
     const [products, setProducts] = useState({} as Record<string, ProductSpecification>);
-    const [jobId, setJobId] = useState("");
+    const [jobId, setJobId] = useState<SubmitResponse>({} as SubmitResponse);
 
     const setSubmittedProducts = (prod: Record<string, ProductSpecification>) => {
         console.log("Submitted products: ", prod);
@@ -70,7 +70,7 @@ const Packages = () => {
                 )}
             </Stepper.Step>
             <Stepper.Step label="Monitoring" allowStepSelect={false} icon={<IconLogs/>}>
-                <ProgressVisualizer id={jobId} />
+                <ProgressVisualizer job={jobId} />
             </Stepper.Step>
             <Stepper.Step label="Visualisation" allowStepSelect={false} icon={<IconMap/>}>
             </Stepper.Step>
@@ -80,4 +80,4 @@ const Packages = () => {
     )
 }
 
-export default Packages;
+export default ProductsPage;
