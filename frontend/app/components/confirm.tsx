@@ -9,7 +9,7 @@ import {ModelSpecification, ProductSpecification, SubmitSpecification, SubmitRes
 import InformationWindow from './model/information'
 import Cart from './products/cart'
 
-import Loader from './animations/loader'
+import GraphModal from './shared/graphModal'
 
 
 interface ConfirmProps {
@@ -20,28 +20,10 @@ interface ConfirmProps {
     setJobId: (value: SubmitResponse) => void;
 }
 
-
-function GraphModal({ graphContent, setGraphContent, loading }: { graphContent: string, setGraphContent: (content: string) => void, loading: boolean }) {
-    return (
-        <Modal
-            opened={!!graphContent || loading}
-            onClose={() => setGraphContent("")}
-            title={loading ? "Loading..." : "Graph"}
-            size={loading ? "xs" : "70vw"}
-        >
-            {loading && <Center><Loader /></Center>}
-            {!loading && graphContent &&
-                <iframe
-                    srcDoc={graphContent} // Use srcDoc to inject the full HTML document
-                    style={{ width: "100%", height: "60vh", border: "none" }}
-                />
-            }
-        </Modal>
-    );
-}
-
 function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmProps) {
     
+    const [submitting, setSubmitting] = useState(false);
+
     const handleSubmit = () => {
         const submitData: SubmitSpecification = {
             model: model,
@@ -49,11 +31,12 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
             environment: {}
         }
         console.log(submitData);
+        setSubmitting(true);
 
         const execute = async () => {
             (async () => {
                 try {
-                    const response = await fetch(`/api/py/execution/execute`, {
+                    const response = await fetch(`/api/py/graph/execute`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(submitData),
@@ -64,18 +47,24 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
                         alert("Error: " + response.status + " " + response.statusText);
                         throw new Error(`Error: ${response.status} - ${response.statusText}`);
                     }
+                    if (result.error) {
+                        alert("Error: " + result.error);
+                        throw new Error(`Error: ${result.error}`);
+                    }
                     console.log(result);
                     setJobId(result);
-                    setSlider(3);
+                    window.location.href = `/progress/${result.job_id}`;
+
                 } catch (error) {
                     console.error("Error executing:", error);
                 } finally {
+                    setSubmitting(false);
                 }
             })();
         };
-        execute();
-
+        execute();       
     }
+
     const handleDownload = () => {
         const submitData: SubmitSpecification = {
             model: model,
@@ -133,7 +122,7 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
             setLoading(true);
             (async () => {
                 try {
-                    const response = await fetch(`/api/py/execution/visualise`, {
+                    const response = await fetch(`/api/py/graph/visualise`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(submitData),
@@ -185,11 +174,13 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
             </Group>
             <Divider p='md'/>
             <SimpleGrid cols={3}>
-                <Button onClick={getGraph} disabled={loading}>
+                <Button color='orange' onClick={getGraph} disabled={loading}>
                     {loading ? "Loading..." : "Visualise"}
                 </Button>
                 <Button onClick={handleDownload}>Download</Button>
-                <Button onClick={handleSubmit}>Submit</Button>
+                <Button color='green'onClick={handleSubmit} disabled={submitting}>
+                    {submitting ? "Submitting..." : "Submit"}
+                </Button>
             </SimpleGrid>
             
             <GraphModal graphContent={graphContent} setGraphContent={setGraphContent} loading={loading}/>
