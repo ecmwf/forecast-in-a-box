@@ -58,10 +58,14 @@ class MockMongoDB:
         return {"deleted_count": 0}
 
     @staticmethod
-    def delete_many(collection_name, query):
+    def delete_many(collection_name, query=None):
         db = MockMongoDB.get_database(db_name)
         if collection_name not in db:
             return {"deleted_count": 0}
+        if not query:
+            deleted_count = len(db[collection_name])
+            db[collection_name] = []
+            return {"deleted_count": deleted_count}
         initial_count = len(db[collection_name])
         db[collection_name] = [doc for doc in db[collection_name] if not all(doc.get(k) == v for k, v in query.items())]
         deleted_count = initial_count - len(db[collection_name])
@@ -72,11 +76,3 @@ class MockMongoDB:
 
 
 db = MockMongoDB()
-
-dummy_jobs = [
-    {"job_id": "job_1", "status": "submitted", "outputs": ["output_1", "output_2"]},
-    {"job_id": "job_2", "status": "completed", "outputs": ["output_3"]},
-    {"job_id": "job_3", "status": "submitted", "outputs": ["dummy_output_1"]},
-]
-for job in dummy_jobs:
-    db.insert_one("job_records", job)

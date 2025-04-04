@@ -58,7 +58,7 @@ async def product_to_config(product: Product, modelspec: ModelSpecification, par
 
     available_product_spec = product.model_intersection(model_spec)
 
-    subsetted_spec = select_from_params(model_qube & product_spec, params)
+    subsetted_spec = select_from_params(available_product_spec, params)
 
     axes = subsetted_spec.axes()
 

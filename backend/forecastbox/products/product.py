@@ -109,9 +109,34 @@ class GenericParamProduct(Product):
                 continue
             if key not in source.nodes.dims:
                 continue
+
+            def convert_to_int(value):
+                """Convert value to int if it is a digit."""
+                try:
+                    return_val = int(value)
+                    if not str(return_val) == value:
+                        return float(value)
+                    return return_val
+                except ValueError:
+                    return value
+
+            if isinstance(value, str):
+                value = convert_to_int(value)
+            if isinstance(value, list):
+                value = [convert_to_int(v) for v in value]
+            
             source = source.sel(**{key: value})
         return source
 
+class GenericTemporalProduct(GenericParamProduct):
+
+    def model_intersection(self, model):
+        """Get model intersection.
+        
+        Add step as axis to the model intersection.        
+        """
+        intersection = super().model_intersection(model)
+        return f"step={'/'.join(map(str, model.timesteps))}" / intersection
 
 USER_DEFINED = "USER_DEFINED"
 """User defined value"""
