@@ -1,9 +1,11 @@
 from forecastbox.products.registry import CategoryRegistry
 
 from earthkit.workflows.fluent import Payload
-from forecastbox.products.product import GenericParamProduct
+from forecastbox.products.product import GenericTemporalProduct
 
 from forecastbox.models import Model
+
+import earthkit.data as ekd
 
 simple_registry = CategoryRegistry("Simple", "Simple products", "Simple")
 
@@ -16,7 +18,7 @@ except ImportError:
 
 
 @simple_registry("Maps")
-class MapProduct(GenericParamProduct):
+class MapProduct(GenericTemporalProduct):
     @property
     def qube(self):
         return self.make_generic_qube()
@@ -41,7 +43,13 @@ class MapProduct(GenericParamProduct):
 
 
 @simple_registry("Record")
-class RecordProduct(GenericParamProduct):
+class RecordProduct(GenericTemporalProduct):
+
+    multiselect = {
+        "param": True,
+        "step": True,
+    }
+
     @property
     def qube(self):
         return self.make_generic_qube()
