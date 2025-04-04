@@ -26,7 +26,7 @@ const HomePage = () => {
       const jobList = Object.entries(progresses).map(([id, progress]) => ({
         id,
         status: progress === '100' ? 'Completed' : `In Progress`,
-        progress: progress,
+        progress: parseFloat(progress.replace('%', '')),
       }));
       setJobs([])
       setJobs(jobList);

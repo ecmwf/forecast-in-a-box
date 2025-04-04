@@ -166,7 +166,7 @@ const ProgressPage = () => {
                             <ActionIcon mb='xs' size='md' mr='21px' disabled={progress !== 100} onClick={() => fetchResults(dataset)}>
                                 <IconSearch scale='30%' />
                             </ActionIcon>
-                            <Button size='md' disabled={progress !== 100} component="a" href={`/api/py/jobs/result/${id}/${dataset}`} target='_blank' leftSection={<IconSearch scale='30%' />}/>
+                            <Button size='sm' disabled={progress !== 100} component="a" href={`/api/py/jobs/result/${id}/${dataset}`} target='_blank'><IconSearch/></Button>
                         </Table.Td>
                     </Table.Tr>
                     </Table.Tbody>
