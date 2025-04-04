@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from fastapi import APIRouter, Response
+from fastapi.responses import HTMLResponse
 
 from typing import Union
 import tempfile
@@ -61,7 +62,7 @@ async def convert_to_cascade(spec: GraphSpecification) -> Cascade:
 
 
 @router.post("/visualise", response_model=str)
-async def get_graph_visualise(spec: GraphSpecification):
+async def get_graph_visualise(spec: GraphSpecification) -> HTMLResponse:
     """Get an HTML visualisation of the product graph."""
     graph = await convert_to_cascade(spec)
 
@@ -69,8 +70,7 @@ async def get_graph_visualise(spec: GraphSpecification):
         graph.visualise(dest.name, preset="blob")
 
         with open(dest.name, "r") as f:
-            return Response(f.read(), media_type="text/html")
-
+            return HTMLResponse(f.read(), media_type="text/html")
 
 @router.post("/serialise")
 async def get_graph_serialised(spec: GraphSpecification) -> JobInstance:
@@ -80,10 +80,22 @@ async def get_graph_serialised(spec: GraphSpecification) -> JobInstance:
 
 
 @router.post("/execute")
+async def execute_api(spec: GraphSpecification) -> api.SubmitJobResponse:
+    return await execute(spec)
+
 async def execute(spec: GraphSpecification) -> api.SubmitJobResponse:
     """Get serialised dump of product graph."""
-    graph = await convert_to_cascade(spec)
+    try:
+        graph = await convert_to_cascade(spec)
+    except Exception as e:
+        return api.SubmitJobResponse(job_id = None, error=str(e))
+    
     job = graph2job(graph._graph)
+
+    sinks = cascade_views.sinks(job)
+    sinks = [s for s in sinks if not s.task.startswith("run_as_earthkit")]
+
+    job.ext_outputs = sinks
 
     # Manual GPU allocation
     for task_id, task in job.tasks.items():
@@ -95,7 +107,6 @@ async def execute(spec: GraphSpecification) -> api.SubmitJobResponse:
     )
     submit_job_response: api.SubmitJobResponse = client.request_response(r, f"{SETTINGS.cascade_url}")  # type: ignore
 
-    sinks = cascade_views.sinks(job)
 
     # Check if the job was submitted successfully
     if submit_job_response.error:
@@ -107,7 +118,7 @@ async def execute(spec: GraphSpecification) -> api.SubmitJobResponse:
         "graph_specification": spec,
         "status": "submitted",
         "created_at": datetime.now(),
-        "outputs": sinks,
+        "outputs": list(map(lambda x: x.task, sinks)),
     }
     db.insert_one("job_records", record)
 
