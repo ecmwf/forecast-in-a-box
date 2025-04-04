@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 class Model:
     """Model Specification"""
 
-    def __init__(self, checkpoint_path: os.PathLike, lead_time, date, ensemble_members, **kwargs):
+    def __init__(self, checkpoint_path: os.PathLike, lead_time: int, date, ensemble_members, **kwargs):
         self.checkpoint_path = checkpoint_path
         self.lead_time = lead_time
         self.date = date
@@ -25,6 +25,10 @@ class Model:
     @property
     def checkpoint(self) -> "Checkpoint":
         return Checkpoint(self.checkpoint_path)
+    
+    @property
+    def timesteps(self) -> list[int]:
+        return list(range(0, int(self.lead_time), int((self.checkpoint.timestep.total_seconds()+1) // 3600)))
 
     def qube(self, assumptions: dict[str, Any] | None = None) -> Qube:
         """Get Model Qube"""
