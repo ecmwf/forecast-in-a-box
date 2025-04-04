@@ -17,8 +17,8 @@ wheels = [
 
 [[package]]
 name = "anemoi-cascade"
-version = "0.1.dev41+g3167fa9"
-source = { git = "ssh://git@github.com/ecmwf/anemoi-cascade.git#3167fa90caba1f44c94d8527d9aeab515a2df64b" }
+version = "0.1.dev42+g9e55ceb"
+source = { git = "ssh://git@github.com/ecmwf/anemoi-cascade.git#9e55ceb68a5def64ccd82e2cf9c62534ba2216b7" }
 dependencies = [
     { name = "anemoi-inference" },
     { name = "earthkit-data" },
@@ -55,7 +55,7 @@ huggingface = [
 
 [[package]]
 name = "anemoi-transform"
-version = "0.1.5"
+version = "0.1.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anemoi-utils" },
@@ -64,14 +64,14 @@ dependencies = [
     { name = "earthkit-meteo" },
     { name = "earthkit-regrid" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4d/ab/33c06e5daf12bec662d3432471ec2fb52b9cf32b673de26ceab40e2b648b/anemoi_transform-0.1.5.tar.gz", hash = "sha256:c40af825b88547d8ac9163ef41e588036fac73cd5fdd73faba91d48f7d7ac902", size = 102779 }
+sdist = { url = "https://files.pythonhosted.org/packages/98/04/7222d88f33d15e0a6f9855fce3e9aa4589fcbafd474513c17fdf1aee1043/anemoi_transform-0.1.8.tar.gz", hash = "sha256:2be6c66357e7b4701ede50858596c7b6b2f167231e842bed5e1a157482d28836", size = 104021 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/96/cc/0c77deecdaa0510eee14a54eae32850ae4d6a4b34a4ca6ed590892a21f55/anemoi_transform-0.1.5-py3-none-any.whl", hash = "sha256:8c340684a56d1a4fd6e89bb087f130bff01c19cbf86b8fca245f8fdecc3639b2", size = 62668 },
+    { url = "https://files.pythonhosted.org/packages/81/d3/e79e2d1d20f4cde173cbddf6fce0afcd066d86bc7c4821e2f55b6a4b0589/anemoi_transform-0.1.8-py3-none-any.whl", hash = "sha256:72ab9e5c7e10fae5a7fec6d3167ccdcda12f38f69bb01faab499e54eb4546aba", size = 64250 },
 ]
 
 [[package]]
 name = "anemoi-utils"
-version = "0.4.17"
+version = "0.4.18"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aniso8601" },
@@ -81,9 +81,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ea/d3/0b0c0b257d6c11bae8845347c1fad64dac603188184bea38fd736abcbfb3/anemoi_utils-0.4.17.tar.gz", hash = "sha256:b5f82cba53477efba9e4bca013e46207b37856cccaeb4414e27d1fdda870e829", size = 120396 }
+sdist = { url = "https://files.pythonhosted.org/packages/48/47/a2f4458fb00193ff3d10b5ed0bb9d7e92b73c48156e833b11b632f4935f6/anemoi_utils-0.4.18.tar.gz", hash = "sha256:b0fa235efd56ae05eac8cc06540950676e93d90d233042df4e29105632792e61", size = 121689 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/84/f3/e8bb20809cc0673911b5b4786cefca15a296cb3e09c9fba3e71b58bd66dc/anemoi_utils-0.4.17-py3-none-any.whl", hash = "sha256:d99153e1e257cc855e5cd2f35b7148aab78ca959ea1135150fe98531da3fe770", size = 73644 },
+    { url = "https://files.pythonhosted.org/packages/e8/03/4ccd55c8e74c210fbc9a11986a8c9810667aa40ac3b9111a79414b3685c2/anemoi_utils-0.4.18-py3-none-any.whl", hash = "sha256:bf807ea3d930bab5513665567a318e24361e71d96ef24fb53d3b835791af1e7e", size = 75491 },
 ]
 
 [package.optional-dependencies]
@@ -446,8 +446,8 @@ wheels = [
 
 [[package]]
 name = "earthkit-plots"
-version = "10.1.dev43+gdf99781"
-source = { git = "ssh://git@github.com/ecmwf/earthkit-plots?rev=experimental#df997819f4e17c2b14dd8158382e0488a911ee6c" }
+version = "10.1.dev78+g3022a25"
+source = { git = "ssh://git@github.com/ecmwf/earthkit-plots?rev=experimental#3022a25d43d8936e605451d73ecff81a1c440c95" }
 dependencies = [
     { name = "adjusttext" },
     { name = "cartopy" },
@@ -685,11 +685,11 @@ wheels = [
 
 [[package]]
 name = "fsspec"
-version = "2025.3.0"
+version = "2025.3.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/34/f4/5721faf47b8c499e776bc34c6a8fc17efdf7fdef0b00f398128bc5dcb4ac/fsspec-2025.3.0.tar.gz", hash = "sha256:a935fd1ea872591f2b5148907d103488fc523295e6c64b835cfad8c3eca44972", size = 298491 }
+sdist = { url = "https://files.pythonhosted.org/packages/45/d8/8425e6ba5fcec61a1d16e41b1b71d2bf9344f1fe48012c2b48b9620feae5/fsspec-2025.3.2.tar.gz", hash = "sha256:e52c77ef398680bbd6a98c0e628fbc469491282981209907bbc8aea76a04fdc6", size = 299281 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/56/53/eb690efa8513166adef3e0669afd31e95ffde69fb3c52ec2ac7223ed6018/fsspec-2025.3.0-py3-none-any.whl", hash = "sha256:efb87af3efa9103f94ca91a7f8cb7a4df91af9f74fc106c9c7ea0efd7277c1b3", size = 193615 },
+    { url = "https://files.pythonhosted.org/packages/44/4b/e0cfc1a6f17e990f3e64b7d941ddc4acdc7b19d6edd51abf495f32b1a9e4/fsspec-2025.3.2-py3-none-any.whl", hash = "sha256:2daf8dc3d1dfa65b6aa37748d112773a7a08416f6c70d96b264c96476ecaf711", size = 194435 },
 ]
 
 [[package]]
@@ -755,7 +755,7 @@ wheels = [
 
 [[package]]
 name = "huggingface-hub"
-version = "0.29.3"
+version = "0.30.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "filelock" },
@@ -766,9 +766,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e5/f9/851f34b02970e8143d41d4001b2d49e54ef113f273902103823b8bc95ada/huggingface_hub-0.29.3.tar.gz", hash = "sha256:64519a25716e0ba382ba2d3fb3ca082e7c7eb4a2fc634d200e8380006e0760e5", size = 390123 }
+sdist = { url = "https://files.pythonhosted.org/packages/78/be/049689a7197630e75c4bb53021cb209a56617c9bf39b3a0950650d1f96e1/huggingface_hub-0.30.1.tar.gz", hash = "sha256:f379e8b8d0791295602538856638460ae3cf679c7f304201eb80fb98c771950e", size = 400784 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/40/0c/37d380846a2e5c9a3c6a73d26ffbcfdcad5fc3eacf42fdf7cff56f2af634/huggingface_hub-0.29.3-py3-none-any.whl", hash = "sha256:0b25710932ac649c08cdbefa6c6ccb8e88eef82927cacdb048efb726429453aa", size = 468997 },
+    { url = "https://files.pythonhosted.org/packages/99/e3/2232d0e726d4d6ea69643b9593d97d0e7e6ea69c2fe9ed5de34d476c1c47/huggingface_hub-0.30.1-py3-none-any.whl", hash = "sha256:0f6aa5ec5a4e68e5b9e45d556b4e5ea180c58f5a5ffa734e7f38c9d573028959", size = 481170 },
 ]
 
 [[package]]
@@ -852,11 +852,11 @@ wheels = [
 
 [[package]]
 name = "jsonpickle"
-version = "4.0.2"
+version = "4.0.5"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/2c/6f/e73cb91f774ad1077929a29b3a4af6e5603beb446cb99a55debe240664c3/jsonpickle-4.0.2.tar.gz", hash = "sha256:3e650b9853adcdab9d9d62a88412b6d36e9a59ba423b01cacf0cd4ee80733aca", size = 315121 }
+sdist = { url = "https://files.pythonhosted.org/packages/d6/33/4bda317ab294722fcdfff8f63aab74af9fda3675a4652d984a101aa7587e/jsonpickle-4.0.5.tar.gz", hash = "sha256:f299818b39367c361b3f26bdba827d4249ab5d383cd93144d0f94b5417aacb35", size = 315661 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5e/c8/e9dc0af97ce006616abbd7f522d0b45ac322a77f72bb29d901b5114a49ba/jsonpickle-4.0.2-py3-none-any.whl", hash = "sha256:cd3c90d32a68dcaa7f0e4b918bda7d4bb61f3c03b182d82dae2caf9ded0ab6b3", size = 46325 },
+    { url = "https://files.pythonhosted.org/packages/dc/1b/0e79cf115e0f54f1e8f56effb6ffd2ef8f92e9c324d692ede660067f1bfe/jsonpickle-4.0.5-py3-none-any.whl", hash = "sha256:b4ac7d0a75ddcdfd93445737f1d36ff28768690d43e54bf5d0ddb1d915e580df", size = 46382 },
 ]
 
 [[package]]
@@ -1670,7 +1670,7 @@ wheels = [
 [[package]]
 name = "qubed"
 version = "0.0.0"
-source = { git = "ssh://git@github.com/ecmwf/qubed.git#b2aba5dd4259bbed591fe1d67e82643e36c3799c" }
+source = { git = "ssh://git@github.com/ecmwf/qubed.git#2e36db42685089c71d8747cdcecb84aa5d947c42" }
 dependencies = [
     { name = "click" },
     { name = "frozendict" },
@@ -1710,15 +1710,15 @@ wheels = [
 
 [[package]]
 name = "rich"
-version = "13.9.4"
+version = "14.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "markdown-it-py" },
     { name = "pygments" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ab/3a/0316b28d0761c6734d6bc14e770d85506c986c85ffb239e688eeaab2c2bc/rich-13.9.4.tar.gz", hash = "sha256:439594978a49a09530cff7ebc4b5c7103ef57baf48d5ea3184f21d9a2befa098", size = 223149 }
+sdist = { url = "https://files.pythonhosted.org/packages/a1/53/830aa4c3066a8ab0ae9a9955976fb770fe9c6102117c8ec4ab3ea62d89e8/rich-14.0.0.tar.gz", hash = "sha256:82f1bc23a6a21ebca4ae0c45af9bdbc492ed20231dcb63f297d6d1021a9d5725", size = 224078 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/19/71/39c7c0d87f8d4e6c020a393182060eaefeeae6c01dab6a84ec346f2567df/rich-13.9.4-py3-none-any.whl", hash = "sha256:6049d5e6ec054bf2779ab3358186963bac2ea89175919d699e378b99738c2a90", size = 242424 },
+    { url = "https://files.pythonhosted.org/packages/0d/9b/63f4c7ebc259242c89b3acafdb37b41d1185c07ff0011164674e9076b491/rich-14.0.0-py3-none-any.whl", hash = "sha256:1c9491e1951aac09caffd42f448ee3d04e58923ffe14993f6e83068dc395d7e0", size = 243229 },
 ]
 
 [[package]]
@@ -1875,11 +1875,11 @@ wheels = [
 
 [[package]]
 name = "termcolor"
-version = "2.5.0"
+version = "3.0.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/37/72/88311445fd44c455c7d553e61f95412cf89054308a1aa2434ab835075fc5/termcolor-2.5.0.tar.gz", hash = "sha256:998d8d27da6d48442e8e1f016119076b690d962507531df4890fcd2db2ef8a6f", size = 13057 }
+sdist = { url = "https://files.pythonhosted.org/packages/f8/b6/8e2aaa8aeb570b5cc955cd913b083d96c5447bbe27eaf330dfd7cc8e3329/termcolor-3.0.1.tar.gz", hash = "sha256:a6abd5c6e1284cea2934443ba806e70e5ec8fd2449021be55c280f8a3731b611", size = 12935 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7f/be/df630c387a0a054815d60be6a97eb4e8f17385d5d6fe660e1c02750062b4/termcolor-2.5.0-py3-none-any.whl", hash = "sha256:37b17b5fc1e604945c2642c872a3764b5d547a48009871aea3edd3afa180afb8", size = 7755 },
+    { url = "https://files.pythonhosted.org/packages/a6/7e/a574ccd49ad07e8b117407bac361f1e096b01f1b620365daf60ff702c936/termcolor-3.0.1-py3-none-any.whl", hash = "sha256:da1ed4ec8a5dc5b2e17476d859febdb3cccb612be1c36e64511a6f2485c10c69", size = 7157 },
 ]
 
 [[package]]
@@ -2029,16 +2029,16 @@ wheels = [
 
 [[package]]
 name = "xarray"
-version = "2025.3.0"
+version = "2025.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
     { name = "packaging" },
     { name = "pandas" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8a/8c/e56820a2c682834d8fb4a940956cd41b9f2532fee9692bfaf43b14f33c6e/xarray-2025.3.0.tar.gz", hash = "sha256:531cf6d64e6ab54c19239930a840654f1a79d2140e9f0d11d1e8d69dcc581d0f", size = 3292399 }
+sdist = { url = "https://files.pythonhosted.org/packages/7c/c4/6931c37cd418658d596e78794bdd1bcb67efec0aac3cdb720e37e03c1ea1/xarray-2025.3.1.tar.gz", hash = "sha256:0252c96a73528b29d1ed7f0ab28d928d2ec00ad809e47369803b184dece1e447", size = 3300778 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/91/19/5dbac77ca82f009f8267d0e7cca4fd3be2a435d83ed98f6f8b9c5cb1747e/xarray-2025.3.0-py3-none-any.whl", hash = "sha256:022b7eac5ebc26d70d34211de732ec1a15127a40455f9492acdde7fbe5bbf091", size = 1270849 },
+    { url = "https://files.pythonhosted.org/packages/91/fd/973deafd9f87085136a58573600646b408ae7af47859f35151f0d83d5090/xarray-2025.3.1-py3-none-any.whl", hash = "sha256:3404e313930c226db70a945377441ea3c957225d8ba2d429e764c099bb91a546", size = 1279327 },
 ]
 
 [[package]]

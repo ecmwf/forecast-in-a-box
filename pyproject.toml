@@ -56,9 +56,6 @@ line-length = 140
 [tool.ruff.lint]
 ignore = ["E731"]
 
-[tool.ruff.format]
-indent-style = "tab"
-
 [tool.mypy]
 plugins = "pydantic.mypy"
 
