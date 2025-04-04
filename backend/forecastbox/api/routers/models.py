@@ -85,12 +85,13 @@ async def download(model: str) -> str:
     temp_download_path = tempfile.NamedTemporaryFile(suffix=".ckpt.tmp")
 
     async with httpx.AsyncClient() as client:
-        response = await client.get(model_path)
-        with open(temp_download_path.name, "wb") as f:
-            async for chunk in response.aiter_bytes(chunk_size=8192):
-                f.write(chunk)
+        async with client.stream("GET", model_path) as response:
+            response.raise_for_status()
+            with open(temp_download_path.name, "wb") as f:
+                async for chunk in response.aiter_bytes(chunk_size=8192):
+                    f.write(chunk)
 
-    shutil.copy(temp_download_path.name, model_download_path)
+    shutil.move(temp_download_path.name, model_download_path)
     return str(model_download_path)
 
 
