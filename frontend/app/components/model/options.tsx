@@ -85,7 +85,6 @@ function Options({ cardProps, tabProps, setSelected }: OptionsProps) {
         fetchModelOptions();
     }, []);
 
-    console.log(modelOptions);
     return (
         <Card {...cardProps} padding="">
             <Card.Section>

@@ -18,11 +18,11 @@ const Header = () => {
             <a href='/'>
               <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="xl">Home</Button>
             </a>
-            <a href='products'>
+            <a href='/products'>
               <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="xl">Products</Button>
             </a>
-            <a href='jobs'>
-              <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="xl">Jobs</Button>
+            <a href='/status'>
+              <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="xl">Status</Button>
             </a>
           </Group>
         </Group>

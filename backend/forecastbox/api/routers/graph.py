@@ -27,25 +27,31 @@ from ..database import db
 from forecastbox.settings import get_settings
 
 router = APIRouter(
-	tags=["execution"],
-	responses={404: {"description": "Not found"}},
+    tags=["execution"],
+    responses={404: {"description": "Not found"}},
 )
 
 SETTINGS = get_settings()
 
+
 class SubmitResponse(api.SubmitJobResponse):
     output_ids: set[DatasetId]
+
 
 async def convert_to_cascade(spec: GraphSpecification) -> Cascade:
     """Convert a specification to a cascade."""
 
-    model_spec = dict(lead_time =spec.model.lead_time, date = spec.model.date, ensemble_members = spec.model.ensemble_members,)
+    model_spec = dict(
+        lead_time=spec.model.lead_time,
+        date=spec.model.date,
+        ensemble_members=spec.model.ensemble_members,
+    )
     model_action = Model(get_model_path(spec.model.model), **model_spec).graph(None, **spec.model.entries)
-    
+
     actions = []
 
     for product in spec.products:
-        product_action = get_product(*product.product.split('/', 1)).to_graph(product.specification, model_action)
+        product_action = get_product(*product.product.split("/", 1)).to_graph(product.specification, model_action)
         actions.append(product_action)
 
     if len(spec.products) == 0:
@@ -58,18 +64,20 @@ async def convert_to_cascade(spec: GraphSpecification) -> Cascade:
 async def get_graph_visualise(spec: GraphSpecification):
     """Get an HTML visualisation of the product graph."""
     graph = await convert_to_cascade(spec)
-    
-    with tempfile.NamedTemporaryFile(suffix=".html") as dest:
-        graph.visualise(dest.name, preset = 'blob')
 
-        with open(dest.name, 'r') as f:
+    with tempfile.NamedTemporaryFile(suffix=".html") as dest:
+        graph.visualise(dest.name, preset="blob")
+
+        with open(dest.name, "r") as f:
             return Response(f.read(), media_type="text/html")
+
 
 @router.post("/serialise")
 async def get_graph_serialised(spec: GraphSpecification) -> JobInstance:
     """Get serialised dump of product graph."""
     graph = await convert_to_cascade(spec)
     return graph2job(graph._graph)
+
 
 @router.post("/execute")
 async def execute(spec: GraphSpecification) -> api.SubmitJobResponse:
@@ -79,20 +87,19 @@ async def execute(spec: GraphSpecification) -> api.SubmitJobResponse:
 
     # Manual GPU allocation
     for task_id, task in job.tasks.items():
-        if task_id.startswith('run_as_earthkit'):
+        if task_id.startswith("run_as_earthkit"):
             task.definition.needs_gpu = True
-            
-    r = api.SubmitJobRequest(job=api.JobSpec(benchmark_name=None, workers_per_host=2, hosts=2, envvars={}, use_slurm=False, job_instance=job))
-    submit_job_response: api.SubmitJobResponse = client.request_response(r, f"{SETTINGS.cascade_url}") # type: ignore
+
+    r = api.SubmitJobRequest(
+        job=api.JobSpec(benchmark_name=None, workers_per_host=2, hosts=2, envvars={}, use_slurm=False, job_instance=job)
+    )
+    submit_job_response: api.SubmitJobResponse = client.request_response(r, f"{SETTINGS.cascade_url}")  # type: ignore
 
     sinks = cascade_views.sinks(job)
 
     # Check if the job was submitted successfully
     if submit_job_response.error:
         raise Exception(f"Job submission failed: {submit_job_response.error}")
-    
-    # Get MongoDB connection
-    collection = db["job_records"]
 
     # Record the job_id and graph specification
     record = {
@@ -106,4 +113,3 @@ async def execute(spec: GraphSpecification) -> api.SubmitJobResponse:
 
     # submit_response = SubmitResponse(**submit_job_response.model_dump(), output_ids=sinks)
     return submit_job_response
-

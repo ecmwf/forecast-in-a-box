@@ -18,6 +18,7 @@ app.include_router(products.router, prefix="/api/py/products")
 app.include_router(graph.router, prefix="/api/py/graph")
 app.include_router(jobs.router, prefix="/api/py/jobs")
 
+
 @app.get("/status", tags=["status"])
 def status():
     """

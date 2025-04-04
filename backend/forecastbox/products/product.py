@@ -8,108 +8,109 @@ from forecastbox.models import Model
 from .definitions import DESCRIPTIONS, LABELS
 
 if TYPE_CHECKING:
-	from cascade.fluent import Action
+    from cascade.fluent import Action
+
 
 class Product(ABC):
-	"""Base Product Class"""
+    """Base Product Class"""
 
-	label: dict[str, str] = {}
-	"""Labels of product axes."""
+    label: dict[str, str] = {}
+    """Labels of product axes."""
 
-	description: dict[str, str] = {}
-	"""Description of product axes."""
+    description: dict[str, str] = {}
+    """Description of product axes."""
 
-	example: dict[str, str] = {}
-	"""Example values for product axes."""
+    example: dict[str, str] = {}
+    """Example values for product axes."""
 
-	multiselect: dict[str, bool] = {}
-	"""Whether the product axes are multi-selectable."""
+    multiselect: dict[str, bool] = {}
+    """Whether the product axes are multi-selectable."""
 
-	@property
-	@abstractmethod
-	def qube(self) -> "Qube":
-		"""Requirements of the product to be used with a Model Qube."""
-		pass
+    @property
+    @abstractmethod
+    def qube(self) -> "Qube":
+        """Requirements of the product to be used with a Model Qube."""
+        pass
 
-	@property
-	def model_assumptions(self) -> dict[str, Any]:
-		"""Model assumptions for the product."""
-		return {}
-	
-	def validate_intersection(self, model: Model) -> bool:
-		"""Validate the intersection of the model and product qubes.
+    @property
+    def model_assumptions(self) -> dict[str, Any]:
+        """Model assumptions for the product."""
+        return {}
 
-		By default, if `model_assumptions` are provided, the intersection must contain all of them.
-		Otherwise, the intersection must be non-empty.		
-		"""
-		model_intersection = self.model_intersection(model)
+    def validate_intersection(self, model: Model) -> bool:
+        """Validate the intersection of the model and product qubes.
 
-		if self.model_assumptions:
-			return all(k in model_intersection.axes() for k in self.model_assumptions.keys())
+        By default, if `model_assumptions` are provided, the intersection must contain all of them.
+        Otherwise, the intersection must be non-empty.
+        """
+        model_intersection = self.model_intersection(model)
 
-		return len(model_intersection.axes()) > 0
+        if self.model_assumptions:
+            return all(k in model_intersection.axes() for k in self.model_assumptions.keys())
 
-	def model_intersection(self, model: Model) -> "Qube":
-		"""Get the intersection of the model and product qubes."""
-		intersection = model.qube(self.model_assumptions) & self.qube		
-		return intersection
+        return len(model_intersection.axes()) > 0
 
-	@abstractmethod
-	def mars_request(self, specification: dict[str, Any]) -> dict[str, Any]:
-		raise NotImplementedError()
+    def model_intersection(self, model: Model) -> "Qube":
+        """Get the intersection of the model and product qubes."""
+        intersection = model.qube(self.model_assumptions) & self.qube
+        return intersection
 
-	@abstractmethod
-	def to_graph(self, specification: dict[str, Any], source: "Action") -> "Action":
-		pass
+    @abstractmethod
+    def mars_request(self, specification: dict[str, Any]) -> dict[str, Any]:
+        raise NotImplementedError()
+
+    @abstractmethod
+    def to_graph(self, specification: dict[str, Any], source: "Action") -> "Action":
+        pass
 
 
 class GenericParamProduct(Product):
-	"""Generic Param Product"""
+    """Generic Param Product"""
 
-	label = LABELS
-	description = DESCRIPTIONS
+    label = LABELS
+    description = DESCRIPTIONS
 
-	@property
-	def generic_params(self) -> dict[str, Any]:
-		"""Specification for generic parameters for a Qube."""
-		return {
-			"frequency": "*",
-			"levtype": "*",
-			"param": "*",
-			"levelist": "*",
-		}
-	
-	def validate_intersection(self, model: Model) -> bool:
-		"""Validate the intersection of the model and product qubes."""
-		return all(k in self.model_intersection(model).axes() for k in self.generic_params if not k == 'levelist')
+    @property
+    def generic_params(self) -> dict[str, Any]:
+        """Specification for generic parameters for a Qube."""
+        return {
+            "frequency": "*",
+            "levtype": "*",
+            "param": "*",
+            "levelist": "*",
+        }
 
-	def make_generic_qube(self, **kwargs) -> "Qube":
-		"""Make a generic Qube, including the intersection of pl and sfc."""
+    def validate_intersection(self, model: Model) -> bool:
+        """Validate the intersection of the model and product qubes."""
+        return all(k in self.model_intersection(model).axes() for k in self.generic_params if not k == "levelist")
 
-		generic_params_without_levelist = self.generic_params.copy()
-		generic_params_without_levelist.pop("levelist")
+    def make_generic_qube(self, **kwargs) -> "Qube":
+        """Make a generic Qube, including the intersection of pl and sfc."""
 
-		return Qube.from_datacube(
-			{
-				**self.generic_params,
-				**kwargs,
-			}
-		) | Qube.from_datacube(
-			{
-				**generic_params_without_levelist,
-				**kwargs,
-			}
-		)
-	
-	def select_on_specification(self, specification: dict[str, Any], source: 'Action') -> 'Action':
-		"""Select on a specification."""
-		for key, value in specification.items():
-			if not value:
-				continue
-			if key not in source.nodes.dims:
-				continue
-			source = source.sel(**{key: value})
-		return source
+        generic_params_without_levelist = self.generic_params.copy()
+        generic_params_without_levelist.pop("levelist")
+
+        return Qube.from_datacube(
+            {
+                **self.generic_params,
+                **kwargs,
+            }
+        ) | Qube.from_datacube(
+            {
+                **generic_params_without_levelist,
+                **kwargs,
+            }
+        )
+
+    def select_on_specification(self, specification: dict[str, Any], source: "Action") -> "Action":
+        """Select on a specification."""
+        for key, value in specification.items():
+            if not value:
+                continue
+            if key not in source.nodes.dims:
+                continue
+            source = source.sel(**{key: value})
+        return source
 
 
 USER_DEFINED = "USER_DEFINED"
