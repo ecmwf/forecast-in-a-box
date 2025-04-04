@@ -77,7 +77,6 @@ export type DatasetId = string;
 export type SubmitResponse = {
   job_id: string;
   error: string;
-  output_ids: DatasetId[];
 };
 
 

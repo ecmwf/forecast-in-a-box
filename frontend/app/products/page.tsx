@@ -36,7 +36,7 @@ const ProductsPage = () => {
         nextStep();
     }
     return(
-      <Container size='xl' pt='md'>
+      <Container size='lg' pt='md'>
         <Stepper active={active} onStepClick={setActive} allowNextStepsSelect={false} completedIcon={<IconCircleCheck size={18} />}>
             <Stepper.Step label="Model" description="Configure the Model" allowStepSelect={true} icon={<IconWorldCog/>}>
                 <Divider my="md" />
@@ -68,11 +68,6 @@ const ProductsPage = () => {
                         <Button onClick={() => setActive(1)}>Back</Button>
                     </>
                 )}
-            </Stepper.Step>
-            <Stepper.Step label="Monitoring" allowStepSelect={false} icon={<IconLogs/>}>
-                <ProgressVisualizer job={jobId} />
-            </Stepper.Step>
-            <Stepper.Step label="Visualisation" allowStepSelect={false} icon={<IconMap/>}>
             </Stepper.Step>
         </Stepper>
         <Divider p='sm'/>

@@ -19,7 +19,7 @@ const Header = () => {
               <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="xl">Home</Button>
             </a>
             <a href='/products'>
-              <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="xl">Products</Button>
+              <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="xl">Configure</Button>
             </a>
             <a href='/status'>
               <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="xl">Status</Button>
