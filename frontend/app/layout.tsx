@@ -32,11 +32,13 @@ export default function RootLayout({ children }: { children: any }) {
       </head>
       <body>
       <MantineProvider theme={theme}>
-        <Notifications/>
+        <Notifications />
+        <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
           <Header />
-          {children}
+          <main style={{ flex: 1 }}>{children}</main>
           <Footer />
-        </MantineProvider>
+        </div>
+      </MantineProvider>
       </body>
     </html>
   );

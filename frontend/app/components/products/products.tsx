@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { LoadingOverlay, Grid, SimpleGrid, Container, Button, Divider } from "@mantine/core";
+import { LoadingOverlay, Group, SimpleGrid, Container, Button, Divider, Title } from "@mantine/core";
 
 import Categories from "./categories";
 import Configuration from "./configuration";
@@ -28,7 +28,6 @@ function ProductConfigurator({model, products, setProducts}: ProductConfiguratio
             ...prev,
             [sha256(JSON.stringify(conf)).toString()]: conf,
         }));
-        console.log(products);
       };
 
       const [categories, setCategories] = useState<CategoriesType>({});
@@ -46,7 +45,6 @@ function ProductConfigurator({model, products, setProducts}: ProductConfiguratio
     useEffect(() => {
         const fetchUpdatedOptions = async () => {
         setLoading(true);
-        console.log("Fetching categories for model: ", model);
         try {
             const response = await fetch(`/api/py/products/valid-categories/`, {
             method: "POST",
@@ -66,14 +64,21 @@ function ProductConfigurator({model, products, setProducts}: ProductConfiguratio
         fetchUpdatedOptions();
     }, [model]); // Update options when formData changes
 
+    useEffect(() => {
+        if (selected) {
+            const configurationContainer = document.querySelector(".configuration_container") as HTMLElement;
+            configurationContainer?.scrollIntoView();
+        }
+    }, [selected]);
+
     return (
-        <Container p='md' size='xl'>
+        <Container size='xl'>
             <LoadingOverlay visible={loading}/>
-            <Grid align="flex-start" justify="space-around" w="100%">
-                <Grid.Col span={4}><h2>Categories</h2><Categories categories={categories} setSelected={setSelectedProduct} /></Grid.Col>
-                <Grid.Col span={4}><h2>Configuration</h2><Configuration selectedProduct={selected} selectedModel={model} submitTarget={addProduct} /></Grid.Col>
-                <Grid.Col span={4}><h2>Selected ({Object.keys(internal_products).length})</h2><Cart products={internal_products} setProducts={internal_setProducts}/></Grid.Col>
-            </Grid>
+            <SimpleGrid cols={{ sm: 1, md: 2, xl: 3}} spacing='' >
+                <Container miw={{sm:'90vw', md:'45vw', xl:'15vw'}}><Title order={2}>Categories</Title><Categories categories={categories} setSelected={setSelectedProduct} /></Container>
+                <Container className='configuration_container' miw={{sm:'90vw', md:'45vw', xl:'15vw'}}><Title order={2}>Configuration</Title><Configuration selectedProduct={selected} selectedModel={model} submitTarget={addProduct} /></Container>
+                <Container miw={{sm:'90vw', xl:'15vw'}}><Title order={2}>Selected ({Object.keys(internal_products).length})</Title><Cart products={internal_products} setProducts={internal_setProducts}/></Container>
+            </SimpleGrid>
             <Divider p='md'/>
             <SimpleGrid cols={1}>
                 <Button onClick={() => setProducts(internal_products)} disabled={!model}>Submit</Button>

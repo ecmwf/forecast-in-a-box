@@ -1,6 +1,6 @@
 "use client"; // Required for client-side fetching
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Modal, Group, TextInput, NumberInput } from '@mantine/core';
+import { Card, Button, Modal, Group, TextInput, NumberInput, Title, Flex} from '@mantine/core';
 // import GlobeSelect from './globe';
 import Options from './options';
 import InformationWindow from './information';
@@ -57,13 +57,8 @@ function Model({ selectedModel, coordinates, setCoordinates, modelSpec, submit }
 
     return (
         <Card padding="">
-            <Group justify="space-between" grow align="flex-start">
-                <Options cardProps={{ w: '30vw' }} setSelected={setModel} />
-                <Card padding="md">
-                    <h2>Information</h2>
-                    <InformationWindow selected={model} />
-                </Card>
-            </Group>
+            <Options cardProps={{}} setSelected={setModel} />
+            <InformationWindow selected={model} />
 
             {showGlobeSelect && (
                 <Group>

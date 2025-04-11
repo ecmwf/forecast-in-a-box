@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { SimpleGrid, Flex, Divider, LoadingOverlay, Text, Stack, Title, Paper} from '@mantine/core';
+import { SimpleGrid, Text, Card, LoadingOverlay, Stack, Title, Paper} from '@mantine/core';
 
 
 import {ModelSpecification} from '../interface'
@@ -32,7 +32,12 @@ function InformationWindow({ selected }: InformationProps) {
 
     if (!selected) {
         return (
-                <p>Select a model for information</p>
+            <Card>
+                <Card.Section>
+                     <Title order={2}>Information</Title>
+                </Card.Section>
+                <Text>Select a model for information</Text>
+            </Card>
         )
     }
 
@@ -42,15 +47,14 @@ function InformationWindow({ selected }: InformationProps) {
     }
 
     return (
-        <>
-            <Title order={3} p=''>{selected}</Title>
+        <Card>
+            <Card.Section>
+                 <Title order={2}>Information</Title>
+            </Card.Section>
+            
+        <Title order={3} p=''>{selected}</Title>
             <LoadingOverlay visible={loading}/>
-            {/* <Stack mih={50}
-                gap="xs"
-                justify="flex-start"
-                align="stretch"
-            > */}
-            <SimpleGrid cols={1}>
+            <SimpleGrid cols={2}>
 
             {information && Object.entries(information).map(([key, value]) => (
                 <Paper shadow="xs" p="xs">
@@ -67,8 +71,7 @@ function InformationWindow({ selected }: InformationProps) {
                 </Paper>
             ))}
             </SimpleGrid>
-            {/* </Stack> */}
-        </>
+        </Card>
     );
 };
 

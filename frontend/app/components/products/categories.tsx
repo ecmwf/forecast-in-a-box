@@ -13,7 +13,6 @@ interface CategoriesProps {
 }
 
 function Categories({categories, setSelected }: CategoriesProps) {
-    console.log(categories)
     return (
         <>
         {Object.entries(categories).map(([key, item]) => (
