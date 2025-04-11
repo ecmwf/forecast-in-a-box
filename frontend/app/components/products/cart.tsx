@@ -70,8 +70,8 @@ function Cart({products, setProducts}: CartProps) {
     ));
     
     return (
-      <Paper shadow="sm" p="lg" radius="md" withBorder h="60vh" w="inherit" mah="90vh">
-        <ScrollArea h='55vh' type="always">
+      <Paper shadow="sm" p="lg" radius="md" withBorder h={{base: "fit", md: "60vh"}}  w="inherit" mih="10vh" mah="90vh">
+        <ScrollArea h={{base: "fit", md: "60vh"}} type="always">
           {rows}
         </ScrollArea>        
       </Paper>

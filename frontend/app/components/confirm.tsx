@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Button, Card, Title, Group, Modal, Divider, SimpleGrid, Center, ScrollArea, Paper, Text} from '@mantine/core';
+import { Button, Card, Title, Group, Divider, SimpleGrid, Container, ScrollArea, Paper, Text} from '@mantine/core';
 
 import { IconX, IconPencil} from '@tabler/icons-react';
 
@@ -140,19 +140,24 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
         };
         getGraphHtml();
     };
-
+    // <SimpleGrid cols={{ base: 1, sm: 3, lg: 3 }} spacing='' >
+    {/* <Container miw={{base:'90vw', sm:'25vw'}}><Title order={2}>Categories</Title><Categories categories={categories} setSelected={setSelectedProduct} /></Container>
+    <Container miw={{base:'90vw', sm:'25vw'}}><Title order={2}>Configuration</Title><Configuration selectedProduct={selected} selectedModel={model} submitTarget={addProduct} /></Container>
+    <Container miw={{base:'90vw', sm:'25vw'}}><Title order={2}>Selected ({Object.keys(internal_products).length})</Title><Cart products={internal_products} setProducts={internal_setProducts}/></Container> */}
+    // </SimpleGrid>
     return (
-        <>
-            <Title order={1}>Confirm</Title>
-            <Group p='' justify="space-between" grow align="flex-start">
-                <Card padding="md">
+        <Container size='xl'>
+        <Title order={2}>Confirm</Title>
+        <Divider my='md'/>
+        <SimpleGrid cols={{ sm: 1, md: 2, lg: 2 }} >
+            <Container miw={{sm:'90vw', md:'20vw'}}>
+                <Card padding="">
                     <Title pb ='md' order={2}>Model</Title>
                     <Button onClick={() => setSlider(0)}>Change</Button>
-                    <Divider p='md'/>
-                    <Title pb ='md' order={3}>Specification</Title>
-                    <SimpleGrid cols={2} mah='30vh'>
+                    <Title pt ='md' order={3}>Specification</Title>
+                    <SimpleGrid cols={{ base: 1, sm: 2, lg: 2 }} spacing=''>
                         {Object.entries(model).filter(([key]) => key !== 'model').map(([key, value]) => ( 
-                            <Paper shadow="xs" p="xs">
+                            <Paper shadow="" p="xs">
                                 <Title order={5}>{key}</Title>
                                 <Text maw='80%' lineClamp={3} style={{ marginLeft: '10px' }}>{JSON.stringify(value, null, 2)}</Text>
                             </Paper>
@@ -164,16 +169,19 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
                         <InformationWindow selected={model.model} />
                     </ScrollArea>
                 </Card>
-
-                <Card padding="md">
+                </Container>
+                
+                <Container miw={{sm:'90vw', md:'20vw'}}>
+                <Card padding="">
                     <Title pb ='md' order={2}>Products ({Object.keys(products).length})</Title>
                     <Button onClick={() => setSlider(1)}>Add more</Button>
                     <Divider p='md'/>
                     <Cart products={products} setProducts={setProducts} />
                 </Card>
-            </Group>
+                </Container>
+            </SimpleGrid>
             <Divider p='md'/>
-            <SimpleGrid cols={3}>
+            <SimpleGrid cols={3} spacing='xs'>
                 <Button color='orange' onClick={getGraph} disabled={loading}>
                     {loading ? "Loading..." : "Visualise"}
                 </Button>
@@ -184,8 +192,7 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
             </SimpleGrid>
             
             <GraphModal graphContent={graphContent} setGraphContent={setGraphContent} loading={loading}/>
-            
-        </>
+        </Container>
     );
 }
 

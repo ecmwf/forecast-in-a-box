@@ -3,13 +3,26 @@
 import React from 'react';
 import { Container } from '@mantine/core';
 import { useEffect, useState } from 'react';
-import { Table, Loader, Center, Title, Progress, Button, Flex} from '@mantine/core';
+import { Table, Loader, Center, Title, Progress, Button, Flex, Divider} from '@mantine/core';
 
-import { IconRefresh } from '@tabler/icons-react';
+import { IconRefresh, IconTrash } from '@tabler/icons-react';
+import classes from './status.module.css';
+
+
+export type ProgressResponse = {
+  progress: string;
+  status: number;
+  error: string;
+}
+
+export type StatusResponse = {
+  progresses: Record<string, ProgressResponse>;
+};
+
 
 const HomePage = () => {
 
-  const [jobs, setJobs] = useState<{ id: string; status: string; progress: number; }[]>([]);
+  const [jobs, setJobs] = useState<StatusResponse>({} as StatusResponse);
   const [loading, setLoading] = useState(true);
 
   const fetchJobs = async () => {
@@ -20,16 +33,10 @@ const HomePage = () => {
         headers: { "Content-Type": "application/json" },
       });
 
-      const data = await response.json();
-      const progresses = data.progresses;
-
-      const jobList = Object.entries(progresses).map(([id, progress]) => ({
-        id,
-        status: progress === '100' ? 'Completed' : `In Progress`,
-        progress: parseFloat(progress.replace('%', '')),
-      }));
-      setJobs([])
-      setJobs(jobList);
+      const data: StatusResponse = await response.json();
+      console.log(data);
+      setJobs(data);
+      
     } catch (error) {
       console.error('Error fetching job statuses:', error);
     } finally {
@@ -45,7 +52,7 @@ const HomePage = () => {
         headers: { "Content-Type": "application/json" },
       });
 
-      const data = await response.json();
+      await response.json();
 
     } catch (error) {
       console.error('Error fetching job statuses:', error);
@@ -63,8 +70,26 @@ const HomePage = () => {
         headers: { "Content-Type": "application/json" },
       });
 
-      const data = await response.json();
+      await response.json();
 
+    }
+    catch (error) {
+      console.error('Error fetching job statuses:', error);
+    }
+    finally {
+      setLoading(false);
+    }
+    fetchJobs();
+  };
+
+  const deleteJob = async (jobId: string) => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/py/jobs/delete/${jobId}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      await response.json();
     }
     catch (error) {
       console.error('Error fetching job statuses:', error);
@@ -80,7 +105,7 @@ const HomePage = () => {
   }, []);
 
   return (
-    <Container size="lg" pt="xl" pb="xl" mih='85vh'>
+    <Container size="lg" pt="xl" pb="xl">
       <Flex gap='xl'>
         <Title>Status</Title>
         <Button onClick={fetchJobs}>
@@ -90,12 +115,13 @@ const HomePage = () => {
           Flush
         </Button>
       </Flex>
+      <Divider my='lg' />
       {loading ? (
         <Center>
           <Loader />
         </Center>
       ) : (
-        <Table striped highlightOnHover verticalSpacing="xs" >
+        <Table striped highlightOnHover verticalSpacing="xs">
           <Table.Thead>
             <Table.Tr style={{ backgroundColor: "#f0f0f6", textAlign: "left" }}>
               <Table.Th>Job ID</Table.Th>
@@ -104,36 +130,43 @@ const HomePage = () => {
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {jobs.length === 0 ? (
+            {Object.keys(jobs.progresses || {}).length === 0 ? (
               <Table.Tr>
                 <Table.Td colSpan={3} style={{ textAlign: "center", padding: "16px" }}>
                   No jobs found.
                 </Table.Td>
               </Table.Tr>
             ) : (
-              jobs.map((job) => (
-                <Table.Tr key={job.id}>
-                  <Table.Td style={{ padding: "8px", borderBottom: "1px solid #e0e0e0" }}>
+              Object.entries(jobs.progresses || {}).map(([jobId, progress]: [string, ProgressResponse]) => (
+                <Table.Tr key={jobId}>
+                    <Table.Td style={{ display: "flex"}}>
                     <Button
                       variant="subtle"
                       color="blue"
                       p="xs"
                       component='a'
-                      href = {`/progress/${job.id}`}>
-                      {job.id}
+                      href={`/progress/${jobId}`}
+                      classNames={{"label": classes['label']}}
+                    >
+                      {jobId}
                     </Button>
+                    </Table.Td>
+                  <Table.Td>
+                    {progress.status}
                   </Table.Td>
-                  <Table.Td style={{ padding: "8px", borderBottom: "1px solid #e0e0e0" }}>
-                    {job.status}
-                  </Table.Td>
-                  <Table.Td style={{ padding: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
-                    {job.progress}%
-                    <Progress value={job.progress} size="sm" style={{ flex: 1 }} />
+                  <Table.Td style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    {progress.progress}%
+                    <Progress value={parseFloat(progress.progress)} size="sm" style={{ flex: 1 }} />
+                    <Button
+                      color='orange'
+                      onClick={() => restartJob(jobId)}
+                      size='xs'
+                      ><IconRefresh/></Button>
                     <Button
                       color='red'
-                      onClick={() => restartJob(job.id)}
-                      size='sm'
-                      ><IconRefresh/></Button>
+                      onClick={() => deleteJob(jobId)}
+                      size='xs'
+                      ><IconTrash/></Button>
                   </Table.Td>
                 </Table.Tr>
               ))

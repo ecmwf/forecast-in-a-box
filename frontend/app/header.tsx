@@ -8,26 +8,20 @@ import { IconBox } from '@tabler/icons-react';
 const Header = () => {
 
   return (
-    <Container bg="#202036" fluid>
+    <Container bg="#202036" fluid w='100vw'>
       <Space h="xl" />
-      <Container size="xl">
         <Group justify="space-between">
-          <a style={{"color":"white"}} href=""><IconBox/><h2></h2></a>
-          <Title style={{"color":"white"}}>Forecast In a Box</Title>
-          <Group gap={40}>
-            <a href='/'>
-              <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="xl">Home</Button>
-            </a>
-            <a href='/products'>
-              <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="xl">Configure</Button>
-            </a>
-            <a href='/status'>
-              <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="xl">Status</Button>
-            </a>
+          <Group>
+            <a style={{"color":"white"}} href="/"><IconBox/></a>
+            <Title style={{"color":"white"}}>Forecast In a Box</Title>
+          </Group>
+          <Group>
+            <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="md" component='a' href='/'>Home</Button>
+            <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="md" component='a' href='/products'>Configure</Button>
+            <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="md" component='a' href='/status'>Status</Button>
           </Group>
         </Group>
-      </Container>
-      <Space h="xl" />
+      <Space h="md" />
     </Container>
   )
 }

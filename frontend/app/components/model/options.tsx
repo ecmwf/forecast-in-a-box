@@ -1,6 +1,6 @@
 "use client"; // Required for client-side fetching
 
-import { Card, Button, Tabs, ScrollArea, Paper, Title, Text, ActionIcon} from '@mantine/core';
+import { Card, Button, Tabs, ScrollArea, Paper, Title, Text, ActionIcon, Flex, SimpleGrid} from '@mantine/core';
 import { useEffect, useState } from "react";
 
 import classes from './options.module.css';
@@ -88,13 +88,15 @@ function Options({ cardProps, tabProps, setSelected }: OptionsProps) {
     return (
         <Card {...cardProps} padding="">
             <Card.Section>
+                <Flex gap='lg'>
                 <Title order={2}>Models</Title>
                 <ActionIcon onClick={fetchModelOptions} style={{ display: 'inline' }}><IconRefresh/></ActionIcon>
+                </Flex>
             </Card.Section>
             {loading ? <p>Loading...</p> : 
             <ScrollArea>
             {modelOptions && Object.entries(modelOptions).map(([key, values]) => (
-                <Paper shadow='sm' className={classes['option-group']} key={key}>
+                <Paper shadow='' className={classes['option-group']} key={key}>
                     <Text className={classes['heading']}>{key}</Text>
                     <Paper p='sm' className={classes['option-list']}>
                     {values.map((value: string) => (

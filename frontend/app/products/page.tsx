@@ -36,7 +36,7 @@ const ProductsPage = () => {
         nextStep();
     }
     return(
-      <Container size='lg' pt='md'>
+      <Container size='xl' pt='md'>
         <Stepper active={active} onStepClick={setActive} allowNextStepsSelect={false} completedIcon={<IconCircleCheck size={18} />}>
             <Stepper.Step label="Model" description="Configure the Model" allowStepSelect={true} icon={<IconWorldCog/>}>
                 <Divider my="md" />
@@ -45,7 +45,7 @@ const ProductsPage = () => {
             <Stepper.Step label="Products" description="Choose Products" allowStepSelect={!!selectedModel.model} icon={<IconShoppingCartCode/>}>
                 <Divider my="md" />
                 {selectedModel ? (
-                    <ProductConfigurator model={selectedModel} products={products} setProducts={setSubmittedProducts} back={prevStep}/>
+                    <ProductConfigurator model={selectedModel} products={products} setProducts={setSubmittedProducts}/>
                 ) : (
                     <>
                         <Alert>Select a model first</Alert>

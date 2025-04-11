@@ -68,29 +68,6 @@ const ProgressPage = () => {
         fetchOutputs(); // Initial fetch
     }, [id]);
 
-    const fetchResults = async (dataset: DatasetId) => {
-        try {
-            const response = await fetch(`/api/py/jobs/result/${id}/${dataset}`, {
-                method: 'GET',
-            });
-            if (!response.ok) {
-                throw new Error(`HTTP error! Status: ${response.status}`);
-            }
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${dataset}.pkl`
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
-            // Handle the data as needed
-        } catch (error) {
-            console.error('Error fetching results:', error);
-        }
-    }
-
     const [graphContent, setGraphContent] = useState<string>("");
     const [loading, setLoading] = useState(false);
 
@@ -163,10 +140,7 @@ const ProgressPage = () => {
                             <Text>{dataset}</Text>
                         </Table.Td>
                         <Table.Td align='right'>
-                            <ActionIcon mb='xs' size='md' mr='21px' disabled={progress !== 100} onClick={() => fetchResults(dataset)}>
-                                <IconSearch scale='30%' />
-                            </ActionIcon>
-                            <Button size='sm' disabled={progress !== 100} component="a" href={`/api/py/jobs/result/${id}/${dataset}`} target='_blank'><IconSearch/></Button>
+                            <Button size='sm' disabled={progress !== 100} component={progress === 100 ? `a` : 'b'} href={progress === 100 ? `/api/py/jobs/result/${id}/${dataset}` : ''} target='_blank'><IconSearch/></Button>
                         </Table.Td>
                     </Table.Tr>
                     </Table.Tbody>
