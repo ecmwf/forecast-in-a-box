@@ -130,6 +130,11 @@ class GenericParamProduct(Product):
 
 class GenericTemporalProduct(GenericParamProduct):
 
+    description = {
+        **GenericParamProduct.description,
+        "step": "Time step",
+    }
+
     def model_intersection(self, model):
         """Get model intersection.
         

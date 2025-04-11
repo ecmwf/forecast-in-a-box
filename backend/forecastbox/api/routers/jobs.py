@@ -1,6 +1,5 @@
 """Products API Router."""
 
-import random
 from fastapi import APIRouter, Response
 from fastapi.responses import FileResponse, StreamingResponse, HTMLResponse
 
@@ -39,71 +38,71 @@ class JobProgressResponses():
     progresses: dict[JobId, JobProgressResponse]
     error: str | None = None
 
+
+def get_job_progress(job_id: str) -> JobProgressResponse:
+    """Get progress of a job."""
+    response: api.JobProgressResponse = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{SETTINGS.cascade_url}")  # type: ignore
+    
+    if response.error:
+        db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "errored"}})
+
+    progress = response.progresses.get(job_id, "0.00").removesuffix('%')
+
+    if progress == "100.00":
+        # Update the job record in MongoDB to mark it as completed
+        db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "completed"}})
+    if float(progress) > 0.00:
+        db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "running"}})
+    else:
+        db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "unknown"}})
+
+    return JobProgressResponse(
+        progress=progress.removesuffix('%'),
+        status=db.find("job_records", {"job_id": job_id})[0]["status"],
+        error=response.error
+    )
+
 @router.get("/status")
-async def get_tasks() -> JobProgressResponses:
+async def get_status() -> JobProgressResponses:
     """Get progress of all tasks recorded in the database."""
     # Get all job records from the MongoDB collection
     job_records = db.find("job_records", {})
 
     # Extract job IDs from the records
-    job_ids = [record["job_id"] for record in job_records if record["status"] == "submitted"]
+    job_ids = [record["job_id"] for record in job_records]
+
     completed_job_ids = [record["job_id"] for record in job_records if record["status"] == "completed"]
+    for_status_job_ids = list(set(job_ids) - set(completed_job_ids))
+
+    completed_job_progresses = {job_id: JobProgressResponse(progress="100.00", status="completed") for job_id in completed_job_ids}
 
     if not job_ids:
-        return JobProgressResponses(progresses={job_id: JobProgressResponse(progress="100.00", status="completed") for job_id in completed_job_ids})
-
-    response: api.JobProgressResponse = client.request_response(api.JobProgressRequest(job_ids=job_ids), f"{SETTINGS.cascade_url}")  # type: ignore
-    if response.error:
-        raise Exception(f"Job progress retrieval failed: {response.error}")
+        return JobProgressResponses(progresses=completed_job_progresses)
     
-    for job_id in response.progresses:
-        if response.progresses[job_id] == "100.00":
-            # Update the job record in MongoDB to mark it as completed
-            db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "completed"}})
-        if float(response.progresses[job_id].removesuffix('%')) > 0.00:
-            db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "running"}})
-        else:
-            db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "unknown"}})
+    progresses = {job_id: get_job_progress(job_id) for job_id in for_status_job_ids}
 
+    progresses.update(completed_job_progresses)
+    progresses.update({job_id: JobProgressResponse(progress="0.00", status="unknown") for job_id in set(job_ids) - set(progresses.keys())})
 
-    progress = JobProgressResponses(
-        progresses={
-            job_id: JobProgressResponse(
-                progress=response.progresses[job_id].removesuffix('%'),
-                status=db.find("job_records", {"job_id": job_id})[0]["status"],
-            )
-            for job_id in job_ids
-        },
-        error=response.error
+    # Sort job records by created_at timestamp
+    sorted_job_records = sorted(job_records, key=lambda record: record.get("created_at", 0))
+
+    # Update progresses to reflect the sorted order
+    progresses = {
+        record["job_id"]: progresses[record["job_id"]]
+        for record in sorted_job_records if record["job_id"] in progresses
+    }
+
+    return JobProgressResponses(
+        progresses=progresses,
+        error=None
     )
-
-    return progress
-
-
 
 
 @router.get("/status/{job_id}")
 async def get_status_of_job(job_id: JobId) -> JobProgressResponse:
     """Get progress of a job."""
-
-    progress_response: api.JobProgressResponse = client.request_response(
-        api.JobProgressRequest(job_ids=[job_id]), f"{SETTINGS.cascade_url}"
-    )  # type: ignore
-    if progress_response.error:
-        db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "failed"}})
-        raise Exception(f"Job progress retrieval failed: {progress_response.error}")
-
-    if progress_response.progresses[job_id] == "100.00":
-        # Update the job record in MongoDB to mark it as completed
-        db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "completed"}})
-    
-    status = db.find("job_records", {"job_id": job_id})[0]["status"]
-
-    return JobProgressResponse(
-        progress=progress_response.progresses[job_id].removesuffix('%'), 
-        status=status,
-        error=progress_response.error
-    )
+    return get_job_progress(job_id)
 
 
 @router.get("/outputs/{job_id}")
@@ -154,18 +153,47 @@ async def get_result(job_id: str, dataset_id: str) -> FileResponse:
     )
     if not response.result:
         raise Exception(f"Result retrieval failed: {response.error}")
-
-    import tempfile
-    temp = tempfile.NamedTemporaryFile(delete=False)
-    with open(temp.name, "wb") as f:
-        f.write(response.result)
-    print(temp.name)
-    return FileResponse(temp.name, media_type="application/octet-stream", filename=f"{dataset_id}.pkl")
     
+    from cascade.gateway.api import decoded_result
+    result = decoded_result(response, job=None)
 
+    bytez, media_type = to_bytes(result)
+    return Response(bytez, media_type=media_type)
+    
+def to_bytes(obj) -> tuple[bytes, str]:
+    """Convert an object to bytes."""
+    import io
+
+    if isinstance(obj, bytes):
+        return obj, "application/octet-stream"
+    
+    try:
+        from earthkit.plots import Figure
+        if isinstance(obj, Figure):
+            buf = io.BytesIO()
+            obj.save(buf)
+            return buf.getvalue(), "image/png"
+    except ImportError:
+        pass
+    try:
+        import earthkit.data as ekd
+        encoder = ekd.create_encoder("grib")
+        if isinstance(obj, ekd.Field):
+            return encoder.encode(obj).to_bytes(), "application/octet-stream"
+        elif isinstance(obj, ekd.FieldList):
+            return encoder.encode(obj[0], template=obj[0]).to_bytes(), "application/octet-stream"
+    except ImportError:
+        pass
+
+    raise TypeError(f"Unsupported type: {type(obj)}")
 
 
 @router.get("/flush")
 async def flush_tasks() -> bool:
     print('DELETED', db.delete_many("job_records", {}))
+    return True
+
+@router.get("/delete/{job_id}")
+async def deleted_task(job_id) -> bool:
+    print('DELETED', db.delete_one("job_records", {'job_id': job_id}))
     return True

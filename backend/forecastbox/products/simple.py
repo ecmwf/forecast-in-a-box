@@ -1,7 +1,7 @@
 from forecastbox.products.registry import CategoryRegistry
 
 from earthkit.workflows.fluent import Payload
-from forecastbox.products.product import GenericTemporalProduct
+from forecastbox.products.product import GenericTemporalProduct, GenericParamProduct
 
 from forecastbox.models import Model
 
@@ -12,28 +12,63 @@ simple_registry = CategoryRegistry("Simple", "Simple products", "Simple")
 
 EARTHKIT_PLOTS_IMPORTED = True
 try:
-    import earthkit.plots
+    import earthkit.plots as ekp
 except ImportError:
     EARTHKIT_PLOTS_IMPORTED = False
 
+def quickplot(field: ekd.Field, domain=None):
+    chart = ekp.Map(domain=domain)
+
+    chart.quickplot(field)
+
+    chart.title("{short_name} over {domain}\n"
+        "Base time: {base_time:%H:%M on %-d %B %Y}\n"
+        "Valid time: {valid_time:%H:%M on %-d %B %Y} (T+{lead_time})"
+    )
+
+    chart.legend(label="{short_name} ({units})")
+
+    chart.coastlines()
+    chart.gridlines()
+
+    return chart.figure
 
 @simple_registry("Maps")
 class MapProduct(GenericTemporalProduct):
+    domains = ['Global', 'Europe', 'Australia', 'Malawi']
+
+    description = {
+        **GenericTemporalProduct.description,
+        'domain': "Domain of the map",
+    }
+    label = {
+        **GenericTemporalProduct.label,
+        'domain': "Domain",
+    }
+
+    @property
+    def model_assumptions(self):
+        return {
+            'domain': self.domains,
+        }
+    
     @property
     def qube(self):
-        return self.make_generic_qube()
+        return self.make_generic_qube(domain = self.domains)
 
     def mars_request(self, **kwargs):
         return super().mars_request(**kwargs)  # type:ignore
 
     def to_graph(self, specification, source):
+        domain = specification.pop('domain', None)
+        if domain == 'Global':
+            domain = None
         source = self.select_on_specification(specification, source)
-
-        from earthkit.plots import quickplot
 
         plots = source.map(
             Payload(
                 quickplot,
+                kwargs={'domain': domain},
             ),
         )
         return plots
@@ -41,9 +76,12 @@ class MapProduct(GenericTemporalProduct):
     def validate_intersection(self, model: Model) -> bool:
         return EARTHKIT_PLOTS_IMPORTED
 
+# @simple_registry('Gif')
+# class GifProduct(GenericParamProduct):
+#     pass
 
-@simple_registry("Record")
-class RecordProduct(GenericTemporalProduct):
+@simple_registry("Grib")
+class GribProduct(GenericTemporalProduct):
 
     multiselect = {
         "param": True,
