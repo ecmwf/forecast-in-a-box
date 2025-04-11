@@ -63,7 +63,7 @@ plugins = "pydantic.mypy"
 qubed = { git = "ssh://git@github.com/ecmwf/qubed.git" }
 earthkit-plots = { git = "ssh://git@github.com/ecmwf/earthkit-plots", rev = "experimental" }
 earthkit-plots-default-styles = { git = "ssh://git@github.com/ecmwf/earthkit-plots-default-styles", rev = "experimental" }
-anemoi-cascade = { git = "ssh://git@github.com/ecmwf/anemoi-cascade.git" }
+anemoi-cascade = { git = "ssh://git@github.com/ecmwf/anemoi-cascade.git", rev = 'fiab_fixes'}
 earthkit-workflows = { git = "https://github.com/ecmwf/earthkit-workflows" }
 
 [tool.hatch.metadata]

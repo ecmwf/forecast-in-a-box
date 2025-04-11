@@ -27,9 +27,20 @@ router = APIRouter(
 
 SETTINGS = get_settings()
 
+@dataclass
+class JobProgressResponse:
+    progress: JobProgress
+    status: str
+    error: str | None = None
+
+
+@dataclass
+class JobProgressResponses():
+    progresses: dict[JobId, JobProgressResponse]
+    error: str | None = None
 
 @router.get("/status")
-async def get_tasks() -> api.JobProgressResponse:
+async def get_tasks() -> JobProgressResponses:
     """Get progress of all tasks recorded in the database."""
     # Get all job records from the MongoDB collection
     job_records = db.find("job_records", {})
@@ -39,26 +50,36 @@ async def get_tasks() -> api.JobProgressResponse:
     completed_job_ids = [record["job_id"] for record in job_records if record["status"] == "completed"]
 
     if not job_ids:
-        return api.JobProgressResponse(progresses={record["job_id"]: "100.00" for record in completed_job_ids}, error=None)
+        return JobProgressResponses(progresses={job_id: JobProgressResponse(progress="100.00", status="completed") for job_id in completed_job_ids})
 
     response: api.JobProgressResponse = client.request_response(api.JobProgressRequest(job_ids=job_ids), f"{SETTINGS.cascade_url}")  # type: ignore
     if response.error:
         raise Exception(f"Job progress retrieval failed: {response.error}")
     
-    response.progresses.update({record["job_id"]: "100.00" for record in completed_job_ids})
+    for job_id in response.progresses:
+        if response.progresses[job_id] == "100.00":
+            # Update the job record in MongoDB to mark it as completed
+            db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "completed"}})
+        if float(response.progresses[job_id].removesuffix('%')) > 0.00:
+            db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "running"}})
+        else:
+            db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "unknown"}})
 
-    # Update the job records in MongoDB to mark them as completed
-    for record in job_records:
-        if record["status"] == "completed":
-            db.update_one("job_records", {"job_id": record["job_id"]}, {"$set": {"status": "completed"}})
 
-    return response
+    progress = JobProgressResponses(
+        progresses={
+            job_id: JobProgressResponse(
+                progress=response.progresses[job_id].removesuffix('%'),
+                status=db.find("job_records", {"job_id": job_id})[0]["status"],
+            )
+            for job_id in job_ids
+        },
+        error=response.error
+    )
+
+    return progress
 
 
-@dataclass
-class JobProgressResponse:
-    progress: JobProgress
-    error: str | None = None
 
 
 @router.get("/status/{job_id}")
@@ -69,12 +90,20 @@ async def get_status_of_job(job_id: JobId) -> JobProgressResponse:
         api.JobProgressRequest(job_ids=[job_id]), f"{SETTINGS.cascade_url}"
     )  # type: ignore
     if progress_response.error:
+        db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "failed"}})
         raise Exception(f"Job progress retrieval failed: {progress_response.error}")
 
     if progress_response.progresses[job_id] == "100.00":
         # Update the job record in MongoDB to mark it as completed
         db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "completed"}})
-    return JobProgressResponse(progress=progress_response.progresses[job_id].removesuffix('%'), error=progress_response.error)
+    
+    status = db.find("job_records", {"job_id": job_id})[0]["status"]
+
+    return JobProgressResponse(
+        progress=progress_response.progresses[job_id].removesuffix('%'), 
+        status=status,
+        error=progress_response.error
+    )
 
 
 @router.get("/outputs/{job_id}")
