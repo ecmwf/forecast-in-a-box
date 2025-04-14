@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Progress, Container, Title, Text, ScrollArea, Divider, Button, ActionIcon, Table, Flex} from '@mantine/core';
+import { Progress, Container, Title, Text, ScrollArea, Divider, Button, Loader, Table, Flex} from '@mantine/core';
 
 import {IconSearch} from '@tabler/icons-react';
 
@@ -120,6 +120,7 @@ const ProgressPage = () => {
             ) : (
                 <>
                 <Progress value={progress || 0} striped animated key={progress}/>
+                {/* <Loader/> */}
                 <Text>{progress}%</Text>
 
                 <Divider my='lg' />

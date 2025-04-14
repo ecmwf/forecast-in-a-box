@@ -1,26 +1,28 @@
+name: FIAB
+
 services:
   frontend:
-    container_name: forecast-in-a-box-frontend
+    container_name: fiab-frontend
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
           NEXT_PUBLIC_API_URL: "backend:8000" # Pass the variable during build
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       NEXT_PUBLIC_API_URL: "backend:8000"
-      # WEB_URL: "http://localhost:3000"
     networks:
       - fiab-network
     
   backend:
-    container_name: forecast-in-a-box-backend
+    container_name: fiab-backend
     build:
       context: ./backend
       dockerfile: Dockerfile
     volumes:
       - ./data_dir:/app/data_dir
+      - './../anemoi-cascade:/app/anemoi-cascade'
     ports:
       - "8000:8000"
     environment:

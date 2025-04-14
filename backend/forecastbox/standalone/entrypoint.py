@@ -34,7 +34,7 @@ async def uvicorn_run(app_name: str, port: int) -> None:
         log_level=None,
         workers=1,
         reload=True,
-        reload_dirs=["backend/forecastbox"],
+        reload_dirs=["forecastbox"],
     )
     server = uvicorn.Server(config)
     await server.serve()

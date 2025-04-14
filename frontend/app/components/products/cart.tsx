@@ -41,7 +41,6 @@ function Cart({products, setProducts}: CartProps) {
       };
   
     const rows = Object.keys(products).map((id) => (
-        <>
         <Card padding='xs' shadow='xs' radius='md' key={id}>
             <Card.Section w='100%'>
                 <Group justify='space-between' mt="xs" mb="xs">
@@ -65,8 +64,6 @@ function Cart({products, setProducts}: CartProps) {
               ))}
             </Stack>
       </Card>
-       <Divider my="md" />
-       </>
     ));
     
     return (

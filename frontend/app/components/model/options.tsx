@@ -1,16 +1,17 @@
 "use client"; // Required for client-side fetching
 
-import { Card, Button, Tabs, ScrollArea, Paper, Title, Text, ActionIcon, Flex, SimpleGrid} from '@mantine/core';
+import { Card, Button, Tabs, ScrollArea, Paper, Title, Text, ActionIcon, Flex, Table, Loader} from '@mantine/core';
 import { useEffect, useState } from "react";
 
 import classes from './options.module.css';
 
-import {IconDownload, IconCheck, IconRefresh} from '@tabler/icons-react';
+import {IconDownload, IconCheck, IconRefresh, IconTableDown} from '@tabler/icons-react';
 
 
 function ModelButton({ model, setSelected }: { model: string; setSelected: (value: string) => void }) {
     const [downloaded, setDownloaded] = useState<boolean>(false);
     const [downloading, setDownloading] = useState<boolean>(false);
+    const [installing, setInstalling] = useState<boolean>(false);
     console.log(model, downloaded);
 
     useEffect(() => {
@@ -26,36 +27,54 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
         setDownloading(true);
         const download = async () => {
             const result = await fetch(`/api/py/models/download/${model}`);
-            console.log('Downloaded:', result.json());
             setDownloaded(true);
             setDownloading(false);
         };
         download();
     };
+    const handleInstall = () => {
+        console.log('Install', model);
+        setInstalling(true);
+        const install = async () => {
+            const result = await fetch(`/api/py/models/install/${model}`);
+            setInstalling(false);
+        }
+        install();
+    };
 
-    return downloaded ? (
-        <Paper className={classes['option']} m="xs" p="">
-            <IconCheck color="green" />
-            <Button
-                className={classes['button']}
-                onClick={() => setSelected(model)}
-            >
-                {model}
-            </Button>
-        </Paper>
-    ) : (
-        <Paper className={classes['option']} m="xs" p="">
-            <ActionIcon disabled={downloading} onClick={() => handleDownload()}>
-                <IconDownload />
-            </ActionIcon>
-            <Button
-                className={`${classes['button']} ${classes['button--disabled']}`}
-                disabled
-            >
-                {model} 
-                {downloading && <Text>   -  Loading...</Text>}
-            </Button>
-        </Paper>
+    return (
+        <Table.Tr>
+            <Table.Td>
+                <Button
+                    className={`${classes['button']} ${!downloaded ? classes['button--disabled'] : ''}`}
+                    onClick={() => setSelected(model)}
+                    disabled={!downloaded}
+                >
+                    {model}
+                    {downloading && !downloaded && <Text> - Loading...</Text>}
+                </Button>
+            </Table.Td>
+            <Table.Td>
+                {downloaded ? (
+                    <IconCheck color="green" />
+                ): downloading ? (
+                        <Loader/>
+                ): (
+                    <ActionIcon disabled={downloading} onClick={() => handleDownload()}>
+                        <IconDownload />
+                    </ActionIcon>
+                    )}
+            </Table.Td>
+            <Table.Td>
+                {installing ?
+                    <Loader/>
+                :
+                <ActionIcon disabled={installing || !downloaded} onClick={() => handleInstall()}>
+                    <IconTableDown />
+                </ActionIcon>
+                }
+            </Table.Td>
+        </Table.Tr>
     );
 }
 
@@ -93,18 +112,22 @@ function Options({ cardProps, tabProps, setSelected }: OptionsProps) {
                 </Flex>
             </Card.Section>
             {loading ? <p>Loading...</p> : 
-            <ScrollArea>
-            {modelOptions && Object.entries(modelOptions).map(([key, values]) => (
-                <Paper shadow='' className={classes['option-group']} key={key}>
-                    <Text className={classes['heading']}>{key}</Text>
-                    <Paper p='sm' className={classes['option-list']}>
-                    {values.map((value: string) => (
-                        <ModelButton key={value} model={`${key}_${value}`} setSelected={setSelected} />
-                    ))}
-                </Paper>
-            </Paper>
-            ))}
-            </ScrollArea>
+            <Table striped highlightOnHover verticalSpacing="xs" className={classes['option-table']}>
+                <Table.Thead>
+                    <Table.Tr style={{ backgroundColor: "#f0f0f6", textAlign: "left" }}>
+                        <Table.Th>Model</Table.Th>
+                        <Table.Th>Download</Table.Th>
+                        <Table.Th>Install</Table.Th>
+                    </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                    {modelOptions && Object.entries(modelOptions).flatMap(([key, values]) =>
+                        values.map((value: string) => (
+                            <ModelButton setSelected={setSelected} model={`${key}_${value}`} key={`${key}_${value}`} />
+                        ))
+                    )}
+                </Table.Tbody>
+            </Table>
             }
         </Card>
     );

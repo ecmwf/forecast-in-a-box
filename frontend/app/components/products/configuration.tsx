@@ -40,6 +40,7 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
 
   // Fetch initial options
   const fetchInitialOptions = async () => {
+    if (!selectedProduct) return; // Prevent unnecessary fetch
     setLoading(true);
     try {
       const response = await fetch(`/api/py/products/configuration/${selectedProduct}`, {

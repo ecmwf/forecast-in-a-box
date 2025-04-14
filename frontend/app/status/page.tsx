@@ -161,6 +161,7 @@ const HomePage = () => {
                       color='orange'
                       onClick={() => restartJob(jobId)}
                       size='xs'
+                      aria-label="Restart Job"
                       ><IconRefresh/></Button>
                     <Button
                       color='red'
