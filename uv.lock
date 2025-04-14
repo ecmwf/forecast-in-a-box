@@ -446,8 +446,8 @@ wheels = [
 
 [[package]]
 name = "earthkit-plots"
-version = "10.1.dev78+g3022a25"
-source = { git = "ssh://git@github.com/ecmwf/earthkit-plots?rev=experimental#3022a25d43d8936e605451d73ecff81a1c440c95" }
+version = "0.3.2.dev3+g7476a06"
+source = { git = "ssh://git@github.com/ecmwf/earthkit-plots#7476a062400c9a0498b84ef9c7a5d49a4ff3d7db" }
 dependencies = [
     { name = "adjusttext" },
     { name = "cartopy" },
@@ -455,14 +455,16 @@ dependencies = [
     { name = "earthkit-plots-default-styles" },
     { name = "matplotlib" },
     { name = "numpy" },
+    { name = "pandas" },
     { name = "pint" },
+    { name = "plotly" },
     { name = "pyyaml" },
 ]
 
 [[package]]
 name = "earthkit-plots-default-styles"
-version = "0.0.2.dev15+g31da6e2"
-source = { git = "ssh://git@github.com/ecmwf/earthkit-plots-default-styles?rev=experimental#31da6e276d512080be18fb1cc5c814655c6ead01" }
+version = "0.1.0"
+source = { git = "ssh://git@github.com/ecmwf/earthkit-plots-default-styles#21b7ac2eb99fd13ca9df15a3ee7c9c1090413937" }
 
 [[package]]
 name = "earthkit-regrid"
@@ -515,6 +517,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/c0/38/cbbe35afd33b5727c13ed699b1b4887b9cabb439019901b948ae09547ff4/eccodes-2.40.1-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:5b81144cc8ab3ee08463ab9a04f5dba7dd572ac578b9ba5241f5969ff023563a", size = 7403596 },
     { url = "https://files.pythonhosted.org/packages/19/74/fd10cb4f119df3baf125592c431679add38434794bd003bee8bc134cb60d/eccodes-2.40.1-cp311-cp311-win_amd64.whl", hash = "sha256:6852894e2be4e4a4ceb731b5e967a6b17eb4643c4132d886f994a3e754d9b273", size = 6224246 },
     { url = "https://files.pythonhosted.org/packages/26/74/c3683ec85d70dd063a79ff4612c5ea4f0c37c39a5aa7a7340c17e767fdbd/eccodes-2.40.1-py3-none-any.whl", hash = "sha256:5a0ae2653e88fee740e53a13c91066682eca1b885bf33bf1547ac8e25e82845e", size = 43563 },
+]
+
+[[package]]
+name = "ecmwf-api-client"
+version = "1.6.5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/14/b5/837fa2daee28118c592cd003b910433894008d5a1f9e3bed9f2c3cabe34b/ecmwf_api_client-1.6.5.tar.gz", hash = "sha256:1fc0eba27163686b7fba5da027cc5dc0a361f75b652508fa7805f50599368b1c", size = 12974 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f5/f3/7a5832d5fb8e16db4d1f3be58fcb2537e68ccffea1270bff8b65de7c85b5/ecmwf_api_client-1.6.5-py3-none-any.whl", hash = "sha256:82678c2c18083b44be74b23e2a7e82d2343061966c0bf3a895272b9e9a802836", size = 13495 },
 ]
 
 [[package]]
@@ -651,15 +662,19 @@ plots = [
 thermo = [
     { name = "thermofeel" },
 ]
+webmars = [
+    { name = "ecmwf-api-client" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "anemoi-cascade", git = "ssh://git@github.com/ecmwf/anemoi-cascade.git" },
     { name = "anemoi-inference", extras = ["huggingface"], specifier = ">=0.4.10" },
     { name = "cloudpickle" },
-    { name = "earthkit-plots", marker = "extra == 'plots'", git = "ssh://git@github.com/ecmwf/earthkit-plots?rev=experimental" },
-    { name = "earthkit-plots-default-styles", marker = "extra == 'plots'", git = "ssh://git@github.com/ecmwf/earthkit-plots-default-styles?rev=experimental" },
+    { name = "earthkit-plots", marker = "extra == 'plots'", git = "ssh://git@github.com/ecmwf/earthkit-plots" },
+    { name = "earthkit-plots-default-styles", marker = "extra == 'plots'", git = "ssh://git@github.com/ecmwf/earthkit-plots-default-styles" },
     { name = "earthkit-workflows", git = "https://github.com/ecmwf/earthkit-workflows" },
+    { name = "ecmwf-api-client", marker = "extra == 'webmars'" },
     { name = "fastapi" },
     { name = "forecast-in-a-box", extras = ["plots", "thermo"], marker = "extra == 'all'" },
     { name = "httpx" },
@@ -1049,6 +1064,15 @@ wheels = [
 ]
 
 [[package]]
+name = "narwhals"
+version = "1.34.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f5/6d/0ad9e8fe41dba509f1c3241a46e52c9677eb9f67f7eb3c8018b1ae088469/narwhals-1.34.1.tar.gz", hash = "sha256:8941a08cf62f39ae67be945090b20a19c51fb9048ac909cad2f95aee23f9e302", size = 265602 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b0/a2/2ea3f2058ae661b06fad1a14c0f29f1cc8e49478d02a2d68f0eac3872b86/narwhals-1.34.1-py3-none-any.whl", hash = "sha256:aee49a30d1624371ad975ede2bab16cd125ab5df0fd185e2f4757e103b074d27", size = 325548 },
+]
+
+[[package]]
 name = "netcdf4"
 version = "1.7.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1371,6 +1395,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b6/2d/7d512a3913d60623e7eb945c6d1b4f0bddf1d0b7ada5225274c87e5b53d1/platformdirs-4.3.7.tar.gz", hash = "sha256:eb437d586b6a0986388f0d6f74aa0cde27b48d0e3d66843640bfb6bdcdb6e351", size = 21291 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6d/45/59578566b3275b8fd9157885918fcd0c4d74162928a5310926887b856a51/platformdirs-4.3.7-py3-none-any.whl", hash = "sha256:a03875334331946f13c549dbd8f4bac7a13a50a895a0eb1e8c6a8ace80d40a94", size = 18499 },
+]
+
+[[package]]
+name = "plotly"
+version = "6.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "narwhals" },
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c7/cc/e41b5f697ae403f0b50e47b7af2e36642a193085f553bf7cc1169362873a/plotly-6.0.1.tar.gz", hash = "sha256:dd8400229872b6e3c964b099be699f8d00c489a974f2cfccfad5e8240873366b", size = 8094643 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/02/65/ad2bc85f7377f5cfba5d4466d5474423a3fb7f6a97fd807c06f92dd3e721/plotly-6.0.1-py3-none-any.whl", hash = "sha256:4714db20fea57a435692c548a4eb4fae454f7daddf15f8d8ba7e1045681d7768", size = 14805757 },
 ]
 
 [[package]]

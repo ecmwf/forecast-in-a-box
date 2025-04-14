@@ -40,8 +40,11 @@ plots = [
     "earthkit-plots-default-styles",
     "earthkit-plots>=0.2.8",
 ]
+webmars = [
+    "ecmwf-api-client>=1.6.5",
+]
 all = [
-	"forecast-in-a-box[plots,thermo]"
+	"forecast-in-a-box[plots,thermo,webmars]"
 ]
 
 [tool.hatch.build.targets.wheel]
