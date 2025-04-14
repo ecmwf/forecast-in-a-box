@@ -17,7 +17,6 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
         const fetchDownloaded = async () => {
             const result = await fetch(`/api/py/models/downloaded/${model}`);
             setDownloaded(await result.json());
-            console.log('Downloaded:', downloaded);
         };
         fetchDownloaded();
     }, [model]);

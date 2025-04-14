@@ -157,7 +157,7 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
                     <Title pt ='md' order={3}>Specification</Title>
                     <SimpleGrid cols={{ base: 1, sm: 2, lg: 2 }} spacing=''>
                         {Object.entries(model).filter(([key]) => key !== 'model').map(([key, value]) => ( 
-                            <Paper shadow="" p="xs">
+                            <Paper shadow="" p="xs" key={key}>
                                 <Title order={5}>{key}</Title>
                                 <Text maw='80%' lineClamp={3} style={{ marginLeft: '10px' }}>{JSON.stringify(value, null, 2)}</Text>
                             </Paper>

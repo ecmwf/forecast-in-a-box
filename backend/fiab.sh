@@ -85,6 +85,8 @@ maybeCreateVenv() {
 	fi
 }
 
+ENTRYPOINT=forecastbox.standalone.entrypoint
+
 for arg in "$@"; do
 	case "$arg" in
 		"--help")
@@ -107,4 +109,4 @@ maybeInstallUv
 maybeInstallPython
 maybeCreateVenv
 
-npm run dev
+python -m $ENTRYPOINT

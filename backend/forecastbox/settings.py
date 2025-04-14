@@ -8,7 +8,6 @@ class Settings(BaseSettings):
 
     api_url: str
     cascade_url: str
-    web_url: str
     mongodb_uri: str
     mongodb_database: str
 

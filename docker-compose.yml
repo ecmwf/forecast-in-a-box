@@ -1,0 +1,38 @@
+services:
+  frontend:
+    container_name: forecast-in-a-box-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+          NEXT_PUBLIC_API_URL: "backend:8000" # Pass the variable during build
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: "backend:8000"
+      # WEB_URL: "http://localhost:3000"
+    networks:
+      - fiab-network
+    
+  backend:
+    container_name: forecast-in-a-box-backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./data_dir:/app/data_dir
+    ports:
+      - "8000:8000"
+    environment:
+      API_URL: "http://localhost:8000"
+      DATA_PATH: "/app/data_dir"
+      MODEL_REPOSITORY: "https://sites.ecmwf.int/repository/fiab/"
+      CASCADE_URL: "tcp://localhost:8067"
+      MONGODB_URI: "mongodb://localhost:27017"
+      MONGODB_DATABASE: "fiab"
+    networks:
+      - fiab-network
+
+networks:
+  fiab-network:
+    driver: bridge
