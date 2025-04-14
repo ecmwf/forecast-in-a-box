@@ -21,7 +21,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     volumes:
-      - fiab_data:/app/data_dir
+      - fiab-data:/app/data_dir
       - './../anemoi-cascade:/app/anemoi-cascade'
     ports:
       - "8000:8000"
@@ -38,3 +38,6 @@ services:
 networks:
   fiab-network:
     driver: bridge
+
+volumes:
+  fiab-data:
