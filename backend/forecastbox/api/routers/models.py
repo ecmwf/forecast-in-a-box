@@ -94,17 +94,38 @@ async def download(model: str) -> str:
     shutil.move(temp_download_path.name, model_download_path)
     return str(model_download_path)
 
+@router.get("/install/{model}")
+async def install(model: str) -> bool:
+    from anemoi.inference.checkpoint import Checkpoint
+
+    ckpt = Checkpoint(str(get_model_path(model.replace("_", "/"))))
+
+    anemoi_versions = {key: val for key, val in ckpt.provenance_training()["module_versions"].items() if key.startswith("anemoi")}
+
+    for key, val in anemoi_versions.items():
+        if key == "anemoi":
+            continue
+        
+        import subprocess
+        import sys
+        try:
+            subprocess.run([sys.executable, "-m", "pip", "install", f"{key}=={val}"], check=True)
+        except Exception as e:
+            raise e
+        
+    return True
+
 
 # Model Info
-@lru_cache
-@router.get("/info/{modelname}")
-async def get_model_info(modelname: str) -> dict[str, Any]:
+@lru_cache(maxsize=128)
+@router.get("/info/{model}")
+async def get_model_info(model: str) -> dict[str, Any]:
     """
     Get basic information about a model.
 
     Parameters
     ----------
-    modelname : str
+    model : str
             Model to load, directory separated by underscores
 
     Returns
@@ -115,7 +136,7 @@ async def get_model_info(modelname: str) -> dict[str, Any]:
 
     from anemoi.inference.checkpoint import Checkpoint
 
-    ckpt = Checkpoint(str(get_model_path(modelname.replace("_", "/"))))
+    ckpt = Checkpoint(str(get_model_path(model.replace("_", "/"))))
 
     anemoi_versions = {key: val for key, val in ckpt.provenance_training()["module_versions"].items() if key.startswith("anemoi")}
 
