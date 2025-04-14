@@ -91,7 +91,7 @@ async def download(model: str) -> str:
                 async for chunk in response.aiter_bytes(chunk_size=8192):
                     f.write(chunk)
 
-    shutil.move(temp_download_path.name, model_download_path)
+    shutil.copy(temp_download_path.name, model_download_path)
     return str(model_download_path)
 
 @router.get("/install/{model}")
@@ -100,19 +100,18 @@ async def install(model: str) -> bool:
 
     ckpt = Checkpoint(str(get_model_path(model.replace("_", "/"))))
 
-    anemoi_versions = {key: val for key, val in ckpt.provenance_training()["module_versions"].items() if key.startswith("anemoi")}
+    anemoi_versions = {key.replace('.','-'): val for key, val in ckpt.provenance_training()["module_versions"].items() if key.startswith("anemoi")}
+    import subprocess
+    import sys
 
-    for key, val in anemoi_versions.items():
-        if key == "anemoi":
-            continue
-        
-        import subprocess
-        import sys
-        try:
-            subprocess.run([sys.executable, "-m", "pip", "install", f"{key}=={val}"], check=True)
-        except Exception as e:
-            raise e
-        
+    BLACKLISTED_INSTALLS = ['anemoi', 'anemoi-training', 'anemoi-inference', 'anemoi-utils']
+    
+    try:
+        packages = [f"{key}=={'.'.join(val.split('.')[:3])}" for key, val in anemoi_versions.items() if key not in BLACKLISTED_INSTALLS]
+        if packages:
+            subprocess.run([sys.executable, "-m", "pip", "install", *packages], check=True)
+    except Exception as e:
+        raise e
     return True
 
 
