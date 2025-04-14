@@ -74,6 +74,8 @@ async def download(model: str) -> str:
     repo = SETTINGS.model_repository
 
     model = model.replace("_", "/")
+    repo = repo.removesuffix('/')
+    
     model_path = f"{repo}/{model}.ckpt"
 
     model_download_path = Path(get_model_path(model.replace("_", "/")))

@@ -28,7 +28,7 @@ services:
     environment:
       API_URL: "http://localhost:8000"
       DATA_PATH: "/app/data_dir"
-      MODEL_REPOSITORY: "https://sites.ecmwf.int/repository/fiab/"
+      MODEL_REPOSITORY: "https://sites.ecmwf.int/repository/fiab"
       CASCADE_URL: "tcp://localhost:8067"
       MONGODB_URI: "mongodb://localhost:27017"
       MONGODB_DATABASE: "fiab"
