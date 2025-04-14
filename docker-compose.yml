@@ -7,11 +7,11 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-          NEXT_PUBLIC_API_URL: "backend:8000" # Pass the variable during build
+          NEXT_PUBLIC_API_URL: "http://backend:8000" # Pass the variable during build
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:3001:3000"
     environment:
-      NEXT_PUBLIC_API_URL: "backend:8000"
+      NEXT_PUBLIC_API_URL: "http://backend:8000"
     networks:
       - fiab-network
     
@@ -21,7 +21,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     volumes:
-      - ./data_dir:/app/data_dir
+      - fiab_data:/app/data_dir
       - './../anemoi-cascade:/app/anemoi-cascade'
     ports:
       - "8000:8000"

@@ -99,9 +99,9 @@ if __name__ == "__main__":
     api = Process(target=launch_api, args=(context,))
     api.start()
 
-    with httpx.Client() as client:
-        for root_url in [context["API_URL"]]:
-            wait_for(client, root_url)
+    # with httpx.Client() as client:
+    #     for root_url in [context["API_URL"]]:
+    #         wait_for(client, root_url)
 
     # webbrowser.open(context["WEB_URL"])
 
