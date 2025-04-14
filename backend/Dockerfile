@@ -1,13 +1,25 @@
-from ubuntu:noble-20240605 as build
+# Use an official lightweight Python image as the base
+FROM python:3.11
 
-run apt update && apt install -y just python-is-python3 python3.12-venv python3-dev binutils
+# Set the working directory in the container
+WORKDIR /app
 
-workdir /build
-copy justfile requirements.txt requirements-dev.txt pyproject.toml /build
-copy src /build/src
-# TODO separate setup local install, run setup before src copy
-run just setup dist
+# Copy the forecastbox directory into the container
+COPY forecastbox /app/forecastbox
+COPY pyproject.toml /app/pyproject.toml
 
-from ubuntu:noble-20240605
-copy --from=build /build/dist/entrypoint /bin/entrypoint
-cmd ["/bin/entrypoint"]
+# Copy the entrypoint script into the container
+COPY fiab.sh /app/fiab.sh
+
+# Ensure the entrypoint script is executable
+RUN chmod +x /app/fiab.sh
+
+# Install any necessary dependencies (if applicable)
+RUN pip install uv
+
+# Install Rust
+# RUN apt-get update && apt-get install -y curl && \
+#     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+#     . "$HOME/.cargo/env"
+
+ENTRYPOINT ["/app/fiab.sh"]

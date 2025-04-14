@@ -88,7 +88,7 @@ if __name__ == "__main__":
 
     settings = get_settings()
     context = {
-        "WEB_URL": settings.web_url,
+        # "WEB_URL": settings.web_url,
         "API_URL": settings.api_url,
         "CASCADE_URL": settings.cascade_url,
     }
@@ -103,7 +103,7 @@ if __name__ == "__main__":
         for root_url in [context["API_URL"]]:
             wait_for(client, root_url)
 
-    webbrowser.open(context["WEB_URL"])
+    # webbrowser.open(context["WEB_URL"])
 
     try:
         connection.wait(

@@ -22,7 +22,7 @@ dependencies = [
 	"cloudpickle",
 	"pyrsistent",
 	"anemoi-inference[huggingface]>=0.4.10",
-	"qubed",
+	"qubed>=0.1.12",
 	"anemoi-cascade",
 	"pydantic-settings",
 	"pymongo",
@@ -48,7 +48,7 @@ all = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["backend/forecastbox"]
+packages = ["forecastbox"]
 
 [tool.setuptools.packages.find]
 where = ["backend"]
@@ -63,10 +63,8 @@ ignore = ["E731"]
 plugins = "pydantic.mypy"
 
 [tool.uv.sources]
-qubed = { git = "ssh://git@github.com/ecmwf/qubed.git" }
-earthkit-plots = { git = "ssh://git@github.com/ecmwf/earthkit-plots" }
-earthkit-plots-default-styles = { git = "ssh://git@github.com/ecmwf/earthkit-plots-default-styles" }
-anemoi-cascade = { git = "ssh://git@github.com/ecmwf/anemoi-cascade.git"}
+#qubed = { git = "https://github.com/ecmwf/qubed" }
+anemoi-cascade  = { git = "https://github.com/ecmwf/anemoi-cascade" }
 earthkit-workflows = { git = "https://github.com/ecmwf/earthkit-workflows" }
 
 [tool.hatch.metadata]
