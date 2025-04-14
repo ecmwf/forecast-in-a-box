@@ -27,13 +27,6 @@ function write_description({ description, constraints }: { description: string; 
 }
 
 function Configuration({ selectedProduct, selectedModel, submitTarget}: ConfigurationProps) {
-  if (!selectedProduct) {
-    return (
-      <Card>
-        <p>Select Product to configure</p>
-      </Card>
-    );
-  }
 
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [productConfig, updateProductConfig] = useState<ProductConfiguration>({ product: selectedProduct, options: {} });
@@ -100,6 +93,15 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
     fetchUpdatedOptions();
   }, [formData]); // Update options when formData changes
 
+  if (!selectedProduct) {
+    return (
+      <Card>
+        <p>Select Product to configure</p>
+      </Card>
+    );
+  }
+
+  
   const isFormValid = () => {
     // console.log(formData);
     const isValid = Object.keys(productConfig.options).every(key => formData[key] !== undefined && formData[key] !== "");

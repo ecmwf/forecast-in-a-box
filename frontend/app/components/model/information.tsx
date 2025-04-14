@@ -57,7 +57,7 @@ function InformationWindow({ selected }: InformationProps) {
             <SimpleGrid cols={2}>
 
             {information && Object.entries(information).map(([key, value]) => (
-                <Paper shadow="xs" p="xs">
+                <Paper shadow="xs" p="xs" key={key}>
                     <Title order={5}>{key}:</Title>
                     {typeof value === 'object' && !Array.isArray(value) && value !== null ? (
                         <Stack maw='80%' style={{ marginLeft: '10px' }} gap='xs'>
