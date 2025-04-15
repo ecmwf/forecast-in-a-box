@@ -21,12 +21,12 @@ def quickplot(field: ekd.Field, domain=None):
 
     chart.quickplot(field)
 
-    chart.title("{short_name} over {domain}\n"
+    chart.title("{variable_name} over {domain}\n"
         "Base time: {base_time:%H:%M on %-d %B %Y}\n"
         "Valid time: {valid_time:%H:%M on %-d %B %Y} (T+{lead_time})"
     )
 
-    chart.legend(label="{short_name} ({units})")
+    chart.legend(label="{variable_name} ({units})")
 
     chart.coastlines()
     chart.gridlines()
@@ -61,8 +61,6 @@ class MapProduct(GenericTemporalProduct):
 
     def to_graph(self, specification, source):
         domain = specification.pop('domain', None)
-        if domain == 'Global':
-            domain = None
         source = self.select_on_specification(specification, source)
 
         plots = source.map(
