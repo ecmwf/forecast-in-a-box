@@ -8,6 +8,7 @@ services:
       dockerfile: Dockerfile
       args:
           NEXT_PUBLIC_API_URL: "http://backend:8000" # Pass the variable during build
+    image: eccr.ecmwf.int/forecast-in-a-box/fiab-frontend:latest
     ports:
       - "127.0.0.1:3001:3000"
     environment:
@@ -20,6 +21,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    image: eccr.ecmwf.int/forecast-in-a-box/fiab-backend:latest
     volumes:
       - data:/app/data_dir
       - './../anemoi-cascade:/app/anemoi-cascade'
