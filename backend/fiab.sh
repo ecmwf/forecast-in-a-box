@@ -81,7 +81,9 @@ maybeCreateVenv() {
 	else
 		uv venv -p "$UV_PY" "$VENV"
 		source "${VENV}/bin/activate" # or export the paths?
-		uv pip install "./"
+		
+		uv pip install "./anemoi-cascade"
+		uv pip install "./[$FIAB_INSTALL_TYPE]"
 	fi
 }
 

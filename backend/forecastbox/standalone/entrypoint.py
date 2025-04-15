@@ -34,7 +34,7 @@ async def uvicorn_run(app_name: str, port: int) -> None:
         log_level=None,
         workers=1,
         reload=True,
-        reload_dirs=["backend/forecastbox"],
+        reload_dirs=["forecastbox"],
     )
     server = uvicorn.Server(config)
     await server.serve()
@@ -99,9 +99,9 @@ if __name__ == "__main__":
     api = Process(target=launch_api, args=(context,))
     api.start()
 
-    with httpx.Client() as client:
-        for root_url in [context["API_URL"]]:
-            wait_for(client, root_url)
+    # with httpx.Client() as client:
+    #     for root_url in [context["API_URL"]]:
+    #         wait_for(client, root_url)
 
     # webbrowser.open(context["WEB_URL"])
 

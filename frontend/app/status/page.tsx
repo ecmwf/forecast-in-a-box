@@ -7,6 +7,7 @@ import { Table, Loader, Center, Title, Progress, Button, Flex, Divider} from '@m
 
 import { IconRefresh, IconTrash } from '@tabler/icons-react';
 import classes from './status.module.css';
+import { showNotification } from '@mantine/notifications';
 
 
 export type ProgressResponse = {
@@ -52,7 +53,18 @@ const HomePage = () => {
         headers: { "Content-Type": "application/json" },
       });
 
-      await response.json();
+      const result = await response.json();
+
+      showNotification({
+        id: `flushed-result-form-${crypto.randomUUID()}`,
+        position: 'top-right',
+        autoClose: 3000,
+        title: "Jobs Flushed",
+        message: `${result.deleted_count} jobs deleted`,
+        color: 'red',
+        icon: <IconTrash />,
+        loading: false,
+      });
 
     } catch (error) {
       console.error('Error fetching job statuses:', error);
@@ -111,7 +123,7 @@ const HomePage = () => {
         <Button onClick={fetchJobs}>
           Refresh
         </Button>
-        <Button onClick={flushJobs} color="red">
+        <Button onClick={flushJobs} color="red" disabled={Object.keys(jobs.progresses || {}).length === 0}>
           Flush
         </Button>
       </Flex>
@@ -161,6 +173,7 @@ const HomePage = () => {
                       color='orange'
                       onClick={() => restartJob(jobId)}
                       size='xs'
+                      aria-label="Restart Job"
                       ><IconRefresh/></Button>
                     <Button
                       color='red'

@@ -40,6 +40,7 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
 
   // Fetch initial options
   const fetchInitialOptions = async () => {
+    if (!selectedProduct) return; // Prevent unnecessary fetch
     setLoading(true);
     try {
       const response = await fetch(`/api/py/products/configuration/${selectedProduct}`, {
@@ -108,15 +109,12 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
     if (!isValid) {
       showNotification({
         id: 'invalid-form',
-        position: 'bottom-center',
-        withCloseButton: true,
-        autoClose: 5000,
+        position: 'top-right',
+        autoClose: 3000,
         title: "Fill in all fields",
         message: 'Please fill in all fields before submitting',
         color: 'red',
         icon: <IconX />,
-        className: 'my-notification-class',
-        // style: { backgroundColor: 'red' },
         loading: false,
       });
     }

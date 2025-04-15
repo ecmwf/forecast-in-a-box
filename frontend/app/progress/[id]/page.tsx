@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Progress, Container, Title, Text, ScrollArea, Divider, Button, ActionIcon, Table, Flex} from '@mantine/core';
+import { Progress, Container, Title, Text, ScrollArea, Divider, Button, Loader, Table, Flex} from '@mantine/core';
 
 import {IconSearch} from '@tabler/icons-react';
 
@@ -120,6 +120,7 @@ const ProgressPage = () => {
             ) : (
                 <>
                 <Progress value={progress || 0} striped animated key={progress}/>
+                {/* <Loader/> */}
                 <Text>{progress}%</Text>
 
                 <Divider my='lg' />
@@ -137,7 +138,7 @@ const ProgressPage = () => {
                     <Table.Tbody>
                     <Table.Tr>
                         <Table.Td>
-                            <Text>{dataset}</Text>
+                            <Text style={{ fontFamily: 'monospace' }}>{dataset.split(':')[0]}:{dataset.split(':')[1]?.substring(0, 15)}</Text>
                         </Table.Td>
                         <Table.Td align='right'>
                             <Button size='sm' disabled={progress !== 100} component={progress === 100 ? `a` : 'b'} href={progress === 100 ? `/api/py/jobs/result/${id}/${dataset}` : ''} target='_blank'><IconSearch/></Button>

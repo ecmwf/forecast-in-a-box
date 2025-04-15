@@ -7,6 +7,7 @@ import {
 } from "@mantine/core";
 
 import { Notifications } from '@mantine/notifications';
+import '@mantine/notifications/styles.css';
 
 import { theme } from "../theme";
 
@@ -32,7 +33,7 @@ export default function RootLayout({ children }: { children: any }) {
       </head>
       <body>
       <MantineProvider theme={theme}>
-        <Notifications />
+       <Notifications />
         <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
           <Header />
           <main style={{ flex: 1 }}>{children}</main>

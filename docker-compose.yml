@@ -1,38 +1,52 @@
+name: FIAB
+
 services:
   frontend:
-    container_name: forecast-in-a-box-frontend
+    container_name: fiab-frontend
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-          NEXT_PUBLIC_API_URL: "backend:8000" # Pass the variable during build
+          NEXT_PUBLIC_API_URL: "http://backend:8000" # Pass the variable during build
+    image: eccr.ecmwf.int/forecast-in-a-box/fiab-frontend:latest
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
-      NEXT_PUBLIC_API_URL: "backend:8000"
-      # WEB_URL: "http://localhost:3000"
+      NEXT_PUBLIC_API_URL: "http://backend:8000"
     networks:
       - fiab-network
     
   backend:
-    container_name: forecast-in-a-box-backend
+    container_name: fiab-backend
     build:
       context: ./backend
       dockerfile: Dockerfile
+    image: eccr.ecmwf.int/forecast-in-a-box/fiab-backend:latest
     volumes:
-      - ./data_dir:/app/data_dir
+      - data:/app/data_dir
+      - './../anemoi-cascade:/app/anemoi-cascade'
     ports:
       - "8000:8000"
     environment:
       API_URL: "http://localhost:8000"
       DATA_PATH: "/app/data_dir"
-      MODEL_REPOSITORY: "https://sites.ecmwf.int/repository/fiab/"
+      MODEL_REPOSITORY: "https://sites.ecmwf.int/repository/fiab"
       CASCADE_URL: "tcp://localhost:8067"
       MONGODB_URI: "mongodb://localhost:27017"
       MONGODB_DATABASE: "fiab"
+
+      ECMWF_API_URL: "https://api.ecmwf.int/v1"
+      ECMWF_API_KEY: ${ECMWF_API_KEY}
+      ECMWF_API_EMAIL: ${ECMWF_API_EMAIL}
+
+      FIAB_INSTALL_TYPE: all
+
     networks:
       - fiab-network
 
 networks:
   fiab-network:
     driver: bridge
+
+volumes:
+  data:

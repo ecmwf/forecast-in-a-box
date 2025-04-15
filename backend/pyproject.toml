@@ -23,7 +23,7 @@ dependencies = [
 	"pyrsistent",
 	"anemoi-inference[huggingface]>=0.4.10",
 	"qubed>=0.1.12",
-	"anemoi-cascade",
+	#"anemoi-cascade",
 	"pydantic-settings",
 	"pymongo",
 	"earthkit-workflows",

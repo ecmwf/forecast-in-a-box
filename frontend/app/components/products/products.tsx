@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { LoadingOverlay, Group, SimpleGrid, Container, Button, Divider, Title } from "@mantine/core";
+import { LoadingOverlay, Group, SimpleGrid, Container, Button, Divider, Title, Grid } from "@mantine/core";
 
 import Categories from "./categories";
 import Configuration from "./configuration";
@@ -74,17 +74,27 @@ function ProductConfigurator({model, products, setProducts}: ProductConfiguratio
     return (
         <Container size='xl'>
             <LoadingOverlay visible={loading}/>
-            <SimpleGrid cols={{ sm: 1, md: 2, xl: 3}} spacing='' >
-                <Container miw={{sm:'90vw', md:'45vw', xl:'15vw'}}><Title order={2}>Categories</Title><Categories categories={categories} setSelected={setSelectedProduct} /></Container>
-                <Container className='configuration_container' miw={{sm:'90vw', md:'45vw', xl:'15vw'}}><Title order={2}>Configuration</Title><Configuration selectedProduct={selected} selectedModel={model} submitTarget={addProduct} /></Container>
-                <Container miw={{sm:'90vw', xl:'15vw'}}><Title order={2}>Selected ({Object.keys(internal_products).length})</Title><Cart products={internal_products} setProducts={internal_setProducts}/></Container>
-            </SimpleGrid>
+            <Grid>
+                <Grid.Col span={{ base: 12, sm: 12, md: 6, xl: 4 }}>
+                    <Title order={2}>Categories</Title>
+                    <Categories categories={categories} setSelected={setSelectedProduct} />
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 12, md: 6, xl: 4 }}>
+                    <Container className='configuration_container'>
+                        <Title order={2}>Configuration</Title>
+                        <Configuration selectedProduct={selected} selectedModel={model} submitTarget={addProduct} />
+                    </Container>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 12, md: 12, xl: 4 }}>
+                    <Title order={2}>Selected ({Object.keys(internal_products).length})</Title>
+                    <Cart products={internal_products} setProducts={internal_setProducts} />
+                </Grid.Col>
+            </Grid>
             <Divider p='md'/>
             <SimpleGrid cols={1}>
                 <Button onClick={() => setProducts(internal_products)} disabled={!model}>Submit</Button>
             </SimpleGrid>
         </Container>
-
     );
 }
 
