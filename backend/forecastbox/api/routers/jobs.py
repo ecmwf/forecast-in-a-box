@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, Response
 from fastapi.responses import FileResponse, StreamingResponse, HTMLResponse
+from fastapi import HTTPException
 
 from typing import Union
 from dataclasses import dataclass
@@ -55,6 +56,10 @@ def get_job_progress(job_id: str) -> JobProgressResponse:
         db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "running"}})
     else:
         db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "unknown"}})
+
+    # Check if the job_id exists in the database
+    if not db.find("job_records", {"job_id": job_id}):
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
 
     return JobProgressResponse(
         progress=progress.removesuffix('%'),
@@ -190,6 +195,8 @@ def to_bytes(obj) -> tuple[bytes, str]:
 
 @router.get("/flush")
 async def flush_tasks() -> dict[str, int]:
+    """Flush all tasks."""
+    client.request_response(api.ShutdownRequest(), f"{SETTINGS.cascade_url}")  # type: ignore
     return db.delete_many("job_records", {})
 
 @router.get("/delete/{job_id}")
