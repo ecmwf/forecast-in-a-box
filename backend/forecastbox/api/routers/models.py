@@ -111,7 +111,7 @@ async def install(model: str) -> bool:
     try:
         packages = [f"{key}=={'.'.join(val.split('.')[:3])}" for key, val in anemoi_versions.items() if key not in BLACKLISTED_INSTALLS]
         if packages:
-            subprocess.run([sys.executable, "-m", "pip", "install", *packages], check=True)
+            subprocess.run(["uv", "pip", "install", *packages], check=True)
     except Exception as e:
         raise e
     return True
