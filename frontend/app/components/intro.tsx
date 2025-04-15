@@ -27,7 +27,7 @@ const Intro = () => {
                     </Group>
                     {/* <Space h="sm" /> */}
                     <Text size="xl" style={{color: "white"}}>
-                        Forecast-In-A-Box streamlines any product generation tasks allowing {' '}
+                        Forecast-In-A-Box streamlines the product generation task allowing {' '}
                         <strong style={{color: "#6DABFF"}}>any</strong> forecaster to get 
                         the data they need, when they need it.
                     </Text>

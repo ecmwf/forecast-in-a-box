@@ -16,13 +16,6 @@ const Footer: React.FC = () => {
             <Text size="sm">
                 © {new Date().getFullYear()} ECMWF. All rights reserved.
             </Text>
-            {/* <nav>
-                <ul>
-                <li><Button href="/home">Home</Button></li>
-                <li><Button href="/models">Models</Button></li>
-                <li><Button href="/results">Results</Button></li>
-                </ul>
-            </nav> */}
 
             <Group>
                 <Anchor href="/privacy-policy" size="sm">
@@ -30,6 +23,9 @@ const Footer: React.FC = () => {
                 </Anchor>
                 <Anchor href="/terms-of-service" size="sm">
                     Terms of Service
+                </Anchor>
+                <Anchor href="/up" size="sm">
+                    System Status
                 </Anchor>
             </Group>
         </Group>
