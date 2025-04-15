@@ -1,8 +1,8 @@
 # from pymongo import MongoClient
 
-from forecastbox.settings import get_settings
+from forecastbox.settings import FIABSettings
 
-SETTINGS = get_settings()
+SETTINGS = FIABSettings()
 db_name = SETTINGS.mongodb_database
 # client = MongoClient(SETTINGS.mongodb_uri)
 # db = client[SETTINGS.mongodb_database]

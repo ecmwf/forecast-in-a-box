@@ -17,14 +17,14 @@ import cascade.gateway.client as client
 
 from ..database import db
 
-from forecastbox.settings import get_settings
+from forecastbox.settings import APISettings
 
 router = APIRouter(
     tags=["jobs"],
     responses={404: {"description": "Not found"}},
 )
 
-SETTINGS = get_settings()
+SETTINGS = APISettings()
 
 @dataclass
 class JobProgressResponse:
@@ -189,11 +189,9 @@ def to_bytes(obj) -> tuple[bytes, str]:
 
 
 @router.get("/flush")
-async def flush_tasks() -> bool:
-    print('DELETED', db.delete_many("job_records", {}))
-    return True
+async def flush_tasks() -> dict[str, int]:
+    return db.delete_many("job_records", {})
 
 @router.get("/delete/{job_id}")
-async def deleted_task(job_id) -> bool:
-    print('DELETED', db.delete_one("job_records", {'job_id': job_id}))
-    return True
+async def deleted_task(job_id) -> dict[str, int]:
+    return db.delete_one("job_records", {'job_id': job_id})

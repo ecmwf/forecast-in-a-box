@@ -25,15 +25,15 @@ import cascade.gateway.client as client
 
 from ..database import db
 
-from forecastbox.settings import get_settings
+from forecastbox.settings import APISettings, CascadeSettings
 
 router = APIRouter(
     tags=["execution"],
     responses={404: {"description": "Not found"}},
 )
 
-SETTINGS = get_settings()
-
+API_SETTINGS = APISettings()
+CASCADE_SETTINGS = CascadeSettings()
 
 class SubmitResponse(api.SubmitJobResponse):
     output_ids: set[DatasetId]
@@ -103,9 +103,9 @@ async def execute(spec: GraphSpecification) -> api.SubmitJobResponse:
             task.definition.needs_gpu = True
 
     r = api.SubmitJobRequest(
-        job=api.JobSpec(benchmark_name=None, workers_per_host=2, hosts=2, envvars={}, use_slurm=False, job_instance=job)
+        job=api.JobSpec(benchmark_name=None, workers_per_host=CASCADE_SETTINGS.workers_per_host, hosts=CASCADE_SETTINGS.hosts, envvars={}, use_slurm=False, job_instance=job)
     )
-    submit_job_response: api.SubmitJobResponse = client.request_response(r, f"{SETTINGS.cascade_url}")  # type: ignore
+    submit_job_response: api.SubmitJobResponse = client.request_response(r, f"{CASCADE_SETTINGS.cascade_url}")  # type: ignore
 
 
     # Check if the job was submitted successfully

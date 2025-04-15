@@ -12,7 +12,7 @@ from pathlib import Path
 from ..types import ModelSpecification
 from forecastbox.models import Model
 
-from forecastbox.settings import get_settings
+from forecastbox.settings import APISettings
 from forecastbox.models import Model
 
 import httpx
@@ -20,7 +20,7 @@ import requests
 import tempfile
 import shutil
 
-SETTINGS = get_settings()
+SETTINGS = APISettings()
 
 router = APIRouter(
     tags=["models"],
@@ -69,7 +69,7 @@ async def check_if_downloaded(model: str) -> bool:
 
 
 @router.get("/download/{model}")
-async def download(model: str) -> str:
+def download(model: str) -> str:
     """Download a model."""
     repo = SETTINGS.model_repository
 
@@ -84,18 +84,18 @@ async def download(model: str) -> str:
 
     temp_download_path = tempfile.NamedTemporaryFile(suffix=".ckpt.tmp")
 
-    async with httpx.AsyncClient() as client:
-        async with client.stream("GET", model_path) as response:
+    with httpx.Client() as client:
+        with client.stream("GET", model_path) as response:
             response.raise_for_status()
             with open(temp_download_path.name, "wb") as f:
-                async for chunk in response.aiter_bytes(chunk_size=8192):
+                for chunk in response.iter_bytes(chunk_size=8192):
                     f.write(chunk)
 
     shutil.copy(temp_download_path.name, model_download_path)
     return str(model_download_path)
 
 @router.get("/install/{model}")
-async def install(model: str) -> bool:
+def install(model: str) -> bool:
     from anemoi.inference.checkpoint import Checkpoint
 
     ckpt = Checkpoint(str(get_model_path(model.replace("_", "/"))))

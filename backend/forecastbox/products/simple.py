@@ -6,6 +6,7 @@ from forecastbox.products.product import GenericTemporalProduct, GenericParamPro
 from forecastbox.models import Model
 
 import earthkit.data as ekd
+from anemoi.cascade.fluent import ENSEMBLE_DIMENSION_NAME
 
 simple_registry = CategoryRegistry("Simple", "Simple products", "Simple")
 
@@ -45,6 +46,9 @@ class MapProduct(GenericTemporalProduct):
         **GenericTemporalProduct.label,
         'domain': "Domain",
     }
+    multiselect = {
+        "param": True,
+    }
 
     @property
     def model_assumptions(self):
@@ -62,6 +66,9 @@ class MapProduct(GenericTemporalProduct):
     def to_graph(self, specification, source):
         domain = specification.pop('domain', None)
         source = self.select_on_specification(specification, source)
+
+        if ENSEMBLE_DIMENSION_NAME in source.nodes.dims:
+            source = source.stack(ENSEMBLE_DIMENSION_NAME)
 
         plots = source.map(
             Payload(

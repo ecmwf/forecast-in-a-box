@@ -93,7 +93,8 @@ async def product_to_config(product: Product, modelspec: ModelSpecification, par
 
 
 @router.get("/categories")
-async def api_get_categories():
+async def api_get_categories() -> dict[str, Category]:
+    """Get all categories."""
     return get_categories()
 
 

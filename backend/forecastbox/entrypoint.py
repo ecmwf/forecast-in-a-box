@@ -3,7 +3,6 @@ FastAPI Entrypoint
 """
 
 from fastapi import FastAPI
-from .settings import Settings
 
 ### Create FastAPI instance with custom docs and openapi url
 app = FastAPI(docs_url="/api/py/docs", openapi_url="/api/py/openapi.json")
@@ -20,7 +19,7 @@ app.include_router(jobs.router, prefix="/api/py/jobs")
 
 
 @app.get("/status", tags=["status"])
-def status():
+def status() -> dict[str, str]:
     """
     Status endpoint
     """

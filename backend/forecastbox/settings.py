@@ -1,19 +1,20 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from functools import lru_cache
 
 
-class Settings(BaseSettings):
-    data_path: str
-    model_repository: str
+class FIABSettings(BaseSettings):
+    """FIAB Settings"""
+    model_config = SettingsConfigDict(env_file=".env", extra='allow')
 
-    api_url: str
-    cascade_url: str
     mongodb_uri: str
     mongodb_database: str
 
-    model_config = SettingsConfigDict(env_file=".env")
+    api_url: str
+    cascade_url: str
 
+class APISettings(FIABSettings):
+    data_path: str
+    model_repository: str
 
-@lru_cache
-def get_settings() -> Settings:
-    return Settings()  # type: ignore
+class CascadeSettings(FIABSettings):
+    hosts: int = 1
+    workers_per_host: int = 1
