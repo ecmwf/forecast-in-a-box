@@ -10,7 +10,7 @@ services:
           NEXT_PUBLIC_API_URL: "http://backend:8000" # Pass the variable during build
     image: eccr.ecmwf.int/forecast-in-a-box/fiab-frontend:latest
     ports:
-      - "127.0.0.1:3001:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       NEXT_PUBLIC_API_URL: "http://backend:8000"
     networks:
