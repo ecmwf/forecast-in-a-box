@@ -3,12 +3,20 @@
 import React from 'react';
 import { Container } from '@mantine/core';
 
+import Intro from './components/intro';
+import DAG from './components/dag';
+import Building from './components/building_on';
+
+import './global.css';
+import './page.module.css';
+
 const HomePage = () => {
   return (
-    <Container size="lg" mih='86vh'>
-      <h1>Forecast In A Box</h1>
-      <p></p>
-    </Container>
+    <>
+      <Intro />
+      <DAG />
+      <Building />
+    </>
   );
 };
 

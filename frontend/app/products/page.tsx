@@ -3,10 +3,10 @@
 import React, { useState } from "react";
 import { SimpleGrid, Stepper, Divider, Button, Alert, Container} from "@mantine/core";
 
-import ProductConfigurator from './../components/products/products'
+import ProductConfigurator from './components/products/products'
 import Model from "./../components/model/model";
 
-import Confirm from './../components/confirm';
+import Confirm from './components/confirm';
 import ProgressVisualizer from "./../components/visualise/progress";
 
 import {ModelSpecification, ProductSpecification, SubmitResponse} from './../components/interface'
