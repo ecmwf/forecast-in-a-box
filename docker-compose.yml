@@ -21,7 +21,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     volumes:
-      - fiab-data:/app/data_dir
+      - data:/app/data_dir
       - './../anemoi-cascade:/app/anemoi-cascade'
     ports:
       - "8000:8000"
@@ -32,6 +32,13 @@ services:
       CASCADE_URL: "tcp://localhost:8067"
       MONGODB_URI: "mongodb://localhost:27017"
       MONGODB_DATABASE: "fiab"
+
+      ECMWF_API_URL: "https://api.ecmwf.int/v1"
+      ECMWF_API_KEY: ${ECMWF_API_KEY}
+      ECMWF_API_EMAIL: ${ECMWF_API_EMAIL}
+
+      FIAB_INSTALL_TYPE: all
+
     networks:
       - fiab-network
 
@@ -40,4 +47,4 @@ networks:
     driver: bridge
 
 volumes:
-  fiab-data:
+  data:

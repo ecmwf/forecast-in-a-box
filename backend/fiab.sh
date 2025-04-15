@@ -83,7 +83,7 @@ maybeCreateVenv() {
 		source "${VENV}/bin/activate" # or export the paths?
 		
 		uv pip install "./anemoi-cascade"
-		uv pip install "./"
+		uv pip install "./[$FIAB_INSTALL_TYPE]"
 	fi
 }
 
