@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Button, Card, Title, Group, Divider, SimpleGrid, Container, ScrollArea, Paper, Text} from '@mantine/core';
+import { Button, Card, Title, Group, Divider, SimpleGrid, Container, ScrollArea, Paper, Text, Grid} from '@mantine/core';
 
 import { IconX, IconPencil} from '@tabler/icons-react';
 
@@ -149,8 +149,8 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
         <Container size='xl'>
         <Title order={2}>Confirm</Title>
         <Divider my='md'/>
-        <SimpleGrid cols={{ sm: 1, md: 2, lg: 2 }} >
-            <Container miw={{sm:'90vw', md:'20vw'}}>
+        <Grid grow gutter='xl'>
+            <Grid.Col span={{ base: 12, sm: 12, md: 6, xl: 6 }}>
                 <Card padding="">
                     <Title pb ='md' order={2}>Model</Title>
                     <Button onClick={() => setSlider(0)}>Change</Button>
@@ -165,21 +165,21 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
                     </SimpleGrid>
                     <Divider p='md'/>
                     <Title pb ='md' order={3}>Model Information</Title>
-                    <ScrollArea h='40vh' type="always">
+                    <ScrollArea h='30vh' type="always">
                         <InformationWindow selected={model.model} />
                     </ScrollArea>
                 </Card>
-                </Container>
+                </Grid.Col>
                 
-                <Container miw={{sm:'90vw', md:'20vw'}}>
-                <Card padding="">
+                <Grid.Col span={{ base: 12, sm: 12, md: 6, xl: 6 }}>
+                <Card padding="" mah='60vh'>
                     <Title pb ='md' order={2}>Products ({Object.keys(products).length})</Title>
                     <Button onClick={() => setSlider(1)}>Add more</Button>
                     <Divider p='md'/>
                     <Cart products={products} setProducts={setProducts} />
                 </Card>
-                </Container>
-            </SimpleGrid>
+                </Grid.Col>
+            </Grid>
             <Divider p='md'/>
             <SimpleGrid cols={3} spacing='xs'>
                 <Button color='orange' onClick={getGraph} disabled={loading}>
