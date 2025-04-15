@@ -8,7 +8,7 @@ from forecastbox.models import Model
 from .definitions import DESCRIPTIONS, LABELS
 
 if TYPE_CHECKING:
-    from cascade.fluent import Action
+    from earthkit.workflows.fluent import Action
 
 
 class Product(ABC):

@@ -38,6 +38,9 @@ def status() -> StatusResponse:
     """
     from forecastbox.settings import APISettings
 
+    import time
+    time.sleep(1)
+
     status = {'api': 'up', 'cascade': 'up', 'ecmwf': 'up'}
 
     from cascade.gateway import client, api
