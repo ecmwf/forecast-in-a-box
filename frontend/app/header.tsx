@@ -13,11 +13,11 @@ const Header = () => {
         <Group justify="space-between">
           <Group>
             <a style={{"color":"white"}} href="/"><IconBox/></a>
-            <Title style={{"color":"white"}}>Forecast In a Box</Title>
+            <Title style={{"color":"white"}}>ECMWF Forecast In a Box</Title>
           </Group>
           <Group>
             <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="md" component='a' href='/'>Home</Button>
-            <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="md" component='a' href='/products'>Configure</Button>
+            <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="md" component='a' href='/products'>Products</Button>
             <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="md" component='a' href='/status'>Status</Button>
           </Group>
         </Group>

@@ -4,8 +4,8 @@ import { Container } from '@mantine/core';
 const HomePage = () => {
   return (
     <Container size="lg" mih='86vh'>
-      <h1>Home Page</h1>
-      <p>Welcome to the home page!</p>
+      <h1>Forecast In A Box</h1>
+      <p></p>
     </Container>
   );
 };
