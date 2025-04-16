@@ -28,7 +28,8 @@ class Model:
     
     @property
     def timesteps(self) -> list[int]:
-        return list(range(0, int(self.lead_time), int((self.checkpoint.timestep.total_seconds()+1) // 3600)))
+        model_step = int((self.checkpoint.timestep.total_seconds()+1) // 3600)
+        return list(range(model_step, int(self.lead_time)+1, model_step))
 
     def qube(self, assumptions: dict[str, Any] | None = None) -> Qube:
         """Get Model Qube"""

@@ -43,7 +43,7 @@ def status() -> StatusResponse:
     from cascade.gateway import client, api
     try:
         client.request_response(
-            api.JobProgressRequest(job_ids=[]), APISettings().cascade_url, timeout_ms=2000
+            api.JobProgressRequest(job_ids=[]), APISettings().cascade_url, timeout_ms=1000
         )
         status['cascade'] = 'up'
     except Exception as e:

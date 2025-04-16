@@ -42,7 +42,10 @@ class JobProgressResponses():
 
 def get_job_progress(job_id: str) -> JobProgressResponse:
     """Get progress of a job."""
-    response: api.JobProgressResponse = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{SETTINGS.cascade_url}")  # type: ignore
+    try:
+        response: api.JobProgressResponse = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{SETTINGS.cascade_url}")  # type: ignore
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving job progress: {e}")
     
     if response.error:
         db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "errored"}})
@@ -120,7 +123,7 @@ async def get_outputs_of_job(job_id: JobId) -> list[str]:
 
 
 @router.get("/visualise/{job_id}")
-async def visualise_job(job_id: JobId) -> list[str]:
+async def visualise_job(job_id: JobId) -> HTMLResponse:
     """Get outputs of a job."""
     job = db.find("job_records", {"job_id": job_id})
     if not job:
@@ -140,7 +143,7 @@ async def visualise_job(job_id: JobId) -> list[str]:
             return HTMLResponse(f.read(), media_type="text/html")
 
 @router.get("/restart/{job_id}")
-async def restart_job(job_id: JobId):
+async def restart_job(job_id: JobId) -> api.SubmitJobResponse:
     """Get outputs of a job."""
     job = db.find("job_records", {"job_id": job_id})
     if not job:
@@ -157,13 +160,44 @@ async def get_result(job_id: str, dataset_id: str) -> FileResponse:
         api.ResultRetrievalRequest(job_id=job_id, dataset_id=DatasetId(task = dataset_id, output='0')), f"{SETTINGS.cascade_url}"
     )
     if not response.result:
-        raise Exception(f"Result retrieval failed: {response.error}")
+        raise HTTPException(404, f"Result retrieval failed: {response.error}")
     
     from cascade.gateway.api import decoded_result
     result = decoded_result(response, job=None)
 
     bytez, media_type = to_bytes(result)
     return Response(bytez, media_type=media_type)
+
+@dataclass
+class DatasetAvailabilityResponse:
+    available: bool
+
+@router.get("/available/{job_id}/{dataset_id}")
+async def get_result_availablity(job_id: str, dataset_id: str) -> DatasetAvailabilityResponse:
+    """
+    Check if the result is available for a given job_id and dataset_id.
+
+    This is used to check if the result is available for download.
+
+    Parameters
+    ----------
+    job_id : str
+        Job ID of the task
+    dataset_id : str
+        Dataset ID of the task
+
+    Returns
+    -------
+    DatasetAvailabilityResponse
+        {'available': Availability of the result}
+    """
+    response: api.ResultRetrievalResponse = client.request_response(
+        api.ResultRetrievalRequest(job_id=job_id, dataset_id=DatasetId(task = dataset_id, output='0')), f"{SETTINGS.cascade_url}"
+    )
+    if not response.result:
+        return {'available': False}
+    
+    return {'available': True}
     
 def to_bytes(obj) -> tuple[bytes, str]:
     """Convert an object to bytes."""
@@ -192,13 +226,24 @@ def to_bytes(obj) -> tuple[bytes, str]:
 
     raise TypeError(f"Unsupported type: {type(obj)}")
 
+@dataclass
+class JobDeletionResponse:
+    deleted_count: int
 
 @router.get("/flush")
-async def flush_tasks() -> dict[str, int]:
-    """Flush all tasks."""
-    client.request_response(api.ShutdownRequest(), f"{SETTINGS.cascade_url}")  # type: ignore
+async def flush_job() -> JobDeletionResponse:
+    """Flush all job from the database and cascade.
+
+    Returns number of deleted jobs.    
+    """
+    client.request_response(api.ResultDeletionRequest(datasets = {}), f"{SETTINGS.cascade_url}")  # type: ignore
     return db.delete_many("job_records", {})
 
 @router.get("/delete/{job_id}")
-async def deleted_task(job_id) -> dict[str, int]:
+async def delete_job(job_id) -> JobDeletionResponse:
+    """Delete a job from the database and cascade.
+    
+    Returns number of deleted jobs.
+    """
+    client.request_response(api.ResultDeletionRequest(datasets = {job_id: []}), f"{SETTINGS.cascade_url}")  # type: ignore
     return db.delete_one("job_records", {'job_id': job_id})
