@@ -12,7 +12,6 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
     const [downloaded, setDownloaded] = useState<boolean>(false);
     const [downloading, setDownloading] = useState<boolean>(false);
     const [installing, setInstalling] = useState<boolean>(false);
-    console.log(model, downloaded);
 
     useEffect(() => {
         const fetchDownloaded = async () => {
@@ -23,7 +22,6 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
     }, [model]);
 
     const handleDownload = () => {
-        console.log('Download', model);
         setDownloading(true);
         const download = async () => {
             const result = await fetch(`/api/py/models/download/${model}`);
@@ -33,7 +31,6 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
         download();
     };
     const handleInstall = () => {
-        console.log('Install', model);
         setInstalling(true);
         const install = async () => {
             const result = await fetch(`/api/py/models/install/${model}`);
@@ -121,6 +118,13 @@ function Options({ cardProps, tabProps, setSelected }: OptionsProps) {
                     </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
+                    {!modelOptions || Object.keys(modelOptions).length === 0 ? (
+                        <Table.Tr>
+                            <Table.Td colSpan={3} style={{ textAlign: 'center' }}>
+                                No models available.
+                            </Table.Td>
+                        </Table.Tr>
+                    ) : null}
                     {modelOptions && Object.entries(modelOptions).flatMap(([key, values]) =>
                         values.map((value: string) => (
                             <ModelButton setSelected={setSelected} model={`${key}_${value}`} key={`${key}_${value}`} />

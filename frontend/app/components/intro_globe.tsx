@@ -126,21 +126,6 @@ const SimpleGlobe = ({showGlobe, setShowGlobe}) => {
   }, [spriteSheet, index]);
 
 
-  // useEffect(() => {
-  //   const modeInterval = setInterval(() => {
-  //     setIndex((prevIndex) => {
-  //       const newIndex = prevIndex === 279 ? 0 : prevIndex + 1;
-  //       setGlobeImageUrl(`./era5/era5-2t-${newIndex.toString().padStart(3, '0')}.png`);
-  //       return newIndex;
-  //     });
-  //   }, 50);
-  //   return () => clearInterval(modeInterval);
-  // }, []);
-  
-
-
-  const [showcode, setCode] = useState(false);
-
   return (
     <>
     <canvas ref={canvasRef} width={FRAME_WIDTH} height={FRAME_HEIGHT}  style={{ display: "none"}}/>
@@ -172,7 +157,6 @@ const SimpleGlobe = ({showGlobe, setShowGlobe}) => {
           height={400}
           atmosphereAltitude={0.1}
           pointAltitude={0}
-          onZoom={() => console.log('Zoom interaction detected')}
         />
   
         {/* Floating Action Icon in Bottom-Right */}

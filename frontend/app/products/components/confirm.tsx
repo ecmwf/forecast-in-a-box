@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Button, Card, Title, Group, Divider, SimpleGrid, Container, ScrollArea, Paper, Text, Grid} from '@mantine/core';
+import { Button, Card, Title, Group, Divider, SimpleGrid, Container, ScrollArea, Paper, Text, Grid, Space} from '@mantine/core';
 
 import { IconX, IconPencil} from '@tabler/icons-react';
 
@@ -189,22 +189,26 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
                     </SimpleGrid>
                     <Divider p='md'/>
                     <Title pb ='md' order={3}>Model Information</Title>
-                    <ScrollArea h='30vh' type="always">
+                    <Card.Section>
+                    <ScrollArea h='35vh' type="always">
                         <InformationWindow selected={model.model} />
                     </ScrollArea>
+                    </Card.Section>
                 </Card>
                 </Grid.Col>
                 
                 <Grid.Col span={{ base: 12, sm: 12, md: 6, xl: 6 }}>
-                <Card padding="" mah='60vh'>
+                <Card padding="">
                     <Title pb ='md' order={2}>Products ({Object.keys(products).length})</Title>
                     <Button onClick={() => setSlider(1)}>Add more</Button>
                     <Divider p='md'/>
-                    <Cart products={products} setProducts={setProducts} />
+                    <Card.Section mah='60vh'>
+                        <Cart products={products} setProducts={setProducts} />
+                    </Card.Section>
                 </Card>
                 </Grid.Col>
             </Grid>
-            <Divider p='md'/>
+            <Space p='xl'/>
             <SimpleGrid cols={3} spacing='xs'>
                 <Button color='orange' onClick={getGraph} disabled={loading}>
                     {loading ? "Loading..." : "Visualise"}

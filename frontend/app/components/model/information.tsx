@@ -28,8 +28,6 @@ function InformationWindow({ selected }: InformationProps) {
         }
     }, [selected]);
 
-    console.log(information)
-
     if (!selected) {
         return (
             <Card>

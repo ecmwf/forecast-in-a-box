@@ -10,9 +10,47 @@ import { SubmitResponse, DatasetId } from '../../components/interface';
 
 import GraphModal from './../../components/shared/graphModal'
 
+function OutputCells({ id, dataset, progress }: { id: string; dataset: string, progress: number | null }) {
+    const [isAvailable, setIsAvailable] = useState<boolean>(false);
+
+    useEffect(() => {
+        const checkAvailability = async () => {
+            try {
+                const response = await fetch(`/api/py/jobs/available/${id}/${dataset}`, {
+                    method: 'GET',
+                });
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                const data = await response.json();
+                setIsAvailable(data.available);
+            } catch (error) {
+                console.error('Error checking availability:', error);
+            }
+        };
+
+        checkAvailability();
+    }, [id, dataset, progress]);
+    
+    return (
+        <>
+        <Table.Td>
+            <Text ml="sm" style={{ fontFamily: 'monospace' }}>{dataset.split(':')[0]}:{dataset.split(':')[1]?.substring(0, 10)}</Text>
+        </Table.Td>
+        <Table.Td align='right'>
+            <Button size='sm' disabled={!isAvailable} component={isAvailable ? `a` : 'b'} href={isAvailable ? `/api/py/jobs/result/${id}/${dataset}` : ''} target='_blank'><IconSearch/></Button>
+        </Table.Td>
+        </>
+    );
+}
+
 const ProgressPage = () => {
     const params = useParams();
     const id = params?.id;
+
+    if (!id || typeof id !== 'string') {
+        return <Text>Invalid ID</Text>;
+    }
 
     const [progressResponse, setProgressResponse] = useState<string>();
     const [progress, setProgress] = useState<number | null>(null);
@@ -59,7 +97,6 @@ const ProgressPage = () => {
                     throw new Error(`HTTP error! Status: ${response.status}`);
                 }
                 const data = await response.json();
-                console.log(data);
                 setOutputs(data);
             } catch (error) {
                 // console.error('Error fetching progress:', error);
@@ -135,7 +172,7 @@ const ProgressPage = () => {
                     <Table.Td colSpan={2} style={{ textAlign: "center"}}>
                      <Space h='lg'/>
                         <Loader size="sm" />
-                        <Text ml="sm">Getting output id's...</Text>
+                        <Text ml="sm">Getting output ids...</Text>
                      <Space h='lg'/>
                     </Table.Td>
                     </Table.Tr>
@@ -143,12 +180,7 @@ const ProgressPage = () => {
                     <>
                     {outputs.map((dataset: DatasetId, index: number) => (
                         <Table.Tr key={index}>
-                            <Table.Td>
-                                <Text ml="sm" style={{ fontFamily: 'monospace' }}>{dataset.split(':')[0]}:{dataset.split(':')[1]?.substring(0, 10)}</Text>
-                            </Table.Td>
-                            <Table.Td align='right'>
-                                <Button size='sm' disabled={progress !== 100} component={progress === 100 ? `a` : 'b'} href={progress === 100 ? `/api/py/jobs/result/${id}/${dataset}` : ''} target='_blank'><IconSearch/></Button>
-                            </Table.Td>
+                            <OutputCells id={id} dataset={dataset} progress={progress}/>
                         </Table.Tr>
                 ))}
                 </>

@@ -1,9 +1,9 @@
 "use client";
 
 import React from 'react';
-import { Container } from '@mantine/core';
+import { Container, Group } from '@mantine/core';
 import { useEffect, useState } from 'react';
-import { Table, Loader, Center, Title, Progress, Button, Flex, Divider} from '@mantine/core';
+import { Table, Loader, Center, Title, Progress, Button, Flex, Divider, Tooltip, Text} from '@mantine/core';
 
 import { IconRefresh, IconTrash } from '@tabler/icons-react';
 import classes from './status.module.css';
@@ -139,47 +139,55 @@ const HomePage = () => {
               <Table.Th>Job ID</Table.Th>
               <Table.Th>Status</Table.Th>
               <Table.Th>Progress</Table.Th>
+              <Table.Th>Options</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
             {Object.keys(jobs.progresses || {}).length === 0 ? (
               <Table.Tr>
-                <Table.Td colSpan={3} style={{ textAlign: "center", padding: "16px" }}>
+                <Table.Td colSpan={4} style={{ textAlign: "center", padding: "16px" }}>
                   No jobs found.
                 </Table.Td>
               </Table.Tr>
             ) : (
               Object.entries(jobs.progresses || {}).map(([jobId, progress]: [string, ProgressResponse]) => (
                 <Table.Tr key={jobId}>
-                    <Table.Td style={{ display: "flex"}}>
+                    <Table.Td align='left'>
+                      <Tooltip label="Click to view progress">
                     <Button
                       variant="subtle"
-                      color="blue"
+                      c="blue"
                       p="xs"
                       component='a'
                       href={`/progress/${jobId}`}
-                      classNames={{"label": classes['label']}}
-                    >
-                      {jobId}
+                      classNames={classes}
+                    >{jobId}
                     </Button>
+                    </Tooltip>
                     </Table.Td>
                   <Table.Td>
                     {progress.status}
                   </Table.Td>
-                  <Table.Td style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Table.Td>
                     {progress.progress}%
                     <Progress value={parseFloat(progress.progress)} size="sm" style={{ flex: 1 }} />
+                    </Table.Td>
+                    <Table.Td>
+                      <Group align='center'>
+                        <Tooltip label="Restart Job">
                     <Button
                       color='orange'
                       onClick={() => restartJob(jobId)}
                       size='xs'
                       aria-label="Restart Job"
-                      ><IconRefresh/></Button>
+                      ><IconRefresh/></Button></Tooltip>
+                      <Tooltip label="Delete Job">
                     <Button
                       color='red'
                       onClick={() => deleteJob(jobId)}
                       size='xs'
-                      ><IconTrash/></Button>
+                      ><IconTrash/></Button></Tooltip>
+                      </Group>
                   </Table.Td>
                 </Table.Tr>
               ))
