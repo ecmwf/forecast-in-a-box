@@ -14,6 +14,8 @@ import { theme } from "../theme";
 import Header from './header';
 import Footer from './footer';
 
+import './global.css';
+
 
 export const metadata = {
   title: "Forecast in a Box",

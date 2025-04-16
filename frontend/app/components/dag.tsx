@@ -24,9 +24,12 @@ const DAG = () => {
         <Center>
           <Title size={40}>Dynamic Product Execution</Title>
         </Center>
+        <Space h="xl" />
+        
         <Center>
           <Text>From anemoi to pproc, all in the box.</Text>
         </Center>
+            <Space h="xl" />
 
         <Center>
             {showIframe && (

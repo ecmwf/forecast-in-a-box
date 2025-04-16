@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button, Card, Title, Group, Divider, SimpleGrid, Container, ScrollArea, Paper, Text, Grid} from '@mantine/core';
 
 import { IconX, IconPencil} from '@tabler/icons-react';
@@ -22,6 +22,31 @@ interface ConfirmProps {
 function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmProps) {
     
     const [submitting, setSubmitting] = useState(false);
+
+    const [status, setStatus] = useState<{
+            cascade: "loading" | "up" | "down";
+        }>({ cascade: "loading"});
+    
+        const checkStatus = async () => {
+            setStatus({ cascade: "loading"});
+            try {
+                const response = await fetch("/api/py/status");
+                if (response.ok) {
+                    const data = await response.json();
+                    setStatus({
+                        cascade: data.cascade || "down",
+                    });
+                } else {
+                    setStatus({cascade: "down" });
+                }
+            } catch (error) {
+                setStatus({ cascade: "down" });
+            }
+        };
+    
+        useEffect(() => {
+            checkStatus();
+        }, []);
 
     const handleSubmit = () => {
         const submitData: SubmitSpecification = {
@@ -185,8 +210,9 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
                     {loading ? "Loading..." : "Visualise"}
                 </Button>
                 <Button onClick={handleDownload}>Download</Button>
-                <Button color='green'onClick={handleSubmit} disabled={submitting}>
-                    {submitting ? "Submitting..." : "Submit"}
+                <Button color='green'onClick={handleSubmit} disabled={submitting || status.cascade !== "up"}>
+                    {submitting ? "Submitting..." : 
+                    (status.cascade !== "up" ? <Text c='red'> (Server is down)</Text> : 'Submit')}
                 </Button>
             </SimpleGrid>
             

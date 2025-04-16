@@ -67,7 +67,7 @@ function ProductConfigurator({model, products, setProducts}: ProductConfiguratio
     useEffect(() => {
         if (selected) {
             const configurationContainer = document.querySelector(".configuration_container") as HTMLElement;
-            configurationContainer?.scrollIntoView();
+            // configurationContainer?.scrollIntoView();
         }
     }, [selected]);
 

@@ -18,7 +18,7 @@ const Intro = () => {
             <Space h="xl" />
             <Space h="xl" />
                 <Grid gutter={50}>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 12, md: 6, xl: 6 }}>
                 <Group>
                     <Group gap={10} wrap="nowrap">
                         <Title style={{color: "white"}} size={40}>
@@ -39,9 +39,9 @@ const Intro = () => {
                     </a>
                     
                 </Center>
-                <Space h="xl" />
+                <Space h="lg" />
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 12, md: 6, xl: 6 }}>
                     <Globe showGlobe={showGlobe} setShowGlobe={setShowGlobe} />
                 </Grid.Col>
                 </Grid>

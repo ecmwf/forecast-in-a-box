@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Progress, Container, Title, Text, ScrollArea, Divider, Button, Loader, Table, Flex} from '@mantine/core';
+import { Progress, Container, Title, Text, ScrollArea, Divider, Button, Loader, Space, Table, Flex} from '@mantine/core';
 
 import {IconSearch} from '@tabler/icons-react';
 
@@ -127,30 +127,34 @@ const ProgressPage = () => {
                 </>
             )}
             <Title order={3}>Output IDs</Title>
-            <ScrollArea h='60vh' type="always">
-            <Container bg='000000'>
-            {outputs === null || outputs.length === 0 ? (
-                <></>
-            ) : (
-            <>
-            {outputs.map((dataset: DatasetId, index: number) => (
-                <Table key={index} mb='xs' w='100%' verticalSpacing=''>
-                    <Table.Tbody>
+            <Space h='lg'/>
+            <Table mb='xs' w='100%' verticalSpacing='' striped highlightOnHover>
+            <Table.Tbody>
+                {outputs === null || outputs.length === 0 ? (
                     <Table.Tr>
-                        <Table.Td>
-                            <Text style={{ fontFamily: 'monospace' }}>{dataset.split(':')[0]}:{dataset.split(':')[1]?.substring(0, 15)}</Text>
-                        </Table.Td>
-                        <Table.Td align='right'>
-                            <Button size='sm' disabled={progress !== 100} component={progress === 100 ? `a` : 'b'} href={progress === 100 ? `/api/py/jobs/result/${id}/${dataset}` : ''} target='_blank'><IconSearch/></Button>
-                        </Table.Td>
+                    <Table.Td colSpan={2} style={{ textAlign: "center"}}>
+                     <Space h='lg'/>
+                        <Loader size="sm" />
+                        <Text ml="sm">Getting output id's...</Text>
+                     <Space h='lg'/>
+                    </Table.Td>
                     </Table.Tr>
-                    </Table.Tbody>
-                </Table>
-            ))}
-            </>
+                ) : (
+                    <>
+                    {outputs.map((dataset: DatasetId, index: number) => (
+                        <Table.Tr key={index}>
+                            <Table.Td>
+                                <Text ml="sm" style={{ fontFamily: 'monospace' }}>{dataset.split(':')[0]}:{dataset.split(':')[1]?.substring(0, 10)}</Text>
+                            </Table.Td>
+                            <Table.Td align='right'>
+                                <Button size='sm' disabled={progress !== 100} component={progress === 100 ? `a` : 'b'} href={progress === 100 ? `/api/py/jobs/result/${id}/${dataset}` : ''} target='_blank'><IconSearch/></Button>
+                            </Table.Td>
+                        </Table.Tr>
+                ))}
+                </>
             )}
-            </Container>
-            </ScrollArea>
+            </Table.Tbody>
+            </Table>
             <GraphModal graphContent={graphContent} setGraphContent={setGraphContent} loading={loading}/>
         </Container>
     );
