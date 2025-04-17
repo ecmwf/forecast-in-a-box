@@ -26,6 +26,9 @@ class Product(ABC):
     multiselect: dict[str, bool] = {}
     """Whether the product axes are multi-selectable."""
 
+    defaults: dict[str, Any] = {}
+    """Default values for product axes."""
+
     @property
     @abstractmethod
     def qube(self) -> "Qube":

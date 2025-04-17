@@ -52,7 +52,8 @@ async def convert_to_cascade(spec: GraphSpecification) -> Cascade:
     actions = []
 
     for product in spec.products:
-        product_action = get_product(*product.product.split("/", 1)).to_graph(product.specification, model_action)
+        specification = product.specification.copy()
+        product_action = get_product(*product.product.split("/", 1)).to_graph(specification, model_action)
         actions.append(product_action)
 
     if len(spec.products) == 0:
@@ -117,6 +118,7 @@ async def execute(spec: GraphSpecification) -> api.SubmitJobResponse:
         "job_id": submit_job_response.job_id,
         "graph_specification": spec,
         "status": "submitted",
+        "error": None,
         "created_at": datetime.now(),
         "outputs": list(map(lambda x: x.task, sinks)),
     }

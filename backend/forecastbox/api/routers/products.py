@@ -84,6 +84,7 @@ async def product_to_config(product: Product, modelspec: ModelSpecification, par
             example=product.example.get(key, None),
             multiple=product.multiselect.get(key, False),
             constrained_by=constrained,
+            default=product.defaults.get(key, None),
         )
 
     for key in model_spec.ignore_in_select:

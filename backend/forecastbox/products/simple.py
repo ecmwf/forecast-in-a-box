@@ -3,6 +3,7 @@ from typing import Any
 import warnings
 
 from forecastbox.products.registry import CategoryRegistry
+from forecastbox.products.ensemble import ensemble_registry, BaseEnsembleProduct
 
 from earthkit.workflows.fluent import Payload, Action
 from forecastbox.products.product import GenericTemporalProduct, GenericParamProduct
@@ -21,7 +22,7 @@ try:
 except ImportError:
     EARTHKIT_PLOTS_IMPORTED = False
 
-def quickplot(fields: ekd.FieldList, domain=None):
+def quickplot(fields: ekd.FieldList, groupby: str = None, subplot_title: str = None, figure_title: str = None, domain=None):
     from earthkit.plots.utils import iter_utils
     from earthkit.plots.components import layouts
     from earthkit.plots.schemas import schema
@@ -29,19 +30,22 @@ def quickplot(fields: ekd.FieldList, domain=None):
     if not isinstance(fields, ekd.FieldList):
         fields = ekd.FieldList.from_fields(fields)
 
-    print(fields.ls())
+    if groupby:
+        unique_values = iter_utils.flatten(arg.metadata(groupby) for arg in fields)
+        unique_values = list(dict.fromkeys(unique_values))
 
-    groupby = 'valid_datetime'
-
-    unique_values = iter_utils.flatten(arg.metadata(groupby) for arg in fields)
-    unique_values = list(dict.fromkeys(unique_values))
-
-    grouped_data = {val: fields.sel(**{groupby: val}) for val in unique_values}
+        grouped_data = {val: fields.sel(**{groupby: val}) for val in unique_values}
+    else:
+        grouped_data = {None: args}
+    
     n_plots = len(grouped_data)
 
     rows, columns = layouts.rows_cols(n_plots)
     
     figure = ekp.Figure(rows=rows, columns=columns)
+
+    if subplot_title is None:
+        subplot_title = f"{{{groupby}}}"
 
     for i, (group_val, group_args) in enumerate(grouped_data.items()):
         subplot = figure.add_map(domain=domain)
@@ -51,7 +55,7 @@ def quickplot(fields: ekd.FieldList, domain=None):
         for m in schema.quickmap_subplot_workflow:
             args = []
             if m == "title":
-                args = ["Valid time: {valid_time:%H:%M on %-d %B %Y} (T+{lead_time})"]
+                args = [subplot_title]
             try:
                 getattr(subplot, m)(*args)
             except Exception as err:
@@ -71,14 +75,10 @@ def quickplot(fields: ekd.FieldList, domain=None):
                 "consider constructing the plot manually."
             )
 
-    figure.title("{variable_name} over {domain}\n"
-        # "Base time: {base_time:%H:%M on %-d %B %Y}\n"
-        # "Valid time: {valid_time:%H:%M on %-d %B %Y} (T+{lead_time})"
-    )
+    figure.title(figure_title)
 
     return figure
 
-@simple_registry("Maps")
 class MapProduct(GenericTemporalProduct):
     """
     Map Product.
@@ -97,11 +97,6 @@ class MapProduct(GenericTemporalProduct):
         **GenericTemporalProduct.label,
         'domain': "Domain",
     }
-    multiselect = {
-        "param": True,
-        "step": True,
-        "domain": False,
-    }
 
     @property
     def model_assumptions(self):
@@ -116,12 +111,25 @@ class MapProduct(GenericTemporalProduct):
     def mars_request(self, **kwargs):
         return super().mars_request(**kwargs)  # type:ignore
 
+    def validate_intersection(self, model: Model) -> bool:
+        return super().validate_intersection(model) & EARTHKIT_PLOTS_IMPORTED
+
+
+@simple_registry("Maps")
+class SimpleMapProduct(MapProduct):
+    multiselect = {
+        "param": True,
+        "step": True,
+        "domain": False,
+    }
+
+    defaults = {
+        'domain': 'Global',
+    }
+
     def to_graph(self, specification: dict[str, Any], source: Action):
         domain = specification.pop('domain', None)
         source = self.select_on_specification(specification, source)
-
-        if ENSEMBLE_DIMENSION_NAME in source.nodes.dims:
-            source = source.stack(ENSEMBLE_DIMENSION_NAME)
         
         if domain == 'Global':
             domain = None
@@ -132,14 +140,46 @@ class MapProduct(GenericTemporalProduct):
         plots = source.map(
             Payload(
                 quickplot,
-                kwargs={'domain': domain},
+                kwargs={'domain': domain, 'groupby': 'valid_datetime', 'subplot_title': "Valid time: {valid_time:%H:%M on %-d %B %Y} (T+{lead_time})", "figure_title": "{variable_name} over {domain}\n"},
             ),
         )
         return plots
+    
+@ensemble_registry("Maps")
+class EnsembleMapProduct(BaseEnsembleProduct, MapProduct):
+    """
+    Ensemble Map Product.
+    
+    Create a subplotted map with each subplot being a different ensemble member.
+    """
+    multiselect = {
+        "param": True,
+        "step": False,
+        "domain": False,
+    }
+    defaults = {
+        'domain': 'Global',
+    }
+    
 
-    def validate_intersection(self, model: Model) -> bool:
-        return EARTHKIT_PLOTS_IMPORTED
+    def to_graph(self, specification: dict[str, Any], source: Action):
+        domain = specification.pop('domain', None)
+        source = self.select_on_specification(specification, source)
+        
+        if domain == 'Global':
+            domain = None
+        
+        source = source.concatenate(ENSEMBLE_DIMENSION_NAME)
+        source = source.concatenate('param')
 
+        plots = source.map(
+            Payload(
+                quickplot,
+                kwargs={'domain': domain, 'groupby': 'member', 'subplot_title': "EnsMember: {member}", "figure_title": "{variable_name} over {domain}\nValid time: {valid_time:%H:%M on %-d %B %Y} (T+{lead_time})"},
+            ),
+        )
+        return plots
+    
 # @simple_registry('Gif')
 # class GifProduct(GenericParamProduct):
 #     pass

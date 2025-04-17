@@ -4,3 +4,4 @@ ensemble_registry = CategoryRegistry("ensemble", "Capture the distribution of th
 
 
 from . import basic
+from .basic import BaseEnsembleProduct
