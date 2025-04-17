@@ -6,11 +6,11 @@ import { Progress, Container, Title, Text, ScrollArea, Divider, Button, Loader, 
 
 import {IconSearch} from '@tabler/icons-react';
 
-import { SubmitResponse, DatasetId } from '../../components/interface';
+import { DatasetId } from '../../components/interface';
 
 import GraphModal from './../../components/shared/graphModal'
 
-function OutputCells({ id, dataset, progress }: { id: string; dataset: string, progress: number | null }) {
+function OutputCells({ id, dataset, progress }: { id: string; dataset: string, progress: string | null }) {
     const [isAvailable, setIsAvailable] = useState<boolean>(false);
 
     useEffect(() => {
@@ -30,6 +30,9 @@ function OutputCells({ id, dataset, progress }: { id: string; dataset: string, p
         };
 
         checkAvailability();
+        if (progress === "100.00") {
+            setIsAvailable(true); // Set to true if progress is 100
+        }
     }, [id, dataset, progress]);
     
     return (
@@ -44,6 +47,13 @@ function OutputCells({ id, dataset, progress }: { id: string; dataset: string, p
     );
 }
 
+
+export type ProgressResponse = {
+    progress: string;
+    status: string;
+    error: string;
+  }
+
 const ProgressPage = () => {
     const params = useParams();
     const id = params?.id;
@@ -52,8 +62,7 @@ const ProgressPage = () => {
         return <Text>Invalid ID</Text>;
     }
 
-    const [progressResponse, setProgressResponse] = useState<string>();
-    const [progress, setProgress] = useState<number | null>(null);
+    const [progress, setProgress] = useState<ProgressResponse>({} as ProgressResponse);
     const [outputs, setOutputs] = useState<DatasetId[] | null>([]);
 
     useEffect(() => {
@@ -66,11 +75,9 @@ const ProgressPage = () => {
                     throw new Error(`HTTP error! Status: ${response.status}`);
                 }
                 const data = await response.json();
-                const sanitisedProgress = parseFloat(data.progress.replace('%', ''));
-                setProgress(sanitisedProgress);
-                setProgressResponse(response.statusText);
+                setProgress(data);
                 
-                if (sanitisedProgress === 100) {
+                if (progress.progress == "100.00" || progress.status == "errored") {
                     clearInterval(interval); // Stop fetching if progress is 100
                 }
 
@@ -120,7 +127,6 @@ const ProgressPage = () => {
                     });
 
                     const graph: string = await response.text();
-                    console.log(graph);
                     setGraphContent(graph);
                 } catch (error) {
                     console.error("Error getting graph:", error);
@@ -131,7 +137,7 @@ const ProgressPage = () => {
         };
         getGraphHtml();
     };
-        
+
     return (
         <Container size='lg'>
             {/* <Button
@@ -147,22 +153,25 @@ const ProgressPage = () => {
             </Button>
             </Flex>
 
-            <Title pt='xl' order={4}>{id}</Title>
+            <Title pt='xl' order={4}>{id} - {progress.status}</Title>
             
-            {progress === null ? (
+            {!progress.progress ? (
                 <>
                 <Title pb='xl' order={6}>Waiting for Cascade...</Title>
-                <Text>{progressResponse}</Text>
                 </>
             ) : (
                 <>
-                <Progress value={progress || 0} striped animated key={progress}/>
+                <Progress value={parseFloat(progress.progress) || 0} striped animated/>
                 {/* <Loader/> */}
-                <Text>{progress}%</Text>
-
+                <Text>{progress.progress}%</Text>
                 <Divider my='lg' />
                 </>
             )}
+            {progress.error && (
+                <Text c='red'>{progress.error}</Text>
+            )}
+            <Space h='lg'/>
+
             <Title order={3}>Output IDs</Title>
             <Space h='lg'/>
             <Table mb='xs' w='100%' verticalSpacing='' striped highlightOnHover>
@@ -180,7 +189,7 @@ const ProgressPage = () => {
                     <>
                     {outputs.map((dataset: DatasetId, index: number) => (
                         <Table.Tr key={index}>
-                            <OutputCells id={id} dataset={dataset} progress={progress}/>
+                            <OutputCells id={id} dataset={dataset} progress={progress.progress}/>
                         </Table.Tr>
                 ))}
                 </>

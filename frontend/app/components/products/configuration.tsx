@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react';
 
-import { Card, TextInput, Select, Button, LoadingOverlay, MultiSelect, Group, Text} from '@mantine/core';
+import { Card, TextInput, Select, Button, LoadingOverlay, MultiSelect, Group, Text, Collapse, Box, Space} from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
 
 import {
   showNotification, // notifications.show
 } from '@mantine/notifications';
 
-import {IconX} from '@tabler/icons-react'
+import {IconX, IconSettings} from '@tabler/icons-react'
 
 import classes from './configuration.module.css';
 
@@ -26,11 +27,53 @@ function write_description({ description, constraints }: { description: string; 
   return description ? <>{description} - {constraintText}</> : constraintText;
 }
 
+function ConfigInput({ selectedProduct, item, keyValue, handleChange }: { selectedProduct: string, item: ConfigEntry, keyValue: string, handleChange: (name: string, value: any) => void }) {
+    return (
+      item.values ? (
+        item.multiple ? (
+          <MultiSelect
+            key={`${selectedProduct}_${keyValue}`}
+            description={write_description({ description: item.description, constraints: item.constrained_by })}
+            label={item.label}
+            placeholder={item.default || `${keyValue}`}
+            // value={formData[key]}
+            disabled={item.values && item.values.length === 0}
+            onChange={(value) => handleChange(keyValue, value)}
+            data={item.values || []}
+            searchable
+          />
+        ) : (
+      <Select
+        key={`${selectedProduct}_${keyValue}`}
+        description={write_description({ description: item.description, constraints: item.constrained_by })}
+        label={item.label}
+        placeholder={item.default || `Select ${keyValue}`}
+        // value={formData[key]}
+        disabled={item.values && item.values.length === 0}
+        onChange={(value) => handleChange(keyValue, value)}
+        data={item.values || []}
+        searchable
+      />
+    )) : item.example ? (
+      <TextInput 
+        key={`${selectedProduct}_${keyValue}`}
+        label={item.label} 
+        description={item.description} 
+        placeholder={item.example} 
+        // value={formData[key] || ""}
+        onChange={(event) => handleChange(keyValue, event.currentTarget.value)}
+      />
+    ) : null
+  )
+}
+
 function Configuration({ selectedProduct, selectedModel, submitTarget}: ConfigurationProps) {
 
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [productConfig, updateProductConfig] = useState<ProductConfiguration>({ product: selectedProduct, options: {} });
   const [loading, setLoading] = useState(true);
+
+  const [advancedOpened, { toggle }] = useDisclosure(false);
 
   // Handle select field changes
   const handleChange = (name: string, value: any) => {
@@ -105,7 +148,7 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
   
   const isFormValid = () => {
     // console.log(formData);
-    const isValid = Object.keys(productConfig.options).every(key => formData[key] !== undefined && formData[key] !== "");
+    const isValid = Object.keys(productConfig.options).every(key => formData[key] !== undefined && formData[key] !== "" || productConfig.options[key].default);
     if (!isValid) {
       showNotification({
         id: 'invalid-form',
@@ -124,7 +167,7 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
   const handleSubmit = () => {
     if (isFormValid()) {
       const filteredFormData = Object.keys(formData)
-        .filter(key => key in productConfig.options)
+        .filter(key => key in productConfig.options && formData[key] !== "")
         .reduce((acc: Record<string, any>, key) => {
           acc[key] = formData[key];
           return acc;
@@ -139,42 +182,28 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
       <LoadingOverlay visible={loading} />
         {productConfig && productConfig.product && <Text pb='md'>{productConfig.product}</Text>}
         {productConfig && Object.entries(productConfig.options).map(([key, item]: [string, ConfigEntry]) => (
-              item.values ? (
-                item.multiple ? (
-                  <MultiSelect
-                    key={`${selectedProduct}_${key}`}
-                    description={write_description({ description: item.description, constraints: item.constrained_by })}
-                    label={item.label}
-                    placeholder={`${key}`}
-                    // value={formData[key]}
-                    disabled={item.values && item.values.length === 0}
-                    onChange={(value) => handleChange(key, value)}
-                    data={item.values || []}
-                    searchable
-                  />
-                ) : (
-              <Select
-                key={`${selectedProduct}_${key}`}
-                description={write_description({ description: item.description, constraints: item.constrained_by })}
-                label={item.label}
-                placeholder={`Select ${key}`}
-                // value={formData[key]}
-                disabled={item.values && item.values.length === 0}
-                onChange={(value) => handleChange(key, value)}
-                data={item.values || []}
-                searchable
-              />
-            )) : item.example ? (
-              <TextInput 
-                key={`${selectedProduct}_${key}`}
-                label={item.label} 
-                description={item.description} 
-                placeholder={item.example} 
-                // value={formData[key] || ""}
-                onChange={(event) => handleChange(key, event.currentTarget.value)}
-              />
-            ) : null
+          !item.default ? (
+                <ConfigInput selectedProduct='{selectedProduct}' key = {key} keyValue={key} item={item} handleChange={handleChange} />
+          ) : null
         ))}
+        <Space h='md' />
+
+        <Card.Section  >
+
+        {productConfig && Object.entries(productConfig.options).some(([key, item]) => item.default) ? (
+          <Button onClick={toggle} rightSection={<IconSettings/>}>Advanced Settings</Button>
+        ) : null}
+
+        <Collapse in={advancedOpened} bg='#f8f8f8' p='md' mt='md'>
+            {productConfig && Object.entries(productConfig.options).map(([key, item]: [string, ConfigEntry]) => (
+              item.default ? (
+                  <ConfigInput selectedProduct='{selectedProduct}' key = {key} keyValue={key} item={item} handleChange={handleChange} />
+              ) : null
+            ))}
+        </Collapse>
+        </Card.Section>
+
+
       <Group w='100%' align='center' mt='lg'>
         <Button type='submit' onClick={handleSubmit} disabled={!isFormValid}>Submit</Button>
         <Button type='button' onClick={() => { setFormData({}); updateProductConfig({ product: selectedProduct, options: {} }); fetchInitialOptions(); }}>Clear</Button>

@@ -6,8 +6,8 @@ import { IconX, IconPencil} from '@tabler/icons-react';
 
 import {ModelSpecification, ProductSpecification, SubmitSpecification, SubmitResponse} from './interface'
 
-import InformationWindow from './../../components/model/information'
-import GraphModal from './../../components/shared/graphModal'
+import InformationWindow from './model/information'
+import GraphModal from './shared/graphModal'
 
 import Cart from './products/cart'
 
