@@ -47,7 +47,9 @@ class ConfigEntry:
     multiple: bool = False
     """Whether the configuration entry is a multiple select"""
     constrained_by: list[str] = field(default_factory=list)
-    """List of configuration entries that this entry is constrained by"""  # TODO
+    """List of configuration entries that this entry is constrained by"""
+    default: Optional[str] = None
+
 
     def __post_init__(self):
         if USER_DEFINED in self.values:

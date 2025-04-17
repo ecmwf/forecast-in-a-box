@@ -1,12 +1,16 @@
-from cascade import backends, fluent
+from earthkit.workflows import fluent, backends
 
-
-def _quantiles_transform(action, quantile: float, new_dim: str, metadata: dict | None):
+def quantiles_transform(action: fluent.Action, quantile: float, new_dim: str, metadata: dict | None):
     payload = fluent.Payload(
         backends.quantiles,
-        (fluent.Node.input_name(0), quantile),
+        (quantile, ),
         {"metadata": metadata},
     )
     new_quantile = action.map(payload)
     new_quantile._add_dimension(new_dim, quantile)
     return new_quantile
+
+
+__all__ = [
+    "quantiles_transform",
+]

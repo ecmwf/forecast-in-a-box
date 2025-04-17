@@ -2,7 +2,7 @@ from typing import Any, TYPE_CHECKING
 
 from forecastbox.models import Model
 from . import ensemble_registry
-from ..product import Product, GenericParamProduct, USER_DEFINED
+from ..product import Product, GenericParamProduct, GenericTemporalProduct, USER_DEFINED
 from ..generic import generic_registry
 
 from qubed import Qube
@@ -65,7 +65,7 @@ class BaseThresholdProbability(BaseEnsembleProduct):
 
 
 @generic_registry("Threshold Probability")
-class GenericThresholdProbability(BaseThresholdProbability, GenericParamProduct):
+class GenericThresholdProbability(BaseThresholdProbability, GenericTemporalProduct):
     example = {
         "threshold": "10",
     }
@@ -120,7 +120,7 @@ class BaseQuantiles(BaseEnsembleProduct):
         return super().mars_request(**kwargs)  # type: ignore
 
     def to_graph(self, specification: dict[str, Any], source: "Action") -> "Action":
-        from .transforms import _quantiles_transform
+        from .transforms import quantiles_transform
         from anemoi.cascade.fluent import ENSEMBLE_DIMENSION_NAME
 
         params = [
@@ -131,7 +131,7 @@ class BaseQuantiles(BaseEnsembleProduct):
         if "levlist" in specification:
             source = source.sel(levlist=specification["levlist"])
 
-        return source.concatenate(ENSEMBLE_DIMENSION_NAME).transform(_quantiles_transform, params, "quantile")
+        return source.concatenate(ENSEMBLE_DIMENSION_NAME).transform(quantiles_transform, params, "quantile")
 
 
 @ensemble_registry("Quantiles")
@@ -150,7 +150,7 @@ class Quantiles(BaseQuantiles):
 
 
 @generic_registry("Quantiles")
-class GenericQuantiles(BaseQuantiles, GenericParamProduct):
+class GenericQuantiles(BaseQuantiles, GenericTemporalProduct):
     example = {
         "quantile": "99.0, 99.5",
     }
@@ -164,8 +164,9 @@ class GenericQuantiles(BaseQuantiles, GenericParamProduct):
 
 
 @ensemble_registry("Ensemble Mean")
-class ENSMS(BaseEnsembleProduct, GenericParamProduct):
+class ENSMS(BaseEnsembleProduct, GenericTemporalProduct):
     multiselect = {
+        'step': True,
         "param": True,
     }
 
@@ -184,9 +185,10 @@ class ENSMS(BaseEnsembleProduct, GenericParamProduct):
 
 
 @ensemble_registry("Ensemble Standard Deviation")
-class ENSSTD(BaseEnsembleProduct, GenericParamProduct):
+class ENSSTD(BaseEnsembleProduct, GenericTemporalProduct):
     multiselect = {
         "param": True,
+        "step": True,
     }
 
     @property
