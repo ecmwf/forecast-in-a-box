@@ -58,13 +58,10 @@ const ProgressPage = () => {
     const params = useParams();
     const id = params?.id;
 
-    if (!id || typeof id !== 'string') {
-        return <Text>Invalid ID</Text>;
-    }
 
     const [progress, setProgress] = useState<ProgressResponse>({} as ProgressResponse);
     const [outputs, setOutputs] = useState<DatasetId[] | null>([]);
-
+    
     useEffect(() => {
         const fetchProgress = async () => {
             try {
