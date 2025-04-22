@@ -31,6 +31,11 @@ const StatusPage = () => {
 
     useEffect(() => {
         checkStatus();
+        const interval = setInterval(() => {
+            checkStatus();
+        }, 10000);
+
+        return () => clearInterval(interval);
     }, []);
 
     return (

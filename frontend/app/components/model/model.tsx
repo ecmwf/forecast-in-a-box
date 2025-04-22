@@ -89,7 +89,7 @@ function Model({ selectedModel, coordinates, setCoordinates, modelSpec, submit }
                 <TextInput
                     label="Date"
                     placeholder="YYYYMMDD"
-                    value={date}
+                    value={date || ""}
                     onChange={(event) => setDate(event.currentTarget.value)}
                 />
                 <NumberInput

@@ -43,6 +43,7 @@ export type ConfigEntry = {
   values?: string[];
   multiple: boolean;
   constrained_by: string[];
+  default?: string;
 };
 
 export type ProductConfiguration = {
