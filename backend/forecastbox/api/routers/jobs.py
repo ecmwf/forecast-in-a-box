@@ -1,6 +1,6 @@
 """Products API Router."""
 
-from fastapi import APIRouter, Response, Depends
+from fastapi import APIRouter, Response, Depends, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse, HTMLResponse
 from fastapi import HTTPException
 
@@ -19,7 +19,7 @@ import cascade.gateway.client as client
 from ..database import db
 
 from forecastbox.settings import APISettings
-from forecastbox.api.types import VisualisationOptions
+from forecastbox.api.types import VisualisationOptions, GraphSpecification
 
 router = APIRouter(
     tags=["jobs"],
@@ -150,17 +150,16 @@ async def get_outputs_of_job(job_id: JobId = Depends(validate_job_id)) -> list[T
     outputs = collection.find({"job_id": job_id})
     return outputs[0]["outputs"]
 
-
 @router.post("/visualise/{job_id}")
-async def visualise_job(job_id: JobId = Depends(validate_job_id), options: VisualisationOptions = VisualisationOptions()) -> HTMLResponse:
+async def visualise_job(job_id: JobId = Depends(validate_job_id), options: VisualisationOptions = None) -> HTMLResponse:
     """Get outputs of a job."""
     collection = db.get_collection("job_records")
     job = collection.find({"job_id": job_id})
 
-    if not job:
-        return HTMLResponse("Job not found", status_code=404)
-    
-    spec = job[0]["graph_specification"]    
+    if not options:
+        options = VisualisationOptions()
+
+    spec = job[0]["graph_specification"]
 
     from .graph import convert_to_cascade
     try:
@@ -171,6 +170,7 @@ async def visualise_job(job_id: JobId = Depends(validate_job_id), options: Visua
     import tempfile
 
     with tempfile.NamedTemporaryFile(suffix=".html") as dest:
+        print(options)
         graph.visualise(dest.name, **options.model_dump())
 
         with open(dest.name, "r") as f:
@@ -186,6 +186,18 @@ async def restart_job(job_id: JobId = Depends(validate_job_id)) -> api.SubmitJob
 
     from .graph import execute
     return await execute(spec)
+
+@router.post("/upload")
+async def upload_job(file: UploadFile = None) -> api.SubmitJobResponse:
+
+    if not file:
+        raise HTTPException(status_code=400, detail="No file provided for upload.")
+    
+    from .graph import execute
+    spec = await file.read()
+    import json
+    return await execute(GraphSpecification(**json.loads(spec)))
+
 
 @router.get("/info/{job_id}")
 async def job_info(job_id: JobId = Depends(validate_job_id)) -> dict:
@@ -274,7 +286,7 @@ async def get_result(job_id: JobId, dataset_id: TaskId) -> FileResponse:
 class JobDeletionResponse:
     deleted_count: int
 
-@router.get("/flush")
+@router.post("/flush")
 async def flush_job() -> JobDeletionResponse:
     """Flush all job from the database and cascade.
 

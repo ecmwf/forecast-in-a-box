@@ -70,11 +70,12 @@ async def convert_to_cascade(spec: GraphSpecification) -> Cascade:
 
     return Cascade(deduplicate_nodes(complete_graph))
 
-
-
-@router.post("/visualise", response_model=str)
-async def get_graph_visualise(spec: GraphSpecification, options: VisualisationOptions = VisualisationOptions()) -> HTMLResponse:
+@router.post("/visualise")
+async def get_graph_visualise(spec: GraphSpecification, options: VisualisationOptions = None) -> HTMLResponse:
     """Get an HTML visualisation of the product graph."""
+    if options is None:
+        options = VisualisationOptions()
+    
     try:
         graph = await convert_to_cascade(spec)
     except Exception as e:
