@@ -25,6 +25,7 @@ services:
     volumes:
       - data:/app/data_dir
       - './../anemoi-cascade:/app/anemoi-cascade'
+      - './../pproc-cascade:/app/pproc-cascade'
     ports:
       - "8000:8000"
     environment:
