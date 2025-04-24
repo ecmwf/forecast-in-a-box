@@ -28,6 +28,7 @@ WORKDIR /app
 # Step 9: Copy the built application from the builder stage
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/public ./public
 
 # Step 10: Install only production dependencies
 RUN npm install --production
