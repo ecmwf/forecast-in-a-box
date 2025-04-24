@@ -117,6 +117,8 @@ const ProgressPage = () => {
             onClick={() => window.location.href = `/status`}>
             All
             </Button> */}
+            <Space h="xl"/>
+            
             <Title display={'inline'} order={1}>Progress</Title>
             <GraphVisualiser spec={null} url={`/api/py/jobs/visualise/${id}`} />
 

@@ -1,17 +1,16 @@
 
-
-
-.heading {
-    font-size: large;
-    color: rgba(102, 101, 101, 0.94);
-}
-
-.option {
+ 
+  .label {
+    white-space: normal;
+    /* word-wrap: normal; */
+    /* word-break: break-all; */
     display: flex;
-}
-
-/* Base button styles */
-.button {
+    overflow: visible;
+  }
+  
+  .root {
+    flex-direction: column;
+    overflow: visible;
     justify-content: center;
     /* margin-left: 5px; */
     transition: background-color 0.3s ease;
@@ -20,33 +19,11 @@
     font-size: small;
     cursor: pointer;
   }
-  
-  /* Hover state */
-  .button:hover {
-    background-color: grey;
-  }
-  
-  /* Disabled button styles */
-  .button--disabled {
+
+  .root:disabled {
+    background-color: transparent;
+    color: gray;
     color: darkgray;
     cursor: not-allowed;
     pointer-events: none;
   }
-  
-  /* Additional button states can be added here */
-  .button--primary {
-    background-color: blue;
-    color: white;
-  }
-  
-  .button--secondary {
-    background-color: white;
-    color: black;
-    border: 1px solid black;
-  }
-  
-  .heading {
-    font-size: large;
-    color: rgba(102, 101, 101, 0.94);
-  }
-  

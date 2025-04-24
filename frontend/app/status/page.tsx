@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Container, Group } from '@mantine/core';
+import { Container, Group, Space } from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { Table, Loader, Center, Title, Progress, Button, Flex, Divider, Tooltip, Text} from '@mantine/core';
 
@@ -48,7 +48,7 @@ const HomePage = () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/py/jobs/flush`, {
-        method: "GET",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
       });
 
@@ -111,6 +111,42 @@ const HomePage = () => {
     fetchJobs();
   };
 
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      fetch("/api/py/jobs/upload", {
+        method: "POST",
+        body: formData,
+      })
+        .then((response) => response.json())
+        .then(() => {
+          showNotification({
+            id: `upload-success-${crypto.randomUUID()}`,
+            position: "top-right",
+            autoClose: 3000,
+            title: "Upload Successful",
+            message: "File uploaded successfully",
+            color: "green",
+          });
+          fetchJobs();
+        })
+        .catch((error) => {
+          console.error("Error uploading file:", error);
+          showNotification({
+            id: `upload-error-${crypto.randomUUID()}`,
+            position: "top-right",
+            autoClose: 3000,
+            title: "Upload Failed",
+            message: "Failed to upload file",
+            color: "red",
+          });
+        });
+    }
+  };
+
   useEffect(() => {
     fetchJobs();
   }, []);
@@ -119,6 +155,14 @@ const HomePage = () => {
     <Container size="lg" pt="xl" pb="xl">
       <Flex gap='xl'>
         <Title>Status</Title>
+        <Button component="label" color='green'>
+          Upload
+          <input
+            type="file"
+            hidden
+            onChange={handleFileUpload}
+          />
+        </Button>
         <Button onClick={fetchJobs}>
           Refresh
         </Button>
