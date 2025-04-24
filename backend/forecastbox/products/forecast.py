@@ -4,12 +4,13 @@ from .registry import CategoryRegistry
 from typing import Any, TYPE_CHECKING
 from .product import GenericParamProduct
 
-
 forecast_registry = CategoryRegistry("fc_stat", "Statistics over time for each member", "Forecast Statistics")
 
 if TYPE_CHECKING:
     from earthkit.workflows.fluent import Action
 
+
+# TODO, Generalise with start, end, step kwargs for configuration
 
 class BaseForecast(GenericParamProduct):
     """Base Forecast Product"""
@@ -49,37 +50,22 @@ class BaseForecast(GenericParamProduct):
         source = self._select_on_step(source, step)
         return getattr(source, statistic)("step")
 
-    def to_graph(self, specification: dict[str, Any], source: "Action") -> "Action":
-        return self._apply_statistic(specification, source, self._statistic)
+    def to_graph(self, product_spec, model, source):
+        return self._apply_statistic(product_spec, source, self._statistic)
 
 
 @forecast_registry("Mean")
 class FCMean(BaseForecast):
     _statistic = "mean"
 
-    def mars_request(self, **kwargs) -> dict[str, Any]:
-        return super().mars_request(**kwargs)  # type: ignore
-
-
 @forecast_registry("Minimum")
 class FCMin(BaseForecast):
     _statistic = "min"
-
-    def mars_request(self, **kwargs) -> dict[str, Any]:
-        return super().mars_request(**kwargs)  # type: ignore
-
 
 @forecast_registry("Maximum")
 class FCMax(BaseForecast):
     _statistic = "max"
 
-    def mars_request(self, **kwargs) -> dict[str, Any]:
-        return super().mars_request(**kwargs)  # type: ignore
-
-
 @forecast_registry("Standard Deviation")
 class FCStd(BaseForecast):
     _statistic = "std"
-
-    def mars_request(self, **kwargs) -> dict[str, Any]:
-        return super().mars_request(**kwargs)  # type: ignore

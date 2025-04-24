@@ -1,0 +1,86 @@
+# Threshold probability definitions for ensemble products
+# Threhold is a list, with threshold, and output paramid
+
+- levtype: sfc
+  param: 2t
+  threshold: 
+    - ['273.15', 131073]
+  operator: '<='
+  
+- levtype: sfc
+  param: tp
+  threshold: 
+    - ['0.001', 131060]
+    - ['0.003', 131066]
+    - ['0.005', 131061]
+    - ['0.01', 131062]
+    - ['0.02', 131063]
+    - ['0.025', 131098]
+    - ['0.05', 131067]
+    - ['0.1', 131085]
+  operator: '>='
+
+- levtype: sfc
+  param: tp
+  threshold: 
+    - ['0.0001', 131064]
+    - ['0.001', 131065]
+  operator: '<'
+
+- levtype: sfc
+  param: [10u, 10v]
+  threshold: 
+    - ['10', 131068]
+    - ['15', 131069]
+  operator: '>='
+
+- levtype: sfc
+  param: 10fg6
+  threshold: 
+    - ['10', 131100]
+    - ['15', 131070]
+    - ['20', 131071]
+    - ['25', 131072]
+  operator: '>='
+
+- levtype: sfc
+  param: swh
+  threshold: 
+    - ['2', 131074]
+    - ['4', 131075]
+    - ['6', 131076]
+    - ['8', 131077]
+  operator: '>='
+
+- levtype: sfc
+  param: mwp
+  threshold: 
+    - ['8', 131078]
+    - ['10', 131079]
+    - ['12', 131080]
+    - ['15', 131081]
+  operator: '>='
+
+- levtype: pl
+  param: 't'
+  levelist: '850'
+  threshold:
+    - ['-2', 131020]
+    - ['-4', 131023]
+    - ['-8', 131022]
+  operator: '<'
+
+- levtype: pl
+  param: 't'
+  levelist: '850'
+  threshold:
+    - ['4', 131024]
+    - ['8', 131025]
+  operator: '>'
+
+- levtype: pl
+  param: 't'
+  levelist: '850'
+  threshold:
+    - ['2', 131021]
+  operator: '>='

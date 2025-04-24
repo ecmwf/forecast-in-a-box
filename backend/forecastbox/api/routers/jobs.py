@@ -19,6 +19,7 @@ import cascade.gateway.client as client
 from ..database import db
 
 from forecastbox.settings import APISettings
+from forecastbox.api.types import VisualisationOptions
 
 router = APIRouter(
     tags=["jobs"],
@@ -29,7 +30,7 @@ SETTINGS = APISettings()
 
 @dataclass
 class JobProgressResponse:
-    progress: JobProgress
+    progress: str
     status: str
     error: str | None = None
 
@@ -41,7 +42,8 @@ class JobProgressResponses():
 
 
 def validate_job_id(job_id: JobId) -> bool:
-    if db.find("job_records", {"job_id": job_id}):
+    collection = db.get_collection("job_records")
+    if collection.find({"job_id": job_id}):
         return job_id
     raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
 
@@ -50,50 +52,52 @@ def get_job_progress(job_id: JobId = Depends(validate_job_id)) -> JobProgressRes
     response = None
     error_on_request = None
 
+    collection = db.get_collection("job_records")
+
     try:
         response: api.JobProgressResponse = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{SETTINGS.cascade_url}")  # type: ignore
     except TimeoutError as e:
-        db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "errored"}})
+        collection.update_one({"job_id": job_id}, {"$set": {"status": "errored"}})
         error_on_request = f"TimeoutError: {e}"
     except KeyError as e:
-        db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "invalid"}})
+        collection.update_one({"job_id": job_id}, {"$set": {"status": "invalid"}})
         error_on_request = f"KeyError: {e}"
     except Exception as e:
-        db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "errored"}})
+        collection.update_one({"job_id": job_id}, {"$set": {"status": "errored"}})
         error_on_request = f"Exception: {e}"
 
     finally:
         if response is None:
             return JobProgressResponse(
                 progress="0.00",
-                status=db.find("job_records", {"job_id": job_id})[0]["status"],
+                status=collection.find({"job_id": job_id})[0]["status"],
                 error=error_on_request,
             )
     
     if response.error:
-        db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "errored"}})
-        db.update_one("job_records", {"job_id": job_id}, {"$set": {"error": response.error}})
+        collection.update_one({"job_id": job_id}, {"$set": {"status": "errored"}})
+        collection.update_one({"job_id": job_id}, {"$set": {"error": response.error}})
 
     jobprogress = response.progresses.get(job_id, None)
 
     if not jobprogress:
-        db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "invalid"}})
+        collection.update_one({"job_id": job_id}, {"$set": {"status": "invalid"}})
     elif jobprogress.failure:
         # Update the job record in MongoDB to mark it as errored
-        db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "errored"}})
-        db.update_one("job_records", {"job_id": job_id}, {"$set": {"error": jobprogress.failure}})
+        collection.update_one({"job_id": job_id}, {"$set": {"status": "errored"}})
+        collection.update_one({"job_id": job_id}, {"$set": {"error": jobprogress.failure}})
     elif jobprogress.completed or jobprogress.pct == "100.00":
         # Update the job record in MongoDB to mark it as completed
-        db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "completed"}})
+        collection.update_one({"job_id": job_id}, {"$set": {"status": "completed"}})
     else:
         # Update the job record in MongoDB to mark it as running
-        db.update_one("job_records", {"job_id": job_id}, {"$set": {"status": "running"}})
+        collection.update_one({"job_id": job_id}, {"$set": {"status": "running"}})
 
     progress = jobprogress.pct if jobprogress.pct else "0.00" if jobprogress.failure else "100.00"
 
     return JobProgressResponse(
         progress=progress,
-        status=db.find("job_records", {"job_id": job_id})[0]["status"],
+        status=collection.find({"job_id": job_id})[0]["status"],
         error=jobprogress.failure,
     )
 
@@ -101,7 +105,8 @@ def get_job_progress(job_id: JobId = Depends(validate_job_id)) -> JobProgressRes
 async def get_status() -> JobProgressResponses:
     """Get progress of all tasks recorded in the database."""
 
-    job_records = db.find("job_records", {})
+    collection = db.get_collection("job_records")
+    job_records = collection.find({})
 
     # Extract job IDs from the records
     job_ids = [record["job_id"] for record in job_records]
@@ -112,7 +117,7 @@ async def get_status() -> JobProgressResponses:
     progresses = {job_id: get_job_progress(job_id) for job_id in for_status_job_ids}
 
     for id in db_status_ids:
-        id_record = db.find("job_records", {"job_id": id})[0]
+        id_record = collection.find({"job_id": id})[0]
         status = id_record["status"]
         error = id_record["error"]
         progresses[id] = JobProgressResponse(progress="0.00" if not status == 'completed' else '100.00', status=status, error = error)
@@ -141,24 +146,32 @@ async def get_status_of_job(job_id: JobId = Depends(validate_job_id)) -> JobProg
 @router.get("/outputs/{job_id}")
 async def get_outputs_of_job(job_id: JobId = Depends(validate_job_id)) -> list[TaskId]:
     """Get outputs of a job."""
-    outputs = db.find("job_records", {"job_id": job_id})
+    collection = db.get_collection("job_records")
+    outputs = collection.find({"job_id": job_id})
     return outputs[0]["outputs"]
 
 
-@router.get("/visualise/{job_id}")
-async def visualise_job(job_id: JobId = Depends(validate_job_id)) -> HTMLResponse:
+@router.post("/visualise/{job_id}")
+async def visualise_job(job_id: JobId = Depends(validate_job_id), options: VisualisationOptions = VisualisationOptions()) -> HTMLResponse:
     """Get outputs of a job."""
-    job = db.find("job_records", {"job_id": job_id})
+    collection = db.get_collection("job_records")
+    job = collection.find({"job_id": job_id})
+
+    if not job:
+        return HTMLResponse("Job not found", status_code=404)
     
     spec = job[0]["graph_specification"]    
 
     from .graph import convert_to_cascade
-    graph = await convert_to_cascade(spec)
+    try:
+        graph = await convert_to_cascade(spec)
+    except Exception as e:
+        return HTMLResponse(str(e), status_code=500)
 
     import tempfile
 
     with tempfile.NamedTemporaryFile(suffix=".html") as dest:
-        graph.visualise(dest.name, preset="blob")
+        graph.visualise(dest.name, **options.model_dump())
 
         with open(dest.name, "r") as f:
             return HTMLResponse(f.read(), media_type="text/html")
@@ -166,7 +179,8 @@ async def visualise_job(job_id: JobId = Depends(validate_job_id)) -> HTMLRespons
 @router.get("/restart/{job_id}")
 async def restart_job(job_id: JobId = Depends(validate_job_id)) -> api.SubmitJobResponse:
     """Get outputs of a job."""
-    job = db.find("job_records", {"job_id": job_id})
+    collection = db.get_collection("job_records")
+    job = collection.find({"job_id": job_id})
     
     spec = job[0]["graph_specification"]    
 
@@ -176,22 +190,9 @@ async def restart_job(job_id: JobId = Depends(validate_job_id)) -> api.SubmitJob
 @router.get("/info/{job_id}")
 async def job_info(job_id: JobId = Depends(validate_job_id)) -> dict:
     """Get outputs of a job."""
-    job = db.find("job_records", {"job_id": job_id})
+    collection = db.get_collection("job_records")
+    job = collection.find({"job_id": job_id})
     return job[0]
-
-@router.get("/result/{job_id}/{dataset_id}")
-async def get_result(job_id: JobId, dataset_id: TaskId) -> FileResponse:
-    response: api.ResultRetrievalResponse = client.request_response(
-        api.ResultRetrievalRequest(job_id=job_id, dataset_id=DatasetId(task = dataset_id, output='0')), f"{SETTINGS.cascade_url}"
-    )
-    if not response.result:
-        raise HTTPException(404, f"Result retrieval failed: {response.error}")
-    
-    from cascade.gateway.api import decoded_result
-    result = decoded_result(response, job=None)
-
-    bytez, media_type = to_bytes(result)
-    return Response(bytez, media_type=media_type)
 
 @dataclass
 class DatasetAvailabilityResponse:
@@ -251,6 +252,24 @@ def to_bytes(obj) -> tuple[bytes, str]:
 
     raise TypeError(f"Unsupported type: {type(obj)}")
 
+@router.get("/result/{job_id}/{dataset_id}")
+async def get_result(job_id: JobId, dataset_id: TaskId) -> FileResponse:
+    response: api.ResultRetrievalResponse = client.request_response(
+        api.ResultRetrievalRequest(job_id=job_id, dataset_id=DatasetId(task = dataset_id, output='0')), f"{SETTINGS.cascade_url}"
+    )
+    if not response.result:
+        raise HTTPException(404, f"Result retrieval failed: {response.error}")
+    
+    try:
+        from cascade.gateway.api import decoded_result
+        result = decoded_result(response, job=None)
+        
+        bytez, media_type = to_bytes(result)
+    except Exception as e:
+        raise HTTPException(500, f"Result retrieval failed: {e}")
+
+    return Response(bytez, media_type=media_type)
+
 @dataclass
 class JobDeletionResponse:
     deleted_count: int
@@ -262,7 +281,8 @@ async def flush_job() -> JobDeletionResponse:
     Returns number of deleted jobs.    
     """
     client.request_response(api.ResultDeletionRequest(datasets = {}), f"{SETTINGS.cascade_url}")  # type: ignore
-    return db.delete_many("job_records", {})
+    collection = db.get_collection("job_records")
+    return collection.delete_many({})
 
 @router.delete("/delete/{job_id}")
 async def delete_job(job_id: JobId = Depends(validate_job_id)) -> JobDeletionResponse:
@@ -271,4 +291,4 @@ async def delete_job(job_id: JobId = Depends(validate_job_id)) -> JobDeletionRes
     Returns number of deleted jobs.
     """
     client.request_response(api.ResultDeletionRequest(datasets = {job_id: []}), f"{SETTINGS.cascade_url}")  # type: ignore
-    return db.delete_one("job_records", {'job_id': job_id})
+    return db.get_collection('job_records').delete_one({'job_id': job_id})

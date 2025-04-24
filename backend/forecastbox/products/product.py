@@ -8,6 +8,7 @@ from forecastbox.models import Model
 from .definitions import DESCRIPTIONS, LABELS
 
 if TYPE_CHECKING:
+    from earthkit.workflows.graph import Graph
     from earthkit.workflows.fluent import Action
 
 
@@ -40,6 +41,32 @@ class Product(ABC):
         """Model assumptions for the product."""
         return {}
 
+    def select_on_specification(self, specification: dict[str, Any], source: "Action") -> "Action":
+        """Select from `source` the key:value pairs from `specification`."""
+        for key, value in specification.items():
+            if not value:
+                continue
+            if key not in source.nodes.dims:
+                continue
+
+            def convert_to_int(value: Any) -> int:
+                """Convert value to int if it is a digit."""
+                try:
+                    return_val = int(value)
+                    if not str(return_val) == value:
+                        return float(value)
+                    return return_val
+                except ValueError:
+                    return value
+
+            if isinstance(value, str):
+                value = convert_to_int(value)
+            if isinstance(value, list):
+                value = [convert_to_int(v) for v in value]
+            
+            source = source.sel(**{key: value if isinstance(value, (list, tuple)) else [value]})
+        return source
+    
     def validate_intersection(self, model: Model) -> bool:
         """Validate the intersection of the model and product qubes.
 
@@ -59,12 +86,8 @@ class Product(ABC):
         return intersection
 
     @abstractmethod
-    def mars_request(self, specification: dict[str, Any]) -> dict[str, Any]:
+    def to_graph(self, product_spec: dict[str, Any], model: Model, source: "Action") -> "Graph":
         raise NotImplementedError()
-
-    @abstractmethod
-    def to_graph(self, specification: dict[str, Any], source: "Action") -> "Action":
-        pass
 
 
 class GenericParamProduct(Product):
@@ -105,32 +128,6 @@ class GenericParamProduct(Product):
             }
         )
 
-    def select_on_specification(self, specification: dict[str, Any], source: "Action") -> "Action":
-        """Select on a specification."""
-        for key, value in specification.items():
-            if not value:
-                continue
-            if key not in source.nodes.dims:
-                continue
-
-            def convert_to_int(value):
-                """Convert value to int if it is a digit."""
-                try:
-                    return_val = int(value)
-                    if not str(return_val) == value:
-                        return float(value)
-                    return return_val
-                except ValueError:
-                    return value
-
-            if isinstance(value, str):
-                value = convert_to_int(value)
-            if isinstance(value, list):
-                value = [convert_to_int(v) for v in value]
-            
-            source = source.sel(**{key: value})
-        return source
-
 class GenericTemporalProduct(GenericParamProduct):
 
     description = {
@@ -147,4 +144,4 @@ class GenericTemporalProduct(GenericParamProduct):
         return f"step={'/'.join(map(str, model.timesteps))}" / intersection
 
 USER_DEFINED = "USER_DEFINED"
-"""User defined value"""
+"""User defined value, used to indicate that the value is not known."""

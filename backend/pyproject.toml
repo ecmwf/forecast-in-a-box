@@ -11,6 +11,7 @@ authors = [
 ]
 license = { text = "Apache License Version 2.0" }
 requires-python=">=3.11,<3.12"
+
 # just a minimal set of dependencies to run the servers. Individual tasks install their runtime dependencies on their own
 dependencies = [
 	"fastapi",
@@ -23,10 +24,12 @@ dependencies = [
 	"pyrsistent",
 	"anemoi-inference[huggingface]>=0.4.10",
 	"qubed>=0.1.12",
-	#"anemoi-cascade",
+	"anemoi-cascade>=0.1.0",
 	"pydantic-settings",
 	"pymongo",
 	"earthkit-workflows",
+	"pproc",
+	#"pproc-cascade",
 ]
 
 [project.urls]
@@ -37,8 +40,8 @@ thermo = [
     "thermofeel>=2.1.1",
 ]
 plots = [
-    "earthkit-plots-default-styles",
-    "earthkit-plots>=0.2.8",
+    "earthkit-plots-default-styles>=0.1.0",
+    "earthkit-plots>=0.3.0",
 ]
 webmars = [
     "ecmwf-api-client>=1.6.5",
@@ -63,9 +66,10 @@ ignore = ["E731"]
 plugins = "pydantic.mypy"
 
 [tool.uv.sources]
-#qubed = { git = "https://github.com/ecmwf/qubed" }
-anemoi-cascade  = { git = "https://github.com/ecmwf/anemoi-cascade" }
+anemoi-cascade  = { git = "ssh://git@github.com/ecmwf/anemoi-cascade.git" }
 earthkit-workflows = { git = "https://github.com/ecmwf/earthkit-workflows" }
+pproc = { git = "ssh://git@github.com/ecmwf/pproc.git", rev = "feature/io-requests" }
+pproc-cascade = { git = "ssh://git@github.com/ecmwf/pproc-cascade.git", rev = "strip-source-sinks" }
 
 [tool.hatch.metadata]
 allow-direct-references = true

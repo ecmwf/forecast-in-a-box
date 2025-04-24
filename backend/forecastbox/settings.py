@@ -16,6 +16,9 @@ class FIABSettings(BaseSettings):
     cascade_url: str
     """Base URL for the Cascade API."""
 
+    pproc_schema_dir: str | None = None
+    """Path to the directory containing the PPROC schema files."""
+
 class APISettings(FIABSettings):
     data_path: str
     """Path to the data directory."""

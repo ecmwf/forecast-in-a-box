@@ -108,9 +108,6 @@ class MapProduct(GenericTemporalProduct):
     def qube(self):
         return self.make_generic_qube(domain = self.domains)
 
-    def mars_request(self, **kwargs):
-        return super().mars_request(**kwargs)  # type:ignore
-
     def validate_intersection(self, model: Model) -> bool:
         return super().validate_intersection(model) & EARTHKIT_PLOTS_IMPORTED
 
@@ -127,9 +124,10 @@ class SimpleMapProduct(MapProduct):
         'domain': 'Global',
     }
 
-    def to_graph(self, specification: dict[str, Any], source: Action):
-        domain = specification.pop('domain', None)
-        source = self.select_on_specification(specification, source)
+    def to_graph(self, product_spec, model, source):
+
+        domain = product_spec.pop('domain', None)
+        source = self.select_on_specification(product_spec, source)
         
         if domain == 'Global':
             domain = None
@@ -162,9 +160,9 @@ class EnsembleMapProduct(BaseEnsembleProduct, MapProduct):
     }
     
 
-    def to_graph(self, specification: dict[str, Any], source: Action):
-        domain = specification.pop('domain', None)
-        source = self.select_on_specification(specification, source)
+    def to_graph(self, product_spec, model, source):
+        domain = product_spec.pop('domain', None)
+        source = self.select_on_specification(product_spec, source)
         
         if domain == 'Global':
             domain = None
@@ -196,9 +194,6 @@ class GribProduct(GenericTemporalProduct):
     def qube(self):
         return self.make_generic_qube()
 
-    def mars_request(self, **kwargs):
-        return super().mars_request(**kwargs)  # type:ignore
-
-    def to_graph(self, specification, source):
-        source = self.select_on_specification(specification, source)
+    def to_graph(self, product_spec, model, source):
+        source = self.select_on_specification(product_spec, source)
         return source

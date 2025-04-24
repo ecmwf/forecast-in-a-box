@@ -4,7 +4,6 @@ from datetime import datetime
 from fastapi import APIRouter, Response
 from fastapi.responses import HTMLResponse
 
-from typing import Union
 import tempfile
 
 from forecastbox.products.registry import get_categories, get_product
@@ -13,7 +12,9 @@ from forecastbox.models import Model
 from .models import get_model_path
 from ..types import GraphSpecification
 
-from earthkit.workflows import Cascade
+from earthkit.workflows import Cascade, fluent
+from earthkit.workflows.graph import Graph, deduplicate_nodes
+
 from cascade.low.into import graph2job
 from cascade.low import views as cascade_views
 
@@ -26,6 +27,7 @@ import cascade.gateway.client as client
 from ..database import db
 
 from forecastbox.settings import APISettings, CascadeSettings
+from forecastbox.api.types import VisualisationOptions
 
 router = APIRouter(
     tags=["execution"],
@@ -47,28 +49,39 @@ async def convert_to_cascade(spec: GraphSpecification) -> Cascade:
         date=spec.model.date,
         ensemble_members=spec.model.ensemble_members,
     )
-    model_action = Model(get_model_path(spec.model.model), **model_spec).graph(None, **spec.model.entries)
-
-    actions = []
+    model = Model(get_model_path(spec.model.model), **model_spec)
+    model_action = model.graph(None, **spec.model.entries)
+    
+    complete_graph = Graph([])
 
     for product in spec.products:
-        specification = product.specification.copy()
-        product_action = get_product(*product.product.split("/", 1)).to_graph(specification, model_action)
-        actions.append(product_action)
+        product_spec = product.specification.copy()
+        try:
+            product_graph = get_product(*product.product.split("/", 1)).to_graph(product_spec, model, model_action)
+        except Exception as e:
+            raise Exception(f"Error in product {product}:\n{e}")
+
+        if isinstance(product_graph, fluent.Action):
+            product_graph = product_graph.graph()
+        complete_graph += product_graph
 
     if len(spec.products) == 0:
-        actions.append(model_action)
+        complete_graph += model_action.graph()
 
-    return Cascade.from_actions(actions)
+    return Cascade(deduplicate_nodes(complete_graph))
+
 
 
 @router.post("/visualise", response_model=str)
-async def get_graph_visualise(spec: GraphSpecification) -> HTMLResponse:
+async def get_graph_visualise(spec: GraphSpecification, options: VisualisationOptions = VisualisationOptions()) -> HTMLResponse:
     """Get an HTML visualisation of the product graph."""
-    graph = await convert_to_cascade(spec)
+    try:
+        graph = await convert_to_cascade(spec)
+    except Exception as e:
+        return HTMLResponse(str(e), status_code=500)
 
     with tempfile.NamedTemporaryFile(suffix=".html") as dest:
-        graph.visualise(dest.name, preset="blob")
+        graph.visualise(dest.name, **options.model_dump())
 
         with open(dest.name, "r") as f:
             return HTMLResponse(f.read(), media_type="text/html")
@@ -83,6 +96,10 @@ async def get_graph_serialised(spec: GraphSpecification) -> JobInstance:
 @router.post("/execute")
 async def execute_api(spec: GraphSpecification) -> api.SubmitJobResponse:
     return await execute(spec)
+    # try:
+    #     return await execute(spec)
+    # except Exception as e:
+    #     return HTMLResponse(str(e), status_code=500)
 
 async def execute(spec: GraphSpecification) -> api.SubmitJobResponse:
     """Get serialised dump of product graph."""
@@ -91,6 +108,8 @@ async def execute(spec: GraphSpecification) -> api.SubmitJobResponse:
     except Exception as e:
         return api.SubmitJobResponse(job_id = None, error=str(e))
     
+    model_path = get_model_path(spec.model.model)
+
     job = graph2job(graph._graph)
 
     sinks = cascade_views.sinks(job)
@@ -98,10 +117,18 @@ async def execute(spec: GraphSpecification) -> api.SubmitJobResponse:
 
     job.ext_outputs = sinks
 
+    BLACKLISTED_INSTALLS = ['anemoi', 'anemoi-training', 'anemoi-inference', 'anemoi-utils']
+    env = [f"{key}=={val}" for key, val in Model.versions(model_path).items() if key not in BLACKLISTED_INSTALLS]
+    env.extend(['anemoi-inference', 'anemoi-cascade'])
+
     # Manual GPU allocation
     for task_id, task in job.tasks.items():
         if task_id.startswith("run_as_earthkit"):
             task.definition.needs_gpu = True
+        # Set the environment variables for the job
+        if any([lambda x: x in task_id, ["run_as_earthkit", "get_initial_conditions"]]):
+            # task.definition.environment = env
+            pass
 
     r = api.SubmitJobRequest(
         job=api.JobSpec(benchmark_name=None, workers_per_host=CASCADE_SETTINGS.workers_per_host, hosts=CASCADE_SETTINGS.hosts, envvars={}, use_slurm=False, job_instance=job)
@@ -122,7 +149,8 @@ async def execute(spec: GraphSpecification) -> api.SubmitJobResponse:
         "created_at": datetime.now(),
         "outputs": list(map(lambda x: x.task, sinks)),
     }
-    db.insert_one("job_records", record)
+    collection = db.get_collection("job_records")
+    collection.insert_one(record)
 
     # submit_response = SubmitResponse(**submit_job_response.model_dump(), output_ids=sinks)
     return submit_job_response

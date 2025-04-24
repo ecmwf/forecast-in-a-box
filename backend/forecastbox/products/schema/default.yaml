@@ -1,0 +1,1834 @@
+config:
+  interp_keys:
+    intgrid: "none"
+    legendre-loader: "shmem"
+    matrix-loader: "file-io"
+
+  filter:param:
+    "*": {}
+    "10":
+      preprocessing: 
+        - operation: norm
+      interp_keys:
+        vod2uv: true
+    "121/122/228026/228027":
+      filter:type:
+        em/es/pb:
+          accumulations:
+            step:
+              type: legacywindow
+    "131068/131069":
+      filter:type:
+        ep:
+          preprocessing:
+            - operation: norm
+    "132044":
+      filter:type:
+        efi/efic/sot:
+          preprocessing:
+          - operation: mask
+            select: {param: "228036"}
+            mask: [{param: "228035"}, "<=", 10]
+    "132059":
+      filter:type:
+        efi/efic/sot:
+          preprocessing:
+          - operation: mask
+            select: {param: "228035"}
+            mask: [{param: "228035"}, "<=", 10]
+    "132145":
+      filter:type:
+        efi/efic/sot:
+          preprocessing:
+            - operation: norm
+    "207/228249":
+      preprocessing:
+        - operation: norm
+    "172142/172143/172144/172228":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          vmin: 0.
+          preprocessing:
+            - operation: scale
+              value: 0.00001157407
+          accumulations:
+            step:
+              include_start: true
+              deaccumulate: true
+    "172008/172009/172146/172147/172169/172175/172176/172177/172178/172179/172180/172181/172182/172205/172212":
+      filter:type: 
+        fcmean/fcstdev/fcmin/fcmax:
+          preprocessing:
+            - operation: scale
+              value: 0.00001157407
+          accumulations:
+            step:
+              include_start: true
+              deaccumulate: true
+    "172189":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          vmin: 0.
+          vmax: 1.
+          preprocessing:
+            - operation: scale
+              value: 0.00001157407
+          accumulations:
+            step:
+              include_start: true
+              deaccumulate: true
+    "260033/260053": 
+      preprocessing:
+        - operation: sum
+        - operation: scale
+          value: 3600
+    "200189/200142/200143/200144/228216/200228":
+      accumulations:
+        step:
+          operation: difference
+          include_start: true
+  filter:type:
+    pf/cf: 
+      filter:param:
+        "261001/261014/261015/261016/260242/260004/260005/261018/260255/261002":
+          entrypoint: pproc-thermal-indices
+        "10":
+          entrypoint: pproc-wind
+        "*":
+          entrypoint: pproc-accumulate
+    em/es:
+      dtype: float64
+      metadata: 
+        perturbationNumber: 0
+        bitsPerValue: 16
+      filter:param:
+        "10":
+          entrypoint: pproc-wind
+        "*": 
+          entrypoint: pproc-ensms
+    efi/sot/efic:
+      entrypoint: pproc-extreme
+      filter:param:
+        132044/132059:
+          eps: 1e-4
+          accumulations:
+            step:
+              type: legacywindow
+              operation: maximum
+        132045/132165/132167: 
+          eps: -1e-4
+          accumulations:
+            step:
+              type: legacywindow
+              operation: mean
+        132049/132201/132216: 
+          eps: -1e-4
+          accumulations:
+            step:
+              type: legacywindow
+              operation: maximum
+        "132144":
+          eps: 1e-4
+          accumulations:
+            step:
+              type: legacywindow
+              operation: difference
+              include_start: true
+        "132202":
+          eps: -1e-4
+          accumulations:
+            step:
+              type: legacywindow
+              operation: minimum
+        "132228":
+          eps: 1e-4
+          accumulations:
+            step:
+              type: legacywindow
+              operation: difference
+              include_start: true
+          filter:stream:
+            "*": {}
+            "eefo":
+              preprocessing: 
+                - scale:
+                  value: 604800000
+    ep:
+      entrypoint: pproc-probabilities
+      filter:param:
+        "131060":
+          accumulations:
+            step:
+              type: legacywindow
+              operation: difference
+              include_start: true
+          threshold:
+            comparison: ">="
+            value: 0.001
+            local_scale_factor: 3
+        "131061":
+          accumulations:
+            step:
+              type: legacywindow
+              operation: difference
+              include_start: true
+          threshold:
+            comparison: ">="
+            value: 0.005
+            local_scale_factor: 3
+        "131062":
+          accumulations:
+            step:
+              type: legacywindow
+              operation: difference
+              include_start: true
+          threshold:
+            comparison: ">="
+            value: 0.01
+            local_scale_factor: 3
+        "131063":
+          accumulations:
+            step:
+              type: legacywindow
+              operation: difference
+              include_start: true
+          threshold:
+            comparison: ">="
+            value: 0.02
+            local_scale_factor: 3
+        "131098":
+          accumulations:
+            step:
+              type: legacywindow
+              operation: difference
+              include_start: true
+          threshold:
+            comparison: ">="
+            value: 0.025
+            local_scale_factor: 3
+            metadata:
+              scaleFactorOfLowerLimit: 0
+        "131099": 
+          accumulations:
+            step:
+              type: legacywindow
+              operation: difference
+              include_start: true
+          threshold:
+            comparison: ">="
+            value: 0.05
+            local_scale_factor: 3
+            metadata:
+              scaleFactorOfLowerLimit: 0
+        "131085": 
+          accumulations:
+            step:
+              type: legacywindow
+              operation: difference
+              include_start: true
+          threshold:
+            comparison: ">="
+            value: 0.1
+            local_scale_factor: 3
+            metadata:
+              scaleFactorOfLowerLimit: 0
+        "131064":
+          accumulations:
+            step:
+              type: legacywindow
+              operation: difference
+              include_start: true
+          threshold:
+            comparison: '<'
+            value: 0.0001
+            local_scale_factor: 4
+        "131065": 
+          accumulations:
+            step:
+              type: legacywindow
+              operation: difference_rate
+              factor: 0.041666666666666664
+              include_start: true
+          threshold:
+            comparison: '<'
+            value: 0.001
+            local_scale_factor: 4
+        "131066": 
+          accumulations:
+            step:
+              type: legacywindow
+              operation: difference_rate
+              factor: 0.041666666666666664
+              include_start: true
+          threshold:
+            comparison: '>='
+            value: 0.003
+            local_scale_factor: 4
+        "131067":
+          accumulations:
+            step:
+              type: legacywindow
+              operation: difference_rate
+              factor: 0.041666666666666664
+              include_start: true
+          threshold:
+            comparison: '>='
+            value: 0.005
+            local_scale_factor: 4
+        "131068":
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: maximum
+          threshold:
+            comparison: ">="
+            value: 10
+        "131069":
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: maximum
+          threshold:
+            comparison: ">="
+            value: 15
+        "131070":
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: maximum
+          threshold:
+            comparison: ">="
+            value: 15
+        "131071":
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: maximum
+          threshold:
+            comparison: ">="
+            value: 20
+        "131072":
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: maximum
+          threshold:
+            comparison: ">="
+            value: 25
+        "131100":
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: maximum
+          threshold:
+            comparison: ">="
+            value: 10 
+        "131074":
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: maximum
+          threshold:
+            comparison: ">="
+            value: 2
+        "131075":
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: maximum
+          threshold:
+            comparison: ">="
+            value: 4
+        "131076": 
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: maximum
+          threshold:
+            comparison: ">="
+            value: 6
+        "131077": 
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: maximum
+          threshold:
+            comparison: ">="
+            value: 8
+        "131074": 
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: maximum
+          threshold:
+            comparison: ">="
+            value: 2
+        "131075":  
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: maximum
+          threshold:
+            comparison: ">="
+            value: 4
+        "131076":  
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: maximum
+          threshold:
+            comparison: ">="
+            value: 6
+        "131077":  
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: maximum
+          threshold:
+            comparison: ">="
+            value: 8
+        "131073":
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: minimum
+          threshold:
+            comparison: "<="
+            value: 273.15
+            local_scale_factor: 2
+        "131020":
+          entrypoint: pproc-anomaly-probabilities
+          accumulations: 
+            step:
+              type: legacywindow
+              include_start: true
+              operation: "mean"
+          threshold:
+            comparison: "<"
+            value: -2
+        "131021":
+          entrypoint: pproc-anomaly-probabilities
+          accumulations: 
+            step:
+              type: legacywindow
+              include_start: true
+              operation: "mean"
+          threshold:
+            comparison: ">="
+            value: 2
+        "131022": 
+          entrypoint: pproc-anomaly-probabilities
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: minimum
+          threshold: 
+            comparison: "<"
+            value: -8
+        "131023": 
+          entrypoint: pproc-anomaly-probabilities 
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: minimum
+          threshold: 
+            comparison: "<"
+            value: -4
+        "131024":  
+          entrypoint: pproc-anomaly-probabilities
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: maximum
+          threshold: 
+            comparison: ">"
+            value: 4
+        "131025":  
+          entrypoint: pproc-anomaly-probabilities
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: maximum
+          threshold: 
+            comparison: ">"
+            value: 8
+        "133093":
+          entrypoint: pproc-anomaly-probabilities
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: maximum
+              std_anomaly: true
+          threshold:
+            comparison: '>'
+            value: 1
+        "133094":
+          entrypoint: pproc-anomaly-probabilities
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: maximum
+              std_anomaly: true
+          threshold:
+            comparison: '>'
+            value: 1.5
+            local_scale_factor: 1
+            metadata:
+              scaleFactorOfLowerLimit: 1
+        "133095":
+          entrypoint: pproc-anomaly-probabilities
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: maximum
+              std_anomaly: true
+          threshold:
+            comparison: '>'
+            value: 2
+        "133096":
+          entrypoint: pproc-anomaly-probabilities
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: minimum
+              std_anomaly: true
+          threshold:
+            comparison: '<'
+            value: -1
+            limit_type: lower
+        "133097":
+          entrypoint: pproc-anomaly-probabilities
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: minimum
+              std_anomaly: true
+          threshold:
+            comparison: '<'
+            value: -1.5
+            local_scale_factor: 1
+            metadata:
+              scaleFactorOfLowerLimit: 1
+            limit_type: lower
+        "133098":
+          entrypoint: pproc-anomaly-probabilities
+          accumulations: 
+            step:
+              type: legacywindow
+              operation: minimum
+              std_anomaly: true
+          threshold:
+            comparison: '<'
+            value: -2
+            limit_type: lower
+    fcmean:
+      dtype: float64
+      filter:stream:
+        "enfo/waef/eefo/weef/enfh/enwh": 
+          entrypoint: pproc-accumulate
+          accumulations:
+            step:
+              type: legacywindow
+              operation: mean
+              metadata:
+                type: fcmean
+          filter:param:
+            "*": {}
+            "235117":
+              metadata:
+                discipline: 0
+                parameterCategory: 7
+                parameterNumber: 6
+                typeOfFirstFixedSurface: 17
+                typeOfStatisticalProcessing: 0
+        msmm/swmm:
+          entrypoint: pproc-monthly-stats
+          accumulations:
+            step:
+              type: legacywindow
+              operation: mean
+              metadata:
+                type: fcmean
+          metadata:
+            bitsPerValue: 16
+    fcstdev:
+      dtype: float64
+      filter:stream:
+        "enfo/waef/eefo/weef/enfh/enwh": 
+          entrypoint: pproc-accumulate
+          accumulations:
+            step:
+              type: legacywindow
+              operation: standard_deviation
+              metadata:
+                type: fcstdev
+          filter:param:
+            "*": {}
+            "239117":
+              metadata:
+                discipline: 0
+                parameterCategory: 7
+                parameterNumber: 6
+                typeOfFirstFixedSurface: 17
+                typeOfStatisticalProcessing: 6
+        msmm/swmm:
+          entrypoint: pproc-monthly-stats
+          accumulations:
+            step:
+              type: legacywindow
+              operation: standard_deviation
+              metadata:
+                type: fcstdev
+          metadata:
+            bitsPerValue: 16
+    fcmin:
+      dtype: float64
+      filter:stream:
+        "enfo/waef/eefo/weef/enfh/enwh": 
+          entrypoint: pproc-accumulate
+          accumulations:
+            step:
+              type: legacywindow
+              operation: minimum
+              metadata:
+                type: fcmin
+          filter:param:
+            "*": {}
+            "238117":
+              metadata:
+                discipline: 0
+                parameterCategory: 7
+                parameterNumber: 6
+                typeOfFirstFixedSurface: 17
+                typeOfStatisticalProcessing: 3
+        msmm/swmm:
+          entrypoint: pproc-monthly-stats
+          accumulations:
+            step:
+              type: legacywindow
+              operation: minimum
+              metadata:
+                type: fcmin
+          metadata:
+            bitsPerValue: 16          
+    fcmax:
+      dtype: float64
+      filter:stream:
+        "enfo/waef/eefo/weef/enfh/enwh": 
+          entrypoint: pproc-accumulate
+          accumulations:
+            step:
+              type: legacywindow
+              operation: maximum
+              metadata:
+                type: fcmax
+          filter:param:
+            "*": {}
+            "237117":
+              metadata:
+                discipline: 0
+                parameterCategory: 7
+                parameterNumber: 6
+                typeOfFirstFixedSurface: 17
+                typeOfStatisticalProcessing: 2
+        msmm/swmm:
+          entrypoint: pproc-monthly-stats
+          accumulations:
+            step:
+              type: legacywindow
+              operation: maximum
+              metadata:
+                type: fcmax
+          metadata:
+            bitsPerValue: 16
+    pb:
+      entrypoint: pproc-quantiles
+windows:
+  defs:
+    width6:
+      - type: range
+        width: 6
+        interval: 3
+        end: 144
+      - type: range
+        width: 6
+        interval: 6
+        start: 144
+    width12:
+      - type: range
+        width: 12
+        interval: 3
+        end: 144
+      - type: range
+        width: 12
+        interval: 6
+        start: 144
+    width24:
+      - type: range
+        width: 24
+        interval: 3
+        end: 144
+      - type: range
+        width: 24
+        interval: 6
+        start: 144
+  filter:stream:
+    oper: 
+      in_steps:
+        - from: 0
+          to: 90
+          by: 1
+        - from: 90
+          to: 144
+          by: 3
+        - from: 144
+          to: 360
+          by: 6 
+    enfo/waef:
+      in_steps:
+        - from: 0
+          to: 90
+          by: 1
+        - from: 90
+          to: 144
+          by: 3
+        - from: 144
+          to: 360
+          by: 6 
+    eefo/weef:
+      in_steps:
+        - from: 0
+          to: 1104
+          by: 6
+    msmm/swmm: 
+      in_steps:
+        - from: 0
+          to: 5160
+          by: 6
+    efhs/wehs:
+      in_steps:
+        - from: 0
+          to: 360
+          by: 6
+    eehs:
+      in_steps:
+        - from: 0
+          to: 1104
+          by: 6
+  filter:type:
+    em/es/pb:
+      filter:stream:
+        enfo:
+          filter:param:
+            "*":
+              out_steps:
+                - type: instantaneous
+                  end: 90
+                  interval: 3
+                - type: instantaneous
+                  start: 90
+            121/122:
+              out_steps:
+                type: instantaneous
+                interval: 6
+            228026/228027:
+              out_steps:
+                type: instantaneous
+                interval: 3
+        eefo:
+          type: instantaneous
+        efhs/wehs:
+          out_steps:
+            type: instantaneous
+            interval: 12
+    fc/cf/pf:
+      filter:stream:
+        "*":
+          filter:param:
+            "*":
+              out_steps:
+                type: instantaneous
+            261001/261014/261015/261002:
+              out_steps:
+                type: instantaneous
+                deaccumulate: true
+    fcmean/fcstdev/fcmax/fcmin:
+      filter:stream:
+        "enfo/eefo/oper":
+          out_steps:
+            type: range
+            interval: 24 
+            width: 168
+        "msmm":
+          out_steps:
+            type: monthly
+            date: "{date}"
+    ep:
+      filter:stream:
+        enfo: 
+          filter:param:
+            131060/131061/131062/131063/131098/131099/131085/131070/131071/131072/131100:
+              out_steps:
+                type: range
+                width: 24
+                interval: 12
+            131064/131065/131066/131067/131070/131071/131072/131100/131074/131075/131076/131077/131078/131079/131080/131081/131020/131021/131073:
+              out_steps:
+                - type: range
+                  width: 120
+                  start: 120
+                  interval: 120
+                - "120-168"
+                - "168-240"
+            131068/131069/131074/131075/131076/131077/131078/131079/131080/131081/131073/131022/131023/131024/131025/133093/133094/133095/133096/133097/133098:
+              out_steps:
+                type: instantaneous
+                start: 12
+                interval: 12
+    efi/efic/sot:
+      filter:stream:
+        "eefo":
+          out_steps:
+            type: range
+            interval: 24 
+            width: 168
+        "enfo":
+          filter:param:
+            "*":
+              time:
+                "12":
+                  out_steps:
+                    - type: range
+                      start: 12
+                      end: 240
+                      width: 24
+                      interval: 24
+                    - type: range
+                      start: 12
+                      end: 240
+                      width: 72
+                      interval: 24
+                      end: 216
+                    - type: range
+                      start: 12
+                      end: 240
+                      width: 120
+                      interval: 24
+                    - type: range
+                      start: 240
+                      width: 24
+                      interval: 24
+                    - "0-240"
+                    - "0-360"
+                    - "240-360"
+                "00":
+                  out_steps:
+                    - type: range
+                      width: 24
+                      interval: 24
+                    - type: range
+                      width: 72
+                      end: 240
+                      interval: 24
+                      end: 216
+                    - type: range
+                      width: 120
+                      end: 240
+                      interval: 24
+                    - "0-240"
+                    - "0-360"
+                    - "240-360"
+            121/122/123/140229/228035/228036:
+              time:
+                "12":
+                  out_steps:
+                    type: range
+                    start: 12
+                    end: 180
+                    width: 24
+                    interval: 24
+                "00":
+                  out_steps:
+                    type: range
+                    end: 168
+                    width: 24
+                    interval: 24 
+    cd:
+      filter:stream:
+        efhs/wehs:
+          filter:param:
+            "*":
+              out_steps:
+                - type: range
+                  width: 24
+                  interval: 12
+                - type: range
+                  width: 72
+                  end: 240
+                  interval: 12
+                  end: 216
+                - type: range
+                  width: 120
+                  end: 240
+                  interval: 12
+                - "0-240"
+                - "0-360"
+                - "240-360"
+            "228004/228":
+              out_steps:
+                - type: range
+                  width: 24
+                  interval: 12
+                - type: range
+                  width: 72
+                  end: 240
+                  interval: 12
+                  end: 216
+                - type: range
+                  width: 120
+                  end: 240
+                  interval: 12
+                - type: range
+                  width: 168
+                  interval: 24
+                - "0-240"
+                - "0-360"
+                - "240-360"
+            "202/201/49/140200/59/228044/140249/228006":
+              out_steps:
+                type: range
+                width: 24
+                interval: 12     
+        eehs:
+          out_steps:
+            type: range
+            width: 168
+            interval: 24 
+inputs:
+  filter:stream:
+    oper: 
+      filter:type:
+        fc/fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request:
+                stream: oper
+                type: fc
+    enfo:
+      filter:type:
+        "em/es/pb/fcmean/fcstdev/fcmin/fcmax/efi/sot":
+          forecast:
+            inputs:
+              - request: 
+                  stream: enfo
+                  type: "cf"
+              - request:
+                  stream: enfo
+                  type: "pf"
+                members: 
+                  start: 1
+                  end: 50
+        "cf/efic":
+          forecast:
+            inputs:
+              request: 
+                stream: enfo
+                type: "cf"
+        "pf/ep":
+          forecast:
+            inputs:
+              request:
+                stream: enfo
+                type: "pf"
+              members: 
+                start: 1
+                end: 50
+      climatology: 
+        inputs:
+          request:
+            stream: "efhs" 
+            time: "00"
+        scheme: ecmwf-4days
+    waef:
+      filter:type:
+        em/es/pb/fcmean/fcstdev/fcmin/fcmax/efi/sot:
+          forecast:
+            inputs:
+              - request: 
+                  stream: waef
+                  type: "cf"
+              - request:
+                  stream: waef
+                  type: "pf"
+                members: 
+                  start: 1
+                  end: 50
+        "cf/efic":
+          forecast:
+            inputs:
+              request:
+                stream: waef 
+                type: "cf"
+        "pf/ep":
+          forecast:
+            inputs:
+              request:
+                stream: waef
+                type: "pf"
+              members: 
+                start: 1
+                end: 50
+      climatology: 
+        inputs:
+          request:
+            stream: "wehs"
+            time: "00"
+        scheme: ecmwf-4days
+    eefo:
+      filter:type:
+        "em/es/pb/fcmean/fcstdev/fcmin/fcmax":
+          forecast:
+            inputs:
+              - request: 
+                  stream: eefo
+                  type: "cf"
+              - request:
+                  stream: eefo
+                  type: "pf"
+                members: 
+                  start: 1
+                  end: 100
+        "cf":
+          forecast:
+            inputs:
+              request: 
+                stream: eefo
+                type: "cf"
+        "pf":
+          forecast:
+            inputs:
+              request:
+                stream: eefo
+                type: "pf"
+              members: 
+                start: 1
+                end: 100
+        "efi/sot/taem/taes":
+          forecast:
+            inputs:
+              - request:
+                  stream: eefo
+                  type: fcmean
+                members:
+                  start: 0
+                  end: 100
+                derive_step: 
+                  type: default
+                  precomputed: true  
+      climatology: 
+        inputs:
+          request:
+            stream: "eehs" 
+            time: "00"
+        scheme: ecmwf-2days
+    weef:
+      filter:type:
+        "em/es/pb/fcmean/fcstdev/fcmin/fcmax":
+          forecast:
+            inputs:
+              - request: 
+                  stream: weef
+                  type: "cf"
+              - request:
+                  stream: weef
+                  type: "pf"
+                members: 
+                  start: 1
+                  end: 100
+        "cf":
+          forecast:
+            inputs:
+              request: 
+                stream: weef
+                type: "cf"
+        "pf":
+          forecast:
+            inputs:
+              request:
+                stream: weef
+                type: "pf"
+              members: 
+                start: 1
+                end: 100
+        "efi/efic/sot/taem/taes":
+          forecast:
+            inputs:
+              - request:
+                  stream: weef
+                  type: fcmean
+                members:
+                  start: 0
+                  end: 100
+                derive_step: 
+                  type: default
+                  precomputed: true 
+      climatology: 
+        inputs:
+          request:
+            stream: "wees" 
+            time: "00"
+        scheme: ecmwf-2days
+    msmm: 
+      filter:type:
+        "fcmean/fcstdev/fcmin/fcmax":
+          forecast:
+            inputs:
+              request:
+                stream: mmsf
+                type: "fc"
+              members:
+                start: 0
+                end: 50
+    swmm: 
+      filter:type:
+        "fcmean/fcstdev/fcmin/fcmax":
+          forecast:
+            inputs:
+              request:
+                stream: wasf
+                type: "fc"
+              members:
+                start: 0
+                end: 50
+  filter:param:
+    "*": 
+      filter:type:
+        "em/es/pb/fcmean/fcstdev/fcmin/fcmax": 
+          forecast:
+            inputs:
+              request:  
+                param: "{param}"
+    "10": 
+      filter:type:
+        fc/cf/pf/em/es/pb:
+          forecast:
+            inputs:
+              request:
+                param: ["138", "155"]
+    "121/122":
+      filter:type:
+        em/es/pb:
+          forecast:
+            inputs:
+              request:  
+                param: "{param}"
+              derive_step:
+                type: default
+                by: 6
+    "228026/228027":
+      filter:type:
+        em/es/pb:
+          forecast:
+            inputs:
+              request:  
+                param: "{param}"
+              derive_step:
+                type: default
+                by: 3
+    131020/131021/131022/131023/131024/131025/133093/133094/133095/133096/133097/133098:
+      filter:type:
+        ep:
+          forecast:
+            inputs:
+              - request:
+                  param: "130"
+                  type: "cf"
+                derive_step:
+                  type: default
+                  by: 12
+                members: null
+              - request:
+                  param: "130"
+                  type: "pf"
+                derive_step:
+                  type: default
+                  by: 12
+          climatology:
+            required: true
+            inputs:
+              - request:
+                  param: "130"
+                  type: "em"
+                derive_date: 
+                  option: previous
+                  strict: False
+                derive_step:  
+                  type: instantaneous
+              - request:
+                  param: "130"
+                  type: "es"
+                derive_date: 
+                  option: previous
+                  strict: False
+                derive_step: 
+                  type: instantaneous
+    131060/131061/131062/131063/131064/131065/131066/131067/131098/131099/131085:
+      filter:type:
+        ep:
+          forecast:
+            inputs:
+              request:
+                param: "228"
+              derive_step: 
+                type: default
+                deaccumulation: true
+    "131068/131069":
+      filter:type:
+        ep:
+          forecast:
+            inputs:
+              request: 
+                param: ["165", "166"]
+    131070/131071/131072/131100:
+      filter:type:
+        ep:
+          forecast:
+            inputs:
+              request:
+                param: "123"
+              derive_step:
+                type: default
+                by: 6
+    "131073":
+      filter:type:
+        ep:
+          filter:steptype:
+            instantaneous:
+              forecast:
+                inputs:
+                  request:
+                    param: "167"
+            range:
+              forecast:
+                inputs:
+                  request:
+                    param: "122"
+    131074/131075/131076/131077: 
+      filter:type:
+        ep:
+          forecast:  
+            inputs:
+              request:   
+                param: "140229"
+    131078/131079/131080/131081:
+      filter:type:
+        ep:
+          forecast:
+            inputs:
+              request:
+                param: "140232"
+    "132044":
+      filter:type:
+        efi/efic/sot:
+          forecast:
+            inputs:
+              request:
+                param: ["228035", "228036"]
+          climatology:
+            inputs:
+              request:
+                param: "228004"
+    "132045":
+      filter:type:
+        efi/efic/sot:
+          forecast:
+            inputs:
+              request:
+                param: ["162071", "162072"]
+          climatology:
+            inputs:
+              request:
+                param: "162045"
+    "132049":
+      filter:type:
+        efi/efic/sot:
+          forecast:
+            inputs:
+              request:
+                param: "123"
+          climatology:
+            inputs:
+              request:
+                param: "49"
+    "132059":
+      filter:type:
+        efi/efic/sot:
+          forecast:
+            inputs:
+              request:
+                param: "228035"
+          climatology:
+            inputs:
+              request:
+                param: "59"
+    "132144":
+      filter:type:
+        efi/efic/sot:
+          forecast:
+            inputs:
+              request:
+                param: "144"
+          climatology:
+            inputs:
+              request:
+                param: "144"
+    "132165":
+      filter:type:
+        efi/efic/sot:
+          forecast:
+            inputs:
+              request:
+                param: "207"
+          climatology:
+            inputs:
+              request:
+                param: "228005"
+    "132167":
+      filter:type:
+        efi/efic/sot:
+          forecast:
+            inputs:
+              request:
+                param: "167"
+          climatology:
+            inputs:
+              request:
+                param: "228004"
+    "132201": 
+      filter:type:
+        efi/efic/sot:
+          forecast:
+            inputs:
+              request:
+                param: "121"
+          climatology:
+            inputs:
+              request:
+                param: "201"
+    "132202": 
+      filter:type:
+        efi/efic/sot:
+          forecast:
+            inputs:
+              request:
+                param: "122"
+          climatology:
+            inputs:
+              request:
+                param: "202"
+    "132216":
+      filter:type:
+        efi/efic/sot:
+          forecast:
+            inputs:
+              request:
+                param: "140229"
+          climatology:
+            inputs:
+              request:
+                param: "140200"
+    "132228":
+      filter:type:
+        efi/efic/sot:
+          filter:stream:
+            eefo:
+              forecast:
+                inputs:
+                  request:
+                    param: "172228"
+              climatology:
+                inputs:
+                  request:
+                    param: "228"
+            enfo:
+              forecast:
+                inputs:
+                  request:
+                    param: "228"
+              climatology:
+                inputs:
+                  request:
+                    param: "228"
+    "172008":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "8"
+    "172009":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "9"
+    "172142":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "142"
+    "172143":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "143"
+    "172144":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "144"
+    "172146":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "146"
+    "172147":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "147"
+    "172169":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "169"
+    "172175": 
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "175"
+    "172176":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "176"
+    "172177":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "177"
+    "172178":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "178"
+    "172179":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "179"
+    "172180":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "180"
+    "172181":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "181"
+    "172182":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "182"
+    "172189":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "189"
+    "172205":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "205"
+    "172212":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "212"
+    "172228":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "228"
+    "200142":
+      from_inputs: false
+      forecast:
+        inputs:
+          request: 
+            param: "142"
+    "200143":
+      from_inputs: false
+      forecast:
+        inputs:
+          request: 
+            param: "143"
+    "200144":
+      from_inputs: false
+      forecast:
+        inputs:
+          request: 
+            param: "144"
+    "200189":
+      from_inputs: false
+      forecast:
+        inputs:
+          request: 
+            param: "189"
+    "200228":
+      from_inputs: false
+      forecast:
+        inputs:
+          request: 
+            param: "228"
+          derive_step:
+            type: default
+            deaccumulation: true
+    "201":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "121"
+    "202":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "122"
+    "207":
+      filter:type:
+        fc/cf/pf/em/es/pb/fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: ["165", "166"]
+    "228249":
+      from_inputs: false
+      forecast:
+        inputs:
+          request: 
+            param: ["228246", "228247"]
+    "235117":
+      filter:type:
+        fcmean/fcstdev/fcmin/fcmax:
+          forecast:
+            inputs:
+              request: 
+                param: "59"
+    "260033": 
+      from_inputs: false
+      forecast:
+        inputs:
+          request: 
+            param: ["228220", "228218"]
+    "260053":
+      from_inputs: false
+      forecast:
+        inputs:
+          request: 
+            param: ["228220", "228221"]
+    "261001":
+      filter:type:
+        cf/pf/fc:
+          forecast:
+            inputs:
+              - request:
+                  param: ["169", "175", "176", "177", "228021", "47"]
+                derive_step:
+                  type: default
+                  deaccumulation: true
+              - request:
+                  param: ["165", "166", "167", "168"]
+        "em/es/pb": 
+          forecast:
+            inputs:
+              request: 
+                param: "261001"
+    "261014":
+      filter:type:
+        cf/pf/fc:
+          forecast:
+            inputs:
+              - request:
+                  param: ["169", "175", "176", "177", "228021", "47"]
+                derive_step:
+                  type: default
+                  deaccumulation: true
+              - request:
+                  param: ["165", "166", "167", "168"]
+        "em/es/pb": 
+          forecast:
+            inputs:
+              request: 
+                param: "261014"
+    "261015":
+      filter:type:
+        cf/pf/fc:
+          forecast:
+            inputs:
+              - request:
+                  param: ["169", "175", "176", "177", "228021", "47"]
+                derive_step:
+                  type: default
+                  deaccumulation: true
+              - request:
+                  param: ["165", "166", "167", "168"]
+        "em/es/pb": 
+          forecast:
+            inputs:
+              request: 
+                param: "261015"
+    "260004": 
+      filter:type:
+        cf/pf/fc:
+          forecast:
+            inputs:
+              request: 
+                param: ["167", "168"]
+        "em/es/pb": 
+          forecast:
+            inputs:
+              request: 
+                param: "260004"
+    "260242": 
+      filter:type:
+        cf/pf/fc:
+          forecast:
+            inputs:
+              request: 
+                param: ["167", "168"]
+        "em/es/pb": 
+          forecast:
+            inputs:
+              request: 
+                param: "260242"
+    "261016": 
+      filter:type:
+        cf/pf/fc:
+          forecast:
+            inputs:
+              request: 
+                param: ["167", "168"]
+        "em/es/pb": 
+          forecast:
+            inputs:
+              request: 
+                param: "261016"
+    "260005": 
+      filter:type:
+        cf/pf/fc:
+          forecast:
+            inputs:
+              request: 
+                param:  ["165", "166", "167"]
+        "em/es/pb": 
+          forecast:
+            inputs:
+              request: 
+                param: "260005"
+    "260255": 
+      filter:type:
+        cf/pf/fc:
+          forecast:
+            inputs:
+              request: 
+                param: ["165", "166", "167", "168"]
+        "em/es/pb": 
+          forecast:
+            inputs:
+              request: 
+                param: "260255"
+    "261018": 
+      filter:type:
+        cf/pf/fc:
+          forecast:
+            inputs:
+              request: 
+                param: ["165", "166", "167", "168"]
+        "em/es/pb": 
+          forecast:
+            inputs:
+              request: 
+                param: "261018"
+    "261002": 
+      filter:type:
+        cf/pf/fc:
+          forecast:
+            inputs:
+              - request:
+                  param: ["47", "228021", "169", "175", "176", "177"]
+                derive_step:
+                  type: default
+                  deaccumulation: true
+              - request:
+                  param: "167" # Required for metadata of cossza
+        "em/es/pb": 
+          forecast:
+            inputs:
+              request: 
+                param: "261002"
+  filter:type:
+    fcmean/fcstdev/fcmax:
+      filter:stream:
+        "*":
+          filter:param:
+            "31/33/34/39/49/78/79/121/122/136/137/139/141/151/151130/151131/151145/151148/151163/151164/151175/159/164/165/166/167/168//202/207/228246/228247/235117/237117/238117/239117": 
+              forecast:
+                inputs:
+                  derive_step: 
+                    type: default
+            40/41/42/170/140229/140231/140232/140233/140245/172008/172009/172142/172143/172144/172146/172147/172169/172175/172176/172177/172178/172179/172180/172181/172182/172189/172205/172212/172228:
+              forecast:
+                inputs:
+                  derive_step:
+                    type: default
+                    by: 24
+            1/2/3/60/129/130/131/132/133/138/155:
+              forecast:
+                inputs:
+                  derive_step:
+                    type: default
+                    by: 12
+        msmm/swmm:
+          filter:param:
+            "34/139/151/164/165/166/167/168/168/207/229/230": 
+              forecast:
+                inputs:
+                  derive_step: 
+                    type: monthly
+            31/33/39/40/41/42/49/51/52/78/79/137/141/170/183/186/206/236/243/140220/140221/140229/140231/140232/140233/140244/140245/172008/172009/172142/172143/172144/172146/172147/172169/172175/172176/172177/172178/172179/172180/172181/172182/172189/172205/172212/172228/228008/228014:
+              forecast:
+                inputs:
+                  derive_step:
+                    type: monthly
+                    by: 24
+            129/130/133/138/155/203:
+              forecast:
+                inputs:
+                  derive_step:
+                    type: monthly
+                    by: 12
+    fcmin:
+      filter:stream:
+        "*":
+          filter:param:
+            "31/33/34/39/49/78/79/121/122/136/137/139/141/151/151130/151131/151145/151148/151163/151164/151175/159/164/165/166/167/168//202/207/228246/228247/235117/237117/238117/239117": 
+              forecast:
+                inputs:
+                  derive_step: 
+                    type: default
+            172142/172143/172144/172228:
+              from_inputs: false
+            40/41/42/170/140229/140231/140232/140233/140245/172008/172009/172146/172147/172169/172175/172176/172177/172178/172179/172180/172181/172182/172189/172205/172212:
+              forecast:
+                inputs:
+                  derive_step:
+                    type: default
+                    by: 24
+            1/2/3/60/129/130/131/132/133/138/155:
+              forecast:
+                inputs:
+                  derive_step:
+                    type: default
+                    by: 12
+        msmm/swmm:
+          filter:param:
+            "34/139/151/164/165/166/167/168/168/207/229/230": 
+              forecast:
+                inputs:
+                  derive_step: 
+                    type: monthly
+            172142/172143/172144/172228:
+              from_inputs: false
+            31/33/39/40/41/42/49/51/52/78/79/137/141/170/183/186/206/236/243/140220/140221/140229/140231/140232/140233/140244/140245/172008/172009/172146/172147/172169/172175/172176/172177/172178/172179/172180/172181/172182/172189/172205/172212/228008/228014:
+              forecast:
+                inputs:
+                  derive_step:
+                    type: monthly
+                    by: 24
+            129/130/133/138/155/203:
+              forecast:
+                inputs:
+                  derive_step:
+                    type: monthly
+                    by: 12
+    efi/efic/sot:
+      climatology:
+        required: true
+        inputs:
+          request:
+            type: cd
+          derive_date: 
+            option: nearest
+          derive_step: 
+            type: range
+      filter:stream:
+        "eefo/weef": 
+          filter:param:
+            132044/132059/132144/132145/132165/132167/132201/132202/132216/132228: {}
+        "*":
+          filter:param:
+            "132044/132059/132145/132165/132167/132201/132202/132216": 
+              forecast:
+                inputs:
+                  derive_step: 
+                    type: default
+                    by: 6
+            132228/132144:
+              forecast:
+                inputs:
+                  derive_step: 
+                    type: default
+                    deaccumulation: true
+    fc/cf/pf/em/es/taem/taes/ep/pb/cd: {}

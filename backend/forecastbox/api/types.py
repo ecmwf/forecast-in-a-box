@@ -1,17 +1,16 @@
-"""API"""
+"""API types"""
 
 from typing import Optional, Any
-from dataclasses import dataclass, field
 
 from forecastbox.products.product import USER_DEFINED
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 CONFIG_ORDER = ["param", "levtype", "levelist"]
 
 ModelName = str
 
 
-@dataclass
-class ModelSpecification:
+class ModelSpecification(BaseModel):
     """Model Configuration"""
 
     model: ModelName
@@ -22,44 +21,45 @@ class ModelSpecification:
     """Lead time"""
     ensemble_members: int
     """Number of ensemble members"""
-    entries: dict[str, str] = field(default_factory=dict)
+    entries: dict[str, str] = Field(default_factory=dict)
     """Configuration entries"""
 
-    def __post_init__(self):
-        self.model = self.model.lower().replace("_", "/")
+    @field_validator("model")
+    def model_cleanup(cls, m):
+        return m.lower().replace("_", "/")
 
 
 EnvironmentSpecification = dict[str, str]
 
 
-@dataclass
-class ConfigEntry:
+class ConfigEntry(BaseModel):
     """Configuration Entry"""
 
     label: str
     """Label of the configuration entry"""
     description: str | None
     """Description of the configuration entry"""
-    values: Optional[list[str]] = None
+    values: Optional[list[Any]] = None
     """Available values for the configuration entry"""
     example: Optional[str] = None
     """Example value for the configuration entry"""
     multiple: bool = False
     """Whether the configuration entry is a multiple select"""
-    constrained_by: list[str] = field(default_factory=list)
+    constrained_by: list[str] = Field(default_factory=list)
     """List of configuration entries that this entry is constrained by"""
     default: Optional[str] = None
 
 
+    @model_validator(mode="after")
     def __post_init__(self):
-        if USER_DEFINED in self.values:
+        if self.values and USER_DEFINED in self.values:
             self.values = None
 
         if self.values is None:
-            self.select = False
             self.multiple = False
         else:
             self._sort_values()
+        return self
 
     def _sort_values(self):
         """Sort values."""
@@ -69,8 +69,7 @@ class ConfigEntry:
         self.values = list(map(str, sorted(self.values, key=lambda x: str(x).lower())))
 
 
-@dataclass
-class ProductConfiguration:
+class ProductConfiguration(BaseModel):
     """Product Configuration"""
 
     product: str
@@ -78,7 +77,8 @@ class ProductConfiguration:
     options: dict[str, ConfigEntry]
     """Configuration spec"""
 
-    def __post_init__(self):
+    @model_validator(mode="after")
+    def sort_values(self):
         new_options = {}
         for key in CONFIG_ORDER:
             if key in self.options:
@@ -89,10 +89,10 @@ class ProductConfiguration:
                 new_options[key] = self.options[key]
 
         self.options = new_options
+        return self
 
 
-@dataclass
-class ProductSpecification:
+class ProductSpecification(BaseModel):
     """Product Specification
 
     A user has chosen a product and specified the configuration.
@@ -104,11 +104,16 @@ class ProductSpecification:
     """Specification"""
 
 
-@dataclass
-class GraphSpecification:
+class GraphSpecification(BaseModel):
     model: ModelSpecification
     """Model Configuration"""
     products: list[ProductSpecification]
     """Product Configuration"""
     environment: EnvironmentSpecification
     """Environment Configuration"""
+
+class VisualisationOptions(BaseModel):
+    """Options for the visualisation."""
+    preset: str = "blob"
+    # width: str | int = '100%'
+    # height: str | int = 600

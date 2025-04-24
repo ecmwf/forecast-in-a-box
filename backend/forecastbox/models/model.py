@@ -9,18 +9,18 @@ from anemoi.cascade.fluent import from_initial_conditions, from_input
 from anemoi.inference.checkpoint import Checkpoint
 
 if TYPE_CHECKING:
-    from cascade.fluent import Action
+    from earthkit.workflows.fluent import Action
 
 
+@dataclass
 class Model:
     """Model Specification"""
-
-    def __init__(self, checkpoint_path: os.PathLike, lead_time: int, date, ensemble_members, **kwargs):
-        self.checkpoint_path = checkpoint_path
-        self.lead_time = lead_time
-        self.date = date
-        self.ensemble_members = ensemble_members
-        self.kwargs = kwargs
+    checkpoint_path: os.PathLike
+    lead_time: int
+    date: str
+    ensemble_members: int
+    time: str = None
+    entries: dict[str, Any] = None
 
     @property
     def checkpoint(self) -> "Checkpoint":
@@ -35,17 +35,41 @@ class Model:
         """Get Model Qube"""
         return convert_to_model_spec(self.checkpoint, assumptions=assumptions)
 
-    def graph(self, initial_conditions: "Action") -> "Action":
+    def graph(self, initial_conditions: "Action", **kwargs) -> "Action":
         """Get Model Graph"""
         return from_input(
-            self.checkpoint_path, "mars", lead_time=self.lead_time, date=self.date, ensemble_members=self.ensemble_members, **self.kwargs
+            self.checkpoint_path, "mars", lead_time=self.lead_time, date=self.date, ensemble_members=self.ensemble_members, **(self.entries or {})
         )
 
     @property
     def ignore_in_select(self) -> list[str]:
         return ["frequency"]
+    
+    @classmethod
+    def versions(cls, checkpoint_path: str) -> dict[str, str]:
+        """Get the versions of the model"""
+        from anemoi.inference.checkpoint import Checkpoint
 
+        ckpt = Checkpoint(checkpoint_path)
+        return {key.replace('.','-'): '.'.join(val.split('.')[:3]) for key, val in ckpt.provenance_training()["module_versions"].items() if key.startswith("anemoi")}
+    
+    @classmethod
+    def info(cls, checkpoint_path: str) -> dict[str, Any]:
+        """Get the model info"""
+        from anemoi.inference.checkpoint import Checkpoint
 
+        ckpt = Checkpoint(checkpoint_path)
+
+        return {
+            "timestep": ckpt.timestep,
+            "diagnostics": ckpt.diagnostic_variables,
+            "prognostics": ckpt.prognostic_variables,
+            "area": ckpt.area,
+            "local_area": True,
+            "grid": ckpt.grid,
+            "versions": cls.versions(checkpoint_path),
+        }
+    
 def convert_to_model_spec(ckpt: "Checkpoint", assumptions: dict[str, Any] | None = None) -> Qube:
     """Convert an anemoi checkpoint to a Qube."""
     variables = [

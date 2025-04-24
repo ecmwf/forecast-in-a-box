@@ -28,7 +28,7 @@ CONFIG_ORDER = ["param", "levtype", "levelist"]
 def get_model(model: ModelSpecification) -> Model:
     """Get the model from the model repository."""
 
-    model_dict = asdict(model)
+    model_dict = model.model_dump()
     model_path = get_model_path(model_dict.pop("model").replace("_", "/"))
     return Model(model_path, **model_dict)
 
@@ -57,7 +57,6 @@ async def product_to_config(product: Product, modelspec: ModelSpecification, par
     model_qube = model_spec.qube(product.model_assumptions)
 
     available_product_spec = product.model_intersection(model_spec)
-
     subsetted_spec = select_from_params(available_product_spec, params)
 
     axes = subsetted_spec.axes()
@@ -89,7 +88,7 @@ async def product_to_config(product: Product, modelspec: ModelSpecification, par
 
     for key in model_spec.ignore_in_select:
         entries.pop(key, None)
-
+        
     return entries
 
 

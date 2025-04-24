@@ -1,0 +1,86 @@
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from . import ensemble_registry
+from ..product import GenericTemporalProduct, USER_DEFINED
+from ..generic import generic_registry
+
+from qubed import Qube
+
+from earthkit.workflows import fluent
+
+from forecastbox.products.definitions import DESCRIPTIONS, LABELS
+from forecastbox.products.ensemble.base import BasePProcEnsembleProduct
+
+class BaseQuantiles(BasePProcEnsembleProduct, GenericTemporalProduct):
+    """Base Quantiles Product"""
+
+    description = {
+        **DESCRIPTIONS,
+        "quantile": "Quantile",
+    }
+    label = {
+        **LABELS,
+        "quantile": "Quantile",
+    }
+    multiselect = {
+        "quantile": True,
+        "param": True,
+    }
+
+    @property
+    def model_assumptions(self):
+        return {"quantile": "*"}
+    
+    def get_sources(self, product_spec, model, source: fluent.Action) -> dict[str, fluent.Action]:
+        params = product_spec["param"]
+        step = product_spec["step"]
+        return {'forecast': self.select_on_specification({'param': params, 'step': step}, source)}
+
+    def mars_request(self, product_spec: dict[str, Any]):
+        """Mars request for quantile."""
+        quantile = product_spec["quantile"]
+        params = product_spec["param"]
+        step = product_spec["step"]
+        levtype = product_spec.get("levtype", None)
+
+        requests = []
+
+        for para in params:
+            request = {
+                'type': 'pb',
+            }
+            from anemoi.utils.grib import shortname_to_paramid
+            param_id = shortname_to_paramid(para)
+
+            request.update({
+                'levtype': levtype,
+                'param': param_id,
+                'step': step,
+                'quantile': list(map(str, quantile)),
+            })
+            requests.append(request)
+        return requests
+
+@ensemble_registry("Quantiles")
+class DefinedQuantiles(BaseQuantiles):
+    @property
+    def qube(self):
+        defined = yaml.safe_load(open(Path(__file__).parent / "definitions/quantiles.yaml"))
+
+        q = Qube.empty()
+        for d in defined:
+            q = q | Qube.from_datacube({"frequency": "*", **d})
+        return q.compress()
+
+
+@generic_registry("Quantiles")
+class GenericQuantiles(BaseQuantiles):
+    example = {
+        "quantile": "99.0, 99.5",
+    }
+    @property
+    def qube(self):
+        return self.make_generic_qube(quantile=USER_DEFINED)

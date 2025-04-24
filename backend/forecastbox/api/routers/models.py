@@ -70,6 +70,8 @@ class DownloadResponse(BaseModel):
 
 
 async def download_file(download_id: str, url: str, download_path: str) -> DownloadResponse:
+
+    collection = db.get_collection("model-downloads")
     try:
         tempfile_path = tempfile.NamedTemporaryFile(prefix="model_", suffix=".ckpt", delete=False)
 
@@ -85,18 +87,18 @@ async def download_file(download_id: str, url: str, download_path: str) -> Downl
                         file.write(chunk)
                         downloaded += len(chunk)
                         progress = int((downloaded / total) * 100) if total else 0
-                        db.update_one('model-downloads',
+                        collection.update_one(
                             {"_id": download_id},
                             {"$set": {"progress": progress}},
                         )
 
                 shutil.move(file_path, download_path)
-        db.update_one('model-downloads',
+        collection.update_one(
             {"_id": download_id},
             {"$set": {"status": "completed"}},
         )
     except Exception as e:
-        db.update_one('model-downloads',
+        collection.update_one(
             {"_id": download_id},
             {"$set": {"status": "errored", "error": str(e)}},
         )
@@ -114,7 +116,8 @@ async def check_if_downloaded(model: str) -> DownloadResponse:
             progress=100.00,
         )
 
-    existing_download = db.find_one('model-downloads', {"model": model})
+    collection = db.get_collection("model-downloads")
+    existing_download = collection.find_one({"model": model})
     if existing_download:
         return DownloadResponse(
             download_id=existing_download["_id"],
@@ -141,7 +144,9 @@ def download(model: str, background_tasks: BackgroundTasks) -> DownloadResponse:
     
     model_path = f"{repo}/{model.replace('_', '/')}.ckpt"
 
-    existing_download = db.find_one('model-downloads', {"model": model})
+    collection = db.get_collection("model-downloads")
+    
+    existing_download = collection.find_one({"model": model})
     if existing_download:
         return DownloadResponse(
             download_id=existing_download["_id"],
@@ -163,7 +168,7 @@ def download(model: str, background_tasks: BackgroundTasks) -> DownloadResponse:
 
     download_id = str(uuid4())
     
-    db.insert_one('model-downloads', {
+    collection.insert_one({
         "_id": download_id,
         "model": model,
         "status": "in_progress",
@@ -190,10 +195,11 @@ def delete_model(model: str) -> DownloadResponse:
             progress=0.00,
         )
 
+    collection = db.get_collection("model-downloads")
     try:
         os.remove(model_path)
-        if db.find_one('model-downloads', {"model": model}):
-            db.delete_one('model-downloads', {"model": model})
+        if collection.find_one({"model": model}):
+            collection.delete_one({"model": model})
     except Exception as e:
         raise e
     
@@ -210,17 +216,14 @@ class InstallResponse(BaseModel):
 
 @router.post("/install/{model}")
 def install(model: str) -> InstallResponse:
-    from anemoi.inference.checkpoint import Checkpoint
 
-    ckpt = Checkpoint(str(get_model_path(model.replace("_", "/"))))
-
-    anemoi_versions = {key.replace('.','-'): val for key, val in ckpt.provenance_training()["module_versions"].items() if key.startswith("anemoi")}
+    anemoi_versions = Model.versions(str(get_model_path(model.replace("_", "/"))))
     import subprocess
 
     BLACKLISTED_INSTALLS = ['anemoi', 'anemoi-training', 'anemoi-inference', 'anemoi-utils']
     
     try:
-        packages = [f"{key}=={'.'.join(val.split('.')[:3])}" for key, val in anemoi_versions.items() if key not in BLACKLISTED_INSTALLS]
+        packages = [f"{key}=={val}" for key, val in anemoi_versions.items() if key not in BLACKLISTED_INSTALLS]
         if packages:
             subprocess.run(["uv", "pip", "install", *packages, '--no-cache'], check=True)
     except Exception as e:
@@ -252,22 +255,7 @@ async def get_model_info(model: str) -> dict[str, Any]:
     dict[str, Any]
             Dictionary containing model information
     """
-
-    from anemoi.inference.checkpoint import Checkpoint
-
-    ckpt = Checkpoint(str(get_model_path(model.replace("_", "/"))))
-
-    anemoi_versions = {key: val for key, val in ckpt.provenance_training()["module_versions"].items() if key.startswith("anemoi")}
-
-    return {
-        "timestep": ckpt.timestep,
-        "diagnostics": ckpt.diagnostic_variables,
-        "prognostics": ckpt.prognostic_variables,
-        "area": ckpt.area,
-        "local_area": True,
-        "grid": ckpt.grid,
-        "versions": anemoi_versions,
-    }
+    return Model.info(get_model_path(model.replace("_", "/")))
 
 
 @router.post("/spec")
