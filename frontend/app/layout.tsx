@@ -4,10 +4,12 @@ import {
   MantineProvider,
   ColorSchemeScript,
   mantineHtmlProps,
+  AppShell,
 } from "@mantine/core";
 
 import { Notifications } from '@mantine/notifications';
 import '@mantine/notifications/styles.css';
+import '@mantine/dates/styles.css';
 
 import { theme } from "../theme";
 

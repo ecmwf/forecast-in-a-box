@@ -35,7 +35,7 @@ const Intro = () => {
                 </Group>
                 <Center>
                      <a href='/products'>
-                    <Button color="#6DABFF" variant="outline" radius={"lg"} size={"xl"}><Title order={2} style={{color: "#6DABFF"}}>Get Started</Title></Button>
+                        <Button color="#6DABFF" variant="outline" radius={"lg"} size={"xl"}><Title order={2} style={{color: "#6DABFF"}}>Get Started</Title></Button>
                     </a>
                     
                 </Center>

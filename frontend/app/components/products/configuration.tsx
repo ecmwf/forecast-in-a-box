@@ -54,16 +54,16 @@ function ConfigInput({ selectedProduct, item, keyValue, handleChange }: { select
         data={item.values || []}
         searchable
       />
-    )) : item.example ? (
+    )) : (
       <TextInput 
         key={`${selectedProduct}_${keyValue}`}
         label={item.label} 
         description={item.description} 
-        placeholder={item.example} 
+        placeholder={item.example? item.example : item.default || `Enter ${keyValue}`} 
         // value={formData[key] || ""}
         onChange={(event) => handleChange(keyValue, event.currentTarget.value)}
       />
-    ) : null
+    )
   )
 }
 
@@ -93,6 +93,7 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
       });
 
       const productSpec: ProductConfiguration = await response.json();
+      console.log(productSpec)
 
       // Extract keys from API response to set formData and options dynamically
       const initialFormData: Record<string, string> = Object.keys(productSpec.options).reduce((acc: Record<string, string>, key: string) => {
@@ -147,7 +148,6 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
 
   
   const isFormValid = () => {
-    // console.log(formData);
     const isValid = Object.keys(productConfig.options).every(key => formData[key] !== undefined && formData[key] !== "" || productConfig.options[key].default);
     if (!isValid) {
       showNotification({

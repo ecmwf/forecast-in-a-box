@@ -31,7 +31,6 @@ const ProductsPage = () => {
     const [jobId, setJobId] = useState<SubmitResponse>({} as SubmitResponse);
 
     const setSubmittedProducts = (prod: Record<string, ProductSpecification>) => {
-        console.log("Submitted products: ", prod);
         setProducts(prod);
         nextStep();
     }

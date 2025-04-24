@@ -7,7 +7,7 @@ import { IconX, IconPencil} from '@tabler/icons-react';
 import {ModelSpecification, ProductSpecification, SubmitSpecification, SubmitResponse} from './interface'
 
 import InformationWindow from './model/information'
-import GraphModal from './shared/graphModal'
+import GraphVisualiser from './visualise';
 
 import Cart from './products/cart'
 
@@ -54,7 +54,6 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
             products: Object.values(products),
             environment: {}
         }
-        console.log(submitData);
         setSubmitting(true);
 
         const execute = async () => {
@@ -75,7 +74,6 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
                         alert("Error: " + result.error);
                         throw new Error(`Error: ${result.error}`);
                     }
-                    console.log(result);
                     setJobId(result);
                     window.location.href = `/progress/${result.job_id}`;
 
@@ -95,7 +93,6 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
             products: Object.values(products),
             environment: {}
         }
-        console.log(submitData);
 
         async function retrieveFileBlob() {
             try {
@@ -115,8 +112,6 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
                 }
                 const fileBlob = await ftch.json();
                 
-                console.log(fileBlob);
-
                 // this works and prompts for download
                 var link = document.createElement('a')  // once we have the file buffer BLOB from the post request we simply need to send a GET request to retrieve the file data
                 const blob = new Blob([JSON.stringify(fileBlob, null, 2)], { type: 'application/json' });
@@ -130,40 +125,6 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
         };
         retrieveFileBlob();
     }
-
-    const [graphContent, setGraphContent] = useState<string>("");
-    const [loading, setLoading] = useState(false);
-
-    const getGraph = () => {
-        const submitData: SubmitSpecification = {
-            model: model,
-            products: Object.values(products),
-            environment: {}
-        };
-        console.log(submitData);
-
-        const getGraphHtml = async () => {
-            setLoading(true);
-            (async () => {
-                try {
-                    const response = await fetch(`/api/py/graph/visualise`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(submitData),
-                    });
-
-                    const graph: string = await response.text();
-                    console.log(graph);
-                    setGraphContent(graph);
-                } catch (error) {
-                    console.error("Error getting graph:", error);
-                } finally {
-                    setLoading(false);
-                }
-            })();
-        };
-        getGraphHtml();
-    };
     // <SimpleGrid cols={{ base: 1, sm: 3, lg: 3 }} spacing='' >
     {/* <Container miw={{base:'90vw', sm:'25vw'}}><Title order={2}>Categories</Title><Categories categories={categories} setSelected={setSelectedProduct} /></Container>
     <Container miw={{base:'90vw', sm:'25vw'}}><Title order={2}>Configuration</Title><Configuration selectedProduct={selected} selectedModel={model} submitTarget={addProduct} /></Container>
@@ -202,25 +163,26 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
                     <Title pb ='md' order={2}>Products ({Object.keys(products).length})</Title>
                     <Button onClick={() => setSlider(1)}>Add more</Button>
                     <Divider p='md'/>
-                    <Card.Section mah='60vh'>
-                        <Cart products={products} setProducts={setProducts} />
-                    </Card.Section>
                 </Card>
+                <Cart products={products} setProducts={setProducts} />
                 </Grid.Col>
             </Grid>
             <Space p='xl'/>
-            <SimpleGrid cols={3} spacing='xs'>
-                <Button color='orange' onClick={getGraph} disabled={loading}>
-                    {loading ? "Loading..." : "Visualise"}
-                </Button>
+            <Group grow justify='center' preventGrowOverflow={true}>
+                <GraphVisualiser 
+                    spec={{
+                        model: model,
+                        products: Object.values(products),
+                        environment: {}
+                    }}
+                    url={null}
+                />
                 <Button onClick={handleDownload}>Download</Button>
                 <Button color='green'onClick={handleSubmit} disabled={submitting || status.cascade !== "up"}>
                     {submitting ? "Submitting..." : 
                     (status.cascade !== "up" ? <Text c='red'> (Server is down)</Text> : 'Submit')}
                 </Button>
-            </SimpleGrid>
-            
-            <GraphModal graphContent={graphContent} setGraphContent={setGraphContent} loading={loading}/>
+            </Group>
         </Container>
     );
 }

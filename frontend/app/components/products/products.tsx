@@ -23,7 +23,6 @@ function ProductConfigurator({model, products, setProducts}: ProductConfiguratio
 
     const addProduct = (conf: ProductSpecification) => {
         setSelectedProduct(null);
-        console.log(sha256(JSON.stringify(conf)).toString());
         internal_setProducts((prev: any) => ({
             ...prev,
             [sha256(JSON.stringify(conf)).toString()]: conf,
@@ -74,7 +73,7 @@ function ProductConfigurator({model, products, setProducts}: ProductConfiguratio
     return (
         <Container size='xl'>
             <LoadingOverlay visible={loading}/>
-            <Grid>
+            <Grid >
                 <Grid.Col span={{ base: 12, sm: 12, md: 6, xl: 4 }}>
                     <Title order={2}>Categories</Title>
                     <Categories categories={categories} setSelected={setSelectedProduct} />
@@ -85,7 +84,7 @@ function ProductConfigurator({model, products, setProducts}: ProductConfiguratio
                         <Configuration selectedProduct={selected} selectedModel={model} submitTarget={addProduct} />
                     </Container>
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 12, md: 12, xl: 4 }}>
+                <Grid.Col span={{ base: 12, sm: 12, md: 12, xl: 4 }} >
                     <Title order={2}>Selected ({Object.keys(internal_products).length})</Title>
                     <Cart products={internal_products} setProducts={internal_setProducts} />
                 </Grid.Col>
