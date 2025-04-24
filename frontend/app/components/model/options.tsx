@@ -64,11 +64,11 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
         <Table.Tr>
             <Table.Td>
                 <Button
-                    className={`${classes['button']} ${downloadStatus.status !== 'completed' ? classes['button--disabled'] : ''}`}
+                    classNames={classes}
                     onClick={() => setSelected(model)}
                     disabled={downloadStatus.status !== 'completed'}
                 >
-                    {model}
+                    <Text size='sm' style={{'wordBreak': 'break-all', 'display':'flex'}}>{model}</Text>
                 </Button>
             </Table.Td>
             <Table.Td>
@@ -81,7 +81,8 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
                         color='green'
                         onClick={() => handleDownload()}
                         disabled={downloadStatus.status !== 'not_downloaded' && downloadStatus.status !== 'errored'}
-                        leftSection={<IconDownload />}
+                        // leftSection={<IconDownload />}
+                        size='sm'
                     >
                         {downloadStatus.status === 'errored' ? 'Retry' : 'Download'}
                     </Button>

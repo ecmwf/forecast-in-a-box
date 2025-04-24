@@ -97,7 +97,7 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
         async function retrieveFileBlob() {
             try {
                 const ftch = await fetch( // this will request the file information for the download (whether an image, PDF, etc.)
-                    `/api/py/execution/serialise`,
+                    `/api/py/graph/serialise`,
                     {
                         method: "POST",
                         headers: {
@@ -116,7 +116,7 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
                 var link = document.createElement('a')  // once we have the file buffer BLOB from the post request we simply need to send a GET request to retrieve the file data
                 const blob = new Blob([JSON.stringify(fileBlob, null, 2)], { type: 'application/json' });
                 link.href = URL.createObjectURL(blob);
-                link.setAttribute("download", 'products.json');
+                link.setAttribute('download', `${crypto.randomUUID()}.cascade`);
                 link.click()
                 link.remove();  //afterwards we remove the element  
             } catch (e) {
@@ -177,7 +177,23 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
                     }}
                     url={null}
                 />
-                <Button onClick={handleDownload}>Download</Button>
+                <Group grow>
+                <Button onClick={handleDownload}>Serialise</Button>
+                <Button onClick={() => {
+                    const submitData: SubmitSpecification = {
+                        model: model,
+                        products: Object.values(products),
+                        environment: {}
+                    };
+
+                    const blob = new Blob([JSON.stringify(submitData, null, 2)], { type: 'application/json' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.setAttribute('download', `${crypto.randomUUID()}.json`);
+                    link.click();
+                    link.remove();
+                }}>Download</Button>
+                </Group>
                 <Button color='green'onClick={handleSubmit} disabled={submitting || status.cascade !== "up"}>
                     {submitting ? "Submitting..." : 
                     (status.cascade !== "up" ? <Text c='red'> (Server is down)</Text> : 'Submit')}

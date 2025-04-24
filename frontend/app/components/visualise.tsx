@@ -20,7 +20,6 @@ export default function GraphVisualiser({ spec, url }: GraphVisualiserProps) {
             setLoading(true);
             (async () => {
                 try {
-                    console.log(options);
                     let response: Response;
                     if (spec) {
                         response = await fetch(`/api/py/graph/visualise`, {
@@ -32,7 +31,7 @@ export default function GraphVisualiser({ spec, url }: GraphVisualiserProps) {
                         response = await fetch(`${url}`, {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ spec: spec, options: options }),
+                            body: JSON.stringify(options),
                         });
                     } else {
                         throw new Error("No valid source for fetching the graph.");
