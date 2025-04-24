@@ -35,7 +35,6 @@ const HomePage = () => {
       });
 
       const data: StatusResponse = await response.json();
-      console.log(data);
       setJobs(data);
       
     } catch (error) {
@@ -98,7 +97,7 @@ const HomePage = () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/py/jobs/delete/${jobId}`, {
-        method: "GET",
+        method: "DELETE",
         headers: { "Content-Type": "application/json" },
       });
       await response.json();

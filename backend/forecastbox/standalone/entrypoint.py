@@ -84,9 +84,9 @@ if __name__ == "__main__":
     setup_process({})
     logger.info("main process starting")
 
-    from forecastbox.settings import get_settings
+    from forecastbox.settings import APISettings
 
-    settings = get_settings()
+    settings = APISettings()
     context = {
         # "WEB_URL": settings.web_url,
         "API_URL": settings.api_url,

@@ -1,75 +1,101 @@
 "use client"; // Required for client-side fetching
 
-import { Card, Button, Tabs, ScrollArea, Paper, Title, Text, ActionIcon, Flex, Table, Loader} from '@mantine/core';
+import { Card, Button, Tabs, ScrollArea, Group, Title, Text, ActionIcon, Flex, Table, Loader, Progress} from '@mantine/core';
 import { useEffect, useState } from "react";
 
 import classes from './options.module.css';
 
-import {IconDownload, IconCheck, IconRefresh, IconTableDown} from '@tabler/icons-react';
+import {IconDownload, IconCheck, IconRefresh, IconTableDown, IconTrash} from '@tabler/icons-react';
 
+interface DownloadResponse {
+    download_id: string;
+    status: string;
+    message: string;
+    progress: number;
+}
 
 function ModelButton({ model, setSelected }: { model: string; setSelected: (value: string) => void }) {
-    const [downloaded, setDownloaded] = useState<boolean>(false);
-    const [downloading, setDownloading] = useState<boolean>(false);
+    const [downloadStatus, setDownloadStatus] = useState<DownloadResponse>({} as DownloadResponse);
     const [installing, setInstalling] = useState<boolean>(false);
 
-    useEffect(() => {
-        const fetchDownloaded = async () => {
-            const result = await fetch(`/api/py/models/downloaded/${model}`);
-            setDownloaded(await result.json());
-        };
-        fetchDownloaded();
-    }, [model]);
+    const getDownloadStatus = async () => {
+        const result = await fetch(`/api/py/models/download/${model}`);
+        const data = await result.json();
+        setDownloadStatus(data);
+    };
 
-    const handleDownload = () => {
-        setDownloading(true);
-        const download = async () => {
-            const result = await fetch(`/api/py/models/download/${model}`);
-            setDownloaded(true);
-            setDownloading(false);
-        };
-        download();
+    const handleDownload = async () => {
+        const result = await fetch(`/api/py/models/download/${model}`, { method: 'POST' });
+        const data = await result.json();
+        setDownloadStatus(data);
+        const interval = setInterval(async () => {
+            await getDownloadStatus();
+            if (downloadStatus.status === "completed" || downloadStatus.status === 'errored') {
+                clearInterval(interval);
+            }
+        }, 1000);
+        setTimeout(() => {
+            clearInterval(interval);
+        }, 20000);
+        return () => clearInterval(interval); // Cleanup on component unmount
     };
-    const handleInstall = () => {
-        setInstalling(true);
-        const install = async () => {
-            const result = await fetch(`/api/py/models/install/${model}`);
-            setInstalling(false);
+
+    const handleDelete = async () => {
+        try {
+            const result = await fetch(`/api/py/models/${model}`, { method: 'DELETE' });
+            const data = await result.json();
+            setDownloadStatus(data);
+        } catch (error) {
+            console.error('Error deleting model:', error);
         }
-        install();
     };
+
+    const handleInstall = async () => {
+        setInstalling(true);
+        const result = await fetch(`/api/py/models/install/${model}`, { method: 'POST' });
+        setInstalling(false);
+    };
+
+    useEffect(() => {
+        getDownloadStatus();
+    }, [model]);
 
     return (
         <Table.Tr>
             <Table.Td>
                 <Button
-                    className={`${classes['button']} ${!downloaded ? classes['button--disabled'] : ''}`}
+                    className={`${classes['button']} ${downloadStatus.status !== 'completed' ? classes['button--disabled'] : ''}`}
                     onClick={() => setSelected(model)}
-                    disabled={!downloaded}
+                    disabled={downloadStatus.status !== 'completed'}
                 >
                     {model}
-                    {downloading && !downloaded && <Text> - Loading...</Text>}
                 </Button>
             </Table.Td>
             <Table.Td>
-                {downloaded ? (
-                    <IconCheck color="green" />
-                ): downloading ? (
-                        <Loader/>
+                {downloadStatus.status === 'completed' ? (
+                    <Group><IconCheck color="green" /> <Text size='sm'>Downloaded</Text></Group>
+                ): downloadStatus.status === 'in_progress' ? (
+                    <Progress value={downloadStatus.progress} />
                 ): (
-                    <ActionIcon disabled={downloading} onClick={() => handleDownload()}>
-                        <IconDownload />
-                    </ActionIcon>
-                    )}
+                    <Button
+                        color='green'
+                        onClick={() => handleDownload()}
+                        disabled={downloadStatus.status !== 'not_downloaded' && downloadStatus.status !== 'errored'}
+                        leftSection={<IconDownload />}
+                    >
+                        {downloadStatus.status === 'errored' ? 'Retry' : 'Download'}
+                    </Button>
+                )}
             </Table.Td>
             <Table.Td>
-                {installing ?
-                    <Loader/>
-                :
-                <ActionIcon disabled={installing || !downloaded} onClick={() => handleInstall()}>
-                    <IconTableDown />
-                </ActionIcon>
-                }
+                <Group>
+                    <Button disabled={downloadStatus.status !== 'completed'} onClick={() => handleInstall()} leftSection={<IconTableDown />} variant="outline" color='blue'>
+                        {installing ? <Loader size={16} /> : 'Install'}
+                    </Button>
+                    <Button disabled={downloadStatus.status !== 'completed'} onClick={() => handleDelete()} leftSection={<IconTrash />}  color='red'>
+                        Delete
+                    </Button>
+                </Group>
             </Table.Td>
         </Table.Tr>
     );
@@ -113,8 +139,8 @@ function Options({ cardProps, tabProps, setSelected }: OptionsProps) {
                 <Table.Thead>
                     <Table.Tr style={{ backgroundColor: "#f0f0f6", textAlign: "left" }}>
                         <Table.Th>Model</Table.Th>
-                        <Table.Th>Download</Table.Th>
-                        <Table.Th>Install</Table.Th>
+                        <Table.Th>Download Status</Table.Th>
+                        <Table.Th>Actions</Table.Th>
                     </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>

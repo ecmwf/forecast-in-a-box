@@ -1,9 +1,9 @@
 
 import React, { useState } from 'react';
-import { Button, ActionIcon, ScrollArea, Card, Text, Group, Paper, Modal, Divider, Stack, Container} from '@mantine/core';
+import { Button, ActionIcon, ScrollArea, Card, Text, Group, Paper, Modal, Divider, Stack, Collapse} from '@mantine/core';
 
 import Configuration from './configuration';
-import { IconX, IconPencil} from '@tabler/icons-react';
+import { IconX, IconChevronRight, IconChevronDown} from '@tabler/icons-react';
 
 import {CategoriesType, ProductSpecification} from '../interface'
 import sha256 from 'crypto-js/sha256';
@@ -39,15 +39,37 @@ function Cart({products, setProducts}: CartProps) {
           [sha256(JSON.stringify(conf)).toString()]: conf,
       });
       };
-  
+      const [expanded, setExpanded] = useState<Record<string, boolean>>(
+        Object.keys(products).reduce((acc, id) => {
+          acc[id] = Object.keys(products).length > 6 ? false : true; 
+          return acc;
+        }, {} as Record<string, boolean>)
+      );
+
+      const toggleExpanded = (id: string) => {
+        setExpanded((prev) => ({
+        ...prev,
+        [id]: !prev[id],
+        }));
+      };
     const rows = Object.keys(products).map((id) => (
         <Card padding='xs' shadow='xs' radius='md' key={id}>
             <Card.Section w='100%'>
-                <Group justify='space-between' mt="xs" mb="xs">
-                    <Text size='md'>{products[id].product}</Text>
+                <Group justify='space-between' mt="" mb="" wrap='nowrap'>
+                    <Group>
+                      <ActionIcon 
+                            color="outline" 
+                            c='blue'
+                            onClick={() => {toggleExpanded(id);}} 
+                            size="xs"
+                          >
+                            {expanded[id] ? <IconChevronRight/> : <IconChevronDown/>}
+                      </ActionIcon>
+                      <Text size='sm'>{products[id].product}</Text>
+                    </Group>
                     <Group>
                     {/* <ActionIcon color="green" onClick={() => openModal(id)} size="lg"><IconPencil/></ActionIcon> */}
-                    <ActionIcon color="red" onClick={() => handleRemove(id)} size="lg"><IconX/></ActionIcon>
+                    <ActionIcon color="red" onClick={() => handleRemove(id)} size="md"><IconX/></ActionIcon>
                     </Group>
                 </Group>
             </Card.Section>
@@ -56,21 +78,24 @@ function Cart({products, setProducts}: CartProps) {
                     <Configuration selectedProduct={products[selectedProduct].product} submitTarget={handleEdit}  /> //initial={products[selectedProduct]}
                 )}
             </Modal> */}
-            <Stack maw='90%' p='' m='' gap='xs'>
-              {Object.entries(products[id].specification).map(([subKey, subValue]) => (
-                subKey !== 'product' && (
-                  <Text size='xs' p='' m='' key={subKey} lineClamp={1}>{subKey}: {JSON.stringify(subValue)}</Text>
-                )
-              ))}
-            </Stack>
+
+            <Collapse in={expanded[id] || Object.keys(products).length > 6 ? false : true}>
+              <Stack maw='90%' p='' m='xs' gap='xs' pl='xl'>
+                {Object.entries(products[id].specification).map(([subKey, subValue]) => (
+                  subKey !== 'product' && (
+                    <Text size='xs'  m='' key={subKey} lineClamp={1}>{subKey}: {JSON.stringify(subValue)}</Text>
+                  )
+                ))}
+              </Stack>
+            </Collapse>
       </Card>
     ));
     
     return (
-      <Paper shadow="sm" p="lg" radius="md" withBorder w="inherit" h='95%' mih="10vh">
-        <ScrollArea mah={{base: "fit", md: "60vh"}} type="always">
+      <Paper shadow="sm" mt='lg' p="sm" radius="md" withBorder w="inherit" h='90%' mih="10vh">
+        <ScrollArea.Autosize mah="90%" type='always'>
           {rows}
-        </ScrollArea>        
+        </ScrollArea.Autosize>
       </Paper>
     );
   };

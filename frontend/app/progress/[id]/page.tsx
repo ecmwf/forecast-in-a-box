@@ -7,8 +7,7 @@ import { Progress, Container, Title, Text, ScrollArea, Divider, Button, Loader, 
 import {IconSearch} from '@tabler/icons-react';
 
 import { DatasetId } from '../../components/interface';
-
-import GraphModal from './../../components/shared/graphModal'
+import GraphVisualiser from '@/app/components/visualise';
 
 function OutputCells({ id, dataset, progress }: { id: string; dataset: string, progress: string | null }) {
     const [isAvailable, setIsAvailable] = useState<boolean>(false);
@@ -74,11 +73,12 @@ const ProgressPage = () => {
                 const data = await response.json();
                 setProgress(data);
                 
-                if (progress.progress == "100.00" || progress.status == "errored") {
+                if (progress.progress == "100.00" || progress.status == "errored" || progress.status == "completed") {
                     clearInterval(interval); // Stop fetching if progress is 100
                 }
 
             } catch (error) {
+                clearInterval(interval);
                 // console.error('Error fetching progress:', error);
             }
         };
@@ -109,32 +109,6 @@ const ProgressPage = () => {
         fetchOutputs(); // Initial fetch
     }, [id]);
 
-    const [graphContent, setGraphContent] = useState<string>("");
-    const [loading, setLoading] = useState(false);
-
-    const getGraph = () => {
-
-        const getGraphHtml = async () => {
-            setLoading(true);
-            (async () => {
-                try {
-                    const response = await fetch(`/api/py/jobs/visualise/${id}`, {
-                        method: "GET",
-                        headers: { "Content-Type": "application/json" },
-                    });
-
-                    const graph: string = await response.text();
-                    setGraphContent(graph);
-                } catch (error) {
-                    console.error("Error getting graph:", error);
-                } finally {
-                    setLoading(false);
-                }
-            })();
-        };
-        getGraphHtml();
-    };
-
     return (
         <Container size='lg'>
             {/* <Button
@@ -143,12 +117,8 @@ const ProgressPage = () => {
             onClick={() => window.location.href = `/status`}>
             All
             </Button> */}
-            <Flex gap='xl' pt='xl'>
             <Title display={'inline'} order={1}>Progress</Title>
-            <Button color='orange' onClick={getGraph} disabled={loading}>
-                {loading ? "Loading..." : "Visualise"}
-            </Button>
-            </Flex>
+            <GraphVisualiser spec={null} url={`/api/py/jobs/visualise/${id}`} />
 
             <Title pt='xl' order={4}>{id} - {progress.status}</Title>
             
@@ -193,7 +163,6 @@ const ProgressPage = () => {
             )}
             </Table.Tbody>
             </Table>
-            <GraphModal graphContent={graphContent} setGraphContent={setGraphContent} loading={loading}/>
         </Container>
     );
 };

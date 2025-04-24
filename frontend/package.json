@@ -14,9 +14,10 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@mantine/core": "^7.17.2",
-    "@mantine/hooks": "^7.17.2",
-    "@mantine/notifications": "^7.17.2",
+    "@mantine/core": "^7.17.4",
+    "@mantine/dates": "^7.17.4",
+    "@mantine/hooks": "^7.17.4",
+    "@mantine/notifications": "^7.17.4",
     "@tabler/icons-react": "^3.30.0",
     "@types/node": "22.5.5",
     "@types/react": "18.3.8",
@@ -24,6 +25,7 @@
     "autoprefixer": "10.4.20",
     "concurrently": "^9.0.1",
     "crypto-js": "^4.2.0",
+    "dayjs": "^1.11.13",
     "eslint": "8.41.0",
     "eslint-config-next": "13.4.4",
     "next": "^14.2.13",
