@@ -2,10 +2,13 @@
 
 from forecastbox.settings import FIABSettings
 
+
 SETTINGS = FIABSettings()
 db_name = SETTINGS.mongodb_database
-# client = MongoClient(SETTINGS.mongodb_uri)
-# db = client[SETTINGS.mongodb_database]
+
+if SETTINGS.mongodb_uri is not None:
+    from pymongo import MongoClient
+    client = MongoClient(SETTINGS.mongodb_uri)
 
 
 class MockMongoDB:
@@ -47,6 +50,11 @@ class MockMongoDB:
         return [doc for doc in db[collection_name] if all(doc.get(k) == v for k, v in query.items())]
 
     @staticmethod
+    def find_one(collection_name, query=None):
+        results = MockMongoDB.find(collection_name, query)
+        return results[0] if results else None
+
+    @staticmethod
     def delete_one(collection_name, query):
         db = MockMongoDB.get_database(db_name)
         if collection_name not in db:
@@ -75,4 +83,7 @@ class MockMongoDB:
         return self.get_database(db_name).get(key, {})
 
 
-db = MockMongoDB()
+if SETTINGS.mongodb_uri is not None:
+    db = client[db_name]
+else:
+    db = MockMongoDB()

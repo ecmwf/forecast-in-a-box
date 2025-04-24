@@ -264,7 +264,7 @@ async def flush_job() -> JobDeletionResponse:
     client.request_response(api.ResultDeletionRequest(datasets = {}), f"{SETTINGS.cascade_url}")  # type: ignore
     return db.delete_many("job_records", {})
 
-@router.get("/delete/{job_id}")
+@router.delete("/delete/{job_id}")
 async def delete_job(job_id: JobId = Depends(validate_job_id)) -> JobDeletionResponse:
     """Delete a job from the database and cascade.
     
