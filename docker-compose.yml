@@ -24,7 +24,7 @@ services:
     image: eccr.ecmwf.int/forecast-in-a-box/fiab-backend:latest
     volumes:
       - data:/app/data_dir
-      - './../anemoi-cascade:/app/anemoi-cascade'
+      - ~/.ssh:/root/.ssh:ro
     ports:
       - "8000:8000"
     environment:

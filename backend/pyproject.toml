@@ -29,7 +29,7 @@ dependencies = [
 	"pymongo",
 	"earthkit-workflows",
 	"pproc",
-	#"pproc-cascade",
+	"pproc-cascade",
 ]
 
 [project.urls]
