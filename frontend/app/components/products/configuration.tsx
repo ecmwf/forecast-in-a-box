@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 
 import { Card, TextInput, Select, Button, LoadingOverlay, MultiSelect, Group, Text, Collapse, Box, Space} from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
+import {useApi} from '@/app/api';
 
 import {
   showNotification, // notifications.show
@@ -72,6 +73,7 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [productConfig, updateProductConfig] = useState<ProductConfiguration>({ product: selectedProduct, options: {} });
   const [loading, setLoading] = useState(true);
+  const api = useApi();
 
   const [advancedOpened, { toggle }] = useDisclosure(false);
 
@@ -86,13 +88,9 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
     if (!selectedProduct) return; // Prevent unnecessary fetch
     setLoading(true);
     try {
-      const response = await fetch(`/api/py/products/configuration/${selectedProduct}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 'model': selectedModel, 'spec': {} }), // Empty request for initial load
-      });
+      const response = await api.post(`/products/configuration/${selectedProduct}`, { 'model': selectedModel, 'spec': {} }); // Empty request for initial load
 
-      const productSpec: ProductConfiguration = await response.json();
+      const productSpec: ProductConfiguration = await response.data;
       console.log(productSpec)
 
       // Extract keys from API response to set formData and options dynamically
@@ -120,13 +118,8 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
     const fetchUpdatedOptions = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/py/products/configuration/${selectedProduct}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 'model': selectedModel, 'spec': formData }),
-        });
-
-        const productSpec: ProductConfiguration = await response.json();
+        const response = await api.post(`/products/configuration/${selectedProduct}`, { 'model': selectedModel, 'spec': formData });
+        const productSpec: ProductConfiguration = await response.data;
         updateProductConfig(productSpec);
         
       } catch (error) {

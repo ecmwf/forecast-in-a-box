@@ -3,12 +3,13 @@
 import React from 'react';
 import { Container, Group, Space } from '@mantine/core';
 import { useEffect, useState } from 'react';
-import { Table, Loader, Center, Title, Progress, Button, Flex, Divider, Tooltip, Text} from '@mantine/core';
+import { Table, Loader, Center, Title, Progress, Button, Flex, Divider, Tooltip, FileButton} from '@mantine/core';
 
 import { IconRefresh, IconTrash } from '@tabler/icons-react';
 import classes from './status.module.css';
 import { showNotification } from '@mantine/notifications';
 
+import {useApi} from '@/app/api';
 
 export type ProgressResponse = {
   progress: string;
@@ -25,16 +26,14 @@ const HomePage = () => {
 
   const [jobs, setJobs] = useState<StatusResponse>({} as StatusResponse);
   const [loading, setLoading] = useState(true);
+  const api = useApi();
 
-  const fetchJobs = async () => {
+  const getStatus = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/py/jobs/status`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
+      const response = await api.get('/jobs/status');
 
-      const data: StatusResponse = await response.json();
+      const data: StatusResponse = await response.data;
       setJobs(data);
       
     } catch (error) {
@@ -47,12 +46,11 @@ const HomePage = () => {
   const flushJobs = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/py/jobs/flush`, {
-        method: "POST",
+      const response = await api.post(`/jobs/flush`, {
         headers: { "Content-Type": "application/json" },
       });
 
-      const result = await response.json();
+      const result = await response.data();
 
       showNotification({
         id: `flushed-result-form-${crypto.randomUUID()}`,
@@ -70,18 +68,17 @@ const HomePage = () => {
     } finally {
       setLoading(false);
     }
-    fetchJobs();
+    getStatus();
   };
 
   const restartJob = async (jobId: string) => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/py/jobs/restart/${jobId}`, {
-        method: "GET",
+      const response = await api.get(`/jobs/restart/${jobId}`, {
         headers: { "Content-Type": "application/json" },
       });
 
-      await response.json();
+      await response.data();
 
     }
     catch (error) {
@@ -90,17 +87,16 @@ const HomePage = () => {
     finally {
       setLoading(false);
     }
-    fetchJobs();
+    getStatus();
   };
 
   const deleteJob = async (jobId: string) => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/py/jobs/delete/${jobId}`, {
-        method: "DELETE",
+      const response = await api.delete(`/jobs/delete/${jobId}`, {
         headers: { "Content-Type": "application/json" },
       });
-      await response.json();
+      await response.data();
     }
     catch (error) {
       console.error('Error fetching job statuses:', error);
@@ -108,20 +104,21 @@ const HomePage = () => {
     finally {
       setLoading(false);
     }
-    fetchJobs();
+    getStatus();
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const handleFileUpload = (file) => {
+    console.log("File selected:", file);
     if (file) {
       const formData = new FormData();
       formData.append("file", file);
 
-      fetch("/api/py/jobs/upload", {
-        method: "POST",
-        body: formData,
+      api.post("/jobs/upload", formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
       })
-        .then((response) => response.json())
+        .then((response) => response.data)
         .then(() => {
           showNotification({
             id: `upload-success-${crypto.randomUUID()}`,
@@ -131,7 +128,7 @@ const HomePage = () => {
             message: "File uploaded successfully",
             color: "green",
           });
-          fetchJobs();
+          getStatus();
         })
         .catch((error) => {
           console.error("Error uploading file:", error);
@@ -148,22 +145,17 @@ const HomePage = () => {
   };
 
   useEffect(() => {
-    fetchJobs();
+    getStatus();
   }, []);
 
   return (
     <Container size="lg" pt="xl" pb="xl">
       <Flex gap='xl'>
         <Title>Status</Title>
-        <Button component="label" color='green'>
-          Upload
-          <input
-            type="file"
-            hidden
-            onChange={handleFileUpload}
-          />
-        </Button>
-        <Button onClick={fetchJobs}>
+        <FileButton onChange={handleFileUpload}>
+          {(props) => <Button color='green' {...props}>Upload</Button>}
+        </FileButton>
+        <Button onClick={getStatus}>
           Refresh
         </Button>
         <Button onClick={flushJobs} color="red" disabled={Object.keys(jobs.progresses || {}).length === 0}>

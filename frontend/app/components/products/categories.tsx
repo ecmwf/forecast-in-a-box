@@ -29,7 +29,7 @@ function Categories({categories, setSelected }: CategoriesProps) {
             ) 
         ))}
         {Object.entries(categories).map(([key, item]) => (
-            !item.available && (
+            !item.available && item.unavailable_options && (
             <Paper shadow='sm' className={classes['option-group']} key={key} m='sm' p='xs' ml='' bg='#F3F3F3'>
                 <Text className={classes['heading']}>{item.title}</Text>
                 <Text className={classes['description']}>{item.description}</Text>

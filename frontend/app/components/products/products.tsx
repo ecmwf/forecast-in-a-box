@@ -6,6 +6,7 @@ import { LoadingOverlay, Group, SimpleGrid, Container, Button, Divider, Title, G
 import Categories from "./categories";
 import Configuration from "./configuration";
 import Cart from "./cart";
+import api from '@/app/api';
 
 import {CategoriesType, ProductSpecification, ModelSpecification} from '../interface'
 import sha256 from 'crypto-js/sha256';
@@ -32,26 +33,12 @@ function ProductConfigurator({model, products, setProducts}: ProductConfiguratio
       const [categories, setCategories] = useState<CategoriesType>({});
       const [loading, setLoading] = useState(true);
   
-    //   useEffect(() => {
-    //       fetch(`/api/py/products/valid-categories/${model}`)
-    //           .then((res) => res.json())
-    //           .then((data) => {
-    //               setCategories(data);
-    //               setLoading(false);
-    //           });
-    //   }, []);
-
     useEffect(() => {
         const fetchUpdatedOptions = async () => {
         setLoading(true);
         try {
-            const response = await fetch(`/api/py/products/valid-categories/`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(model),
-            });
-    
-            const categories: CategoriesType = await response.json();
+            const response = await api.post(`/products/valid-categories/`, model);    
+            const categories: CategoriesType = await response.data;
             setCategories(categories);
             
         } catch (error) {

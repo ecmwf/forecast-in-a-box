@@ -3,6 +3,7 @@ import { useState } from "react";
 import { SubmitSpecification } from "./interface";
 import { ActionIcon, Button, Container, Group, Menu } from "@mantine/core";
 import GraphModal from "./shared/graphModal";
+import {useApi} from '@/app/api';
 
 import {IconMenu2} from '@tabler/icons-react';
 
@@ -14,32 +15,26 @@ interface GraphVisualiserProps {
 export default function GraphVisualiser({ spec, url }: GraphVisualiserProps) {
     const [graphContent, setGraphContent] = useState<string>("");
     const [loading, setLoading] = useState(false);
+    const api = useApi();
+    
 
     const getGraph = (options: { preset: string }) => {
         const getGraphHtml = async () => {
             setLoading(true);
             (async () => {
                 try {
-                    let response: Response;
+                    let response;
                     if (spec) {
-                        response = await fetch(`/api/py/graph/visualise`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ spec: spec, options: options }),
-                        });
+                        response = await api.post(`/graph/visualise`, { spec: spec, options: options });
                     } else if (url) {
-                        response = await fetch(`${url}`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify(options),
-                        });
+                        response = await api.post(`${url}`, {options});
                     } else {
                         throw new Error("No valid source for fetching the graph.");
                     }
-                    const graph: string = await response.text();
+                    const graph: string = await response.data;
                     setGraphContent(graph);
-                } catch (error) {
-                    console.error("Error getting graph:", error);
+                } catch (err) {
+                    setGraphContent(err.response.data.detail);
                 } finally {
                     setLoading(false);
                 }

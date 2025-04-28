@@ -10,6 +10,7 @@ import InformationWindow from './model/information'
 import GraphVisualiser from './visualise';
 
 import Cart from './products/cart'
+import {useApi} from '@/app/api';
 
 interface ConfirmProps {
     model: ModelSpecification;
@@ -20,6 +21,7 @@ interface ConfirmProps {
 }
 
 function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmProps) {
+    const api = useApi();
     
     const [submitting, setSubmitting] = useState(false);
 
@@ -30,9 +32,9 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
         const checkStatus = async () => {
             setStatus({ cascade: "loading"});
             try {
-                const response = await fetch("/api/py/status");
-                if (response.ok) {
-                    const data = await response.json();
+                const response = await api.get("/status");
+                if (response.status == 200) {
+                    const data = await response.data;
                     setStatus({
                         cascade: data.cascade || "down",
                     });
@@ -49,7 +51,7 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
         }, []);
 
     const handleSubmit = () => {
-        const submitData: SubmitSpecification = {
+        const spec: SubmitSpecification = {
             model: model,
             products: Object.values(products),
             environment: {}
@@ -59,14 +61,10 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
         const execute = async () => {
             (async () => {
                 try {
-                    const response = await fetch(`/api/py/graph/execute`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(submitData),
-                    });
+                    const response = await api.post(`/graph/execute`, spec);
 
-                    const result: SubmitResponse = await response.json();
-                    if (!response.ok) {
+                    const result: SubmitResponse = await response.data;
+                    if (response.status !== 200) {
                         alert("Error: " + response.status + " " + response.statusText);
                         throw new Error(`Error: ${response.status} - ${response.statusText}`);
                     }
@@ -96,21 +94,15 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
 
         async function retrieveFileBlob() {
             try {
-                const ftch = await fetch( // this will request the file information for the download (whether an image, PDF, etc.)
-                    `/api/py/graph/serialise`,
-                    {
-                        method: "POST",
-                        headers: {
-                            "Content-type": "application/json"
-                        },
-                        body: JSON.stringify(submitData)
-                    },
+                const ftch = await api.post( // this will request the file information for the download (whether an image, PDF, etc.)
+                    `/graph/serialise`,
+                    {submitData},
                 )
-                if (!ftch.ok) {
+                if (ftch.status !== 200) {
                     alert("Error: " + ftch.status + " " + ftch.statusText);
                     throw new Error(`Could not download graph: ${ftch.status} - ${ftch.statusText}`);
                 }
-                const fileBlob = await ftch.json();
+                const fileBlob = await ftch.data();
                 
                 // this works and prompts for download
                 var link = document.createElement('a')  // once we have the file buffer BLOB from the post request we simply need to send a GET request to retrieve the file data

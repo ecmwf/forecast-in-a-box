@@ -3,25 +3,25 @@ const nextConfig = {
   rewrites: async () => {
     return [
       {
-        source: "/api/py/:path*",
+        source: "/:path*",
         destination:
           process.env.NODE_ENV === "development"
-            ? "http://127.0.0.1:8000/api/py/:path*"
-            : `${process.env.NEXT_PUBLIC_API_URL}/api/py/:path*`,
+            ? "http://127.0.0.1:8000/:path*"
+            : `${process.env.NEXT_PUBLIC_API_URL}/:path*`,
       },
       {
         source: "/docs",
         destination:
           process.env.NODE_ENV === "development"
-            ? "http://127.0.0.1:8000/api/py/docs"
-            : `${process.env.NEXT_PUBLIC_API_URL}/api/py/docs`,
+            ? "http://127.0.0.1:8000/docs"
+            : `${process.env.NEXT_PUBLIC_API_URL}/docs`,
       },
       {
         source: "/openapi.json",
         destination:
           process.env.NODE_ENV === "development"
-          ? "http://127.0.0.1:8000/api/py/openapi.json"
-          : `${process.env.NEXT_PUBLIC_API_URL}/api/py/openapi.json`,
+          ? "http://127.0.0.1:8000/openapi.json"
+          : `${process.env.NEXT_PUBLIC_API_URL}/openapi.json`,
       },
     ];
   },

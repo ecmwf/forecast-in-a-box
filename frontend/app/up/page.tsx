@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { Container, Title, Text, Loader, Table, Paper, Button, Group } from "@mantine/core";
 
+import {useApi} from '@/app/api';
+
+
 const StatusPage = () => {
     const [status, setStatus] = useState<{
         api: "loading" | "up" | "down";
@@ -10,12 +13,14 @@ const StatusPage = () => {
         ecmwf: "loading" | "up" | "down";
     }>({ api: "loading", cascade: "loading", ecmwf: "loading" });
 
+    const api = useApi();
+    
     const checkStatus = async () => {
         setStatus({ api: "loading", cascade: "loading", ecmwf: "loading" });
         try {
-            const response = await fetch("/api/py/status");
-            if (response.ok) {
-                const data = await response.json();
+            const response = await api.get("/status");
+            if (response.status == 200) {
+                const data = await response.data;
                 setStatus({
                     api: data.api || "down",
                     cascade: data.cascade || "down",
@@ -42,7 +47,7 @@ const StatusPage = () => {
         <Container size="sm" style={{ marginTop: "40px" }}>
             <Paper shadow="xs" p="md" withBorder>
                 <Group grow mb="md">
-                    <Title order={2} align="center">
+                    <Title order={2} ta="center">
                         Server Status
                     </Title>
                     <Button onClick={checkStatus} variant="outline" size="sm">

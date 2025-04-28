@@ -6,15 +6,14 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-          NEXT_PUBLIC_API_URL: "http://backend:8000" # Pass the variable during build
     image: eccr.ecmwf.int/forecast-in-a-box/fiab-frontend:latest
     ports:
       - "127.0.0.1:3000:3000"
     environment:
-      NEXT_PUBLIC_API_URL: "http://backend:8000"
-    networks:
-      - fiab-network
+      API_URL: "http://localhost:8000"
+    # networks:
+    #   - fiab-network
+    #   - host
     
   backend:
     container_name: fiab-backend
@@ -47,6 +46,9 @@ services:
 networks:
   fiab-network:
     driver: bridge
+  host:
+    external: true
+    name: host
 
 volumes:
   data:

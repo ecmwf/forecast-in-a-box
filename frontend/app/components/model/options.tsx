@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import classes from './options.module.css';
 
 import {IconDownload, IconCheck, IconRefresh, IconTableDown, IconTrash} from '@tabler/icons-react';
+import {useApi} from '@/app/api';
 
 interface DownloadResponse {
     download_id: string;
@@ -17,16 +18,17 @@ interface DownloadResponse {
 function ModelButton({ model, setSelected }: { model: string; setSelected: (value: string) => void }) {
     const [downloadStatus, setDownloadStatus] = useState<DownloadResponse>({} as DownloadResponse);
     const [installing, setInstalling] = useState<boolean>(false);
+    const api = useApi();
 
     const getDownloadStatus = async () => {
-        const result = await fetch(`/api/py/models/download/${model}`);
-        const data = await result.json();
+        const result = await api.get(`/models/download/${model}`);
+        const data = await result.data;
         setDownloadStatus(data);
     };
 
     const handleDownload = async () => {
-        const result = await fetch(`/api/py/models/download/${model}`, { method: 'POST' });
-        const data = await result.json();
+        const result = await api.post(`/models/download/${model}`);
+        const data = await result.data;
         setDownloadStatus(data);
         const interval = setInterval(async () => {
             await getDownloadStatus();
@@ -42,8 +44,8 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
 
     const handleDelete = async () => {
         try {
-            const result = await fetch(`/api/py/models/${model}`, { method: 'DELETE' });
-            const data = await result.json();
+            const result = await api.delete(`/models/${model}`);
+            const data = await result.data();
             setDownloadStatus(data);
         } catch (error) {
             console.error('Error deleting model:', error);
@@ -52,7 +54,7 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
 
     const handleInstall = async () => {
         setInstalling(true);
-        const result = await fetch(`/api/py/models/install/${model}`, { method: 'POST' });
+        const result = await api.post(`/models/install/${model}`);
         setInstalling(false);
     };
 
@@ -61,14 +63,14 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
     }, [model]);
 
     return (
-        <Table.Tr>
+        <>
             <Table.Td>
                 <Button
                     classNames={classes}
                     onClick={() => setSelected(model)}
                     disabled={downloadStatus.status !== 'completed'}
                 >
-                    <Text size='sm' style={{'wordBreak': 'break-all', 'display':'flex'}}>{model}</Text>
+                    <Text size='sm' style={{'wordBreak': 'break-all', 'display':'flex'}}>{model.split('_',2)[1]}</Text>
                 </Button>
             </Table.Td>
             <Table.Td>
@@ -98,7 +100,7 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
                     </Button>
                 </Group>
             </Table.Td>
-        </Table.Tr>
+        </>
     );
 }
 
@@ -111,12 +113,13 @@ interface OptionsProps {
 function Options({ cardProps, tabProps, setSelected }: OptionsProps) {
     const [modelOptions, setData] = useState<Record<string, string[]>>();
     const [loading, setLoading] = useState(true);
+    const api = useApi();
 
     const fetchModelOptions = async () => {
         setLoading(true);
         try {
-            const res = await fetch('/api/py/models/available');
-            const data = await res.json();
+            const res = await api.get('/models/available');
+            const data = await res.data;
             setData(data);
         } finally {
             setLoading(false);
@@ -139,6 +142,7 @@ function Options({ cardProps, tabProps, setSelected }: OptionsProps) {
             <Table striped highlightOnHover verticalSpacing="xs" className={classes['option-table']}>
                 <Table.Thead>
                     <Table.Tr style={{ backgroundColor: "#f0f0f6", textAlign: "left" }}>
+                        <Table.Th>Model Group</Table.Th>
                         <Table.Th>Model</Table.Th>
                         <Table.Th>Download Status</Table.Th>
                         <Table.Th>Actions</Table.Th>
@@ -147,14 +151,21 @@ function Options({ cardProps, tabProps, setSelected }: OptionsProps) {
                 <Table.Tbody>
                     {!modelOptions || Object.keys(modelOptions).length === 0 ? (
                         <Table.Tr>
-                            <Table.Td colSpan={3} style={{ textAlign: 'center' }}>
+                            <Table.Td colSpan={4} style={{ textAlign: 'center' }}>
                                 No models available.
                             </Table.Td>
                         </Table.Tr>
                     ) : null}
                     {modelOptions && Object.entries(modelOptions).flatMap(([key, values]) =>
-                        values.map((value: string) => (
-                            <ModelButton setSelected={setSelected} model={`${key}_${value}`} key={`${key}_${value}`} />
+                        values.map((value: string, index: number) => (
+                            <Table.Tr key={`${key}_${value}`}>
+                                {index === 0 && (
+                                    <Table.Td rowSpan={values.length} style={{ verticalAlign: 'top', fontWeight: 'bold' }}>
+                                        {key}
+                                    </Table.Td>
+                                )}
+                                <ModelButton setSelected={setSelected} model={`${key}_${value}`} />
+                            </Table.Tr>
                         ))
                     )}
                 </Table.Tbody>

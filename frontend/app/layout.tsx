@@ -11,6 +11,8 @@ import { Notifications } from '@mantine/notifications';
 import '@mantine/notifications/styles.css';
 import '@mantine/dates/styles.css';
 
+import { SettingsProvider } from './SettingsContext';
+
 import { theme } from "../theme";
 
 import Header from './header';
@@ -39,13 +41,15 @@ export default function RootLayout({ children }: { children: any }) {
       </head>
       <body>
       <MantineProvider theme={theme}>
-       <Notifications />
-        <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-          <Header />
-          <main style={{ flex: 1 }}>{children}</main>
-          <Footer />
-        </div>
-      </MantineProvider>
+        <SettingsProvider>
+        <Notifications />
+          <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+            <Header />
+            <main style={{ flex: 1 }}>{children}</main>
+            <Footer />
+          </div>
+          </SettingsProvider>
+          </MantineProvider>
       </body>
     </html>
   );

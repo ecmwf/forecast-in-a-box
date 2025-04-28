@@ -6,6 +6,7 @@ import Options from './options';
 import InformationWindow from './information';
 
 import { ModelSpecification } from '../interface';
+import {useApi} from '@/app/api';
 
 interface ModelProps {
     selectedModel: ModelSpecification;
@@ -20,6 +21,8 @@ function Model({ selectedModel, coordinates, setCoordinates, modelSpec, submit }
     const [model, setModel] = useState<string>(selectedModel.model);
     const [modalOpened, setModalOpened] = useState(false);
     const [showGlobeSelect, setShowGlobeSelect] = useState(false);
+    const api = useApi();
+    
 
     // State for form inputs
     const [date, setDate] = useState<string | null>(selectedModel.date || null);
@@ -43,8 +46,8 @@ function Model({ selectedModel, coordinates, setCoordinates, modelSpec, submit }
 
     useEffect(() => {
         if (model) {
-            fetch(`/api/py/models/info/${model}`)
-                .then((res) => res.json())
+            api.get(`/models/info/${model}`)
+                .then((res) => res.data)
                 .then((modelOptions) => {
                     if (modelOptions.local_area) {
                         setShowGlobeSelect(true);

@@ -3,6 +3,7 @@ import { SimpleGrid, Text, Card, LoadingOverlay, Stack, Title, Paper} from '@man
 
 
 import {ModelSpecification} from '../interface'
+import {useApi} from '@/app/api';
 
 
 interface InformationProps {
@@ -10,21 +11,22 @@ interface InformationProps {
 }
 
 function InformationWindow({ selected }: InformationProps) {
-    const [information, setInformation] = useState<string | null>(null);
+    const [information, setInformation] = useState<Record<string, any> | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
+    const api = useApi();
+    
 
     useEffect(() => {
         if (selected) {
             setLoading(true);
-            fetch(`/api/py/models/info/${selected}`)
-                .then((res) => res.json())
-                .then((modelOptions) => {
-                    setInformation(modelOptions);
-                    setLoading(false);
-                })
-                .catch(() => {
-                    setLoading(false);
-                });
+            api.get(`/models/info/${selected}`)
+            .then((res) => {
+                setInformation(res.data);
+                setLoading(false);
+            })
+            .catch(() => {
+                setLoading(false);
+            });
         }
     }, [selected]);
 
