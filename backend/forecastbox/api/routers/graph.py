@@ -5,6 +5,7 @@ from fastapi import APIRouter, Response
 from fastapi.responses import HTMLResponse
 
 import tempfile
+import logging
 
 from forecastbox.products.registry import get_categories, get_product
 from forecastbox.models import Model
@@ -32,6 +33,8 @@ router = APIRouter(
     tags=["execution"],
     responses={404: {"description": "Not found"}},
 )
+
+LOG = logging.getLogger(__name__)
 
 class SubmitResponse(api.SubmitJobResponse):
     output_ids: set[DatasetId]
@@ -75,6 +78,7 @@ async def get_graph_visualise(spec: GraphSpecification, options: VisualisationOp
     try:
         graph = await convert_to_cascade(spec)
     except Exception as e:
+        LOG.error(f"Error converting to cascade: {e}")
         return HTMLResponse(str(e), status_code=500)
 
     with tempfile.NamedTemporaryFile(suffix=".html") as dest:
@@ -127,8 +131,11 @@ async def execute(spec: GraphSpecification) -> api.SubmitJobResponse:
             # task.definition.environment = env
             pass
 
+    hosts = CASCADE_SETTINGS.max_hosts
+    workers_per_host = CASCADE_SETTINGS.max_workers_per_host
+
     r = api.SubmitJobRequest(
-        job=api.JobSpec(benchmark_name=None, workers_per_host=CASCADE_SETTINGS.workers_per_host, hosts=CASCADE_SETTINGS.hosts, envvars={}, use_slurm=False, job_instance=job)
+        job=api.JobSpec(benchmark_name=None, workers_per_host=workers_per_host, hosts=hosts, envvars={}, use_slurm=False, job_instance=job)
     )
     submit_job_response: api.SubmitJobResponse = client.request_response(r, f"{CASCADE_SETTINGS.cascade_url}")  # type: ignore
 

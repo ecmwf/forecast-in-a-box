@@ -19,11 +19,9 @@ from pydantic import BaseModel
 from ..types import ModelSpecification
 from forecastbox.models import Model
 
-from forecastbox.settings import APISettings
+from forecastbox.settings import API_SETTINGS
 from forecastbox.models import Model
 from forecastbox.api.database import db
-
-SETTINGS = APISettings()
 
 router = APIRouter(
     tags=["models"],
@@ -33,7 +31,7 @@ router = APIRouter(
 
 def get_model_path(model: str) -> Path:
     """Get the path to a model."""
-    return (Path(SETTINGS.data_path) / model).with_suffix(".ckpt").absolute()
+    return (Path(API_SETTINGS.data_path) / model).with_suffix(".ckpt").absolute()
 
 
 # Model Availability
@@ -48,7 +46,7 @@ async def get_available_models() -> dict[str, list[str]]:
             Dictionary containing model categories and their models
     """
 
-    manifest_path = os.path.join(SETTINGS.model_repository, "MANIFEST")
+    manifest_path = os.path.join(API_SETTINGS.model_repository, "MANIFEST")
 
     response = requests.get(manifest_path)
     if response.status_code != 200:
@@ -138,7 +136,7 @@ async def check_if_downloaded(model: str) -> DownloadResponse:
 def download(model: str, background_tasks: BackgroundTasks) -> DownloadResponse:
     """Download a model."""
 
-    repo = SETTINGS.model_repository
+    repo = API_SETTINGS.model_repository
 
     repo = repo.removesuffix('/')
     

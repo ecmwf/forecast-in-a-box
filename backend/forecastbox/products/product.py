@@ -43,6 +43,18 @@ class Product(ABC):
 
     def select_on_specification(self, specification: dict[str, Any], source: "Action") -> "Action":
         """Select from `source` the key:value pairs from `specification`."""
+
+        # Handle levelist specification where param is flattened
+        # into a list of param_levelist
+        if 'levelist' in specification:
+            levelist = specification.pop('levelist')
+            if isinstance(levelist, str):
+                levelist = [levelist]
+            if isinstance(specification['param'], str):
+                specification['param'] = [f"{specification['param']}_{l}" for l in levelist]
+            else:
+                specification['param'] = [f"{p}_{l}" for p in specification['param'] for l in levelist]
+
         for key, value in specification.items():
             if not value:
                 continue

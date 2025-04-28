@@ -48,15 +48,14 @@ def status() -> StatusResponse:
     """
     Status endpoint
     """
-    from forecastbox.settings import APISettings
-    settings = APISettings() # type: ignore
+    from forecastbox.settings import CASCADE_SETTINGS, API_SETTINGS
 
     status = {'api': 'up', 'cascade': 'up', 'ecmwf': 'up'}
 
     from cascade.gateway import client, api
     try:
         client.request_response(
-            api.JobProgressRequest(job_ids=[]), settings.cascade_url, timeout_ms=1000
+            api.JobProgressRequest(job_ids=[]), CASCADE_SETTINGS.cascade_url, timeout_ms=1000
         )
         status['cascade'] = 'up'
     except Exception as e:
@@ -66,7 +65,7 @@ def status() -> StatusResponse:
     # Check connection to model_repository
     import requests
     try:
-        response = requests.get(f"{settings.model_repository}/MANIFEST", timeout=1)
+        response = requests.get(f"{API_SETTINGS.model_repository}/MANIFEST", timeout=1)
         if response.status_code == 200:
             status['ecmwf'] = 'up'
         else:

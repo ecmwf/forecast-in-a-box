@@ -32,11 +32,21 @@ class Model:
         return list(range(model_step, int(self.lead_time)+1, model_step))
 
     def qube(self, assumptions: dict[str, Any] | None = None) -> Qube:
-        """Get Model Qube"""
+        """Get Model Qube.
+        
+        The Qube is a representation of the model parameters and their
+        dimensions. Parameters are represented as 'param' and their levels
+        as 'levelist'. Which differs from the graph where each param and level
+        are represented as separate nodes.
+        """
         return convert_to_model_spec(self.checkpoint, assumptions=assumptions)
 
     def graph(self, initial_conditions: "Action", **kwargs) -> "Action":
-        """Get Model Graph"""
+        """Get Model Graph.
+        
+        Anemoi cascade exposes each param as a separate node in the graph,
+        with pressure levels represented as 'param_levelist'.
+        """
         return from_input(
             self.checkpoint_path, "mars", lead_time=self.lead_time, date=self.date, ensemble_members=self.ensemble_members, **(self.entries or {})
         )
@@ -97,7 +107,7 @@ def convert_to_model_spec(ckpt: "Checkpoint", assumptions: dict[str, Any] | None
                 "frequency": ckpt.timestep,
                 "levtype": "pl",
                 "param": variable,
-                # "levelist": list(map(str, levels)), # TODO, Removed due to anemoi cascade not expanding levlist
+                "levelist": list(map(str, sorted(map(int, levels)))),
                 **assumptions,
             }
         )

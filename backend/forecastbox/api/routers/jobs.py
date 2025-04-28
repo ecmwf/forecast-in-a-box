@@ -18,15 +18,13 @@ import cascade.gateway.client as client
 
 from ..database import db
 
-from forecastbox.settings import APISettings
+from forecastbox.settings import CASCADE_SETTINGS
 from forecastbox.api.types import VisualisationOptions, GraphSpecification
 
 router = APIRouter(
     tags=["jobs"],
     responses={404: {"description": "Not found"}},
 )
-
-SETTINGS = APISettings()
 
 @dataclass
 class JobProgressResponse:
@@ -55,7 +53,7 @@ def get_job_progress(job_id: JobId = Depends(validate_job_id)) -> JobProgressRes
     collection = db.get_collection("job_records")
 
     try:
-        response: api.JobProgressResponse = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{SETTINGS.cascade_url}")  # type: ignore
+        response: api.JobProgressResponse = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{CASCADE_SETTINGS.cascade_url}")  # type: ignore
     except TimeoutError as e:
         collection.update_one({"job_id": job_id}, {"$set": {"status": "errored"}})
         error_on_request = f"TimeoutError: {e}"
@@ -235,7 +233,7 @@ async def get_result_availablity(job_id: JobId, dataset_id: TaskId) -> DatasetAv
         {'available': Availability of the result}
     """
     response: api.ResultRetrievalResponse = client.request_response(
-        api.ResultRetrievalRequest(job_id=job_id, dataset_id=DatasetId(task = dataset_id, output='0')), f"{SETTINGS.cascade_url}"
+        api.ResultRetrievalRequest(job_id=job_id, dataset_id=DatasetId(task = dataset_id, output='0')), f"{CASCADE_SETTINGS.cascade_url}"
     )
     if not response.result:
         return {'available': False}
@@ -272,7 +270,7 @@ def to_bytes(obj) -> tuple[bytes, str]:
 @router.get("/result/{job_id}/{dataset_id}")
 async def get_result(job_id: JobId, dataset_id: TaskId) -> FileResponse:
     response: api.ResultRetrievalResponse = client.request_response(
-        api.ResultRetrievalRequest(job_id=job_id, dataset_id=DatasetId(task = dataset_id, output='0')), f"{SETTINGS.cascade_url}"
+        api.ResultRetrievalRequest(job_id=job_id, dataset_id=DatasetId(task = dataset_id, output='0')), f"{CASCADE_SETTINGS.cascade_url}"
     )
     if not response.result:
         raise HTTPException(404, f"Result retrieval failed: {response.error}")
@@ -297,7 +295,7 @@ async def flush_job() -> JobDeletionResponse:
 
     Returns number of deleted jobs.    
     """
-    client.request_response(api.ResultDeletionRequest(datasets = {}), f"{SETTINGS.cascade_url}")  # type: ignore
+    client.request_response(api.ResultDeletionRequest(datasets = {}), f"{CASCADE_SETTINGS.cascade_url}")  # type: ignore
     collection = db.get_collection("job_records")
     return collection.delete_many({})
 
@@ -307,5 +305,5 @@ async def delete_job(job_id: JobId = Depends(validate_job_id)) -> JobDeletionRes
     
     Returns number of deleted jobs.
     """
-    client.request_response(api.ResultDeletionRequest(datasets = {job_id: []}), f"{SETTINGS.cascade_url}")  # type: ignore
+    client.request_response(api.ResultDeletionRequest(datasets = {job_id: []}), f"{CASCADE_SETTINGS.cascade_url}")  # type: ignore
     return db.get_collection('job_records').delete_one({'job_id': job_id})

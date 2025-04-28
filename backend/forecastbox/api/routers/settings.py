@@ -22,7 +22,9 @@ class ExposedSettings(BaseModel):
 @router.get('')
 async def get_settings() -> ExposedSettings:
     """Get current settings"""
-    return ExposedSettings()
+    settings = ExposedSettings()
+    del settings.api.api_url
+    return settings
 
 @router.post('')
 async def post_settings(settings: ExposedSettings) -> HTMLResponse:

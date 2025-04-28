@@ -20,6 +20,7 @@ class BaseForecast(GenericParamProduct):
 
     multiselect = {
         "param": True,
+        "levelist": True,
     }
     label = {
         **GenericParamProduct.label,
