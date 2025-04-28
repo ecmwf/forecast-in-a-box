@@ -3,22 +3,34 @@ FastAPI Entrypoint
 """
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from dataclasses import dataclass
 
 import logging
 
 ### Create FastAPI instance with custom docs and openapi url
-app = FastAPI(docs_url="/api/py/docs", openapi_url="/api/py/openapi.json")
+app = FastAPI(docs_url="/docs", openapi_url="/openapi.json")
 
 from .api.routers import models
 from .api.routers import products
 from .api.routers import graph
 from .api.routers import jobs
+from .api.routers import settings
 
-app.include_router(models.router, prefix="/api/py/models")
-app.include_router(products.router, prefix="/api/py/products")
-app.include_router(graph.router, prefix="/api/py/graph")
-app.include_router(jobs.router, prefix="/api/py/jobs")
+app.include_router(models.router, prefix="/models")
+app.include_router(products.router, prefix="/products")
+app.include_router(graph.router, prefix="/graph")
+app.include_router(jobs.router, prefix="/jobs")
+app.include_router(settings.router, prefix="/settings")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 LOG = logging.getLogger(__name__)
 
@@ -31,7 +43,7 @@ class StatusResponse:
     cascade: str
     ecmwf: str
 
-@app.get("/api/py/status", tags=["status"])
+@app.get("/status", tags=["status"])
 def status() -> StatusResponse:
     """
     Status endpoint

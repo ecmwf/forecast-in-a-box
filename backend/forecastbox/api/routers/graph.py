@@ -1,4 +1,4 @@
-"""Products API Router."""
+"""Graph API Router."""
 
 from datetime import datetime
 from fastapi import APIRouter, Response
@@ -19,23 +19,19 @@ from cascade.low.into import graph2job
 from cascade.low import views as cascade_views
 
 from cascade.low.core import JobInstance, DatasetId
-from cascade.controller.report import JobId, JobProgress
 
 import cascade.gateway.api as api
 import cascade.gateway.client as client
 
 from ..database import db
 
-from forecastbox.settings import APISettings, CascadeSettings
+from forecastbox.settings import CASCADE_SETTINGS
 from forecastbox.api.types import VisualisationOptions
 
 router = APIRouter(
     tags=["execution"],
     responses={404: {"description": "Not found"}},
 )
-
-API_SETTINGS = APISettings()
-CASCADE_SETTINGS = CascadeSettings()
 
 class SubmitResponse(api.SubmitJobResponse):
     output_ids: set[DatasetId]

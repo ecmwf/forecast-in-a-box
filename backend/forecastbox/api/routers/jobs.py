@@ -82,6 +82,11 @@ def get_job_progress(job_id: JobId = Depends(validate_job_id)) -> JobProgressRes
 
     if not jobprogress:
         collection.update_one({"job_id": job_id}, {"$set": {"status": "invalid"}})
+        return JobProgressResponse(
+            progress="0.00",
+            status="invalid",
+            error="Job not found in the database.",
+        )
     elif jobprogress.failure:
         # Update the job record in MongoDB to mark it as errored
         collection.update_one({"job_id": job_id}, {"$set": {"status": "errored"}})
