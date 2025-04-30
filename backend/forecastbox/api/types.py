@@ -9,7 +9,7 @@ CONFIG_ORDER = ["param", "levtype", "levelist"]
 
 ModelName = str
 
-
+    
 class ModelSpecification(BaseModel):
     """Model Configuration"""
 
@@ -27,9 +27,6 @@ class ModelSpecification(BaseModel):
     @field_validator("model")
     def model_cleanup(cls, m):
         return m.lower().replace("_", "/")
-
-
-EnvironmentSpecification = dict[str, str]
 
 
 class ConfigEntry(BaseModel):
@@ -104,7 +101,10 @@ class ProductSpecification(BaseModel):
     """Specification"""
 
 
-class GraphSpecification(BaseModel):
+class EnvironmentSpecification(BaseModel):
+    pass
+
+class ExecutionSpecification(BaseModel):
     model: ModelSpecification
     """Model Configuration"""
     products: list[ProductSpecification]

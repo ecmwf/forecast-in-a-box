@@ -39,6 +39,7 @@ class BaseEnsembleStats(BasePProcEnsembleProduct, GenericTemporalProduct):
                 'type': self._type,
             }
             from anemoi.utils.grib import shortname_to_paramid
+            
             param_id = shortname_to_paramid(para)
 
             request.update({

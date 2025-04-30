@@ -54,6 +54,9 @@ class PProcProduct(Product):
 
         By default just provides the model source as 'forecast'
 
+        If different sources are needed, this method should be overridden.
+        Use, 'model.deaccumulate(source)' to deaccumulate the source if needed.
+
         Parameters
         ----------
         product_spec : dict[str, Any]

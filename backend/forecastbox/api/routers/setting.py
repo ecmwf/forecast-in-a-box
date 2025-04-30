@@ -4,13 +4,10 @@ from fastapi import APIRouter, Response
 from fastapi.responses import HTMLResponse
 
 from pydantic import BaseModel
-
-from ..database import db
-
 from forecastbox.settings import CascadeSettings, APISettings, CASCADE_SETTINGS, API_SETTINGS
 
 router = APIRouter(
-    tags=["settings"],
+    tags=["setting"],
     responses={404: {"description": "Not found"}},
 )
 

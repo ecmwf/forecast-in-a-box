@@ -1,0 +1,124 @@
+
+"261001":
+  filter:type:
+    cf/pf/fc:
+      forecast:
+        inputs:
+          - request:
+              param: ["169", "175", "176", "177", "228021", "47"]
+            derive_step:
+              type: default
+              deaccumulation: true
+          - request:
+              param: ["165", "166", "167", "168"]
+    "em/es/pb": 
+      forecast:
+        inputs:
+          request: 
+            param: "261001"
+"261014":
+  filter:type:
+    cf/pf/fc:
+      forecast:
+        inputs:
+          - request:
+              param: ["169", "175", "176", "177", "228021", "47"]
+            derive_step:
+              type: default
+              deaccumulation: true
+          - request:
+              param: ["165", "166", "167", "168"]
+    "em/es/pb": 
+      forecast:
+        inputs:
+          request: 
+            param: "261014"
+"261015":
+  filter:type:
+    cf/pf/fc:
+      forecast:
+        inputs:
+          - request:
+              param: ["169", "175", "176", "177", "228021", "47"]
+            derive_step:
+              type: default
+              deaccumulation: true
+          - request:
+              param: ["165", "166", "167", "168"]
+    "em/es/pb": 
+      forecast:
+        inputs:
+          request: 
+            param: "261015"
+"260004": 
+  filter:type:
+    cf/pf/fc:
+      forecast:
+        inputs:
+          request: 
+            param: ["167", "168"]
+    "em/es/pb": 
+      forecast:
+        inputs:
+          request: 
+            param: "260004"
+"260242": 
+  filter:type:
+    cf/pf/fc:
+      forecast:
+        inputs:
+          request: 
+            param: ["167", "168"]
+    "em/es/pb": 
+      forecast:
+        inputs:
+          request: 
+            param: "260242"
+"261016": 
+  filter:type:
+    cf/pf/fc:
+      forecast:
+        inputs:
+          request: 
+            param: ["167", "168"]
+    "em/es/pb": 
+      forecast:
+        inputs:
+          request: 
+            param: "261016"
+"260005": 
+  filter:type:
+    cf/pf/fc:
+      forecast:
+        inputs:
+          request: 
+            param:  ["165", "166", "167"]
+    "em/es/pb": 
+      forecast:
+        inputs:
+          request: 
+            param: "260005"
+"260255": 
+  filter:type:
+    cf/pf/fc:
+      forecast:
+        inputs:
+          request: 
+            param: ["165", "166", "167", "168"]
+    "em/es/pb": 
+      forecast:
+        inputs:
+          request: 
+            param: "260255"
+"261018": 
+  filter:type:
+    cf/pf/fc:
+      forecast:
+        inputs:
+          request: 
+            param: ["165", "166", "167", "168"]
+    "em/es/pb": 
+      forecast:
+        inputs:
+          request: 
+            param: "261018"

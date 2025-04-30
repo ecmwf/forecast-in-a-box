@@ -10,7 +10,7 @@ from forecastbox.products.product import Product, USER_DEFINED
 from forecastbox.products.registry import get_categories, get_product, Category
 from forecastbox.models import Model
 
-from .models import get_model_path
+from .model import get_model_path
 
 from ..types import ConfigEntry, ProductConfiguration, ModelSpecification
 from qubed import Qube
@@ -18,7 +18,7 @@ from qubed import Qube
 from dataclasses import asdict
 
 router = APIRouter(
-    tags=["products"],
+    tags=["product"],
     responses={404: {"description": "Not found"}},
 )
 

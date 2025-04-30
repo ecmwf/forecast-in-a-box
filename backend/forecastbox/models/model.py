@@ -5,11 +5,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from qubed import Qube
+from earthkit.workflows.fluent import Action
+
 from anemoi.cascade.fluent import from_initial_conditions, from_input
 from anemoi.inference.checkpoint import Checkpoint
 
-if TYPE_CHECKING:
-    from earthkit.workflows.fluent import Action
 
 
 @dataclass
@@ -30,6 +30,19 @@ class Model:
     def timesteps(self) -> list[int]:
         model_step = int((self.checkpoint.timestep.total_seconds()+1) // 3600)
         return list(range(model_step, int(self.lead_time)+1, model_step))
+    
+    @property
+    def variables(self) -> list[str]:
+        return [
+            *self.checkpoint.diagnostic_variables,
+            *self.checkpoint.prognostic_variables,
+        ]
+
+    @property
+    def accumulations(self) -> list[str]:
+        return [
+            *self.checkpoint.accumulations,
+        ]
 
     def qube(self, assumptions: dict[str, Any] | None = None) -> Qube:
         """Get Model Qube.
@@ -50,6 +63,40 @@ class Model:
         return from_input(
             self.checkpoint_path, "mars", lead_time=self.lead_time, date=self.date, ensemble_members=self.ensemble_members, **(self.entries or {})
         )
+    
+    def deaccumulate(self, outputs: "Action") -> "Action":
+        """
+        Get the deaccumulated outputs.
+        """
+        accumulated_fields = self.accumulations
+
+        steps = outputs.nodes.coords['step']
+
+        fields: Action = None
+
+        for field in self.variables:
+            if field not in accumulated_fields:
+                if fields is None:
+                    fields = outputs.sel(param = field)
+                else:
+                    fields = fields.join(outputs.sel(param = [field]), 'param')
+                continue
+            
+            deaccumulated_steps: Action = outputs.sel(param = [field]).isel(step = [0])
+
+            for i in range(1, len(steps)):
+                t_0 = outputs.sel(param = [field]).isel(step = [i-1])
+                t_1 = outputs.sel(param = [field]).isel(step = [i])
+
+                deaccum = t_1.subtract(t_0)
+                deaccumulated_steps = deaccumulated_steps.join(deaccum, 'step')
+                
+            if fields is None:
+                fields = deaccumulated_steps
+            else:
+                fields = fields.join(deaccumulated_steps, 'param')
+                
+        return fields
 
     @property
     def ignore_in_select(self) -> list[str]:

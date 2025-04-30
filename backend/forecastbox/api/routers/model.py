@@ -2,7 +2,7 @@
 
 from collections import defaultdict
 from uuid import uuid4
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 import os
 
 from functools import lru_cache
@@ -16,7 +16,7 @@ import tempfile
 import shutil
 from pydantic import BaseModel
 
-from ..types import ModelSpecification
+from ..types import ModelSpecification, ModelName
 from forecastbox.models import Model
 
 from forecastbox.settings import API_SETTINGS
@@ -24,7 +24,7 @@ from forecastbox.models import Model
 from forecastbox.api.database import db
 
 router = APIRouter(
-    tags=["models"],
+    tags=["model"],
     responses={404: {"description": "Not found"}},
 )
 
@@ -33,24 +33,25 @@ def get_model_path(model: str) -> Path:
     """Get the path to a model."""
     return (Path(API_SETTINGS.data_path) / model).with_suffix(".ckpt").absolute()
 
+Category = str
 
 # Model Availability
 @router.get("/available")
-async def get_available_models() -> dict[str, list[str]]:
+async def get_available_models() -> dict[Category, list[ModelName]]:
     """
     Get a list of available models sorted into categories.
 
     Returns
     -------
-    dict[str, list[str]]
-            Dictionary containing model categories and their models
+    dict[Category, list[ModelName]]
+        Dictionary containing model categories and their models
     """
 
     manifest_path = os.path.join(API_SETTINGS.model_repository, "MANIFEST")
 
     response = requests.get(manifest_path)
     if response.status_code != 200:
-        raise Exception(f"Failed to fetch manifest from {manifest_path}")
+        raise HTTPException(response.status_code, f"Failed to fetch manifest from {manifest_path}")
 
     models = defaultdict(list)
 
@@ -101,11 +102,11 @@ async def download_file(download_id: str, url: str, download_path: str) -> Downl
             {"$set": {"status": "errored", "error": str(e)}},
         )
 
-@router.get("/download/{model}")
-async def check_if_downloaded(model: str) -> DownloadResponse:
+@router.get("/{model_id}/downloaded")
+async def check_if_downloaded(model_id: str) -> DownloadResponse:
     """Check if a model has been downloaded."""
 
-    model_path = get_model_path(model.replace("_", "/"))
+    model_path = get_model_path(model_id.replace("_", "/"))
     if model_path.exists():
         return DownloadResponse(
             download_id=None,
@@ -115,7 +116,7 @@ async def check_if_downloaded(model: str) -> DownloadResponse:
         )
 
     collection = db.get_collection("model-downloads")
-    existing_download = collection.find_one({"model": model})
+    existing_download = collection.find_one({"model": model_id})
     if existing_download:
         return DownloadResponse(
             download_id=existing_download["_id"],
@@ -132,19 +133,19 @@ async def check_if_downloaded(model: str) -> DownloadResponse:
         progress=0.00,
     )
 
-@router.post("/download/{model}")
-def download(model: str, background_tasks: BackgroundTasks) -> DownloadResponse:
+@router.post("/{model_id}/download")
+def download(model_id: str, background_tasks: BackgroundTasks) -> DownloadResponse:
     """Download a model."""
 
     repo = API_SETTINGS.model_repository
 
     repo = repo.removesuffix('/')
     
-    model_path = f"{repo}/{model.replace('_', '/')}.ckpt"
+    model_path = f"{repo}/{model_id.replace('_', '/')}.ckpt"
 
     collection = db.get_collection("model-downloads")
     
-    existing_download = collection.find_one({"model": model})
+    existing_download = collection.find_one({"model": model_id})
     if existing_download:
         return DownloadResponse(
             download_id=existing_download["_id"],
@@ -153,7 +154,7 @@ def download(model: str, background_tasks: BackgroundTasks) -> DownloadResponse:
             progress=existing_download["progress"]
         )
 
-    model_download_path = Path(get_model_path(model.replace("_", "/")))
+    model_download_path = Path(get_model_path(model_id.replace("_", "/")))
     model_download_path.parent.mkdir(parents=True, exist_ok=True)
 
     if model_download_path.exists():
@@ -168,7 +169,7 @@ def download(model: str, background_tasks: BackgroundTasks) -> DownloadResponse:
     
     collection.insert_one({
         "_id": download_id,
-        "model": model,
+        "model": model_id,
         "status": "in_progress",
         "progress": 0
     })
@@ -180,11 +181,11 @@ def download(model: str, background_tasks: BackgroundTasks) -> DownloadResponse:
         progress=0.00,
     )
 
-@router.delete("/{model}")
-def delete_model(model: str) -> DownloadResponse:
+@router.delete("/{model_id}")
+def delete_model(model_id: str) -> DownloadResponse:
     """Delete a model."""
 
-    model_path = get_model_path(model.replace("_", "/"))
+    model_path = get_model_path(model_id.replace("_", "/"))
     if not model_path.exists():
         return DownloadResponse(
             download_id=None,
@@ -196,8 +197,8 @@ def delete_model(model: str) -> DownloadResponse:
     collection = db.get_collection("model-downloads")
     try:
         os.remove(model_path)
-        if collection.find_one({"model": model}):
-            collection.delete_one({"model": model})
+        if collection.find_one({"model": model_id}):
+            collection.delete_one({"model": model_id})
     except Exception as e:
         raise e
     
@@ -212,10 +213,10 @@ class InstallResponse(BaseModel):
     installed: bool
     error: str | None = None
 
-@router.post("/install/{model}")
-def install(model: str) -> InstallResponse:
+@router.post("/{model_id}/install")
+def install(model_id: str) -> InstallResponse:
 
-    anemoi_versions = Model.versions(str(get_model_path(model.replace("_", "/"))))
+    anemoi_versions = Model.versions(str(get_model_path(model_id.replace("_", "/"))))
     import subprocess
 
     BLACKLISTED_INSTALLS = ['anemoi', 'anemoi-training', 'anemoi-inference', 'anemoi-utils']
@@ -238,14 +239,14 @@ def install(model: str) -> InstallResponse:
 
 # Model Info
 @lru_cache(maxsize=128)
-@router.get("/info/{model}")
-async def get_model_info(model: str) -> dict[str, Any]:
+@router.get("/{model_id}/info")
+async def get_model_info(model_id: str) -> dict[str, Any]:
     """
     Get basic information about a model.
 
     Parameters
     ----------
-    model : str
+    model_id : str
             Model to load, directory separated by underscores
 
     Returns
@@ -253,11 +254,11 @@ async def get_model_info(model: str) -> dict[str, Any]:
     dict[str, Any]
             Dictionary containing model information
     """
-    return Model.info(get_model_path(model.replace("_", "/")))
+    return Model.info(get_model_path(model_id.replace("_", "/")))
 
 
-@router.post("/spec")
-async def get_model_spec(modelspec: ModelSpecification) -> dict[str, Any]:
+@router.post("/{model_id}/spec")
+async def get_model_spec(model_id: str, modelspec: ModelSpecification) -> dict[str, Any]:
     """
     Get the Qubed model spec as a json.
 

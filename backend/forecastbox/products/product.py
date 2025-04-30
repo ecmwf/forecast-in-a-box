@@ -37,6 +37,12 @@ class Product(ABC):
         pass
 
     @property
+    # @abstractmethod
+    def data_requirements(self) -> "Qube":
+        """Data requirements for the product."""
+        return Qube({})
+
+    @property
     def model_assumptions(self) -> dict[str, Any]:
         """Model assumptions for the product."""
         return {}
