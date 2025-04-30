@@ -5,12 +5,13 @@ from fastapi import APIRouter, Response
 from fastapi.responses import HTMLResponse
 
 import tempfile
+import logging
 
 from forecastbox.products.registry import get_categories, get_product
 from forecastbox.models import Model
 
-from .models import get_model_path
-from ..types import GraphSpecification
+from .model import get_model_path
+from ..types import ExecutionSpecification
 
 from earthkit.workflows import Cascade, fluent
 from earthkit.workflows.graph import Graph, deduplicate_nodes
@@ -33,11 +34,13 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
+LOG = logging.getLogger(__name__)
+
 class SubmitResponse(api.SubmitJobResponse):
     output_ids: set[DatasetId]
 
 
-async def convert_to_cascade(spec: GraphSpecification) -> Cascade:
+async def convert_to_cascade(spec: ExecutionSpecification) -> Cascade:
     """Convert a specification to a cascade."""
 
     model_spec = dict(
@@ -67,7 +70,7 @@ async def convert_to_cascade(spec: GraphSpecification) -> Cascade:
     return Cascade(deduplicate_nodes(complete_graph))
 
 @router.post("/visualise")
-async def get_graph_visualise(spec: GraphSpecification, options: VisualisationOptions = None) -> HTMLResponse:
+async def get_graph_visualise(spec: ExecutionSpecification, options: VisualisationOptions = None) -> HTMLResponse:
     """Get an HTML visualisation of the product graph."""
     if options is None:
         options = VisualisationOptions()
@@ -75,6 +78,7 @@ async def get_graph_visualise(spec: GraphSpecification, options: VisualisationOp
     try:
         graph = await convert_to_cascade(spec)
     except Exception as e:
+        LOG.error(f"Error converting to cascade: {e}")
         return HTMLResponse(str(e), status_code=500)
 
     with tempfile.NamedTemporaryFile(suffix=".html") as dest:
@@ -84,21 +88,27 @@ async def get_graph_visualise(spec: GraphSpecification, options: VisualisationOp
             return HTMLResponse(f.read(), media_type="text/html")
 
 @router.post("/serialise")
-async def get_graph_serialised(spec: GraphSpecification) -> JobInstance:
+async def get_graph_serialised(spec: ExecutionSpecification) -> JobInstance:
     """Get serialised dump of product graph."""
     graph = await convert_to_cascade(spec)
     return graph2job(graph._graph)
 
 
+@router.post("/download")
+async def get_graph_download(spec: ExecutionSpecification) -> str:
+    """Get downloadable json of the graph."""
+    return spec.model_dump_json()
+
+
 @router.post("/execute")
-async def execute_api(spec: GraphSpecification) -> api.SubmitJobResponse:
+async def execute_api(spec: ExecutionSpecification) -> api.SubmitJobResponse:
     return await execute(spec)
     # try:
     #     return await execute(spec)
     # except Exception as e:
     #     return HTMLResponse(str(e), status_code=500)
 
-async def execute(spec: GraphSpecification) -> api.SubmitJobResponse:
+async def execute(spec: ExecutionSpecification) -> api.SubmitJobResponse:
     """Get serialised dump of product graph."""
     try:
         graph = await convert_to_cascade(spec)
@@ -127,8 +137,11 @@ async def execute(spec: GraphSpecification) -> api.SubmitJobResponse:
             # task.definition.environment = env
             pass
 
+    hosts = CASCADE_SETTINGS.max_hosts
+    workers_per_host = CASCADE_SETTINGS.max_workers_per_host
+
     r = api.SubmitJobRequest(
-        job=api.JobSpec(benchmark_name=None, workers_per_host=CASCADE_SETTINGS.workers_per_host, hosts=CASCADE_SETTINGS.hosts, envvars={}, use_slurm=False, job_instance=job)
+        job=api.JobSpec(benchmark_name=None, workers_per_host=workers_per_host, hosts=hosts, envvars={}, use_slurm=False, job_instance=job)
     )
     submit_job_response: api.SubmitJobResponse = client.request_response(r, f"{CASCADE_SETTINGS.cascade_url}")  # type: ignore
 

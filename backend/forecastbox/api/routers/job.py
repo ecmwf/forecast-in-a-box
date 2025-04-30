@@ -18,15 +18,13 @@ import cascade.gateway.client as client
 
 from ..database import db
 
-from forecastbox.settings import APISettings
-from forecastbox.api.types import VisualisationOptions, GraphSpecification
+from forecastbox.settings import CASCADE_SETTINGS
+from forecastbox.api.types import VisualisationOptions, ExecutionSpecification
 
 router = APIRouter(
-    tags=["jobs"],
+    tags=["job"],
     responses={404: {"description": "Not found"}},
 )
-
-SETTINGS = APISettings()
 
 @dataclass
 class JobProgressResponse:
@@ -55,7 +53,7 @@ def get_job_progress(job_id: JobId = Depends(validate_job_id)) -> JobProgressRes
     collection = db.get_collection("job_records")
 
     try:
-        response: api.JobProgressResponse = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{SETTINGS.cascade_url}")  # type: ignore
+        response: api.JobProgressResponse = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{CASCADE_SETTINGS.cascade_url}")  # type: ignore
     except TimeoutError as e:
         collection.update_one({"job_id": job_id}, {"$set": {"status": "errored"}})
         error_on_request = f"TimeoutError: {e}"
@@ -142,20 +140,20 @@ async def get_status() -> JobProgressResponses:
     )
 
 
-@router.get("/status/{job_id}")
+@router.get("/{job_id}/status")
 async def get_status_of_job(job_id: JobId = Depends(validate_job_id)) -> JobProgressResponse:
     """Get progress of a job."""
     return get_job_progress(job_id)
 
 
-@router.get("/outputs/{job_id}")
+@router.get("/{job_id}/outputs")
 async def get_outputs_of_job(job_id: JobId = Depends(validate_job_id)) -> list[TaskId]:
     """Get outputs of a job."""
     collection = db.get_collection("job_records")
     outputs = collection.find({"job_id": job_id})
     return outputs[0]["outputs"]
 
-@router.post("/visualise/{job_id}")
+@router.post("/{job_id}/visualise")
 async def visualise_job(job_id: JobId = Depends(validate_job_id), options: VisualisationOptions = None) -> HTMLResponse:
     """Get outputs of a job."""
     collection = db.get_collection("job_records")
@@ -181,7 +179,7 @@ async def visualise_job(job_id: JobId = Depends(validate_job_id), options: Visua
         with open(dest.name, "r") as f:
             return HTMLResponse(f.read(), media_type="text/html")
 
-@router.get("/restart/{job_id}")
+@router.get("/{job_id}/restart")
 async def restart_job(job_id: JobId = Depends(validate_job_id)) -> api.SubmitJobResponse:
     """Get outputs of a job."""
     collection = db.get_collection("job_records")
@@ -201,10 +199,10 @@ async def upload_job(file: UploadFile = None) -> api.SubmitJobResponse:
     from .graph import execute
     spec = await file.read()
     import json
-    return await execute(GraphSpecification(**json.loads(spec)))
+    return await execute(ExecutionSpecification(**json.loads(spec)))
 
 
-@router.get("/info/{job_id}")
+@router.get("/{job_id}/info")
 async def job_info(job_id: JobId = Depends(validate_job_id)) -> dict:
     """Get outputs of a job."""
     collection = db.get_collection("job_records")
@@ -215,7 +213,7 @@ async def job_info(job_id: JobId = Depends(validate_job_id)) -> dict:
 class DatasetAvailabilityResponse:
     available: bool
 
-@router.get("/available/{job_id}/{dataset_id}")
+@router.get("/{job_id}/{dataset_id}/available")
 async def get_result_availablity(job_id: JobId, dataset_id: TaskId) -> DatasetAvailabilityResponse:
     """
     Check if the result is available for a given job_id and dataset_id.
@@ -235,7 +233,7 @@ async def get_result_availablity(job_id: JobId, dataset_id: TaskId) -> DatasetAv
         {'available': Availability of the result}
     """
     response: api.ResultRetrievalResponse = client.request_response(
-        api.ResultRetrievalRequest(job_id=job_id, dataset_id=DatasetId(task = dataset_id, output='0')), f"{SETTINGS.cascade_url}"
+        api.ResultRetrievalRequest(job_id=job_id, dataset_id=DatasetId(task = dataset_id, output='0')), f"{CASCADE_SETTINGS.cascade_url}"
     )
     if not response.result:
         return {'available': False}
@@ -269,10 +267,10 @@ def to_bytes(obj) -> tuple[bytes, str]:
 
     raise TypeError(f"Unsupported type: {type(obj)}")
 
-@router.get("/result/{job_id}/{dataset_id}")
+@router.get("/{job_id}/{dataset_id}/result")
 async def get_result(job_id: JobId, dataset_id: TaskId) -> FileResponse:
     response: api.ResultRetrievalResponse = client.request_response(
-        api.ResultRetrievalRequest(job_id=job_id, dataset_id=DatasetId(task = dataset_id, output='0')), f"{SETTINGS.cascade_url}"
+        api.ResultRetrievalRequest(job_id=job_id, dataset_id=DatasetId(task = dataset_id, output='0')), f"{CASCADE_SETTINGS.cascade_url}"
     )
     if not response.result:
         raise HTTPException(404, f"Result retrieval failed: {response.error}")
@@ -297,15 +295,15 @@ async def flush_job() -> JobDeletionResponse:
 
     Returns number of deleted jobs.    
     """
-    client.request_response(api.ResultDeletionRequest(datasets = {}), f"{SETTINGS.cascade_url}")  # type: ignore
+    client.request_response(api.ResultDeletionRequest(datasets = {}), f"{CASCADE_SETTINGS.cascade_url}")  # type: ignore
     collection = db.get_collection("job_records")
     return collection.delete_many({})
 
-@router.delete("/delete/{job_id}")
+@router.delete("/{job_id}/delete")
 async def delete_job(job_id: JobId = Depends(validate_job_id)) -> JobDeletionResponse:
     """Delete a job from the database and cascade.
     
     Returns number of deleted jobs.
     """
-    client.request_response(api.ResultDeletionRequest(datasets = {job_id: []}), f"{SETTINGS.cascade_url}")  # type: ignore
+    client.request_response(api.ResultDeletionRequest(datasets = {job_id: []}), f"{CASCADE_SETTINGS.cascade_url}")  # type: ignore
     return db.get_collection('job_records').delete_one({'job_id': job_id})

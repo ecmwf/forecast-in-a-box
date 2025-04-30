@@ -4,13 +4,10 @@ from fastapi import APIRouter, Response
 from fastapi.responses import HTMLResponse
 
 from pydantic import BaseModel
-
-from ..database import db
-
 from forecastbox.settings import CascadeSettings, APISettings, CASCADE_SETTINGS, API_SETTINGS
 
 router = APIRouter(
-    tags=["settings"],
+    tags=["setting"],
     responses={404: {"description": "Not found"}},
 )
 
@@ -22,7 +19,9 @@ class ExposedSettings(BaseModel):
 @router.get('')
 async def get_settings() -> ExposedSettings:
     """Get current settings"""
-    return ExposedSettings()
+    settings = ExposedSettings()
+    del settings.api.api_url
+    return settings
 
 @router.post('')
 async def post_settings(settings: ExposedSettings) -> HTMLResponse:

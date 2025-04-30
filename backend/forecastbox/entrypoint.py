@@ -12,17 +12,17 @@ import logging
 ### Create FastAPI instance with custom docs and openapi url
 app = FastAPI(docs_url="/docs", openapi_url="/openapi.json")
 
-from .api.routers import models
-from .api.routers import products
+from .api.routers import model
+from .api.routers import product
 from .api.routers import graph
-from .api.routers import jobs
-from .api.routers import settings
+from .api.routers import job
+from .api.routers import setting
 
-app.include_router(models.router, prefix="/models")
-app.include_router(products.router, prefix="/products")
-app.include_router(graph.router, prefix="/graph")
-app.include_router(jobs.router, prefix="/jobs")
-app.include_router(settings.router, prefix="/settings")
+app.include_router(model.router, prefix="/v1/model")
+app.include_router(product.router, prefix="/v1/product")
+app.include_router(graph.router, prefix="/v1/graph")
+app.include_router(job.router, prefix="/v1/job")
+app.include_router(setting.router, prefix="/v1/setting")
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,15 +48,14 @@ def status() -> StatusResponse:
     """
     Status endpoint
     """
-    from forecastbox.settings import APISettings
-    settings = APISettings() # type: ignore
+    from forecastbox.settings import CASCADE_SETTINGS, API_SETTINGS
 
     status = {'api': 'up', 'cascade': 'up', 'ecmwf': 'up'}
 
     from cascade.gateway import client, api
     try:
         client.request_response(
-            api.JobProgressRequest(job_ids=[]), settings.cascade_url, timeout_ms=1000
+            api.JobProgressRequest(job_ids=[]), CASCADE_SETTINGS.cascade_url, timeout_ms=1000
         )
         status['cascade'] = 'up'
     except Exception as e:
@@ -66,7 +65,7 @@ def status() -> StatusResponse:
     # Check connection to model_repository
     import requests
     try:
-        response = requests.get(f"{settings.model_repository}/MANIFEST", timeout=1)
+        response = requests.get(f"{API_SETTINGS.model_repository}/MANIFEST", timeout=1)
         if response.status_code == 200:
             status['ecmwf'] = 'up'
         else:
