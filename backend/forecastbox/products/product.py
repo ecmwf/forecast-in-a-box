@@ -52,14 +52,14 @@ class Product(ABC):
 
         # Handle levelist specification where param is flattened
         # into a list of param_levelist
-        if 'levelist' in specification:
-            levelist = specification.pop('levelist')
+        if "levelist" in specification:
+            levelist = specification.pop("levelist")
             if isinstance(levelist, str):
                 levelist = [levelist]
-            if isinstance(specification['param'], str):
-                specification['param'] = [f"{specification['param']}_{l}" for l in levelist]
+            if isinstance(specification["param"], str):
+                specification["param"] = [f"{specification['param']}_{l}" for l in levelist]
             else:
-                specification['param'] = [f"{p}_{l}" for p in specification['param'] for l in levelist]
+                specification["param"] = [f"{p}_{l}" for p in specification["param"] for l in levelist]
 
         for key, value in specification.items():
             if not value:
@@ -81,10 +81,10 @@ class Product(ABC):
                 value = convert_to_int(value)
             if isinstance(value, list):
                 value = [convert_to_int(v) for v in value]
-            
+
             source = source.sel(**{key: value if isinstance(value, (list, tuple)) else [value]})
         return source
-    
+
     def validate_intersection(self, model: Model) -> bool:
         """Validate the intersection of the model and product qubes.
 
@@ -100,8 +100,7 @@ class Product(ABC):
 
     def model_intersection(self, model: Model) -> "Qube":
         """Get the intersection of the model and product qubes."""
-        intersection = model.qube(self.model_assumptions) & self.qube
-        return intersection
+        return model.qube(self.model_assumptions) & self.qube
 
     @abstractmethod
     def to_graph(self, product_spec: dict[str, Any], model: Model, source: "Action") -> "Graph":
@@ -126,7 +125,8 @@ class GenericParamProduct(Product):
 
     def validate_intersection(self, model: Model) -> bool:
         """Validate the intersection of the model and product qubes."""
-        return all(k in self.model_intersection(model).axes() for k in self.generic_params if not k == "levelist")
+        axes = self.model_intersection(model).axes()
+        return all(k in axes for k in self.generic_params if not k == "levelist")
 
     def make_generic_qube(self, **kwargs) -> "Qube":
         """Make a generic Qube, including the intersection of pl and sfc."""
@@ -146,20 +146,22 @@ class GenericParamProduct(Product):
             }
         )
 
-class GenericTemporalProduct(GenericParamProduct):
 
+class GenericTemporalProduct(GenericParamProduct):
     description = {
         **GenericParamProduct.description,
         "step": "Time step",
     }
 
-    def model_intersection(self, model):
+    def model_intersection(self, model: Model) -> Qube:
         """Get model intersection.
-        
-        Add step as axis to the model intersection.        
+
+        Add step as axis to the model intersection.
         """
         intersection = super().model_intersection(model)
-        return f"step={'/'.join(map(str, model.timesteps))}" / intersection
+        result = f"step={'/'.join(map(str, model.timesteps))}" / intersection
+        return result
+
 
 USER_DEFINED = "USER_DEFINED"
 """User defined value, used to indicate that the value is not known."""

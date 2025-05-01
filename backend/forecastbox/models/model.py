@@ -1,44 +1,54 @@
-import os
 from collections import defaultdict
-from dataclasses import dataclass
+from functools import cached_property, lru_cache
 
-from typing import TYPE_CHECKING, Any
+from pydantic import BaseModel, FilePath
+
+from typing import Any
 
 from qubed import Qube
 from earthkit.workflows.fluent import Action
 
-from anemoi.cascade.fluent import from_initial_conditions, from_input
+from anemoi.cascade.fluent import from_input
 from anemoi.inference.checkpoint import Checkpoint
 
 
+@lru_cache
+def open_checkpoint(checkpoint_path: str) -> Checkpoint:
+    """Open a checkpoint from the given path."""
+    return Checkpoint(checkpoint_path)
 
-@dataclass
-class Model:
+
+class Model(BaseModel):
     """Model Specification"""
-    checkpoint_path: os.PathLike
+
+    class Config:
+        frozen = True
+        arbitrary_types_allowed = True
+
+    checkpoint_path: FilePath
     lead_time: int
     date: str
     ensemble_members: int
     time: str = None
     entries: dict[str, Any] = None
 
-    @property
-    def checkpoint(self) -> "Checkpoint":
-        return Checkpoint(self.checkpoint_path)
-    
-    @property
+    @cached_property
+    def checkpoint(self) -> Checkpoint:
+        return open_checkpoint(self.checkpoint_path)
+
+    @cached_property
     def timesteps(self) -> list[int]:
-        model_step = int((self.checkpoint.timestep.total_seconds()+1) // 3600)
-        return list(range(model_step, int(self.lead_time)+1, model_step))
-    
-    @property
+        model_step = int((self.checkpoint.timestep.total_seconds() + 1) // 3600)
+        return list(range(model_step, int(self.lead_time) + 1, model_step))
+
+    @cached_property
     def variables(self) -> list[str]:
         return [
             *self.checkpoint.diagnostic_variables,
             *self.checkpoint.prognostic_variables,
         ]
 
-    @property
+    @cached_property
     def accumulations(self) -> list[str]:
         return [
             *self.checkpoint.accumulations,
@@ -46,9 +56,10 @@ class Model:
 
     def qube(self, assumptions: dict[str, Any] | None = None) -> Qube:
         """Get Model Qube.
-        
+
         The Qube is a representation of the model parameters and their
-        dimensions. Parameters are represented as 'param' and their levels
+        dimensions.
+        Parameters are represented as 'param' and their levels
         as 'levelist'. Which differs from the graph where each param and level
         are represented as separate nodes.
         """
@@ -56,66 +67,97 @@ class Model:
 
     def graph(self, initial_conditions: "Action", **kwargs) -> "Action":
         """Get Model Graph.
-        
+
         Anemoi cascade exposes each param as a separate node in the graph,
         with pressure levels represented as 'param_levelist'.
         """
+
+        versions = self.versions(self.checkpoint_path, filter=False)
+        BLACKLISTED_INSTALLS = ["anemoi", "anemoi-training", "anemoi-inference", "anemoi-utils"]
+        FILTER_STARTS = ["anemoi", "flash"]
+
+        env = [
+            f"{key}=={val}"
+            for key, val in versions.items()
+            if key not in BLACKLISTED_INSTALLS and any(key.startswith(start) for start in FILTER_STARTS)
+        ]
+
         return from_input(
-            self.checkpoint_path, "mars", lead_time=self.lead_time, date=self.date, ensemble_members=self.ensemble_members, **(self.entries or {})
+            self.checkpoint_path,
+            "mars",
+            lead_time=self.lead_time,
+            date=self.date,
+            ensemble_members=self.ensemble_members,
+            **(self.entries or {}),
+            environment={"inference": env},
         )
-    
+
     def deaccumulate(self, outputs: "Action") -> "Action":
         """
         Get the deaccumulated outputs.
         """
         accumulated_fields = self.accumulations
 
-        steps = outputs.nodes.coords['step']
+        steps = outputs.nodes.coords["step"]
 
         fields: Action = None
 
         for field in self.variables:
             if field not in accumulated_fields:
                 if fields is None:
-                    fields = outputs.sel(param = field)
+                    fields = outputs.sel(param=field)
                 else:
-                    fields = fields.join(outputs.sel(param = [field]), 'param')
+                    fields = fields.join(outputs.sel(param=[field]), "param")
                 continue
-            
-            deaccumulated_steps: Action = outputs.sel(param = [field]).isel(step = [0])
+
+            deaccumulated_steps: Action = outputs.sel(param=[field]).isel(step=[0])
 
             for i in range(1, len(steps)):
-                t_0 = outputs.sel(param = [field]).isel(step = [i-1])
-                t_1 = outputs.sel(param = [field]).isel(step = [i])
+                t_0 = outputs.sel(param=[field]).isel(step=[i - 1])
+                t_1 = outputs.sel(param=[field]).isel(step=[i])
 
                 deaccum = t_1.subtract(t_0)
-                deaccumulated_steps = deaccumulated_steps.join(deaccum, 'step')
-                
+                deaccumulated_steps = deaccumulated_steps.join(deaccum, "step")
+
             if fields is None:
                 fields = deaccumulated_steps
             else:
-                fields = fields.join(deaccumulated_steps, 'param')
-                
+                fields = fields.join(deaccumulated_steps, "param")
+
         return fields
 
     @property
     def ignore_in_select(self) -> list[str]:
         return ["frequency"]
-    
-    @classmethod
-    def versions(cls, checkpoint_path: str) -> dict[str, str]:
-        """Get the versions of the model"""
-        from anemoi.inference.checkpoint import Checkpoint
 
-        ckpt = Checkpoint(checkpoint_path)
-        return {key.replace('.','-'): '.'.join(val.split('.')[:3]) for key, val in ckpt.provenance_training()["module_versions"].items() if key.startswith("anemoi")}
-    
+    @classmethod
+    def versions(cls, checkpoint_path: str, filter: bool = True) -> dict[str, str]:
+        """Get the versions of the model"""
+
+        ckpt = open_checkpoint(checkpoint_path)
+
+        def parse_versions(key, val):
+            if key.startswith("_"):
+                return None, None
+            if "." not in val or "/" in val:
+                return None, None
+            return key.replace(".", "-"), ".".join(val.split(".")[:3])
+
+        versions = {
+            key: val
+            for key, val in (parse_versions(key, val) for key, val in ckpt.provenance_training()["module_versions"].items())
+            if key is not None and val is not None
+        }
+
+        if not filter:
+            return versions
+        return {key: val for key, val in versions.items() if key.startswith("anemoi")}
+
     @classmethod
     def info(cls, checkpoint_path: str) -> dict[str, Any]:
         """Get the model info"""
-        from anemoi.inference.checkpoint import Checkpoint
 
-        ckpt = Checkpoint(checkpoint_path)
+        ckpt = open_checkpoint(checkpoint_path)
 
         return {
             "timestep": ckpt.timestep,
@@ -126,8 +168,9 @@ class Model:
             "grid": ckpt.grid,
             "versions": cls.versions(checkpoint_path),
         }
-    
-def convert_to_model_spec(ckpt: "Checkpoint", assumptions: dict[str, Any] | None = None) -> Qube:
+
+
+def convert_to_model_spec(ckpt: Checkpoint, assumptions: dict[str, Any] | None = None) -> Qube:
     """Convert an anemoi checkpoint to a Qube."""
     variables = [
         *ckpt.diagnostic_variables,

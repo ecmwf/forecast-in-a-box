@@ -7,7 +7,7 @@ import os
 
 from functools import lru_cache
 
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 from pathlib import Path
 
 import httpx
@@ -20,7 +20,6 @@ from ..types import ModelSpecification, ModelName
 from forecastbox.models import Model
 
 from forecastbox.settings import API_SETTINGS
-from forecastbox.models import Model
 from forecastbox.api.database import db
 
 router = APIRouter(
@@ -33,7 +32,9 @@ def get_model_path(model: str) -> Path:
     """Get the path to a model."""
     return (Path(API_SETTINGS.data_path) / model).with_suffix(".ckpt").absolute()
 
+
 Category = str
+
 
 # Model Availability
 @router.get("/available")
@@ -60,17 +61,17 @@ async def get_available_models() -> dict[Category, list[ModelName]]:
         models[cat].append(name)
     return models
 
+
 class DownloadResponse(BaseModel):
     download_id: str | None
     message: str
-    status: Literal['not_downloaded', 'in_progress', 'errored', 'completed']
+    status: Literal["not_downloaded", "in_progress", "errored", "completed"]
     progress: float
     error: str | None = None
 
 
 async def download_file(download_id: str, url: str, download_path: str) -> DownloadResponse:
-
-    collection = db.get_collection("model-downloads")
+    collection = db.get_collection("model_downloads")
     try:
         tempfile_path = tempfile.NamedTemporaryFile(prefix="model_", suffix=".ckpt", delete=False)
 
@@ -102,6 +103,7 @@ async def download_file(download_id: str, url: str, download_path: str) -> Downl
             {"$set": {"status": "errored", "error": str(e)}},
         )
 
+
 @router.get("/{model_id}/downloaded")
 async def check_if_downloaded(model_id: str) -> DownloadResponse:
     """Check if a model has been downloaded."""
@@ -111,11 +113,11 @@ async def check_if_downloaded(model_id: str) -> DownloadResponse:
         return DownloadResponse(
             download_id=None,
             message="Download already completed.",
-            status='completed',
+            status="completed",
             progress=100.00,
         )
 
-    collection = db.get_collection("model-downloads")
+    collection = db.get_collection("model_downloads")
     existing_download = collection.find_one({"model": model_id})
     if existing_download:
         return DownloadResponse(
@@ -123,15 +125,16 @@ async def check_if_downloaded(model_id: str) -> DownloadResponse:
             message="Download in progress.",
             status=existing_download["status"],
             progress=existing_download["progress"],
-            error=existing_download.get('error', None)
+            error=existing_download.get("error", None),
         )
-        
+
     return DownloadResponse(
         download_id=None,
         message="Model not downloaded.",
-        status='not_downloaded',
+        status="not_downloaded",
         progress=0.00,
     )
+
 
 @router.post("/{model_id}/download")
 def download(model_id: str, background_tasks: BackgroundTasks) -> DownloadResponse:
@@ -139,19 +142,19 @@ def download(model_id: str, background_tasks: BackgroundTasks) -> DownloadRespon
 
     repo = API_SETTINGS.model_repository
 
-    repo = repo.removesuffix('/')
-    
+    repo = repo.removesuffix("/")
+
     model_path = f"{repo}/{model_id.replace('_', '/')}.ckpt"
 
-    collection = db.get_collection("model-downloads")
-    
+    collection = db.get_collection("model_downloads")
+
     existing_download = collection.find_one({"model": model_id})
     if existing_download:
         return DownloadResponse(
             download_id=existing_download["_id"],
             message="Download already in progress.",
             status=existing_download["status"],
-            progress=existing_download["progress"]
+            progress=existing_download["progress"],
         )
 
     model_download_path = Path(get_model_path(model_id.replace("_", "/")))
@@ -161,25 +164,21 @@ def download(model_id: str, background_tasks: BackgroundTasks) -> DownloadRespon
         return DownloadResponse(
             download_id=None,
             message="Download already completed.",
-            status='completed',
+            status="completed",
             progress=100.00,
         )
 
     download_id = str(uuid4())
-    
-    collection.insert_one({
-        "_id": download_id,
-        "model": model_id,
-        "status": "in_progress",
-        "progress": 0
-    })
+
+    collection.insert_one({"_id": download_id, "model": model_id, "status": "in_progress", "progress": 0})
     background_tasks.add_task(download_file, download_id, model_path, model_download_path)
     return DownloadResponse(
         download_id=download_id,
         message="Download started.",
-        status='in_progress',
+        status="in_progress",
         progress=0.00,
     )
+
 
 @router.delete("/{model_id}")
 def delete_model(model_id: str) -> DownloadResponse:
@@ -190,51 +189,46 @@ def delete_model(model_id: str) -> DownloadResponse:
         return DownloadResponse(
             download_id=None,
             message="Model not found.",
-            status='not_downloaded',
+            status="not_downloaded",
             progress=0.00,
         )
 
-    collection = db.get_collection("model-downloads")
+    collection = db.get_collection("model_downloads")
     try:
         os.remove(model_path)
         if collection.find_one({"model": model_id}):
             collection.delete_one({"model": model_id})
     except Exception as e:
         raise e
-    
+
     return DownloadResponse(
         download_id=None,
         message="Model deleted.",
-        status='not_downloaded',
+        status="not_downloaded",
         progress=0.00,
     )
+
 
 class InstallResponse(BaseModel):
     installed: bool
     error: str | None = None
 
+
 @router.post("/{model_id}/install")
 def install(model_id: str) -> InstallResponse:
-
     anemoi_versions = Model.versions(str(get_model_path(model_id.replace("_", "/"))))
     import subprocess
 
-    BLACKLISTED_INSTALLS = ['anemoi', 'anemoi-training', 'anemoi-inference', 'anemoi-utils']
-    
+    BLACKLISTED_INSTALLS = ["anemoi", "anemoi-training", "anemoi-inference", "anemoi-utils"]
+
     try:
         packages = [f"{key}=={val}" for key, val in anemoi_versions.items() if key not in BLACKLISTED_INSTALLS]
         if packages:
-            subprocess.run(["uv", "pip", "install", *packages, '--no-cache'], check=True)
+            subprocess.run(["uv", "pip", "install", *packages, "--no-cache"], check=True)
     except Exception as e:
-        return InstallResponse(
-            installed=False,
-            error=str(e)
-        )
-    
-    return InstallResponse(
-        installed=True,
-        error=None
-    )
+        return InstallResponse(installed=False, error=str(e))
+
+    return InstallResponse(installed=True, error=None)
 
 
 # Model Info
@@ -275,4 +269,4 @@ async def get_model_spec(model_id: str, modelspec: ModelSpecification) -> dict[s
 
     model_dict = dict(lead_time=modelspec.lead_time, date=modelspec.date, ensemble_members=modelspec.ensemble_members)
 
-    return Model(get_model_path(modelspec.model), **model_dict).qube().to_json()
+    return Model(checkpoint_path=get_model_path(modelspec.model), **model_dict).qube().to_json()

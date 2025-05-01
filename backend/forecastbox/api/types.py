@@ -1,5 +1,6 @@
 """API types"""
 
+from dataclasses import dataclass
 from typing import Optional, Any
 
 from forecastbox.products.product import USER_DEFINED
@@ -9,8 +10,12 @@ CONFIG_ORDER = ["param", "levtype", "levelist"]
 
 ModelName = str
 
-    
-class ModelSpecification(BaseModel):
+
+class FIABBaseModel(BaseModel):
+    pass
+
+
+class ModelSpecification(FIABBaseModel):
     """Model Configuration"""
 
     model: ModelName
@@ -29,7 +34,7 @@ class ModelSpecification(BaseModel):
         return m.lower().replace("_", "/")
 
 
-class ConfigEntry(BaseModel):
+class ConfigEntry(FIABBaseModel):
     """Configuration Entry"""
 
     label: str
@@ -45,7 +50,6 @@ class ConfigEntry(BaseModel):
     constrained_by: list[str] = Field(default_factory=list)
     """List of configuration entries that this entry is constrained by"""
     default: Optional[str] = None
-
 
     @model_validator(mode="after")
     def __post_init__(self):
@@ -66,8 +70,12 @@ class ConfigEntry(BaseModel):
         self.values = list(map(str, sorted(self.values, key=lambda x: str(x).lower())))
 
 
-class ProductConfiguration(BaseModel):
-    """Product Configuration"""
+class ProductConfiguration(FIABBaseModel):
+    """
+    Product Configuration
+
+    Provides the available configuration entries for a product.
+    """
 
     product: str
     """Product name"""
@@ -89,7 +97,8 @@ class ProductConfiguration(BaseModel):
         return self
 
 
-class ProductSpecification(BaseModel):
+@dataclass
+class ProductSpecification:
     """Product Specification
 
     A user has chosen a product and specified the configuration.
@@ -101,10 +110,11 @@ class ProductSpecification(BaseModel):
     """Specification"""
 
 
-class EnvironmentSpecification(BaseModel):
+class EnvironmentSpecification(FIABBaseModel):
     pass
 
-class ExecutionSpecification(BaseModel):
+
+class ExecutionSpecification(FIABBaseModel):
     model: ModelSpecification
     """Model Configuration"""
     products: list[ProductSpecification]
@@ -112,8 +122,10 @@ class ExecutionSpecification(BaseModel):
     environment: EnvironmentSpecification
     """Environment Configuration"""
 
-class VisualisationOptions(BaseModel):
+
+class VisualisationOptions(FIABBaseModel):
     """Options for the visualisation."""
+
     preset: str = "blob"
     # width: str | int = '100%'
     # height: str | int = 600
