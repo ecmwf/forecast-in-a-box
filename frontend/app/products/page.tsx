@@ -7,9 +7,8 @@ import ProductConfigurator from '../components/products/products'
 import Model from "./../components/model/model";
 
 import Confirm from '../components/confirm';
-import ProgressVisualizer from "./../components/visualise/progress";
 
-import {ModelSpecification, ProductSpecification, SubmitResponse} from './../components/interface'
+import {ModelSpecification, ProductSpecification, EnvironmentSpecification, SubmitResponse} from './../components/interface'
 
 import { IconWorldCog, IconCircleCheck, IconShoppingCartCode, IconRocket, IconTerminal2, IconLogs, IconMap } from '@tabler/icons-react';
 
@@ -28,6 +27,7 @@ const ProductsPage = () => {
     }
 
     const [products, setProducts] = useState({} as Record<string, ProductSpecification>);
+    const [environment, setEnvironment] = useState({} as EnvironmentSpecification);
     const [jobId, setJobId] = useState<SubmitResponse>({} as SubmitResponse);
 
     const setSubmittedProducts = (prod: Record<string, ProductSpecification>) => {
@@ -52,15 +52,15 @@ const ProductsPage = () => {
                     </>
                 )}
             </Stepper.Step>
-            {/* <Stepper.Step label="Environment" description="Configure Execution Environment" allowStepSelect={false} icon={<IconTerminal2/>}>
+            <Stepper.Step label="Environment" description="Configure Execution Environment" allowStepSelect={true} icon={<IconTerminal2/>}>
                 <Divider my="md" />
                 <Button onClick={prevStep}>Back</Button>
                 <Button onClick={nextStep}>Next</Button>
-            </Stepper.Step> */}
+            </Stepper.Step>
             <Stepper.Step label="Confirm" description="Execute the graph" allowStepSelect={!!selectedModel.model} icon={<IconRocket/>}>
                 <Divider my="md" />
                 {products && selectedModel ? (
-                    <Confirm model={selectedModel} products={products} setProducts={setProducts} setSlider={setActive} setJobId={setJobId}/>
+                    <Confirm model={selectedModel} products={products} environment={environment} setProducts={setProducts} setSlider={setActive} setJobId={setJobId}/>
                 ) : (
                     <>
                         <Alert>Select products first</Alert>

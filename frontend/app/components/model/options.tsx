@@ -1,7 +1,7 @@
 "use client"; // Required for client-side fetching
 
 import { Card, Button, Tabs, ScrollArea, Group, Title, Text, ActionIcon, Flex, Table, Loader, Progress} from '@mantine/core';
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import classes from './options.module.css';
 
@@ -20,31 +20,40 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
     const [installing, setInstalling] = useState<boolean>(false);
     const api = useApi();
 
+    const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    
     const getDownloadStatus = async () => {
-        const result = await api.get(`/models/download/${model}`);
+        const result = await api.get(`/api/v1/model/${model}/downloaded`);
         const data = await result.data;
         setDownloadStatus(data);
+        if (downloadStatus.status === "completed" || downloadStatus.status === 'errored') {
+            if (progressIntervalRef.current) {
+                clearInterval(progressIntervalRef.current);
+                progressIntervalRef.current = null;
+            }
+        }
     };
 
     const handleDownload = async () => {
-        const result = await api.post(`/models/download/${model}`);
+        const result = await api.post(`/api/v1/model/${model}/download`);
         const data = await result.data;
         setDownloadStatus(data);
-        const interval = setInterval(async () => {
-            await getDownloadStatus();
-            if (downloadStatus.status === "completed" || downloadStatus.status === 'errored') {
-                clearInterval(interval);
+
+        progressIntervalRef.current = setInterval(() => {
+            getDownloadStatus();
+        }, 2500);
+    
+        return () => {
+            if (progressIntervalRef.current) {
+                clearInterval(progressIntervalRef.current);
+                progressIntervalRef.current = null;
             }
-        }, 1000);
-        setTimeout(() => {
-            clearInterval(interval);
-        }, 20000);
-        return () => clearInterval(interval); // Cleanup on component unmount
-    };
+        };
+    }
 
     const handleDelete = async () => {
         try {
-            const result = await api.delete(`/models/${model}`);
+            const result = await api.delete(`/api/v1/model/${model}`);
             const data = await result.data();
             setDownloadStatus(data);
         } catch (error) {
@@ -54,7 +63,7 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
 
     const handleInstall = async () => {
         setInstalling(true);
-        const result = await api.post(`/models/install/${model}`);
+        const result = await api.post(`/api/v1/model/${model}/install`);
         setInstalling(false);
     };
 
@@ -118,7 +127,7 @@ function Options({ cardProps, tabProps, setSelected }: OptionsProps) {
     const fetchModelOptions = async () => {
         setLoading(true);
         try {
-            const res = await api.get('/models/available');
+            const res = await api.get('/api/v1/model/available');
             const data = await res.data;
             setData(data);
         } finally {
@@ -139,7 +148,7 @@ function Options({ cardProps, tabProps, setSelected }: OptionsProps) {
                 </Flex>
             </Card.Section>
             {loading ? <p>Loading...</p> : 
-            <Table striped highlightOnHover verticalSpacing="xs" className={classes['option-table']}>
+            <Table highlightOnHover verticalSpacing="xs" className={classes['option-table']}>
                 <Table.Thead>
                     <Table.Tr style={{ backgroundColor: "#f0f0f6", textAlign: "left" }}>
                         <Table.Th>Model Group</Table.Th>

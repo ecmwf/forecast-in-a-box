@@ -9,7 +9,7 @@ import { AxiosError } from 'axios';
 import {IconSearch} from '@tabler/icons-react';
 
 import { DatasetId } from '../../components/interface';
-import GraphVisualiser from '@/app/components/visualise';
+import GraphVisualiser from '@/app/components/graph_visualiser';
 import {useApi} from '@/app/api';
 
 function OutputCells({ id, dataset, progress }: { id: string; dataset: string, progress: string | null }) {
@@ -19,7 +19,7 @@ function OutputCells({ id, dataset, progress }: { id: string; dataset: string, p
     useEffect(() => {
         const checkAvailability = async () => {
             try {
-                const response = await api.get(`/jobs/available/${id}/${dataset}`);
+                const response = await api.get(`/api/v1/job/${id}/${dataset}/available`);
                 if (response.status !== 200) {
                     throw new Error(`HTTP error! Status: ${response.statusText}`);
                 }
@@ -42,7 +42,7 @@ function OutputCells({ id, dataset, progress }: { id: string; dataset: string, p
             <Text ml="sm" style={{ fontFamily: 'monospace' }}>{dataset.split(':')[0]}:{dataset.split(':')[1]?.substring(0, 10)}</Text>
         </Table.Td>
         <Table.Td align='right'>
-            <Button size='sm' disabled={!isAvailable} component={isAvailable ? `a` : 'b'} href={isAvailable ? `/jobs/result/${id}/${dataset}` : ''} target='_blank'><IconSearch/></Button>
+            <Button size='sm' disabled={!isAvailable} component={isAvailable ? `a` : 'b'} href={isAvailable ? `/result/${id}/${dataset}` : ''} target='_blank'><IconSearch/></Button>
         </Table.Td>
         </>
     );
@@ -67,11 +67,11 @@ const ProgressPage = () => {
     
     const fetchProgress = async () => {
         try {
-            const response = await api.get(`/jobs/status/${id}`);
+            const response = await api.get(`/api/v1/job/${id}/status`);
             const data = response.data;
             setProgress(data);
     
-            if (data.progress === "100.00" || data.status === "errored" || data.status === "completed") {
+            if (data.progress === "100.00" || data.status === "completed") {
                 if (progressIntervalRef.current) {
                     clearInterval(progressIntervalRef.current); // Stop fetching if progress is 100
                     progressIntervalRef.current = null;
@@ -93,7 +93,7 @@ const ProgressPage = () => {
     
     const fetchOutputs = async () => {
         try {
-            const response = await api.get(`/jobs/outputs/${id}`);
+            const response = await api.get(`/api/v1/job/${id}/outputs`);
             const data = await response.data;
             setOutputs(data);
         } catch (error) {
@@ -108,7 +108,6 @@ const ProgressPage = () => {
     
     useEffect(() => {
         fetchOutputs(); // Initial fetch
-        fetchProgress(); // Initial fetch
     
         // Start the interval and store its ID in the ref
         progressIntervalRef.current = setInterval(() => {
@@ -129,7 +128,7 @@ const ProgressPage = () => {
             <Space h="xl"/>
             
             <Title display={'inline'} order={1}>Progress</Title>
-            <GraphVisualiser spec={null} url={`/jobs/visualise/${id}`} />
+            <GraphVisualiser spec={null} url={`/api/v1/job/${id}/visualise`} />
 
             <Title pt='xl' order={4}>{id} - {progress.status}</Title>
             

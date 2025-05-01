@@ -5,7 +5,6 @@ import { useSettings } from '@/app/SettingsContext';
 
 export function useApi() {
   const { settings } = useSettings();
-  console.log("API URL: ", settings.apiUrl);
 
   const api = axios.create({
     baseURL: settings.apiUrl,

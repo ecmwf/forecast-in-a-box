@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { SimpleGrid, Text, Card, LoadingOverlay, Stack, Title, Paper} from '@mantine/core';
 
-
-import {ModelSpecification} from '../interface'
 import {useApi} from '@/app/api';
 
 
@@ -19,7 +17,7 @@ function InformationWindow({ selected }: InformationProps) {
     useEffect(() => {
         if (selected) {
             setLoading(true);
-            api.get(`/models/info/${selected}`)
+            api.get(`/api/v1/model/${selected}/info`)
             .then((res) => {
                 setInformation(res.data);
                 setLoading(false);

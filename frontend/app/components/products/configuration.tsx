@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 
-import { Card, TextInput, Select, Button, LoadingOverlay, MultiSelect, Group, Text, Collapse, Box, Space} from '@mantine/core';
+import { Card, TextInput, Select, Button, LoadingOverlay, MultiSelect, Group, Text, Collapse, Box, Space, Loader} from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {useApi} from '@/app/api';
 
@@ -73,6 +73,7 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [productConfig, updateProductConfig] = useState<ProductConfiguration>({ product: selectedProduct, options: {} });
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
   const api = useApi();
 
   const [advancedOpened, { toggle }] = useDisclosure(false);
@@ -88,7 +89,7 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
     if (!selectedProduct) return; // Prevent unnecessary fetch
     setLoading(true);
     try {
-      const response = await api.post(`/products/configuration/${selectedProduct}`, { 'model': selectedModel, 'spec': {} }); // Empty request for initial load
+      const response = await api.post(`/api/v1/product/configuration/${selectedProduct}`, { 'model': selectedModel, 'spec': {} }); // Empty request for initial load
 
       const productSpec: ProductConfiguration = await response.data;
       console.log(productSpec)
@@ -106,6 +107,22 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
     }
     setLoading(false);
   };
+
+
+  const fetchUpdatedOptions = async () => {
+    setUpdating(true);
+    try {
+      const response = await api.post(`/api/v1/product/configuration/${selectedProduct}`, { 'model': selectedModel, 'spec': formData });
+      const productSpec: ProductConfiguration = await response.data;
+      updateProductConfig(productSpec);
+      
+    } catch (error) {
+      console.error("Error fetching updated options:", error);
+    }
+    setUpdating(false);
+  };
+
+  
   // Fetch initial options on component mount
   useEffect(() => {
     fetchInitialOptions();
@@ -114,20 +131,6 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
 
   useEffect(() => {
     if (Object.keys(formData).length === 0) return; // Prevent unnecessary fetch
-
-    const fetchUpdatedOptions = async () => {
-      setLoading(true);
-      try {
-        const response = await api.post(`/products/configuration/${selectedProduct}`, { 'model': selectedModel, 'spec': formData });
-        const productSpec: ProductConfiguration = await response.data;
-        updateProductConfig(productSpec);
-        
-      } catch (error) {
-        console.error("Error fetching updated options:", error);
-      }
-      setLoading(false);
-    };
-
     fetchUpdatedOptions();
   }, [formData]); // Update options when formData changes
 
@@ -173,7 +176,11 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
   return (
     <Card padding='sm'>
       <LoadingOverlay visible={loading} />
-        {productConfig && productConfig.product && <Text pb='md'>{productConfig.product}</Text>}
+        {productConfig && productConfig.product && 
+          <Group p='apart' mb='md'>
+            <Text>{productConfig.product}</Text><Text size='xs' c='dimmed'>{updating ? 'Updating': null}</Text> {updating ? <Loader size='xs'/> : null}
+          </Group>
+        }
         {productConfig && Object.entries(productConfig.options).map(([key, item]: [string, ConfigEntry]) => (
           !item.default ? (
                 <ConfigInput selectedProduct='{selectedProduct}' key = {key} keyValue={key} item={item} handleChange={handleChange} />
@@ -187,7 +194,7 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
           <Button onClick={toggle} rightSection={<IconSettings/>}>Advanced Settings</Button>
         ) : null}
 
-        <Collapse in={advancedOpened} bg='#f8f8f8' p='md' mt='md'>
+        <Collapse in={advancedOpened} bg='#f8f8f8' p='md' mt='md' id={`advanced-settings-${selectedProduct}`}>
             {productConfig && Object.entries(productConfig.options).map(([key, item]: [string, ConfigEntry]) => (
               item.default ? (
                   <ConfigInput selectedProduct='{selectedProduct}' key = {key} keyValue={key} item={item} handleChange={handleChange} />

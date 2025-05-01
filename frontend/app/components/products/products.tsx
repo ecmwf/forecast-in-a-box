@@ -6,7 +6,7 @@ import { LoadingOverlay, Group, SimpleGrid, Container, Button, Divider, Title, G
 import Categories from "./categories";
 import Configuration from "./configuration";
 import Cart from "./cart";
-import api from '@/app/api';
+import {useApi} from '@/app/api';
 
 import {CategoriesType, ProductSpecification, ModelSpecification} from '../interface'
 import sha256 from 'crypto-js/sha256';
@@ -21,6 +21,8 @@ interface ProductConfigurationProps {
 function ProductConfigurator({model, products, setProducts}: ProductConfigurationProps) {
     const [selected, setSelectedProduct] = useState<string | null>(null);
     const [internal_products, internal_setProducts] = useState(products);
+
+    const api = useApi();
 
     const addProduct = (conf: ProductSpecification) => {
         setSelectedProduct(null);
@@ -37,7 +39,7 @@ function ProductConfigurator({model, products, setProducts}: ProductConfiguratio
         const fetchUpdatedOptions = async () => {
         setLoading(true);
         try {
-            const response = await api.post(`/products/valid-categories/`, model);    
+            const response = await api.post(`/api/v1/product/valid-categories/`, model);    
             const categories: CategoriesType = await response.data;
             setCategories(categories);
             

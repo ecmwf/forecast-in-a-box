@@ -66,7 +66,7 @@ export type ProductSpecification = {
 
 export type EnvironmentSpecification = Record<string, string>;
 
-export type SubmitSpecification = {
+export type ExecutionSpecification = {
   model: ModelSpecification;
   products: ProductSpecification[];
   environment: EnvironmentSpecification;

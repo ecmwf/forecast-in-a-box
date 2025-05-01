@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { Container, Group, Space } from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { Table, Loader, Center, Title, Progress, Button, Flex, Divider, Tooltip, FileButton} from '@mantine/core';
@@ -26,31 +26,40 @@ const HomePage = () => {
 
   const [jobs, setJobs] = useState<StatusResponse>({} as StatusResponse);
   const [loading, setLoading] = useState(true);
+
+  const [working, setWorking] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const api = useApi();
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const getStatus = async () => {
     try {
-      setLoading(true);
-      const response = await api.get('/jobs/status');
+      const response = await api.get('/api/v1/job/status');
 
       const data: StatusResponse = await response.data;
       setJobs(data);
       
     } catch (error) {
-      console.error('Error fetching job statuses:', error);
-    } finally {
+      showNotification({
+        id: `status-error-${crypto.randomUUID()}`,
+        position: "top-right",
+        autoClose: 3000,
+        title: "Error getting status",
+        message: `${error.response?.data?.detail}`,
+        color: "red",
+      });    } finally {
       setLoading(false);
     }
   };
 
   const flushJobs = async () => {
     try {
-      setLoading(true);
-      const response = await api.post(`/jobs/flush`, {
+      setWorking(true);
+      const response = await api.post(`/api/v1/job/flush`, {
         headers: { "Content-Type": "application/json" },
       });
 
-      const result = await response.data();
+      const result = await response.data;
 
       showNotification({
         id: `flushed-result-form-${crypto.randomUUID()}`,
@@ -64,68 +73,110 @@ const HomePage = () => {
       });
 
     } catch (error) {
-      console.error('Error fetching job statuses:', error);
+      showNotification({
+        id: `flush-error-${crypto.randomUUID()}`,
+        position: "top-right",
+        autoClose: 3000,
+        title: "Flush Failed",
+        message: `${error.response?.data?.detail}`,
+        color: "red",
+      });
+
     } finally {
       setLoading(false);
+      setWorking(false);
     }
     getStatus();
   };
 
   const restartJob = async (jobId: string) => {
     try {
-      setLoading(true);
-      const response = await api.get(`/jobs/restart/${jobId}`, {
-        headers: { "Content-Type": "application/json" },
+      setWorking(true);
+      // setLoading(true);
+      const response = await api.get(`/api/v1/job/${jobId}/restart`, {
+      headers: { "Content-Type": "application/json" },
       });
 
-      await response.data();
+      const job = await response.data;
 
-    }
-    catch (error) {
-      console.error('Error fetching job statuses:', error);
-    }
-    finally {
+      showNotification({
+        id: `restart-success-${crypto.randomUUID()}`,
+        position: "top-right",
+        autoClose: 3000,
+        title: "Restart Successful",
+        message: `Job ${job['job_id']} created successfully`,
+        color: "green",
+      });
+    } catch (error) {
+      showNotification({
+        id: `restart-error-${crypto.randomUUID()}`,
+        position: "top-right",
+        autoClose: 3000,
+        title: "Restart Failed",
+        message: `${error.response?.data?.detail}`,
+        color: "red",
+      });
+    } finally {
       setLoading(false);
+      setWorking(false);
     }
     getStatus();
   };
 
   const deleteJob = async (jobId: string) => {
     try {
-      setLoading(true);
-      const response = await api.delete(`/jobs/delete/${jobId}`, {
-        headers: { "Content-Type": "application/json" },
+      setWorking(true);
+      // setLoading(true);
+      const response = await api.delete(`/api/v1/job/${jobId}`);
+      await response.data;
+
+      showNotification({
+        id: `upload-success-${crypto.randomUUID()}`,
+        position: "top-right",
+        autoClose: 3000,
+        title: "Delete Successful",
+        message: "Job deleted successfully",
+        color: "green",
       });
-      await response.data();
     }
     catch (error) {
-      console.error('Error fetching job statuses:', error);
+      showNotification({
+        id: `delete-error-${crypto.randomUUID()}`,
+        position: "top-right",
+        autoClose: 3000,
+        title: "Delete Failed",
+        message: `${error.response?.data?.detail}`,
+        color: "red",
+      });
     }
     finally {
       setLoading(false);
+      setWorking(false);
     }
     getStatus();
   };
 
   const handleFileUpload = (file) => {
+    setUploading(true);
+    setWorking(true);
     console.log("File selected:", file);
     if (file) {
       const formData = new FormData();
       formData.append("file", file);
 
-      api.post("/jobs/upload", formData, {
+      api.post("/api/v1/job/upload", formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
       })
         .then((response) => response.data)
-        .then(() => {
+        .then((data) => {
           showNotification({
             id: `upload-success-${crypto.randomUUID()}`,
             position: "top-right",
             autoClose: 3000,
             title: "Upload Successful",
-            message: "File uploaded successfully",
+            message:`File uploaded successfully. ${data.job_id} started`,
             color: "green",
           });
           getStatus();
@@ -142,25 +193,41 @@ const HomePage = () => {
           });
         });
     }
+    setUploading(false);
+    setWorking(false);
   };
 
   useEffect(() => {
+    setLoading(true);
     getStatus();
+      // Start the interval and store its ID in the ref
+      progressIntervalRef.current = setInterval(() => {
+        getStatus();
+    }, 5000);
+
+    // Cleanup function to clear the interval when the component unmounts or `id` changes
+    return () => {
+        if (progressIntervalRef.current) {
+            clearInterval(progressIntervalRef.current);
+            progressIntervalRef.current = null;
+        }
+    };
   }, []);
 
   return (
     <Container size="lg" pt="xl" pb="xl">
       <Flex gap='xl'>
         <Title>Status</Title>
-        <FileButton onChange={handleFileUpload}>
-          {(props) => <Button color='green' {...props}>Upload</Button>}
+        <FileButton onChange={handleFileUpload} disabled={uploading}>
+          {(props) => <Button color='green' {...props}>{uploading? 'Uploading': 'Upload'}</Button>}
         </FileButton>
-        <Button onClick={getStatus}>
+        <Button onClick={() => { setLoading(true); getStatus(); }}>
           Refresh
         </Button>
         <Button onClick={flushJobs} color="red" disabled={Object.keys(jobs.progresses || {}).length === 0}>
           Flush
         </Button>
+        {working && <Loader/>}
       </Flex>
       <Divider my='lg' />
       {loading ? (

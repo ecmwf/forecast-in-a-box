@@ -4,10 +4,10 @@ import { Button, Card, Title, Group, Divider, SimpleGrid, Container, ScrollArea,
 
 import { IconX, IconPencil} from '@tabler/icons-react';
 
-import {ModelSpecification, ProductSpecification, SubmitSpecification, SubmitResponse} from './interface'
+import {ModelSpecification, ProductSpecification, EnvironmentSpecification, ExecutionSpecification, SubmitResponse} from './interface'
 
 import InformationWindow from './model/information'
-import GraphVisualiser from './visualise';
+import GraphVisualiser from './graph_visualiser';
 
 import Cart from './products/cart'
 import {useApi} from '@/app/api';
@@ -15,12 +15,13 @@ import {useApi} from '@/app/api';
 interface ConfirmProps {
     model: ModelSpecification;
     products: Record<string, ProductSpecification>;
+    environment: EnvironmentSpecification;
     setProducts: (products: Record<string, ProductSpecification>) => void;
     setSlider: (value: number) => void;
     setJobId: (value: SubmitResponse) => void;
 }
 
-function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmProps) {
+function Confirm({ model, products, environment, setProducts, setSlider, setJobId}: ConfirmProps) {
     const api = useApi();
     
     const [submitting, setSubmitting] = useState(false);
@@ -32,7 +33,7 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
         const checkStatus = async () => {
             setStatus({ cascade: "loading"});
             try {
-                const response = await api.get("/status");
+                const response = await api.get("/api/v1/status");
                 if (response.status == 200) {
                     const data = await response.data;
                     setStatus({
@@ -51,17 +52,17 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
         }, []);
 
     const handleSubmit = () => {
-        const spec: SubmitSpecification = {
+        const spec: ExecutionSpecification = {
             model: model,
             products: Object.values(products),
-            environment: {}
+            environment: environment
         }
         setSubmitting(true);
 
         const execute = async () => {
             (async () => {
                 try {
-                    const response = await api.post(`/graph/execute`, spec);
+                    const response = await api.post(`/api/v1/graph/execute`, spec);
 
                     const result: SubmitResponse = await response.data;
                     if (response.status !== 200) {
@@ -86,7 +87,7 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
     }
 
     const handleDownload = () => {
-        const submitData: SubmitSpecification = {
+        const submitData: ExecutionSpecification = {
             model: model,
             products: Object.values(products),
             environment: {}
@@ -95,7 +96,7 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
         async function retrieveFileBlob() {
             try {
                 const ftch = await api.post( // this will request the file information for the download (whether an image, PDF, etc.)
-                    `/graph/serialise`,
+                    `/api/v1/graph/serialise`,
                     {submitData},
                 )
                 if (ftch.status !== 200) {
@@ -172,7 +173,7 @@ function Confirm({ model, products, setProducts, setSlider, setJobId}: ConfirmPr
                 <Group grow>
                 <Button onClick={handleDownload}>Serialise</Button>
                 <Button onClick={() => {
-                    const submitData: SubmitSpecification = {
+                    const submitData: ExecutionSpecification = {
                         model: model,
                         products: Object.values(products),
                         environment: {}

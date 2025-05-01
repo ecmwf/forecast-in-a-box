@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { SubmitSpecification } from "./interface";
+import { ExecutionSpecification } from "./interface";
 import { ActionIcon, Button, Container, Group, Menu } from "@mantine/core";
 import GraphModal from "./shared/graphModal";
 import {useApi} from '@/app/api';
@@ -8,7 +8,7 @@ import {useApi} from '@/app/api';
 import {IconMenu2} from '@tabler/icons-react';
 
 interface GraphVisualiserProps {
-    spec: SubmitSpecification | null;
+    spec: ExecutionSpecification | null;
     url: string | null;
 }
 
@@ -25,7 +25,7 @@ export default function GraphVisualiser({ spec, url }: GraphVisualiserProps) {
                 try {
                     let response;
                     if (spec) {
-                        response = await api.post(`/graph/visualise`, { spec: spec, options: options });
+                        response = await api.post(`/api/v1/graph/visualise`, { spec: spec, options: options });
                     } else if (url) {
                         response = await api.post(`${url}`, {options});
                     } else {
