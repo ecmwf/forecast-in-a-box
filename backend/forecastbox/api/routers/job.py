@@ -1,8 +1,9 @@
 """Products API Router."""
 
+from functools import lru_cache
 import json
 from fastapi import APIRouter, Response, Depends, UploadFile, Body
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import HTMLResponse
 from fastapi import HTTPException
 
 from dataclasses import dataclass
@@ -152,10 +153,12 @@ async def get_outputs_of_job(job_id: JobId = Depends(validate_job_id)) -> list[T
 
 
 @router.post("/{job_id}/visualise")
-async def visualise_job(job_id: JobId = Depends(validate_job_id), options: VisualisationOptions = Body(default=None)) -> HTMLResponse:
+async def visualise_job(job_id: JobId = Depends(validate_job_id), options: VisualisationOptions = Body(None)) -> HTMLResponse:
     """Get outputs of a job."""
     collection = db.get_collection("job_records")
     job = collection.find({"job_id": job_id})
+
+    print(options)
 
     if not options:
         options = VisualisationOptions()
@@ -204,7 +207,9 @@ async def upload_job(file: UploadFile = None) -> api.SubmitJobResponse:
     spec = await file.read()
     import json
 
-    response = await execute(json.loads(spec))
+    spec = ExecutionSpecification(**json.loads(spec))
+    response = await execute(spec)
+
     if response.error:
         raise HTTPException(status_code=500, detail=response.error)
     return response
@@ -257,7 +262,12 @@ async def get_result_availablity(job_id: JobId, dataset_id: TaskId) -> DatasetAv
     DatasetAvailabilityResponse
         {'available': Availability of the result}
     """
-    response: api.JobProgressResponse = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{CASCADE_SETTINGS.cascade_url}")
+    try:
+        response: api.JobProgressResponse = client.request_response(
+            api.JobProgressRequest(job_ids=[job_id]), f"{CASCADE_SETTINGS.cascade_url}"
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=f"Job retrieval failed: {e}")
 
     return DatasetAvailabilityResponse(dataset_id in [x.task for x in response.datasets[job_id]])
 
@@ -292,13 +302,19 @@ def to_bytes(obj) -> tuple[bytes, str]:
     raise TypeError(f"Unsupported type: {type(obj)}")
 
 
-@router.get("/{job_id}/{dataset_id}")
-async def get_result(job_id: JobId, dataset_id: TaskId) -> FileResponse:
-    response: api.ResultRetrievalResponse = client.request_response(
+@lru_cache
+def result_cache(job_id: JobId, dataset_id: TaskId) -> api.ResultRetrievalResponse:
+    """Get the path to the result cache."""
+    return client.request_response(
         api.ResultRetrievalRequest(job_id=job_id, dataset_id=DatasetId(task=dataset_id, output="0")), f"{CASCADE_SETTINGS.cascade_url}"
     )
-    if not response.result:
-        raise HTTPException(404, f"Result retrieval failed: {response.error}")
+
+
+@router.get("/{job_id}/{dataset_id}")
+async def get_result(job_id: JobId, dataset_id: TaskId) -> Response:
+    response = result_cache(job_id, dataset_id)
+    if response.error:
+        raise HTTPException(500, f"Result retrieval failed: {response.error}")
 
     try:
         from cascade.gateway.api import decoded_result
@@ -327,7 +343,8 @@ async def flush_job() -> JobDeletionResponse:
         client.request_response(api.ResultDeletionRequest(datasets={}), f"{CASCADE_SETTINGS.cascade_url}")  # type: ignore
     except Exception as e:
         raise HTTPException(500, f"Job deletion failed: {e}")
-    collection = db.get_collection("job_records")
+    finally:
+        collection = db.get_collection("job_records")
     return JobDeletionResponse(deleted_count=collection.delete_many({}).deleted_count)
 
 
@@ -341,5 +358,6 @@ async def delete_job(job_id: JobId = Depends(validate_job_id)) -> JobDeletionRes
         client.request_response(api.ResultDeletionRequest(datasets={job_id: []}), f"{CASCADE_SETTINGS.cascade_url}")  # type: ignore
     except Exception as e:
         raise HTTPException(500, f"Job deletion failed: {e}")
-    delete = db.get_collection("job_records").delete_one({"job_id": job_id})
+    finally:
+        delete = db.get_collection("job_records").delete_one({"job_id": job_id})
     return JobDeletionResponse(deleted_count=delete.deleted_count)

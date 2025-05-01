@@ -18,7 +18,7 @@ const StatusPage = () => {
     const checkStatus = async () => {
         setStatus({ api: "loading", cascade: "loading", ecmwf: "loading" });
         try {
-            const response = await api.get("/api/v1/status");
+            const response = await api.get("/v1/status");
             if (response.status == 200) {
                 const data = await response.data;
                 setStatus({

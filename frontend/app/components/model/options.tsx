@@ -23,7 +23,7 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
     const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
     
     const getDownloadStatus = async () => {
-        const result = await api.get(`/api/v1/model/${model}/downloaded`);
+        const result = await api.get(`/v1/model/${model}/downloaded`);
         const data = await result.data;
         setDownloadStatus(data);
         if (downloadStatus.status === "completed" || downloadStatus.status === 'errored') {
@@ -35,7 +35,7 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
     };
 
     const handleDownload = async () => {
-        const result = await api.post(`/api/v1/model/${model}/download`);
+        const result = await api.post(`/v1/model/${model}/download`);
         const data = await result.data;
         setDownloadStatus(data);
 
@@ -53,7 +53,7 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
 
     const handleDelete = async () => {
         try {
-            const result = await api.delete(`/api/v1/model/${model}`);
+            const result = await api.delete(`/v1/model/${model}`);
             const data = await result.data();
             setDownloadStatus(data);
         } catch (error) {
@@ -63,7 +63,7 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
 
     const handleInstall = async () => {
         setInstalling(true);
-        const result = await api.post(`/api/v1/model/${model}/install`);
+        const result = await api.post(`/v1/model/${model}/install`);
         setInstalling(false);
     };
 
@@ -127,7 +127,7 @@ function Options({ cardProps, tabProps, setSelected }: OptionsProps) {
     const fetchModelOptions = async () => {
         setLoading(true);
         try {
-            const res = await api.get('/api/v1/model/available');
+            const res = await api.get('/v1/model/available');
             const data = await res.data;
             setData(data);
         } finally {

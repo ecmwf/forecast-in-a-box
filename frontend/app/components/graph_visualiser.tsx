@@ -6,6 +6,7 @@ import GraphModal from "./shared/graphModal";
 import {useApi} from '@/app/api';
 
 import {IconMenu2} from '@tabler/icons-react';
+import { headers } from "next/headers";
 
 interface GraphVisualiserProps {
     spec: ExecutionSpecification | null;
@@ -25,9 +26,9 @@ export default function GraphVisualiser({ spec, url }: GraphVisualiserProps) {
                 try {
                     let response;
                     if (spec) {
-                        response = await api.post(`/api/v1/graph/visualise`, { spec: spec, options: options });
+                        response = await api.post(`/v1/graph/visualise`, { spec: spec, options: options });
                     } else if (url) {
-                        response = await api.post(`${url}`, {options});
+                        response = await api.post(`${url}`, { options }, { headers: { "Content-Type": "application/json" } });
                     } else {
                         throw new Error("No valid source for fetching the graph.");
                     }

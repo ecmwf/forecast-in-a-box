@@ -33,7 +33,7 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
         const checkStatus = async () => {
             setStatus({ cascade: "loading"});
             try {
-                const response = await api.get("/api/v1/status");
+                const response = await api.get("/v1/status");
                 if (response.status == 200) {
                     const data = await response.data;
                     setStatus({
@@ -62,7 +62,7 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
         const execute = async () => {
             (async () => {
                 try {
-                    const response = await api.post(`/api/v1/graph/execute`, spec);
+                    const response = await api.post(`/v1/graph/execute`, spec);
 
                     const result: SubmitResponse = await response.data;
                     if (response.status !== 200) {
@@ -96,7 +96,7 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
         async function retrieveFileBlob() {
             try {
                 const ftch = await api.post( // this will request the file information for the download (whether an image, PDF, etc.)
-                    `/api/v1/graph/serialise`,
+                    `/v1/graph/serialise`,
                     {submitData},
                 )
                 if (ftch.status !== 200) {

@@ -29,11 +29,17 @@ app.include_router(setting.router, prefix="/api/v1/setting")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["127.0.0.1"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# @app.middleware("http")
+# async def restrict_to_localhost(request: Request, call_next):
+#     client_ip = request.client.host
+#     if client_ip != "127.0.0.1":
+#         raise HTTPException(status_code=403, detail="Forbidden")
+#     return await call_next(request)
 
 
 @app.middleware("http")

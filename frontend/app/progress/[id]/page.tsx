@@ -19,7 +19,7 @@ function OutputCells({ id, dataset, progress }: { id: string; dataset: string, p
     useEffect(() => {
         const checkAvailability = async () => {
             try {
-                const response = await api.get(`/api/v1/job/${id}/${dataset}/available`);
+                const response = await api.get(`/v1/job/${id}/${dataset}/available`);
                 if (response.status !== 200) {
                     throw new Error(`HTTP error! Status: ${response.statusText}`);
                 }
@@ -67,7 +67,7 @@ const ProgressPage = () => {
     
     const fetchProgress = async () => {
         try {
-            const response = await api.get(`/api/v1/job/${id}/status`);
+            const response = await api.get(`/v1/job/${id}/status`);
             const data = response.data;
             setProgress(data);
     
@@ -93,7 +93,7 @@ const ProgressPage = () => {
     
     const fetchOutputs = async () => {
         try {
-            const response = await api.get(`/api/v1/job/${id}/outputs`);
+            const response = await api.get(`/v1/job/${id}/outputs`);
             const data = await response.data;
             setOutputs(data);
         } catch (error) {
@@ -128,7 +128,7 @@ const ProgressPage = () => {
             <Space h="xl"/>
             
             <Title display={'inline'} order={1}>Progress</Title>
-            <GraphVisualiser spec={null} url={`/api/v1/job/${id}/visualise`} />
+            <GraphVisualiser spec={null} url={`/v1/job/${id}/visualise`} />
 
             <Title pt='xl' order={4}>{id} - {progress.status}</Title>
             

@@ -44,7 +44,7 @@ const HomePage = () => {
   const fetchSettings = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/api/v1/setting');
+      const response = await api.get('/v1/setting');
       setApiSettings(response.data);
       setFormValues(response.data); // Initialize form values
     } catch (error) {
@@ -62,7 +62,7 @@ const HomePage = () => {
   const updateApiSettings = async () => {
     setUpdating(true);
     try {
-      await api.post('/api/v1/setting', formValues);
+      await api.post('/v1/setting', formValues);
       showNotification({
         title: 'Success',
         message: 'Settings updated successfully',

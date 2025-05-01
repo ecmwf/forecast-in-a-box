@@ -8,7 +8,6 @@
     "python-dev": "concurrently \"npm run fastapi-dev\" \"npm run cascade-dev\"",
     "next-dev": "next dev",
     "dev": "concurrently \"npm run next-dev\" \"npm run python-dev\"",
-    "setup": "uv add fastapi",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"

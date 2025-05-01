@@ -1,5 +1,3 @@
-"use client";
-
 import axios from 'axios';
 import { useSettings } from '@/app/SettingsContext';
 

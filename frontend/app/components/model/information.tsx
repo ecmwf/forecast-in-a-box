@@ -17,7 +17,7 @@ function InformationWindow({ selected }: InformationProps) {
     useEffect(() => {
         if (selected) {
             setLoading(true);
-            api.get(`/api/v1/model/${selected}/info`)
+            api.get(`/v1/model/${selected}/info`)
             .then((res) => {
                 setInformation(res.data);
                 setLoading(false);

@@ -34,7 +34,7 @@ const HomePage = () => {
 
   const getStatus = async () => {
     try {
-      const response = await api.get('/api/v1/job/status');
+      const response = await api.get('/v1/job/status');
 
       const data: StatusResponse = await response.data;
       setJobs(data);
@@ -45,9 +45,10 @@ const HomePage = () => {
         position: "top-right",
         autoClose: 3000,
         title: "Error getting status",
-        message: `${error.response?.data?.detail}`,
+        message: `${error.response?.data?.detail? error.response?.data?.detail : ''}`,
         color: "red",
-      });    } finally {
+      });    
+    } finally {
       setLoading(false);
     }
   };
@@ -55,7 +56,7 @@ const HomePage = () => {
   const flushJobs = async () => {
     try {
       setWorking(true);
-      const response = await api.post(`/api/v1/job/flush`, {
+      const response = await api.post(`/v1/job/flush`, {
         headers: { "Content-Type": "application/json" },
       });
 
@@ -93,7 +94,7 @@ const HomePage = () => {
     try {
       setWorking(true);
       // setLoading(true);
-      const response = await api.get(`/api/v1/job/${jobId}/restart`, {
+      const response = await api.get(`/v1/job/${jobId}/restart`, {
       headers: { "Content-Type": "application/json" },
       });
 
@@ -127,7 +128,7 @@ const HomePage = () => {
     try {
       setWorking(true);
       // setLoading(true);
-      const response = await api.delete(`/api/v1/job/${jobId}`);
+      const response = await api.delete(`/v1/job/${jobId}`);
       await response.data;
 
       showNotification({
@@ -164,7 +165,7 @@ const HomePage = () => {
       const formData = new FormData();
       formData.append("file", file);
 
-      api.post("/api/v1/job/upload", formData, {
+      api.post("/v1/job/upload", formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
@@ -203,7 +204,7 @@ const HomePage = () => {
       // Start the interval and store its ID in the ref
       progressIntervalRef.current = setInterval(() => {
         getStatus();
-    }, 5000);
+    }, 10000);
 
     // Cleanup function to clear the interval when the component unmounts or `id` changes
     return () => {

@@ -89,7 +89,7 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
     if (!selectedProduct) return; // Prevent unnecessary fetch
     setLoading(true);
     try {
-      const response = await api.post(`/api/v1/product/configuration/${selectedProduct}`, { 'model': selectedModel, 'spec': {} }); // Empty request for initial load
+      const response = await api.post(`/v1/product/configuration/${selectedProduct}`, { 'model': selectedModel, 'spec': {} }); // Empty request for initial load
 
       const productSpec: ProductConfiguration = await response.data;
       console.log(productSpec)
@@ -112,7 +112,7 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
   const fetchUpdatedOptions = async () => {
     setUpdating(true);
     try {
-      const response = await api.post(`/api/v1/product/configuration/${selectedProduct}`, { 'model': selectedModel, 'spec': formData });
+      const response = await api.post(`/v1/product/configuration/${selectedProduct}`, { 'model': selectedModel, 'spec': formData });
       const productSpec: ProductConfiguration = await response.data;
       updateProductConfig(productSpec);
       
