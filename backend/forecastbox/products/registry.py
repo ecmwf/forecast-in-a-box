@@ -49,7 +49,7 @@ class CategoryRegistry:
 
     def to_category_info(self) -> Category:
         return Category(
-            title=self._title, description=self._description, options=list(map(str, self._products.keys()))
+            title=self._title, description=self._description, options=set(map(str, self._products.keys()))
         )  # {"title": self._title, "description": self._description, "options": list(map(str, self._products.keys()))}
 
     def __call__(self, product: str) -> Callable:

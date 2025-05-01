@@ -1,7 +1,6 @@
 """Products API Router."""
 
 from fastapi import APIRouter
-from functools import lru_cache
 
 from typing import Any
 
@@ -15,7 +14,6 @@ from .model import get_model_path
 from ..types import ConfigEntry, ProductConfiguration, ModelSpecification
 from qubed import Qube
 
-from dataclasses import asdict
 
 router = APIRouter(
     tags=["product"],
@@ -30,7 +28,7 @@ def get_model(model: ModelSpecification) -> Model:
 
     model_dict = model.model_dump()
     model_path = get_model_path(model_dict.pop("model").replace("_", "/"))
-    return Model(model_path, **model_dict)
+    return Model(checkpoint_path=model_path, **model_dict)
 
 
 def select_from_params(available_spec: Qube, params: dict[str, Any]) -> Qube:
@@ -66,7 +64,7 @@ async def product_to_config(product: Product, modelspec: ModelSpecification, par
         # Add back in other options when selected
         constrained = []
         for k, v in params.items():
-            if k == key or not k in params:
+            if k == key or k not in params:
                 continue
 
             if sorted(select_from_params(available_product_spec, {}).span(key)) != sorted(
@@ -79,7 +77,7 @@ async def product_to_config(product: Product, modelspec: ModelSpecification, par
         entries[key] = ConfigEntry(
             label=product.label.get(key, key),
             description=product.description.get(key, None),
-            values=list(val),
+            values=set(val),
             example=product.example.get(key, None),
             multiple=product.multiselect.get(key, False),
             constrained_by=constrained,
@@ -88,7 +86,7 @@ async def product_to_config(product: Product, modelspec: ModelSpecification, par
 
     for key in model_spec.ignore_in_select:
         entries.pop(key, None)
-        
+
     return entries
 
 

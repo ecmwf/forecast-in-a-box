@@ -22,7 +22,7 @@ dependencies = [
 	"uvicorn",
 	"cloudpickle",
 	"pyrsistent",
-	"anemoi-inference[huggingface]>=0.4.10",
+	"anemoi-inference>=0.4.10",
 	"qubed>=0.1.12",
 	"anemoi-cascade>=0.1.0",
 	"pydantic-settings",

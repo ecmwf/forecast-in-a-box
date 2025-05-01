@@ -1,13 +1,13 @@
 """Graph API Router."""
 
 from datetime import datetime
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
 
 import tempfile
 import logging
 
-from forecastbox.products.registry import get_categories, get_product
+from forecastbox.products.registry import get_product
 from forecastbox.models import Model
 
 from .model import get_model_path
@@ -36,6 +36,7 @@ router = APIRouter(
 
 LOG = logging.getLogger(__name__)
 
+
 class SubmitResponse(api.SubmitJobResponse):
     output_ids: set[DatasetId]
 
@@ -48,9 +49,9 @@ async def convert_to_cascade(spec: ExecutionSpecification) -> Cascade:
         date=spec.model.date,
         ensemble_members=spec.model.ensemble_members,
     )
-    model = Model(get_model_path(spec.model.model), **model_spec)
+    model = Model(checkpoint_path=get_model_path(spec.model.model), **model_spec)
     model_action = model.graph(None, **spec.model.entries)
-    
+
     complete_graph = Graph([])
 
     for product in spec.products:
@@ -69,12 +70,13 @@ async def convert_to_cascade(spec: ExecutionSpecification) -> Cascade:
 
     return Cascade(deduplicate_nodes(complete_graph))
 
+
 @router.post("/visualise")
 async def get_graph_visualise(spec: ExecutionSpecification, options: VisualisationOptions = None) -> HTMLResponse:
     """Get an HTML visualisation of the product graph."""
     if options is None:
         options = VisualisationOptions()
-    
+
     try:
         graph = await convert_to_cascade(spec)
     except Exception as e:
@@ -86,6 +88,7 @@ async def get_graph_visualise(spec: ExecutionSpecification, options: Visualisati
 
         with open(dest.name, "r") as f:
             return HTMLResponse(f.read(), media_type="text/html")
+
 
 @router.post("/serialise")
 async def get_graph_serialised(spec: ExecutionSpecification) -> JobInstance:
@@ -102,19 +105,19 @@ async def get_graph_download(spec: ExecutionSpecification) -> str:
 
 @router.post("/execute")
 async def execute_api(spec: ExecutionSpecification) -> api.SubmitJobResponse:
-    return await execute(spec)
-    # try:
-    #     return await execute(spec)
-    # except Exception as e:
-    #     return HTMLResponse(str(e), status_code=500)
+    response = await execute(spec)
+    if response.error:
+        raise HTTPException(status_code=500, detail=response.error)
+    return response
+
 
 async def execute(spec: ExecutionSpecification) -> api.SubmitJobResponse:
     """Get serialised dump of product graph."""
     try:
         graph = await convert_to_cascade(spec)
     except Exception as e:
-        return api.SubmitJobResponse(job_id = None, error=str(e))
-    
+        return api.SubmitJobResponse(job_id=None, error=str(e))
+
     model_path = get_model_path(spec.model.model)
 
     job = graph2job(graph._graph)
@@ -124,36 +127,24 @@ async def execute(spec: ExecutionSpecification) -> api.SubmitJobResponse:
 
     job.ext_outputs = sinks
 
-    BLACKLISTED_INSTALLS = ['anemoi', 'anemoi-training', 'anemoi-inference', 'anemoi-utils']
-    env = [f"{key}=={val}" for key, val in Model.versions(model_path).items() if key not in BLACKLISTED_INSTALLS]
-    env.extend(['anemoi-inference', 'anemoi-cascade'])
-
-    # Manual GPU allocation
-    for task_id, task in job.tasks.items():
-        if task_id.startswith("run_as_earthkit"):
-            task.definition.needs_gpu = True
-        # Set the environment variables for the job
-        if any([lambda x: x in task_id, ["run_as_earthkit", "get_initial_conditions"]]):
-            # task.definition.environment = env
-            pass
-
     hosts = CASCADE_SETTINGS.max_hosts
     workers_per_host = CASCADE_SETTINGS.max_workers_per_host
 
     r = api.SubmitJobRequest(
         job=api.JobSpec(benchmark_name=None, workers_per_host=workers_per_host, hosts=hosts, envvars={}, use_slurm=False, job_instance=job)
     )
-    submit_job_response: api.SubmitJobResponse = client.request_response(r, f"{CASCADE_SETTINGS.cascade_url}")  # type: ignore
+    try:
+        submit_job_response: api.SubmitJobResponse = client.request_response(r, f"{CASCADE_SETTINGS.cascade_url}")  # type: ignore
+    except Exception as e:
+        return api.SubmitJobResponse(job_id=None, error="Failed to submit job: " + str(e))
 
-
-    # Check if the job was submitted successfully
     if submit_job_response.error:
-        raise Exception(f"Job submission failed: {submit_job_response.error}")
+        return submit_job_response
 
     # Record the job_id and graph specification
     record = {
         "job_id": submit_job_response.job_id,
-        "graph_specification": spec,
+        "graph_specification": spec.model_dump_json(),
         "status": "submitted",
         "error": None,
         "created_at": datetime.now(),
