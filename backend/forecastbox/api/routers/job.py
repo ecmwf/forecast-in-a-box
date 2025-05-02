@@ -318,10 +318,14 @@ async def get_result(job_id: JobId, dataset_id: TaskId) -> Response:
         from cascade.gateway.api import decoded_result
 
         result = decoded_result(response, job=None)
-
         bytez, media_type = to_bytes(result)
-    except Exception as e:
-        raise HTTPException(500, f"Result retrieval failed: {e}")
+    except Exception:
+        import pickle
+
+        media_type = "application/pickle"
+        bytez = pickle.dumps(result)
+        # return Response(response.model_dump_json(), media_type=media_type)
+        # raise HTTPException(500, f"Result retrieval failed: {e}")
 
     return Response(bytez, media_type=media_type)
 
@@ -343,6 +347,7 @@ async def flush_job() -> JobDeletionResponse:
         raise HTTPException(500, f"Job deletion failed: {e}")
     finally:
         delete = db.get_collection("job_records").delete_many({})
+        result_cache.cache_clear()
     return JobDeletionResponse(deleted_count=delete.deleted_count)
 
 

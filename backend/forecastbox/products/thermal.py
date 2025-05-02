@@ -5,6 +5,7 @@ from forecastbox.models import Model
 from .registry import CategoryRegistry
 from .product import Product
 
+
 from ppcascade.fluent import Action as ppAction
 
 thermal_indices = CategoryRegistry("thermal", "Thermal Indices", "Thermal Indices")
@@ -49,7 +50,7 @@ class BaseThermalIndex(Product):
         selected = self.select_on_specification(product_spec, deaccumulated)
         source = selected.select(param=self.param_requirements)
 
-        return ppAction(source.nodes).thermal_index(self.output_param)
+        return ppAction(source.nodes).thermal_index(self.output_param).map(self.named_payload(self.__class__.__name__))
 
 
 @thermal_indices("Heat Index")

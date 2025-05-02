@@ -7,6 +7,8 @@ from forecastbox.models import Model
 
 from .definitions import DESCRIPTIONS, LABELS
 
+from earthkit.workflows import fluent
+
 if TYPE_CHECKING:
     from earthkit.workflows.graph import Graph
     from earthkit.workflows.fluent import Action
@@ -101,6 +103,15 @@ class Product(ABC):
     def model_intersection(self, model: Model) -> "Qube":
         """Get the intersection of the model and product qubes."""
         return model.qube(self.model_assumptions) & self.qube
+
+    def named_payload(self, name: str) -> fluent.Payload:
+        """Get an empty payload with a name."""
+
+        def payload(x):
+            return x
+
+        payload.__name__ = name
+        return fluent.Payload(payload)
 
     @abstractmethod
     def to_graph(self, product_spec: dict[str, Any], model: Model, source: "Action") -> "Graph":

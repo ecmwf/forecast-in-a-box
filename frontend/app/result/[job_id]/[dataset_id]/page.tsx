@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { useApi } from "@/app/api";
-import { Container, Loader, Text, Title, Alert, Group, Space, Center, Stack, Button } from "@mantine/core";
+import { Container, Loader, Text, Title, Alert, Group, Space, Center, Stack, Button, ActionIcon } from "@mantine/core";
 import { useParams } from "next/navigation";
+
+import { IconDownload } from "@tabler/icons-react";
 
 export default function ResultsPage() {
     const params = useParams();
@@ -77,7 +79,7 @@ export default function ResultsPage() {
                                 Download 
                             </Text>
                         </a> */}
-                        <iframe 
+                        {/* <iframe 
                             src={dataLink} 
                             style={{ 
                                 border: "0px solid #ccc", 
@@ -88,9 +90,9 @@ export default function ResultsPage() {
                                 width: "80%",
                                 flex: 1, 
                             }} 
-                        />
+                        /> */}
 
-                    {/* {data?.image_data ? (
+                    {data?.image_data ? (
                         <img
                             src={`data:image/png;base64,${data.image_data}`}
                             alt="Result Image"
@@ -105,8 +107,20 @@ export default function ResultsPage() {
                             }}
                         />
                     ) : (
-                        null
-                    )} */}
+                        <Stack align="center" style={{ flex: 1 }}>
+                        <ActionIcon
+                            component="a"
+                            href={dataLink}
+                            download={`${dataset_id}.pickle`}
+                            size="xxl"
+                        >
+                            <IconDownload size={'30vh'} />
+                        </ActionIcon>
+                        <Title order={3} style={{ wordWrap: "break-word", textAlign: "center" }}>
+                            Download
+                        </Title>
+                        </Stack>
+                    )}
                 </Stack>
             )}
         </Center>

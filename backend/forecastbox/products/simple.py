@@ -23,7 +23,7 @@ except ImportError:
 
 
 @as_payload
-@mark.environment_requirements(["earthkit-plots", "earthkit-plots-default-styles", "git+https://github.com/ecmwf/earthkit-data.git"])
+@mark.environment_requirements(["earthkit-plots", "earthkit-plots-default-styles"])
 def quickplot(fields: ekd.FieldList, groupby: str = None, subplot_title: str = None, figure_title: str = None, domain=None):
     from earthkit.plots.utils import iter_utils
     from earthkit.plots.components import layouts
@@ -200,8 +200,8 @@ class GribProduct(GenericTemporalProduct):
         return self.make_generic_qube()
 
     def to_graph(self, product_spec, model, source):
-        source = self.select_on_specification(product_spec, source)
-        return source
+        source = self.select_on_specification(product_spec, source).concatenate("param").concatenate("step")
+        return source.map(self.named_payload("grib"))
 
 
 @simple_registry("Deaccumulated")
@@ -220,4 +220,4 @@ class DeaccumulatedProduct(GenericTemporalProduct):
         return self.make_generic_qube()
 
     def to_graph(self, product_spec, model, source):
-        return self.select_on_specification(product_spec, model.deaccumulate(source))
+        return self.select_on_specification(product_spec, model.deaccumulate(source)).map(self.named_payload("deaccumulated"))
