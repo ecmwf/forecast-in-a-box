@@ -23,7 +23,7 @@ import './global.css';
 
 export const metadata = {
   title: "Forecast in a Box",
-  description: "Pain",
+  description: "",
 };
 
 export default function RootLayout({ children }: { children: any }) {

@@ -1,49 +1,28 @@
-"""
-In-memory, thread-safe, mutation-robust simple KV store
-"""
+from fastapi_users_db_beanie import BeanieUserDatabase
+from forecastbox.settings import FIABSettings
+from forecastbox.schemas.user import User
 
-import pyrsistent
-from typing import Generic, TypeVar, Protocol, Iterable, Optional
+import motor.motor_asyncio
+from beanie import init_beanie
+from pymongo import MongoClient
 
-T = TypeVar("T")
+SETTINGS = FIABSettings()
+db_name = SETTINGS.mongodb_database
 
+user_client = motor.motor_asyncio.AsyncIOMotorClient(SETTINGS.mongodb_uri, uuidRepresentation="standard")
+mongo_client = MongoClient(SETTINGS.mongodb_uri)
 
-class KVStore(Protocol[T]):
-    def update(self, key: str, value: T):
-        raise NotImplementedError
-
-    def all(self) -> Iterable[tuple[str, T]]:
-        raise NotImplementedError
-
-    def get(self, key: str) -> Optional[T]:
-        raise NotImplementedError
-
-    def contains(self, key: str) -> bool:
-        raise NotImplementedError
-
-    def remove(self, key: str) -> None:
-        raise NotImplementedError
+db = mongo_client[db_name]
 
 
-class KVStorePyrsistent(Generic[T]):
-    """Pyrsistent-based, lock-free implementation -- assuming assignment is atomic"""
+async def get_user_db():
+    yield BeanieUserDatabase(User)
 
-    def __init__(self):
-        self.d = pyrsistent.m()
 
-    def update(self, key: str, value: T):
-        # "new" collection constructed
-        self.d = self.d.set(key, value)
-
-    def all(self) -> Iterable[tuple[str, T]]:
-        # iterator is immutable / won't see future updates
-        return (e for e in self.d.items())
-
-    def get(self, key: str) -> Optional[T]:
-        return self.d.get(key, None)
-
-    def contains(self, key: str) -> bool:
-        return key in self.d
-
-    def remove(self, key: str) -> None:
-        self.d = self.d.remove(key)
+async def init_db():
+    await init_beanie(
+        database=user_client[db_name],
+        document_models=[
+            User,
+        ],
+    )

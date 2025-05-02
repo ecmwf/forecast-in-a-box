@@ -87,7 +87,7 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
     }
 
     const handleDownload = () => {
-        const submitData: ExecutionSpecification = {
+        const spec: ExecutionSpecification = {
             model: model,
             products: Object.values(products),
             environment: {}
@@ -95,21 +95,14 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
 
         async function retrieveFileBlob() {
             try {
-                const ftch = await api.post( // this will request the file information for the download (whether an image, PDF, etc.)
-                    `/v1/graph/serialise`,
-                    {submitData},
-                )
-                if (ftch.status !== 200) {
-                    alert("Error: " + ftch.status + " " + ftch.statusText);
-                    throw new Error(`Could not download graph: ${ftch.status} - ${ftch.statusText}`);
-                }
-                const fileBlob = await ftch.data();
+                const ftch = await api.post(`/v1/graph/serialise`,spec)
+                const fileBlob = await ftch.data;
                 
                 // this works and prompts for download
                 var link = document.createElement('a')  // once we have the file buffer BLOB from the post request we simply need to send a GET request to retrieve the file data
                 const blob = new Blob([JSON.stringify(fileBlob, null, 2)], { type: 'application/json' });
                 link.href = URL.createObjectURL(blob);
-                link.setAttribute('download', `${crypto.randomUUID()}.cascade`);
+                link.setAttribute('download', `${crypto.randomUUID()}.json`);
                 link.click()
                 link.remove();  //afterwards we remove the element  
             } catch (e) {

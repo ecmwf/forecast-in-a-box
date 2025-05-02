@@ -15,7 +15,7 @@ from cascade.controller.report import JobId
 import cascade.gateway.api as api
 import cascade.gateway.client as client
 
-from ..database import db
+from ...db import db
 
 from forecastbox.settings import CASCADE_SETTINGS
 from forecastbox.api.types import VisualisationOptions, ExecutionSpecification
@@ -157,8 +157,6 @@ async def visualise_job(job_id: JobId = Depends(validate_job_id), options: Visua
     """Get outputs of a job."""
     collection = db.get_collection("job_records")
     job = collection.find({"job_id": job_id})
-
-    print(options)
 
     if not options:
         options = VisualisationOptions()
@@ -344,8 +342,8 @@ async def flush_job() -> JobDeletionResponse:
     except Exception as e:
         raise HTTPException(500, f"Job deletion failed: {e}")
     finally:
-        collection = db.get_collection("job_records")
-    return JobDeletionResponse(deleted_count=collection.delete_many({}).deleted_count)
+        delete = db.get_collection("job_records").delete_many({})
+    return JobDeletionResponse(deleted_count=delete.deleted_count)
 
 
 @router.delete("/{job_id}")

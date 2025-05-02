@@ -2,6 +2,7 @@
 FastAPI Entrypoint
 """
 
+from contextlib import asynccontextmanager
 import time
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,23 +10,34 @@ from fastapi.middleware.cors import CORSMiddleware
 from dataclasses import dataclass
 
 import logging
+from forecastbox.db import init_db
 
 LOG = logging.getLogger(__name__)
 
-### Create FastAPI instance with custom docs and openapi url
-app = FastAPI(docs_url="/api/v1/docs", openapi_url="/api/v1/openapi.json", title="Forecast in a Box API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    yield
+
+
+app = FastAPI(
+    docs_url="/api/v1/docs", openapi_url="/api/v1/openapi.json", title="Forecast in a Box API", version="1.0.0", lifespan=lifespan
+)
 
 from .api.routers import model
 from .api.routers import product
 from .api.routers import graph
 from .api.routers import job
-from .api.routers import setting
+from .api.routers import admin
+from .api.routers import auth
 
 app.include_router(model.router, prefix="/api/v1/model")
 app.include_router(product.router, prefix="/api/v1/product")
 app.include_router(graph.router, prefix="/api/v1/graph")
 app.include_router(job.router, prefix="/api/v1/job")
-app.include_router(setting.router, prefix="/api/v1/setting")
+app.include_router(admin.router, prefix="/api/v1/admin")
+app.include_router(auth.router, prefix="/api/v1")
 
 app.add_middleware(
     CORSMiddleware,

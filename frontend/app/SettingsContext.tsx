@@ -9,7 +9,7 @@ type Settings = {
 };
 
 const defaultSettings: Settings = {
-  apiUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
+  apiUrl: process.env.NEXT_PUBLIC_API_URL || '/api',
   theme: 'light',
   language: 'en',
 };

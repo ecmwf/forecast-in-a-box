@@ -23,7 +23,7 @@ except ImportError:
 
 
 @as_payload
-@mark.environment_requirements(["earthkit-plots", "earthkit-plots-default-styles"])
+@mark.environment_requirements(["earthkit-plots", "earthkit-plots-default-styles", "git+https://github.com/ecmwf/earthkit-data.git"])
 def quickplot(fields: ekd.FieldList, groupby: str = None, subplot_title: str = None, figure_title: str = None, domain=None):
     from earthkit.plots.utils import iter_utils
     from earthkit.plots.components import layouts
@@ -55,6 +55,7 @@ def quickplot(fields: ekd.FieldList, groupby: str = None, subplot_title: str = N
         print(f"Plotting {group_val} ({i+1}/{n_plots})")
         subplot = figure.add_map(domain=domain)
         for f in group_args:
+            print(f, f.metadata().dump())
             subplot.quickplot(f, units=None)
 
         for m in schema.quickmap_subplot_workflow:
@@ -65,6 +66,7 @@ def quickplot(fields: ekd.FieldList, groupby: str = None, subplot_title: str = N
                 getattr(subplot, m)(*args)
             except Exception as err:
                 warnings.warn(f"Failed to execute {m} on given data with: \n" f"{err}\n\n" "consider constructing the plot manually.")
+        print(f"Plotted {group_val} ({i+1}/{n_plots})")
 
     for m in schema.quickmap_figure_workflow:
         try:
@@ -200,3 +202,22 @@ class GribProduct(GenericTemporalProduct):
     def to_graph(self, product_spec, model, source):
         source = self.select_on_specification(product_spec, source)
         return source
+
+
+@simple_registry("Deaccumulated")
+class DeaccumulatedProduct(GenericTemporalProduct):
+    """
+    Deaccumulated Product.
+    """
+
+    multiselect = {
+        "param": True,
+        "step": True,
+    }
+
+    @property
+    def qube(self):
+        return self.make_generic_qube()
+
+    def to_graph(self, product_spec, model, source):
+        return self.select_on_specification(product_spec, model.deaccumulate(source))

@@ -1,5 +1,3 @@
-from typing import Any, TYPE_CHECKING
-from earthkit.workflows.fluent import Action, Payload, Node
 from qubed import Qube
 
 from forecastbox.models import Model
@@ -33,7 +31,7 @@ class BaseThermalIndex(Product):
         return Qube.from_datacube({"param": "*"})
 
     def model_intersection(self, model: Model) -> Qube:
-        return f"step={'/'.join(map(str, model.timesteps))}" /  Qube.from_datacube({})
+        return f"step={'/'.join(map(str, model.timesteps))}" / Qube.from_datacube({})
 
     def validate_intersection(self, model: Model) -> bool:
         model_intersection = model.qube()
@@ -41,7 +39,7 @@ class BaseThermalIndex(Product):
         if not THERMOFEEL_IMPORTED or self.param_requirements is None:
             return False
         return all(x in model_intersection.span("param") for x in self.param_requirements)
-    
+
     def to_graph(self, product_spec, model, source):
         """
         Get the graph for the product.
@@ -49,16 +47,17 @@ class BaseThermalIndex(Product):
         deaccumulated = model.deaccumulate(source)
 
         selected = self.select_on_specification(product_spec, deaccumulated)
-        
         source = selected.select(param=self.param_requirements)
+
         return ppAction(source.nodes).thermal_index(self.output_param)
+
 
 @thermal_indices("Heat Index")
 class HeatIndex(BaseThermalIndex):
     """Heat Index Product"""
 
     param_requirements = ["2t", "r"]
-    output_param = 'heatx'
+    output_param = "heatx"
 
     # def to_graph(self, specification: dict[str, Any], source: Action) -> Action:
     #     from thermofeel import calculate_heat_index_simplified
@@ -73,62 +72,70 @@ class HeatIndex(BaseThermalIndex):
     #         dim="param",
     #     )
 
+
 @thermal_indices("Universal thermal climate index")
 class UniversalThermalClimateIndex(BaseThermalIndex):
     """Universal thermal climate index product"""
 
-    param_requirements = ['ssrd', 'strd', 'ssr', 'str', 'fdir', '10u', '10v', '2t', '2d']
-    output_param = 'utci'
+    param_requirements = ["ssrd", "strd", "ssr", "str", "fdir", "10u", "10v", "2t", "2d"]
+    output_param = "utci"
 
 
 @thermal_indices("Wet bulb globe temperature")
 class WetBulbGlobeTemperature(BaseThermalIndex):
     """Wet bulb globe temperature product"""
 
-    param_requirements = ['ssrd', 'strd', 'ssr', 'str', 'fdir', '10u', '10v', '2t', '2d']
-    output_param = 'wbgt'
+    param_requirements = ["ssrd", "strd", "ssr", "str", "fdir", "10u", "10v", "2t", "2d"]
+    output_param = "wbgt"
+
 
 @thermal_indices("Globe temperature")
 class GlobeTemperature(BaseThermalIndex):
     """Globe temperature product"""
 
-    param_requirements = ['ssrd', 'strd', 'ssr', 'str', 'fdir', '10u', '10v', '2t']
-    output_param = 'gt'
+    param_requirements = ["ssrd", "strd", "ssr", "str", "fdir", "10u", "10v", "2t"]
+    output_param = "gt"
+
 
 @thermal_indices("2 metre relative humidity")
 class TwoMetreRelativeHumidity(BaseThermalIndex):
     """2 metre relative humidity product"""
 
-    param_requirements = ['2t', '2d']
-    output_param = '2r'
+    param_requirements = ["2t", "2d"]
+    output_param = "2r"
+
 
 @thermal_indices("Humidex")
 class Humidex(BaseThermalIndex):
     """Humidex product"""
 
-    param_requirements = ['2t', '2d']
-    output_param = 'hmdx'
+    param_requirements = ["2t", "2d"]
+    output_param = "hmdx"
+
 
 @thermal_indices("Wind chill factor")
 class WindChill(BaseThermalIndex):
     """Wind chill factor product"""
 
-    param_requirements = ['10u', '10v', '2t']
-    output_param = 'wcf'
+    param_requirements = ["10u", "10v", "2t"]
+    output_param = "wcf"
+
 
 @thermal_indices("Apparent temperature")
 class ApparentTemperature(BaseThermalIndex):
     """Apparent temperature product"""
 
-    param_requirements = ['10u', '10v', '2t', '2d']
-    output_param = 'aptmp'
+    param_requirements = ["10u", "10v", "2t", "2d"]
+    output_param = "aptmp"
+
 
 @thermal_indices("Normal effective temperature")
 class NormalEffectiveTemperature(BaseThermalIndex):
     """Normal effective temperature product"""
 
-    param_requirements = ['10u', '10v', '2t', '2d']
-    output_param = 'nefft'
+    param_requirements = ["10u", "10v", "2t", "2d"]
+    output_param = "nefft"
+
 
 # @thermal_indices("Heat Index Adjusted")
 # class HeatIndexAdjusted(BaseThermalIndex):

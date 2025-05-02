@@ -24,7 +24,7 @@ from cascade.low.core import JobInstance, DatasetId
 import cascade.gateway.api as api
 import cascade.gateway.client as client
 
-from ..database import db
+from ...db import db
 
 from forecastbox.settings import CASCADE_SETTINGS
 from forecastbox.api.types import VisualisationOptions
@@ -114,13 +114,13 @@ async def execute_api(spec: ExecutionSpecification) -> api.SubmitJobResponse:
 async def execute(spec: ExecutionSpecification) -> api.SubmitJobResponse:
     """Get serialised dump of product graph."""
     try:
-        graph = await convert_to_cascade(spec)
+        cascade_graph = await convert_to_cascade(spec)
     except Exception as e:
         return api.SubmitJobResponse(job_id=None, error=str(e))
 
     model_path = get_model_path(spec.model.model)
 
-    job = graph2job(graph._graph)
+    job = graph2job(cascade_graph._graph)
 
     sinks = cascade_views.sinks(job)
     sinks = [s for s in sinks if not s.task.startswith("run_as_earthkit")]

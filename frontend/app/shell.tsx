@@ -9,7 +9,7 @@ import Footer from './footer';
 export function Shell({ children }: { children: React.ReactNode }) {
     return (
         <AppShell
-            padding="md"
+            padding=""
             header={{ height: 60 }}
             footer={{ height: 60 }}
         >

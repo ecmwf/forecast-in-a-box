@@ -3,7 +3,7 @@
 import React, { useRef } from 'react';
 import { Container, Group, Space } from '@mantine/core';
 import { useEffect, useState } from 'react';
-import { Table, Loader, Center, Title, Progress, Button, Flex, Divider, Tooltip, FileButton} from '@mantine/core';
+import { Table, Loader, Center, Title, Progress, Button, Flex, Divider, Tooltip, FileButton, Menu, Burger} from '@mantine/core';
 
 import { IconRefresh, IconTrash } from '@tabler/icons-react';
 import classes from './status.module.css';
@@ -215,20 +215,54 @@ const HomePage = () => {
     };
   }, []);
 
+  const UserButtons = (): JSX.Element[] => {
+    return [
+      <FileButton key="upload" onChange={handleFileUpload} disabled={uploading}>
+        {(props) => (
+          <Button color="green" {...props} fullWidth>
+            {uploading ? "Uploading" : "Upload"}
+          </Button>
+        )}
+      </FileButton>,
+      <Button key="refresh" onClick={() => { setLoading(true); getStatus(); }} fullWidth>
+        Refresh
+      </Button>,
+      <Button
+        key="flush"
+        onClick={flushJobs}
+        color="red"
+        disabled={Object.keys(jobs.progresses || {}).length === 0}
+        fullWidth
+      >
+        Flush
+      </Button>
+    ];
+  };
+
   return (
     <Container size="lg" pt="xl" pb="xl">
-      <Flex gap='xl'>
+      <Flex gap='xl' justify={'space-between'} align='center'>
         <Title>Status</Title>
-        <FileButton onChange={handleFileUpload} disabled={uploading}>
-          {(props) => <Button color='green' {...props}>{uploading? 'Uploading': 'Upload'}</Button>}
-        </FileButton>
-        <Button onClick={() => { setLoading(true); getStatus(); }}>
-          Refresh
-        </Button>
-        <Button onClick={flushJobs} color="red" disabled={Object.keys(jobs.progresses || {}).length === 0}>
-          Flush
-        </Button>
+        <Menu shadow="md">
+          <Menu.Target>
+            <Burger hiddenFrom ="xs"/>
+          </Menu.Target>
+          <Menu.Dropdown>
+            {UserButtons().map((button, index) => (
+              <Menu.Item key={index}>
+              {button}
+              </Menu.Item>
+            ))}
+          </Menu.Dropdown>
+        </Menu>
         {working && <Loader/>}
+        <Flex visibleFrom='xs' gap='xs' direction='row'>
+        {UserButtons().map((button, index) => (
+          <div key={index}>
+            {button}
+          </div>
+        ))}
+        </Flex>
       </Flex>
       <Divider my='lg' />
       {loading ? (

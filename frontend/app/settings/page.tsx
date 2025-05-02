@@ -32,7 +32,7 @@ const HomePage = () => {
 
   const { settings, updateSetting, updateSettings } = useSettings();
 
-  const [apiSettings, setApiSettings] = useState();
+  const [apiSettings, setApiSettings] = useState<Settings | null>(null);
 
   const [apiUrl, setApiUrl] = useState(settings.apiUrl);
 
@@ -44,11 +44,12 @@ const HomePage = () => {
   const fetchSettings = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/v1/setting');
+      const response = await api.get('/v1/admin/settings');
       setApiSettings(response.data);
       setFormValues(response.data); // Initialize form values
     } catch (error) {
       showNotification({
+        id: 'fetch-settings-error',
         title: 'Error',
         message: 'Failed to fetch settings',
         color: 'red',
@@ -80,11 +81,11 @@ const HomePage = () => {
   };
 
   // Handle form input changes
-  const handleInputChange = (section, key, value) => {
+  const handleInputChange = (section: string, key: string, value: string) => {
     setFormValues((prev) => ({
       ...prev,
       [section]: {
-        ...prev[section],
+        ...(prev[section as keyof Settings] as Record<string, any>),
         [key]: value,
       },
     }));

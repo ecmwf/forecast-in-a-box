@@ -20,7 +20,7 @@ from ..types import ModelSpecification, ModelName
 from forecastbox.models import Model
 
 from forecastbox.settings import API_SETTINGS
-from forecastbox.api.database import db
+from forecastbox.db import db
 
 router = APIRouter(
     tags=["model"],

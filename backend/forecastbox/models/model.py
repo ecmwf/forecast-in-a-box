@@ -90,6 +90,7 @@ class Model(BaseModel):
             ensemble_members=self.ensemble_members,
             **(self.entries or {}),
             environment={"inference": env},
+            env={"ANEMOI_INFERENCE_NUM_CHUNKS": 4},
         )
 
     def deaccumulate(self, outputs: "Action") -> "Action":

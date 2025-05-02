@@ -1,11 +1,11 @@
 "use client"; // Required for client-side fetching
 
-import { Card, Button, Tabs, ScrollArea, Group, Title, Text, ActionIcon, Flex, Table, Loader, Progress} from '@mantine/core';
+import { Card, Button, Tabs, ScrollArea, Group, Title, Text, ActionIcon, Flex, Table, Loader, Progress, Menu, Burger} from '@mantine/core';
 import { useEffect, useRef, useState } from "react";
 
 import classes from './options.module.css';
 
-import {IconDownload, IconCheck, IconRefresh, IconTableDown, IconTrash} from '@tabler/icons-react';
+import {IconX, IconCheck, IconRefresh, IconTableDown, IconTrash} from '@tabler/icons-react';
 import {useApi} from '@/app/api';
 
 interface DownloadResponse {
@@ -32,6 +32,12 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
                 progressIntervalRef.current = null;
             }
         }
+        console.log('downloadStatus', data);
+        if (downloadStatus.status === "in_progress") {
+            progressIntervalRef.current = setInterval(() => {
+                getDownloadStatus();
+            }, 2500);
+        }
     };
 
     const handleDownload = async () => {
@@ -54,7 +60,7 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
     const handleDelete = async () => {
         try {
             const result = await api.delete(`/v1/model/${model}`);
-            const data = await result.data();
+            const data = await result.data;
             setDownloadStatus(data);
         } catch (error) {
             console.error('Error deleting model:', error);
@@ -71,6 +77,26 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
         getDownloadStatus();
     }, [model]);
 
+    const UserButtons = (): JSX.Element[] => {
+        return [
+            <Button
+                color='green'
+                onClick={() => handleDownload()}
+                disabled={downloadStatus.status !== 'not_downloaded' && downloadStatus.status !== 'errored'}
+                // leftSection={<IconDownload />}
+                size='sm'
+            >
+                {downloadStatus.status === 'errored' ? 'Retry' : 'Download'}
+            </Button>,
+            // <Button disabled={downloadStatus.status !== 'completed'} onClick={() => handleInstall()} leftSection={<IconTableDown />} variant="outline" color='blue'>
+            //     {installing ? <Loader size={16} /> : 'Install'}
+            // </Button>,
+            <Button disabled={downloadStatus.status !== 'completed'} onClick={() => handleDelete()} leftSection={<IconTrash />}  color='red'>
+                Delete
+            </Button>
+            ];
+    };
+
     return (
         <>
             <Table.Td>
@@ -84,29 +110,32 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
             </Table.Td>
             <Table.Td>
                 {downloadStatus.status === 'completed' ? (
-                    <Group><IconCheck color="green" /> <Text size='sm'>Downloaded</Text></Group>
+                    <IconCheck color="green" />
                 ): downloadStatus.status === 'in_progress' ? (
-                    <Progress value={downloadStatus.progress} />
+                    <><Progress value={downloadStatus.progress} /> <Text size='xs'>{downloadStatus.progress}%</Text></>
                 ): (
-                    <Button
-                        color='green'
-                        onClick={() => handleDownload()}
-                        disabled={downloadStatus.status !== 'not_downloaded' && downloadStatus.status !== 'errored'}
-                        // leftSection={<IconDownload />}
-                        size='sm'
-                    >
-                        {downloadStatus.status === 'errored' ? 'Retry' : 'Download'}
-                    </Button>
+                    <IconX color="red" />
                 )}
             </Table.Td>
             <Table.Td>
-                <Group>
-                    <Button disabled={downloadStatus.status !== 'completed'} onClick={() => handleInstall()} leftSection={<IconTableDown />} variant="outline" color='blue'>
-                        {installing ? <Loader size={16} /> : 'Install'}
-                    </Button>
-                    <Button disabled={downloadStatus.status !== 'completed'} onClick={() => handleDelete()} leftSection={<IconTrash />}  color='red'>
-                        Delete
-                    </Button>
+                <Menu shadow="md">
+                <Menu.Target>
+                    <Burger hiddenFrom ="xs"/>
+                </Menu.Target>
+                <Menu.Dropdown>
+                    {UserButtons().map((button, index) => (
+                    <Menu.Item key={index}>
+                    {button}
+                    </Menu.Item>
+                    ))}
+                </Menu.Dropdown>
+                </Menu>
+                <Group visibleFrom='xs' gap='xs'>
+                    {UserButtons().map((button, index) => (
+                         <div key={index}>
+                            {button}
+                        </div>
+                    ))}
                 </Group>
             </Table.Td>
         </>
@@ -151,9 +180,9 @@ function Options({ cardProps, tabProps, setSelected }: OptionsProps) {
             <Table highlightOnHover verticalSpacing="xs" className={classes['option-table']}>
                 <Table.Thead>
                     <Table.Tr style={{ backgroundColor: "#f0f0f6", textAlign: "left" }}>
-                        <Table.Th>Model Group</Table.Th>
+                        <Table.Th>Group</Table.Th>
                         <Table.Th>Model</Table.Th>
-                        <Table.Th>Download Status</Table.Th>
+                        <Table.Th>Status</Table.Th>
                         <Table.Th>Actions</Table.Th>
                     </Table.Tr>
                 </Table.Thead>
