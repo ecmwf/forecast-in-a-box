@@ -17,6 +17,9 @@ export default function ResultsPage() {
 
     const [data, setData] = useState(null);
     const [dataLink, setDataLink] = useState('');
+
+    const [contentType, setContentType] = useState('');
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -27,6 +30,7 @@ export default function ResultsPage() {
                     const response = await api.get(`/v1/job/${job_id}/${dataset_id}`, { responseType: 'blob' });
                     const blob = new Blob([response.data], { type: response.headers['content-type'] });
                     setDataLink(URL.createObjectURL(blob));
+                    setContentType(response.headers['content-type']);
                     setData(response.data);
                 } catch (err) {
                     setError(err.response?.data?.detail || err.message || "An error occurred while fetching data.");
@@ -41,9 +45,9 @@ export default function ResultsPage() {
 
     return (
         <>
-                <Button component="a" href={`/progress/${job_id}`} variant="outline" color="blue" size="md">
-                    Back to Results
-                </Button>
+        <Button component="a" href={`/progress/${job_id}`} variant="outline" color="blue" size="md">
+            Back to Results
+        </Button>
         <Container
             size="xl"
             style={{
@@ -51,7 +55,6 @@ export default function ResultsPage() {
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: loading ? "center" : "flex-start",
-                height: "80vh",
             }}
         >
             <Center w='100%'>
@@ -65,7 +68,7 @@ export default function ResultsPage() {
                     {error}
                 </Alert>
             ) : (
-                <Stack align="center" h='80vh' w='inherit'>
+                <Stack align="center">
                     <Space h={20} />
                     {/* <Title order={2} style={{ wordWrap: "break-word", wordbreak: 'break-all', textAlign: "center" }}>
                         {job_id}
@@ -79,32 +82,17 @@ export default function ResultsPage() {
                                 Download 
                             </Text>
                         </a> */}
-                        {/* <iframe 
-                            src={dataLink} 
-                            style={{ 
-                                border: "0px solid #ccc", 
-                                borderRadius: "8px", 
-                                margin: "0 auto", 
-                                maxWidth: "70vw",
-                                // height: "40%",
-                                width: "80%",
-                                flex: 1, 
-                            }} 
-                        /> */}
 
-                    {data?.image_data ? (
-                        <img
-                            src={`data:image/png;base64,${data.image_data}`}
-                            alt="Result Image"
-                            style={{
-                                maxWidth: "80%",
-                                maxHeight: "80vh",
-                                objectFit: "contain",
-                                border: "1px solid #ccc",
-                                borderRadius: "8px",
-                                display: "block",
-                                margin: "0 auto"
-                            }}
+                    {contentType == 'image/png' ? (
+                        <img 
+                            src={dataLink} 
+                            alt="Result Image" 
+                            style={{ 
+                                maxWidth: "100%", 
+                                maxHeight: "70vh", 
+                                borderRadius: "8px", 
+                                boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)" 
+                            }} 
                         />
                     ) : (
                         <Stack align="center" style={{ flex: 1 }}>

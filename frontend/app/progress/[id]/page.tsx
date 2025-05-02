@@ -138,7 +138,7 @@ const ProgressPage = () => {
                 </>
             ) : (
                 <>
-                <Progress value={parseFloat(progress.progress) || 0} striped animated/>
+                <Progress value={Math.max(1, parseFloat(progress.progress) || 0)} striped animated/>
                 <Text>{progress.progress}%</Text>
                 <Divider my='lg' />
                 </>
