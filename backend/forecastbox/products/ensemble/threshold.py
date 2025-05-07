@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import Any
 
 import yaml
 
@@ -29,8 +29,7 @@ class BaseThresholdProbability(BaseEnsembleProduct):
 
     @property
     def model_assumptions(self):
-        return {"threshold": "*", 'operator': "*", 'step': '*'}
-
+        return {"threshold": "*", "operator": "*", "step": "*"}
 
 
 @generic_registry("Threshold Probability")
@@ -44,10 +43,10 @@ class GenericThresholdProbability(BaseThresholdProbability, GenericParamProduct)
 
     @property
     def qube(self):
-        return self.make_generic_qube(threshold=USER_DEFINED, operator = USER_DEFINED, step = USER_DEFINED)
-    
+        return self.make_generic_qube(threshold=USER_DEFINED, operator=USER_DEFINED, step=USER_DEFINED)
+
     def to_graph(self, product_spec, model, source):
-        from anemoi.cascade.fluent import ENSEMBLE_DIMENSION_NAME
+        from earthkit.workflows.plugins.anemoi.fluent import ENSEMBLE_DIMENSION_NAME
         from earthkit.workflows import backends, fluent
 
         source = source.sel(param=product_spec["param"])
@@ -71,23 +70,25 @@ class DefinedThresholdProbability(BaseThresholdProbability, BasePProcEnsemblePro
     @property
     def defined(self) -> list[dict[str, Any]]:
         return yaml.safe_load(open(Path(__file__).parent / "definitions/threshold_probability.yaml"))
-    
+
     @property
     def thresholds(self):
         defined = self.defined
         for defi in defined:
-            defi['threshold'] = list((x[0] for x in defi['threshold']))
+            defi["threshold"] = list((x[0] for x in defi["threshold"]))
         return defined
 
     def get_out_paramid(self, levtype, param, levlist, threshold, operator) -> int | None:
         defined = self.defined
         for defi in defined:
-            if all([
-                defi["levtype"] == levtype,
-                defi["param"] == param,
-                (defi["levlist"] == levlist) if levlist and levtype == 'pl' else True,
-                defi["operator"] == operator,
-            ]):
+            if all(
+                [
+                    defi["levtype"] == levtype,
+                    defi["param"] == param,
+                    (defi["levlist"] == levlist) if levlist and levtype == "pl" else True,
+                    defi["operator"] == operator,
+                ]
+            ):
                 for thres in defi["threshold"]:
                     if thres[0] == threshold:
                         return thres[1]
@@ -99,13 +100,13 @@ class DefinedThresholdProbability(BaseThresholdProbability, BasePProcEnsemblePro
         for d in self.thresholds:
             q = q | Qube.from_datacube({"frequency": "*", **d, "step": USER_DEFINED})
         return q.compress()
-    
+
     def get_sources(self, product_spec, model, source: fluent.Action) -> dict[str, fluent.Action]:
         params = product_spec["param"]
         step = product_spec["step"]
-        if isinstance(step, str) and '-' in step:
-            step = [int(x) for x in step.split('-')]
-        return {'forecast': self.select_on_specification({'param': params, 'step': step}, source)}
+        if isinstance(step, str) and "-" in step:
+            step = [int(x) for x in step.split("-")]
+        return {"forecast": self.select_on_specification({"param": params, "step": step}, source)}
 
     def mars_request(self, product_spec: dict[str, Any]):
         """Mars request for threshold."""
@@ -120,9 +121,9 @@ class DefinedThresholdProbability(BaseThresholdProbability, BasePProcEnsemblePro
             raise KeyError(f"Could not identify output paramid for {param!r} with threshold {threshold!r} and operator {operator!r}.")
 
         request = {
-            'type': 'ep',
-            'levtype': levtype,
-            'param': paramid,
-            'step': step,
+            "type": "ep",
+            "levtype": levtype,
+            "param": paramid,
+            "step": step,
         }
         return request

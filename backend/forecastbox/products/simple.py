@@ -10,7 +10,7 @@ from forecastbox.products.product import GenericTemporalProduct
 from forecastbox.models import Model
 
 import earthkit.data as ekd
-from anemoi.cascade.fluent import ENSEMBLE_DIMENSION_NAME
+from earthkit.workflows.plugins.anemoi.fluent import ENSEMBLE_DIMENSION_NAME
 
 simple_registry = CategoryRegistry("Simple", "Simple products", "Simple")
 
@@ -40,7 +40,7 @@ def quickplot(fields: ekd.FieldList, groupby: str = None, subplot_title: str = N
 
         grouped_data = {val: fields.sel(**{groupby: val}) for val in unique_values}
     else:
-        grouped_data = {None: args}
+        grouped_data = {None: fields}
 
     n_plots = len(grouped_data)
 
@@ -138,8 +138,8 @@ class SimpleMapProduct(MapProduct):
         quickplot_payload = quickplot(
             domain=domain,
             groupby="valid_datetime",
-            subplot_title="Valid time: {valid_time:%H:%M on %-d %B %Y} (T+{lead_time})",
-            figure_title="{variable_name} over {domain}\n",
+            subplot_title="T+{lead_time}",
+            figure_title="{variable_name} over {domain}\n Base time: {base_time:%H%M %d/%m/%Y}\n",
         )
         plots = source.map(quickplot_payload)
 
@@ -176,8 +176,8 @@ class EnsembleMapProduct(BaseEnsembleProduct, MapProduct):
         quickplot_payload = quickplot(
             domain=domain,
             groupby="member",
-            subplot_title="EnsMember: {member}",
-            figure_title="{variable_name} over {domain}\nValid time: {valid_time:%H:%M on %-d %B %Y} (T+{lead_time})",
+            subplot_title="n{member}",
+            figure_title="{variable_name} over {domain}\nValid time: {valid_time:%H:%M on %-d %B %Y} (T+{lead_time})\n",
         )
         plots = source.map(quickplot_payload)
         return plots

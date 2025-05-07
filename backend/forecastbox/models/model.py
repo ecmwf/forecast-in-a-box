@@ -8,7 +8,7 @@ from typing import Any
 from qubed import Qube
 from earthkit.workflows.fluent import Action
 
-from anemoi.cascade.fluent import from_input
+from earthkit.workflows.plugins.anemoi.fluent import from_input
 from anemoi.inference.checkpoint import Checkpoint
 
 
