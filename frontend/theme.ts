@@ -1,6 +1,12 @@
 "use client";
 
-import { createTheme, Title } from "@mantine/core";
+import {
+  createTheme,
+  DEFAULT_THEME,
+  Title,
+} from '@mantine/core';
+
+import './NebulaSans/NebulaSans.css';
 
 export const theme = createTheme({
   colors: {},
@@ -11,5 +17,9 @@ export const theme = createTheme({
       },
     }),
   },
-  fontFamily: "Varela Round, Open Sans, sans-serif",
+  fontFamily: 'NebulaSans, sans-serif',
+  fontFamilyMonospace: 'Monaco, Courier, monospace',
+  headings: {
+    fontFamily: `NebulaSans, ${DEFAULT_THEME.fontFamily}`,
+  },
 });

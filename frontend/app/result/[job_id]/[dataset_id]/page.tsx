@@ -55,6 +55,7 @@ export default function ResultsPage() {
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: loading ? "center" : "flex-start",
+                minHeight: "40vh",
             }}
         >
             <Center w='100%'>

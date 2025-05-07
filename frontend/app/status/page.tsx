@@ -243,6 +243,7 @@ const HomePage = () => {
     <Container size="lg" pt="xl" pb="xl">
       <Flex gap='xl' justify={'space-between'} align='center'>
         <Title>Status</Title>
+        {working && <Loader/>}
         <Menu shadow="md">
           <Menu.Target>
             <Burger hiddenFrom ="xs"/>
@@ -255,7 +256,6 @@ const HomePage = () => {
             ))}
           </Menu.Dropdown>
         </Menu>
-        {working && <Loader/>}
         <Flex visibleFrom='xs' gap='xs' direction='row'>
         {UserButtons().map((button, index) => (
           <div key={index}>

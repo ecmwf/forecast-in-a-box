@@ -6,7 +6,6 @@ import GraphModal from "./shared/graphModal";
 import {useApi} from '@/app/api';
 
 import {IconMenu2} from '@tabler/icons-react';
-import { headers } from "next/headers";
 
 interface GraphVisualiserProps {
     spec: ExecutionSpecification | null;
@@ -35,7 +34,8 @@ export default function GraphVisualiser({ spec, url }: GraphVisualiserProps) {
                     const graph: string = await response.data;
                     setGraphContent(graph);
                 } catch (err) {
-                    setGraphContent(err.response.data.detail);
+                    console.error(err);
+                    setGraphContent(err.response.data);
                 } finally {
                     setLoading(false);
                 }

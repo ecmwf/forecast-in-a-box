@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef} from 'react';
 import { useParams } from 'next/navigation';
-import { Progress, Container, Title, Text, ScrollArea, Divider, Button, Loader, Space, Table, Flex} from '@mantine/core';
+import { Progress, Container, Title, Text, ScrollArea, Divider, Button, Loader, Space, Table, Flex, Group} from '@mantine/core';
 import { showNotification } from '@mantine/notifications';
 import { AxiosError } from 'axios';
 
@@ -107,13 +107,13 @@ const ProgressPage = () => {
     };
     
     useEffect(() => {
-        fetchOutputs(); // Initial fetch
-    
         // Start the interval and store its ID in the ref
         progressIntervalRef.current = setInterval(() => {
             fetchProgress();
         }, 5000);
-    
+        fetchProgress(); // Initial fetch
+        fetchOutputs(); // Initial fetch
+
         // Cleanup function to clear the interval when the component unmounts or `id` changes
         return () => {
             if (progressIntervalRef.current) {
@@ -138,8 +138,8 @@ const ProgressPage = () => {
                 </>
             ) : (
                 <>
-                <Progress value={Math.max(1, parseFloat(progress.progress) || 0)} striped animated/>
-                <Text>{progress.progress}%</Text>
+                <Progress value={Math.max(1, parseFloat(progress.progress) || 0)} striped animated/> 
+                <Group><Loader size="xs" /><Text>{progress.progress}%</Text></Group>
                 <Divider my='lg' />
                 </>
             )}
