@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Container, Title, Text, Loader, Table, Paper, Button, Group } from "@mantine/core";
+import { Container, Title, Text, Loader, Table, Paper, Button, Group, Space } from "@mantine/core";
 
 import {useApi} from '../api';
 
