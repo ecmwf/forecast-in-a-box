@@ -104,6 +104,7 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
                     classNames={classes}
                     onClick={() => setSelected(model)}
                     disabled={downloadStatus.status !== 'completed'}
+                    variant='outline'
                 >
                     <Text size='sm' style={{'wordBreak': 'break-all', 'display':'flex'}}>{model.split('_',2)[1]}</Text>
                 </Button>

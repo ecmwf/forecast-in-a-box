@@ -13,11 +13,15 @@
     overflow: visible;
     justify-content: center;
     /* margin-left: 5px; */
-    transition: background-color 0.3s ease;
-    color: black;
-    background-color: transparent;
+    /* transition: background-color 0.3s ease; */
+    /* color: black; */
+    /* background-color: transparent; */
     font-size: small;
     cursor: pointer;
+  }
+
+  .root:hover {
+    background-color: rgba(0, 0, 255, 0.05);
   }
 
   .root:disabled {
