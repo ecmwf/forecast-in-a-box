@@ -12,10 +12,24 @@ from earthkit.workflows.plugins.anemoi.fluent import from_input
 from anemoi.inference.checkpoint import Checkpoint
 
 
+FORECAST_IN_A_BOX_METADATA = "forecast-in-a-box.json"
+
+
 @lru_cache
 def open_checkpoint(checkpoint_path: str) -> Checkpoint:
     """Open a checkpoint from the given path."""
     return Checkpoint(checkpoint_path)
+
+
+class ModelExtra(BaseModel):
+    version_overrides: dict[str, str] = None
+    """Overrides for the versions of the model."""
+    input_preference: str = None
+    """Input preference of the model."""
+    input_overrides: dict[str, str] = None
+    """Overrides for the input of the model."""
+    dataset_configuration: dict[str, str] = None
+    """If using input=dataset, this is the configuration for the dataset."""
 
 
 class Model(BaseModel):
@@ -35,6 +49,11 @@ class Model(BaseModel):
     @cached_property
     def checkpoint(self) -> Checkpoint:
         return open_checkpoint(self.checkpoint_path)
+
+    @cached_property
+    def extra_information(self) -> ModelExtra:
+        """Get the extra information for the model."""
+        return get_extra_information(self.checkpoint_path)
 
     @cached_property
     def timesteps(self) -> list[int]:
@@ -72,14 +91,15 @@ class Model(BaseModel):
         with pressure levels represented as 'param_levelist'.
         """
 
-        versions = self.versions(self.checkpoint_path, filter=False)
-        BLACKLISTED_INSTALLS = ["anemoi", "anemoi-training", "anemoi-inference", "anemoi-utils"]
-        FILTER_STARTS = ["anemoi", "flash"]
+        versions = self.versions(filter=False)
+        INFERENCE_FILTER_STARTS = ["anemoi-models", "anemoi-graphs", "flash", "torch"]
+        INITIAL_CONDITIONS_FILTER_STARTS = ["anemoi-inference", "anemoi-datasets", "earthkit-data", "anemoi-transform"]
 
-        env = [
-            f"{key}=={val}"
-            for key, val in versions.items()
-            if key not in BLACKLISTED_INSTALLS and any(key.startswith(start) for start in FILTER_STARTS)
+        inference_env = [
+            f"{key}=={val}" for key, val in versions.items() if any(key.startswith(start) for start in INFERENCE_FILTER_STARTS)
+        ]
+        initial_conditions_env = [
+            f"{key}=={val}" for key, val in versions.items() if any(key.startswith(start) for start in INITIAL_CONDITIONS_FILTER_STARTS)
         ]
 
         return from_input(
@@ -89,7 +109,7 @@ class Model(BaseModel):
             date=self.date,
             ensemble_members=self.ensemble_members,
             **(self.entries or {}),
-            environment={"inference": env},
+            environment={"inference": inference_env, "initial_conditions": initial_conditions_env},
             env={"ANEMOI_INFERENCE_NUM_CHUNKS": 4},
         )
 
@@ -131,44 +151,62 @@ class Model(BaseModel):
     def ignore_in_select(self) -> list[str]:
         return ["frequency"]
 
-    @classmethod
-    def versions(cls, checkpoint_path: str, filter: bool = True) -> dict[str, str]:
+    def versions(self, filter: bool = True) -> dict[str, str]:
         """Get the versions of the model"""
+        return model_versions(self.checkpoint_path, filter=filter)
 
-        ckpt = open_checkpoint(checkpoint_path)
-
-        def parse_versions(key, val):
-            if key.startswith("_"):
-                return None, None
-            if "." not in val or "/" in val:
-                return None, None
-            return key.replace(".", "-"), ".".join(val.split(".")[:3])
-
-        versions = {
-            key: val
-            for key, val in (parse_versions(key, val) for key, val in ckpt.provenance_training()["module_versions"].items())
-            if key is not None and val is not None
-        }
-
-        if not filter:
-            return versions
-        return {key: val for key, val in versions.items() if key.startswith("anemoi")}
-
-    @classmethod
-    def info(cls, checkpoint_path: str) -> dict[str, Any]:
+    def info(self) -> dict[str, Any]:
         """Get the model info"""
+        return model_info(self.checkpoint_path)
 
-        ckpt = open_checkpoint(checkpoint_path)
 
-        return {
-            "timestep": ckpt.timestep,
-            "diagnostics": ckpt.diagnostic_variables,
-            "prognostics": ckpt.prognostic_variables,
-            "area": ckpt.area,
-            "local_area": True,
-            "grid": ckpt.grid,
-            "versions": cls.versions(checkpoint_path),
-        }
+def model_versions(checkpoint_path: str, filter: bool = True) -> dict[str, str]:
+    """Get the versions of the model"""
+
+    ckpt = open_checkpoint(checkpoint_path)
+
+    def parse_versions(key, val):
+        if key.startswith("_"):
+            return None, None
+        if "." not in val or "/" in val:
+            return None, None
+        val = val.split("+")[0]
+        return key.replace(".", "-"), ".".join(val.split(".")[:3])
+
+    versions = {
+        key: val
+        for key, val in (parse_versions(key, val) for key, val in ckpt.provenance_training()["module_versions"].items())
+        if key is not None and val is not None
+    }
+
+    extra_versions = get_extra_information(checkpoint_path).version_overrides
+    versions.update(extra_versions or {})
+
+    if not filter:
+        return versions
+    return {key: val for key, val in versions.items() if key.startswith("anemoi")}
+
+
+def model_info(checkpoint_path: str) -> dict[str, Any]:
+    ckpt = open_checkpoint(checkpoint_path)
+
+    return {
+        "timestep": ckpt.timestep,
+        "diagnostics": ckpt.diagnostic_variables,
+        "prognostics": ckpt.prognostic_variables,
+        "area": ckpt.area,
+        "local_area": True,
+        "grid": ckpt.grid,
+        "versions": model_versions(checkpoint_path),
+    }
+
+
+def get_extra_information(checkpoint_path: str) -> ModelExtra:
+    from anemoi.utils.checkpoints import has_metadata, load_metadata
+
+    if not has_metadata(checkpoint_path, name=FORECAST_IN_A_BOX_METADATA):
+        return ModelExtra()
+    return load_metadata(checkpoint_path, name=FORECAST_IN_A_BOX_METADATA)
 
 
 def convert_to_model_spec(ckpt: Checkpoint, assumptions: dict[str, Any] | None = None) -> Qube:

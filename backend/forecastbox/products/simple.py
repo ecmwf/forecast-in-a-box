@@ -3,7 +3,6 @@ import warnings
 from forecastbox.products.registry import CategoryRegistry
 from forecastbox.products.ensemble import ensemble_registry, BaseEnsembleProduct
 
-from earthkit.workflows import mark
 from earthkit.workflows.decorators import as_payload
 from forecastbox.products.product import GenericTemporalProduct
 
@@ -23,7 +22,7 @@ except ImportError:
 
 
 @as_payload
-@mark.environment_requirements(["earthkit-plots", "earthkit-plots-default-styles"])
+# @mark.environment_requirements(["earthkit-plots", "earthkit-plots-default-styles"])
 def quickplot(fields: ekd.FieldList, groupby: str = None, subplot_title: str = None, figure_title: str = None, domain=None):
     from earthkit.plots.utils import iter_utils
     from earthkit.plots.components import layouts
@@ -56,7 +55,7 @@ def quickplot(fields: ekd.FieldList, groupby: str = None, subplot_title: str = N
         subplot = figure.add_map(domain=domain)
         for f in group_args:
             print(f, f.metadata().dump())
-            subplot.quickplot(f, units=None)
+            subplot.quickplot(f, units=None, interpolate=True)
 
         for m in schema.quickmap_subplot_workflow:
             args = []
@@ -139,7 +138,7 @@ class SimpleMapProduct(MapProduct):
             domain=domain,
             groupby="valid_datetime",
             subplot_title="T+{lead_time}",
-            figure_title="{variable_name} over {domain}\n Base time: {base_time:%H%M %d/%m/%Y}\n",
+            figure_title="{variable_name} over {domain}\n Base time: {base_time:%H%M %Y%m%d}\n",
         )
         plots = source.map(quickplot_payload)
 

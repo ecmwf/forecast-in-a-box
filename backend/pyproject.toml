@@ -25,7 +25,7 @@ dependencies = [
 	"pyrsistent",
 	"anemoi-inference>=0.4.10",
 	"qubed>=0.1.12",
-	"anemoi-cascade>=0.1.0",
+	"earthkit-workflows-anemoi>=0.1.0",
 	"pydantic-settings",
 	"pymongo",
 	"earthkit-workflows",
@@ -67,7 +67,7 @@ ignore = ["E731"]
 plugins = "pydantic.mypy"
 
 [tool.uv.sources]
-anemoi-cascade  = { git = "ssh://git@github.com/ecmwf/anemoi-cascade.git" }
+earthkit-workflows-anemoi  = { git = "ssh://git@github.com/ecmwf/earthkit-workflows-anemoi.git" }
 earthkit-workflows = { git = "https://github.com/ecmwf/earthkit-workflows" }
 pproc = { git = "ssh://git@github.com/ecmwf/pproc.git", rev = "feature/io-requests" }
 pproc-cascade = { git = "ssh://git@github.com/ecmwf/pproc-cascade.git", rev = "strip-source-sinks" }

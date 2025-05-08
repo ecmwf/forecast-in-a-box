@@ -1,7 +1,7 @@
 """Graph API Router."""
 
 from datetime import datetime
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 
 import tempfile
@@ -24,7 +24,9 @@ from cascade.low.core import JobInstance, DatasetId
 import cascade.gateway.api as api
 import cascade.gateway.client as client
 
-from ...db import db
+from forecastbox.db import db
+from forecastbox.auth.users import current_active_user
+from forecastbox.schemas.user import User
 
 from forecastbox.settings import CASCADE_SETTINGS
 from forecastbox.api.types import VisualisationOptions
@@ -104,21 +106,19 @@ async def get_graph_download(spec: ExecutionSpecification) -> str:
 
 
 @router.post("/execute")
-async def execute_api(spec: ExecutionSpecification) -> api.SubmitJobResponse:
-    response = await execute(spec)
+async def execute_api(spec: ExecutionSpecification, user: User = Depends(current_active_user)) -> api.SubmitJobResponse:
+    response = await execute(spec, user=user)
     if response.error:
         raise HTTPException(status_code=500, detail=response.error)
     return response
 
 
-async def execute(spec: ExecutionSpecification) -> api.SubmitJobResponse:
+async def execute(spec: ExecutionSpecification, user) -> api.SubmitJobResponse:
     """Get serialised dump of product graph."""
     try:
         cascade_graph = await convert_to_cascade(spec)
     except Exception as e:
         return api.SubmitJobResponse(job_id=None, error=str(e))
-
-    model_path = get_model_path(spec.model.model)
 
     job = graph2job(cascade_graph._graph)
 
@@ -127,11 +127,20 @@ async def execute(spec: ExecutionSpecification) -> api.SubmitJobResponse:
 
     job.ext_outputs = sinks
 
-    hosts = CASCADE_SETTINGS.max_hosts
-    workers_per_host = CASCADE_SETTINGS.max_workers_per_host
+    environment = spec.environment
+
+    hosts = min(CASCADE_SETTINGS.max_hosts, environment.hosts)
+    workers_per_host = min(CASCADE_SETTINGS.max_workers_per_host, environment.workers_per_host)
 
     r = api.SubmitJobRequest(
-        job=api.JobSpec(benchmark_name=None, workers_per_host=workers_per_host, hosts=hosts, envvars={}, use_slurm=False, job_instance=job)
+        job=api.JobSpec(
+            benchmark_name=None,
+            workers_per_host=workers_per_host,
+            hosts=hosts,
+            envvars=environment.environment_variables,
+            use_slurm=False,
+            job_instance=job,
+        )
     )
     try:
         submit_job_response: api.SubmitJobResponse = client.request_response(r, f"{CASCADE_SETTINGS.cascade_url}")  # type: ignore
@@ -148,6 +157,8 @@ async def execute(spec: ExecutionSpecification) -> api.SubmitJobResponse:
         "status": "submitted",
         "error": None,
         "created_at": datetime.now(),
+        "updated_at": datetime.now(),
+        "created_by": user.id if user else None,
         "outputs": list(map(lambda x: x.task, sinks)),
     }
     collection = db.get_collection("job_records")

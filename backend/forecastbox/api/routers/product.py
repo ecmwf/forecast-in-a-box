@@ -49,10 +49,10 @@ def select_from_params(available_spec: Qube, params: dict[str, Any]) -> Qube:
 async def product_to_config(product: Product, modelspec: ModelSpecification, params: dict[str, Any]) -> dict[str, ConfigEntry]:
     """Convert a product to a configuration."""
 
-    product_spec = product.qube
+    # product_spec = product.qube
 
     model_spec = get_model(modelspec)
-    model_qube = model_spec.qube(product.model_assumptions)
+    # model_qube = model_spec.qube(product.model_assumptions)
 
     available_product_spec = product.model_intersection(model_spec)
     subsetted_spec = select_from_params(available_product_spec, params)
@@ -111,7 +111,7 @@ async def get_valid_categories(modelspec: ModelSpecification) -> dict[str, Categ
                 options.append(product)
             else:
                 category.unavailable_options.append(product)
-        category.options = options
+        category.options = sorted(options)
     return categories
 
 

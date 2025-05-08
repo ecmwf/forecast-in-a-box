@@ -14,8 +14,10 @@ from cascade.controller.report import JobId
 
 import cascade.gateway.api as api
 import cascade.gateway.client as client
+from forecastbox.schemas.user import User
+from forecastbox.auth.users import current_active_user
 
-from ...db import db
+from forecastbox.db import db
 
 from forecastbox.settings import CASCADE_SETTINGS
 from forecastbox.api.types import VisualisationOptions, ExecutionSpecification
@@ -180,7 +182,7 @@ async def visualise_job(job_id: JobId = Depends(validate_job_id), options: Visua
 
 
 @router.get("/{job_id}/restart")
-async def restart_job(job_id: JobId = Depends(validate_job_id)) -> api.SubmitJobResponse:
+async def restart_job(job_id: JobId = Depends(validate_job_id), user: User = Depends(current_active_user)) -> api.SubmitJobResponse:
     """Get outputs of a job."""
     collection = db.get_collection("job_records")
     job = collection.find({"job_id": job_id})
@@ -189,14 +191,14 @@ async def restart_job(job_id: JobId = Depends(validate_job_id)) -> api.SubmitJob
 
     from .graph import execute
 
-    response = await execute(spec)
+    response = await execute(spec, user=user)
     if response.error:
         raise HTTPException(status_code=500, detail=response.error)
     return response
 
 
 @router.post("/upload")
-async def upload_job(file: UploadFile = None) -> api.SubmitJobResponse:
+async def upload_job(file: UploadFile = None, user: User = Depends(current_active_user)) -> api.SubmitJobResponse:
     if not file:
         raise HTTPException(status_code=400, detail="No file provided for upload.")
 
@@ -206,7 +208,7 @@ async def upload_job(file: UploadFile = None) -> api.SubmitJobResponse:
     import json
 
     spec = ExecutionSpecification(**json.loads(spec))
-    response = await execute(spec)
+    response = await execute(spec, user=user)
 
     if response.error:
         raise HTTPException(status_code=500, detail=response.error)
@@ -227,7 +229,7 @@ class DatasetAvailabilityResponse:
 
 
 @router.get("/{job_id}/available")
-async def get_result_availablity(job_id: JobId) -> list[TaskId]:
+async def get_job_availablity(job_id: JobId) -> list[TaskId]:
     """
     Check which results are available for a given job_id.
 
@@ -266,6 +268,9 @@ async def get_result_availablity(job_id: JobId, dataset_id: TaskId) -> DatasetAv
         )
     except ValueError as e:
         raise HTTPException(status_code=500, detail=f"Job retrieval failed: {e}")
+
+    if job_id not in response.datasets:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
 
     return DatasetAvailabilityResponse(dataset_id in [x.task for x in response.datasets[job_id]])
 
@@ -320,10 +325,10 @@ async def get_result(job_id: JobId, dataset_id: TaskId) -> Response:
         result = decoded_result(response, job=None)
         bytez, media_type = to_bytes(result)
     except Exception:
-        import pickle
+        import cloudpickle
 
         media_type = "application/pickle"
-        bytez = pickle.dumps(result)
+        bytez = cloudpickle.dumps(result)
         # return Response(response.model_dump_json(), media_type=media_type)
         # raise HTTPException(500, f"Result retrieval failed: {e}")
 

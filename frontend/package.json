@@ -1,43 +1,41 @@
 {
   "name": "FIAB",
-  "version": "0.0.0",
   "private": true,
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
-    "fastapi-dev": "uv run --frozen uvicorn forecastbox.entrypoint:app --reload --log-level info",
-    "cascade-dev": "uv run --frozen --module cascade.gateway tcp://localhost:8079",
-    "python-dev": "concurrently \"npm run fastapi-dev\" \"npm run cascade-dev\"",
-    "next-dev": "next dev",
-    "dev": "concurrently \"npm run next-dev\" \"npm run python-dev\"",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "dev": "vite --port 3000",
+    "build": "tsc -b && vite build --watch",
+    "prodbuild": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@mantine/core": "^7.17.4",
-    "@mantine/dates": "^7.17.4",
     "@mantine/hooks": "^7.17.4",
     "@mantine/notifications": "^7.17.4",
-    "@tabler/icons-react": "^3.30.0",
-    "@types/node": "22.5.5",
-    "@types/react": "18.3.8",
-    "@types/react-dom": "18.3.0",
-    "autoprefixer": "10.4.20",
+    "@tabler/icons-react": "^3.31.0",
     "axios": "^1.8.4",
-    "concurrently": "^9.0.1",
     "crypto-js": "^4.2.0",
-    "dayjs": "^1.11.13",
-    "eslint": "8.41.0",
-    "eslint-config-next": "13.4.4",
-    "next": "^14.2.13",
-    "postcss": "^8.4.47",
-    "react": "18.3.1",
-    "react-dom": "18.3.1",
-    "react-globe": "^5.0.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "react-globe.gl": "^2.33.2",
-    "tailwindcss": "3.4.12",
-    "typescript": "5.6.2"
+    "react-hook-form": "^7.55.0",
+    "react-router-dom": "^7.5.1",
+    "three": "^0.176.0",
+    "vite-plugin-checker": "^0.9.3"
   },
   "devDependencies": {
-    "@types/crypto-js": "^4.2.2"
+    "@eslint/js": "^9.22.0",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.4.1",
+    "eslint": "^9.22.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.19",
+    "globals": "^16.0.0",
+    "typescript": "~5.7.2",
+    "typescript-eslint": "^8.26.1",
+    "vite": "^6.3.1"
   }
 }

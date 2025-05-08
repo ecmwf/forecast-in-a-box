@@ -17,7 +17,7 @@ import shutil
 from pydantic import BaseModel
 
 from ..types import ModelSpecification, ModelName
-from forecastbox.models import Model
+from forecastbox.models.model import Model, model_versions, model_info
 
 from forecastbox.settings import API_SETTINGS
 from forecastbox.db import db
@@ -216,7 +216,7 @@ class InstallResponse(BaseModel):
 
 @router.post("/{model_id}/install")
 def install(model_id: str) -> InstallResponse:
-    anemoi_versions = Model.versions(str(get_model_path(model_id.replace("_", "/"))))
+    anemoi_versions = model_versions(str(get_model_path(model_id.replace("_", "/"))))
     import subprocess
 
     BLACKLISTED_INSTALLS = ["anemoi", "anemoi-training", "anemoi-inference", "anemoi-utils"]
@@ -248,7 +248,7 @@ async def get_model_info(model_id: str) -> dict[str, Any]:
     dict[str, Any]
             Dictionary containing model information
     """
-    return Model.info(get_model_path(model_id.replace("_", "/")))
+    return model_info(get_model_path(model_id.replace("_", "/")))
 
 
 @router.post("/{model_id}/spec")

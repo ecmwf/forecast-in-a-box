@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Optional, Any
 
 from forecastbox.products.product import USER_DEFINED
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator, PositiveInt
 
 CONFIG_ORDER = ["param", "levtype", "levelist"]
 
@@ -111,7 +111,14 @@ class ProductSpecification:
 
 
 class EnvironmentSpecification(FIABBaseModel):
-    pass
+    """Environment Configuration"""
+
+    hosts: PositiveInt = Field(default=1)
+    """Number of hosts"""
+    workers_per_host: PositiveInt = Field(default=1)
+    """Number of workers per host"""
+    environment_variables: dict[str, str] = Field(default_factory=dict)
+    """Environment variables"""
 
 
 class ExecutionSpecification(FIABBaseModel):
@@ -121,6 +128,7 @@ class ExecutionSpecification(FIABBaseModel):
     """Product Configuration"""
     environment: EnvironmentSpecification
     """Environment Configuration"""
+    shared: bool = Field(default=False)
 
 
 class VisualisationOptions(FIABBaseModel):

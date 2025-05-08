@@ -5,6 +5,7 @@
 lib
 data_dir
 *.ckpt
+dist
 
 __pycache__
 *.py[co]
