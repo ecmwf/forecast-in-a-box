@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [
     react({
       include: "**/*.tsx",
+      include: "**/*.css",
     }),
   ],
   server: {

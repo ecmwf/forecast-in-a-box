@@ -132,12 +132,15 @@ async def execute(spec: ExecutionSpecification, user) -> api.SubmitJobResponse:
     hosts = min(CASCADE_SETTINGS.max_hosts, environment.hosts or CASCADE_SETTINGS.max_hosts)
     workers_per_host = min(CASCADE_SETTINGS.max_workers_per_host, environment.workers_per_host or CASCADE_SETTINGS.max_workers_per_host)
 
+    env_vars = {"TMPDIR": CASCADE_SETTINGS.VENV_TEMP_DIR}
+    env_vars.update(environment.environment_variables)
+
     r = api.SubmitJobRequest(
         job=api.JobSpec(
             benchmark_name=None,
             workers_per_host=workers_per_host,
             hosts=hosts,
-            envvars=environment.environment_variables,
+            envvars=env_vars,
             use_slurm=False,
             job_instance=job,
         )

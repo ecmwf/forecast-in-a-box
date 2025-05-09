@@ -38,6 +38,8 @@ class CascadeSettings(BaseSettingsModel):
     """Base URL for the Cascade API."""
     LOG_COLLECTION_MAX_SIZE: int = 1000
 
+    VENV_TEMP_DIR: str = "/tmp"
+
 
 FIAB_SETTINGS = FIABSettings()
 API_SETTINGS = APISettings()

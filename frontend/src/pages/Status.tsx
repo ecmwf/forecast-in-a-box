@@ -47,7 +47,7 @@ const StatusPage = () => {
 
     return (
         <MainLayout>
-        <Container size="sm">
+        <Container size="sm" pt='xl'>
             <Paper shadow="xs" p="md" withBorder>
                 <Group grow mb="md">
                     <Title order={2} ta="center">

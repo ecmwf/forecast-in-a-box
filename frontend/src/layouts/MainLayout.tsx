@@ -68,13 +68,13 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
     return (
         <AppShell
-            header={{ height: { xs: 180, sm: 250, md: 180, lg: 180, xl: 120, xxl: 120} }}
+            header={{ height: 120 }}
             navbar={{ width: 50, breakpoint: 'sm', collapsed: { desktop: true, mobile: !opened } }}
-            footer={{ height: 60 }}
+            footer={{ height: 50 }}
         >
             <AppShell.Header>
-                <Container bg="#202036" fluid w='100vw' pt='md' pb='md'>
-                <Group h="100%" px="md">
+                <Container bg="#202036" fluid pt='md' pb='md'>
+                <Group px="md">
                     <Group justify="space-between" style={{ flex: 1 }}>
                         <Group align="center" >
                             <a style={{"color":"white", "display":'inline'}} href="/"><img src='/logos/fiab.png' width='50vw'/></a>
@@ -101,7 +101,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 </Container>
             </AppShell.Header>
             <AppShell.Navbar>
-                <Container bg="#202036" fluid w='100vw' pt='md' pb='md' h='100%' hiddenFrom="md">
+                <Container bg="#202036" fluid w='100vw' pt='md' pb='md' h='100%' hiddenFrom="sm">
                     <Group justify="space-between" style={{ flex: 1 }} px="md" pt='md' align='top'>
                         <Stack>
                         {loggedIn ? (
@@ -123,7 +123,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             <AppShell.Footer>
                 <Footer /> 
             </AppShell.Footer>
-            <AppShell.Main>
+            <AppShell.Main mt={{base: 200, xs: 120, sm: 120, md: 80, lg: 40, xl: 0 }}>
                 {children}
             </AppShell.Main>
         </AppShell>
