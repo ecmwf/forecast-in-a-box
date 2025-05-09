@@ -31,6 +31,7 @@ dependencies = [
 	"earthkit-workflows",
 	"pproc",
 	"pproc-cascade",
+	"sse-starlette",
 ]
 
 [project.urls]

@@ -9,10 +9,11 @@ from pymongo import MongoClient
 SETTINGS = FIABSettings()
 db_name = SETTINGS.mongodb_database
 
-user_client = motor.motor_asyncio.AsyncIOMotorClient(SETTINGS.mongodb_uri, uuidRepresentation="standard")
+async_client = motor.motor_asyncio.AsyncIOMotorClient(SETTINGS.mongodb_uri, uuidRepresentation="standard")
 mongo_client = MongoClient(SETTINGS.mongodb_uri)
 
 db = mongo_client[db_name]
+async_db = async_client[db_name]
 
 
 async def get_user_db():
@@ -21,7 +22,7 @@ async def get_user_db():
 
 async def init_db():
     await init_beanie(
-        database=user_client[db_name],
+        database=async_client[db_name],
         document_models=[
             User,
         ],

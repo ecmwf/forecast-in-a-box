@@ -1,7 +1,6 @@
 "use client"; // Required for client-side fetching
 
 import { Card, Button, Tabs, Stack, Paper, Text } from '@mantine/core';
-import { useEffect, useState } from "react";
 
 import classes from './categories.module.css';
 

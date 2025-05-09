@@ -13,6 +13,10 @@ import JobProgress from './pages/jobs/progress';
 import JobStatus from './pages/jobs/status';
 import Result from './pages/result/result';
 
+import AdminLayout from './layouts/AdminPage';
+import AdminSettings from './pages/admin/settings';
+import Gateway from './pages/admin/gateway';
+
 const router = createBrowserRouter([
   {
     path: '/',
@@ -45,6 +49,24 @@ const router = createBrowserRouter([
   {
     path: '/result/:job_id/:dataset_id',
     element: <Result />,
+  },
+  {
+    path: '/admin',
+    element: <AdminLayout children={null} />,
+    children: [
+      {
+        path: '',
+        element: <Navigate to="settings" />,
+      },
+      {
+        path: 'settings',
+        element: <AdminSettings />,
+      },
+      {
+        path: 'gateway',
+        element: <Gateway />,
+      },
+    ],
   },
   {
     path: '*',

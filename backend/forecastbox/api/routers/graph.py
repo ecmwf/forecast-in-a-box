@@ -129,8 +129,8 @@ async def execute(spec: ExecutionSpecification, user) -> api.SubmitJobResponse:
 
     environment = spec.environment
 
-    hosts = min(CASCADE_SETTINGS.max_hosts, environment.hosts)
-    workers_per_host = min(CASCADE_SETTINGS.max_workers_per_host, environment.workers_per_host)
+    hosts = min(CASCADE_SETTINGS.max_hosts, environment.hosts or CASCADE_SETTINGS.max_hosts)
+    workers_per_host = min(CASCADE_SETTINGS.max_workers_per_host, environment.workers_per_host or CASCADE_SETTINGS.max_workers_per_host)
 
     r = api.SubmitJobRequest(
         job=api.JobSpec(

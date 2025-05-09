@@ -12,18 +12,6 @@ from dataclasses import dataclass
 import logging
 from forecastbox.db import init_db
 
-LOG = logging.getLogger(__name__)
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await init_db()
-    yield
-
-
-app = FastAPI(
-    docs_url="/api/v1/docs", openapi_url="/api/v1/openapi.json", title="Forecast in a Box API", version="1.0.0", lifespan=lifespan
-)
 
 from .api.routers import model
 from .api.routers import product
@@ -31,6 +19,22 @@ from .api.routers import graph
 from .api.routers import job
 from .api.routers import admin
 from .api.routers import auth
+from .api.routers import gateway
+
+LOG = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    yield
+    await gateway.shutdown_processes()
+
+
+app = FastAPI(
+    docs_url="/api/v1/docs", openapi_url="/api/v1/openapi.json", title="Forecast in a Box API", version="1.0.0", lifespan=lifespan
+)
+
 
 app.include_router(model.router, prefix="/api/v1/model")
 app.include_router(product.router, prefix="/api/v1/product")
@@ -38,6 +42,7 @@ app.include_router(graph.router, prefix="/api/v1/graph")
 app.include_router(job.router, prefix="/api/v1/job")
 app.include_router(admin.router, prefix="/api/v1/admin")
 app.include_router(auth.router, prefix="/api/v1")
+app.include_router(gateway.router, prefix="/api/v1/gateway")
 
 app.add_middleware(
     CORSMiddleware,

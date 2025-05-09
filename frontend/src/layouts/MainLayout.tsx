@@ -9,7 +9,6 @@ import { useApi } from '../api';
 import { useNavigate } from 'react-router-dom';
 import { showNotification } from '@mantine/notifications';
 
-import Header from '../components/header';
 import Footer from '../components/footer';
 import Banner from '../components/Banner';
 import { useEffect, useState } from "react";
@@ -39,19 +38,27 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       navigate('/')
     };
     const [loggedIn, setLoggedIn] = useState(false);
+    const [isSuperuser, setIsSuperuser] = useState(false);
   
     const checkLogin = () => {
-      api.get('/v1/users/me')
-      .then((res) => {
-        if (res.status === 200) {
-        setLoggedIn(true);
-        } else {
-        setLoggedIn(false);
+        const token = localStorage.getItem('token');
+        if (!token) {
+            setLoggedIn(false);
+        } else {    
+            setLoggedIn(true);
         }
-      })
-      .catch((err) => {
-        setLoggedIn(false);
-      });
+        api.get('/v1/users/me')
+        .then((res) => {
+            if (res.status === 200) {
+                setLoggedIn(true);
+                setIsSuperuser(res.data.is_superuser);
+            } else {
+            setLoggedIn(false);
+            }
+        })
+        .catch((err) => {
+            setLoggedIn(false);
+        });
     }
   
     useEffect(() => {
@@ -61,24 +68,26 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
     return (
         <AppShell
-            header={{ height: { base: 120 }}}
+            header={{ height: { xs: 180, sm: 250, md: 180, lg: 180, xl: 120, xxl: 120} }}
             navbar={{ width: 50, breakpoint: 'sm', collapsed: { desktop: true, mobile: !opened } }}
             footer={{ height: 60 }}
         >
             <AppShell.Header>
-                <Banner />
                 <Container bg="#202036" fluid w='100vw' pt='md' pb='md'>
                 <Group h="100%" px="md">
                     <Group justify="space-between" style={{ flex: 1 }}>
                         <Group align="center" >
-                            <a style={{"color":"white", "display":'inline'}} href="/"><img src='logos/fiab.png' width='50vw'/></a>
+                            <a style={{"color":"white", "display":'inline'}} href="/"><img src='/logos/fiab.png' width='50vw'/></a>
                             <Title style={{"color":"white"}} order={2} textWrap={'pretty'}>ECMWF Forecast In a Box</Title>
                         </Group>
+                        <Banner />
                         <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" color="white"/>
                         <Group ml="xl" gap={0} visibleFrom="sm">
                             {loggedIn ? (
                                 <>
-                                <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="md" component='a' href='/settings'>Settings</Button>
+                                {loggedIn && isSuperuser && (
+                                    <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="md" component='a' href='/admin'>Admin</Button>
+                                )} 
                                 <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="md" component='a' href='/products'>Products</Button>
                                 <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="md" component='a' href='/job/status'>Job Status</Button>
                                 <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="md" onClick={handleLogout}>Logout</Button>
@@ -92,7 +101,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 </Container>
             </AppShell.Header>
             <AppShell.Navbar>
-                <Container bg="#202036" fluid w='100vw' pt='md' pb='md' h='100%' hiddenFrom="sm">
+                <Container bg="#202036" fluid w='100vw' pt='md' pb='md' h='100%' hiddenFrom="md">
                     <Group justify="space-between" style={{ flex: 1 }} px="md" pt='md' align='top'>
                         <Stack>
                         {loggedIn ? (
@@ -106,7 +115,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                             <UnstyledButton className="animated-button" size="md" c = 'white' component='a' href='/login'>Login</UnstyledButton>
                         )}
                         </Stack>
-                <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" color="white"/>
+                <Burger opened={opened} onClick={toggle} hiddenFrom="md" size="sm" color="white"/>
                 </Group>
                 </Container>
             </AppShell.Navbar>
@@ -114,8 +123,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             <AppShell.Footer>
                 <Footer /> 
             </AppShell.Footer>
-            <AppShell.Main pt={`calc(${rem(120)} + var(--mantine-spacing-md))`}>
-                <Space h='xl'/>
+            <AppShell.Main>
                 {children}
             </AppShell.Main>
         </AppShell>

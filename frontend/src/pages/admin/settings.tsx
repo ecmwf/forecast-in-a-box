@@ -6,9 +6,9 @@ import { showNotification } from '@mantine/notifications';
 import { IconRefresh } from '@tabler/icons-react';
 
 
-import { useSettings } from '../SettingsContext';
+import { useSettings } from '../../SettingsContext';
 
-import {useApi} from '../api';
+import {useApi} from '../../api';
 
 
 // Define the TypeScript interfaces for settings
@@ -26,7 +26,7 @@ interface Settings {
 }
 
 
-const HomePage = () => {
+const Settings = () => {
 
   const api = useApi();
 
@@ -161,4 +161,4 @@ const HomePage = () => {
   );
 }
 
-export default HomePage;
+export default Settings;

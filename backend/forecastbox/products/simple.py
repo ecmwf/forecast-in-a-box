@@ -112,6 +112,16 @@ class MapProduct(GenericTemporalProduct):
         return super().validate_intersection(model) and EARTHKIT_PLOTS_IMPORTED
 
 
+@as_payload
+def print_metadata(fields):
+    """
+    Print the metadata of a field.
+    """
+    for field in fields:
+        print(field.metadata().dump())
+    return field
+
+
 @simple_registry("Maps")
 class SimpleMapProduct(MapProduct):
     multiselect = {
@@ -131,6 +141,7 @@ class SimpleMapProduct(MapProduct):
         if domain == "Global":
             domain = None
 
+        source = source.map(print_metadata())
         source = source.concatenate("param")
         source = source.concatenate("step")
 
@@ -187,7 +198,10 @@ class EnsembleMapProduct(BaseEnsembleProduct, MapProduct):
 #     pass
 
 
-@simple_registry("Grib")
+OUTPUT_TYPES = ["grib", "xarray"]
+
+
+@simple_registry("Output")
 class GribProduct(GenericTemporalProduct):
     multiselect = {
         "param": True,
@@ -196,7 +210,7 @@ class GribProduct(GenericTemporalProduct):
 
     @property
     def qube(self):
-        return self.make_generic_qube()
+        return self.make_generic_qube(format=OUTPUT_TYPES)
 
     def to_graph(self, product_spec, model, source):
         source = self.select_on_specification(product_spec, source).concatenate("param").concatenate("step")

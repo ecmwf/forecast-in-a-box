@@ -36,6 +36,7 @@ class CascadeSettings(BaseSettingsModel):
     """Number of workers per host for Cascade."""
     cascade_url: str = "tcp://localhost:8067"
     """Base URL for the Cascade API."""
+    LOG_COLLECTION_MAX_SIZE: int = 1000
 
 
 FIAB_SETTINGS = FIABSettings()

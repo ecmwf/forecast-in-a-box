@@ -113,9 +113,9 @@ class ProductSpecification:
 class EnvironmentSpecification(FIABBaseModel):
     """Environment Configuration"""
 
-    hosts: PositiveInt = Field(default=1)
+    hosts: PositiveInt | None = Field(default=None)
     """Number of hosts"""
-    workers_per_host: PositiveInt = Field(default=1)
+    workers_per_host: PositiveInt | None = Field(default=None)
     """Number of workers per host"""
     environment_variables: dict[str, str] = Field(default_factory=dict)
     """Environment variables"""

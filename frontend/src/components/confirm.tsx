@@ -118,8 +118,8 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
     // </SimpleGrid>
     return (
         <Container size='xl'>
-        <Title order={2}>Confirm</Title>
-        <Divider my='md'/>
+        {/* <Title order={2}>Confirm</Title>
+        <Divider my='md'/> */}
         <Grid grow gutter='xl'>
             <Grid.Col span={{ base: 12, sm: 12, md: 6, xl: 6 }}>
                 <Card padding="">
