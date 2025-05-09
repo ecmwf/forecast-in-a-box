@@ -5,9 +5,9 @@ import { SimpleGrid, Stepper, Divider, Button, Alert, Container} from "@mantine/
 
 import ProductConfigurator from '../components/products/products'
 import Model from "../components/model/model";
+import Environment from "../components/environment";
 
 import Confirm from '../components/confirm';
-
 import LoggedIn from '../layouts/LoggedIn';
 
 import {ModelSpecification, ProductSpecification, EnvironmentSpecification, SubmitResponse} from '../components/interface'
@@ -36,6 +36,12 @@ const ProductsPage = () => {
         setProducts(prod);
         nextStep();
     }
+
+    const setEnvironmentInfo = (env: EnvironmentSpecification) => {
+        setEnvironment(env);
+        nextStep();
+    }
+
     return(
     <LoggedIn>
       <Container size='xl' pt='xl'>
@@ -55,10 +61,8 @@ const ProductsPage = () => {
                     </>
                 )}
             </Stepper.Step>
-            <Stepper.Step label="Environment" description="Configure Execution Environment" allowStepSelect={true} icon={<IconTerminal2/>}>
-                <Divider my="md" />
-                <Button onClick={prevStep}>Back</Button>
-                <Button onClick={nextStep}>Next</Button>
+            <Stepper.Step label="Environment" description="Configure Execution" allowStepSelect={true} icon={<IconTerminal2/>}>
+                <Environment setEnvironment={setEnvironmentInfo}/>
             </Stepper.Step>
             <Stepper.Step label="Confirm" description="Execute the graph" allowStepSelect={!!selectedModel.model} icon={<IconRocket/>}>
                 <Divider my="md" />

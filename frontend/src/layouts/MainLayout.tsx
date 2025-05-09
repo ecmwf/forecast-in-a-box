@@ -70,8 +70,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 <Container bg="#202036" fluid w='100vw' pt='md' pb='md'>
                 <Group h="100%" px="md">
                     <Group justify="space-between" style={{ flex: 1 }}>
-                        <Group>
-                            <a style={{"color":"white", "display":'inline'}} href="/"><IconBox/></a>
+                        <Group align="center" >
+                            <a style={{"color":"white", "display":'inline'}} href="/"><img src='logos/fiab.png' width='50vw'/></a>
                             <Title style={{"color":"white"}} order={2} textWrap={'pretty'}>ECMWF Forecast In a Box</Title>
                         </Group>
                         <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" color="white"/>

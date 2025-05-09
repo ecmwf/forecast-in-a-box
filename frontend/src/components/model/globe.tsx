@@ -1,6 +1,7 @@
 "use client"; // Required for client-side fetching
 
 import React, { useState, useEffect, useCallback } from 'react';
+
 import Globe from 'react-globe.gl';
 import { Card, Button, NumberInput, Flex } from '@mantine/core';
 import classes from './globe.module.css';

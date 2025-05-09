@@ -64,7 +64,11 @@ export type ProductSpecification = {
   specification: Record<string, any>;
 };
 
-export type EnvironmentSpecification = Record<string, string>;
+export type EnvironmentSpecification = {
+  hosts: number;
+  workers_per_host: number;
+  environment_variables: Record<string, string>;
+}
 
 export type ExecutionSpecification = {
   model: ModelSpecification;
