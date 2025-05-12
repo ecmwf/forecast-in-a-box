@@ -159,7 +159,7 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
                     spec={{
                         model: model,
                         products: Object.values(products),
-                        environment: {}
+                        environment: {} as EnvironmentSpecification
                     }}
                     url={null}
                 />
@@ -169,7 +169,7 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
                     const submitData: ExecutionSpecification = {
                         model: model,
                         products: Object.values(products),
-                        environment: {}
+                        environment: {} as EnvironmentSpecification
                     };
 
                     const blob = new Blob([JSON.stringify(submitData, null, 2)], { type: 'application/json' });

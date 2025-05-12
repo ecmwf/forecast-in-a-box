@@ -3,10 +3,12 @@ import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig({
+  build: {
+    cssCodeSplit: false,
+  },
   plugins: [
     react({
-      include: "**/*.tsx",
-      include: "**/*.css",
+      include: ["**/*.tsx", "**/*.css"],
     }),
   ],
   server: {
