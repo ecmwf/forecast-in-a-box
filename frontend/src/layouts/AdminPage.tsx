@@ -1,12 +1,6 @@
 import { AppShell, Container, Burger,  Badge, NavLink, Image, Group, Affix, Skeleton, Grid, rem, Card, Title, Divider, Space} from '@mantine/core'
 
 import { IconSettings, IconGalaxy } from '@tabler/icons-react';
-import {
-    IconLogout,
-    IconReceipt2,
-    IconSwitchHorizontal,
-  
-  } from '@tabler/icons-react';
 
 import MainLayout from './MainLayout';
 import { useEffect } from 'react';
@@ -103,7 +97,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <MainLayout>
             <Grid>
             <Grid.Col span={{ xxs: 12, xs: 6, sm: 5, md: 4, lg: 3 }}>
-                <Affix position={{ top: `calc(${rem(120)} + var(--mantine-spacing-md))`}} pt={{ xs: 80, sm: 120, md: 60, lg: 50, xl:20, xxl: 0}}>
+                <Affix position={{ top: `calc(${rem(80)} + var(--mantine-spacing-md))`}}>
                     <NavbarSimple/>
                 </Affix>
             </Grid.Col>
