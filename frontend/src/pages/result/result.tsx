@@ -41,7 +41,7 @@ export default function ResultsPage() {
 
     return (
         <MainLayout>
-        <Button component="a" href={`/progress/${job_id}`} variant="outline" color="blue" size="md">
+        <Button component="a" href={`/progress/${job_id}`} variant="outline" color="blue" size="md" m='xl'>
             Back to Results
         </Button>
         <Container
@@ -67,19 +67,6 @@ export default function ResultsPage() {
             ) : (
                 <Stack align="center">
                     <Space h={20} />
-                    {/* <Title order={2} style={{ wordWrap: "break-word", wordbreak: 'break-all', textAlign: "center" }}>
-                        {job_id}
-                    </Title>
-                    <Title order={4} style={{ wordWrap: "break-word", textAlign: "center" }}>
-                        {dataset_id}
-                    </Title> */}
-                    {/* <Container size="lg" style={{ textAlign: "center" }}> */}
-                        {/* <a href={dataLink} download>
-                            <Text c="blue">
-                                Download 
-                            </Text>
-                        </a> */}
-
                     {contentType == 'image/png' ? (
                         <img 
                             src={dataLink} 

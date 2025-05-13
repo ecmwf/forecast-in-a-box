@@ -11,6 +11,7 @@ import GraphVisualiser from './graph_visualiser';
 
 import Cart from './products/cart'
 import {useApi} from './../api';
+import { showNotification } from '@mantine/notifications';
 
 interface ConfirmProps {
     model: ModelSpecification;
@@ -63,21 +64,31 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
             (async () => {
                 try {
                     const response = await api.post(`/v1/graph/execute`, spec);
-
                     const result: SubmitResponse = await response.data;
-                    if (response.status !== 200) {
-                        alert("Error: " + response.status + " " + response.statusText);
-                        throw new Error(`Error: ${response.status} - ${response.statusText}`);
-                    }
                     if (result.error) {
                         alert("Error: " + result.error);
-                        throw new Error(`Error: ${result.error}`);
+                        showNotification(
+                            {
+                                title: 'Error',
+                                message: `An error occurred while submitting the graph.\n ${result.error}`,
+                                color: 'red',
+                                icon: <IconX size={16} />,
+                            }
+                        )
                     }
                     setJobId(result);
                     window.location.href = `/job/${result.job_id}`;
 
                 } catch (error) {
                     console.error("Error executing:", error);
+                    showNotification(
+                        {
+                            title: 'Error',
+                            message: `An error occurred while submitting the graph.\n ${error.response.data.detail}`,
+                            color: 'red',
+                            icon: <IconX size={16} />,
+                        }
+                    )
                 } finally {
                     setSubmitting(false);
                 }
@@ -90,7 +101,7 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
         const spec: ExecutionSpecification = {
             model: model,
             products: Object.values(products),
-            environment: {}
+            environment: {} as EnvironmentSpecification
         }
 
         async function retrieveFileBlob() {

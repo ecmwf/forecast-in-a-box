@@ -68,7 +68,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
     return (
         <AppShell
-            header={{ height: 120 }}
+            header={{ height: 80 }}
             navbar={{ width: 50, breakpoint: 'sm', collapsed: { desktop: true, mobile: !opened } }}
             footer={{ height: 50 }}
         >
@@ -123,7 +123,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             <AppShell.Footer>
                 <Footer /> 
             </AppShell.Footer>
-            <AppShell.Main mt={{base: 200, xs: 120, sm: 120, md: 80, lg: 40, xl: 0 }}>
+            <AppShell.Main>
                 {children}
             </AppShell.Main>
         </AppShell>
