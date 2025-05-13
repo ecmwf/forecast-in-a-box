@@ -1,3 +1,12 @@
+# (C) Copyright 2024- ECMWF.
+#
+# This software is licensed under the terms of the Apache Licence Version 2.0
+# which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# In applying this licence, ECMWF does not waive the privileges and immunities
+# granted to it by virtue of its status as an intergovernmental organisation
+# nor does it submit to any jurisdiction.
+
 from abc import ABC, abstractmethod
 
 from typing import Any, TYPE_CHECKING
@@ -59,9 +68,9 @@ class Product(ABC):
             if isinstance(levelist, str):
                 levelist = [levelist]
             if isinstance(specification["param"], str):
-                specification["param"] = [f"{specification['param']}_{l}" for l in levelist]
+                specification["param"] = [f"{specification['param']}_{lev}" for lev in levelist]
             else:
-                specification["param"] = [f"{p}_{l}" for p in specification["param"] for l in levelist]
+                specification["param"] = [f"{par}_{lev}" for par in specification["param"] for lev in levelist]
 
         for key, value in specification.items():
             if not value:
@@ -79,10 +88,19 @@ class Product(ABC):
                 except ValueError:
                     return value
 
+            original_value = value
+
             if isinstance(value, str):
                 value = convert_to_int(value)
             if isinstance(value, list):
                 value = [convert_to_int(v) for v in value]
+
+            if isinstance(value, list):
+                if not all(str(value[i]) == original_value[i] for i in range(len(original_value))):
+                    value = original_value
+            else:
+                if str(value) != original_value:
+                    value = original_value
 
             source = source.sel(**{key: value if isinstance(value, (list, tuple)) else [value]})
         return source

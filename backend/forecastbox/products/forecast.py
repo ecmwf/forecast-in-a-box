@@ -1,3 +1,12 @@
+# (C) Copyright 2024- ECMWF.
+#
+# This software is licensed under the terms of the Apache Licence Version 2.0
+# which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# In applying this licence, ECMWF does not waive the privileges and immunities
+# granted to it by virtue of its status as an intergovernmental organisation
+# nor does it submit to any jurisdiction.
+
 from .registry import CategoryRegistry
 
 
@@ -10,7 +19,8 @@ if TYPE_CHECKING:
     from earthkit.workflows.fluent import Action
 
 
-# TODO, Generalise with start, end, step kwargs for configuration
+# TODO, Generalise with start, end, step kwargs for configuration
+
 
 class BaseForecast(GenericParamProduct):
     """Base Forecast Product"""
@@ -59,13 +69,16 @@ class BaseForecast(GenericParamProduct):
 class FCMean(BaseForecast):
     _statistic = "mean"
 
+
 @forecast_registry("Minimum")
 class FCMin(BaseForecast):
     _statistic = "min"
 
+
 @forecast_registry("Maximum")
 class FCMax(BaseForecast):
     _statistic = "max"
+
 
 @forecast_registry("Standard Deviation")
 class FCStd(BaseForecast):

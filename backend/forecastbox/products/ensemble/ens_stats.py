@@ -1,4 +1,13 @@
-from typing import Any, TYPE_CHECKING
+# (C) Copyright 2024- ECMWF.
+#
+# This software is licensed under the terms of the Apache Licence Version 2.0
+# which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# In applying this licence, ECMWF does not waive the privileges and immunities
+# granted to it by virtue of its status as an intergovernmental organisation
+# nor does it submit to any jurisdiction.
+
+from typing import Any
 
 import itertools
 
@@ -9,11 +18,12 @@ from forecastbox.products.ensemble.base import BasePProcEnsembleProduct
 
 from . import ensemble_registry
 
+
 class BaseEnsembleStats(BasePProcEnsembleProduct, GenericTemporalProduct):
     _type: str = None
-    
+
     multiselect = {
-        'step': True,
+        "step": True,
         "param": True,
     }
 
@@ -24,7 +34,7 @@ class BaseEnsembleStats(BasePProcEnsembleProduct, GenericTemporalProduct):
     def get_sources(self, product_spec, model, source: fluent.Action) -> dict[str, fluent.Action]:
         params = product_spec["param"]
         step = product_spec["step"]
-        return {'forecast': self.select_on_specification({'param': params, 'step': step}, source)}
+        return {"forecast": self.select_on_specification({"param": params, "step": step}, source)}
 
     def mars_request(self, product_spec: dict[str, Any]):
         """Mars request for ensemble stats."""
@@ -36,24 +46,28 @@ class BaseEnsembleStats(BasePProcEnsembleProduct, GenericTemporalProduct):
 
         for para, st in itertools.product(params, steps):
             request = {
-                'type': self._type,
+                "type": self._type,
             }
             from anemoi.utils.grib import shortname_to_paramid
-            
+
             param_id = shortname_to_paramid(para)
 
-            request.update({
-                'levtype': levtype,
-                'param': param_id,
-                'step': st,
-            })
+            request.update(
+                {
+                    "levtype": levtype,
+                    "param": param_id,
+                    "step": st,
+                }
+            )
             requests.append(request)
         return requests
-    
+
+
 @ensemble_registry("Ensemble Mean")
 class ENSMS(BaseEnsembleStats):
-    _type = 'em'
+    _type = "em"
+
 
 @ensemble_registry("Ensemble Standard Deviation")
 class ENSSTD(BaseEnsembleStats):
-    _type = 'es'
+    _type = "es"

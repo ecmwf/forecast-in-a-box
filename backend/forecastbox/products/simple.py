@@ -1,3 +1,12 @@
+# (C) Copyright 2024- ECMWF.
+#
+# This software is licensed under the terms of the Apache Licence Version 2.0
+# which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# In applying this licence, ECMWF does not waive the privileges and immunities
+# granted to it by virtue of its status as an intergovernmental organisation
+# nor does it submit to any jurisdiction.
+
 import warnings
 
 from forecastbox.products.registry import CategoryRegistry
@@ -112,16 +121,6 @@ class MapProduct(GenericTemporalProduct):
         return super().validate_intersection(model) and EARTHKIT_PLOTS_IMPORTED
 
 
-@as_payload
-def print_metadata(fields):
-    """
-    Print the metadata of a field.
-    """
-    for field in fields:
-        print(field.metadata().dump())
-    return field
-
-
 @simple_registry("Maps")
 class SimpleMapProduct(MapProduct):
     multiselect = {
@@ -141,7 +140,6 @@ class SimpleMapProduct(MapProduct):
         if domain == "Global":
             domain = None
 
-        source = source.map(print_metadata())
         source = source.concatenate("param")
         source = source.concatenate("step")
 
