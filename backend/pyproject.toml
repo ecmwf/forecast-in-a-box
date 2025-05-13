@@ -68,10 +68,10 @@ ignore = ["E731"]
 plugins = "pydantic.mypy"
 
 [tool.uv.sources]
-earthkit-workflows-anemoi  = { git = "ssh://git@github.com/ecmwf/earthkit-workflows-anemoi.git" }
+earthkit-workflows-anemoi  = { git = "https://github.com/ecmwf/earthkit-workflows-anemoi" }
 earthkit-workflows = { git = "https://github.com/ecmwf/earthkit-workflows" }
-pproc = { git = "ssh://git@github.com/ecmwf/pproc.git", rev = "feature/io-requests" }
-pproc-cascade = { git = "ssh://git@github.com/ecmwf/pproc-cascade.git", rev = "strip-source-sinks" }
+pproc = { git = https://github.com/ecmwf/pproc" }
+pproc-cascade = { git = "https://github.com/ecmwf/pproc-cascade" }
 
 [tool.hatch.metadata]
 allow-direct-references = true
