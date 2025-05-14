@@ -30,7 +30,7 @@ dependencies = [
 	"pymongo",
 	"earthkit-workflows",
 	"pproc",
-	"pproc-cascade",
+	"earthkit-workflows-pproc",
 	"sse-starlette",
 ]
 
@@ -70,8 +70,8 @@ plugins = "pydantic.mypy"
 [tool.uv.sources]
 earthkit-workflows-anemoi  = { git = "https://github.com/ecmwf/earthkit-workflows-anemoi" }
 earthkit-workflows = { git = "https://github.com/ecmwf/earthkit-workflows" }
-pproc = { git = https://github.com/ecmwf/pproc" }
-pproc-cascade = { git = "https://github.com/ecmwf/pproc-cascade" }
+pproc = { git = "https://github.com/ecmwf/pproc" }
+earthkit-workflows-pproc = { git = "https://github.com/ecmwf/earthkit-workflows-pproc" }
 
 [tool.hatch.metadata]
 allow-direct-references = true
