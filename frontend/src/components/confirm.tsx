@@ -108,6 +108,21 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
     }
 
     const handleDownload = () => {
+        const submitData: ExecutionSpecification = {
+            model: model,
+            products: Object.values(products),
+            environment: {} as EnvironmentSpecification
+        };
+
+        const blob = new Blob([JSON.stringify(submitData, null, 2)], { type: 'application/json' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute('download', `${crypto.randomUUID()}.json`);
+        link.click();
+        link.remove();
+    }
+
+    const handleSeralise = () => {
         const spec: ExecutionSpecification = {
             model: model,
             products: Object.values(products),
@@ -185,20 +200,9 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
                     url={null}
                 />
                 <Group grow>
-                <Button onClick={handleDownload}>Serialise</Button>
+                <Button onClick={handleSeralise}>Serialise</Button>
                 <Button onClick={() => {
-                    const submitData: ExecutionSpecification = {
-                        model: model,
-                        products: Object.values(products),
-                        environment: {} as EnvironmentSpecification
-                    };
-
-                    const blob = new Blob([JSON.stringify(submitData, null, 2)], { type: 'application/json' });
-                    const link = document.createElement('a');
-                    link.href = URL.createObjectURL(blob);
-                    link.setAttribute('download', `${crypto.randomUUID()}.json`);
-                    link.click();
-                    link.remove();
+                    handleDownload();
                 }}>Download</Button>
                 </Group>
                 <Button color='green'onClick={handleSubmit} disabled={submitting || status.cascade !== "up"}>

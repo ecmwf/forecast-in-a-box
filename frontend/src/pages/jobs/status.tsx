@@ -13,14 +13,18 @@
 import { useRef } from 'react';
 import { Container, Group } from '@mantine/core';
 import { useEffect, useState } from 'react';
-import { Table, Loader, Center, Title, Progress, Button, Flex, Divider, Tooltip, FileButton, Menu, Burger} from '@mantine/core';
+import { Table, Loader, Center, Title, Progress, Button, Flex, Divider, Tooltip, FileButton, Menu, Burger, Modal} from '@mantine/core';
 
-import { IconRefresh, IconTrash } from '@tabler/icons-react';
+import { IconDownload, IconRefresh, IconTrash } from '@tabler/icons-react';
 import classes from './status.module.css';
 import { showNotification } from '@mantine/notifications';
 
 import {useApi} from '../../api';
 import MainLayout from '../../layouts/MainLayout';
+
+import { ExecutionSpecification } from '../../components/interface';
+
+import Cart from './../../components/products/cart';
 
 export type ProgressResponse = {
   progress: string;
@@ -99,6 +103,35 @@ const HomePage = () => {
       setWorking(false);
     }
     getStatus();
+  };
+
+  const downloadJob = async (jobId: string) => {
+    try {
+      setWorking(true);
+      // setLoading(true);
+      const response = await api.get(`/v1/job/${jobId}/specification`, {
+      headers: { "Content-Type": "application/json" },
+      });
+
+      const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute('download', `${crypto.randomUUID()}.json`);
+      link.click();
+      link.remove();
+
+    } catch (error) {
+      showNotification({
+        id: `download-error-${crypto.randomUUID()}`,
+        position: "top-right",
+        autoClose: 3000,
+        title: "Download Failed",
+        message: `${error.response?.data?.detail}`,
+        color: "red",
+      });
+    } finally {
+      setWorking(false);
+    }
   };
 
   const restartJob = async (jobId: string) => {
@@ -209,6 +242,42 @@ const HomePage = () => {
     setWorking(false);
   };
 
+  const [showMoreInfo, setShowMoreInfo] = useState(false);
+  const [moreInfoSpec, setMoreInfoSpec] = useState({} as ExecutionSpecification);
+
+  const handleMoreInfo = (jobId: string) => {
+    setWorking(true);
+    try {
+      api.get(`/v1/job/${jobId}/specification`)
+        .then((response) => {
+          setMoreInfoSpec(response.data);
+          setShowMoreInfo(true);
+        })
+        .catch((error) => {
+          console.error("Error getting job specification:", error);
+          showNotification({
+            id: `more-info-error-${crypto.randomUUID()}`,
+            position: "top-right",
+            autoClose: 3000,
+            title: "Error getting job specification",
+            message: `${error.response?.data?.detail}`,
+            color: "red",
+          });
+        });
+    } catch (error) {
+      showNotification({
+        id: `more-info-error-${crypto.randomUUID()}`,
+        position: "top-right",
+        autoClose: 3000,
+        title: "Error getting job specification",
+        message: `${error.response?.data?.detail}`,
+        color: "red",
+      });
+    }
+    setWorking(false);
+
+  }
+
   useEffect(() => {
     setLoading(true);
     getStatus();
@@ -253,6 +322,30 @@ const HomePage = () => {
   return (
     <MainLayout>
     <Container size="lg" pt="xl" pb="xl">
+    <Modal
+        opened={showMoreInfo}
+        onClose={() => setShowMoreInfo(false)}
+        title="Job Outputs"
+        size="lg"
+      >
+        {moreInfoSpec.products && moreInfoSpec.products.length > 0 && (
+          <>
+            <Cart 
+              products={Object.fromEntries(moreInfoSpec.products.map((product, index) => [index.toString(), product]))} 
+              setProducts={(updatedProducts) => {
+                moreInfoSpec.products = Object.values(updatedProducts);
+              }}
+              disable_delete={true}
+            />
+            {/* <Title order={3}>Model</Title>
+            <pre>{JSON.stringify(moreInfoSpec.model, null, 2)}</pre>
+            <Title order={3}>Environment</Title>
+            <pre>{JSON.stringify(moreInfoSpec.environment, null, 2)}</pre> */}
+          </>
+        )}
+
+      </Modal>
+
       <Flex gap='xl' justify={'space-between'} align='center'>
         <Title>Status</Title>
         {working && <Loader/>}
@@ -302,6 +395,9 @@ const HomePage = () => {
               Object.entries(jobs.progresses || {}).map(([jobId, progress]: [string, ProgressResponse]) => (
                 <Table.Tr key={jobId}>
                     <Table.Td align='left'>
+                      <Tooltip label="More Info">
+                        <Burger onClick={() => handleMoreInfo(jobId)}/>
+                      </Tooltip>
                       <Tooltip label="Click to view progress">
                     <Button
                       variant="subtle"
@@ -323,19 +419,26 @@ const HomePage = () => {
                     </Table.Td>
                     <Table.Td>
                       <Group align='center'>
+                        <Tooltip label="Download Job">
+                        <Button
+                          color='blue'
+                          onClick={() => downloadJob(jobId)}
+                          size='xs'
+                          aria-label="Download Job"
+                          ><IconDownload/></Button></Tooltip>
                         <Tooltip label="Restart Job">
-                    <Button
-                      color='orange'
-                      onClick={() => restartJob(jobId)}
-                      size='xs'
-                      aria-label="Restart Job"
-                      ><IconRefresh/></Button></Tooltip>
-                      <Tooltip label="Delete Job">
-                    <Button
-                      color='red'
-                      onClick={() => deleteJob(jobId)}
-                      size='xs'
-                      ><IconTrash/></Button></Tooltip>
+                        <Button
+                          color='orange'
+                          onClick={() => restartJob(jobId)}
+                          size='xs'
+                          aria-label="Restart Job"
+                          ><IconRefresh/></Button></Tooltip>
+                          <Tooltip label="Delete Job">
+                        <Button
+                          color='red'
+                          onClick={() => deleteJob(jobId)}
+                          size='xs'
+                          ><IconTrash/></Button></Tooltip>
                       </Group>
                   </Table.Td>
                 </Table.Tr>

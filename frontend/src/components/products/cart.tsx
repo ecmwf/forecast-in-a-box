@@ -21,11 +21,12 @@ import sha256 from 'crypto-js/sha256';
 
 interface CartProps {
     products: Record<string, ProductSpecification>;
+    disable_delete?: boolean;
     setProducts: (products: Record<string, ProductSpecification>) => void;
 }
 
 
-function Cart({products, setProducts}: CartProps) {
+function Cart({products, disable_delete, setProducts}: CartProps) {
     const handleRemove = (id: string) => {
       const updatedProducts = { ...products };
       delete updatedProducts[id];
@@ -79,7 +80,9 @@ function Cart({products, setProducts}: CartProps) {
                     </Group>
                     <Group>
                     {/* <ActionIcon color="green" onClick={() => openModal(id)} size="lg"><IconPencil/></ActionIcon> */}
-                    <ActionIcon color="red" onClick={() => handleRemove(id)} size="md"><IconX/></ActionIcon>
+                    {!  disable_delete && (
+                      <ActionIcon color="red" onClick={() => handleRemove(id)} size="md"><IconX/></ActionIcon>
+                    )}
                     </Group>
                 </Group>
             </Card.Section>

@@ -12,7 +12,7 @@
 
 import { useEffect, useState, useRef} from 'react';
 import { useNavigate, useParams } from 'react-router-dom'
-import { Progress, Container, Title, Text, Divider, Button, Loader, Space, Table, Group} from '@mantine/core';
+import { Progress, Container, Title, Text, Divider, Button, Loader, Space, Table, Group, Modal} from '@mantine/core';
 import { showNotification } from '@mantine/notifications';
 import { AxiosError } from 'axios';
 
@@ -23,6 +23,10 @@ import GraphVisualiser from '../../components/graph_visualiser';
 import {useApi} from '../../api';
 
 import MainLayout from '../../layouts/MainLayout';
+
+import { ExecutionSpecification } from '../../components/interface';
+import Cart from './../../components/products/cart';
+
 
 function OutputCells({ id, dataset, progress }: { id: string; dataset: string, progress: string | null }) {
     const [isAvailable, setIsAvailable] = useState<boolean>(false);
@@ -76,6 +80,39 @@ const ProgressPage = () => {
     
     const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const api = useApi();
+
+    const [showMoreInfo, setShowMoreInfo] = useState(false);
+    const [moreInfoSpec, setMoreInfoSpec] = useState({} as ExecutionSpecification);
+
+    const handleMoreInfo = (jobId: string) => {
+        try {
+        api.get(`/v1/job/${jobId}/specification`)
+            .then((response) => {
+            setMoreInfoSpec(response.data);
+            setShowMoreInfo(true);
+            })
+            .catch((error) => {
+            console.error("Error getting job specification:", error);
+            showNotification({
+                id: `more-info-error-${crypto.randomUUID()}`,
+                position: "top-right",
+                autoClose: 3000,
+                title: "Error getting job specification",
+                message: `${error.response?.data?.detail}`,
+                color: "red",
+            });
+            });
+        } catch (error) {
+        showNotification({
+            id: `more-info-error-${crypto.randomUUID()}`,
+            position: "top-right",
+            autoClose: 3000,
+            title: "Error getting job specification",
+            message: `${error.response?.data?.detail}`,
+            color: "red",
+        });
+        }
+    }
     
     const fetchProgress = async () => {
         try {
@@ -138,11 +175,36 @@ const ProgressPage = () => {
     return (
         <MainLayout>
         <Container size='lg' pt='xl'>
+        <Modal
+            opened={showMoreInfo}
+            onClose={() => setShowMoreInfo(false)}
+            title="Job Outputs"
+            size="lg"
+            >
+            {moreInfoSpec.products && moreInfoSpec.products.length > 0 && (
+                <>
+                <Cart 
+                    products={Object.fromEntries(moreInfoSpec.products.map((product, index) => [index.toString(), product]))} 
+                    setProducts={(updatedProducts) => {
+                    moreInfoSpec.products = Object.values(updatedProducts);
+                    }}
+                    disable_delete={true}
+                />
+                {/* <Title order={3}>Model</Title>
+                <pre>{JSON.stringify(moreInfoSpec.model, null, 2)}</pre>
+                <Title order={3}>Environment</Title>
+                <pre>{JSON.stringify(moreInfoSpec.environment, null, 2)}</pre> */}
+                </>
+            )}
+
+            </Modal>
             <Space h="xl"/>
             
             <Title display={'inline'} order={1}>Progress</Title>
-            <GraphVisualiser spec={null} url={`/v1/job/${id}/visualise`} />
-
+            <Group grow>
+                <GraphVisualiser spec={null} url={`/v1/job/${id}/visualise`} />
+                <Button color='green' onClick={() => handleMoreInfo(id as string)}>More Info</Button>
+            </Group>
             <Title pt='xl' order={4}>{id} - {progress.status}</Title>
             
             {!progress.progress ? (

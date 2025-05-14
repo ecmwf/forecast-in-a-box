@@ -190,6 +190,14 @@ async def visualise_job(job_id: JobId = Depends(validate_job_id), options: Visua
             return HTMLResponse(f.read(), media_type="text/html")
 
 
+@router.get("/{job_id}/specification")
+async def get_job_specification(job_id: JobId = Depends(validate_job_id)) -> ExecutionSpecification:
+    """Get specification of a job."""
+    collection = db.get_collection("job_records")
+    job = collection.find({"job_id": job_id})
+    return ExecutionSpecification(**json.loads(job[0]["graph_specification"]))
+
+
 @router.get("/{job_id}/restart")
 async def restart_job(job_id: JobId = Depends(validate_job_id), user: User = Depends(current_active_user)) -> api.SubmitJobResponse:
     """Get outputs of a job."""
