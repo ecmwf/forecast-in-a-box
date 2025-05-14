@@ -145,7 +145,7 @@ export default function Environment({setEnvironment}: EnvironmentProps) {
             </Box>
             <Space h="md" />
             <Group grow>
-                <Button onClick={handleSubmit} color='blue'>Submit</Button>
+                <Button onClick={handleSubmit} color='green'>Submit</Button>
             </Group>
         </Container>
     );
