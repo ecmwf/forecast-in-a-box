@@ -58,10 +58,8 @@ def quickplot(fields: ekd.FieldList, groupby: str = None, subplot_title: str = N
         subplot_title = f"{{{groupby}}}"
 
     for i, (group_val, group_args) in enumerate(grouped_data.items()):
-        print(f"Plotting {group_val} ({i+1}/{n_plots})")
         subplot = figure.add_map(domain=domain)
         for f in group_args:
-            print(f, f.metadata().dump())
             subplot.quickplot(f, units=None, interpolate=True)
 
         for m in schema.quickmap_subplot_workflow:
