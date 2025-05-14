@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from 'react';
 
-import { Container, TextInput, NumberInput, Stack, Button, LoadingOverlay, MultiSelect, Group, Text, Collapse, Box, Space, Loader, Divider, Title} from '@mantine/core'
+import { Container, TextInput, NumberInput, Stack, Button, LoadingOverlay, MultiSelect, Group, Text, Collapse, Box, Space, Loader, Divider, Title, Card, SimpleGrid, ScrollArea} from '@mantine/core'
+
+
+import { IconPlus, IconTrash } from '@tabler/icons-react';
 
 
 import { EnvironmentSpecification } from './interface';
@@ -45,11 +48,46 @@ export default function Environment({setEnvironment}: EnvironmentProps) {
             />
             </Group>
              <Box>
-                <Space h="lg" />
+                <Space h="xl" />
                 <Stack>
-                <Title order={4}>Environment Variables</Title>
-                {Object.entries(environment).map(([key, value], index) => (
-                    <Group key={index} align='flex-end'>
+                    <Group justify='space-between' align='flex-end'>
+                        <Title order={4}>Environment Variables</Title>
+                        <Text size="sm" c="dimmed">
+                            Add environment variables for all tasks within the workflow.
+                        </Text>
+                        <Button
+                            leftSection={<IconPlus />}
+                            onClick={() =>
+                                setLocalEnvironment((prev) => ({
+                                    ...prev,
+                                    [`key${Object.keys(prev).length + 1}`]: "",
+                                }))
+                            }
+                        >
+                            Add Variable
+                        </Button>
+                    </Group>
+                    <ScrollArea.Autosize mah="600px" mx="-md" type='always'>
+                    <SimpleGrid cols={3}>
+                    {Object.keys(environment).length === 0 && (
+                        <Text size="sm" c="dimmed">
+                            No environment variables added yet.
+                        </Text>
+                    )}
+                    {Object.entries(environment).map(([key, value], index) => (
+                        <Card shadow='sm' padding='lg' radius='md' withBorder>
+                            <Card.Section style={{ position: 'absolute', top: '30px', right: '30px' }}>
+                                <IconTrash
+                                    style={{ cursor: 'pointer' }}
+                                    onClick={() => {
+                                        setLocalEnvironment((prev) => {
+                                            const updated = { ...prev };
+                                            delete updated[key];
+                                            return updated;
+                                        });
+                                    }}
+                                />
+                            </Card.Section>
                         <TextInput
                             label="Key"
                             placeholder="Enter key"
@@ -76,8 +114,10 @@ export default function Environment({setEnvironment}: EnvironmentProps) {
                                 }));
                             }}
                         />
-                        <Button
+                        {/* <Space h="md" /> */}
+                        {/* <Button
                             color="red"
+                            leftSection={<IconTrash />}
                             onClick={() => {
                                 setLocalEnvironment((prev) => {
                                     const updated = { ...prev };
@@ -87,50 +127,17 @@ export default function Environment({setEnvironment}: EnvironmentProps) {
                             }}
                         >
                             Remove
-                        </Button>
-                    </Group>
+                        </Button> */}
+                        </Card>
                 ))}
-                <Button
-                    onClick={() =>
-                        setLocalEnvironment((prev) => ({
-                            ...prev,
-                            [`key${Object.keys(prev).length + 1}`]: "",
-                        }))
-                    }
-                >
-                    Add Variable
-                </Button>
+                    </SimpleGrid>
+                    </ScrollArea.Autosize>
                 </Stack>
             </Box>
             <Space h="md" />
-            <Group p="right">
+            <Group grow>
                 <Button onClick={handleSubmit} color='green'>Submit</Button>
             </Group>
         </Container>
     );
-    // return (
-    //     <Container size='xl'>
-    //         <LoadingOverlay visible={loading}/>
-    //         <Grid >
-    //             <Grid.Col span={{ base: 12, sm: 12, md: 6, xl: 4 }}>
-    //                 <Title order={2}>Categories</Title>
-    //                 <Categories categories={categories} setSelected={setSelectedProduct} />
-    //             </Grid.Col>
-    //             <Grid.Col span={{ base: 12, sm: 12, md: 6, xl: 4 }}>
-    //                 <Container className='configuration_container'>
-    //                     <Title order={2}>Configuration</Title>
-    //                     <Configuration selectedProduct={selected} selectedModel={model} submitTarget={addProduct} />
-    //                 </Container>
-    //             </Grid.Col>
-    //             <Grid.Col span={{ base: 12, sm: 12, md: 12, xl: 4 }} >
-    //                 <Title order={2}>Selected ({Object.keys(internal_products).length})</Title>
-    //                 <Cart products={internal_products} setProducts={internal_setProducts} />
-    //             </Grid.Col>
-    //         </Grid>
-    //         <Divider p='md'/>
-    //         <SimpleGrid cols={1}>
-    //             <Button onClick={() => setProducts(internal_products)} disabled={!model}>Submit</Button>
-    //         </SimpleGrid>
-    //     </Container>
-    // );
 }
