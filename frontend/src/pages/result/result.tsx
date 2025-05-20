@@ -12,10 +12,11 @@
 
 import { useEffect, useState } from "react";
 import { useApi } from "../../api";
-import { Container, Loader, Text, Title, Alert, Space, Center, Stack, Button, ActionIcon } from "@mantine/core";
+import { Container, Loader, Text, Title, Alert, Space, Center, Stack, Button, ActionIcon, Group } from "@mantine/core";
 import { useParams } from 'react-router-dom'
 
 import MainLayout from "../../layouts/MainLayout";
+import ImageShare from "../../components/image_share";
 
 import { IconDownload } from "@tabler/icons-react";
 
@@ -38,6 +39,7 @@ export default function ResultsPage() {
                     const blob = new Blob([response.data], { type: response.headers['content-type'] });
                     console.log(response.headers['content-type'])
                     setDataLink(URL.createObjectURL(blob));
+                    console.log(dataLink)
                     setContentType(response.headers['content-type']);
                 } catch (err) {
                     setError(err.response?.data?.detail || err.message || "An error occurred while fetching data.");
@@ -51,9 +53,19 @@ export default function ResultsPage() {
 
     return (
         <MainLayout>
-        <Button component="a" href={`/progress/${job_id}`} variant="outline" color="blue" size="md" m='xl'>
-            Back to Results
-        </Button>
+        
+        <Group justify='space-between' w='100%' mb='xl'>
+            <Button component="a" href={`/progress/${job_id}`} variant="outline" color="blue" size="md" m='xl'>
+                Back to Results
+            </Button>
+            {contentType == 'image/png' ? (
+                <ImageShare
+                    imageUrl={`${window.location.origin}/share/${job_id}/${dataset_id}`}
+                    title={`Forecast in a Box - ${dataset_id}`}
+                />
+            ) : null}
+        </Group>
+    
         <Container
             size="xl"
             style={{
@@ -64,6 +76,7 @@ export default function ResultsPage() {
                 minHeight: "40vh",
             }}
         >
+
             <Center w='100%'>
             {loading ? (
                 <Stack align="center">
@@ -76,8 +89,9 @@ export default function ResultsPage() {
                 </Alert>
             ) : (
                 <Stack align="center">
-                    <Space h={20} />
+                    {/* <Space h={20} /> */}
                     {contentType == 'image/png' ? (
+                        <>
                         <img 
                             src={dataLink} 
                             alt="Result Image" 
@@ -88,6 +102,7 @@ export default function ResultsPage() {
                                 boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)" 
                             }} 
                         />
+                        </>
                     ) : (
                         <Stack align="center" style={{ flex: 1 }}>
                         <ActionIcon

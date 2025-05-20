@@ -11,12 +11,6 @@
 FastAPI Entrypoint
 """
 
-# TODO Remove when fckit is auto installed
-import findlibs
-
-findlibs.load("fckit")
-
-
 from contextlib import asynccontextmanager
 import time
 from fastapi import FastAPI, Request

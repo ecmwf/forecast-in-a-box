@@ -19,7 +19,7 @@ import {
 import './NebulaSans/NebulaSans.css';
 
 export const theme = createTheme({
-  colors: {},
+  // colors: {},
   components: {
     Title: Title.extend({
       defaultProps: {

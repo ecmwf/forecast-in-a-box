@@ -93,7 +93,7 @@ class Model(BaseModel):
         """
         return convert_to_model_spec(self.checkpoint, assumptions=assumptions)
 
-    def graph(self, initial_conditions: "Action", **kwargs) -> "Action":
+    def graph(self, initial_conditions: "Action", environment_kwargs: dict = None, **kwargs) -> "Action":
         """Get Model Graph.
 
         Anemoi cascade exposes each param as a separate node in the graph,
@@ -101,7 +101,7 @@ class Model(BaseModel):
         """
 
         versions = self.versions(filter=False)
-        INFERENCE_FILTER_STARTS = ["anemoi-models", "anemoi-graphs", "flash", "torch"]
+        INFERENCE_FILTER_STARTS = ["anemoi-models", "anemoi-graphs", "flash-attn", "torch"]
         INITIAL_CONDITIONS_FILTER_STARTS = ["anemoi-inference", "anemoi-datasets", "earthkit-data", "anemoi-transform"]
 
         inference_env = [
@@ -119,7 +119,7 @@ class Model(BaseModel):
             ensemble_members=self.ensemble_members,
             **(self.entries or {}),
             environment={"inference": inference_env, "initial_conditions": initial_conditions_env},
-            env={"ANEMOI_INFERENCE_NUM_CHUNKS": 4},
+            env=environment_kwargs or {}, #{"ANEMOI_INFERENCE_NUM_CHUNKS": 4},
         )
 
     def deaccumulate(self, outputs: "Action") -> "Action":
@@ -175,10 +175,14 @@ def model_versions(checkpoint_path: str, filter: bool = True) -> dict[str, str]:
     ckpt = open_checkpoint(checkpoint_path)
 
     def parse_versions(key, val):
+        if not filter:     
+            return key, val      
+         
         if key.startswith("_"):
             return None, None
         if "." not in val or "/" in val:
             return None, None
+        
         val = val.split("+")[0]
         return key.replace(".", "-"), ".".join(val.split(".")[:3])
 
@@ -206,7 +210,7 @@ def model_info(checkpoint_path: str) -> dict[str, Any]:
         "area": ckpt.area,
         "local_area": True,
         "grid": ckpt.grid,
-        "versions": model_versions(checkpoint_path),
+        "versions": model_versions(checkpoint_path, filter=True),
     }
 
 

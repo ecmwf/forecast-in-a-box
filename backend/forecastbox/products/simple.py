@@ -94,7 +94,7 @@ class MapProduct(GenericTemporalProduct):
     # TODO, Add projection, and title control
     """
 
-    domains = ["Global", "Europe", "Australia", "Malawi"]
+    domains = ["Global", "Europe", "Australia", "Malawi", "Norway"]
 
     description = {
         **GenericTemporalProduct.description,
@@ -145,7 +145,7 @@ class SimpleMapProduct(MapProduct):
             domain=domain,
             groupby="valid_datetime",
             subplot_title="T+{lead_time}",
-            figure_title="{variable_name} over {domain}\n Base time: {base_time:%H%M %Y%m%d}\n",
+            figure_title="{variable_name} over {domain}\n Base time: {base_time: %Y%m%dT%H%M}\n",
         )
         plots = source.map(quickplot_payload)
 
@@ -182,7 +182,7 @@ class EnsembleMapProduct(BaseEnsembleProduct, MapProduct):
         quickplot_payload = quickplot(
             domain=domain,
             groupby="member",
-            subplot_title="n{member}",
+            subplot_title="Member{member}",
             figure_title="{variable_name} over {domain}\nValid time: {valid_time:%H:%M on %-d %B %Y} (T+{lead_time})\n",
         )
         plots = source.map(quickplot_payload)

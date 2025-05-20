@@ -23,8 +23,11 @@ import LoggedIn from '../layouts/LoggedIn';
 import {ModelSpecification, ProductSpecification, EnvironmentSpecification, SubmitResponse} from '../components/interface'
 
 import { IconWorldCog, IconCircleCheck, IconShoppingCartCode, IconRocket, IconTerminal2, IconLogs, IconMap } from '@tabler/icons-react';
+import { useParams } from "react-router-dom";
 
-const ProductsPage = () => {    
+const ProductsPage = () => {
+    let {id} = useParams();
+
     const [active, setActive] = useState(0);
     const nextStep = () => setActive((current) => (current < 3 ? current + 1 : current));
     const prevStep = () => setActive((current) => (current > 0 ? current - 1 : current));

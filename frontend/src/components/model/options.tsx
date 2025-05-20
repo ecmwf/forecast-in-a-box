@@ -136,7 +136,7 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
                 <Menu.Dropdown>
                     {UserButtons().map((button, index) => (
                     <Menu.Item key={index}>
-                    {button}
+                        {button}
                     </Menu.Item>
                     ))}
                 </Menu.Dropdown>
@@ -183,8 +183,10 @@ function Options({ cardProps, tabProps, setSelected }: OptionsProps) {
         <Card {...cardProps} padding="">
             <Card.Section>
                 <Flex gap='lg'>
-                <Title order={2}>Models</Title>
-                <ActionIcon onClick={fetchModelOptions} style={{ display: 'inline' }}><IconRefresh/></ActionIcon>
+                    <Title order={2}>Models</Title>
+                    <ActionIcon onClick={fetchModelOptions} style={{ display: 'inline' }}>
+                        <IconRefresh/>
+                    </ActionIcon>
                 </Flex>
             </Card.Section>
             {loading ? <p>Loading...</p> : 
@@ -206,16 +208,18 @@ function Options({ cardProps, tabProps, setSelected }: OptionsProps) {
                         </Table.Tr>
                     ) : null}
                     {modelOptions && Object.entries(modelOptions).flatMap(([key, values]) =>
-                        values.map((value: string, index: number) => (
-                            <Table.Tr key={`${key}_${value}`}>
-                                {index === 0 && (
-                                    <Table.Td rowSpan={values.length} style={{ verticalAlign: 'top', fontWeight: 'bold' }}>
-                                        {key}
-                                    </Table.Td>
-                                )}
-                                <ModelButton setSelected={setSelected} model={`${key}_${value}`} />
-                            </Table.Tr>
-                        ))
+                        Array.isArray(values)
+                            ? values.map((value: string, index: number) => (
+                                <Table.Tr key={`${key}_${value}`}>
+                                    {index === 0 && (
+                                        <Table.Td rowSpan={values.length} style={{ verticalAlign: 'top', fontWeight: 'bold' }}>
+                                            {key}
+                                        </Table.Td>
+                                    )}
+                                    <ModelButton setSelected={setSelected} model={`${key}_${value}`} />
+                                </Table.Tr>
+                            ))
+                            : null
                     )}
                 </Table.Tbody>
             </Table>

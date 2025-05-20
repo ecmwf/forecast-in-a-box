@@ -15,12 +15,15 @@ import { useState } from 'react'
 
 import { useApi } from '../api'
 import { showNotification } from '@mantine/notifications'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate} from 'react-router-dom'
 
 import MainLayout from '../layouts/MainLayout';
 
 
 export default function Login() {
+  const params = new URLSearchParams(location.search)
+  const redirectUrl = params.get('q') || '/'
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -36,8 +39,8 @@ export default function Login() {
 
       const response = await api.post('/v1/auth/jwt/login', formData)
 
-      localStorage.setItem('token', response.data.access_token)
-      navigate('/')
+      localStorage.setItem('fiabtoken', response.data.access_token)
+      navigate(redirectUrl)
     } catch (err) {
         showNotification({
             id: `login-error-form-${crypto.randomUUID()}`,

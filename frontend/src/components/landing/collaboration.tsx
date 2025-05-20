@@ -9,28 +9,24 @@
 // nor does it submit to any jurisdiction.
 
 'use client';
-import React, { useState, useEffect, useRef } from "react";
 
-import { Container, Title, Center, Space, Button, Group, Divider, Image } from "@mantine/core";
+import { Container, Title, Center, Space, Group, Divider, Image } from "@mantine/core";
 
-import { IconCube, IconStack2Filled, IconBlocks, IconMapPin, IconTable, IconPolygon, IconBraces, IconWorld } from "@tabler/icons-react";
-
-const Packages = () => {
-
+const Collaboration = () => {
 
   return (
-    <Container fluid bg="#3F3F6B">
+    <Container fluid bg="#e0e0eb">
       <Divider color="#fff" />
       <Container size="lg">
         <Space h="xl" />
         <Space h="xl" />
         <Center>
-            <Title style={{color: "white"}} size={40}>Building on top of</Title>
+            <Title style={{color: "#424270"}} size={40}>A Collaboration between</Title>
         </Center>
         <Space h="xl" />
         <Group gap={0} justify="space-evenly">
-          <Image src="logos/packages/earthkit-dark.svg" w={240} style={{ paddingTop: "5px" }} />
-          <Image src="logos/packages/anemoi.webp" w={240} style={{ paddingTop: "12px" }} />
+          <Image src="logos/org/ECMWF.png" w={240} style={{ paddingTop: "5px" }} />
+          <Image src="logos/org/MetNorway.png" w={240} style={{ paddingTop: "12px" }} />
         </Group>
         <Space h="xl" />
         <Space h="xl" />
@@ -39,4 +35,4 @@ const Packages = () => {
   )
 };
 
-export default Packages;
+export default Collaboration;

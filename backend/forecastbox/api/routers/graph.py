@@ -61,7 +61,7 @@ async def convert_to_cascade(spec: ExecutionSpecification) -> Cascade:
         ensemble_members=spec.model.ensemble_members,
     )
     model = Model(checkpoint_path=get_model_path(spec.model.model), **model_spec)
-    model_action = model.graph(None, **spec.model.entries)
+    model_action = model.graph(None, **spec.model.entries, environment_kwargs=spec.environment.environment_variables)
 
     complete_graph = Graph([])
 

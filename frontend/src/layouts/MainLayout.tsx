@@ -10,10 +10,8 @@
 
 
 
-import { AppShell, Burger, Button, Container, Group, rem, Space, Stack, Title, UnstyledButton } from "@mantine/core";
+import { AppShell, Burger, Button, Container, Group, Stack, Title, UnstyledButton } from "@mantine/core";
 import { useDisclosure, useHeadroom } from '@mantine/hooks';
-
-import { IconBox } from '@tabler/icons-react';
 
 import { useApi } from '../api';
 import { useNavigate } from 'react-router-dom';
@@ -33,7 +31,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     const handleLogout = () => {
       api.post('/v1/auth/jwt/logout')
       .then(() => {
-        localStorage.removeItem('token');
+        localStorage.removeItem('fiabtoken');
       })
       showNotification({
         id: `logout-success-${crypto.randomUUID()}`,
@@ -51,7 +49,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     const [isSuperuser, setIsSuperuser] = useState(false);
   
     const checkLogin = () => {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('fiabtoken');
         if (!token) {
             setLoggedIn(false);
         } else {    

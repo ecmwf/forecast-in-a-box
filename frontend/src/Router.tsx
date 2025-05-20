@@ -16,7 +16,10 @@ import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Register from './pages/SignUp';
 import Status from './pages/Status';
-import Products from './pages/Products';
+
+import ProductList from './pages/products/products';
+import ProductConfiguration from './pages/Products';
+
 
 
 import JobProgress from './pages/jobs/progress';
@@ -46,7 +49,11 @@ const router = createBrowserRouter([
   },
   {
     path: '/products',
-    element: <Products />,
+    element: <ProductList />,
+  },
+  {
+    path: '/products/:product_id',
+    element: <ProductConfiguration />,
   },
   {
     path: '/job/:id',

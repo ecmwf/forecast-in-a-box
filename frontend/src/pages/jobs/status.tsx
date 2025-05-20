@@ -11,9 +11,9 @@
 "use client";
 
 import { useRef } from 'react';
-import { Container, Group } from '@mantine/core';
+import { Container, Group, Paper, SimpleGrid } from '@mantine/core';
 import { useEffect, useState } from 'react';
-import { Table, Loader, Center, Title, Progress, Button, Flex, Divider, Tooltip, FileButton, Menu, Burger, Modal} from '@mantine/core';
+import { Table, Loader, Center, Title, Progress, Button, Flex, Divider, Tooltip, FileButton, Menu, Burger, Modal, Text } from '@mantine/core';
 
 import { IconDownload, IconRefresh, IconTrash } from '@tabler/icons-react';
 import classes from './status.module.css';
@@ -21,10 +21,11 @@ import { showNotification } from '@mantine/notifications';
 
 import {useApi} from '../../api';
 import MainLayout from '../../layouts/MainLayout';
+import LoggedIn from '../../layouts/LoggedIn';
 
 import { ExecutionSpecification } from '../../components/interface';
 
-import Cart from './../../components/products/cart';
+import SummaryModal from '../../components/summary';
 
 export type ProgressResponse = {
   progress: string;
@@ -37,7 +38,7 @@ export type StatusResponse = {
 };
 
 
-const HomePage = () => {
+const JobStatusPage = () => {
 
   const [jobs, setJobs] = useState<StatusResponse>({} as StatusResponse);
   const [loading, setLoading] = useState(true);
@@ -164,6 +165,8 @@ const HomePage = () => {
     } finally {
       setLoading(false);
       setWorking(false);
+      getStatus();
+
     }
     getStatus();
   };
@@ -197,8 +200,8 @@ const HomePage = () => {
     finally {
       setLoading(false);
       setWorking(false);
+      getStatus();
     }
-    getStatus();
   };
 
   const handleFileUpload = (file) => {
@@ -240,6 +243,7 @@ const HomePage = () => {
     }
     setUploading(false);
     setWorking(false);
+    getStatus();
   };
 
   const [showMoreInfo, setShowMoreInfo] = useState(false);
@@ -320,31 +324,9 @@ const HomePage = () => {
   };
 
   return (
-    <MainLayout>
+    <LoggedIn>
     <Container size="lg" pt="xl" pb="xl">
-    <Modal
-        opened={showMoreInfo}
-        onClose={() => setShowMoreInfo(false)}
-        title="Job Outputs"
-        size="lg"
-      >
-        {moreInfoSpec.products && moreInfoSpec.products.length > 0 && (
-          <>
-            <Cart 
-              products={Object.fromEntries(moreInfoSpec.products.map((product, index) => [index.toString(), product]))} 
-              setProducts={(updatedProducts) => {
-                moreInfoSpec.products = Object.values(updatedProducts);
-              }}
-              disable_delete={true}
-            />
-            {/* <Title order={3}>Model</Title>
-            <pre>{JSON.stringify(moreInfoSpec.model, null, 2)}</pre>
-            <Title order={3}>Environment</Title>
-            <pre>{JSON.stringify(moreInfoSpec.environment, null, 2)}</pre> */}
-          </>
-        )}
-
-      </Modal>
+    <SummaryModal moreInfoSpec={moreInfoSpec} showMoreInfo={showMoreInfo} setShowMoreInfo={setShowMoreInfo} />
 
       <Flex gap='xl' justify={'space-between'} align='center'>
         <Title>Status</Title>
@@ -448,8 +430,8 @@ const HomePage = () => {
         </Table>
       )}
     </Container>
-    </MainLayout>
+    </LoggedIn>
   );
 };
 
-export default HomePage;
+export default JobStatusPage;

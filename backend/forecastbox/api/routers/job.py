@@ -52,7 +52,7 @@ class JobProgressResponses:
 
 def validate_job_id(job_id: JobId) -> bool:
     collection = db.get_collection("job_records")
-    if collection.find({"job_id": job_id}):
+    if collection.find_one({"job_id": job_id}):
         return job_id
     raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
 

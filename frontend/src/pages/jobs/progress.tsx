@@ -23,9 +23,10 @@ import GraphVisualiser from '../../components/graph_visualiser';
 import {useApi} from '../../api';
 
 import MainLayout from '../../layouts/MainLayout';
+import LoggedIn from '../../layouts/LoggedIn';
 
 import { ExecutionSpecification } from '../../components/interface';
-import Cart from './../../components/products/cart';
+import SummaryModal from '../../components/summary';
 
 
 function OutputCells({ id, dataset, progress }: { id: string; dataset: string, progress: string | null }) {
@@ -173,31 +174,9 @@ const ProgressPage = () => {
     }, [id]);
 
     return (
-        <MainLayout>
+        <LoggedIn>
         <Container size='lg' pt='xl'>
-        <Modal
-            opened={showMoreInfo}
-            onClose={() => setShowMoreInfo(false)}
-            title="Job Outputs"
-            size="lg"
-            >
-            {moreInfoSpec.products && moreInfoSpec.products.length > 0 && (
-                <>
-                <Cart 
-                    products={Object.fromEntries(moreInfoSpec.products.map((product, index) => [index.toString(), product]))} 
-                    setProducts={(updatedProducts) => {
-                    moreInfoSpec.products = Object.values(updatedProducts);
-                    }}
-                    disable_delete={true}
-                />
-                {/* <Title order={3}>Model</Title>
-                <pre>{JSON.stringify(moreInfoSpec.model, null, 2)}</pre>
-                <Title order={3}>Environment</Title>
-                <pre>{JSON.stringify(moreInfoSpec.environment, null, 2)}</pre> */}
-                </>
-            )}
-
-            </Modal>
+        <SummaryModal moreInfoSpec={moreInfoSpec} showMoreInfo={showMoreInfo} setShowMoreInfo={setShowMoreInfo}/>
             <Space h="xl"/>
             
             <Title display={'inline'} order={1}>Progress</Title>
@@ -214,7 +193,10 @@ const ProgressPage = () => {
             ) : (
                 <>
                 <Progress value={Math.max(1, parseFloat(progress.progress) || 0)} striped animated/> 
-                <Group><Loader size="xs" /><Text>{progress.progress}%</Text></Group>
+                <Group>
+                    {/* <Loader size="xs" /> */}
+                    <Text>{progress.progress}%</Text>
+                </Group>
                 <Divider my='lg' />
                 </>
             )}
@@ -248,7 +230,7 @@ const ProgressPage = () => {
             </Table.Tbody>
             </Table>
         </Container>
-        </MainLayout>
+        </LoggedIn>
     );
 };
 

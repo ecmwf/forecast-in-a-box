@@ -49,7 +49,7 @@ function ProductConfigurator({model, products, setProducts}: ProductConfiguratio
         const fetchUpdatedOptions = async () => {
         setLoading(true);
         try {
-            const response = await api.post(`/v1/product/valid-categories/`, model);    
+            const response = await api.post(`/v1/product/valid-categories`, model);    
             const categories: CategoriesType = await response.data;
             setCategories(categories);
             

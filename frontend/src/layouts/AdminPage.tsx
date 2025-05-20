@@ -8,9 +8,9 @@
 // granted to it by virtue of its status as an intergovernmental organisation
 // nor does it submit to any jurisdiction.
 
-import { AppShell, Container, Burger,  Badge, NavLink, Image, Group, Affix, Skeleton, Grid, rem, Card, Title, Divider, Space} from '@mantine/core'
+import { NavLink, Image, Group, Affix, Skeleton, Grid, rem, Card, Title, Divider, Space} from '@mantine/core'
 
-import { IconSettings, IconGalaxy } from '@tabler/icons-react';
+import { IconSettings, IconGalaxy, IconManualGearbox } from '@tabler/icons-react';
 
 import MainLayout from './MainLayout';
 import { useEffect } from 'react';
@@ -24,6 +24,7 @@ import classes from './Navbar.module.css';
 const data = [
   { link: '/admin/settings', label: 'Settings', icon: IconSettings },
   { link: '/admin/gateway', label: 'Gateway', icon: IconGalaxy },
+  { link: '/admin/checkpoints', label: 'Checkpoint', icon: IconManualGearbox },
 ];
 
 export function NavbarSimple() {
@@ -71,15 +72,15 @@ export function NavbarSimple() {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
 
-    const token = localStorage.getItem('token')
+    const fiabtoken = localStorage.getItem('fiabtoken')
     const navigate = useNavigate();
     const api = useApi();
 
     useEffect(() => {
-        if (!token) {
+        if (!fiabtoken) {
             navigate('/login');
         }
-    }, [token, navigate]);
+    }, [fiabtoken, navigate]);
 
     useEffect(() => {
         api.get('/v1/users/me')
