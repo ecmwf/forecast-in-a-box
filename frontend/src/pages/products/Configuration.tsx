@@ -13,14 +13,14 @@
 import React, { useState } from "react";
 import { SimpleGrid, Stepper, Divider, Button, Alert, Container} from "@mantine/core";
 
-import ProductConfigurator from '../components/products/products'
-import Model from "../components/model/model";
-import Environment from "../components/environment";
+import ProductConfigurator from '../../components/products/products'
+import Model from "../../components/model/model";
+import Environment from "../../components/environment";
 
-import Confirm from '../components/confirm';
-import LoggedIn from '../layouts/LoggedIn';
+import Confirm from '../../components/confirm';
+import LoggedIn from '../../layouts/LoggedIn';
 
-import {ModelSpecification, ProductSpecification, EnvironmentSpecification, SubmitResponse} from '../components/interface'
+import {ModelSpecification, ProductSpecification, EnvironmentSpecification, SubmitResponse} from '../../components/interface'
 
 import { IconWorldCog, IconCircleCheck, IconShoppingCartCode, IconRocket, IconTerminal2, IconLogs, IconMap } from '@tabler/icons-react';
 import { useParams } from "react-router-dom";

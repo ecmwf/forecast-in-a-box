@@ -24,7 +24,7 @@ import classes from './Navbar.module.css';
 const data = [
   { link: '/admin/settings', label: 'Settings', icon: IconSettings },
   { link: '/admin/gateway', label: 'Gateway', icon: IconGalaxy },
-  { link: '/admin/checkpoints', label: 'Checkpoint', icon: IconManualGearbox },
+  { link: '/admin/checkpoints', label: 'Checkpoints', icon: IconManualGearbox },
 ];
 
 export function NavbarSimple() {

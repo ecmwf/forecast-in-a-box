@@ -22,8 +22,6 @@ import {
 
 import {IconX, IconSettings} from '@tabler/icons-react'
 
-import classes from './configuration.module.css';
-
 import {ProductSpecification, ProductConfiguration, ConfigEntry, ModelSpecification} from '../interface'
 
 interface ConfigurationProps {

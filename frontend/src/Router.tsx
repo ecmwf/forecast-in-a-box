@@ -18,7 +18,7 @@ import Register from './pages/SignUp';
 import Status from './pages/Status';
 
 import ProductList from './pages/products/products';
-import ProductConfiguration from './pages/Products';
+import ProductConfiguration from './pages/products/Configuration';
 
 
 
