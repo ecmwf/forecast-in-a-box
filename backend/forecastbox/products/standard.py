@@ -7,7 +7,10 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from ..registry import CategoryRegistry
-from ..interfaces import Interfaces
+from forecastbox.products.registry import CategoryRegistry
 
-extreme_registry = CategoryRegistry("extreme", interface=Interfaces.DETAILED, description="Extreme Value Indices", title="Extreme Indices")
+from .interfaces import Interfaces
+
+standard_product_registry = CategoryRegistry(
+    "Standard", interface=[Interfaces.STANDARD, Interfaces.DETAILED], description="Standard products", title="Standard Products"
+)

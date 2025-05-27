@@ -16,11 +16,14 @@ from earthkit.workflows.decorators import as_payload
 from forecastbox.products.product import GenericTemporalProduct
 
 from forecastbox.models import Model
+from .interfaces import Interfaces
 
 import earthkit.data as ekd
 from earthkit.workflows.plugins.anemoi.fluent import ENSEMBLE_DIMENSION_NAME
 
-simple_registry = CategoryRegistry("Simple", "Simple products", "Simple")
+standard_product_registry = CategoryRegistry(
+    "Standard", interface=[Interfaces.STANDARD, Interfaces.DETAILED], description="Standard products", title="Standard Products"
+)
 
 
 EARTHKIT_PLOTS_IMPORTED = True
@@ -117,7 +120,7 @@ class MapProduct(GenericTemporalProduct):
         return super().validate_intersection(model) and EARTHKIT_PLOTS_IMPORTED
 
 
-@simple_registry("Maps")
+@standard_product_registry("Maps")
 class SimpleMapProduct(MapProduct):
     multiselect = {
         "param": True,
@@ -195,7 +198,7 @@ class EnsembleMapProduct(BaseEnsembleProduct, MapProduct):
 OUTPUT_TYPES = ["grib", "xarray"]
 
 
-@simple_registry("Output")
+@standard_product_registry("Output")
 class GribProduct(GenericTemporalProduct):
     multiselect = {
         "param": True,
@@ -211,7 +214,7 @@ class GribProduct(GenericTemporalProduct):
         return source.map(self.named_payload("grib"))
 
 
-@simple_registry("Deaccumulated")
+@standard_product_registry("Deaccumulated")
 class DeaccumulatedProduct(GenericTemporalProduct):
     """
     Deaccumulated Product.

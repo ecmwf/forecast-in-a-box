@@ -7,7 +7,7 @@
 // granted to it by virtue of its status as an intergovernmental organisation
 // nor does it submit to any jurisdiction.
 
-import { IconChartScatter, IconListDetails, IconPointer } from '@tabler/icons-react';
+import { IconChartScatter, IconListDetails, IconPointer, IconCrystalBall } from '@tabler/icons-react';
 import {
   Badge,
   Button,
@@ -52,6 +52,14 @@ const interfaces = [
     id: 'interactive',
     status: 'coming-soon',
   },
+  {
+    title: 'All',
+    description:
+      'All products.',
+    icon: IconCrystalBall,
+    id: 'all',
+    status: 'alpha',
+  },
 ];
 
 export default function ProductsCards() {
@@ -85,7 +93,7 @@ export default function ProductsCards() {
 
   return (
     <MainLayout>
-    <Container size="lg" py="xl">
+    <Container size="xl" py="xl">
       <Title order={2} className={classes.title} ta="center" mt="sm">
         Product Options
       </Title>
@@ -96,7 +104,7 @@ export default function ProductsCards() {
         </Text>
       </Center>
 
-      <SimpleGrid cols={{ base: 1, md: 3 }} spacing="xl" mt={50}>
+      <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="xl" mt={50}>
         {features}
       </SimpleGrid>
     </Container>

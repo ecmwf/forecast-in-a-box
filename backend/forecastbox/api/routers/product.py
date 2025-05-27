@@ -18,6 +18,8 @@ from forecastbox.products.product import Product, USER_DEFINED
 from forecastbox.products.registry import get_categories, get_product, Category
 from forecastbox.models import Model
 
+from forecastbox.products.interfaces import Interfaces
+
 from .model import get_model_path
 
 from ..types import ConfigEntry, ProductConfiguration, ModelSpecification
@@ -99,17 +101,17 @@ async def product_to_config(product: Product, modelspec: ModelSpecification, par
     return entries
 
 
-@router.get("/categories")
-async def api_get_categories() -> dict[str, Category]:
+@router.get("/categories/{interface}")
+async def api_get_categories(interface: Interfaces) -> dict[str, Category]:
     """Get all categories."""
-    return get_categories()
+    return get_categories(interface)
 
 
-@router.post("/valid-categories")
-async def get_valid_categories(modelspec: ModelSpecification) -> dict[str, Category]:
+@router.post("/categories/{interface}")
+async def get_valid_categories(interface: Interfaces, modelspec: ModelSpecification) -> dict[str, Category]:
     model_spec = get_model(modelspec)
 
-    categories = get_categories()
+    categories = get_categories(interface)
     for key, category in categories.items():
         options = []
         for product in category.options:

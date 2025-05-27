@@ -26,7 +26,7 @@ import { IconWorldCog, IconCircleCheck, IconShoppingCartCode, IconRocket, IconTe
 import { useParams } from "react-router-dom";
 
 const ProductsPage = () => {
-    let {id} = useParams();
+    let {product_id} = useParams();
 
     const [active, setActive] = useState(0);
     const nextStep = () => setActive((current) => (current < 3 ? current + 1 : current));
