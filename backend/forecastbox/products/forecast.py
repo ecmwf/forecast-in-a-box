@@ -14,7 +14,7 @@ from .interfaces import Interfaces
 from .product import GenericParamProduct
 
 forecast_registry = CategoryRegistry(
-    "fc_stat", interface=Interfaces.DETAILED, description="Statistics over time for each member", title="Forecast Statistics"
+    "forecast_statistic", interface=Interfaces.DETAILED, description="Statistics over time for each member", title="Forecast Statistics"
 )
 
 if TYPE_CHECKING:

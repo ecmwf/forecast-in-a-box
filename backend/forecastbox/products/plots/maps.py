@@ -9,22 +9,17 @@
 
 import warnings
 
-from forecastbox.products.registry import CategoryRegistry
-from forecastbox.products.ensemble import ensemble_registry, BaseEnsembleProduct
+from forecastbox.products.ensemble import BaseEnsembleProduct
 
 from earthkit.workflows.decorators import as_payload
 from forecastbox.products.product import GenericTemporalProduct
 
 from forecastbox.models import Model
-from .interfaces import Interfaces
 
 import earthkit.data as ekd
 from earthkit.workflows.plugins.anemoi.fluent import ENSEMBLE_DIMENSION_NAME
 
-standard_product_registry = CategoryRegistry(
-    "Standard", interface=[Interfaces.STANDARD, Interfaces.DETAILED], description="Standard products", title="Standard Products"
-)
-
+from . import plot_product_registry
 
 EARTHKIT_PLOTS_IMPORTED = True
 try:
@@ -81,7 +76,7 @@ def quickplot(fields: ekd.FieldList, groupby: str = None, subplot_title: str = N
         except Exception as err:
             warnings.warn(f"Failed to execute {m} on given data with: \n" f"{err}\n\n" "consider constructing the plot manually.")
 
-    figure.title(figure_title)
+    # figure.title(figure_title)
 
     return figure
 
@@ -120,7 +115,7 @@ class MapProduct(GenericTemporalProduct):
         return super().validate_intersection(model) and EARTHKIT_PLOTS_IMPORTED
 
 
-@standard_product_registry("Maps")
+@plot_product_registry("Maps")
 class SimpleMapProduct(MapProduct):
     multiselect = {
         "param": True,
@@ -153,7 +148,7 @@ class SimpleMapProduct(MapProduct):
         return plots
 
 
-@ensemble_registry("Maps")
+@plot_product_registry("Ensemble Maps")
 class EnsembleMapProduct(BaseEnsembleProduct, MapProduct):
     """
     Ensemble Map Product.
@@ -188,58 +183,3 @@ class EnsembleMapProduct(BaseEnsembleProduct, MapProduct):
         )
         plots = source.map(quickplot_payload)
         return plots
-
-
-# @simple_registry('Gif')
-# class GifProduct(GenericParamProduct):
-#     pass
-
-
-OUTPUT_TYPES = ["grib", "xarray"]
-
-
-@standard_product_registry("Output")
-class GribProduct(GenericTemporalProduct):
-    multiselect = {
-        "param": True,
-        "step": True,
-    }
-
-    @property
-    def qube(self):
-        return self.make_generic_qube(format=OUTPUT_TYPES)
-
-    def to_graph(self, product_spec, model, source):
-        source = self.select_on_specification(product_spec, source).concatenate("param").concatenate("step")
-        return source.map(self.named_payload("grib"))
-
-
-@standard_product_registry("Deaccumulated")
-class DeaccumulatedProduct(GenericTemporalProduct):
-    """
-    Deaccumulated Product.
-    """
-
-    multiselect = {
-        "param": True,
-        "step": True,
-    }
-
-    @property
-    def qube(self):
-        return self.make_generic_qube()
-
-    def model_intersection(self, model: Model):
-        """
-        Model intersection with the product qube.
-
-        Only the accumulation variables are used to create the intersection.
-        """
-        self_qube = self.make_generic_qube(param=model.accumulations)
-
-        intersection = model.qube(self.model_assumptions) & self_qube
-        result = f"step={'/'.join(map(str, model.timesteps))}" / intersection
-        return result
-
-    def to_graph(self, product_spec, model, source):
-        return self.select_on_specification(product_spec, model.deaccumulate(source)).map(self.named_payload("deaccumulated"))
