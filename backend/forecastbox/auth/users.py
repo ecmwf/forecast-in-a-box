@@ -19,7 +19,7 @@ from fastapi_users.authentication import (
 )
 from fastapi_users_db_beanie import BeanieUserDatabase, ObjectIDIDMixin
 
-from forecastbox.db import User, get_user_db
+from forecastbox.db import User, get_user_db, async_db
 from forecastbox.settings import FIAB_SETTINGS
 
 SECRET = FIAB_SETTINGS.jwt_secret
@@ -30,6 +30,9 @@ class UserManager(ObjectIDIDMixin, BaseUserManager[User, PydanticObjectId]):
     verification_token_secret = SECRET
 
     async def on_after_register(self, user: User, request: Optional[Request] = None):
+        user_count = await async_db["User"].count_documents({})
+        if user_count == 1:
+            await self.user_db.update(user, {"is_superuser": True})
         print(f"User {user.id} has registered.")
 
     async def on_after_forgot_password(self, user: User, token: str, request: Optional[Request] = None):
