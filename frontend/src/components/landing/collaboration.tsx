@@ -23,10 +23,11 @@ const Collaboration = () => {
         <Center>
             <Title style={{color: "#424270"}} size={40}>A Collaboration between</Title>
         </Center>
-        <Space h="xl" />
+        <Space h="md" />
         <Group gap={0} justify="space-evenly">
           <Image src="logos/org/ECMWF.png" w={240} style={{ paddingTop: "5px" }} />
           <Image src="logos/org/MetNorway.png" w={240} style={{ paddingTop: "12px" }} />
+          <Image src="logos/org/destine.png" w={240} style={{ paddingTop: "12px" }} />
         </Group>
         <Space h="xl" />
         <Space h="xl" />
