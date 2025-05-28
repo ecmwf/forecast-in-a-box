@@ -62,3 +62,54 @@ async def post_settings(settings: ExposedSettings, admin=Depends(get_admin_user)
         return HTMLResponse(content=str(e), status_code=500)
 
     return HTMLResponse(content="Settings updated successfully", status_code=200)
+
+
+@router.get("/users", response_model=list[User])
+async def get_users(admin=Depends(get_admin_user)) -> list[User]:
+    """Get all users"""
+    users = await User.find_all().to_list()
+    return users
+
+
+@router.get("/users/{user_id}", response_model=User)
+async def get_user(user_id: str, admin=Depends(get_admin_user)) -> User:
+    """Get a specific user by ID"""
+    user = await User.get(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
+@router.delete("/users/{user_id}", response_class=HTMLResponse)
+async def delete_user(user_id: str, admin=Depends(get_admin_user)) -> HTMLResponse:
+    """Delete a user by ID"""
+    user = await User.get(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    await user.delete()
+    return HTMLResponse(content="User deleted successfully", status_code=200)
+
+
+@router.put("/users/{user_id}", response_model=User)
+async def update_user(user_id: str, user_data: User, admin=Depends(get_admin_user)) -> User:
+    """Update a user by ID"""
+    user = await User.get(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    await user.update(user_data)
+    await user.save()
+    return user
+
+
+@router.patch("/users/{user_id}", response_class=HTMLResponse)
+async def patch_user(user_id: str, update_dict: dict, admin: User = Depends(get_admin_user)) -> HTMLResponse:
+    """Patch a user by ID"""
+    user = await User.get(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Use Beanie's set method for partial updates
+    await user.set(update_dict)
+    return HTMLResponse(content="User updated successfully", status_code=200)

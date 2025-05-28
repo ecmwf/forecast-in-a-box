@@ -29,6 +29,7 @@ import Result from './pages/result/result';
 import AdminLayout from './layouts/AdminPage';
 import AdminSettings from './pages/admin/settings';
 import Gateway from './pages/admin/gateway';
+import Users from './pages/admin/users';
 
 const router = createBrowserRouter([
   {
@@ -83,6 +84,10 @@ const router = createBrowserRouter([
         path: 'gateway',
         element: <Gateway />,
       },
+      {
+        path: 'users',
+        element: <Users />,
+      }
     ],
   },
   {

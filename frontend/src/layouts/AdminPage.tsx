@@ -10,7 +10,7 @@
 
 import { NavLink, Image, Group, Affix, Skeleton, Grid, rem, Card, Title, Divider, Space} from '@mantine/core'
 
-import { IconSettings, IconGalaxy, IconManualGearbox } from '@tabler/icons-react';
+import { IconSettings, IconGalaxy, IconManualGearbox, IconCookieManFilled} from '@tabler/icons-react';
 
 import MainLayout from './MainLayout';
 import { useEffect } from 'react';
@@ -22,8 +22,9 @@ import { showNotification } from '@mantine/notifications';
 import classes from './Navbar.module.css';
 
 const data = [
+  { link: '/admin/users', label: 'Users', icon: IconCookieManFilled },
   { link: '/admin/settings', label: 'Settings', icon: IconSettings },
-  { link: '/admin/gateway', label: 'Gateway', icon: IconGalaxy },
+  { link: '/admin/gateway', label: 'Cascade', icon: IconGalaxy },
   { link: '/admin/checkpoints', label: 'Checkpoints', icon: IconManualGearbox },
 ];
 
