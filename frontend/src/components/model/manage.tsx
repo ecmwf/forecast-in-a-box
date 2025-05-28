@@ -10,13 +10,14 @@
 
 "use client"; // Required for client-side fetching
 
-import { Card, Button, Tabs, ScrollArea, Group, Title, Text, ActionIcon, Flex, Table, Loader, Progress, Menu, Burger} from '@mantine/core';
+import { Card, Button, Tabs, ScrollArea, Group, Title, Text, ActionIcon, Flex, Table, Loader, Progress, Menu, Burger, Modal, Textarea} from '@mantine/core';
 import { useEffect, useRef, useState } from "react";
 
 import classes from './options.module.css';
 
-import {IconX, IconCheck, IconRefresh, IconTableDown, IconTrash} from '@tabler/icons-react';
+import {IconX, IconCheck, IconRefresh, IconTableDown, IconTrash, IconPencil} from '@tabler/icons-react';
 import {useApi} from '../../api';
+import { showNotification } from '@mantine/notifications';
 
 interface DownloadResponse {
     download_id: string;
@@ -25,9 +26,139 @@ interface DownloadResponse {
     progress: number;
 }
 
+function EditModel({ model }: { model: string }) {
+    const [modalOpened, setModalOpened] = useState(false);
+    const [modelData, setModelData] = useState<any>(null);
+
+    const [editable, setEditable] = useState(false);
+
+    const api = useApi();
+    const fetchModelData = async () => {
+        try {
+            const result = await api.get(`/v1/model/${model}/metadata`);
+            const data = await result.data;
+            setModelData(data);
+            console.log('Model data fetched:', data);
+        } catch (error) {
+            console.error('Error fetching model data:', error);
+        }
+    }
+
+    const fetchEditableStatus = async () => {
+        try {
+            const result = await api.get(`/v1/model/${model}/editable`);
+            const data = await result.data;
+            setEditable(data);
+            console.log('Editable status fetched:', model, data);
+        } catch (error) {
+            console.error('Error fetching editable status:', error);
+        }
+    };
+
+
+    const waitForComplete = async () => {
+        setEditable(false);
+        // Poll for status
+        const interval = setInterval(async () => {
+            await fetchEditableStatus();
+            console.log('Editable status:', editable);
+            if (editable) {
+                clearInterval(interval);
+            }
+        }, 2000);
+    };
+
+    const handleEdit = async (modelData) => {
+        showNotification({
+            color: 'blue',
+            message: 'Saving model data...'
+        });
+        try {
+            await api.patch(`/v1/model/${model}/metadata`, modelData)
+            waitForComplete()
+        } catch (error) {
+            showNotification({
+                color: 'red',
+                message: 'Error saving model data',                
+            });
+        } finally {
+            setModalOpened(false);
+        }
+    }
+
+    useEffect(() => {
+        fetchEditableStatus();
+        // Fetch model data when the modal opens
+        if (modalOpened) {
+            fetchModelData();
+        }
+    }, [modalOpened, model]);
+
+    return (
+        <>
+            <Button onClick={() => {fetchModelData(); setModalOpened(true)}} leftSection={<IconPencil />} color='orange' disabled={!editable}>
+                Edit
+            </Button>
+            <Modal
+                opened={modalOpened}
+                onClose={() => setModalOpened(false)}
+                title={`Edit Model: ${model}`}
+                size="lg"
+            >
+                    <Flex direction="column" gap="md">
+                        {modelData ? (
+                            Object.entries(modelData).map(([key, value]) => (
+                                <Group key={key} justify="apart">
+                                    <Textarea
+                                        w="100%"
+                                        label={key}
+                                        autosize
+                                        minRows={2}
+                                        value={
+                                            typeof value === 'object' && value !== null
+                                                ? JSON.stringify(value, null, 2)
+                                                : String(value || '')
+                                        }
+                                        onChange={e => {
+                                            let newValue = e.target.value;
+                                            if (typeof value === 'object' && value !== null) {
+                                                try {
+                                                    newValue = JSON.parse(e.target.value);
+                                                } catch {
+                                                    // keep as string if not valid JSON
+                                                }
+                                            }
+                                            setModelData((prev: any) => ({
+                                                ...prev,
+                                                [key]: newValue
+                                            }));
+                                        }}
+                                        styles={{
+                                            input: {
+                                                fontFamily: typeof value === 'object' && value !== null ? 'monospace' : undefined
+                                            }
+                                        }}
+                                    />
+                                </Group>
+                            ))
+                        ) : (
+                            <Loader />
+                        )}
+                    </Flex>
+                    <Button mt="md" 
+                        fullWidth
+                        onClick={() => {
+                            handleEdit(modelData)
+                    }}>
+                        Save Changes
+                    </Button>
+            </Modal>
+        </>
+    );
+}
+
 function ModelButton({ model, setSelected }: { model: string; setSelected: (value: string) => void }) {
     const [downloadStatus, setDownloadStatus] = useState<DownloadResponse>({} as DownloadResponse);
-    const [installing, setInstalling] = useState<boolean>(false);
     const api = useApi();
 
     const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -77,12 +208,6 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
         }
     };
 
-    const handleInstall = async () => {
-        setInstalling(true);
-        const result = await api.post(`/v1/model/${model}/install`);
-        setInstalling(false);
-    };
-
     useEffect(() => {
         getDownloadStatus();
     }, [model]);
@@ -98,12 +223,10 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
             >
                 {downloadStatus.status === 'errored' ? 'Retry' : 'Download'}
             </Button>,
-            // <Button disabled={downloadStatus.status !== 'completed'} onClick={() => handleInstall()} leftSection={<IconTableDown />} variant="outline" color='blue'>
-            //     {installing ? <Loader size={16} /> : 'Install'}
-            // </Button>,
             <Button disabled={downloadStatus.status !== 'completed'} onClick={() => handleDelete()} leftSection={<IconTrash />}  color='red'>
                 Delete
-            </Button>
+            </Button>,
+            <EditModel model={model} />,
             ];
     };
 
@@ -167,7 +290,7 @@ function Options({ cardProps, tabProps, setSelected }: OptionsProps) {
     const fetchModelOptions = async () => {
         setLoading(true);
         try {
-            const res = await api.get('/v1/model/available');
+            const res = await api.get('/v1/model/availability');
             const data = await res.data;
             setData(data);
         } finally {

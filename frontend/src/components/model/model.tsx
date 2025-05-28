@@ -12,7 +12,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Modal, Group, TextInput, NumberInput, Divider, Flex} from '@mantine/core';
 import GlobeSelect from './globe';
-import Options from './options';
+import SelectModel from './select';
 import InformationWindow from './information';
 
 import { ModelSpecification } from '../interface';
@@ -70,7 +70,7 @@ function Model({ selectedModel, coordinates, setCoordinates, modelSpec, submit }
 
     return (
         <Card padding="">
-            <Options cardProps={{}} setSelected={setModel} />
+            <SelectModel setSelected={setModel} />
             <Divider my="md" />
             <InformationWindow selected={model} />
 

@@ -11,7 +11,7 @@
 
 from collections import defaultdict
 from uuid import uuid4
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 import os
 
 from functools import lru_cache
@@ -26,10 +26,12 @@ import shutil
 from pydantic import BaseModel
 
 from ..types import ModelSpecification, ModelName
-from forecastbox.models.model import Model, model_versions, model_info
+from forecastbox.models.model import Model, model_info, get_extra_information, set_extra_information, ModelExtra
+from .admin import get_admin_user
 
 from forecastbox.settings import API_SETTINGS
 from forecastbox.db import db
+import asyncio
 
 router = APIRouter(
     tags=["model"],
@@ -45,11 +47,42 @@ def get_model_path(model: str) -> Path:
 Category = str
 
 
-# Model Availability
+def model_downloaded(model_id: str) -> bool:
+    """Check if a model is downloaded."""
+    model_path = get_model_path(model_id.replace("_", "/"))
+    return model_path.exists()
+
+
 @router.get("/available")
 async def get_available_models() -> dict[Category, list[ModelName]]:
     """
     Get a list of available models sorted into categories.
+
+    Returns
+    -------
+    dict[Category, list[ModelName]]
+        Dictionary containing model categories and their models
+        Only shows models that are already downloaded
+    """
+    models = defaultdict(list)
+
+    for model in Path(API_SETTINGS.data_path).glob("**/*.ckpt"):
+        if not model.is_file():
+            continue
+        model_path = model.relative_to(API_SETTINGS.data_path)
+        category, name = model_path.parts[:-1], model_path.name
+        models["/".join(category)].append(name.replace(".ckpt", ""))
+
+    return models
+
+
+# Model Availability
+@router.get("/availability")
+async def manage_get_available_models(admin=Depends(get_admin_user)) -> dict[Category, list[ModelName]]:
+    """
+    Get a list of available models sorted into categories.
+
+    Will show all models in the manifest, regardless of whether they are downloaded or not.
 
     Returns
     -------
@@ -114,7 +147,7 @@ async def download_file(download_id: str, url: str, download_path: str) -> Downl
 
 
 @router.get("/{model_id}/downloaded")
-async def check_if_downloaded(model_id: str) -> DownloadResponse:
+async def check_if_downloaded(model_id: str, admin=Depends(get_admin_user)) -> DownloadResponse:
     """Check if a model has been downloaded."""
 
     model_path = get_model_path(model_id.replace("_", "/"))
@@ -146,7 +179,7 @@ async def check_if_downloaded(model_id: str) -> DownloadResponse:
 
 
 @router.post("/{model_id}/download")
-def download(model_id: str, background_tasks: BackgroundTasks) -> DownloadResponse:
+def download(model_id: str, background_tasks: BackgroundTasks, admin=Depends(get_admin_user)) -> DownloadResponse:
     """Download a model."""
 
     repo = API_SETTINGS.model_repository
@@ -218,26 +251,108 @@ def delete_model(model_id: str) -> DownloadResponse:
     )
 
 
-class InstallResponse(BaseModel):
-    installed: bool
-    error: str | None = None
+@router.get("/{model_id}/metadata")
+async def get_model_metadata(model_id: str) -> dict[str, Any]:
+    """
+    Get metadata for a specific model.
+
+    Parameters
+    ----------
+    model_id : str
+        Model to load, directory separated by underscores
+
+    Returns
+    -------
+    ModelExtra
+        Extra model metadata
+    """
+    model_path = get_model_path(model_id.replace("_", "/"))
+
+    if not model_path.exists():
+        raise HTTPException(status_code=404, detail="Model not found")
+
+    metadata = get_extra_information(model_path).model_dump()
+    metadata.pop("version", None)
+    return metadata
 
 
-@router.post("/{model_id}/install")
-def install(model_id: str) -> InstallResponse:
-    anemoi_versions = model_versions(str(get_model_path(model_id.replace("_", "/"))))
-    import subprocess
+@router.get("/{model_id}/editable")
+def is_model_metadata_editable(model_id: str) -> bool:
+    """
+    Check if metadata for a specific model is editable.
 
-    BLACKLISTED_INSTALLS = ["anemoi", "anemoi-training", "anemoi-inference", "anemoi-utils"]
+    May not be editable if the model is currently being downloaded or edited.
+    """
+    collection = db.get_collection("model_edits")
+    in_edit = collection.find_one({"model": model_id}) is not None
 
-    try:
-        packages = [f"{key}=={val}" for key, val in anemoi_versions.items() if key not in BLACKLISTED_INSTALLS]
-        if packages:
-            subprocess.run(["uv", "pip", "install", *packages, "--no-cache"], check=True)
-    except Exception as e:
-        return InstallResponse(installed=False, error=str(e))
+    return not in_edit and model_downloaded(model_id)
 
-    return InstallResponse(installed=True, error=None)
+
+async def _update_model_metadata(model_id: str, metadata: dict) -> ModelExtra:
+    """
+    Update metadata for a specific model.
+
+    Parameters
+    ----------
+    model_id : str
+        Model to load, directory separated by underscores
+    metadata : dict
+        Metadata to update
+
+    Returns
+    -------
+    ModelExtra
+        Updated model metadata
+    """
+
+    model_path = get_model_path(model_id.replace("_", "/"))
+
+    if not model_path.exists():
+        raise HTTPException(status_code=404, detail="Model not found")
+
+    # Run the sync function in a thread to avoid blocking the event loop
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, set_extra_information, model_path, ModelExtra(**metadata))
+
+    collection = db.get_collection("model_edits")
+    collection.delete_one({"model": model_id})
+
+    return ModelExtra(**metadata)
+
+
+@router.patch("/{model_id}/metadata")
+async def patch_model_metadata(model_id: str, metadata: dict, background_tasks: BackgroundTasks) -> None:
+    """
+    Patch metadata for a specific model.
+
+    Parameters
+    ----------
+    model_id : str
+        Model to load, directory separated by underscores
+    metadata : dict
+        Metadata to patch
+
+    Returns
+    -------
+    ModelExtra
+        Updated model metadata
+    """
+    model_path = get_model_path(model_id.replace("_", "/"))
+
+    complete_metadata = get_extra_information(model_path).model_dump()
+    complete_metadata.update(metadata)
+    ModelExtra(**complete_metadata)  # Validate the metadata
+
+    if not model_path.exists():
+        raise HTTPException(status_code=404, detail="Model not found")
+
+    collection = db.get_collection("model_edits")
+    collection.insert_one({"model": model_id, "metadata": metadata})
+
+    background_tasks.add_task(_update_model_metadata, model_id, complete_metadata)
+
+    return
 
 
 # Model Info

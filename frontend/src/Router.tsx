@@ -30,6 +30,7 @@ import AdminLayout from './layouts/AdminPage';
 import AdminSettings from './pages/admin/settings';
 import Gateway from './pages/admin/gateway';
 import Users from './pages/admin/users';
+import Checkpoints from './pages/admin/checkpoints';
 
 const router = createBrowserRouter([
   {
@@ -87,6 +88,10 @@ const router = createBrowserRouter([
       {
         path: 'users',
         element: <Users />,
+      },
+      {
+        path: 'checkpoints',
+        element: <Checkpoints />,
       }
     ],
   },
