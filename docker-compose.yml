@@ -49,6 +49,18 @@ services:
     entrypoint: "python -m cascade.gateway tcp://0.0.0.0:8067"
     networks:
       - fiab-network
+    volumes:
+      - data:/app/data_dir
+      - ~/.ssh:/root/.ssh:ro
+      - ~/.ecmwfapirc:/root/.ecmwfapirc:ro
+    
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
   db:
     container_name: fiab-db
