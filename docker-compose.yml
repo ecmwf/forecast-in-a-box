@@ -1,37 +1,36 @@
 name: FIAB
-
 services:
+
   frontend:
     container_name: fiab-frontend
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    image: eccr.ecmwf.int/forecast-in-a-box/fiab-frontend:latest
+
     ports:
-      - "127.0.0.1:3000:3000"
-    environment:
-      API_URL: "http://localhost:8000"
-    # networks:
-    #   - fiab-network
-    #   - host
-    
+      - "3000:3000"
+    # environment:
+    #   VITE_API_BASE: "http://localhost:8000"
+    networks:
+      - fiab-network
+
   backend:
     container_name: fiab-backend
     build:
       context: ./backend
       dockerfile: Dockerfile
-    image: eccr.ecmwf.int/forecast-in-a-box/fiab-backend:latest
     volumes:
       - data:/app/data_dir
       - ~/.ssh:/root/.ssh:ro
+      - ~/.ecmwfapirc:/root/.ecmwfapirc:ro
     ports:
       - "8000:8000"
     environment:
-      API_URL: "http://localhost:8000"
+      API_URL: "http://backend:8000"
       DATA_PATH: "/app/data_dir"
       MODEL_REPOSITORY: "https://sites.ecmwf.int/repository/fiab"
-      CASCADE_URL: "tcp://localhost:8067"
-      MONGODB_URI: "mongodb://localhost:27017"
+      CASCADE_URL: "tcp://cascade:8067"
+      MONGODB_URI: "mongodb://db:27017"
       MONGODB_DATABASE: "fiab"
 
       ECMWF_API_URL: "https://api.ecmwf.int/v1"
@@ -39,9 +38,32 @@ services:
       ECMWF_API_EMAIL: ${ECMWF_API_EMAIL}
 
       FIAB_INSTALL_TYPE: all
-
     networks:
       - fiab-network
+
+  cascade:
+    container_name: fiab-cascade
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    entrypoint: "python -m cascade.gateway tcp://0.0.0.0:8067"
+    networks:
+      - fiab-network
+
+  db:
+    container_name: fiab-db
+    image: mongo:8.0
+    networks:
+      - fiab-network
+
+  # web:
+  #   container_name: fiab-web
+  #   image: nginxinc/nginx-unprivileged:1-alpine-slim
+  #   volumes:
+  #     # - $PWD/nginx.conf:/etc/nginx/conf.d/default.conf
+  #     - frontend-dist:/usr/share/nginx/html
+  #   ports:
+  #     - "8080:8080"
 
 networks:
   fiab-network:
@@ -52,3 +74,4 @@ networks:
 
 volumes:
   data:
+  # frontend-dist:

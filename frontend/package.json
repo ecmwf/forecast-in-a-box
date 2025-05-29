@@ -1,5 +1,5 @@
 {
-  "name": "FIAB",
+  "name": "fiab",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build --watch",
     "prodbuild": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview --port 3000"
+    "preview": "vite preview --port 3000 --host 0.0.0.0"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
