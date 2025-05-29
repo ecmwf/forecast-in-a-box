@@ -203,7 +203,7 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
                 <Button onClick={handleSeralise}>Serialise</Button>
                 <Button onClick={() => {
                     handleDownload();
-                }}>Download</Button>
+                }}>Download JSON</Button>
                 </Group>
                 <Button color='green'onClick={handleSubmit} disabled={submitting || status.cascade !== "up"}>
                     {submitting ? "Submitting..." : 

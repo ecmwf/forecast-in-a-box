@@ -94,7 +94,7 @@ function ProductConfigurator({model, products, setProducts}: ProductConfiguratio
             </Grid>
             <Divider p='md'/>
             <SimpleGrid cols={1}>
-                <Button onClick={() => setProducts(internal_products)} disabled={!model}>Submit</Button>
+                <Button onClick={() => setProducts(internal_products)} disabled={!model}>Continue</Button>
             </SimpleGrid>
         </Container>
     );
