@@ -41,6 +41,7 @@ router = APIRouter(
 class JobProgressResponse:
     progress: str
     status: str
+    created_at: str | None = None
     error: str | None = None
 
 
@@ -114,6 +115,7 @@ def get_job_progress(job_id: JobId = Depends(validate_job_id)) -> JobProgressRes
 
     return JobProgressResponse(
         progress=progress,
+        created_at=collection.find({"job_id": job_id})[0]["created_at"],
         status=collection.find({"job_id": job_id})[0]["status"],
         error=jobprogress.failure,
     )
@@ -138,7 +140,10 @@ async def get_status() -> JobProgressResponses:
         id_record = collection.find({"job_id": id})[0]
         status = id_record["status"]
         error = id_record["error"]
-        progresses[id] = JobProgressResponse(progress="0.00" if not status == "completed" else "100.00", status=status, error=error)
+        created_at = id_record.get("created_at", None)
+        progresses[id] = JobProgressResponse(
+            progress="0.00" if not status == "completed" else "100.00", status=status, created_at=created_at, error=error
+        )
 
     # Sort job records by created_at timestamp
     sorted_job_ids = sorted(job_ids, key=lambda id: collection.find_one({"job_id": id}).get("created_at", 0))

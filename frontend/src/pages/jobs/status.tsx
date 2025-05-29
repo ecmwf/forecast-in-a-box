@@ -30,6 +30,7 @@ import SummaryModal from '../../components/summary';
 export type ProgressResponse = {
   progress: string;
   status: number;
+  created_at: string;
   error: string;
 }
 
@@ -362,6 +363,7 @@ const JobStatusPage = () => {
             <Table.Tr style={{ backgroundColor: "#f0f0f6", textAlign: "left" }}>
               <Table.Th>Job ID</Table.Th>
               <Table.Th>Status</Table.Th>
+              <Table.Th>Created At</Table.Th>
               <Table.Th>Progress</Table.Th>
               <Table.Th>Options</Table.Th>
             </Table.Tr>
@@ -394,6 +396,9 @@ const JobStatusPage = () => {
                     </Table.Td>
                   <Table.Td>
                     {progress.status}
+                  </Table.Td>
+                  <Table.Td>
+                    {new Date(progress.created_at).toLocaleString()}
                   </Table.Td>
                   <Table.Td>
                     {progress.progress}%
