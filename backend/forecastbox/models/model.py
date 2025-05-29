@@ -14,7 +14,7 @@ from pydantic import BaseModel, FilePath
 from pydantic import model_validator
 import yaml
 
-from typing import Any, Literal
+from typing import Any
 
 from qubed import Qube
 from earthkit.workflows.fluent import Action
@@ -41,8 +41,6 @@ class ModelExtra(BaseModel):
     """Overrides for the input of the model."""
     dataset_configuration: dict[str, str] | None = None
     """If using input=dataset, this is the configuration for the dataset."""
-
-    version: Literal["1.0"] = "1.0"
 
     @model_validator(mode="before")
     @classmethod
@@ -141,8 +139,6 @@ class Model(BaseModel):
             {key: val for key, val in versions.items() if any(key.startswith(start) for start in INITIAL_CONDITIONS_FILTER_STARTS)}
         )
 
-        print(inference_env)
-
         return from_input(
             self.checkpoint_path,
             "mars",
@@ -201,6 +197,15 @@ class Model(BaseModel):
         return model_info(self.checkpoint_path)
 
 
+def get_model(checkpoint_path, **kwargs) -> Model:
+    """Get the model."""
+
+    return Model(
+        checkpoint_path=checkpoint_path,
+        **kwargs,
+    )
+
+
 def model_versions(checkpoint_path: str) -> dict[str, str]:
     """Get the versions of the model"""
 
@@ -232,7 +237,7 @@ def model_info(checkpoint_path: str) -> dict[str, Any]:
     ckpt = open_checkpoint(checkpoint_path)
 
     anemoi_versions = model_versions(checkpoint_path)
-    # anemoi_versions = {k: v for k, v in anemoi_versions.items() if k.startswith("anemoi-")}
+    anemoi_versions = {k: v for k, v in anemoi_versions.items() if k.startswith("anemoi-")}
 
     return {
         "timestep": ckpt.timestep,
@@ -267,7 +272,7 @@ def set_extra_information(checkpoint_path: str, extra: ModelExtra) -> None:
 
     replace_metadata(
         checkpoint_path,
-        extra.model_dump(),
+        {**extra.model_dump(), "version": "1.0.0"},
         name=FORECAST_IN_A_BOX_METADATA,
     )
 

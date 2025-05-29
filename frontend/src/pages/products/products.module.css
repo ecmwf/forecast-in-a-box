@@ -27,10 +27,17 @@
   border: 1px solid light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-5));
     transition: box-shadow 0.2s ease-in-out, transform 0.2s ease-in-out;
     &:hover {
-        transform: translateY(-5px) rotate(1deg);
+        transform: translateY(-5px) rotate(0.3deg);
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
     }
 }
+
+.cardDisabled {
+  pointer-events: none;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 
 .cardTitle {
   &::after {

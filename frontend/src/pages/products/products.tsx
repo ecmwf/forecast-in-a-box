@@ -14,6 +14,7 @@ import {
   Card,
   Center,
   Container,
+  Grid,
   Group,
   SimpleGrid,
   Space,
@@ -69,11 +70,12 @@ export default function ProductsCards() {
         key={feature.title}
         shadow="md"
         radius="md"
-        className={classes.card}
+        // className={classes.card}
+        className={feature.status === 'coming-soon' ? classes.cardDisabled : classes.card}
         padding="xl"
         component="a"
         href={`/products/${feature.id}`}
-        style={feature.status === 'coming-soon' ? { opacity: 0.6, color:'grey', pointerEvents: 'none' } : {}}
+        // style={feature.status === 'coming-soon' ? { opacity: 0.6, color:'grey', pointerEvents: 'none' } : {}}
     >
         <Group justify="space-between" mb="xs">
             <feature.icon size={50} stroke={1.5} color={theme.colors.blue[6]} />
@@ -104,9 +106,15 @@ export default function ProductsCards() {
         </Text>
       </Center>
 
-      <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="xl" mt={50}>
-        {features}
-      </SimpleGrid>
+      <Grid gutter="xl" mt={50} grow columns={3}>
+        {features.slice(0, 3).map((feature) => <Grid.Col span={{base: 3, sm:3, md:1}}>{feature}</Grid.Col>)}
+        <Grid.Col span={3}>
+          <Space h='xl'/>
+        </Grid.Col>
+        <Grid.Col span={3}>
+          {features[3]}
+        </Grid.Col>
+      </Grid>
     </Container>
     </MainLayout>
   );

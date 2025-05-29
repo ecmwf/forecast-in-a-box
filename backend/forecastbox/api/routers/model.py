@@ -252,7 +252,7 @@ def delete_model(model_id: str) -> DownloadResponse:
 
 
 @router.get("/{model_id}/metadata")
-async def get_model_metadata(model_id: str) -> dict[str, Any]:
+async def get_model_metadata(model_id: str) -> ModelExtra:
     """
     Get metadata for a specific model.
 
@@ -289,7 +289,7 @@ def is_model_metadata_editable(model_id: str) -> bool:
     return not in_edit and model_downloaded(model_id)
 
 
-async def _update_model_metadata(model_id: str, metadata: dict) -> ModelExtra:
+async def _update_model_metadata(model_id: str, metadata: ModelExtra) -> ModelExtra:
     """
     Update metadata for a specific model.
 
@@ -313,7 +313,7 @@ async def _update_model_metadata(model_id: str, metadata: dict) -> ModelExtra:
 
     # Run the sync function in a thread to avoid blocking the event loop
     loop = asyncio.get_running_loop()
-    await loop.run_in_executor(None, set_extra_information, model_path, ModelExtra(**metadata))
+    await loop.run_in_executor(None, set_extra_information, model_path, metadata)
 
     collection = db.get_collection("model_edits")
     collection.delete_one({"model": model_id})
@@ -322,7 +322,7 @@ async def _update_model_metadata(model_id: str, metadata: dict) -> ModelExtra:
 
 
 @router.patch("/{model_id}/metadata")
-async def patch_model_metadata(model_id: str, metadata: dict, background_tasks: BackgroundTasks) -> None:
+async def patch_model_metadata(model_id: str, metadata: ModelExtra, background_tasks: BackgroundTasks) -> None:
     """
     Patch metadata for a specific model.
 
@@ -340,17 +340,13 @@ async def patch_model_metadata(model_id: str, metadata: dict, background_tasks: 
     """
     model_path = get_model_path(model_id.replace("_", "/"))
 
-    complete_metadata = get_extra_information(model_path).model_dump()
-    complete_metadata.update(metadata)
-    ModelExtra(**complete_metadata)  # Validate the metadata
-
     if not model_path.exists():
         raise HTTPException(status_code=404, detail="Model not found")
 
     collection = db.get_collection("model_edits")
-    collection.insert_one({"model": model_id, "metadata": metadata})
+    collection.insert_one({"model": model_id, "metadata": metadata.model_dump()})
 
-    background_tasks.add_task(_update_model_metadata, model_id, complete_metadata)
+    background_tasks.add_task(_update_model_metadata, model_id, metadata)
 
     return
 
