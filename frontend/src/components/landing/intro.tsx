@@ -41,11 +41,11 @@ const Intro = () => {
                         <strong style={{color: "#6DABFF"}}>any</strong> user to get weather predictions
                         where they need it, when they need it.
                     </Text>
-                    <Text size="md" style={{color: "white"}}>
-                        With a simple and intuitive interface, you can easily create and manage your products, 
-                        ensuring that you always have the right information at your fingertips.
+                    {/* <Text size="md" style={{color: "white"}}>
+                        With a simple and intuitive interface, users can easily create many products, 
+
                         "Whatever works for you"
-                    </Text>
+                    </Text> */}
                     <Space h="md" />
                 </Group>
                 <Center>
