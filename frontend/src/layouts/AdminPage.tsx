@@ -79,7 +79,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     useEffect(() => {
         if (!fiabtoken) {
-            navigate('/login');
+            navigate(`/login?q=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         }
     }, [fiabtoken, navigate]);
 
@@ -89,7 +89,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             if (res.status === 200 && res.data.is_superuser) {
                 // User is logged in and is a superuser
             } else {
-                navigate('/login');
+                navigate('/');
+                showNotification({
+                    id: 'login-error',
+                    title: 'Access Denied',
+                    message: 'You do not have permission to access this page.',
+                    color: 'red',
+                    autoClose: 3000,
+                    loading: false,
+                });
             }
         })
         .catch(() => {
@@ -101,7 +109,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 autoClose: 3000,
                 loading: false,
             });
-            navigate('/login');
+            navigate(`/login?q=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         });
     }, [api, navigate]);
 
