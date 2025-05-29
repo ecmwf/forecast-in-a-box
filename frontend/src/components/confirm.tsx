@@ -87,7 +87,7 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
                         )
                     }
                     setJobId(result);
-                    window.location.href = `/job/${result.job_id}`;
+                    window.location.href = `/job/${result.id}`;
 
                 } catch (error) {
                     console.error("Error executing:", error);

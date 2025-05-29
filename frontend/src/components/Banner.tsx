@@ -15,25 +15,25 @@ const Banner: React.FC = () => {
     const [showAlert, setShowAlert] = React.useState(true);
 
     return (
-        <div style={{
-            position: 'fixed',
-            bottom: 50,
-            left: 8,
-            zIndex: 9999,
-            maxWidth: '300px'
-        }}>
+        // <div style={{
+        //     position: 'fixed',
+        //     bottom: 50,
+        //     left: 8,
+        //     zIndex: 9999,
+        //     maxWidth: '300px'
+        // }}>
             <Alert
                 p='xs'
                 color="red"
                 variant="filled"
                 // withCloseButton
                 closeButtonLabel="Dismiss"
-                w='300px'
+                // w='px'
             >
                 <Title c="white" p='' m='' order={3} style={{ fontFamily: 'Nebula-Bold' }}>PROTOTYPE</Title>
                 <Box p='' m=''><strong>This is a prototype providing an experimental service of ECMWF products. </strong></Box>
             </Alert>
-        </div>
+        // </div>
         )
     };
 

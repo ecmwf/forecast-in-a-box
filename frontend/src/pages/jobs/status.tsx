@@ -151,7 +151,7 @@ const JobStatusPage = () => {
         position: "top-right",
         autoClose: 3000,
         title: "Restart Successful",
-        message: `Job ${job['job_id']} created successfully`,
+        message: `Job ${job['id']} created successfully`,
         color: "green",
       });
     } catch (error) {
@@ -225,7 +225,7 @@ const JobStatusPage = () => {
             position: "top-right",
             autoClose: 3000,
             title: "Upload Successful",
-            message:`File uploaded successfully. ${data.job_id} started`,
+            message:`File uploaded successfully. ${data.id} started`,
             color: "green",
           });
           getStatus();

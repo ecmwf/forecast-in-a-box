@@ -10,7 +10,7 @@
 """Graph API Router."""
 
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from fastapi.responses import HTMLResponse
 
 import tempfile
@@ -18,6 +18,7 @@ import logging
 
 from forecastbox.products.registry import get_product
 from forecastbox.models import Model
+from pydantic import BaseModel
 
 from .model import get_model_path
 from ..types import ExecutionSpecification
@@ -28,7 +29,7 @@ from earthkit.workflows.graph import Graph, deduplicate_nodes
 from cascade.low.into import graph2job
 from cascade.low import views as cascade_views
 
-from cascade.low.core import JobInstance, DatasetId
+from cascade.low.core import JobInstance
 
 import cascade.gateway.api as api
 import cascade.gateway.client as client
@@ -48,11 +49,11 @@ router = APIRouter(
 LOG = logging.getLogger(__name__)
 
 
-class SubmitResponse(api.SubmitJobResponse):
-    output_ids: set[DatasetId]
+class SubmitJobResponse(BaseModel):
+    id: str
 
 
-async def convert_to_cascade(spec: ExecutionSpecification) -> Cascade:
+def convert_to_cascade(spec: ExecutionSpecification) -> Cascade:
     """Convert a specification to a cascade."""
 
     model_spec = dict(
@@ -114,21 +115,13 @@ async def get_graph_download(spec: ExecutionSpecification) -> str:
     return spec.model_dump_json()
 
 
-@router.post("/execute")
-async def execute_api(spec: ExecutionSpecification, user: User = Depends(current_active_user)) -> api.SubmitJobResponse:
-    response = await execute(spec, user=user)
-    if response.error:
-        raise HTTPException(status_code=500, detail=response.error)
-    return response
+async def _execute(spec: ExecutionSpecification, id: str, user: User) -> api.SubmitJobResponse:
+    collection = db.get_collection("job_records")
 
-
-async def execute(spec: ExecutionSpecification, user) -> api.SubmitJobResponse:
-    """Get serialised dump of product graph."""
     try:
-        cascade_graph = await convert_to_cascade(spec)
+        cascade_graph = convert_to_cascade(spec)
     except Exception as e:
-        return api.SubmitJobResponse(job_id=None, error=str(e))
-
+        collection.update_one({"id": id}, {"$set": {"error": str(e)}})
     job = graph2job(cascade_graph._graph)
 
     sinks = cascade_views.sinks(job)
@@ -156,25 +149,46 @@ async def execute(spec: ExecutionSpecification, user) -> api.SubmitJobResponse:
     )
     try:
         submit_job_response: api.SubmitJobResponse = client.request_response(r, f"{CASCADE_SETTINGS.cascade_url}")  # type: ignore
+        print(f"Job submitted with ID: {submit_job_response.job_id}")
     except Exception as e:
-        return api.SubmitJobResponse(job_id=None, error="Failed to submit job: " + str(e))
-
-    if submit_job_response.error:
-        return submit_job_response
+        collection.update_one({"id": id}, {"$set": {"error": "Failed to submit job - " + str(e)}})
 
     # Record the job_id and graph specification
     record = {
         "job_id": submit_job_response.job_id,
-        "graph_specification": spec.model_dump_json(),
         "status": "submitted",
         "error": None,
-        "created_at": datetime.now(),
         "updated_at": datetime.now(),
         "created_by": user.id if user else None,
         "outputs": list(map(lambda x: x.task, sinks)),
     }
     collection = db.get_collection("job_records")
-    collection.insert_one(record)
+    collection.update_one({"id": id}, {"$set": record})
 
-    # submit_response = SubmitResponse(**submit_job_response.model_dump(), output_ids=sinks)
-    return submit_job_response
+
+async def execute(spec: ExecutionSpecification, user: User, background_tasks: BackgroundTasks) -> SubmitJobResponse:
+    """Get serialised dump of product graph."""
+    import uuid
+
+    id = str(uuid.uuid4())
+    collection = db.get_collection("job_records")
+    collection.insert_one(
+        {
+            "id": id,
+            "status": "submitting",
+            "created_at": datetime.now(),
+            "updated_at": datetime.now(),
+            "graph_specification": spec.model_dump_json(),
+        }
+    )
+
+    background_tasks.add_task(_execute, spec, id, user)
+    return SubmitJobResponse(id=id)
+
+
+@router.post("/execute")
+async def execute_api(
+    spec: ExecutionSpecification, background_tasks: BackgroundTasks, user: User = Depends(current_active_user)
+) -> SubmitJobResponse:
+    response = await execute(spec, user=user, background_tasks=background_tasks)
+    return response
