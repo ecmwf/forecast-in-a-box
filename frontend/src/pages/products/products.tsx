@@ -30,6 +30,14 @@ import MainLayout from '../../layouts/MainLayout';
 
 const interfaces = [
   {
+    title: 'Default',
+    description:
+      'Default plots produced from the latest initial conditions, with no configuration.',
+    icon: IconChartScatter,
+    id: 'default',
+    status: 'coming-soon',
+  },
+  {
     title: 'Standard',
     description:
       'Select from a standard list of products, making readable, comphrehensible plots.',
@@ -106,13 +114,13 @@ export default function ProductsCards() {
         </Text>
       </Center>
 
-      <Grid gutter="xl" mt={50} grow columns={3}>
-        {features.slice(0, 3).map((feature) => <Grid.Col span={{base: 3, sm:3, md:1}}>{feature}</Grid.Col>)}
+      <Grid gutter="xl" mt={50} grow columns={4}>
+        {features.slice(0, 4).map((feature) => <Grid.Col span={{base: 2, sm:4, md:2, xl: 1}}>{feature}</Grid.Col>)}
         <Grid.Col span={3}>
           <Space h='xl'/>
         </Grid.Col>
         <Grid.Col span={3}>
-          {features[3]}
+          {features[4]}
         </Grid.Col>
       </Grid>
     </Container>
