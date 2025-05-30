@@ -114,7 +114,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                         <Stack>
                         {loggedIn ? (
                             <>
-                            <UnstyledButton className="animated-button" size="md" c = 'white' component='a' href='/settings'>Settings</UnstyledButton>
+                            <UnstyledButton className="animated-button" size="md" c = 'white' component='a' href='/admin'>Admin</UnstyledButton>
                             <UnstyledButton className="animated-button" size="md" c = 'white' component='a' href='/products'>Products</UnstyledButton>
                             <UnstyledButton className="animated-button" size="md" c = 'white' component='a' href='/job/status'>Job Status</UnstyledButton>
                             <UnstyledButton className="animated-button" size="md" c = 'white' onClick={handleLogout}>Logout</UnstyledButton>
