@@ -303,17 +303,19 @@ async def get_result_availablity(
     DatasetAvailabilityResponse
         {'available': Availability of the result}
     """
+
+    cascade_job_id = get_cascade_job_id(job_id)
     try:
         response: api.JobProgressResponse = client.request_response(
-            api.JobProgressRequest(job_ids=[job_id]), f"{CASCADE_SETTINGS.cascade_url}"
+            api.JobProgressRequest(job_ids=[cascade_job_id]), f"{CASCADE_SETTINGS.cascade_url}"
         )
     except ValueError as e:
         raise HTTPException(status_code=500, detail=f"Job retrieval failed: {e}")
 
-    if job_id not in response.datasets:
+    if cascade_job_id not in response.datasets:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
 
-    return DatasetAvailabilityResponse(dataset_id in [x.task for x in response.datasets[job_id]])
+    return DatasetAvailabilityResponse(dataset_id in [x.task for x in response.datasets[cascade_job_id]])
 
 
 def to_bytes(obj) -> tuple[bytes, str]:
@@ -352,7 +354,8 @@ def result_cache(
 ) -> api.ResultRetrievalResponse:
     """Get the path to the result cache."""
     return client.request_response(
-        api.ResultRetrievalRequest(job_id=job_id, dataset_id=DatasetId(task=dataset_id, output="0")), f"{CASCADE_SETTINGS.cascade_url}"
+        api.ResultRetrievalRequest(job_id=get_cascade_job_id(job_id), dataset_id=DatasetId(task=dataset_id, output="0")),
+        f"{CASCADE_SETTINGS.cascade_url}",
     )
 
 

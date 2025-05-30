@@ -115,7 +115,7 @@ export default function ProductsCards() {
       </Center>
 
       <Grid gutter="xl" mt={50} grow columns={4}>
-        {features.slice(0, 4).map((feature) => <Grid.Col span={{base: 2, sm:4, md:2, xl: 1}}>{feature}</Grid.Col>)}
+        {features.slice(0, 4).map((feature) => <Grid.Col span={{base: 4, sm:4, md:2, xl: 1}}>{feature}</Grid.Col>)}
         <Grid.Col span={3}>
           <Space h='xl'/>
         </Grid.Col>

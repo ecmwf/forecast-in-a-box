@@ -10,7 +10,7 @@
 """Graph API Router."""
 
 from datetime import datetime
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 
 import tempfile
@@ -105,8 +105,14 @@ async def get_graph_visualise(spec: ExecutionSpecification, options: Visualisati
 @router.post("/serialise")
 async def get_graph_serialised(spec: ExecutionSpecification) -> JobInstance:
     """Get serialised dump of product graph."""
-    graph = await convert_to_cascade(spec)
-    return graph2job(graph._graph)
+    try:
+        graph = convert_to_cascade(spec)
+        return graph2job(graph._graph)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error serialising graph: {e}",
+        )
 
 
 @router.post("/download")

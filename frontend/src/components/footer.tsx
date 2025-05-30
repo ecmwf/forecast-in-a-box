@@ -9,7 +9,7 @@
 // nor does it submit to any jurisdiction.
 
 import React from 'react';
-import { Container, Text, Group, Anchor, Button } from '@mantine/core';
+import { Container, Text, Group, Anchor, Image } from '@mantine/core';
 
 const Footer: React.FC = () => {
     return (
@@ -23,11 +23,13 @@ const Footer: React.FC = () => {
         }}
     >
         <Group align='center' justify='center'>
+            <Image src="/logos/org/destine.png" w={240} h={20} />
+
             <Text size="sm">
                 © {new Date().getFullYear()} ECMWF. All rights reserved.
             </Text>
 
-            <Group>
+            <Group>    
                 <Anchor href="/privacy-policy" size="sm">
                     Privacy Policy
                 </Anchor>

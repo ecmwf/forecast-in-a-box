@@ -36,6 +36,7 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
     const api = useApi();
     
     const [submitting, setSubmitting] = useState(false);
+    const [loading, setLoading] = useState(false);
 
     const [status, setStatus] = useState<{
             cascade: "loading" | "up" | "down";
@@ -123,6 +124,7 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
     }
 
     const handleSeralise = () => {
+        setLoading(true);
         const spec: ExecutionSpecification = {
             model: model,
             products: Object.values(products),
@@ -141,11 +143,20 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
                 link.setAttribute('download', `${crypto.randomUUID()}.json`);
                 link.click()
                 link.remove();  //afterwards we remove the element  
-            } catch (e) {
-                console.log({ "message": e, status: 400 })  // handle error
+            } catch (error) {
+                console.error({ "message": error, status: 400 })  // handle error
+                showNotification(
+                        {
+                            title: 'Error',
+                            message: `An error occurred while serialising the graph.\n ${error.response.data.detail}`,
+                            color: 'red',
+                            icon: <IconX size={16} />,
+                        }
+                    )
             }
         };
         retrieveFileBlob();
+        setLoading(false);
     }
     // <SimpleGrid cols={{ base: 1, sm: 3, lg: 3 }} spacing='' >
     {/* <Container miw={{base:'90vw', sm:'25vw'}}><Title order={2}>Categories</Title><Categories categories={categories} setSelected={setSelectedProduct} /></Container>
@@ -200,7 +211,7 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
                     url={null}
                 />
                 <Group grow>
-                <Button onClick={handleSeralise}>Serialise</Button>
+                <Button disabled={loading} onClick={handleSeralise}>Serialise</Button>
                 <Button onClick={() => {
                     handleDownload();
                 }}>Download JSON</Button>
