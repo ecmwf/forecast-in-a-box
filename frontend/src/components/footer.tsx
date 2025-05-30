@@ -23,8 +23,6 @@ const Footer: React.FC = () => {
         }}
     >
         <Group align='center' justify='center'>
-            <Image src="/logos/org/destine.png" w={240} h={20} />
-
             <Text size="sm">
                 © {new Date().getFullYear()} ECMWF. All rights reserved.
             </Text>
@@ -40,6 +38,7 @@ const Footer: React.FC = () => {
                     System Status
                 </Anchor>
             </Group>
+            <Image src="/logos/org/destine.png" w={240} h={20} />
         </Group>
     </Container>
     );

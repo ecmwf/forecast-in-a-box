@@ -27,7 +27,7 @@ const Collaboration = () => {
         <Group gap='xs' justify="space-evenly">
           <Image src="logos/org/ECMWF.png" w={240} />
           <Image src="logos/org/MetNorway.png" w={240}/>
-          <Image src="logos/org/destine.png" w={240} />
+          <Image src="logos/org/destine-fund.png" w={240} />
         </Group>
         <Space h="xl" />
         <Space h="xl" />

@@ -201,7 +201,7 @@ async def visualise_job(job_id: JobId = Depends(validate_job_id), options: Visua
     from .graph import convert_to_cascade
 
     try:
-        graph = await convert_to_cascade(spec)
+        graph = convert_to_cascade(spec)
     except Exception as e:
         return HTMLResponse(str(e), status_code=500)
 

@@ -9,10 +9,9 @@
 // nor does it submit to any jurisdiction.
 
 import React from 'react';
-import { Alert, Title, Box} from '@mantine/core';
+import { Alert, Title} from '@mantine/core';
 
 const Banner: React.FC = () => {
-    const [showAlert, setShowAlert] = React.useState(true);
 
     return (
         // <div style={{
@@ -28,10 +27,10 @@ const Banner: React.FC = () => {
                 variant="filled"
                 // withCloseButton
                 closeButtonLabel="Dismiss"
-                // w='px'
+                // w='100px'
             >
                 <Title c="white" p='' m='' order={3} style={{ fontFamily: 'Nebula-Bold' }}>PROTOTYPE</Title>
-                <Box p='' m=''><strong>This is a prototype providing an experimental service of ECMWF products. </strong></Box>
+                {/* <Box p='' m=''><strong>This is a prototype providing an experimental service of ECMWF products. </strong></Box> */}
             </Alert>
         // </div>
         )
