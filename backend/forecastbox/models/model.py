@@ -41,11 +41,19 @@ class ModelExtra(BaseModel):
     """Overrides for the input of the model."""
     dataset_configuration: dict[str, str] | None = None
     """If using input=dataset, this is the configuration for the dataset."""
+    environment_variables: dict[str, Any] | None = None
+    """Environment variables for execution."""
 
     @model_validator(mode="before")
     @classmethod
     def parse_yaml_dicts(cls, values):
-        dict_fields = ["version_overrides", "input_overrides", "dataset_configuration"]
+        dict_fields = [
+            "version_overrides",
+            "input_overrides",
+            "dataset_configuration",
+            "initial_conditions_environment_variables",
+            "inference_environment_variables",
+        ]
         for field in dict_fields:
             val = values.get(field)
             if isinstance(val, str):
@@ -81,7 +89,7 @@ class Model(BaseModel):
     @cached_property
     def extra_information(self) -> ModelExtra:
         """Get the extra information for the model."""
-        return get_extra_information(self.checkpoint_path)
+        return get_extra_information(self.checkpoint_path).model_copy()
 
     @cached_property
     def timesteps(self) -> list[int]:
@@ -132,22 +140,31 @@ class Model(BaseModel):
                     install_list.append(f"{key}=={val}")
             return install_list
 
-        inference_env = parse_into_install(
-            {key: val for key, val in versions.items() if any(key.startswith(start) for start in INFERENCE_FILTER_STARTS)}
-        )
+        inference_env = {key: val for key, val in versions.items() if any(key.startswith(start) for start in INFERENCE_FILTER_STARTS)}
+
+        inference_env.update(self.extra_information.version_overrides or {})
+        inference_env_list = parse_into_install(inference_env)
+
         initial_conditions_env = parse_into_install(
             {key: val for key, val in versions.items() if any(key.startswith(start) for start in INITIAL_CONDITIONS_FILTER_STARTS)}
         )
 
+        inference_environment_variables = (self.extra_information.environment_variables or {}).copy()
+        inference_environment_variables.update(environment_kwargs or {})
+
+        input_source = self.extra_information.input_preference or "mars"
+        if self.extra_information.input_overrides:
+            input_source = {"input_source": self.extra_information.input_overrides}
+
         return from_input(
             self.checkpoint_path,
-            "mars",
+            input_source,
             lead_time=self.lead_time,
             date=self.date,
             ensemble_members=self.ensemble_members,
             **(self.entries or {}),
-            environment={"inference": inference_env, "initial_conditions": initial_conditions_env},
-            env=environment_kwargs or {},  # {"ANEMOI_INFERENCE_NUM_CHUNKS": 4},
+            environment={"inference": inference_env_list, "initial_conditions": initial_conditions_env},
+            env=inference_environment_variables,
         )
 
     def deaccumulate(self, outputs: "Action") -> "Action":

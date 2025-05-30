@@ -318,7 +318,7 @@ async def _update_model_metadata(model_id: str, metadata: ModelExtra) -> ModelEx
     collection = db.get_collection("model_edits")
     collection.delete_one({"model": model_id})
 
-    return ModelExtra(**metadata)
+    return metadata
 
 
 @router.patch("/{model_id}/metadata")

@@ -128,6 +128,8 @@ async def _execute(spec: ExecutionSpecification, id: str, user: User) -> api.Sub
         cascade_graph = convert_to_cascade(spec)
     except Exception as e:
         collection.update_one({"id": id}, {"$set": {"error": str(e)}})
+        return
+
     job = graph2job(cascade_graph._graph)
 
     sinks = cascade_views.sinks(job)
@@ -155,9 +157,9 @@ async def _execute(spec: ExecutionSpecification, id: str, user: User) -> api.Sub
     )
     try:
         submit_job_response: api.SubmitJobResponse = client.request_response(r, f"{CASCADE_SETTINGS.cascade_url}")  # type: ignore
-        print(f"Job submitted with ID: {submit_job_response.job_id}")
     except Exception as e:
         collection.update_one({"id": id}, {"$set": {"error": "Failed to submit job - " + str(e)}})
+        return
 
     # Record the job_id and graph specification
     record = {

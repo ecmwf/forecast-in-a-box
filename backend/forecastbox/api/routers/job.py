@@ -83,6 +83,15 @@ def get_job_progress(job_id: JobId = Depends(validate_job_id)) -> JobProgressRes
     collection = db.get_collection("job_records")
     cascade_job_id = get_cascade_job_id(job_id)
 
+    if not cascade_job_id:
+        id_record = collection.find_one({"id": job_id})
+        return JobProgressResponse(
+            progress="0.00",
+            status=id_record.get("status", "unknown"),
+            created_at=str(id_record.get("created_at", None)),
+            error=id_record.get("error", None),
+        )
+
     try:
         response: api.JobProgressResponse = client.request_response(
             api.JobProgressRequest(job_ids=[cascade_job_id]), f"{CASCADE_SETTINGS.cascade_url}"
@@ -161,7 +170,10 @@ async def get_status() -> JobProgressResponses:
         created_at = id_record.get("created_at", None)
 
         progresses[id] = JobProgressResponse(
-            progress="0.00" if not status == "completed" else "100.00", status=status, created_at=created_at, error=error
+            progress="0.00" if not status == "completed" else "100.00",
+            status=status,
+            created_at=str(created_at) if created_at else created_at,
+            error=error,
         )
 
     # Sort job records by created_at timestamp
@@ -183,8 +195,8 @@ async def get_status_of_job(job_id: JobId = Depends(validate_job_id)) -> JobProg
 async def get_outputs_of_job(job_id: JobId = Depends(validate_job_id)) -> list[TaskId]:
     """Get outputs of a job."""
     collection = db.get_collection("job_records")
-    outputs = collection.find({"id": job_id})
-    return outputs[0].get("outputs", [])
+    outputs = collection.find_one({"id": job_id})
+    return outputs.get("outputs", [])
 
 
 @router.post("/{job_id}/visualise")
@@ -235,7 +247,6 @@ async def restart_job(
         raise HTTPException(status_code=404, detail=f"Job {job_id} had no specification.")
 
     spec = ExecutionSpecification(**json.loads(spec))
-
     response = await execute(spec, user=user, background_tasks=background_tasks)
     return response
 
@@ -258,8 +269,8 @@ async def upload_job(file: UploadFile, background_tasks: BackgroundTasks, user: 
 async def job_info(job_id: JobId = Depends(validate_job_id)) -> dict:
     """Get outputs of a job."""
     collection = db.get_collection("job_records")
-    job = collection.find({"id": job_id})
-    return job[0]
+    job = collection.find_one({"id": job_id})
+    return job
 
 
 @dataclass
@@ -277,7 +288,9 @@ async def get_job_availablity(job_id: JobId = Depends(validate_job_id)) -> list[
     job_id : str
         Job ID of the task
     """
-    response: api.JobProgressResponse = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{CASCADE_SETTINGS.cascade_url}")
+    response: api.JobProgressResponse = client.request_response(
+        api.JobProgressRequest(job_ids=[get_cascade_job_id(job_id)]), f"{CASCADE_SETTINGS.cascade_url}"
+    )
 
     return [x.task for x in response.datasets[job_id]]
 
