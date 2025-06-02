@@ -7,7 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Settings API Router."""
+"""Admin API Router."""
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
@@ -56,8 +56,8 @@ async def post_settings(settings: ExposedSettings, admin=Depends(get_admin_user)
             setattr(old, key, val)
 
     try:
-        update(BackendAPISettings, settings.api)
-        update(CascadeSettings, settings.cascade)
+        update(config.api, settings.api)
+        update(config.cascade, settings.cascade)
     except Exception as e:
         return HTMLResponse(content=str(e), status_code=500)
 
