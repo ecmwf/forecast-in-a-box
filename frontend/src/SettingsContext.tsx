@@ -15,12 +15,14 @@ const backendBase = import.meta.env.VITE_API_BASE || '/api'
 
 type Settings = {
   apiUrl: string;
+  banner_text: string;
   theme: 'light' | 'dark';
   language: string;
 };
 
 const defaultSettings: Settings = {
   apiUrl: backendBase,
+  banner_text: 'PROTOTYPE',
   theme: 'light',
   language: 'en',
 };
