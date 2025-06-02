@@ -7,16 +7,16 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Products API Router."""
+"""Job Monitoring API Router."""
 
 from functools import lru_cache
 import json
+from typing import Literal
 from fastapi import APIRouter, BackgroundTasks, Response, Depends, UploadFile, Body
 from fastapi.responses import HTMLResponse
 from fastapi import HTTPException
 
 from dataclasses import dataclass
-
 
 from cascade.low.core import DatasetId, TaskId
 from cascade.controller.report import JobId
@@ -30,8 +30,7 @@ from forecastbox.db import db
 
 from forecastbox.config import config
 from forecastbox.api.types import VisualisationOptions, ExecutionSpecification
-
-from .graph import execute, SubmitJobResponse
+from forecastbox.api.routers.execution import execute, SubmitJobResponse
 
 router = APIRouter(
     tags=["job"],
@@ -39,21 +38,38 @@ router = APIRouter(
 )
 
 
+STATUS = Literal["running", "completed", "errored", "invalid", "timeout", "unknown"]
+
+
 @dataclass
 class JobProgressResponse:
+    """Job Progress Response."""
+
     progress: str
-    status: str
+    """Progress of the job as a percentage."""
+    status: STATUS
+    """Status of the job."""
     created_at: str | None = None
+    """Creation timestamp of the job."""
     error: str | None = None
+    """Error message if the job encountered an error, otherwise None."""
 
 
 @dataclass
 class JobProgressResponses:
+    """Job Progress Responses.
+
+    Contains progress information for multiple jobs.
+    """
+
     progresses: dict[JobId, JobProgressResponse]
+    """A dictionary mapping job IDs to their progress responses."""
     error: str | None = None
+    """An error message if there was an issue retrieving job progress, otherwise None."""
 
 
 def validate_job_id(job_id: JobId) -> JobId | None:
+    """Validate the job ID by checking if it exists in the database."""
     collection = db.get_collection("job_records")
 
     record = collection.find_one({"id": job_id})
@@ -63,7 +79,11 @@ def validate_job_id(job_id: JobId) -> JobId | None:
 
 
 def get_cascade_job_id(job_id: JobId) -> JobId | None:
-    """Get the cascade job ID from the job ID."""
+    """Get the cascade job ID from the job ID.
+
+    Returns None if the record exists, but the job ID is not found in the database.
+    Raises HTTPException if the job ID is not found in the database.
+    """
     collection = db.get_collection("job_records")
     record = collection.find_one({"id": job_id})
     if record:
@@ -72,11 +92,27 @@ def get_cascade_job_id(job_id: JobId) -> JobId | None:
 
 
 def validate_dataset_id(dataset_id: str) -> str:
+    """Validate the dataset ID."""
     return dataset_id
 
 
-def get_job_progress(job_id: JobId = Depends(validate_job_id)) -> JobProgressResponse:
-    """Get progress of a job."""
+def get_job_progress(job_id: JobId) -> JobProgressResponse:
+    """
+    Get the progress of a job.
+
+    Updates the job record in the database with the job status and error if any.
+
+    Parameters
+    ----------
+    job_id : JobId
+        job_id of the task, expected to be the id
+        in the database, not the cascade job id.
+
+    Returns
+    -------
+    JobProgressResponse
+        Progress of the job as a percentage, status, creation timestamp, and error message if any.
+    """
     response = None
     error_on_request = None
 
@@ -187,7 +223,7 @@ async def get_status() -> JobProgressResponses:
 
 @router.get("/{job_id}/status")
 async def get_status_of_job(job_id: JobId = Depends(validate_job_id)) -> JobProgressResponse:
-    """Get progress of a job."""
+    """Get progress of a particular job."""
     return get_job_progress(job_id)
 
 
@@ -201,7 +237,11 @@ async def get_outputs_of_job(job_id: JobId = Depends(validate_job_id)) -> list[T
 
 @router.post("/{job_id}/visualise")
 async def visualise_job(job_id: JobId = Depends(validate_job_id), options: VisualisationOptions = Body(None)) -> HTMLResponse:
-    """Get outputs of a job."""
+    """Visualise a job's execution graph.
+
+    Retrieves the job's graph specification from the database, converts it to a cascade graph,
+    and generates an HTML visualisation of the graph.
+    """
     collection = db.get_collection("job_records")
     job = collection.find({"id": job_id})
 
@@ -210,7 +250,7 @@ async def visualise_job(job_id: JobId = Depends(validate_job_id), options: Visua
 
     spec = ExecutionSpecification(**json.loads(job[0]["graph_specification"]))
 
-    from .graph import convert_to_cascade
+    from .execution import convert_to_cascade
 
     try:
         graph = convert_to_cascade(spec)
@@ -228,7 +268,7 @@ async def visualise_job(job_id: JobId = Depends(validate_job_id), options: Visua
 
 @router.get("/{job_id}/specification")
 async def get_job_specification(job_id: JobId = Depends(validate_job_id)) -> ExecutionSpecification:
-    """Get specification of a job."""
+    """Get specification in the database of a job."""
     collection = db.get_collection("job_records")
     job = collection.find_one({"id": job_id})
     return ExecutionSpecification(**json.loads(job["graph_specification"]))
@@ -238,7 +278,7 @@ async def get_job_specification(job_id: JobId = Depends(validate_job_id)) -> Exe
 async def restart_job(
     background_tasks: BackgroundTasks, job_id: JobId = Depends(validate_job_id), user: User = Depends(current_active_user)
 ) -> SubmitJobResponse:
-    """Get outputs of a job."""
+    """Restart a job by executing its specification."""
     collection = db.get_collection("job_records")
     job = collection.find_one({"id": job_id})
 
@@ -253,6 +293,7 @@ async def restart_job(
 
 @router.post("/upload")
 async def upload_job(file: UploadFile, background_tasks: BackgroundTasks, user: User = Depends(current_active_user)) -> SubmitJobResponse:
+    """Upload a job specification file and execute it."""
     if not file:
         raise HTTPException(status_code=400, detail="No file provided for upload.")
 
@@ -265,17 +306,12 @@ async def upload_job(file: UploadFile, background_tasks: BackgroundTasks, user: 
     return response
 
 
-@router.get("/{job_id}/info")
-async def job_info(job_id: JobId = Depends(validate_job_id)) -> dict:
-    """Get outputs of a job."""
-    collection = db.get_collection("job_records")
-    job = collection.find_one({"id": job_id})
-    return job
-
-
 @dataclass
 class DatasetAvailabilityResponse:
+    """Dataset Availability Response."""
+
     available: bool
+    """Indicates whether the dataset is available for download."""
 
 
 @router.get("/{job_id}/available")
@@ -365,7 +401,10 @@ def to_bytes(obj) -> tuple[bytes, str]:
 def result_cache(
     job_id: JobId = Depends(validate_job_id), dataset_id: TaskId = Depends(validate_dataset_id)
 ) -> api.ResultRetrievalResponse:
-    """Get the path to the result cache."""
+    """Retrieve the result of a job from Cascade.
+
+    This function caches the result retrieval to avoid multiple requests for the same job and dataset ID.
+    """
     return client.request_response(
         api.ResultRetrievalRequest(job_id=get_cascade_job_id(job_id), dataset_id=DatasetId(task=dataset_id, output="0")),
         f"{config.cascade.cascade_url}",
@@ -374,6 +413,26 @@ def result_cache(
 
 @router.get("/{job_id}/{dataset_id}")
 async def get_result(job_id: JobId = Depends(validate_job_id), dataset_id: TaskId = Depends(validate_dataset_id)) -> Response:
+    """
+    Get the result of a job.
+
+    Parameters
+    ----------
+    job_id : JobId
+        Job ID of the task, expected to be the id in the database, not the cascade job id.
+    dataset_id : TaskId
+        Dataset ID of the task, these can be found from /{job_id}/outputs.
+
+    Returns
+    -------
+    Response
+        Response containing the result of the job, encoded as bytes.
+
+    Raises
+    ------
+    HTTPException
+        If the result retrieval fails or if the job or dataset ID is not found in the database.
+    """
     response = result_cache(job_id, dataset_id)
     if response.error:
         raise HTTPException(500, f"Result retrieval failed: {response.error}")
@@ -396,7 +455,10 @@ async def get_result(job_id: JobId = Depends(validate_job_id), dataset_id: TaskI
 
 @dataclass
 class JobDeletionResponse:
+    """Job Deletion Response."""
+
     deleted_count: int
+    """Number of jobs deleted from the database."""
 
 
 @router.post("/flush")

@@ -8,6 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 from dataclasses import dataclass
+from typing import Literal
 from sse_starlette.sse import EventSourceResponse
 import subprocess
 import asyncio
@@ -16,7 +17,7 @@ from datetime import datetime
 from threading import Thread
 from queue import Queue
 
-from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from forecastbox.db import async_db as db
@@ -28,8 +29,7 @@ processes = {}
 
 
 async def shutdown_processes():
-    print("Shutting down...")
-
+    """Terminate all running processes on shutdown."""
     # Terminate all running subprocesses
     for pid, proc in processes.items():
         if proc.poll() is None:
@@ -42,17 +42,26 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
     on_shutdown=[shutdown_processes],
 )
+
 PROCESS_ID = "cascade_gateway"
+STATUS = Literal["running", "terminated", "not running"]
 
 
 @dataclass
 class ProcessStatus:
+    """Represent the status of a process."""
+
     process_id: str
-    status: str
+    """Unique identifier for the process."""
+    status: STATUS
+    """Current status of the process (e.g., 'running', 'terminated', 'not running')."""
 
 
 @router.post("/start")
-async def start_process(background_tasks: BackgroundTasks) -> ProcessStatus:
+async def start_process() -> ProcessStatus:
+    """
+    Start the Cascade Gateway process.
+    """
     proc_id = PROCESS_ID
 
     if proc_id in processes:
@@ -89,6 +98,9 @@ async def start_process(background_tasks: BackgroundTasks) -> ProcessStatus:
 
 
 async def capture_logs(proc_id: str, process):
+    """
+    Capture logs from the subprocess and store them in the database.
+    """
     q = Queue()
 
     def reader():
@@ -118,32 +130,9 @@ async def capture_logs(proc_id: str, process):
             break
 
 
-# async def capture_logs(proc_id, process):
-#     while True:
-#         line = False
-#         print("Capturing logs...")
-#         line = process.stdout.readline()
-#         if line:
-#             await logs_collection.insert_one({
-#                 "process_id": proc_id,
-#                 "timestamp": datetime.utcnow(),
-#                 "log": line.strip()
-#             })
-#             # Check collection size and remove oldest if over limit
-
-#             collection_size = await logs_collection.count_documents({})
-#             if collection_size > CASCADE_SETTINGS.LOG_COLLECTION_MAX_SIZE:
-#                 oldest_log = await logs_collection.find_one(sort=[("timestamp", 1)])
-#                 if oldest_log:
-#                     await logs_collection.delete_one({"_id": oldest_log["_id"]})
-
-#         elif process.poll() is not None:
-#             break
-#         await asyncio.sleep(0.25)
-
-
 @router.get("/status")
 async def get_status() -> ProcessStatus:
+    """Get the status of the Cascade Gateway process."""
     process = processes.get(PROCESS_ID)
     if process and process.poll() is None:
         return ProcessStatus(process_id=PROCESS_ID, status="running")
@@ -153,6 +142,7 @@ async def get_status() -> ProcessStatus:
 
 @router.get("/logs")
 async def stream_logs(request: Request) -> StreamingResponse:
+    """Stream logs from the Cascade Gateway process."""
     process_id = PROCESS_ID
     last_id = None
 
@@ -187,9 +177,12 @@ async def stream_logs(request: Request) -> StreamingResponse:
 
 @router.post("/kill")
 async def kill_process() -> ProcessStatus:
+    """Kill the Cascade Gateway process."""
     process = processes.pop(PROCESS_ID, None)
     await logs_collection.delete_many({"process_id": PROCESS_ID})
+
     if process and process.poll() is None:
         process.terminate()
         return ProcessStatus(process_id=PROCESS_ID, status="terminated")
+
     return ProcessStatus(process_id=PROCESS_ID, status="not running")

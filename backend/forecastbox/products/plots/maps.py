@@ -124,7 +124,7 @@ class SimpleMapProduct(MapProduct):
     }
 
     defaults = {
-        "domain": "Global",
+        "domain": "Europe",
     }
 
     def to_graph(self, product_spec, model, source):
@@ -158,11 +158,11 @@ class EnsembleMapProduct(BaseEnsembleProduct, MapProduct):
 
     multiselect = {
         "param": True,
-        "step": False,
+        "step": True,
         "domain": False,
     }
     defaults = {
-        "domain": "Global",
+        "domain": "Europe",
     }
 
     def to_graph(self, product_spec, model, source):

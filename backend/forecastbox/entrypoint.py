@@ -25,7 +25,7 @@ from forecastbox.db import init_db
 
 from .api.routers import model
 from .api.routers import product
-from .api.routers import graph
+from .api.routers import execution
 from .api.routers import job
 from .api.routers import admin
 from .api.routers import auth
@@ -51,7 +51,7 @@ app = FastAPI(
 
 app.include_router(model.router, prefix="/api/v1/model")
 app.include_router(product.router, prefix="/api/v1/product")
-app.include_router(graph.router, prefix="/api/v1/graph")
+app.include_router(execution.router, prefix="/api/v1/graph")
 app.include_router(job.router, prefix="/api/v1/job")
 app.include_router(admin.router, prefix="/api/v1/admin")
 app.include_router(auth.router, prefix="/api/v1")

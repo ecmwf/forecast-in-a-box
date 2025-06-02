@@ -7,21 +7,11 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Graph API Router."""
+"""Execution functionality."""
 
 from datetime import datetime
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from fastapi.responses import HTMLResponse
 
-import tempfile
 import logging
-
-from forecastbox.products.registry import get_product
-from forecastbox.models import Model
-from pydantic import BaseModel
-
-from .model import get_model_path
-from ..types import ExecutionSpecification
 
 from earthkit.workflows import Cascade, fluent
 from earthkit.workflows.graph import Graph, deduplicate_nodes
@@ -29,43 +19,53 @@ from earthkit.workflows.graph import Graph, deduplicate_nodes
 from cascade.low.into import graph2job
 from cascade.low import views as cascade_views
 
-from cascade.low.core import JobInstance
-
 import cascade.gateway.api as api
 import cascade.gateway.client as client
 
+from forecastbox.products.registry import get_product
+from forecastbox.models import Model
+
 from forecastbox.db import db
-from forecastbox.auth.users import current_active_user
 from forecastbox.schemas.user import User
 
 from forecastbox.config import config
-from forecastbox.api.types import VisualisationOptions
 
-router = APIRouter(
-    tags=["execution"],
-    responses={404: {"description": "Not found"}},
-)
+from forecastbox.api.utils import get_model_path
+from forecastbox.api.types import ExecutionSpecification
 
 LOG = logging.getLogger(__name__)
 
 
-class SubmitJobResponse(BaseModel):
-    id: str
-
-
 def convert_to_cascade(spec: ExecutionSpecification) -> Cascade:
-    """Convert a specification to a cascade."""
+    """Convert am `ExecutionSpecification` to a `Cascade` object ready for execution.
 
+    Parameters
+    ----------
+    spec : ExecutionSpecification
+        The specification containing model and product details.
+
+    Returns
+    -------
+    Cascade
+        A Cascade object that represents the execution graph for the specified model and products.
+    """
+
+    # Get the model specification and create a Model instance
     model_spec = dict(
         lead_time=spec.model.lead_time,
         date=spec.model.date,
         ensemble_members=spec.model.ensemble_members,
     )
+
     model = Model(checkpoint_path=get_model_path(spec.model.model), **model_spec)
+
+    # Create the model action graph
     model_action = model.graph(None, **spec.model.entries, environment_kwargs=spec.environment.environment_variables)
 
+    # Initialize an empty graph to accumulate product graphs
     complete_graph = Graph([])
 
+    # Iterate over each product in the specification
     for product in spec.products:
         product_spec = product.specification.copy()
         try:
@@ -83,52 +83,36 @@ def convert_to_cascade(spec: ExecutionSpecification) -> Cascade:
     return Cascade(deduplicate_nodes(complete_graph))
 
 
-@router.post("/visualise")
-async def get_graph_visualise(spec: ExecutionSpecification, options: VisualisationOptions = None) -> HTMLResponse:
-    """Get an HTML visualisation of the product graph."""
-    if options is None:
-        options = VisualisationOptions()
+def execute(spec: ExecutionSpecification, id: str, user: User) -> api.SubmitJobResponse | None:
+    """
+    Execute a job based on the provided execution specification.
 
-    try:
-        graph = convert_to_cascade(spec)
-    except Exception as e:
-        LOG.error(f"Error converting to cascade: {e}")
-        return HTMLResponse(str(e), status_code=500)
+    Converts the execution specification into a Cascade graph, prepares the job for submission,
+    and submits it to the Cascade gateway.
 
-    with tempfile.NamedTemporaryFile(suffix=".html") as dest:
-        graph.visualise(dest.name, **options.model_dump())
+    Will update the job record in the database with the job ID and status.
 
-        with open(dest.name, "r") as f:
-            return HTMLResponse(f.read(), media_type="text/html")
+    Parameters
+    ----------
+    spec : ExecutionSpecification
+        Execution specification containing model and product details.
+    id : str
+        Id of the job record in the database.
+    user : User
+        User object representing the user executing the job.
 
-
-@router.post("/serialise")
-async def get_graph_serialised(spec: ExecutionSpecification) -> JobInstance:
-    """Get serialised dump of product graph."""
-    try:
-        graph = convert_to_cascade(spec)
-        return graph2job(graph._graph)
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error serialising graph: {e}",
-        )
-
-
-@router.post("/download")
-async def get_graph_download(spec: ExecutionSpecification) -> str:
-    """Get downloadable json of the graph."""
-    return spec.model_dump_json()
-
-
-async def _execute(spec: ExecutionSpecification, id: str, user: User) -> api.SubmitJobResponse:
+    Returns
+    -------
+    api.SubmitJobResponse
+        The response from the Cascade gateway after submitting the job
+    """
     collection = db.get_collection("job_records")
 
     try:
         cascade_graph = convert_to_cascade(spec)
     except Exception as e:
         collection.update_one({"id": id}, {"$set": {"error": str(e)}})
-        return
+        return api.SubmitJobResponse(job_id=None, error=str(e))
 
     job = graph2job(cascade_graph._graph)
 
@@ -159,7 +143,7 @@ async def _execute(spec: ExecutionSpecification, id: str, user: User) -> api.Sub
         submit_job_response: api.SubmitJobResponse = client.request_response(r, f"{config.cascade.cascade_url}")  # type: ignore
     except Exception as e:
         collection.update_one({"id": id}, {"$set": {"error": "Failed to submit job - " + str(e)}})
-        return
+        return api.SubmitJobResponse(job_id=None, error=str(e))
 
     # Record the job_id and graph specification
     record = {
@@ -173,30 +157,4 @@ async def _execute(spec: ExecutionSpecification, id: str, user: User) -> api.Sub
     collection = db.get_collection("job_records")
     collection.update_one({"id": id}, {"$set": record})
 
-
-async def execute(spec: ExecutionSpecification, user: User, background_tasks: BackgroundTasks) -> SubmitJobResponse:
-    """Get serialised dump of product graph."""
-    import uuid
-
-    id = str(uuid.uuid4())
-    collection = db.get_collection("job_records")
-    collection.insert_one(
-        {
-            "id": id,
-            "status": "submitting",
-            "created_at": datetime.now(),
-            "updated_at": datetime.now(),
-            "graph_specification": spec.model_dump_json(),
-        }
-    )
-
-    background_tasks.add_task(_execute, spec, id, user)
-    return SubmitJobResponse(id=id)
-
-
-@router.post("/execute")
-async def execute_api(
-    spec: ExecutionSpecification, background_tasks: BackgroundTasks, user: User = Depends(current_active_user)
-) -> SubmitJobResponse:
-    response = await execute(spec, user=user, background_tasks=background_tasks)
-    return response
+    return submit_job_response

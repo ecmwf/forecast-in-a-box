@@ -31,18 +31,14 @@ from .admin import get_admin_user
 
 from forecastbox.config import config
 from forecastbox.db import db
+from forecastbox.api.utils import get_model_path
+
 import asyncio
 
 router = APIRouter(
     tags=["model"],
     responses={404: {"description": "Not found"}},
 )
-
-
-def get_model_path(model: str) -> Path:
-    """Get the path to a model."""
-    return (Path(config.api.data_path) / model).with_suffix(".ckpt").absolute()
-
 
 Category = str
 
@@ -105,14 +101,42 @@ async def manage_get_available_models(admin=Depends(get_admin_user)) -> dict[Cat
 
 
 class DownloadResponse(BaseModel):
+    """
+    Response model for model download operations.
+    """
+
     download_id: str | None
+    """Unique identifier for the download operation, if applicable."""
     message: str
+    """Message describing the status of the download operation."""
     status: Literal["not_downloaded", "in_progress", "errored", "completed"]
+    """Current status of the download operation."""
     progress: float
+    """Progress of the download operation as a percentage (0.00 to 100.00)."""
     error: str | None = None
+    """Error message if the download operation failed, otherwise None."""
 
 
 async def download_file(download_id: str, url: str, download_path: str) -> DownloadResponse:
+    """
+    Download a file from a given URL and save it to the specified path.
+
+    This function updates the download progress in the database.
+
+    Parameters
+    ----------
+    download_id : str
+        Unique identifier for the download operation.
+    url : str
+        URL of the file to download.
+    download_path : str
+        Path where the downloaded file will be saved.
+
+    Returns
+    -------
+    DownloadResponse
+        Response model containing the status of the download operation.
+    """
     collection = db.get_collection("model_downloads")
     try:
         tempfile_path = tempfile.NamedTemporaryFile(prefix="model_", suffix=".ckpt", delete=False)
@@ -223,7 +247,7 @@ def download(model_id: str, background_tasks: BackgroundTasks, admin=Depends(get
 
 
 @router.delete("/{model_id}")
-def delete_model(model_id: str) -> DownloadResponse:
+def delete_model(model_id: str, admin=Depends(get_admin_user)) -> DownloadResponse:
     """Delete a model."""
 
     model_path = get_model_path(model_id.replace("_", "/"))
@@ -252,7 +276,7 @@ def delete_model(model_id: str) -> DownloadResponse:
 
 
 @router.get("/{model_id}/metadata")
-async def get_model_metadata(model_id: str) -> ModelExtra:
+async def get_model_metadata(model_id: str, admin=Depends(get_admin_user)) -> ModelExtra:
     """
     Get metadata for a specific model.
 
@@ -277,7 +301,7 @@ async def get_model_metadata(model_id: str) -> ModelExtra:
 
 
 @router.get("/{model_id}/editable")
-def is_model_metadata_editable(model_id: str) -> bool:
+def is_model_metadata_editable(model_id: str, admin=Depends(get_admin_user)) -> bool:
     """
     Check if metadata for a specific model is editable.
 
@@ -322,7 +346,9 @@ async def _update_model_metadata(model_id: str, metadata: ModelExtra) -> ModelEx
 
 
 @router.patch("/{model_id}/metadata")
-async def patch_model_metadata(model_id: str, metadata: ModelExtra, background_tasks: BackgroundTasks) -> None:
+async def patch_model_metadata(
+    model_id: str, metadata: ModelExtra, background_tasks: BackgroundTasks, admin=Depends(get_admin_user)
+) -> None:
     """
     Patch metadata for a specific model.
 
@@ -354,14 +380,14 @@ async def patch_model_metadata(model_id: str, metadata: ModelExtra, background_t
 # Model Info
 @lru_cache(maxsize=128)
 @router.get("/{model_id}/info")
-async def get_model_info(model_id: str) -> dict[str, Any]:
+async def get_model_info(model_id: str, admin=Depends(get_admin_user)) -> dict[str, Any]:
     """
     Get basic information about a model.
 
     Parameters
     ----------
     model_id : str
-            Model to load, directory separated by underscores
+        Model to load, directory separated by underscores
 
     Returns
     -------
@@ -372,14 +398,14 @@ async def get_model_info(model_id: str) -> dict[str, Any]:
 
 
 @router.post("/{model_id}/spec")
-async def get_model_spec(model_id: str, modelspec: ModelSpecification) -> dict[str, Any]:
+async def get_model_spec(model_id: str, modelspec: ModelSpecification, admin=Depends(get_admin_user)) -> dict[str, Any]:
     """
     Get the Qubed model spec as a json.
 
     Parameters
     ----------
     modelspec : ModelSpecification
-            Model Specification
+        Model Specification
 
     Returns
     -------

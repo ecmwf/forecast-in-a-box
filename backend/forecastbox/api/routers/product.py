@@ -32,10 +32,11 @@ router = APIRouter(
 )
 
 CONFIG_ORDER = ["param", "levtype", "levelist"]
+"""Order of configuration parameters for display purposes."""
 
 
 def get_model(model: ModelSpecification) -> Model:
-    """Get the model from the model repository."""
+    """Get the model from the local model repository."""
 
     model_dict = model.model_dump()
     model_path = get_model_path(model_dict.pop("model").replace("_", "/"))
@@ -43,6 +44,7 @@ def get_model(model: ModelSpecification) -> Model:
 
 
 def select_from_params(available_spec: Qube, params: dict[str, Any]) -> Qube:
+    """Select from the available specification based on the provided parameters."""
     for key, val in params.items():
         if not val:
             continue
@@ -57,12 +59,28 @@ def select_from_params(available_spec: Qube, params: dict[str, Any]) -> Qube:
     return available_spec
 
 
-async def product_to_config(product: Product, modelspec: ModelSpecification, params: dict[str, Any]) -> dict[str, ConfigEntry]:
-    """Convert a product to a configuration."""
+async def product_to_config(product: Product, model_spec: ModelSpecification, params: dict[str, Any]) -> dict[str, ConfigEntry]:
+    """
+    Convert a product to a configuration dictionary.
+
+    Parameters
+    ----------
+    product : Product
+        Product Specification
+    modelspec : ModelSpecification
+        Specification of the model to use for the product.
+    params : dict[str, Any]
+        Params from the user to apply to the the product configuration.
+
+    Returns
+    -------
+    dict[str, ConfigEntry]
+        Dictionary of configuration entries for the product.
+    """
 
     # product_spec = product.qube
 
-    model_spec = get_model(modelspec)
+    model_spec = get_model(model_spec)
     # model_qube = model_spec.qube(product.model_assumptions)
 
     available_product_spec = product.model_intersection(model_spec)
@@ -103,12 +121,27 @@ async def product_to_config(product: Product, modelspec: ModelSpecification, par
 
 @router.get("/categories/{interface}")
 async def api_get_categories(interface: Interfaces) -> dict[str, Category]:
-    """Get all categories."""
+    """Get all categories for an interface."""
     return get_categories(interface)
 
 
 @router.post("/categories/{interface}")
 async def get_valid_categories(interface: Interfaces, modelspec: ModelSpecification) -> dict[str, Category]:
+    """
+    Get valid categories for a given interface and model specification.
+
+    Parameters
+    ----------
+    interface : Interfaces
+        Interface to get categories for.
+    modelspec : ModelSpecification
+        Model specification to validate against the categories.
+
+    Returns
+    -------
+    dict[str, Category]
+        Dictionary of categories with available options based on the model specification.
+    """
     model_spec = get_model(modelspec)
 
     categories = get_categories(interface)
@@ -128,6 +161,27 @@ async def get_valid_categories(interface: Interfaces, modelspec: ModelSpecificat
 
 @router.post("/configuration/{category}/{product}")
 async def get_product_configuration(category: str, product: str, model: ModelSpecification, spec: dict[str, Any]) -> ProductConfiguration:
+    """
+    Get the product configuration for a given category and product.
+
+    Validates the product against the model specification and returns a configuration object.
+
+    Parameters
+    ----------
+    category : str
+        Category of the product.
+    product : str
+        Product name.
+    model : ModelSpecification
+        Model specification to validate against the product.
+    spec : dict[str, Any]
+        Specification parameters to apply to the product configuration.
+
+    Returns
+    -------
+    ProductConfiguration
+        Product configuration object containing the product name and options.
+    """
     prod = get_product(category, product)
     entries = await product_to_config(prod, model, spec)
     return ProductConfiguration(product=f"{category}/{product}", options=entries)
