@@ -29,7 +29,7 @@ from ..types import ModelSpecification, ModelName
 from forecastbox.models.model import Model, model_info, get_extra_information, set_extra_information, ModelExtra
 from .admin import get_admin_user
 
-from forecastbox.settings import API_SETTINGS
+from forecastbox.config import config
 from forecastbox.db import db
 import asyncio
 
@@ -41,7 +41,7 @@ router = APIRouter(
 
 def get_model_path(model: str) -> Path:
     """Get the path to a model."""
-    return (Path(API_SETTINGS.data_path) / model).with_suffix(".ckpt").absolute()
+    return (Path(config.api.data_path) / model).with_suffix(".ckpt").absolute()
 
 
 Category = str
@@ -66,10 +66,10 @@ async def get_available_models() -> dict[Category, list[ModelName]]:
     """
     models = defaultdict(list)
 
-    for model in Path(API_SETTINGS.data_path).glob("**/*.ckpt"):
+    for model in Path(config.api.data_path).glob("**/*.ckpt"):
         if not model.is_file():
             continue
-        model_path = model.relative_to(API_SETTINGS.data_path)
+        model_path = model.relative_to(config.api.data_path)
         category, name = model_path.parts[:-1], model_path.name
         models["/".join(category)].append(name.replace(".ckpt", ""))
 
@@ -90,7 +90,7 @@ async def manage_get_available_models(admin=Depends(get_admin_user)) -> dict[Cat
         Dictionary containing model categories and their models
     """
 
-    manifest_path = os.path.join(API_SETTINGS.model_repository, "MANIFEST")
+    manifest_path = os.path.join(config.api.model_repository, "MANIFEST")
 
     response = requests.get(manifest_path)
     if response.status_code != 200:
@@ -182,7 +182,7 @@ async def check_if_downloaded(model_id: str, admin=Depends(get_admin_user)) -> D
 def download(model_id: str, background_tasks: BackgroundTasks, admin=Depends(get_admin_user)) -> DownloadResponse:
     """Download a model."""
 
-    repo = API_SETTINGS.model_repository
+    repo = config.api.model_repository
 
     repo = repo.removesuffix("/")
 

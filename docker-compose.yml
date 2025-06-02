@@ -6,7 +6,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-
+    image: eccr.ecmwf.int/forecast-in-a-box/fiab-frontend:latest
     ports:
       - "3000:3000"
     # environment:
@@ -19,6 +19,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    image: eccr.ecmwf.int/forecast-in-a-box/fiab-backend:latest
     volumes:
       - data:/app/data_dir
       - ~/.ssh:/root/.ssh:ro
@@ -28,12 +29,12 @@ services:
     depends_on:
       - db
     environment:
-      API_URL: "http://backend:8000"
-      DATA_PATH: "/app/data_dir"
-      MODEL_REPOSITORY: "https://sites.ecmwf.int/repository/fiab"
-      CASCADE_URL: "tcp://cascade:8067"
-      MONGODB_URI: "mongodb://db:27017"
-      MONGODB_DATABASE: "fiab"
+      API__API_URL: "http://backend:8000"
+      API__DATA_PATH: "/app/data_dir"
+      API__MODEL_REPOSITORY: "https://sites.ecmwf.int/repository/fiab"
+      CASCADE__CASCADE_URL: "tcp://cascade:8067"
+      DB__MONGODB_URI: "mongodb://db:27017"
+      DB__MONGODB_DATABASE: "fiab"
 
       ECMWF_API_URL: "https://api.ecmwf.int/v1"
       ECMWF_API_KEY: ${ECMWF_API_KEY}
@@ -48,6 +49,7 @@ services:
     build:
       context: ./backend
       dockerfile: DockerfileMARSRocky
+    image: eccr.ecmwf.int/forecast-in-a-box/fiab-cascade:latest
     entrypoint: "python -m cascade.gateway tcp://0.0.0.0:8067"
     environment:
       MARS_DHS_LOCALHOST: 136.156.137.31

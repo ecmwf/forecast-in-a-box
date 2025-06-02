@@ -21,7 +21,7 @@ from fastapi.responses import StreamingResponse
 
 from forecastbox.db import async_db as db
 
-from forecastbox.settings import CASCADE_SETTINGS
+from forecastbox.config import config
 
 logs_collection = db["process_logs"]
 processes = {}
@@ -75,7 +75,7 @@ async def start_process(background_tasks: BackgroundTasks) -> ProcessStatus:
         raise HTTPException(404, "Neither Python nor uv found. Cannot start process.")
 
     process = subprocess.Popen(
-        ["stdbuf", "-oL", *command_prefix, "-u", "-m", "cascade.gateway", CASCADE_SETTINGS.cascade_url],
+        ["stdbuf", "-oL", *command_prefix, "-u", "-m", "cascade.gateway", config.cascade.cascade_url],
         # ['echo', 'Hello, World!', f"{command_prefix}"],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -105,10 +105,10 @@ async def capture_logs(proc_id: str, process):
             print(f"Error reading log: {e}")
             break
 
-        await logs_collection.insert_one({"process_id": proc_id, "timestamp": datetime.utcnow(), "log": line})
+        await logs_collection.insert_one({"process_id": proc_id, "timestamp": datetime.now(), "log": line})
 
         collection_size = await logs_collection.count_documents({})
-        if collection_size > CASCADE_SETTINGS.LOG_COLLECTION_MAX_SIZE:
+        if collection_size > config.cascade.log_collection_max_size:
             oldest_log = await logs_collection.find_one(sort=[("timestamp", 1)])
             if oldest_log:
                 await logs_collection.delete_one({"_id": oldest_log["_id"]})

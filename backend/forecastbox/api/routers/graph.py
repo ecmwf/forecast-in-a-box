@@ -38,7 +38,7 @@ from forecastbox.db import db
 from forecastbox.auth.users import current_active_user
 from forecastbox.schemas.user import User
 
-from forecastbox.settings import CASCADE_SETTINGS
+from forecastbox.config import config
 from forecastbox.api.types import VisualisationOptions
 
 router = APIRouter(
@@ -90,7 +90,7 @@ async def get_graph_visualise(spec: ExecutionSpecification, options: Visualisati
         options = VisualisationOptions()
 
     try:
-        graph = await convert_to_cascade(spec)
+        graph = convert_to_cascade(spec)
     except Exception as e:
         LOG.error(f"Error converting to cascade: {e}")
         return HTMLResponse(str(e), status_code=500)
@@ -139,10 +139,10 @@ async def _execute(spec: ExecutionSpecification, id: str, user: User) -> api.Sub
 
     environment = spec.environment
 
-    hosts = min(CASCADE_SETTINGS.max_hosts, environment.hosts or CASCADE_SETTINGS.max_hosts)
-    workers_per_host = min(CASCADE_SETTINGS.max_workers_per_host, environment.workers_per_host or CASCADE_SETTINGS.max_workers_per_host)
+    hosts = min(config.cascade.max_hosts, environment.hosts or config.cascade.max_hosts)
+    workers_per_host = min(config.cascade.max_workers_per_host, environment.workers_per_host or config.cascade.max_workers_per_host)
 
-    env_vars = {"TMPDIR": CASCADE_SETTINGS.VENV_TEMP_DIR}
+    env_vars = {"TMPDIR": config.cascade.venv_temp_dir}
     env_vars.update(environment.environment_variables)
 
     r = api.SubmitJobRequest(
@@ -156,7 +156,7 @@ async def _execute(spec: ExecutionSpecification, id: str, user: User) -> api.Sub
         )
     )
     try:
-        submit_job_response: api.SubmitJobResponse = client.request_response(r, f"{CASCADE_SETTINGS.cascade_url}")  # type: ignore
+        submit_job_response: api.SubmitJobResponse = client.request_response(r, f"{config.cascade.cascade_url}")  # type: ignore
     except Exception as e:
         collection.update_one({"id": id}, {"$set": {"error": "Failed to submit job - " + str(e)}})
         return

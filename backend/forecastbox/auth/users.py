@@ -20,9 +20,9 @@ from fastapi_users.authentication import (
 from fastapi_users_db_beanie import BeanieUserDatabase, ObjectIDIDMixin
 
 from forecastbox.db import User, get_user_db, async_db
-from forecastbox.settings import FIAB_SETTINGS
+from forecastbox.config import config
 
-SECRET = FIAB_SETTINGS.jwt_secret
+SECRET = config.general.jwt_secret
 
 
 class UserManager(ObjectIDIDMixin, BaseUserManager[User, PydanticObjectId]):

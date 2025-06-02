@@ -254,7 +254,9 @@ def model_info(checkpoint_path: str) -> dict[str, Any]:
     ckpt = open_checkpoint(checkpoint_path)
 
     anemoi_versions = model_versions(checkpoint_path)
-    anemoi_versions = {k: v for k, v in anemoi_versions.items() if k.startswith("anemoi-")}
+    anemoi_versions = {
+        k: v for k, v in anemoi_versions.items() if any(k.startswith(prefix) for prefix in ["anemoi-", "earthkit-", "torch", "flash-attn"])
+    }
 
     return {
         "timestep": ckpt.timestep,
@@ -278,6 +280,8 @@ def get_extra_information(checkpoint_path: str) -> ModelExtra:
 def set_extra_information(checkpoint_path: str, extra: ModelExtra) -> None:
     """Set the extra information for the model."""
     from anemoi.utils.checkpoints import replace_metadata, save_metadata, has_metadata
+
+    open_checkpoint.cache_clear()
 
     if not has_metadata(checkpoint_path, name=FORECAST_IN_A_BOX_METADATA):
         save_metadata(

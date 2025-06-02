@@ -31,8 +31,10 @@ from .api.routers import admin
 from .api.routers import auth
 from .api.routers import gateway
 
+from .config import config
 
 LOG = logging.getLogger(__name__)
+LOG.debug("Starting FIAB with config: %s", config)
 
 
 @asynccontextmanager
@@ -94,14 +96,14 @@ def status() -> StatusResponse:
     """
     Status endpoint
     """
-    from forecastbox.settings import CASCADE_SETTINGS, API_SETTINGS
+    from forecastbox.config import config
 
     status = {"api": "up", "cascade": "up", "ecmwf": "up"}
 
     from cascade.gateway import client, api
 
     try:
-        client.request_response(api.JobProgressRequest(job_ids=[]), CASCADE_SETTINGS.cascade_url, timeout_ms=1000)
+        client.request_response(api.JobProgressRequest(job_ids=[]), config.cascade.cascade_url, timeout_ms=1000)
         status["cascade"] = "up"
     except Exception as e:
         LOG.warning(f"Error connecting to Cascade: {e}")
@@ -111,7 +113,7 @@ def status() -> StatusResponse:
     import requests
 
     try:
-        response = requests.get(f"{API_SETTINGS.model_repository}/MANIFEST", timeout=1)
+        response = requests.get(f"{config.api.model_repository}/MANIFEST", timeout=1)
         if response.status_code == 200:
             status["ecmwf"] = "up"
         else:

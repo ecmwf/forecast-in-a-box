@@ -28,7 +28,7 @@ from forecastbox.auth.users import current_active_user
 
 from forecastbox.db import db
 
-from forecastbox.settings import CASCADE_SETTINGS
+from forecastbox.config import config
 from forecastbox.api.types import VisualisationOptions, ExecutionSpecification
 
 from .graph import execute, SubmitJobResponse
@@ -94,7 +94,7 @@ def get_job_progress(job_id: JobId = Depends(validate_job_id)) -> JobProgressRes
 
     try:
         response: api.JobProgressResponse = client.request_response(
-            api.JobProgressRequest(job_ids=[cascade_job_id]), f"{CASCADE_SETTINGS.cascade_url}"
+            api.JobProgressRequest(job_ids=[cascade_job_id]), f"{config.cascade.cascade_url}"
         )  # type: ignore
     except TimeoutError as e:
         collection.update_one({"id": job_id}, {"$set": {"status": "timeout"}})
@@ -289,7 +289,7 @@ async def get_job_availablity(job_id: JobId = Depends(validate_job_id)) -> list[
         Job ID of the task
     """
     response: api.JobProgressResponse = client.request_response(
-        api.JobProgressRequest(job_ids=[get_cascade_job_id(job_id)]), f"{CASCADE_SETTINGS.cascade_url}"
+        api.JobProgressRequest(job_ids=[get_cascade_job_id(job_id)]), f"{config.cascade.cascade_url}"
     )
 
     return [x.task for x in response.datasets[job_id]]
@@ -320,7 +320,7 @@ async def get_result_availablity(
     cascade_job_id = get_cascade_job_id(job_id)
     try:
         response: api.JobProgressResponse = client.request_response(
-            api.JobProgressRequest(job_ids=[cascade_job_id]), f"{CASCADE_SETTINGS.cascade_url}"
+            api.JobProgressRequest(job_ids=[cascade_job_id]), f"{config.cascade.cascade_url}"
         )
     except ValueError as e:
         raise HTTPException(status_code=500, detail=f"Job retrieval failed: {e}")
@@ -368,7 +368,7 @@ def result_cache(
     """Get the path to the result cache."""
     return client.request_response(
         api.ResultRetrievalRequest(job_id=get_cascade_job_id(job_id), dataset_id=DatasetId(task=dataset_id, output="0")),
-        f"{CASCADE_SETTINGS.cascade_url}",
+        f"{config.cascade.cascade_url}",
     )
 
 
@@ -406,7 +406,7 @@ async def flush_job() -> JobDeletionResponse:
     Returns number of deleted jobs.
     """
     try:
-        client.request_response(api.ResultDeletionRequest(datasets={}), f"{CASCADE_SETTINGS.cascade_url}")  # type: ignore
+        client.request_response(api.ResultDeletionRequest(datasets={}), f"{config.cascade.cascade_url}")  # type: ignore
     except Exception as e:
         raise HTTPException(500, f"Job deletion failed: {e}")
     finally:
@@ -422,7 +422,7 @@ async def delete_job(job_id: JobId = Depends(validate_job_id)) -> JobDeletionRes
     Returns number of deleted jobs.
     """
     try:
-        client.request_response(api.ResultDeletionRequest(datasets={job_id: []}), f"{CASCADE_SETTINGS.cascade_url}")  # type: ignore
+        client.request_response(api.ResultDeletionRequest(datasets={job_id: []}), f"{config.cascade.cascade_url}")  # type: ignore
     except Exception as e:
         raise HTTPException(500, f"Job deletion failed: {e}")
     finally:
