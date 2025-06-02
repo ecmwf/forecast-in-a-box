@@ -25,6 +25,8 @@ services:
       - ~/.ecmwfapirc:/root/.ecmwfapirc:ro
     ports:
       - "8000:8000"
+    depends_on:
+      - db
     environment:
       API_URL: "http://backend:8000"
       DATA_PATH: "/app/data_dir"
@@ -55,6 +57,7 @@ services:
       - fiab-network
     ports:
       - "48165:48165"
+    shm_size: '5gb'
     volumes:
       - data:/app/data_dir
       - ~/.ssh:/root/.ssh:ro
