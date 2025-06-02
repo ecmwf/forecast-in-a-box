@@ -11,7 +11,10 @@
 import React from 'react';
 import { Alert, Title} from '@mantine/core';
 
+import { useSettings } from '../SettingsContext';
+
 const Banner: React.FC = () => {
+    const { settings } = useSettings();
 
     return (
         // <div style={{
@@ -29,7 +32,9 @@ const Banner: React.FC = () => {
                 closeButtonLabel="Dismiss"
                 // w='100px'
             >
-                <Title c="white" p='' m='' order={3} style={{ fontFamily: 'Nebula-Bold' }}>PROTOTYPE</Title>
+                <Title c="white" p='' m='' order={3} style={{ fontFamily: 'Nebula-Bold' }}>
+                    {settings.banner_text|| 'PROTOTYPE'}
+                </Title>
                 {/* <Box p='' m=''><strong>This is a prototype providing an experimental service of ECMWF products. </strong></Box> */}
             </Alert>
         // </div>

@@ -130,6 +130,7 @@ const Settings = () => {
         <Button onClick={() => handleApiUrlChange(apiUrl)} mt="md">
             Set API URL
         </Button>
+        <TextInput label='Set Banner text' onChange={(e) => updateSetting('banner_text', e.target.value)} value={settings.banner_text || 'PROTOTYPE'} mt="md" />
       <Space h="md" />
       <Title order={3}></Title>
       {apiSettings && !loading && (
