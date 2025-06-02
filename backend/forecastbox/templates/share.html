@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Forecast-in-a-Box</title>
+    <!-- Open Graph -->
+    <meta property="og:title" content="{{ image_name }}" />
+    <!-- <meta property="og:description" content="A beautiful image worth sharing!" /> -->
+    <meta property="og:image" content="{{ image_url }}" />
+    <meta property="og:type" content="website" />
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="{{ image_url }}" />
+</head>
+<body>
+    <div style="display: flex; justify-content: center; align-items: center;">
+        <img src="{{ image_url }}" alt="Shared Image" style="max-width: 100vw; max-height: 100vh; object-fit: contain;" />
+    </div>
+</body>
+</html>
