@@ -18,6 +18,7 @@ import { showNotification } from '@mantine/notifications'
 import { useNavigate} from 'react-router-dom'
 
 import MainLayout from '../layouts/MainLayout';
+import { useEffect } from 'react'
 
 
 export default function Login() {
@@ -56,7 +57,16 @@ export default function Login() {
 
   }
   const handleSSO = async () => {
+    
   }
+
+  useEffect(() => {
+    const token = localStorage.getItem('fiabtoken')
+    
+    if (token) {
+      navigate(redirectUrl)
+    }
+  }, [navigate, redirectUrl])
 
   return (
     <MainLayout>
@@ -69,7 +79,7 @@ export default function Login() {
             {/* Don&apos;t have an account? <Link to="/signup">Sign up</Link> */}
           </Text>
             <Button fullWidth mt="xl" onClick={handleLogin}>Login</Button>
-          <Button fullWidth mt="sm" variant="outline" onClick={handleSSO}>Login with ECMWF</Button>
+          {/* <Button fullWidth mt="sm" variant="outline" onClick={handleSSO}>Login with ECMWF</Button> */}
         </Paper>
       </Container>
       </MainLayout>
