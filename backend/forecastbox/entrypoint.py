@@ -129,7 +129,7 @@ def status() -> StatusResponse:
     return StatusResponse(**status)
 
 
-@app.get("/api/v1/share/{job_id}/{dataset_id}", response_class=HTMLResponse)
+@app.get("/api/v1/share/{job_id}/{dataset_id}", response_class=HTMLResponse, tags=["share"], summary="Share Image")
 async def share_image(request: Request, job_id: str, dataset_id: str):
     """
     Endpoint to share an image from a job and dataset ID.
