@@ -117,6 +117,7 @@ function Model({ selectedModel, coordinates, setCoordinates, modelSpec, submit }
                     value={ensembleMembers}
                     onChange={(value) => setEnsembleMembers(value)}
                     min={1}
+                    max={51}
                 />
             </Card>
 

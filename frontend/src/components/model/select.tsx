@@ -13,7 +13,7 @@
 import { Card, Button, Tabs, ScrollArea, Group, Title, Text, ActionIcon, Flex, Table, Loader, Progress, Menu, Burger} from '@mantine/core';
 import { useEffect, useRef, useState } from "react";
 
-import classes from './options.module.css';
+import classes from './manage.module.css';
 
 import {IconX, IconCheck, IconRefresh, IconTableDown, IconTrash} from '@tabler/icons-react';
 import {useApi} from '../../api';

@@ -73,7 +73,7 @@ const Settings = () => {
   const updateApiSettings = async () => {
     setUpdating(true);
     try {
-      await api.post('/v1/settings', formValues);
+      await api.post('/v1/admin/settings', formValues);
       showNotification({
         title: 'Success',
         message: 'Settings updated successfully',

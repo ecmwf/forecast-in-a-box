@@ -8,7 +8,7 @@
 // granted to it by virtue of its status as an intergovernmental organisation
 // nor does it submit to any jurisdiction.
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SimpleGrid, Text, Card, LoadingOverlay, Stack, Title, Paper} from '@mantine/core';
 
 import {useApi} from '../../api';

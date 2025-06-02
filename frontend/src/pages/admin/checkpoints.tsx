@@ -10,16 +10,22 @@
 
 "use client";
 
-import { Container} from '@mantine/core';
+import { Container, Divider} from '@mantine/core';
 
 
 import ManageCheckpoints from '../../components/model/manage';
+import ModelInformation from '../../components/model/information';
+import { useState } from 'react';
 
 
 export default function CheckpointsPage() {
+    const [selectedModel, setSelectedModel] = useState<string | null>(null);
+
     return (
         <Container pt='xl' size='xl'>
-            <ManageCheckpoints setSelected={() => null}/>
+            <ManageCheckpoints setSelected={setSelectedModel}/>
+            <Divider my='xl' />
+            <ModelInformation selected={selectedModel}/>
         </Container>
     )
 }
