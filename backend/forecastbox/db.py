@@ -11,13 +11,12 @@ from fastapi_users_db_beanie import BeanieUserDatabase
 from forecastbox.config import config
 from forecastbox.schemas.user import User
 
-import motor.motor_asyncio
 from beanie import init_beanie
-from pymongo import MongoClient
+from pymongo import MongoClient, AsyncMongoClient
 
 db_name = config.db.mongodb_database
 
-async_client = motor.motor_asyncio.AsyncIOMotorClient(config.db.mongodb_uri, uuidRepresentation="standard")
+async_client = AsyncMongoClient(config.db.mongodb_uri)
 mongo_client = MongoClient(config.db.mongodb_uri)
 
 db = mongo_client[db_name]
