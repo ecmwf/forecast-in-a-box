@@ -38,9 +38,14 @@ const Intro = () => {
                     {/* <Space h="sm" /> */}
                     <Text size="xl" style={{color: "white"}}>
                         Forecast-In-A-Box streamlines the product generation task allowing {' '}
-                        <strong style={{color: "#6DABFF"}}>any</strong> forecaster to get 
-                        the data they need, when they need it.
+                        <strong style={{color: "#6DABFF"}}>any</strong> user to get weather predictions
+                        where they need it, when they need it.
                     </Text>
+                    {/* <Text size="md" style={{color: "white"}}>
+                        With a simple and intuitive interface, users can easily create many products, 
+
+                        "Whatever works for you"
+                    </Text> */}
                     <Space h="md" />
                 </Group>
                 <Center>

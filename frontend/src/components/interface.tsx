@@ -90,7 +90,7 @@ export type ExecutionSpecification = {
 export type DatasetId = string;
 
 export type SubmitResponse = {
-  job_id: string;
+  id: string;
   error: string;
 };
 

@@ -1,0 +1,56 @@
+FROM rockylinux:9
+
+ARG REPO_BASE=https://nexus.ecmwf.int
+ARG REPO_SUFFIX=stable
+
+ENV REPO_BASE=${REPO_BASE}
+ENV REPO_SUFFIX=${REPO_SUFFIX}
+
+ENV MARS_DHS_LOCALHOST=136.156.137.31
+ENV MARS_ENVIRON_ORIGIN="ewc"
+ENV MARS_DHS_LOCALPORT=48165
+
+# 1. Install base packages
+RUN dnf install -y epel-release dnf-plugins-core firewalld iproute && \
+    dnf clean all
+
+# 2. Determine and enable extra repo (crb or powertools)
+RUN ver=$(rpm -E %rhel) && \
+    if [ "$ver" -gt 8 ]; then extra_repo="crb"; else extra_repo="powertools"; fi && \
+    if ! dnf repolist "$extra_repo" --enabled | grep -q "$extra_repo"; then \
+        dnf config-manager --enable "$extra_repo"; \
+    fi && \
+    dnf clean all
+
+# 3. Import ECMWF GPG key
+RUN rpm --import ${REPO_BASE}/repository/private-raw-repos-config/rocky/keys/ewc-rocky-gpg-key
+
+# 4. Add ECMWF yum repository
+RUN ver=$(rpm -E %rhel) && \
+    mkdir -p /etc/yum.repos.d && \
+    printf "[ecmwf]\nname=ECMWF Repository\nbaseurl=%s/repository/private-rocky-%s/%s/5/rpms\nenabled=1\ngpgcheck=1\n" \
+      "${REPO_BASE}" "${REPO_SUFFIX}" "$ver" > /etc/yum.repos.d/ecmwf.repo
+
+# 5. Install MARS client
+RUN dnf install -y mars-client-cloud && \
+    dnf clean all
+
+
+# Set the working directory in the container
+WORKDIR /app/backend
+
+# Copy the backend directory into the container
+COPY forecastbox /app/backend/forecastbox/
+COPY install.sh /app/backend/install.sh
+COPY pyproject.toml /app/backend/forecastbox/pyproject.toml
+
+
+# Install UV
+COPY --from=ghcr.io/astral-sh/uv:0.7.8 /uv /uvx /bin/
+
+# Create a virtual env. Install fiab dependencies, with caching
+RUN --mount=type=cache,mode=0755,target=/root/.cache/uv sh /app/backend/install.sh
+
+ENV PATH="/app/.venv/bin/:$PATH"
+ENTRYPOINT ["/app/.venv/bin/uvicorn", "--host", "0.0.0.0", \
+    "forecastbox.entrypoint:app", "--log-level", "info"]

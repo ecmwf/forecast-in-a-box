@@ -11,12 +11,6 @@
 FastAPI Entrypoint
 """
 
-# TODO Remove when fckit is auto installed
-import findlibs
-
-findlibs.load("fckit")
-
-
 from contextlib import asynccontextmanager
 import time
 from fastapi import FastAPI, Request
@@ -31,14 +25,16 @@ from forecastbox.db import init_db
 
 from .api.routers import model
 from .api.routers import product
-from .api.routers import graph
+from .api.routers import execution
 from .api.routers import job
 from .api.routers import admin
 from .api.routers import auth
 from .api.routers import gateway
 
+from .config import config
 
 LOG = logging.getLogger(__name__)
+LOG.debug("Starting FIAB with config: %s", config)
 
 
 @asynccontextmanager
@@ -55,7 +51,7 @@ app = FastAPI(
 
 app.include_router(model.router, prefix="/api/v1/model")
 app.include_router(product.router, prefix="/api/v1/product")
-app.include_router(graph.router, prefix="/api/v1/graph")
+app.include_router(execution.router, prefix="/api/v1/graph")
 app.include_router(job.router, prefix="/api/v1/job")
 app.include_router(admin.router, prefix="/api/v1/admin")
 app.include_router(auth.router, prefix="/api/v1")
@@ -100,14 +96,14 @@ def status() -> StatusResponse:
     """
     Status endpoint
     """
-    from forecastbox.settings import CASCADE_SETTINGS, API_SETTINGS
+    from forecastbox.config import config
 
     status = {"api": "up", "cascade": "up", "ecmwf": "up"}
 
     from cascade.gateway import client, api
 
     try:
-        client.request_response(api.JobProgressRequest(job_ids=[]), CASCADE_SETTINGS.cascade_url, timeout_ms=1000)
+        client.request_response(api.JobProgressRequest(job_ids=[]), config.cascade.cascade_url, timeout_ms=1000)
         status["cascade"] = "up"
     except Exception as e:
         LOG.warning(f"Error connecting to Cascade: {e}")
@@ -117,7 +113,7 @@ def status() -> StatusResponse:
     import requests
 
     try:
-        response = requests.get(f"{API_SETTINGS.model_repository}/MANIFEST", timeout=1)
+        response = requests.get(f"{config.api.model_repository}/MANIFEST", timeout=1)
         if response.status_code == 200:
             status["ecmwf"] = "up"
         else:

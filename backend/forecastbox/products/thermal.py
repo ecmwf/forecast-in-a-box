@@ -14,11 +14,11 @@ from forecastbox.models import Model
 
 from .registry import CategoryRegistry
 from .product import Product
-
+from .interfaces import Interfaces
 
 from earthkit.workflows.plugins.pproc.fluent import Action as ppAction
 
-thermal_indices = CategoryRegistry("thermal", "Thermal Indices", "Thermal Indices")
+thermal_indices = CategoryRegistry("thermal", interface=Interfaces.DETAILED, description="Thermal Indices", title="Thermal Indices")
 
 THERMOFEEL_IMPORTED = True
 if not importlib.util.find_spec("thermofeel"):

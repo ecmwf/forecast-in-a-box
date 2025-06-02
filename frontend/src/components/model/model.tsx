@@ -10,9 +10,9 @@
 
 "use client"; // Required for client-side fetching
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Modal, Group, TextInput, NumberInput, Divider, Flex} from '@mantine/core';
+import { Card, Button, Modal, Group, TextInput, NumberInput, Divider, Text} from '@mantine/core';
 import GlobeSelect from './globe';
-import Options from './options';
+import SelectModel from './select';
 import InformationWindow from './information';
 
 import { ModelSpecification } from '../interface';
@@ -70,13 +70,14 @@ function Model({ selectedModel, coordinates, setCoordinates, modelSpec, submit }
 
     return (
         <Card padding="">
-            <Options cardProps={{}} setSelected={setModel} />
+            <SelectModel setSelected={setModel} />
             <Divider my="md" />
             <InformationWindow selected={model} />
 
             {showGlobeSelect && (
                 <Group>
                     <Button onClick={() => setModalOpened(true)}>Open Globe</Button>
+                    <Text>This does nothing at the moment, but shows how LAM's could be configured.</Text>
                     <Group>
                         {coordinates && (
                             <>
@@ -116,11 +117,12 @@ function Model({ selectedModel, coordinates, setCoordinates, modelSpec, submit }
                     value={ensembleMembers}
                     onChange={(value) => setEnsembleMembers(value)}
                     min={1}
+                    max={51}
                 />
             </Card>
 
             <Button onClick={handleModelSubmit} disabled={!model || !date} mt="md">
-                Submit
+                Continue
             </Button>
         </Card>
     );

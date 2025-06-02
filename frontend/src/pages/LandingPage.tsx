@@ -10,9 +10,10 @@
 
 "use client";
 
-import Intro from '../components/intro';
-import DAG from '../components/dag';
-import Building from '../components/building_on';
+import Intro from '../components/landing/intro';
+import DAG from '../components/landing/dag';
+import Building from '../components/landing/building_on';
+import Collaboration from '../components/landing/collaboration';
 
 import MainLayout from '../layouts/MainLayout';
 
@@ -22,6 +23,7 @@ export default function LandingPage() {
       <Intro />
       <DAG />
       <Building />
+      <Collaboration />
     </MainLayout>
   );
 };

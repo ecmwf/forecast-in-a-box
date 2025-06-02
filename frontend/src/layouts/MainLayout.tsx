@@ -10,10 +10,8 @@
 
 
 
-import { AppShell, Burger, Button, Container, Group, rem, Space, Stack, Title, UnstyledButton } from "@mantine/core";
+import { AppShell, Burger, Button, Container, Group, Stack, Title, UnstyledButton } from "@mantine/core";
 import { useDisclosure, useHeadroom } from '@mantine/hooks';
-
-import { IconBox } from '@tabler/icons-react';
 
 import { useApi } from '../api';
 import { useNavigate } from 'react-router-dom';
@@ -33,7 +31,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     const handleLogout = () => {
       api.post('/v1/auth/jwt/logout')
       .then(() => {
-        localStorage.removeItem('token');
+        localStorage.removeItem('fiabtoken');
       })
       showNotification({
         id: `logout-success-${crypto.randomUUID()}`,
@@ -51,7 +49,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     const [isSuperuser, setIsSuperuser] = useState(false);
   
     const checkLogin = () => {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('fiabtoken');
         if (!token) {
             setLoggedIn(false);
         } else {    
@@ -88,7 +86,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                     <Group justify="space-between" style={{ flex: 1 }}>
                         <Group align="center" >
                             <a style={{"color":"white", "display":'inline'}} href="/"><img src='/logos/fiab.png' width='50vw'/></a>
-                            <Title style={{"color":"white"}} order={2} textWrap={'pretty'}>ECMWF Forecast In a Box</Title>
+                            <Title style={{"color":"white"}} order={2} textWrap={'pretty'}>Forecast In a Box</Title>
                         </Group>
                         <Banner />
                         <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" color="white"/>
@@ -116,7 +114,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                         <Stack>
                         {loggedIn ? (
                             <>
-                            <UnstyledButton className="animated-button" size="md" c = 'white' component='a' href='/settings'>Settings</UnstyledButton>
+                            <UnstyledButton className="animated-button" size="md" c = 'white' component='a' href='/admin'>Admin</UnstyledButton>
                             <UnstyledButton className="animated-button" size="md" c = 'white' component='a' href='/products'>Products</UnstyledButton>
                             <UnstyledButton className="animated-button" size="md" c = 'white' component='a' href='/job/status'>Job Status</UnstyledButton>
                             <UnstyledButton className="animated-button" size="md" c = 'white' onClick={handleLogout}>Logout</UnstyledButton>

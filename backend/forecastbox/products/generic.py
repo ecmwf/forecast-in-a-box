@@ -8,5 +8,8 @@
 # nor does it submit to any jurisdiction.
 
 from .registry import CategoryRegistry
+from .interfaces import Interfaces
 
-generic_registry = CategoryRegistry("generic", "General products with full configuration", "Generic")
+generic_registry = CategoryRegistry(
+    "generic", interface=Interfaces.DETAILED, description="General products with full configuration", title="Generic"
+)

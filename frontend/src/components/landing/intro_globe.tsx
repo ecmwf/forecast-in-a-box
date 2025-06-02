@@ -17,8 +17,8 @@ import React, { useRef, useEffect, useState} from 'react';
 import * as THREE from 'three';
 import { Button, Group, Center, ActionIcon, Space, Tooltip} from '@mantine/core';
 
-import points from './reduced-gg-points.json'
-import coastlinesHigh from './coastlines-low.json';
+import points from '../reduced-gg-points.json'
+import coastlinesHigh from '../coastlines-low.json';
 
 const globeMaterial = new THREE.MeshBasicMaterial();
 const defaultPOV = { lat: 52, lng: 16, altitude: 1.4 };

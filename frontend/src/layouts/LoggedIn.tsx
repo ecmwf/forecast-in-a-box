@@ -13,17 +13,43 @@
 import MainLayout from './MainLayout';
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useApi } from '../api';
+import { showNotification } from '@mantine/notifications';
 
 export default function LoggedIn({ children }: { children: React.ReactNode }) {
 
-    const token = localStorage.getItem('token')
+    const fiabtoken = localStorage.getItem('fiabtoken')
     const navigate = useNavigate();
+    
+    const api = useApi();
 
     useEffect(() => {
-        if (!token) {
-            navigate('/login');
+        if (!fiabtoken) {
+            navigate(`/login?q=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         }
-    }, [token, navigate]);
+    }, [fiabtoken, navigate]);
+
+    useEffect(() => {
+        api.get('/v1/users/me')
+        .then((res) => {
+            if (res.status === 200) {
+                // User is logged in
+            } else {
+                navigate(`/login?q=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+            }
+        })
+        .catch(() => {
+            showNotification({
+                id: 'login-error',
+                title: 'Error',
+                message: 'Failed to fetch user data',
+                color: 'red',
+                autoClose: 3000,
+                loading: false,
+            });
+            navigate(`/login?q=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+        });
+    }, [api, navigate]);
 
     return (
         <MainLayout>

@@ -22,8 +22,6 @@ import {
 
 import {IconX, IconSettings} from '@tabler/icons-react'
 
-import classes from './configuration.module.css';
-
 import {ProductSpecification, ProductConfiguration, ConfigEntry, ModelSpecification} from '../interface'
 
 interface ConfigurationProps {
@@ -215,7 +213,7 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
 
 
       <Group w='100%' align='center' mt='lg'>
-        <Button type='submit' onClick={handleSubmit} disabled={!isFormValid}>Submit</Button>
+        <Button type='submit' onClick={handleSubmit} disabled={!isFormValid}>Add</Button>
         <Button type='button' onClick={() => { setFormData({}); updateProductConfig({ product: selectedProduct, options: {} }); fetchInitialOptions(); }}>Clear</Button>
       </Group>
     </Card>

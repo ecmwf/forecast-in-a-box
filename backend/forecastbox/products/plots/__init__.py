@@ -7,11 +7,13 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""
-Contains bootstrap code for standalone regime.
-The entrypoint here will spawn processes for:
- - client
- - controller
- - single worker
-with a common config, and join on those processes.
-"""
+
+from forecastbox.products.registry import CategoryRegistry
+from forecastbox.products.interfaces import Interfaces
+
+
+plot_product_registry = CategoryRegistry(
+    "Plots", interface=[Interfaces.STANDARD, Interfaces.DETAILED], description="Display products as plots", title="Plots"
+)
+
+from . import maps, meteogram  # noqa: F401, E402

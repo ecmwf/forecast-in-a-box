@@ -16,6 +16,8 @@ from typing import Callable, Type
 
 from .product import Product
 
+from .interfaces import Interfaces
+
 PRODUCTS: dict[str, "CategoryRegistry"] = {}
 
 
@@ -32,7 +34,13 @@ class Category:
 
 
 class CategoryRegistry:
-    def __init__(self, category: str, description: str, title: str | None = None):
+    def __init__(
+        self,
+        category: str,
+        interface: Interfaces | list[Interfaces] = Interfaces.ALL,
+        description: str | None = None,
+        title: str | None = None,
+    ):
         """
         Register a product category.
 
@@ -42,6 +50,8 @@ class CategoryRegistry:
             Category name
         description : str
             Category description
+        interface : Interfaces | list[Interfaces] | None, optional
+            Interface(s) for the category, by default None
         title : str, optional
             Category title, by default None
 
@@ -53,6 +63,7 @@ class CategoryRegistry:
         PRODUCTS[category] = self
         self._products: dict[str, Type[Product]] = {}
 
+        self.interface = [interface] if not isinstance(interface, list) else interface
         self._description = description
         self._title = title or category
 
@@ -92,10 +103,22 @@ class CategoryRegistry:
     def __contains__(self, key: str) -> bool:
         return key in self._products
 
+    def __repr__(self) -> str:
+        return f"CategoryRegistry({self._title}, {self._description}, {self.interface})"
 
-def get_categories() -> dict[str, Category]:
-    """Get category information."""
-    return {key: val.to_category_info() for key, val in sorted(PRODUCTS.items(), key=lambda x: x[0])}
+
+def get_categories(interface: str | None = None) -> dict[str, Category]:
+    """Get product categories.
+
+    If an interface is provided, only return categories for that interface.
+    If no interface is provided, return all categories.
+    """
+    valid_categories = {
+        key: val
+        for key, val in PRODUCTS.items()
+        if (interface is None) or interface == Interfaces.ALL or (Interfaces.ALL in val.interface) or (interface in val.interface)
+    }
+    return {key: val.to_category_info() for key, val in sorted(valid_categories.items(), key=lambda x: x[0])}
 
 
 def get_product_list(category: str) -> list[str]:

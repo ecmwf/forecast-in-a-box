@@ -11,6 +11,8 @@ from collections import defaultdict
 from functools import cached_property, lru_cache
 
 from pydantic import BaseModel, FilePath
+from pydantic import model_validator
+import yaml
 
 from typing import Any
 
@@ -31,14 +33,39 @@ def open_checkpoint(checkpoint_path: str) -> Checkpoint:
 
 
 class ModelExtra(BaseModel):
-    version_overrides: dict[str, str] = None
+    version_overrides: dict[str, str] | None = None
     """Overrides for the versions of the model."""
-    input_preference: str = None
+    input_preference: str | None = None
     """Input preference of the model."""
-    input_overrides: dict[str, str] = None
+    input_overrides: dict[str, str] | None = None
     """Overrides for the input of the model."""
-    dataset_configuration: dict[str, str] = None
+    dataset_configuration: dict[str, str] | None = None
     """If using input=dataset, this is the configuration for the dataset."""
+    environment_variables: dict[str, Any] | None = None
+    """Environment variables for execution."""
+
+    @model_validator(mode="before")
+    @classmethod
+    def parse_yaml_dicts(cls, values):
+        dict_fields = [
+            "version_overrides",
+            "input_overrides",
+            "dataset_configuration",
+            "initial_conditions_environment_variables",
+            "inference_environment_variables",
+        ]
+        for field in dict_fields:
+            val = values.get(field)
+            if isinstance(val, str):
+                try:
+                    loaded = yaml.safe_load(val)
+                    if isinstance(loaded, dict):
+                        values[field] = loaded
+                except Exception:
+                    pass
+            if not val:
+                values[field] = None
+        return values
 
 
 class Model(BaseModel):
@@ -62,7 +89,7 @@ class Model(BaseModel):
     @cached_property
     def extra_information(self) -> ModelExtra:
         """Get the extra information for the model."""
-        return get_extra_information(self.checkpoint_path)
+        return get_extra_information(self.checkpoint_path).model_copy()
 
     @cached_property
     def timesteps(self) -> list[int]:
@@ -93,33 +120,51 @@ class Model(BaseModel):
         """
         return convert_to_model_spec(self.checkpoint, assumptions=assumptions)
 
-    def graph(self, initial_conditions: "Action", **kwargs) -> "Action":
+    def graph(self, initial_conditions: "Action", environment_kwargs: dict = None, **kwargs) -> "Action":
         """Get Model Graph.
 
         Anemoi cascade exposes each param as a separate node in the graph,
         with pressure levels represented as 'param_levelist'.
         """
 
-        versions = self.versions(filter=False)
-        INFERENCE_FILTER_STARTS = ["anemoi-models", "anemoi-graphs", "flash", "torch"]
+        versions = self.versions()
+        INFERENCE_FILTER_STARTS = ["anemoi-models", "anemoi-graphs", "flash-attn", "torch"]
         INITIAL_CONDITIONS_FILTER_STARTS = ["anemoi-inference", "anemoi-datasets", "earthkit-data", "anemoi-transform"]
 
-        inference_env = [
-            f"{key}=={val}" for key, val in versions.items() if any(key.startswith(start) for start in INFERENCE_FILTER_STARTS)
-        ]
-        initial_conditions_env = [
-            f"{key}=={val}" for key, val in versions.items() if any(key.startswith(start) for start in INITIAL_CONDITIONS_FILTER_STARTS)
-        ]
+        def parse_into_install(version_dict):
+            install_list = []
+            for key, val in version_dict.items():
+                if "://" in val or "git+" in val:
+                    install_list.append(f"{key} @ {val}")
+                else:
+                    install_list.append(f"{key}=={val}")
+            return install_list
+
+        inference_env = {key: val for key, val in versions.items() if any(key.startswith(start) for start in INFERENCE_FILTER_STARTS)}
+
+        inference_env.update(self.extra_information.version_overrides or {})
+        inference_env_list = parse_into_install(inference_env)
+
+        initial_conditions_env = parse_into_install(
+            {key: val for key, val in versions.items() if any(key.startswith(start) for start in INITIAL_CONDITIONS_FILTER_STARTS)}
+        )
+
+        inference_environment_variables = (self.extra_information.environment_variables or {}).copy()
+        inference_environment_variables.update(environment_kwargs or {})
+
+        input_source = self.extra_information.input_preference or "mars"
+        if self.extra_information.input_overrides:
+            input_source = {"input_source": self.extra_information.input_overrides}
 
         return from_input(
             self.checkpoint_path,
-            "mars",
+            input_source,
             lead_time=self.lead_time,
             date=self.date,
             ensemble_members=self.ensemble_members,
             **(self.entries or {}),
-            environment={"inference": inference_env, "initial_conditions": initial_conditions_env},
-            env={"ANEMOI_INFERENCE_NUM_CHUNKS": 4},
+            environment={"inference": inference_env_list, "initial_conditions": initial_conditions_env},
+            env=inference_environment_variables,
         )
 
     def deaccumulate(self, outputs: "Action") -> "Action":
@@ -160,16 +205,25 @@ class Model(BaseModel):
     def ignore_in_select(self) -> list[str]:
         return ["frequency"]
 
-    def versions(self, filter: bool = True) -> dict[str, str]:
+    def versions(self) -> dict[str, str]:
         """Get the versions of the model"""
-        return model_versions(self.checkpoint_path, filter=filter)
+        return model_versions(self.checkpoint_path)
 
     def info(self) -> dict[str, Any]:
         """Get the model info"""
         return model_info(self.checkpoint_path)
 
 
-def model_versions(checkpoint_path: str, filter: bool = True) -> dict[str, str]:
+def get_model(checkpoint_path, **kwargs) -> Model:
+    """Get the model."""
+
+    return Model(
+        checkpoint_path=checkpoint_path,
+        **kwargs,
+    )
+
+
+def model_versions(checkpoint_path: str) -> dict[str, str]:
     """Get the versions of the model"""
 
     ckpt = open_checkpoint(checkpoint_path)
@@ -177,10 +231,12 @@ def model_versions(checkpoint_path: str, filter: bool = True) -> dict[str, str]:
     def parse_versions(key, val):
         if key.startswith("_"):
             return None, None
-        if "." not in val or "/" in val:
-            return None, None
+        key = key.replace(".", "-")
+        if "://" in val:
+            return key, val
+
         val = val.split("+")[0]
-        return key.replace(".", "-"), ".".join(val.split(".")[:3])
+        return key, ".".join(val.split(".")[:3])
 
     versions = {
         key: val
@@ -191,13 +247,16 @@ def model_versions(checkpoint_path: str, filter: bool = True) -> dict[str, str]:
     extra_versions = get_extra_information(checkpoint_path).version_overrides
     versions.update(extra_versions or {})
 
-    if not filter:
-        return versions
-    return {key: val for key, val in versions.items() if key.startswith("anemoi")}
+    return versions
 
 
 def model_info(checkpoint_path: str) -> dict[str, Any]:
     ckpt = open_checkpoint(checkpoint_path)
+
+    anemoi_versions = model_versions(checkpoint_path)
+    anemoi_versions = {
+        k: v for k, v in anemoi_versions.items() if any(k.startswith(prefix) for prefix in ["anemoi-", "earthkit-", "torch", "flash-attn"])
+    }
 
     return {
         "timestep": ckpt.timestep,
@@ -206,7 +265,7 @@ def model_info(checkpoint_path: str) -> dict[str, Any]:
         "area": ckpt.area,
         "local_area": True,
         "grid": ckpt.grid,
-        "versions": model_versions(checkpoint_path),
+        "versions": anemoi_versions,
     }
 
 
@@ -215,7 +274,28 @@ def get_extra_information(checkpoint_path: str) -> ModelExtra:
 
     if not has_metadata(checkpoint_path, name=FORECAST_IN_A_BOX_METADATA):
         return ModelExtra()
-    return load_metadata(checkpoint_path, name=FORECAST_IN_A_BOX_METADATA)
+    return ModelExtra(**load_metadata(checkpoint_path, name=FORECAST_IN_A_BOX_METADATA))
+
+
+def set_extra_information(checkpoint_path: str, extra: ModelExtra) -> None:
+    """Set the extra information for the model."""
+    from anemoi.utils.checkpoints import replace_metadata, save_metadata, has_metadata
+
+    open_checkpoint.cache_clear()
+
+    if not has_metadata(checkpoint_path, name=FORECAST_IN_A_BOX_METADATA):
+        save_metadata(
+            checkpoint_path,
+            extra.model_dump(),
+            name=FORECAST_IN_A_BOX_METADATA,
+        )
+        return
+
+    replace_metadata(
+        checkpoint_path,
+        {**extra.model_dump(), "version": "1.0.0"},
+        name=FORECAST_IN_A_BOX_METADATA,
+    )
 
 
 def convert_to_model_spec(ckpt: Checkpoint, assumptions: dict[str, Any] | None = None) -> Qube:

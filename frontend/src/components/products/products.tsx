@@ -10,8 +10,8 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { LoadingOverlay, Group, SimpleGrid, Container, Button, Divider, Title, Grid } from "@mantine/core";
+import { useEffect, useState } from "react";
+import { LoadingOverlay, SimpleGrid, Container, Button, Divider, Title, Grid } from "@mantine/core";
 
 import Categories from "./categories";
 import Configuration from "./configuration";
@@ -20,6 +20,7 @@ import {useApi} from '../../api';
 
 import {CategoriesType, ProductSpecification, ModelSpecification} from '../interface'
 import sha256 from 'crypto-js/sha256';
+import { useParams } from "react-router-dom";
 
 
 interface ProductConfigurationProps {
@@ -29,6 +30,9 @@ interface ProductConfigurationProps {
 }
 
 function ProductConfigurator({model, products, setProducts}: ProductConfigurationProps) {
+    let {product_id} = useParams();
+
+    
     const [selected, setSelectedProduct] = useState<string | null>(null);
     const [internal_products, internal_setProducts] = useState(products);
 
@@ -49,7 +53,7 @@ function ProductConfigurator({model, products, setProducts}: ProductConfiguratio
         const fetchUpdatedOptions = async () => {
         setLoading(true);
         try {
-            const response = await api.post(`/v1/product/valid-categories/`, model);    
+            const response = await api.post(`/v1/product/categories/${product_id}`, model);    
             const categories: CategoriesType = await response.data;
             setCategories(categories);
             
@@ -90,7 +94,7 @@ function ProductConfigurator({model, products, setProducts}: ProductConfiguratio
             </Grid>
             <Divider p='md'/>
             <SimpleGrid cols={1}>
-                <Button onClick={() => setProducts(internal_products)} disabled={!model}>Submit</Button>
+                <Button onClick={() => setProducts(internal_products)} disabled={!model}>Continue</Button>
             </SimpleGrid>
         </Container>
     );

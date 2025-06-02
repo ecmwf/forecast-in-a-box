@@ -9,11 +9,9 @@
 // nor does it submit to any jurisdiction.
 
 'use client';
-import React, { useState, useEffect, useRef } from "react";
 
-import { Container, Title, Center, Space, Button, Group, Divider, Image } from "@mantine/core";
+import { Container, Title, Center, Space, Group, Divider, Image } from "@mantine/core";
 
-import { IconCube, IconStack2Filled, IconBlocks, IconMapPin, IconTable, IconPolygon, IconBraces, IconWorld } from "@tabler/icons-react";
 
 const Packages = () => {
 

@@ -16,7 +16,10 @@ import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Register from './pages/SignUp';
 import Status from './pages/Status';
-import Products from './pages/Products';
+
+import ProductList from './pages/products/products';
+import ProductConfiguration from './pages/products/Configuration';
+
 
 
 import JobProgress from './pages/jobs/progress';
@@ -26,6 +29,8 @@ import Result from './pages/result/result';
 import AdminLayout from './layouts/AdminPage';
 import AdminSettings from './pages/admin/settings';
 import Gateway from './pages/admin/gateway';
+import Users from './pages/admin/users';
+import Checkpoints from './pages/admin/checkpoints';
 
 const router = createBrowserRouter([
   {
@@ -46,7 +51,11 @@ const router = createBrowserRouter([
   },
   {
     path: '/products',
-    element: <Products />,
+    element: <ProductList />,
+  },
+  {
+    path: '/products/:product_id',
+    element: <ProductConfiguration />,
   },
   {
     path: '/job/:id',
@@ -76,6 +85,14 @@ const router = createBrowserRouter([
         path: 'gateway',
         element: <Gateway />,
       },
+      {
+        path: 'users',
+        element: <Users />,
+      },
+      {
+        path: 'checkpoints',
+        element: <Checkpoints />,
+      }
     ],
   },
   {

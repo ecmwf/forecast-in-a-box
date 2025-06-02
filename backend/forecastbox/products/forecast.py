@@ -7,13 +7,15 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from .registry import CategoryRegistry
-
-
 from typing import Any, TYPE_CHECKING
+
+from .registry import CategoryRegistry
+from .interfaces import Interfaces
 from .product import GenericParamProduct
 
-forecast_registry = CategoryRegistry("fc_stat", "Statistics over time for each member", "Forecast Statistics")
+forecast_registry = CategoryRegistry(
+    "forecast_statistic", interface=Interfaces.DETAILED, description="Statistics over time for each member", title="Forecast Statistics"
+)
 
 if TYPE_CHECKING:
     from earthkit.workflows.fluent import Action

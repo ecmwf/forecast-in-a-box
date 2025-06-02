@@ -22,7 +22,7 @@ export default defineConfig({
     }),
   ],
   server: {
-    allowedHosts: ['forecast-in-a-box.ecmwf.int'],
+    allowedHosts: true,
     watch: {
       usePolling: true
     },
