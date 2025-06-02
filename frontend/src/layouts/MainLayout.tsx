@@ -22,7 +22,6 @@ import Banner from '../components/Banner';
 import { useEffect, useState } from "react";
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
-    const pinned = useHeadroom({ fixedAt: 120 });
     const [opened, { toggle }] = useDisclosure();
     
     const api = useApi();
@@ -45,6 +44,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       setLoggedIn(false);
       navigate('/')
     };
+
     const [loggedIn, setLoggedIn] = useState(false);
     const [isSuperuser, setIsSuperuser] = useState(false);
   
