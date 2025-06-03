@@ -6,9 +6,14 @@ on:
       - '*'
 
 jobs:
-  build-and-push:
+  build-and-push-image:
     runs-on: ubuntu-latest
-
+    strategy:
+      matrix:
+        image:
+          - backend
+          - frontend
+          - cascade
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -19,23 +24,20 @@ jobs:
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-            registry: ghcr.io
-            username: ${{ github.actor }}
-            password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract tag name
         id: extract_tag
         run: echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
-      - name: Build and push images from docker-compose
+      - name: Build and push image
         run: |
-            docker compose build
-            for image in $(docker compose config | grep 'image:' | awk '{print $2}'); do
-                IMAGE_NAME=$(echo $image | sed "s|\${TAG}|${TAG}|g")
-                REPO_IMAGE=ghcr.io/${{ github.repository_owner }}/$(basename $IMAGE_NAME):${TAG}
-                docker tag $IMAGE_NAME $REPO_IMAGE
-                docker push $REPO_IMAGE
-            done
-            done
+          IMAGE_NAME=$(echo "${{ matrix.image }}" | sed "s|\${TAG}|${TAG}|g")
+          REPO_IMAGE=ghcr.io/${{ github.repository_owner }}/$(basename $IMAGE_NAME):${TAG}
+          docker compose build --build-arg TAG=${TAG} $IMAGE_NAME
+          docker tag $IMAGE_NAME $REPO_IMAGE
+          docker push $REPO_IMAGE
         env:
-            TAG: ${{ env.TAG }}
+          TAG: ${{ env.TAG }}
