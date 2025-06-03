@@ -43,19 +43,17 @@ RUN apt update && \
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory in the container
-WORKDIR /app/backend
+WORKDIR /app/cascade
 
 # Copy the backend directory into the container
-COPY forecastbox /app/backend/forecastbox/
-COPY install.sh /app/backend/install.sh
-COPY pyproject.toml /app/backend/forecastbox/pyproject.toml
+COPY install.sh /app/cascade/install.sh
 
 # Install UV
 COPY --from=ghcr.io/astral-sh/uv:0.7.8 /uv /uvx /bin/
 
 # Create a virtual env. Install fiab dependencies, with caching
-RUN --mount=type=cache,mode=0755,target=/root/.cache/uv sh /app/backend/install.sh
+RUN --mount=type=cache,mode=0755,target=/root/.cache/uv sh /app/cascade/install.sh
 
 ENV PATH="/app/.venv/bin/:$PATH"
-ENTRYPOINT ["/app/.venv/bin/uvicorn", "--host", "0.0.0.0", \
-    "forecastbox.entrypoint:app", "--log-level", "info"]
+ENTRYPOINT ["/app/.venv/bin/python", "-m", "cascade.gateway", "tcp://0.0.0.0:8067"]
+
