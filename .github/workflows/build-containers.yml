@@ -4,7 +4,7 @@ on:
   push:
     tags:
       - '*'
-      
+
   workflow_dispatch:
     inputs:
       tag:
@@ -22,6 +22,20 @@ jobs:
           - frontend
           - cascade
     steps:
+      - name: Free Disk Space Before Build
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+          sudo rm -rf /usr/local/.ghcup
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/local/lib/android/sdk/ndk
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo apt-get clean
+          echo "Disk space after cleanup:"
+          df -h
+          
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -35,17 +49,36 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract tag name
-        id: extract_tag
-        run: echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-
-      - name: Build and push image
+      - name: Set env variables
         run: |
-          IMAGE_NAME=$(echo "${{ matrix.image }}" | sed "s|\${TAG}|${TAG}|g")
-          REPO_IMAGE=ghcr.io/${{ github.repository_owner }}/$(basename $IMAGE_NAME):${TAG}
-          echo "Building and pushing image: $REPO_IMAGE - with tag: ${TAG}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            export TAG=${{ github.event.inputs.tag }}
+          else
+            export TAG=${GITHUB_REF_NAME}
+          fi
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "IMAGE_NAME=${{ matrix.image }}" >> $GITHUB_ENV
+          echo "REPO_IMAGE=ghcr.io/${{ github.repository }}/${{ matrix.image }}:$TAG" >> $GITHUB_ENV
+
+      - name: Build image
+        run: |
+          echo "Building image: $REPO_IMAGE - with tag: ${TAG}"
           docker compose build --build-arg TAG=${TAG} $IMAGE_NAME
-          docker tag $IMAGE_NAME $REPO_IMAGE
-          docker push $REPO_IMAGE
         env:
           TAG: ${{ env.TAG }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          REPO_IMAGE: ${{ env.REPO_IMAGE }}
+
+      - name: Tag image
+        run: |
+          docker tag fiab-$IMAGE_NAME $REPO_IMAGE
+        env:
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          REPO_IMAGE: ${{ env.REPO_IMAGE }}
+
+      - name: Push image
+        run: |
+          echo "Pushing image: $REPO_IMAGE"
+          docker push $REPO_IMAGE
+        env:
+          REPO_IMAGE: ${{ env.REPO_IMAGE }}
