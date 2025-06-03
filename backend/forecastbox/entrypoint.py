@@ -15,9 +15,12 @@ from contextlib import asynccontextmanager
 import time
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import logging
 from forecastbox.db import init_db
@@ -47,6 +50,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     docs_url="/api/v1/docs", openapi_url="/api/v1/openapi.json", title="Forecast in a Box API", version="1.0.0", lifespan=lifespan
 )
+
+templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 
 app.include_router(model.router, prefix="/api/v1/model")
@@ -122,3 +127,13 @@ def status() -> StatusResponse:
         status["ecmwf"] = "down"
 
     return StatusResponse(**status)
+
+
+@app.get("/api/v1/share/{job_id}/{dataset_id}", response_class=HTMLResponse, tags=["share"], summary="Share Image")
+async def share_image(request: Request, job_id: str, dataset_id: str):
+    """
+    Endpoint to share an image from a job and dataset ID.
+    """
+    base_url = str(request.base_url).rstrip("/")
+    image_url = f"{base_url}/api/v1/job/{job_id}/{dataset_id}"
+    return templates.TemplateResponse("share.html", {"request": request, "image_url": image_url, "image_name": f"{job_id}_{dataset_id}"})
