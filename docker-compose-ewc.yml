@@ -6,6 +6,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    image: eccr.ecmwf.int/forecast-in-a-box/fiab-frontend:latest
     ports:
       - "3000:3000"
     # environment:
@@ -18,6 +19,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    image: eccr.ecmwf.int/forecast-in-a-box/fiab-backend:latest
     volumes:
       - data:/app/data_dir
       - ~/.ssh:/root/.ssh:ro
@@ -46,8 +48,13 @@ services:
     container_name: fiab-cascade
     build:
       context: ./cascade
-      dockerfile: Dockerfile
+      dockerfile: DockerfileMARSRocky
+    image: eccr.ecmwf.int/forecast-in-a-box/fiab-cascade:latest
     entrypoint: "python -m cascade.gateway tcp://0.0.0.0:8067"
+    environment:
+      MARS_DHS_LOCALHOST: 136.156.137.31
+      MARS_DHS_LOCALPORT: 48165
+      MARS_ENVIRON_ORIGIN: "ewc"
     networks:
       - fiab-network
     ports:
