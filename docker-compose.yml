@@ -48,10 +48,6 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     entrypoint: "python -m cascade.gateway tcp://0.0.0.0:8067"
-    environment:
-      MARS_DHS_LOCALHOST: 136.156.137.31
-      MARS_DHS_LOCALPORT: 48165
-      MARS_ENVIRON_ORIGIN: "ewc"
     networks:
       - fiab-network
     ports:
