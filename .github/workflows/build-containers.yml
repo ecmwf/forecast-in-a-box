@@ -38,12 +38,11 @@ jobs:
       - name: Set env variables
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "TAG=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
             export TAG=${{ github.event.inputs.tag }}
           else
-            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-            export TAG=${GITHUB_REF#refs/tags/}
+            export TAG=${GITHUB_REF_NAME}
           fi
+          echo "TAG=$TAG" >> $GITHUB_ENV
           echo "IMAGE_NAME=${{ matrix.image }}" >> $GITHUB_ENV
           echo "REPO_IMAGE=ghcr.io/${{ github.repository }}/${{ matrix.image }}:$TAG" >> $GITHUB_ENV
 
