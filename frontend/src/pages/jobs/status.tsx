@@ -11,21 +11,21 @@
 "use client";
 
 import { useRef } from 'react';
-import { Container, Group, Paper, SimpleGrid } from '@mantine/core';
+import { Container, Grid, Group, Paper, SimpleGrid, Stack } from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { Table, Loader, Center, Title, Progress, Button, Flex, Divider, Tooltip, FileButton, Menu, Burger, Modal, Text } from '@mantine/core';
 
 import { IconDownload, IconRefresh, IconTrash } from '@tabler/icons-react';
-import classes from './status.module.css';
 import { showNotification } from '@mantine/notifications';
+import classes from './status.module.css';
 
 import {useApi} from '../../api';
-import MainLayout from '../../layouts/MainLayout';
 import LoggedIn from '../../layouts/LoggedIn';
 
 import { ExecutionSpecification } from '../../components/interface';
 
 import SummaryModal from '../../components/summary';
+import { useMediaQuery } from '@mantine/hooks';
 
 export type ProgressResponse = {
   progress: string;
@@ -49,6 +49,8 @@ const JobStatusPage = () => {
   const api = useApi();
   const progressIntervalRef = useRef<null>(null);
 
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  
   const getStatus = async () => {
     try {
       const response = await api.get('/v1/job/status');
@@ -324,6 +326,8 @@ const JobStatusPage = () => {
     ];
   };
 
+  const columns = ['Job ID', 'Status', 'Created At', 'Progress', 'Options'];
+
   return (
     <LoggedIn>
     <Container size="lg" pt="xl" pb="xl">
@@ -358,14 +362,14 @@ const JobStatusPage = () => {
           <Loader />
         </Center>
       ) : (
-        <Table striped highlightOnHover verticalSpacing="xs">
+        <>
+        {!isMobile ? (
+          <Table striped highlightOnHover verticalSpacing="xs">
           <Table.Thead>
             <Table.Tr style={{ backgroundColor: "#f0f0f6", textAlign: "left" }}>
-              <Table.Th>Job ID</Table.Th>
-              <Table.Th>Status</Table.Th>
-              <Table.Th>Created At</Table.Th>
-              <Table.Th>Progress</Table.Th>
-              <Table.Th>Options</Table.Th>
+              {columns.map((col) => (
+              <Table.Th key={col}>{col}</Table.Th>
+            ))}
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -383,16 +387,15 @@ const JobStatusPage = () => {
                         <Burger onClick={() => handleMoreInfo(jobId)}/>
                       </Tooltip>
                       <Tooltip label="Click to view progress">
-                    <Button
-                      variant="subtle"
-                      c="blue"
-                      p="xs"
-                      component='a'
-                      href={`/job/${jobId}`}
-                      classNames={classes}
-                    >{jobId}
-                    </Button>
-                    </Tooltip>
+                        <Button
+                          variant="subtle"
+                          c="blue"
+                          p="xs"
+                          component='a'
+                          href={`/job/${jobId}`}
+                        ><Text classNames={classes}>{jobId}</Text>
+                        </Button>
+                      </Tooltip>
                     </Table.Td>
                   <Table.Td>
                     {progress.status}
@@ -433,6 +436,67 @@ const JobStatusPage = () => {
             )}
           </Table.Tbody>
         </Table>
+        ) : (
+          <Stack>
+            {Object.keys(jobs.progresses || {}).length === 0 ? (
+              <Paper>
+                  No jobs found.
+              </Paper>
+            ) : (
+              Object.entries(jobs.progresses || {}).map(([jobId, progress]: [string, ProgressResponse]) => (
+                <Paper key={jobId} shadow="xs" p="md" withBorder w='100%'>
+                  <Stack>
+                  <Group justify='space-between' align='center' wrap='nowrap'>
+                    <Tooltip label="More Info">
+                      <Burger onClick={() => handleMoreInfo(jobId)}/>
+                    </Tooltip>
+                    <Tooltip label="Click to view progress">
+                      <Text
+                          c='blue'
+                          component='a'
+                          href={`/job/${jobId}`}
+                          classNames={classes}>{jobId}
+                        </Text>
+                      </Tooltip>
+                    </Group>
+                    <Group wrap='nowrap' justify='space-between' align='center' w='100%'>
+                      <Text>{progress.status}</Text>
+                      <Text>{new Date(progress.created_at).toLocaleString()}</Text>
+                    </Group>
+                    <Group>
+                      <Progress value={parseFloat(progress.progress)} size="sm" style={{ flex: 1 }} />
+                      {progress.progress}%
+                    </Group>
+                      <Group align='center' grow>
+                        <Tooltip label="Download Job">
+                        <Button
+                          color='blue'
+                          onClick={() => downloadJob(jobId)}
+                          size='xs'
+                          aria-label="Download Job"
+                          ><IconDownload/></Button></Tooltip>
+                        <Tooltip label="Restart Job">
+                        <Button
+                          color='orange'
+                          onClick={() => restartJob(jobId)}
+                          size='xs'
+                          aria-label="Restart Job"
+                          ><IconRefresh/></Button></Tooltip>
+                          <Tooltip label="Delete Job">
+                        <Button
+                          color='red'
+                          onClick={() => deleteJob(jobId)}
+                          size='xs'
+                          ><IconTrash/></Button></Tooltip>
+                      </Group>
+                  </Stack>
+                </Paper>
+              ))
+            )}
+          </Stack>
+        )
+        }
+        </>
       )}
     </Container>
     </LoggedIn>

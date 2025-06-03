@@ -77,7 +77,7 @@ export default function Environment({setEnvironment}: EnvironmentProps) {
                         </Button>
                     </Group>
                     <ScrollArea.Autosize mah="600px" mx="-md" type='always'>
-                    <SimpleGrid cols={3}>
+                    <SimpleGrid cols={{'sm': 2, 'md': 3, 'lg': 4}} spacing='md' style={{ position: 'relative' }}>
                     {Object.keys(environment).length === 0 && (
                         <Text size="sm" c="dimmed">
                             No environment variables added yet.

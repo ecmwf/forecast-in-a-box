@@ -1,12 +1,7 @@
-.label {
-  white-space: normal;
+.root {
+  /* white-space: normal; */
   word-wrap: break-word;
   word-break: break-all;
   display: flex;
-  overflow: visible;
-}
-
-.root {
-  flex-direction: column;
   overflow: visible;
 }
