@@ -4,6 +4,13 @@ on:
   push:
     tags:
       - '*'
+      
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build and push'
+        required: true
+        type: string
 
 jobs:
   build-and-push-image:
