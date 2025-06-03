@@ -22,6 +22,20 @@ jobs:
           - frontend
           - cascade
     steps:
+      - name: Free Disk Space Before Build
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+          sudo rm -rf /usr/local/.ghcup
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/local/lib/android/sdk/ndk
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo apt-get clean
+          echo "Disk space after cleanup:"
+          df -h
+          
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -44,7 +58,7 @@ jobs:
           fi
           echo "TAG=$TAG" >> $GITHUB_ENV
           echo "IMAGE_NAME=${{ matrix.image }}" >> $GITHUB_ENV
-          echo "REPO_IMAGE=ghcr.io/${{ github.repository }}/fiab-${{ matrix.image }}:$TAG" >> $GITHUB_ENV
+          echo "REPO_IMAGE=ghcr.io/${{ github.repository }}/${{ matrix.image }}:$TAG" >> $GITHUB_ENV
 
       - name: Build image
         run: |
