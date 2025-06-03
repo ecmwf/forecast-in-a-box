@@ -47,7 +47,7 @@ services:
   cascade:
     container_name: fiab-cascade
     build:
-      context: ./backend
+      context: ./cascade
       dockerfile: DockerfileMARSRocky
     image: eccr.ecmwf.int/forecast-in-a-box/fiab-cascade:latest
     entrypoint: "python -m cascade.gateway tcp://0.0.0.0:8067"

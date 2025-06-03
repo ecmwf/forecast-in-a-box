@@ -45,7 +45,7 @@ services:
   cascade:
     container_name: fiab-cascade
     build:
-      context: ./backend
+      context: ./cascade
       dockerfile: Dockerfile
     entrypoint: "python -m cascade.gateway tcp://0.0.0.0:8067"
     networks:
