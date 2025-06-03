@@ -1,0 +1,61 @@
+FROM ubuntu:22.04
+
+# Define build arguments to replace ansible variables
+ARG DISTRO=ubuntu
+ARG RELEASE=jammy
+ARG REPO_SUFFIX=stable
+ARG REPO_BASE=https://nexus.ecmwf.int
+
+ENV MARS_DHS_LOCALHOST=136.156.137.31
+ENV MARS_ENVIRON_ORIGIN="ewc"
+ENV MARS_DHS_LOCALPORT=48165
+
+# Set environment variables for non-interactive apt
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN sed -i 's|http://|https://|g' /etc/apt/sources.list
+
+# Install required base packages
+RUN apt-get update --fix-missing && apt-get install -y \
+    libgomp1 \
+    libnetcdf-dev \
+    libblas3 \
+    gpg-agent \
+    curl
+
+# Add Nexus GPG key
+RUN curl ${REPO_BASE}/repository/private-raw-repos-config/${DISTRO}/${RELEASE}/${REPO_SUFFIX}/public-${REPO_SUFFIX}.gpg.key \
+    | gpg --dearmor -o /usr/share/keyrings/nexus-private-${DISTRO}-${RELEASE}-${REPO_SUFFIX}.gpg
+
+# Add the Nexus repository
+RUN echo "deb [signed-by=/usr/share/keyrings/nexus-private-${DISTRO}-${RELEASE}-${REPO_SUFFIX}.gpg] \
+    ${REPO_BASE}/repository/private-${DISTRO}-${RELEASE}-${REPO_SUFFIX}/ ${RELEASE} main" \
+    > /etc/apt/sources.list.d/nexus-private-${DISTRO}-${RELEASE}-${REPO_SUFFIX}.list
+
+# Install mars-client-cloud
+RUN apt-get update && apt-get install -y mars-client-cloud
+
+# NOTE: REMOVE GIT when installable from PYPI
+RUN apt update && \
+    apt install -y --no-install-recommends git curl iproute2
+
+# Optional cleanup to reduce image size
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Set the working directory in the container
+WORKDIR /app/backend
+
+# Copy the backend directory into the container
+COPY forecastbox /app/backend/forecastbox/
+COPY install.sh /app/backend/install.sh
+COPY pyproject.toml /app/backend/forecastbox/pyproject.toml
+
+# Install UV
+COPY --from=ghcr.io/astral-sh/uv:0.7.8 /uv /uvx /bin/
+
+# Create a virtual env. Install fiab dependencies, with caching
+RUN --mount=type=cache,mode=0755,target=/root/.cache/uv sh /app/backend/install.sh
+
+ENV PATH="/app/.venv/bin/:$PATH"
+ENTRYPOINT ["/app/.venv/bin/uvicorn", "--host", "0.0.0.0", \
+    "forecastbox.entrypoint:app", "--log-level", "info"]

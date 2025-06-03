@@ -44,7 +44,7 @@ jobs:
           fi
           echo "TAG=$TAG" >> $GITHUB_ENV
           echo "IMAGE_NAME=${{ matrix.image }}" >> $GITHUB_ENV
-          echo "REPO_IMAGE=ghcr.io/${{ github.repository }}/${{ matrix.image }}:$TAG" >> $GITHUB_ENV
+          echo "REPO_IMAGE=ghcr.io/${{ github.repository }}/fiab-${{ matrix.image }}:$TAG" >> $GITHUB_ENV
 
       - name: Build image
         run: |
