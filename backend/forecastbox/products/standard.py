@@ -8,6 +8,12 @@
 # nor does it submit to any jurisdiction.
 
 
+from typing import Literal
+import earthkit.data as ekd
+
+from earthkit.workflows.decorators import as_payload
+
+
 from forecastbox.products.registry import CategoryRegistry
 from forecastbox.products.product import GenericTemporalProduct
 from forecastbox.models import Model
@@ -18,11 +24,29 @@ standard_product_registry = CategoryRegistry(
     "Standard", interface=[Interfaces.STANDARD, Interfaces.DETAILED], description="Standard products", title="Standard Products"
 )
 
-OUTPUT_TYPES = ["grib", "xarray"]
+OUTPUT_TYPES = ["grib", "netcdf", "numpy"]
+
+
+@as_payload
+def convert_to(fields: ekd.FieldList, format: Literal["grib", "netcdf", "numpy"] = "grib") -> ekd.FieldList:
+    if format == "grib":
+        return fields
+    elif format == "netcdf":
+        xr_obj = fields.to_xarray()
+        if xr_obj is None:
+            raise ValueError("Data cannot be converted to netcdf.")
+        return xr_obj
+    elif format == "numpy":
+        np_obj = fields.to_numpy()
+        if np_obj is None:
+            raise ValueError("Data cannot be converted to numpy.")
+        return np_obj
+
+    raise ValueError(f"Unsupported format: {format}. Supported formats are 'grib' and 'netcdf'.")
 
 
 @standard_product_registry("Output")
-class GribProduct(GenericTemporalProduct):
+class OutputProduct(GenericTemporalProduct):
     multiselect = {
         "param": True,
         "step": True,
@@ -51,7 +75,12 @@ class GribProduct(GenericTemporalProduct):
             for dim in source.nodes.dims:
                 source = source.concatenate(dim)
 
-        source = source.map(self.named_payload("grib"))
+        format = product_spec.get("format", "grib")
+
+        conversion_payload = convert_to(format=format)
+        conversion_payload.func.__name__ = f"convert_to_{format}"
+
+        source = source.map(conversion_payload).map(self.named_payload(f"output-{format}"))
         return source
 
 
