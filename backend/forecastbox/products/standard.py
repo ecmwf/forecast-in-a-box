@@ -30,7 +30,7 @@ class GribProduct(GenericTemporalProduct):
 
     defaults = {
         "format": "grib",
-        "reduce": "False",
+        "reduce": "True",
     }
 
     @property
@@ -45,12 +45,13 @@ class GribProduct(GenericTemporalProduct):
         }
 
     def to_graph(self, product_spec, model, source):
-        source = self.select_on_specification(product_spec, source).concatenate("param").concatenate("step")
+        source = self.select_on_specification(product_spec, source)
 
-        if product_spec.get("reduce", "False") == "True":
-            source = source.reduce(self.named_payload("grib"))
-        else:
-            source = source.map(self.named_payload("grib"))
+        if product_spec.get("reduce", "True") == "True":
+            for dim in source.nodes.dims:
+                source = source.concatenate(dim)
+
+        source = source.map(self.named_payload("grib"))
         return source
 
 
