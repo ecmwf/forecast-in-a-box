@@ -98,15 +98,17 @@ async def product_to_config(product: Product, model_spec: ModelSpecification, pa
 
         # Check if the current axis is being constrained by another parameter
         for k, v in params.items():
+            # Skip if the key is the same as the current key or not in params
             if k == key or k not in params:
                 continue
 
+            # Has a key: val in params constrained the current key
             if sorted(select_from_params(available_product_spec, {}).span(key)) != sorted(
                 select_from_params(available_product_spec, {k: v}).span(key)
             ):
                 constrained.append(product.label.get(k, k))
 
-            # Has this key: val constrained another key
+            # Has this key: val in the subsetted_spec constrained another axis
             selected_span = select_from_params(available_product_spec, {key: val}).span(k)
             if len(selected_span) == 1 and not selected_span[0] == USER_DEFINED:
                 inferred_constraints[k] = selected_span[0]
