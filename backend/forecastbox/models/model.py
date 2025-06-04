@@ -129,7 +129,7 @@ class Model(BaseModel):
 
         versions = self.versions()
         INFERENCE_FILTER_STARTS = ["anemoi-models", "anemoi-graphs", "flash-attn", "torch"]
-        INITIAL_CONDITIONS_FILTER_STARTS = ["anemoi-inference", "anemoi-datasets", "earthkit-data", "anemoi-transform"]
+        INITIAL_CONDITIONS_FILTER_STARTS = ["anemoi-inference", "anemoi-datasets", "earthkit", "anemoi-transform"]
 
         def parse_into_install(version_dict):
             install_list = []
