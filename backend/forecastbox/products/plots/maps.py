@@ -57,7 +57,15 @@ def _plot_fields(subplot: ekp.Subplot, fields: ekd.FieldList, **kwargs: dict[str
 
     for method, comp in plot_categories.items():
         for sub_cat, sub_fields in comp.items():
-            getattr(subplot, method)(ekd.FieldList.from_fields(sub_fields), **kwargs.get(method, {}))
+            try:
+                getattr(subplot, method)(ekd.FieldList.from_fields(sub_fields), **kwargs.get(method, {}))
+            except Exception as err:
+                if method == "quickplot":
+                    raise err
+                subplot.quickplot(
+                    ekd.FieldList.from_fields(sub_fields),
+                    **kwargs.get("quickplot", {}),
+                )
 
 
 @as_payload
@@ -192,7 +200,7 @@ class EnsembleMapProduct(BaseEnsembleProduct, MapProduct):
         "domain": False,
     }
     defaults = {
-        "domain": "Europe",
+        "domain": "Global",
     }
 
     def to_graph(self, product_spec, model, source):
