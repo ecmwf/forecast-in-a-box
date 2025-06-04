@@ -28,13 +28,30 @@ class GribProduct(GenericTemporalProduct):
         "step": True,
     }
 
+    defaults = {
+        "format": "grib",
+        "reduce": "False",
+    }
+
     @property
     def qube(self):
-        return self.make_generic_qube(format=OUTPUT_TYPES)
+        return self.make_generic_qube(format=OUTPUT_TYPES, reduce=["True", "False"])
+
+    @property
+    def model_assumptions(self):
+        return {
+            "format": "*",
+            "reduce": "*",
+        }
 
     def to_graph(self, product_spec, model, source):
         source = self.select_on_specification(product_spec, source).concatenate("param").concatenate("step")
-        return source.map(self.named_payload("grib"))
+
+        if product_spec.get("reduce", "False") == "True":
+            source = source.reduce(self.named_payload("grib"))
+        else:
+            source = source.map(self.named_payload("grib"))
+        return source
 
 
 @standard_product_registry("Deaccumulated")
