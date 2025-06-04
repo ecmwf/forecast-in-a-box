@@ -48,12 +48,13 @@ def select_from_params(available_spec: Qube, params: dict[str, Any]) -> Qube:
     for key, val in params.items():
         if not val:
             continue
+
         if key in available_spec.axes() and USER_DEFINED in available_spec.span(key):
-            # Dont select if open ended
+            # Don't select if open ended
             continue
 
         available_spec = available_spec.select(
-            {key: str(val) if not isinstance(val, (list, tuple)) else list(map(str, val))}, consume=False
+            {key: str(val) if not isinstance(val, (list, tuple, set)) else list(map(str, val))}, consume=False
         )
 
     return available_spec
@@ -89,9 +90,13 @@ async def product_to_config(product: Product, model_spec: ModelSpecification, pa
     axes = subsetted_spec.axes()
 
     entries = {}
+
     for key, val in axes.items():
-        # Add back in other options when selected
         constrained = []
+
+        inferred_constraints = {}
+
+        # Check if the current axis is being constrained by another parameter
         for k, v in params.items():
             if k == key or k not in params:
                 continue
@@ -101,7 +106,14 @@ async def product_to_config(product: Product, model_spec: ModelSpecification, pa
             ):
                 constrained.append(product.label.get(k, k))
 
-        val = select_from_params(available_product_spec, {k: v for k, v in params.items() if not k == key}).axes().get(key, val)
+            # Has this key: val constrained another key
+            selected_span = select_from_params(available_product_spec, {key: val}).span(k)
+            if len(selected_span) == 1 and not selected_span[0] == USER_DEFINED:
+                inferred_constraints[k] = selected_span[0]
+
+        # Select from the available product specification based on all parameters except the current key
+        updated_params = {**params, **inferred_constraints}
+        val = select_from_params(available_product_spec, {k: v for k, v in updated_params.items() if not k == key}).axes().get(key, val)
 
         entries[key] = ConfigEntry(
             label=product.label.get(key, key),
