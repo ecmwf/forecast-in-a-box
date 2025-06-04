@@ -9,9 +9,7 @@
 
 
 from forecastbox.products.registry import CategoryRegistry
-
 from forecastbox.products.product import GenericTemporalProduct
-
 from forecastbox.models import Model
 from forecastbox.products.interfaces import Interfaces
 

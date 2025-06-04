@@ -16,4 +16,4 @@ plot_product_registry = CategoryRegistry(
     "Plots", interface=[Interfaces.STANDARD, Interfaces.DETAILED], description="Display products as plots", title="Plots"
 )
 
-from . import maps, meteogram  # noqa: F401, E402
+from . import maps, meteogram, vertical_profile  # noqa: F401, E402

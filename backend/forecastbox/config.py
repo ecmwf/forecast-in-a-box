@@ -83,5 +83,3 @@ class FIABConfig(BaseSettings):
 
 
 config = FIABConfig()
-
-print(config.model_dump())
