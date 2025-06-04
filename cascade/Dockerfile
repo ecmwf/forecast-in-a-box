@@ -14,7 +14,7 @@ COPY install.sh /app/cascade/install.sh
 # Install UV
 COPY --from=ghcr.io/astral-sh/uv:0.7.8 /uv /uvx /bin/
 
-# Create a virtual env. Install fiab dependencies, with caching
+# Create a virtual env. Install cascade dependencies, with caching
 RUN --mount=type=cache,mode=0755,target=/root/.cache/uv sh /app/cascade/install.sh
 
 ENV PATH="/app/.venv/bin/:$PATH"
