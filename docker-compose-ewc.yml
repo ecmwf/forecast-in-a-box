@@ -18,7 +18,7 @@ services:
     container_name: fiab-backend
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: DockerfileMARSRocky
     image: eccr.ecmwf.int/forecast-in-a-box/fiab-backend:latest
     volumes:
       - data:/app/data_dir

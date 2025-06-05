@@ -52,6 +52,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         const token = localStorage.getItem('fiabtoken');
         if (!token) {
             setLoggedIn(false);
+            return;
         } else {    
             setLoggedIn(true);
         }
@@ -61,10 +62,21 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 setLoggedIn(true);
                 setIsSuperuser(res.data.is_superuser);
             } else {
-            setLoggedIn(false);
+                setLoggedIn(false);
+                localStorage.removeItem('fiabtoken');
+                showNotification({
+                    id: `login-error-${crypto.randomUUID()}`,
+                    position: 'top-right',
+                    autoClose: 3000,
+                    title: "Login Failed",
+                    message: 'Please login again.',
+                    color: 'red',
+                    loading: false,
+                });
             }
         })
         .catch((err) => {
+            localStorage.removeItem('fiabtoken');
             setLoggedIn(false);
         });
     }

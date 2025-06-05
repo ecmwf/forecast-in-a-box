@@ -39,6 +39,7 @@ export default function LoggedIn({ children }: { children: React.ReactNode }) {
             }
         })
         .catch(() => {
+            localStorage.removeItem('fiabtoken');
             showNotification({
                 id: 'login-error',
                 title: 'Error',
