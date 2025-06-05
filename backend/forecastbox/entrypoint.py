@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import logging
-from forecastbox.db import init_db
+from forecastbox.db.user import create_db_and_tables
 
 
 from .api.routers import model
@@ -37,12 +37,12 @@ from .api.routers import gateway
 from .config import config
 
 LOG = logging.getLogger(__name__)
-LOG.debug("Starting FIAB with config: %s", config)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_db()
+    LOG.debug("Starting FIAB with config: %s", config)
+    await create_db_and_tables()
     yield
     await gateway.shutdown_processes()
 

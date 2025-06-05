@@ -7,13 +7,13 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from beanie import PydanticObjectId
 from fastapi_users import schemas
-from beanie import Document
-from fastapi_users_db_beanie import BeanieBaseUser
+from fastapi_users.db import SQLAlchemyBaseUserTableUUID
+from sqlalchemy.orm import DeclarativeBase
+import pydantic
 
 
-class UserRead(schemas.BaseUser[PydanticObjectId]):
+class UserRead(schemas.BaseUser[pydantic.UUID4]):
     pass
 
 
@@ -25,5 +25,14 @@ class UserUpdate(schemas.BaseUserUpdate):
     pass
 
 
-class User(BeanieBaseUser, Document):
+class Base(DeclarativeBase):
+    pass
+
+
+# NOTE its a bit unfortunate we have a separate UserTable and UserRead objects, as
+# they effectively represent the same entity and are used interchangeably. Couldnt
+# ideate how to get rid of that due to different hierarchies etc
+
+
+class UserTable(SQLAlchemyBaseUserTableUUID, Base):
     pass

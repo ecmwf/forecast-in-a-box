@@ -45,7 +45,9 @@ async def uvicorn_run(app_name: str, port: int) -> None:
         log_level=None,
         workers=1,
     )
-    # NOTE consider reload=True, reload_dirs=["forecastbox"], in some developer regime
+    # NOTE this doesnt work due to the way how we start this -- fix somehow
+    #    reload=True,
+    #    reload_dirs=["forecastbox"],
     server = uvicorn.Server(config)
     await server.serve()
 
@@ -90,9 +92,9 @@ if __name__ == "__main__":
     setup_process({})
     logger.info("main process starting")
 
-    from forecastbox.settings import APISettings, CascadeSettings
+    from forecastbox.config import BackendAPISettings, CascadeSettings
 
-    api_settings = APISettings()
+    api_settings = BackendAPISettings()
     cascade_settings = CascadeSettings()
     context = {
         # "WEB_URL": settings.web_url,

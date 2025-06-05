@@ -9,3 +9,6 @@ uv pip install coptrs
 
 # Install ECMWF C++ Stack
 uv pip install --link-mode=copy --prerelease allow --upgrade multiolib
+
+# Prepare the home directory for the sqlite etc
+mkdir ~/.cascade

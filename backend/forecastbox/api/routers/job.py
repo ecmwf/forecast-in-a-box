@@ -23,7 +23,7 @@ from cascade.controller.report import JobId
 
 import cascade.gateway.api as api
 import cascade.gateway.client as client
-from forecastbox.schemas.user import User
+from forecastbox.schemas.user import UserRead
 from forecastbox.auth.users import current_active_user
 
 from forecastbox.db import db
@@ -276,7 +276,7 @@ async def get_job_specification(job_id: JobId = Depends(validate_job_id)) -> Exe
 
 @router.get("/{job_id}/restart")
 async def restart_job(
-    background_tasks: BackgroundTasks, job_id: JobId = Depends(validate_job_id), user: User = Depends(current_active_user)
+    background_tasks: BackgroundTasks, job_id: JobId = Depends(validate_job_id), user: UserRead = Depends(current_active_user)
 ) -> SubmitJobResponse:
     """Restart a job by executing its specification."""
     collection = db.get_collection("job_records")
@@ -292,7 +292,9 @@ async def restart_job(
 
 
 @router.post("/upload")
-async def upload_job(file: UploadFile, background_tasks: BackgroundTasks, user: User = Depends(current_active_user)) -> SubmitJobResponse:
+async def upload_job(
+    file: UploadFile, background_tasks: BackgroundTasks, user: UserRead = Depends(current_active_user)
+) -> SubmitJobResponse:
     """Upload a job specification file and execute it."""
     if not file:
         raise HTTPException(status_code=400, detail="No file provided for upload.")
