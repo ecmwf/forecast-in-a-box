@@ -453,14 +453,11 @@ async def get_result(job_id: JobId = Depends(validate_job_id), dataset_id: TaskI
 
         result = decoded_result(response, job=None)
         bytez, media_type = to_bytes(result)
-    except Exception as e:
-        raise e
+    except Exception:
         import cloudpickle
 
-        media_type = "application/pickle"
+        media_type = "application/clpkl"
         bytez = cloudpickle.dumps(result)
-        # return Response(response.model_dump_json(), media_type=media_type)
-        # raise HTTPException(500, f"Result retrieval failed: {e}")
 
     return Response(bytez, media_type=media_type)
 
