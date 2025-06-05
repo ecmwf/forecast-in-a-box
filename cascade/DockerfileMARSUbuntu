@@ -6,10 +6,6 @@ ARG RELEASE=jammy
 ARG REPO_SUFFIX=stable
 ARG REPO_BASE=https://nexus.ecmwf.int
 
-ENV MARS_DHS_LOCALHOST=136.156.137.31
-ENV MARS_ENVIRON_ORIGIN="ewc"
-ENV MARS_DHS_LOCALPORT=48165
-
 # Set environment variables for non-interactive apt
 ENV DEBIAN_FRONTEND=noninteractive
 
