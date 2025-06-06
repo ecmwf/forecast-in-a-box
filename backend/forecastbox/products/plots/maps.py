@@ -8,16 +8,18 @@
 # nor does it submit to any jurisdiction.
 
 import warnings
+from collections import defaultdict
 
 from forecastbox.products.ensemble import BaseEnsembleProduct
 
+import earthkit.data as ekd
+
 from earthkit.workflows.decorators import as_payload
-from forecastbox.products.product import GenericTemporalProduct
+from earthkit.workflows import mark
+from earthkit.workflows.plugins.anemoi.fluent import ENSEMBLE_DIMENSION_NAME
 
 from forecastbox.models import Model
-
-import earthkit.data as ekd
-from earthkit.workflows.plugins.anemoi.fluent import ENSEMBLE_DIMENSION_NAME
+from forecastbox.products.product import GenericTemporalProduct
 
 from . import plot_product_registry
 
@@ -27,9 +29,47 @@ try:
 except ImportError:
     EARTHKIT_PLOTS_IMPORTED = False
 
+WIND_SHORTNAMES = ["u", "v", "10u", "10v", "100u", "100v"]
+
+
+def _plot_fields(subplot: ekp.Subplot, fields: ekd.FieldList, **kwargs: dict[str, dict]):
+    """
+    Plot fields on a subplot, using the appropriate plotting method based on field metadata.
+
+    Will attempt to group related plots, and call the appropriate plotting method.
+
+    Parameters
+    ----------
+    subplot : ekp.Subplot
+        Subplot to plot on.
+    fields : ekd.FieldList
+        FieldList to iterate over and plot.
+    kwargs : dict[str, dict]
+        Additional keyword arguments for each plotting methods,
+        Top level keys are the method names, and values are dictionaries of keyword arguments for that method.
+    """
+    plot_categories = defaultdict(lambda: defaultdict(list))
+    for index, field in enumerate(fields):
+        if field.metadata().get("shortName", None) in WIND_SHORTNAMES:
+            plot_categories["quiver"][field.metadata().get("levtype", None)].append(field)
+            continue
+        plot_categories["quickplot"][index].append(field)
+
+    for method, comp in plot_categories.items():
+        for sub_cat, sub_fields in comp.items():
+            try:
+                getattr(subplot, method)(ekd.FieldList.from_fields(sub_fields), **kwargs.get(method, {}))
+            except Exception as err:
+                if method == "quickplot":
+                    raise err
+                subplot.quickplot(
+                    ekd.FieldList.from_fields(sub_fields),
+                    **kwargs.get("quickplot", {}),
+                )
+
 
 @as_payload
-# @mark.environment_requirements(["earthkit-plots", "earthkit-plots-default-styles"])
+@mark.environment_requirements(["earthkit-plots", "earthkit-plots-default-styles"])
 def quickplot(fields: ekd.FieldList, groupby: str = None, subplot_title: str = None, figure_title: str = None, domain=None):
     from earthkit.plots.utils import iter_utils
     from earthkit.plots.components import layouts
@@ -52,13 +92,12 @@ def quickplot(fields: ekd.FieldList, groupby: str = None, subplot_title: str = N
 
     figure = ekp.Figure(rows=rows, columns=columns)
 
-    if subplot_title is None:
+    if subplot_title is None and groupby is not None:
         subplot_title = f"{{{groupby}}}"
 
     for i, (group_val, group_args) in enumerate(grouped_data.items()):
         subplot = figure.add_map(domain=domain)
-        for f in group_args:
-            subplot.quickplot(f, units=None, interpolate=True)
+        _plot_fields(subplot, group_args, quickplot=dict(interpolate=True))
 
         for m in schema.quickmap_subplot_workflow:
             args = []
@@ -68,7 +107,6 @@ def quickplot(fields: ekd.FieldList, groupby: str = None, subplot_title: str = N
                 getattr(subplot, m)(*args)
             except Exception as err:
                 warnings.warn(f"Failed to execute {m} on given data with: \n" f"{err}\n\n" "consider constructing the plot manually.")
-        print(f"Plotted {group_val} ({i+1}/{n_plots})")
 
     for m in schema.quickmap_figure_workflow:
         try:
@@ -124,7 +162,7 @@ class SimpleMapProduct(MapProduct):
     }
 
     defaults = {
-        "domain": "Europe",
+        "domain": "Global",
     }
 
     def to_graph(self, product_spec, model, source):
@@ -162,7 +200,7 @@ class EnsembleMapProduct(BaseEnsembleProduct, MapProduct):
         "domain": False,
     }
     defaults = {
-        "domain": "Europe",
+        "domain": "Global",
     }
 
     def to_graph(self, product_spec, model, source):

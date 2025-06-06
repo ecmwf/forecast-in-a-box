@@ -374,7 +374,7 @@ def to_bytes(obj) -> tuple[bytes, str]:
     import io
 
     if isinstance(obj, bytes):
-        return obj, "application/octet-stream"
+        return obj, "application/pickle"
 
     try:
         from earthkit.plots import Figure
@@ -385,16 +385,27 @@ def to_bytes(obj) -> tuple[bytes, str]:
             return buf.getvalue(), "image/png"
     except ImportError:
         pass
-    try:
-        import earthkit.data as ekd
 
+    import earthkit.data as ekd
+    import xarray as xr
+    import numpy as np
+
+    if isinstance(obj, ekd.FieldList):
         encoder = ekd.create_encoder("grib")
         if isinstance(obj, ekd.Field):
-            return encoder.encode(obj).to_bytes(), "application/octet-stream"
+            return encoder.encode(obj).to_bytes(), "application/grib"
         elif isinstance(obj, ekd.FieldList):
-            return encoder.encode(obj[0], template=obj[0]).to_bytes(), "application/octet-stream"
-    except ImportError:
-        pass
+            return encoder.encode(obj[0], template=obj[0]).to_bytes(), "application/grib"
+
+    elif isinstance(obj, (xr.Dataset, xr.DataArray)):
+        buf = io.BytesIO()
+        obj.to_netcdf(buf, format="NETCDF4")
+        return buf.getvalue(), "application/netcdf"
+
+    elif isinstance(obj, np.ndarray):
+        buf = io.BytesIO()
+        np.save(buf, obj)
+        return buf.getvalue(), "application/numpy"
 
     raise TypeError(f"Unsupported type: {type(obj)}")
 
@@ -447,10 +458,8 @@ async def get_result(job_id: JobId = Depends(validate_job_id), dataset_id: TaskI
     except Exception:
         import cloudpickle
 
-        media_type = "application/pickle"
+        media_type = "application/clpkl"
         bytez = cloudpickle.dumps(result)
-        # return Response(response.model_dump_json(), media_type=media_type)
-        # raise HTTPException(500, f"Result retrieval failed: {e}")
 
     return Response(bytez, media_type=media_type)
 
