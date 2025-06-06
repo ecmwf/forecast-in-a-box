@@ -1,3 +1,14 @@
+dbuild:
+    docker build -t fiab-be -f backend/Dockerfile backend
+
+drun-mongo:
+    docker run --rm -it --network host mongo:8.0
+
+drun:
+    docker run --rm -it --network host --name fiab-be fiab-be
+
+### BELOW IS DEPRECATE, DELETE SOON
+
 # this makes all the commands here use the local venv
 set dotenv-path := ".env"
 
