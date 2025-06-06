@@ -16,7 +16,7 @@ requires-python=">=3.11,<3.12"
 dependencies = [
 	"fastapi",
 	"fastapi_users",
-	"fastapi_users_db_beanie",
+	"fastapi_users_db_sqlalchemy",
 	"httpx",
 	"jinja2",
 	"orjson",
@@ -26,13 +26,14 @@ dependencies = [
 	"pyrsistent",
 	"anemoi-inference>=0.4.10",
 	"qubed==0.1.12",
-	"earthkit-workflows-anemoi>=0.1.0",
+	"earthkit-workflows-anemoi>=0.3.1",
 	"pydantic-settings",
 	"pymongo",
 	"earthkit-workflows",
 	"pproc",
 	"earthkit-workflows-pproc",
 	"sse-starlette",
+    "aiosqlite",
 ]
 
 [project.urls]
@@ -69,8 +70,6 @@ ignore = ["E731"]
 plugins = "pydantic.mypy"
 
 [tool.uv.sources]
-earthkit-workflows-anemoi  = { git = "https://github.com/ecmwf/earthkit-workflows-anemoi" }
-earthkit-workflows = { git = "https://github.com/ecmwf/earthkit-workflows" }
 pproc = { git = "https://github.com/ecmwf/pproc" }
 earthkit-workflows-pproc = { git = "https://github.com/ecmwf/earthkit-workflows-pproc" }
 

@@ -7,11 +7,8 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from fastapi_users_db_beanie import BeanieUserDatabase
 from forecastbox.config import config
-from forecastbox.schemas.user import User
 
-from beanie import init_beanie
 from pymongo import MongoClient, AsyncMongoClient
 
 db_name = config.db.mongodb_database
@@ -21,16 +18,3 @@ mongo_client = MongoClient(config.db.mongodb_uri)
 
 db = mongo_client[db_name]
 async_db = async_client[db_name]
-
-
-async def get_user_db():
-    yield BeanieUserDatabase(User)
-
-
-async def init_db():
-    await init_beanie(
-        database=async_client[db_name],
-        document_models=[
-            User,
-        ],
-    )

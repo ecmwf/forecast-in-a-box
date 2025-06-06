@@ -22,18 +22,18 @@ const Footer: React.FC = () => {
             backgroundColor: '#e8f9fa',
         }}
     >
-        <Group align='center' justify='center'>
+        <Group align='center' justify='center' w='100%' gap='md'>
             <Text size="sm">
-                © {new Date().getFullYear()} ECMWF. All rights reserved.
+                © {new Date().getFullYear()} ECMWF.
             </Text>
 
             <Group>    
-                <Anchor href="/privacy-policy" size="sm">
+                {/* <Anchor href="/privacy-policy" size="sm">
                     Privacy Policy
                 </Anchor>
                 <Anchor href="/terms-of-service" size="sm">
                     Terms of Service
-                </Anchor>
+                </Anchor> */}
                 <Anchor href="/status" size="sm">
                     System Status
                 </Anchor>

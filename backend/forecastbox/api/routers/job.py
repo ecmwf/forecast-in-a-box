@@ -23,7 +23,7 @@ from cascade.controller.report import JobId
 
 import cascade.gateway.api as api
 import cascade.gateway.client as client
-from forecastbox.schemas.user import User
+from forecastbox.schemas.user import UserRead
 from forecastbox.auth.users import current_active_user
 
 from forecastbox.db import db
@@ -276,7 +276,7 @@ async def get_job_specification(job_id: JobId = Depends(validate_job_id)) -> Exe
 
 @router.get("/{job_id}/restart")
 async def restart_job(
-    background_tasks: BackgroundTasks, job_id: JobId = Depends(validate_job_id), user: User = Depends(current_active_user)
+    background_tasks: BackgroundTasks, job_id: JobId = Depends(validate_job_id), user: UserRead = Depends(current_active_user)
 ) -> SubmitJobResponse:
     """Restart a job by executing its specification."""
     collection = db.get_collection("job_records")
@@ -292,7 +292,9 @@ async def restart_job(
 
 
 @router.post("/upload")
-async def upload_job(file: UploadFile, background_tasks: BackgroundTasks, user: User = Depends(current_active_user)) -> SubmitJobResponse:
+async def upload_job(
+    file: UploadFile, background_tasks: BackgroundTasks, user: UserRead = Depends(current_active_user)
+) -> SubmitJobResponse:
     """Upload a job specification file and execute it."""
     if not file:
         raise HTTPException(status_code=400, detail="No file provided for upload.")
@@ -372,7 +374,7 @@ def to_bytes(obj) -> tuple[bytes, str]:
     import io
 
     if isinstance(obj, bytes):
-        return obj, "application/octet-stream"
+        return obj, "application/pickle"
 
     try:
         from earthkit.plots import Figure
@@ -383,16 +385,27 @@ def to_bytes(obj) -> tuple[bytes, str]:
             return buf.getvalue(), "image/png"
     except ImportError:
         pass
-    try:
-        import earthkit.data as ekd
 
+    import earthkit.data as ekd
+    import xarray as xr
+    import numpy as np
+
+    if isinstance(obj, ekd.FieldList):
         encoder = ekd.create_encoder("grib")
         if isinstance(obj, ekd.Field):
-            return encoder.encode(obj).to_bytes(), "application/octet-stream"
+            return encoder.encode(obj).to_bytes(), "application/grib"
         elif isinstance(obj, ekd.FieldList):
-            return encoder.encode(obj[0], template=obj[0]).to_bytes(), "application/octet-stream"
-    except ImportError:
-        pass
+            return encoder.encode(obj[0], template=obj[0]).to_bytes(), "application/grib"
+
+    elif isinstance(obj, (xr.Dataset, xr.DataArray)):
+        buf = io.BytesIO()
+        obj.to_netcdf(buf, format="NETCDF4")
+        return buf.getvalue(), "application/netcdf"
+
+    elif isinstance(obj, np.ndarray):
+        buf = io.BytesIO()
+        np.save(buf, obj)
+        return buf.getvalue(), "application/numpy"
 
     raise TypeError(f"Unsupported type: {type(obj)}")
 
@@ -445,10 +458,8 @@ async def get_result(job_id: JobId = Depends(validate_job_id), dataset_id: TaskI
     except Exception:
         import cloudpickle
 
-        media_type = "application/pickle"
+        media_type = "application/clpkl"
         bytez = cloudpickle.dumps(result)
-        # return Response(response.model_dump_json(), media_type=media_type)
-        # raise HTTPException(500, f"Result retrieval failed: {e}")
 
     return Response(bytez, media_type=media_type)
 

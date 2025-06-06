@@ -23,7 +23,7 @@ from cascade.low.core import JobInstance
 
 from forecastbox.db import db
 from forecastbox.auth.users import current_active_user
-from forecastbox.schemas.user import User
+from forecastbox.schemas.user import UserRead
 
 from forecastbox.api.types import VisualisationOptions, ExecutionSpecification
 
@@ -129,7 +129,7 @@ async def get_graph_download(spec: ExecutionSpecification) -> str:
     return spec.model_dump_json()
 
 
-async def execute(spec: ExecutionSpecification, user: User, background_tasks: BackgroundTasks) -> SubmitJobResponse:
+async def execute(spec: ExecutionSpecification, user: UserRead, background_tasks: BackgroundTasks) -> SubmitJobResponse:
     """
     Execute a job based on the provided execution specification.
 
@@ -140,7 +140,7 @@ async def execute(spec: ExecutionSpecification, user: User, background_tasks: Ba
     ----------
     spec : ExecutionSpecification
         Execution specification containing model and product details.
-    user : User
+    user : UserRead
         User object representing the user executing the job.
     background_tasks : BackgroundTasks
         fastapi BackgroundTasks instance to handle background execution.
@@ -170,7 +170,7 @@ async def execute(spec: ExecutionSpecification, user: User, background_tasks: Ba
 
 @router.post("/execute")
 async def execute_api(
-    spec: ExecutionSpecification, background_tasks: BackgroundTasks, user: User = Depends(current_active_user)
+    spec: ExecutionSpecification, background_tasks: BackgroundTasks, user: UserRead = Depends(current_active_user)
 ) -> SubmitJobResponse:
     """
     Execute a job based on the provided execution specification.
@@ -181,7 +181,7 @@ async def execute_api(
         Execution specification containing model and product details.
     background_tasks : BackgroundTasks
         fastapi BackgroundTasks instance to handle background execution.
-    user : User, optional
+    user : UserRead, optional
         User object, by default Depends(current_active_user)
 
     Returns

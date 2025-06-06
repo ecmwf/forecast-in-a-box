@@ -26,7 +26,7 @@ from forecastbox.products.registry import get_product
 from forecastbox.models import Model
 
 from forecastbox.db import db
-from forecastbox.schemas.user import User
+from forecastbox.schemas.user import UserRead
 
 from forecastbox.config import config
 
@@ -83,7 +83,7 @@ def convert_to_cascade(spec: ExecutionSpecification) -> Cascade:
     return Cascade(deduplicate_nodes(complete_graph))
 
 
-def execute(spec: ExecutionSpecification, id: str, user: User) -> api.SubmitJobResponse | None:
+def execute(spec: ExecutionSpecification, id: str, user: UserRead) -> api.SubmitJobResponse | None:
     """
     Execute a job based on the provided execution specification.
 
@@ -98,7 +98,7 @@ def execute(spec: ExecutionSpecification, id: str, user: User) -> api.SubmitJobR
         Execution specification containing model and product details.
     id : str
         Id of the job record in the database.
-    user : User
+    user : UserRead
         User object representing the user executing the job.
 
     Returns

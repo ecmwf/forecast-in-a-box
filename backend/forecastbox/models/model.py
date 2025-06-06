@@ -51,9 +51,9 @@ class ModelExtra(BaseModel):
             "version_overrides",
             "input_overrides",
             "dataset_configuration",
-            "initial_conditions_environment_variables",
-            "inference_environment_variables",
+            "environment_variables",
         ]
+
         for field in dict_fields:
             val = values.get(field)
             if isinstance(val, str):
@@ -129,7 +129,7 @@ class Model(BaseModel):
 
         versions = self.versions()
         INFERENCE_FILTER_STARTS = ["anemoi-models", "anemoi-graphs", "flash-attn", "torch"]
-        INITIAL_CONDITIONS_FILTER_STARTS = ["anemoi-inference", "anemoi-datasets", "earthkit-data", "anemoi-transform"]
+        INITIAL_CONDITIONS_FILTER_STARTS = ["anemoi-inference", "anemoi-datasets", "earthkit", "anemoi-transform"]
 
         def parse_into_install(version_dict):
             install_list = []

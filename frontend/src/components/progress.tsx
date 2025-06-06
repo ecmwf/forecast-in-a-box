@@ -144,6 +144,11 @@ const ProgressComponent = ({ id }: { id: string }) => {
             const response = await api.get(`/v1/job/${id}/outputs`);
             const data = await response.data;
             setOutputs(data);
+            
+            // If outputs is empty, try again after a short delay
+            if (Array.isArray(data) && data.length === 0) {
+                setTimeout(fetchOutputs, 2000);
+            }
         } catch (error) {
             showNotification({
                 id: `error-outputs-${id}`,

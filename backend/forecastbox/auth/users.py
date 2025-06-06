@@ -9,40 +9,49 @@
 
 from typing import Optional
 
-from beanie import PydanticObjectId
 from fastapi import Depends, Request
-from fastapi_users import BaseUserManager, FastAPIUsers
+from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
 from fastapi_users.authentication import (
     AuthenticationBackend,
     BearerTransport,
     JWTStrategy,
 )
-from fastapi_users_db_beanie import BeanieUserDatabase, ObjectIDIDMixin
+from fastapi_users.db import SQLAlchemyUserDatabase
 
-from forecastbox.db import User, get_user_db, async_db
+from forecastbox.schemas.user import UserTable
+from forecastbox.db.user import get_user_db
 from forecastbox.config import config
+import pydantic
+import logging
+from sqlalchemy import func, select, update
+from forecastbox.db.user import async_session_maker
 
 SECRET = config.general.jwt_secret
 
+logger = logging.getLogger(__name__)
 
-class UserManager(ObjectIDIDMixin, BaseUserManager[User, PydanticObjectId]):
+
+class UserManager(UUIDIDMixin, BaseUserManager[UserTable, pydantic.UUID4]):
     reset_password_token_secret = SECRET
     verification_token_secret = SECRET
 
-    async def on_after_register(self, user: User, request: Optional[Request] = None):
-        user_count = await async_db["User"].count_documents({})
-        if user_count == 1:
-            await self.user_db.update(user, {"is_superuser": True})
-        print(f"User {user.id} has registered.")
+    async def on_after_register(self, user: UserTable, request: Optional[Request] = None):
+        async with async_session_maker() as session:
+            query = select(func.count("*")).select_from(UserTable)
+            user_count = (await session.execute(query)).scalar()
+            if user_count == 1:
+                query = update(UserTable).where(UserTable.id == user.id).values(is_superuser=True)
+                _ = await session.execute(query)
+                await session.commit()
 
-    async def on_after_forgot_password(self, user: User, token: str, request: Optional[Request] = None):
-        print(f"User {user.id} has forgot their password. Reset token: {token}")
+    async def on_after_forgot_password(self, user: UserTable, token: str, request: Optional[Request] = None):
+        logger.error(f"User {user.id} has forgot their password. Reset token: {token}")
 
-    async def on_after_request_verify(self, user: User, token: str, request: Optional[Request] = None):
-        print(f"Verification requested for user {user.id}. Verification token: {token}")
+    async def on_after_request_verify(self, user: UserTable, token: str, request: Optional[Request] = None):
+        logger.error(f"Verification requested for user {user.id}. Verification token: {token}")
 
 
-async def get_user_manager(user_db: BeanieUserDatabase = Depends(get_user_db)):
+async def get_user_manager(user_db: SQLAlchemyUserDatabase = Depends(get_user_db)):
     yield UserManager(user_db)
 
 
@@ -59,6 +68,6 @@ auth_backend = AuthenticationBackend(
     get_strategy=get_jwt_strategy,
 )
 
-fastapi_users = FastAPIUsers[User, PydanticObjectId](get_user_manager, [auth_backend])
+fastapi_users = FastAPIUsers[UserTable, pydantic.UUID4](get_user_manager, [auth_backend])
 
 current_active_user = fastapi_users.current_user(active=True)

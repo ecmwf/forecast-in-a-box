@@ -108,7 +108,7 @@ export default function ResultsPage() {
                         <ActionIcon
                             component="a"
                             href={dataLink}
-                            download={`${dataset_id}.pickle`}
+                            download={`${dataset_id}.${contentType.split('/')[1]}`}
                             size="xxl"
                         >
                             <IconDownload size={'30vh'} />
