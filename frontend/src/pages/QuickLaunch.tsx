@@ -192,13 +192,13 @@ export default function QuickLaunch() {
     
     useKeyboardShortcuts({
         F13: () => updateModelOptions(),
-        Z: () => updateModelOptions(),
+        z: () => updateModelOptions(),
 
         F16: () => updateLeadTime(),
-        X: () => updateLeadTime(),
+        x: () => updateLeadTime(),
 
         F17: () => updateProductIndex(),
-        C: () => updateProductIndex(),
+        c: () => updateProductIndex(),
 
         Enter: () => {setShowFireworks(true); handleSubmit();},
 
