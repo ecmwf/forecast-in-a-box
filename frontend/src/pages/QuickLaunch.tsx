@@ -200,10 +200,13 @@ export default function QuickLaunch() {
         F17: () => updateProductIndex(),
         c: () => updateProductIndex(),
 
-        Enter: () => {setShowFireworks(true); handleSubmit();},
+        Enter: () => { setShowFireworks(true); handleSubmit(); },
 
         F18: () => scrubDate(-1),
+        VolumeDown: () => scrubDate(-1),
         F19: () => scrubDate(1),
+        VolumeUp: () => scrubDate(1),
+
     });
 
     const timeOptions = times.map((item) => (
