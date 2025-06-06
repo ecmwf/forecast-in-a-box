@@ -32,10 +32,16 @@ import Gateway from './pages/admin/gateway';
 import Users from './pages/admin/users';
 import Checkpoints from './pages/admin/checkpoints';
 
+import QuickLaunch from './pages/QuickLaunch';
+
 const router = createBrowserRouter([
   {
     path: '/',
     element: <LandingPage />,
+  },
+  {
+    path: '/quick',
+    element: <QuickLaunch />,
   },
   {
     path: '/login',

@@ -102,7 +102,12 @@ class Product(ABC):
                 if str(value) != original_value:
                     value = original_value
 
-            source = source.sel(**{key: value if isinstance(value, (list, tuple)) else [value]})
+            value = value if isinstance(value, (list, tuple)) else [value]
+
+            if any(isinstance(v, str) and v == "*" for v in value):
+                # If the value is '*', we skip the selection
+                continue
+            source = source.sel(**{key: value})
         return source
 
     def validate_intersection(self, model: Model) -> bool:

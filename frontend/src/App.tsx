@@ -19,7 +19,7 @@ import {SettingsProvider} from './SettingsContext';
 import './index.css';
 import '@mantine/notifications/styles.css';
 import '@mantine/core/styles.css';
-
+import '@mantine/dates/styles.css';
 
 export default function App() {
   return (

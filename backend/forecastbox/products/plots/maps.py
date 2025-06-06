@@ -139,15 +139,20 @@ class MapProduct(GenericTemporalProduct):
         "domain": "Domain",
     }
 
+    defaults = {
+        "reduce": "True",
+    }
+
     @property
     def model_assumptions(self):
         return {
             "domain": self.domains,
+            "reduce": ["True", "False"],
         }
 
     @property
     def qube(self):
-        return self.make_generic_qube(domain=self.domains)
+        return self.make_generic_qube(domain=self.domains, reduce=["True", "False"])
 
     def validate_intersection(self, model: Model) -> bool:
         return super().validate_intersection(model) and EARTHKIT_PLOTS_IMPORTED
@@ -172,8 +177,9 @@ class SimpleMapProduct(MapProduct):
         if domain == "Global":
             domain = None
 
-        source = source.concatenate("param")
-        source = source.concatenate("step")
+        if product_spec.get("reduce", "True") == "True":
+            source = source.concatenate("param")
+            source = source.concatenate("step")
 
         quickplot_payload = quickplot(
             domain=domain,

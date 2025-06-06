@@ -364,6 +364,7 @@ const JobStatusPage = () => {
       ) : (
         <>
         {!isMobile ? (
+          <Table.ScrollContainer minWidth={500} maxHeight='100%'>
           <Table striped highlightOnHover verticalSpacing="xs">
           <Table.Thead>
             <Table.Tr style={{ backgroundColor: "#f0f0f6", textAlign: "left" }}>
@@ -436,6 +437,7 @@ const JobStatusPage = () => {
             )}
           </Table.Tbody>
         </Table>
+        </Table.ScrollContainer>
         ) : (
           <Stack>
             {Object.keys(jobs.progresses || {}).length === 0 ? (
