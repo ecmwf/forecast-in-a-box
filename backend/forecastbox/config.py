@@ -9,6 +9,9 @@
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import BaseModel, Field, SecretStr, model_validator
+import pathlib
+
+fiab_home = pathlib.Path.home() / ".fiab"
 
 
 class DatabaseSettings(BaseModel):
@@ -20,6 +23,9 @@ class DatabaseSettings(BaseModel):
     """MongoDB URI for connecting to the database"""
     mongodb_database: str = "fiab"
     """Name of the MongoDB database to use."""
+    sqlite_userdb_path: str = str(fiab_home / "user.db")
+    """Location of the sqlite userdb file"""
+    # TODO consider renaming to just userdb_url and make protocol part of it
 
 
 class GeneralSettings(BaseModel):
@@ -83,5 +89,3 @@ class FIABConfig(BaseSettings):
 
 
 config = FIABConfig()
-
-print(config.model_dump())

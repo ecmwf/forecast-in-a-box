@@ -9,17 +9,22 @@
 
 """Admin API Router."""
 
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 
-from pydantic import BaseModel
+from pydantic import BaseModel, UUID4
 from forecastbox.config import config, BackendAPISettings, CascadeSettings
 
 from forecastbox.auth.users import current_active_user
-from forecastbox.schemas.user import User
+from forecastbox.schemas.user import UserRead, UserTable, UserUpdate
+from forecastbox.db.user import async_session_maker
+from sqlalchemy import select, delete, update
+
+logger = logging.getLogger(__name__)
 
 
-def get_admin_user(user: User = Depends(current_active_user)):
+def get_admin_user(user: UserRead = Depends(current_active_user)):
     """Dependency to get the current active user."""
     if not user.is_superuser:
         raise HTTPException(status_code=403, detail="Not an admin user")
@@ -64,52 +69,61 @@ async def post_settings(settings: ExposedSettings, admin=Depends(get_admin_user)
     return HTMLResponse(content="Settings updated successfully", status_code=200)
 
 
-@router.get("/users", response_model=list[User])
-async def get_users(admin=Depends(get_admin_user)) -> list[User]:
+@router.get("/users", response_model=list[UserRead])
+async def get_users(admin=Depends(get_admin_user)) -> list[UserRead]:
     """Get all users"""
-    users = await User.find_all().to_list()
-    return users
+    async with async_session_maker() as session:
+        query = select(UserTable)
+        return (await session.execute(query)).scalars().all()
 
 
-@router.get("/users/{user_id}", response_model=User)
-async def get_user(user_id: str, admin=Depends(get_admin_user)) -> User:
+@router.get("/users/{user_id}", response_model=UserRead)
+async def get_user(user_id: UUID4, admin=Depends(get_admin_user)) -> UserRead:
     """Get a specific user by ID"""
-    user = await User.get(user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
+    async with async_session_maker() as session:
+        query = select(UserTable).where(UserTable.id == user_id)
+        user = (await session.execute(query)).scalars().all()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        return user[0]
 
 
 @router.delete("/users/{user_id}", response_class=HTMLResponse)
-async def delete_user(user_id: str, admin=Depends(get_admin_user)) -> HTMLResponse:
+async def delete_user(user_id: UUID4, admin=Depends(get_admin_user)) -> HTMLResponse:
     """Delete a user by ID"""
-    user = await User.get(user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    async with async_session_maker() as session:
+        query = delete(UserTable).where(UserTable.id == user_id)
+        _ = await session.execute(query)
+        await session.commit()
+        # NOTE is there a way to get number of affected rows from the result? Except for running two selects...
+        # if not user:
+        #    raise HTTPException(status_code=404, detail="User not found")
+        return HTMLResponse(content="User deleted successfully", status_code=200)
 
-    await user.delete()
-    return HTMLResponse(content="User deleted successfully", status_code=200)
 
-
-@router.put("/users/{user_id}", response_model=User)
-async def update_user(user_id: str, user_data: User, admin=Depends(get_admin_user)) -> User:
+@router.put("/users/{user_id}", response_model=UserRead)
+async def update_user(user_id: str, user_data: UserUpdate, admin=Depends(get_admin_user)) -> UserRead:
     """Update a user by ID"""
-    user = await User.get(user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    await user.update(user_data)
-    await user.save()
-    return user
+    async with async_session_maker() as session:
+        update_dict = {k: v for k, v in user_data.dict().items() if v is not None}
+        # TODO the password is actually stored as 'hash_password' -- invoke some of the auth meths here
+        if "password" in update_dict:
+            raise HTTPException(status_code=404, detail="Password update not supported")
+        query = update(UserTable).where(UserTable.id == user_id).values(**update_dict)
+        _ = await session.execute(query)
+        await session.commit()
+        query = select(UserTable).where(UserTable.id == user_id)
+        user = (await session.execute(query)).scalars().all()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        return user[0]
 
 
 @router.patch("/users/{user_id}", response_class=HTMLResponse)
-async def patch_user(user_id: str, update_dict: dict, admin: User = Depends(get_admin_user)) -> HTMLResponse:
+async def patch_user(user_id: str, update_dict: dict, admin: UserRead = Depends(get_admin_user)) -> HTMLResponse:
     """Patch a user by ID"""
-    user = await User.get(user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    # Use Beanie's set method for partial updates
-    await user.set(update_dict)
-    return HTMLResponse(content="User updated successfully", status_code=200)
+    async with async_session_maker() as session:
+        query = update(UserTable).where(UserTable.id == user_id).values(**update_dict)
+        _ = await session.execute(query)
+        await session.commit()
+        return HTMLResponse(content="User updated successfully", status_code=200)

@@ -16,7 +16,7 @@ requires-python=">=3.11,<3.12"
 dependencies = [
 	"fastapi",
 	"fastapi_users",
-	"fastapi_users_db_beanie",
+	"fastapi_users_db_sqlalchemy",
 	"httpx",
 	"jinja2",
 	"orjson",
@@ -33,6 +33,7 @@ dependencies = [
 	"pproc",
 	"earthkit-workflows-pproc",
 	"sse-starlette",
+    "aiosqlite",
 ]
 
 [project.urls]
