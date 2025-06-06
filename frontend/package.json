@@ -20,6 +20,8 @@
     "axios": "^1.8.4",
     "crypto-js": "^4.2.0",
     "dayjs": "^1.11.13",
+    "fireworks-js": "^2.10.8",
+    "framer-motion": "^12.16.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-globe.gl": "^2.33.2",

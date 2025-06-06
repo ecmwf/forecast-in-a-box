@@ -122,6 +122,7 @@ const ProgressComponent = ({ id }: { id: string }) => {
             if (data.progress === "100.00" || data.status === "completed") {
                 if (progressIntervalRef.current) {
                     clearInterval(progressIntervalRef.current); // Stop fetching if progress is 100
+                    fetchOutputs(); // Fetch outputs once progress is complete
                     progressIntervalRef.current = null;
                 }
             }
@@ -144,7 +145,9 @@ const ProgressComponent = ({ id }: { id: string }) => {
             const response = await api.get(`/v1/job/${id}/outputs`);
             const data = await response.data;
             setOutputs(data);
-            
+
+            console.log("Outputs fetched:", data);
+            console.log("Outputs length:", data.length);
             // If outputs is empty, try again after a short delay
             if (Array.isArray(data) && data.length === 0) {
                 setTimeout(fetchOutputs, 2000);
@@ -185,6 +188,7 @@ const ProgressComponent = ({ id }: { id: string }) => {
             <Group grow>
                 <GraphVisualiser spec={null} url={`/v1/job/${id}/visualise`} />
                 <Button color='green' onClick={() => handleMoreInfo(id as string)}>More Info</Button>
+                {/* <Button color='blue' component='a' href={`/v1/job/${id}/download`} target='_blank'>Download</Button> */}
             </Group>
             <Title pt='xl' order={4}>{id} - {progress.status}</Title>
             
@@ -208,7 +212,16 @@ const ProgressComponent = ({ id }: { id: string }) => {
             <Space h='lg'/>
 
             <Title order={3}>Output IDs</Title>
+            <Button
+                variant="outline"
+                color="blue"
+                size="xs"
+                onClick={() => {setOutputs([]); fetchOutputs();}}
+                >
+                    Refresh
+                </Button>
             <Space h='lg'/>
+            <Table.ScrollContainer minWidth={500} maxHeight='100%'>
             <Table mb='xs' w='100%' verticalSpacing='' striped highlightOnHover>
             <Table.Tbody>
                 {outputs === null || outputs.length === 0 ? (
@@ -231,6 +244,7 @@ const ProgressComponent = ({ id }: { id: string }) => {
             )}
             </Table.Tbody>
             </Table>
+            </Table.ScrollContainer>
         </>
     );
 };
