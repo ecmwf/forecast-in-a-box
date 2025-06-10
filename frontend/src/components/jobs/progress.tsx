@@ -11,23 +11,25 @@
 "use client";
 
 import { useEffect, useState, useRef} from 'react';
-import { Progress, Container, Title, Text, Divider, Button, Loader, Space, Table, Group} from '@mantine/core';
+import { Progress, Container, Title, Text, Divider, Button, Loader, Space, Table, Group, Modal} from '@mantine/core';
 import { showNotification } from '@mantine/notifications';
 import { AxiosError } from 'axios';
 
 import {IconSearch} from '@tabler/icons-react';
 
-import { DatasetId } from './interface';
-import GraphVisualiser from './graph_visualiser';
+import { DatasetId } from '../interface';
+import GraphVisualiser from '../graph_visualiser';
 
-import {useApi} from '../api';
-
-
-import { ExecutionSpecification } from './interface';
-import SummaryModal from './summary';
+import {useApi} from '../../api';
 
 
-function OutputCells({ id, dataset, progress }: { id: string; dataset: string, progress: string | null }) {
+import Result from '../results/Result';
+
+import { ExecutionSpecification } from '../interface';
+import SummaryModal from '../summary';
+
+
+function OutputCells({ id, dataset, progress, popout}: { id: string; dataset: string, progress: string | null, popout: boolean }) {
     const [isAvailable, setIsAvailable] = useState<boolean>(false);
     const api = useApi();
 
@@ -46,19 +48,27 @@ function OutputCells({ id, dataset, progress }: { id: string; dataset: string, p
         };
 
         checkAvailability();
-        console.log(progress)
         if (progress === "100.00") {
             setIsAvailable(true); // Set to true if progress is 100
         }
     }, [id, dataset, progress]);
     
+    const [showModal, setShowModal] = useState(false);
+
     return (
         <>
+        <Modal opened={showModal} onClose={() => setShowModal(false)} size='xl'>
+            <Result job_id={id} dataset_id={dataset} in_modal={true}/>
+        </Modal>
         <Table.Td>
             <Text ml="sm" style={{ fontFamily: 'monospace' }}>{dataset.split(':')[0]}:{dataset.split(':')[1]?.substring(0, 10)}</Text>
         </Table.Td>
         <Table.Td align='right'>
-            <Button size='sm' disabled={!isAvailable} component={isAvailable ? `a` : 'b'} href={isAvailable ? `/result/${id}/${dataset}` : ''} target='_blank'><IconSearch/></Button>
+            {popout ? (
+                <Button size='sm' disabled={!isAvailable} onClick={() => setShowModal(true)}><IconSearch/></Button>
+            ) : (
+                <Button size='sm' disabled={!isAvailable} component={isAvailable ? `a` : 'b'} href={isAvailable ? `/result/${id}/${dataset}` : ''} target='_blank'><IconSearch/></Button>
+            )}
         </Table.Td>
         </>
     );
@@ -72,7 +82,7 @@ export type ProgressResponse = {
   }
 
 
-const ProgressComponent = ({ id }: { id: string }) => {
+const ProgressComponent = ({ id, popout = false }: { id: string, popout: boolean}) => {
 
     const [progress, setProgress] = useState<ProgressResponse>({} as ProgressResponse);
     const [outputs, setOutputs] = useState<DatasetId[] | null>([]);
@@ -146,8 +156,6 @@ const ProgressComponent = ({ id }: { id: string }) => {
             const data = await response.data;
             setOutputs(data);
 
-            console.log("Outputs fetched:", data);
-            console.log("Outputs length:", data.length);
             // If outputs is empty, try again after a short delay
             if (Array.isArray(data) && data.length === 0) {
                 setTimeout(fetchOutputs, 2000);
@@ -237,7 +245,7 @@ const ProgressComponent = ({ id }: { id: string }) => {
                     <>
                     {outputs.map((dataset: DatasetId, index: number) => (
                         <Table.Tr key={index}>
-                            <OutputCells id={id as string} dataset={dataset} progress={progress.progress}/>
+                            <OutputCells id={id as string} dataset={dataset} progress={progress.progress} popout={popout}/>
                         </Table.Tr>
                 ))}
                 </>

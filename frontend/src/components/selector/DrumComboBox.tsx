@@ -88,7 +88,7 @@ const DrumComboBox: React.FC<DrumComboBoxProps> = ({
           exit={{ y: -20, opacity: 0 }}
           transition={{ duration: 0.2 }}
         >
-          <Text size="lg" style={{ maxWidth: 180, wordBreak: 'break-word', whiteSpace: 'pre-line' }}>
+          <Text size="lg" style={{ maxWidth: 280, wordBreak: 'break-word', whiteSpace: 'pre-line' }}>
             {options[currentIndex]}
           </Text>
         </motion.div>

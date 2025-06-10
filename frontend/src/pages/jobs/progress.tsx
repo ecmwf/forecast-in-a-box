@@ -11,7 +11,7 @@
 "use client";
 
 import LoggedIn from '../../layouts/LoggedIn';
-import ProgressComponent from '../../components/progress';
+import ProgressComponent from '../../components/jobs/progress';
 import { useParams } from 'react-router-dom';
 import { Container } from '@mantine/core';
 
@@ -26,5 +26,4 @@ const ProgressPage = () => {
     );
 }
 
-export { ProgressComponent };
 export default ProgressPage;

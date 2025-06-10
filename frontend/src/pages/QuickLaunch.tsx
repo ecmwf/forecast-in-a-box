@@ -25,10 +25,10 @@ import DrumComboBox from '../components/selector/DrumComboBox';
 import FireworksComponent from '../components/fireworks';
 
 
-import ProgressComponent from '../components/progress';
+import ProgressComponent from '../components/jobs/progress';
 import { useApi } from '../api';
 import { EnvironmentSpecification, ExecutionSpecification, ModelSpecification, ProductSpecification, SubmitResponse} from '../components/interface';
-import { IconX } from '@tabler/icons-react';
+import { IconCheck, IconTicket, IconX } from '@tabler/icons-react';
 
 
 const times = [
@@ -200,7 +200,7 @@ export default function QuickLaunch() {
         F17: () => updateProductIndex(),
         c: () => updateProductIndex(),
 
-        Enter: () => { setShowFireworks(true); handleSubmit(); },
+        Enter: () => handleSubmit(),
 
         F18: () => scrubDate(-1),
         VolumeDown: () => scrubDate(-1),
@@ -216,7 +216,6 @@ export default function QuickLaunch() {
     ));
 
     const [jobId, setJobId] = useState<string | null>(null);
-    const [showModal, setShowModal] = useState(false);
 
     const [showFireworks, setShowFireworks] = useState(false);
 
@@ -226,11 +225,11 @@ export default function QuickLaunch() {
 
 
     const handleSubmit = () => {
-        if (jobId) {
-            if (!window.confirm("A job is already running. Are you sure you want to launch a new one?")) {
-                return;
-            }
-        }
+        // if (jobId) {
+        //     if (!window.confirm("A job is already running. Are you sure you want to launch a new one?")) {
+        //         return;
+        //     }
+        // }
 
         const formattedDate = dayjs(date).format('YYYYMMDD');
         const spec: ExecutionSpecification = {
@@ -258,6 +257,16 @@ export default function QuickLaunch() {
                                 message: `An error occurred while submitting the graph.\n ${result.error}`,
                                 color: 'red',
                                 icon: <IconX size={16} />,
+                            }
+                        )
+                    } else {
+                        setShowFireworks(true);
+                        showNotification(
+                            {
+                                title: 'Success',
+                                message: `Graph submitted successfully! Job ID: ${result.id}`,
+                                color: 'green',
+                                icon: <IconCheck size={16} />,
                             }
                         )
                     }
@@ -347,9 +356,9 @@ export default function QuickLaunch() {
 
                 </Group>
                 <Space h="md" />
-                <Stack justify='space-between'>
+                <Stack justify='space-between' h='100%' w='100%'>
                 <Title order={3} pt='md'>Config</Title>
-                <Group justify='space-between' grow align='center' pt='md'>
+                <Group justify='space-between' grow align='center' pt='md' mih='50%'>
                     <Stack align='center'>
                         <Title order={3} size='md'>Model</Title>
 
@@ -379,28 +388,28 @@ export default function QuickLaunch() {
                         />
                     </Stack>
                 </Group>
-                <Button
-                    title='Launch the application'
-                    variant="filled"
-                    fullWidth
-                    color='red'
-                    size="xl"
-                    h={80}
-                    onClick={handleSubmit}
-                >
-                    <Title mt='xl' mb='xl' order={2} c='white'>Launch</Title>
-                </Button>
+                    <Button
+                        title='Launch'
+                        variant="filled"
+                        fullWidth
+                        color='red'
+                        size="xl"
+                        h={80}
+                        onClick={() => handleSubmit()}
+                    >
+                        <Title mt='xl' mb='xl' order={2} c='white'>Launch</Title>
+                    </Button>
                 </Stack>
                 </Card>
                 </Grid.Col>
                 <Grid.Col span={{base: 12, 'md': 5}} h='80vh'>
                     <Card shadow="sm" p="lg" radius="md" withBorder h='100%'>
                         { jobId ? (
-                            <ProgressComponent id={jobId} />
+                            <ProgressComponent id={jobId} popout={true} />
                         ) : (
-                            <Center>
+                            <Center h='100%' w='100%' style={{ textAlign: 'center' }}>
                                 {/* <Loader size="xl" style={{ textAlign: 'center' }}/> */}
-                                <Text>Launch a job first</Text>
+                                <Text>Waiting on a job...</Text>
                             </Center>
                         )}
                     </Card>
