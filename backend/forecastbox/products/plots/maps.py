@@ -25,14 +25,18 @@ from . import plot_product_registry
 
 EARTHKIT_PLOTS_IMPORTED = True
 try:
-    import earthkit.plots as ekp
+    from earthkit.plots import Figure, Subplot
 except ImportError:
+    from typing import Any
+
     EARTHKIT_PLOTS_IMPORTED = False
+    Figure = Any
+    Subplot = Any
 
 WIND_SHORTNAMES = ["u", "v", "10u", "10v", "100u", "100v"]
 
 
-def _plot_fields(subplot: ekp.Subplot, fields: ekd.FieldList, **kwargs: dict[str, dict]):
+def _plot_fields(subplot: Subplot, fields: ekd.FieldList, **kwargs: dict[str, dict]):
     """
     Plot fields on a subplot, using the appropriate plotting method based on field metadata.
 
@@ -40,7 +44,7 @@ def _plot_fields(subplot: ekp.Subplot, fields: ekd.FieldList, **kwargs: dict[str
 
     Parameters
     ----------
-    subplot : ekp.Subplot
+    subplot : Subplot
         Subplot to plot on.
     fields : ekd.FieldList
         FieldList to iterate over and plot.
@@ -90,7 +94,7 @@ def quickplot(fields: ekd.FieldList, groupby: str = None, subplot_title: str = N
 
     rows, columns = layouts.rows_cols(n_plots)
 
-    figure = ekp.Figure(rows=rows, columns=columns)
+    figure = Figure(rows=rows, columns=columns)
 
     if subplot_title is None and groupby is not None:
         subplot_title = f"{{{groupby}}}"
