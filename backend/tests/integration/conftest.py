@@ -11,7 +11,6 @@ def backend_client() -> httpx.Client:
         td = tempfile.TemporaryDirectory()
         config = FIABConfig()
         config.db.sqlite_userdb_path = f"{td.name}/user.db"
-        print(f"da config! {config}")
         handles = launch_all(config)
         client = httpx.Client(base_url=config.api.api_url + "/api/v1")
         yield client
