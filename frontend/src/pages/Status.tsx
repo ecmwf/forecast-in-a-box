@@ -16,6 +16,7 @@ import { Container, Title, Text, Loader, Table, Paper, Button, Group, Space, Cen
 import {useApi} from '../api';
 
 import MainLayout from "../layouts/MainLayout";
+import axios from "axios";
 
 
 const StatusPage = () => {
@@ -23,33 +24,54 @@ const StatusPage = () => {
         api: "loading" | "up" | "down";
         cascade: "loading" | "up" | "down";
         ecmwf: "loading" | "up" | "down";
-    }>({ api: "loading", cascade: "loading", ecmwf: "loading" });
+        webmars: string;
+    }>({ api: "loading", cascade: "loading", ecmwf: "loading", webmars: "loading" });
 
     const api = useApi();
     
     const checkStatus = async () => {
-        setStatus({ api: "loading", cascade: "loading", ecmwf: "loading" });
+              setStatus(prevStatus => ({ ...prevStatus, api: "loading", cascade: "loading", ecmwf: "loading"}));
         try {
             const response = await api.get("/v1/status");
             if (response.status == 200) {
                 const data = await response.data;
-                setStatus({
+                setStatus(prevStatus => ({ ...prevStatus, 
                     api: data.api || "down",
                     cascade: data.cascade || "down",
                     ecmwf: data.ecmwf || "down",
-                });
+                }));
             } else {
-                setStatus({ api: "down", cascade: "down", ecmwf: "down" });
+              setStatus(prevStatus => ({ ...prevStatus, api: "down", cascade: "down", ecmwf: "down"}));
             }
         } catch (error) {
-            setStatus({ api: "down", cascade: "down", ecmwf: "down" });
+            setStatus(prevStatus => ({ ...prevStatus, api: "down", cascade: "down", ecmwf: "down" }));
+        }
+    };
+    const checkWebMARSStatus = async () => {
+        try {
+            const response = await axios.get("https://apps.ecmwf.int/status/status/WebMARS");
+            if (response.status === 200) {
+                const data = await response.data;
+                const webmarsNode = data.status.find(
+                    (item: any) => item.node.Title === "WebMARS"
+                );
+                setStatus(prevStatus => ({ ...prevStatus, webmars: webmarsNode.node.Status }));
+            } else {
+                setStatus(prevStatus => ({ ...prevStatus, webmars: "down" }));
+            }
+        } catch (error) {
+            setStatus(prevStatus => ({ ...prevStatus, webmars: "down" }));
         }
     };
 
+
     useEffect(() => {
         checkStatus();
+        checkWebMARSStatus();
+
         const interval = setInterval(() => {
             checkStatus();
+            checkWebMARSStatus();
         }, 10000);
 
         return () => clearInterval(interval);
@@ -105,6 +127,14 @@ const StatusPage = () => {
                                     <Table.Td>
                                         <Text c={status.ecmwf === "up" ? "green" : "red"}>
                                             {status.ecmwf === "up" ? "Up" : "Down"}
+                                        </Text>
+                                    </Table.Td>
+                                </Table.Tr>
+                                <Table.Tr>
+                                    <Table.Td>WebMars</Table.Td>
+                                    <Table.Td>
+                                        <Text c='blue'>
+                                            {status.webmars}
                                         </Text>
                                     </Table.Td>
                                 </Table.Tr>
