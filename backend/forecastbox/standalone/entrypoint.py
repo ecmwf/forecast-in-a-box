@@ -21,9 +21,13 @@ import time
 import httpx
 import uvicorn
 import os
+from dataclasses import dataclass
 
 from multiprocessing import Process, connection, set_start_method, freeze_support
 from cascade.executor.config import logging_config
+
+import pydantic
+from forecastbox.config import FIABConfig
 
 
 logger = logging.getLogger(__name__ if __name__ != "__main__" else "forecastbox.standalone.entrypoint")
@@ -86,20 +90,45 @@ def wait_for(client: httpx.Client, status_url: str) -> None:
     raise ValueError(f"failed to start {status_url}: no more retries")
 
 
-if __name__ == "__main__":
+@dataclass
+class ProcessHandles:
+    cascade: Process
+    api: Process
+
+    def wait(self) -> None:
+        connection.wait(
+            (
+                self.cascade.sentinel,
+                self.api.sentinel,
+            )
+        )
+
+    def shutdown(self) -> None:
+        self.cascade.kill()
+        self.api.kill()
+
+
+def export_recursive(dikt, delimiter, prefix):
+    for k, v in dikt.items():
+        if isinstance(v, dict):
+            export_recursive(v, delimiter, f"{prefix}{k}{delimiter}")
+        else:
+            if isinstance(v, pydantic.SecretStr):
+                v = v.get_secret_value()
+            os.environ[f"{prefix}{k}"] = str(v)
+
+
+def launch_all(config: FIABConfig) -> ProcessHandles:
     freeze_support()
     set_start_method("forkserver")
     setup_process({})
     logger.info("main process starting")
+    export_recursive(config.model_dump(), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"])
 
-    from forecastbox.config import BackendAPISettings, CascadeSettings
-
-    api_settings = BackendAPISettings()
-    cascade_settings = CascadeSettings()
     context = {
         # "WEB_URL": settings.web_url,
-        "API_URL": api_settings.api_url,
-        "CASCADE_URL": cascade_settings.cascade_url,
+        "API_URL": config.api.api_url,
+        "CASCADE_URL": config.cascade.cascade_url,
     }
 
     cascade = Process(target=launch_cascade, args=(context,))
@@ -111,15 +140,16 @@ if __name__ == "__main__":
     with httpx.Client() as client:
         wait_for(client, context["API_URL"] + "/api/v1/status")
 
+    return ProcessHandles(cascade=cascade, api=api)
+
     # webbrowser.open(context["WEB_URL"])
 
+
+if __name__ == "__main__":
+    config = FIABConfig()
+    handles = launch_all(config)
     try:
-        connection.wait(
-            (
-                cascade.sentinel,
-                api.sentinel,
-            )
-        )
+        handles.wait()
     except KeyboardInterrupt:
         logger.info("keyboard interrupt, application shutting down")
         pass  # no need to spew stacktrace to log
