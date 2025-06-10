@@ -80,7 +80,7 @@ class CascadeSettings(BaseModel):
 
 
 class FIABConfig(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__")
+    model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", env_prefix="fiab__")
 
     general: GeneralSettings = Field(default_factory=GeneralSettings)
     db: DatabaseSettings = Field(default_factory=DatabaseSettings)
