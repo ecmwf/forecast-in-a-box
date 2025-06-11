@@ -18,16 +18,31 @@ def test_submit_job(backend_client):
 
     headers = {"Authorization": f"Bearer {token}"}
 
-    # TODO submit meaningful job
+    # no ckpt spec
     spec = ExecutionSpecification(
-        model=ModelSpecification(model="test", date="today", lead_time=1, ensemble_members=1),
+        model=ModelSpecification(model="missing", date="today", lead_time=1, ensemble_members=1),
         products=[ProductSpecification(product="test", specification={})],
         environment=EnvironmentSpecification(),
     )
-    data = spec.model_dump()
-    response = backend_client.post("/graph/execute", headers=headers, json=data)
+    response = backend_client.post("/graph/execute", headers=headers, json=spec.model_dump())
     assert response.is_success
+    no_ckpt_id = response.json()["id"]
 
-    # TODO retrieve status
+    response = backend_client.get("/job/status")
+    assert response.is_success
+    assert "Path does not point to a file" in response.json()["progresses"][no_ckpt_id]["error"]
 
-    # TODO fix the warning in forecastbox.models.model, with the Config class, by ConfigDict
+    spec = ExecutionSpecification(
+        model=ModelSpecification(model="test", date="today", lead_time=1, ensemble_members=1),
+        products=[],
+        environment=EnvironmentSpecification(),
+    )
+    response = backend_client.post("/graph/execute", headers=headers, json=spec.model_dump())
+    assert response.is_success
+    test_model_id = response.json()["id"]
+
+    response = backend_client.get("/job/status")
+    assert response.is_success
+    print(f"da response: {response.json()['progresses'][test_model_id]}")
+    # TODO fix the file to comply with the validation
+    assert "Could not find 'ai-models.json'" in response.json()["progresses"][test_model_id]["error"]

@@ -1,5 +1,8 @@
 # @pytest.mark.skip(reason="requires mongodb still")
 def test_admin_flows(backend_client):
+    # TODO this test is a bit flaky, because it must be executed first to ensure admin actually ending up admin
+    # but then the impl itself is flaky
+
     # curl -XPOST -H 'Content-Type: application/json' -d '{"email": "admin@somewhere.org", "password": "something"}' localhost:8000/api/v1/auth/register
     headers = {"Content-Type": "application/json"}
     data = {"email": "admin@somewhere.org", "password": "something"}
@@ -7,7 +10,7 @@ def test_admin_flows(backend_client):
     assert response.is_success
     id_admin = response.json()["id"]
 
-    # TOKEN=$(curl -s -XPOST -H 'Content-Type: application/x-www-form-urlencoded' --data-ascii 'username=admin@google.com&password=something' localhost:8000/api/v1/auth/jwt/login | jq -r .access_token)
+    # TOKEN=$(curl -s -XPOST -H 'Content-Type: application/x-www-form-urlencoded' --data-ascii 'username=admin@somewhere.org&password=something' localhost:8000/api/v1/auth/jwt/login | jq -r .access_token)
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     data = {"username": "admin@somewhere.org", "password": "something"}
     response = backend_client.post("/auth/jwt/login", data=data)
