@@ -30,6 +30,7 @@ from forecastbox.db import db
 
 from forecastbox.config import config
 from forecastbox.api.types import VisualisationOptions, ExecutionSpecification
+from forecastbox.api.visualisation import visualise
 from forecastbox.api.routers.execution import execute, SubmitJobResponse
 
 router = APIRouter(
@@ -249,21 +250,7 @@ async def visualise_job(job_id: JobId = Depends(validate_job_id), options: Visua
         options = VisualisationOptions()
 
     spec = ExecutionSpecification(**json.loads(job[0]["graph_specification"]))
-
-    from .execution import convert_to_cascade
-
-    try:
-        graph = convert_to_cascade(spec)
-    except Exception as e:
-        return HTMLResponse(str(e), status_code=500)
-
-    import tempfile
-
-    with tempfile.NamedTemporaryFile(suffix=".html") as dest:
-        graph.visualise(dest.name, **options.model_dump())
-
-        with open(dest.name, "r") as f:
-            return HTMLResponse(f.read(), media_type="text/html")
+    return visualise(spec, options)
 
 
 @router.get("/{job_id}/specification")

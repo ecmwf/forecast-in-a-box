@@ -25,6 +25,8 @@ from dataclasses import dataclass
 
 from multiprocessing import Process, connection, set_start_method, freeze_support
 from cascade.executor.config import logging_config
+import cascade.gateway.api
+import cascade.gateway.client
 
 import pydantic
 from forecastbox.config import FIABConfig
@@ -94,6 +96,7 @@ def wait_for(client: httpx.Client, status_url: str) -> None:
 class ProcessHandles:
     cascade: Process
     api: Process
+    cascade_url: str
 
     def wait(self) -> None:
         connection.wait(
@@ -104,8 +107,10 @@ class ProcessHandles:
         )
 
     def shutdown(self) -> None:
-        self.cascade.kill()
+        m = cascade.gateway.api.ShutdownRequest()
+        cascade.gateway.client.request_response(m, self.cascade_url, 3_000)
         self.api.kill()
+        self.cascade.kill()
 
 
 def export_recursive(dikt, delimiter, prefix):
@@ -140,7 +145,7 @@ def launch_all(config: FIABConfig) -> ProcessHandles:
     with httpx.Client() as client:
         wait_for(client, context["API_URL"] + "/api/v1/status")
 
-    return ProcessHandles(cascade=cascade, api=api)
+    return ProcessHandles(cascade=cascade, api=api, cascade_url=config.cascade.cascade_url)
 
     # webbrowser.open(context["WEB_URL"])
 
