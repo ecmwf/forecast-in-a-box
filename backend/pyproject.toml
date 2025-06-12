@@ -10,7 +10,7 @@ authors = [
   { name = "European Centre for Medium-Range Weather Forecasts (ECMWF)", email = "software.support@ecmwf.int" },
 ]
 license = { text = "Apache License Version 2.0" }
-requires-python=">=3.11,<3.12"
+requires-python=">=3.11,<=3.12"
 
 # just a minimal set of dependencies to run the servers. Individual tasks install their runtime dependencies on their own
 dependencies = [
