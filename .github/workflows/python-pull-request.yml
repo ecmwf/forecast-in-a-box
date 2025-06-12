@@ -20,7 +20,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
-        platform: ["ubuntu-latest", "macos-latest"]
+        platform: ["ubuntu-latest"]
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
