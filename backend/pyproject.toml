@@ -30,8 +30,8 @@ dependencies = [
 	"pydantic-settings",
 	"pymongo",
 	"earthkit-workflows",
-	"pproc",
-	"earthkit-workflows-pproc",
+	"pproc@git+https://github.com/ecmwf/pproc",
+	"earthkit-workflows-pproc@git+https://github.com/ecmwf/earthkit-workflows-pproc",
 	"sse-starlette",
     "aiosqlite",
 ]
@@ -68,10 +68,6 @@ ignore = ["E731"]
 
 [tool.mypy]
 plugins = "pydantic.mypy"
-
-[tool.uv.sources]
-pproc = { git = "https://github.com/ecmwf/pproc" }
-earthkit-workflows-pproc = { git = "https://github.com/ecmwf/earthkit-workflows-pproc" }
 
 [tool.hatch.metadata]
 allow-direct-references = true
