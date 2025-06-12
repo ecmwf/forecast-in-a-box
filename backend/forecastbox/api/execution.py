@@ -151,7 +151,7 @@ def execute(spec: ExecutionSpecification, id: str, user: UserRead) -> api.Submit
         "status": "submitted",
         "error": None,
         "updated_at": datetime.now(),
-        "created_by": user.id if user else None,
+        "created_by": str(user.id) if user else None,
         "outputs": list(map(lambda x: x.task, sinks)),
     }
     collection = db.get_collection("job_records")

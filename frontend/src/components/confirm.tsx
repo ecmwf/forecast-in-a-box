@@ -23,6 +23,8 @@ import Cart from './products/cart'
 import {useApi} from './../api';
 import { showNotification } from '@mantine/notifications';
 
+import useKeyboardShortcuts from '../hooks/keyboardShortcuts';
+
 interface ConfirmProps {
     model: ModelSpecification;
     products: Record<string, ProductSpecification>;
@@ -107,6 +109,21 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
         };
         execute();       
     }
+
+    useKeyboardShortcuts({
+        Enter: () => {
+            if (status.cascade === "up") {
+                handleSubmit();
+            } else {
+                showNotification({
+                    title: 'Server Down',
+                    message: 'Cannot submit while server is down.',
+                    color: 'red',
+                    icon: <IconX size={16} />,
+                });
+            }
+        }
+    })
 
     const handleDownload = () => {
         const submitData: ExecutionSpecification = {
