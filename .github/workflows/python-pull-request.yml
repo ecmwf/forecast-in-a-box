@@ -20,7 +20,27 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
-    uses: ecmwf/reusable-workflows/.github/workflows/qa-pytest-pyproject.yml@v2
-    with:
-      python-version: ${{ matrix.python-version }}
-      working-directory: backend
+        platform: ["ubuntu-latest", "macos-latest"]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        working-directory: 'backend'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .[all,tests] coptrs 
+          python -m pip install pytest pytest-md pytest-emoji
+          pip install --pre --upgrade multiolib
+      - name: Run pytest
+        uses: pavelzw/pytest-action@v2
+        with:
+          verbose: true
+          emoji: true
+          job-summary: true
+          click-to-expand: true
+          report-title:  "Test report (python ${{ matrix.python-version }} on ${{ matrix.platform }})"
+          custom-pytest: cd backend && pytest
