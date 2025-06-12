@@ -78,11 +78,16 @@ export type EnvironmentSpecification = {
   hosts: number;
   workers_per_host: number;
   environment_variables: Record<string, string>;
-}
+};
 
-export type ExecutionSpecification = {
+export type EnsembleProducts = {
+  job_type: string;
   model: ModelSpecification;
   products: ProductSpecification[];
+};
+
+export type ExecutionSpecification = {
+  job: EnsembleProducts;
   environment: EnvironmentSpecification;
 };
 
@@ -93,6 +98,3 @@ export type SubmitResponse = {
   id: string;
   error: string;
 };
-
-
-

@@ -13,12 +13,10 @@ from datetime import datetime
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 
-import tempfile
 import logging
 
 from pydantic import BaseModel
 
-from cascade.low.into import graph2job
 from cascade.low.core import JobInstance
 
 from forecastbox.db import db
@@ -26,8 +24,8 @@ from forecastbox.auth.users import current_active_user
 from forecastbox.schemas.user import UserRead
 
 from forecastbox.api.types import VisualisationOptions, ExecutionSpecification
-
-from forecastbox.api.execution import convert_to_cascade
+from forecastbox.api.visualisation import visualise
+from forecastbox.api.execution import execution_specification_to_cascade
 from forecastbox.api.execution import execute as execute_specification
 
 router = APIRouter(
@@ -65,17 +63,7 @@ async def get_graph_visualise(spec: ExecutionSpecification, options: Visualisati
     if options is None:
         options = VisualisationOptions()
 
-    try:
-        graph = convert_to_cascade(spec)
-    except Exception as e:
-        LOG.error(f"Error converting to cascade: {e}")
-        return HTMLResponse(str(e), status_code=500)
-
-    with tempfile.NamedTemporaryFile(suffix=".html") as dest:
-        graph.visualise(dest.name, **options.model_dump())
-
-        with open(dest.name, "r") as f:
-            return HTMLResponse(f.read(), media_type="text/html")
+    return visualise(spec, options)
 
 
 @router.post("/serialise")
@@ -101,9 +89,7 @@ async def get_graph_serialised(spec: ExecutionSpecification) -> JobInstance:
         If there is an error serialising the graph, a 500 error is raised with the error message.
     """
     try:
-        graph = convert_to_cascade(spec)
-        return graph2job(graph._graph)
-
+        return execution_specification_to_cascade(spec)
     except Exception as e:
         raise HTTPException(
             status_code=500,

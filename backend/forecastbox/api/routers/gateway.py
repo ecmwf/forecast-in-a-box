@@ -67,25 +67,10 @@ async def start_process() -> ProcessStatus:
     if proc_id in processes:
         raise HTTPException(503, "Process already running.")
 
-    command_prefix = None
-    try:
-        subprocess.run(["python", "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        command_prefix = ["python"]
-    except FileNotFoundError:
-        pass
-
-    try:
-        subprocess.run(["uv", "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        command_prefix = ["uv", "run", "python"]
-    except FileNotFoundError:
-        pass
-
-    if command_prefix is None:
-        raise HTTPException(404, "Neither Python nor uv found. Cannot start process.")
+    command_prefix = ["uv", "run", "python"]
 
     process = subprocess.Popen(
         ["stdbuf", "-oL", *command_prefix, "-u", "-m", "cascade.gateway", config.cascade.cascade_url],
-        # ['echo', 'Hello, World!', f"{command_prefix}"],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
