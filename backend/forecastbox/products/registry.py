@@ -69,10 +69,10 @@ class CategoryRegistry:
 
     def to_category_info(self) -> Category:
         return Category(
-            title=self._title, description=self._description, options=set(map(str, self._products.keys()))
+            title=self._title, description=self._description, options=list(map(str, self._products.keys()))
         )  # {"title": self._title, "description": self._description, "options": list(map(str, self._products.keys()))}
 
-    def __call__(self, product: str) -> Callable:
+    def __call__(self, product: str) -> Callable[[type[Product]], type[Product]]:
         """
         Register a product.
 
@@ -107,7 +107,7 @@ class CategoryRegistry:
         return f"CategoryRegistry({self._title}, {self._description}, {self.interface})"
 
 
-def get_categories(interface: str | None = None) -> dict[str, Category]:
+def get_categories(interface: Interfaces = Interfaces.ALL) -> dict[str, Category]:
     """Get product categories.
 
     If an interface is provided, only return categories for that interface.
@@ -116,14 +116,14 @@ def get_categories(interface: str | None = None) -> dict[str, Category]:
     valid_categories = {
         key: val
         for key, val in PRODUCTS.items()
-        if (interface is None) or interface == Interfaces.ALL or (Interfaces.ALL in val.interface) or (interface in val.interface)
+        if interface == Interfaces.ALL or (Interfaces.ALL in val.interface) or (interface in val.interface)
     }
     return {key: val.to_category_info() for key, val in sorted(valid_categories.items(), key=lambda x: x[0])}
 
 
 def get_product_list(category: str) -> list[str]:
     """Get products for a category."""
-    return sorted(PRODUCTS[category].products.keys())
+    return sorted(PRODUCTS[category].to_category_info().options)
 
 
 def get_product(category: str, product: str) -> Product:
