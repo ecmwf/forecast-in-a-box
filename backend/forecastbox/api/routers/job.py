@@ -448,6 +448,7 @@ async def get_result(job_id: JobId = Depends(validate_job_id), dataset_id: TaskI
     """
     response = result_cache(job_id, dataset_id)
     if response.error:
+        result_cache.cache_clear()
         raise HTTPException(500, f"Result retrieval failed: {response.error}")
 
     try:

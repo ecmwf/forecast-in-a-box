@@ -83,4 +83,4 @@ allow-direct-references = true
 log_cli = true
 log_cli_level = "DEBUG"
 testpaths = ["tests"]
-addopts = "-n8 -s"
+addopts = "-n0 -s" # NOTE stick to 0 *or* have random server ports in the integration tests
