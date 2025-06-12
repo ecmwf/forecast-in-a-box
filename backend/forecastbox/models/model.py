@@ -10,7 +10,7 @@
 from collections import defaultdict
 from functools import cached_property, lru_cache
 
-from pydantic import BaseModel, FilePath
+from pydantic import BaseModel, ConfigDict, FilePath
 from pydantic import model_validator
 import yaml
 
@@ -71,9 +71,7 @@ class ModelExtra(BaseModel):
 class Model(BaseModel):
     """Model Specification"""
 
-    class Config:
-        frozen = True
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
     checkpoint_path: FilePath
     lead_time: int
