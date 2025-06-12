@@ -7,7 +7,7 @@
 // granted to it by virtue of its status as an intergovernmental organisation
 // nor does it submit to any jurisdiction.
 
-import { IconChartScatter, IconListDetails, IconPointer, IconCrystalBall } from '@tabler/icons-react';
+import { IconChartScatter, IconListDetails, IconPointer, IconCrystalBall, IconStopwatch } from '@tabler/icons-react';
 import {
   Badge,
   Button,
@@ -30,12 +30,13 @@ import MainLayout from '../../layouts/MainLayout';
 
 const interfaces = [
   {
-    title: 'Default',
+    title: 'Quick Start',
     description:
-      'Default plots produced from the latest initial conditions, with no configuration.',
-    icon: IconChartScatter,
-    id: 'default',
-    status: 'coming-soon',
+      'Quickly start with a simple interface to get you going.',
+    icon: IconStopwatch,
+    id: 'quick',
+    status: 'alpha',
+    link: '/quick',
   },
   {
     title: 'Standard',
@@ -44,6 +45,7 @@ const interfaces = [
     icon: IconChartScatter,
     id: 'standard',
     status: 'alpha',
+    link: '/products/standard',
   },
   {
     title: 'Detailed',
@@ -52,6 +54,7 @@ const interfaces = [
     icon: IconListDetails,
     id: 'detailed',
     status: 'beta',
+    link: '/products/detailed',
   },
   {
     title: 'Interactive',
@@ -60,6 +63,7 @@ const interfaces = [
     icon: IconPointer,
     id: 'interactive',
     status: 'coming-soon',
+    link: '/products/interactive',
   },
   {
     title: 'All',
@@ -82,7 +86,7 @@ export default function ProductsCards() {
         className={feature.status === 'coming-soon' ? classes.cardDisabled : classes.card}
         padding="xl"
         component="a"
-        href={`/products/${feature.id}`}
+        href={feature.link}
         // style={feature.status === 'coming-soon' ? { opacity: 0.6, color:'grey', pointerEvents: 'none' } : {}}
     >
         <Group justify="space-between" mb="xs">

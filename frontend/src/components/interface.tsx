@@ -63,7 +63,7 @@ export type ProductConfiguration = {
 
 export type ModelSpecification = {
   model: string;
-  date: Date;
+  date: string;
   lead_time: number;
   ensemble_members: number;
   entries?: Record<string, string>;
