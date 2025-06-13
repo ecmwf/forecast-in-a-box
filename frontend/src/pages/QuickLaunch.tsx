@@ -11,6 +11,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 
 import {Card, Title, Text, Space, Group, Button, Container, Combobox, useCombobox, InputBase, Input, Stack, SimpleGrid, Loader, Grid, Center, Modal, FocusTrap} from '@mantine/core';
@@ -110,9 +111,12 @@ const products: Record<string, ProductSpecification[]> = {
     }],
 }
 
-
 export default function QuickLaunch() { 
     const api = useApi();
+    const navigate = useNavigate();
+    
+    const params = new URLSearchParams(location.search)
+    const job_id = params.get('jobId') || '/'
 
     const [date, setDate] = useState(new Date());
     const [timeValue, setTimeValue] = useState<string | null>('T00');
@@ -215,7 +219,7 @@ export default function QuickLaunch() {
         </Combobox.Option>
     ));
 
-    const [jobId, setJobId] = useState<string | null>(null);
+    const [jobId, setJobId] = useState<string | null>(job_id);
 
     const [showFireworks, setShowFireworks] = useState(false);
 
@@ -269,9 +273,9 @@ export default function QuickLaunch() {
                                 icon: <IconCheck size={16} />,
                             }
                         )
+                        setJobId(result.id);
+                        navigate(`/quick?jobId=${result.id}`);
                     }
-                    setJobId(result.id);
-            
 
                 } catch (error) {
                     console.error("Error executing:", error);
