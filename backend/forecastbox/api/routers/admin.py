@@ -74,7 +74,7 @@ async def get_users(admin=Depends(get_admin_user)) -> list[UserRead]:
     """Get all users"""
     async with async_session_maker() as session:
         query = select(UserTable)
-        return (await session.execute(query)).scalars().all()
+        return (await session.execute(query)).unique().scalars().all()
 
 
 @router.get("/users/{user_id}", response_model=UserRead)
@@ -82,7 +82,7 @@ async def get_user(user_id: UUID4, admin=Depends(get_admin_user)) -> UserRead:
     """Get a specific user by ID"""
     async with async_session_maker() as session:
         query = select(UserTable).where(UserTable.id == user_id)
-        user = (await session.execute(query)).scalars().all()
+        user = (await session.execute(query)).unique().scalars().all()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         return user[0]
@@ -102,13 +102,14 @@ async def delete_user(user_id: UUID4, admin=Depends(get_admin_user)) -> HTMLResp
 
 
 @router.put("/users/{user_id}", response_model=UserRead)
-async def update_user(user_id: str, user_data: UserUpdate, admin=Depends(get_admin_user)) -> UserRead:
+async def update_user(user_id: UUID4, user_data: UserUpdate, admin=Depends(get_admin_user)) -> UserRead:
     """Update a user by ID"""
     async with async_session_maker() as session:
         update_dict = {k: v for k, v in user_data.dict().items() if v is not None}
         # TODO the password is actually stored as 'hash_password' -- invoke some of the auth meths here
         if "password" in update_dict:
             raise HTTPException(status_code=404, detail="Password update not supported")
+        print(user_id)
         query = update(UserTable).where(UserTable.id == user_id).values(**update_dict)
         _ = await session.execute(query)
         await session.commit()
@@ -120,7 +121,7 @@ async def update_user(user_id: str, user_data: UserUpdate, admin=Depends(get_adm
 
 
 @router.patch("/users/{user_id}", response_class=HTMLResponse)
-async def patch_user(user_id: str, update_dict: dict, admin: UserRead = Depends(get_admin_user)) -> HTMLResponse:
+async def patch_user(user_id: UUID4, update_dict: dict, admin: UserRead = Depends(get_admin_user)) -> HTMLResponse:
     """Patch a user by ID"""
     async with async_session_maker() as session:
         query = update(UserTable).where(UserTable.id == user_id).values(**update_dict)
