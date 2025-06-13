@@ -15,7 +15,7 @@ requires-python=">=3.11,<3.12"
 # just a minimal set of dependencies to run the servers. Individual tasks install their runtime dependencies on their own
 dependencies = [
 	"fastapi",
-	"fastapi_users",
+	"fastapi_users[oauth]",
 	"fastapi_users_db_sqlalchemy",
 	"httpx",
 	"jinja2",

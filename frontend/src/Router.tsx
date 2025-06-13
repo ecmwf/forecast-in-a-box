@@ -33,6 +33,7 @@ import Users from './pages/admin/users';
 import Checkpoints from './pages/admin/checkpoints';
 
 import QuickLaunch from './pages/QuickLaunch';
+import OidcCallback from './pages/oidcCallback';
 
 const router = createBrowserRouter([
   {
@@ -50,6 +51,10 @@ const router = createBrowserRouter([
   {
     path: '/register',
     element: <Register />,
+  },
+  {
+    path: '/oidc/callback',
+    element: <OidcCallback />,
   },
   {
     path: '/status',

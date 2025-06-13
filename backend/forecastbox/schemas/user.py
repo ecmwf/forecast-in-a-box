@@ -8,8 +8,9 @@
 # nor does it submit to any jurisdiction.
 
 from fastapi_users import schemas
-from fastapi_users.db import SQLAlchemyBaseUserTableUUID
-from sqlalchemy.orm import DeclarativeBase
+from fastapi_users.db import SQLAlchemyBaseUserTableUUID, SQLAlchemyBaseOAuthAccountTableUUID
+from sqlalchemy.orm import DeclarativeBase, Mapped, relationship
+
 import pydantic
 
 
@@ -29,10 +30,14 @@ class Base(DeclarativeBase):
     pass
 
 
+class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
+    pass
+
+
 # NOTE its a bit unfortunate we have a separate UserTable and UserRead objects, as
 # they effectively represent the same entity and are used interchangeably. Couldnt
 # ideate how to get rid of that due to different hierarchies etc
 
 
 class UserTable(SQLAlchemyBaseUserTableUUID, Base):
-    pass
+    oauth_accounts: Mapped[list[OAuthAccount]] = relationship("OAuthAccount", lazy="joined")

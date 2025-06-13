@@ -28,18 +28,34 @@ class DatabaseSettings(BaseModel):
     # TODO consider renaming to just userdb_url and make protocol part of it
 
 
-class GeneralSettings(BaseModel):
+class OIDCSettings(BaseModel):
     ### ----------------------------------------------------- ###
-    ### General Settings
+    ### OIDC Settings
     ### ----------------------------------------------------- ###
 
-    # JWT settings
-    jwt_secret: SecretStr = "fiab_secret"
-    """Secret key for JWT authentication."""
+    client_id: str
+    client_secret: SecretStr
+    openid_configuration_endpoint: str
+    name: str = "oidc"
+    base_scope: list[str] = ["openid", "profile", "email"]
 
-    # PPROC settings
-    pproc_schema_dir: str | None = None
-    """Path to the directory containing the PPROC schema files."""
+    @model_validator(mode="after")
+    def pass_to_secret(self):
+        """Convert the client_secret to a SecretStr."""
+        if isinstance(self.client_secret, str):
+            self.client_secret = SecretStr(self.client_secret)
+        return self
+
+
+class AuthSettings(BaseModel):
+    ### ----------------------------------------------------- ###
+    ### Authentication Settings
+    ### ----------------------------------------------------- ###
+
+    jwt_secret: SecretStr
+    """JWT secret key for authentication."""
+    oidc: OIDCSettings | None = Field(default_factory=None)
+    """OIDC settings for authentication, if applicable, if not given no route will be made."""
 
     @model_validator(mode="after")
     def pass_to_secret(self):
@@ -47,6 +63,16 @@ class GeneralSettings(BaseModel):
         if isinstance(self.jwt_secret, str):
             self.jwt_secret = SecretStr(self.jwt_secret)
         return self
+
+
+class GeneralSettings(BaseModel):
+    ### ----------------------------------------------------- ###
+    ### General Settings
+    ### ----------------------------------------------------- ###
+
+    # PPROC settings
+    pproc_schema_dir: str | None = None
+    """Path to the directory containing the PPROC schema files."""
 
 
 class BackendAPISettings(BaseModel):
@@ -82,7 +108,11 @@ class CascadeSettings(BaseModel):
 class FIABConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", env_prefix="fiab__")
 
+    url: str
+
     general: GeneralSettings = Field(default_factory=GeneralSettings)
+    auth: AuthSettings = Field(default_factory=AuthSettings)
+
     db: DatabaseSettings = Field(default_factory=DatabaseSettings)
     api: BackendAPISettings = Field(default_factory=BackendAPISettings)
     cascade: CascadeSettings = Field(default_factory=CascadeSettings)
