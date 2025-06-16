@@ -109,7 +109,6 @@ async def update_user(user_id: UUID4, user_data: UserUpdate, admin=Depends(get_a
         # TODO the password is actually stored as 'hash_password' -- invoke some of the auth meths here
         if "password" in update_dict:
             raise HTTPException(status_code=404, detail="Password update not supported")
-        print(user_id)
         query = update(UserTable).where(UserTable.id == user_id).values(**update_dict)
         _ = await session.execute(query)
         await session.commit()

@@ -25,7 +25,12 @@ SECRET = config.auth.jwt_secret.get_secret_value()
 
 if oauth_client is not None:
     oauth_router = fastapi_users.get_oauth_router(
-        oauth_client, auth_backend, SECRET, is_verified_by_default=True, associate_by_email=True, redirect_url=f"{config.url}/oidc/callback"
+        oauth_client,
+        auth_backend,
+        SECRET,
+        is_verified_by_default=True,
+        associate_by_email=True,
+        redirect_url=f"{config.frontend_url}/oidc/callback",
     )
 
     router.include_router(

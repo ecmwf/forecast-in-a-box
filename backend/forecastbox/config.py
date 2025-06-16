@@ -52,9 +52,9 @@ class AuthSettings(BaseModel):
     ### Authentication Settings
     ### ----------------------------------------------------- ###
 
-    jwt_secret: SecretStr
+    jwt_secret: SecretStr = "fiab_secret"
     """JWT secret key for authentication."""
-    oidc: OIDCSettings | None = Field(default_factory=None)
+    oidc: OIDCSettings | None = None
     """OIDC settings for authentication, if applicable, if not given no route will be made."""
 
     @model_validator(mode="after")
@@ -108,7 +108,7 @@ class CascadeSettings(BaseModel):
 class FIABConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", env_prefix="fiab__")
 
-    url: str
+    frontend_url: str = "http://localhost:3000"
 
     general: GeneralSettings = Field(default_factory=GeneralSettings)
     auth: AuthSettings = Field(default_factory=AuthSettings)
