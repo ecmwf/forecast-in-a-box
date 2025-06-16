@@ -57,7 +57,32 @@ export default function Login() {
 
   }
   const handleSSO = async () => {
-    
+    try {
+      const response = await api.get('/v1/auth/oidc/authorize')
+      if (response.data && response.data.authorization_url) {
+        window.location.href = response.data.authorization_url;
+      } else {
+        showNotification({
+          id: `sso-error-${crypto.randomUUID()}`,
+          position: 'top-right',
+          autoClose: 3000,
+          title: "SSO Failed",
+          message: 'Could not initiate SSO login.',
+          color: 'red',
+          loading: false,
+        });
+      }
+    } catch (err) {
+      showNotification({
+        id: `sso-error-${crypto.randomUUID()}`,
+        position: 'top-right',
+        autoClose: 3000,
+        title: "SSO Failed",
+        message: 'Could not initiate SSO login.',
+        color: 'red',
+        loading: false,
+      });
+    }
   }
 
   useEffect(() => {
@@ -79,7 +104,7 @@ export default function Login() {
             {/* Don&apos;t have an account? <Link to="/signup">Sign up</Link> */}
           </Text>
             <Button fullWidth mt="xl" onClick={handleLogin}>Login</Button>
-          {/* <Button fullWidth mt="sm" variant="outline" onClick={handleSSO}>Login with ECMWF</Button> */}
+          <Button fullWidth mt="sm" variant="outline" onClick={handleSSO}>Login with ECMWF</Button>
         </Paper>
       </Container>
       </MainLayout>

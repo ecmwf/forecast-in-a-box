@@ -8,20 +8,37 @@
 # nor does it submit to any jurisdiction.
 
 from fastapi import APIRouter
+
 from forecastbox.auth.users import fastapi_users
 from forecastbox.auth.users import auth_backend
+from forecastbox.auth.oidc import oauth_client
 
 
 from forecastbox.schemas.user import UserRead, UserCreate, UserUpdate
 
-router = APIRouter()
+from forecastbox.config import config
 
-# # OAuth routes
-# router.include_router(
-#     fastapi_users.get_oauth_router(auth_provider),
-#     prefix="/auth/ecmwf",
-#     tags=["auth"]
-# )
+router = APIRouter()
+SECRET = config.auth.jwt_secret.get_secret_value()
+
+# OAuth routes
+
+if oauth_client is not None:
+    oauth_router = fastapi_users.get_oauth_router(
+        oauth_client,
+        auth_backend,
+        SECRET,
+        is_verified_by_default=True,
+        associate_by_email=True,
+        redirect_url=f"{config.frontend_url}/oidc/callback",
+    )
+
+    router.include_router(
+        oauth_router,
+        prefix="/auth/oidc",
+        tags=["auth"],
+    )
+
 
 # JWT login routes
 router.include_router(fastapi_users.get_auth_router(auth_backend), prefix="/auth/jwt", tags=["auth"])

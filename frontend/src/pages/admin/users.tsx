@@ -19,7 +19,7 @@ import { IconRefresh } from '@tabler/icons-react';
 import {useApi} from '../../api';
 
 interface User {
-    _id: number;
+    id: string;
     email: string;
     is_superuser: boolean;
 }
@@ -38,6 +38,7 @@ export default function AdminUsersPage() {
         } catch (e: any) {
             showNotification({ color: 'red', message: 'Failed to fetch users' });
         }
+        console.log(users)
         setLoading(false);
     };
 
@@ -46,21 +47,21 @@ export default function AdminUsersPage() {
         // eslint-disable-next-line
     }, []);
 
-    const handleDelete = async (id: number) => {
+    const handleDelete = async (id: string) => {
         if (!window.confirm('Are you sure you want to delete this user?')) return;
         try {
             await api.delete(`/v1/admin/users/${id}`);
-            setUsers(users.filter((u) => u._id !== id));
+            setUsers(users.filter((u) => u.id !== id));
             showNotification({ color: 'green', message: 'User deleted' });
         } catch (e: any) {
             showNotification({ color: 'red', message: 'Failed to delete user' });
         }
     };
 
-    const handleSuperuser = async (id: number, is_superuser: boolean) => {
+    const handleSuperuser = async (id: string, is_superuser: boolean) => {
         try {
             await api.patch(`/v1/admin/users/${id}`, { is_superuser: !is_superuser });
-            setUsers(users.map((u) => u._id === id ? { ...u, is_superuser: !is_superuser } : u));
+            setUsers(users.map((u) => u.id === id ? { ...u, is_superuser: !is_superuser } : u));
             showNotification({ color: 'green', message: 'User updated' });
         } catch (e: any) {
             showNotification({ color: 'red', message: 'Failed to update user' });
@@ -95,7 +96,7 @@ export default function AdminUsersPage() {
                     </Table.Thead>
                     <Table.Tbody>
                         {users.map((user) => (
-                            <Table.Tr key={user._id} style={{ borderBottom: '1px solid #eee' }}>
+                            <Table.Tr key={user.id} style={{ borderBottom: '1px solid #eee' }}>
                                 <Table.Td>{user.email}</Table.Td>
                                 <Table.Td>
                                     {user.is_superuser ? 'Yes' : 'No'}
@@ -107,7 +108,7 @@ export default function AdminUsersPage() {
                                             color={user.is_superuser ? 'gray' : 'blue'}
                                             variant="outline"
                                             disabled={user.is_superuser && users.filter(u => u.is_superuser).length === 1}
-                                            onClick={() => handleSuperuser(user._id, user.is_superuser)}
+                                            onClick={() => handleSuperuser(user.id, user.is_superuser)}
                                         >
                                             {user.is_superuser ? 'Remove Superuser' : 'Make Superuser'}
                                         </Button>
@@ -116,7 +117,7 @@ export default function AdminUsersPage() {
                                             color="red"
                                             variant="outline"
                                             disabled={user.is_superuser && users.filter(u => u.is_superuser).length === 1}
-                                            onClick={() => handleDelete(user._id)}
+                                            onClick={() => handleDelete(user.id)}
                                         >
                                             Delete
                                         </Button>

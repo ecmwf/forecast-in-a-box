@@ -26,7 +26,7 @@ import logging
 from sqlalchemy import func, select, update
 from forecastbox.db.user import async_session_maker
 
-SECRET = config.general.jwt_secret
+SECRET = config.auth.jwt_secret.get_secret_value()
 
 logger = logging.getLogger(__name__)
 
