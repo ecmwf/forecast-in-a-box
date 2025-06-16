@@ -44,9 +44,9 @@ def test_submit_job(backend_client):
     while i > 0:
         response = backend_client.get("/job/status")
         assert response.is_success
-        print(f"da response {response.json()['progresses'][raw_job_id]}")
         status = response.json()["progresses"][raw_job_id]["status"]
-        assert status in {"submitting", "running", "completed"}
+        # TODO parse response with corresponding class, define a method `not_failed` instead
+        assert status in {"submitting", "submitted", "running", "completed"}
         if status == "completed":
             break
         time.sleep(0.3)
@@ -69,6 +69,7 @@ def test_submit_job(backend_client):
 
     response = backend_client.get("/job/status")
     assert response.is_success
+    # TODO retry in case of error not present yet
     assert "Path does not point to a file" in response.json()["progresses"][no_ckpt_id]["error"]
 
     # valid spec
@@ -86,6 +87,6 @@ def test_submit_job(backend_client):
 
     response = backend_client.get("/job/status")
     assert response.is_success
-    print(f"da response: {response.json()['progresses'][test_model_id]}")
     # TODO fix the file to comply with the validation, then test the workflow success
+    # TODO retry in case of error not present yet
     assert "Could not find 'ai-models.json'" in response.json()["progresses"][test_model_id]["error"]
