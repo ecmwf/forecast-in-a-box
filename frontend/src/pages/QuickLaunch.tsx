@@ -116,7 +116,7 @@ export default function QuickLaunch() {
     const navigate = useNavigate();
     
     const params = new URLSearchParams(location.search)
-    const job_id = params.get('jobId') || '/'
+    const job_id = params.get('jobId') || null;
 
     const [date, setDate] = useState(new Date());
     const [timeValue, setTimeValue] = useState<string | null>('T00');
