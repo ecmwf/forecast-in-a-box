@@ -237,13 +237,16 @@ export default function QuickLaunch() {
 
         const formattedDate = dayjs(date).format('YYYYMMDD');
         const spec: ExecutionSpecification = {
-            model: {
-                model: modelOptions[modelOptionsIndex % modelOptions.length],
-                lead_time: Number(leadTimeOptions[leadTimeIndex].split(' ')[0]),
-                date: `${formattedDate}${timeValue}`,
-                ensemble_members: 1, // Default to 1, can be changed later
-            } as ModelSpecification,
-            products: products[productOptions[productIndex % productOptions.length]],
+            job: {
+                job_type: "forecast_products",
+                model: {
+                    model: modelOptions[modelOptionsIndex % modelOptions.length],
+                    lead_time: Number(leadTimeOptions[leadTimeIndex].split(' ')[0]),
+                    date: `${formattedDate}${timeValue}`,
+                    ensemble_members: 1, // Default to 1, can be changed later
+                } as ModelSpecification,
+                products: products[productOptions[productIndex % productOptions.length]],
+            },
             environment: {} as EnvironmentSpecification
         }
         

@@ -131,8 +131,11 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
 
     const handleDownload = () => {
         const submitData: ExecutionSpecification = {
-            model: model,
-            products: Object.values(products),
+            job: {
+                job_type: "forecast_products",
+                model: model,
+                products: Object.values(products),
+            },
             environment: {} as EnvironmentSpecification
         };
 
@@ -147,8 +150,11 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
     const handleSeralise = () => {
         setLoading(true);
         const spec: ExecutionSpecification = {
-            model: model,
-            products: Object.values(products),
+            job: {
+                job_type: "forecast_products",
+                model: model,
+                products: Object.values(products),
+            },
             environment: {} as EnvironmentSpecification
         }
 
@@ -225,8 +231,11 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
             <Group grow justify='center' preventGrowOverflow={true}>
                 <GraphVisualiser 
                     spec={{
-                        model: model,
-                        products: Object.values(products),
+                        job: {
+                            job_type: "forecast_products",
+                            model: model,
+                            products: Object.values(products),
+                        },
                         environment: {} as EnvironmentSpecification
                     }}
                     url={null}
