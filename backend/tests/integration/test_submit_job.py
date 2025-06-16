@@ -46,7 +46,7 @@ def test_submit_job(backend_client):
         assert response.is_success
         print(f"da response {response.json()['progresses'][raw_job_id]}")
         status = response.json()["progresses"][raw_job_id]["status"]
-        assert status in {"running", "completed"}
+        assert status in {"submitting", "running", "completed"}
         if status == "completed":
             break
         time.sleep(0.3)
@@ -57,7 +57,7 @@ def test_submit_job(backend_client):
     # no ckpt spec
     spec = ExecutionSpecification(
         job=ForecastProducts(
-            job_type="ensemble_products",
+            job_type="forecast_products",
             model=ModelSpecification(model="missing", date="today", lead_time=1, ensemble_members=1),
             products=[ProductSpecification(product="test", specification={})],
         ),
@@ -74,7 +74,7 @@ def test_submit_job(backend_client):
     # valid spec
     spec = ExecutionSpecification(
         job=ForecastProducts(
-            job_type="ensemble_products",
+            job_type="forecast_products",
             model=ModelSpecification(model="test", date="today", lead_time=1, ensemble_members=1),
             products=[],
         ),
