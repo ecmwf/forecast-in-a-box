@@ -20,7 +20,7 @@ const ProgressPage = () => {
     return (
         <LoggedIn>
             <Container size='lg' pt='xl'>
-                <ProgressComponent id={id} />
+                <ProgressComponent id={id} popout={false} />
             </Container>
         </LoggedIn>
     );
