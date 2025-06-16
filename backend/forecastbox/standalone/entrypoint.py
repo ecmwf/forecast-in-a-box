@@ -120,7 +120,8 @@ def export_recursive(dikt, delimiter, prefix):
         else:
             if isinstance(v, pydantic.SecretStr):
                 v = v.get_secret_value()
-            os.environ[f"{prefix}{k}"] = str(v)
+            if v is not None:
+                os.environ[f"{prefix}{k}"] = str(v)
 
 
 def launch_all(config: FIABConfig) -> ProcessHandles:
