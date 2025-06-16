@@ -3,7 +3,7 @@ from forecastbox.api.types import (
     EnvironmentSpecification,
     ExecutionSpecification,
     ModelSpecification,
-    EnsembleProducts,
+    ForecastProducts,
     RawCascadeJob,
 )
 import time
@@ -56,7 +56,7 @@ def test_submit_job(backend_client):
 
     # no ckpt spec
     spec = ExecutionSpecification(
-        job=EnsembleProducts(
+        job=ForecastProducts(
             job_type="ensemble_products",
             model=ModelSpecification(model="missing", date="today", lead_time=1, ensemble_members=1),
             products=[ProductSpecification(product="test", specification={})],
@@ -73,7 +73,7 @@ def test_submit_job(backend_client):
 
     # valid spec
     spec = ExecutionSpecification(
-        job=EnsembleProducts(
+        job=ForecastProducts(
             job_type="ensemble_products",
             model=ModelSpecification(model="test", date="today", lead_time=1, ensemble_members=1),
             products=[],

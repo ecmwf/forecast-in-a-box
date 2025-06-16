@@ -31,12 +31,12 @@ from forecastbox.schemas.user import UserRead
 from forecastbox.config import config
 
 from forecastbox.api.utils import get_model_path
-from forecastbox.api.types import ExecutionSpecification, RawCascadeJob, EnsembleProducts, EnvironmentSpecification
+from forecastbox.api.types import ExecutionSpecification, RawCascadeJob, ForecastProducts, EnvironmentSpecification
 
 LOG = logging.getLogger(__name__)
 
 
-def ensemble_products_to_cascade(spec: EnsembleProducts, environment: EnvironmentSpecification) -> Cascade:
+def forecast_products_to_cascade(spec: ForecastProducts, environment: EnvironmentSpecification) -> Cascade:
     # Get the model specification and create a Model instance
     model_spec = dict(
         lead_time=spec.model.lead_time,
@@ -69,8 +69,8 @@ def ensemble_products_to_cascade(spec: EnsembleProducts, environment: Environmen
 
 
 def execution_specification_to_cascade(spec: ExecutionSpecification) -> JobInstance:
-    if isinstance(spec.job, EnsembleProducts):
-        cascade_graph = ensemble_products_to_cascade(spec.job, spec.environment)
+    if isinstance(spec.job, ForecastProducts):
+        cascade_graph = forecast_products_to_cascade(spec.job, spec.environment)
         return graph2job(cascade_graph._graph)
     elif isinstance(spec.job, RawCascadeJob):
         return spec.job.job_instance

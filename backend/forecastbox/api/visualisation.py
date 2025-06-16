@@ -8,20 +8,20 @@
 # nor does it submit to any jurisdiction.
 
 import logging
-from forecastbox.api.types import VisualisationOptions, ExecutionSpecification, EnsembleProducts
+from forecastbox.api.types import VisualisationOptions, ExecutionSpecification, ForecastProducts
 from fastapi.responses import HTMLResponse
 import tempfile
-from forecastbox.api.execution import ensemble_products_to_cascade
+from forecastbox.api.execution import forecast_products_to_cascade
 
 logger = logging.getLogger(__name__)
 
 
 def visualise(spec: ExecutionSpecification, options: VisualisationOptions) -> HTMLResponse:
-    if not isinstance(spec.job, EnsembleProducts):
-        return HTMLResponse("Visualisation supported only for EnsembleProducts", status_code=400)
+    if not isinstance(spec.job, ForecastProducts):
+        return HTMLResponse("Visualisation supported only for ForecastProducts", status_code=400)
 
     try:
-        graph = ensemble_products_to_cascade(spec)
+        graph = forecast_products_to_cascade(spec)
     except Exception as e:
         logger.exception("Error converting to cascade")
         return HTMLResponse(str(e), status_code=500)

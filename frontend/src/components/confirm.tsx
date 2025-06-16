@@ -14,7 +14,7 @@ import { Button, Card, Title, Group, Divider, SimpleGrid, Container, ScrollArea,
 
 import { IconX, IconPencil} from '@tabler/icons-react';
 
-import {EnsembleProducts, ModelSpecification, ProductSpecification, EnvironmentSpecification, ExecutionSpecification, SubmitResponse} from './interface'
+import {ForecastProducts, ModelSpecification, ProductSpecification, EnvironmentSpecification, ExecutionSpecification, SubmitResponse} from './interface'
 
 import InformationWindow from './model/information'
 import GraphVisualiser from './graph_visualiser';
@@ -66,13 +66,13 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
         }, []);
 
     const handleSubmit = () => {
-        const ensembleProducts: EnsembleProducts = {
-            job_type: "ensemble_products",
+        const forecastProducts: ForecastProducts = {
+            job_type: "forecast_products",
             model: model,
             products: Object.values(products)
         }
         const spec: ExecutionSpecification = {
-            job: ensembleProducts,
+            job: forecastProducts,
             environment: environment
         }
         setSubmitting(true);

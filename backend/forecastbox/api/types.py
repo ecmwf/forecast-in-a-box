@@ -107,8 +107,8 @@ class EnvironmentSpecification(FIABBaseModel):
     environment_variables: dict[str, str] = Field(default_factory=dict)
 
 
-class EnsembleProducts(FIABBaseModel):
-    job_type: Literal["ensemble_products"]
+class ForecastProducts(FIABBaseModel):
+    job_type: Literal["forecast_products"]
     model: ModelSpecification
     products: list[ProductSpecification]
 
@@ -119,7 +119,7 @@ class RawCascadeJob(FIABBaseModel):
 
 
 class ExecutionSpecification(FIABBaseModel):
-    job: EnsembleProducts | RawCascadeJob = Field(discriminator="job_type")
+    job: ForecastProducts | RawCascadeJob = Field(discriminator="job_type")
     environment: EnvironmentSpecification
     shared: bool = Field(default=False)
 

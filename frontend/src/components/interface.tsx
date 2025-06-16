@@ -80,14 +80,14 @@ export type EnvironmentSpecification = {
   environment_variables: Record<string, string>;
 };
 
-export type EnsembleProducts = {
+export type ForecastProducts = {
   job_type: string;
   model: ModelSpecification;
   products: ProductSpecification[];
 };
 
 export type ExecutionSpecification = {
-  job: EnsembleProducts;
+  job: ForecastProducts;
   environment: EnvironmentSpecification;
 };
 
