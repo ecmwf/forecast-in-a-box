@@ -14,7 +14,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 
-import {Card, Title, Text, Space, Group, Button, Container, Combobox, useCombobox, InputBase, Input, Stack, SimpleGrid, Loader, Grid, Center, Modal, FocusTrap} from '@mantine/core';
+import {Card, Title, Text, Space, Group, Button, Combobox, useCombobox, InputBase, Input, Stack, Grid, Center} from '@mantine/core';
 import { showNotification } from '@mantine/notifications';
 import { DatePickerInput } from '@mantine/dates';
 import dayjs from 'dayjs';
@@ -29,7 +29,7 @@ import FireworksComponent from '../components/fireworks';
 import ProgressComponent from '../components/jobs/progress';
 import { useApi } from '../api';
 import { EnvironmentSpecification, ExecutionSpecification, ModelSpecification, ProductSpecification, SubmitResponse} from '../components/interface';
-import { IconCheck, IconTicket, IconX } from '@tabler/icons-react';
+import { IconCheck, IconX } from '@tabler/icons-react';
 
 
 const times = [
@@ -245,10 +245,11 @@ export default function QuickLaunch() {
                     date: `${formattedDate}${timeValue}`,
                     ensemble_members: 1, // Default to 1, can be changed later
                 } as ModelSpecification,
-                products: products[productOptions[productIndex % productOptions.length]],
+                products: products[productOptions[(productIndex + 1) % productOptions.length]],
             },
             environment: {} as EnvironmentSpecification
         }
+        console.log("Submitting spec:", spec);
         
         const execute = async () => {
         

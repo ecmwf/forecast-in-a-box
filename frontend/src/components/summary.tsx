@@ -38,6 +38,9 @@ type SummaryModalProps = {
 };
 
 const SummaryModal = ({ moreInfoSpec, showMoreInfo, setShowMoreInfo }: SummaryModalProps) => {
+
+    const job = moreInfoSpec.job;
+
     return (
         <Modal
             opened={showMoreInfo}
@@ -45,24 +48,24 @@ const SummaryModal = ({ moreInfoSpec, showMoreInfo, setShowMoreInfo }: SummaryMo
             title="Job Configuration"
             size="lg"
         >
-            {moreInfoSpec && (
+            {job && (
                 <>
                     <Title order={3}>Model</Title>
-                    {moreInfoSpec.model && (
-                        dictionaryAsGrid(moreInfoSpec.model)
+                    {job.model && (
+                        dictionaryAsGrid(job.model)
                     )}
                     <Title order={3}>Environment</Title>
                     {moreInfoSpec.environment && (
                         dictionaryAsGrid(moreInfoSpec.environment)
                     )}
                     <Title order={3}>Products</Title>
-                    {moreInfoSpec.products && moreInfoSpec.products.length > 0 && (
+                    {job.products && job.products.length > 0 && (
                         <Cart
                             products={Object.fromEntries(
-                                moreInfoSpec.products.map((product: any, index: number) => [index.toString(), product])
+                                job.products.map((product: any, index: number) => [index.toString(), product])
                             )}
                             setProducts={(updatedProducts: Record<string, any>) => {
-                                moreInfoSpec.products = Object.values(updatedProducts);
+                                job.products = Object.values(updatedProducts);
                             }}
                             disable_delete={true}
                         />
