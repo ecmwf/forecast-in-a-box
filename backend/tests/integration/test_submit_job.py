@@ -8,6 +8,7 @@ from forecastbox.api.types import (
 )
 import time
 from cascade.low.builders import JobBuilder, TaskBuilder
+import cloudpickle
 
 
 # @pytest.mark.skip(reason="requires mongodb still")
@@ -53,6 +54,11 @@ def test_submit_job(backend_client):
         i -= 1
 
     assert i > 0, "Failed to finish job"
+
+    outputs = backend_client.get(f"/job/{raw_job_id}/outputs").raise_for_status().json()
+    assert outputs == ["n1"]
+    output = backend_client.get(f"/job/{raw_job_id}/n1")
+    assert cloudpickle.loads(output.content) == 3
 
     # no ckpt spec
     spec = ExecutionSpecification(
