@@ -51,6 +51,9 @@ plots = [
 webmars = [
     "ecmwf-api-client>=1.6.5",
 ]
+tests = [
+	"pytest-xdist",
+]
 all = [
 	"forecast-in-a-box[plots,thermo,webmars]"
 ]
