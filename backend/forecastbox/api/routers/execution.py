@@ -124,4 +124,4 @@ async def execute_api(spec: ExecutionSpecification, user: UserRead = Depends(cur
     SubmitJobResponse
         Job submission response containing the job ID.
     """
-    return execute(spec, user=user)
+    return await execute(spec, user=user)
