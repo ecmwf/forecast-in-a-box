@@ -8,166 +8,136 @@
 # nor does it submit to any jurisdiction.
 
 from dataclasses import dataclass
-from typing import Literal
 from sse_starlette.sse import EventSourceResponse
 import subprocess
+import select
 import asyncio
-from datetime import datetime
+import logging
 
-from threading import Thread
-from queue import Queue
+from multiprocessing import Process
+from tempfile import TemporaryDirectory
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
-
-from forecastbox.db import async_db as db
+import cascade.gateway.api
+import cascade.gateway.client
 
 from forecastbox.config import config
+from forecastbox.standalone.entrypoint import launch_cascade, export_recursive
 
-logs_collection = db["process_logs"]
-processes = {}
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class GatewayProcess:
+    logs_directory: TemporaryDirectory
+    process: Process
+
+    def cleanup(self) -> None:
+        logger.debug("gateway cleanup")
+        self.logs_directory.cleanup()
+
+    def kill(self) -> None:
+        logger.debug("gateway shutdown message")
+        m = cascade.gateway.api.ShutdownRequest()
+        cascade.gateway.client.request_response(m, config.cascade.cascade_url, 3_000)
+        logger.debug("gateway terminate and join")
+        self.process.terminate()
+        self.process.join(1)
+        if self.process.exitcode is None:
+            logger.debug("gateway kill")
+            self.process.kill()
+
+    @staticmethod
+    def log_path(directory: TemporaryDirectory) -> str:
+        return f"{directory.name}/gateway.txt"
+
+
+gateway: GatewayProcess | None = None
 
 
 async def shutdown_processes():
     """Terminate all running processes on shutdown."""
-    # Terminate all running subprocesses
-    for pid, proc in processes.items():
-        if proc.poll() is None:
-            proc.terminate()
-        await logs_collection.delete_many({"process_id": pid})
+    logger.debug("initiating graceful gateway shutdown")
+    global gateway
+    if gateway is not None:
+        if gateway.process.exitcode is None:
+            gateway.kill()
+        gateway.cleanup()
+        gateway = None
 
 
 router = APIRouter(
     tags=["gateway"],
     responses={404: {"description": "Not found"}},
-    on_shutdown=[shutdown_processes],
 )
-
-PROCESS_ID = "cascade_gateway"
-STATUS = Literal["running", "terminated", "not running"]
-
-
-@dataclass
-class ProcessStatus:
-    """Represent the status of a process."""
-
-    process_id: str
-    """Unique identifier for the process."""
-    status: STATUS
-    """Current status of the process (e.g., 'running', 'terminated', 'not running')."""
 
 
 @router.post("/start")
-async def start_process() -> ProcessStatus:
-    """
-    Start the Cascade Gateway process.
-    """
-    proc_id = PROCESS_ID
+async def start_gateway() -> None:
+    global gateway
+    if gateway is not None:
+        if gateway.process.exitcode is None:
+            # TODO add an explicit restart option
+            raise HTTPException(400, "Process already running.")
+        else:
+            logger.warning(f"restarting gateway as it exited with {gateway.process.exitcode}")
+            # TODO spawn as async task? This blocks... but we'd need to lock
+            gateway.cleanup()
+            gateway = None
 
-    if proc_id in processes:
-        raise HTTPException(503, "Process already running.")
-
-    command_prefix = ["uv", "run", "python"]
-
-    process = subprocess.Popen(
-        ["stdbuf", "-oL", *command_prefix, "-u", "-m", "cascade.gateway", config.cascade.cascade_url],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-    )
-    processes[proc_id] = process
-
-    asyncio.create_task(capture_logs(proc_id, process))
-    return ProcessStatus(process_id=proc_id, status="running")
-
-
-async def capture_logs(proc_id: str, process):
-    """
-    Capture logs from the subprocess and store them in the database.
-    """
-    q = Queue()
-
-    def reader():
-        for line in process.stdout:
-            q.put(line.strip())
-
-    # Run reader in a background thread
-    Thread(target=reader, daemon=True).start()
-
-    while True:
-        try:
-            line = await asyncio.get_event_loop().run_in_executor(None, q.get)
-        except Exception as e:
-            print(f"Error reading log: {e}")
-            break
-
-        await logs_collection.insert_one({"process_id": proc_id, "timestamp": datetime.now(), "log": line})
-
-        collection_size = await logs_collection.count_documents({})
-        if collection_size > config.cascade.log_collection_max_size:
-            oldest_log = await logs_collection.find_one(sort=[("timestamp", 1)])
-            if oldest_log:
-                await logs_collection.delete_one({"_id": oldest_log["_id"]})
-
-        if process.poll() is not None and q.empty():
-            print(f"[capture_logs] Process {proc_id} ended")
-            break
+    logs_directory = TemporaryDirectory()
+    config.cascade.log_path = GatewayProcess.log_path(logs_directory)
+    export_recursive(config.model_dump(), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"])
+    process = Process(target=launch_cascade)
+    process.start()
+    gateway = GatewayProcess(logs_directory=logs_directory, process=process)
+    logger.debug(f"spawned new gateway process with pid {process.pid} and logs at {config.cascade.log_path}")
 
 
 @router.get("/status")
-async def get_status() -> ProcessStatus:
+async def get_status() -> str:
     """Get the status of the Cascade Gateway process."""
-    process = processes.get(PROCESS_ID)
-    if process and process.poll() is None:
-        return ProcessStatus(process_id=PROCESS_ID, status="running")
+    if gateway is None:
+        return "not started"
+    elif gateway.exitcode is not None:
+        return f"exited with {gateway.exitcode}"
     else:
-        return ProcessStatus(process_id=PROCESS_ID, status="not running")
+        return "running"
 
 
 @router.get("/logs")
 async def stream_logs(request: Request) -> StreamingResponse:
     """Stream logs from the Cascade Gateway process."""
-    process_id = PROCESS_ID
-    last_id = None
+
+    if gateway is None:
+        raise HTTPException(400, "Gateway not running")
 
     async def event_generator():
-        nonlocal last_id
+        # NOTE consider rewriting to aiofile, eg https://github.com/kuralabs/logserver/blob/master/server/server.py
+        gateway_process = gateway.process
+        log_path = GatewayProcess.log_path(gateway.logs_directory)
 
-        # Stream past logs
-        docs = await logs_collection.find({"process_id": process_id}).sort("_id").to_list(100)
-        for doc in docs:
-            last_id = doc["_id"]
-            yield {"event": "log", "data": doc["log"]}
+        pipe = subprocess.Popen(["tail", "-F", log_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        poller = select.poll()
+        poller.register(pipe.stdout)
 
-        # Poll for new logs forever (or until disconnected)
-        while True:
-            if await request.is_disconnected():
-                print("Client disconnected.")
-                break
-
-            query = {"process_id": process_id}
-            if last_id:
-                query["_id"] = {"$gt": last_id}
-
-            docs = await logs_collection.find(query).sort("_id").to_list(100)
-            for doc in docs:
-                last_id = doc["_id"]
-                yield {"event": "log", "data": doc["log"]}
-
+        while gateway_process.is_alive() and not (await request.is_disconnected()):
+            while poller.poll(0):
+                yield pipe.stdout.readline()
             await asyncio.sleep(1)
 
     return EventSourceResponse(event_generator())
 
 
 @router.post("/kill")
-async def kill_process() -> ProcessStatus:
-    """Kill the Cascade Gateway process."""
-    process = processes.pop(PROCESS_ID, None)
-    await logs_collection.delete_many({"process_id": PROCESS_ID})
-
-    if process and process.poll() is None:
-        process.terminate()
-        return ProcessStatus(process_id=PROCESS_ID, status="terminated")
-
-    return ProcessStatus(process_id=PROCESS_ID, status="not running")
+async def kill_gateway() -> str:
+    global gateway
+    if gateway is None or gateway.process.exitcode is not None:
+        return "not running"
+    else:
+        # TODO spawn as async task? This blocks... but we'd need to lock
+        gateway.kill()
+        gateway.cleanup()
+        gateway = None
+        return "killed"

@@ -9,8 +9,11 @@
 
 from datetime import datetime
 
+import uuid
+from typing import Any
 import logging
 
+from pydantic import BaseModel
 from earthkit.workflows import Cascade, fluent
 from earthkit.workflows.graph import Graph, deduplicate_nodes
 
@@ -78,36 +81,12 @@ def execution_specification_to_cascade(spec: ExecutionSpecification) -> JobInsta
         assert_never(spec.job)
 
 
-def execute(spec: ExecutionSpecification, id: str, user: UserRead) -> api.SubmitJobResponse | None:
-    """
-    Execute a job based on the provided execution specification.
-
-    Converts the execution specification into a Cascade graph, prepares the job for submission,
-    and submits it to the Cascade gateway.
-
-    Will update the job record in the database with the job ID and status.
-
-    Parameters
-    ----------
-    spec : ExecutionSpecification
-        Execution specification containing model and product details.
-    id : str
-        Id of the job record in the database.
-    user : UserRead
-        User object representing the user executing the job.
-
-    Returns
-    -------
-    api.SubmitJobResponse
-        The response from the Cascade gateway after submitting the job
-    """
-    collection = db.get_collection("job_records")
-
+def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobResponse, list[Any]]:
+    """Converts spec to JobInstance and submits to cascade api, returning response + list of sinks"""
     try:
         job = execution_specification_to_cascade(spec)
     except Exception as e:
-        collection.update_one({"id": id}, {"$set": {"error": str(e)}})
-        return api.SubmitJobResponse(job_id=None, error=str(e))
+        return api.SubmitJobResponse(job_id=None, error=repr(e)), []
 
     sinks = cascade_views.sinks(job)
     sinks = [s for s in sinks if not s.task.startswith("run_as_earthkit")]
@@ -135,19 +114,38 @@ def execute(spec: ExecutionSpecification, id: str, user: UserRead) -> api.Submit
     try:
         submit_job_response: api.SubmitJobResponse = client.request_response(r, f"{config.cascade.cascade_url}")  # type: ignore
     except Exception as e:
-        collection.update_one({"id": id}, {"$set": {"error": "Failed to submit job - " + str(e)}})
-        return api.SubmitJobResponse(job_id=None, error=str(e))
+        return api.SubmitJobResponse(job_id=None, error=repr(e)), []
 
-    # Record the job_id and graph specification
+    return submit_job_response, sinks
+
+
+def _submit2db(response: api.SubmitJobResponse, user: UserRead, spec: ExecutionSpecification, sinks: list[Any]) -> None:
     record = {
-        "job_id": submit_job_response.job_id,
-        "status": "submitted",
-        "error": None,
+        "job_id": response.job_id,
+        "status": "submitted" if not response.error else "failed",
+        "error": response.error,
+        "created_at": datetime.now(),
         "updated_at": datetime.now(),
         "created_by": str(user.id) if user else None,
+        "graph_specification": spec.model_dump_json(),
         "outputs": list(map(lambda x: x.task, sinks)),
     }
     collection = db.get_collection("job_records")
-    collection.update_one({"id": id}, {"$set": record})
+    collection.insert_one(record)
 
-    return submit_job_response
+
+class SubmitJobResponse(BaseModel):
+    """Submit Job Response."""
+
+    id: str
+    """Id of the submitted job."""
+
+
+def execute(spec: ExecutionSpecification, user: UserRead) -> SubmitJobResponse:
+    response, sinks = _execute_cascade(spec)
+    if not response.job_id:
+        # TODO this best comes from the db... we still have a cascade conflict problem,
+        # we best redesign cascade api to allow for uuid acceptance
+        response.job_id = str(uuid.uuid4())
+    _submit2db(response, user, spec, sinks)
+    return SubmitJobResponse(id=response.job_id)

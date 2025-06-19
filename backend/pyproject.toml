@@ -18,6 +18,7 @@ dependencies = [
 	"fastapi_users[oauth]",
 	"fastapi_users_db_sqlalchemy",
 	"httpx",
+    "httpx_oauth",
 	"jinja2",
 	"orjson",
 	"python-multipart",

@@ -103,6 +103,8 @@ class CascadeSettings(BaseModel):
     """Maximum size of the log collection for Cascade."""
     venv_temp_dir: str = "/tmp"
     """Temporary directory for virtual environments."""
+    log_path: str | None = None
+    """Full path to the file for logging. Directory must exist. If None, log to stderr"""
 
 
 class FIABConfig(BaseSettings):
