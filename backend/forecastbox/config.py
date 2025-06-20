@@ -15,24 +15,20 @@ fiab_home = pathlib.Path.home() / ".fiab"
 
 
 class DatabaseSettings(BaseModel):
-    ### ----------------------------------------------------- ###
-    ### Database Settings
-    ### ----------------------------------------------------- ###
-
     mongodb_uri: str = "mongodb://localhost:27017"
     """MongoDB URI for connecting to the database"""
     mongodb_database: str = "fiab"
     """Name of the MongoDB database to use."""
     sqlite_userdb_path: str = str(fiab_home / "user.db")
-    """Location of the sqlite userdb file"""
+    """Location of the sqlite file for user auth+info"""
+    sqlite_jobdb_path: str = str(fiab_home / "job.db")
+    """Location of the sqlite file for job progress tracking"""
+
     # TODO consider renaming to just userdb_url and make protocol part of it
+    # NOTE keep job and user dbs separate -- latter is more sensitive and likely to be externalized
 
 
 class OIDCSettings(BaseModel):
-    ### ----------------------------------------------------- ###
-    ### OIDC Settings
-    ### ----------------------------------------------------- ###
-
     client_id: str
     client_secret: SecretStr
     openid_configuration_endpoint: str
@@ -48,10 +44,6 @@ class OIDCSettings(BaseModel):
 
 
 class AuthSettings(BaseModel):
-    ### ----------------------------------------------------- ###
-    ### Authentication Settings
-    ### ----------------------------------------------------- ###
-
     jwt_secret: SecretStr = "fiab_secret"
     """JWT secret key for authentication."""
     oidc: OIDCSettings | None = None
@@ -66,20 +58,11 @@ class AuthSettings(BaseModel):
 
 
 class GeneralSettings(BaseModel):
-    ### ----------------------------------------------------- ###
-    ### General Settings
-    ### ----------------------------------------------------- ###
-
-    # PPROC settings
     pproc_schema_dir: str | None = None
     """Path to the directory containing the PPROC schema files."""
 
 
 class BackendAPISettings(BaseModel):
-    ### ----------------------------------------------------- ###
-    ### Backend API Settings
-    ### ----------------------------------------------------- ###
-
     data_path: str = "./data_dir"
     """Path to the data directory."""
     model_repository: str = "https://sites.ecmwf.int/repository/fiab"
@@ -89,10 +72,6 @@ class BackendAPISettings(BaseModel):
 
 
 class CascadeSettings(BaseModel):
-    ### ----------------------------------------------------- ###
-    ### Cascade Settings
-    ### ----------------------------------------------------- ###
-
     max_hosts: int = 1
     """Number of hosts for Cascade."""
     max_workers_per_host: int = 8

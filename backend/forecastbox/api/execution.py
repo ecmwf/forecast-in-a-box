@@ -7,11 +7,12 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from datetime import datetime
+import datetime as dt
 
 import uuid
 from typing import Any
 import logging
+import json
 
 from pydantic import BaseModel
 from earthkit.workflows import Cascade, fluent
@@ -28,15 +29,16 @@ import cascade.gateway.client as client
 from forecastbox.products.registry import get_product
 from forecastbox.models import Model
 
-from forecastbox.db import db
 from forecastbox.schemas.user import UserRead
+from forecastbox.schemas.job import JobRecord
+from forecastbox.db.job import async_session_maker
 
 from forecastbox.config import config
 
 from forecastbox.api.utils import get_model_path
 from forecastbox.api.types import ExecutionSpecification, RawCascadeJob, ForecastProducts, EnvironmentSpecification
 
-LOG = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def forecast_products_to_cascade(spec: ForecastProducts, environment: EnvironmentSpecification) -> Cascade:
@@ -119,19 +121,22 @@ def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobRespons
     return submit_job_response, sinks
 
 
-def _submit2db(response: api.SubmitJobResponse, user: UserRead, spec: ExecutionSpecification, sinks: list[Any]) -> None:
-    record = {
-        "job_id": response.job_id,
-        "status": "submitted" if not response.error else "failed",
-        "error": response.error,
-        "created_at": datetime.now(),
-        "updated_at": datetime.now(),
-        "created_by": str(user.id) if user else None,
-        "graph_specification": spec.model_dump_json(),
-        "outputs": list(map(lambda x: x.task, sinks)),
-    }
-    collection = db.get_collection("job_records")
-    collection.insert_one(record)
+async def _submit2db(response: api.SubmitJobResponse, user: UserRead, spec: ExecutionSpecification, sinks: list[Any]) -> None:
+    ref_time = dt.datetime.now()
+
+    entity = JobRecord(
+        job_id=response.job_id,
+        status="submitted" if not response.error else "failed",
+        created_at=ref_time,
+        updated_at=ref_time,
+        created_by=str(user.id) if user else None,
+        graph_specification=spec.model_dump_json(),
+        outputs=json.dumps(list(map(lambda x: x.task, sinks))),
+        error=response.error,
+    )
+    async with async_session_maker() as session:
+        session.add(entity)
+        await session.commit()
 
 
 class SubmitJobResponse(BaseModel):
@@ -141,11 +146,11 @@ class SubmitJobResponse(BaseModel):
     """Id of the submitted job."""
 
 
-def execute(spec: ExecutionSpecification, user: UserRead) -> SubmitJobResponse:
+async def execute(spec: ExecutionSpecification, user: UserRead) -> SubmitJobResponse:
     response, sinks = _execute_cascade(spec)
     if not response.job_id:
         # TODO this best comes from the db... we still have a cascade conflict problem,
         # we best redesign cascade api to allow for uuid acceptance
         response.job_id = str(uuid.uuid4())
-    _submit2db(response, user, spec, sinks)
+    await _submit2db(response, user, spec, sinks)
     return SubmitJobResponse(id=response.job_id)
