@@ -28,10 +28,12 @@ Forecast-In-A-Box is a prototype system to deliver ECMWF products on demand as g
 ### Developer Setup, Docker-free
 ```
 # first activate your venv or something
+mkdir -p ~/.fiab
 uv pip install -e backend[test]
 uv pip install --prerelease=allow --upgrade multiolib==2.6.1.dev20250613 # this is a known working version -- once we get past dev, this will disappear
 pytest backend # just to ensure all is good
 ```
+Note the above will likely change over time -- you may want to instead run `./backend/fiab.sh`, perhaps with explicit `FIAB_ROOT` (as it defaults to `"~/.fiab"`). Note in particular that this command creates a venv in `$FIAB_ROOT/venv` unless one exists already.
 
 ### Developer Setup, with Docker
 
@@ -54,6 +56,11 @@ yarn dev
 cd backend
 uvicorn forecastbox.entrypoint:app --reload --log-level info
 python -m cascade.gateway tcp://localhost:8067
+```
+
+### User Setup, Docker-free
+```
+bash ./backend/fiab.sh # used both as installer script *and* launcher
 ```
 
 ### User Setup, with Docker-compose
