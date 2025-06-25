@@ -1,11 +1,10 @@
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 import logging
-from forecastbox.schemas.job import Base
+from forecastbox.schemas.job import Base, JobRecord
 from forecastbox.config import config
 from cascade.controller.report import JobId
 from sqlalchemy import select, update, func, delete
 import datetime as dt
-from forecastbox.schemas.job import JobRecord
 from typing import Iterable
 
 logger = logging.getLogger(__name__)
@@ -20,11 +19,29 @@ async def create_db_and_tables():
         await conn.run_sync(Base.metadata.create_all)
 
 
+async def insert_one(job_id: JobId, error: str | None, user_id: str | None, graph_spec: str, outputs: str) -> None:
+    async with async_session_maker() as session:
+        ref_time = dt.datetime.now()
+        entity = JobRecord(
+            job_id=job_id,
+            status="submitted" if not error else "failed",
+            created_at=ref_time,
+            updated_at=ref_time,
+            created_by=user_id,
+            graph_specification=graph_spec,
+            outputs=outputs,
+            error=error,
+        )
+        session.add(entity)
+        await session.commit()
+
+
 async def get_one(job_id: JobId) -> JobRecord | None:
     async with async_session_maker() as session:
         query = select(JobRecord).where(JobRecord.job_id == job_id)
         result = await session.execute(query)
-        return result.first()[0]
+        maybe_row = result.first()
+        return maybe_row if maybe_row is None else maybe_row[0]
 
 
 async def get_all() -> Iterable[JobRecord]:

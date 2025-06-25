@@ -29,7 +29,6 @@ dependencies = [
 	"qubed==0.1.12",
 	"earthkit-workflows-anemoi>=0.3.1",
 	"pydantic-settings",
-	"pymongo",
 	"earthkit-workflows>=0.3.1",
 	"pproc",
 	"earthkit-workflows-pproc",

@@ -7,8 +7,6 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-import datetime as dt
-
 import uuid
 from typing import Any
 import logging
@@ -30,8 +28,7 @@ from forecastbox.products.registry import get_product
 from forecastbox.models import Model
 
 from forecastbox.schemas.user import UserRead
-from forecastbox.schemas.job import JobRecord
-from forecastbox.db.job import async_session_maker
+from forecastbox.db.job import insert_one
 
 from forecastbox.config import config
 
@@ -121,24 +118,6 @@ def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobRespons
     return submit_job_response, sinks
 
 
-async def _submit2db(response: api.SubmitJobResponse, user: UserRead, spec: ExecutionSpecification, sinks: list[Any]) -> None:
-    ref_time = dt.datetime.now()
-
-    entity = JobRecord(
-        job_id=response.job_id,
-        status="submitted" if not response.error else "failed",
-        created_at=ref_time,
-        updated_at=ref_time,
-        created_by=str(user.id) if user else None,
-        graph_specification=spec.model_dump_json(),
-        outputs=json.dumps(list(map(lambda x: x.task, sinks))),
-        error=response.error,
-    )
-    async with async_session_maker() as session:
-        session.add(entity)
-        await session.commit()
-
-
 class SubmitJobResponse(BaseModel):
     """Submit Job Response."""
 
@@ -152,5 +131,11 @@ async def execute(spec: ExecutionSpecification, user: UserRead) -> SubmitJobResp
         # TODO this best comes from the db... we still have a cascade conflict problem,
         # we best redesign cascade api to allow for uuid acceptance
         response.job_id = str(uuid.uuid4())
-    await _submit2db(response, user, spec, sinks)
+    await insert_one(
+        response.job_id,
+        response.error,
+        str(user.id) if user else None,
+        spec.model_dump_json(),
+        json.dumps(list(map(lambda x: x.task, sinks))),
+    )
     return SubmitJobResponse(id=response.job_id)

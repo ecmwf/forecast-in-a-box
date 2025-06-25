@@ -1,7 +1,7 @@
-# @pytest.mark.skip(reason="requires mongodb still")
 def test_admin_flows(backend_client):
     # TODO this test is a bit flaky, because it must be executed first to ensure admin actually ending up admin
     # but then the impl itself is flaky
+    # NOTE there is additionally dependence of test_model.py on this test
 
     # curl -XPOST -H 'Content-Type: application/json' -d '{"email": "admin@somewhere.org", "password": "something"}' localhost:8000/api/v1/auth/register
     headers = {"Content-Type": "application/json"}
