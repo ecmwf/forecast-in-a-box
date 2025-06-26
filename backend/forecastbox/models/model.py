@@ -10,7 +10,7 @@
 from collections import defaultdict
 from functools import cached_property, lru_cache
 
-from pydantic import BaseModel, FilePath, ConfigDict
+from pydantic import BaseModel, ConfigDict, FilePath
 from pydantic import model_validator
 import yaml
 
