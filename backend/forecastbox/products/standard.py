@@ -95,6 +95,10 @@ class DeaccumulatedProduct(GenericTemporalProduct):
         "step": True,
     }
 
+    def validate_intersection(self, model):
+        super_result = super().validate_intersection(model)
+        return super_result and len(model.accumulations) > 0
+
     @property
     def qube(self):
         return self.make_generic_qube()
@@ -105,7 +109,7 @@ class DeaccumulatedProduct(GenericTemporalProduct):
 
         Only the accumulation variables are used to create the intersection.
         """
-        self_qube = self.make_generic_qube(param=model.accumulations)
+        self_qube = self.make_generic_qube(param=model.accumulations or model.variables)
 
         intersection = model.qube(self.model_assumptions) & self_qube
         result = f"step={'/'.join(map(str, model.timesteps))}" / intersection

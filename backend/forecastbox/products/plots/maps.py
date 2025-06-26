@@ -141,10 +141,14 @@ class MapProduct(GenericTemporalProduct):
     label = {
         **GenericTemporalProduct.label,
         "domain": "Domain",
+        "reduce": "Reduce",
     }
 
     defaults = {
         "reduce": "True",
+    }
+    description = {
+        "reduce": "Combine all steps and parameters into a single plot",
     }
 
     @property
@@ -170,9 +174,7 @@ class SimpleMapProduct(MapProduct):
         "domain": False,
     }
 
-    defaults = {
-        "domain": "Global",
-    }
+    defaults = {"domain": "Global", **MapProduct.defaults}
 
     def to_graph(self, product_spec, model, source):
         domain = product_spec.pop("domain", None)
@@ -209,9 +211,7 @@ class EnsembleMapProduct(BaseEnsembleProduct, MapProduct):
         "step": True,
         "domain": False,
     }
-    defaults = {
-        "domain": "Global",
-    }
+    defaults = {"domain": "Global", **MapProduct.defaults}
 
     def to_graph(self, product_spec, model, source):
         domain = product_spec.pop("domain", None)
