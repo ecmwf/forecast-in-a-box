@@ -21,6 +21,12 @@ class FakeModelRepository(BaseHTTPRequestHandler):
             chunk = b"x" * 256
             for _ in range(4):
                 self.wfile.write(chunk)
+        elif self.path == "/MANIFEST":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            manifest_content = f"{fake_model_name}.ckpt"
+            self.wfile.write(manifest_content.encode("utf-8"))
         else:
             self.send_error(404, f"Not Found: {self.path}")
 

@@ -186,8 +186,17 @@ async def all_available_models() -> dict[Category, list[ModelName]]:
 
     models = defaultdict(list)
 
+    # TODO: Improve category assignment
     for model in response.text.split("\n"):
-        cat, name = model.split("/", 1)
+        model = model.strip()
+        if not model or model.startswith("#"):
+            continue
+
+        if "/" not in model:
+            cat = ""
+            name = model
+        else:
+            cat, name = model.split("/", 1)
         models[cat].append(name)
     return models
 
@@ -217,10 +226,9 @@ async def get_models(admin=Depends(get_admin_user)) -> dict[str, ModelDetails]:
             not_in_edit = (await get_edit(model_id)) is None
 
             existing_download = await get_download(model_id)
-            is_model_downloaded = model_downloaded(model_id)
             download = download2response(existing_download)
 
-            if is_model_downloaded:
+            if is_model_downloaded := model_downloaded(model_id):
                 download.status = "completed"
 
             models[model_id] = ModelDetails(download=download, editable=not_in_edit and is_model_downloaded)
