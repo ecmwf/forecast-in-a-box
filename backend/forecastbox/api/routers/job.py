@@ -93,7 +93,7 @@ async def update_and_get_progress(job_id: JobId) -> JobProgressResponse:
         response: api.JobProgressResponse = client.request_response(
             api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}"
         )  # type: ignore
-    except TimeoutError | KeyError | Exception as e:
+    except (TimeoutError, KeyError, Exception) as e:
         status = {TimeoutError: "timeouted", KeyError: "invalid", Exception: "errored"}[e.__class__]
         error_on_request = repr(e)
     if response.error:
