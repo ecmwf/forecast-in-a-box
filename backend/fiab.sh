@@ -29,7 +29,7 @@ EOF
 }
 
 
-FIAB_ROOT="$HOME/.fiab"
+FIAB_ROOT=${FIAB_ROOT:-"$HOME/.fiab"}
 check() {
 	if [ -z "$(which curl || :)" ] ; then
 		echo "command 'curl' not found, please install"
@@ -81,9 +81,10 @@ maybeCreateVenv() {
 	else
 		uv venv -p "$UV_PY" "$VENV"
 		source "${VENV}/bin/activate" # or export the paths?
-
-		uv pip install "./[$FIAB_INSTALL_TYPE]"
 	fi
+
+    uv pip install -e .[test]
+    uv pip install --prerelease=allow --upgrade multiolib==2.6.1.dev20250613 # TODO fix once stabilized
 }
 
 ENTRYPOINT=forecastbox.standalone.entrypoint

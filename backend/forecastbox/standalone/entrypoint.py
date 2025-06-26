@@ -28,7 +28,7 @@ from multiprocessing import Process, connection, set_start_method, freeze_suppor
 from cascade.executor.config import logging_config, logging_config_filehandler
 
 import pydantic
-from forecastbox.config import FIABConfig
+from forecastbox.config import FIABConfig, validate_runtime
 
 
 logger = logging.getLogger(__name__ if __name__ != "__main__" else "forecastbox.standalone.entrypoint")
@@ -155,6 +155,7 @@ def launch_all(config: FIABConfig) -> ProcessHandles:
 
 if __name__ == "__main__":
     config = FIABConfig()
+    validate_runtime(config)
     handles = launch_all(config)
     try:
         handles.wait()

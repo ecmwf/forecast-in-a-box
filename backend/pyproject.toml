@@ -29,8 +29,7 @@ dependencies = [
 	"qubed==0.1.12",
 	"earthkit-workflows-anemoi>=0.3.1",
 	"pydantic-settings",
-	"pymongo",
-	"earthkit-workflows",
+	"earthkit-workflows>=0.3.1",
 	"pproc",
 	"earthkit-workflows-pproc",
 	"sse-starlette",
@@ -51,11 +50,9 @@ plots = [
 webmars = [
     "ecmwf-api-client>=1.6.5",
 ]
-tests = [
-	"pytest-xdist",
-]
+test = ["pytest-xdist"]
 all = [
-	"forecast-in-a-box[plots,thermo,webmars]"
+	"forecast-in-a-box[plots,test,thermo,webmars]"
 ]
 
 [tool.hatch.build.targets.wheel]

@@ -26,13 +26,13 @@ import cascade.gateway.client as client
 from forecastbox.schemas.user import UserRead
 from forecastbox.auth.users import current_active_user
 
-from forecastbox.db import db
 from forecastbox.api.utils import encode_result
 
 from forecastbox.config import config
 from forecastbox.api.types import VisualisationOptions, ExecutionSpecification
 from forecastbox.api.visualisation import visualise
 from forecastbox.api.execution import execute, SubmitJobResponse
+from forecastbox.db.job import get_one, update_one, get_all, delete_all, delete_one
 
 logger = logging.getLogger(__name__)
 
@@ -73,13 +73,9 @@ class JobProgressResponses:
 
 
 def validate_job_id(job_id: JobId) -> JobId | None:
-    """Validate the job ID by checking if it exists in the database."""
-    collection = db.get_collection("job_records")
-
-    record = collection.find_one({"job_id": job_id})
-    if record:
-        return job_id
-    raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
+    """Validate the job ID."""
+    # NOTE we could query the db here, but since next step is a conditional db retrieval anyway, this extra query makes low sense
+    return job_id
 
 
 def validate_dataset_id(dataset_id: str) -> str:
@@ -87,72 +83,52 @@ def validate_dataset_id(dataset_id: str) -> str:
     return dataset_id
 
 
-def get_job_progress(job_id: JobId) -> JobProgressResponse:
-    """
-    Get the progress of a job.
-
-    Updates the job record in the database with the job status and error if any.
-
-    Parameters
-    ----------
-    job_id : JobId
-        job_id of the task, expected to be the id
-        in the database, not the cascade job id.
-
-    Returns
-    -------
-    JobProgressResponse
-        Progress of the job as a percentage, status, creation timestamp, and error message if any.
-    """
+async def update_and_get_progress(job_id: JobId) -> JobProgressResponse:
+    """Updates the job db with the newest cascade gateway response, returns the updated result"""
     response = None
     error_on_request = None
-    collection = db.get_collection("job_records")
+    status = "unknown"
 
     try:
         response: api.JobProgressResponse = client.request_response(
             api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}"
         )  # type: ignore
-    except TimeoutError as e:
-        collection.update_one({"job_id": job_id}, {"$set": {"status": "timeout"}})
-        error_on_request = f"TimeoutError: {e}"
-    except KeyError as e:
-        collection.update_one({"job_id": job_id}, {"$set": {"status": "invalid"}})
-        error_on_request = f"KeyError: {e}"
-    except Exception as e:
-        collection.update_one({"job_id": job_id}, {"$set": {"status": "errored"}})
-        error_on_request = f"Exception: {e}"
-
-    finally:
-        if response is None:
-            return JobProgressResponse(
-                progress="0.00",
-                status=collection.find({"job_id": job_id})[0]["status"],
-                error=error_on_request,
-            )
-
+    except (TimeoutError, KeyError, Exception) as e:
+        status = {TimeoutError: "timeouted", KeyError: "invalid", Exception: "errored"}[e.__class__]
+        error_on_request = repr(e)
     if response.error:
-        collection.update_one({"job_id": job_id}, {"$set": {"status": "errored", "error": response.error}})
+        status = "errored"
+        error_on_request = response.error
+    if error_on_request is not None:
+        await update_one(job_id, status=status)
+        return JobProgressResponse(
+            progress="0.00",
+            status=status,
+            error=error_on_request,
+        )
 
     jobprogress = response.progresses.get(job_id, None)
     if not jobprogress:
-        logger.error(f"request for {job_id=} produced incompatible {response=}")
-        raise HTTPException(status_code=500, detail=f"Unable to retrieve status of {job_id}")
-
+        # NOTE this is for cases where jobdb outlives gateway (which is legit scenario)
+        await update_one(job_id, status="invalid")
+        return JobProgressResponse(progress="0.00", status="invalid", error="job not tracked anymore")
     elif jobprogress.failure:
-        collection.update_one({"job_id": job_id}, {"$set": {"status": "errored", "error": jobprogress.failure}})
+        await update_one(job_id, status="errored", error=jobprogress.failure)
     elif jobprogress.completed or jobprogress.pct == "100.00":
-        collection.update_one({"job_id": job_id}, {"$set": {"status": "completed"}})
+        await update_one(job_id, status="completed")
     else:
-        collection.update_one({"job_id": job_id}, {"$set": {"status": "running"}})
+        await update_one(job_id, status="running")
 
     progress = jobprogress.pct if jobprogress.pct else "0.00" if jobprogress.failure else "100.00"
 
-    job = collection.find_one({"job_id": job_id})
+    job = await get_one(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
     return JobProgressResponse(
         progress=progress,
-        created_at=str(job["created_at"]),
-        status=job["status"],
-        error=jobprogress.failure,
+        created_at=str(job.created_at),
+        status=job.status,
+        error=job.error,
     )
 
 
@@ -160,35 +136,19 @@ def get_job_progress(job_id: JobId) -> JobProgressResponse:
 async def get_status() -> JobProgressResponses:
     """Get progress of all tasks recorded in the database."""
 
-    collection = db.get_collection("job_records")
-    job_records = collection.find({})
+    job_records = await get_all()
 
-    # Extract job IDs from the records
-    job_ids = [record["job_id"] for record in job_records]
-
-    for_status_job_ids = [job_id for job_id in job_ids if collection.find_one({"job_id": job_id})["status"] in ["running", "submitted"]]
-    db_status_ids = list(set(job_ids) - set(for_status_job_ids))
-
-    progresses = {job_id: get_job_progress(job_id) for job_id in for_status_job_ids}
-
-    for job_id in db_status_ids:
-        id_record = collection.find({"job_id": job_id})[0]
-        status = id_record.get("status", "unknown")
-        error = id_record.get("error", None)
-        created_at = id_record.get("created_at", None)
-
-        progresses[job_id] = JobProgressResponse(
-            progress="0.00" if not status == "completed" else "100.00",
-            status=status,
-            created_at=str(created_at) if created_at else created_at,
-            error=error,
+    progresses = {
+        job.job_id: await update_and_get_progress(job.job_id)
+        if job.status in ["running", "submitted"]
+        else JobProgressResponse(
+            progress="0.00" if not job.status == "completed" else "100.00",
+            status=job.status,
+            created_at=str(job.created_at),
+            error=job.error,
         )
-
-    # Sort job records by created_at timestamp
-    sorted_job_ids = sorted(job_ids, key=lambda id: collection.find_one({"job_id": job_id}).get("created_at", 0))
-
-    # Update progresses to reflect the sorted order
-    progresses = {job_id: progresses[job_id] for job_id in sorted_job_ids if job_id in progresses}
+        for job in job_records
+    }
 
     return JobProgressResponses(progresses=progresses, error=None)
 
@@ -196,15 +156,16 @@ async def get_status() -> JobProgressResponses:
 @router.get("/{job_id}/status")
 async def get_status_of_job(job_id: JobId = Depends(validate_job_id)) -> JobProgressResponse:
     """Get progress of a particular job."""
-    return get_job_progress(job_id)
+    return await update_and_get_progress(job_id)
 
 
 @router.get("/{job_id}/outputs")
 async def get_outputs_of_job(job_id: JobId = Depends(validate_job_id)) -> list[TaskId]:
     """Get outputs of a job."""
-    collection = db.get_collection("job_records")
-    outputs = collection.find_one({"job_id": job_id})
-    return outputs.get("outputs", [])
+    job = await get_one(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
+    return json.loads(job.outputs)
 
 
 @router.post("/{job_id}/visualise")
@@ -214,37 +175,39 @@ async def visualise_job(job_id: JobId = Depends(validate_job_id), options: Visua
     Retrieves the job's graph specification from the database, converts it to a cascade graph,
     and generates an HTML visualisation of the graph.
     """
-    collection = db.get_collection("job_records")
-    job = collection.find({"job_id": job_id})
-
+    job = await get_one(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
     if not options:
         options = VisualisationOptions()
-
-    spec = ExecutionSpecification(**json.loads(job[0]["graph_specification"]))
+    if job.graph_specification is None:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} had no specification.")
+    spec = ExecutionSpecification(**json.loads(job.graph_specification))
     return visualise(spec, options)
 
 
 @router.get("/{job_id}/specification")
 async def get_job_specification(job_id: JobId = Depends(validate_job_id)) -> ExecutionSpecification:
     """Get specification in the database of a job."""
-    collection = db.get_collection("job_records")
-    job = collection.find_one({"job_id": job_id})
-    return ExecutionSpecification(**json.loads(job["graph_specification"]))
+    job = await get_one(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
+    if job.graph_specification is None:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} had no specification.")
+    return ExecutionSpecification(**json.loads(job.graph_specification))
 
 
 @router.get("/{job_id}/restart")
 async def restart_job(job_id: JobId = Depends(validate_job_id), user: UserRead = Depends(current_active_user)) -> SubmitJobResponse:
     """Restart a job by executing its specification."""
-    collection = db.get_collection("job_records")
-    job = collection.find_one({"job_id": job_id})
-
-    spec = job.get("graph_specification", None)
+    job = await get_one(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
+    spec = job.graph_specification
     if not spec:
         raise HTTPException(status_code=404, detail=f"Job {job_id} had no specification.")
-
     spec = ExecutionSpecification(**json.loads(spec))
-    response = execute(spec, user)
-    return response
+    return await execute(spec, user)
 
 
 @router.post("/upload")
@@ -252,14 +215,9 @@ async def upload_job(file: UploadFile, user: UserRead = Depends(current_active_u
     """Upload a job specification file and execute it."""
     if not file:
         raise HTTPException(status_code=400, detail="No file provided for upload.")
-
     spec = await file.read()
-    import json
-
     spec = ExecutionSpecification(**json.loads(spec))
-    response = execute(spec, user=user)
-
-    return response
+    return await execute(spec, user=user)
 
 
 @dataclass
@@ -281,7 +239,6 @@ async def get_job_availablity(job_id: JobId = Depends(validate_job_id)) -> list[
         Job ID of the task
     """
     response: api.JobProgressResponse = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}")
-
     return [x.task for x in response.datasets[job_id]]
 
 
@@ -378,8 +335,8 @@ async def flush_job() -> JobDeletionResponse:
     except Exception as e:
         raise HTTPException(500, f"Job deletion failed: {e}")
     finally:
-        delete = db.get_collection("job_records").delete_many({})
-    return JobDeletionResponse(deleted_count=delete.deleted_count)
+        deleted_count = await delete_all()
+    return JobDeletionResponse(deleted_count=deleted_count)
 
 
 @router.delete("/{job_id}")
@@ -393,5 +350,5 @@ async def delete_job(job_id: JobId = Depends(validate_job_id)) -> JobDeletionRes
     except Exception as e:
         raise HTTPException(500, f"Job deletion failed: {e}")
     finally:
-        delete = db.get_collection("job_records").delete_one({"job_id": job_id})
-    return JobDeletionResponse(deleted_count=delete.deleted_count)
+        deleted_count = await delete_one(job_id)
+    return JobDeletionResponse(deleted_count=deleted_count)

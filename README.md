@@ -25,27 +25,30 @@ Forecast-In-A-Box is a prototype system to deliver ECMWF products on demand as g
 
 ## Installation
 
-Python 3.11 is required due to the built versions of some of the downstream packages.
-
-
-### Setup Backend
-
-```bash
-uv venv --seed ./ --python 3.11
-uv pip install ./backend[all]
+### Developer Setup, Docker-free
 ```
+# first activate your venv or something
+mkdir -p ~/.fiab
+uv pip install -e backend[test]
+uv pip install --prerelease=allow --upgrade multiolib==2.6.1.dev20250613 # this is a known working version -- once we get past dev, this will disappear
+pytest backend # just to ensure all is good
+```
+Note the above will likely change over time -- you may want to instead run `./backend/fiab.sh`, perhaps with explicit `FIAB_ROOT` (as it defaults to `"~/.fiab"`). Note in particular that this command creates a venv in `$FIAB_ROOT/venv` unless one exists already.
 
-### Setup frontend
+### Developer Setup, with Docker
 
+Installation:
 ```bash
+# backend
+uv venv --seed ./ 
+uv pip install ./backend[all]
+
+# frontend
 cd frontend
 npm install yarn
 ```
 
-### Running
-
-Running the server
-
+Running the server:
 ```bash
 cd frontend
 yarn dev
@@ -55,7 +58,12 @@ uvicorn forecastbox.entrypoint:app --reload --log-level info
 python -m cascade.gateway tcp://localhost:8067
 ```
 
-### Docker Compose
+### User Setup, Docker-free
+```
+bash ./backend/fiab.sh # used both as installer script *and* launcher
+```
+
+### User Setup, with Docker-compose
 
 To use the prebuilt containers use the following docker-compose file, otherwise the default 
 in the repo will build.

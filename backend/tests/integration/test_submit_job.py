@@ -11,7 +11,6 @@ from cascade.low.builders import JobBuilder, TaskBuilder
 import cloudpickle
 
 
-# @pytest.mark.skip(reason="requires mongodb still")
 def test_submit_job(backend_client):
     headers = {"Content-Type": "application/json"}
     data = {"email": "executor@somewhere.org", "password": "something"}
@@ -96,3 +95,11 @@ def test_submit_job(backend_client):
     # TODO fix the file to comply with the validation, then test the workflow success
     # TODO retry in case of error not present yet
     assert "Could not find 'ai-models.json'" in response.json()["progresses"][test_model_id]["error"]
+
+    # delete jobs
+    response = backend_client.delete(f"/job/{raw_job_id}").raise_for_status().json()
+    assert response["deleted_count"] == 1
+    response = backend_client.get("/job/status").raise_for_status().json()
+    assert len(response.keys()) == 2
+    response = backend_client.post("/job/flush").raise_for_status().json()
+    assert response["deleted_count"] == 2
