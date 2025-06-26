@@ -11,7 +11,6 @@ from cascade.low.builders import JobBuilder, TaskBuilder
 import cloudpickle
 
 
-# @pytest.mark.skip(reason="requires mongodb still")
 def test_submit_job(backend_client):
     headers = {"Content-Type": "application/json"}
     data = {"email": "executor@somewhere.org", "password": "something"}
