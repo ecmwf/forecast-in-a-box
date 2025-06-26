@@ -9,24 +9,21 @@
 
 """Execution API Router."""
 
-from datetime import datetime
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 
 import logging
 
-from pydantic import BaseModel
 
 from cascade.low.core import JobInstance
 
-from forecastbox.db import db
 from forecastbox.auth.users import current_active_user
 from forecastbox.schemas.user import UserRead
 
 from forecastbox.api.types import VisualisationOptions, ExecutionSpecification
 from forecastbox.api.visualisation import visualise
 from forecastbox.api.execution import execution_specification_to_cascade
-from forecastbox.api.execution import execute as execute_specification
+from forecastbox.api.execution import execute, SubmitJobResponse
 
 router = APIRouter(
     tags=["execution"],
@@ -34,13 +31,6 @@ router = APIRouter(
 )
 
 LOG = logging.getLogger(__name__)
-
-
-class SubmitJobResponse(BaseModel):
-    """Submit Job Response."""
-
-    id: str
-    """Id of the submitted job."""
 
 
 @router.post("/visualise")
@@ -115,49 +105,8 @@ async def get_graph_download(spec: ExecutionSpecification) -> str:
     return spec.model_dump_json()
 
 
-async def execute(spec: ExecutionSpecification, user: UserRead, background_tasks: BackgroundTasks) -> SubmitJobResponse:
-    """
-    Execute a job based on the provided execution specification.
-
-    Immediately submits the job to the database and starts the execution in the background.
-
-
-    Parameters
-    ----------
-    spec : ExecutionSpecification
-        Execution specification containing model and product details.
-    user : UserRead
-        User object representing the user executing the job.
-    background_tasks : BackgroundTasks
-        fastapi BackgroundTasks instance to handle background execution.
-
-    Returns
-    -------
-    SubmitJobResponse
-        Job submission response containing the job ID.
-    """
-    import uuid
-
-    id = str(uuid.uuid4())
-    collection = db.get_collection("job_records")
-    collection.insert_one(
-        {
-            "id": id,
-            "status": "submitting",
-            "created_at": datetime.now(),
-            "updated_at": datetime.now(),
-            "graph_specification": spec.model_dump_json(),
-        }
-    )
-
-    background_tasks.add_task(execute_specification, spec, id, user)
-    return SubmitJobResponse(id=id)
-
-
 @router.post("/execute")
-async def execute_api(
-    spec: ExecutionSpecification, background_tasks: BackgroundTasks, user: UserRead = Depends(current_active_user)
-) -> SubmitJobResponse:
+async def execute_api(spec: ExecutionSpecification, user: UserRead = Depends(current_active_user)) -> SubmitJobResponse:
     """
     Execute a job based on the provided execution specification.
 
@@ -175,5 +124,4 @@ async def execute_api(
     SubmitJobResponse
         Job submission response containing the job ID.
     """
-    response = await execute(spec, user=user, background_tasks=background_tasks)
-    return response
+    return execute(spec, user=user)
