@@ -56,26 +56,22 @@ def mocked_category_registry(mocked_products_global_dict):
     return registry
 
 
-@pytest.fixture
-def mocked_product():
-    """Fixture to create a mocked product."""
+class MockProduct:
+    """Mock product class for testing"""
 
-    class MockProduct:
-        name = "mock_product"
-        description = "This is a mock product."
-        options = ["option1", "option2"]
-
-    return MockProduct
+    name = "mock_product"
+    description = "This is a mock product."
+    options = ["option1", "option2"]
 
 
-def test_category_registry_add_product(mocked_category_registry: CategoryRegistry, mocked_product):
+def test_category_registry_add_product(mocked_category_registry: CategoryRegistry):
     """Test adding a product to the CategoryRegistry."""
 
-    mocked_category_registry("mock_product")(mocked_product)
+    mocked_category_registry("mock_product")(MockProduct)
 
     assert "mock_product" in mocked_category_registry.products
-    assert mocked_category_registry.products["mock_product"] == mocked_product
+    assert mocked_category_registry.products["mock_product"] == MockProduct
 
     assert get_product_list("mocked_category") == ["mock_product"]
-    assert isinstance(get_product("mocked_category", "mock_product"), mocked_product)
+    assert isinstance(get_product("mocked_category", "mock_product"), MockProduct)
     assert get_categories(Interfaces.ALL)["mocked_category"].options == ["mock_product"]

@@ -14,7 +14,6 @@ from qubed import Qube
 
 from forecastbox.models.model import Model, ModelExtra
 
-import pytest
 
 from anemoi.inference.testing import fake_checkpoints
 from anemoi.inference.checkpoint import Checkpoint
@@ -22,44 +21,32 @@ from anemoi.inference.checkpoint import Checkpoint
 from earthkit.workflows import fluent
 
 
-@pytest.fixture
-def mock_checkpoint_path():
-    """Fixture for a mock checkpoint path."""
-    return (Path(__file__).parent / "../checkpoints/simple.yaml").absolute()
+checkpoint_path = (Path(__file__).parent / "../checkpoints/simple.yaml").absolute()
 
 
-@pytest.fixture
-@fake_checkpoints
-def mock_checkpoint(mock_checkpoint_path) -> Checkpoint:
-    return Checkpoint(mock_checkpoint_path)
+class FakeModel(Model):
+    """Test model for testing purposes."""
 
+    @property
+    @fake_checkpoints
+    def checkpoint(self):
+        return Checkpoint(checkpoint_path)
 
-@pytest.fixture
-def test_model(mock_checkpoint_path, mock_checkpoint) -> Model:
-    """Fixture for a test model."""
+    def versions(self):
+        """Checkpoint has no versions."""
+        return {}
 
-    class TestModel(Model):
-        """Test model for testing purposes."""
-
-        @property
-        @fake_checkpoints
-        def checkpoint(self):
-            return mock_checkpoint
-
-        def versions(self):
-            """Checkpoint has no versions."""
-            return {}
-
-        @property
-        def extra_information(self) -> ModelExtra:
-            return ModelExtra()
-
-    return TestModel(checkpoint_path=mock_checkpoint_path, lead_time=72, date="2023-01-01", ensemble_members=1)
+    @property
+    def extra_information(self) -> ModelExtra:
+        return ModelExtra()
 
 
 @fake_checkpoints
-def test_model_qube(test_model: Model):
+def test_model_qube():
     """Test the `qube` method of the model."""
+
+    test_model = FakeModel(checkpoint_path=checkpoint_path, lead_time=72, date="2023-01-01", ensemble_members=1)
+
     qube = test_model.qube({})
     assert isinstance(qube, Qube), "Qube should be an instance of Qube"
 
@@ -74,8 +61,11 @@ def test_model_qube(test_model: Model):
 
 
 @fake_checkpoints
-def test_model_qube_with_model_assumptions(test_model: Model):
+def test_model_qube_with_model_assumptions():
     """Test the `qube` method of the model with model assumptions."""
+
+    test_model = test_model = FakeModel(checkpoint_path=checkpoint_path, lead_time=72, date="2023-01-01", ensemble_members=1)
+
     model_assumptions = {
         "options": ["value1", "value2"],
     }
@@ -85,14 +75,11 @@ def test_model_qube_with_model_assumptions(test_model: Model):
     assert qube.span("options") == ["value1", "value2"], "Qube 'options' axis should match expected values"
 
 
-@pytest.fixture
-def fake_initial_conditions() -> fluent.Action:
-    return fluent.from_source(lambda x: x)
-
-
 @fake_checkpoints
-def test_graph_creation(fake_initial_conditions: fluent.Action, test_model: Model):
+def test_graph_creation():
     """Test the creation of a graph from the model."""
-    graph = test_model.graph(fake_initial_conditions)
+
+    test_model = test_model = FakeModel(checkpoint_path=checkpoint_path, lead_time=72, date="2023-01-01", ensemble_members=1)
+    graph = test_model.graph(fluent.from_source(lambda x: x))
 
     assert isinstance(graph, fluent.Action), "Graph should be an instance of fluent.Action"
