@@ -197,7 +197,7 @@ class ModelDetails(BaseModel):
     editable: bool
 
 
-@router.get("s")
+@router.get("")
 async def get_models(admin=Depends(get_admin_user)) -> dict[str, ModelDetails]:
     """
     Fetch a dictionary of models with their details.
