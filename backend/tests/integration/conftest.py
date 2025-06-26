@@ -36,6 +36,7 @@ def backend_client() -> httpx.Client:
     try:
         td = tempfile.TemporaryDirectory()
         config = FIABConfig()
+        config.api.api_url = "http://localhost:30645"
         config.db.sqlite_userdb_path = f"{td.name}/user.db"
         config.db.sqlite_jobdb_path = f"{td.name}/job.db"
         config.api.data_path = str(pathlib.Path(__file__).parent / "data")
