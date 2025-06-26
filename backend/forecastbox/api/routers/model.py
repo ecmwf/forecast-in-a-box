@@ -217,13 +217,13 @@ async def get_models(admin=Depends(get_admin_user)) -> dict[str, ModelDetails]:
             not_in_edit = (await get_edit(model_id)) is None
 
             existing_download = await get_download(model_id)
-            model_downloaded_ = model_downloaded(model_id)
+            is_model_downloaded = model_downloaded(model_id)
             download = download2response(existing_download)
 
-            if model_downloaded_:
+            if is_model_downloaded:
                 download.status = "completed"
 
-            models[model_id] = ModelDetails(download=download, editable=not_in_edit and model_downloaded_)
+            models[model_id] = ModelDetails(download=download, editable=not_in_edit and is_model_downloaded)
 
     return models
 
