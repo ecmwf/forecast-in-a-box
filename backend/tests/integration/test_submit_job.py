@@ -27,6 +27,10 @@ def test_submit_job(backend_client):
 
     headers = {"Authorization": f"Bearer {token}"}
 
+    # not existent
+    response = backend_client.get("/job/notToBeFound/status")
+    assert response.status_code == 404
+
     # raw job
     job_instance = JobBuilder().with_node("n1", TaskBuilder.from_callable(eval).with_values("1+2")).build().get_or_raise()
     spec = ExecutionSpecification(
@@ -96,10 +100,38 @@ def test_submit_job(backend_client):
     # TODO retry in case of error not present yet
     assert "Could not find 'ai-models.json'" in response.json()["progresses"][test_model_id]["error"]
 
+    # sleeper job
+    def sleep_with_sgn(secs: int):
+        import time
+
+        time.sleep(secs)
+
+    job_instance = JobBuilder().with_node("n1", TaskBuilder.from_callable(sleep_with_sgn).with_values(10)).build().get_or_raise()
+    spec = ExecutionSpecification(
+        job=RawCascadeJob(
+            job_type="raw_cascade_job",
+            job_instance=job_instance,
+        ),
+        environment=EnvironmentSpecification(),
+    )
+    response = backend_client.post("/graph/execute", headers=headers, json=spec.model_dump())
+    assert response.is_success
+    sleeper_id = response.json()["id"]
+
     # delete jobs
     response = backend_client.delete(f"/job/{raw_job_id}").raise_for_status().json()
     assert response["deleted_count"] == 1
     response = backend_client.get("/job/status").raise_for_status().json()
-    assert len(response.keys()) == 2
+    assert len(response["progresses"].keys()) == 3
+
+    # gateway restart
+    backend_client.post("/gateway/kill").raise_for_status()
+    backend_client.post("/gateway/start").raise_for_status()
+
+    response = backend_client.get("/job/status").raise_for_status().json()
+    assert len(response["progresses"].keys()) == 3
+    assert response["progresses"][sleeper_id]["status"] == "invalid"
+    assert response["progresses"][sleeper_id]["error"] == "evicted from gateway"
+
     response = backend_client.post("/job/flush").raise_for_status().json()
-    assert response["deleted_count"] == 2
+    assert response["deleted_count"] == 3
