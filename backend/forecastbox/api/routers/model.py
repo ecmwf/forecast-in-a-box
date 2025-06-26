@@ -42,64 +42,7 @@ router = APIRouter(
 
 Category = str
 
-# section: MODEL DOWNLOADS
-
-
-def model_downloaded(model_id: str) -> bool:
-    """Check if a model is downloaded."""
-    model_path = get_model_path(model_id.replace("_", "/"))
-    return model_path.exists()
-
-
-@router.get("/available")
-async def get_available_models() -> dict[Category, list[ModelName]]:
-    """
-    Get a list of available models sorted into categories.
-
-    Returns
-    -------
-    dict[Category, list[ModelName]]
-        Dictionary containing model categories and their models
-        Only shows models that are already downloaded
-    """
-    models = defaultdict(list)
-
-    for model in Path(config.api.data_path).glob("**/*.ckpt"):
-        if not model.is_file():
-            continue
-        model_path = model.relative_to(config.api.data_path)
-        category, name = model_path.parts[:-1], model_path.name
-        models["/".join(category)].append(name.replace(".ckpt", ""))
-
-    return models
-
-
-# Model Availability
-@router.get("/availability")
-async def manage_get_available_models(admin=Depends(get_admin_user)) -> dict[Category, list[ModelName]]:
-    """
-    Get a list of available models sorted into categories.
-
-    Will show all models in the manifest, regardless of whether they are downloaded or not.
-
-    Returns
-    -------
-    dict[Category, list[ModelName]]
-        Dictionary containing model categories and their models
-    """
-
-    manifest_path = os.path.join(config.api.model_repository, "MANIFEST")
-
-    response = requests.get(manifest_path)
-    if response.status_code != 200:
-        raise HTTPException(response.status_code, f"Failed to fetch manifest from {manifest_path}")
-
-    models = defaultdict(list)
-
-    for model in response.text.split("\n"):
-        cat, name = model.split("/")
-        models[cat].append(name)
-    return models
+# section: MODEL DOWNLOAD
 
 
 class DownloadResponse(BaseModel):
@@ -191,21 +134,98 @@ def download2response(model_download: ModelDownload | None) -> DownloadResponse:
     )
 
 
-@router.get("/{model_id}/downloaded")
-async def check_if_downloaded(model_id: str, admin=Depends(get_admin_user)) -> DownloadResponse:
-    """Check if a model has been downloaded."""
+# section: MODEL AVAILABILITY
 
+
+def model_downloaded(model_id: str) -> bool:
+    """Check if a model is downloaded."""
     model_path = get_model_path(model_id.replace("_", "/"))
-    if model_path.exists():
-        return DownloadResponse(
-            download_id=None,
-            message="Download already completed.",
-            status="completed",
-            progress=100.00,
-        )
+    return model_path.exists()
 
-    existing_download = await get_download(model_id)
-    return download2response(existing_download)
+
+@router.get("/available")
+async def get_available_models() -> dict[Category, list[ModelName]]:
+    """
+    Get a list of available models sorted into categories.
+
+    Returns
+    -------
+    dict[Category, list[ModelName]]
+        Dictionary containing model categories and their models
+        Only shows models that are already downloaded
+    """
+    models = defaultdict(list)
+
+    for model in Path(config.api.data_path).glob("**/*.ckpt"):
+        if not model.is_file():
+            continue
+        model_path = model.relative_to(config.api.data_path)
+        category, name = model_path.parts[:-1], model_path.name
+        models["/".join(category)].append(name.replace(".ckpt", ""))
+
+    return models
+
+
+async def all_available_models() -> dict[Category, list[ModelName]]:
+    """
+    Get a list of available models sorted into categories.
+
+    Will show all models in the manifest, regardless of whether they are downloaded or not.
+
+    Returns
+    -------
+    dict[Category, list[ModelName]]
+        Dictionary containing model categories and their models
+    """
+
+    manifest_path = os.path.join(config.api.model_repository, "MANIFEST")
+
+    response = requests.get(manifest_path)
+    if response.status_code != 200:
+        raise HTTPException(response.status_code, f"Failed to fetch manifest from {manifest_path}")
+
+    models = defaultdict(list)
+
+    for model in response.text.split("\n"):
+        cat, name = model.split("/", 1)
+        models[cat].append(name)
+    return models
+
+
+class ModelDetails(BaseModel):
+    download: DownloadResponse
+    editable: bool
+
+
+@router.get("s")
+async def get_models(admin=Depends(get_admin_user)) -> dict[str, ModelDetails]:
+    """
+    Fetch a dictionary of models with their details.
+
+    Returns
+    -------
+    ModelsResponse
+        Response model containing a list of models with their details.
+    """
+    models = {}
+    available_models = await all_available_models()
+
+    for category, model_names in available_models.items():
+        for model_name in model_names:
+            model_id = f"{category}/{model_name}"
+
+            not_in_edit = (await get_edit(model_id)) is None
+
+            existing_download = await get_download(model_id)
+            model_downloaded_ = model_downloaded(model_id)
+            download = download2response(existing_download)
+
+            if model_downloaded_:
+                download.status = "completed"
+
+            models[model_id] = ModelDetails(download=download, editable=not_in_edit and model_downloaded_)
+
+    return models
 
 
 @router.post("/{model_id}/download")
@@ -264,6 +284,9 @@ async def delete_model(model_id: str, admin=Depends(get_admin_user)) -> Download
     )
 
 
+# section: MODEL EDIT
+
+
 @router.get("/{model_id}/metadata")
 async def get_model_metadata(model_id: str, admin=Depends(get_admin_user)) -> ModelExtra:
     """
@@ -287,21 +310,6 @@ async def get_model_metadata(model_id: str, admin=Depends(get_admin_user)) -> Mo
     metadata = get_extra_information(model_path).model_dump()
     metadata.pop("version", None)
     return metadata
-
-
-# section: MODEL EDIT
-
-
-@router.get("/{model_id}/editable")
-async def is_model_metadata_editable(model_id: str, admin=Depends(get_admin_user)) -> bool:
-    """
-    Check if metadata for a specific model is editable.
-
-    May not be editable if the model is currently being downloaded or edited.
-    """
-    not_in_edit = (await get_edit(model_id)) is None
-
-    return not_in_edit and model_downloaded(model_id)
 
 
 async def _update_model_metadata(model_id: str, metadata: ModelExtra) -> ModelExtra:
@@ -360,6 +368,9 @@ async def patch_model_metadata(
     background_tasks.add_task(_update_model_metadata, model_id, metadata)
 
 
+# section: MODEL INFO
+
+
 # Model Info
 @lru_cache(maxsize=128)
 @router.get("/{model_id}/info")
@@ -380,8 +391,8 @@ async def get_model_info(model_id: str, admin=Depends(get_admin_user)) -> dict[s
     return model_info(get_model_path(model_id.replace("_", "/")))
 
 
-@router.post("/{model_id}/spec")
-async def get_model_spec(model_id: str, modelspec: ModelSpecification, admin=Depends(get_admin_user)) -> dict[str, Any]:
+@router.post("/specification")
+async def get_model_spec(modelspec: ModelSpecification, admin=Depends(get_admin_user)) -> dict[str, Any]:
     """
     Get the Qubed model spec as a json.
 
