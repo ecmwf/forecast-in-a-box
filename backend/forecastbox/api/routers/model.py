@@ -219,9 +219,10 @@ async def get_models(admin=Depends(get_admin_user)) -> dict[str, ModelDetails]:
     models = {}
     available_models = await all_available_models()
 
+    # TODO: Improve category assignment
     for category, model_names in available_models.items():
         for model_name in model_names:
-            model_id = f"{category}/{model_name}"
+            model_id = f"{category}/{model_name}" if category else model_name
 
             not_in_edit = (await get_edit(model_id)) is None
 

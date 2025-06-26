@@ -23,7 +23,9 @@ def test_download_model(backend_client):
     assert response.json() == {"": ["test"]}  # test.ckpt in tests/integration/data
 
     response = backend_client.get("/model", headers=headers).raise_for_status()
-    assert response.json()[fake_model_name]["message"] == "Model not downloaded."
+
+    assert fake_model_name in response.json()
+    assert response.json()[fake_model_name]["download"]["message"] == "Model not downloaded."
 
     response = backend_client.post(f"/model/{fake_model_name}/download", headers=headers).raise_for_status()
     assert response.json()["message"] == "Download started."
@@ -31,7 +33,7 @@ def test_download_model(backend_client):
     i = 6
     while i > 0:
         response = backend_client.get("/model", headers=headers).raise_for_status()
-        message = response.json()[fake_model_name]["message"]
+        message = response.json()[fake_model_name]["download"]["message"]
         if message == "Download already completed.":
             break
         time.sleep(0.3)
@@ -45,4 +47,4 @@ def test_download_model(backend_client):
     backend_client.delete(f"/model/{fake_model_name}", headers=headers).raise_for_status()
 
     response = backend_client.get("/model", headers=headers).raise_for_status()
-    assert response.json()[fake_model_name]["message"] == "Model not downloaded."
+    assert response.json()[fake_model_name]["download"]["message"] == "Model not downloaded."
