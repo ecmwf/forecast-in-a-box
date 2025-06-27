@@ -15,6 +15,7 @@ from typing import Literal
 from fastapi import APIRouter, Response, Depends, UploadFile, Body
 from fastapi.responses import HTMLResponse
 from fastapi import HTTPException
+import asyncio
 
 from dataclasses import dataclass
 
@@ -184,7 +185,8 @@ async def visualise_job(job_id: JobId = Depends(validate_job_id), options: Visua
     if job.graph_specification is None:
         raise HTTPException(status_code=404, detail=f"Job {job_id} had no specification.")
     spec = ExecutionSpecification(**json.loads(job.graph_specification))
-    return visualise(spec, options)
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, visualise, spec, options)  # CPU bound
 
 
 @router.get("/{job_id}/specification")
