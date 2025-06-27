@@ -69,14 +69,11 @@ def launch_api():
         pass  # no need to spew stacktrace to log
 
 
-def launch_cascade():
+def launch_cascade(log_path: str):
     config = FIABConfig()
     # TODO this configuration of log_path is very unsystematic, improve!
     # TODO we may want this to propagate to controller/executors -- but stripped the gateway.txt etc
-    if (log_path := config.cascade.log_path) is not None:
-        setup_process(log_path)
-    else:
-        setup_process()
+    setup_process(log_path)
     from cascade.gateway.server import serve
 
     try:

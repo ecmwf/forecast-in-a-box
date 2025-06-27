@@ -24,7 +24,8 @@ async def insert_one(job_id: JobId, error: str | None, user_id: str | None, grap
         ref_time = dt.datetime.now()
         entity = JobRecord(
             job_id=job_id,
-            status="submitted" if not error else "failed",
+            # NOTE we insert with running instead of submitted due to linearization of submit-insert
+            status="running" if not error else "failed",
             created_at=ref_time,
             updated_at=ref_time,
             created_by=user_id,
