@@ -11,6 +11,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
+import asyncio
 
 import logging
 
@@ -53,7 +54,8 @@ async def get_graph_visualise(spec: ExecutionSpecification, options: Visualisati
     if options is None:
         options = VisualisationOptions()
 
-    return visualise(spec, options)
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, visualise, spec, options)  # CPU bound
 
 
 @router.post("/serialise")

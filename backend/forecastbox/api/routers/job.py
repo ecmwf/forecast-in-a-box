@@ -15,6 +15,7 @@ from typing import Literal
 from fastapi import APIRouter, Response, Depends, UploadFile, Body
 from fastapi.responses import HTMLResponse
 from fastapi import HTTPException
+import asyncio
 
 from dataclasses import dataclass
 
@@ -85,51 +86,52 @@ def validate_dataset_id(dataset_id: str) -> str:
 
 async def update_and_get_progress(job_id: JobId) -> JobProgressResponse:
     """Updates the job db with the newest cascade gateway response, returns the updated result"""
-    response = None
-    error_on_request = None
-    status = "unknown"
-
-    try:
-        response: api.JobProgressResponse = client.request_response(
-            api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}"
-        )  # type: ignore
-    except (TimeoutError, KeyError, Exception) as e:
-        status = {TimeoutError: "timeouted", KeyError: "invalid", Exception: "errored"}[e.__class__]
-        error_on_request = repr(e)
-    if response.error:
-        status = "errored"
-        error_on_request = response.error
-    if error_on_request is not None:
-        await update_one(job_id, status=status)
-        return JobProgressResponse(
-            progress="0.00",
-            status=status,
-            error=error_on_request,
-        )
-
-    jobprogress = response.progresses.get(job_id, None)
-    if not jobprogress:
-        # NOTE this is for cases where jobdb outlives gateway (which is legit scenario)
-        await update_one(job_id, status="invalid")
-        return JobProgressResponse(progress="0.00", status="invalid", error="job not tracked anymore")
-    elif jobprogress.failure:
-        await update_one(job_id, status="errored", error=jobprogress.failure)
-    elif jobprogress.completed or jobprogress.pct == "100.00":
-        await update_one(job_id, status="completed")
-    else:
-        await update_one(job_id, status="running")
-
-    progress = jobprogress.pct if jobprogress.pct else "0.00" if jobprogress.failure else "100.00"
-
     job = await get_one(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
-    return JobProgressResponse(
-        progress=progress,
-        created_at=str(job.created_at),
-        status=job.status,
-        error=job.error,
-    )
+    created_at = str(job.created_at)
+
+    # NOTE the submitted status currently shouldnt happen due to linearization of submit-insert
+    if job.status in ("running", "submitted"):
+        try:
+            response: api.JobProgressResponse = client.request_response(
+                api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}"
+            )  # type: ignore
+        except TimeoutError:
+            # NOTE we dont update db because the job may still be running
+            return JobProgressResponse(progress="0.00", created_at=created_at, status="timeout", error="failed to communicate with gateway")
+        except Exception:
+            # TODO this is either network or internal (eg serde) problem. Ideally fine-grain network into TimeoutError branch
+            await update_one(job_id, status="unknown")
+            return JobProgressResponse(progress="0.00", created_at=created_at, status="unknown", error="internal cascade failure")
+        if response.error:
+            if response.error.startswith("KeyError"):
+                # NOTE currently can happen only via gateway restart -- but if submit-insert werent
+                # linearized, could happen due to ongoing cascade conversion
+                result = {"status": "invalid", "error": "evicted from gateway"}
+                await update_one(job_id, **result)
+                return JobProgressResponse(progress="0.00", created_at=created_at, **result)
+            else:
+                result = {"status": "unknown", "error": response.error}
+                # NOTE we dont update db because the job may still be running
+                return JobProgressResponse(progress="0.00", created_at=created_at, **result)
+
+        jobprogress = response.progresses.get(job_id)
+        if jobprogress.failure:
+            result = {"status": "errored", "error": jobprogress.failure}
+            await update_one(job_id, **result)
+            return JobProgressResponse(progress="0.00", created_at=created_at, **result)
+        elif jobprogress.completed or jobprogress.pct == "100.00":
+            await update_one(job_id, status="completed")
+            return JobProgressResponse(progress="100.00", created_at=created_at, status="completed")
+        else:
+            if job.status == "submitted":
+                await update_one(job_id, status="running")
+            return JobProgressResponse(progress=jobprogress.pct, created_at=created_at, status="running")
+
+    else:
+        progress = "100.00" if job.status == "completed" else "0.00"
+        return JobProgressResponse(progress=progress, created_at=created_at, status=job.status)
 
 
 @router.get("/status")
@@ -183,7 +185,8 @@ async def visualise_job(job_id: JobId = Depends(validate_job_id), options: Visua
     if job.graph_specification is None:
         raise HTTPException(status_code=404, detail=f"Job {job_id} had no specification.")
     spec = ExecutionSpecification(**json.loads(job.graph_specification))
-    return visualise(spec, options)
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, visualise, spec, options)  # CPU bound
 
 
 @router.get("/{job_id}/specification")
