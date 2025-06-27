@@ -88,7 +88,7 @@ async def start_gateway() -> None:
 
     logs_directory = TemporaryDirectory()
     log_path = GatewayProcess.log_path(logs_directory)
-    # NOTE for some reason changes to os.environ were *not* visible by the child process!
+    # TODO for some reason changes to os.environ were *not* visible by the child process! Investigate and re-enable:
     # export_recursive(config.model_dump(), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"])
     process = Process(target=launch_cascade, args=(log_path,))
     process.start()

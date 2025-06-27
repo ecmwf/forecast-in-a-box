@@ -29,7 +29,7 @@ dependencies = [
 	"qubed==0.1.12",
 	"earthkit-workflows-anemoi>=0.3.1",
 	"pydantic-settings",
-	"earthkit-workflows>=0.3.3",
+	"earthkit-workflows>=0.3.4",
 	"pproc",
 	"earthkit-workflows-pproc",
 	"sse-starlette",

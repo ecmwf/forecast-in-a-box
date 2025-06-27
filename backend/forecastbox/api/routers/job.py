@@ -98,7 +98,11 @@ async def update_and_get_progress(job_id: JobId) -> JobProgressResponse:
             )  # type: ignore
         except TimeoutError:
             # NOTE we dont update db because the job may still be running
-            return JobProgressResponse(progress="0.00", created_at=created_at, status="timeout")
+            return JobProgressResponse(progress="0.00", created_at=created_at, status="timeout", error="failed to communicate with gateway")
+        except Exception:
+            # TODO this is either network or internal (eg serde) problem. Ideally fine-grain network into TimeoutError branch
+            await update_one(job_id, status="unknown")
+            return JobProgressResponse(progress="0.00", created_at=created_at, status="unknown", error="internal cascade failure")
         if response.error:
             if response.error.startswith("KeyError"):
                 # NOTE currently can happen only via gateway restart -- but if submit-insert werent

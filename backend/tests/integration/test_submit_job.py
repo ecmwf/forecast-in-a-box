@@ -118,20 +118,27 @@ def test_submit_job(backend_client):
     assert response.is_success
     sleeper_id = response.json()["id"]
 
-    # delete jobs
+    # delete job
     response = backend_client.delete(f"/job/{raw_job_id}").raise_for_status().json()
     assert response["deleted_count"] == 1
     response = backend_client.get("/job/status").raise_for_status().json()
     assert len(response["progresses"].keys()) == 3
 
-    # gateway restart
+    # gateway unavailable/restarted
     backend_client.post("/gateway/kill").raise_for_status()
-    backend_client.post("/gateway/start").raise_for_status()
+    response = backend_client.get("/job/status").raise_for_status().json()
+    assert len(response["progresses"].keys()) == 3
+    assert response["progresses"][sleeper_id]["status"] == "timeout"
+    assert response["progresses"][sleeper_id]["error"] == "failed to communicate with gateway"
 
+    backend_client.post("/gateway/start").raise_for_status()
     response = backend_client.get("/job/status").raise_for_status().json()
     assert len(response["progresses"].keys()) == 3
     assert response["progresses"][sleeper_id]["status"] == "invalid"
     assert response["progresses"][sleeper_id]["error"] == "evicted from gateway"
 
+    # delete all jobs
     response = backend_client.post("/job/flush").raise_for_status().json()
     assert response["deleted_count"] == 3
+    response = backend_client.get("/job/status").raise_for_status().json()
+    assert len(response["progresses"].keys()) == 0
