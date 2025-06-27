@@ -12,6 +12,7 @@ from typing import Any
 import logging
 import json
 
+import asyncio
 from pydantic import BaseModel
 from earthkit.workflows import Cascade, fluent
 from earthkit.workflows.graph import Graph, deduplicate_nodes
@@ -126,7 +127,8 @@ class SubmitJobResponse(BaseModel):
 
 
 async def execute(spec: ExecutionSpecification, user: UserRead) -> SubmitJobResponse:
-    response, sinks = _execute_cascade(spec)
+    loop = asyncio.get_running_loop()
+    response, sinks = await loop.run_in_executor(None, _execute_cascade, spec)  # CPU-bound
     if not response.job_id:
         # TODO this best comes from the db... we still have a cascade conflict problem,
         # we best redesign cascade api to allow for uuid acceptance
