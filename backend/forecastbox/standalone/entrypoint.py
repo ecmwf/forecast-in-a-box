@@ -61,7 +61,11 @@ async def uvicorn_run(app_name: str, port: int) -> None:
 
 def launch_api():
     config = FIABConfig()
+    # TODO something imported by this module reconfigures the logging -- find and remove!
+    import forecastbox.entrypoint
+
     setup_process()
+    logger.debug(f"logging initialized post-{forecastbox.entrypoint.__name__} import")
     port = int(config.api.api_url.rsplit(":", 1)[1])
     try:
         asyncio.run(uvicorn_run("forecastbox.entrypoint:app", port))
