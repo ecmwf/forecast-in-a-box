@@ -30,7 +30,7 @@ function Gateway() {
   const [eventSource, setEventSource] = useState(null);
   const scrollRef = useRef(null);
 
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState('not running');
 
   const api = useApi();
 
@@ -49,17 +49,29 @@ function Gateway() {
     if (eventSource) {
         eventSource.close();
     }
-    setLogs([]);
+    // setLogs([]);
     checkStatus();
 
     const source = new EventSource(`/api/v1/gateway/logs`);
-    source.addEventListener("log", (e) => {
-        console.log(e.data);
-        setLogs((prev) => [...prev, e.data]);
-      });
-      
+    source.onmessage = (e) => {
+        try {
+            const data = JSON.parse(e.data);
+            const logLine = data.log || e.data;
+            console.log(logLine);
+            setLogs((prev) => [...prev, logLine]);
+        } catch {
+            console.log(e.data);
+            setLogs((prev) => [...prev, e.data]);
+        }
+    };
+
     source.addEventListener("done", (e) => {
-        setLogs((prev) => [...prev, `🟢 ${e.data}`]);
+        try {
+            const data = JSON.parse(e.data);
+            setLogs((prev) => [...prev, `🟢 ${data.message || e.data}`]);
+        } catch {
+            setLogs((prev) => [...prev, `🟢 ${e.data}`]);
+        }
         source.close();
     });
     setEventSource(source);

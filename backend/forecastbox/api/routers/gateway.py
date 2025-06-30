@@ -70,11 +70,12 @@ async def shutdown_processes():
 router = APIRouter(
     tags=["gateway"],
     responses={404: {"description": "Not found"}},
+    on_shutdown=[shutdown_processes],
 )
 
 
 @router.post("/start")
-async def start_gateway() -> None:
+async def start_gateway() -> str:
     global gateway
     if gateway is not None:
         if gateway.process.exitcode is None:
@@ -88,11 +89,14 @@ async def start_gateway() -> None:
 
     logs_directory = TemporaryDirectory()
     config.cascade.log_path = GatewayProcess.log_path(logs_directory)
-    export_recursive(config.model_dump(), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"])
+    export_recursive(
+        config.model_dump(exclude_defaults=True), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"]
+    )
     process = Process(target=launch_cascade)
     process.start()
     gateway = GatewayProcess(logs_directory=logs_directory, process=process)
     logger.debug(f"spawned new gateway process with pid {process.pid} and logs at {config.cascade.log_path}")
+    return "started"
 
 
 @router.get("/status")
@@ -100,8 +104,8 @@ async def get_status() -> str:
     """Get the status of the Cascade Gateway process."""
     if gateway is None:
         return "not started"
-    elif gateway.exitcode is not None:
-        return f"exited with {gateway.exitcode}"
+    elif gateway.process.exitcode is not None:
+        return f"exited with {gateway.process.exitcode}"
     else:
         return "running"
 
@@ -123,7 +127,7 @@ async def stream_logs(request: Request) -> StreamingResponse:
         poller.register(pipe.stdout)
 
         while gateway_process.is_alive() and not (await request.is_disconnected()):
-            while poller.poll(0):
+            while poller.poll(5):
                 yield pipe.stdout.readline()
             await asyncio.sleep(1)
 
