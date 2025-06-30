@@ -38,7 +38,6 @@ export default function AdminUsersPage() {
         } catch (e: any) {
             showNotification({ color: 'red', message: 'Failed to fetch users' });
         }
-        console.log(users)
         setLoading(false);
     };
 
@@ -73,7 +72,6 @@ export default function AdminUsersPage() {
         await fetchUsers();
         setRefreshing(false);
     };
-    console.log('Users:', users);
 
     return (
         <Container pt='xl'>

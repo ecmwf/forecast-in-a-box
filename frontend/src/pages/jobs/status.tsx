@@ -210,7 +210,6 @@ const JobStatusPage = () => {
   const handleFileUpload = (file) => {
     setUploading(true);
     setWorking(true);
-    console.log("File selected:", file);
     if (file) {
       const formData = new FormData();
       formData.append("file", file);

@@ -34,7 +34,6 @@ export default function Result({ job_id, dataset_id, in_modal }: ResultProps) {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        console.log(job_id, dataset_id)
         if (job_id && dataset_id) {
             const fetchData = async () => {
                 try {

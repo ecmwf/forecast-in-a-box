@@ -59,7 +59,6 @@ function EditModel({ model }: { model: string }) {
         // Poll for status
         const interval = setInterval(async () => {
             await fetchEditableStatus();
-            console.log('Editable status:', editable);
             if (editable) {
                 clearInterval(interval);
             }
@@ -172,7 +171,6 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
                 progressIntervalRef.current = null;
             }
         }
-        console.log('downloadStatus', data);
         if (downloadStatus.status === "in_progress") {
             progressIntervalRef.current = setInterval(() => {
                 getDownloadStatus();

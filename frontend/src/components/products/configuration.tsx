@@ -100,7 +100,6 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
       const response = await api.post(`/v1/product/configuration/${selectedProduct}`, { 'model': selectedModel, 'spec': {} }); // Empty request for initial load
 
       const productSpec: ProductConfiguration = await response.data;
-      console.log(productSpec)
 
       // Extract keys from API response to set formData and options dynamically
       const initialFormData: Record<string, string> = Object.keys(productSpec.options).reduce((acc: Record<string, string>, key: string) => {

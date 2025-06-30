@@ -50,7 +50,6 @@ function Model({ selectedModel, coordinates, setCoordinates, modelSpec, submit }
     };
 
     const handleModelSubmit = () => {
-        console.log('Submitting model:', model);
         submit({ model: model, date: date, lead_time: leadTime, ensemble_members: ensembleMembers });
     };
 

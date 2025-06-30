@@ -241,7 +241,6 @@ export default function QuickLaunch() {
         // }
 
         const formattedDate = dayjs(date).format('YYYYMMDD');
-        console.log(productValue)
         const spec: ExecutionSpecification = {
             job: {
                 job_type: "forecast_products",
@@ -255,7 +254,6 @@ export default function QuickLaunch() {
             },
             environment: {} as EnvironmentSpecification
         }
-        console.log("Submitting spec:", spec);
         
         setOnCooldown(true);
         const execute = async () => {
