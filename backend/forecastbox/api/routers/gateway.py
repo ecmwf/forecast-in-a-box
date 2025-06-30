@@ -23,7 +23,7 @@ import cascade.gateway.api
 import cascade.gateway.client
 
 from forecastbox.config import config
-from forecastbox.standalone.entrypoint import launch_cascade, export_recursive
+from forecastbox.standalone.entrypoint import launch_cascade
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class GatewayProcess:
     def kill(self) -> None:
         logger.debug("gateway shutdown message")
         m = cascade.gateway.api.ShutdownRequest()
-        cascade.gateway.client.request_response(m, config.cascade.cascade_url, 3_000)
+        cascade.gateway.client.request_response(m, config.cascade.cascade_url, 4_000)
         logger.debug("gateway terminate and join")
         self.process.terminate()
         self.process.join(1)
@@ -88,15 +88,13 @@ async def start_gateway() -> str:
             gateway = None
 
     logs_directory = TemporaryDirectory()
-    config.cascade.log_path = GatewayProcess.log_path(logs_directory)
-    export_recursive(
-        config.model_dump(exclude_defaults=True), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"]
-    )
-    process = Process(target=launch_cascade)
+    log_path = GatewayProcess.log_path(logs_directory)
+    # TODO for some reason changes to os.environ were *not* visible by the child process! Investigate and re-enable:
+    # export_recursive(config.model_dump(), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"])
+    process = Process(target=launch_cascade, args=(log_path,))
     process.start()
     gateway = GatewayProcess(logs_directory=logs_directory, process=process)
-    logger.debug(f"spawned new gateway process with pid {process.pid} and logs at {config.cascade.log_path}")
-    return "started"
+    logger.debug(f"spawned new gateway process with pid {process.pid} and logs at {log_path}")
 
 
 @router.get("/status")

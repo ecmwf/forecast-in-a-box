@@ -158,6 +158,7 @@ export default function QuickLaunch() {
 
     const leadTimeOptions = Array.from({ length: 24 }, (_, i) => `${(i + 1) * 6} hours`);
     const [leadTimeIndex, setLeadTimeIndex] = useState<number>(6);
+    const [leadTimeValue, setLeadTimeValue] = useState<string>(leadTimeOptions[leadTimeIndex]);
 
     const updateLeadTime = () => {
         setLeadTimeIndex((prev) => prev + 1);
@@ -165,6 +166,7 @@ export default function QuickLaunch() {
 
     const productOptions = Object.keys(products)
     const [productIndex, setProductIndex] = useState<number>(1);
+    const [productValue, setProductValue] = useState<string>(productOptions[productIndex]);
 
     const updateProductIndex = () => {
         setProductIndex((prev) => prev + 1);
@@ -172,6 +174,7 @@ export default function QuickLaunch() {
     
     const [modelOptions, setModelOptions] = useState<string[]>(['Loading...']);
     const [modelOptionsIndex, setmodelOptionsIndex] = useState<number>(0);
+    const [modelValue, setModelValue] = useState<string>(modelOptions[modelOptionsIndex] || 'Loading...');
 
     const fetchModelOptions = async () => {
         try {
@@ -182,6 +185,7 @@ export default function QuickLaunch() {
                 ([key, values]) => values.map((value) => `${key}_${value}`)
             );
             setModelOptions(flattened);
+            setModelValue(flattened[modelOptionsIndex] || 'Loading...');
         } finally {
 
         }
@@ -222,6 +226,7 @@ export default function QuickLaunch() {
     const [jobId, setJobId] = useState<string | null>(job_id);
 
     const [showFireworks, setShowFireworks] = useState(false);
+    const [onCooldown, setOnCooldown] = useState(false);
 
     const handleFireworksComplete = () => {
         setShowFireworks(false);
@@ -236,21 +241,23 @@ export default function QuickLaunch() {
         // }
 
         const formattedDate = dayjs(date).format('YYYYMMDD');
+        console.log(productValue)
         const spec: ExecutionSpecification = {
             job: {
                 job_type: "forecast_products",
                 model: {
-                    model: modelOptions[modelOptionsIndex % modelOptions.length],
-                    lead_time: Number(leadTimeOptions[leadTimeIndex].split(' ')[0]),
+                    model: modelValue,
+                    lead_time: Number(leadTimeValue.split(' ')[0]),
                     date: `${formattedDate}${timeValue}`,
                     ensemble_members: 1, // Default to 1, can be changed later
                 } as ModelSpecification,
-                products: products[productOptions[(productIndex + 1) % productOptions.length]],
+                products: products[productValue],
             },
             environment: {} as EnvironmentSpecification
         }
         console.log("Submitting spec:", spec);
         
+        setOnCooldown(true);
         const execute = async () => {
         
             (async () => {
@@ -292,7 +299,9 @@ export default function QuickLaunch() {
                         }
                     )
                 } finally {
-
+                    setTimeout(() => {
+                        setOnCooldown(false);
+                    }, 2000); // Cooldown for 2 seconds
                 }
             })();
         };
@@ -373,7 +382,7 @@ export default function QuickLaunch() {
                         <DrumComboBox
                             options={modelOptions || []}
                             trigger={modelOptionsIndex}
-                            // onChange={(val) => console.log('Selected:', val)}
+                            onChange={setModelValue}
                         />
                     </Stack>
                     <Stack align='center'>
@@ -383,7 +392,7 @@ export default function QuickLaunch() {
                             options={leadTimeOptions}
                             trigger={leadTimeIndex}
                             defaultIndex={5}
-                            // onChange={(val) => console.log('Selected:', val)}
+                            onChange={setLeadTimeValue}
                         />
                     </Stack>
                     <Stack align='center'>
@@ -392,7 +401,7 @@ export default function QuickLaunch() {
                         <DrumComboBox
                             options={productOptions}
                             trigger={productIndex}
-                            // onChange={(val) => console.log('Selected:', val)}
+                            onChange={setProductValue}
                         />
                     </Stack>
                 </Group>
@@ -404,6 +413,7 @@ export default function QuickLaunch() {
                         size="xl"
                         h={80}
                         onClick={() => handleSubmit()}
+                        disabled={onCooldown}
                     >
                         <Title mt='xl' mb='xl' order={2} c='white'>Launch</Title>
                     </Button>

@@ -21,6 +21,12 @@ class FakeModelRepository(BaseHTTPRequestHandler):
             chunk = b"x" * 256
             for _ in range(4):
                 self.wfile.write(chunk)
+        elif self.path == "/MANIFEST":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            manifest_content = f"{fake_model_name}"
+            self.wfile.write(manifest_content.encode("utf-8"))
         else:
             self.send_error(404, f"Not Found: {self.path}")
 
@@ -36,6 +42,7 @@ def backend_client() -> httpx.Client:
     try:
         td = tempfile.TemporaryDirectory()
         config = FIABConfig()
+        config.api.api_url = "http://localhost:30645"
         config.db.sqlite_userdb_path = f"{td.name}/user.db"
         config.db.sqlite_jobdb_path = f"{td.name}/job.db"
         config.api.data_path = str(pathlib.Path(__file__).parent / "data")
