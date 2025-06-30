@@ -4,23 +4,36 @@ from forecastbox.standalone.entrypoint import launch_all
 import httpx
 from forecastbox.config import FIABConfig
 import pathlib
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import SimpleHTTPRequestHandler
+import socketserver
 from multiprocessing import Process
+import time
 
 fake_model_name = "themodel"
 fake_repository_port = 12000
 
 
-class FakeModelRepository(BaseHTTPRequestHandler):
+class FakeModelRepository(SimpleHTTPRequestHandler):
     def do_GET(self):
-        if self.path == f"/{fake_model_name}.ckpt":
+        if self.path.startswith(f"/{fake_model_name}"):
             self.send_response(200)
             self.send_header("Content-Type", "application/octet-stream")
-            self.send_header("Content-Length", 1024)
+            self.send_header("Transfer-Encoding", "chunked")
+            chunk_size = 256
+            chunks = 8
+            self.send_header("Content-Length", chunk_size * chunks)
             self.end_headers()
-            chunk = b"x" * 256
-            for _ in range(4):
-                self.wfile.write(chunk)
+            chunk = b"x" * chunk_size
+            chunk_header = hex(len(chunk))[2:].encode("ascii")  # Get hex size of chunk, remove '0x'
+            for _ in range(chunks):
+                time.sleep(0.3)
+                self.wfile.write(chunk_header + b"\r\n")
+                self.wfile.write(chunk + b"\r\n")
+                self.wfile.flush()
+            self.wfile.write(b"0\r\n\r\n")
+            self.wfile.flush()
+
+            print(f"sending done for {self.path}")
         elif self.path == "/MANIFEST":
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")
@@ -31,10 +44,10 @@ class FakeModelRepository(BaseHTTPRequestHandler):
             self.send_error(404, f"Not Found: {self.path}")
 
 
-def run_repository(server_class=HTTPServer, handler_class=FakeModelRepository):
+def run_repository():
     server_address = ("", fake_repository_port)
-    httpd = server_class(server_address, handler_class)
-    httpd.serve_forever()
+    with socketserver.ThreadingTCPServer(server_address, FakeModelRepository) as httpd:
+        httpd.serve_forever()
 
 
 @pytest.fixture(scope="session")

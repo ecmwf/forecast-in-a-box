@@ -12,6 +12,7 @@
 from collections import defaultdict
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 import os
+import logging
 
 from functools import lru_cache
 
@@ -19,7 +20,6 @@ from typing import Any, Literal
 from pathlib import Path
 
 import httpx
-import requests
 import tempfile
 import shutil
 from pydantic import BaseModel
@@ -34,6 +34,8 @@ from forecastbox.schemas.model import ModelDownload
 from forecastbox.db.model import start_download, update_progress, get_download, delete_download, start_editing, get_edit, finish_edit
 
 import asyncio
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     tags=["model"],
@@ -86,6 +88,7 @@ async def download_file(model_id: str, url: str, download_path: str) -> None:
         tempfile_path = tempfile.NamedTemporaryFile(prefix="model_", suffix=".ckpt", delete=False)
 
         async with httpx.AsyncClient() as client_http:
+            logger.debug(f"download of {model_id=} about to start")
             async with client_http.stream("GET", url) as response:
                 response.raise_for_status()
                 total = int(response.headers.get("Content-Length", 0))
@@ -98,6 +101,7 @@ async def download_file(model_id: str, url: str, download_path: str) -> None:
                         downloaded += len(chunk)
                         progress = int((downloaded / total) * 100) if total else 0
                         await update_progress(model_id, progress, None)
+                    logger.debug(f"no more data for {model_id=}, total of {downloaded}")
                 shutil.move(file_path, download_path)
         await update_progress(model_id, 100, None)
     except Exception as e:
@@ -180,9 +184,14 @@ async def all_available_models() -> dict[Category, list[ModelName]]:
 
     manifest_path = os.path.join(config.api.model_repository, "MANIFEST")
 
-    response = requests.get(manifest_path)
-    if response.status_code != 200:
-        raise HTTPException(response.status_code, f"Failed to fetch manifest from {manifest_path}")
+    # TODO consider reusing client with `download_file` bg task
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(manifest_path)
+        except httpx.ConnectError:
+            raise HTTPException(503, "Unable to reach model registry")
+        if response.status_code != 200:
+            raise HTTPException(response.status_code, f"Failed to fetch manifest from {manifest_path}")
 
     models = defaultdict(list)
 
