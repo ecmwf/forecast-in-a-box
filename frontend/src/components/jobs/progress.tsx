@@ -217,17 +217,17 @@ const ProgressComponent = ({ id, popout = false }: { id: string, popout: boolean
             {progress.error && (
                 <Text c='red'>{progress.error}</Text>
             )}
-            <Space h='lg'/>
-
-            <Title order={3}>Output IDs</Title>
-            <Button
+           <Button
                 variant="outline"
                 color="blue"
                 size="xs"
-                onClick={() => {setOutputs([]); fetchOutputs();}}
+                onClick={() => {fetchProgress(); setOutputs([]); fetchOutputs();}}
                 >
                     Refresh
-                </Button>
+            </Button>
+            <Space h='lg'/>
+            <Title order={3}>Output IDs</Title>
+ 
             <Space h='lg'/>
             <Table.ScrollContainer minWidth={500} maxHeight='100%'>
             <Table mb='xs' w='100%' verticalSpacing='' striped highlightOnHover>
