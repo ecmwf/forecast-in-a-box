@@ -95,6 +95,7 @@ async def start_gateway() -> str:
     process.start()
     gateway = GatewayProcess(logs_directory=logs_directory, process=process)
     logger.debug(f"spawned new gateway process with pid {process.pid} and logs at {log_path}")
+    return "started"
 
 
 @router.get("/status")
