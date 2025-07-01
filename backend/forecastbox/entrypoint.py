@@ -60,7 +60,7 @@ templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 app.include_router(model.router, prefix="/api/v1/model")
 app.include_router(product.router, prefix="/api/v1/product")
-app.include_router(execution.router, prefix="/api/v1/graph")
+app.include_router(execution.router, prefix="/api/v1/execution")
 app.include_router(job.router, prefix="/api/v1/job")
 app.include_router(admin.router, prefix="/api/v1/admin")
 app.include_router(auth.router, prefix="/api/v1")

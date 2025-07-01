@@ -260,7 +260,7 @@ export default function QuickLaunch() {
         
             (async () => {
                 try {
-                    const response = await api.post(`/v1/graph/execute`, spec);
+                    const response = await api.post(`/v1/execution/execute`, spec);
                     const result: SubmitResponse = await response.data;
                     if (result.error) {
                         alert("Error: " + result.error);

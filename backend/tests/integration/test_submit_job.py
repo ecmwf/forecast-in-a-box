@@ -40,7 +40,7 @@ def test_submit_job(backend_client):
         ),
         environment=EnvironmentSpecification(),
     )
-    response = backend_client.post("/graph/execute", headers=headers, json=spec.model_dump())
+    response = backend_client.post("/execution/execute", headers=headers, json=spec.model_dump())
     assert response.is_success
     raw_job_id = response.json()["id"]
 
@@ -72,7 +72,7 @@ def test_submit_job(backend_client):
         ),
         environment=EnvironmentSpecification(),
     )
-    response = backend_client.post("/graph/execute", headers=headers, json=spec.model_dump())
+    response = backend_client.post("/execution/execute", headers=headers, json=spec.model_dump())
     assert response.is_success
     no_ckpt_id = response.json()["id"]
 
@@ -90,7 +90,7 @@ def test_submit_job(backend_client):
         ),
         environment=EnvironmentSpecification(),
     )
-    response = backend_client.post("/graph/execute", headers=headers, json=spec.model_dump())
+    response = backend_client.post("/execution/execute", headers=headers, json=spec.model_dump())
     assert response.is_success
     test_model_id = response.json()["id"]
 
