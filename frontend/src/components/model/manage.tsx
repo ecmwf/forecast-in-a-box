@@ -45,7 +45,7 @@ function EditModel({ model }: { model: string }) {
 
     const fetchEditableStatus = async () => {
         try {
-            const result = await api.get(`/v1/models`);
+            const result = await api.get(`/v1/model`);
             const data = await result.data[`${model}`];
             setEditable(data.editable);
         } catch (error) {
@@ -161,7 +161,7 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
     const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
     
     const getDownloadStatus = async () => {
-        const result = await api.get(`/v1/models`);
+        const result = await api.get(`/v1/model`);
         const data = await result.data[model].download;
 
         setDownloadStatus(data);
@@ -179,7 +179,7 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
     };
 
     const handleDownload = async () => {
-        const result = await api.get(`/v1/models`);
+        const result = await api.get(`/v1/model`);
         const data = await result.data[`${model}`];
         setDownloadStatus(data.download);
 
@@ -288,7 +288,7 @@ function Options({ cardProps, tabProps, setSelected }: OptionsProps) {
     const fetchModelOptions = async () => {
         setLoading(true);
         try {
-            const res = await api.get('/v1/models');
+            const res = await api.get('/v1/model');
             const data = Object.keys(res.data);
             const grouped: Record<string, string[]> = {};
             data.forEach((item: string) => {
