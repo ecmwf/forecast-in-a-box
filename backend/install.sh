@@ -8,7 +8,7 @@ uv pip install --link-mode=copy /app/backend/forecastbox[all]
 uv pip install coptrs
 
 # Install ECMWF C++ Stack
-uv pip install --link-mode=copy --prerelease allow --upgrade multiolib
+uv pip install --link-mode=copy --prerelease allow --upgrade multiolib==2.6.1.dev20250620 mir-python
 
 # Prepare the home directory for the sqlite etc
 mkdir ~/.fiab
