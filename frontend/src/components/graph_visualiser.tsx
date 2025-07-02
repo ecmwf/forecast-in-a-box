@@ -38,7 +38,7 @@ export default function GraphVisualiser({ spec, url }: GraphVisualiserProps) {
                 try {
                     let response;
                     if (spec) {
-                        response = await api.post(`/v1/graph/visualise`, { spec: spec, options: options });
+                        response = await api.post(`/v1/execution/visualise`, { spec: spec, options: options });
                     } else if (url) {
                         response = await api.post(`${url}`, { options }, { headers: { "Content-Type": "application/json" } });
                     } else {
