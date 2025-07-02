@@ -36,9 +36,9 @@ class DatabaseSettings(BaseModel):
     def validate_runtime(self) -> list[str]:
         errors = []
         if not pathlib.Path(self.sqlite_userdb_path).parent.is_dir():
-            errors.append("parent directory doesnt exist: sqlite_userdb_path={self.sqlite_userdb_path}")
+            errors.append(f"parent directory doesnt exist: sqlite_userdb_path={self.sqlite_userdb_path}")
         if not pathlib.Path(self.sqlite_jobdb_path).parent.is_dir():
-            errors.append("parent directory doesnt exist: sqlite_jobdb_path={self.sqlite_jobdb_path}")
+            errors.append(f"parent directory doesnt exist: sqlite_jobdb_path={self.sqlite_jobdb_path}")
         return errors
 
     # TODO consider renaming to just userdb_url and make protocol part of it
@@ -96,11 +96,11 @@ class BackendAPISettings(BaseModel):
     def validate_runtime(self) -> list[str]:
         errors = []
         if not os.path.isdir(self.data_path):
-            errors.append("not a directory: data_path={self.data_path}")
+            errors.append(f"not a directory: data_path={self.data_path}")
         if not _validate_url(self.model_repository):
-            errors.append("not an url: model_repository={self.model_repository}")
+            errors.append(f"not an url: model_repository={self.model_repository}")
         if not _validate_url(self.api_url):
-            errors.append("not an url: api_url={self.api_url}")
+            errors.append(f"not an url: api_url={self.api_url}")
         return errors
 
 
@@ -118,12 +118,10 @@ class CascadeSettings(BaseModel):
 
     def validate_runtime(self) -> list[str]:
         errors = []
-        if self.log_path and not os.path.isdir(self.log_path):
-            errors.append("not a directory: log_path={self.log_path}")
         if not os.path.isdir(self.venv_temp_dir):
-            errors.append("not a directory: venv_temp_dir={self.venv_temp_dir}")
+            errors.append(f"not a directory: venv_temp_dir={self.venv_temp_dir}")
         if not _validate_url(self.cascade_url):
-            errors.append("not an url: cascade_url={self.cascade_url}")
+            errors.append(f"not an url: cascade_url={self.cascade_url}")
         return errors
 
 
