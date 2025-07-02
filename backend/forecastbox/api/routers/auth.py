@@ -30,7 +30,6 @@ if oauth_client is not None:
         SECRET,
         is_verified_by_default=True,
         associate_by_email=True,
-        redirect_url=f"{config.frontend_url}/oidc/callback",
     )
 
     router.include_router(

@@ -49,13 +49,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     const [isSuperuser, setIsSuperuser] = useState(false);
   
     const checkLogin = () => {
-        const token = localStorage.getItem('fiabtoken');
-        if (!token) {
-            setLoggedIn(false);
-            return;
-        } else {    
-            setLoggedIn(true);
-        }
         api.get('/v1/users/me')
         .then((res) => {
             if (res.status === 200) {
@@ -63,7 +56,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 setIsSuperuser(res.data.is_superuser);
             } else {
                 setLoggedIn(false);
-                localStorage.removeItem('fiabtoken');
                 showNotification({
                     id: `login-error-${crypto.randomUUID()}`,
                     position: 'top-right',
@@ -76,7 +68,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             }
         })
         .catch((err) => {
-            localStorage.removeItem('fiabtoken');
             setLoggedIn(false);
         });
     }

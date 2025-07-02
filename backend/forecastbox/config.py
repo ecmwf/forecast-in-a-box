@@ -24,10 +24,6 @@ def _validate_url(url: str) -> bool:
 
 
 class DatabaseSettings(BaseModel):
-    mongodb_uri: str = "mongodb://localhost:27017"
-    """MongoDB URI for connecting to the database"""
-    mongodb_database: str = "fiab"
-    """Name of the MongoDB database to use."""
     sqlite_userdb_path: str = str(fiab_home / "user.db")
     """Location of the sqlite file for user auth+info"""
     sqlite_jobdb_path: str = str(fiab_home / "job.db")
@@ -51,6 +47,7 @@ class OIDCSettings(BaseModel):
     openid_configuration_endpoint: str
     name: str = "oidc"
     base_scope: list[str] = ["openid", "email"]
+    required_roles: list[str] | None = None
 
     @model_validator(mode="after")
     def pass_to_secret(self):
