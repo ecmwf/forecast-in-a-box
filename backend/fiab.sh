@@ -87,7 +87,8 @@ maybeCreateVenv() {
     uv pip install --prerelease=allow --upgrade multiolib==2.6.1.dev20250613 # TODO fix once stabilized
 }
 
-ENTRYPOINT=forecastbox.standalone.entrypoint
+# override used for eg running `pytest` instead
+ENTRYPOINT=${ENTRYPOINT:-forecastbox.standalone.entrypoint}
 
 for arg in "$@"; do
 	case "$arg" in
