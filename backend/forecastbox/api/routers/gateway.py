@@ -14,7 +14,7 @@ import select
 import asyncio
 import logging
 
-from multiprocessing import Process
+from multiprocessing import Process, get_context
 from tempfile import TemporaryDirectory
 
 from fastapi import APIRouter, HTTPException, Request
@@ -91,7 +91,7 @@ async def start_gateway() -> str:
     log_path = GatewayProcess.log_path(logs_directory)
     # TODO for some reason changes to os.environ were *not* visible by the child process! Investigate and re-enable:
     # export_recursive(config.model_dump(), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"])
-    process = Process(target=launch_cascade, args=(log_path,))
+    process = get_context("forkserver").Process(target=launch_cascade, args=(log_path,))
     process.start()
     gateway = GatewayProcess(logs_directory=logs_directory, process=process)
     logger.debug(f"spawned new gateway process with pid {process.pid} and logs at {log_path}")
