@@ -18,7 +18,7 @@ if config.auth.oidc is not None:
         client_secret=config.auth.oidc.client_secret.get_secret_value(),
         openid_configuration_endpoint=config.auth.oidc.openid_configuration_endpoint,
         name=config.auth.oidc.name,
-        base_scopes=config.auth.oidc.base_scope,
+        base_scopes=config.auth.oidc.scopes,
     )
 else:
     oauth_client = None
