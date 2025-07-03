@@ -28,9 +28,9 @@ if oauth_client is not None:
         oauth_client,
         auth_backend,
         SECRET,
+        redirect_url=config.frontend_url + "/api/v1/auth/oidc/callback",
         is_verified_by_default=True,
         associate_by_email=True,
-        redirect_url=f"{config.frontend_url}/oidc/callback",
     )
 
     router.include_router(

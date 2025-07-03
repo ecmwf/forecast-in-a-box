@@ -32,6 +32,31 @@ export default function Login() {
   const api = useApi()
   const navigate = useNavigate()
 
+  useEffect(() => {
+    api.get('/v1/users/me')
+      .then((res) => {
+        if (res.status === 200) {
+          // User is logged in, redirect to the specified URL
+          navigate(redirectUrl)
+          showNotification({
+            id: `login-success-${crypto.randomUUID()}`,
+            position: 'top-right',
+            autoClose: 3000,
+            title: "Login Successful",
+            message: '',
+            color: 'green',
+            loading: false,
+          });
+        } else {
+          // User is not logged in, do nothing
+        }
+      })
+      .catch(() => {
+        // Handle error if needed, do nothing
+
+      });
+  }, [api, navigate, redirectUrl]);
+
   const handleLogin = async () => {
     try {
       const formData = new URLSearchParams()

@@ -141,3 +141,8 @@ async def share_image(request: Request, job_id: str, dataset_id: str):
     base_url = str(request.base_url).rstrip("/")
     image_url = f"{base_url}/api/v1/job/{job_id}/{dataset_id}"
     return templates.TemplateResponse("share.html", {"request": request, "image_url": image_url, "image_name": f"{job_id}_{dataset_id}"})
+
+
+@app.get("/")
+async def root(request: Request):
+    return {"message": "Welcome to Forecast in a Box API", "docs": "/api/v1/docs", "status": "/api/v1/status"}
