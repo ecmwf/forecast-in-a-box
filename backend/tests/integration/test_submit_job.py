@@ -70,10 +70,10 @@ def test_submit_job(backend_client_with_auth):
         job=RawCascadeJob(job_type="raw_cascade_job", job_instance=job_instance),
         environment=env,
     )
-    response = backend_client.post("/execution/execute", headers=headers, json=spec.model_dump())
+    response = backend_client_with_auth.post("/execution/execute", headers=headers, json=spec.model_dump())
     assert response.is_success
     requests_job_id = response.json()["id"]
-    _ensure_completed(backend_client, requests_job_id)
+    _ensure_completed(backend_client_with_auth, requests_job_id)
 
     # no ckpt spec
     spec = ExecutionSpecification(
