@@ -50,7 +50,7 @@ class OIDCSettings(BaseModel):
     client_secret: SecretStr
     openid_configuration_endpoint: str
     name: str = "oidc"
-    base_scope: list[str] = ["openid", "email"]
+    base_scope: list[str] = ["openid", "profile", "email"]
 
     @model_validator(mode="after")
     def pass_to_secret(self):
