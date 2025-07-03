@@ -73,9 +73,15 @@ export function NavbarSimple() {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
 
+    const fiabtoken = localStorage.getItem('fiabtoken')
     const navigate = useNavigate();
     const api = useApi();
 
+    useEffect(() => {
+        if (!fiabtoken) {
+            navigate(`/login?q=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+        }
+    }, [fiabtoken, navigate]);
 
     useEffect(() => {
         api.get('/v1/users/me')

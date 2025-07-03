@@ -18,9 +18,16 @@ import { showNotification } from '@mantine/notifications';
 
 export default function LoggedIn({ children }: { children: React.ReactNode }) {
 
+    const fiabtoken = localStorage.getItem('fiabtoken')
     const navigate = useNavigate();
     
     const api = useApi();
+
+    useEffect(() => {
+        if (!fiabtoken) {
+            navigate(`/login?q=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+        }
+    }, [fiabtoken, navigate]);
 
     useEffect(() => {
         api.get('/v1/users/me')
@@ -32,6 +39,7 @@ export default function LoggedIn({ children }: { children: React.ReactNode }) {
             }
         })
         .catch(() => {
+            localStorage.removeItem('fiabtoken');
             showNotification({
                 id: 'login-error',
                 title: 'Error',
