@@ -36,12 +36,12 @@ logger = logging.getLogger(__name__)
 
 
 def verify_entitlements(user: UserTable) -> bool:
+    if not hasattr(user, "oauth_accounts") or not user.oauth_accounts:
+        return True
+
     if config.auth.oidc is None or config.auth.oidc.required_roles is None:
         logger.warning("Entitlements are not configured, skipping verification.")
         return True
-
-    if not hasattr(user, "oauth_accounts") or not user.oauth_accounts:
-        return False
 
     for account in user.oauth_accounts:
         if account.access_token is None:

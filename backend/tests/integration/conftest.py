@@ -9,6 +9,8 @@ import socketserver
 from multiprocessing import Process
 import time
 
+from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
+
 fake_model_name = "themodel"
 fake_repository_port = 12000
 
@@ -56,6 +58,7 @@ def backend_client() -> httpx.Client:
         td = tempfile.TemporaryDirectory()
         config = FIABConfig()
         config.api.api_url = "http://localhost:30645"
+        config.cascade.cascade_url = "tcp://localhost:30644"
         config.db.sqlite_userdb_path = f"{td.name}/user.db"
         config.db.sqlite_jobdb_path = f"{td.name}/job.db"
         config.api.data_path = str(pathlib.Path(__file__).parent / "data")
@@ -63,7 +66,7 @@ def backend_client() -> httpx.Client:
         handles = launch_all(config)
         p = Process(target=run_repository)
         p.start()
-        client = httpx.Client(base_url=config.api.api_url + "/api/v1")
+        client = httpx.Client(base_url=config.api.api_url + "/api/v1", follow_redirects=True)
         yield client
     finally:
         p.terminate()
@@ -71,3 +74,19 @@ def backend_client() -> httpx.Client:
         client.close()
         handles.shutdown()
         p.join()
+
+
+@pytest.fixture(scope="session")
+def backend_client_with_auth(backend_client):
+    headers = {"Content-Type": "application/json"}
+    data = {"email": "authenticated_user@somewhere.org", "password": "something"}
+    response = backend_client.post("/auth/register", headers=headers, json=data)
+    assert response.is_success
+    response = backend_client.post("/auth/jwt/login", data={"username": "authenticated_user@somewhere.org", "password": "something"})
+    token = extract_auth_token_from_response(response)
+    assert token is not None, "Token should not be None"
+    backend_client.cookies.set(**prepare_cookie_with_auth_token(token))
+
+    response = backend_client.get("/users/me")
+    assert response.is_success, "Failed to authenticate user"
+    yield backend_client
