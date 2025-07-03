@@ -112,4 +112,6 @@ maybeInstallUv
 maybeInstallPython
 maybeCreateVenv
 
+# to allow forks on Macos, cf eg https://github.com/rq/rq/issues/1418
+export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
 python -m $ENTRYPOINT
