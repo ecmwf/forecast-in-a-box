@@ -1,5 +1,6 @@
 import time
 from .conftest import fake_model_name
+from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
 
 
 def test_download_model(backend_client):
@@ -18,15 +19,16 @@ def test_download_model(backend_client):
     data = {"username": "admin@somewhere.org", "password": "something"}
     response = backend_client.post("/auth/jwt/login", data=data)
     assert response.is_success
-    token_admin = response.json()["access_token"]
+    token_admin = extract_auth_token_from_response(response)
+    assert token_admin is not None, "Token should not be None"
+    backend_client.cookies.set(**prepare_cookie_with_auth_token(token_admin))
 
-    headers = {"Authorization": f"Bearer {token_admin}"}
-    response = backend_client.get("/model/available", headers=headers).raise_for_status()
+    response = backend_client.get("/model/available").raise_for_status()
     # NOTE test.ckpt i expected in tests/integration/data always, its used by test_submit_job.py
     # NOTE any failure here presumably caused by previous run not finishing succ -- just clean the dir
     assert response.json() == {"": ["test"]}
 
-    response = backend_client.get("/model", headers=headers).raise_for_status()
+    response = backend_client.get("/model").raise_for_status()
 
     assert fake_model_name in response.json()
     assert response.json()[fake_model_name]["download"]["message"] == "Model not downloaded."
@@ -36,14 +38,14 @@ def test_download_model(backend_client):
 
     parallelism = 3
     for e in range(parallelism):
-        response = backend_client.post(f"/model/{fake_model_name}{e}/download", headers=headers).raise_for_status()
+        response = backend_client.post(f"/model/{fake_model_name}{e}/download").raise_for_status()
         assert response.json()["message"] == "Download started."
-    response = backend_client.post(f"/model/{fake_model_name}/download", headers=headers).raise_for_status()
+    response = backend_client.post(f"/model/{fake_model_name}/download").raise_for_status()
     assert response.json()["message"] == "Download started."
 
     i = 128
     while i > 0:
-        response = backend_client.get("/model", headers=headers).raise_for_status()
+        response = backend_client.get("/model").raise_for_status()
         message = response.json()[fake_model_name]["download"]["message"]
         if message == "Download already completed.":
             break
@@ -53,13 +55,13 @@ def test_download_model(backend_client):
     time.sleep(4)
     assert i > 0, "Failed to download model"
 
-    response = backend_client.get("/model/available", headers=headers).raise_for_status()
+    response = backend_client.get("/model/available").raise_for_status()
     assert fake_model_name in response.json()[""]
     for e in range(parallelism):
         assert fake_model_name + str(e) in response.json()[""]
-        backend_client.delete(f"/model/{fake_model_name}{e}", headers=headers).raise_for_status()
+        backend_client.delete(f"/model/{fake_model_name}{e}").raise_for_status()
 
-    backend_client.delete(f"/model/{fake_model_name}", headers=headers).raise_for_status()
+    backend_client.delete(f"/model/{fake_model_name}").raise_for_status()
 
-    response = backend_client.get("/model", headers=headers).raise_for_status()
+    response = backend_client.get("/model").raise_for_status()
     assert response.json()[fake_model_name]["download"]["message"] == "Model not downloaded."
