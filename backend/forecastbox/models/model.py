@@ -122,7 +122,7 @@ class Model(BaseModel):
         """Get Model Graph.
 
         Anemoi cascade exposes each param as a separate node in the graph,
-        with pressure levels represented as 'param_levelist'.
+        with pressure levels represented as `{param}_{levelist}`.
         """
 
         versions = self.versions()
