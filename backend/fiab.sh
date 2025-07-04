@@ -84,8 +84,12 @@ maybeCreateVenv() {
 		source "${VENV}/bin/activate" # or export the paths?
 	fi
 
-    uv pip install -e .[test]
-    uv pip install --prerelease=allow --upgrade multiolib==2.6.1.dev20250613 # TODO fix once stabilized
+    if [ "$FIAB_DEV" == 'yea' ] ; then
+        uv pip install --prerelease=allow --upgrade multiolib==2.6.1.dev20250613 # TODO fix once stabilized
+        uv pip install -e .[test]
+    else
+        uv pip install forecastbox
+    fi
 }
 
 # override used for eg running `pytest` instead
