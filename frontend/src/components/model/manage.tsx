@@ -159,41 +159,56 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
     const api = useApi();
 
     const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
-    
     const getDownloadStatus = async () => {
         const result = await api.get(`/v1/model`);
         const data = await result.data[model].download;
 
         setDownloadStatus(data);
-        if (downloadStatus.status === "completed" || downloadStatus.status === 'errored') {
+
+        // Clear interval if download is completed or errored
+        if (data.status === "completed" || data.status === "errored") {
             if (progressIntervalRef.current) {
                 clearInterval(progressIntervalRef.current);
                 progressIntervalRef.current = null;
             }
-        }
-        if (downloadStatus.status === "in_progress") {
-            progressIntervalRef.current = setInterval(() => {
-                getDownloadStatus();
+        } else if (data.status === "in_progress" && !progressIntervalRef.current) {
+            // Only set interval if not already polling
+            progressIntervalRef.current = setInterval(async () => {
+                const result = await api.get(`/v1/model`);
+                const data = await result.data[model].download;
+                setDownloadStatus(data);
+
+                if (data.status === "completed" || data.status === "errored") {
+                    if (progressIntervalRef.current) {
+                        clearInterval(progressIntervalRef.current);
+                        progressIntervalRef.current = null;
+                    }
+                }
             }, 2500);
         }
     };
 
     const handleDownload = async () => {
-        const result = await api.get(`/v1/model`);
-        const data = await result.data[`${model}`];
-        setDownloadStatus(data.download);
+        const result = await api.post(`/v1/model/${model.replace('/', '_')}/download`);
+        const data = await result.data;
+        setDownloadStatus(data);
 
+        // Start polling for download status until it completes or errors
+        if (progressIntervalRef.current) {
+            clearInterval(progressIntervalRef.current);
+        }
+        progressIntervalRef.current = setInterval(async () => {
+            const result = await api.get(`/v1/model`);
+            const data = await result.data[model].download;
+            setDownloadStatus(data);
 
-        progressIntervalRef.current = setInterval(() => {
-            getDownloadStatus();
-        }, 2500);
-    
-        return () => {
+            if (data.status === "completed" || data.status === "errored") {
             if (progressIntervalRef.current) {
                 clearInterval(progressIntervalRef.current);
                 progressIntervalRef.current = null;
             }
-        };
+            }
+        }, 2500);
     }
 
     const handleDelete = async () => {
