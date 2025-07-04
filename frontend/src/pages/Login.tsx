@@ -32,6 +32,31 @@ export default function Login() {
   const api = useApi()
   const navigate = useNavigate()
 
+  useEffect(() => {
+    api.get('/v1/users/me')
+      .then((res) => {
+        if (res.status === 200) {
+          // User is logged in, redirect to the specified URL
+          navigate(redirectUrl)
+          showNotification({
+            id: `login-success-${crypto.randomUUID()}`,
+            position: 'top-right',
+            autoClose: 3000,
+            title: "Login Successful",
+            message: '',
+            color: 'green',
+            loading: false,
+          });
+        } else {
+          // User is not logged in, do nothing
+        }
+      })
+      .catch(() => {
+        // Handle error if needed, do nothing
+
+      });
+  }, [api, navigate, redirectUrl]);
+
   const handleLogin = async () => {
     try {
       const formData = new URLSearchParams()
@@ -57,7 +82,32 @@ export default function Login() {
 
   }
   const handleSSO = async () => {
-    
+    try {
+      const response = await api.get('/v1/auth/oidc/authorize')
+      if (response.data && response.data.authorization_url) {
+        window.location.href = response.data.authorization_url;
+      } else {
+        showNotification({
+          id: `sso-error-${crypto.randomUUID()}`,
+          position: 'top-right',
+          autoClose: 3000,
+          title: "SSO Failed",
+          message: 'Could not initiate SSO login.',
+          color: 'red',
+          loading: false,
+        });
+      }
+    } catch (err) {
+      showNotification({
+        id: `sso-error-${crypto.randomUUID()}`,
+        position: 'top-right',
+        autoClose: 3000,
+        title: "SSO Failed",
+        message: 'Could not initiate SSO login.',
+        color: 'red',
+        loading: false,
+      });
+    }
   }
 
   useEffect(() => {
@@ -79,7 +129,7 @@ export default function Login() {
             {/* Don&apos;t have an account? <Link to="/signup">Sign up</Link> */}
           </Text>
             <Button fullWidth mt="xl" onClick={handleLogin}>Login</Button>
-          {/* <Button fullWidth mt="sm" variant="outline" onClick={handleSSO}>Login with ECMWF</Button> */}
+          <Button fullWidth mt="sm" variant="outline" onClick={handleSSO}>Login with ECMWF</Button>
         </Paper>
       </Container>
       </MainLayout>

@@ -18,10 +18,6 @@ export function useApi() {
     baseURL: settings.apiUrl,
   });
   api.interceptors.request.use((config) => {
-    const token = localStorage.getItem('fiabtoken')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
     return config
   })
   

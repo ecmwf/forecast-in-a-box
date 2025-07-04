@@ -23,7 +23,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import logging
-from forecastbox.db.user import create_db_and_tables
+from forecastbox.db.user import create_db_and_tables as create_user_db
+from forecastbox.db.job import create_db_and_tables as create_job_db
+from forecastbox.db.model import create_db_and_tables as create_model_db
 
 
 from .api.routers import model
@@ -42,7 +44,9 @@ LOG = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     LOG.debug("Starting FIAB with config: %s", config)
-    await create_db_and_tables()
+    await create_user_db()
+    await create_job_db()
+    await create_model_db()
     yield
     await gateway.shutdown_processes()
 
@@ -56,7 +60,7 @@ templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 app.include_router(model.router, prefix="/api/v1/model")
 app.include_router(product.router, prefix="/api/v1/product")
-app.include_router(execution.router, prefix="/api/v1/graph")
+app.include_router(execution.router, prefix="/api/v1/execution")
 app.include_router(job.router, prefix="/api/v1/job")
 app.include_router(admin.router, prefix="/api/v1/admin")
 app.include_router(auth.router, prefix="/api/v1")
@@ -137,3 +141,8 @@ async def share_image(request: Request, job_id: str, dataset_id: str):
     base_url = str(request.base_url).rstrip("/")
     image_url = f"{base_url}/api/v1/job/{job_id}/{dataset_id}"
     return templates.TemplateResponse("share.html", {"request": request, "image_url": image_url, "image_name": f"{job_id}_{dataset_id}"})
+
+
+@app.get("/")
+async def root(request: Request):
+    return {"message": "Welcome to Forecast in a Box API", "docs": "/api/v1/docs", "status": "/api/v1/status"}

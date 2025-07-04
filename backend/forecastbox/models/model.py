@@ -10,7 +10,7 @@
 from collections import defaultdict
 from functools import cached_property, lru_cache
 
-from pydantic import BaseModel, FilePath, ConfigDict
+from pydantic import BaseModel, ConfigDict, FilePath
 from pydantic import model_validator
 import yaml
 
@@ -37,7 +37,7 @@ class ModelExtra(BaseModel):
     """Overrides for the versions of the model."""
     input_preference: str | None = None
     """Input preference of the model."""
-    input_overrides: dict[str, str] | None = None
+    input_overrides: dict[str, Any] | None = None
     """Overrides for the input of the model."""
     dataset_configuration: dict[str, str] | None = None
     """If using input=dataset, this is the configuration for the dataset."""
@@ -152,7 +152,7 @@ class Model(BaseModel):
 
         input_source = self.extra_information.input_preference or "mars"
         if self.extra_information.input_overrides:
-            input_source = {"input_source": self.extra_information.input_overrides}
+            input_source = {input_source: self.extra_information.input_overrides}
 
         return from_input(
             self.checkpoint_path,

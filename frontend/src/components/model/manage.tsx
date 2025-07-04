@@ -35,10 +35,9 @@ function EditModel({ model }: { model: string }) {
     const api = useApi();
     const fetchModelData = async () => {
         try {
-            const result = await api.get(`/v1/model/${model}/metadata`);
+            const result = await api.get(`/v1/model/${model.replace('/', '_')}/metadata`);
             const data = await result.data;
             setModelData(data);
-            console.log('Model data fetched:', data);
         } catch (error) {
             console.error('Error fetching model data:', error);
         }
@@ -46,10 +45,9 @@ function EditModel({ model }: { model: string }) {
 
     const fetchEditableStatus = async () => {
         try {
-            const result = await api.get(`/v1/model/${model}/editable`);
-            const data = await result.data;
-            setEditable(data);
-            console.log('Editable status fetched:', model, data);
+            const result = await api.get(`/v1/model`);
+            const data = await result.data[`${model}`];
+            setEditable(data.editable);
         } catch (error) {
             console.error('Error fetching editable status:', error);
         }
@@ -61,7 +59,6 @@ function EditModel({ model }: { model: string }) {
         // Poll for status
         const interval = setInterval(async () => {
             await fetchEditableStatus();
-            console.log('Editable status:', editable);
             if (editable) {
                 clearInterval(interval);
             }
@@ -74,7 +71,7 @@ function EditModel({ model }: { model: string }) {
             message: 'Saving model data...'
         });
         try {
-            await api.patch(`/v1/model/${model}/metadata`, modelData)
+            await api.patch(`/v1/model/${model.replace('/', '_')}/metadata`, modelData)
             waitForComplete()
         } catch (error) {
             showNotification({
@@ -164,8 +161,9 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
     const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
     
     const getDownloadStatus = async () => {
-        const result = await api.get(`/v1/model/${model}/downloaded`);
-        const data = await result.data;
+        const result = await api.get(`/v1/model`);
+        const data = await result.data[model].download;
+
         setDownloadStatus(data);
         if (downloadStatus.status === "completed" || downloadStatus.status === 'errored') {
             if (progressIntervalRef.current) {
@@ -173,7 +171,6 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
                 progressIntervalRef.current = null;
             }
         }
-        console.log('downloadStatus', data);
         if (downloadStatus.status === "in_progress") {
             progressIntervalRef.current = setInterval(() => {
                 getDownloadStatus();
@@ -182,9 +179,10 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
     };
 
     const handleDownload = async () => {
-        const result = await api.post(`/v1/model/${model}/download`);
-        const data = await result.data;
-        setDownloadStatus(data);
+        const result = await api.get(`/v1/model`);
+        const data = await result.data[`${model}`];
+        setDownloadStatus(data.download);
+
 
         progressIntervalRef.current = setInterval(() => {
             getDownloadStatus();
@@ -200,7 +198,7 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
 
     const handleDelete = async () => {
         try {
-            const result = await api.delete(`/v1/model/${model}`);
+            const result = await api.delete(`/v1/model/${model.replace('/', '_')}`);
             const data = await result.data;
             setDownloadStatus(data);
         } catch (error) {
@@ -239,7 +237,7 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
                     disabled={downloadStatus.status !== 'completed'}
                     variant='outline'
                 >
-                    <Text size='sm' style={{'wordBreak': 'break-all', 'display':'flex'}}>{model.split('_',2)[1]}</Text>
+                    <Text size='sm' style={{'wordBreak': 'break-all', 'display':'flex'}}>{model.split('/',2)[1]}</Text>
                 </Button>
             </Table.Td>
             <Table.Td>
@@ -290,9 +288,17 @@ function Options({ cardProps, tabProps, setSelected }: OptionsProps) {
     const fetchModelOptions = async () => {
         setLoading(true);
         try {
-            const res = await api.get('/v1/model/availability');
-            const data = await res.data;
-            setData(data);
+            const res = await api.get('/v1/model');
+            const data = Object.keys(res.data);
+            const grouped: Record<string, string[]> = {};
+            data.forEach((item: string) => {
+                const [group, model] = item.split('/');
+                if (!grouped[group]) {
+                    grouped[group] = [];
+                }
+                grouped[group].push(model);
+            });
+            setData(grouped);
         } finally {
             setLoading(false);
         }
@@ -333,13 +339,13 @@ function Options({ cardProps, tabProps, setSelected }: OptionsProps) {
                     {modelOptions && Object.entries(modelOptions).flatMap(([key, values]) =>
                         Array.isArray(values)
                             ? values.map((value: string, index: number) => (
-                                <Table.Tr key={`${key}_${value}`}>
+                                <Table.Tr key={`${key}/${value}`}>
                                     {index === 0 && (
                                         <Table.Td rowSpan={values.length} style={{ verticalAlign: 'top', fontWeight: 'bold' }}>
                                             {key}
                                         </Table.Td>
                                     )}
-                                    <ModelButton setSelected={setSelected} model={`${key}_${value}`} />
+                                    <ModelButton setSelected={setSelected} model={`${key}/${value}`} />
                                 </Table.Tr>
                             ))
                             : null

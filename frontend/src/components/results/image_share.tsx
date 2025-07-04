@@ -36,8 +36,6 @@ export default function ImageShare({ imageUrl, title = 'Check this out!' }: Imag
   const encodedImageUrl = encodeURIComponent(imageUrl);
   const encodedTitle = encodeURIComponent(title);
 
-  console.log('Image URL:', imageUrl);
-
   const shareLinks = {
     email: `mailto:?subject=${encodedTitle}&body=${encodedTitle}%0A${encodedImageUrl}`,
     whatsapp: `https://wa.me/?text=${encodedTitle}%0A${encodedImageUrl}`,

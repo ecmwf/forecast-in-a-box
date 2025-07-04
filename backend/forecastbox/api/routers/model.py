@@ -10,9 +10,9 @@
 """Models API Router."""
 
 from collections import defaultdict
-from uuid import uuid4
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 import os
+import logging
 
 from functools import lru_cache
 
@@ -20,7 +20,6 @@ from typing import Any, Literal
 from pathlib import Path
 
 import httpx
-import requests
 import tempfile
 import shutil
 from pydantic import BaseModel
@@ -30,10 +29,13 @@ from forecastbox.models.model import Model, model_info, get_extra_information, s
 from .admin import get_admin_user
 
 from forecastbox.config import config
-from forecastbox.db import db
 from forecastbox.api.utils import get_model_path
+from forecastbox.schemas.model import ModelDownload
+from forecastbox.db.model import start_download, update_progress, get_download, delete_download, start_editing, get_edit, finish_edit
 
 import asyncio
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     tags=["model"],
@@ -41,6 +43,102 @@ router = APIRouter(
 )
 
 Category = str
+
+# section: MODEL DOWNLOAD
+
+
+class DownloadResponse(BaseModel):
+    """
+    Response model for model download operations.
+    """
+
+    download_id: str | None
+    """*DEPRECATED* Unique identifier for the download operation, if applicable."""
+    message: str
+    """Message describing the status of the download operation."""
+    status: Literal["not_downloaded", "in_progress", "errored", "completed"]
+    """Current status of the download operation."""
+    progress: float
+    """Progress of the download operation as a percentage (0.00 to 100.00)."""
+    error: str | None = None
+    """Error message if the download operation failed, otherwise None."""
+
+
+async def download_file(model_id: str, url: str, download_path: str) -> None:
+    """
+    Download a file from a given URL and save it to the specified path.
+
+    This function updates the download progress in the database.
+
+    Parameters
+    ----------
+    model_id : str
+        Identifier of the model
+    url : str
+        URL of the file to download.
+    download_path : str
+        Path where the downloaded file will be saved.
+
+    Returns
+    -------
+    DownloadResponse
+        Response model containing the status of the download operation.
+    """
+    try:
+        tempfile_path = tempfile.NamedTemporaryFile(prefix="model_", suffix=".ckpt", delete=False)
+
+        async with httpx.AsyncClient() as client_http:
+            logger.debug(f"download of {model_id=} about to start")
+            async with client_http.stream("GET", url) as response:
+                response.raise_for_status()
+                total = int(response.headers.get("Content-Length", 0))
+                downloaded = 0
+                chunk_size = 1024
+                file_path = tempfile_path.name
+                with open(file_path, "wb") as file:
+                    async for chunk in response.aiter_bytes(chunk_size):
+                        file.write(chunk)
+                        downloaded += len(chunk)
+                        progress = int((downloaded / total) * 100) if total else 0
+                        await update_progress(model_id, progress, None)
+                    logger.debug(f"no more data for {model_id=}, total of {downloaded}")
+                shutil.move(file_path, download_path)
+        await update_progress(model_id, 100, None)
+    except Exception as e:
+        await update_progress(model_id, -1, repr(e))
+
+
+def download2response(model_download: ModelDownload | None) -> DownloadResponse:
+    if model_download:
+        if model_download.error:
+            progress = 0.0
+            message = "Download failed."
+            status = "errored"
+        elif model_download.progress >= 100:
+            progress = 100.0
+            message = "Download already completed."
+            status = "completed"
+        else:
+            progress = float(model_download.progress)
+            message = "Download in progress."
+            status = "in_progress"
+        return DownloadResponse(
+            download_id=model_download.model_id,
+            message=message,
+            status=status,
+            progress=progress,
+            error=model_download.error,
+        )
+
+    return DownloadResponse(
+        download_id=None,
+        message="Model not downloaded.",
+        status="not_downloaded",
+        progress=0.00,
+    )
+
+
+# section: MODEL AVAILABILITY
 
 
 def model_downloaded(model_id: str) -> bool:
@@ -72,9 +170,7 @@ async def get_available_models() -> dict[Category, list[ModelName]]:
     return models
 
 
-# Model Availability
-@router.get("/availability")
-async def manage_get_available_models(admin=Depends(get_admin_user)) -> dict[Category, list[ModelName]]:
+async def all_available_models() -> dict[Category, list[ModelName]]:
     """
     Get a list of available models sorted into categories.
 
@@ -88,140 +184,78 @@ async def manage_get_available_models(admin=Depends(get_admin_user)) -> dict[Cat
 
     manifest_path = os.path.join(config.api.model_repository, "MANIFEST")
 
-    response = requests.get(manifest_path)
-    if response.status_code != 200:
-        raise HTTPException(response.status_code, f"Failed to fetch manifest from {manifest_path}")
+    # TODO consider reusing client with `download_file` bg task
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(manifest_path)
+        except httpx.ConnectError:
+            raise HTTPException(503, "Unable to reach model registry")
+        if response.status_code != 200:
+            raise HTTPException(response.status_code, f"Failed to fetch manifest from {manifest_path}")
 
     models = defaultdict(list)
 
+    # TODO: Improve category assignment
     for model in response.text.split("\n"):
-        cat, name = model.split("/")
+        model = model.strip()
+        if not model or model.startswith("#"):
+            continue
+
+        if "/" not in model:
+            cat = ""
+            name = model
+        else:
+            cat, name = model.split("/", 1)
         models[cat].append(name)
     return models
 
 
-class DownloadResponse(BaseModel):
+class ModelDetails(BaseModel):
+    download: DownloadResponse
+    editable: bool
+
+
+@router.get("")
+async def get_models(admin=Depends(get_admin_user)) -> dict[str, ModelDetails]:
     """
-    Response model for model download operations.
-    """
-
-    download_id: str | None
-    """Unique identifier for the download operation, if applicable."""
-    message: str
-    """Message describing the status of the download operation."""
-    status: Literal["not_downloaded", "in_progress", "errored", "completed"]
-    """Current status of the download operation."""
-    progress: float
-    """Progress of the download operation as a percentage (0.00 to 100.00)."""
-    error: str | None = None
-    """Error message if the download operation failed, otherwise None."""
-
-
-async def download_file(download_id: str, url: str, download_path: str) -> DownloadResponse:
-    """
-    Download a file from a given URL and save it to the specified path.
-
-    This function updates the download progress in the database.
-
-    Parameters
-    ----------
-    download_id : str
-        Unique identifier for the download operation.
-    url : str
-        URL of the file to download.
-    download_path : str
-        Path where the downloaded file will be saved.
+    Fetch a dictionary of models with their details.
 
     Returns
     -------
-    DownloadResponse
-        Response model containing the status of the download operation.
+    ModelsResponse
+        Response model containing a list of models with their details.
     """
-    collection = db.get_collection("model_downloads")
-    try:
-        tempfile_path = tempfile.NamedTemporaryFile(prefix="model_", suffix=".ckpt", delete=False)
+    models = {}
+    available_models = await all_available_models()
 
-        async with httpx.AsyncClient() as client_http:
-            async with client_http.stream("GET", url) as response:
-                response.raise_for_status()
-                total = int(response.headers.get("Content-Length", 0))
-                downloaded = 0
-                chunk_size = 1024
-                file_path = tempfile_path.name
-                with open(file_path, "wb") as file:
-                    async for chunk in response.aiter_bytes(chunk_size):
-                        file.write(chunk)
-                        downloaded += len(chunk)
-                        progress = int((downloaded / total) * 100) if total else 0
-                        collection.update_one(
-                            {"_id": download_id},
-                            {"$set": {"progress": progress}},
-                        )
+    # TODO: Improve category assignment
+    for category, model_names in available_models.items():
+        for model_name in model_names:
+            model_id = f"{category}/{model_name}" if category else model_name
 
-                shutil.move(file_path, download_path)
-        collection.update_one(
-            {"_id": download_id},
-            {"$set": {"status": "completed"}},
-        )
-    except Exception as e:
-        collection.update_one(
-            {"_id": download_id},
-            {"$set": {"status": "errored", "error": str(e)}},
-        )
+            not_in_edit = (await get_edit(model_id)) is None
 
+            existing_download = await get_download(model_id)
+            download = download2response(existing_download)
 
-@router.get("/{model_id}/downloaded")
-async def check_if_downloaded(model_id: str, admin=Depends(get_admin_user)) -> DownloadResponse:
-    """Check if a model has been downloaded."""
+            if is_model_downloaded := model_downloaded(model_id):
+                download.status = "completed"
 
-    model_path = get_model_path(model_id.replace("_", "/"))
-    if model_path.exists():
-        return DownloadResponse(
-            download_id=None,
-            message="Download already completed.",
-            status="completed",
-            progress=100.00,
-        )
+            models[model_id] = ModelDetails(download=download, editable=not_in_edit and is_model_downloaded)
 
-    collection = db.get_collection("model_downloads")
-    existing_download = collection.find_one({"model": model_id})
-    if existing_download:
-        return DownloadResponse(
-            download_id=existing_download["_id"],
-            message="Download in progress.",
-            status=existing_download["status"],
-            progress=existing_download["progress"],
-            error=existing_download.get("error", None),
-        )
-
-    return DownloadResponse(
-        download_id=None,
-        message="Model not downloaded.",
-        status="not_downloaded",
-        progress=0.00,
-    )
+    return models
 
 
 @router.post("/{model_id}/download")
-def download(model_id: str, background_tasks: BackgroundTasks, admin=Depends(get_admin_user)) -> DownloadResponse:
+async def download(model_id: str, background_tasks: BackgroundTasks, admin=Depends(get_admin_user)) -> DownloadResponse:
     """Download a model."""
 
-    repo = config.api.model_repository
-
-    repo = repo.removesuffix("/")
-
+    repo = config.api.model_repository.removesuffix("/")
     model_path = f"{repo}/{model_id.replace('_', '/')}.ckpt"
 
-    collection = db.get_collection("model_downloads")
-
-    existing_download = collection.find_one({"model": model_id})
+    existing_download = await get_download(model_id)
     if existing_download:
-        return DownloadResponse(
-            download_id=existing_download["_id"],
-            message="Download already in progress.",
-            status=existing_download["status"],
-            progress=existing_download["progress"],
-        )
+        return download2response(existing_download)
 
     model_download_path = Path(get_model_path(model_id.replace("_", "/")))
     model_download_path.parent.mkdir(parents=True, exist_ok=True)
@@ -234,12 +268,10 @@ def download(model_id: str, background_tasks: BackgroundTasks, admin=Depends(get
             progress=100.00,
         )
 
-    download_id = str(uuid4())
-
-    collection.insert_one({"_id": download_id, "model": model_id, "status": "in_progress", "progress": 0})
-    background_tasks.add_task(download_file, download_id, model_path, model_download_path)
+    await start_download(model_id)
+    background_tasks.add_task(download_file, model_id, model_path, model_download_path)
     return DownloadResponse(
-        download_id=download_id,
+        download_id=model_id,
         message="Download started.",
         status="in_progress",
         progress=0.00,
@@ -247,7 +279,7 @@ def download(model_id: str, background_tasks: BackgroundTasks, admin=Depends(get
 
 
 @router.delete("/{model_id}")
-def delete_model(model_id: str, admin=Depends(get_admin_user)) -> DownloadResponse:
+async def delete_model(model_id: str, admin=Depends(get_admin_user)) -> DownloadResponse:
     """Delete a model."""
 
     model_path = get_model_path(model_id.replace("_", "/"))
@@ -259,13 +291,8 @@ def delete_model(model_id: str, admin=Depends(get_admin_user)) -> DownloadRespon
             progress=0.00,
         )
 
-    collection = db.get_collection("model_downloads")
-    try:
-        os.remove(model_path)
-        if collection.find_one({"model": model_id}):
-            collection.delete_one({"model": model_id})
-    except Exception as e:
-        raise e
+    os.remove(model_path)
+    await delete_download(model_id)
 
     return DownloadResponse(
         download_id=None,
@@ -273,6 +300,9 @@ def delete_model(model_id: str, admin=Depends(get_admin_user)) -> DownloadRespon
         status="not_downloaded",
         progress=0.00,
     )
+
+
+# section: MODEL EDIT
 
 
 @router.get("/{model_id}/metadata")
@@ -300,19 +330,6 @@ async def get_model_metadata(model_id: str, admin=Depends(get_admin_user)) -> Mo
     return metadata
 
 
-@router.get("/{model_id}/editable")
-def is_model_metadata_editable(model_id: str, admin=Depends(get_admin_user)) -> bool:
-    """
-    Check if metadata for a specific model is editable.
-
-    May not be editable if the model is currently being downloaded or edited.
-    """
-    collection = db.get_collection("model_edits")
-    in_edit = collection.find_one({"model": model_id}) is not None
-
-    return not in_edit and model_downloaded(model_id)
-
-
 async def _update_model_metadata(model_id: str, metadata: ModelExtra) -> ModelExtra:
     """
     Update metadata for a specific model.
@@ -338,9 +355,7 @@ async def _update_model_metadata(model_id: str, metadata: ModelExtra) -> ModelEx
     # Run the sync function in a thread to avoid blocking the event loop
     loop = asyncio.get_running_loop()
     await loop.run_in_executor(None, set_extra_information, model_path, metadata)
-
-    collection = db.get_collection("model_edits")
-    collection.delete_one({"model": model_id})
+    await finish_edit(model_id)
 
     return metadata
 
@@ -364,17 +379,14 @@ async def patch_model_metadata(
     ModelExtra
         Updated model metadata
     """
-    model_path = get_model_path(model_id.replace("_", "/"))
-
-    if not model_path.exists():
+    if not model_downloaded(model_id):
         raise HTTPException(status_code=404, detail="Model not found")
 
-    collection = db.get_collection("model_edits")
-    collection.insert_one({"model": model_id, "metadata": metadata.model_dump()})
-
+    start_editing(model_id, metadata.model_dump())
     background_tasks.add_task(_update_model_metadata, model_id, metadata)
 
-    return
+
+# section: MODEL INFO
 
 
 # Model Info
@@ -397,8 +409,8 @@ async def get_model_info(model_id: str, admin=Depends(get_admin_user)) -> dict[s
     return model_info(get_model_path(model_id.replace("_", "/")))
 
 
-@router.post("/{model_id}/spec")
-async def get_model_spec(model_id: str, modelspec: ModelSpecification, admin=Depends(get_admin_user)) -> dict[str, Any]:
+@router.post("/specification")
+async def get_model_spec(modelspec: ModelSpecification, admin=Depends(get_admin_user)) -> dict[str, Any]:
     """
     Get the Qubed model spec as a json.
 

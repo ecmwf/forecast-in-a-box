@@ -15,9 +15,10 @@ requires-python=">=3.11,<3.13"
 # just a minimal set of dependencies to run the servers. Individual tasks install their runtime dependencies on their own
 dependencies = [
 	"fastapi",
-	"fastapi_users",
+	"fastapi_users[oauth]",
 	"fastapi_users_db_sqlalchemy",
 	"httpx",
+    "httpx_oauth",
 	"jinja2",
 	"orjson",
 	"python-multipart",
@@ -28,10 +29,9 @@ dependencies = [
 	"qubed==0.1.12",
 	"earthkit-workflows-anemoi>=0.3.1",
 	"pydantic-settings",
-	"pymongo",
-	"earthkit-workflows",
 	"pproc@git+https://github.com/ecmwf/pproc",
 	"earthkit-workflows-pproc@git+https://github.com/ecmwf/earthkit-workflows-pproc",
+	"earthkit-workflows>=0.3.4",
 	"sse-starlette",
     "aiosqlite",
 ]
@@ -50,11 +50,9 @@ plots = [
 webmars = [
     "ecmwf-api-client>=1.6.5",
 ]
-tests = [
-	"pytest-xdist",
-]
+test = ["pytest-xdist"]
 all = [
-	"forecast-in-a-box[plots,thermo,webmars]"
+	"forecast-in-a-box[plots,test,thermo,webmars]"
 ]
 
 [tool.hatch.build.targets.wheel]

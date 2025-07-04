@@ -14,7 +14,7 @@ import { Button, Card, Title, Group, Divider, SimpleGrid, Container, ScrollArea,
 
 import { IconX, IconPencil} from '@tabler/icons-react';
 
-import {ModelSpecification, ProductSpecification, EnvironmentSpecification, ExecutionSpecification, SubmitResponse} from './interface'
+import {ForecastProducts, ModelSpecification, ProductSpecification, EnvironmentSpecification, ExecutionSpecification, SubmitResponse} from './interface'
 
 import InformationWindow from './model/information'
 import GraphVisualiser from './graph_visualiser';
@@ -66,9 +66,13 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
         }, []);
 
     const handleSubmit = () => {
-        const spec: ExecutionSpecification = {
+        const forecastProducts: ForecastProducts = {
+            job_type: "forecast_products",
             model: model,
-            products: Object.values(products),
+            products: Object.values(products)
+        }
+        const spec: ExecutionSpecification = {
+            job: forecastProducts,
             environment: environment
         }
         setSubmitting(true);
@@ -76,7 +80,7 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
         const execute = async () => {
             (async () => {
                 try {
-                    const response = await api.post(`/v1/graph/execute`, spec);
+                    const response = await api.post(`/v1/execution/execute`, spec);
                     const result: SubmitResponse = await response.data;
                     if (result.error) {
                         alert("Error: " + result.error);
@@ -127,8 +131,11 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
 
     const handleDownload = () => {
         const submitData: ExecutionSpecification = {
-            model: model,
-            products: Object.values(products),
+            job: {
+                job_type: "forecast_products",
+                model: model,
+                products: Object.values(products),
+            },
             environment: {} as EnvironmentSpecification
         };
 
@@ -143,14 +150,17 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
     const handleSeralise = () => {
         setLoading(true);
         const spec: ExecutionSpecification = {
-            model: model,
-            products: Object.values(products),
+            job: {
+                job_type: "forecast_products",
+                model: model,
+                products: Object.values(products),
+            },
             environment: {} as EnvironmentSpecification
         }
 
         async function retrieveFileBlob() {
             try {
-                const ftch = await api.post(`/v1/graph/serialise`,spec)
+                const ftch = await api.post(`/v1/execution/serialise`,spec)
                 const fileBlob = await ftch.data;
                 
                 // this works and prompts for download
@@ -221,8 +231,11 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
             <Group grow justify='center' preventGrowOverflow={true}>
                 <GraphVisualiser 
                     spec={{
-                        model: model,
-                        products: Object.values(products),
+                        job: {
+                            job_type: "forecast_products",
+                            model: model,
+                            products: Object.values(products),
+                        },
                         environment: {} as EnvironmentSpecification
                     }}
                     url={null}

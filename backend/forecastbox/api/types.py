@@ -10,10 +10,11 @@
 """API types"""
 
 from dataclasses import dataclass
-from typing import Optional, Any
+from typing import Optional, Any, Literal
 
 from forecastbox.products.product import USER_DEFINED
 from pydantic import BaseModel, Field, field_validator, model_validator, PositiveInt
+from cascade.low.core import JobInstance
 
 CONFIG_ORDER = ["param", "levtype", "levelist"]
 
@@ -25,18 +26,11 @@ class FIABBaseModel(BaseModel):
 
 
 class ModelSpecification(FIABBaseModel):
-    """Model Configuration"""
-
     model: ModelName
-    """Model name"""
     date: str
-    """Date"""
     lead_time: int
-    """Lead time"""
     ensemble_members: int
-    """Number of ensemble members"""
     entries: dict[str, str] = Field(default_factory=dict)
-    """Configuration entries"""
 
     @field_validator("model")
     def model_cleanup(cls, m):
@@ -44,8 +38,6 @@ class ModelSpecification(FIABBaseModel):
 
 
 class ConfigEntry(FIABBaseModel):
-    """Configuration Entry"""
-
     label: str
     """Label of the configuration entry"""
     description: str | None
@@ -72,7 +64,6 @@ class ConfigEntry(FIABBaseModel):
         return self
 
     def _sort_values(self):
-        """Sort values."""
         if all(str(x).isdigit() for x in self.values):
             self.values = list(map(str, sorted(self.values, key=float)))
             return
@@ -87,9 +78,7 @@ class ProductConfiguration(FIABBaseModel):
     """
 
     product: str
-    """Product name"""
     options: dict[str, ConfigEntry]
-    """Configuration spec"""
 
     @model_validator(mode="after")
     def sort_values(self):
@@ -108,41 +97,34 @@ class ProductConfiguration(FIABBaseModel):
 
 @dataclass
 class ProductSpecification:
-    """Product Specification
-
-    A user has chosen a product and specified the configuration.
-    """
-
     product: str
-    """Product name"""
     specification: dict[str, Any]
-    """Specification"""
 
 
 class EnvironmentSpecification(FIABBaseModel):
-    """Environment Configuration"""
-
     hosts: PositiveInt | None = Field(default=None)
-    """Number of hosts"""
     workers_per_host: PositiveInt | None = Field(default=None)
-    """Number of workers per host"""
     environment_variables: dict[str, str] = Field(default_factory=dict)
-    """Environment variables"""
+
+
+class ForecastProducts(FIABBaseModel):
+    job_type: Literal["forecast_products"]
+    model: ModelSpecification
+    products: list[ProductSpecification]
+
+
+class RawCascadeJob(FIABBaseModel):
+    job_type: Literal["raw_cascade_job"]
+    job_instance: JobInstance
 
 
 class ExecutionSpecification(FIABBaseModel):
-    model: ModelSpecification
-    """Model Configuration"""
-    products: list[ProductSpecification]
-    """Product Configuration"""
+    job: ForecastProducts | RawCascadeJob = Field(discriminator="job_type")
     environment: EnvironmentSpecification
-    """Environment Configuration"""
     shared: bool = Field(default=False)
 
 
 class VisualisationOptions(FIABBaseModel):
-    """Options for the visualisation."""
-
     preset: str = "blob"
     # width: str | int = '100%'
     # height: str | int = 600

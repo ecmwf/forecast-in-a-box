@@ -7,16 +7,19 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Execution functionality."""
-
-from datetime import datetime
-
+import uuid
+from typing import Any
 import logging
+import json
 
+import asyncio
+from pydantic import BaseModel
 from earthkit.workflows import Cascade, fluent
 from earthkit.workflows.graph import Graph, deduplicate_nodes
 
 from cascade.low.into import graph2job
+from cascade.low.core import JobInstance
+from cascade.low.func import assert_never
 from cascade.low import views as cascade_views
 
 import cascade.gateway.api as api
@@ -25,31 +28,18 @@ import cascade.gateway.client as client
 from forecastbox.products.registry import get_product
 from forecastbox.models import Model
 
-from forecastbox.db import db
 from forecastbox.schemas.user import UserRead
+from forecastbox.db.job import insert_one
 
 from forecastbox.config import config
 
 from forecastbox.api.utils import get_model_path
-from forecastbox.api.types import ExecutionSpecification
+from forecastbox.api.types import ExecutionSpecification, RawCascadeJob, ForecastProducts, EnvironmentSpecification
 
-LOG = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
-def convert_to_cascade(spec: ExecutionSpecification) -> Cascade:
-    """Convert am `ExecutionSpecification` to a `Cascade` object ready for execution.
-
-    Parameters
-    ----------
-    spec : ExecutionSpecification
-        The specification containing model and product details.
-
-    Returns
-    -------
-    Cascade
-        A Cascade object that represents the execution graph for the specified model and products.
-    """
-
+def forecast_products_to_cascade(spec: ForecastProducts, environment: EnvironmentSpecification) -> Cascade:
     # Get the model specification and create a Model instance
     model_spec = dict(
         lead_time=spec.model.lead_time,
@@ -60,12 +50,10 @@ def convert_to_cascade(spec: ExecutionSpecification) -> Cascade:
     model = Model(checkpoint_path=get_model_path(spec.model.model), **model_spec)
 
     # Create the model action graph
-    model_action = model.graph(None, **spec.model.entries, environment_kwargs=spec.environment.environment_variables)
-
-    # Initialize an empty graph to accumulate product graphs
-    complete_graph = Graph([])
+    model_action = model.graph(None, **spec.model.entries, environment_kwargs=environment.environment_variables)
 
     # Iterate over each product in the specification
+    complete_graph = Graph([])
     for product in spec.products:
         product_spec = product.specification.copy()
         try:
@@ -83,38 +71,22 @@ def convert_to_cascade(spec: ExecutionSpecification) -> Cascade:
     return Cascade(deduplicate_nodes(complete_graph))
 
 
-def execute(spec: ExecutionSpecification, id: str, user: UserRead) -> api.SubmitJobResponse | None:
-    """
-    Execute a job based on the provided execution specification.
+def execution_specification_to_cascade(spec: ExecutionSpecification) -> JobInstance:
+    if isinstance(spec.job, ForecastProducts):
+        cascade_graph = forecast_products_to_cascade(spec.job, spec.environment)
+        return graph2job(cascade_graph._graph)
+    elif isinstance(spec.job, RawCascadeJob):
+        return spec.job.job_instance
+    else:
+        assert_never(spec.job)
 
-    Converts the execution specification into a Cascade graph, prepares the job for submission,
-    and submits it to the Cascade gateway.
 
-    Will update the job record in the database with the job ID and status.
-
-    Parameters
-    ----------
-    spec : ExecutionSpecification
-        Execution specification containing model and product details.
-    id : str
-        Id of the job record in the database.
-    user : UserRead
-        User object representing the user executing the job.
-
-    Returns
-    -------
-    api.SubmitJobResponse
-        The response from the Cascade gateway after submitting the job
-    """
-    collection = db.get_collection("job_records")
-
+def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobResponse, list[Any]]:
+    """Converts spec to JobInstance and submits to cascade api, returning response + list of sinks"""
     try:
-        cascade_graph = convert_to_cascade(spec)
+        job = execution_specification_to_cascade(spec)
     except Exception as e:
-        collection.update_one({"id": id}, {"$set": {"error": str(e)}})
-        return api.SubmitJobResponse(job_id=None, error=str(e))
-
-    job = graph2job(cascade_graph._graph)
+        return api.SubmitJobResponse(job_id=None, error=repr(e)), []
 
     sinks = cascade_views.sinks(job)
     sinks = [s for s in sinks if not s.task.startswith("run_as_earthkit")]
@@ -142,19 +114,30 @@ def execute(spec: ExecutionSpecification, id: str, user: UserRead) -> api.Submit
     try:
         submit_job_response: api.SubmitJobResponse = client.request_response(r, f"{config.cascade.cascade_url}")  # type: ignore
     except Exception as e:
-        collection.update_one({"id": id}, {"$set": {"error": "Failed to submit job - " + str(e)}})
-        return api.SubmitJobResponse(job_id=None, error=str(e))
+        return api.SubmitJobResponse(job_id=None, error=repr(e)), []
 
-    # Record the job_id and graph specification
-    record = {
-        "job_id": submit_job_response.job_id,
-        "status": "submitted",
-        "error": None,
-        "updated_at": datetime.now(),
-        "created_by": str(user.id) if user else None,
-        "outputs": list(map(lambda x: x.task, sinks)),
-    }
-    collection = db.get_collection("job_records")
-    collection.update_one({"id": id}, {"$set": record})
+    return submit_job_response, sinks
 
-    return submit_job_response
+
+class SubmitJobResponse(BaseModel):
+    """Submit Job Response."""
+
+    id: str
+    """Id of the submitted job."""
+
+
+async def execute(spec: ExecutionSpecification, user: UserRead) -> SubmitJobResponse:
+    loop = asyncio.get_running_loop()
+    response, sinks = await loop.run_in_executor(None, _execute_cascade, spec)  # CPU-bound
+    if not response.job_id:
+        # TODO this best comes from the db... we still have a cascade conflict problem,
+        # we best redesign cascade api to allow for uuid acceptance
+        response.job_id = str(uuid.uuid4())
+    await insert_one(
+        response.job_id,
+        response.error,
+        str(user.id) if user else None,
+        spec.model_dump_json(),
+        json.dumps(list(map(lambda x: x.task, sinks))),
+    )
+    return SubmitJobResponse(id=response.job_id)

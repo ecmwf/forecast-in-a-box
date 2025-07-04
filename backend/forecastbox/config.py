@@ -10,36 +10,58 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import BaseModel, Field, SecretStr, model_validator
 import pathlib
+from cascade.low.func import pydantic_recursive_collect
+import urllib.parse
+import os
 
 fiab_home = pathlib.Path.home() / ".fiab"
 
 
+def _validate_url(url: str) -> bool:
+    # TODO add DNS resolution attempt or something
+    parse = urllib.parse.urlparse(url)
+    return parse.scheme and parse.netloc
+
+
 class DatabaseSettings(BaseModel):
-    ### ----------------------------------------------------- ###
-    ### Database Settings
-    ### ----------------------------------------------------- ###
-
-    mongodb_uri: str = "mongodb://localhost:27017"
-    """MongoDB URI for connecting to the database"""
-    mongodb_database: str = "fiab"
-    """Name of the MongoDB database to use."""
     sqlite_userdb_path: str = str(fiab_home / "user.db")
-    """Location of the sqlite userdb file"""
+    """Location of the sqlite file for user auth+info"""
+    sqlite_jobdb_path: str = str(fiab_home / "job.db")
+    """Location of the sqlite file for job progress tracking"""
+
+    def validate_runtime(self) -> list[str]:
+        errors = []
+        if not pathlib.Path(self.sqlite_userdb_path).parent.is_dir():
+            errors.append(f"parent directory doesnt exist: sqlite_userdb_path={self.sqlite_userdb_path}")
+        if not pathlib.Path(self.sqlite_jobdb_path).parent.is_dir():
+            errors.append(f"parent directory doesnt exist: sqlite_jobdb_path={self.sqlite_jobdb_path}")
+        return errors
+
     # TODO consider renaming to just userdb_url and make protocol part of it
+    # NOTE keep job and user dbs separate -- latter is more sensitive and likely to be externalized
 
 
-class GeneralSettings(BaseModel):
-    ### ----------------------------------------------------- ###
-    ### General Settings
-    ### ----------------------------------------------------- ###
+class OIDCSettings(BaseModel):
+    client_id: str
+    client_secret: SecretStr
+    openid_configuration_endpoint: str
+    name: str = "oidc"
+    scopes: list[str] = ["openid", "email"]
+    required_roles: list[str] | None = None
 
-    # JWT settings
+    @model_validator(mode="after")
+    def pass_to_secret(self):
+        """Convert the client_secret to a SecretStr."""
+        if isinstance(self.client_secret, str):
+            self.client_secret = SecretStr(self.client_secret)
+        return self
+
+
+class AuthSettings(BaseModel):
     jwt_secret: SecretStr = "fiab_secret"
-    """Secret key for JWT authentication."""
-
-    # PPROC settings
-    pproc_schema_dir: str | None = None
-    """Path to the directory containing the PPROC schema files."""
+    """JWT secret key for authentication."""
+    oidc: OIDCSettings | None = None
+    """OIDC settings for authentication, if applicable, if not given no route will be made."""
 
     @model_validator(mode="after")
     def pass_to_secret(self):
@@ -49,11 +71,18 @@ class GeneralSettings(BaseModel):
         return self
 
 
-class BackendAPISettings(BaseModel):
-    ### ----------------------------------------------------- ###
-    ### Backend API Settings
-    ### ----------------------------------------------------- ###
+class GeneralSettings(BaseModel):
+    pproc_schema_dir: str | None = None
+    """Path to the directory containing the PPROC schema files."""
 
+    def validate_runtime(self) -> list[str]:
+        if self.pproc_schema_dir and not os.path.isdir(self.pproc_schema_dir):
+            return ["not a directory: pproc_schema_dir={self.pproc_schema_dir}"]
+        else:
+            return []
+
+
+class BackendAPISettings(BaseModel):
     data_path: str = "./data_dir"
     """Path to the data directory."""
     model_repository: str = "https://sites.ecmwf.int/repository/fiab"
@@ -61,12 +90,18 @@ class BackendAPISettings(BaseModel):
     api_url: str = "http://localhost:8000"
     """Base URL for the API."""
 
+    def validate_runtime(self) -> list[str]:
+        errors = []
+        if not os.path.isdir(self.data_path):
+            errors.append(f"not a directory: data_path={self.data_path}")
+        if not _validate_url(self.model_repository):
+            errors.append(f"not an url: model_repository={self.model_repository}")
+        if not _validate_url(self.api_url):
+            errors.append(f"not an url: api_url={self.api_url}")
+        return errors
+
 
 class CascadeSettings(BaseModel):
-    ### ----------------------------------------------------- ###
-    ### Cascade Settings
-    ### ----------------------------------------------------- ###
-
     max_hosts: int = 1
     """Number of hosts for Cascade."""
     max_workers_per_host: int = 8
@@ -78,14 +113,43 @@ class CascadeSettings(BaseModel):
     venv_temp_dir: str = "/tmp"
     """Temporary directory for virtual environments."""
 
+    def validate_runtime(self) -> list[str]:
+        errors = []
+        if not os.path.isdir(self.venv_temp_dir):
+            errors.append(f"not a directory: venv_temp_dir={self.venv_temp_dir}")
+        if not _validate_url(self.cascade_url):
+            errors.append(f"not an url: cascade_url={self.cascade_url}")
+        return errors
+
 
 class FIABConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", env_prefix="fiab__")
 
+    frontend_url: str = "http://localhost:3000"
+
     general: GeneralSettings = Field(default_factory=GeneralSettings)
+    auth: AuthSettings = Field(default_factory=AuthSettings)
+
     db: DatabaseSettings = Field(default_factory=DatabaseSettings)
     api: BackendAPISettings = Field(default_factory=BackendAPISettings)
     cascade: CascadeSettings = Field(default_factory=CascadeSettings)
+
+    def validate_runtime(self) -> list[str]:
+        if not _validate_url(self.frontend_url):
+            return ["not an url: frontend_url={self.frontend_url}"]
+        else:
+            return []
+
+
+def validate_runtime(config: FIABConfig) -> None:
+    """Validates that a particular config can be used to execute FIAB in this machine/venv.
+    Note this differs from a regular pydantic validation which just checks types etc. For example
+    here we check presence/accessibility of databases"""
+
+    errors = pydantic_recursive_collect(config, "validate_runtime")
+    if errors:
+        errors_formatted = "\n".join(f"at {e[0]}: {e[1]}" for e in errors)
+        raise ValueError(f"Errors were found in configuration:\n{errors_formatted}")
 
 
 config = FIABConfig()

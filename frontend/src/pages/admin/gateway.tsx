@@ -26,21 +26,16 @@ import {useApi} from '../../api';
 
 function Gateway() {
   const [logs, setLogs] = useState([]);
-  const [processId, setProcessId] = useState(null);
-  const [eventSource, setEventSource] = useState(null);
+  const [eventSource, setEventSource] = useState<EventSource | null>(null);
   const scrollRef = useRef(null);
 
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState('not running');
 
   const api = useApi();
 
   const startProcess = async () => {
-    const res = await api.post("/v1/gateway/start");
-    const id = res.data.process_id;
-    setProcessId(id);
-    if (eventSource) {
-      eventSource.close();
-    }
+    await api.post("/v1/gateway/start");
+    await checkStatus();
     setLogs([]);
     fetchLogs();
   }
@@ -49,19 +44,35 @@ function Gateway() {
     if (eventSource) {
         eventSource.close();
     }
-    setLogs([]);
-    checkStatus();
 
-    const source = new EventSource(`/api/v1/gateway/logs`);
-    source.addEventListener("log", (e) => {
-        console.log(e.data);
-        setLogs((prev) => [...prev, e.data]);
-      });
-      
+    let source = new EventSource(`/api/v1/gateway/logs`);
+    source.onopen = () => {
+        console.log("EventSource connection opened");
+        setLogs((prev) => [...prev, "Connecting to Cascade Gateway..."]);
+    };
+    source.onmessage = (e) => {
+        try {
+            const data = JSON.parse(e.data);
+            const logLine = data.log || e.data;
+            setLogs((prev) => [...prev, logLine]);
+        } catch {
+            setLogs((prev) => [...prev, e.data]);
+        }
+    };
+
     source.addEventListener("done", (e) => {
-        setLogs((prev) => [...prev, `🟢 ${e.data}`]);
+        try {
+            const data = JSON.parse(e.data);
+            setLogs((prev) => [...prev, `🟢 ${data.message || e.data}`]);
+        } catch {
+            setLogs((prev) => [...prev, `🟢 ${e.data}`]);
+        }
         source.close();
     });
+    source.onerror = (e) => {
+        setLogs((prev) => [...prev, "❌ Error connecting to Cascade Gateway"]);
+        source.close();
+    };
     setEventSource(source);
   };
 
@@ -70,15 +81,13 @@ function Gateway() {
     if (eventSource) {
         eventSource.close();
     }
+    checkStatus();
+    setLogs((prev) => [...prev, "Gateway process killed"]);
   };
 
   const checkStatus = async () => {
     const res = await api.get("/v1/gateway/status");
-    if (res.status === 200) {
-        setStatus(res.data.status);
-    } else {
-        setStatus('Error fetching status');
-    }
+    setStatus(res.data);
   };
 
     useEffect(() => {
@@ -107,7 +116,7 @@ function Gateway() {
                 <Button onClick={startProcess} color="blue" disabled={status == 'running'}>
                     Start Gateway
                 </Button>
-                <Button onClick={fetchLogs} color="green">
+                <Button onClick={fetchLogs} color="green" disabled={status !== 'running'}>
                     Refresh Logs
                 </Button>
                 <Button onClick={killProcess} color="red" disabled={status !== 'running'}>

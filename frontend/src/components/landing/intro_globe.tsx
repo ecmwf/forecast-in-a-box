@@ -85,7 +85,6 @@ const SimpleGlobe = ({showGlobe, setShowGlobe}) => {
         globe.pointOfView(defaultPOV);
 
         setGlobeReady(true); // Mark the globe as ready
-        console.log("Globe is ready and should now rotate.");
       }
     };
 

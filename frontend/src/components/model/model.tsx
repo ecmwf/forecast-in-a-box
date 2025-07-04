@@ -50,13 +50,12 @@ function Model({ selectedModel, coordinates, setCoordinates, modelSpec, submit }
     };
 
     const handleModelSubmit = () => {
-        console.log('Submitting model:', model);
         submit({ model: model, date: date, lead_time: leadTime, ensemble_members: ensembleMembers });
     };
 
     useEffect(() => {
         if (model) {
-            api.get(`/v1/model/${model}/info`)
+            api.get(`/v1/model/${model.replace('/', '_')}/info`)
                 .then((res) => res.data)
                 .then((modelOptions) => {
                     if (modelOptions.local_area) {

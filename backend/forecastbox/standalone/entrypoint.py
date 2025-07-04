@@ -13,6 +13,7 @@ Entrypoint for the standalone fiab execution (frontend, controller and worker sp
 
 # TODO support frontend
 # NOTE until migrated to sqlite3 / pymongo_inmemory, use `docker run --rm -it --network host mongo:8.0` in parallel
+# TODO simplify and refactor -- some of gateway spawning code is duplicated with api/routers/gateway.py now
 
 import asyncio
 import logging
@@ -24,19 +25,21 @@ import os
 from dataclasses import dataclass
 
 from multiprocessing import Process, connection, set_start_method, freeze_support
-from cascade.executor.config import logging_config
+from cascade.executor.config import logging_config, logging_config_filehandler
 
 import pydantic
-from forecastbox.config import FIABConfig
+from forecastbox.config import FIABConfig, validate_runtime
 
 
 logger = logging.getLogger(__name__ if __name__ != "__main__" else "forecastbox.standalone.entrypoint")
 
 
-def setup_process(env_context: dict[str, str]):
+def setup_process(log_path: str | None = None):
     """Invoke at the start of each new process. Configures logging etc"""
-    logging.config.dictConfig(logging_config)
-    os.environ.update(env_context)
+    if log_path is not None:
+        logging.config.dictConfig(logging_config_filehandler(log_path))
+    else:
+        logging.config.dictConfig(logging_config)
 
 
 async def uvicorn_run(app_name: str, port: int) -> None:
@@ -56,21 +59,29 @@ async def uvicorn_run(app_name: str, port: int) -> None:
     await server.serve()
 
 
-def launch_api(env_context: dict[str, str]):
-    setup_process(env_context)
-    port = int(env_context["API_URL"].rsplit(":", 1)[1])
+def launch_api():
+    config = FIABConfig()
+    # TODO something imported by this module reconfigures the logging -- find and remove!
+    import forecastbox.entrypoint
+
+    setup_process()
+    logger.debug(f"logging initialized post-{forecastbox.entrypoint.__name__} import")
+    port = int(config.api.api_url.rsplit(":", 1)[1])
     try:
         asyncio.run(uvicorn_run("forecastbox.entrypoint:app", port))
     except KeyboardInterrupt:
         pass  # no need to spew stacktrace to log
 
 
-def launch_cascade(env_context: dict[str, str]):
-    setup_process(env_context)
+def launch_cascade(log_path: str):
+    config = FIABConfig()
+    # TODO this configuration of log_path is very unsystematic, improve!
+    # TODO we may want this to propagate to controller/executors -- but stripped the gateway.txt etc
+    setup_process(log_path)
     from cascade.gateway.server import serve
 
     try:
-        serve(env_context["CASCADE_URL"])
+        serve(config.cascade.cascade_url)
     except KeyboardInterrupt:
         pass  # no need to spew stacktrace to log
 
@@ -92,20 +103,25 @@ def wait_for(client: httpx.Client, status_url: str) -> None:
 
 @dataclass
 class ProcessHandles:
-    cascade: Process
+    # cascade: Process
     api: Process
+    cascade_url: str
 
     def wait(self) -> None:
         connection.wait(
             (
-                self.cascade.sentinel,
+                # self.cascade.sentinel,
                 self.api.sentinel,
             )
         )
 
     def shutdown(self) -> None:
-        self.cascade.kill()
+        # m = cascade.gateway.api.ShutdownRequest()
+        # cascade.gateway.client.request_response(m, self.cascade_url, 3_000)
+        self.api.terminate()
+        self.api.join(1)
         self.api.kill()
+        # self.cascade.kill()
 
 
 def export_recursive(dikt, delimiter, prefix):
@@ -115,38 +131,32 @@ def export_recursive(dikt, delimiter, prefix):
         else:
             if isinstance(v, pydantic.SecretStr):
                 v = v.get_secret_value()
-            os.environ[f"{prefix}{k}"] = str(v)
+            if v is not None:
+                os.environ[f"{prefix}{k}"] = str(v)
 
 
 def launch_all(config: FIABConfig) -> ProcessHandles:
     freeze_support()
     set_start_method("forkserver")
-    setup_process({})
+    setup_process()
     logger.info("main process starting")
     export_recursive(config.model_dump(), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"])
 
-    context = {
-        # "WEB_URL": settings.web_url,
-        "API_URL": config.api.api_url,
-        "CASCADE_URL": config.cascade.cascade_url,
-    }
-
-    cascade = Process(target=launch_cascade, args=(context,))
-    cascade.start()
-
-    api = Process(target=launch_api, args=(context,))
+    api = Process(target=launch_api)
     api.start()
 
     with httpx.Client() as client:
-        wait_for(client, context["API_URL"] + "/api/v1/status")
+        wait_for(client, config.api.api_url + "/api/v1/status")
+        client.post(config.api.api_url + "/api/v1/gateway/start").raise_for_status()
 
-    return ProcessHandles(cascade=cascade, api=api)
+    return ProcessHandles(api=api, cascade_url=config.cascade.cascade_url)
 
-    # webbrowser.open(context["WEB_URL"])
+    # webbrowser.open(config.frontend_url)
 
 
 if __name__ == "__main__":
     config = FIABConfig()
+    validate_runtime(config)
     handles = launch_all(config)
     try:
         handles.wait()
