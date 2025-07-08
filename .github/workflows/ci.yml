@@ -28,4 +28,5 @@ jobs:
       - run: |
           cd backend
           mkdir ./tmpFiabHome
-          FIAB_ROOT=./tmpFiabHome ENTRYPOINT=pytest ./fiab.sh
+          mkdir forecastbox/static && touch forecastbox/static/index.html # TODO replace with proper static file build
+          FIAB_DEV=yea FIAB_ROOT=./tmpFiabHome ENTRYPOINT=pytest ./fiab.sh
