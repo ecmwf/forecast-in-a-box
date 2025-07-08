@@ -83,7 +83,7 @@ class GeneralSettings(BaseModel):
 
 
 class BackendAPISettings(BaseModel):
-    data_path: str = "./data_dir"
+    data_path: str = str(fiab_home / "data_dir")
     """Path to the data directory."""
     model_repository: str = "https://sites.ecmwf.int/repository/fiab"
     """URL to the model repository."""

@@ -1,0 +1,34 @@
+name: cd
+
+on:
+  push:
+    tags:
+    - '**'
+    inputs:
+      testpypi:
+        description: Whether to upload to testpypi instead of pypi.
+        type: boolean
+        required: false
+        default: false
+  workflow_call:
+    inputs:
+      testpypi:
+        description: Whether to upload to testpypi instead of pypi.
+        type: boolean
+        required: false
+        default: true
+
+jobs:
+  deploy-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: "0"
+      - run: |
+          # prereqs
+          apt install just npm
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          uv pip install setuptools twine build
+          # build
+          just fiabwheel

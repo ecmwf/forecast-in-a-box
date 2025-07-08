@@ -8,12 +8,13 @@ drun:
     docker run --rm -it --network host --name fiab-be fiab-be
 
 fiabwheel:
+    #!/usr/bin/env bash
     cd frontend
     npm install --force # TODO fix the npm dependencies to get rid of --force !!!
     npm run prodbuild
     cd ../backend
     ln -s ../../frontend/dist forecastbox/static
-    python -m build .
+    python -m build --installer uv .
     twine check dist/*
     twine upload dist/*
 

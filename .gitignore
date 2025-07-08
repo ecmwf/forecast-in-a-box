@@ -63,3 +63,4 @@ venv
 .aider*
 
 backend/forecastbox/static
+**/_version.py

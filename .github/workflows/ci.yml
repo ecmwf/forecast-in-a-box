@@ -27,6 +27,6 @@ jobs:
       - uses: actions/checkout@v4
       - run: |
           cd backend
-          mkdir ./tmpFiabHome
+          mkdir /tmp/tmpFiabHome
           mkdir forecastbox/static && touch forecastbox/static/index.html # TODO replace with proper static file build
-          FIAB_DEV=yea FIAB_ROOT=./tmpFiabHome ENTRYPOINT=pytest ./fiab.sh
+          FIAB_DEV=yea FIAB_ROOT=/tmp/tmpFiabHome ENTRYPOINT=pytest ./fiab.sh
