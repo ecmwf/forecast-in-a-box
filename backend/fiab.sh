@@ -36,7 +36,7 @@ check() {
 		exit 1
 	fi
 	mkdir -p "$FIAB_ROOT"
-	mkdir -p "$FIAB_ROOT/uvcache"
+	mkdir -p "$FIAB_ROOT/uvcache" "$FIAB_ROOT/data_dir"
 }
 
 maybeInstallUv() {
@@ -85,10 +85,9 @@ maybeCreateVenv() {
 	fi
 
     if [ "$FIAB_DEV" == 'yea' ] ; then
-        uv pip install --prerelease=allow --upgrade multiolib==2.6.1.dev20250613 # TODO fix once stabilized
-        uv pip install -e .[test]
+        uv pip install --prerelease=allow --upgrade -e .[test]
     else
-        uv pip install forecastbox
+        uv pip install --prerelease=allow --upgrade forecastbox # TODO remove prerelease once bin wheels stable
     fi
 }
 
