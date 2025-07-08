@@ -10,7 +10,7 @@ authors = [
   { name = "European Centre for Medium-Range Weather Forecasts (ECMWF)", email = "software.support@ecmwf.int" },
 ]
 license = { text = "Apache License Version 2.0" }
-requires-python=">=3.11,<3.12"
+requires-python=">=3.11,<3.13"
 
 # just a minimal set of dependencies to run the servers. Individual tasks install their runtime dependencies on their own
 dependencies = [
@@ -29,9 +29,9 @@ dependencies = [
 	"qubed==0.1.12",
 	"earthkit-workflows-anemoi>=0.3.1",
 	"pydantic-settings",
+	"pproc@git+https://github.com/ecmwf/pproc",
+	"earthkit-workflows-pproc@git+https://github.com/ecmwf/earthkit-workflows-pproc",
 	"earthkit-workflows>=0.3.4",
-	"pproc",
-	"earthkit-workflows-pproc",
 	"sse-starlette",
     "aiosqlite",
     "multiolib", # to bring in the binary stack eagerly
@@ -70,10 +70,6 @@ ignore = ["E731"]
 
 [tool.mypy]
 plugins = "pydantic.mypy"
-
-[tool.uv.sources]
-pproc = { git = "https://github.com/ecmwf/pproc" }
-earthkit-workflows-pproc = { git = "https://github.com/ecmwf/earthkit-workflows-pproc" }
 
 [tool.hatch.metadata]
 allow-direct-references = true
