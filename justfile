@@ -15,8 +15,6 @@ fiabwheel:
     cd ../backend
     ln -s ../../frontend/dist forecastbox/static
     python -m build --installer uv .
-    twine check dist/*
-    twine upload dist/*
 
 clean:
 	find . -name '*.egg-info' -exec rm -fr {} +
