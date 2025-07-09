@@ -63,7 +63,7 @@ def backend_client() -> httpx.Client:
         config.db.sqlite_jobdb_path = f"{td.name}/job.db"
         config.api.data_path = str(pathlib.Path(__file__).parent / "data")
         config.api.model_repository = f"http://localhost:{fake_repository_port}"
-        handles = launch_all(config)
+        handles = launch_all(config, False)
         p = Process(target=run_repository)
         p.start()
         client = httpx.Client(base_url=config.api.api_url + "/api/v1", follow_redirects=True)

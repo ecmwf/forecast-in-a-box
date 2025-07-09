@@ -23,6 +23,7 @@ import httpx
 import uvicorn
 import os
 from dataclasses import dataclass
+import webbrowser
 
 from multiprocessing import Process, connection, set_start_method, freeze_support
 from cascade.executor.config import logging_config, logging_config_filehandler
@@ -135,7 +136,7 @@ def export_recursive(dikt, delimiter, prefix):
                 os.environ[f"{prefix}{k}"] = str(v)
 
 
-def launch_all(config: FIABConfig) -> ProcessHandles:
+def launch_all(config: FIABConfig, is_browser: bool) -> ProcessHandles:
     freeze_support()
     set_start_method("forkserver")
     setup_process()
@@ -148,6 +149,8 @@ def launch_all(config: FIABConfig) -> ProcessHandles:
     with httpx.Client() as client:
         wait_for(client, config.api.api_url + "/api/v1/status")
         client.post(config.api.api_url + "/api/v1/gateway/start").raise_for_status()
+    if is_browser:
+        webbrowser.open(config.api.api_url)
 
     return ProcessHandles(api=api, cascade_url=config.cascade.cascade_url)
 
@@ -157,7 +160,7 @@ def launch_all(config: FIABConfig) -> ProcessHandles:
 if __name__ == "__main__":
     config = FIABConfig()
     validate_runtime(config)
-    handles = launch_all(config)
+    handles = launch_all(config, True)
     try:
         handles.wait()
     except KeyboardInterrupt:
