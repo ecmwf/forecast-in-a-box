@@ -126,7 +126,7 @@ class SubmitJobResponse(BaseModel):
     """Id of the submitted job."""
 
 
-async def execute(spec: ExecutionSpecification, user: UserRead) -> SubmitJobResponse:
+async def execute(spec: ExecutionSpecification, user: UserRead | None) -> SubmitJobResponse:
     loop = asyncio.get_running_loop()
     response, sinks = await loop.run_in_executor(None, _execute_cascade, spec)  # CPU-bound
     if not response.job_id:

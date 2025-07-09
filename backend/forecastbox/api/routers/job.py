@@ -201,7 +201,7 @@ async def get_job_specification(job_id: JobId = Depends(validate_job_id)) -> Exe
 
 
 @router.get("/{job_id}/restart")
-async def restart_job(job_id: JobId = Depends(validate_job_id), user: UserRead = Depends(current_active_user)) -> SubmitJobResponse:
+async def restart_job(job_id: JobId = Depends(validate_job_id), user: UserRead | None = Depends(current_active_user)) -> SubmitJobResponse:
     """Restart a job by executing its specification."""
     job = await get_one(job_id)
     if job is None:
@@ -214,7 +214,7 @@ async def restart_job(job_id: JobId = Depends(validate_job_id), user: UserRead =
 
 
 @router.post("/upload")
-async def upload_job(file: UploadFile, user: UserRead = Depends(current_active_user)) -> SubmitJobResponse:
+async def upload_job(file: UploadFile, user: UserRead | None = Depends(current_active_user)) -> SubmitJobResponse:
     """Upload a job specification file and execute it."""
     if not file:
         raise HTTPException(status_code=400, detail="No file provided for upload.")
