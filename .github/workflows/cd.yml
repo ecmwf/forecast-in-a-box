@@ -36,7 +36,7 @@ jobs:
           just fiabwheel
           twine check backend/dist/*
           # upload
-          if [ "${{ inputs.use_test_pypi }}" = "true" ] ; then
+          if [ "${{ inputs.testpypi }}" = "true" ] ; then
             export TWINE_PASSWORD="$TWINE_PASSWORD_TEST"
             TARGET="--repository testpypi"
           else
