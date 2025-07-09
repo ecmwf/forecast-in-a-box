@@ -64,3 +64,4 @@ venv
 
 backend/forecastbox/static
 **/_version.py
+backend/MANIFEST.in

@@ -87,7 +87,7 @@ maybeCreateVenv() {
     if [ "$FIAB_DEV" == 'yea' ] ; then
         uv pip install --prerelease=allow --upgrade -e .[test]
     else
-        uv pip install --prerelease=allow --upgrade forecastbox # TODO remove prerelease once bin wheels stable
+        uv pip install --prerelease=allow --upgrade 'forecast-in-a-box>=0.1.0' # TODO remove prerelease once bin wheels stable
     fi
 }
 
