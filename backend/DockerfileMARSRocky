@@ -22,7 +22,7 @@ COPY pyproject.toml /app/backend/forecastbox/pyproject.toml
 
 # Create a virtual env. Install fiab dependencies, with caching
 ARG FIAB_VERSION=1
-RUN --mount=type=cache,mode=0755,target=/root/.cache/uv SETUPTOOLS_SCM_PRETEND_VERSION_FOR_FORECASTBOX=${FIAB_VERSION} sh /app/backend/install.sh
+RUN --mount=type=cache,mode=0755,target=/root/.cache/uv SETUPTOOLS_SCM_PRETEND_VERSION_FOR_FORECAST_IN_A_BOX=${FIAB_VERSION} sh /app/backend/install.sh
 
 ENV PATH="/app/.venv/bin/:$PATH"
 ENTRYPOINT ["/app/.venv/bin/uvicorn", "--host", "0.0.0.0", \
