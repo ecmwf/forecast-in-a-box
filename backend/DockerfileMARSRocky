@@ -1,4 +1,4 @@
-FROM rockylinux:9
+FROM eccr.ecmwf.int/mars/stable-rocky9
 
 ARG REPO_BASE=https://nexus.ecmwf.int
 ARG REPO_SUFFIX=stable
@@ -8,28 +8,6 @@ ENV REPO_SUFFIX=${REPO_SUFFIX}
 
 # 1. Install base packages
 RUN dnf install -y epel-release dnf-plugins-core firewalld iproute git && \
-    dnf clean all
-
-# 2. Determine and enable extra repo (crb or powertools)
-RUN ver=$(rpm -E %rhel) && \
-    if [ "$ver" -gt 8 ]; then extra_repo="crb"; else extra_repo="powertools"; fi && \
-    if ! dnf repolist "$extra_repo" --enabled | grep -q "$extra_repo"; then \
-        dnf config-manager --enable "$extra_repo"; \
-    fi && \
-    dnf clean all
-
-# 3. Import ECMWF GPG key
-RUN rpm --import ${REPO_BASE}/repository/private-raw-repos-config/rocky/keys/ewc-rocky-gpg-key
-
-# 4. Add ECMWF yum repository
-RUN ver=$(rpm -E %rhel) && \
-    mkdir -p /etc/yum.repos.d && \
-    printf "[ecmwf]\nname=ECMWF Repository\nbaseurl=%s/repository/private-rocky-%s/%s/5/rpms\nenabled=1\ngpgcheck=1\n" \
-      "${REPO_BASE}" "${REPO_SUFFIX}" "$ver" > /etc/yum.repos.d/ecmwf.repo
-
-# 5. Install MARS client
-# NOTE: REMOVE GIT when installable from PYPI
-RUN dnf install -y mars-client-cloud && \
     dnf clean all
 
 # Set the working directory in the container
