@@ -1,5 +1,4 @@
-#!/bin/bash
-
+set -euo pipefail
 
 uv venv --seed /app/.venv --python 3.11
 
