@@ -75,7 +75,7 @@ def launch_api():
         pass  # no need to spew stacktrace to log
 
 
-def launch_cascade(log_path: str):
+def launch_cascade(log_path: str, log_base: str):
     config = FIABConfig()
     # TODO this configuration of log_path is very unsystematic, improve!
     # TODO we may want this to propagate to controller/executors -- but stripped the gateway.txt etc
@@ -83,7 +83,7 @@ def launch_cascade(log_path: str):
     from cascade.gateway.server import serve
 
     try:
-        serve(config.cascade.cascade_url)
+        serve(config.cascade.cascade_url, log_base)
     except KeyboardInterrupt:
         pass  # no need to spew stacktrace to log
 
