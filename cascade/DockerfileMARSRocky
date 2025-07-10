@@ -1,11 +1,5 @@
 FROM eccr.ecmwf.int/mars/stable-rocky9
 
-ARG REPO_BASE=https://nexus.ecmwf.int
-ARG REPO_SUFFIX=stable
-
-ENV REPO_BASE=${REPO_BASE}
-ENV REPO_SUFFIX=${REPO_SUFFIX}
-
 # 1. Install base packages
 RUN dnf install -y epel-release dnf-plugins-core firewalld iproute && \
     dnf clean all
