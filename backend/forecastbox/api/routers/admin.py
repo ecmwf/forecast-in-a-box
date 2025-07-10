@@ -50,7 +50,6 @@ class ExposedSettings(BaseModel):
 async def get_settings(admin=Depends(get_admin_user)) -> ExposedSettings:
     """Get current settings"""
     settings = ExposedSettings()
-    del settings.api.api_url
     return settings
 
 

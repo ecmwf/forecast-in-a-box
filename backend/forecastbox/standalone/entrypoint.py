@@ -43,12 +43,12 @@ def setup_process(log_path: str | None = None):
         logging.config.dictConfig(logging_config)
 
 
-async def uvicorn_run(app_name: str, port: int) -> None:
+async def uvicorn_run(app_name: str, host: str, port: int) -> None:
     # NOTE we pass None to log config to not interfere with original logging setting
     config = uvicorn.Config(
         app_name,
         port=port,
-        host="0.0.0.0",
+        host=host,
         log_config=None,
         log_level=None,
         workers=1,
@@ -67,9 +67,10 @@ def launch_api():
 
     setup_process()
     logger.debug(f"logging initialized post-{forecastbox.entrypoint.__name__} import")
-    port = int(config.api.api_url.rsplit(":", 1)[1])
+    port = config.api.uvicorn_port
+    host = config.api.uvicorn_host
     try:
-        asyncio.run(uvicorn_run("forecastbox.entrypoint:app", port))
+        asyncio.run(uvicorn_run("forecastbox.entrypoint:app", host, port))
     except KeyboardInterrupt:
         pass  # no need to spew stacktrace to log
 
@@ -147,10 +148,10 @@ def launch_all(config: FIABConfig, is_browser: bool) -> ProcessHandles:
     api.start()
 
     with httpx.Client() as client:
-        wait_for(client, config.api.api_url + "/api/v1/status")
-        client.post(config.api.api_url + "/api/v1/gateway/start").raise_for_status()
+        wait_for(client, config.api.local_url() + "/api/v1/status")
+        client.post(config.api.local_url() + "/api/v1/gateway/start").raise_for_status()
     if is_browser:
-        webbrowser.open(config.api.api_url)
+        webbrowser.open(config.api.local_url())
 
     return ProcessHandles(api=api, cascade_url=config.cascade.cascade_url)
 
