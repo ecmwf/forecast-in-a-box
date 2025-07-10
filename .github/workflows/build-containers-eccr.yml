@@ -58,7 +58,7 @@ jobs:
           fi
           echo "TAG=$TAG" >> $GITHUB_ENV
           echo "IMAGE_NAME=${{ matrix.image }}" >> $GITHUB_ENV
-          echo "REPO_IMAGE=eccr.ecmwf.int/forecast-in-a-box//${{ matrix.image }}:$TAG" >> $GITHUB_ENV
+          echo "REPO_IMAGE=eccr.ecmwf.int/forecast-in-a-box/${{ matrix.image }}:$TAG" >> $GITHUB_ENV
 
       - name: Build image
         run: |
