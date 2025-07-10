@@ -68,6 +68,7 @@ __version__ = "{version}"
 '''
 local_scheme = "no-local-version"
 root = ".."
+fallback_version = "0.0.0"
 
 # TODO remove once released
 [tool.uv.sources]
