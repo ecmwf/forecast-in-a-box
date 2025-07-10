@@ -103,6 +103,8 @@ class BackendAPISettings(BaseModel):
     """Listening host of the whole server."""
     uvicorn_port: int = 8000
     """Listening port of the whole server."""
+    serve_static: bool = True
+    """If true, serve static files from the static directory."""
 
     def local_url(self) -> str:
         return f"http://localhost:{self.uvicorn_port}"

@@ -162,4 +162,5 @@ class SPAStaticFiles(StaticFiles):
                 raise
 
 
-app.mount("/", SPAStaticFiles(directory=frontend, html=True, follow_symlink=True), name="static")
+if config.api.serve_static:
+    app.mount("/", SPAStaticFiles(directory=frontend, html=True, follow_symlink=True), name="static")

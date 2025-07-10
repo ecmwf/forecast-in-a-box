@@ -30,6 +30,7 @@ COPY pyproject.toml /app/backend/forecastbox/pyproject.toml
 # Create a virtual env. Install fiab dependencies, with caching
 RUN --mount=type=cache,mode=0755,target=/root/.cache/uv sh /app/backend/install.sh
 
+ENV FIAB__API__SERVE_STATIC=False
 ENV PATH="/app/.venv/bin/:$PATH"
 ENTRYPOINT ["/app/.venv/bin/uvicorn", "--host", "0.0.0.0", \
     "forecastbox.entrypoint:app", "--log-level", "info"]
