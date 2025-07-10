@@ -28,7 +28,7 @@ if oauth_client is not None:
         oauth_client,
         auth_backend,
         SECRET,
-        redirect_url=config.frontend_url + "/api/v1/auth/oidc/callback",
+        redirect_url=config.auth.public_url + "/api/v1/auth/oidc/callback",
         is_verified_by_default=True,
         associate_by_email=True,
     )

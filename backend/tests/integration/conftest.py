@@ -57,16 +57,16 @@ def backend_client() -> httpx.Client:
     try:
         td = tempfile.TemporaryDirectory()
         config = FIABConfig()
-        config.api.api_url = "http://localhost:30645"
+        config.api.uvicorn_port = 30645
         config.cascade.cascade_url = "tcp://localhost:30644"
         config.db.sqlite_userdb_path = f"{td.name}/user.db"
         config.db.sqlite_jobdb_path = f"{td.name}/job.db"
         config.api.data_path = str(pathlib.Path(__file__).parent / "data")
         config.api.model_repository = f"http://localhost:{fake_repository_port}"
-        handles = launch_all(config)
+        handles = launch_all(config, False)
         p = Process(target=run_repository)
         p.start()
-        client = httpx.Client(base_url=config.api.api_url + "/api/v1", follow_redirects=True)
+        client = httpx.Client(base_url=config.api.local_url() + "/api/v1", follow_redirects=True)
         yield client
     finally:
         p.terminate()

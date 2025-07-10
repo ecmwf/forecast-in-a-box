@@ -64,13 +64,23 @@ class AuthSettings(BaseModel):
     """OIDC settings for authentication, if applicable, if not given no route will be made."""
     passthrough: bool = False
     """If true, all authentication is ignored. Used for single-user standalone regime"""
+    public_url: str | None = None
+    """Used for OIDC redirects"""
 
     @model_validator(mode="after")
     def pass_to_secret(self):
         """Convert the jwt_secret to a SecretStr."""
         if isinstance(self.jwt_secret, str):
             self.jwt_secret = SecretStr(self.jwt_secret)
+        if self.oidc is not None and self.public_url is None:
+            raise ValueError("when using oidc, public_url must be configured")
         return self
+
+    def validate_runtime(self) -> list[str]:
+        errors = []
+        if self.public_url is not None:
+            errors.append(f"not an url: public_url={self.public_url}")
+        return errors
 
 
 class GeneralSettings(BaseModel):
@@ -89,8 +99,13 @@ class BackendAPISettings(BaseModel):
     """Path to the data directory."""
     model_repository: str = "https://sites.ecmwf.int/repository/fiab"
     """URL to the model repository."""
-    api_url: str = "http://localhost:8000"
-    """Base URL for the API."""
+    uvicorn_host: str = "0.0.0.0"
+    """Listening host of the whole server."""
+    uvicorn_port: int = 8000
+    """Listening port of the whole server."""
+
+    def local_url(self) -> str:
+        return f"http://localhost:{self.uvicorn_port}"
 
     def validate_runtime(self) -> list[str]:
         errors = []
@@ -98,8 +113,9 @@ class BackendAPISettings(BaseModel):
             errors.append(f"not a directory: data_path={self.data_path}")
         if not _validate_url(self.model_repository):
             errors.append(f"not an url: model_repository={self.model_repository}")
-        if not _validate_url(self.api_url):
-            errors.append(f"not an url: api_url={self.api_url}")
+        pseudo_url = f"http://{self.uvicorn_host}:{self.uvicorn_port}"
+        if not _validate_url(pseudo_url) or (self.uvicorn_port < 0) or (self.uvicorn_port > 2**16):
+            errors.append(f"not a valid uvicorn config: {pseudo_url}")
         return errors
 
 
@@ -127,20 +143,12 @@ class CascadeSettings(BaseModel):
 class FIABConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", env_prefix="fiab__")
 
-    frontend_url: str = "http://localhost:3000"
-
     general: GeneralSettings = Field(default_factory=GeneralSettings)
     auth: AuthSettings = Field(default_factory=AuthSettings)
 
     db: DatabaseSettings = Field(default_factory=DatabaseSettings)
     api: BackendAPISettings = Field(default_factory=BackendAPISettings)
     cascade: CascadeSettings = Field(default_factory=CascadeSettings)
-
-    def validate_runtime(self) -> list[str]:
-        if not _validate_url(self.frontend_url):
-            return ["not an url: frontend_url={self.frontend_url}"]
-        else:
-            return []
 
 
 def validate_runtime(config: FIABConfig) -> None:
