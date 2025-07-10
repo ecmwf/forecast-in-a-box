@@ -62,7 +62,7 @@ jobs:
 
       - name: Build image
         run: |
-          echo "Building image: $REPO_IMAGE - with tag: ${TAG}"
+          echo "Building image: $IMAGE_NAME - with tag: ${TAG}"
           docker compose -f docker-compose-ewc.yml build --build-arg TAG=${TAG} $IMAGE_NAME
         env:
           TAG: ${{ env.TAG }}
