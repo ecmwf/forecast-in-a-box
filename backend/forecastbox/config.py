@@ -62,6 +62,8 @@ class AuthSettings(BaseModel):
     """JWT secret key for authentication."""
     oidc: OIDCSettings | None = None
     """OIDC settings for authentication, if applicable, if not given no route will be made."""
+    passthrough: bool = False
+    """If true, all authentication is ignored. Used for single-user standalone regime"""
 
     @model_validator(mode="after")
     def pass_to_secret(self):
