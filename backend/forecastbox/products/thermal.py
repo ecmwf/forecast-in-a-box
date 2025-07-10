@@ -58,7 +58,7 @@ class BaseThermalIndex(Product):
         selected = self.select_on_specification(product_spec, deaccumulated)
         source = selected.select(param=self.param_requirements)
 
-        return ppAction(source.nodes).thermal_index(self.output_param).map(self.named_payload(self.__class__.__name__))
+        return ppAction(source.nodes).thermal_index(self.output_param).stack("step").map(self.named_payload(self.__class__.__name__))
 
 
 @thermal_indices("Heat Index")
