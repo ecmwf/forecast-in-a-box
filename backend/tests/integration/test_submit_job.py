@@ -7,6 +7,8 @@ from forecastbox.api.types import (
     RawCascadeJob,
 )
 import time
+import io
+import zipfile
 from cascade.low.builders import JobBuilder, TaskBuilder
 import cloudpickle
 
@@ -56,6 +58,12 @@ def test_submit_job(backend_client_with_auth):
     assert outputs == ["n1"]
     output = backend_client_with_auth.get(f"/job/{raw_job_id}/n1")
     assert cloudpickle.loads(output.content) == 3
+
+    logs = backend_client_with_auth.get(f"/job/{raw_job_id}/logs").raise_for_status().content
+    with zipfile.ZipFile(io.BytesIO(logs), "r") as zf:
+        # NOTE dbEntity, gwState, gateway, controller, host0, host0.dsr, host0.shm, host0.w1, host0.w2
+        expected_log_count = 9
+        assert len(zf.namelist()) == expected_log_count
 
     # requests job
     def do_request() -> str:
