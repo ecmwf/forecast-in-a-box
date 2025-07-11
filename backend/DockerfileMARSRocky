@@ -19,6 +19,7 @@ COPY forecastbox /app/backend/forecastbox/forecastbox
 COPY install.sh /app/backend/install.sh
 COPY pyproject.toml /app/backend/forecastbox/pyproject.toml
 
+WORKDIR /app/backend/forecastbox
 # Create a virtual env. Install fiab dependencies, with caching
 RUN --mount=type=cache,mode=0755,target=/root/.cache/uv bash /app/backend/install.sh
 
