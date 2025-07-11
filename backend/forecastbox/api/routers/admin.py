@@ -24,9 +24,11 @@ from sqlalchemy import select, delete, update
 logger = logging.getLogger(__name__)
 
 
-def get_admin_user(user: UserRead = Depends(current_active_user)):
+def get_admin_user(user: UserRead | None = Depends(current_active_user)) -> UserRead | None:
     """Dependency to get the current active user."""
-    if not user.is_superuser:
+    if config.auth.passthrough:
+        return user
+    if user is None or not user.is_superuser:
         raise HTTPException(status_code=403, detail="Not an admin user")
     return user
 
@@ -48,7 +50,6 @@ class ExposedSettings(BaseModel):
 async def get_settings(admin=Depends(get_admin_user)) -> ExposedSettings:
     """Get current settings"""
     settings = ExposedSettings()
-    del settings.api.api_url
     return settings
 
 

@@ -1,4 +1,4 @@
-name: Build and Push Docker Images
+name: Build and Push Docker Images to eccr
 
 on:
   push:
@@ -45,9 +45,9 @@ jobs:
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: eccr.ecmwf.int
+          username: ${{ secrets.ECMWF_DOCKER_REGISTRY_USERNAME }}
+          password: ${{ secrets.ECMWF_DOCKER_REGISTRY_ACCESS_TOKEN }}
 
       - name: Set env variables
         run: |
@@ -58,12 +58,12 @@ jobs:
           fi
           echo "TAG=$TAG" >> $GITHUB_ENV
           echo "IMAGE_NAME=${{ matrix.image }}" >> $GITHUB_ENV
-          echo "REPO_IMAGE=ghcr.io/${{ github.repository }}/${{ matrix.image }}:$TAG" >> $GITHUB_ENV
+          echo "REPO_IMAGE=eccr.ecmwf.int/forecast-in-a-box/${{ matrix.image }}:$TAG" >> $GITHUB_ENV
 
       - name: Build image
         run: |
-          echo "Building image: $REPO_IMAGE - with tag: ${TAG}"
-          docker compose build --build-arg TAG=${TAG} $IMAGE_NAME
+          echo "Building image: $IMAGE_NAME - with tag: ${TAG}"
+          docker compose -f docker-compose-ewc.yml build --build-arg TAG=${TAG} $IMAGE_NAME
         env:
           TAG: ${{ env.TAG }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}

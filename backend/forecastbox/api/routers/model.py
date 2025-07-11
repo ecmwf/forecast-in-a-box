@@ -93,15 +93,16 @@ async def download_file(model_id: str, url: str, download_path: str) -> None:
                 response.raise_for_status()
                 total = int(response.headers.get("Content-Length", 0))
                 downloaded = 0
-                chunk_size = 1024
+                chunk_size = 1024 * 1024  # 1MB chunks for efficiency
                 file_path = tempfile_path.name
                 with open(file_path, "wb") as file:
                     async for chunk in response.aiter_bytes(chunk_size):
-                        file.write(chunk)
-                        downloaded += len(chunk)
-                        progress = int((downloaded / total) * 100) if total else 0
-                        await update_progress(model_id, progress, None)
-                    logger.debug(f"no more data for {model_id=}, total of {downloaded}")
+                        if chunk:
+                            file.write(chunk)
+                            downloaded += len(chunk)
+                            progress = float(downloaded) / total * 100 if total else 0.0
+                            await update_progress(model_id, int(progress), None)
+                logger.debug(f"Download finished for {model_id=}, total bytes: {downloaded}")
                 shutil.move(file_path, download_path)
         await update_progress(model_id, 100, None)
     except Exception as e:
@@ -170,6 +171,14 @@ async def get_available_models() -> dict[Category, list[ModelName]]:
     return models
 
 
+async def get_manifest() -> str:
+    manifest_path = os.path.join(config.api.model_repository, "MANIFEST")
+    async with httpx.AsyncClient() as client:
+        response = await client.get(manifest_path)
+        response.raise_for_status()
+        return response.text
+
+
 async def all_available_models() -> dict[Category, list[ModelName]]:
     """
     Get a list of available models sorted into categories.
@@ -182,21 +191,13 @@ async def all_available_models() -> dict[Category, list[ModelName]]:
         Dictionary containing model categories and their models
     """
 
-    manifest_path = os.path.join(config.api.model_repository, "MANIFEST")
-
     # TODO consider reusing client with `download_file` bg task
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.get(manifest_path)
-        except httpx.ConnectError:
-            raise HTTPException(503, "Unable to reach model registry")
-        if response.status_code != 200:
-            raise HTTPException(response.status_code, f"Failed to fetch manifest from {manifest_path}")
+    response = await get_manifest()
 
     models = defaultdict(list)
 
     # TODO: Improve category assignment
-    for model in response.text.split("\n"):
+    for model in response.split("\n"):
         model = model.strip()
         if not model or model.startswith("#"):
             continue
@@ -235,7 +236,7 @@ async def get_models(admin=Depends(get_admin_user)) -> dict[str, ModelDetails]:
 
             not_in_edit = (await get_edit(model_id)) is None
 
-            existing_download = await get_download(model_id)
+            existing_download = await get_download(f"{category}_{model_name}" if category else model_name)
             download = download2response(existing_download)
 
             if is_model_downloaded := model_downloaded(model_id):
@@ -255,7 +256,10 @@ async def download(model_id: str, background_tasks: BackgroundTasks, admin=Depen
 
     existing_download = await get_download(model_id)
     if existing_download:
-        return download2response(existing_download)
+        if existing_download.error:
+            await delete_download(model_id)
+        else:
+            return download2response(existing_download)
 
     model_download_path = Path(get_model_path(model_id.replace("_", "/")))
     model_download_path.parent.mkdir(parents=True, exist_ok=True)

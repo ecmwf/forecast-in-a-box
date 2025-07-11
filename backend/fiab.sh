@@ -36,7 +36,7 @@ check() {
 		exit 1
 	fi
 	mkdir -p "$FIAB_ROOT"
-	mkdir -p "$FIAB_ROOT/uvcache"
+	mkdir -p "$FIAB_ROOT/uvcache" "$FIAB_ROOT/data_dir"
 }
 
 maybeInstallUv() {
@@ -51,25 +51,26 @@ maybeInstallUv() {
 		export PATH="$UV_PATH:$PATH"
 	elif [ -d "$FIAB_ROOT/uvdir" ] ; then
 		echo "using 'uv' in $FIAB_ROOT/uvdir"
-		export PATH="$FIAB_ROOT/uvdir/bin:$PATH"
+		export PATH="$FIAB_ROOT/uvdir:$PATH"
 	elif [ -n "$(which uv || :)" ] ; then
 		echo "'uv' found, using that"
 	else
 		curl -LsSf https://astral.sh/uv/install.sh > "$FIAB_ROOT/uvinstaller.sh"
 		CARGO_DIST_FORCE_INSTALL_DIR="$FIAB_ROOT/uvdir" sh "$FIAB_ROOT/uvinstaller.sh"
-		export PATH="$FIAB_ROOT/uvdir/bin:$PATH"
+		export PATH="$FIAB_ROOT/uvdir:$PATH"
 	fi
 }
 
 maybeInstallPython() {
 	# checks whether py3.11 is present on the system, uv-installs if not, exports UV_PYTHON to hold the binary's path
-	MAYBE_PYTHON="$(uv python list | grep python3.11 | sed 's/ \+/;/g' | cut -f 2 -d ';' | head -n 1 || :)"
+	# MAYBE_PYTHON="$(uv python list | grep python3.11 | sed 's/ \+/;/g' | cut -f 2 -d ';' | head -n 1 || :)"
+    # NOTE somehow this regexp isn't portable, but we dont really need the full binary path
+    MAYBE_PYTHON="$(uv python list | grep python3.11 || :)"
 	if [ -z "$MAYBE_PYTHON" ] ; then
-		uv python install 3.11 # TODO install to custom directory instead?
-		export UV_PY="$(uv python list | grep python3.11 | sed 's/ \+/;/g' | cut -f 2 -d ';' | head -n 1)"
-	else
-		export UV_PY="$MAYBE_PYTHON"
+		uv python install 3.11 # TODO install to fiab home instead?
 	fi
+    # export UV_PY="$MAYBE_PYTHON"
+    export UV_PY="python3.11"
 }
 
 VENV="${FIAB_ROOT}/venv"
@@ -83,11 +84,16 @@ maybeCreateVenv() {
 		source "${VENV}/bin/activate" # or export the paths?
 	fi
 
-    uv pip install -e .[test]
-    uv pip install --prerelease=allow --upgrade multiolib==2.6.1.dev20250613 # TODO fix once stabilized
+    if [ "$FIAB_DEV" == 'yea' ] ; then
+        uv pip install --prerelease=allow --upgrade -e .[test]
+    else
+        uv pip install --prerelease=allow --upgrade pproc@git+https://github.com/ecmwf/pproc earthkit-workflows-pproc@git+https://github.com/ecmwf/earthkit-workflows-pproc 'forecast-in-a-box>=0.1.0' # TODO remove prerelease once bin wheels stable, remove pproc and ekw-pproc once published
+        export fiab__auth__passthrough=True # NOTE we dont passthrough in `dev` mode as we use it to run strict tests
+    fi
 }
 
-ENTRYPOINT=forecastbox.standalone.entrypoint
+# override used for eg running `pytest` instead
+ENTRYPOINT=${ENTRYPOINT:-forecastbox.standalone.entrypoint}
 
 for arg in "$@"; do
 	case "$arg" in
@@ -97,7 +103,6 @@ for arg in "$@"; do
 			;;
 		"--warmup")
 			export FIAB_CACHE="${FIAB_ROOT}/uvcache"
-			# yarn setup;
 			;;
 		"--offline")
 			export FIAB_CACHE="${FIAB_ROOT}/uvcache"
@@ -111,4 +116,6 @@ maybeInstallUv
 maybeInstallPython
 maybeCreateVenv
 
+# to allow forks on Macos, cf eg https://github.com/rq/rq/issues/1418
+export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
 python -m $ENTRYPOINT

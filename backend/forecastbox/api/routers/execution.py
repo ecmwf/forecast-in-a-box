@@ -108,7 +108,7 @@ async def get_graph_download(spec: ExecutionSpecification) -> str:
 
 
 @router.post("/execute")
-async def execute_api(spec: ExecutionSpecification, user: UserRead = Depends(current_active_user)) -> SubmitJobResponse:
+async def execute_api(spec: ExecutionSpecification, user: UserRead | None = Depends(current_active_user)) -> SubmitJobResponse:
     """
     Execute a job based on the provided execution specification.
 

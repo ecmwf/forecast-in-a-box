@@ -7,3 +7,8 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+try:
+    from ._version import __version__  # noqa: F401
+except ImportError:
+    # assuming editable install etc
+    pass

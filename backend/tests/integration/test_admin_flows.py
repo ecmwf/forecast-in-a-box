@@ -1,3 +1,6 @@
+from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
+
+
 def test_admin_flows(backend_client):
     # TODO this test is a bit flaky, because it must be executed first to ensure admin actually ending up admin
     # but then the impl itself is flaky
@@ -15,16 +18,15 @@ def test_admin_flows(backend_client):
     data = {"username": "admin@somewhere.org", "password": "something"}
     response = backend_client.post("/auth/jwt/login", data=data)
     assert response.is_success
-    token_admin = response.json()["access_token"]
+    token_admin = extract_auth_token_from_response(response)
+    assert token_admin is not None, "Token should not be None"
+    backend_client.cookies.set(**prepare_cookie_with_auth_token(token_admin))
 
-    response = backend_client.get("admin/users", headers={})
-    assert not response.is_success
     # curl -H "Authorization: Bearer $TOKEN" localhost:8000/api/v1/admin/users
-    headers = {"Authorization": f"Bearer {token_admin}"}
-    response = backend_client.get("admin/users", headers=headers)
+    response = backend_client.get("admin/users")
     assert response.is_success
     assert response.json()[0]["email"] == "admin@somewhere.org"
-    response = backend_client.get(f"admin/users/{id_admin}", headers=headers)
+    response = backend_client.get(f"admin/users/{id_admin}")
     assert response.is_success
     assert response.json()["email"] == "admin@somewhere.org"
 
@@ -32,16 +34,14 @@ def test_admin_flows(backend_client):
     data = {"email": "user@somewhere.org", "password": "something"}
     response = backend_client.post("/auth/register", headers=headers, json=data)
     assert response.is_success
-    id_user = response.json()["id"]
 
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     data = {"username": "user@somewhere.org", "password": "something"}
     response = backend_client.post("/auth/jwt/login", data=data)
     assert response.is_success
-    token_user = response.json()["access_token"]
+    backend_client.cookies.set(**prepare_cookie_with_auth_token(extract_auth_token_from_response(response)))
 
-    headers = {"Authorization": f"Bearer {token_user}"}
-    response = backend_client.get("admin/users", headers=headers)
+    response = backend_client.get("admin/users")
     assert not response.is_success
-    response = backend_client.get(f"admin/users/{id_user}", headers=headers)
-    assert not response.is_success  # NOTE maybe a bit odd? Would we want a self-info endpoint?
+    response = backend_client.get("/users/me")
+    assert response.is_success

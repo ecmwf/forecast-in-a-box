@@ -1,0 +1,50 @@
+name: cd
+
+on:
+  push:
+    tags:
+    - '**'
+    inputs:
+      testpypi:
+        description: Whether to upload to testpypi instead of pypi.
+        type: boolean
+        required: false
+        default: false
+  workflow_dispatch:
+    inputs:
+      testpypi:
+        description: Whether to upload to testpypi instead of pypi.
+        type: boolean
+        required: false
+        default: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: "0"
+      - uses: extractions/setup-just@v3
+      - uses: actions/setup-node@v4
+      - run: |
+          # prereqs
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          uv venv venv && source venv/bin/activate
+          uv pip install twine build
+          # build
+          just fiabwheel
+          twine check backend/dist/*
+          # upload
+          if [ "${{ inputs.testpypi }}" = "true" ] ; then
+            export TWINE_PASSWORD="$TWINE_PASSWORD_TEST"
+            TARGET="--repository testpypi"
+          else
+            export TWINE_PASSWORD="$TWINE_PASSWORD_PROD"
+            TARGET=""
+          fi
+          twine upload backend/dist/*
+        env:
+          TWINE_PASSWORD_PROD: ${{ secrets.PYPI_API_TOKEN }}
+          TWINE_PASSWORD_TEST: ${{ secrets.PYPI_TEST_API_TOKEN }}
+

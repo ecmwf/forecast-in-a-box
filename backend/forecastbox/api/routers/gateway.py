@@ -13,8 +13,8 @@ import subprocess
 import select
 import asyncio
 import logging
-
-from multiprocessing import Process
+import datetime as dt
+from multiprocessing import Process, get_context
 from tempfile import TemporaryDirectory
 
 from fastapi import APIRouter, HTTPException, Request
@@ -30,12 +30,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class GatewayProcess:
-    logs_directory: TemporaryDirectory
+    log_path: str
     process: Process
 
     def cleanup(self) -> None:
-        logger.debug("gateway cleanup")
-        self.logs_directory.cleanup()
+        pass
 
     def kill(self) -> None:
         logger.debug("gateway shutdown message")
@@ -48,11 +47,8 @@ class GatewayProcess:
             logger.debug("gateway kill")
             self.process.kill()
 
-    @staticmethod
-    def log_path(directory: TemporaryDirectory) -> str:
-        return f"{directory.name}/gateway.txt"
 
-
+logs_directory: TemporaryDirectory | None = None
 gateway: GatewayProcess | None = None
 
 
@@ -77,6 +73,10 @@ router = APIRouter(
 @router.post("/start")
 async def start_gateway() -> str:
     global gateway
+    global logs_directory
+    if logs_directory is None:
+        logs_directory = TemporaryDirectory(prefix="fiabLogs")
+        logger.debug(f"logging base is at {logs_directory.name}")
     if gateway is not None:
         if gateway.process.exitcode is None:
             # TODO add an explicit restart option
@@ -87,13 +87,13 @@ async def start_gateway() -> str:
             gateway.cleanup()
             gateway = None
 
-    logs_directory = TemporaryDirectory()
-    log_path = GatewayProcess.log_path(logs_directory)
+    now = dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    log_path = f"{logs_directory.name}/gateway.{now}.txt"
     # TODO for some reason changes to os.environ were *not* visible by the child process! Investigate and re-enable:
     # export_recursive(config.model_dump(), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"])
-    process = Process(target=launch_cascade, args=(log_path,))
+    process = get_context("forkserver").Process(target=launch_cascade, args=(log_path, logs_directory.name))
     process.start()
-    gateway = GatewayProcess(logs_directory=logs_directory, process=process)
+    gateway = GatewayProcess(log_path=log_path, process=process)
     logger.debug(f"spawned new gateway process with pid {process.pid} and logs at {log_path}")
     return "started"
 
@@ -118,14 +118,12 @@ async def stream_logs(request: Request) -> StreamingResponse:
 
     async def event_generator():
         # NOTE consider rewriting to aiofile, eg https://github.com/kuralabs/logserver/blob/master/server/server.py
-        gateway_process = gateway.process
-        log_path = GatewayProcess.log_path(gateway.logs_directory)
 
-        pipe = subprocess.Popen(["tail", "-F", log_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        pipe = subprocess.Popen(["tail", "-F", gateway.log_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         poller = select.poll()
         poller.register(pipe.stdout)
 
-        while gateway_process.is_alive() and not (await request.is_disconnected()):
+        while gateway.process.is_alive() and not (await request.is_disconnected()):
             while poller.poll(5):
                 yield pipe.stdout.readline()
             await asyncio.sleep(1)

@@ -80,7 +80,7 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
         const execute = async () => {
             (async () => {
                 try {
-                    const response = await api.post(`/v1/graph/execute`, spec);
+                    const response = await api.post(`/v1/execution/execute`, spec);
                     const result: SubmitResponse = await response.data;
                     if (result.error) {
                         alert("Error: " + result.error);
@@ -160,7 +160,7 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
 
         async function retrieveFileBlob() {
             try {
-                const ftch = await api.post(`/v1/graph/serialise`,spec)
+                const ftch = await api.post(`/v1/execution/serialise`,spec)
                 const fileBlob = await ftch.data;
                 
                 // this works and prompts for download
