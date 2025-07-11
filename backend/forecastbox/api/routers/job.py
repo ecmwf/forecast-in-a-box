@@ -10,12 +10,17 @@
 """Job Monitoring API Router."""
 
 import logging
+import os
+import pathlib
+import orjson
 import json
 from typing import Literal
 from fastapi import APIRouter, Response, Depends, UploadFile, Body
 from fastapi.responses import HTMLResponse
 from fastapi import HTTPException
 import asyncio
+import io
+import zipfile
 
 from dataclasses import dataclass
 
@@ -33,6 +38,7 @@ from forecastbox.config import config
 from forecastbox.api.types import VisualisationOptions, ExecutionSpecification
 from forecastbox.api.visualisation import visualise
 from forecastbox.api.execution import execute, SubmitJobResponse
+from forecastbox.api.routers.gateway import Globals
 from forecastbox.db.job import get_one, update_one, get_all, delete_all, delete_one
 
 logger = logging.getLogger(__name__)
@@ -280,6 +286,69 @@ async def get_result_availablity(
     return DatasetAvailabilityResponse(dataset_id in [x.task for x in response.datasets[job_id]])
 
 
+@router.get("/{job_id}/logs")
+async def get_logs(job_id: JobId = Depends(validate_job_id)) -> Response:
+    """Returns a zip file with logs and other data for the purpose of troubleshooting"""
+
+    logger.debug(f"getting logs for {job_id}")
+    try:
+        db_entity_raw = await get_one(job_id)
+        db_entity = {c.name: getattr(db_entity_raw, c.name) for c in db_entity_raw.__table__.columns}
+    except Exception as e:
+        db_entity = {"error": repr(e)}
+    logger.debug(f"{db_entity=} for {job_id}")
+
+    try:
+        request = api.JobProgressRequest(job_ids=[job_id])
+        gw_state = client.request_response(request, f"{config.cascade.cascade_url}").model_dump()
+    except TimeoutError:
+        gw_state = {"progresses": {}, "datasets": {}, "error": "TimeoutError"}
+    except Exception as e:
+        gw_state = {"progresses": {}, "datasets": {}, "error": repr(e)}
+    logger.debug(f"{gw_state=} for {job_id}")
+
+    def _build_zip() -> tuple[bytes, str]:
+        try:
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, "a", zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr("db_entity.json", orjson.dumps(db_entity))
+                zf.writestr("gw_state.json", orjson.dumps(gw_state))
+                if not Globals.logs_directory:
+                    zf.writestr("logs_directory.error.txt", "logs directory missing")
+                else:
+                    p = pathlib.Path(Globals.logs_directory.name)
+                    f = ""
+                    try:
+                        for f in os.listdir(p):
+                            jPref = f"job.{job_id}"
+                            if f.startswith("gateway") or f.startswith(jPref):
+                                zf.write(f"{p/f}", arcname=f)
+                    except Exception as e:
+                        zf.writestr("logs_directory.error.txt", f"{f} => {repr(e)}")
+            return buffer.getvalue(), ""
+        except Exception as e:
+            logger.exception("building zip")
+            return b"", repr(e)
+
+    loop = asyncio.get_running_loop()
+    bytez, error = await loop.run_in_executor(None, _build_zip)  # IO bound
+
+    if not error:
+        return Response(
+            content=bytez,
+            status_code=200,
+            media_type="application/zip",
+        )
+    else:
+        return Response(
+            content=error,
+            status_code=500,
+            media_type="text/plain",
+        )
+
+
+# TODO refactor this endpoint to /job_id/results/dataset_id, otherwise consumes too much
+# eg /job_id/available or /job_id/logs become order-dependent / conflicting with output of such name
 @router.get("/{job_id}/{dataset_id}")
 async def get_result(job_id: JobId = Depends(validate_job_id), dataset_id: TaskId = Depends(validate_dataset_id)) -> Response:
     """
