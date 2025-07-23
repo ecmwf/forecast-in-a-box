@@ -1,4 +1,4 @@
-name: ci
+name: bigtest
 
 # DA BIG TEST
 # launches the backend, downloads a model, executes full blown forecast job, ensures success
@@ -23,6 +23,5 @@ jobs:
       - run: |
           set -euo pipefail
           cd backend
-          mkdir /tmp/tmpFiabHome
-          mkdir forecastbox/static && touch forecastbox/static/index.html # TODO replace with proper static file build
+          mkdir /tmp/tmpFiabHome # we want a clean env for install
           FIAB_ROOT=/tmp/tmpFiabHome ENTRYPOINT=scripts.bigtest ./fiab.sh

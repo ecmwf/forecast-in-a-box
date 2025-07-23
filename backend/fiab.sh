@@ -29,7 +29,7 @@ EOF
 }
 
 
-FIAB_ROOT=${FIAB_ROOT:-"$HOME/.fiab"}
+export FIAB_ROOT=${FIAB_ROOT:-"$HOME/.fiab"}
 check() {
 	if [ -z "$(which curl || :)" ] ; then
 		echo "command 'curl' not found, please install"
@@ -87,7 +87,7 @@ maybeCreateVenv() {
     if [ "$FIAB_DEV" == 'yea' ] ; then
         uv pip install --prerelease=allow --upgrade -e .[test]
     else
-        uv pip install --prerelease=allow --upgrade pproc@git+https://github.com/ecmwf/pproc earthkit-workflows-pproc@git+https://github.com/ecmwf/earthkit-workflows-pproc 'forecast-in-a-box>=0.1.0' # TODO remove prerelease once bin wheels stable, remove pproc and ekw-pproc once published
+        uv pip install --prerelease=allow --upgrade pproc@git+https://github.com/ecmwf/pproc earthkit-workflows-pproc@git+https://github.com/ecmwf/earthkit-workflows-pproc 'forecast-in-a-box[plots,webmars]>=0.1.0' # TODO remove prerelease once bin wheels stable, remove pproc and ekw-pproc once published
         export fiab__auth__passthrough=True # NOTE we dont passthrough in `dev` mode as we use it to run strict tests
     fi
 }
