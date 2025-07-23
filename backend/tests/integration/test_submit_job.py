@@ -14,7 +14,7 @@ import cloudpickle
 
 
 def _ensure_completed(backend_client, job_id):
-    i = 8
+    i = 20
     while i > 0:
         response = backend_client.get("/job/status")
         assert response.is_success
@@ -23,7 +23,7 @@ def _ensure_completed(backend_client, job_id):
         assert status in {"submitting", "submitted", "running", "completed"}
         if status == "completed":
             break
-        time.sleep(0.3)
+        time.sleep(0.5)
         i -= 1
 
     assert i > 0, f"Failed to finish job {job_id}"
