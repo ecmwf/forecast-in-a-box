@@ -56,4 +56,5 @@ router.include_router(
     tags=["auth"],
 )
 # Password reset/verify/email optional
+# TODO we would like to somehow connect this with config.auth.passthrough, instead of hotfixing via middleware in entrypoint.py
 router.include_router(fastapi_users.get_users_router(UserRead, UserUpdate), prefix="/users", tags=["users"])

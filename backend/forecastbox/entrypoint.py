@@ -90,6 +90,17 @@ async def add_process_time_header(request: Request, call_next):
     return response
 
 
+@app.middleware("http")
+async def circumvent_auth(request: Request, call_next):
+    # TODO this is a hotfix, we'd instead like to fix properly in api/routers/auth.py
+    if request.url.path == "/api/v1/users/me" and config.auth.passthrough:
+        from starlette.responses import JSONResponse
+
+        return JSONResponse({})
+    else:
+        return await call_next(request)
+
+
 @dataclass
 class StatusResponse:
     """
