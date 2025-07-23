@@ -87,8 +87,8 @@ async def download_file(model_id: str, url: str, download_path: str) -> None:
     try:
         tempfile_path = tempfile.NamedTemporaryFile(prefix="model_", suffix=".ckpt", delete=False)
 
-        async with httpx.AsyncClient() as client_http:
-            logger.debug(f"download of {model_id=} about to start")
+        async with httpx.AsyncClient(follow_redirects=True) as client_http:
+            logger.debug(f"download of {model_id=} about to start from {url=} into {tempfile_path.name=}")
             async with client_http.stream("GET", url) as response:
                 response.raise_for_status()
                 total = int(response.headers.get("Content-Length", 0))
@@ -113,7 +113,7 @@ def download2response(model_download: ModelDownload | None) -> DownloadResponse:
     if model_download:
         if model_download.error:
             progress = 0.0
-            message = "Download failed."
+            message = "Download failed. To retry, call delete_model first"
             status = "errored"
         elif model_download.progress >= 100:
             progress = 100.0
@@ -256,10 +256,7 @@ async def download(model_id: str, background_tasks: BackgroundTasks, admin=Depen
 
     existing_download = await get_download(model_id)
     if existing_download:
-        if existing_download.error:
-            await delete_download(model_id)
-        else:
-            return download2response(existing_download)
+        return download2response(existing_download)
 
     model_download_path = Path(get_model_path(model_id.replace("_", "/")))
     model_download_path.parent.mkdir(parents=True, exist_ok=True)
@@ -286,8 +283,10 @@ async def download(model_id: str, background_tasks: BackgroundTasks, admin=Depen
 async def delete_model(model_id: str, admin=Depends(get_admin_user)) -> DownloadResponse:
     """Delete a model."""
 
+    await delete_download(model_id)
     model_path = get_model_path(model_id.replace("_", "/"))
     if not model_path.exists():
+        # TODO if path is not expected to exist (ie failed download), return OK
         return DownloadResponse(
             download_id=None,
             message="Model not found.",
@@ -296,7 +295,6 @@ async def delete_model(model_id: str, admin=Depends(get_admin_user)) -> Download
         )
 
     os.remove(model_path)
-    await delete_download(model_id)
 
     return DownloadResponse(
         download_id=None,
