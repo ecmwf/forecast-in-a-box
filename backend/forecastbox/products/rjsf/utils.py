@@ -17,6 +17,7 @@ from typing import Any
 from typing import List
 from typing import Optional
 from typing import TypeVar
+from typing import Union
 
 from .forms import FieldWithUI
 from .jsonSchema import ArraySchema
@@ -68,25 +69,24 @@ def update_enum_within_field(field: FieldWithUI, new_enum: List[Any]) -> FieldWi
     return field
 
 
-F = TypeVar("Field", bound=FieldSchema)
 UI = TypeVar("UI", bound=UISchema)
 
 
-def __collapse_enums_if_possible(jsonschema: FieldSchema, uischema: Optional[UI] = None) -> tuple[StringSchema, UI]:
-    uischema = uischema or UIField(widget="text")
-    if not isinstance(uischema, UIField):
+def __collapse_enums(jsonschema: FieldSchema, uischema: Optional[UI] = None) -> tuple[StringSchema, Union[UI, UIField]]:
+    resolved_uischema: UISchema = uischema or UIField(widget="text")
+    if not isinstance(resolved_uischema, UIField):
         raise TypeError("UI schema must be a UIField to collapse enums")
 
     assert isinstance(jsonschema, EnumMixin), "JSON schema must support enum to collapse"
     assert jsonschema.enum and len(jsonschema.enum) == 1, "JSON schema enum must have exactly one value to collapse"
 
-    uischema.readonly = True
+    resolved_uischema.readonly = True
     jsonschema = StringSchema(
         type="string",
         title=jsonschema.title,
         default=jsonschema.enum[0],
     )
-    return jsonschema, uischema
+    return jsonschema, resolved_uischema
 
 
 def collapse_enums_if_possible(field: FieldWithUI) -> FieldWithUI:
@@ -108,13 +108,13 @@ def collapse_enums_if_possible(field: FieldWithUI) -> FieldWithUI:
             return field
 
         # If there's only one enum value, collapse it to a read-only field
-        field.jsonschema, field.ui = __collapse_enums_if_possible(field.jsonschema, field.ui)
+        field.jsonschema, field.ui = __collapse_enums(field.jsonschema, field.ui)
 
     elif isinstance(field.jsonschema, ArraySchema) and isinstance(field.jsonschema.items, EnumMixin):
         if not field.jsonschema.items.enum or len(field.jsonschema.items.enum) > 1:
             return field
 
-        field.jsonschema.items, uischema = __collapse_enums_if_possible(field.jsonschema.items, field.ui)
+        field.jsonschema.items, uischema = __collapse_enums(field.jsonschema.items, field.ui)
         field.ui = UIObjectField(anyOf=[uischema])
 
     elif isinstance(field.jsonschema, ObjectSchema):
