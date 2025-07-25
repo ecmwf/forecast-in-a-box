@@ -57,7 +57,7 @@ def forecast_products_to_cascade(spec: ForecastProducts, environment: Environmen
     for product in spec.products:
         product_spec = product.specification.copy()
         try:
-            product_graph = get_product(*product.product.split("/", 1)).to_graph(product_spec, model, model_action)
+            product_graph = get_product(*product.product.split("/", 1)).execute(product_spec, model, model_action)
         except Exception as e:
             raise Exception(f"Error in product {product}:\n{e}")
 

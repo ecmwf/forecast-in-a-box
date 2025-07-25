@@ -80,7 +80,7 @@ def __collapse_enums(jsonschema: FieldSchema, uischema: Optional[UI] = None) -> 
     assert isinstance(jsonschema, EnumMixin), "JSON schema must support enum to collapse"
     assert jsonschema.enum and len(jsonschema.enum) == 1, "JSON schema enum must have exactly one value to collapse"
 
-    resolved_uischema.readonly = True
+    resolved_uischema.disabled = True
     jsonschema = StringSchema(
         type="string",
         title=jsonschema.title,

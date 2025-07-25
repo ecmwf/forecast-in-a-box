@@ -21,21 +21,37 @@ from ..generic import generic_registry
 
 from forecastbox.products.definitions import DESCRIPTIONS, LABELS
 from forecastbox.products.ensemble.base import BasePProcEnsembleProduct, BaseEnsembleProduct
+from ..rjsf import FieldWithUI, StringSchema, IntegerSchema, ArraySchema, UIObjectField, UIStringField, FieldSchema
 
 
 class BaseThresholdProbability(BaseEnsembleProduct):
     """Base Threshold Probability Product"""
 
-    description = {
-        **DESCRIPTIONS,
-        "threshold": "Threshold",
-    }
-    label = {
-        **LABELS,
-        "threshold": "Threshold",
-        "operator": "Operator",
-    }
-
+    @property
+    def formfields(self):
+        formfields = super().formfields.copy()
+        formfields.update(
+            step=FieldWithUI(
+                jsonschema=StringSchema(
+                    title="Step",
+                    description="Forecast step, e.g. 0-24, 0-168"
+                )
+            ),
+            threshold=FieldWithUI(
+                jsonschema=StringSchema(
+                    title="Threshold",
+                    description="Threshold value to apply, e.g. 0, 5, 10, etc."
+                )
+            ),
+            operator=FieldWithUI(
+                jsonschema=StringSchema(
+                    title="Operator",
+                    description="Operator to apply to the threshold, e.g. '>', '<', '==', etc.",
+                    enum=["<", "<=", "==", ">=", ">"]
+                )
+            ),
+        )
+        return formfields
     @property
     def model_assumptions(self):
         return {"threshold": "*", "operator": "*", "step": "*"}
@@ -43,19 +59,13 @@ class BaseThresholdProbability(BaseEnsembleProduct):
 
 @generic_registry("Threshold Probability")
 class GenericThresholdProbability(BaseThresholdProbability, GenericParamProduct):
-    example = {
-        "threshold": "10",
-    }
-    multiselect = {
-        "param": True,
-    }
 
     @property
     def qube(self):
         return self.make_generic_qube(threshold=USER_DEFINED, operator=USER_DEFINED, step=USER_DEFINED)
 
-    def to_graph(self, product_spec, model, source):
-        from earthkit.workflows.plugins.anemoi.fluent import ENSEMBLE_DIMENSION_NAME
+    def execute(self, product_spec, model, source):
+        from earthkit.workflows.plugins.anemoi.types import ENSEMBLE_DIMENSION_NAME
         from earthkit.workflows import backends, fluent
 
         source = source.sel(param=product_spec["param"])

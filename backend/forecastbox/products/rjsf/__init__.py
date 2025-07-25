@@ -15,6 +15,7 @@
 
 from .forms import FieldWithUI
 from .forms import FormDefinition
+from .forms import ExportedSchemas
 from .jsonSchema import ArraySchema
 from .jsonSchema import BooleanSchema
 from .jsonSchema import EnumMixin
@@ -27,9 +28,11 @@ from .uiSchema import UIBooleanField
 from .uiSchema import UIIntegerField
 from .uiSchema import UISchema
 from .uiSchema import UIStringField
+from .uiSchema import UIObjectField
 
 __all__ = [
     "FormDefinition",
+    "ExportedSchemas",
     "FieldWithUI",
     "FieldSchema",
     "EnumMixin",
@@ -41,6 +44,7 @@ __all__ = [
     "NullSchema",
     "UISchema",
     "UIStringField",
+    "UIObjectField",
     "UIIntegerField",
     "UIBooleanField",
 ]

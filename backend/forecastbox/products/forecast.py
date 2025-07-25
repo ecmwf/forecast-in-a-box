@@ -7,11 +7,12 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from typing import Any, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING, OrderedDict
 
 from .registry import CategoryRegistry
 from .interfaces import Interfaces
 from .product import GenericParamProduct
+from .rjsf import FieldWithUI, StringSchema, IntegerSchema, ArraySchema, UIObjectField, UIStringField, FieldSchema
 
 forecast_registry = CategoryRegistry(
     "forecast_statistic", interface=Interfaces.DETAILED, description="Statistics over time for each member", title="Forecast Statistics"
@@ -30,14 +31,25 @@ class BaseForecast(GenericParamProduct):
     _statistic: str | None = None
     """Statistic to apply"""
 
-    multiselect = {
-        "param": True,
-        "levelist": True,
-    }
-    label = {
-        **GenericParamProduct.label,
-        "step": "Step Range",
-    }
+    allow_multiple_params = True
+    allow_multiple_levels = True
+
+    @property
+    def _name(self):
+        return f"Forecast {self._statistic.capitalize() if self._statistic else ''}"
+
+    @property
+    def formfields(self) -> OrderedDict[str, "FieldWithUI"]:
+        """Form fields for the product."""
+        formfields = super().formfields.copy()
+        formfields.update(
+            step= self._make_field(
+                title='Step',
+                multiple=False,
+                schema=StringSchema,
+            ),
+        )
+        return formfields
 
     @property
     def model_assumptions(self):
@@ -63,7 +75,8 @@ class BaseForecast(GenericParamProduct):
         source = self._select_on_step(source, step)
         return getattr(source, statistic)("step")
 
-    def to_graph(self, product_spec, model, source):
+    def execute(self, product_spec, model, source):
+        assert self._statistic is not None, "Statistic must be defined"
         return self._apply_statistic(product_spec, source, self._statistic)
 
 

@@ -66,13 +66,6 @@ function ProductConfigurator({model, products, setProducts}: ProductConfiguratio
         fetchUpdatedOptions();
     }, [model]); // Update options when formData changes
 
-    useEffect(() => {
-        if (selected) {
-            const configurationContainer = document.querySelector(".configuration_container") as HTMLElement;
-            // configurationContainer?.scrollIntoView();
-        }
-    }, [selected]);
-
     return (
         <Container size='xl'>
             <LoadingOverlay visible={loading}/>

@@ -32,6 +32,11 @@ def encode_result(result: api.ResultRetrievalResponse) -> tuple[bytes, str]:
     obj = decoded_result(result, job=None)
     if isinstance(obj, bytes):
         return obj, "application/pickle"
+    if isinstance(obj, tuple):
+        if len(obj) == 2 and isinstance(obj[0], bytes):
+            return obj[0], obj[1]
+        else:
+            raise ValueError("Tuple result must contain exactly two elements: (bytes, mime_type)")
 
     try:
         from earthkit.plots import Figure
@@ -60,5 +65,4 @@ def encode_result(result: api.ResultRetrievalResponse) -> tuple[bytes, str]:
         np.save(buf, obj)
         return buf.getvalue(), "application/numpy"
 
-    else:
-        return cloudpickle.dumps(obj), "application/clpkl"
+    return cloudpickle.dumps(obj), "application/clpkl"

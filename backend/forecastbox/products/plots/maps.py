@@ -7,7 +7,9 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+from typing import Optional
 import warnings
+import io
 from collections import defaultdict
 
 from forecastbox.products.ensemble import BaseEnsembleProduct
@@ -22,6 +24,7 @@ from forecastbox.models import Model
 from forecastbox.products.product import GenericTemporalProduct
 
 from . import plot_product_registry
+from ..rjsf import FieldWithUI, StringSchema, IntegerSchema, ArraySchema, UIObjectField, UIStringField, FieldSchema
 
 EARTHKIT_PLOTS_IMPORTED = True
 try:
@@ -71,10 +74,35 @@ def _plot_fields(subplot: Subplot, fields: ekd.FieldList, **kwargs: dict[str, di
                     **kwargs.get("quickplot", {}),
                 )
 
+@as_payload
+@mark.environment_requirements(["earthkit-plots"])
+def export(figure: Figure, format: str = "png") -> tuple[bytes, str]:
+    """
+    Export a figure to a specified format.
+
+    Parameters
+    ----------
+    figure : Figure
+        The figure to export.
+    format : str
+        The format to export the figure to. Supported formats are 'png', 'pdf', 'svg'.
+
+    Returns
+    -------
+    tuple[bytes, str]
+        A tuple containing the serialized data as bytes and the MIME type.
+    """
+    if format not in ["png", "pdf", "svg"]:
+        raise ValueError(f"Unsupported format: {format}. Supported formats are 'png', 'pdf', 'svg'.")
+    
+    buf = io.BytesIO()
+    figure.save(buf, format=format)
+
+    return buf.getvalue(), f"image/{format}"
 
 @as_payload
 @mark.environment_requirements(["earthkit-plots", "earthkit-plots-default-styles"])
-def quickplot(fields: ekd.FieldList, groupby: str = None, subplot_title: str = None, figure_title: str = None, domain=None):
+def quickplot(fields: ekd.FieldList, groupby: Optional[str] = None, subplot_title: Optional[str] = None, figure_title: Optional[str] = None, domain:Optional[str]=None):
     from earthkit.plots.utils import iter_utils
     from earthkit.plots.components import layouts
     from earthkit.plots.schemas import schema
@@ -134,23 +162,32 @@ class MapProduct(GenericTemporalProduct):
 
     domains = ["Global", "Europe", "Australia", "Malawi", "Norway"]
 
-    description = {
-        **GenericTemporalProduct.description,
-        "domain": "Domain of the map",
-    }
-    label = {
-        **GenericTemporalProduct.label,
-        "domain": "Domain",
-        "reduce": "Reduce",
-    }
-
-    defaults = {
-        "reduce": "True",
-    }
-    description = {
-        "reduce": "Combine all steps and parameters into a single plot",
-    }
-
+    @property
+    def formfields(self):
+        formfields = super().formfields.copy()
+        formfields.update(
+            reduce=FieldWithUI(
+                jsonschema=StringSchema(
+                    title="Reduce",
+                    description="Combine all steps and parameters into a single plot",
+                    enum=["True", "False"],
+                    default="True",
+                )
+            ),
+            domain=FieldWithUI(
+                jsonschema=StringSchema(
+                    title="Domain",
+                    description="Domain of the map",
+                    enum=self.domains,
+                    default="Global",
+                ),
+                ui=UIStringField(
+                    widget="select",
+                )
+            )
+        )
+        return formfields
+    
     @property
     def model_assumptions(self):
         return {
@@ -168,15 +205,8 @@ class MapProduct(GenericTemporalProduct):
 
 @plot_product_registry("Maps")
 class SimpleMapProduct(MapProduct):
-    multiselect = {
-        "param": True,
-        "step": True,
-        "domain": False,
-    }
 
-    defaults = {"domain": "Global", **MapProduct.defaults}
-
-    def to_graph(self, product_spec, model, source):
+    def execute(self, product_spec, model, source):
         domain = product_spec.pop("domain", None)
         source = self.select_on_specification(product_spec, source)
 
@@ -193,7 +223,7 @@ class SimpleMapProduct(MapProduct):
             subplot_title="T+{lead_time}",
             figure_title="{variable_name} over {domain}\n Base time: {base_time: %Y%m%dT%H%M}\n",
         )
-        plots = source.map(quickplot_payload)
+        plots = source.map(quickplot_payload).map(export(format="png")).map(self.named_payload("Map"))
 
         return plots
 
@@ -206,14 +236,7 @@ class EnsembleMapProduct(BaseEnsembleProduct, MapProduct):
     Create a subplotted map with each subplot being a different ensemble member.
     """
 
-    multiselect = {
-        "param": True,
-        "step": True,
-        "domain": False,
-    }
-    defaults = {"domain": "Global", **MapProduct.defaults}
-
-    def to_graph(self, product_spec, model, source):
+    def execute(self, product_spec, model, source):
         domain = product_spec.pop("domain", None)
         source = self.select_on_specification(product_spec, source)
 

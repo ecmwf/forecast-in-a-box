@@ -124,7 +124,7 @@ class PProcProduct(Product):
 
         return deduplicate_nodes(total_graph)
 
-    def to_graph(self, product_spec: dict[str, Any], model: Model, source: fluent.Action):
+    def execute(self, product_spec: dict[str, Any], model: Model, source: fluent.Action):
         """
         Convert the product specification to a graph action.
         """

@@ -34,7 +34,7 @@ def create_test_product(axis: dict[str, list[str]]) -> Product:
         def model_assumptions(self):
             return {}
 
-        def to_graph(self, product_spec, model, source):
+        def execute(self, product_spec, model, source):
             raise NotImplementedError("Testing")
 
     product = TestProduct()
@@ -104,7 +104,7 @@ def test_generic_param_product():
     class TestGeneric(GenericParamProduct):
         """Test product for testing purposes."""
 
-        def to_graph(self, product_spec, model, source):
+        def execute(self, product_spec, model, source):
             raise NotImplementedError("Testing")
 
         @property

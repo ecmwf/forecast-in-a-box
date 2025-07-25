@@ -15,7 +15,7 @@ from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
-from typing import TypedDict
+from typing_extensions import TypedDict
 
 from pydantic import BaseModel
 
@@ -27,13 +27,13 @@ class ExportedJsonSchema(TypedDict):
     title: str
     type: str
     required: List[str]
-    properties: Dict[str, Any]
+    properties: Dict[str, Dict]
     """The JSON Schema definition for the form."""
 
 
 class ExportedSchemas(TypedDict):
     jsonSchema: ExportedJsonSchema
-    uiSchema: Dict[str, Any]
+    uiSchema: Dict[str, Dict]
 
 
 # Combined Schema + UI

@@ -38,6 +38,8 @@ class BaseSchema(BaseModel):
     """Description of the schema."""
     default: Optional[Any] = None
     """Default value for the schema."""
+    additionalProperties: Optional[Dict[str, Any]] = None
+    """Additional properties allowed in the schema."""
 
     model_config = ConfigDict(extra="allow", use_enum_values=True, json_schema_extra={"discriminator": "type"})
 
@@ -86,9 +88,6 @@ class StringSchema(BaseSchema, EnumMixin):
     """Minimum length."""
     maxLength: Optional[int] = None
     """Maximum length."""
-    # enum is inherited from EnumMixin
-    """Allowed values."""
-
 
 class IntegerSchema(BaseSchema, EnumMixin):
     """JSON Schema for integer type.
@@ -108,9 +107,8 @@ class IntegerSchema(BaseSchema, EnumMixin):
     """Minimum value."""
     maximum: Optional[int] = None
     """Maximum value."""
-    # enum is inherited from EnumMixin
-    """Allowed values."""
-
+    multipleOf: Optional[int] = None
+    """Value must be a multiple of this number."""
 
 class NumberSchema(BaseSchema, EnumMixin):
     """JSON Schema for number type (float or int).
@@ -131,9 +129,6 @@ class NumberSchema(BaseSchema, EnumMixin):
     """Minimum value."""
     maximum: Optional[float] = None
     """Maximum value."""
-    # enum is inherited from EnumMixin
-    """Allowed values."""
-
 
 class BooleanSchema(BaseSchema):
     """JSON Schema for boolean type.
