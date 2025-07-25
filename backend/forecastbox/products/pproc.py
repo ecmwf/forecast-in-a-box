@@ -12,19 +12,21 @@ from pathlib import Path
 from typing import Any
 
 from earthkit.workflows import fluent
-
+from earthkit.workflows.graph import Graph
+from earthkit.workflows.graph import deduplicate_nodes
+from earthkit.workflows.plugins.anemoi.types import ENSEMBLE_DIMENSION_NAME
 from earthkit.workflows.plugins.pproc.fluent import Action as ppAction
 from earthkit.workflows.plugins.pproc.templates import derive_template
-from earthkit.workflows.graph import Graph, deduplicate_nodes
-
+from forecastbox.config import config
 from forecastbox.models import Model
 from forecastbox.products.product import Product
-from forecastbox.config import config
 
-from earthkit.workflows.plugins.anemoi.fluent import ENSEMBLE_DIMENSION_NAME
+from .export import export_fieldlist_as
 
 
-def from_request(request: dict, pproc_schema: str, action_kwargs: dict[str, Any] | None = None, **sources: fluent.Action) -> fluent.Action:
+def from_request(
+    request: dict, pproc_schema: str, action_kwargs: dict[str, Any] | None = None, **sources: fluent.Action
+) -> fluent.Action:
     inputs = []
     for source in sources.values():
         inputs.append({k: list(source.nodes.coords[k].values) for k in source.nodes.coords.keys()})
@@ -54,9 +56,10 @@ class PProcProduct(Product):
     def action_kwargs(self) -> dict[str, Any]:
         return {"ensemble_dim": ENSEMBLE_DIMENSION_NAME}
 
-    def get_sources(self, product_spec: dict[str, Any], model: Model, source: fluent.Action) -> dict[str, fluent.Action]:
-        """
-        Get sources for pproc action.
+    def get_sources(
+        self, product_spec: dict[str, Any], model: Model, source: fluent.Action
+    ) -> dict[str, fluent.Action]:
+        """Get sources for pproc action.
 
         By default just provides the model source as 'forecast'
 
@@ -97,8 +100,7 @@ class PProcProduct(Product):
         return schema_path
 
     def request_to_graph(self, request: dict[str, Any] | list[dict[str, Any]], **sources: fluent.Action) -> Graph:
-        """
-        Convert a request to a graph action.
+        """Convert a request to a graph action.
 
         Parameters
         ----------
@@ -120,14 +122,17 @@ class PProcProduct(Product):
             sources[key] = ppAction(sources[key].nodes)
 
         for req in request:
-            total_graph += from_request(req, self._pproc_schema_path, self.action_kwargs, **sources).graph()
+            total_graph += (
+                from_request(req, self._pproc_schema_path, self.action_kwargs, **sources)
+                .map(export_fieldlist_as(format="grib"))
+                .map(self.named_payload(self.__class__.__name__))
+                .graph()
+            )
 
         return deduplicate_nodes(total_graph)
 
-    def to_graph(self, product_spec: dict[str, Any], model: Model, source: fluent.Action):
-        """
-        Convert the product specification to a graph action.
-        """
+    def execute(self, product_spec: dict[str, Any], model: Model, source: fluent.Action):
+        """Convert the product specification to a graph action."""
         request = self.mars_request(product_spec).copy()
 
         if not isinstance(request, list):

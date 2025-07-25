@@ -46,19 +46,19 @@ export type CategoriesType = {
   [key: string]: CategoryType;
 };
 
-export type ConfigEntry = {
-  label: string;
-  description: string;
-  example?: string;
-  values?: string[];
-  multiple: boolean;
-  constrained_by: string[];
-  default?: string;
-};
+// export type ConfigEntry = {
+//   label: string;
+//   description: string;
+//   example?: string;
+//   values?: string[];
+//   multiple: boolean;
+//   constrained_by: string[];
+//   default?: string;
+// };
 
 export type ProductConfiguration = {
-  product: string;
-  options: Record<string, ConfigEntry>;
+  jsonSchema: Record<string, any>;
+  uiSchema: Record<string, any>;
 };
 
 export type ModelSpecification = {

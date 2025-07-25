@@ -9,9 +9,12 @@
 
 """Products API Router."""
 
+from typing_extensions import OrderedDict
 from fastapi import APIRouter
 
 from typing import Any
+from qubed import Qube
+
 
 from forecastbox.products.product import Product, USER_DEFINED
 
@@ -23,7 +26,8 @@ from forecastbox.products.interfaces import Interfaces
 from .model import get_model_path
 
 from ..types import ConfigEntry, ProductConfiguration, ModelSpecification
-from qubed import Qube
+from forecastbox.products.rjsf import FormDefinition, ExportedSchemas, FieldWithUI, StringSchema
+import forecastbox.products.rjsf.utils as rjsfutils
 
 
 router = APIRouter(
@@ -31,7 +35,7 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-CONFIG_ORDER = ["param", "levtype", "levelist"]
+CONFIG_ORDER = ["param", "levtype", "levelist", "step"]
 """Order of configuration parameters for display purposes."""
 
 
@@ -59,8 +63,27 @@ def select_from_params(available_spec: Qube, params: dict[str, Any]) -> Qube:
 
     return available_spec
 
+def _sort_values(values: list[Any]) -> list[Any]:
+    if all(str(x).isdigit() for x in values):
+        values = list(map(float, sorted(values, key=float)))
+        return values
+    values = list(sorted(values, key=lambda x: str(x).lower()))
+    return values
 
-async def product_to_config(product: Product, model_spec: ModelSpecification, params: dict[str, Any]) -> dict[str, ConfigEntry]:
+def _sort_fields(fields: dict) -> dict:
+    new_fields = OrderedDict()
+    for key in CONFIG_ORDER:
+        if key in fields:
+            new_fields[key] = fields[key]
+
+    for key in fields:
+        if key not in new_fields:
+            new_fields[key] = fields[key]
+
+    return new_fields
+
+
+async def product_to_config(product: Product, model_spec: ModelSpecification, params: dict[str, Any]) -> ExportedSchemas:
     """
     Convert a product to a configuration dictionary.
 
@@ -68,29 +91,28 @@ async def product_to_config(product: Product, model_spec: ModelSpecification, pa
     ----------
     product : Product
         Product Specification
-    modelspec : ModelSpecification
+    model_spec : ModelSpecification
         Specification of the model to use for the product.
     params : dict[str, Any]
         Params from the user to apply to the the product configuration.
 
     Returns
     -------
-    dict[str, ConfigEntry]
-        Dictionary of configuration entries for the product.
+    ExportedSchemas
+        Schema to make form from.
     """
 
     # product_spec = product.qube
 
-    model_spec = get_model(model_spec)
+    model = get_model(model_spec)
     # model_qube = model_spec.qube(product.model_assumptions)
 
-    available_product_spec = product.model_intersection(model_spec)
+    available_product_spec = product.model_intersection(model)
     subsetted_spec = select_from_params(available_product_spec, params)
 
     axes = subsetted_spec.axes()
 
-    entries = {}
-
+    fields = {}
     for key, val in axes.items():
         constrained = []
 
@@ -106,7 +128,7 @@ async def product_to_config(product: Product, model_spec: ModelSpecification, pa
             if sorted(select_from_params(available_product_spec, {}).span(key)) != sorted(
                 select_from_params(available_product_spec, {k: v}).span(key)
             ):
-                constrained.append(product.label.get(k, k))
+                constrained.append(k)
 
             # Has this key: val in the subsetted_spec constrained another axis
             selected_span = select_from_params(available_product_spec, {key: val}).span(k)
@@ -117,20 +139,47 @@ async def product_to_config(product: Product, model_spec: ModelSpecification, pa
         updated_params = {**params, **inferred_constraints}
         val = select_from_params(available_product_spec, {k: v for k, v in updated_params.items() if not k == key}).axes().get(key, val)
 
-        entries[key] = ConfigEntry(
-            label=product.label.get(key, key),
-            description=product.description.get(key, None),
-            values=set(val),
-            example=product.example.get(key, None),
-            multiple=product.multiselect.get(key, False),
-            constrained_by=constrained,
-            default=product.defaults.get(key, None),
-        )
+        field = FieldWithUI(jsonschema=StringSchema(title=key))
 
-    for key in model_spec.ignore_in_select:
-        entries.pop(key, None)
+        if key in model.formfields:
+            # Use the model formfield if available
+            field = model.formfields[key]
+        elif key in product.formfields:
+            # Use the product formfield if available
+            field = product.formfields[key]
 
-    return entries
+        if USER_DEFINED not in available_product_spec.span(key):
+            try:
+                field = rjsfutils.update_enum_within_field(
+                    field,
+                    _sort_values(list(set(val)))
+                )
+            except TypeError:
+                pass
+
+        field = rjsfutils.collapse_enums_if_possible(field)
+        fields[key] = field
+        # TODO: Add constraints to the field
+
+        # fields[key] = ConfigEntry(
+        #     label=product.label.get(key, key),
+        #     description=product.description.get(key, None),
+        #     values=set(val),
+        #     example=product.example.get(key, None),
+        #     multiple=product.multiselect.get(key, False),
+        #     constrained_by=constrained,
+        #     default=product.defaults.get(key, None),
+        # )
+
+    for key in model.ignore_in_select:
+        fields.pop(key, None)
+
+    form = FormDefinition(
+        title=getattr(product, "_name", product.__class__.__name__),
+        fields=_sort_fields(fields),
+        required=list(fields.keys()),
+    )
+    return form.export_all()
 
 
 @router.get("/categories/{interface}")
@@ -174,7 +223,7 @@ async def get_valid_categories(interface: Interfaces, modelspec: ModelSpecificat
 
 
 @router.post("/configuration/{category}/{product}")
-async def get_product_configuration(category: str, product: str, model: ModelSpecification, spec: dict[str, Any]) -> ProductConfiguration:
+async def get_product_configuration(category: str, product: str, model: ModelSpecification, spec: dict[str, Any]) -> ExportedSchemas:
     """
     Get the product configuration for a given category and product.
 
@@ -193,9 +242,9 @@ async def get_product_configuration(category: str, product: str, model: ModelSpe
 
     Returns
     -------
-    ProductConfiguration
-        Product configuration object containing the product name and options.
+    ExportedSchemas
+        Schema to make form from.
     """
     prod = get_product(category, product)
-    entries = await product_to_config(prod, model, spec)
-    return ProductConfiguration(product=f"{category}/{product}", options=entries)
+    return await product_to_config(prod, model, spec)
+    # return ProductConfiguration(product=f"{category}/{product}", options=entries)

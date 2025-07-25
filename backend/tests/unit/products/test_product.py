@@ -14,7 +14,7 @@ from forecastbox.products.product import GenericParamProduct
 
 
 class TestProduct(GenericParamProduct):
-    def to_graph(self, product_spec, model, source):
+    def execute(self, product_spec, model, source):
         raise NotImplementedError("Testing")
 
     @property

@@ -9,14 +9,15 @@
 
 from abc import ABC, abstractmethod
 
-from typing import Any, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING, OrderedDict, Union
 
 from qubed import Qube
-from forecastbox.models import Model
+from earthkit.workflows import fluent
 
+from forecastbox.models import Model
+from .rjsf import FieldWithUI, StringSchema, IntegerSchema, ArraySchema, UIObjectField, UIStringField, FieldSchema
 from .definitions import DESCRIPTIONS, LABELS
 
-from earthkit.workflows import fluent
 
 if TYPE_CHECKING:
     from earthkit.workflows.graph import Graph
@@ -25,21 +26,30 @@ if TYPE_CHECKING:
 
 class Product(ABC):
     """Base Product Class"""
+    
+    @property
+    def _name(self):
+        """Name of the product, used for display purposes."""
+        return self.__class__.__name__
 
-    label: dict[str, str] = {}
-    """Labels of product axes."""
+    @property
+    def formfields(self) -> OrderedDict[str, "FieldWithUI"]:
+        return OrderedDict()
 
-    description: dict[str, str] = {}
-    """Description of product axes."""
-
-    example: dict[str, str] = {}
-    """Example values for product axes."""
-
-    multiselect: dict[str, bool] = {}
-    """Whether the product axes are multi-selectable."""
-
-    defaults: dict[str, Any] = {}
-    """Default values for product axes."""
+    def _make_field(self, multiple: bool = True, schema: type[FieldSchema] = StringSchema, **kwargs):
+        if multiple:
+            return FieldWithUI(
+                jsonschema=ArraySchema(
+                    title=kwargs.pop("title", None),
+                    description=kwargs.pop("description", None),
+                    items=schema(**kwargs),
+                    uniqueItems=True,
+                    minItems=1,
+                ),
+            )
+        return FieldWithUI(
+            jsonschema=schema(**kwargs),
+        )
 
     @property
     @abstractmethod
@@ -48,10 +58,9 @@ class Product(ABC):
         pass
 
     @property
-    # @abstractmethod
     def data_requirements(self) -> "Qube":
         """Data requirements for the product."""
-        return Qube({})
+        return Qube.from_datacube({})
 
     @property
     def model_assumptions(self) -> dict[str, Any]:
@@ -78,7 +87,7 @@ class Product(ABC):
             if key not in source.nodes.dims:
                 continue
 
-            def convert_to_int(value: Any) -> int:
+            def convert_to_int(value: Any) -> Any:
                 """Convert value to int if it is a digit."""
                 try:
                     return_val = int(value)
@@ -107,7 +116,7 @@ class Product(ABC):
             if any(isinstance(v, str) and v == "*" for v in value):
                 # If the value is '*', we skip the selection
                 continue
-            source = source.sel(**{key: value})
+            source = source.sel(**{key: value}) # type: ignore
         return source
 
     def validate_intersection(self, model: Model) -> bool:
@@ -137,15 +146,40 @@ class Product(ABC):
         return fluent.Payload(payload)
 
     @abstractmethod
-    def to_graph(self, product_spec: dict[str, Any], model: Model, source: "Action") -> "Graph":
+    def execute(self, product_spec: dict[str, Any], model: Model, source: "Action") -> Union["Graph","Action"]:
         raise NotImplementedError()
 
 
 class GenericParamProduct(Product):
     """Generic Param Product"""
+    label = {}
+    description = {}
 
-    label = LABELS
-    description = DESCRIPTIONS
+    allow_multiple_params = True
+    allow_multiple_levels = True
+
+
+    @property
+    def formfields(self) -> OrderedDict[str, "FieldWithUI"]:
+        """Form fields for the product."""
+        formfields = super().formfields.copy()
+        formfields.update(
+            param = self._make_field(
+                title='Parameter',
+                multiple=self.allow_multiple_params,
+            ),
+            levtype = FieldWithUI(
+                jsonschema=StringSchema(
+                    title='Level Type',
+                ),
+            ),
+            levelist = self._make_field(
+                title='Level List',
+                schema=IntegerSchema,
+                multiple=self.allow_multiple_levels,
+            )
+        )
+        return formfields
 
     @property
     def generic_params(self) -> dict[str, Any]:
@@ -184,10 +218,28 @@ class GenericParamProduct(Product):
 
 
 class GenericTemporalProduct(GenericParamProduct):
-    description = {
-        **GenericParamProduct.description,
-        "step": "Time step",
-    }
+    """Generic Temporal Product.
+    
+    Adds step as an axis to the product qube, and configures
+    the formfields to include step.
+    """
+
+
+    allow_multiple_steps = True
+    """Whether the product allows multiple steps."""
+
+    @property
+    def formfields(self) -> OrderedDict[str, "FieldWithUI"]:
+        """Form fields for the product."""
+        formfields = super().formfields.copy()
+        formfields.update(
+            step= self._make_field(
+                title='Step',
+                multiple=self.allow_multiple_steps,
+                schema=IntegerSchema,
+            ),
+        )
+        return formfields
 
     def model_intersection(self, model: Model) -> Qube:
         """Get model intersection.
