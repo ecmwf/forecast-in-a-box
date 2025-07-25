@@ -106,6 +106,7 @@ def quickplot(fields: ekd.FieldList, groupby: Optional[str] = None, subplot_titl
     from earthkit.plots.utils import iter_utils
     from earthkit.plots.components import layouts
     from earthkit.plots.schemas import schema
+    from earthkit.plots import Figure  # NOTE we need to import again to mask the possible Any
 
     if not isinstance(fields, ekd.FieldList):
         fields = ekd.FieldList.from_fields(fields)
