@@ -7,15 +7,22 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from typing import Any, TYPE_CHECKING, OrderedDict
+from typing import TYPE_CHECKING
+from typing import Any
+from typing import OrderedDict
 
-from .registry import CategoryRegistry
+from .export import export_fieldlist_as
 from .interfaces import Interfaces
 from .product import GenericParamProduct
-from .rjsf import FieldWithUI, StringSchema, IntegerSchema, ArraySchema, UIObjectField, UIStringField, FieldSchema
+from .registry import CategoryRegistry
+from .rjsf import FieldWithUI
+from .rjsf import StringSchema
 
 forecast_registry = CategoryRegistry(
-    "forecast_statistic", interface=Interfaces.DETAILED, description="Statistics over time for each member", title="Forecast Statistics"
+    "forecast_statistic",
+    interface=Interfaces.DETAILED,
+    description="Statistics over time for each member",
+    title="Forecast Statistics",
 )
 
 if TYPE_CHECKING:
@@ -43,8 +50,8 @@ class BaseForecast(GenericParamProduct):
         """Form fields for the product."""
         formfields = super().formfields.copy()
         formfields.update(
-            step= self._make_field(
-                title='Step',
+            step=self._make_field(
+                title="Step",
                 multiple=False,
                 schema=StringSchema,
             ),
@@ -77,7 +84,11 @@ class BaseForecast(GenericParamProduct):
 
     def execute(self, product_spec, model, source):
         assert self._statistic is not None, "Statistic must be defined"
-        return self._apply_statistic(product_spec, source, self._statistic)
+        return (
+            self._apply_statistic(product_spec, source, self._statistic)
+            .map(export_fieldlist_as(format="grib"))
+            .map(self.named_payload(self._statistic))
+        )
 
 
 @forecast_registry("Mean")
