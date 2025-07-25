@@ -7,17 +7,17 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from pathlib import Path
 import io
-import earthkit.data as ekd
-import xarray as xr
-import numpy as np
-import cloudpickle
 import logging
+from pathlib import Path
 
-from forecastbox.config import config
-from cascade.gateway.api import decoded_result
 import cascade.gateway.api as api
+import cloudpickle
+import earthkit.data as ekd
+import numpy as np
+import xarray as xr
+from cascade.gateway.api import decoded_result
+from forecastbox.config import config
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ def get_model_path(model: str) -> Path:
 
 def encode_result(result: api.ResultRetrievalResponse) -> tuple[bytes, str]:
     """Converts cascade Result response to bytes+mime"""
-    obj = decoded_result(result, job=None)
+    obj = decoded_result(result, job=None)  # type: ignore
     if isinstance(obj, bytes):
         return obj, "application/pickle"
     if isinstance(obj, tuple):
@@ -51,13 +51,13 @@ def encode_result(result: api.ResultRetrievalResponse) -> tuple[bytes, str]:
     if isinstance(obj, ekd.FieldList):
         encoder = ekd.create_encoder("grib")
         if isinstance(obj, ekd.Field):
-            return encoder.encode(obj).to_bytes(), "application/grib"
+            return encoder.encode(obj).to_bytes(), "application/grib"  # type: ignore
         elif isinstance(obj, ekd.FieldList):
-            return encoder.encode(obj[0], template=obj[0]).to_bytes(), "application/grib"
+            return encoder.encode(obj[0], template=obj[0]).to_bytes(), "application/grib"  # type: ignore
 
     elif isinstance(obj, (xr.Dataset, xr.DataArray)):
         buf = io.BytesIO()
-        obj.to_netcdf(buf, format="NETCDF4")
+        obj.to_netcdf(buf, format="NETCDF4")  # type: ignore
         return buf.getvalue(), "application/netcdf"
 
     elif isinstance(obj, np.ndarray):
