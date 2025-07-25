@@ -51,7 +51,7 @@ const GlobeSelect: React.FC<GlobeSelectProps> = ({ handleSubmit, setSelectedLoca
 
         setLatitude(startLat);
         setLongitude(startlon);
-        
+
     }, []);
 
     // Handlers for changing the latitude and longitude
@@ -70,7 +70,7 @@ const GlobeSelect: React.FC<GlobeSelectProps> = ({ handleSubmit, setSelectedLoca
             markLocation({ lat: latitude, lng: newlon });
         }
     };
-    
+
     const handleSubmitClick = () => {
         if (latitude && longitude) {
             setSelectedLocation({ lat: parseFloat(latitude.toString()), lon: parseFloat(longitude.toString()) });
@@ -122,7 +122,7 @@ const GlobeSelect: React.FC<GlobeSelectProps> = ({ handleSubmit, setSelectedLoca
                     polygonCapColor={() => 'rgba(0, 100, 0, 0)'}
 
                     // pointOfView = {{ lat: 54.5260, lng: 15.2551, altitude: 3 }} // Not working
-                    
+
                     ringsData={ringsData}
                     ringColor={() => t => `rgba(255,255,255,${1-t})`}
                     ringMaxRadius={RINGS_MAX_R}

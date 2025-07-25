@@ -10,11 +10,17 @@
 """API types"""
 
 from dataclasses import dataclass
-from typing import Optional, Any, Literal
+from typing import Any
+from typing import Literal
+from typing import Optional
 
-from forecastbox.products.product import USER_DEFINED
-from pydantic import BaseModel, Field, field_validator, model_validator, PositiveInt
 from cascade.low.core import JobInstance
+from forecastbox.products.product import USER_DEFINED
+from pydantic import BaseModel
+from pydantic import Field
+from pydantic import PositiveInt
+from pydantic import field_validator
+from pydantic import model_validator
 
 CONFIG_ORDER = ["param", "levtype", "levelist"]
 
@@ -71,8 +77,7 @@ class ConfigEntry(FIABBaseModel):
 
 
 class ProductConfiguration(FIABBaseModel):
-    """
-    Product Configuration
+    """Product Configuration
 
     Provides the available configuration entries for a product.
     """

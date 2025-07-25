@@ -9,9 +9,10 @@
 
 
 from typing import Any
-from forecastbox.products.product import Product
-from forecastbox.products.pproc import PProcProduct
+
 from forecastbox.models.model import Model
+from forecastbox.products.pproc import PProcProduct
+from forecastbox.products.product import Product
 
 
 class BaseEnsembleProduct(Product):

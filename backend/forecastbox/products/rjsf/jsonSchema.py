@@ -89,6 +89,7 @@ class StringSchema(BaseSchema, EnumMixin):
     maxLength: Optional[int] = None
     """Maximum length."""
 
+
 class IntegerSchema(BaseSchema, EnumMixin):
     """JSON Schema for integer type.
 
@@ -110,6 +111,7 @@ class IntegerSchema(BaseSchema, EnumMixin):
     multipleOf: Optional[int] = None
     """Value must be a multiple of this number."""
 
+
 class NumberSchema(BaseSchema, EnumMixin):
     """JSON Schema for number type (float or int).
 
@@ -129,6 +131,7 @@ class NumberSchema(BaseSchema, EnumMixin):
     """Minimum value."""
     maximum: Optional[float] = None
     """Maximum value."""
+
 
 class BooleanSchema(BaseSchema):
     """JSON Schema for boolean type.

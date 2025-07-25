@@ -1,12 +1,13 @@
-"""
-Common session maker invocation, db locking, retries
-"""
+"""Common session maker invocation, db locking, retries"""
 
 import asyncio
-import sqlalchemy.exc
-from asyncio import Lock
 import logging
-from typing import Callable, Any, TypeVar
+from asyncio import Lock
+from typing import Any
+from typing import Callable
+from typing import TypeVar
+
+import sqlalchemy.exc
 
 logger = logging.getLogger(__name__)
 retries = 3

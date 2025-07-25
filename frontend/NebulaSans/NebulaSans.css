@@ -4,7 +4,7 @@
     font-weight: 700;
     font-style: normal;
   }
-  
+
   @font-face {
     font-family: 'NebulaSans-Bold';
     src: url('./NebulaSans-Bold.woff2') format('woff2');

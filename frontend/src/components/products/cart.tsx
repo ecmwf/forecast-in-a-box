@@ -35,7 +35,7 @@ function Cart({products, disable_delete, setProducts}: CartProps) {
 
     const [modalOpen, setModalOpen] = useState<boolean>(false);
     const [selectedProduct, setSelectedProduct] = useState<string>("");
-    
+
     const openModal = (id: string) => {
       setSelectedProduct(id);
       setModalOpen(true);
@@ -52,7 +52,7 @@ function Cart({products, disable_delete, setProducts}: CartProps) {
       };
       const [expanded, setExpanded] = useState<Record<string, boolean>>(
         Object.keys(products).reduce((acc, id) => {
-          acc[id] = Object.keys(products).length > 6 ? false : true; 
+          acc[id] = Object.keys(products).length > 6 ? false : true;
           return acc;
         }, {} as Record<string, boolean>)
       );
@@ -68,10 +68,10 @@ function Cart({products, disable_delete, setProducts}: CartProps) {
             <Card.Section w='100%'>
                 <Group justify='space-between' mt="" mb="" wrap='nowrap'>
                     <Group>
-                      <ActionIcon 
-                            color="outline" 
+                      <ActionIcon
+                            color="outline"
                             c='blue'
-                            onClick={() => {toggleExpanded(id);}} 
+                            onClick={() => {toggleExpanded(id);}}
                             size="xs"
                           >
                             {expanded[id] ? <IconChevronRight/> : <IconChevronDown/>}
@@ -103,7 +103,7 @@ function Cart({products, disable_delete, setProducts}: CartProps) {
             </Collapse>
       </Card>
     ));
-    
+
     return (
       <Paper shadow="sm" mt='lg' p="sm" radius="md" withBorder w="inherit" h='90%' mih="10vh">
         <ScrollArea.Autosize mah="90%" type='always'>
@@ -112,6 +112,6 @@ function Cart({products, disable_delete, setProducts}: CartProps) {
       </Paper>
     );
   };
-  
+
 
   export default Cart;

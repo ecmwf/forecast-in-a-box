@@ -1,4 +1,5 @@
-from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
+from .utils import extract_auth_token_from_response
+from .utils import prepare_cookie_with_auth_token
 
 
 def test_admin_flows(backend_client):

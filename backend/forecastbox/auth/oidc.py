@@ -7,10 +7,8 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from httpx_oauth.clients.openid import OpenID
-
 from forecastbox.config import config
-
+from httpx_oauth.clients.openid import OpenID
 
 if config.auth.oidc is not None:
     oauth_client = OpenID(

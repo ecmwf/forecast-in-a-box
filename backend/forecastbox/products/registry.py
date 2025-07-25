@@ -7,16 +7,15 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""
-Registry of products
-"""
+"""Registry of products"""
 
-from dataclasses import dataclass, field
-from typing import Callable, Type
-
-from .product import Product
+from dataclasses import dataclass
+from dataclasses import field
+from typing import Callable
+from typing import Type
 
 from .interfaces import Interfaces
+from .product import Product
 
 PRODUCTS: dict[str, "CategoryRegistry"] = {}
 
@@ -41,8 +40,7 @@ class CategoryRegistry:
         description: str | None = None,
         title: str | None = None,
     ):
-        """
-        Register a product category.
+        """Register a product category.
 
         Parameters
         ----------
@@ -73,8 +71,7 @@ class CategoryRegistry:
         )  # {"title": self._title, "description": self._description, "options": list(map(str, self._products.keys()))}
 
     def __call__(self, product: str) -> Callable[[type[Product]], type[Product]]:
-        """
-        Register a product.
+        """Register a product.
 
         Parameters
         ----------

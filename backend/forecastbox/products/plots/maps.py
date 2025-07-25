@@ -7,28 +7,28 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from typing import Optional
-import warnings
 import io
+import warnings
 from collections import defaultdict
-
-from forecastbox.products.ensemble import BaseEnsembleProduct
+from typing import Optional
 
 import earthkit.data as ekd
-
-from earthkit.workflows.decorators import as_payload
 from earthkit.workflows import mark
+from earthkit.workflows.decorators import as_payload
 from earthkit.workflows.plugins.anemoi.fluent import ENSEMBLE_DIMENSION_NAME
-
 from forecastbox.models import Model
+from forecastbox.products.ensemble import BaseEnsembleProduct
 from forecastbox.products.product import GenericTemporalProduct
 
+from ..rjsf import FieldWithUI
+from ..rjsf import StringSchema
+from ..rjsf import UIStringField
 from . import plot_product_registry
-from ..rjsf import FieldWithUI, StringSchema, IntegerSchema, ArraySchema, UIObjectField, UIStringField, FieldSchema
 
 EARTHKIT_PLOTS_IMPORTED = True
 try:
-    from earthkit.plots import Figure, Subplot
+    from earthkit.plots import Figure
+    from earthkit.plots import Subplot
 except ImportError:
     from typing import Any
 
@@ -39,9 +39,8 @@ except ImportError:
 WIND_SHORTNAMES = ["u", "v", "10u", "10v", "100u", "100v"]
 
 
-def _plot_fields(subplot: Subplot, fields: ekd.FieldList, **kwargs: dict[str, dict]):
-    """
-    Plot fields on a subplot, using the appropriate plotting method based on field metadata.
+def _plot_fields(subplot: Subplot, fields: ekd.FieldList, **kwargs: dict[str, dict]) -> None:
+    """Plot fields on a subplot, using the appropriate plotting method based on field metadata.
 
     Will attempt to group related plots, and call the appropriate plotting method.
 
@@ -74,11 +73,11 @@ def _plot_fields(subplot: Subplot, fields: ekd.FieldList, **kwargs: dict[str, di
                     **kwargs.get("quickplot", {}),
                 )
 
+
 @as_payload
 @mark.environment_requirements(["earthkit-plots"])
 def export(figure: Figure, format: str = "png") -> tuple[bytes, str]:
-    """
-    Export a figure to a specified format.
+    """Export a figure to a specified format.
 
     Parameters
     ----------
@@ -94,19 +93,26 @@ def export(figure: Figure, format: str = "png") -> tuple[bytes, str]:
     """
     if format not in ["png", "pdf", "svg"]:
         raise ValueError(f"Unsupported format: {format}. Supported formats are 'png', 'pdf', 'svg'.")
-    
+
     buf = io.BytesIO()
     figure.save(buf, format=format)
 
     return buf.getvalue(), f"image/{format}"
 
+
 @as_payload
 @mark.environment_requirements(["earthkit-plots", "earthkit-plots-default-styles"])
-def quickplot(fields: ekd.FieldList, groupby: Optional[str] = None, subplot_title: Optional[str] = None, figure_title: Optional[str] = None, domain:Optional[str]=None):
-    from earthkit.plots.utils import iter_utils
+def quickplot(
+    fields: ekd.FieldList,
+    groupby: Optional[str] = None,
+    subplot_title: Optional[str] = None,
+    figure_title: Optional[str] = None,
+    domain: Optional[str] = None,
+):
     from earthkit.plots.components import layouts
     from earthkit.plots.schemas import schema
     from earthkit.plots import Figure  # NOTE we need to import again to mask the possible Any
+    from earthkit.plots.utils import iter_utils
 
     if not isinstance(fields, ekd.FieldList):
         fields = ekd.FieldList.from_fields(fields)
@@ -139,13 +145,19 @@ def quickplot(fields: ekd.FieldList, groupby: Optional[str] = None, subplot_titl
             try:
                 getattr(subplot, m)(*args)
             except Exception as err:
-                warnings.warn(f"Failed to execute {m} on given data with: \n" f"{err}\n\n" "consider constructing the plot manually.")
+                warnings.warn(
+                    f"Failed to execute {m} on given data with: \n"
+                    f"{err}\n\n"
+                    "consider constructing the plot manually."
+                )
 
     for m in schema.quickmap_figure_workflow:
         try:
             getattr(figure, m)()
         except Exception as err:
-            warnings.warn(f"Failed to execute {m} on given data with: \n" f"{err}\n\n" "consider constructing the plot manually.")
+            warnings.warn(
+                f"Failed to execute {m} on given data with: \n" f"{err}\n\n" "consider constructing the plot manually."
+            )
 
     # figure.title(figure_title)
 
@@ -153,8 +165,7 @@ def quickplot(fields: ekd.FieldList, groupby: Optional[str] = None, subplot_titl
 
 
 class MapProduct(GenericTemporalProduct):
-    """
-    Map Product.
+    """Map Product.
 
     This product is a simple wrapper around the `earthkit.plots` library to create maps.
 
@@ -184,11 +195,11 @@ class MapProduct(GenericTemporalProduct):
                 ),
                 ui=UIStringField(
                     widget="select",
-                )
-            )
+                ),
+            ),
         )
         return formfields
-    
+
     @property
     def model_assumptions(self):
         return {
@@ -231,8 +242,7 @@ class SimpleMapProduct(MapProduct):
 
 @plot_product_registry("Ensemble Maps")
 class EnsembleMapProduct(BaseEnsembleProduct, MapProduct):
-    """
-    Ensemble Map Product.
+    """Ensemble Map Product.
 
     Create a subplotted map with each subplot being a different ensemble member.
     """
