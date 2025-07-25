@@ -28,7 +28,7 @@ def test_collapse_enums_if_possible_string():
     collapsed = utils.collapse_enums_if_possible(field)
     assert collapsed.jsonschema.default == "only"
     assert isinstance(collapsed.ui, UIField)
-    assert collapsed.ui.readonly is True
+    assert collapsed.ui.disabled is True
 
 
 def test_collapse_enums_if_possible_array():
