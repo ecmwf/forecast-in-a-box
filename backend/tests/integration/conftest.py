@@ -1,15 +1,17 @@
-import tempfile
-import pytest
-from forecastbox.standalone.entrypoint import launch_all
-import httpx
-from forecastbox.config import FIABConfig
 import pathlib
-from http.server import SimpleHTTPRequestHandler
 import socketserver
-from multiprocessing import Process
+import tempfile
 import time
+from http.server import SimpleHTTPRequestHandler
+from multiprocessing import Process
 
-from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
+import httpx
+import pytest
+from forecastbox.config import FIABConfig
+from forecastbox.standalone.entrypoint import launch_all
+
+from .utils import extract_auth_token_from_response
+from .utils import prepare_cookie_with_auth_token
 
 fake_model_name = "themodel"
 fake_repository_port = 12000
@@ -82,7 +84,9 @@ def backend_client_with_auth(backend_client):
     data = {"email": "authenticated_user@somewhere.org", "password": "something"}
     response = backend_client.post("/auth/register", headers=headers, json=data)
     assert response.is_success
-    response = backend_client.post("/auth/jwt/login", data={"username": "authenticated_user@somewhere.org", "password": "something"})
+    response = backend_client.post(
+        "/auth/jwt/login", data={"username": "authenticated_user@somewhere.org", "password": "something"}
+    )
     token = extract_auth_token_from_response(response)
     assert token is not None, "Token should not be None"
     backend_client.cookies.set(**prepare_cookie_with_auth_token(token))

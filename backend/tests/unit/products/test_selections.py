@@ -9,12 +9,12 @@
 
 
 from pathlib import Path
-from qubed import Qube
-
-from forecastbox.products.product import GenericParamProduct, Product
-from forecastbox.models import Model
 
 import pytest
+from forecastbox.models import Model
+from forecastbox.products.product import GenericParamProduct
+from forecastbox.products.product import Product
+from qubed import Qube
 
 
 def create_test_product(axis: dict[str, list[str]]) -> Product:
@@ -74,7 +74,9 @@ def test_product_selection():
     product_qube = product.model_intersection(model)
     assert "options" in product_qube.axes(), "Product qube should have 'options' axis"
 
-    assert product_qube.axes()["options"] == set(["value1", "value2"]), "Product qube should have 'value1' and 'value2' in 'options' axis"
+    assert product_qube.axes()["options"] == set(
+        ["value1", "value2"]
+    ), "Product qube should have 'value1' and 'value2' in 'options' axis"
 
 
 @pytest.mark.parametrize(
@@ -115,6 +117,9 @@ def test_generic_param_product():
     qube = product.make_generic_qube(options=["value1", "value2"])
 
     assert isinstance(qube, Qube), "Generic product should return a Qube"
-    assert qube.span("options") == ["value1", "value2"], "Generic product Qube should have 'value1' and 'value2' in 'options' axis"
+    assert qube.span("options") == [
+        "value1",
+        "value2",
+    ], "Generic product Qube should have 'value1' and 'value2' in 'options' axis"
 
     # assert qube.span('param') == ["*"], "Generic product Qube should have '*' in 'param' axis" # Cannot check due to wildcard nature of 'param'

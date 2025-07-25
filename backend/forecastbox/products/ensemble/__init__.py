@@ -8,14 +8,17 @@
 # nor does it submit to any jurisdiction.
 
 from forecastbox.products.registry import CategoryRegistry
+
 from ..interfaces import Interfaces
 
 ensemble_registry = CategoryRegistry(
     "ensemble", interface=Interfaces.DETAILED, description="Capture the distribution of the ensemble", title="Ensemble"
 )
 
+from . import ens_stats  # noqa: F401, E402
+from . import quantiles  # noqa: F401, E402
+from . import threshold  # noqa: F401, E402
 from .base import BaseEnsembleProduct  # noqa: F401, E402
-from . import threshold, quantiles, ens_stats  # noqa: F401, E402
 
 __all__ = [
     "ensemble_registry",

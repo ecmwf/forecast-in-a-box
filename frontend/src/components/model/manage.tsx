@@ -76,7 +76,7 @@ function EditModel({ model }: { model: string }) {
         } catch (error) {
             showNotification({
                 color: 'red',
-                message: 'Error saving model data',                
+                message: 'Error saving model data',
             });
         } finally {
             setModalOpened(false);
@@ -142,7 +142,7 @@ function EditModel({ model }: { model: string }) {
                             <Loader />
                         )}
                     </Flex>
-                    <Button mt="md" 
+                    <Button mt="md"
                         fullWidth
                         onClick={() => {
                             handleEdit(modelData)
@@ -333,7 +333,7 @@ function Options({ cardProps, tabProps, setSelected }: OptionsProps) {
                     </ActionIcon>
                 </Flex>
             </Card.Section>
-            {loading ? <p>Loading...</p> : 
+            {loading ? <p>Loading...</p> :
             <Table highlightOnHover verticalSpacing="xs" className={classes['option-table']}>
                 <Table.Thead>
                     <Table.Tr style={{ backgroundColor: "#f0f0f6", textAlign: "left" }}>

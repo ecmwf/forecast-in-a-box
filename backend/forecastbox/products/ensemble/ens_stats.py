@@ -7,14 +7,13 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from typing import Any, Optional
-
 import itertools
+from typing import Any
+from typing import Optional
 
 from earthkit.workflows import fluent
-
-from forecastbox.products.product import GenericTemporalProduct
 from forecastbox.products.ensemble.base import BasePProcEnsembleProduct
+from forecastbox.products.product import GenericTemporalProduct
 
 from . import ensemble_registry
 

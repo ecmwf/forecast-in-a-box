@@ -7,27 +7,29 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+import logging
 from typing import Optional
 
-from fastapi import Depends, HTTPException, Request, responses
-from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
-from fastapi_users.authentication import (
-    AuthenticationBackend,
-    CookieTransport,
-    JWTStrategy,
-)
-from fastapi_users.db import SQLAlchemyUserDatabase
-
-import pydantic
-import logging
-from sqlalchemy import func, select, update
 import jwt
-
-from forecastbox.schemas.user import UserTable
-from forecastbox.db.user import get_user_db
+import pydantic
+from fastapi import Depends
+from fastapi import HTTPException
+from fastapi import Request
+from fastapi import responses
+from fastapi_users import BaseUserManager
+from fastapi_users import FastAPIUsers
+from fastapi_users import UUIDIDMixin
+from fastapi_users.authentication import AuthenticationBackend
+from fastapi_users.authentication import CookieTransport
+from fastapi_users.authentication import JWTStrategy
+from fastapi_users.db import SQLAlchemyUserDatabase
 from forecastbox.config import config
 from forecastbox.db.user import async_session_maker
-
+from forecastbox.db.user import get_user_db
+from forecastbox.schemas.user import UserTable
+from sqlalchemy import func
+from sqlalchemy import select
+from sqlalchemy import update
 
 SECRET = config.auth.jwt_secret.get_secret_value()
 COOKIE_NAME = "forecastbox_auth"
@@ -71,10 +73,14 @@ class UserManager(UUIDIDMixin, BaseUserManager[UserTable, pydantic.UUID4]):
                 _ = await session.execute(query)
                 await session.commit()
 
-    async def on_after_login(self, user: UserTable, request: Optional[Request] = None, response: Optional[responses.Response] = None):
+    async def on_after_login(
+        self, user: UserTable, request: Optional[Request] = None, response: Optional[responses.Response] = None
+    ):
         if not verify_entitlements(user):
             logger.error(f"User {user.id} does not have the required entitlements.")
-            raise HTTPException(status_code=403, detail="You do not have the required entitlements to access this resource.")
+            raise HTTPException(
+                status_code=403, detail="You do not have the required entitlements to access this resource."
+            )
 
         response.status_code = 302
         response.headers["location"] = "/"

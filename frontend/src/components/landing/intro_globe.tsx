@@ -77,7 +77,7 @@ const SimpleGlobe = ({showGlobe, setShowGlobe}) => {
       const globe = globeEl.current;
       if (globe && globe.controls) {
         const controls = globe.controls();
-        
+
         controls.autoRotate = true;
         controls.autoRotateSpeed = 2;
         controls.enableZoom = false;
@@ -165,13 +165,13 @@ const SimpleGlobe = ({showGlobe, setShowGlobe}) => {
           atmosphereAltitude={0.1}
           pointAltitude={0}
         />
-  
+
         {/* Floating Action Icon in Bottom-Right */}
       </div>
       </Center>
       </>
   );
-  
+
 }
 
 export default SimpleGlobe;

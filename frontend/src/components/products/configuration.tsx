@@ -62,14 +62,14 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
       const response = await api.post(`/v1/product/configuration/${selectedProduct}`, { 'model': selectedModel, 'spec': data });
       const productSpec: ProductConfiguration = await response.data;
       updateProductConfig(productSpec);
-      
+
     } catch (error) {
       console.error("Error fetching updated options:", error);
     }
     setUpdating(false);
   };
 
-  
+
   // Fetch initial options on component mount
   useEffect(() => {
     setFormData({});
@@ -110,7 +110,7 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
               onChange={(e) => { setFormData(e.formData); fetchUpdatedOptions(e.formData); }}
               onSubmit={(e) => { onSubmit(e.formData); }}
               showErrorList={"bottom"}
-              omitExtraData={true}              
+              omitExtraData={true}
             />
           </Card.Section>
           <Button type='button' onClick={() => { setFormData({}); fetchInitialOptions(); }}>Clear</Button>
@@ -120,7 +120,7 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
             </Group>
           </Card.Section>
           </>
-          ) : 
+          ) :
           <Text>Loading product configuration...</Text>
         }
     </Card>

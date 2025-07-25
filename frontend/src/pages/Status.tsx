@@ -28,14 +28,14 @@ const StatusPage = () => {
     }>({ api: "loading", cascade: "loading", ecmwf: "loading", webmars: "loading" });
 
     const api = useApi();
-    
+
     const checkStatus = async () => {
               setStatus(prevStatus => ({ ...prevStatus, api: "loading", cascade: "loading", ecmwf: "loading"}));
         try {
             const response = await api.get("/v1/status");
             if (response.status == 200) {
                 const data = await response.data;
-                setStatus(prevStatus => ({ ...prevStatus, 
+                setStatus(prevStatus => ({ ...prevStatus,
                     api: data.api || "down",
                     cascade: data.cascade || "down",
                     ecmwf: data.ecmwf || "down",

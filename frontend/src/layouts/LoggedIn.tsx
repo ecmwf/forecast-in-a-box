@@ -19,7 +19,7 @@ import { showNotification } from '@mantine/notifications';
 export default function LoggedIn({ children }: { children: React.ReactNode }) {
 
     const navigate = useNavigate();
-    
+
     const api = useApi();
 
     useEffect(() => {

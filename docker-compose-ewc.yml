@@ -57,7 +57,7 @@ services:
     volumes:
       - data:/app/data_dir
       - ~/.ecmwfapirc:/root/.ecmwfapirc:ro
-    
+
     deploy:
       resources:
         reservations:

@@ -35,7 +35,7 @@ function Categories({categories, setSelected }: CategoriesProps) {
                     </Button>
                 ))}
             </Paper>
-            ) 
+            )
         ))}
         {Object.entries(categories).map(([key, item]) => (
             !item.available && item.unavailable_options && (
@@ -49,7 +49,7 @@ function Categories({categories, setSelected }: CategoriesProps) {
                     </Button>
                 ))}
             </Paper>
-            ) 
+            )
         ))}
         </>
     );

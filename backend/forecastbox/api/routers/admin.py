@@ -10,16 +10,24 @@
 """Admin API Router."""
 
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+
+from fastapi import APIRouter
+from fastapi import Depends
+from fastapi import HTTPException
 from fastapi.responses import HTMLResponse
-
-from pydantic import BaseModel, UUID4
-from forecastbox.config import config, BackendAPISettings, CascadeSettings
-
 from forecastbox.auth.users import current_active_user
-from forecastbox.schemas.user import UserRead, UserTable, UserUpdate
+from forecastbox.config import BackendAPISettings
+from forecastbox.config import CascadeSettings
+from forecastbox.config import config
 from forecastbox.db.user import async_session_maker
-from sqlalchemy import select, delete, update
+from forecastbox.schemas.user import UserRead
+from forecastbox.schemas.user import UserTable
+from forecastbox.schemas.user import UserUpdate
+from pydantic import UUID4
+from pydantic import BaseModel
+from sqlalchemy import delete
+from sqlalchemy import select
+from sqlalchemy import update
 
 logger = logging.getLogger(__name__)
 

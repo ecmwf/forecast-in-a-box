@@ -1,15 +1,18 @@
-def extract_auth_token_from_response(response):
-    """
-    Extracts the authentication token from the response cookies.
+def extract_auth_token_from_response(response) -> None | str:
+    """Extracts the authentication token from the response cookies.
 
     Will look for the `forecastbox_auth` cookie in the response,
     including in any redirects that may have occurred.
 
-    Args:
-        response (httpx.Response): The HTTP response object.
+    Parameters
+    ----------
+    response: httpx.Response
+        The HTTP response object from which to extract the token.
 
-    Returns:
-        str: The authentication token if found, otherwise None.
+    Returns
+    -------
+    None | str
+        The authentication token if found, otherwise None.
     """
     cookies = response.cookies
     if cookies:
@@ -21,14 +24,17 @@ def extract_auth_token_from_response(response):
     return None
 
 
-def prepare_cookie_with_auth_token(token):
-    """
-    Prepares a cookie with the authentication token.
+def prepare_cookie_with_auth_token(token) -> dict:
+    """Prepares a cookie with the authentication token.
 
-    Args:
-        token (str): The authentication token to be set in the cookie.
+    Parameters
+    ----------
+    token: str
+        The authentication token to be set in the cookie.
 
-    Returns:
-        dict: A dictionary representing the cookie with the token.
+    Returns
+    -------
+    dict:
+        A dictionary representing the cookie with the token.
     """
     return {"name": "forecastbox_auth", "value": token}

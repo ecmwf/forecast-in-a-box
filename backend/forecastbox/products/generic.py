@@ -7,8 +7,8 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from .registry import CategoryRegistry
 from .interfaces import Interfaces
+from .registry import CategoryRegistry
 
 generic_registry = CategoryRegistry(
     "generic", interface=Interfaces.DETAILED, description="General products with full configuration", title="Generic"

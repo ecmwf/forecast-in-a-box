@@ -9,9 +9,10 @@
 
 
 import io
-from typing import Literal, TYPE_CHECKING
-import earthkit.data as ekd
+from typing import TYPE_CHECKING
+from typing import Literal
 
+import earthkit.data as ekd
 from earthkit.workflows.decorators import as_payload
 
 if TYPE_CHECKING:
@@ -20,20 +21,31 @@ if TYPE_CHECKING:
 
 OUTPUT_TYPES = ["grib", "netcdf", "numpy"]
 
+
 @as_payload
-def export_fieldlist_as(fields: ekd.FieldList, format: Literal["grib", "netcdf", "numpy"] = "grib") -> tuple[bytes, str]:
-    """
-    Export an earthkit FieldList to a specified format.
+def export_fieldlist_as(
+    fields: ekd.FieldList, format: Literal["grib", "netcdf", "numpy"] = "grib"
+) -> tuple[bytes, str]:
+    """Export an earthkit FieldList to a specified format.
     Supported formats are 'grib', 'netcdf', and 'numpy'.
 
+    Parameters:
+    ----------
+    fields : ekd.FieldList
+        The FieldList to export.
+    format : str, optional
+        The format to export to. Default is 'grib'.
+
     Returns:
+    -------
+    tuple[bytes, str]
         A tuple containing the serialized data as bytes and the MIME type.
     """
     written_bytes = bytes()
-    
+
     if format == "grib":
         buf = io.BytesIO()
-        fields.to_target('file', buf)
+        fields.to_target("file", buf)
         written_bytes = buf.getvalue()
     elif format == "netcdf":
         xr_obj: xr.Dataset = fields.to_xarray()
@@ -41,7 +53,7 @@ def export_fieldlist_as(fields: ekd.FieldList, format: Literal["grib", "netcdf",
             raise ValueError("Data cannot be converted to netcdf.")
         written_bytes = xr_obj.to_netcdf()
     elif format == "numpy":
-        np_obj: np.ndarray = fields.to_numpy() # type: ignore
+        np_obj: np.ndarray = fields.to_numpy()  # type: ignore
         if np_obj is None:
             raise ValueError("Data cannot be converted to numpy.")
         written_bytes = np_obj.tobytes()

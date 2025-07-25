@@ -34,7 +34,7 @@ const ProductsPage = () => {
 
     const [selectedModel, setSelectedModel] = useState<ModelSpecification>({} as ModelSpecification);
     const [coords, setCoordinates] = useState<{ lat: number; lon: number } | null>(null);
-    
+
 
     const setSubmittedModel = (val: ModelSpecification) => {
         setSelectedModel(val);

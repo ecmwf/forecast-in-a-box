@@ -8,15 +8,13 @@
 # nor does it submit to any jurisdiction.
 
 from fastapi import APIRouter
-
-from forecastbox.auth.users import fastapi_users
-from forecastbox.auth.users import auth_backend
 from forecastbox.auth.oidc import oauth_client
-
-
-from forecastbox.schemas.user import UserRead, UserCreate, UserUpdate
-
+from forecastbox.auth.users import auth_backend
+from forecastbox.auth.users import fastapi_users
 from forecastbox.config import config
+from forecastbox.schemas.user import UserCreate
+from forecastbox.schemas.user import UserRead
+from forecastbox.schemas.user import UserUpdate
 
 router = APIRouter()
 SECRET = config.auth.jwt_secret.get_secret_value()

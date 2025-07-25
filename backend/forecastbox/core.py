@@ -7,7 +7,8 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from abc import ABC, abstractmethod
+from abc import ABC
+from abc import abstractmethod
 from typing import Dict
 
 from forecastbox.products.rjsf import FieldWithUI
@@ -20,7 +21,7 @@ class FormFieldProvider(ABC):
     @abstractmethod
     def formfields(self) -> Dict[str, FieldWithUI]:
         """Dictionary of form fields.
-        
+
         Will be used to populate the form definition with fields that have both JSON Schema and optional UI Schema.
         """
         return {}

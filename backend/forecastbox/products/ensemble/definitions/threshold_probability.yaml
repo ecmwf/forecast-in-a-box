@@ -3,13 +3,13 @@
 
 - levtype: sfc
   param: 2t
-  threshold: 
+  threshold:
     - ['273.15', 131073]
   operator: '<='
-  
+
 - levtype: sfc
   param: tp
-  threshold: 
+  threshold:
     - ['0.001', 131060]
     - ['0.003', 131066]
     - ['0.005', 131061]
@@ -22,21 +22,21 @@
 
 - levtype: sfc
   param: tp
-  threshold: 
+  threshold:
     - ['0.0001', 131064]
     - ['0.001', 131065]
   operator: '<'
 
 - levtype: sfc
   param: [10u, 10v]
-  threshold: 
+  threshold:
     - ['10', 131068]
     - ['15', 131069]
   operator: '>='
 
 - levtype: sfc
   param: 10fg6
-  threshold: 
+  threshold:
     - ['10', 131100]
     - ['15', 131070]
     - ['20', 131071]
@@ -45,7 +45,7 @@
 
 - levtype: sfc
   param: swh
-  threshold: 
+  threshold:
     - ['2', 131074]
     - ['4', 131075]
     - ['6', 131076]
@@ -54,7 +54,7 @@
 
 - levtype: sfc
   param: mwp
-  threshold: 
+  threshold:
     - ['8', 131078]
     - ['10', 131079]
     - ['12', 131080]

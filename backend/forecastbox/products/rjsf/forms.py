@@ -15,9 +15,9 @@ from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
-from typing_extensions import TypedDict
 
 from pydantic import BaseModel
+from typing_extensions import TypedDict
 
 from .jsonSchema import FieldSchema
 from .uiSchema import UISchema

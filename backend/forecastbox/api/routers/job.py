@@ -9,37 +9,44 @@
 
 """Job Monitoring API Router."""
 
+import asyncio
+import io
+import json
 import logging
 import os
 import pathlib
-import orjson
-import json
-from typing import Literal
-from fastapi import APIRouter, Response, Depends, UploadFile, Body
-from fastapi.responses import HTMLResponse
-from fastapi import HTTPException
-import asyncio
-import io
 import zipfile
-
 from dataclasses import dataclass
-
-from cascade.low.core import DatasetId, TaskId
-from cascade.controller.report import JobId
+from typing import Literal
 
 import cascade.gateway.api as api
 import cascade.gateway.client as client
-from forecastbox.schemas.user import UserRead
-from forecastbox.auth.users import current_active_user
-
-from forecastbox.api.utils import encode_result
-
-from forecastbox.config import config
-from forecastbox.api.types import VisualisationOptions, ExecutionSpecification
-from forecastbox.api.visualisation import visualise
-from forecastbox.api.execution import execute, SubmitJobResponse
+import orjson
+from cascade.controller.report import JobId
+from cascade.low.core import DatasetId
+from cascade.low.core import TaskId
+from fastapi import APIRouter
+from fastapi import Body
+from fastapi import Depends
+from fastapi import HTTPException
+from fastapi import Response
+from fastapi import UploadFile
+from fastapi.responses import HTMLResponse
+from forecastbox.api.execution import SubmitJobResponse
+from forecastbox.api.execution import execute
 from forecastbox.api.routers.gateway import Globals
-from forecastbox.db.job import get_one, update_one, get_all, delete_all, delete_one
+from forecastbox.api.types import ExecutionSpecification
+from forecastbox.api.types import VisualisationOptions
+from forecastbox.api.utils import encode_result
+from forecastbox.api.visualisation import visualise
+from forecastbox.auth.users import current_active_user
+from forecastbox.config import config
+from forecastbox.db.job import delete_all
+from forecastbox.db.job import delete_one
+from forecastbox.db.job import get_all
+from forecastbox.db.job import get_one
+from forecastbox.db.job import update_one
+from forecastbox.schemas.user import UserRead
 
 logger = logging.getLogger(__name__)
 
@@ -105,11 +112,15 @@ async def update_and_get_progress(job_id: JobId) -> JobProgressResponse:
             )  # type: ignore
         except TimeoutError:
             # NOTE we dont update db because the job may still be running
-            return JobProgressResponse(progress="0.00", created_at=created_at, status="timeout", error="failed to communicate with gateway")
+            return JobProgressResponse(
+                progress="0.00", created_at=created_at, status="timeout", error="failed to communicate with gateway"
+            )
         except Exception:
             # TODO this is either network or internal (eg serde) problem. Ideally fine-grain network into TimeoutError branch
             await update_one(job_id, status="unknown")
-            return JobProgressResponse(progress="0.00", created_at=created_at, status="unknown", error="internal cascade failure")
+            return JobProgressResponse(
+                progress="0.00", created_at=created_at, status="unknown", error="internal cascade failure"
+            )
         if response.error:
             if response.error.startswith("KeyError"):
                 # NOTE currently can happen only via gateway restart -- but if submit-insert werent
@@ -147,13 +158,15 @@ async def get_status() -> JobProgressResponses:
     job_records = await get_all()
 
     progresses = {
-        job.job_id: await update_and_get_progress(job.job_id)
-        if job.status in ["running", "submitted"]
-        else JobProgressResponse(
-            progress="0.00" if not job.status == "completed" else "100.00",
-            status=job.status,
-            created_at=str(job.created_at),
-            error=job.error,
+        job.job_id: (
+            await update_and_get_progress(job.job_id)
+            if job.status in ["running", "submitted"]
+            else JobProgressResponse(
+                progress="0.00" if not job.status == "completed" else "100.00",
+                status=job.status,
+                created_at=str(job.created_at),
+                error=job.error,
+            )
         )
         for job in job_records
     }
@@ -177,7 +190,9 @@ async def get_outputs_of_job(job_id: JobId = Depends(validate_job_id)) -> list[T
 
 
 @router.post("/{job_id}/visualise")
-async def visualise_job(job_id: JobId = Depends(validate_job_id), options: VisualisationOptions = Body(None)) -> HTMLResponse:
+async def visualise_job(
+    job_id: JobId = Depends(validate_job_id), options: VisualisationOptions = Body(None)
+) -> HTMLResponse:
     """Visualise a job's execution graph.
 
     Retrieves the job's graph specification from the database, converts it to a cascade graph,
@@ -207,7 +222,9 @@ async def get_job_specification(job_id: JobId = Depends(validate_job_id)) -> Exe
 
 
 @router.get("/{job_id}/restart")
-async def restart_job(job_id: JobId = Depends(validate_job_id), user: UserRead | None = Depends(current_active_user)) -> SubmitJobResponse:
+async def restart_job(
+    job_id: JobId = Depends(validate_job_id), user: UserRead | None = Depends(current_active_user)
+) -> SubmitJobResponse:
     """Restart a job by executing its specification."""
     job = await get_one(job_id)
     if job is None:
@@ -239,15 +256,21 @@ class DatasetAvailabilityResponse:
 
 @router.get("/{job_id}/available")
 async def get_job_availablity(job_id: JobId = Depends(validate_job_id)) -> list[TaskId]:
-    """
-    Check which results are available for a given job_id.
+    """Check which results are available for a given job_id.
 
     Parameters
     ----------
     job_id : str
         Job ID of the task
+
+    Returns
+    -------
+    list[TaskId]
+        List of dataset IDs that are available for the job.
     """
-    response: api.JobProgressResponse = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}")
+    response: api.JobProgressResponse = client.request_response(
+        api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}"
+    )
     return [x.task for x in response.datasets[job_id]]
 
 
@@ -255,8 +278,7 @@ async def get_job_availablity(job_id: JobId = Depends(validate_job_id)) -> list[
 async def get_result_availablity(
     job_id: JobId = Depends(validate_job_id), dataset_id: TaskId = Depends(validate_dataset_id)
 ) -> DatasetAvailabilityResponse:
-    """
-    Check if the result is available for a given job_id and dataset_id.
+    """Check if the result is available for a given job_id and dataset_id.
 
     This is used to check if the result is available for download.
 
@@ -350,9 +372,10 @@ async def get_logs(job_id: JobId = Depends(validate_job_id)) -> Response:
 # TODO refactor this endpoint to /job_id/results/dataset_id, otherwise consumes too much
 # eg /job_id/available or /job_id/logs become order-dependent / conflicting with output of such name
 @router.get("/{job_id}/{dataset_id}")
-async def get_result(job_id: JobId = Depends(validate_job_id), dataset_id: TaskId = Depends(validate_dataset_id)) -> Response:
-    """
-    Get the result of a job.
+async def get_result(
+    job_id: JobId = Depends(validate_job_id), dataset_id: TaskId = Depends(validate_dataset_id)
+) -> Response:
+    """Get the result of a job.
 
     Parameters
     ----------

@@ -53,7 +53,7 @@ function SelectModel({ setSelected }: OptionsProps) {
                     </ActionIcon>
                 </Flex>
             </Card.Section>
-            {loading ? <p>Loading...</p> : 
+            {loading ? <p>Loading...</p> :
             <Table highlightOnHover verticalSpacing="xs" className={classes['option-table']}>
                 <Table.Thead>
                     <Table.Tr style={{ backgroundColor: "#f0f0f6", textAlign: "left" }}>

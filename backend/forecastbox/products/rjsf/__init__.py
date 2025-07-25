@@ -13,9 +13,9 @@
 # https://rjsf-team.github.io/react-jsonschema-form/docs/
 
 
+from .forms import ExportedSchemas
 from .forms import FieldWithUI
 from .forms import FormDefinition
-from .forms import ExportedSchemas
 from .jsonSchema import ArraySchema
 from .jsonSchema import BooleanSchema
 from .jsonSchema import EnumMixin
@@ -26,9 +26,9 @@ from .jsonSchema import NumberSchema
 from .jsonSchema import StringSchema
 from .uiSchema import UIBooleanField
 from .uiSchema import UIIntegerField
+from .uiSchema import UIObjectField
 from .uiSchema import UISchema
 from .uiSchema import UIStringField
-from .uiSchema import UIObjectField
 
 __all__ = [
     "FormDefinition",

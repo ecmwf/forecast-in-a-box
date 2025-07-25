@@ -1,5 +1,5 @@
 
- 
+
   .label {
     white-space: normal;
     /* word-wrap: normal; */
@@ -7,7 +7,7 @@
     display: flex;
     overflow: visible;
   }
-  
+
   .root {
     flex-direction: column;
     overflow: visible;

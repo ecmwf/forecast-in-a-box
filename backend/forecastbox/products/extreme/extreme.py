@@ -7,7 +7,9 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from ..registry import CategoryRegistry
 from ..interfaces import Interfaces
+from ..registry import CategoryRegistry
 
-extreme_registry = CategoryRegistry("extreme", interface=Interfaces.DETAILED, description="Extreme Value Indices", title="Extreme Indices")
+extreme_registry = CategoryRegistry(
+    "extreme", interface=Interfaces.DETAILED, description="Extreme Value Indices", title="Extreme Indices"
+)

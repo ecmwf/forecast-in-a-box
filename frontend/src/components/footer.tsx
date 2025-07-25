@@ -27,7 +27,7 @@ const Footer: React.FC = () => {
                 © {new Date().getFullYear()} ECMWF.
             </Text>
 
-            <Group>    
+            <Group>
                 {/* <Anchor href="/privacy-policy" size="sm">
                     Privacy Policy
                 </Anchor>

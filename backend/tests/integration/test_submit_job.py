@@ -1,16 +1,16 @@
-from forecastbox.api.types import (
-    ProductSpecification,
-    EnvironmentSpecification,
-    ExecutionSpecification,
-    ModelSpecification,
-    ForecastProducts,
-    RawCascadeJob,
-)
-import time
 import io
+import time
 import zipfile
-from cascade.low.builders import JobBuilder, TaskBuilder
+
 import cloudpickle
+from cascade.low.builders import JobBuilder
+from cascade.low.builders import TaskBuilder
+from forecastbox.api.types import EnvironmentSpecification
+from forecastbox.api.types import ExecutionSpecification
+from forecastbox.api.types import ForecastProducts
+from forecastbox.api.types import ModelSpecification
+from forecastbox.api.types import ProductSpecification
+from forecastbox.api.types import RawCascadeJob
 
 
 def _ensure_completed(backend_client, job_id):
@@ -41,7 +41,9 @@ def test_submit_job(backend_client_with_auth):
     assert response.status_code == 404
 
     # raw job
-    job_instance = JobBuilder().with_node("n1", TaskBuilder.from_callable(eval).with_values("1+2")).build().get_or_raise()
+    job_instance = (
+        JobBuilder().with_node("n1", TaskBuilder.from_callable(eval).with_values("1+2")).build().get_or_raise()
+    )
     spec = ExecutionSpecification(
         job=RawCascadeJob(
             job_type="raw_cascade_job",
@@ -126,7 +128,9 @@ def test_submit_job(backend_client_with_auth):
 
         time.sleep(secs)
 
-    job_instance = JobBuilder().with_node("n1", TaskBuilder.from_callable(sleep_with_sgn).with_values(10)).build().get_or_raise()
+    job_instance = (
+        JobBuilder().with_node("n1", TaskBuilder.from_callable(sleep_with_sgn).with_values(10)).build().get_or_raise()
+    )
     spec = ExecutionSpecification(
         job=RawCascadeJob(
             job_type="raw_cascade_job",

@@ -42,7 +42,7 @@ const Intro = () => {
                         where they need it, when they need it.
                     </Text>
                     {/* <Text size="md" style={{color: "white"}}>
-                        With a simple and intuitive interface, users can easily create many products, 
+                        With a simple and intuitive interface, users can easily create many products,
 
                         "Whatever works for you"
                     </Text> */}
@@ -52,7 +52,7 @@ const Intro = () => {
                      <a href='/products'>
                         <Button color="#6DABFF" variant="outline" radius={"lg"} size={"xl"}><Title order={2} style={{color: "#6DABFF"}}>Get Started</Title></Button>
                     </a>
-                    
+
                 </Center>
                 <Space h="lg" />
                 </Grid.Col>
@@ -63,7 +63,7 @@ const Intro = () => {
             </Container>
             <Space h="md" />
             <Space h="xl" />
-            
+
             {/* <Divider color="#424270" /> */}
         </Container>
     )

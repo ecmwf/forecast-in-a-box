@@ -52,7 +52,7 @@ function OutputCells({ id, dataset, progress, popout}: { id: string; dataset: st
             setIsAvailable(true); // Set to true if progress is 100
         }
     }, [id, dataset, progress]);
-    
+
     const [showModal, setShowModal] = useState(false);
 
     return (
@@ -86,7 +86,7 @@ const ProgressComponent = ({ id, popout = false }: { id: string, popout: boolean
 
     const [progress, setProgress] = useState<ProgressResponse>({} as ProgressResponse);
     const [outputs, setOutputs] = useState<DatasetId[] | null>([]);
-    
+
     const progressIntervalRef = useRef<number | null>(null);
     const api = useApi();
 
@@ -122,13 +122,13 @@ const ProgressComponent = ({ id, popout = false }: { id: string, popout: boolean
         });
         }
     }
-    
+
     const fetchProgress = async () => {
         try {
             const response = await api.get(`/v1/job/${id}/status`);
             const data = response.data;
             setProgress(data);
-    
+
             if (data.progress === "100.00" || data.status === "completed") {
                 if (progressIntervalRef.current) {
                     clearInterval(progressIntervalRef.current); // Stop fetching if progress is 100
@@ -149,7 +149,7 @@ const ProgressComponent = ({ id, popout = false }: { id: string, popout: boolean
             });
         }
     };
-    
+
     const fetchOutputs = async () => {
         try {
             const response = await api.get(`/v1/job/${id}/outputs`);
@@ -169,7 +169,7 @@ const ProgressComponent = ({ id, popout = false }: { id: string, popout: boolean
             });
         }
     };
-    
+
     useEffect(() => {
         // Start the interval and store its ID in the ref
         progressIntervalRef.current = setInterval(() => {
@@ -191,7 +191,7 @@ const ProgressComponent = ({ id, popout = false }: { id: string, popout: boolean
         <>
         <SummaryModal moreInfoSpec={moreInfoSpec} showMoreInfo={showMoreInfo} setShowMoreInfo={setShowMoreInfo}/>
             <Space h="xl"/>
-            
+
             <Title display={'inline'} order={1}>Progress</Title>
             <Group grow>
                 <GraphVisualiser spec={null} url={`/v1/job/${id}/visualise`} />
@@ -199,14 +199,14 @@ const ProgressComponent = ({ id, popout = false }: { id: string, popout: boolean
                 {/* <Button color='blue' component='a' href={`/v1/job/${id}/download`} target='_blank'>Download</Button> */}
             </Group>
             <Title pt='xl' order={4}>{id} - {progress.status}</Title>
-            
+
             {!progress.progress ? (
                 <>
                 <Title pb='xl' order={6}>Waiting for Cascade...</Title>
                 </>
             ) : (
                 <>
-                <Progress value={Math.max(1, parseFloat(progress.progress) || 0)} striped animated/> 
+                <Progress value={Math.max(1, parseFloat(progress.progress) || 0)} striped animated/>
                 <Group>
                     {/* <Loader size="xs" /> */}
                     <Text>{progress.progress}%</Text>
@@ -227,7 +227,7 @@ const ProgressComponent = ({ id, popout = false }: { id: string, popout: boolean
             </Button>
             <Space h='lg'/>
             <Title order={3}>Output IDs</Title>
- 
+
             <Space h='lg'/>
             <Table.ScrollContainer minWidth={500} maxHeight='100%'>
             <Table mb='xs' w='100%' verticalSpacing='' striped highlightOnHover>

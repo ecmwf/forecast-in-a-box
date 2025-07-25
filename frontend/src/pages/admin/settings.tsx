@@ -25,7 +25,7 @@ import {useApi} from '../../api';
 interface APISettings {
     [key: string]: string | number; // Adjust types based on actual API settings structure
   }
-  
+
 interface CascadeSettings {
   [key: string]: string | number; // Adjust types based on actual cascade settings structure
 }

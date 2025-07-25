@@ -22,7 +22,7 @@ function InformationWindow({ selected }: InformationProps) {
     const [information, setInformation] = useState<Record<string, any> | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
     const api = useApi();
-    
+
 
     useEffect(() => {
         if (selected) {
@@ -59,7 +59,7 @@ function InformationWindow({ selected }: InformationProps) {
             <Card.Section>
                  <Title order={2}>Information</Title>
             </Card.Section>
-            
+
         <Title order={3} p=''>{selected}</Title>
             <LoadingOverlay visible={loading}/>
             <SimpleGrid cols={2}>

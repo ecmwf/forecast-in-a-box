@@ -40,7 +40,7 @@ Note the above will likely change over time -- you may want to instead run `./ba
 Installation:
 ```bash
 # backend
-uv venv --seed ./ 
+uv venv --seed ./
 uv pip install ./backend[all]
 
 # frontend
@@ -65,7 +65,7 @@ bash ./backend/fiab.sh # used both as installer script *and* launcher
 
 ### User Setup, with Docker-compose
 
-To use the prebuilt containers use the following docker-compose file, otherwise the default 
+To use the prebuilt containers use the following docker-compose file, otherwise the default
 in the repo will build.
 
 ```yaml

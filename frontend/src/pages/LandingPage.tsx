@@ -17,7 +17,7 @@ import Collaboration from '../components/landing/collaboration';
 
 import MainLayout from '../layouts/MainLayout';
 
-export default function LandingPage() {  
+export default function LandingPage() {
   return (
     <MainLayout>
       <Intro />
@@ -27,4 +27,3 @@ export default function LandingPage() {
     </MainLayout>
   );
 };
-

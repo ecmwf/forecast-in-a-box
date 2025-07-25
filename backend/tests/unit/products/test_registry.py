@@ -8,9 +8,12 @@
 # nor does it submit to any jurisdiction.
 
 import pytest
-
-from forecastbox.products.registry import CategoryRegistry, PRODUCTS, get_categories, get_product, get_product_list
 from forecastbox.products.interfaces import Interfaces
+from forecastbox.products.registry import PRODUCTS
+from forecastbox.products.registry import CategoryRegistry
+from forecastbox.products.registry import get_categories
+from forecastbox.products.registry import get_product
+from forecastbox.products.registry import get_product_list
 
 
 @pytest.fixture(scope="module")
