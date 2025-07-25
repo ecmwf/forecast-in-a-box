@@ -88,10 +88,10 @@ def launch_cascade(log_path: str, log_base: str):
         pass  # no need to spew stacktrace to log
 
 
-def wait_for(client: httpx.Client, status_url: str) -> None:
+def wait_for(client: httpx.Client, status_url: str, attempts: int) -> None:
     """Calls /status endpoint, retry on ConnectError"""
     i = 0
-    while i < 10:
+    while i < attempts:
         try:
             rc = client.get(status_url)
             if not rc.status_code == 200:
@@ -137,7 +137,7 @@ def export_recursive(dikt, delimiter, prefix):
                 os.environ[f"{prefix}{k}"] = str(v)
 
 
-def launch_all(config: FIABConfig, is_browser: bool) -> ProcessHandles:
+def launch_all(config: FIABConfig, is_browser: bool, attempts: int = 10) -> ProcessHandles:
     freeze_support()
     set_start_method("forkserver")
     setup_process()
@@ -148,7 +148,7 @@ def launch_all(config: FIABConfig, is_browser: bool) -> ProcessHandles:
     api.start()
 
     with httpx.Client() as client:
-        wait_for(client, config.api.local_url() + "/api/v1/status")
+        wait_for(client, config.api.local_url() + "/api/v1/status", attempts)
         client.post(config.api.local_url() + "/api/v1/gateway/start").raise_for_status()
     if is_browser:
         webbrowser.open(config.api.local_url())
