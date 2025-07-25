@@ -109,9 +109,9 @@ def quickplot(
     figure_title: Optional[str] = None,
     domain: Optional[str] = None,
 ):
+    from earthkit.plots import Figure  # NOTE we need to import again to mask the possible Any
     from earthkit.plots.components import layouts
     from earthkit.plots.schemas import schema
-    from earthkit.plots import Figure  # NOTE we need to import again to mask the possible Any
     from earthkit.plots.utils import iter_utils
 
     if not isinstance(fields, ekd.FieldList):

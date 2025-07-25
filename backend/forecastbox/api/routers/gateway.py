@@ -121,7 +121,9 @@ async def stream_logs(request: Request) -> StreamingResponse:
     async def event_generator():
         # NOTE consider rewriting to aiofile, eg https://github.com/kuralabs/logserver/blob/master/server/server.py
 
-        pipe = subprocess.Popen(["tail", "-F", Globals.gateway.log_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        pipe = subprocess.Popen(
+            ["tail", "-F", Globals.gateway.log_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
         poller = select.poll()
         poller.register(pipe.stdout)
 

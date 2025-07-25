@@ -9,27 +9,19 @@
 
 """Job Monitoring API Router."""
 
+import asyncio
+import io
+import json
 import logging
 import os
 import pathlib
-import orjson
-import json
-from typing import Literal
-from fastapi import APIRouter, Response, Depends, UploadFile, Body
-from fastapi.responses import HTMLResponse
-from fastapi import HTTPException
-import asyncio
-import io
 import zipfile
-
-import asyncio
-import json
-import logging
 from dataclasses import dataclass
 from typing import Literal
 
 import cascade.gateway.api as api
 import cascade.gateway.client as client
+import orjson
 from cascade.controller.report import JobId
 from cascade.low.core import DatasetId
 from cascade.low.core import TaskId
@@ -42,13 +34,11 @@ from fastapi import UploadFile
 from fastapi.responses import HTMLResponse
 from forecastbox.api.execution import SubmitJobResponse
 from forecastbox.api.execution import execute
+from forecastbox.api.routers.gateway import Globals
 from forecastbox.api.types import ExecutionSpecification
 from forecastbox.api.types import VisualisationOptions
 from forecastbox.api.utils import encode_result
 from forecastbox.api.visualisation import visualise
-from forecastbox.api.execution import execute, SubmitJobResponse
-from forecastbox.api.routers.gateway import Globals
-from forecastbox.db.job import get_one, update_one, get_all, delete_all, delete_one
 from forecastbox.auth.users import current_active_user
 from forecastbox.config import config
 from forecastbox.db.job import delete_all
