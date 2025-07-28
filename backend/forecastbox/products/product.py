@@ -31,6 +31,11 @@ if TYPE_CHECKING:
 
 class Product(ABC):
     """Base Product Class"""
+    
+    @property
+    def _name(self):
+        """Name of the product, used for display purposes."""
+        return self.__class__.__name__
 
     @property
     def _name(self):
@@ -157,9 +162,6 @@ class Product(ABC):
 
 class GenericParamProduct(Product):
     """Generic Param Product"""
-
-    label = {}
-    description = {}
 
     allow_multiple_params = True
     allow_multiple_levels = True

@@ -9,6 +9,7 @@
 
 import io
 import warnings
+import io
 from collections import defaultdict
 from typing import Optional
 
@@ -24,6 +25,7 @@ from ..rjsf import FieldWithUI
 from ..rjsf import StringSchema
 from ..rjsf import UIStringField
 from . import plot_product_registry
+from ..rjsf import FieldWithUI, StringSchema, IntegerSchema, ArraySchema, UIObjectField, UIStringField, FieldSchema
 
 EARTHKIT_PLOTS_IMPORTED = True
 try:
@@ -73,6 +75,31 @@ def _plot_fields(subplot: Subplot, fields: ekd.FieldList, **kwargs: dict[str, di
                     **kwargs.get("quickplot", {}),
                 )
 
+@as_payload
+@mark.environment_requirements(["earthkit-plots"])
+def export(figure: Figure, format: str = "png") -> tuple[bytes, str]:
+    """
+    Export a figure to a specified format.
+
+    Parameters
+    ----------
+    figure : Figure
+        The figure to export.
+    format : str
+        The format to export the figure to. Supported formats are 'png', 'pdf', 'svg'.
+
+    Returns
+    -------
+    tuple[bytes, str]
+        A tuple containing the serialized data as bytes and the MIME type.
+    """
+    if format not in ["png", "pdf", "svg"]:
+        raise ValueError(f"Unsupported format: {format}. Supported formats are 'png', 'pdf', 'svg'.")
+    
+    buf = io.BytesIO()
+    figure.save(buf, format=format)
+
+    return buf.getvalue(), f"image/{format}"
 
 @as_payload
 @mark.environment_requirements(["earthkit-plots"])

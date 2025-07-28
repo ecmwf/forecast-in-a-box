@@ -39,6 +39,19 @@ class BaseThermalIndex(Product):
     @property
     def qube(self):
         return Qube.from_datacube({"param": "*"})
+    
+    @property
+    def formfields(self) -> OrderedDict[str, "FieldWithUI"]:
+        """Form fields for the product."""
+        formfields = super().formfields.copy()
+        formfields.update(
+            step= self._make_field(
+                title='Step',
+                multiple=True,
+                schema=IntegerSchema,
+            ),
+        )
+        return formfields
 
     @property
     def formfields(self) -> OrderedDict[str, "FieldWithUI"]:
