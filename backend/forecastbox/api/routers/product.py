@@ -9,9 +9,9 @@
 
 """Products API Router."""
 
-import re
 from typing import Any
 from typing import Iterable
+import re
 
 import forecastbox.products.rjsf.utils as rjsfutils
 from fastapi import APIRouter
@@ -71,6 +71,7 @@ def _sort_values(values: Iterable[Any]) -> Iterable[Any]:
     alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
     return sorted(values, key=alphanum_key)
 
+
 def _sort_fields(fields: dict) -> dict:
     new_fields = OrderedDict()
     for key in CONFIG_ORDER:
@@ -84,7 +85,9 @@ def _sort_fields(fields: dict) -> dict:
     return new_fields
 
 
-async def product_to_config(product: Product, model_spec: ModelSpecification, params: dict[str, Any]) -> ExportedSchemas:
+async def product_to_config(
+    product: Product, model_spec: ModelSpecification, params: dict[str, Any]
+) -> ExportedSchemas:
     """Convert a product to a configuration dictionary.
 
     Parameters
@@ -137,7 +140,11 @@ async def product_to_config(product: Product, model_spec: ModelSpecification, pa
 
         # Select from the available product specification based on all parameters except the current key
         updated_params = {**params, **inferred_constraints}
-        val = select_from_params(available_product_spec, {k: v for k, v in updated_params.items() if not k == key}).axes().get(key, val)
+        val = (
+            select_from_params(available_product_spec, {k: v for k, v in updated_params.items() if not k == key})
+            .axes()
+            .get(key, val)
+        )
 
         field = FieldWithUI(jsonschema=StringSchema(title=key))
 
@@ -150,16 +157,13 @@ async def product_to_config(product: Product, model_spec: ModelSpecification, pa
 
         if USER_DEFINED not in available_product_spec.span(key):
             try:
-                field = rjsfutils.update_enum_within_field(
-                    field,
-                    _sort_values(list(set(val)))
-                )
+                field = rjsfutils.update_enum_within_field(field, _sort_values(list(set(val))))
             except TypeError:
                 pass
 
         field = rjsfutils.collapse_enums_if_possible(field)
         fields[key] = field
-        # TODO: Add constraints to the field
+        # TODO: Add constraints to the field
 
         # fields[key] = ConfigEntry(
         #     label=product.label.get(key, key),
@@ -222,7 +226,9 @@ async def get_valid_categories(interface: Interfaces, modelspec: ModelSpecificat
 
 
 @router.post("/configuration/{category}/{product}")
-async def get_product_configuration(category: str, product: str, model: ModelSpecification, spec: dict[str, Any]) -> ExportedSchemas:
+async def get_product_configuration(
+    category: str, product: str, model: ModelSpecification, spec: dict[str, Any]
+) -> ExportedSchemas:
     """Get the product configuration for a given category and product.
 
     Validates the product against the model specification and returns a configuration object.

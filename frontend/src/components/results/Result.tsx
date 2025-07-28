@@ -70,7 +70,7 @@ export default function Result({ job_id, dataset_id, in_modal }: ResultProps) {
                 />
             ) : null}
         </Group>
-    
+
         <Container
             size="xl"
             style={{
@@ -97,15 +97,15 @@ export default function Result({ job_id, dataset_id, in_modal }: ResultProps) {
                     {/* <Space h={20} /> */}
                     {contentType == 'image/png' ? (
                         <>
-                        <img 
-                            src={dataLink} 
-                            alt="Result Image" 
-                            style={{ 
-                                maxWidth: "90%", 
-                                maxHeight: "80%", 
-                                borderRadius: "8px", 
-                                boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)" 
-                            }} 
+                        <img
+                            src={dataLink}
+                            alt="Result Image"
+                            style={{
+                                maxWidth: "90%",
+                                maxHeight: "80%",
+                                borderRadius: "8px",
+                                boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)"
+                            }}
                         />
                         </>
                     ) : (

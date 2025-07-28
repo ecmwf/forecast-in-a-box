@@ -7,26 +7,36 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from abc import ABC, abstractmethod
+from abc import ABC
+from abc import abstractmethod
+from typing import TYPE_CHECKING
+from typing import Any
+from typing import OrderedDict
+from typing import Union
 
-from typing import Any, TYPE_CHECKING, OrderedDict, Union
-
-from qubed import Qube
 from earthkit.workflows import fluent
-
 from forecastbox.models import Model
-from .rjsf import FieldWithUI, StringSchema, IntegerSchema, ArraySchema, UIObjectField, UIStringField, FieldSchema
-from .definitions import DESCRIPTIONS, LABELS
+from qubed import Qube
 
+from .rjsf import ArraySchema
+from .rjsf import FieldSchema
+from .rjsf import FieldWithUI
+from .rjsf import IntegerSchema
+from .rjsf import StringSchema
 
 if TYPE_CHECKING:
-    from earthkit.workflows.graph import Graph
     from earthkit.workflows.fluent import Action
+    from earthkit.workflows.graph import Graph
 
 
 class Product(ABC):
     """Base Product Class"""
     
+    @property
+    def _name(self):
+        """Name of the product, used for display purposes."""
+        return self.__class__.__name__
+
     @property
     def _name(self):
         """Name of the product, used for display purposes."""
@@ -116,7 +126,7 @@ class Product(ABC):
             if any(isinstance(v, str) and v == "*" for v in value):
                 # If the value is '*', we skip the selection
                 continue
-            source = source.sel(**{key: value}) # type: ignore
+            source = source.sel(**{key: value})  # type: ignore
         return source
 
     def validate_intersection(self, model: Model) -> bool:
@@ -146,38 +156,35 @@ class Product(ABC):
         return fluent.Payload(payload)
 
     @abstractmethod
-    def execute(self, product_spec: dict[str, Any], model: Model, source: "Action") -> Union["Graph","Action"]:
+    def execute(self, product_spec: dict[str, Any], model: Model, source: "Action") -> Union["Graph", "Action"]:
         raise NotImplementedError()
 
 
 class GenericParamProduct(Product):
     """Generic Param Product"""
-    label = {}
-    description = {}
 
     allow_multiple_params = True
     allow_multiple_levels = True
-
 
     @property
     def formfields(self) -> OrderedDict[str, "FieldWithUI"]:
         """Form fields for the product."""
         formfields = super().formfields.copy()
         formfields.update(
-            param = self._make_field(
-                title='Parameter',
+            param=self._make_field(
+                title="Parameter",
                 multiple=self.allow_multiple_params,
             ),
-            levtype = FieldWithUI(
+            levtype=FieldWithUI(
                 jsonschema=StringSchema(
-                    title='Level Type',
+                    title="Level Type",
                 ),
             ),
-            levelist = self._make_field(
-                title='Level List',
+            levelist=self._make_field(
+                title="Level List",
                 schema=IntegerSchema,
                 multiple=self.allow_multiple_levels,
-            )
+            ),
         )
         return formfields
 
@@ -219,11 +226,10 @@ class GenericParamProduct(Product):
 
 class GenericTemporalProduct(GenericParamProduct):
     """Generic Temporal Product.
-    
+
     Adds step as an axis to the product qube, and configures
     the formfields to include step.
     """
-
 
     allow_multiple_steps = True
     """Whether the product allows multiple steps."""
@@ -233,8 +239,8 @@ class GenericTemporalProduct(GenericParamProduct):
         """Form fields for the product."""
         formfields = super().formfields.copy()
         formfields.update(
-            step= self._make_field(
-                title='Step',
+            step=self._make_field(
+                title="Step",
                 multiple=self.allow_multiple_steps,
                 schema=IntegerSchema,
             ),

@@ -7,12 +7,17 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import BaseModel, Field, SecretStr, model_validator
-import pathlib
-from cascade.low.func import pydantic_recursive_collect
-import urllib.parse
 import os
+import pathlib
+import urllib.parse
+
+from cascade.low.func import pydantic_recursive_collect
+from pydantic import BaseModel
+from pydantic import Field
+from pydantic import SecretStr
+from pydantic import model_validator
+from pydantic_settings import BaseSettings
+from pydantic_settings import SettingsConfigDict
 
 fiab_home = pathlib.Path.home() / ".fiab"
 
@@ -154,7 +159,8 @@ class FIABConfig(BaseSettings):
 def validate_runtime(config: FIABConfig) -> None:
     """Validates that a particular config can be used to execute FIAB in this machine/venv.
     Note this differs from a regular pydantic validation which just checks types etc. For example
-    here we check presence/accessibility of databases"""
+    here we check presence/accessibility of databases
+    """
 
     errors = pydantic_recursive_collect(config, "validate_runtime")
     if errors:

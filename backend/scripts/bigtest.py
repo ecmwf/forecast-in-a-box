@@ -1,10 +1,11 @@
 """Executed from the bigtest github action"""
 
+import datetime as dt
+import time
+
+import httpx
 from forecastbox.config import config
 from forecastbox.standalone.entrypoint import launch_all
-import time
-import datetime as dt
-import httpx
 
 
 def get_quickstart_job() -> dict:
@@ -12,7 +13,13 @@ def get_quickstart_job() -> dict:
     return {
         "job": {
             "job_type": "forecast_products",
-            "model": {"model": "testing/o48-pretrained", "date": today + "T00", "lead_time": 42, "ensemble_members": 1, "entries": {}},
+            "model": {
+                "model": "testing/o48-pretrained",
+                "date": today + "T00",
+                "lead_time": 42,
+                "ensemble_members": 1,
+                "entries": {},
+            },
             "products": [
                 {
                     "product": "Plots/Maps",

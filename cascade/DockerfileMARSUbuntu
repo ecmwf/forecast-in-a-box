@@ -52,4 +52,3 @@ RUN --mount=type=cache,mode=0755,target=/root/.cache/uv sh /app/cascade/install.
 
 ENV PATH="/app/.venv/bin/:$PATH"
 ENTRYPOINT ["/app/.venv/bin/python", "-m", "cascade.gateway", "tcp://0.0.0.0:8067"]
-

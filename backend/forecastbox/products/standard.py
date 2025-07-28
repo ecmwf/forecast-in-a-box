@@ -8,16 +8,21 @@
 # nor does it submit to any jurisdiction.
 
 
-from forecastbox.products.registry import CategoryRegistry
-from forecastbox.products.product import GenericTemporalProduct
 from forecastbox.models import Model
 from forecastbox.products.interfaces import Interfaces
+from forecastbox.products.product import GenericTemporalProduct
+from forecastbox.products.registry import CategoryRegistry
 
-from .rjsf import FieldWithUI, StringSchema, IntegerSchema, ArraySchema, UIStringField
 from .export import export_fieldlist_as
+from .rjsf import FieldWithUI
+from .rjsf import StringSchema
+from .rjsf import UIStringField
 
 standard_product_registry = CategoryRegistry(
-    "Standard", interface=[Interfaces.STANDARD, Interfaces.DETAILED], description="Standard products", title="Standard Products"
+    "Standard",
+    interface=[Interfaces.STANDARD, Interfaces.DETAILED],
+    description="Standard products",
+    title="Standard Products",
 )
 
 OUTPUT_TYPES = ["grib", "netcdf", "numpy"]
@@ -48,8 +53,8 @@ class OutputProduct(GenericTemporalProduct):
                 ),
                 ui=UIStringField(
                     widget="select",
-                )
-            )
+                ),
+            ),
         )
         return formfields
 
@@ -82,9 +87,7 @@ class OutputProduct(GenericTemporalProduct):
 
 @standard_product_registry("Deaccumulated")
 class DeaccumulatedProduct(GenericTemporalProduct):
-    """
-    Deaccumulated Product.
-    """
+    """Deaccumulated Product."""
 
     allow_multiple_steps = True
 
@@ -97,8 +100,7 @@ class DeaccumulatedProduct(GenericTemporalProduct):
         return self.make_generic_qube()
 
     def model_intersection(self, model: Model):
-        """
-        Model intersection with the product qube.
+        """Model intersection with the product qube.
 
         Only the accumulation variables are used to create the intersection.
         """

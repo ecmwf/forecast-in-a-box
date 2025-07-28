@@ -23,10 +23,10 @@ import { useEffect, useState } from "react";
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
     const [opened, { toggle }] = useDisclosure();
-    
+
     const api = useApi();
     const navigate = useNavigate();
-  
+
     const handleLogout = () => {
       api.post('/v1/auth/jwt/logout')
       .then(() => {
@@ -47,7 +47,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
     const [loggedIn, setLoggedIn] = useState(false);
     const [isSuperuser, setIsSuperuser] = useState(false);
-  
+
     const checkLogin = () => {
         api.get('/v1/users/me')
         .then((res) => {
@@ -71,7 +71,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             setLoggedIn(false);
         });
     }
-  
+
     useEffect(() => {
       checkLogin();
     }
@@ -98,7 +98,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                                 <>
                                 {loggedIn && isSuperuser && (
                                     <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="md" component='a' href='/admin'>Admin</Button>
-                                )} 
+                                )}
                                 <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="md" component='a' href='/products'>Products</Button>
                                 <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="md" component='a' href='/job/status'>Job Status</Button>
                                 <Button radius={0} className="animated-button" bg="rgba(0, 0, 0, 0)" size="md" onClick={handleLogout}>Logout</Button>
@@ -130,9 +130,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 </Group>
                 </Container>
             </AppShell.Navbar>
-            
+
             <AppShell.Footer>
-                <Footer /> 
+                <Footer />
             </AppShell.Footer>
             <AppShell.Main>
                 {children}

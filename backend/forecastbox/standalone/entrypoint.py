@@ -7,9 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""
-Entrypoint for the standalone fiab execution (frontend, controller and worker spawned by a single process)
-"""
+"""Entrypoint for the standalone fiab execution (frontend, controller and worker spawned by a single process)"""
 
 # TODO support frontend
 # NOTE until migrated to sqlite3 / pymongo_inmemory, use `docker run --rm -it --network host mongo:8.0` in parallel
@@ -18,19 +16,22 @@ Entrypoint for the standalone fiab execution (frontend, controller and worker sp
 import asyncio
 import logging
 import logging.config
-import time
-import httpx
-import uvicorn
 import os
-from dataclasses import dataclass
+import time
 import webbrowser
+from dataclasses import dataclass
+from multiprocessing import Process
+from multiprocessing import connection
+from multiprocessing import freeze_support
+from multiprocessing import set_start_method
 
-from multiprocessing import Process, connection, set_start_method, freeze_support
-from cascade.executor.config import logging_config, logging_config_filehandler
-
+import httpx
 import pydantic
-from forecastbox.config import FIABConfig, validate_runtime
-
+import uvicorn
+from cascade.executor.config import logging_config
+from cascade.executor.config import logging_config_filehandler
+from forecastbox.config import FIABConfig
+from forecastbox.config import validate_runtime
 
 logger = logging.getLogger(__name__ if __name__ != "__main__" else "forecastbox.standalone.entrypoint")
 
@@ -142,7 +143,9 @@ def launch_all(config: FIABConfig, is_browser: bool) -> ProcessHandles:
     set_start_method("forkserver")
     setup_process()
     logger.info("main process starting")
-    export_recursive(config.model_dump(), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"])
+    export_recursive(
+        config.model_dump(), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"]
+    )
 
     api = Process(target=launch_api)
     api.start()

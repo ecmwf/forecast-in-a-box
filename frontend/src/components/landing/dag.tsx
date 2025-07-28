@@ -35,7 +35,7 @@ const DAG = () => {
           <Title size={40}>Dynamic Product Execution</Title>
         </Center>
         <Space h="xl" />
-        
+
         <Center>
           <Text>From anemoi to pproc, all in the box.</Text>
         </Center>
@@ -43,10 +43,10 @@ const DAG = () => {
 
         <Center>
             {showIframe && (
-                <iframe 
-                    src="/dag/example.html" 
-                    width="100%" 
-                    height="620px" 
+                <iframe
+                    src="/dag/example.html"
+                    width="100%"
+                    height="620px"
                     style={{ border: "none" }}
                     title="Dynamic Product Execution"
                 ></iframe>

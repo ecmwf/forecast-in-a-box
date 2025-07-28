@@ -112,7 +112,7 @@ export default function Login() {
 
   useEffect(() => {
     const token = localStorage.getItem('fiabtoken')
-    
+
     if (token) {
       navigate(redirectUrl)
     }

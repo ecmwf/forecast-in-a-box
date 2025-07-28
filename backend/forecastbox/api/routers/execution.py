@@ -9,22 +9,22 @@
 
 """Execution API Router."""
 
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import HTMLResponse
 import asyncio
-
 import logging
 
-
 from cascade.low.core import JobInstance
-
+from fastapi import APIRouter
+from fastapi import Depends
+from fastapi import HTTPException
+from fastapi.responses import HTMLResponse
+from forecastbox.api.execution import SubmitJobResponse
+from forecastbox.api.execution import execute
+from forecastbox.api.execution import execution_specification_to_cascade
+from forecastbox.api.types import ExecutionSpecification
+from forecastbox.api.types import VisualisationOptions
+from forecastbox.api.visualisation import visualise
 from forecastbox.auth.users import current_active_user
 from forecastbox.schemas.user import UserRead
-
-from forecastbox.api.types import VisualisationOptions, ExecutionSpecification
-from forecastbox.api.visualisation import visualise
-from forecastbox.api.execution import execution_specification_to_cascade
-from forecastbox.api.execution import execute, SubmitJobResponse
 
 router = APIRouter(
     tags=["execution"],
@@ -36,8 +36,7 @@ LOG = logging.getLogger(__name__)
 
 @router.post("/visualise")
 async def get_graph_visualise(spec: ExecutionSpecification, options: VisualisationOptions = None) -> HTMLResponse:
-    """
-    Get an HTML visualisation of the product graph.
+    """Get an HTML visualisation of the product graph.
 
     Parameters
     ----------
@@ -60,8 +59,7 @@ async def get_graph_visualise(spec: ExecutionSpecification, options: Visualisati
 
 @router.post("/serialise")
 async def get_graph_serialised(spec: ExecutionSpecification) -> JobInstance:
-    """
-    Get serialised dump of product graph.
+    """Get serialised dump of product graph.
 
     Contains the job instance as `Cascade` creates it.
 
@@ -91,8 +89,7 @@ async def get_graph_serialised(spec: ExecutionSpecification) -> JobInstance:
 
 @router.post("/download")
 async def get_graph_download(spec: ExecutionSpecification) -> str:
-    """
-    Get downloadable json of the graph.
+    """Get downloadable json of the graph.
 
     Parameters
     ----------
@@ -108,16 +105,15 @@ async def get_graph_download(spec: ExecutionSpecification) -> str:
 
 
 @router.post("/execute")
-async def execute_api(spec: ExecutionSpecification, user: UserRead | None = Depends(current_active_user)) -> SubmitJobResponse:
-    """
-    Execute a job based on the provided execution specification.
+async def execute_api(
+    spec: ExecutionSpecification, user: UserRead | None = Depends(current_active_user)
+) -> SubmitJobResponse:
+    """Execute a job based on the provided execution specification.
 
     Parameters
     ----------
     spec : ExecutionSpecification
         Execution specification containing model and product details.
-    background_tasks : BackgroundTasks
-        fastapi BackgroundTasks instance to handle background execution.
     user : UserRead, optional
         User object, by default Depends(current_active_user)
 

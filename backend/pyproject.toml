@@ -1,65 +1,68 @@
 [build-system]
-requires = ["setuptools>=80", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
+
+requires = [ "setuptools>=80", "setuptools-scm[toml]>=6.2" ]
 
 [project]
 name = "forecast-in-a-box"
 description = "Weather Forecast in a Box"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = [ "LICENSE" ]
 authors = [
   { name = "European Centre for Medium-Range Weather Forecasts (ECMWF)", email = "software.support@ecmwf.int" },
 ]
-license = "Apache-2.0"
-license-files = ["LICENSE"]
-requires-python=">=3.11"
-readme = "README.md"
-dynamic = ["version"]
+requires-python = ">=3.11"
+# [tool.setuptools]
+# packages = ["forecastbox"]
+classifiers = [
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+dynamic = [ "version" ]
 
 # just a minimal set of dependencies to run the servers. Individual tasks install their runtime dependencies on their own
 dependencies = [
-	"fastapi",
-	"fastapi_users[oauth]",
-	"fastapi_users_db_sqlalchemy",
-	"httpx<1.0",
-    "httpx_oauth",
-	"jinja2",
-	"orjson",
-	"python-multipart",
-	"uvicorn",
-	"cloudpickle",
-	"pyrsistent",
-	"anemoi-inference>=0.4.10",
-	"qubed==0.1.12",
-	"earthkit-workflows-anemoi>=0.3.1",
-	"pydantic-settings",
-	"earthkit-workflows>=0.4.0",
-	"pproc",
-	"earthkit-workflows-pproc",
-	"sse-starlette",
-    "aiosqlite",
-    "multiolib==2.6.1.dev20250613", # to bring in the binary stack eagerly, TODO unpin once stable
+  "aiosqlite",
+  "anemoi-inference>=0.4.10",
+  "cloudpickle",
+  "earthkit-workflows>=0.3.6",
+  "earthkit-workflows-anemoi>=0.3.1",
+  "earthkit-workflows-pproc",
+  "fastapi",
+  "fastapi-users[oauth]",
+  "fastapi-users-db-sqlalchemy",
+  "httpx<1",
+  "httpx-oauth",
+  "jinja2",
+  "multiolib==2.6.1.dev20250613",     # to bring in the binary stack eagerly, TODO unpin once stable
+  "orjson",
+  "pproc",
+  "pydantic-settings",
+  "pyrsistent",
+  "python-multipart",
+  "qubed==0.1.12",
+  "sse-starlette",
+  "uvicorn",
 ]
 
-[project.urls]
-"Source code" = "https://github.com/ecmwf/forecast-in-a-box"
-
-[project.optional-dependencies]
-thermo = [
-    "thermofeel>=2.1.1",
+optional-dependencies.all = [
+  "forecast-in-a-box[plots,test,thermo,webmars]",
 ]
-plots = [
-    "earthkit-plots-default-styles>=0.1.0",
-    "earthkit-plots>=0.3.0",
+optional-dependencies.plots = [
+  "earthkit-plots>=0.3",
+  "earthkit-plots-default-styles>=0.1",
 ]
-webmars = [
-    "ecmwf-api-client>=1.6.5",
+optional-dependencies.test = [ "pytest-xdist" ]
+optional-dependencies.thermo = [
+  "thermofeel>=2.1.1",
 ]
-test = ["pytest-xdist"]
-all = [
-	"forecast-in-a-box[plots,test,thermo,webmars]"
+optional-dependencies.webmars = [
+  "ecmwf-api-client>=1.6.5",
 ]
-
-# [tool.setuptools]
-# packages = ["forecastbox"]
+urls."Source code" = "https://github.com/ecmwf/forecast-in-a-box"
 
 [tool.setuptools_scm]
 version_file = "forecastbox/_version.py"
@@ -71,22 +74,21 @@ root = ".."
 fallback_version = "0.0.0"
 
 # TODO remove once released
-[tool.uv.sources]
-pproc = { git = "https://github.com/ecmwf/pproc" }
-earthkit-workflows-pproc = { git = "https://github.com/ecmwf/earthkit-workflows-pproc" }
-
 
 [tool.ruff]
 line-length = 140
 
-[tool.ruff.lint]
-ignore = ["E731"]
-
-[tool.mypy]
-plugins = "pydantic.mypy"
+lint.ignore = [ "E731" ]
 
 [tool.pytest.ini_options]
 log_cli = true
 log_cli_level = "DEBUG"
-testpaths = ["tests"]
-addopts = "-n0 -s" # NOTE stick to 0 *or* have random server ports in the integration tests
+testpaths = [ "tests" ]
+addopts = "-n0 -s"      # NOTE stick to 0 *or* have random server ports in the integration tests
+
+[tool.mypy]
+plugins = "pydantic.mypy"
+
+[tool.uv.sources]
+pproc = { git = "https://github.com/ecmwf/pproc" }
+earthkit-workflows-pproc = { git = "https://github.com/ecmwf/earthkit-workflows-pproc" }

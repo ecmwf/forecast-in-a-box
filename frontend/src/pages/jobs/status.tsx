@@ -50,14 +50,14 @@ const JobStatusPage = () => {
   const progressIntervalRef = useRef<null>(null);
 
   const isMobile = useMediaQuery('(max-width: 768px)');
-  
+
   const getStatus = async () => {
     try {
       const response = await api.get('/v1/job/status');
 
       const data: StatusResponse = await response.data;
       setJobs(data);
-      
+
     } catch (error) {
       showNotification({
         id: `status-error-${crypto.randomUUID()}`,
@@ -66,7 +66,7 @@ const JobStatusPage = () => {
         title: "Error getting status",
         message: `${error.response?.data?.detail? error.response?.data?.detail : ''}`,
         color: "red",
-      });    
+      });
     } finally {
       setLoading(false);
     }

@@ -8,23 +8,23 @@
 # nor does it submit to any jurisdiction.
 
 from collections import defaultdict
-from functools import cached_property, lru_cache
+from functools import cached_property
+from functools import lru_cache
+from typing import Any
+from typing import Dict
+from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, FilePath
-from pydantic import model_validator
 import yaml
-
-from typing import Any, Dict, Optional
-
-from qubed import Qube
+from anemoi.inference.checkpoint import Checkpoint
 from earthkit.workflows.fluent import Action
 from earthkit.workflows.plugins.anemoi.fluent import from_input
-
-from anemoi.inference.checkpoint import Checkpoint
-
 from forecastbox.core import FormFieldProvider
-from forecastbox.products.rjsf import FieldWithUI, StringSchema, UIStringField, IntegerSchema, UIIntegerField, ArraySchema, UIObjectField
-
+from forecastbox.products.rjsf import FieldWithUI
+from pydantic import BaseModel
+from pydantic import ConfigDict
+from pydantic import FilePath
+from pydantic import model_validator
+from qubed import Qube
 
 FORECAST_IN_A_BOX_METADATA = "forecast-in-a-box.json"
 
@@ -123,7 +123,7 @@ class Model(BaseModel, FormFieldProvider):
     def extra_information(self) -> ModelExtra:
         """Get the extra information for the model."""
         return get_extra_information(str(self.checkpoint_path)).model_copy()
-    
+
     @cached_property
     def timestep(self) -> int:
         """Get the timestep of the model in hours."""
@@ -177,13 +177,19 @@ class Model(BaseModel, FormFieldProvider):
                     install_list.append(f"{key}=={val}")
             return install_list
 
-        inference_env = {key: val for key, val in versions.items() if any(key.startswith(start) for start in INFERENCE_FILTER_STARTS)}
+        inference_env = {
+            key: val for key, val in versions.items() if any(key.startswith(start) for start in INFERENCE_FILTER_STARTS)
+        }
 
         inference_env.update(self.extra_information.version_overrides or {})
         inference_env_list = parse_into_install(inference_env)
 
         initial_conditions_env = parse_into_install(
-            {key: val for key, val in versions.items() if any(key.startswith(start) for start in INITIAL_CONDITIONS_FILTER_STARTS)}
+            {
+                key: val
+                for key, val in versions.items()
+                if any(key.startswith(start) for start in INITIAL_CONDITIONS_FILTER_STARTS)
+            }
         )
 
         inference_environment_variables = (self.extra_information.environment_variables or {}).copy()
@@ -205,9 +211,7 @@ class Model(BaseModel, FormFieldProvider):
         )
 
     def deaccumulate(self, outputs: "Action") -> "Optional[Action]":
-        """
-        Get the deaccumulated outputs.
-        """
+        """Get the deaccumulated outputs."""
         accumulated_fields = self.accumulations
 
         steps = outputs.nodes.coords["step"]
@@ -292,7 +296,9 @@ def model_info(checkpoint_path: str) -> dict[str, Any]:
 
     anemoi_versions = model_versions(checkpoint_path)
     anemoi_versions = {
-        k: v for k, v in anemoi_versions.items() if any(k.startswith(prefix) for prefix in ["anemoi-", "earthkit-", "torch", "flash-attn"])
+        k: v
+        for k, v in anemoi_versions.items()
+        if any(k.startswith(prefix) for prefix in ["anemoi-", "earthkit-", "torch", "flash-attn"])
     }
 
     return {
@@ -307,7 +313,8 @@ def model_info(checkpoint_path: str) -> dict[str, Any]:
 
 
 def get_extra_information(checkpoint_path: str) -> ModelExtra:
-    from anemoi.utils.checkpoints import has_metadata, load_metadata
+    from anemoi.utils.checkpoints import has_metadata
+    from anemoi.utils.checkpoints import load_metadata
 
     if not has_metadata(checkpoint_path, name=FORECAST_IN_A_BOX_METADATA):
         return ModelExtra()
@@ -316,7 +323,9 @@ def get_extra_information(checkpoint_path: str) -> ModelExtra:
 
 def set_extra_information(checkpoint_path: str, extra: ModelExtra) -> None:
     """Set the extra information for the model."""
-    from anemoi.utils.checkpoints import replace_metadata, save_metadata, has_metadata
+    from anemoi.utils.checkpoints import has_metadata
+    from anemoi.utils.checkpoints import replace_metadata
+    from anemoi.utils.checkpoints import save_metadata
 
     open_checkpoint.cache_clear()
 

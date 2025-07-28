@@ -9,31 +9,42 @@
 
 """Models API Router."""
 
-from collections import defaultdict
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-import os
+import asyncio
 import logging
-
+import os
+import shutil
+import tempfile
+from collections import defaultdict
 from functools import lru_cache
-
-from typing import Any, Literal
 from pathlib import Path
+from typing import Any
+from typing import Literal
 
 import httpx
-import tempfile
-import shutil
+from fastapi import APIRouter
+from fastapi import BackgroundTasks
+from fastapi import Depends
+from fastapi import HTTPException
+from forecastbox.api.utils import get_model_path
+from forecastbox.config import config
+from forecastbox.db.model import delete_download
+from forecastbox.db.model import finish_edit
+from forecastbox.db.model import get_download
+from forecastbox.db.model import get_edit
+from forecastbox.db.model import start_download
+from forecastbox.db.model import start_editing
+from forecastbox.db.model import update_progress
+from forecastbox.models.model import Model
+from forecastbox.models.model import ModelExtra
+from forecastbox.models.model import get_extra_information
+from forecastbox.models.model import model_info
+from forecastbox.models.model import set_extra_information
+from forecastbox.schemas.model import ModelDownload
 from pydantic import BaseModel
 
-from ..types import ModelSpecification, ModelName
-from forecastbox.models.model import Model, model_info, get_extra_information, set_extra_information, ModelExtra
+from ..types import ModelName
+from ..types import ModelSpecification
 from .admin import get_admin_user
-
-from forecastbox.config import config
-from forecastbox.api.utils import get_model_path
-from forecastbox.schemas.model import ModelDownload
-from forecastbox.db.model import start_download, update_progress, get_download, delete_download, start_editing, get_edit, finish_edit
-
-import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -48,9 +59,7 @@ Category = str
 
 
 class DownloadResponse(BaseModel):
-    """
-    Response model for model download operations.
-    """
+    """Response model for model download operations."""
 
     download_id: str | None
     """*DEPRECATED* Unique identifier for the download operation, if applicable."""
@@ -65,8 +74,7 @@ class DownloadResponse(BaseModel):
 
 
 async def download_file(model_id: str, url: str, download_path: str) -> None:
-    """
-    Download a file from a given URL and save it to the specified path.
+    """Download a file from a given URL and save it to the specified path.
 
     This function updates the download progress in the database.
 
@@ -78,11 +86,6 @@ async def download_file(model_id: str, url: str, download_path: str) -> None:
         URL of the file to download.
     download_path : str
         Path where the downloaded file will be saved.
-
-    Returns
-    -------
-    DownloadResponse
-        Response model containing the status of the download operation.
     """
     try:
         tempfile_path = tempfile.NamedTemporaryFile(prefix="model_", suffix=".ckpt", delete=False)
@@ -150,8 +153,7 @@ def model_downloaded(model_id: str) -> bool:
 
 @router.get("/available")
 async def get_available_models() -> dict[Category, list[ModelName]]:
-    """
-    Get a list of available models sorted into categories.
+    """Get a list of available models sorted into categories.
 
     Returns
     -------
@@ -180,8 +182,7 @@ async def get_manifest() -> str:
 
 
 async def all_available_models() -> dict[Category, list[ModelName]]:
-    """
-    Get a list of available models sorted into categories.
+    """Get a list of available models sorted into categories.
 
     Will show all models in the manifest, regardless of whether they are downloaded or not.
 
@@ -218,8 +219,12 @@ class ModelDetails(BaseModel):
 
 @router.get("")
 async def get_models(admin=Depends(get_admin_user)) -> dict[str, ModelDetails]:
-    """
-    Fetch a dictionary of models with their details.
+    """Fetch a dictionary of models with their details.
+
+    Parameters
+    ----------
+    admin : Depends
+        Dependency to check if the user is an admin.
 
     Returns
     -------
@@ -309,13 +314,14 @@ async def delete_model(model_id: str, admin=Depends(get_admin_user)) -> Download
 
 @router.get("/{model_id}/metadata")
 async def get_model_metadata(model_id: str, admin=Depends(get_admin_user)) -> ModelExtra:
-    """
-    Get metadata for a specific model.
+    """Get metadata for a specific model.
 
     Parameters
     ----------
     model_id : str
         Model to load, directory separated by underscores
+    admin : Depends
+        Dependency to check if the user is an admin.
 
     Returns
     -------
@@ -333,8 +339,7 @@ async def get_model_metadata(model_id: str, admin=Depends(get_admin_user)) -> Mo
 
 
 async def _update_model_metadata(model_id: str, metadata: ModelExtra) -> ModelExtra:
-    """
-    Update metadata for a specific model.
+    """Update metadata for a specific model.
 
     Parameters
     ----------
@@ -366,8 +371,7 @@ async def _update_model_metadata(model_id: str, metadata: ModelExtra) -> ModelEx
 async def patch_model_metadata(
     model_id: str, metadata: ModelExtra, background_tasks: BackgroundTasks, admin=Depends(get_admin_user)
 ) -> None:
-    """
-    Patch metadata for a specific model.
+    """Patch metadata for a specific model.
 
     Parameters
     ----------
@@ -375,11 +379,11 @@ async def patch_model_metadata(
         Model to load, directory separated by underscores
     metadata : dict
         Metadata to patch
+    background_tasks : BackgroundTasks
+        Background tasks to run the update in the background
+    admin : Depends
+        Dependency to check if the user is an admin.
 
-    Returns
-    -------
-    ModelExtra
-        Updated model metadata
     """
     if not model_downloaded(model_id):
         raise HTTPException(status_code=404, detail="Model not found")
@@ -395,13 +399,14 @@ async def patch_model_metadata(
 @lru_cache(maxsize=128)
 @router.get("/{model_id}/info")
 async def get_model_info(model_id: str, admin=Depends(get_admin_user)) -> dict[str, Any]:
-    """
-    Get basic information about a model.
+    """Get basic information about a model.
 
     Parameters
     ----------
     model_id : str
         Model to load, directory separated by underscores
+    admin : Depends
+        Dependency to check if the user is an admin.
 
     Returns
     -------
@@ -413,13 +418,14 @@ async def get_model_info(model_id: str, admin=Depends(get_admin_user)) -> dict[s
 
 @router.post("/specification")
 async def get_model_spec(modelspec: ModelSpecification, admin=Depends(get_admin_user)) -> dict[str, Any]:
-    """
-    Get the Qubed model spec as a json.
+    """Get the Qubed model spec as a json.
 
     Parameters
     ----------
     modelspec : ModelSpecification
         Model Specification
+    admin : Depends
+        Dependency to check if the user is an admin.
 
     Returns
     -------
