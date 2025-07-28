@@ -12,8 +12,6 @@
 # https://rjsf-team.github.io/react-jsonschema-form/docs/
 
 from typing import Any
-from typing import Dict
-from typing import List
 from typing import Optional
 from typing import Union
 
@@ -38,7 +36,7 @@ class UIField(BaseModel):
     """Widget type to use for this field (e.g., 'text', 'textarea', 'checkbox', etc.)."""
     classNames: Optional[str] = None
     """CSS class names to apply to the field container."""
-    style: Optional[Dict[str, str]] = None
+    style: Optional[dict[str, str]] = None
     """Inline styles to apply to the field container."""
     autocomplete: Optional[str] = None
     """HTML autocomplete attribute value."""
@@ -50,9 +48,9 @@ class UIField(BaseModel):
     """If True, the field will be disabled."""
     emptyValue: Optional[Any] = None
     """Value to use when the field is empty."""
-    enumDisabled: Optional[List[Any]] = None
-    """List of enum values to disable in a select."""
-    enumNames: Optional[List[str]] = None
+    enumDisabled: Optional[list[Any]] = None
+    """list of enum values to disable in a select."""
+    enumNames: Optional[list[str]] = None
     """Custom display names for enum options."""
     help: Optional[str] = None
     """Help text to display below the field."""
@@ -62,7 +60,7 @@ class UIField(BaseModel):
     """HTML input type (e.g., 'text', 'number')."""
     label: Optional[bool] = None
     """If False, the label will be hidden."""
-    order: Optional[List[str]] = None
+    order: Optional[list[str]] = None
     """Order of fields in the UI schema, if applicable."""
     placeholder: Optional[str] = None
     """Placeholder text for the field."""
@@ -73,7 +71,7 @@ class UIField(BaseModel):
     title: Optional[str] = None
     """Custom title for the field."""
 
-    def export_with_prefix(self) -> Dict[str, Any]:
+    def export_with_prefix(self) -> dict[str, Any]:
         return {"ui:options": self.model_dump(exclude_none=True)}
 
 
@@ -125,12 +123,12 @@ class UIObjectField(BaseModel):
     >>> UIObjectField(anyOf=[UIStringField(widget="text"), UIIntegerField(widget="updown")])
     """
 
-    anyOf: Optional[List["UISchema"]] = None
-    """List of schemas for 'anyOf' condition."""
-    oneOf: Optional[List["UISchema"]] = None
-    """List of schemas for 'oneOf' condition."""
+    anyOf: Optional[list["UISchema"]] = None
+    """list of schemas for 'anyOf' condition."""
+    oneOf: Optional[list["UISchema"]] = None
+    """list of schemas for 'oneOf' condition."""
 
-    def export_with_prefix(self) -> Dict[str, Any]:
+    def export_with_prefix(self) -> dict[str, Any]:
         """Export the UI schema with prefix."""
         result = {}
         if self.anyOf:

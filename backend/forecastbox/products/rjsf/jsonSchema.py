@@ -12,8 +12,6 @@
 # https://rjsf-team.github.io/react-jsonschema-form/docs/
 
 from typing import Any
-from typing import Dict
-from typing import List
 from typing import Literal
 from typing import Optional
 from typing import Union
@@ -38,7 +36,7 @@ class BaseSchema(BaseModel):
     """Description of the schema."""
     default: Optional[Any] = None
     """Default value for the schema."""
-    additionalProperties: Optional[Dict[str, Any]] = None
+    additionalProperties: Optional[dict[str, Any]] = None
     """Additional properties allowed in the schema."""
 
     model_config = ConfigDict(extra="allow", use_enum_values=True, json_schema_extra={"discriminator": "type"})
@@ -59,10 +57,10 @@ class EnumMixin:
     >>> s.update_enum(["x", "y"])
     """
 
-    enum: Optional[List[Any]] = None
-    """List of allowed values for the schema."""
+    enum: Optional[list[Any]] = None
+    """list of allowed values for the schema."""
 
-    def update_enum(self, new_enum: List[Any]):
+    def update_enum(self, new_enum: list[Any]):
         if not isinstance(new_enum, list):
             raise TypeError("Enum must be a list")
         self.enum = new_enum
@@ -173,14 +171,14 @@ class ObjectSchema(BaseSchema):
     """
 
     type: Literal["object"] = Field(default="object")
-    properties: Dict[str, "FieldSchema"]
+    properties: dict[str, "FieldSchema"]
     """Underlying fields of the object."""
-    required: Optional[List[str]] = None
-    """List of required property names."""
+    required: Optional[list[str]] = None
+    """list of required property names."""
 
-    anyOf: Optional[List["FieldSchema"]] = None
-    oneOf: Optional[List["FieldSchema"]] = None
-    allOf: Optional[List["FieldSchema"]] = None
+    anyOf: Optional[list["FieldSchema"]] = None
+    oneOf: Optional[list["FieldSchema"]] = None
+    allOf: Optional[list["FieldSchema"]] = None
 
 
 class ArraySchema(BaseSchema):

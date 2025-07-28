@@ -9,26 +9,28 @@
 
 """Products API Router."""
 
-from typing_extensions import OrderedDict
-from fastapi import APIRouter
-
+import re
 from typing import Any
-from qubed import Qube
+from typing import Iterable
 
-
-from forecastbox.products.product import Product, USER_DEFINED
-
-from forecastbox.products.registry import get_categories, get_product, Category
-from forecastbox.models import Model
-
-from forecastbox.products.interfaces import Interfaces
-
-from .model import get_model_path
-
-from ..types import ConfigEntry, ProductConfiguration, ModelSpecification
-from forecastbox.products.rjsf import FormDefinition, ExportedSchemas, FieldWithUI, StringSchema
 import forecastbox.products.rjsf.utils as rjsfutils
+from fastapi import APIRouter
+from forecastbox.models import Model
+from forecastbox.products.interfaces import Interfaces
+from forecastbox.products.product import USER_DEFINED
+from forecastbox.products.product import Product
+from forecastbox.products.registry import Category
+from forecastbox.products.registry import get_categories
+from forecastbox.products.registry import get_product
+from forecastbox.products.rjsf import ExportedSchemas
+from forecastbox.products.rjsf import FieldWithUI
+from forecastbox.products.rjsf import FormDefinition
+from forecastbox.products.rjsf import StringSchema
+from qubed import Qube
+from typing_extensions import OrderedDict
 
+from ..types import ModelSpecification
+from .model import get_model_path
 
 router = APIRouter(
     tags=["product"],
@@ -63,12 +65,11 @@ def select_from_params(available_spec: Qube, params: dict[str, Any]) -> Qube:
 
     return available_spec
 
-def _sort_values(values: list[Any]) -> list[Any]:
-    if all(str(x).isdigit() for x in values):
-        values = list(map(float, sorted(values, key=float)))
-        return values
-    values = list(sorted(values, key=lambda x: str(x).lower()))
-    return values
+def _sort_values(values: Iterable[Any]) -> Iterable[Any]:
+    """Sort values in a way that numbers come before strings, and numbers are sorted numerically."""
+    convert = lambda text: int(text) if text.isdigit() else text
+    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
+    return sorted(values, key=alphanum_key)
 
 def _sort_fields(fields: dict) -> dict:
     new_fields = OrderedDict()
@@ -84,8 +85,7 @@ def _sort_fields(fields: dict) -> dict:
 
 
 async def product_to_config(product: Product, model_spec: ModelSpecification, params: dict[str, Any]) -> ExportedSchemas:
-    """
-    Convert a product to a configuration dictionary.
+    """Convert a product to a configuration dictionary.
 
     Parameters
     ----------
@@ -190,8 +190,7 @@ async def api_get_categories(interface: Interfaces) -> dict[str, Category]:
 
 @router.post("/categories/{interface}")
 async def get_valid_categories(interface: Interfaces, modelspec: ModelSpecification) -> dict[str, Category]:
-    """
-    Get valid categories for a given interface and model specification.
+    """Get valid categories for a given interface and model specification.
 
     Parameters
     ----------
@@ -224,8 +223,7 @@ async def get_valid_categories(interface: Interfaces, modelspec: ModelSpecificat
 
 @router.post("/configuration/{category}/{product}")
 async def get_product_configuration(category: str, product: str, model: ModelSpecification, spec: dict[str, Any]) -> ExportedSchemas:
-    """
-    Get the product configuration for a given category and product.
+    """Get the product configuration for a given category and product.
 
     Validates the product against the model specification and returns a configuration object.
 
