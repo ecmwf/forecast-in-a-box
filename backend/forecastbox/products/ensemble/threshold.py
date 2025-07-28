@@ -11,30 +11,40 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
-from qubed import Qube
 from earthkit.workflows import fluent
+from forecastbox.products.ensemble.base import BaseEnsembleProduct
+from forecastbox.products.ensemble.base import BasePProcEnsembleProduct
+from qubed import Qube
 
-from . import ensemble_registry
-from ..product import GenericParamProduct, USER_DEFINED
+from ..export import export_fieldlist_as
 from ..generic import generic_registry
-
-from forecastbox.products.definitions import DESCRIPTIONS, LABELS
-from forecastbox.products.ensemble.base import BasePProcEnsembleProduct, BaseEnsembleProduct
+from ..product import USER_DEFINED
+from ..product import GenericParamProduct
+from ..rjsf import FieldWithUI
+from ..rjsf import StringSchema
+from . import ensemble_registry
 
 
 class BaseThresholdProbability(BaseEnsembleProduct):
     """Base Threshold Probability Product"""
 
-    description = {
-        **DESCRIPTIONS,
-        "threshold": "Threshold",
-    }
-    label = {
-        **LABELS,
-        "threshold": "Threshold",
-        "operator": "Operator",
-    }
+    @property
+    def formfields(self):
+        formfields = super().formfields.copy()
+        formfields.update(
+            step=FieldWithUI(jsonschema=StringSchema(title="Step", description="Forecast step, e.g. 0-24, 0-168")),
+            threshold=FieldWithUI(
+                jsonschema=StringSchema(title="Threshold", description="Threshold value to apply, e.g. 0, 5, 10, etc.")
+            ),
+            operator=FieldWithUI(
+                jsonschema=StringSchema(
+                    title="Operator",
+                    description="Operator to apply to the threshold, e.g. '>', '<', '==', etc.",
+                    enum=["<", "<=", "==", ">=", ">"],
+                )
+            ),
+        )
+        return formfields
 
     @property
     def model_assumptions(self):
@@ -43,20 +53,15 @@ class BaseThresholdProbability(BaseEnsembleProduct):
 
 @generic_registry("Threshold Probability")
 class GenericThresholdProbability(BaseThresholdProbability, GenericParamProduct):
-    example = {
-        "threshold": "10",
-    }
-    multiselect = {
-        "param": True,
-    }
 
     @property
     def qube(self):
         return self.make_generic_qube(threshold=USER_DEFINED, operator=USER_DEFINED, step=USER_DEFINED)
 
-    def to_graph(self, product_spec, model, source):
-        from earthkit.workflows.plugins.anemoi.fluent import ENSEMBLE_DIMENSION_NAME
-        from earthkit.workflows import backends, fluent
+    def execute(self, product_spec, model, source):
+        from earthkit.workflows import backends
+        from earthkit.workflows import fluent
+        from earthkit.workflows.plugins.anemoi.types import ENSEMBLE_DIMENSION_NAME
 
         source = source.sel(param=product_spec["param"])
         if "levlist" in product_spec:
@@ -71,7 +76,13 @@ class GenericThresholdProbability(BaseThresholdProbability, GenericParamProduct)
             ),
         )
 
-        return source.map(payload).multiply(100).mean(ENSEMBLE_DIMENSION_NAME)
+        return (
+            source.map(payload)
+            .multiply(100)
+            .mean(ENSEMBLE_DIMENSION_NAME)
+            .map(export_fieldlist_as(format="grib"))
+            .map(self.named_payload("Threshold Probability"))
+        )
 
 
 @ensemble_registry("Threshold Probability")
@@ -127,7 +138,9 @@ class DefinedThresholdProbability(BaseThresholdProbability, BasePProcEnsemblePro
 
         paramid = self.get_out_paramid(levtype, param, product_spec.get("levlist", None), threshold, operator)
         if paramid is None:
-            raise KeyError(f"Could not identify output paramid for {param!r} with threshold {threshold!r} and operator {operator!r}.")
+            raise KeyError(
+                f"Could not identify output paramid for {param!r} with threshold {threshold!r} and operator {operator!r}."
+            )
 
         request = {
             "type": "ep",

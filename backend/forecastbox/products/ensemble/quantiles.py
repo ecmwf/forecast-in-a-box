@@ -22,23 +22,24 @@ from earthkit.workflows import fluent
 
 from forecastbox.products.definitions import DESCRIPTIONS, LABELS
 from forecastbox.products.ensemble.base import BasePProcEnsembleProduct
+from ..rjsf import FieldWithUI, StringSchema, IntegerSchema, ArraySchema, UIObjectField, UIStringField, FieldSchema
 
 
 class BaseQuantiles(BasePProcEnsembleProduct, GenericTemporalProduct):
     """Base Quantiles Product"""
 
-    description = {
-        **DESCRIPTIONS,
-        "quantile": "Quantile",
-    }
-    label = {
-        **LABELS,
-        "quantile": "Quantile",
-    }
-    multiselect = {
-        "quantile": True,
-        "param": True,
-    }
+    @property
+    def formfields(self):
+        formfields = super().formfields.copy()
+        formfields.update(
+            quantile=FieldWithUI(
+                jsonschema=StringSchema(
+                    title="Quantiles",
+                    description="Computed Quantile",
+                )
+            ),
+        )
+        return formfields
 
     @property
     def model_assumptions(self):
@@ -59,7 +60,7 @@ class BaseQuantiles(BasePProcEnsembleProduct, GenericTemporalProduct):
         requests = []
 
         for para in params:
-            request = {
+            request: dict[str, Any] = {
                 "type": "pb",
             }
             from anemoi.utils.grib import shortname_to_paramid

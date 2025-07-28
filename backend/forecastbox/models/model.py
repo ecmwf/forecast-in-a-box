@@ -14,13 +14,16 @@ from pydantic import BaseModel, ConfigDict, FilePath
 from pydantic import model_validator
 import yaml
 
-from typing import Any
+from typing import Any, Dict, Optional
 
 from qubed import Qube
 from earthkit.workflows.fluent import Action
-
 from earthkit.workflows.plugins.anemoi.fluent import from_input
+
 from anemoi.inference.checkpoint import Checkpoint
+
+from forecastbox.core import FormFieldProvider
+from forecastbox.products.rjsf import FieldWithUI, StringSchema, UIStringField, IntegerSchema, UIIntegerField, ArraySchema, UIObjectField
 
 
 FORECAST_IN_A_BOX_METADATA = "forecast-in-a-box.json"
@@ -68,7 +71,7 @@ class ModelExtra(BaseModel):
         return values
 
 
-class Model(BaseModel):
+class Model(BaseModel, FormFieldProvider):
     """Model Specification"""
 
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
@@ -77,8 +80,40 @@ class Model(BaseModel):
     lead_time: int
     date: str
     ensemble_members: int
-    time: str = None
-    entries: dict[str, Any] = None
+    time: Optional[str] = None
+    entries: Optional[Dict[str, Any]] = None
+
+    @property
+    def formfields(self) -> dict[str, "FieldWithUI"]:
+        return {
+            # 'date': FieldWithUI(
+            #     jsonschema= StringSchema(
+            #         title="Date",
+            #         description="Date of the forecast in YYYY-MM-DD format.",
+            #         format="date",
+            #     ),
+            #     ui=UIStringField(
+            #         widget="date",
+            #         inputType="date",
+            #         label=False,
+            #         placeholder="YYYY-MM-DD",
+            #     )
+            # ),
+            # 'lead_time': FieldWithUI(
+            #     jsonschema=IntegerSchema(
+            #         title="Lead Time",
+            #         description="Lead time for the forecast in hours.",
+            #         minimum=0,
+            #         maximum=self.lead_time,
+            #         multipleOf=self.timestep,
+            #     ),
+            #     ui=UIIntegerField(
+            #         widget='range',
+            #         label=False,
+            #         placeholder="Enter lead time in hours",
+            #     )
+            # ),
+        }
 
     @cached_property
     def checkpoint(self) -> Checkpoint:
@@ -87,12 +122,16 @@ class Model(BaseModel):
     @cached_property
     def extra_information(self) -> ModelExtra:
         """Get the extra information for the model."""
-        return get_extra_information(self.checkpoint_path).model_copy()
+        return get_extra_information(str(self.checkpoint_path)).model_copy()
+    
+    @cached_property
+    def timestep(self) -> int:
+        """Get the timestep of the model in hours."""
+        return int((self.checkpoint.timestep.total_seconds() + 1) // 3600)
 
     @cached_property
     def timesteps(self) -> list[int]:
-        model_step = int((self.checkpoint.timestep.total_seconds() + 1) // 3600)
-        return list(range(model_step, int(self.lead_time) + 1, model_step))
+        return list(range(self.timestep, int(self.lead_time) + 1, self.timestep))
 
     @cached_property
     def variables(self) -> list[str]:
@@ -118,11 +157,11 @@ class Model(BaseModel):
         """
         return convert_to_model_spec(self.checkpoint, assumptions=assumptions)
 
-    def graph(self, initial_conditions: "Action", environment_kwargs: dict = None, **kwargs) -> "Action":
+    def graph(self, initial_conditions: "Action", environment_kwargs: Optional[Dict] = None, **kwargs) -> "Action":
         """Get Model Graph.
 
         Anemoi cascade exposes each param as a separate node in the graph,
-        with pressure levels represented as 'param_levelist'.
+        with pressure levels represented as `{param}_{levelist}`.
         """
 
         versions = self.versions()
@@ -165,7 +204,7 @@ class Model(BaseModel):
             env=inference_environment_variables,
         )
 
-    def deaccumulate(self, outputs: "Action") -> "Action":
+    def deaccumulate(self, outputs: "Action") -> "Optional[Action]":
         """
         Get the deaccumulated outputs.
         """
@@ -173,7 +212,7 @@ class Model(BaseModel):
 
         steps = outputs.nodes.coords["step"]
 
-        fields: Action = None
+        fields: Optional[Action] = None
 
         for field in self.variables:
             if field not in accumulated_fields:
@@ -205,11 +244,11 @@ class Model(BaseModel):
 
     def versions(self) -> dict[str, str]:
         """Get the versions of the model"""
-        return model_versions(self.checkpoint_path)
+        return model_versions(str(self.checkpoint_path))
 
     def info(self) -> dict[str, Any]:
         """Get the model info"""
-        return model_info(self.checkpoint_path)
+        return model_info(str(self.checkpoint_path))
 
 
 def get_model(checkpoint_path, **kwargs) -> Model:
