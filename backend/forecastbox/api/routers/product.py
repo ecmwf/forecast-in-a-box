@@ -10,6 +10,8 @@
 """Products API Router."""
 
 from typing import Any
+from typing import Iterable
+import re
 
 import forecastbox.products.rjsf.utils as rjsfutils
 from fastapi import APIRouter
@@ -63,13 +65,11 @@ def select_from_params(available_spec: Qube, params: dict[str, Any]) -> Qube:
 
     return available_spec
 
-
-def _sort_values(values: list[Any]) -> list[Any]:
-    if all(str(x).isdigit() for x in values):
-        values = list(map(float, sorted(values, key=float)))
-        return values
-    values = list(sorted(values, key=lambda x: str(x).lower()))
-    return values
+def _sort_values(values: Iterable[Any]) -> Iterable[Any]:
+    """Sort values in a way that numbers come before strings, and numbers are sorted numerically."""
+    convert = lambda text: int(text) if text.isdigit() else text
+    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
+    return sorted(values, key=alphanum_key)
 
 
 def _sort_fields(fields: dict) -> dict:

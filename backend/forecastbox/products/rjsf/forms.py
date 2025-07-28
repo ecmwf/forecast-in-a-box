@@ -12,8 +12,6 @@
 # https://rjsf-team.github.io/react-jsonschema-form/docs/
 
 from typing import Any
-from typing import Dict
-from typing import List
 from typing import Optional
 
 from pydantic import BaseModel
@@ -26,14 +24,14 @@ from .uiSchema import UISchema
 class ExportedJsonSchema(TypedDict):
     title: str
     type: str
-    required: List[str]
-    properties: Dict[str, Dict]
+    required: list[str]
+    properties: dict[str, dict]
     """The JSON Schema definition for the form."""
 
 
 class ExportedSchemas(TypedDict):
     jsonSchema: ExportedJsonSchema
-    uiSchema: Dict[str, Dict]
+    uiSchema: dict[str, dict]
 
 
 # Combined Schema + UI
@@ -51,10 +49,10 @@ class FormDefinition(BaseModel):
 
     title: str
     """The title of the form."""
-    fields: Dict[str, FieldWithUI]
+    fields: dict[str, FieldWithUI]
     """The fields in the form, keyed by field name."""
-    required: Optional[List[str]] = []
-    """List of required field names."""
+    required: Optional[list[str]] = []
+    """list of required field names."""
 
     def export_jsonschema(self) -> ExportedJsonSchema:
         """Exports the form definition as a JSON Schema object.
@@ -67,7 +65,7 @@ class FormDefinition(BaseModel):
             "properties": {key: field.jsonschema.model_dump(exclude_none=True) for key, field in self.fields.items()},
         }
 
-    def export_uischema(self) -> Dict[str, Any]:
+    def export_uischema(self) -> dict[str, Any]:
         """Exports the form definition as a UI Schema object.
         This includes the UI options for each field that has a UI Schema defined.
         """
