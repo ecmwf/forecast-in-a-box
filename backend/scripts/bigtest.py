@@ -1,9 +1,11 @@
 """Executed from the bigtest github action"""
 
 import datetime as dt
+import tempfile
 import time
 
 import httpx
+from forecastbox.config import FIABConfig
 from forecastbox.config import config
 from forecastbox.standalone.entrypoint import launch_all
 
@@ -49,8 +51,21 @@ def get_quickstart_job() -> dict:
 
 
 if __name__ == "__main__":
+    handles = None
+    dbDir = None
+    dataDir = None
     try:
-        handles = launch_all(config, False)
+        dbDir = tempfile.TemporaryDirectory()
+        config = FIABConfig()
+        config.api.uvicorn_port = 30645
+        config.auth.passthrough = True
+        config.cascade.cascade_url = "tcp://localhost:30644"
+        config.db.sqlite_userdb_path = f"{dbDir.name}/user.db"
+        config.db.sqlite_jobdb_path = f"{dbDir.name}/job.db"
+        dataDir = tempfile.TemporaryDirectory()
+        config.api.data_path = dataDir.name
+
+        handles = launch_all(config, False, attempts=50)
         client = httpx.Client(base_url=config.api.local_url() + "/api/v1", follow_redirects=True)
 
         # download model
@@ -86,4 +101,9 @@ if __name__ == "__main__":
                 raise ValueError(response)
 
     finally:
-        handles.shutdown()
+        if handles is not None:
+            handles.shutdown()
+        if dataDir is not None:
+            dataDir.cleanup()
+        if dbDir is not None:
+            dbDir.cleanup()
