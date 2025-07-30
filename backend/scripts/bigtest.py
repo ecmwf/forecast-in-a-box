@@ -1,6 +1,7 @@
 """Executed from the bigtest github action"""
 
 import datetime as dt
+import logging
 import os
 import tempfile
 import time
@@ -10,6 +11,7 @@ from forecastbox.config import FIABConfig
 from forecastbox.config import config
 from forecastbox.standalone.entrypoint import launch_all
 
+logger = logging.getLogger("forecastbox.bigtest")
 
 def get_quickstart_job() -> dict:
     today = dt.date.today().strftime("%Y%m%d")
@@ -72,7 +74,7 @@ if __name__ == "__main__":
 
         # download model
         client.post("/model/testing_o48-pretrained/download").raise_for_status()
-        i = 30
+        i = 100
         while True:
             if i <= 0:
                 raise TimeoutError("no more retries")
@@ -82,6 +84,8 @@ if __name__ == "__main__":
                 break
             elif response["status"] in {"errored", "not_downloaded"}:
                 raise ValueError(response)
+            else:
+                logger.debug(f"download in progress: {response}")
             i -= 1
 
         # execute "quickstart" job
