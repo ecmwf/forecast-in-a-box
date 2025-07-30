@@ -153,6 +153,7 @@ def launch_all(config: FIABConfig, is_browser: bool, attempts: int = 10) -> Proc
     with httpx.Client() as client:
         wait_for(client, config.api.local_url() + "/api/v1/status", attempts)
         client.post(config.api.local_url() + "/api/v1/gateway/start").raise_for_status()
+        client.post(config.api.local_url() + "/api/v1/model/flush").raise_for_status()
     if is_browser:
         webbrowser.open(config.api.local_url())
 

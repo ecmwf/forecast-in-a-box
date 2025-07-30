@@ -57,9 +57,12 @@ async def start_download(model_id: str) -> None:
     await addAndCommit(entity, async_session_maker)
 
 
-async def delete_download(model_id: str) -> None:
-    where = ModelDownload.model_id == model_id
-    stmt = delete(ModelDownload).where(where)
+async def delete_download(model_id: str|None) -> None:
+    if model_id:
+        where = ModelDownload.model_id == model_id
+        stmt = delete(ModelDownload).where(where)
+    else:
+        stmt = delete(ModelDownload)
     await executeAndCommit(stmt, async_session_maker)
 
 
