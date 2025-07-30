@@ -308,6 +308,10 @@ async def delete_model(model_id: str, admin=Depends(get_admin_user)) -> Download
         progress=0.00,
     )
 
+@router.post("/flush")
+async def flush_inprogress_downloads(admin=Depends(get_admin_user)) -> None:
+    """For flushing the model downloads table -- primarily makes sense at the startup time"""
+    await delete_download(None)
 
 # section: MODEL EDIT
 

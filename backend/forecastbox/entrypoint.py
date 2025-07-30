@@ -98,7 +98,7 @@ async def circumvent_auth(request: Request, call_next):
     if request.url.path == "/api/v1/users/me" and config.auth.passthrough:
         from starlette.responses import JSONResponse
 
-        return JSONResponse({})
+        return JSONResponse({'is_superuser': True})
     else:
         return await call_next(request)
 
