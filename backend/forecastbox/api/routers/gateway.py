@@ -13,17 +13,14 @@ import logging
 import select
 import subprocess
 from dataclasses import dataclass
-from multiprocessing import Process
-from multiprocessing import get_context
+from multiprocessing import Process, get_context
 from tempfile import TemporaryDirectory
 
 import cascade.gateway.api
 import cascade.gateway.client
-from fastapi import APIRouter
-from fastapi import HTTPException
-from fastapi import Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from forecastbox.config import config
+from forecastbox.config import StatusMessage, config
 from forecastbox.standalone.entrypoint import launch_cascade
 from sse_starlette.sse import EventSourceResponse
 
@@ -108,7 +105,7 @@ async def get_status() -> str:
     elif Globals.gateway.process.exitcode is not None:
         return f"exited with {Globals.gateway.process.exitcode}"
     else:
-        return "running"
+        return StatusMessage.gateway_running
 
 
 @router.get("/logs")

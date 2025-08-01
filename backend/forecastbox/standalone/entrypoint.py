@@ -20,18 +20,15 @@ import os
 import time
 import webbrowser
 from dataclasses import dataclass
-from multiprocessing import Process
-from multiprocessing import connection
-from multiprocessing import freeze_support
-from multiprocessing import set_start_method
+from multiprocessing import Process, connection, freeze_support, set_start_method
+from typing import Callable
 
 import httpx
 import pydantic
 import uvicorn
-from cascade.executor.config import logging_config
-from cascade.executor.config import logging_config_filehandler
-from forecastbox.config import FIABConfig
-from forecastbox.config import validate_runtime
+from cascade.executor.config import logging_config, logging_config_filehandler
+from cascade.low.func import assert_never
+from forecastbox.config import FIABConfig, StatusMessage, validate_runtime
 
 logger = logging.getLogger(__name__ if __name__ != "__main__" else "forecastbox.standalone.entrypoint")
 
@@ -89,19 +86,35 @@ def launch_cascade(log_path: str, log_base: str):
         pass  # no need to spew stacktrace to log
 
 
-def wait_for(client: httpx.Client, status_url: str, attempts: int) -> None:
+CallResult = httpx.Response|httpx.HTTPError
+def _call_succ(response: CallResult, url: str) -> bool:
+    if isinstance(response, httpx.Response):
+        if response.status_code == 200:
+            return True
+        else:
+            raise ValueError(f"failure on {url}: {response}")
+    elif isinstance(response, httpx.ConnectError):
+        return False
+    elif isinstance(response, httpx.HTTPError):
+        raise ValueError(f"failure on {url}: {repr(response)}")
+    else:
+        assert_never(response)
+
+
+def wait_for(client: httpx.Client, url: str, attempts: int, condition: Callable[[CallResult, str], bool]) -> None:
     """Calls /status endpoint, retry on ConnectError"""
     i = 0
     while i < attempts:
         try:
-            rc = client.get(status_url)
-            if not rc.status_code == 200:
-                raise ValueError(f"failed to start {status_url}: {rc}")
-            return
-        except httpx.ConnectError:
-            i += 1
-            time.sleep(2)
-    raise ValueError(f"failed to start {status_url}: no more retries")
+            response = client.get(url)
+            if condition(response, url):
+                return
+        except httpx.HTTPError as e:
+            if condition(e, url):
+                return
+        i += 1
+        time.sleep(2)
+    raise ValueError(f"failure on {url}: no more retries")
 
 
 @dataclass
@@ -151,10 +164,13 @@ def launch_all(config: FIABConfig, is_browser: bool, attempts: int = 10) -> Proc
     api.start()
 
     with httpx.Client() as client:
-        wait_for(client, config.api.local_url() + "/api/v1/status", attempts)
+        wait_for(client, config.api.local_url() + "/api/v1/status", attempts, _call_succ)
         client.post(config.api.local_url() + "/api/v1/gateway/start").raise_for_status()
         if config.auth.passthrough:
             client.post(config.api.local_url() + "/api/v1/model/flush").raise_for_status()
+        gw_check = lambda resp, _: resp.raise_for_status().text == f"\"{StatusMessage.gateway_running}\""
+        wait_for(client, config.api.local_url() + "/api/v1/gateway/status", attempts, gw_check)
+
     if is_browser:
         webbrowser.open(config.api.local_url())
 

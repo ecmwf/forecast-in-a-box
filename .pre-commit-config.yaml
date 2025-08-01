@@ -32,9 +32,7 @@ repos:
   - id: isort
     args:
     - -l 120
-    - --force-single-line-imports
     - --profile black
-    - --project anemoi
 - repo: https://github.com/astral-sh/ruff-pre-commit
   rev: v0.12.2
   hooks:
