@@ -12,12 +12,8 @@ import pathlib
 import urllib.parse
 
 from cascade.low.func import pydantic_recursive_collect
-from pydantic import BaseModel
-from pydantic import Field
-from pydantic import SecretStr
-from pydantic import model_validator
-from pydantic_settings import BaseSettings
-from pydantic_settings import SettingsConfigDict
+from pydantic import BaseModel, Field, SecretStr, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 fiab_home = pathlib.Path.home() / ".fiab"
 
@@ -26,6 +22,11 @@ def _validate_url(url: str) -> bool:
     # TODO add DNS resolution attempt or something
     parse = urllib.parse.urlparse(url)
     return parse.scheme and parse.netloc
+
+class StatusMessage:
+    """Namespace class for status message sharing"""
+    # NOTE this class is here as this is a low place in hierarchy, and we dont want circular imports
+    gateway_running = "running"
 
 
 class DatabaseSettings(BaseModel):
