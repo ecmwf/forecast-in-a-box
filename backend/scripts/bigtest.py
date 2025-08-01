@@ -14,7 +14,7 @@ from forecastbox.standalone.entrypoint import launch_all
 logger = logging.getLogger("forecastbox.bigtest")
 
 def get_quickstart_job() -> dict:
-    today = dt.date.today().strftime("%Y%m%d")
+    today = (dt.date.today() - dt.timedelta(2)).strftime("%Y%m%d")
     return {
         "job": {
             "job_type": "forecast_products",
