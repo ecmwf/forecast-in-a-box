@@ -166,7 +166,7 @@ class Model(BaseModel, FormFieldProvider):
 
         versions = self.versions()
         INFERENCE_FILTER_STARTS = ["anemoi-models", "anemoi-graphs", "flash-attn", "torch"]
-        INITIAL_CONDITIONS_FILTER_STARTS = ["anemoi-inference", "earthkit", "anemoi-transform"]
+        INITIAL_CONDITIONS_FILTER_STARTS = ["anemoi-inference", "earthkit", "anemoi-transform", "anemoi-plugins"]
 
         def parse_into_install(version_dict):
             install_list = []
@@ -177,11 +177,15 @@ class Model(BaseModel, FormFieldProvider):
                     install_list.append(f"{key}=={val}")
             return install_list
 
+        additional_constraints = self.extra_information.model_dump()
+        additional_constraints.update(kwargs)
+        additional_constraints = ModelExtra(**additional_constraints)
+
         inference_env = {
             key: val for key, val in versions.items() if any(key.startswith(start) for start in INFERENCE_FILTER_STARTS)
         }
 
-        inference_env.update(self.extra_information.version_overrides or {})
+        inference_env.update(additional_constraints.version_overrides or {})
         inference_env_list = parse_into_install(inference_env)
 
         initial_conditions_env = parse_into_install(
@@ -192,12 +196,12 @@ class Model(BaseModel, FormFieldProvider):
             }
         )
 
-        inference_environment_variables = (self.extra_information.environment_variables or {}).copy()
+        inference_environment_variables = (additional_constraints.environment_variables or {}).copy()
         inference_environment_variables.update(environment_kwargs or {})
 
-        input_source = self.extra_information.input_preference or "mars"
-        if self.extra_information.input_overrides:
-            input_source = {input_source: self.extra_information.input_overrides}
+        input_source = additional_constraints.input_preference or "mars"
+        if additional_constraints.input_overrides:
+            input_source = {input_source: additional_constraints.input_overrides}
 
         return from_input(
             self.checkpoint_path,
