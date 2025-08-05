@@ -9,8 +9,7 @@
 
 
 import io
-from typing import TYPE_CHECKING
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import earthkit.data as ekd
 from earthkit.workflows.decorators import as_payload
@@ -45,7 +44,7 @@ def export_fieldlist_as(
 
     if format == "grib":
         buf = io.BytesIO()
-        fields.to_target("file", buf)
+        fields.to_target("file", buf, encoder="grib")
         written_bytes = buf.getvalue()
     elif format == "netcdf":
         xr_obj: xr.Dataset = fields.to_xarray()
