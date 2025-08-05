@@ -58,23 +58,24 @@ const products: Record<string, ProductSpecification[]> = {
             ]
         }
     },
-    {
-      product: "Standard/Output",
-      specification: {
-            param: [
-                "2t",
-                "msl",
-                "10u",
-                "10v"
-            ],
-            levtype: "sfc",
-            reduce: "True",
-            format: "grib",
-            step: [
-                "*"
-            ]
-      }
-    }],
+    // {
+    //   product: "Standard/Output",
+    //   specification: {
+    //         param: [
+    //             "2t",
+    //             "msl",
+    //             "10u",
+    //             "10v"
+    //         ],
+    //         levtype: "sfc",
+    //         reduce: "True",
+    //         format: "grib",
+    //         step: [
+    //             "*"
+    //         ]
+    //   }
+    // }
+    ],
     'TP, MSLP and Winds': [{
         product: "Plots/Maps",
         specification: {
@@ -92,23 +93,24 @@ const products: Record<string, ProductSpecification[]> = {
             ]
         }
     },
-    {
-      product: "Standard/Output",
-      specification: {
-            param: [
-                "tp",
-                "msl",
-                "10u",
-                "10v"
-            ],
-            levtype: "sfc",
-            reduce: "True",
-            format: "grib",
-            step: [
-                "*"
-            ]
-      }
-    }],
+    // {
+    //   product: "Standard/Output",
+    //   specification: {
+    //         param: [
+    //             "tp",
+    //             "msl",
+    //             "10u",
+    //             "10v"
+    //         ],
+    //         levtype: "sfc",
+    //         reduce: "True",
+    //         format: "grib",
+    //         step: [
+    //             "*"
+    //         ]
+    //   }
+    // }
+    ],
 }
 
 export default function QuickLaunch() {
