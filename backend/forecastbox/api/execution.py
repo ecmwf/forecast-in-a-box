@@ -19,14 +19,9 @@ from cascade.low import views as cascade_views
 from cascade.low.core import JobInstance
 from cascade.low.func import assert_never
 from cascade.low.into import graph2job
-from earthkit.workflows import Cascade
-from earthkit.workflows import fluent
-from earthkit.workflows.graph import Graph
-from earthkit.workflows.graph import deduplicate_nodes
-from forecastbox.api.types import EnvironmentSpecification
-from forecastbox.api.types import ExecutionSpecification
-from forecastbox.api.types import ForecastProducts
-from forecastbox.api.types import RawCascadeJob
+from earthkit.workflows import Cascade, fluent
+from earthkit.workflows.graph import Graph, deduplicate_nodes
+from forecastbox.api.types import EnvironmentSpecification, ExecutionSpecification, ForecastProducts, RawCascadeJob
 from forecastbox.api.utils import get_model_path
 from forecastbox.config import config
 from forecastbox.db.job import insert_one
@@ -49,7 +44,7 @@ def forecast_products_to_cascade(spec: ForecastProducts, environment: Environmen
     model = Model(checkpoint_path=get_model_path(spec.model.model), **model_spec)
 
     # Create the model action graph
-    model_action = model.graph(None, **spec.model.entries, environment_kwargs=environment.environment_variables)
+    model_action = model.graph(None, environment_kwargs=environment.environment_variables, **spec.model.entries)
 
     # Iterate over each product in the specification
     complete_graph = Graph([])
