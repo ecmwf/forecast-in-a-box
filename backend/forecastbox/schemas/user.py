@@ -9,11 +9,8 @@
 
 import pydantic
 from fastapi_users import schemas
-from fastapi_users.db import SQLAlchemyBaseOAuthAccountTableUUID
-from fastapi_users.db import SQLAlchemyBaseUserTableUUID
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.orm import Mapped
-from sqlalchemy.orm import relationship
+from fastapi_users.db import SQLAlchemyBaseOAuthAccountTableUUID, SQLAlchemyBaseUserTableUUID
+from sqlalchemy.orm import DeclarativeBase, Mapped, relationship
 
 
 class UserRead(schemas.BaseUser[pydantic.UUID4]):

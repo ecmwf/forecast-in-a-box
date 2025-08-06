@@ -1,7 +1,5 @@
-from forecastbox.products.rjsf.forms import FieldWithUI
-from forecastbox.products.rjsf.forms import FormDefinition
-from forecastbox.products.rjsf.jsonSchema import IntegerSchema
-from forecastbox.products.rjsf.jsonSchema import StringSchema
+from forecastbox.products.rjsf.forms import FieldWithUI, FormDefinition
+from forecastbox.products.rjsf.jsonSchema import IntegerSchema, StringSchema
 from forecastbox.products.rjsf.uiSchema import UIStringField
 
 

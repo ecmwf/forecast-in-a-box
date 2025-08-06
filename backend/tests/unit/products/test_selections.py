@@ -12,8 +12,7 @@ from pathlib import Path
 
 import pytest
 from forecastbox.models import Model
-from forecastbox.products.product import GenericParamProduct
-from forecastbox.products.product import Product
+from forecastbox.products.product import GenericParamProduct, Product
 from qubed import Qube
 
 

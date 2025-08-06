@@ -10,7 +10,8 @@
 """Products API Router."""
 
 import re
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any, OrderedDict
 
 import forecastbox.products.rjsf.utils as rjsfutils
 from fastapi import APIRouter, HTTPException
@@ -20,7 +21,6 @@ from forecastbox.products.product import USER_DEFINED, Product
 from forecastbox.products.registry import Category, get_categories, get_product
 from forecastbox.products.rjsf import ExportedSchemas, FieldWithUI, FormDefinition, StringSchema
 from qubed import Qube
-from typing_extensions import OrderedDict
 
 from ..types import ModelSpecification
 from .model import get_model_path

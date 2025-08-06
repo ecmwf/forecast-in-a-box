@@ -3,14 +3,9 @@ import time
 import zipfile
 
 import cloudpickle
-from cascade.low.builders import JobBuilder
-from cascade.low.builders import TaskBuilder
-from forecastbox.api.types import EnvironmentSpecification
-from forecastbox.api.types import ExecutionSpecification
-from forecastbox.api.types import ForecastProducts
-from forecastbox.api.types import ModelSpecification
-from forecastbox.api.types import ProductSpecification
-from forecastbox.api.types import RawCascadeJob
+from cascade.low.builders import JobBuilder, TaskBuilder
+from forecastbox.api.types import (EnvironmentSpecification, ExecutionSpecification, ForecastProducts,
+                                   ModelSpecification, ProductSpecification, RawCascadeJob)
 
 
 def _ensure_completed(backend_client, job_id):

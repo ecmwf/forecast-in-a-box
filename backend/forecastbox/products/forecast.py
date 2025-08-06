@@ -7,16 +7,14 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from typing import TYPE_CHECKING
-from typing import Any
-from typing import OrderedDict
+from collections import OrderedDict
+from typing import TYPE_CHECKING, Any
 
 from .export import export_fieldlist_as
 from .interfaces import Interfaces
 from .product import GenericParamProduct
 from .registry import CategoryRegistry
-from .rjsf import FieldWithUI
-from .rjsf import StringSchema
+from .rjsf import FieldWithUI, StringSchema
 
 forecast_registry = CategoryRegistry(
     "forecast_statistic",

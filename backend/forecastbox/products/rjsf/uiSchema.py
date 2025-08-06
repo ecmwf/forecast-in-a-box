@@ -11,12 +11,9 @@
 # This schema defines how the UI should be rendered based on the JSON Schema.
 # https://rjsf-team.github.io/react-jsonschema-form/docs/
 
-from typing import Any
-from typing import Optional
-from typing import Union
+from typing import Any, Union
 
-from pydantic import BaseModel
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 
 class UIField(BaseModel):
@@ -32,43 +29,43 @@ class UIField(BaseModel):
     >>> UIField(classNames="my-class", style={"color": "red"})
     """
 
-    widget: Optional[str] = None
+    widget: str | None = None
     """Widget type to use for this field (e.g., 'text', 'textarea', 'checkbox', etc.)."""
-    classNames: Optional[str] = None
+    classNames: str | None = None
     """CSS class names to apply to the field container."""
-    style: Optional[dict[str, str]] = None
+    style: dict[str, str] | None = None
     """Inline styles to apply to the field container."""
-    autocomplete: Optional[str] = None
+    autocomplete: str | None = None
     """HTML autocomplete attribute value."""
-    autofocus: Optional[bool] = None
+    autofocus: bool | None = None
     """If True, the field will be auto-focused."""
-    description: Optional[str] = None
+    description: str | None = None
     """Custom description for the field."""
-    disabled: Optional[bool] = None
+    disabled: bool | None = None
     """If True, the field will be disabled."""
-    emptyValue: Optional[Any] = None
+    emptyValue: Any | None = None
     """Value to use when the field is empty."""
-    enumDisabled: Optional[list[Any]] = None
+    enumDisabled: list[Any] | None = None
     """list of enum values to disable in a select."""
-    enumNames: Optional[list[str]] = None
+    enumNames: list[str] | None = None
     """Custom display names for enum options."""
-    help: Optional[str] = None
+    help: str | None = None
     """Help text to display below the field."""
-    hideError: Optional[bool] = None
+    hideError: bool | None = None
     """If True, validation errors will be hidden."""
-    inputType: Optional[str] = None
+    inputType: str | None = None
     """HTML input type (e.g., 'text', 'number')."""
-    label: Optional[bool] = None
+    label: bool | None = None
     """If False, the label will be hidden."""
-    order: Optional[list[str]] = None
+    order: list[str] | None = None
     """Order of fields in the UI schema, if applicable."""
-    placeholder: Optional[str] = None
+    placeholder: str | None = None
     """Placeholder text for the field."""
-    readonly: Optional[bool] = None
+    readonly: bool | None = None
     """If True, the field will be read-only."""
-    rows: Optional[int] = None
+    rows: int | None = None
     """Number of rows for textarea widgets."""
-    title: Optional[str] = None
+    title: str | None = None
     """Custom title for the field."""
 
     def export_with_prefix(self) -> dict[str, Any]:
@@ -83,9 +80,9 @@ class UIStringField(UIField):
     >>> UIStringField(widget="textarea", format="email")
     """
 
-    widget: Optional[str] = Field(default="text")
+    widget: str | None = Field(default="text")
     """Widget type for string fields, default is 'text'."""
-    format: Optional[str] = None
+    format: str | None = None
     """Format for string fields (e.g., 'email', 'date')."""
 
 
@@ -97,7 +94,7 @@ class UIIntegerField(UIField):
     >>> UIIntegerField(widget="updown")
     """
 
-    widget: Optional[str] = Field(default="updown")
+    widget: str | None = Field(default="updown")
     """Widget type for integer fields, default is 'updown'."""
 
 
@@ -109,7 +106,7 @@ class UIBooleanField(UIField):
     >>> UIBooleanField(widget="checkbox")
     """
 
-    widget: Optional[str] = Field(default="checkbox")
+    widget: str | None = Field(default="checkbox")
     """Widget type for boolean fields, default is 'checkbox'."""
 
 
@@ -123,9 +120,9 @@ class UIObjectField(BaseModel):
     >>> UIObjectField(anyOf=[UIStringField(widget="text"), UIIntegerField(widget="updown")])
     """
 
-    anyOf: Optional[list["UISchema"]] = None
+    anyOf: list["UISchema"] | None = None
     """list of schemas for 'anyOf' condition."""
-    oneOf: Optional[list["UISchema"]] = None
+    oneOf: list["UISchema"] | None = None
     """list of schemas for 'oneOf' condition."""
 
     def export_with_prefix(self) -> dict[str, Any]:

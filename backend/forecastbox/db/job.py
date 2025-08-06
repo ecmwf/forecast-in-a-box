@@ -1,21 +1,13 @@
 import datetime as dt
 import logging
-from typing import Iterable
+from collections.abc import Iterable
 
 from cascade.controller.report import JobId
 from forecastbox.config import config
-from forecastbox.db.core import addAndCommit
-from forecastbox.db.core import dbRetry
-from forecastbox.db.core import executeAndCommit
-from forecastbox.db.core import querySingle
-from forecastbox.schemas.job import Base
-from forecastbox.schemas.job import JobRecord
-from sqlalchemy import delete
-from sqlalchemy import func
-from sqlalchemy import select
-from sqlalchemy import update
-from sqlalchemy.ext.asyncio import async_sessionmaker
-from sqlalchemy.ext.asyncio import create_async_engine
+from forecastbox.db.core import addAndCommit, dbRetry, executeAndCommit, querySingle
+from forecastbox.schemas.job import Base, JobRecord
+from sqlalchemy import delete, func, select, update
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 logger = logging.getLogger(__name__)
 

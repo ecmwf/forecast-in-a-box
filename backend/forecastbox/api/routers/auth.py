@@ -9,12 +9,9 @@
 
 from fastapi import APIRouter
 from forecastbox.auth.oidc import oauth_client
-from forecastbox.auth.users import auth_backend
-from forecastbox.auth.users import fastapi_users
+from forecastbox.auth.users import auth_backend, fastapi_users
 from forecastbox.config import config
-from forecastbox.schemas.user import UserCreate
-from forecastbox.schemas.user import UserRead
-from forecastbox.schemas.user import UserUpdate
+from forecastbox.schemas.user import UserCreate, UserRead, UserUpdate
 
 router = APIRouter()
 SECRET = config.auth.jwt_secret.get_secret_value()

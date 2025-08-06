@@ -12,7 +12,6 @@
 # https://rjsf-team.github.io/react-jsonschema-form/docs/
 
 from typing import Any
-from typing import Optional
 
 from pydantic import BaseModel
 from typing_extensions import TypedDict
@@ -40,7 +39,7 @@ class FieldWithUI(BaseModel):
 
     jsonschema: FieldSchema
     """The JSON Schema definition for the field."""
-    ui: Optional[UISchema] = None
+    ui: UISchema | None = None
     """The UI Schema definition for the field (controls rendering and widgets)."""
 
 
@@ -51,7 +50,7 @@ class FormDefinition(BaseModel):
     """The title of the form."""
     fields: dict[str, FieldWithUI]
     """The fields in the form, keyed by field name."""
-    required: Optional[list[str]] = []
+    required: list[str] | None = []
     """list of required field names."""
 
     def export_jsonschema(self) -> ExportedJsonSchema:

@@ -13,15 +13,10 @@ import asyncio
 import logging
 
 from cascade.low.core import JobInstance
-from fastapi import APIRouter
-from fastapi import Depends
-from fastapi import HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
-from forecastbox.api.execution import SubmitJobResponse
-from forecastbox.api.execution import execute
-from forecastbox.api.execution import execution_specification_to_cascade
-from forecastbox.api.types import ExecutionSpecification
-from forecastbox.api.types import VisualisationOptions
+from forecastbox.api.execution import SubmitJobResponse, execute, execution_specification_to_cascade
+from forecastbox.api.types import ExecutionSpecification, VisualisationOptions
 from forecastbox.api.visualisation import visualise
 from forecastbox.auth.users import current_active_user
 from forecastbox.schemas.user import UserRead

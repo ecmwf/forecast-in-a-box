@@ -16,10 +16,8 @@ from forecastbox.products.ensemble.base import BasePProcEnsembleProduct
 from qubed import Qube
 
 from ..generic import generic_registry
-from ..product import USER_DEFINED
-from ..product import GenericTemporalProduct
-from ..rjsf import FieldWithUI
-from ..rjsf import StringSchema
+from ..product import USER_DEFINED, GenericTemporalProduct
+from ..rjsf import FieldWithUI, StringSchema
 from . import ensemble_registry
 
 

@@ -40,7 +40,7 @@ def export_fieldlist_as(
     tuple[bytes, str]
         A tuple containing the serialized data as bytes and the MIME type.
     """
-    written_bytes = bytes()
+    written_bytes = b''
 
     if format == "grib":
         buf = io.BytesIO()

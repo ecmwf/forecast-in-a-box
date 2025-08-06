@@ -10,7 +10,6 @@
 import io
 import warnings
 from collections import defaultdict
-from typing import Optional
 
 import earthkit.data as ekd
 from earthkit.workflows import mark
@@ -105,10 +104,10 @@ def export(figure: Figure, format: str = "png", dpi: int = 100, no_pad: bool = F
 @mark.environment_requirements(["earthkit-plots", "earthkit-plots-default-styles"])
 def quickplot(
     fields: ekd.FieldList,
-    groupby: Optional[str] = None,
-    subplot_title: Optional[str] = None,
-    figure_title: Optional[str] = None,
-    domain: Optional[str] = None,
+    groupby: str | None = None,
+    subplot_title: str | None = None,
+    figure_title: str | None = None,
+    domain: str | None = None,
     no_pad: bool = True,
 ):
     from earthkit.plots import Figure  # NOTE we need to import again to mask the possible Any
