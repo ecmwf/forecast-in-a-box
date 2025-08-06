@@ -13,13 +13,13 @@ import re
 from collections.abc import Iterable
 from typing import Any, OrderedDict
 
-import forecastbox.products.rjsf.utils as rjsfutils
+import forecastbox.rjsf.utils as rjsfutils
 from fastapi import APIRouter, HTTPException
 from forecastbox.models import Model
 from forecastbox.products.interfaces import Interfaces
 from forecastbox.products.product import USER_DEFINED, Product
 from forecastbox.products.registry import Category, get_categories, get_product
-from forecastbox.products.rjsf import ExportedSchemas, FieldWithUI, FormDefinition, StringSchema
+from forecastbox.rjsf import ExportedSchemas, FieldWithUI, FormDefinition, StringSchema
 from qubed import Qube
 
 from ..types import ModelSpecification

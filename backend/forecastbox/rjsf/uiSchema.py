@@ -71,6 +71,17 @@ class UIField(BaseModel):
     def export_with_prefix(self) -> dict[str, Any]:
         return {"ui:options": self.model_dump(exclude_none=True)}
 
+class UIAdditionalProperties(BaseModel):
+    """Base class for additional properties in UI schema."""
+    additionalProperties: "UISchema | None" = None
+
+    def export_with_prefix(self) -> dict[str, Any]:
+        """Export the UI schema with prefix."""
+        result = {}
+        if self.additionalProperties:
+            result = {"additionalProperties": self.additionalProperties.export_with_prefix()}
+        return result
+
 
 class UIStringField(UIField):
     """UI schema for string fields.
@@ -135,9 +146,12 @@ class UIObjectField(BaseModel):
         return result
 
 
-UISchema = Union[UIStringField, UIIntegerField, UIBooleanField, UIObjectField, UIField]
+
+
+UISchema = Union[UIStringField, UIIntegerField, UIBooleanField, UIObjectField, UIField, UIAdditionalProperties]
 """Union type for all UI schema field types."""
 
 UIObjectField.model_rebuild()
+UIAdditionalProperties.model_rebuild()
 
 __all__ = ["UIField", "UIStringField", "UIIntegerField", "UIBooleanField", "UIObjectField", "UISchema"]

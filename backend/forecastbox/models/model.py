@@ -7,63 +7,151 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+import os
+from abc import ABCMeta, abstractmethod
 from collections import defaultdict
-from functools import cached_property, lru_cache
+from functools import cached_property
 from typing import Any, Optional
 
-import yaml
 from anemoi.inference.checkpoint import Checkpoint
 from earthkit.workflows.fluent import Action
 from earthkit.workflows.plugins.anemoi.fluent import from_input
 from forecastbox.core import FormFieldProvider
-from forecastbox.products.rjsf import FieldWithUI
-from pydantic import BaseModel, ConfigDict, FilePath, model_validator
+from forecastbox.rjsf import FieldWithUI
+from pydantic import BaseModel, ConfigDict, FilePath
 from qubed import Qube
+
+from .metadata import ControlMetadata, get_control_metadata
+from .utils import open_checkpoint
 
 FORECAST_IN_A_BOX_METADATA = "forecast-in-a-box.json"
 
 
-@lru_cache
-def open_checkpoint(checkpoint_path: str) -> Checkpoint:
-    """Open a checkpoint from the given path."""
-    return Checkpoint(checkpoint_path)
+class BaseForecastModel(FormFieldProvider, ABCMeta):
+    def __init__(self, checkpoint: os.PathLike):
+        self.checkpoint_path = checkpoint
+        self.validate_checkpoint()
 
+    def validate_checkpoint(self):
+        """Validate the checkpoint."""
+        pass
 
-class ModelExtra(BaseModel):
-    version_overrides: dict[str, str] | None = None
-    """Overrides for the versions of the model."""
-    input_preference: str | None = None
-    """Input preference of the model."""
-    input_overrides: dict[str, Any] | None = None
-    """Overrides for the input of the model."""
-    dataset_configuration: dict[str, str] | None = None
-    """If using input=dataset, this is the configuration for the dataset."""
-    environment_variables: dict[str, Any] | None = None
-    """Environment variables for execution."""
+    @cached_property
+    def checkpoint(self) -> Checkpoint:
+        return open_checkpoint(self.checkpoint_path)
 
-    @model_validator(mode="before")
-    @classmethod
-    def parse_yaml_dicts(cls, values):
-        dict_fields = [
-            "version_overrides",
-            "input_overrides",
-            "dataset_configuration",
-            "environment_variables",
+    @cached_property
+    def metadata(self):
+        """Get the metadata of the model."""
+        return self.checkpoint._metadata
+
+    @cached_property
+    def control(self) -> ControlMetadata:
+        return get_control_metadata(str(self.checkpoint_path)).model_copy()
+
+    @cached_property
+    def timestep(self) -> int:
+        """Get the timestep of the model in hours."""
+        return int((self.checkpoint.timestep.total_seconds() + 1) // 3600)
+
+    def timesteps(self, lead_time: int) -> list[int]:
+        """Get the timesteps for the given lead time."""
+        if lead_time < self.timestep:
+            raise ValueError(f"Lead time {lead_time} must be greater than or equal to timestep {self.timestep}.")
+        return list(range(self.timestep, int(lead_time) + 1, self.timestep))
+
+    @cached_property
+    def variables(self) -> list[str]:
+        return [
+            *self.checkpoint.diagnostic_variables,
+            *self.checkpoint.prognostic_variables,
         ]
 
-        for field in dict_fields:
-            val = values.get(field)
-            if isinstance(val, str):
-                try:
-                    loaded = yaml.safe_load(val)
-                    if isinstance(loaded, dict):
-                        values[field] = loaded
-                except Exception:
-                    pass
-            if not val:
-                values[field] = None
-        return values
+    @cached_property
+    def accumulations(self) -> list[str]:
+        return [
+            *self.checkpoint.accumulations,
+        ]
 
+    @cached_property
+    def versions(self) -> dict[str, str]:
+        def parse_versions(key, val):
+                if key.startswith("_"):
+                    return None, None
+                key = key.replace(".", "-")
+                if "://" in val:
+                    return key, val
+
+                val = val.split("+")[0]
+                return key, ".".join(val.split(".")[:3])
+
+        versions = {
+            key: val
+            for key, val in (parse_versions(key, val) for key, val in self.checkpoint.provenance_training()["module_versions"].items())
+            if key is not None and val is not None
+        }
+
+        extra_versions = self.control.pkg_versions or {}
+        versions.update(extra_versions or {})
+
+        return versions
+
+
+    @property
+    def ignore_in_select(self) -> list[str]:
+        return ["frequency"]
+
+    def qube(self, assumptions: dict[str, Any] | None = None) -> Qube:
+        """Get Model Qube.
+
+        The Qube is a representation of the model parameters and their
+        dimensions.
+        Parameters are represented as 'param' and their levels
+        as 'levelist'. Which differs from the graph where each param and level
+        are represented as separate nodes.
+        """
+        return convert_to_model_spec(self.checkpoint, assumptions=assumptions)
+
+
+    @abstractmethod
+    def _create_input_configuration(self):
+        pass
+
+    @abstractmethod
+    def graph(self, lead_time: int, date: str | int, ensemble_members: int = 1, **kwargs) -> Action:
+        pass
+
+    def deaccumulate(self, outputs: "Action") -> "Optional[Action]":
+        """Get the deaccumulated outputs."""
+        accumulated_fields = self.accumulations
+
+        steps = outputs.nodes.coords["step"]
+
+        fields: Action | None = None
+
+        for field in self.variables:
+            if field not in accumulated_fields:
+                if fields is None:
+                    fields = outputs.sel(param=field)
+                else:
+                    fields = fields.join(outputs.sel(param=[field]), "param")
+                continue
+
+            deaccumulated_steps: Action = outputs.sel(param=[field]).isel(step=[0])
+
+            for i in range(1, len(steps)):
+                t_0 = outputs.sel(param=[field]).isel(step=[i - 1])
+                t_1 = outputs.sel(param=[field]).isel(step=[i])
+
+                deaccum = t_1.subtract(t_0)
+                deaccumulated_steps = deaccumulated_steps.join(deaccum, "step")
+
+            if fields is None:
+                fields = deaccumulated_steps
+            else:
+                fields = fields.join(deaccumulated_steps, "param")
+
+        return fields
 
 class Model(BaseModel, FormFieldProvider):
     """Model Specification"""
@@ -109,47 +197,13 @@ class Model(BaseModel, FormFieldProvider):
             # ),
         }
 
-    @cached_property
-    def checkpoint(self) -> Checkpoint:
-        return open_checkpoint(self.checkpoint_path)
 
-    @cached_property
-    def extra_information(self) -> ModelExtra:
-        """Get the extra information for the model."""
-        return get_extra_information(str(self.checkpoint_path)).model_copy()
 
-    @cached_property
-    def timestep(self) -> int:
-        """Get the timestep of the model in hours."""
-        return int((self.checkpoint.timestep.total_seconds() + 1) // 3600)
 
     @cached_property
     def timesteps(self) -> list[int]:
         return list(range(self.timestep, int(self.lead_time) + 1, self.timestep))
 
-    @cached_property
-    def variables(self) -> list[str]:
-        return [
-            *self.checkpoint.diagnostic_variables,
-            *self.checkpoint.prognostic_variables,
-        ]
-
-    @cached_property
-    def accumulations(self) -> list[str]:
-        return [
-            *self.checkpoint.accumulations,
-        ]
-
-    def qube(self, assumptions: dict[str, Any] | None = None) -> Qube:
-        """Get Model Qube.
-
-        The Qube is a representation of the model parameters and their
-        dimensions.
-        Parameters are represented as 'param' and their levels
-        as 'levelist'. Which differs from the graph where each param and level
-        are represented as separate nodes.
-        """
-        return convert_to_model_spec(self.checkpoint, assumptions=assumptions)
 
     def graph(self, initial_conditions: "Action", environment_kwargs: dict | None = None, **kwargs) -> "Action":
         """Get Model Graph.
@@ -208,85 +262,19 @@ class Model(BaseModel, FormFieldProvider):
             env=inference_environment_variables,
         )
 
-    def deaccumulate(self, outputs: "Action") -> "Optional[Action]":
-        """Get the deaccumulated outputs."""
-        accumulated_fields = self.accumulations
-
-        steps = outputs.nodes.coords["step"]
-
-        fields: Action | None = None
-
-        for field in self.variables:
-            if field not in accumulated_fields:
-                if fields is None:
-                    fields = outputs.sel(param=field)
-                else:
-                    fields = fields.join(outputs.sel(param=[field]), "param")
-                continue
-
-            deaccumulated_steps: Action = outputs.sel(param=[field]).isel(step=[0])
-
-            for i in range(1, len(steps)):
-                t_0 = outputs.sel(param=[field]).isel(step=[i - 1])
-                t_1 = outputs.sel(param=[field]).isel(step=[i])
-
-                deaccum = t_1.subtract(t_0)
-                deaccumulated_steps = deaccumulated_steps.join(deaccum, "step")
-
-            if fields is None:
-                fields = deaccumulated_steps
-            else:
-                fields = fields.join(deaccumulated_steps, "param")
-
-        return fields
-
-    @property
-    def ignore_in_select(self) -> list[str]:
-        return ["frequency"]
-
-    def versions(self) -> dict[str, str]:
-        """Get the versions of the model"""
-        return model_versions(str(self.checkpoint_path))
-
-    def info(self) -> dict[str, Any]:
-        """Get the model info"""
-        return model_info(str(self.checkpoint_path))
 
 
-def get_model(checkpoint_path, **kwargs) -> Model:
-    """Get the model."""
 
-    return Model(
-        checkpoint_path=checkpoint_path,
-        **kwargs,
-    )
+def model(checkpoint: os.PathLike) -> BaseForecastModel:
+    """Get the model class based on the control metadata."""
+    from .globe import GlobalModel
+    from .nested import NestedModel
 
+    control = get_control_metadata(checkpoint)
+    if control.nested:
+        return NestedModel(checkpoint)
+    return GlobalModel(checkpoint)
 
-def model_versions(checkpoint_path: str) -> dict[str, str]:
-    """Get the versions of the model"""
-
-    ckpt = open_checkpoint(checkpoint_path)
-
-    def parse_versions(key, val):
-        if key.startswith("_"):
-            return None, None
-        key = key.replace(".", "-")
-        if "://" in val:
-            return key, val
-
-        val = val.split("+")[0]
-        return key, ".".join(val.split(".")[:3])
-
-    versions = {
-        key: val
-        for key, val in (parse_versions(key, val) for key, val in ckpt.provenance_training()["module_versions"].items())
-        if key is not None and val is not None
-    }
-
-    extra_versions = get_extra_information(checkpoint_path).version_overrides
-    versions.update(extra_versions or {})
-
-    return versions
 
 
 def model_info(checkpoint_path: str) -> dict[str, Any]:
@@ -309,34 +297,6 @@ def model_info(checkpoint_path: str) -> dict[str, Any]:
         "versions": anemoi_versions,
     }
 
-
-def get_extra_information(checkpoint_path: str) -> ModelExtra:
-    from anemoi.utils.checkpoints import has_metadata, load_metadata
-
-    if not has_metadata(checkpoint_path, name=FORECAST_IN_A_BOX_METADATA):
-        return ModelExtra()
-    return ModelExtra(**load_metadata(checkpoint_path, name=FORECAST_IN_A_BOX_METADATA))
-
-
-def set_extra_information(checkpoint_path: str, extra: ModelExtra) -> None:
-    """Set the extra information for the model."""
-    from anemoi.utils.checkpoints import has_metadata, replace_metadata, save_metadata
-
-    open_checkpoint.cache_clear()
-
-    if not has_metadata(checkpoint_path, name=FORECAST_IN_A_BOX_METADATA):
-        save_metadata(
-            checkpoint_path,
-            extra.model_dump(),
-            name=FORECAST_IN_A_BOX_METADATA,
-        )
-        return
-
-    replace_metadata(
-        checkpoint_path,
-        {**extra.model_dump(), "version": "1.0.0"},
-        name=FORECAST_IN_A_BOX_METADATA,
-    )
 
 
 def convert_to_model_spec(ckpt: Checkpoint, assumptions: dict[str, Any] | None = None) -> Qube:

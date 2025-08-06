@@ -7,12 +7,11 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from functools import lru_cache
 
-from anemoi.inference.checkpoint import Checkpoint
+from .model import BaseForecastModel
 
 
-@lru_cache
-def open_checkpoint(checkpoint_path: str) -> Checkpoint:
-    """Open a checkpoint from the given path."""
-    return Checkpoint(checkpoint_path)
+class GlobalModel(BaseForecastModel):
+    def validate_checkpoint(self):
+        if self.control.nested:
+            raise ValueError("GlobalModel cannot have a 'nested' configuration in the control metadata.")

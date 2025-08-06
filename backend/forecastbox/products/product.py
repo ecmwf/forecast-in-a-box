@@ -13,9 +13,8 @@ from typing import TYPE_CHECKING, Any, Union
 
 from earthkit.workflows import fluent
 from forecastbox.models import Model
+from forecastbox.rjsf import ArraySchema, FieldSchema, FieldWithUI, IntegerSchema, StringSchema
 from qubed import Qube
-
-from .rjsf import ArraySchema, FieldSchema, FieldWithUI, IntegerSchema, StringSchema
 
 if TYPE_CHECKING:
     from earthkit.workflows.fluent import Action

@@ -18,8 +18,8 @@ from earthkit.workflows.plugins.anemoi.fluent import ENSEMBLE_DIMENSION_NAME
 from forecastbox.models import Model
 from forecastbox.products.ensemble import BaseEnsembleProduct
 from forecastbox.products.product import GenericTemporalProduct
+from forecastbox.rjsf import FieldWithUI, StringSchema, UIStringField
 
-from ..rjsf import FieldWithUI, StringSchema, UIStringField
 from . import plot_product_registry
 
 EARTHKIT_PLOTS_IMPORTED = True

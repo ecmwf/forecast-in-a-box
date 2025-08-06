@@ -31,7 +31,7 @@ class BaseSchema(BaseModel):
     """Description of the schema."""
     default: Any | None = None
     """Default value for the schema."""
-    additionalProperties: dict[str, Any] | None = None
+    additionalProperties: "FieldSchema | None" = None
     """Additional properties allowed in the schema."""
 
     model_config = ConfigDict(extra="allow", use_enum_values=True, json_schema_extra={"discriminator": "type"})
@@ -169,7 +169,7 @@ class ObjectSchema(BaseSchema):
     """
 
     type: Literal["object"] = Field(default="object")
-    properties: dict[str, "FieldSchema"]
+    properties: dict[str, "FieldSchema"] = Field(default_factory=dict)
     """Underlying fields of the object."""
     required: list[str] | None = None
     """list of required property names."""
@@ -213,6 +213,7 @@ FieldSchema = Union[
 ]
 """Union type for all JSON Schema field types."""
 
+BaseSchema.model_rebuild()
 ObjectSchema.model_rebuild()
 ArraySchema.model_rebuild()
 

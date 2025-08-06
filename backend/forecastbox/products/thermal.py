@@ -12,13 +12,13 @@ from collections import OrderedDict
 
 from earthkit.workflows.plugins.pproc.fluent import Action as ppAction
 from forecastbox.models import Model
+from forecastbox.rjsf import FieldWithUI, IntegerSchema
 from qubed import Qube
 
 from .export import export_fieldlist_as
 from .interfaces import Interfaces
 from .product import Product
 from .registry import CategoryRegistry
-from .rjsf import FieldWithUI, IntegerSchema
 
 thermal_indices = CategoryRegistry(
     "thermal", interface=Interfaces.DETAILED, description="Thermal Indices", title="Thermal Indices"

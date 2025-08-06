@@ -10,11 +10,12 @@
 from collections import OrderedDict
 from typing import TYPE_CHECKING, Any
 
+from forecastbox.rjsf import StringSchema
+
 from .export import export_fieldlist_as
 from .interfaces import Interfaces
 from .product import GenericParamProduct
 from .registry import CategoryRegistry
-from .rjsf import FieldWithUI, StringSchema
 
 forecast_registry = CategoryRegistry(
     "forecast_statistic",
