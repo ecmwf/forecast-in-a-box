@@ -85,7 +85,7 @@ def _sort_fields(fields: dict) -> dict:
     return new_fields
 
 
-async def product_to_config(
+def product_to_config(
     product: Product, model_spec: ModelSpecification, params: dict[str, Any]
 ) -> ExportedSchemas:
     """Convert a product to a configuration dictionary.
@@ -251,6 +251,6 @@ async def get_product_configuration(
     """
     try:
         prod = get_product(category, product)
-        return await product_to_config(prod, model, spec)
+        return product_to_config(prod, model, spec)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=f"Product not found: {e}")

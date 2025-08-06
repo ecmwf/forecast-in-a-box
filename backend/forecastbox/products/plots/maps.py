@@ -152,7 +152,7 @@ def quickplot(
                 except Exception as err:
                     warnings.warn(
                         f"Failed to execute {m} on given data with: \n"
-                        f"{err}\n\n"
+                        f"{repr(err)}\n\n"
                         "consider constructing the plot manually."
                     )
 
@@ -160,10 +160,8 @@ def quickplot(
         for m in schema.quickmap_figure_workflow:
             try:
                 getattr(figure, m)()
-            except Exception as err:
-                warnings.warn(
-                    f"Failed to execute {m} on given data with: \n" f"{err}\n\n" "consider constructing the plot manually."
-                )
+            except Exception:
+                pass
 
     # figure.title(figure_title)
 
