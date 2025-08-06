@@ -30,7 +30,7 @@ class ModelSpecification(FIABBaseModel):
     date: str
     lead_time: int
     ensemble_members: int
-    entries: dict[str, str] = Field(default_factory=dict)
+    # entries: dict[str, str] = Field(default_factory=dict)
 
     @field_validator("model")
     def model_cleanup(cls, m):

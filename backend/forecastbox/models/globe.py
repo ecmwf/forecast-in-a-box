@@ -8,6 +8,9 @@
 # nor does it submit to any jurisdiction.
 
 
+from typing import Any
+
+from .metadata import ControlMetadata
 from .model import BaseForecastModel
 
 
@@ -15,3 +18,6 @@ class GlobalModel(BaseForecastModel):
     def validate_checkpoint(self):
         if self.control.nested:
             raise ValueError("GlobalModel cannot have a 'nested' configuration in the control metadata.")
+
+    def _create_input_configuration(self, control: ControlMetadata) -> str | dict[str, Any]:
+        return control.input_source

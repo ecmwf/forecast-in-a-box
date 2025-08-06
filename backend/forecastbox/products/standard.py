@@ -8,7 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 
-from forecastbox.models import Model
+from forecastbox.models import SpecifiedModel
 from forecastbox.products.interfaces import Interfaces
 from forecastbox.products.product import GenericTemporalProduct
 from forecastbox.products.registry import CategoryRegistry
@@ -97,7 +97,7 @@ class DeaccumulatedProduct(GenericTemporalProduct):
     def qube(self):
         return self.make_generic_qube()
 
-    def model_intersection(self, model: Model):
+    def model_intersection(self, model: SpecifiedModel):
         """Model intersection with the product qube.
 
         Only the accumulation variables are used to create the intersection.
@@ -105,7 +105,7 @@ class DeaccumulatedProduct(GenericTemporalProduct):
         self_qube = self.make_generic_qube(param=model.accumulations or model.variables)
 
         intersection = model.qube(self.model_assumptions) & self_qube
-        result = f"step={'/'.join(map(str, model.timesteps))}" / intersection
+        result = f"step={'/'.join(map(str, model.timesteps()))}" / intersection
         return result
 
     def execute(self, product_spec, model, source):

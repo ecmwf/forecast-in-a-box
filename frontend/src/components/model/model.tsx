@@ -55,7 +55,7 @@ function Model({ selectedModel, coordinates, setCoordinates, modelSpec, submit }
 
     useEffect(() => {
         if (model) {
-            api.get(`/v1/model/${model.replace('/', '_')}/info`)
+            api.get(`/v1/model/${model}/info`)
                 .then((res) => res.data)
                 .then((modelOptions) => {
                     if (modelOptions.local_area) {

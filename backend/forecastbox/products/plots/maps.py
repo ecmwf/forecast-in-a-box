@@ -14,8 +14,8 @@ from collections import defaultdict
 import earthkit.data as ekd
 from earthkit.workflows import mark
 from earthkit.workflows.decorators import as_payload
-from earthkit.workflows.plugins.anemoi.fluent import ENSEMBLE_DIMENSION_NAME
-from forecastbox.models import Model
+from earthkit.workflows.plugins.anemoi.types import ENSEMBLE_DIMENSION_NAME
+from forecastbox.models import SpecifiedModel
 from forecastbox.products.ensemble import BaseEnsembleProduct
 from forecastbox.products.product import GenericTemporalProduct
 from forecastbox.rjsf import FieldWithUI, StringSchema, UIStringField
@@ -214,7 +214,7 @@ class MapProduct(GenericTemporalProduct):
     def qube(self):
         return self.make_generic_qube(domain=self.domains, reduce=["True", "False"])
 
-    def validate_intersection(self, model: Model) -> bool:
+    def validate_intersection(self, model: SpecifiedModel) -> bool:
         return super().validate_intersection(model) and EARTHKIT_PLOTS_IMPORTED
 
 
@@ -253,7 +253,7 @@ class InteractiveMapProduct(GenericTemporalProduct):
         formfields.pop('reduce', None)
         return formfields
 
-    def validate_intersection(self, model: Model) -> bool:
+    def validate_intersection(self, model: SpecifiedModel) -> bool:
         return super().validate_intersection(model) and EARTHKIT_PLOTS_IMPORTED
 
     @property

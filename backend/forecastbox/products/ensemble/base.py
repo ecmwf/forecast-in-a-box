@@ -10,7 +10,7 @@
 
 from typing import Any
 
-from forecastbox.models.model import Model
+from forecastbox.models import SpecifiedModel
 from forecastbox.products.pproc import PProcProduct
 from forecastbox.products.product import Product
 
@@ -18,10 +18,10 @@ from forecastbox.products.product import Product
 class BaseEnsembleProduct(Product):
     """Base Ensemble Product"""
 
-    def validate_intersection(self, model: Model) -> bool:
+    def validate_intersection(self, model: SpecifiedModel) -> bool:
         """Check if the model has ensemble members"""
         result = super().validate_intersection(model)
-        if model.ensemble_members == 1:
+        if model._ensemble_members == 1:
             return False
         return result & True
 

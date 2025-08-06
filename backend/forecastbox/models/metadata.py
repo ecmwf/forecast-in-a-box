@@ -156,7 +156,7 @@ class ControlMetadata(BaseModel):
             }
         )
 
-    def update(self, **kwargs) -> "ControlMetadata":
+    def update(self, **kwargs: Any) -> "ControlMetadata":
         """Update the current metadata."""
         self_dump = self.model_dump(exclude_none=True)
 
@@ -196,12 +196,27 @@ def get_control_metadata(checkpoint_path: os.PathLike) -> ControlMetadata:
             f"Failed to load control metadata from {checkpoint_path}: {e}. "
             "Returning an empty ControlMetadata instance and deleting the offending metadata."
         )
+        import asyncio
+
         from anemoi.utils.checkpoints import replace_metadata
-        replace_metadata(
-            str(checkpoint_path),
-            {"version": ControlMetadata()._version},
-            name=FORECAST_IN_A_BOX_METADATA,
-        )
+
+        # If we are in an async context, use the event loop to run the replacement
+        # Otherwise, run it synchronously
+
+        if loop := asyncio.get_running_loop():
+            def async_replace():
+                replace_metadata(
+                    str(checkpoint_path),
+                    {"version": ControlMetadata()._version},
+                    name=FORECAST_IN_A_BOX_METADATA,
+                )
+            loop.run_in_executor(None, async_replace)
+        else:
+            replace_metadata(
+                str(checkpoint_path),
+                {"version": ControlMetadata()._version},
+                name=FORECAST_IN_A_BOX_METADATA,
+            )
         return ControlMetadata()
 
 

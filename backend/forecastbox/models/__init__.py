@@ -7,6 +7,15 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from .model import Model as Model
 
-__all__ = ["Model"]
+from .metadata import ControlMetadata
+from .model import BaseForecastModel, SpecifiedModel, get_model
+from .utils import open_checkpoint
+
+__all__ = [
+    "ControlMetadata",
+    "BaseForecastModel",
+    "SpecifiedModel",
+    "get_model",
+    "open_checkpoint",
+]

@@ -26,12 +26,12 @@ from forecastbox.config import config
 from forecastbox.db.model import (delete_download, finish_edit, get_download, get_edit, start_download, start_editing,
                                   update_progress)
 from forecastbox.models.metadata import ControlMetadata, set_control_metadata
-from forecastbox.models.model import Model, model_info
+from forecastbox.models.model import ModelInfo, get_model, model_info
 from forecastbox.rjsf import ExportedSchemas
 from forecastbox.schemas.model import ModelDownload
 from pydantic import BaseModel
 
-from ..types import ModelName, ModelSpecification
+from ..types import ModelName
 from .admin import get_admin_user
 
 logger = logging.getLogger(__name__)
@@ -389,41 +389,15 @@ async def patch_model_metadata(
 # Model Info
 @lru_cache(maxsize=128)
 @router.get("/{model_id}/info")
-async def get_model_info(model_id: str, admin=Depends(get_admin_user)) -> dict[str, Any]:
-    """Get basic information about a model.
-
-    Parameters
-    ----------
-    model_id : str
-        Model to load, directory separated by underscores
-    admin : Depends
-        Dependency to check if the user is an admin.
-
-    Returns
-    -------
-    dict[str, Any]
-            Dictionary containing model information
-    """
-    return model_info(get_model_path(model_id.replace("_", "/")))
+async def get_model_info(model: str, admin=Depends(get_admin_user)) -> ModelInfo:
+    """Get basic information about the model."""
+    return model_info(get_model_path(model))
 
 
 @router.post("/specification")
-async def get_model_spec(modelspec: ModelSpecification, admin=Depends(get_admin_user)) -> dict[str, Any]:
-    """Get the Qubed model spec as a json.
-
-    Parameters
-    ----------
-    modelspec : ModelSpecification
-        Model Specification
-    admin : Depends
-        Dependency to check if the user is an admin.
-
-    Returns
-    -------
-    dict[str, Any]
-            Json Dump of the Qubed model spec
-    """
-
-    model_dict = dict(lead_time=modelspec.lead_time, date=modelspec.date, ensemble_members=modelspec.ensemble_members)
-
-    return Model(checkpoint_path=get_model_path(modelspec.model), **model_dict).qube().to_json()
+async def get_model_spec(model: str, admin=Depends(get_admin_user)) -> dict[str, Any]:
+    """Get Qubed Specification for a model."""
+    try:
+        return get_model(checkpoint=get_model_path(model)).qube().to_json()
+    except FileNotFoundError:
+        raise HTTPException(404, f"Cannot find {model}")

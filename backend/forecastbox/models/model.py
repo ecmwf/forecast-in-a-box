@@ -8,7 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 import os
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 from collections import defaultdict
 from functools import cached_property
 from typing import Any, Optional
@@ -17,8 +17,8 @@ from anemoi.inference.checkpoint import Checkpoint
 from earthkit.workflows.fluent import Action
 from earthkit.workflows.plugins.anemoi.fluent import from_input
 from forecastbox.core import FormFieldProvider
-from forecastbox.rjsf import FieldWithUI
-from pydantic import BaseModel, ConfigDict, FilePath
+from forecastbox.rjsf import FieldWithUI, FormDefinition
+from pydantic import BaseModel
 from qubed import Qube
 
 from .metadata import ControlMetadata, get_control_metadata
@@ -27,7 +27,7 @@ from .utils import open_checkpoint
 FORECAST_IN_A_BOX_METADATA = "forecast-in-a-box.json"
 
 
-class BaseForecastModel(FormFieldProvider, ABCMeta):
+class BaseForecastModel(FormFieldProvider, ABC):
     def __init__(self, checkpoint: os.PathLike):
         self.checkpoint_path = checkpoint
         self.validate_checkpoint()
@@ -114,12 +114,63 @@ class BaseForecastModel(FormFieldProvider, ABCMeta):
 
 
     @abstractmethod
-    def _create_input_configuration(self):
+    def _create_input_configuration(self, control: ControlMetadata) -> str | dict[str, Any]:
         pass
 
-    @abstractmethod
-    def graph(self, lead_time: int, date: str | int, ensemble_members: int = 1, **kwargs) -> Action:
-        pass
+    def graph(self, lead_time: int, date, ensemble_members: int = 1, **kwargs) -> Action:
+
+        versions = self.versions
+        INFERENCE_FILTER_STARTS = ["anemoi-models", "anemoi-graphs", "flash-attn", "torch"]
+        INITIAL_CONDITIONS_FILTER_STARTS = ["anemoi-inference", "earthkit", "anemoi-transform", "anemoi-plugins"]
+
+        def parse_into_install(version_dict):
+            install_list = []
+            for key, val in version_dict.items():
+                if "://" in val or "git+" in val:
+                    install_list.append(f"{key} @ {val}")
+                else:
+                    install_list.append(f"{key}=={val}")
+            return install_list
+
+        control = self.control.update(**kwargs)
+
+        inference_env = {
+            key: val for key, val in versions.items() if any(key.startswith(start) for start in INFERENCE_FILTER_STARTS)
+        }
+
+        inference_env.update(control.pkg_versions)
+        inference_env_list = parse_into_install(inference_env)
+
+        initial_conditions_env = parse_into_install(
+            {
+                key: val
+                for key, val in versions.items()
+                if any(key.startswith(start) for start in INITIAL_CONDITIONS_FILTER_STARTS)
+            }
+        )
+
+        inference_environment_variables = (control.environment_variables).copy()
+        input_source = self._create_input_configuration(control)
+
+
+        return from_input(
+            self.checkpoint_path,
+            input_source,
+            lead_time=lead_time,
+            date=date,
+            ensemble_members=ensemble_members,
+            environment={"inference": inference_env_list, "initial_conditions": initial_conditions_env},
+            env=inference_environment_variables,
+        )
+
+    @property
+    def formfields(self) -> dict[str, FieldWithUI]:
+        """Fields to be used in the product configuration form."""
+        return {}
+
+    @property
+    def form(self) -> FormDefinition:
+        return FormDefinition(title = "#TODO", fields = {})
 
     def deaccumulate(self, outputs: "Action") -> "Optional[Action]":
         """Get the deaccumulated outputs."""
@@ -153,119 +204,55 @@ class BaseForecastModel(FormFieldProvider, ABCMeta):
 
         return fields
 
-class Model(BaseModel, FormFieldProvider):
-    """Model Specification"""
+    def specify(self, lead_time: int, date, ensemble_members: int = 1, **kwargs) -> "SpecifiedModel":
+        """Create a SpecifiedModel instance with the given parameters."""
+        return SpecifiedModel(self, lead_time, date, ensemble_members, **kwargs)
 
-    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+class SpecifiedModel(BaseForecastModel):
+    """Model with specified parameters, delegating to a BaseForecastModel instance."""
+    def __init__(self, model: BaseForecastModel, lead_time: int, date, ensemble_members: int = 1, **kwargs):
+        self._model = model
+        self._kwargs = kwargs
+        self._lead_time = lead_time
+        self._date = date
+        self._ensemble_members = ensemble_members
 
-    checkpoint_path: FilePath
-    lead_time: int
-    date: str
-    ensemble_members: int
-    time: str | None = None
-    entries: dict[str, Any] | None = None
+    def _create_input_configuration(self, control: ControlMetadata) -> str | dict[str, Any]:
+        return self._model._create_input_configuration(control)
 
-    @property
-    def formfields(self) -> dict[str, "FieldWithUI"]:
-        return {
-            # 'date': FieldWithUI(
-            #     jsonschema= StringSchema(
-            #         title="Date",
-            #         description="Date of the forecast in YYYY-MM-DD format.",
-            #         format="date",
-            #     ),
-            #     ui=UIStringField(
-            #         widget="date",
-            #         inputType="date",
-            #         label=False,
-            #         placeholder="YYYY-MM-DD",
-            #     )
-            # ),
-            # 'lead_time': FieldWithUI(
-            #     jsonschema=IntegerSchema(
-            #         title="Lead Time",
-            #         description="Lead time for the forecast in hours.",
-            #         minimum=0,
-            #         maximum=self.lead_time,
-            #         multipleOf=self.timestep,
-            #     ),
-            #     ui=UIIntegerField(
-            #         widget='range',
-            #         label=False,
-            #         placeholder="Enter lead time in hours",
-            #     )
-            # ),
-        }
+    def timesteps(self) -> list[int]: # type: ignore[override]
+        return self._model.timesteps(self._lead_time)
 
-
-
-
-    @cached_property
-    def timesteps(self) -> list[int]:
-        return list(range(self.timestep, int(self.lead_time) + 1, self.timestep))
-
-
-    def graph(self, initial_conditions: "Action", environment_kwargs: dict | None = None, **kwargs) -> "Action":
-        """Get Model Graph.
-
-        Anemoi cascade exposes each param as a separate node in the graph,
-        with pressure levels represented as `{param}_{levelist}`.
-        """
-
-        versions = self.versions()
-        INFERENCE_FILTER_STARTS = ["anemoi-models", "anemoi-graphs", "flash-attn", "torch"]
-        INITIAL_CONDITIONS_FILTER_STARTS = ["anemoi-inference", "earthkit", "anemoi-transform", "anemoi-plugins"]
-
-        def parse_into_install(version_dict):
-            install_list = []
-            for key, val in version_dict.items():
-                if "://" in val or "git+" in val:
-                    install_list.append(f"{key} @ {val}")
-                else:
-                    install_list.append(f"{key}=={val}")
-            return install_list
-
-        additional_constraints = self.extra_information.model_dump()
-        additional_constraints.update(kwargs)
-        additional_constraints = ModelExtra(**additional_constraints)
-
-        inference_env = {
-            key: val for key, val in versions.items() if any(key.startswith(start) for start in INFERENCE_FILTER_STARTS)
-        }
-
-        inference_env.update(additional_constraints.version_overrides or {})
-        inference_env_list = parse_into_install(inference_env)
-
-        initial_conditions_env = parse_into_install(
-            {
-                key: val
-                for key, val in versions.items()
-                if any(key.startswith(start) for start in INITIAL_CONDITIONS_FILTER_STARTS)
-            }
+    def graph(self, **kwargs) -> Action: # type: ignore[override]
+        """Create the model action graph with specified parameters."""
+        k = self._kwargs.copy()
+        k.update(kwargs)
+        return self._model.graph(
+            lead_time=self._lead_time,
+            date=self._date,
+            ensemble_members=self._ensemble_members,
+            **k,
         )
 
-        inference_environment_variables = (additional_constraints.environment_variables or {}).copy()
-        inference_environment_variables.update(environment_kwargs or {})
-
-        input_source = additional_constraints.input_preference or "mars"
-        if additional_constraints.input_overrides:
-            input_source = {input_source: additional_constraints.input_overrides}
-
-        return from_input(
-            self.checkpoint_path,
-            input_source,
-            lead_time=self.lead_time,
-            date=self.date,
-            ensemble_members=self.ensemble_members,
-            **(self.entries or {}),
-            environment={"inference": inference_env_list, "initial_conditions": initial_conditions_env},
-            env=inference_environment_variables,
-        )
+    def __getattr__(self, key):
+        return getattr(self._model, key)
 
 
 
+# class Model(BaseModel, FormFieldProvider):
+#     """Model Specification"""
 
-def model(checkpoint: os.PathLike) -> BaseForecastModel:
+#     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+
+#     checkpoint_path: FilePath
+#     lead_time: int
+#     date: str
+#     ensemble_members: int
+#     time: str | None = None
+#     entries: dict[str, Any] | None = None
+
+
+def get_model(checkpoint: os.PathLike) -> BaseForecastModel:
     """Get the model class based on the control metadata."""
     from .globe import GlobalModel
     from .nested import NestedModel
@@ -276,26 +263,37 @@ def model(checkpoint: os.PathLike) -> BaseForecastModel:
     return GlobalModel(checkpoint)
 
 
+class ModelInfo(BaseModel):
+    timestep: int
+    diagnostics: list[str]
+    prognostics: list[str]
+    area: Any
+    grid: Any
+    versions: dict[str, str]
+    type: str
 
-def model_info(checkpoint_path: str) -> dict[str, Any]:
-    ckpt = open_checkpoint(checkpoint_path)
+def model_info(checkpoint_path: os.PathLike) -> ModelInfo:
+    """Get basic information about the model from the checkpoint.
+    This includes the timestep, diagnostic and prognostic variables,
+    area, grid, and versions.
+    """
+    model = get_model(checkpoint_path)
 
-    anemoi_versions = model_versions(checkpoint_path)
     anemoi_versions = {
         k: v
-        for k, v in anemoi_versions.items()
+        for k, v in model.versions.items()
         if any(k.startswith(prefix) for prefix in ["anemoi-", "earthkit-", "torch", "flash-attn"])
     }
 
-    return {
-        "timestep": ckpt.timestep,
-        "diagnostics": ckpt.diagnostic_variables,
-        "prognostics": ckpt.prognostic_variables,
-        "area": ckpt.area,
-        "local_area": True,
-        "grid": ckpt.grid,
-        "versions": anemoi_versions,
-    }
+    return ModelInfo(
+        timestep=model.timestep,
+        diagnostics=model.metadata.diagnostic_variables,
+        prognostics=model.metadata.prognostic_variables,
+        area=model.metadata.area,
+        grid=model.metadata.grid,
+        versions=anemoi_versions,
+        type=model.__class__.__name__,
+    )
 
 
 
