@@ -13,24 +13,14 @@
 # https://rjsf-team.github.io/react-jsonschema-form/docs/
 
 
-from typing import Any
-from typing import List
-from typing import Optional
-from typing import TypeVar
-from typing import Union
+from typing import Any, TypeVar
 
 from .forms import FieldWithUI
-from .jsonSchema import ArraySchema
-from .jsonSchema import EnumMixin
-from .jsonSchema import FieldSchema
-from .jsonSchema import ObjectSchema
-from .jsonSchema import StringSchema
-from .uiSchema import UIField
-from .uiSchema import UIObjectField
-from .uiSchema import UISchema
+from .jsonSchema import ArraySchema, EnumMixin, FieldSchema, ObjectSchema, StringSchema
+from .uiSchema import UIField, UIObjectField, UISchema
 
 
-def __update_enum_within_jsonschema(jsonschema: FieldSchema, new_enum: List[Any]) -> FieldSchema:
+def __update_enum_within_jsonschema(jsonschema: FieldSchema, new_enum: list[Any]) -> FieldSchema:
     """Update the enum of a JSON schema."""
 
     if isinstance(jsonschema, EnumMixin):
@@ -42,7 +32,7 @@ def __update_enum_within_jsonschema(jsonschema: FieldSchema, new_enum: List[Any]
     return jsonschema
 
 
-def update_enum_within_field(field: FieldWithUI, new_enum: List[Any]) -> FieldWithUI:
+def update_enum_within_field(field: FieldWithUI, new_enum: list[Any]) -> FieldWithUI:
     """Update the enum of a field's JSON schema.
 
     Will only update the JSON schema if it supports enums,
@@ -72,7 +62,7 @@ def update_enum_within_field(field: FieldWithUI, new_enum: List[Any]) -> FieldWi
 UI = TypeVar("UI", bound=UISchema)
 
 
-def __collapse_enums(jsonschema: FieldSchema, uischema: Optional[UI] = None) -> tuple[StringSchema, Union[UI, UIField]]:
+def __collapse_enums(jsonschema: FieldSchema, uischema: UI | None = None) -> tuple[StringSchema, UI | UIField]:
     resolved_uischema: UISchema = uischema or UIField(widget="text")
     if not isinstance(resolved_uischema, UIField):
         raise TypeError("UI schema must be a UIField to collapse enums")

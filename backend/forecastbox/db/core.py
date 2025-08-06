@@ -3,9 +3,8 @@
 import asyncio
 import logging
 from asyncio import Lock
-from typing import Any
-from typing import Callable
-from typing import TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 import sqlalchemy.exc
 

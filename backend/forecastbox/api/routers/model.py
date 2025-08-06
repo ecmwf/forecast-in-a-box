@@ -17,33 +17,19 @@ import tempfile
 from collections import defaultdict
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
-from typing import Literal
+from typing import Any, Literal
 
 import httpx
-from fastapi import APIRouter
-from fastapi import BackgroundTasks
-from fastapi import Depends
-from fastapi import HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from forecastbox.api.utils import get_model_path
 from forecastbox.config import config
-from forecastbox.db.model import delete_download
-from forecastbox.db.model import finish_edit
-from forecastbox.db.model import get_download
-from forecastbox.db.model import get_edit
-from forecastbox.db.model import start_download
-from forecastbox.db.model import start_editing
-from forecastbox.db.model import update_progress
-from forecastbox.models.model import Model
-from forecastbox.models.model import ModelExtra
-from forecastbox.models.model import get_extra_information
-from forecastbox.models.model import model_info
-from forecastbox.models.model import set_extra_information
+from forecastbox.db.model import (delete_download, finish_edit, get_download, get_edit, start_download, start_editing,
+                                  update_progress)
+from forecastbox.models.model import Model, ModelExtra, get_extra_information, model_info, set_extra_information
 from forecastbox.schemas.model import ModelDownload
 from pydantic import BaseModel
 
-from ..types import ModelName
-from ..types import ModelSpecification
+from ..types import ModelName, ModelSpecification
 from .admin import get_admin_user
 
 logger = logging.getLogger(__name__)

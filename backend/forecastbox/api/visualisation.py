@@ -12,9 +12,7 @@ import tempfile
 
 from fastapi.responses import HTMLResponse
 from forecastbox.api.execution import forecast_products_to_cascade
-from forecastbox.api.types import ExecutionSpecification
-from forecastbox.api.types import ForecastProducts
-from forecastbox.api.types import VisualisationOptions
+from forecastbox.api.types import ExecutionSpecification, ForecastProducts, VisualisationOptions
 
 logger = logging.getLogger(__name__)
 
@@ -32,5 +30,5 @@ def visualise(spec: ExecutionSpecification, options: VisualisationOptions) -> HT
     with tempfile.NamedTemporaryFile(suffix=".html") as dest:
         graph.visualise(dest.name, **options.model_dump())
 
-        with open(dest.name, "r") as f:
+        with open(dest.name) as f:
             return HTMLResponse(f.read(), media_type="text/html")

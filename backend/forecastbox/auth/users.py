@@ -8,28 +8,17 @@
 # nor does it submit to any jurisdiction.
 
 import logging
-from typing import Optional
 
 import jwt
 import pydantic
-from fastapi import Depends
-from fastapi import HTTPException
-from fastapi import Request
-from fastapi import responses
-from fastapi_users import BaseUserManager
-from fastapi_users import FastAPIUsers
-from fastapi_users import UUIDIDMixin
-from fastapi_users.authentication import AuthenticationBackend
-from fastapi_users.authentication import CookieTransport
-from fastapi_users.authentication import JWTStrategy
+from fastapi import Depends, HTTPException, Request, responses
+from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
+from fastapi_users.authentication import AuthenticationBackend, CookieTransport, JWTStrategy
 from fastapi_users.db import SQLAlchemyUserDatabase
 from forecastbox.config import config
-from forecastbox.db.user import async_session_maker
-from forecastbox.db.user import get_user_db
+from forecastbox.db.user import async_session_maker, get_user_db
 from forecastbox.schemas.user import UserTable
-from sqlalchemy import func
-from sqlalchemy import select
-from sqlalchemy import update
+from sqlalchemy import func, select, update
 
 SECRET = config.auth.jwt_secret.get_secret_value()
 COOKIE_NAME = "forecastbox_auth"
@@ -64,7 +53,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[UserTable, pydantic.UUID4]):
     reset_password_token_secret = SECRET
     verification_token_secret = SECRET
 
-    async def on_after_register(self, user: UserTable, request: Optional[Request] = None):
+    async def on_after_register(self, user: UserTable, request: Request | None = None):
         async with async_session_maker() as session:
             query = select(func.count("*")).select_from(UserTable)
             user_count = (await session.execute(query)).scalar()
@@ -74,7 +63,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[UserTable, pydantic.UUID4]):
                 await session.commit()
 
     async def on_after_login(
-        self, user: UserTable, request: Optional[Request] = None, response: Optional[responses.Response] = None
+        self, user: UserTable, request: Request | None = None, response: responses.Response | None = None
     ):
         if not verify_entitlements(user):
             logger.error(f"User {user.id} does not have the required entitlements.")
@@ -85,10 +74,10 @@ class UserManager(UUIDIDMixin, BaseUserManager[UserTable, pydantic.UUID4]):
         response.status_code = 302
         response.headers["location"] = "/"
 
-    async def on_after_forgot_password(self, user: UserTable, token: str, request: Optional[Request] = None):
+    async def on_after_forgot_password(self, user: UserTable, token: str, request: Request | None = None):
         logger.error(f"User {user.id} has forgot their password. Reset token: {token}")
 
-    async def on_after_request_verify(self, user: UserTable, token: str, request: Optional[Request] = None):
+    async def on_after_request_verify(self, user: UserTable, token: str, request: Request | None = None):
         logger.error(f"Verification requested for user {user.id}. Verification token: {token}")
 
 

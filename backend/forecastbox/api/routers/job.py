@@ -23,29 +23,17 @@ import cascade.gateway.api as api
 import cascade.gateway.client as client
 import orjson
 from cascade.controller.report import JobId
-from cascade.low.core import DatasetId
-from cascade.low.core import TaskId
-from fastapi import APIRouter
-from fastapi import Body
-from fastapi import Depends
-from fastapi import HTTPException
-from fastapi import Response
-from fastapi import UploadFile
+from cascade.low.core import DatasetId, TaskId
+from fastapi import APIRouter, Body, Depends, HTTPException, Response, UploadFile
 from fastapi.responses import HTMLResponse
-from forecastbox.api.execution import SubmitJobResponse
-from forecastbox.api.execution import execute
+from forecastbox.api.execution import SubmitJobResponse, execute
 from forecastbox.api.routers.gateway import Globals
-from forecastbox.api.types import ExecutionSpecification
-from forecastbox.api.types import VisualisationOptions
+from forecastbox.api.types import ExecutionSpecification, VisualisationOptions
 from forecastbox.api.utils import encode_result
 from forecastbox.api.visualisation import visualise
 from forecastbox.auth.users import current_active_user
 from forecastbox.config import config
-from forecastbox.db.job import delete_all
-from forecastbox.db.job import delete_one
-from forecastbox.db.job import get_all
-from forecastbox.db.job import get_one
-from forecastbox.db.job import update_one
+from forecastbox.db.job import delete_all, delete_one, get_all, get_one, update_one
 from forecastbox.schemas.user import UserRead
 
 logger = logging.getLogger(__name__)

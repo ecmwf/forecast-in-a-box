@@ -19,9 +19,9 @@ import logging.config
 import os
 import time
 import webbrowser
+from collections.abc import Callable
 from dataclasses import dataclass
 from multiprocessing import Process, connection, freeze_support, set_start_method
-from typing import Callable
 
 import httpx
 import pydantic

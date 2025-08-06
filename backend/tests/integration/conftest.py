@@ -10,8 +10,7 @@ import pytest
 from forecastbox.config import FIABConfig
 from forecastbox.standalone.entrypoint import launch_all
 
-from .utils import extract_auth_token_from_response
-from .utils import prepare_cookie_with_auth_token
+from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
 
 fake_model_name = "themodel"
 fake_repository_port = 12000

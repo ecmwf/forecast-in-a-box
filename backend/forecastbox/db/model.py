@@ -9,17 +9,10 @@ import datetime as dt
 import logging
 
 from forecastbox.config import config
-from forecastbox.db.core import addAndCommit
-from forecastbox.db.core import executeAndCommit
-from forecastbox.db.core import querySingle
-from forecastbox.schemas.model import Base
-from forecastbox.schemas.model import ModelDownload
-from forecastbox.schemas.model import ModelEdit
-from sqlalchemy import delete
-from sqlalchemy import select
-from sqlalchemy import update
-from sqlalchemy.ext.asyncio import async_sessionmaker
-from sqlalchemy.ext.asyncio import create_async_engine
+from forecastbox.db.core import addAndCommit, executeAndCommit, querySingle
+from forecastbox.schemas.model import Base, ModelDownload, ModelEdit
+from sqlalchemy import delete, select, update
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 logger = logging.getLogger(__name__)
 

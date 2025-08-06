@@ -1,8 +1,4 @@
-from forecastbox.products.rjsf.uiSchema import UIBooleanField
-from forecastbox.products.rjsf.uiSchema import UIField
-from forecastbox.products.rjsf.uiSchema import UIIntegerField
-from forecastbox.products.rjsf.uiSchema import UIObjectField
-from forecastbox.products.rjsf.uiSchema import UIStringField
+from forecastbox.products.rjsf.uiSchema import UIBooleanField, UIField, UIIntegerField, UIObjectField, UIStringField
 
 
 def test_uifield_export_with_prefix():
