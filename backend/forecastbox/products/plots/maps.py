@@ -9,7 +9,6 @@
 
 import io
 import warnings
-import io
 from collections import defaultdict
 from typing import Optional
 
@@ -21,16 +20,12 @@ from forecastbox.models import Model
 from forecastbox.products.ensemble import BaseEnsembleProduct
 from forecastbox.products.product import GenericTemporalProduct
 
-from ..rjsf import FieldWithUI
-from ..rjsf import StringSchema
-from ..rjsf import UIStringField
+from ..rjsf import FieldWithUI, StringSchema, UIStringField
 from . import plot_product_registry
-from ..rjsf import FieldWithUI, StringSchema, IntegerSchema, ArraySchema, UIObjectField, UIStringField, FieldSchema
 
 EARTHKIT_PLOTS_IMPORTED = True
 try:
-    from earthkit.plots import Figure
-    from earthkit.plots import Subplot
+    from earthkit.plots import Figure, Subplot
 except ImportError:
     from typing import Any
 
@@ -77,33 +72,7 @@ def _plot_fields(subplot: Subplot, fields: ekd.FieldList, **kwargs: dict[str, di
 
 @as_payload
 @mark.environment_requirements(["earthkit-plots"])
-def export(figure: Figure, format: str = "png") -> tuple[bytes, str]:
-    """
-    Export a figure to a specified format.
-
-    Parameters
-    ----------
-    figure : Figure
-        The figure to export.
-    format : str
-        The format to export the figure to. Supported formats are 'png', 'pdf', 'svg'.
-
-    Returns
-    -------
-    tuple[bytes, str]
-        A tuple containing the serialized data as bytes and the MIME type.
-    """
-    if format not in ["png", "pdf", "svg"]:
-        raise ValueError(f"Unsupported format: {format}. Supported formats are 'png', 'pdf', 'svg'.")
-    
-    buf = io.BytesIO()
-    figure.save(buf, format=format)
-
-    return buf.getvalue(), f"image/{format}"
-
-@as_payload
-@mark.environment_requirements(["earthkit-plots"])
-def export(figure: Figure, format: str = "png") -> tuple[bytes, str]:
+def export(figure: Figure, format: str = "png", dpi: int = 100, no_pad: bool = False) -> tuple[bytes, str]:
     """Export a figure to a specified format.
 
     Parameters
@@ -111,18 +80,23 @@ def export(figure: Figure, format: str = "png") -> tuple[bytes, str]:
     figure : Figure
         The figure to export.
     format : str
-        The format to export the figure to. Supported formats are 'png', 'pdf', 'svg'.
+        The format to export the figure to.
+        If format starts with 'i', it will be treated as an interactive format (e.g., 'ipng').
+        and the 'i' will be stripped off for the actual export.
+    dpi : int
+        The DPI (dots per inch) for the exported image.
+    no_pad: bool
+        Apply no padding, defaults to False.
 
     Returns
     -------
     tuple[bytes, str]
         A tuple containing the serialized data as bytes and the MIME type.
     """
-    if format not in ["png", "pdf", "svg"]:
-        raise ValueError(f"Unsupported format: {format}. Supported formats are 'png', 'pdf', 'svg'.")
-
+    export_format = format[1:] if format.startswith("i") else format
     buf = io.BytesIO()
-    figure.save(buf, format=format)
+    figure.save(buf, format=export_format, dpi = dpi, pad_inches=(0 if no_pad else None))
+
 
     return buf.getvalue(), f"image/{format}"
 
@@ -135,6 +109,7 @@ def quickplot(
     subplot_title: Optional[str] = None,
     figure_title: Optional[str] = None,
     domain: Optional[str] = None,
+    no_pad: bool = True,
 ):
     from earthkit.plots import Figure  # NOTE we need to import again to mask the possible Any
     from earthkit.plots.components import layouts
@@ -165,26 +140,28 @@ def quickplot(
         subplot = figure.add_map(domain=domain)
         _plot_fields(subplot, group_args, quickplot=dict(interpolate=True))
 
-        for m in schema.quickmap_subplot_workflow:
-            args = []
-            if m == "title":
-                args = [subplot_title]
-            try:
-                getattr(subplot, m)(*args)
-            except Exception as err:
-                warnings.warn(
-                    f"Failed to execute {m} on given data with: \n"
-                    f"{err}\n\n"
-                    "consider constructing the plot manually."
-                )
+        if no_pad:
+            subplot.ax.axis("off")
+        else:
+            for m in schema.quickmap_subplot_workflow:
+                args = []
+                if m == "title":
+                    args = [subplot_title]
+                try:
+                    getattr(subplot, m)(*args)
+                except Exception as err:
+                    warnings.warn(
+                        f"Failed to execute {m} on given data with: \n"
+                        f"{repr(err)}\n\n"
+                        "consider constructing the plot manually."
+                    )
 
-    for m in schema.quickmap_figure_workflow:
-        try:
-            getattr(figure, m)()
-        except Exception as err:
-            warnings.warn(
-                f"Failed to execute {m} on given data with: \n" f"{err}\n\n" "consider constructing the plot manually."
-            )
+    if not no_pad:
+        for m in schema.quickmap_figure_workflow:
+            try:
+                getattr(figure, m)()
+            except Exception:
+                pass
 
     # figure.title(figure_title)
 
@@ -263,6 +240,42 @@ class SimpleMapProduct(MapProduct):
             figure_title="{variable_name} over {domain}\n Base time: {base_time: %Y%m%dT%H%M}\n",
         )
         plots = source.map(quickplot_payload).map(export(format="png")).map(self.named_payload("Map"))
+
+        return plots
+
+@plot_product_registry("Interactive Map")
+class InteractiveMapProduct(GenericTemporalProduct):
+    """Interactive Map Product."""
+    allow_multiple_steps = True
+
+    @property
+    def formfields(self):
+        formfields = super().formfields.copy()
+        formfields.pop('reduce', None)
+        return formfields
+
+    def validate_intersection(self, model: Model) -> bool:
+        return super().validate_intersection(model) and EARTHKIT_PLOTS_IMPORTED
+
+    @property
+    def qube(self):
+        return self.make_generic_qube()
+
+    def execute(self, product_spec, model, source):
+        domain = product_spec.pop("domain", None)
+        source = self.select_on_specification(product_spec, source)
+
+        if domain == "Global":
+            domain = None
+
+        source = source.concatenate("param")
+
+        quickplot_payload = quickplot(
+            domain=domain,
+            groupby="valid_datetime",
+            no_pad=True,
+        )
+        plots = source.map(quickplot_payload).map(export(format="ipng", dpi = 1000)).map(self.named_payload("Interactive Map"))
 
         return plots
 

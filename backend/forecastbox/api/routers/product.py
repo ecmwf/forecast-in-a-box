@@ -9,23 +9,16 @@
 
 """Products API Router."""
 
-from typing import Any
-from typing import Iterable
 import re
+from typing import Any, Iterable
 
 import forecastbox.products.rjsf.utils as rjsfutils
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from forecastbox.models import Model
 from forecastbox.products.interfaces import Interfaces
-from forecastbox.products.product import USER_DEFINED
-from forecastbox.products.product import Product
-from forecastbox.products.registry import Category
-from forecastbox.products.registry import get_categories
-from forecastbox.products.registry import get_product
-from forecastbox.products.rjsf import ExportedSchemas
-from forecastbox.products.rjsf import FieldWithUI
-from forecastbox.products.rjsf import FormDefinition
-from forecastbox.products.rjsf import StringSchema
+from forecastbox.products.product import USER_DEFINED, Product
+from forecastbox.products.registry import Category, get_categories, get_product
+from forecastbox.products.rjsf import ExportedSchemas, FieldWithUI, FormDefinition, StringSchema
 from qubed import Qube
 from typing_extensions import OrderedDict
 
@@ -71,6 +64,13 @@ def _sort_values(values: Iterable[Any]) -> Iterable[Any]:
     alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
     return sorted(values, key=alphanum_key)
 
+def _convert_to_int(value: Iterable[Any]) -> Any:
+    """Convert a value to int if it is a digit."""
+    if all(isinstance(v, str) and v.isdigit() for v in value):
+        return [float(v) for v in value]
+    return value
+
+
 
 def _sort_fields(fields: dict) -> dict:
     new_fields = OrderedDict()
@@ -85,7 +85,7 @@ def _sort_fields(fields: dict) -> dict:
     return new_fields
 
 
-async def product_to_config(
+def product_to_config(
     product: Product, model_spec: ModelSpecification, params: dict[str, Any]
 ) -> ExportedSchemas:
     """Convert a product to a configuration dictionary.
@@ -157,7 +157,7 @@ async def product_to_config(
 
         if USER_DEFINED not in available_product_spec.span(key):
             try:
-                field = rjsfutils.update_enum_within_field(field, _sort_values(list(set(val))))
+                field = rjsfutils.update_enum_within_field(field, _convert_to_int(_sort_values(list(set(val)))))
             except TypeError:
                 pass
 
@@ -249,6 +249,8 @@ async def get_product_configuration(
     ExportedSchemas
         Schema to make form from.
     """
-    prod = get_product(category, product)
-    return await product_to_config(prod, model, spec)
-    # return ProductConfiguration(product=f"{category}/{product}", options=entries)
+    try:
+        prod = get_product(category, product)
+        return product_to_config(prod, model, spec)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=f"Product not found: {e}")
