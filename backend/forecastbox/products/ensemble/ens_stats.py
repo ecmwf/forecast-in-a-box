@@ -9,7 +9,6 @@
 
 import itertools
 from typing import Any
-from typing import Optional
 
 from earthkit.workflows import fluent
 from forecastbox.products.ensemble.base import BasePProcEnsembleProduct
@@ -19,7 +18,7 @@ from . import ensemble_registry
 
 
 class BaseEnsembleStats(BasePProcEnsembleProduct, GenericTemporalProduct):
-    _type: Optional[str] = None
+    _type: str | None = None
 
     allow_multiple_levels = True
     allow_multiple_params = True

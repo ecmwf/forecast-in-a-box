@@ -11,14 +11,9 @@
 # This schema defines the structure of data as expected by RJSF based on the JSON Schema specification.
 # https://rjsf-team.github.io/react-jsonschema-form/docs/
 
-from typing import Any
-from typing import Literal
-from typing import Optional
-from typing import Union
+from typing import Any, Literal, Union
 
-from pydantic import BaseModel
-from pydantic import ConfigDict
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # Base Schema with discriminator
@@ -30,13 +25,13 @@ class BaseSchema(BaseModel):
     >>> BaseSchema(title="Example", description="A base schema", default=None)
     """
 
-    title: Optional[str] = None
+    title: str | None = None
     """Title of the schema."""
-    description: Optional[str] = None
+    description: str | None = None
     """Description of the schema."""
-    default: Optional[Any] = None
+    default: Any | None = None
     """Default value for the schema."""
-    additionalProperties: Optional[dict[str, Any]] = None
+    additionalProperties: dict[str, Any] | None = None
     """Additional properties allowed in the schema."""
 
     model_config = ConfigDict(extra="allow", use_enum_values=True, json_schema_extra={"discriminator": "type"})
@@ -57,7 +52,7 @@ class EnumMixin:
     >>> s.update_enum(["x", "y"])
     """
 
-    enum: Optional[list[Any]] = None
+    enum: list[Any] | None = None
     """list of allowed values for the schema."""
 
     def update_enum(self, new_enum: list[Any]):
@@ -80,11 +75,11 @@ class StringSchema(BaseSchema, EnumMixin):
     """
 
     type: Literal["string"] = Field(default="string")
-    format: Optional[str] = None
+    format: str | None = None
     """String format (e.g., 'date', 'email')."""
-    minLength: Optional[int] = None
+    minLength: int | None = None
     """Minimum length."""
-    maxLength: Optional[int] = None
+    maxLength: int | None = None
     """Maximum length."""
 
 
@@ -102,11 +97,11 @@ class IntegerSchema(BaseSchema, EnumMixin):
     """
 
     type: Literal["integer"] = Field(default="integer")
-    minimum: Optional[int] = None
+    minimum: int | None = None
     """Minimum value."""
-    maximum: Optional[int] = None
+    maximum: int | None = None
     """Maximum value."""
-    multipleOf: Optional[int] = None
+    multipleOf: int | None = None
     """Value must be a multiple of this number."""
 
 
@@ -125,9 +120,9 @@ class NumberSchema(BaseSchema, EnumMixin):
 
     type: Literal["number"] = Field(default="number")
     """Must be 'number'."""
-    minimum: Optional[float] = None
+    minimum: float | None = None
     """Minimum value."""
-    maximum: Optional[float] = None
+    maximum: float | None = None
     """Maximum value."""
 
 
@@ -176,12 +171,12 @@ class ObjectSchema(BaseSchema):
     type: Literal["object"] = Field(default="object")
     properties: dict[str, "FieldSchema"]
     """Underlying fields of the object."""
-    required: Optional[list[str]] = None
+    required: list[str] | None = None
     """list of required property names."""
 
-    anyOf: Optional[list["FieldSchema"]] = None
-    oneOf: Optional[list["FieldSchema"]] = None
-    allOf: Optional[list["FieldSchema"]] = None
+    anyOf: list["FieldSchema"] | None = None
+    oneOf: list["FieldSchema"] | None = None
+    allOf: list["FieldSchema"] | None = None
 
 
 class ArraySchema(BaseSchema):
@@ -199,11 +194,11 @@ class ArraySchema(BaseSchema):
     type: Literal["array"] = Field(default="array")
     items: "FieldSchema"
     """Schema for array items."""
-    minItems: Optional[int] = None
+    minItems: int | None = None
     """Minimum number of items."""
-    maxItems: Optional[int] = None
+    maxItems: int | None = None
     """Maximum number of items."""
-    uniqueItems: Optional[bool] = None
+    uniqueItems: bool | None = None
     """Whether all items must be unique."""
 
 

@@ -8,11 +8,8 @@
 # nor does it submit to any jurisdiction.
 
 from collections import defaultdict
-from functools import cached_property
-from functools import lru_cache
-from typing import Any
-from typing import Dict
-from typing import Optional
+from functools import cached_property, lru_cache
+from typing import Any, Optional
 
 import yaml
 from anemoi.inference.checkpoint import Checkpoint
@@ -20,10 +17,7 @@ from earthkit.workflows.fluent import Action
 from earthkit.workflows.plugins.anemoi.fluent import from_input
 from forecastbox.core import FormFieldProvider
 from forecastbox.products.rjsf import FieldWithUI
-from pydantic import BaseModel
-from pydantic import ConfigDict
-from pydantic import FilePath
-from pydantic import model_validator
+from pydantic import BaseModel, ConfigDict, FilePath, model_validator
 from qubed import Qube
 
 FORECAST_IN_A_BOX_METADATA = "forecast-in-a-box.json"
@@ -80,8 +74,8 @@ class Model(BaseModel, FormFieldProvider):
     lead_time: int
     date: str
     ensemble_members: int
-    time: Optional[str] = None
-    entries: Optional[Dict[str, Any]] = None
+    time: str | None = None
+    entries: dict[str, Any] | None = None
 
     @property
     def formfields(self) -> dict[str, "FieldWithUI"]:
@@ -157,7 +151,7 @@ class Model(BaseModel, FormFieldProvider):
         """
         return convert_to_model_spec(self.checkpoint, assumptions=assumptions)
 
-    def graph(self, initial_conditions: "Action", environment_kwargs: Optional[Dict] = None, **kwargs) -> "Action":
+    def graph(self, initial_conditions: "Action", environment_kwargs: dict | None = None, **kwargs) -> "Action":
         """Get Model Graph.
 
         Anemoi cascade exposes each param as a separate node in the graph,
@@ -220,7 +214,7 @@ class Model(BaseModel, FormFieldProvider):
 
         steps = outputs.nodes.coords["step"]
 
-        fields: Optional[Action] = None
+        fields: Action | None = None
 
         for field in self.variables:
             if field not in accumulated_fields:
@@ -317,8 +311,7 @@ def model_info(checkpoint_path: str) -> dict[str, Any]:
 
 
 def get_extra_information(checkpoint_path: str) -> ModelExtra:
-    from anemoi.utils.checkpoints import has_metadata
-    from anemoi.utils.checkpoints import load_metadata
+    from anemoi.utils.checkpoints import has_metadata, load_metadata
 
     if not has_metadata(checkpoint_path, name=FORECAST_IN_A_BOX_METADATA):
         return ModelExtra()
@@ -327,9 +320,7 @@ def get_extra_information(checkpoint_path: str) -> ModelExtra:
 
 def set_extra_information(checkpoint_path: str, extra: ModelExtra) -> None:
     """Set the extra information for the model."""
-    from anemoi.utils.checkpoints import has_metadata
-    from anemoi.utils.checkpoints import replace_metadata
-    from anemoi.utils.checkpoints import save_metadata
+    from anemoi.utils.checkpoints import has_metadata, replace_metadata, save_metadata
 
     open_checkpoint.cache_clear()
 

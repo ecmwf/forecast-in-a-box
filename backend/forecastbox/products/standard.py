@@ -14,9 +14,7 @@ from forecastbox.products.product import GenericTemporalProduct
 from forecastbox.products.registry import CategoryRegistry
 
 from .export import export_fieldlist_as
-from .rjsf import FieldWithUI
-from .rjsf import StringSchema
-from .rjsf import UIStringField
+from .rjsf import FieldWithUI, StringSchema, UIStringField
 
 standard_product_registry = CategoryRegistry(
     "Standard",

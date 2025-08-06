@@ -9,10 +9,8 @@
 
 """Registry of products"""
 
-from dataclasses import dataclass
-from dataclasses import field
-from typing import Callable
-from typing import Type
+from collections.abc import Callable
+from dataclasses import dataclass, field
 
 from .interfaces import Interfaces
 from .product import Product
@@ -59,7 +57,7 @@ class CategoryRegistry:
             Decorator Function
         """
         PRODUCTS[category] = self
-        self._products: dict[str, Type[Product]] = {}
+        self._products: dict[str, type[Product]] = {}
 
         self.interface = [interface] if not isinstance(interface, list) else interface
         self._description = description
@@ -91,10 +89,10 @@ class CategoryRegistry:
         return decorator
 
     @property
-    def products(self) -> dict[str, Type[Product]]:
+    def products(self) -> dict[str, type[Product]]:
         return self._products
 
-    def __getitem__(self, key: str) -> Type[Product]:
+    def __getitem__(self, key: str) -> type[Product]:
         return self._products[key]
 
     def __contains__(self, key: str) -> bool:

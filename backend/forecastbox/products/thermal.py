@@ -8,7 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 import importlib.util
-from typing import OrderedDict
+from collections import OrderedDict
 
 from earthkit.workflows.plugins.pproc.fluent import Action as ppAction
 from forecastbox.models import Model
@@ -18,8 +18,7 @@ from .export import export_fieldlist_as
 from .interfaces import Interfaces
 from .product import Product
 from .registry import CategoryRegistry
-from .rjsf import FieldWithUI
-from .rjsf import IntegerSchema
+from .rjsf import FieldWithUI, IntegerSchema
 
 thermal_indices = CategoryRegistry(
     "thermal", interface=Interfaces.DETAILED, description="Thermal Indices", title="Thermal Indices"
@@ -39,19 +38,6 @@ class BaseThermalIndex(Product):
     @property
     def qube(self):
         return Qube.from_datacube({"param": "*"})
-    
-    @property
-    def formfields(self) -> OrderedDict[str, "FieldWithUI"]:
-        """Form fields for the product."""
-        formfields = super().formfields.copy()
-        formfields.update(
-            step= self._make_field(
-                title='Step',
-                multiple=True,
-                schema=IntegerSchema,
-            ),
-        )
-        return formfields
 
     @property
     def formfields(self) -> OrderedDict[str, "FieldWithUI"]:

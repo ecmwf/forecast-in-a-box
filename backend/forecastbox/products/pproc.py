@@ -12,8 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from earthkit.workflows import fluent
-from earthkit.workflows.graph import Graph
-from earthkit.workflows.graph import deduplicate_nodes
+from earthkit.workflows.graph import Graph, deduplicate_nodes
 from earthkit.workflows.plugins.anemoi.types import ENSEMBLE_DIMENSION_NAME
 from earthkit.workflows.plugins.pproc.fluent import Action as ppAction
 from earthkit.workflows.plugins.pproc.templates import derive_template

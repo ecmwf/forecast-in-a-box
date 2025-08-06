@@ -10,17 +10,11 @@
 """API types"""
 
 from dataclasses import dataclass
-from typing import Any
-from typing import Literal
-from typing import Optional
+from typing import Any, Literal
 
 from cascade.low.core import JobInstance
 from forecastbox.products.product import USER_DEFINED
-from pydantic import BaseModel
-from pydantic import Field
-from pydantic import PositiveInt
-from pydantic import field_validator
-from pydantic import model_validator
+from pydantic import BaseModel, Field, PositiveInt, field_validator, model_validator
 
 CONFIG_ORDER = ["param", "levtype", "levelist"]
 
@@ -48,15 +42,15 @@ class ConfigEntry(FIABBaseModel):
     """Label of the configuration entry"""
     description: str | None
     """Description of the configuration entry"""
-    values: Optional[list[Any]] = None
+    values: list[Any] | None = None
     """Available values for the configuration entry"""
-    example: Optional[str] = None
+    example: str | None = None
     """Example value for the configuration entry"""
     multiple: bool = False
     """Whether the configuration entry is a multiple select"""
     constrained_by: list[str] = Field(default_factory=list)
     """List of configuration entries that this entry is constrained by"""
-    default: Optional[str] = None
+    default: str | None = None
 
     @model_validator(mode="after")
     def __post_init__(self):

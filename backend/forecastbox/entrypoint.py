@@ -16,11 +16,9 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi import Request
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from forecastbox.db.job import create_db_and_tables as create_job_db
@@ -28,13 +26,7 @@ from forecastbox.db.model import create_db_and_tables as create_model_db
 from forecastbox.db.user import create_db_and_tables as create_user_db
 from starlette.exceptions import HTTPException
 
-from .api.routers import admin
-from .api.routers import auth
-from .api.routers import execution
-from .api.routers import gateway
-from .api.routers import job
-from .api.routers import model
-from .api.routers import product
+from .api.routers import admin, auth, execution, gateway, job, model, product
 from .config import config
 
 logger = logging.getLogger(__name__)
@@ -119,8 +111,7 @@ def status() -> StatusResponse:
 
     status = {"api": "up", "cascade": "up", "ecmwf": "up"}
 
-    from cascade.gateway import api
-    from cascade.gateway import client
+    from cascade.gateway import api, client
 
     try:
         client.request_response(api.JobProgressRequest(job_ids=[]), config.cascade.cascade_url, timeout_ms=1000)

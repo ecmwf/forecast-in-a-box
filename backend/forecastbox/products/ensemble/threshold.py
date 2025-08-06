@@ -12,16 +12,13 @@ from typing import Any
 
 import yaml
 from earthkit.workflows import fluent
-from forecastbox.products.ensemble.base import BaseEnsembleProduct
-from forecastbox.products.ensemble.base import BasePProcEnsembleProduct
+from forecastbox.products.ensemble.base import BaseEnsembleProduct, BasePProcEnsembleProduct
 from qubed import Qube
 
 from ..export import export_fieldlist_as
 from ..generic import generic_registry
-from ..product import USER_DEFINED
-from ..product import GenericParamProduct
-from ..rjsf import FieldWithUI
-from ..rjsf import StringSchema
+from ..product import USER_DEFINED, GenericParamProduct
+from ..rjsf import FieldWithUI, StringSchema
 from . import ensemble_registry
 
 
@@ -59,8 +56,7 @@ class GenericThresholdProbability(BaseThresholdProbability, GenericParamProduct)
         return self.make_generic_qube(threshold=USER_DEFINED, operator=USER_DEFINED, step=USER_DEFINED)
 
     def execute(self, product_spec, model, source):
-        from earthkit.workflows import backends
-        from earthkit.workflows import fluent
+        from earthkit.workflows import backends, fluent
         from earthkit.workflows.plugins.anemoi.types import ENSEMBLE_DIMENSION_NAME
 
         source = source.sel(param=product_spec["param"])
@@ -95,7 +91,7 @@ class DefinedThresholdProbability(BaseThresholdProbability, BasePProcEnsemblePro
     def thresholds(self):
         defined = self.defined
         for defi in defined:
-            defi["threshold"] = list((x[0] for x in defi["threshold"]))
+            defi["threshold"] = list(x[0] for x in defi["threshold"])
         return defined
 
     def get_out_paramid(self, levtype, param, levlist, threshold, operator) -> int | None:

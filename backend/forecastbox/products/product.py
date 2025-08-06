@@ -7,22 +7,15 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from abc import ABC
-from abc import abstractmethod
-from typing import TYPE_CHECKING
-from typing import Any
-from typing import OrderedDict
-from typing import Union
+from abc import ABC, abstractmethod
+from collections import OrderedDict
+from typing import TYPE_CHECKING, Any, Union
 
 from earthkit.workflows import fluent
 from forecastbox.models import Model
 from qubed import Qube
 
-from .rjsf import ArraySchema
-from .rjsf import FieldSchema
-from .rjsf import FieldWithUI
-from .rjsf import IntegerSchema
-from .rjsf import StringSchema
+from .rjsf import ArraySchema, FieldSchema, FieldWithUI, IntegerSchema, StringSchema
 
 if TYPE_CHECKING:
     from earthkit.workflows.fluent import Action
@@ -31,7 +24,7 @@ if TYPE_CHECKING:
 
 class Product(ABC):
     """Base Product Class"""
-    
+
     @property
     def _name(self):
         """Name of the product, used for display purposes."""

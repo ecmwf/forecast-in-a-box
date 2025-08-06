@@ -1,8 +1,7 @@
 import time
 
 from .conftest import fake_model_name
-from .utils import extract_auth_token_from_response
-from .utils import prepare_cookie_with_auth_token
+from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
 
 
 def test_download_model(backend_client):
