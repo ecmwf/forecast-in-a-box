@@ -58,23 +58,24 @@ const products: Record<string, ProductSpecification[]> = {
             ]
         }
     },
-    {
-      product: "Standard/Output",
-      specification: {
-            param: [
-                "2t",
-                "msl",
-                "10u",
-                "10v"
-            ],
-            levtype: "sfc",
-            reduce: "True",
-            format: "grib",
-            step: [
-                "*"
-            ]
-      }
-    }],
+    // {
+    //   product: "Standard/Output",
+    //   specification: {
+    //         param: [
+    //             "2t",
+    //             "msl",
+    //             "10u",
+    //             "10v"
+    //         ],
+    //         levtype: "sfc",
+    //         reduce: "True",
+    //         format: "grib",
+    //         step: [
+    //             "*"
+    //         ]
+    //   }
+    // }
+    ],
     'TP, MSLP and Winds': [{
         product: "Plots/Maps",
         specification: {
@@ -92,29 +93,30 @@ const products: Record<string, ProductSpecification[]> = {
             ]
         }
     },
-    {
-      product: "Standard/Output",
-      specification: {
-            param: [
-                "tp",
-                "msl",
-                "10u",
-                "10v"
-            ],
-            levtype: "sfc",
-            reduce: "True",
-            format: "grib",
-            step: [
-                "*"
-            ]
-      }
-    }],
+    // {
+    //   product: "Standard/Output",
+    //   specification: {
+    //         param: [
+    //             "tp",
+    //             "msl",
+    //             "10u",
+    //             "10v"
+    //         ],
+    //         levtype: "sfc",
+    //         reduce: "True",
+    //         format: "grib",
+    //         step: [
+    //             "*"
+    //         ]
+    //   }
+    // }
+    ],
 }
 
-export default function QuickLaunch() { 
+export default function QuickLaunch() {
     const api = useApi();
     const navigate = useNavigate();
-    
+
     const params = new URLSearchParams(location.search)
     const job_id = params.get('jobId') || null;
 
@@ -171,7 +173,7 @@ export default function QuickLaunch() {
     const updateProductIndex = () => {
         setProductIndex((prev) => prev + 1);
     };
-    
+
     const [modelOptions, setModelOptions] = useState<string[]>(['Loading...']);
     const [modelOptionsIndex, setmodelOptionsIndex] = useState<number>(0);
     const [modelValue, setModelValue] = useState<string>(modelOptions[modelOptionsIndex] || 'Loading...');
@@ -179,7 +181,7 @@ export default function QuickLaunch() {
     const fetchModelOptions = async () => {
         try {
             const res = await api.get('/v1/model/available');
-            const data: Record<string, string[]> = await res.data; 
+            const data: Record<string, string[]> = await res.data;
             // Flatten the record by prepending the key to each value
             const flattened = Object.entries(data).flatMap(
                 ([key, values]) => values.map((value) => `${key}_${value}`)
@@ -197,7 +199,7 @@ export default function QuickLaunch() {
     useEffect(() => {
         fetchModelOptions();
     }, []);
-    
+
     useKeyboardShortcuts({
         F13: () => updateModelOptions(),
         z: () => updateModelOptions(),
@@ -254,10 +256,10 @@ export default function QuickLaunch() {
             },
             environment: {} as EnvironmentSpecification
         }
-        
+
         setOnCooldown(true);
         const execute = async () => {
-        
+
             (async () => {
                 try {
                     const response = await api.post(`/v1/execution/execute`, spec);
@@ -333,7 +335,7 @@ export default function QuickLaunch() {
                         Use the keyboard shortcuts to quickly navigate and configure the system.
                     </Text>
                 </Card.Section>
-                
+
                 <Title order={3} pt='md'>Initial Conditions</Title>
                 <Group grow justify='space-between' align='center' pt='md'>
                     <DatePickerInput
@@ -435,4 +437,3 @@ export default function QuickLaunch() {
    </MainLayout>
   );
 };
-

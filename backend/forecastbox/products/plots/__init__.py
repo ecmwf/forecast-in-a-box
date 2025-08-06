@@ -8,12 +8,16 @@
 # nor does it submit to any jurisdiction.
 
 
-from forecastbox.products.registry import CategoryRegistry
 from forecastbox.products.interfaces import Interfaces
-
+from forecastbox.products.registry import CategoryRegistry
 
 plot_product_registry = CategoryRegistry(
-    "Plots", interface=[Interfaces.STANDARD, Interfaces.DETAILED], description="Display products as plots", title="Plots"
+    "Plots",
+    interface=[Interfaces.STANDARD, Interfaces.DETAILED],
+    description="Display products as plots",
+    title="Plots",
 )
 
-from . import maps, meteogram, vertical_profile  # noqa: F401, E402
+from . import maps  # noqa: F401, E402
+from . import meteogram  # noqa: F401, E402
+from . import vertical_profile  # noqa: F401, E402

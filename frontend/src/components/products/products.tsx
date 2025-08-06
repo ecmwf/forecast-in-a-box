@@ -32,7 +32,7 @@ interface ProductConfigurationProps {
 function ProductConfigurator({model, products, setProducts}: ProductConfigurationProps) {
     let {product_id} = useParams();
 
-    
+
     const [selected, setSelectedProduct] = useState<string | null>(null);
     const [internal_products, internal_setProducts] = useState(products);
 
@@ -48,30 +48,23 @@ function ProductConfigurator({model, products, setProducts}: ProductConfiguratio
 
       const [categories, setCategories] = useState<CategoriesType>({});
       const [loading, setLoading] = useState(true);
-  
+
     useEffect(() => {
         const fetchUpdatedOptions = async () => {
         setLoading(true);
         try {
-            const response = await api.post(`/v1/product/categories/${product_id}`, model);    
+            const response = await api.post(`/v1/product/categories/${product_id}`, model);
             const categories: CategoriesType = await response.data;
             setCategories(categories);
-            
+
         } catch (error) {
             console.error("Error fetching categories:", error);
         }
         setLoading(false);
         };
-    
+
         fetchUpdatedOptions();
     }, [model]); // Update options when formData changes
-
-    useEffect(() => {
-        if (selected) {
-            const configurationContainer = document.querySelector(".configuration_container") as HTMLElement;
-            // configurationContainer?.scrollIntoView();
-        }
-    }, [selected]);
 
     return (
         <Container size='xl'>

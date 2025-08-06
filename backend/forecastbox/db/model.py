@@ -1,18 +1,25 @@
-"""
-Contains db functions for model_edits and model_downloads tables
+"""Contains db functions for model_edits and model_downloads tables
 
 Note that those reside in the jobdb as well -- there is no modeldb
 """
 
 # NOTE consider rewrite of this to a *dictionary*, there seems no need for persistence
 
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from sqlalchemy import select, update, delete
 import datetime as dt
 import logging
-from forecastbox.schemas.model import Base, ModelDownload, ModelEdit
+
 from forecastbox.config import config
-from forecastbox.db.core import executeAndCommit, querySingle, addAndCommit
+from forecastbox.db.core import addAndCommit
+from forecastbox.db.core import executeAndCommit
+from forecastbox.db.core import querySingle
+from forecastbox.schemas.model import Base
+from forecastbox.schemas.model import ModelDownload
+from forecastbox.schemas.model import ModelEdit
+from sqlalchemy import delete
+from sqlalchemy import select
+from sqlalchemy import update
+from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +57,12 @@ async def start_download(model_id: str) -> None:
     await addAndCommit(entity, async_session_maker)
 
 
-async def delete_download(model_id: str) -> None:
-    where = ModelDownload.model_id == model_id
-    stmt = delete(ModelDownload).where(where)
+async def delete_download(model_id: str|None) -> None:
+    if model_id:
+        where = ModelDownload.model_id == model_id
+        stmt = delete(ModelDownload).where(where)
+    else:
+        stmt = delete(ModelDownload)
     await executeAndCommit(stmt, async_session_maker)
 
 

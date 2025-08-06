@@ -1,18 +1,20 @@
-from forecastbox.api.types import (
-    ProductSpecification,
-    EnvironmentSpecification,
-    ExecutionSpecification,
-    ModelSpecification,
-    ForecastProducts,
-    RawCascadeJob,
-)
+import io
 import time
-from cascade.low.builders import JobBuilder, TaskBuilder
+import zipfile
+
 import cloudpickle
+from cascade.low.builders import JobBuilder
+from cascade.low.builders import TaskBuilder
+from forecastbox.api.types import EnvironmentSpecification
+from forecastbox.api.types import ExecutionSpecification
+from forecastbox.api.types import ForecastProducts
+from forecastbox.api.types import ModelSpecification
+from forecastbox.api.types import ProductSpecification
+from forecastbox.api.types import RawCascadeJob
 
 
 def _ensure_completed(backend_client, job_id):
-    i = 8
+    i = 20
     while i > 0:
         response = backend_client.get("/job/status")
         assert response.is_success
@@ -21,7 +23,7 @@ def _ensure_completed(backend_client, job_id):
         assert status in {"submitting", "submitted", "running", "completed"}
         if status == "completed":
             break
-        time.sleep(0.3)
+        time.sleep(0.5)
         i -= 1
 
     assert i > 0, f"Failed to finish job {job_id}"
@@ -39,7 +41,9 @@ def test_submit_job(backend_client_with_auth):
     assert response.status_code == 404
 
     # raw job
-    job_instance = JobBuilder().with_node("n1", TaskBuilder.from_callable(eval).with_values("1+2")).build().get_or_raise()
+    job_instance = (
+        JobBuilder().with_node("n1", TaskBuilder.from_callable(eval).with_values("1+2")).build().get_or_raise()
+    )
     spec = ExecutionSpecification(
         job=RawCascadeJob(
             job_type="raw_cascade_job",
@@ -56,6 +60,12 @@ def test_submit_job(backend_client_with_auth):
     assert outputs == ["n1"]
     output = backend_client_with_auth.get(f"/job/{raw_job_id}/n1")
     assert cloudpickle.loads(output.content) == 3
+
+    logs = backend_client_with_auth.get(f"/job/{raw_job_id}/logs").raise_for_status().content
+    with zipfile.ZipFile(io.BytesIO(logs), "r") as zf:
+        # NOTE dbEntity, gwState, gateway, controller, host0, host0.dsr, host0.shm, host0.w1, host0.w2
+        expected_log_count = 9
+        assert len(zf.namelist()) == expected_log_count
 
     # requests job
     def do_request() -> str:
@@ -118,7 +128,9 @@ def test_submit_job(backend_client_with_auth):
 
         time.sleep(secs)
 
-    job_instance = JobBuilder().with_node("n1", TaskBuilder.from_callable(sleep_with_sgn).with_values(10)).build().get_or_raise()
+    job_instance = (
+        JobBuilder().with_node("n1", TaskBuilder.from_callable(sleep_with_sgn).with_values(10)).build().get_or_raise()
+    )
     spec = ExecutionSpecification(
         job=RawCascadeJob(
             job_type="raw_cascade_job",

@@ -16,7 +16,7 @@ import Result from "../../components/results/Result";
 
 export default function ResultsPage() {
     let {job_id, dataset_id} = useParams();
-    
+
     return (
         <MainLayout>
             <Result job_id={job_id} dataset_id={dataset_id} />

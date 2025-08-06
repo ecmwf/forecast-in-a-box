@@ -15,6 +15,7 @@ import { useApi } from "../../api";
 import { Container, Loader, Text, Title, Alert, Space, Center, Stack, Button, ActionIcon, Group } from "@mantine/core";
 
 import ImageShare from "./image_share";
+import InteractiveMap from "./interactive";
 
 import { IconDownload } from "@tabler/icons-react";
 
@@ -38,9 +39,13 @@ export default function Result({ job_id, dataset_id, in_modal }: ResultProps) {
             const fetchData = async () => {
                 try {
                     const response = await api.get(`/v1/job/${job_id}/${dataset_id}`, { responseType: 'blob' });
-                    const blob = new Blob([response.data], { type: response.headers['content-type'] });
-                    setDataLink(URL.createObjectURL(blob));
                     setContentType(response.headers['content-type']);
+
+                    let contentType = response.headers['content-type'] || 'application/octet-stream';
+                    contentType = contentType.replace(/\/i/, '/');
+                    const blob = new Blob([response.data], { type: contentType });
+                    setDataLink(URL.createObjectURL(blob));
+                    console.log("Content-Type:", contentType);
                 } catch (err) {
                     setError(err.response?.data?.detail || err.message || "An error occurred while fetching data.");
                 } finally {
@@ -63,14 +68,14 @@ export default function Result({ job_id, dataset_id, in_modal }: ResultProps) {
                     <Text>Result for {dataset_id}</Text>
                 </Title>
             )}
-            {contentType == 'image/png' ? (
+            {contentType.startsWith('image') ? (
                 <ImageShare
                     imageUrl={`${window.location.origin}/share/${job_id}/${dataset_id}`}
                     title={`Forecast in a Box - ${dataset_id}`}
                 />
             ) : null}
         </Group>
-    
+
         <Container
             size="xl"
             style={{
@@ -79,10 +84,11 @@ export default function Result({ job_id, dataset_id, in_modal }: ResultProps) {
                 alignItems: "center",
                 justifyContent: loading ? "center" : "flex-start",
                 minHeight: "40vh",
+                minWidth: "70vw",
             }}
         >
 
-            <Center w='90%'>
+            <Center w='90%' h='100%'>
             {loading ? (
                 <Stack align="center">
                     <Loader size="xl" />
@@ -93,20 +99,21 @@ export default function Result({ job_id, dataset_id, in_modal }: ResultProps) {
                     {error}
                 </Alert>
             ) : (
-                <Stack align="center">
-                    {/* <Space h={20} /> */}
-                    {contentType == 'image/png' ? (
+                <>
+                    {contentType.startsWith('image/i') ? (
+                        <InteractiveMap globeImageUrl={dataLink} />
+                    ) : contentType.startsWith('image') ? (
                         <>
-                        <img 
-                            src={dataLink} 
-                            alt="Result Image" 
-                            style={{ 
-                                maxWidth: "90%", 
-                                maxHeight: "80%", 
-                                borderRadius: "8px", 
-                                boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)" 
-                            }} 
-                        />
+                            <img
+                                src={dataLink}
+                                alt="Result Image"
+                                style={{
+                                    maxWidth: "90%",
+                                    maxHeight: "80%",
+                                    borderRadius: "8px",
+                                    boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)"
+                                }}
+                            />
                         </>
                     ) : (
                         <Stack align="center" style={{ flex: 1 }}>
@@ -123,7 +130,7 @@ export default function Result({ job_id, dataset_id, in_modal }: ResultProps) {
                         </Title>
                         </Stack>
                     )}
-                </Stack>
+                </>
             )}
         </Center>
         </Container>

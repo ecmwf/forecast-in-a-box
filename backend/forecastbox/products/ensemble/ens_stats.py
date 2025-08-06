@@ -7,25 +7,23 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from typing import Any
-
 import itertools
+from typing import Any
+from typing import Optional
 
 from earthkit.workflows import fluent
-
-from forecastbox.products.product import GenericTemporalProduct
 from forecastbox.products.ensemble.base import BasePProcEnsembleProduct
+from forecastbox.products.product import GenericTemporalProduct
 
 from . import ensemble_registry
 
 
 class BaseEnsembleStats(BasePProcEnsembleProduct, GenericTemporalProduct):
-    _type: str = None
+    _type: Optional[str] = None
 
-    multiselect = {
-        "step": True,
-        "param": True,
-    }
+    allow_multiple_levels = True
+    allow_multiple_params = True
+    allow_multiple_steps = True
 
     @property
     def qube(self):
@@ -45,7 +43,7 @@ class BaseEnsembleStats(BasePProcEnsembleProduct, GenericTemporalProduct):
         requests = []
 
         for para, st in itertools.product(params, steps):
-            request = {
+            request: dict[str, Any] = {
                 "type": self._type,
             }
             from anemoi.utils.grib import shortname_to_paramid

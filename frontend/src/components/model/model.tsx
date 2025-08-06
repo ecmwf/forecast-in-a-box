@@ -32,7 +32,7 @@ function Model({ selectedModel, coordinates, setCoordinates, modelSpec, submit }
     const [modalOpened, setModalOpened] = useState(false);
     const [showGlobeSelect, setShowGlobeSelect] = useState(false);
     const api = useApi();
-    
+
 
     // State for form inputs
     const [date, setDate] = useState<string | null>(selectedModel.date || null);

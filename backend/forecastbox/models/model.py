@@ -8,20 +8,23 @@
 # nor does it submit to any jurisdiction.
 
 from collections import defaultdict
-from functools import cached_property, lru_cache
-
-from pydantic import BaseModel, ConfigDict, FilePath
-from pydantic import model_validator
-import yaml
-
+from functools import cached_property
+from functools import lru_cache
 from typing import Any
+from typing import Dict
+from typing import Optional
 
-from qubed import Qube
-from earthkit.workflows.fluent import Action
-
-from earthkit.workflows.plugins.anemoi.fluent import from_input
+import yaml
 from anemoi.inference.checkpoint import Checkpoint
-
+from earthkit.workflows.fluent import Action
+from earthkit.workflows.plugins.anemoi.fluent import from_input
+from forecastbox.core import FormFieldProvider
+from forecastbox.products.rjsf import FieldWithUI
+from pydantic import BaseModel
+from pydantic import ConfigDict
+from pydantic import FilePath
+from pydantic import model_validator
+from qubed import Qube
 
 FORECAST_IN_A_BOX_METADATA = "forecast-in-a-box.json"
 
@@ -68,7 +71,7 @@ class ModelExtra(BaseModel):
         return values
 
 
-class Model(BaseModel):
+class Model(BaseModel, FormFieldProvider):
     """Model Specification"""
 
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
@@ -77,8 +80,40 @@ class Model(BaseModel):
     lead_time: int
     date: str
     ensemble_members: int
-    time: str = None
-    entries: dict[str, Any] = None
+    time: Optional[str] = None
+    entries: Optional[Dict[str, Any]] = None
+
+    @property
+    def formfields(self) -> dict[str, "FieldWithUI"]:
+        return {
+            # 'date': FieldWithUI(
+            #     jsonschema= StringSchema(
+            #         title="Date",
+            #         description="Date of the forecast in YYYY-MM-DD format.",
+            #         format="date",
+            #     ),
+            #     ui=UIStringField(
+            #         widget="date",
+            #         inputType="date",
+            #         label=False,
+            #         placeholder="YYYY-MM-DD",
+            #     )
+            # ),
+            # 'lead_time': FieldWithUI(
+            #     jsonschema=IntegerSchema(
+            #         title="Lead Time",
+            #         description="Lead time for the forecast in hours.",
+            #         minimum=0,
+            #         maximum=self.lead_time,
+            #         multipleOf=self.timestep,
+            #     ),
+            #     ui=UIIntegerField(
+            #         widget='range',
+            #         label=False,
+            #         placeholder="Enter lead time in hours",
+            #     )
+            # ),
+        }
 
     @cached_property
     def checkpoint(self) -> Checkpoint:
@@ -87,12 +122,16 @@ class Model(BaseModel):
     @cached_property
     def extra_information(self) -> ModelExtra:
         """Get the extra information for the model."""
-        return get_extra_information(self.checkpoint_path).model_copy()
+        return get_extra_information(str(self.checkpoint_path)).model_copy()
+
+    @cached_property
+    def timestep(self) -> int:
+        """Get the timestep of the model in hours."""
+        return int((self.checkpoint.timestep.total_seconds() + 1) // 3600)
 
     @cached_property
     def timesteps(self) -> list[int]:
-        model_step = int((self.checkpoint.timestep.total_seconds() + 1) // 3600)
-        return list(range(model_step, int(self.lead_time) + 1, model_step))
+        return list(range(self.timestep, int(self.lead_time) + 1, self.timestep))
 
     @cached_property
     def variables(self) -> list[str]:
@@ -118,7 +157,7 @@ class Model(BaseModel):
         """
         return convert_to_model_spec(self.checkpoint, assumptions=assumptions)
 
-    def graph(self, initial_conditions: "Action", environment_kwargs: dict = None, **kwargs) -> "Action":
+    def graph(self, initial_conditions: "Action", environment_kwargs: Optional[Dict] = None, **kwargs) -> "Action":
         """Get Model Graph.
 
         Anemoi cascade exposes each param as a separate node in the graph,
@@ -127,7 +166,7 @@ class Model(BaseModel):
 
         versions = self.versions()
         INFERENCE_FILTER_STARTS = ["anemoi-models", "anemoi-graphs", "flash-attn", "torch"]
-        INITIAL_CONDITIONS_FILTER_STARTS = ["anemoi-inference", "earthkit", "anemoi-transform"]
+        INITIAL_CONDITIONS_FILTER_STARTS = ["anemoi-inference", "earthkit", "anemoi-transform", "anemoi-plugins"]
 
         def parse_into_install(version_dict):
             install_list = []
@@ -138,21 +177,31 @@ class Model(BaseModel):
                     install_list.append(f"{key}=={val}")
             return install_list
 
-        inference_env = {key: val for key, val in versions.items() if any(key.startswith(start) for start in INFERENCE_FILTER_STARTS)}
+        additional_constraints = self.extra_information.model_dump()
+        additional_constraints.update(kwargs)
+        additional_constraints = ModelExtra(**additional_constraints)
 
-        inference_env.update(self.extra_information.version_overrides or {})
+        inference_env = {
+            key: val for key, val in versions.items() if any(key.startswith(start) for start in INFERENCE_FILTER_STARTS)
+        }
+
+        inference_env.update(additional_constraints.version_overrides or {})
         inference_env_list = parse_into_install(inference_env)
 
         initial_conditions_env = parse_into_install(
-            {key: val for key, val in versions.items() if any(key.startswith(start) for start in INITIAL_CONDITIONS_FILTER_STARTS)}
+            {
+                key: val
+                for key, val in versions.items()
+                if any(key.startswith(start) for start in INITIAL_CONDITIONS_FILTER_STARTS)
+            }
         )
 
-        inference_environment_variables = (self.extra_information.environment_variables or {}).copy()
+        inference_environment_variables = (additional_constraints.environment_variables or {}).copy()
         inference_environment_variables.update(environment_kwargs or {})
 
-        input_source = self.extra_information.input_preference or "mars"
-        if self.extra_information.input_overrides:
-            input_source = {input_source: self.extra_information.input_overrides}
+        input_source = additional_constraints.input_preference or "mars"
+        if additional_constraints.input_overrides:
+            input_source = {input_source: additional_constraints.input_overrides}
 
         return from_input(
             self.checkpoint_path,
@@ -165,15 +214,13 @@ class Model(BaseModel):
             env=inference_environment_variables,
         )
 
-    def deaccumulate(self, outputs: "Action") -> "Action":
-        """
-        Get the deaccumulated outputs.
-        """
+    def deaccumulate(self, outputs: "Action") -> "Optional[Action]":
+        """Get the deaccumulated outputs."""
         accumulated_fields = self.accumulations
 
         steps = outputs.nodes.coords["step"]
 
-        fields: Action = None
+        fields: Optional[Action] = None
 
         for field in self.variables:
             if field not in accumulated_fields:
@@ -205,11 +252,11 @@ class Model(BaseModel):
 
     def versions(self) -> dict[str, str]:
         """Get the versions of the model"""
-        return model_versions(self.checkpoint_path)
+        return model_versions(str(self.checkpoint_path))
 
     def info(self) -> dict[str, Any]:
         """Get the model info"""
-        return model_info(self.checkpoint_path)
+        return model_info(str(self.checkpoint_path))
 
 
 def get_model(checkpoint_path, **kwargs) -> Model:
@@ -253,7 +300,9 @@ def model_info(checkpoint_path: str) -> dict[str, Any]:
 
     anemoi_versions = model_versions(checkpoint_path)
     anemoi_versions = {
-        k: v for k, v in anemoi_versions.items() if any(k.startswith(prefix) for prefix in ["anemoi-", "earthkit-", "torch", "flash-attn"])
+        k: v
+        for k, v in anemoi_versions.items()
+        if any(k.startswith(prefix) for prefix in ["anemoi-", "earthkit-", "torch", "flash-attn"])
     }
 
     return {
@@ -268,7 +317,8 @@ def model_info(checkpoint_path: str) -> dict[str, Any]:
 
 
 def get_extra_information(checkpoint_path: str) -> ModelExtra:
-    from anemoi.utils.checkpoints import has_metadata, load_metadata
+    from anemoi.utils.checkpoints import has_metadata
+    from anemoi.utils.checkpoints import load_metadata
 
     if not has_metadata(checkpoint_path, name=FORECAST_IN_A_BOX_METADATA):
         return ModelExtra()
@@ -277,7 +327,9 @@ def get_extra_information(checkpoint_path: str) -> ModelExtra:
 
 def set_extra_information(checkpoint_path: str, extra: ModelExtra) -> None:
     """Set the extra information for the model."""
-    from anemoi.utils.checkpoints import replace_metadata, save_metadata, has_metadata
+    from anemoi.utils.checkpoints import has_metadata
+    from anemoi.utils.checkpoints import replace_metadata
+    from anemoi.utils.checkpoints import save_metadata
 
     open_checkpoint.cache_clear()
 

@@ -7,20 +7,20 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+import io
 import warnings
 from collections import defaultdict
-
-from forecastbox.products.ensemble import BaseEnsembleProduct
+from typing import Optional
 
 import earthkit.data as ekd
-
-from earthkit.workflows.decorators import as_payload
 from earthkit.workflows import mark
+from earthkit.workflows.decorators import as_payload
 from earthkit.workflows.plugins.anemoi.fluent import ENSEMBLE_DIMENSION_NAME
-
 from forecastbox.models import Model
+from forecastbox.products.ensemble import BaseEnsembleProduct
 from forecastbox.products.product import GenericTemporalProduct
 
+from ..rjsf import FieldWithUI, StringSchema, UIStringField
 from . import plot_product_registry
 
 EARTHKIT_PLOTS_IMPORTED = True
@@ -36,9 +36,8 @@ except ImportError:
 WIND_SHORTNAMES = ["u", "v", "10u", "10v", "100u", "100v"]
 
 
-def _plot_fields(subplot: Subplot, fields: ekd.FieldList, **kwargs: dict[str, dict]):
-    """
-    Plot fields on a subplot, using the appropriate plotting method based on field metadata.
+def _plot_fields(subplot: Subplot, fields: ekd.FieldList, **kwargs: dict[str, dict]) -> None:
+    """Plot fields on a subplot, using the appropriate plotting method based on field metadata.
 
     Will attempt to group related plots, and call the appropriate plotting method.
 
@@ -71,13 +70,51 @@ def _plot_fields(subplot: Subplot, fields: ekd.FieldList, **kwargs: dict[str, di
                     **kwargs.get("quickplot", {}),
                 )
 
+@as_payload
+@mark.environment_requirements(["earthkit-plots"])
+def export(figure: Figure, format: str = "png", dpi: int = 100, no_pad: bool = False) -> tuple[bytes, str]:
+    """Export a figure to a specified format.
+
+    Parameters
+    ----------
+    figure : Figure
+        The figure to export.
+    format : str
+        The format to export the figure to.
+        If format starts with 'i', it will be treated as an interactive format (e.g., 'ipng').
+        and the 'i' will be stripped off for the actual export.
+    dpi : int
+        The DPI (dots per inch) for the exported image.
+    no_pad: bool
+        Apply no padding, defaults to False.
+
+    Returns
+    -------
+    tuple[bytes, str]
+        A tuple containing the serialized data as bytes and the MIME type.
+    """
+    export_format = format[1:] if format.startswith("i") else format
+    buf = io.BytesIO()
+    figure.save(buf, format=export_format, dpi = dpi, pad_inches=(0 if no_pad else None))
+
+
+    return buf.getvalue(), f"image/{format}"
+
 
 @as_payload
 @mark.environment_requirements(["earthkit-plots", "earthkit-plots-default-styles"])
-def quickplot(fields: ekd.FieldList, groupby: str = None, subplot_title: str = None, figure_title: str = None, domain=None):
-    from earthkit.plots.utils import iter_utils
+def quickplot(
+    fields: ekd.FieldList,
+    groupby: Optional[str] = None,
+    subplot_title: Optional[str] = None,
+    figure_title: Optional[str] = None,
+    domain: Optional[str] = None,
+    no_pad: bool = True,
+):
+    from earthkit.plots import Figure  # NOTE we need to import again to mask the possible Any
     from earthkit.plots.components import layouts
     from earthkit.plots.schemas import schema
+    from earthkit.plots.utils import iter_utils
 
     if not isinstance(fields, ekd.FieldList):
         fields = ekd.FieldList.from_fields(fields)
@@ -103,20 +140,28 @@ def quickplot(fields: ekd.FieldList, groupby: str = None, subplot_title: str = N
         subplot = figure.add_map(domain=domain)
         _plot_fields(subplot, group_args, quickplot=dict(interpolate=True))
 
-        for m in schema.quickmap_subplot_workflow:
-            args = []
-            if m == "title":
-                args = [subplot_title]
-            try:
-                getattr(subplot, m)(*args)
-            except Exception as err:
-                warnings.warn(f"Failed to execute {m} on given data with: \n" f"{err}\n\n" "consider constructing the plot manually.")
+        if no_pad:
+            subplot.ax.axis("off")
+        else:
+            for m in schema.quickmap_subplot_workflow:
+                args = []
+                if m == "title":
+                    args = [subplot_title]
+                try:
+                    getattr(subplot, m)(*args)
+                except Exception as err:
+                    warnings.warn(
+                        f"Failed to execute {m} on given data with: \n"
+                        f"{repr(err)}\n\n"
+                        "consider constructing the plot manually."
+                    )
 
-    for m in schema.quickmap_figure_workflow:
-        try:
-            getattr(figure, m)()
-        except Exception as err:
-            warnings.warn(f"Failed to execute {m} on given data with: \n" f"{err}\n\n" "consider constructing the plot manually.")
+    if not no_pad:
+        for m in schema.quickmap_figure_workflow:
+            try:
+                getattr(figure, m)()
+            except Exception:
+                pass
 
     # figure.title(figure_title)
 
@@ -124,8 +169,7 @@ def quickplot(fields: ekd.FieldList, groupby: str = None, subplot_title: str = N
 
 
 class MapProduct(GenericTemporalProduct):
-    """
-    Map Product.
+    """Map Product.
 
     This product is a simple wrapper around the `earthkit.plots` library to create maps.
 
@@ -134,22 +178,31 @@ class MapProduct(GenericTemporalProduct):
 
     domains = ["Global", "Europe", "Australia", "Malawi", "Norway"]
 
-    description = {
-        **GenericTemporalProduct.description,
-        "domain": "Domain of the map",
-    }
-    label = {
-        **GenericTemporalProduct.label,
-        "domain": "Domain",
-        "reduce": "Reduce",
-    }
-
-    defaults = {
-        "reduce": "True",
-    }
-    description = {
-        "reduce": "Combine all steps and parameters into a single plot",
-    }
+    @property
+    def formfields(self):
+        formfields = super().formfields.copy()
+        formfields.update(
+            reduce=FieldWithUI(
+                jsonschema=StringSchema(
+                    title="Reduce",
+                    description="Combine all steps and parameters into a single plot",
+                    enum=["True", "False"],
+                    default="True",
+                )
+            ),
+            domain=FieldWithUI(
+                jsonschema=StringSchema(
+                    title="Domain",
+                    description="Domain of the map",
+                    enum=self.domains,
+                    default="Global",
+                ),
+                ui=UIStringField(
+                    widget="select",
+                ),
+            ),
+        )
+        return formfields
 
     @property
     def model_assumptions(self):
@@ -168,15 +221,8 @@ class MapProduct(GenericTemporalProduct):
 
 @plot_product_registry("Maps")
 class SimpleMapProduct(MapProduct):
-    multiselect = {
-        "param": True,
-        "step": True,
-        "domain": False,
-    }
 
-    defaults = {"domain": "Global", **MapProduct.defaults}
-
-    def to_graph(self, product_spec, model, source):
+    def execute(self, product_spec, model, source):
         domain = product_spec.pop("domain", None)
         source = self.select_on_specification(product_spec, source)
 
@@ -193,27 +239,55 @@ class SimpleMapProduct(MapProduct):
             subplot_title="T+{lead_time}",
             figure_title="{variable_name} over {domain}\n Base time: {base_time: %Y%m%dT%H%M}\n",
         )
-        plots = source.map(quickplot_payload)
+        plots = source.map(quickplot_payload).map(export(format="png")).map(self.named_payload("Map"))
+
+        return plots
+
+@plot_product_registry("Interactive Map")
+class InteractiveMapProduct(GenericTemporalProduct):
+    """Interactive Map Product."""
+    allow_multiple_steps = True
+
+    @property
+    def formfields(self):
+        formfields = super().formfields.copy()
+        formfields.pop('reduce', None)
+        return formfields
+
+    def validate_intersection(self, model: Model) -> bool:
+        return super().validate_intersection(model) and EARTHKIT_PLOTS_IMPORTED
+
+    @property
+    def qube(self):
+        return self.make_generic_qube()
+
+    def execute(self, product_spec, model, source):
+        domain = product_spec.pop("domain", None)
+        source = self.select_on_specification(product_spec, source)
+
+        if domain == "Global":
+            domain = None
+
+        source = source.concatenate("param")
+
+        quickplot_payload = quickplot(
+            domain=domain,
+            groupby="valid_datetime",
+            no_pad=True,
+        )
+        plots = source.map(quickplot_payload).map(export(format="ipng", dpi = 1000)).map(self.named_payload("Interactive Map"))
 
         return plots
 
 
 @plot_product_registry("Ensemble Maps")
 class EnsembleMapProduct(BaseEnsembleProduct, MapProduct):
-    """
-    Ensemble Map Product.
+    """Ensemble Map Product.
 
     Create a subplotted map with each subplot being a different ensemble member.
     """
 
-    multiselect = {
-        "param": True,
-        "step": True,
-        "domain": False,
-    }
-    defaults = {"domain": "Global", **MapProduct.defaults}
-
-    def to_graph(self, product_spec, model, source):
+    def execute(self, product_spec, model, source):
         domain = product_spec.pop("domain", None)
         source = self.select_on_specification(product_spec, source)
 

@@ -36,14 +36,14 @@ interface ConfirmProps {
 
 function Confirm({ model, products, environment, setProducts, setSlider, setJobId}: ConfirmProps) {
     const api = useApi();
-    
+
     const [submitting, setSubmitting] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const [status, setStatus] = useState<{
             cascade: "loading" | "up" | "down";
         }>({ cascade: "loading"});
-    
+
         const checkStatus = async () => {
             setStatus({ cascade: "loading"});
             try {
@@ -60,7 +60,7 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
                 setStatus({ cascade: "down" });
             }
         };
-    
+
         useEffect(() => {
             checkStatus();
         }, []);
@@ -111,7 +111,7 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
                 }
             })();
         };
-        execute();       
+        execute();
     }
 
     useKeyboardShortcuts({
@@ -162,14 +162,14 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
             try {
                 const ftch = await api.post(`/v1/execution/serialise`,spec)
                 const fileBlob = await ftch.data;
-                
+
                 // this works and prompts for download
                 var link = document.createElement('a')  // once we have the file buffer BLOB from the post request we simply need to send a GET request to retrieve the file data
                 const blob = new Blob([JSON.stringify(fileBlob, null, 2)], { type: 'application/json' });
                 link.href = URL.createObjectURL(blob);
                 link.setAttribute('download', `${crypto.randomUUID()}.json`);
                 link.click()
-                link.remove();  //afterwards we remove the element  
+                link.remove();  //afterwards we remove the element
             } catch (error) {
                 console.error({ "message": error, status: 400 })  // handle error
                 showNotification(
@@ -201,7 +201,7 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
                     <Button onClick={() => setSlider(0)}>Change</Button>
                     <Title pt ='md' order={3}>Specification</Title>
                     <SimpleGrid cols={{ base: 1, sm: 2, lg: 2 }} spacing=''>
-                        {Object.entries(model).filter(([key]) => key !== 'model').map(([key, value]) => ( 
+                        {Object.entries(model).filter(([key]) => key !== 'model').map(([key, value]) => (
                             <Paper shadow="" p="xs" key={key}>
                                 <Title order={5}>{key}</Title>
                                 <Text maw='80%' lineClamp={3} style={{ marginLeft: '10px' }}>{JSON.stringify(value, null, 2)}</Text>
@@ -217,7 +217,7 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
                     </Card.Section>
                 </Card>
                 </Grid.Col>
-                
+
                 <Grid.Col span={{ base: 12, sm: 12, md: 6, xl: 6 }}>
                 <Card padding="">
                     <Title pb ='md' order={2}>Products ({Object.keys(products).length})</Title>
@@ -229,7 +229,7 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
             </Grid>
             <Space p='xl'/>
             <Group grow justify='center' preventGrowOverflow={true}>
-                <GraphVisualiser 
+                <GraphVisualiser
                     spec={{
                         job: {
                             job_type: "forecast_products",
@@ -247,7 +247,7 @@ function Confirm({ model, products, environment, setProducts, setSlider, setJobI
                 }}>Download JSON</Button>
                 </Group>
                 <Button color='green'onClick={handleSubmit} disabled={submitting || status.cascade !== "up"}>
-                    {submitting ? "Submitting..." : 
+                    {submitting ? "Submitting..." :
                     (status.cascade !== "up" ? <Text c='red'> (Server is down)</Text> : 'Submit')}
                 </Button>
             </Group>

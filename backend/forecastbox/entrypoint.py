@@ -7,36 +7,34 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""
-FastAPI Entrypoint
-"""
+"""FastAPI Entrypoint"""
 
-from contextlib import asynccontextmanager
-import time
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-from starlette.exceptions import HTTPException
+import logging
 import os
-
+import time
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-import logging
-from forecastbox.db.user import create_db_and_tables as create_user_db
+from fastapi import FastAPI
+from fastapi import Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from forecastbox.db.job import create_db_and_tables as create_job_db
 from forecastbox.db.model import create_db_and_tables as create_model_db
+from forecastbox.db.user import create_db_and_tables as create_user_db
+from starlette.exceptions import HTTPException
 
-from .api.routers import model
-from .api.routers import product
-from .api.routers import execution
-from .api.routers import job
 from .api.routers import admin
 from .api.routers import auth
+from .api.routers import execution
 from .api.routers import gateway
-
+from .api.routers import job
+from .api.routers import model
+from .api.routers import product
 from .config import config
 
 logger = logging.getLogger(__name__)
@@ -53,7 +51,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    docs_url="/api/v1/docs", openapi_url="/api/v1/openapi.json", title="Forecast in a Box API", version="1.0.0", lifespan=lifespan
+    docs_url="/api/v1/docs",
+    openapi_url="/api/v1/openapi.json",
+    title="Forecast in a Box API",
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
@@ -90,11 +92,20 @@ async def add_process_time_header(request: Request, call_next):
     return response
 
 
+@app.middleware("http")
+async def circumvent_auth(request: Request, call_next):
+    # TODO this is a hotfix, we'd instead like to fix properly in api/routers/auth.py
+    if request.url.path == "/api/v1/users/me" and config.auth.passthrough:
+        from starlette.responses import JSONResponse
+
+        return JSONResponse({'is_superuser': True})
+    else:
+        return await call_next(request)
+
+
 @dataclass
 class StatusResponse:
-    """
-    Status response model
-    """
+    """Status response model"""
 
     api: str
     cascade: str
@@ -103,14 +114,13 @@ class StatusResponse:
 
 @app.get("/api/v1/status", tags=["status"])
 def status() -> StatusResponse:
-    """
-    Status endpoint
-    """
+    """Status endpoint"""
     from forecastbox.config import config
 
     status = {"api": "up", "cascade": "up", "ecmwf": "up"}
 
-    from cascade.gateway import client, api
+    from cascade.gateway import api
+    from cascade.gateway import client
 
     try:
         client.request_response(api.JobProgressRequest(job_ids=[]), config.cascade.cascade_url, timeout_ms=1000)
@@ -136,21 +146,19 @@ def status() -> StatusResponse:
 
 @app.get("/api/v1/share/{job_id}/{dataset_id}", response_class=HTMLResponse, tags=["share"], summary="Share Image")
 async def share_image(request: Request, job_id: str, dataset_id: str):
-    """
-    Endpoint to share an image from a job and dataset ID.
-    """
+    """Endpoint to share an image from a job and dataset ID."""
     base_url = str(request.base_url).rstrip("/")
     image_url = f"{base_url}/api/v1/job/{job_id}/{dataset_id}"
-    return templates.TemplateResponse("share.html", {"request": request, "image_url": image_url, "image_name": f"{job_id}_{dataset_id}"})
+    return templates.TemplateResponse(
+        "share.html", {"request": request, "image_url": image_url, "image_name": f"{job_id}_{dataset_id}"}
+    )
 
 
 frontend = os.path.join(os.path.dirname(__file__), "static")
 
 
 class SPAStaticFiles(StaticFiles):
-    """
-    Custom StaticFiles class to handle SPA routing.
-    """
+    """Custom StaticFiles class to handle SPA routing."""
 
     async def get_response(self, path: str, scope):
         try:

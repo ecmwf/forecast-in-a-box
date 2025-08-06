@@ -7,18 +7,23 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from qubed import Qube
 import importlib.util
-
-from forecastbox.models import Model
-
-from .registry import CategoryRegistry
-from .product import Product
-from .interfaces import Interfaces
+from typing import OrderedDict
 
 from earthkit.workflows.plugins.pproc.fluent import Action as ppAction
+from forecastbox.models import Model
+from qubed import Qube
 
-thermal_indices = CategoryRegistry("thermal", interface=Interfaces.DETAILED, description="Thermal Indices", title="Thermal Indices")
+from .export import export_fieldlist_as
+from .interfaces import Interfaces
+from .product import Product
+from .registry import CategoryRegistry
+from .rjsf import FieldWithUI
+from .rjsf import IntegerSchema
+
+thermal_indices = CategoryRegistry(
+    "thermal", interface=Interfaces.DETAILED, description="Thermal Indices", title="Thermal Indices"
+)
 
 THERMOFEEL_IMPORTED = True
 if not importlib.util.find_spec("thermofeel"):
@@ -31,13 +36,35 @@ class BaseThermalIndex(Product):
     param_requirements: list[str] | None = None
     output_param: str
 
-    multiselect = {
-        "step": True,
-    }
-
     @property
     def qube(self):
         return Qube.from_datacube({"param": "*"})
+    
+    @property
+    def formfields(self) -> OrderedDict[str, "FieldWithUI"]:
+        """Form fields for the product."""
+        formfields = super().formfields.copy()
+        formfields.update(
+            step= self._make_field(
+                title='Step',
+                multiple=True,
+                schema=IntegerSchema,
+            ),
+        )
+        return formfields
+
+    @property
+    def formfields(self) -> OrderedDict[str, "FieldWithUI"]:
+        """Form fields for the product."""
+        formfields = super().formfields.copy()
+        formfields.update(
+            step=self._make_field(
+                title="Step",
+                multiple=True,
+                schema=IntegerSchema,
+            ),
+        )
+        return formfields
 
     def model_intersection(self, model: Model) -> Qube:
         return f"step={'/'.join(map(str, model.timesteps))}" / Qube.from_datacube({})
@@ -49,16 +76,21 @@ class BaseThermalIndex(Product):
             return False
         return all(x in model_intersection.span("param") for x in self.param_requirements)
 
-    def to_graph(self, product_spec, model, source):
-        """
-        Get the graph for the product.
-        """
+    def execute(self, product_spec, model, source):
+        """Get the graph for the product."""
         deaccumulated = model.deaccumulate(source)
+        assert deaccumulated is not None, "Model does not support deaccumulation."
 
         selected = self.select_on_specification(product_spec, deaccumulated)
         source = selected.select(param=self.param_requirements)
 
-        return ppAction(source.nodes).thermal_index(self.output_param).stack("step").map(self.named_payload(self.__class__.__name__))
+        return (
+            ppAction(source.nodes)
+            .thermal_index(self.output_param)
+            .stack("step")
+            .map(export_fieldlist_as(format="grib"))
+            .map(self.named_payload(self.__class__.__name__))
+        )
 
 
 @thermal_indices("Heat Index")
@@ -67,19 +99,6 @@ class HeatIndex(BaseThermalIndex):
 
     param_requirements = ["2t", "r"]
     output_param = "heatx"
-
-    # def to_graph(self, specification: dict[str, Any], source: Action) -> Action:
-    #     from thermofeel import calculate_heat_index_simplified
-
-    #     source = source.select(param=["2t", "r"])
-
-    #     return source.reduce(
-    #         Payload(
-    #             calculate_heat_index_simplified,
-    #             (Node.input_name(0), Node.input_name(1)),
-    #         ),
-    #         dim="param",
-    #     )
 
 
 @thermal_indices("Universal thermal climate index")

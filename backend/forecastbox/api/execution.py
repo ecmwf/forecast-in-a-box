@@ -7,34 +7,28 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+import asyncio
+import json
+import logging
 import uuid
 from typing import Any
-import logging
-import json
-
-import asyncio
-from pydantic import BaseModel
-from earthkit.workflows import Cascade, fluent
-from earthkit.workflows.graph import Graph, deduplicate_nodes
-
-from cascade.low.into import graph2job
-from cascade.low.core import JobInstance
-from cascade.low.func import assert_never
-from cascade.low import views as cascade_views
 
 import cascade.gateway.api as api
 import cascade.gateway.client as client
-
-from forecastbox.products.registry import get_product
-from forecastbox.models import Model
-
-from forecastbox.schemas.user import UserRead
-from forecastbox.db.job import insert_one
-
-from forecastbox.config import config
-
+from cascade.low import views as cascade_views
+from cascade.low.core import JobInstance
+from cascade.low.func import assert_never
+from cascade.low.into import graph2job
+from earthkit.workflows import Cascade, fluent
+from earthkit.workflows.graph import Graph, deduplicate_nodes
+from forecastbox.api.types import EnvironmentSpecification, ExecutionSpecification, ForecastProducts, RawCascadeJob
 from forecastbox.api.utils import get_model_path
-from forecastbox.api.types import ExecutionSpecification, RawCascadeJob, ForecastProducts, EnvironmentSpecification
+from forecastbox.config import config
+from forecastbox.db.job import insert_one
+from forecastbox.models import Model
+from forecastbox.products.registry import get_product
+from forecastbox.schemas.user import UserRead
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -50,14 +44,14 @@ def forecast_products_to_cascade(spec: ForecastProducts, environment: Environmen
     model = Model(checkpoint_path=get_model_path(spec.model.model), **model_spec)
 
     # Create the model action graph
-    model_action = model.graph(None, **spec.model.entries, environment_kwargs=environment.environment_variables)
+    model_action = model.graph(None, environment_kwargs=environment.environment_variables, **spec.model.entries)
 
     # Iterate over each product in the specification
     complete_graph = Graph([])
     for product in spec.products:
         product_spec = product.specification.copy()
         try:
-            product_graph = get_product(*product.product.split("/", 1)).to_graph(product_spec, model, model_action)
+            product_graph = get_product(*product.product.split("/", 1)).execute(product_spec, model, model_action)
         except Exception as e:
             raise Exception(f"Error in product {product}:\n{e}")
 
@@ -96,7 +90,9 @@ def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobRespons
     environment = spec.environment
 
     hosts = min(config.cascade.max_hosts, environment.hosts or config.cascade.max_hosts)
-    workers_per_host = min(config.cascade.max_workers_per_host, environment.workers_per_host or config.cascade.max_workers_per_host)
+    workers_per_host = min(
+        config.cascade.max_workers_per_host, environment.workers_per_host or config.cascade.max_workers_per_host
+    )
 
     env_vars = {"TMPDIR": config.cascade.venv_temp_dir}
     env_vars.update(environment.environment_variables)

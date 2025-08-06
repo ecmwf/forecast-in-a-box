@@ -7,11 +7,13 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from fastapi_users import schemas
-from fastapi_users.db import SQLAlchemyBaseUserTableUUID, SQLAlchemyBaseOAuthAccountTableUUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, relationship
-
 import pydantic
+from fastapi_users import schemas
+from fastapi_users.db import SQLAlchemyBaseOAuthAccountTableUUID
+from fastapi_users.db import SQLAlchemyBaseUserTableUUID
+from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import Mapped
+from sqlalchemy.orm import relationship
 
 
 class UserRead(schemas.BaseUser[pydantic.UUID4]):

@@ -20,12 +20,13 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        arch_type: [ARM64] # [ARM64, X64]
-        python_version: ["3.11"] # ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        arch_type: [ARM64, X64]
+        python_version: ["3.11", "3.12", "3.13"]
     runs-on: [self-hosted, macOS, "${{ matrix.arch_type }}"]
     steps:
       - uses: actions/checkout@v4
       - run: |
+          set -euo pipefail
           cd backend
           mkdir /tmp/tmpFiabHome
           mkdir forecastbox/static && touch forecastbox/static/index.html # TODO replace with proper static file build

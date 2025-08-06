@@ -11,34 +11,33 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
-from . import ensemble_registry
-from ..product import GenericTemporalProduct, USER_DEFINED
-from ..generic import generic_registry
-
+from earthkit.workflows import fluent
+from forecastbox.products.ensemble.base import BasePProcEnsembleProduct
 from qubed import Qube
 
-from earthkit.workflows import fluent
-
-from forecastbox.products.definitions import DESCRIPTIONS, LABELS
-from forecastbox.products.ensemble.base import BasePProcEnsembleProduct
+from ..generic import generic_registry
+from ..product import USER_DEFINED
+from ..product import GenericTemporalProduct
+from ..rjsf import FieldWithUI
+from ..rjsf import StringSchema
+from . import ensemble_registry
 
 
 class BaseQuantiles(BasePProcEnsembleProduct, GenericTemporalProduct):
     """Base Quantiles Product"""
 
-    description = {
-        **DESCRIPTIONS,
-        "quantile": "Quantile",
-    }
-    label = {
-        **LABELS,
-        "quantile": "Quantile",
-    }
-    multiselect = {
-        "quantile": True,
-        "param": True,
-    }
+    @property
+    def formfields(self):
+        formfields = super().formfields.copy()
+        formfields.update(
+            quantile=FieldWithUI(
+                jsonschema=StringSchema(
+                    title="Quantiles",
+                    description="Computed Quantile",
+                )
+            ),
+        )
+        return formfields
 
     @property
     def model_assumptions(self):
@@ -59,7 +58,7 @@ class BaseQuantiles(BasePProcEnsembleProduct, GenericTemporalProduct):
         requests = []
 
         for para in params:
-            request = {
+            request: dict[str, Any] = {
                 "type": "pb",
             }
             from anemoi.utils.grib import shortname_to_paramid
