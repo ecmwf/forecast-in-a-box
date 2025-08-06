@@ -19,6 +19,13 @@ import {IconX, IconCheck, IconRefresh, IconTableDown, IconTrash, IconPencil} fro
 import {useApi} from '../../api';
 import { showNotification } from '@mantine/notifications';
 
+import { withTheme } from '@rjsf/core';
+import { Theme } from '@rjsf/mui';
+
+const Form = withTheme(Theme);
+
+import validator from '@rjsf/validator-ajv8';
+
 interface DownloadResponse {
     download_id: string;
     status: string;
@@ -28,16 +35,17 @@ interface DownloadResponse {
 
 function EditModel({ model }: { model: string }) {
     const [modalOpened, setModalOpened] = useState(false);
-    const [modelData, setModelData] = useState<any>(null);
+    const [modelConfig, setModelConfig] = useState<any>(null);
+    const [controlConfig, updateControlConfig] = useState<any>(null);
 
     const [editable, setEditable] = useState(false);
 
     const api = useApi();
-    const fetchModelData = async () => {
+    const fetchControlMetadata = async () => {
         try {
             const result = await api.get(`/v1/model/${model.replace('/', '_')}/metadata`);
-            const data = await result.data;
-            setModelData(data);
+            const spec = await result.data;
+            updateControlConfig(spec);
         } catch (error) {
             console.error('Error fetching model data:', error);
         }
@@ -65,35 +73,36 @@ function EditModel({ model }: { model: string }) {
         }, 2000);
     };
 
-    const handleEdit = async (modelData) => {
+
+  const onSubmit = async (data: any) => {
+    showNotification({
+        color: 'blue',
+        message: 'Saving model data...'
+    });
+    try {
+        await api.patch(`/v1/model/${model.replace('/', '_')}/metadata`, {metadata: data})
+        waitForComplete()
+    } catch (error) {
         showNotification({
-            color: 'blue',
-            message: 'Saving model data...'
+            color: 'red',
+            message: 'Error saving model data',
         });
-        try {
-            await api.patch(`/v1/model/${model.replace('/', '_')}/metadata`, modelData)
-            waitForComplete()
-        } catch (error) {
-            showNotification({
-                color: 'red',
-                message: 'Error saving model data',
-            });
-        } finally {
-            setModalOpened(false);
-        }
+    } finally {
+        setModalOpened(false);
+    }
     }
 
     useEffect(() => {
         fetchEditableStatus();
         // Fetch model data when the modal opens
         if (modalOpened) {
-            fetchModelData();
+            fetchControlMetadata();
         }
     }, [modalOpened, model]);
 
     return (
         <>
-            <Button onClick={() => {fetchModelData(); setModalOpened(true)}} leftSection={<IconPencil />} color='orange' disabled={!editable}>
+            <Button onClick={() => {fetchControlMetadata(); setModalOpened(true)}} leftSection={<IconPencil />} color='orange' disabled={!editable}>
                 Edit
             </Button>
             <Modal
@@ -102,53 +111,23 @@ function EditModel({ model }: { model: string }) {
                 title={`Edit Model: ${model}`}
                 size="lg"
             >
-                    <Flex direction="column" gap="md">
-                        {modelData ? (
-                            Object.entries(modelData).map(([key, value]) => (
-                                <Group key={key} justify="apart">
-                                    <Textarea
-                                        w="100%"
-                                        label={key}
-                                        autosize
-                                        minRows={2}
-                                        value={
-                                            typeof value === 'object' && value !== null
-                                                ? JSON.stringify(value, null, 2)
-                                                : String(value || '')
-                                        }
-                                        onChange={e => {
-                                            let newValue = e.target.value;
-                                            if (typeof value === 'object' && value !== null) {
-                                                try {
-                                                    newValue = JSON.parse(e.target.value);
-                                                } catch {
-                                                    // keep as string if not valid JSON
-                                                }
-                                            }
-                                            setModelData((prev: any) => ({
-                                                ...prev,
-                                                [key]: newValue
-                                            }));
-                                        }}
-                                        styles={{
-                                            input: {
-                                                fontFamily: typeof value === 'object' && value !== null ? 'monospace' : undefined
-                                            }
-                                        }}
-                                    />
-                                </Group>
-                            ))
-                        ) : (
-                            <Loader />
-                        )}
-                    </Flex>
-                    <Button mt="md"
-                        fullWidth
-                        onClick={() => {
-                            handleEdit(modelData)
-                    }}>
-                        Save Changes
-                    </Button>
+            {controlConfig && controlConfig.jsonSchema ? (
+                <Form
+                    schema={controlConfig.jsonSchema}
+                    uiSchema={controlConfig.uiSchema}
+                    validator={validator}
+                    formData={modelConfig}
+                    onChange={(e) => { setModelConfig(e.formData); }}
+                    onSubmit={(e) => { onSubmit(e.formData); }}
+                    showErrorList={"bottom"}
+                    omitExtraData={true}
+                    />
+            ) : (
+                <>
+                    <Text>Loading model configuration...</Text>
+                    <Loader/>
+                </>
+            )}
             </Modal>
         </>
     );

@@ -10,7 +10,7 @@
 from collections import OrderedDict
 from typing import TYPE_CHECKING, Any
 
-from forecastbox.rjsf import StringSchema
+from forecastbox.rjsf import FieldWithUI, StringSchema
 
 from .export import export_fieldlist_as
 from .interfaces import Interfaces

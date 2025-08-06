@@ -46,7 +46,6 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
     setLoading(true);
     try {
       const response = await api.post(`/v1/product/configuration/${selectedProduct}`, { 'model': selectedModel, 'spec': {} }); // Empty request for initial load
-
       const productSpec: ProductConfiguration = await response.data;
       updateProductConfig(productSpec);
     } catch (error) {

@@ -7,6 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+import logging
 import os
 from typing import Any
 
@@ -19,6 +20,7 @@ from pydantic import BaseModel, Field, model_validator
 from .utils import open_checkpoint
 
 FORECAST_IN_A_BOX_METADATA = "forecast-in-a-box.json"
+logger = logging.getLogger(__name__)
 
 
 class ControlMetadata(BaseModel):
@@ -32,17 +34,19 @@ class ControlMetadata(BaseModel):
 
     nested: dict[str, dict[str, Any] | str] | None = Field(default=None, examples=[])
     """Configuration if using nested input sources. Will use the CutoutInput to combine these sources.
+
     Control the source of these source with the `input_source` field.
 
     E.g.
-    ```yaml
-    nested:
-      lam:
-            pre_processors:
-                - regrid:
-                    area: ...
-                    grid: ...
-      global: {}
+    ----
+    ```
+        nested:
+        lam:
+                pre_processors:
+                    - regrid:
+                        area: ...
+                        grid: ...
+        global: {}
     ```
     """
 
@@ -134,7 +138,7 @@ class ControlMetadata(BaseModel):
                         default=self.pkg_versions,
                     ),
                     ui=UIAdditionalProperties(
-                        additionalProperties=UIStringField(widget="textarea")
+                        additionalProperties=UIStringField(widget="text")
                     )
 
                 ),
@@ -152,30 +156,82 @@ class ControlMetadata(BaseModel):
             }
         )
 
+    def update(self, **kwargs) -> "ControlMetadata":
+        """Update the current metadata."""
+        self_dump = self.model_dump(exclude_none=True)
+
+        def merge(s,o):
+            """Merge two dictionaries, with `o` overwriting `s`."""
+            for key, value in o.items():
+                if isinstance(value, dict) and key in s:
+                    s[key] = merge(s[key], value)
+                else:
+                    s[key] = value
+            return s
+
+        updated_dump = merge(self_dump, kwargs)
+        return ControlMetadata(**updated_dump)
+
+    @staticmethod
+    def from_checkpoint(checkpoint_path: os.PathLike) -> "ControlMetadata":
+        """Load metadata from a checkpoint."""
+        return get_control_metadata(checkpoint_path)
+
+    def to_checkpoint(self, checkpoint_path: os.PathLike) -> None:
+        """Save metadata to a checkpoint."""
+        set_control_metadata(checkpoint_path, self)
 
 def get_control_metadata(checkpoint_path: os.PathLike) -> ControlMetadata:
+    """Get the control metadata from a checkpoint."""
     from anemoi.utils.checkpoints import has_metadata, load_metadata
 
-    if not has_metadata(checkpoint_path, name=FORECAST_IN_A_BOX_METADATA):
+    if not has_metadata(str(checkpoint_path), name=FORECAST_IN_A_BOX_METADATA):
         return ControlMetadata()
-    return ControlMetadata(**load_metadata(checkpoint_path, name=FORECAST_IN_A_BOX_METADATA))
+
+    loaded_metadata = load_metadata(str(checkpoint_path), name=FORECAST_IN_A_BOX_METADATA)
+    try:
+       return ControlMetadata(**loaded_metadata)
+    except Exception as e:
+        logger.warning(
+            f"Failed to load control metadata from {checkpoint_path}: {e}. "
+            "Returning an empty ControlMetadata instance and deleting the offending metadata."
+        )
+        from anemoi.utils.checkpoints import replace_metadata
+        replace_metadata(
+            str(checkpoint_path),
+            {"version": ControlMetadata()._version},
+            name=FORECAST_IN_A_BOX_METADATA,
+        )
+        return ControlMetadata()
 
 
-def set_control_metadata(checkpoint_path: os.PathLike, extra: ControlMetadata) -> None:
+def set_control_metadata(checkpoint_path: os.PathLike, control_data: ControlMetadata) -> None:
+    """Set the control metadata for a checkpoint.
+
+    This function updates the metadata of a checkpoint with the provided `control_data` metadata.
+    If the metadata file does not exist, it creates a new one.
+
+    Parameters
+    ----------
+    checkpoint_path : os.PathLike
+        The path to the checkpoint file.
+    control_data : ControlMetadata
+        Control metadata to be saved.
+    """
     from anemoi.utils.checkpoints import has_metadata, replace_metadata, save_metadata
 
     open_checkpoint.cache_clear()
 
-    if not has_metadata(checkpoint_path, name=FORECAST_IN_A_BOX_METADATA):
+    if not has_metadata(str(checkpoint_path), name=FORECAST_IN_A_BOX_METADATA):
         save_metadata(
-            checkpoint_path,
-            extra.model_dump(),
+            str(checkpoint_path),
+            control_data.model_dump(),
             name=FORECAST_IN_A_BOX_METADATA,
         )
         return
 
     replace_metadata(
-        checkpoint_path,
-        {**extra.model_dump(), "version": extra._version},
+        str(checkpoint_path),
+        {**control_data.model_dump(), "version": control_data._version},
         name=FORECAST_IN_A_BOX_METADATA,
     )

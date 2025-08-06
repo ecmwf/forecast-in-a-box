@@ -25,7 +25,9 @@ from forecastbox.api.utils import get_model_path
 from forecastbox.config import config
 from forecastbox.db.model import (delete_download, finish_edit, get_download, get_edit, start_download, start_editing,
                                   update_progress)
-from forecastbox.models.model import Model, ModelExtra, get_extra_information, model_info, set_extra_information
+from forecastbox.models.metadata import ControlMetadata, set_control_metadata
+from forecastbox.models.model import Model, model_info
+from forecastbox.rjsf import ExportedSchemas
 from forecastbox.schemas.model import ModelDownload
 from pydantic import BaseModel
 
@@ -303,7 +305,7 @@ async def flush_inprogress_downloads(admin=Depends(get_admin_user)) -> None:
 
 
 @router.get("/{model_id}/metadata")
-async def get_model_metadata(model_id: str, admin=Depends(get_admin_user)) -> ModelExtra:
+async def get_model_metadata(model_id: str, admin=Depends(get_admin_user)) -> ExportedSchemas:
     """Get metadata for a specific model.
 
     Parameters
@@ -323,12 +325,11 @@ async def get_model_metadata(model_id: str, admin=Depends(get_admin_user)) -> Mo
     if not model_path.exists():
         raise HTTPException(status_code=404, detail="Model not found")
 
-    metadata = get_extra_information(model_path).model_dump()
-    metadata.pop("version", None)
-    return metadata
+    metadata = ControlMetadata.from_checkpoint(model_path)
+    return metadata.form.export_all()
 
 
-async def _update_model_metadata(model_id: str, metadata: ModelExtra) -> ModelExtra:
+async def _update_model_metadata(model_id: str, metadata: ControlMetadata) -> ControlMetadata:
     """Update metadata for a specific model.
 
     Parameters
@@ -351,7 +352,7 @@ async def _update_model_metadata(model_id: str, metadata: ModelExtra) -> ModelEx
 
     # Run the sync function in a thread to avoid blocking the event loop
     loop = asyncio.get_running_loop()
-    await loop.run_in_executor(None, set_extra_information, model_path, metadata)
+    await loop.run_in_executor(None, set_control_metadata, model_path, metadata)
     await finish_edit(model_id)
 
     return metadata
@@ -359,7 +360,7 @@ async def _update_model_metadata(model_id: str, metadata: ModelExtra) -> ModelEx
 
 @router.patch("/{model_id}/metadata")
 async def patch_model_metadata(
-    model_id: str, metadata: ModelExtra, background_tasks: BackgroundTasks, admin=Depends(get_admin_user)
+    model_id: str, metadata: ControlMetadata, background_tasks: BackgroundTasks, admin=Depends(get_admin_user)
 ) -> None:
     """Patch metadata for a specific model.
 
@@ -378,7 +379,7 @@ async def patch_model_metadata(
     if not model_downloaded(model_id):
         raise HTTPException(status_code=404, detail="Model not found")
 
-    start_editing(model_id, metadata.model_dump())
+    await start_editing(model_id, metadata.model_dump())
     background_tasks.add_task(_update_model_metadata, model_id, metadata)
 
 
