@@ -80,6 +80,7 @@ function EditModel({ model }: { model: string }) {
         message: 'Saving model data...'
     });
     try {
+        setEditable(false);
         await api.patch(`/v1/model/${model.replace('/', '_')}/metadata`, {metadata: data})
         waitForComplete()
     } catch (error) {
@@ -87,6 +88,7 @@ function EditModel({ model }: { model: string }) {
             color: 'red',
             message: 'Error saving model data',
         });
+        setEditable(true);
     } finally {
         setModalOpened(false);
     }
@@ -102,7 +104,7 @@ function EditModel({ model }: { model: string }) {
 
     return (
         <>
-            <Button onClick={() => {fetchControlMetadata(); setModalOpened(true)}} leftSection={<IconPencil />} color='orange' disabled={!editable}>
+            <Button onClick={() => {setModalOpened(true)}} leftSection={<IconPencil />} color='orange' disabled={!editable}>
                 Edit
             </Button>
             <Modal

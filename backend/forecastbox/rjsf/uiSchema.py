@@ -43,6 +43,8 @@ class UIField(BaseModel):
     """Custom description for the field."""
     disabled: bool | None = None
     """If True, the field will be disabled."""
+    enableMarkdownInDescription: bool | None = None
+    """If True, Markdown will be enabled in the description."""
     emptyValue: Any | None = None
     """Value to use when the field is empty."""
     enumDisabled: list[Any] | None = None

@@ -111,12 +111,12 @@ class ControlMetadata(BaseModel):
                 "pre_processors": FieldWithUI(
                     jsonschema=ObjectSchema(
                         title="Pre-processors",
-                        description="List of pre-processors to apply to the input data.",
+                        description="Pre-processors to apply to the input data. Key is the name of the pre-processor, value is the configuration.",
                         additionalProperties=StringSchema(),
                         default=list(map(self._dump_yaml, self.pre_processors)),
                     ),
                     ui=UIAdditionalProperties(
-                        additionalProperties=UIStringField(widget="textarea", format="yaml")
+                        additionalProperties=UIStringField(widget="textarea", format="yaml", enableMarkdownInDescription=True)
                     )
                 ),
                 "post_processors": FieldWithUI(
@@ -150,7 +150,7 @@ class ControlMetadata(BaseModel):
                         default=self.environment_variables or {},
                     ),
                     ui=UIAdditionalProperties(
-                        additionalProperties=UIStringField()
+                        additionalProperties=UIStringField(format="yaml")
                     )
                 )
             }
