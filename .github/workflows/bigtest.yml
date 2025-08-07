@@ -23,5 +23,8 @@ jobs:
       - run: |
           set -euo pipefail
           cd backend
+          # TODO dont execute in `backend` -- that causes forecastbox module to be twice on pythonpath!
+          # Because of that, we need to create the static directory:
+          mkdir forecastbox/static && touch forecastbox/static/__init__.py
           mkdir /tmp/tmpFiabHome # we want a clean env for install
-          FIAB_ROOT=/tmp/tmpFiabHome ENTRYPOINT=scripts.bigtest ./fiab.sh
+          FIAB_LOGSTDOUT=yea FIAB_ROOT=/tmp/tmpFiabHome ENTRYPOINT=scripts.bigtest ./fiab.sh
