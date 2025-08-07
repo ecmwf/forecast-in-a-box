@@ -28,7 +28,7 @@ dependencies = [
   "aiosqlite",
   "anemoi-inference>=0.4.10",
   "cloudpickle",
-  "earthkit-workflows>=0.4.4",
+  "earthkit-workflows>=0.4.5",
   "earthkit-workflows-anemoi>=0.3.1",
   "earthkit-workflows-pproc",
   "fastapi",

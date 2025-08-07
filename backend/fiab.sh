@@ -85,6 +85,7 @@ maybeCreateVenv() {
 	fi
 
     if [ "$FIAB_DEV" == 'yea' ] ; then
+        export EARTHKIT_DATA_CACHE_POLICY=user # TODO use this in both regimes, but manage it!
         uv pip install --prerelease=allow --upgrade -e .[test]
     else
         uv pip install --prerelease=allow --upgrade pproc@git+https://github.com/ecmwf/pproc earthkit-workflows-pproc@git+https://github.com/ecmwf/earthkit-workflows-pproc 'git+https://github.com/ecmwf/anemoi-plugins-ecmwf#subdirectory=inference[opendata]' 'forecast-in-a-box[plots,webmars,test]>=0.2.2' # TODO remove prerelease once bin wheels stable, remove pproc and ekw-pproc once published

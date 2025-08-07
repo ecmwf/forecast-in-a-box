@@ -14,9 +14,10 @@ import os
 import select
 import subprocess
 from dataclasses import dataclass
-from multiprocessing import Process, get_context
+from multiprocessing import Process
 from tempfile import TemporaryDirectory
 
+import cascade.executor.platform as cascade_platform
 import cascade.gateway.api
 import cascade.gateway.client
 from fastapi import APIRouter, HTTPException, Request
@@ -92,7 +93,7 @@ async def start_gateway() -> str:
     logs_directory = None if os.getenv("FIAB_LOGSTDOUT", "nay") == "yea" else Globals.logs_directory.name
     # TODO for some reason changes to os.environ were *not* visible by the child process! Investigate and re-enable:
     # export_recursive(config.model_dump(), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"])
-    process = get_context("forkserver").Process(target=launch_cascade, args=(log_path, logs_directory))
+    process = cascade_platform.get_mp_ctx("gateway").Process(target=launch_cascade, args=(log_path, logs_directory))
     process.start()
     Globals.gateway = GatewayProcess(log_path=log_path, process=process)
     logger.debug(f"spawned new gateway process with pid {process.pid} and logs at {log_path}")
