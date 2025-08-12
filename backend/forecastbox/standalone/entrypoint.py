@@ -9,10 +9,6 @@
 
 """Entrypoint for the standalone fiab execution (frontend, controller and worker spawned by a single process)"""
 
-# TODO support frontend
-# NOTE until migrated to sqlite3 / pymongo_inmemory, use `docker run --rm -it --network host mongo:8.0` in parallel
-# TODO simplify and refactor -- some of gateway spawning code is duplicated with api/routers/gateway.py now
-
 import asyncio
 import logging
 import logging.config
@@ -24,6 +20,7 @@ from dataclasses import dataclass
 from multiprocessing import Process, connection, freeze_support, set_start_method
 
 import httpx
+import psutil
 import pydantic
 import uvicorn
 from cascade.executor.config import logging_config, logging_config_filehandler
@@ -56,6 +53,37 @@ async def uvicorn_run(app_name: str, host: str, port: int) -> None:
     #    reload_dirs=["forecastbox"],
     server = uvicorn.Server(config)
     await server.serve()
+
+
+def _previous_cleanup():
+    """Attempts killing all cascade/fiab procesess. To be executed prior to starting,
+    to deal with leftovers from previous possibly unclean exit.
+    """
+    # NOTE we implement by "was launched from the same executable", which should be
+    # the safest given we have fiab-only python. We could filter by name, by user,
+    # persits pids, etc, but ultimately those sound less reliable / less safe
+    self = psutil.Process()
+    executable = self.exe()
+    def filtering(p: psutil.Process):
+        try:
+            return p.exe() == executable and p.pid != self.pid
+        except (psutil.AccessDenied, psutil.ZombieProcess):
+            return False
+    processes = [p for p in psutil.process_iter(['pid', 'exe']) if filtering(p)]
+    for p in processes:
+        try:
+            logger.warning(f"stopping process {p.pid}, believing it a remnant of previous run")
+            p.terminate()
+            try:
+                p.wait(1.0)
+            except psutil.TimeoutExpired:
+                p.kill()
+                p.wait(1.0)
+        except psutil.ProcessLookupError:
+            # NOTE likely some earlier kill brought this one down too
+            pass
+        except Exception:
+            logger.error("failed to stop {p.pid()} with {repr(e)}, continuing despite that")
 
 
 def launch_api():
@@ -182,6 +210,7 @@ def launch_all(config: FIABConfig, is_browser: bool, attempts: int = 10) -> Proc
 if __name__ == "__main__":
     config = FIABConfig()
     validate_runtime(config)
+    _previous_cleanup()
     handles = launch_all(config, True)
     try:
         handles.wait()
