@@ -128,6 +128,8 @@ def _call_succ(response: CallResult, url: str) -> bool:
     else:
         assert_never(response)
 
+class StartupError(ValueError):
+    pass
 
 def wait_for(client: httpx.Client, url: str, attempts: int, condition: Callable[[CallResult, str], bool]) -> None:
     """Calls /status endpoint, retry on ConnectError"""
@@ -142,7 +144,7 @@ def wait_for(client: httpx.Client, url: str, attempts: int, condition: Callable[
                 return
         i += 1
         time.sleep(2)
-    raise ValueError(f"failure on {url}: no more retries")
+    raise StartupError(f"failure on {url}: no more retries")
 
 
 @dataclass
@@ -179,7 +181,7 @@ def export_recursive(dikt, delimiter, prefix):
                 os.environ[f"{prefix}{k}"] = str(v)
 
 
-def launch_all(config: FIABConfig, is_browser: bool, attempts: int = 10) -> ProcessHandles:
+def launch_all(config: FIABConfig, is_browser: bool, attempts: int = 20) -> ProcessHandles:
     freeze_support()
     set_start_method("forkserver")
     setup_process()
@@ -191,13 +193,21 @@ def launch_all(config: FIABConfig, is_browser: bool, attempts: int = 10) -> Proc
     api = Process(target=launch_api)
     api.start()
 
-    with httpx.Client() as client:
-        wait_for(client, config.api.local_url() + "/api/v1/status", attempts, _call_succ)
-        client.post(config.api.local_url() + "/api/v1/gateway/start").raise_for_status()
-        if config.auth.passthrough:
-            client.post(config.api.local_url() + "/api/v1/model/flush").raise_for_status()
-        gw_check = lambda resp, _: resp.raise_for_status().text == f"\"{StatusMessage.gateway_running}\""
-        wait_for(client, config.api.local_url() + "/api/v1/gateway/status", attempts, gw_check)
+    try:
+        with httpx.Client() as client:
+            wait_for(client, config.api.local_url() + "/api/v1/status", attempts, _call_succ)
+            client.post(config.api.local_url() + "/api/v1/gateway/start").raise_for_status()
+            if config.auth.passthrough:
+                client.post(config.api.local_url() + "/api/v1/model/flush").raise_for_status()
+            gw_check = lambda resp, _: resp.raise_for_status().text == f"\"{StatusMessage.gateway_running}\""
+            wait_for(client, config.api.local_url() + "/api/v1/gateway/status", attempts, gw_check)
+    except StartupError as e:
+        logger.error(f"failed to start the backend: {e}")
+        if api.is_alive():
+            api.terminate()
+            api.join(1)
+            api.kill()
+        raise
 
     if is_browser:
         webbrowser.open(config.api.local_url())
