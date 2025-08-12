@@ -40,6 +40,7 @@ dependencies = [
   "multiolib==2.6.1.dev20250613",     # to bring in the binary stack eagerly, TODO unpin once stable
   "orjson",
   "pproc",
+  "psutil",
   "pydantic-settings",
   "pyrsistent",
   "python-multipart",

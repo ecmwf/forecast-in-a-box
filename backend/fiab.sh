@@ -67,7 +67,7 @@ maybeInstallPython() {
     # NOTE somehow this regexp isn't portable, but we dont really need the full binary path
     MAYBE_PYTHON="$(uv python list | grep python3.11 || :)"
 	if [ -z "$MAYBE_PYTHON" ] ; then
-		uv python install 3.11 # TODO install to fiab home instead?
+		uv python install --python-preference only-managed 3.11 # TODO install to fiab home instead?
 	fi
     # export UV_PY="$MAYBE_PYTHON"
     export UV_PY="python3.11"
@@ -80,7 +80,7 @@ maybeCreateVenv() {
 		# TODO check packages
 		source "${VENV}/bin/activate" # or export the paths?
 	else
-		uv venv -p "$UV_PY" "$VENV"
+		uv venv -p "$UV_PY" --python-preference only-managed "$VENV"
 		source "${VENV}/bin/activate" # or export the paths?
 	fi
 
