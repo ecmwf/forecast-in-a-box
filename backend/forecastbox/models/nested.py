@@ -48,7 +48,7 @@ class NestedModel(BaseForecastModel):
     def _execution_kwargs(self) -> dict[str, Any]:
         """Model specific execution kwargs."""
         return {
-            "run_kwargs": {"templates": "mir"},
+            "output": {"out": {"templates": "mir"}},
         }
 
     @property
