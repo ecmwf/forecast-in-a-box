@@ -9,7 +9,7 @@
 
 
 import io
-from typing import TYPE_CHECKING, Literal, get_args
+from typing import TYPE_CHECKING, Literal
 
 import earthkit.data as ekd
 from earthkit.workflows.decorators import as_payload
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     import numpy as np
 
 FORMAT = Literal["grib", "netcdf", "numpy"]
-OUTPUT_TYPES = get_args(FORMAT)
+OUTPUT_TYPES = ["grib", "netcdf", "numpy"]
 
 
 @as_payload
