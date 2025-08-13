@@ -85,11 +85,24 @@ maybeCreateVenv() {
 	fi
 
     if [ "$FIAB_DEV" == 'yea' ] ; then
-        export EARTHKIT_DATA_CACHE_POLICY=user # TODO use this in both regimes, but manage it!
         uv pip install --prerelease=allow --upgrade -e .[test]
     else
         uv pip install --prerelease=allow --upgrade pproc@git+https://github.com/ecmwf/pproc earthkit-workflows-pproc@git+https://github.com/ecmwf/earthkit-workflows-pproc 'git+https://github.com/ecmwf/anemoi-plugins-ecmwf#subdirectory=inference[opendata]' 'forecast-in-a-box[plots,webmars,test]>=0.2.2' # TODO remove prerelease once bin wheels stable, remove pproc and ekw-pproc once published
         export fiab__auth__passthrough=True # NOTE we dont passthrough in `dev` mode as we use it to run strict tests
+    fi
+}
+
+maybePruneUvCache() {
+    # NOTE we install a lot, so we best prune uv cache from time to time. This is a system-wide effect, but presumably not an undesired one
+    PRUNETS=$FIAB_ROOT/uvcache.prunetimestamp
+    if [ -f "$PRUNETS" ] ; then
+        if find "$PRUNETS" -mtime +30 ; then
+            echo "uv cache pruned more than 30 days ago: pruning"
+            uv cache prune
+            touch "$PRUNETS"
+        fi
+    else
+        touch "$PRUNETS"
     fi
 }
 
@@ -116,7 +129,11 @@ check
 maybeInstallUv
 maybeInstallPython
 maybeCreateVenv
+maybePruneUvCache
 
 # to allow forks on Macos, cf eg https://github.com/rq/rq/issues/1418
 export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
+
+export EARTHKIT_DATA_CACHE_POLICY=${EARTHKIT_DATA_CACHE_POLICY:-"user"}
+export EARTHKIT_DATA_MAXIMUM_CACHE_SIZE=${EARTHKIT_DATA_MAXIMUM_CACHE_SIZE:-"50G"}
 python -m $ENTRYPOINT
