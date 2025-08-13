@@ -148,8 +148,8 @@ class BaseForecastModel(ABC):
         def parse_into_install(version_dict):
             install_list = []
             for key, val in version_dict.items():
-                if "://" in val or "git+" in val:
-                    install_list.append(f"{key} @ {val}")
+                if "://" in val or "git+" in val or val.startswith("/"):
+                    install_list.append(f"{key}@{val}")
                 else:
                     install_list.append(f"{key}=={val}")
             return install_list
