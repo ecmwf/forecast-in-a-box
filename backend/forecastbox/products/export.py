@@ -16,7 +16,6 @@ from earthkit.workflows.decorators import as_payload
 
 if TYPE_CHECKING:
     import numpy as np
-    import xarray as xr
 
 OUTPUT_TYPES = ["grib", "netcdf", "numpy"]
 
@@ -47,10 +46,9 @@ def export_fieldlist_as(
         fields.to_target("file", buf, encoder="grib")
         written_bytes = buf.getvalue()
     elif format == "netcdf":
-        xr_obj: xr.Dataset = fields.to_xarray()
-        if xr_obj is None:
-            raise ValueError("Data cannot be converted to netcdf.")
-        written_bytes = xr_obj.to_netcdf()
+        buf = io.BytesIO()
+        fields.to_target("file", buf, encoder="netcdf", decode_timedelta=False)
+        written_bytes = buf.getvalue()
     elif format == "numpy":
         np_obj: np.ndarray = fields.to_numpy()  # type: ignore
         if np_obj is None:
