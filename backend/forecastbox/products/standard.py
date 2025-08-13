@@ -14,7 +14,7 @@ from forecastbox.products.product import GenericTemporalProduct
 from forecastbox.products.registry import CategoryRegistry
 from forecastbox.rjsf import FieldWithUI, StringSchema, UIStringField
 
-from .export import export_fieldlist_as
+from .export import OUTPUT_TYPES, export_fieldlist_as
 
 standard_product_registry = CategoryRegistry(
     "Standard",
@@ -22,8 +22,6 @@ standard_product_registry = CategoryRegistry(
     description="Standard products",
     title="Standard Products",
 )
-
-OUTPUT_TYPES = ["grib", "netcdf", "numpy"]
 
 
 @standard_product_registry("Output")

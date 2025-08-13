@@ -9,20 +9,23 @@
 
 
 import io
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, get_args
 
 import earthkit.data as ekd
 from earthkit.workflows.decorators import as_payload
 
+from .product import Product
+
 if TYPE_CHECKING:
     import numpy as np
 
-OUTPUT_TYPES = ["grib", "netcdf", "numpy"]
+FORMAT = Literal["grib", "netcdf", "numpy"]
+OUTPUT_TYPES = get_args(FORMAT)
 
 
 @as_payload
 def export_fieldlist_as(
-    fields: ekd.FieldList, format: Literal["grib", "netcdf", "numpy"] = "grib"
+    fields: ekd.FieldList, format: FORMAT = "grib"
 ) -> tuple[bytes, str]:
     """Export an earthkit FieldList to a specified format.
     Supported formats are 'grib', 'netcdf', and 'numpy'.
@@ -58,3 +61,6 @@ def export_fieldlist_as(
         raise ValueError(f"Unsupported format: {format}. Supported formats are {OUTPUT_TYPES}.")
 
     return written_bytes, f"application/{format}"
+
+class ExportMixin(Product):
+    pass

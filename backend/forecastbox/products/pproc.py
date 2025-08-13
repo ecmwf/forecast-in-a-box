@@ -19,8 +19,9 @@ from earthkit.workflows.plugins.pproc.templates import derive_template
 from forecastbox.config import config
 from forecastbox.models import SpecifiedModel
 from forecastbox.products.product import Product
+from forecastbox.rjsf import StringSchema
 
-from .export import export_fieldlist_as
+from .export import OUTPUT_TYPES, export_fieldlist_as
 
 
 def from_request(
@@ -54,6 +55,29 @@ class PProcProduct(Product):
     @property
     def action_kwargs(self) -> dict[str, Any]:
         return {"ensemble_dim": ENSEMBLE_DIMENSION_NAME}
+
+    @property
+    def formfields(self):
+        """Form fields for the product."""
+        formfields = super().formfields.copy()
+        formfields.update(
+            format=self._make_field(
+                title="Export Format",
+                multiple=False,
+                schema=StringSchema,
+                enum=OUTPUT_TYPES,
+                default="grib",
+            ),
+        )
+        return formfields
+
+    # @property
+    # def model_assumptions(self) -> dict[str, Any]:
+    #    return {
+    #         # "format": "*",
+    #         **super().model_assumptions,
+    #    }
+
 
     def get_sources(
         self, product_spec: dict[str, Any], model: SpecifiedModel, source: fluent.Action
@@ -98,13 +122,15 @@ class PProcProduct(Product):
             return str(fallback_path)
         return str(schema_path)
 
-    def request_to_graph(self, request: dict[str, Any] | list[dict[str, Any]], **sources: fluent.Action) -> Graph:
+    def request_to_graph(self, request: dict[str, Any] | list[dict[str, Any]], format: str, **sources: fluent.Action) -> Graph:
         """Convert a request to a graph action.
 
         Parameters
         ----------
         request : dict[str, Any] | list[dict[str, Any]]
             Mars requests to use with pproc
+        format: str
+            format to export as
         sources : fluent.Action
             Actions to use with pproc-cascade as sources
 
@@ -123,7 +149,7 @@ class PProcProduct(Product):
         for req in request:
             total_graph += (
                 from_request(req, self._pproc_schema_path, self.action_kwargs, **sources)
-                .map(export_fieldlist_as(format="grib"))
+                .map(export_fieldlist_as(format=format))
                 .map(self.named_payload(self.__class__.__name__))
                 .graph()
             )
@@ -132,6 +158,8 @@ class PProcProduct(Product):
 
     def execute(self, product_spec: dict[str, Any], model: SpecifiedModel, source: fluent.Action):
         """Convert the product specification to a graph action."""
+        product_spec = product_spec.copy()
+        format = product_spec.pop("format", "grib")
         request = self.mars_request(product_spec).copy()
 
         if not isinstance(request, list):
@@ -149,4 +177,4 @@ class PProcProduct(Product):
             full_requests.append(req_full)
 
         sources = self.get_sources(product_spec, model, source)
-        return self.request_to_graph(full_requests, **sources)
+        return self.request_to_graph(full_requests, format=format, **sources)

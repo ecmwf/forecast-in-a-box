@@ -26,6 +26,7 @@ class BaseEnsembleStats(BasePProcEnsembleProduct, GenericTemporalProduct):
 
     @property
     def qube(self):
+        # return self.make_generic_qube(format=OUTPUT_TYPES)
         return self.make_generic_qube()
 
     def get_sources(self, product_spec, model, source: fluent.Action) -> dict[str, fluent.Action]:

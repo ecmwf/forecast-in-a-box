@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 from forecastbox.rjsf import FieldWithUI, StringSchema
 
-from .export import export_fieldlist_as
+from .export import OUTPUT_TYPES, export_fieldlist_as
 from .interfaces import Interfaces
 from .product import GenericParamProduct
 from .registry import CategoryRegistry
@@ -54,16 +54,23 @@ class BaseForecast(GenericParamProduct):
                 multiple=False,
                 schema=StringSchema,
             ),
+            format=self._make_field(
+                title="Export Format",
+                multiple=False,
+                schema=StringSchema,
+                enum=OUTPUT_TYPES,
+                default="grib",
+            ),
         )
         return formfields
 
     @property
     def model_assumptions(self):
-        return {"step": "*"}
+        return {"step": "*", "format": "*"}
 
     @property
     def qube(self):
-        return self.make_generic_qube(step=["0-24", "0-168"])
+        return self.make_generic_qube(step=["0-24", "0-168"], format=OUTPUT_TYPES)
 
     def _select_on_step(self, source: "Action", step: str) -> "Action":
         if step == "0-24":
@@ -74,18 +81,19 @@ class BaseForecast(GenericParamProduct):
             raise ValueError(f"Invalid step {step}")
 
     def _apply_statistic(self, specification: dict[str, Any], source: "Action", statistic: str) -> "Action":
-        spec = specification.copy()
-        step = spec.pop("step")
+        step = specification.pop("step")
 
-        source = super().select_on_specification(spec, source)
+        source = super().select_on_specification(specification, source)
         source = self._select_on_step(source, step)
         return getattr(source, statistic)("step")
 
     def execute(self, product_spec, model, source):
         assert self._statistic is not None, "Statistic must be defined"
+        product_spec = product_spec.copy()
+        export_format = product_spec.pop("format", "grib")
         return (
             self._apply_statistic(product_spec, source, self._statistic)
-            .map(export_fieldlist_as(format="grib"))
+            .map(export_fieldlist_as(format=export_format))
             .map(self.named_payload(self._statistic))
         )
 
