@@ -1,5 +1,5 @@
 import pytest
-from forecastbox.products.rjsf import jsonSchema
+from forecastbox.rjsf import jsonSchema
 
 # Test StringSchema
 

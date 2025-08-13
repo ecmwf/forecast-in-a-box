@@ -86,7 +86,7 @@ class BaseForecastModel(ABC):
 
         versions = {
             key: val
-            for key, val in (parse_versions(key, val) for key, val in self.checkpoint.provenance_training()["module_versions"].items())
+            for key, val in (parse_versions(key, val) for key, val in self.checkpoint.provenance_training().get("module_versions", {}).items())
             if key is not None and val is not None
         }
 

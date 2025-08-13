@@ -11,7 +11,7 @@
 from pathlib import Path
 
 import pytest
-from forecastbox.models import Model
+from forecastbox.models.globe import ControlMetadata, GlobalModel
 from forecastbox.products.product import GenericParamProduct, Product
 from qubed import Qube
 
@@ -43,21 +43,25 @@ def create_test_product(axis: dict[str, list[str]]) -> Product:
     return product
 
 
-def create_test_model(axis: dict[str, list[str]]) -> Model:
+def create_test_model(axis: dict[str, list[str]]) -> GlobalModel:
     """Create a test model with specified axis."""
 
-    class TestModel(Model):
+    class TestModel(GlobalModel):
         """Test model for testing purposes."""
 
-        def qube(self, model_assumptions) -> Qube:
-            assert model_assumptions == {}, "Model assumptions should be empty for this test"
+        def qube(self, assumptions) -> Qube:
+            assert assumptions == {}, "Model assumptions should be empty for this test"
             return Qube.from_datacube(axis)
+
+        @property
+        def control(self) -> ControlMetadata:
+            return ControlMetadata()
 
         @property
         def checkpoint(self):
             return None  # No checkpoint needed for this test
 
-    model = TestModel(checkpoint_path=Path(__file__), lead_time=72, date="2023-01-01", ensemble_members=1)
+    model = TestModel(checkpoint=Path(__file__))
     assert model.qube({}) == Qube.from_datacube(axis), "Model qube should match the provided axis"
 
     return model
