@@ -31,3 +31,22 @@
     cursor: not-allowed;
     pointer-events: none;
   }
+
+  .option-card {
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.2s, background-color 0.2s;
+    }
+
+  .option-card:hover {
+    transform: translateY(-2px);
+    background-color: #f0f0f0;
+  }
+  .option-card:active {
+    transform: translateY(0);
+    background-color: #e0e0e0;
+  }
+  .option-card.selected {
+    background-color: #d0e0ff;
+    border: 1px solid #007bff;
+  }

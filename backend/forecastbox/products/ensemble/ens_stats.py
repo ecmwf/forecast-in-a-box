@@ -31,7 +31,10 @@ class BaseEnsembleStats(BasePProcEnsembleProduct, GenericTemporalProduct):
     def get_sources(self, product_spec, model, source: fluent.Action) -> dict[str, fluent.Action]:
         params = product_spec["param"]
         step = product_spec["step"]
-        return {"forecast": self.select_on_specification({"param": params, "step": step}, source)}
+        spec = {"param": params, "step": step}
+        if 'levelist' in product_spec:
+            spec['levelist'] = product_spec['levelist']
+        return {"forecast": self.select_on_specification(spec, source)}
 
     def mars_request(self, product_spec: dict[str, Any]):
         """Mars request for ensemble stats."""

@@ -43,8 +43,9 @@ function EditModel({ model }: { model: string }) {
     const api = useApi();
     const fetchControlMetadata = async () => {
         try {
-            const result = await api.get(`/v1/model/${model.replace('/', '_')}/metadata`);
+            const result = await api.get(`/v1/model/${model.replace('/', '_')}/metadata_form`);
             const spec = await result.data;
+            setModelConfig(spec.formData || {});
             updateControlConfig(spec);
         } catch (error) {
             console.error('Error fetching model data:', error);
@@ -75,23 +76,23 @@ function EditModel({ model }: { model: string }) {
 
 
   const onSubmit = async (data: any) => {
-    showNotification({
-        color: 'blue',
-        message: 'Saving model data...'
-    });
-    try {
-        setEditable(false);
-        await api.patch(`/v1/model/${model.replace('/', '_')}/metadata`, {metadata: data})
-        waitForComplete()
-    } catch (error) {
         showNotification({
-            color: 'red',
-            message: 'Error saving model data',
+            color: 'blue',
+            message: 'Saving model data...'
         });
-        setEditable(true);
-    } finally {
-        setModalOpened(false);
-    }
+        try {
+            setEditable(false);
+            await api.patch(`/v1/model/${model.replace('/', '_')}/metadata`, data)
+            waitForComplete()
+        } catch (error) {
+            showNotification({
+                color: 'red',
+                message: 'Error saving model data',
+            });
+            setEditable(true);
+        } finally {
+            setModalOpened(false);
+        }
     }
 
     useEffect(() => {
@@ -126,7 +127,7 @@ function EditModel({ model }: { model: string }) {
                     />
             ) : (
                 <>
-                    <Text>Loading model configuration...</Text>
+                    <Text>Loading metadata</Text>
                     <Loader/>
                 </>
             )}

@@ -140,8 +140,8 @@ class PProcProduct(Product):
         full_requests = []
         for req in request:
             req_full = {
-                "date": model.date,
-                "time": model.time,
+                "date": model.specification['date'],
+                "time": model.specification.get('time', '00'),
                 "domain": getattr(model, "domain", "g"),
                 **self.default_request_keys,
             }

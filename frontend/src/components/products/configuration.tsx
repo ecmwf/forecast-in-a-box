@@ -111,12 +111,9 @@ function Configuration({ selectedProduct, selectedModel, submitTarget}: Configur
               showErrorList={"bottom"}
               omitExtraData={true}
             />
-          </Card.Section>
-          <Button type='button' onClick={() => { setFormData({}); fetchInitialOptions(); }}>Clear</Button>
-          <Card.Section>
-            <Group p='apart' mb='md'>
-              <Text size='xs' c='dimmed'>{updating ? 'Updating': null}</Text> {updating ? <Loader size='xs'/> : null}
-            </Group>
+          <Space h='md' />
+          <Button type='button' color='red' onClick={() => { setFormData({}); fetchInitialOptions(); }}>Clear</Button>
+          <Text size='xs' c='dimmed'>{updating ? 'Updating': null}</Text> {updating ? <Loader size='xs'/> : null}
           </Card.Section>
           </>
           ) :

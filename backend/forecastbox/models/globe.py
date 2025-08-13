@@ -13,6 +13,8 @@ from typing import Any
 from .metadata import ControlMetadata
 from .model import BaseForecastModel
 
+DEFAULT_GLOBAL_INPUT_SOURCE = "mars"
+
 
 class GlobalModel(BaseForecastModel):
     def validate_checkpoint(self):
@@ -20,4 +22,4 @@ class GlobalModel(BaseForecastModel):
             raise ValueError("GlobalModel cannot have a 'nested' configuration in the control metadata.")
 
     def _create_input_configuration(self, control: ControlMetadata) -> str | dict[str, Any]:
-        return control.input_source
+        return control.input_source or DEFAULT_GLOBAL_INPUT_SOURCE

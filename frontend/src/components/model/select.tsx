@@ -10,7 +10,7 @@
 
 "use client"; // Required for client-side fetching
 
-import { Card, Button, Tabs, ScrollArea, Group, Title, Text, ActionIcon, Flex, Table, Loader, Progress, Menu, Burger} from '@mantine/core';
+import { Card, Button, Tabs, ScrollArea, Group, Title, Text, ActionIcon, Flex, Table, Loader, Progress, Menu, Burger, Space, Divider} from '@mantine/core';
 import { useEffect, useRef, useState } from "react";
 
 import classes from './manage.module.css';
@@ -20,10 +20,11 @@ import {useApi} from '../../api';
 
 
 interface OptionsProps {
+    selected: string;
     setSelected: (value: string) => void;
 }
 
-function SelectModel({ setSelected }: OptionsProps) {
+function SelectModel({ selected, setSelected }: OptionsProps) {
     const [modelOptions, setData] = useState<Record<string, string[]>>();
     const [loading, setLoading] = useState(true);
     const api = useApi();
@@ -54,43 +55,39 @@ function SelectModel({ setSelected }: OptionsProps) {
                 </Flex>
             </Card.Section>
             {loading ? <p>Loading...</p> :
-            <Table highlightOnHover verticalSpacing="xs" className={classes['option-table']}>
-                <Table.Thead>
-                    <Table.Tr style={{ backgroundColor: "#f0f0f6", textAlign: "left" }}>
-                        <Table.Th>Group</Table.Th>
-                        <Table.Th>Model</Table.Th>
-                    </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                    {!modelOptions || Object.keys(modelOptions).length === 0 ? (
-                        <Table.Tr>
-                            <Table.Td colSpan={4} style={{ textAlign: 'center' }}>
-                                No models available.
-                            </Table.Td>
-                        </Table.Tr>
-                    ) : null}
-                    {modelOptions && Object.entries(modelOptions).flatMap(([key, values]) =>
-                        Array.isArray(values)
-                            ? values.map((value: string, index: number) => (
-                                <Table.Tr key={`${key}_${value}`}>
-                                    {index === 0 && (
-                                        <Table.Td rowSpan={values.length} style={{ verticalAlign: 'top', fontWeight: 'bold' }}>
-                                            {key}
-                                        </Table.Td>
-                                    )}
-                                    <Button
-                                        classNames={classes}
-                                        onClick={() => setSelected(`${key}_${value}`)}
-                                        variant='outline'
+            <ScrollArea>
+                {!modelOptions || Object.keys(modelOptions).length === 0 ? (
+                    <Text p="center" mt="md">No models available.</Text>
+                ) : (
+                    Object.entries(modelOptions).map(([group, models]) => (
+                        <div key={group} style={{ marginBottom: 24 }}>
+                            <Title order={3} mb="xs">{group}</Title>
+                            <Divider mb="md" />
+                            <Flex gap="md" wrap="wrap">
+                                {models.map((model) => (
+                                    <Card
+                                        key={`${group}_${model}`}
+                                        shadow="sm"
+                                        padding="md"
+                                        radius="md"
+                                        withBorder
+                                        className={`${classes['option-card']} ${selected === `${group}_${model}` ? classes['selected'] : ''}`} style={{ minWidth: 200, maxWidth: 300 }}
+
+                                        onClick={() => setSelected(`${group}_${model}`)}
                                     >
-                                        <Text size='sm' style={{'wordBreak': 'break-all', 'display':'flex'}}>{value}</Text>
-                                    </Button>
-                                </Table.Tr>
-                            ))
-                            : null
-                    )}
-                </Table.Tbody>
-            </Table>
+                                        <Title order={4}>
+                                            {model}
+                                        </Title>
+                                        <Card.Section>
+                                            <Space h="md" />
+                                        </Card.Section>
+                                    </Card>
+                                ))}
+                            </Flex>
+                        </div>
+                    ))
+                )}
+            </ScrollArea>
             }
         </Card>
     );

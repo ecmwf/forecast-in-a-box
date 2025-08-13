@@ -148,10 +148,7 @@ def product_to_config(
 
         field = FieldWithUI(jsonschema=StringSchema(title=key))
 
-        if key in model.formfields:
-            # Use the model formfield if available
-            field = model.formfields[key]
-        elif key in product.formfields:
+        if key in product.formfields:
             # Use the product formfield if available
             field = product.formfields[key]
 

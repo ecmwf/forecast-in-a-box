@@ -13,7 +13,7 @@ from typing import Any
 
 import yaml
 from forecastbox.rjsf import FieldWithUI, FormDefinition
-from forecastbox.rjsf.jsonSchema import ObjectSchema, StringSchema
+from forecastbox.rjsf.jsonSchema import BooleanSchema, IntegerSchema, ObjectSchema, StringSchema
 from forecastbox.rjsf.uiSchema import UIAdditionalProperties, UIStringField
 from pydantic import BaseModel, Field, model_validator
 
@@ -23,25 +23,47 @@ FORECAST_IN_A_BOX_METADATA = "forecast-in-a-box.json"
 logger = logging.getLogger(__name__)
 
 
+processor_example = [{
+    "regrid": {
+        "area": "global",
+        "grid": "0.25deg",
+    }
+}]
+
+
+class Capabilities(BaseModel):
+    ensemble: bool = True
+    max_lead_time: int | None = None
+
 class ControlMetadata(BaseModel):
     _version: str = "1.0.0"
 
     pkg_versions: dict[str, str] = Field(default_factory=dict, examples=[{"numpy": "1.23.0", "pandas": "1.4.0"}])
     """Absolute overrides for the packages to install when running."""
 
-    input_source: str | dict[str, str] = Field(default="mars")
+    input_source: str | dict[str, str] | None = Field(None, examples=["mars", {'polytope': {'collection': "..."}}])
     """Source of the input, if dictionary, refers to keys of nested input sources"""
 
-    nested: dict[str, dict[str, Any] | str] | None = Field(default=None, examples=[])
+    nested: dict[str, dict[str, Any] | str] | None = Field(default=None, examples=[
+        {
+            "lam": {
+                "mars": {
+                    "pre_processors": [
+                        {"regrid": {"area": "...", "grid": "..."}}
+                    ]
+                }
+            },
+            'global': 'mars'
+        },
+    ])
     """Configuration if using nested input sources. Will use the CutoutInput to combine these sources.
-
-    Control the source of these source with the `input_source` field.
 
     E.g.
     ----
     ```
         nested:
         lam:
+            mars:
                 pre_processors:
                     - regrid:
                         area: ...
@@ -50,11 +72,13 @@ class ControlMetadata(BaseModel):
     ```
     """
 
-    pre_processors: list[str | dict[str, Any]] = Field(default_factory=list)
-    post_processors: list[str | dict[str, Any]] = Field(default_factory=list)
+    pre_processors: dict[str, Any] = Field(default_factory=dict, examples=processor_example)
+    post_processors: dict[str, Any] = Field(default_factory=dict, examples=processor_example)
 
     environment_variables: dict[str, Any] = Field(default_factory=dict, examples=[{"MY_VAR": "value", "ANOTHER_VAR": "another_value"}])
     """Environment variables for execution."""
+
+    capabilities: Capabilities = Field(default_factory=Capabilities, examples=[{"ensemble": True, "max_lead_time": 240}])
 
     @model_validator(mode="before")
     @classmethod
@@ -70,8 +94,9 @@ class ControlMetadata(BaseModel):
             if isinstance(val, str):
                 try:
                     return yaml.safe_load(val)
-                except yaml.YAMLError:
-                    return val
+                except yaml.YAMLError as e:
+                    from pydantic import ValidationError
+                    raise ValidationError(f"Invalid YAML format: {e}") from e
             elif isinstance(val, dict):
                 return {k: parse_yaml(v) for k, v in val.items()}
             return val
@@ -90,14 +115,29 @@ class ControlMetadata(BaseModel):
 
     @property
     def form(self) -> FormDefinition:
+        data = self.model_dump(exclude_none=True)
+        data.pop('_version', None)  # Remove version from form data
+
+        for key in list(data.keys()):
+            if isinstance(data[key], dict) and len(data[key]) == 0:
+                data.pop(key)
+
+        nested_dictionaries = ['nested', 'pre_processors', 'post_processors']
+
+        for key in nested_dictionaries:
+            if key in data and isinstance(data[key], dict):
+                for k in data[key]:
+                    data[key][k] = self._dump_yaml(data[key][k])
+
         return FormDefinition(
             title="Control Metadata",
+            formData=data,
             fields={
                 "input_source": FieldWithUI(
                     jsonschema=StringSchema(
                         title="Input Source",
                         description="Source of the input data, can be a string or a dictionary of sources.",
-                        default=self._dump_yaml(self.input_source),
+                        # default=self._dump_yaml(self.input_source),
                     ),
                 ),
                 "nested": FieldWithUI(
@@ -105,7 +145,19 @@ class ControlMetadata(BaseModel):
                         title="Nested Input Sources",
                         description="Configuration for nested input sources.",
                         additionalProperties=StringSchema(),
-                        default=self._dump_yaml(self.nested or {}),
+                        # default=self._dump_yaml(self.nested or {}),
+                    ),
+                    ui=UIAdditionalProperties(
+                        additionalProperties=UIStringField(widget="textarea", format="yaml")
+                    )
+                    ),
+                    "capabilites": FieldWithUI(
+                    jsonschema=ObjectSchema(
+                        title="Capabilities",
+                        properties={
+                            "ensemble": BooleanSchema(title="Ensemble", description="Whether the model supports ensemble forecasts.", default=self.capabilities.ensemble),
+                            "max_lead_time": IntegerSchema(title="Max Lead Time", description="Maximum lead time in hours for the model."),
+                        },
                     ),
                 ),
                 "pre_processors": FieldWithUI(
@@ -113,10 +165,10 @@ class ControlMetadata(BaseModel):
                         title="Pre-processors",
                         description="Pre-processors to apply to the input data. Key is the name of the pre-processor, value is the configuration.",
                         additionalProperties=StringSchema(),
-                        default=list(map(self._dump_yaml, self.pre_processors)),
+                        # default=list(map(self._dump_yaml, self.pre_processors)),
                     ),
                     ui=UIAdditionalProperties(
-                        additionalProperties=UIStringField(widget="textarea", format="yaml", enableMarkdownInDescription=True)
+                        additionalProperties=UIStringField(widget="textarea", format="yaml")
                     )
                 ),
                 "post_processors": FieldWithUI(
@@ -124,7 +176,7 @@ class ControlMetadata(BaseModel):
                         title="Post-processors",
                         description="List of post-processors to apply to the output data.",
                         additionalProperties=StringSchema(),
-                        default=list(map(self._dump_yaml, self.post_processors)),
+                        # default=list(map(self._dump_yaml, self.post_processors)),
                     ),
                     ui=UIAdditionalProperties(
                         additionalProperties=UIStringField(widget="textarea", format="yaml")
@@ -135,7 +187,7 @@ class ControlMetadata(BaseModel):
                         title="Package Versions",
                         description="Override package versions.",
                         additionalProperties=StringSchema(format="yaml"),
-                        default=self.pkg_versions,
+                        # default=self.pkg_versions,
                     ),
                     ui=UIAdditionalProperties(
                         additionalProperties=UIStringField(widget="text")
@@ -147,7 +199,7 @@ class ControlMetadata(BaseModel):
                         title="Environment Variables",
                         description="Environment variables for execution.",
                         additionalProperties=StringSchema(),
-                        default=self.environment_variables or {},
+                        # default=self.environment_variables or {},
                     ),
                     ui=UIAdditionalProperties(
                         additionalProperties=UIStringField(format="yaml")
@@ -237,10 +289,12 @@ def set_control_metadata(checkpoint_path: os.PathLike, control_data: ControlMeta
 
     open_checkpoint.cache_clear()
 
+    logger.info(f"Setting control metadata for {checkpoint_path}: {control_data.model_dump()}")
+
     if not has_metadata(str(checkpoint_path), name=FORECAST_IN_A_BOX_METADATA):
         save_metadata(
             str(checkpoint_path),
-            control_data.model_dump(),
+            {**control_data.model_dump(), "version": control_data._version},
             name=FORECAST_IN_A_BOX_METADATA,
         )
         return

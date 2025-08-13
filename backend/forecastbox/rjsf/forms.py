@@ -13,7 +13,7 @@
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
 
 from .jsonSchema import FieldSchema
@@ -31,6 +31,7 @@ class ExportedJsonSchema(TypedDict):
 class ExportedSchemas(TypedDict):
     jsonSchema: ExportedJsonSchema
     uiSchema: dict[str, dict]
+    formData: dict[str, Any]
 
 
 # Combined Schema + UI
@@ -52,6 +53,9 @@ class FormDefinition(BaseModel):
     """The fields in the form, keyed by field name."""
     required: list[str] | None = []
     """list of required field names."""
+    submitButtonOptions: dict[str, Any] | None = None
+    """Options for submit button, such as label and props."""
+    formData: dict[str, Any] = Field(default_factory=dict)
 
     def export_jsonschema(self) -> ExportedJsonSchema:
         """Exports the form definition as a JSON Schema object.
@@ -68,10 +72,13 @@ class FormDefinition(BaseModel):
         """Exports the form definition as a UI Schema object.
         This includes the UI options for each field that has a UI Schema defined.
         """
-        return {key: field.ui.export_with_prefix() for key, field in self.fields.items() if field.ui}
+        uischema = {key: field.ui.export_with_prefix() for key, field in self.fields.items() if field.ui}
+        if self.submitButtonOptions:
+            uischema["ui:submitButtonOptions"] = self.submitButtonOptions
+        return uischema
 
     def export_all(self) -> ExportedSchemas:
         """Exports both JSON Schema and UI Schema in a combined format.
         This is useful for rendering forms in RJSF.
         """
-        return {"jsonSchema": self.export_jsonschema(), "uiSchema": self.export_uischema()}
+        return {"jsonSchema": self.export_jsonschema(), "uiSchema": self.export_uischema(), 'formData': self.formData}

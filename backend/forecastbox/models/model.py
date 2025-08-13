@@ -16,8 +16,7 @@ from typing import Any, Optional
 from anemoi.inference.checkpoint import Checkpoint
 from earthkit.workflows.fluent import Action
 from earthkit.workflows.plugins.anemoi.fluent import from_input
-from forecastbox.core import FormFieldProvider
-from forecastbox.rjsf import FieldWithUI, FormDefinition
+from forecastbox.rjsf import FieldWithUI, FormDefinition, IntegerSchema, StringSchema, UIIntegerField, UIStringField
 from pydantic import BaseModel
 from qubed import Qube
 
@@ -27,7 +26,7 @@ from .utils import open_checkpoint
 FORECAST_IN_A_BOX_METADATA = "forecast-in-a-box.json"
 
 
-class BaseForecastModel(FormFieldProvider, ABC):
+class BaseForecastModel(ABC):
     def __init__(self, checkpoint: os.PathLike):
         self.checkpoint_path = checkpoint
         self.validate_checkpoint()
@@ -47,7 +46,7 @@ class BaseForecastModel(FormFieldProvider, ABC):
 
     @cached_property
     def control(self) -> ControlMetadata:
-        return get_control_metadata(str(self.checkpoint_path)).model_copy()
+        return get_control_metadata(self.checkpoint_path).model_copy()
 
     @cached_property
     def timestep(self) -> int:
@@ -113,12 +112,35 @@ class BaseForecastModel(FormFieldProvider, ABC):
         return convert_to_model_spec(self.checkpoint, assumptions=assumptions)
 
 
+    # -------
+    # Abstract methods
+    # To define graph execution and input configuration
+    # -------
+
     @abstractmethod
     def _create_input_configuration(self, control: ControlMetadata) -> str | dict[str, Any]:
         pass
 
-    def graph(self, lead_time: int, date, ensemble_members: int = 1, **kwargs) -> Action:
+    def _pre_processors(self, kwargs: dict[str, Any]) -> list[dict[str, Any]]:
+        """Get the pre-processors for the model."""
+        return []
+    def _post_processors(self, kwargs: dict[str, Any]) -> list[dict[str, Any]]:
+        """Get the post-processors for the model."""
+        return []
 
+    @property
+    def _pkg_versions(self) -> dict[str, str]:
+        """Model specific override for package versions."""
+        return {}
+
+    @property
+    def _execution_kwargs(self) -> dict[str, Any]:
+        """Model specific execution kwargs."""
+        return {}
+
+
+    def graph(self, lead_time: int, date, ensemble_members: int = 1, **kwargs) -> Action:
+        """Create the model action graph with specified parameters."""
         versions = self.versions
         INFERENCE_FILTER_STARTS = ["anemoi-models", "anemoi-graphs", "flash-attn", "torch"]
         INITIAL_CONDITIONS_FILTER_STARTS = ["anemoi-inference", "earthkit", "anemoi-transform", "anemoi-plugins"]
@@ -139,6 +161,7 @@ class BaseForecastModel(FormFieldProvider, ABC):
         }
 
         inference_env.update(control.pkg_versions)
+        inference_env.update(self._pkg_versions)
         inference_env_list = parse_into_install(inference_env)
 
         initial_conditions_env = parse_into_install(
@@ -152,6 +175,20 @@ class BaseForecastModel(FormFieldProvider, ABC):
         inference_environment_variables = (control.environment_variables).copy()
         input_source = self._create_input_configuration(control)
 
+        if isinstance(input_source, str):
+            input_source = {input_source: {}}
+
+        extra_kwargs = {
+            'pre_processors': [],
+            'post_processors': [],
+        }
+        if control.pre_processors:
+            extra_kwargs["pre_processors"].extend(control.pre_processors)
+        if control.post_processors:
+            extra_kwargs["post_processors"].extend(control.post_processors)
+
+        extra_kwargs['pre_processors'].extend(self._pre_processors(kwargs))
+        extra_kwargs['post_processors'].extend(self._post_processors(kwargs))
 
         return from_input(
             self.checkpoint_path,
@@ -161,16 +198,9 @@ class BaseForecastModel(FormFieldProvider, ABC):
             ensemble_members=ensemble_members,
             environment={"inference": inference_env_list, "initial_conditions": initial_conditions_env},
             env=inference_environment_variables,
+            **extra_kwargs,
+            **self._execution_kwargs,
         )
-
-    @property
-    def formfields(self) -> dict[str, FieldWithUI]:
-        """Fields to be used in the product configuration form."""
-        return {}
-
-    @property
-    def form(self) -> FormDefinition:
-        return FormDefinition(title = "#TODO", fields = {})
 
     def deaccumulate(self, outputs: "Action") -> "Optional[Action]":
         """Get the deaccumulated outputs."""
@@ -208,6 +238,55 @@ class BaseForecastModel(FormFieldProvider, ABC):
         """Create a SpecifiedModel instance with the given parameters."""
         return SpecifiedModel(self, lead_time, date, ensemble_members, **kwargs)
 
+    # -------
+    # Model Definition Forms
+    # -------
+
+    @property
+    def _extra_form_fields(self) -> dict[str, FieldWithUI]:
+        """Extra fields to be added to the model definition form."""
+        return {}
+
+    @property
+    def form(self) -> FormDefinition:
+        name = os.path.basename(self.checkpoint_path)
+        title = f"Model: {name}"
+        fields = {
+            "date": FieldWithUI(
+                jsonschema=StringSchema(
+                    title="Date",
+                    description="The date for the forecast",
+                ),
+                ui=UIStringField(widget="date"),
+            ),
+            "lead_time": FieldWithUI(
+                jsonschema=IntegerSchema(
+                    title="Lead Time",
+                    description="The lead time for the forecast, in hours.",
+                    minimum=self.timestep,
+                    default=self.control.capabilities.max_lead_time or 72,
+                    maximum=self.control.capabilities.max_lead_time,
+                    multipleOf= self.timestep,
+                ),
+                ui=UIIntegerField(),
+            ),
+            "ensemble_members": FieldWithUI(
+                jsonschema=IntegerSchema(
+                    title="Ensemble Members",
+                    description="The number of ensemble members to use.",
+                    default=1,
+                    maximum=51,
+                ),
+                ui=UIIntegerField(disabled=not self.control.capabilities.ensemble),
+            ),
+        }
+        fields.update(self._extra_form_fields)
+        return FormDefinition(
+            title=title,
+            fields=fields,
+            required=["date", "lead_time", "ensemble_members"],
+        )
+
 class SpecifiedModel(BaseForecastModel):
     """Model with specified parameters, delegating to a BaseForecastModel instance."""
     def __init__(self, model: BaseForecastModel, lead_time: int, date, ensemble_members: int = 1, **kwargs):
@@ -222,6 +301,16 @@ class SpecifiedModel(BaseForecastModel):
 
     def timesteps(self) -> list[int]: # type: ignore[override]
         return self._model.timesteps(self._lead_time)
+
+    @property
+    def specification(self) -> dict[str, Any]:
+        """Get the specification of the model."""
+        return {
+            "lead_time": self._lead_time,
+            "date": self._date,
+            "ensemble_members": self._ensemble_members,
+            **self._kwargs,
+        }
 
     def graph(self, **kwargs) -> Action: # type: ignore[override]
         """Create the model action graph with specified parameters."""
@@ -258,7 +347,8 @@ def get_model(checkpoint: os.PathLike) -> BaseForecastModel:
     from .nested import NestedModel
 
     control = get_control_metadata(checkpoint)
-    if control.nested:
+
+    if control.nested is not None:
         return NestedModel(checkpoint)
     return GlobalModel(checkpoint)
 
