@@ -11,7 +11,7 @@ The self-bootstrapping installer for Forecast in a Box
 This script:
 1. checks for the 'uv' binary on the system, and if missing downloads into fiab
    root directory (~/.fiab)
-2. checks for a python 3.11 interpreter, and if missing installs it
+2. checks for a python interpreter of desired version, and if missing installs it
 3. checks for a venv in fiab root directory, and if missing creates it
    and installs the fiab wheel in there from pypi
 4. checks for a yarn install, and if missing installs it
@@ -30,6 +30,12 @@ EOF
 
 
 export FIAB_ROOT=${FIAB_ROOT:-"$HOME/.fiab"}
+# to allow forks on Macos, cf eg https://github.com/rq/rq/issues/1418
+export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
+export EARTHKIT_DATA_CACHE_POLICY=${EARTHKIT_DATA_CACHE_POLICY:-"user"}
+export EARTHKIT_DATA_MAXIMUM_CACHE_SIZE=${EARTHKIT_DATA_MAXIMUM_CACHE_SIZE:-"50G"}
+FIAB_PY_VERSION=${FIAB_PY_VERSION:-"3.12.7"}
+
 check() {
 	if [ -z "$(which curl || :)" ] ; then
 		echo "command 'curl' not found, please install"
@@ -62,15 +68,15 @@ maybeInstallUv() {
 }
 
 maybeInstallPython() {
-	# checks whether py3.11 is present on the system, uv-installs if not, exports UV_PYTHON to hold the binary's path
-	# MAYBE_PYTHON="$(uv python list | grep python3.11 | sed 's/ \+/;/g' | cut -f 2 -d ';' | head -n 1 || :)"
+	# checks whether FIAB_PY_VERSION is present on the system, uv-installs if not, exports UV_PYTHON to hold the binary's path
+	# MAYBE_PYTHON="$(uv python list | grep python"$FIAB_PY_VERSION" | sed 's/ \+/;/g' | cut -f 2 -d ';' | head -n 1 || :)"
     # NOTE somehow this regexp isn't portable, but we dont really need the full binary path
-    MAYBE_PYTHON="$(uv python list | grep python3.11 || :)"
+    MAYBE_PYTHON="$(uv python list | grep python"$FIAB_PY_VERSION" || :)"
 	if [ -z "$MAYBE_PYTHON" ] ; then
-		uv python install --python-preference only-managed 3.11 # TODO install to fiab home instead?
+		uv python install --python-preference only-managed "$FIAB_PY_VERSION" # TODO install to fiab home instead?
 	fi
     # export UV_PY="$MAYBE_PYTHON"
-    export UV_PY="python3.11"
+    export UV_PY="python$FIAB_PY_VERSION"
 }
 
 VENV="${FIAB_ROOT}/venv"
@@ -96,7 +102,7 @@ maybePruneUvCache() {
     # NOTE we install a lot, so we best prune uv cache from time to time. This is a system-wide effect, but presumably not an undesired one
     PRUNETS=$FIAB_ROOT/uvcache.prunetimestamp
     if [ -f "$PRUNETS" ] ; then
-        if find "$PRUNETS" -mtime +30 ; then
+        if find "$PRUNETS" -mtime +30 | grep "$PRUNETS" ; then
             echo "uv cache pruned more than 30 days ago: pruning"
             uv cache prune
             touch "$PRUNETS"
@@ -131,9 +137,4 @@ maybeInstallPython
 maybeCreateVenv
 maybePruneUvCache
 
-# to allow forks on Macos, cf eg https://github.com/rq/rq/issues/1418
-export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
-
-export EARTHKIT_DATA_CACHE_POLICY=${EARTHKIT_DATA_CACHE_POLICY:-"user"}
-export EARTHKIT_DATA_MAXIMUM_CACHE_SIZE=${EARTHKIT_DATA_MAXIMUM_CACHE_SIZE:-"50G"}
 python -m $ENTRYPOINT
