@@ -279,7 +279,7 @@ export default function QuickLaunch() {
                         showNotification(
                             {
                                 title: 'Success',
-                                message: `Graph submitted successfully! Job ID: ${result.id}`,
+                                message: `Job submitted successfully!: ${result.id}`,
                                 color: 'green',
                                 icon: <IconCheck size={16} />,
                             }

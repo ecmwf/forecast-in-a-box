@@ -194,6 +194,9 @@ function ModelButton({ model, setSelected }: { model: string; setSelected: (valu
     }
 
     const handleDelete = async () => {
+        if (!window.confirm("Are you sure you want to delete this model?")) {
+            return;
+        }
         try {
             const result = await api.delete(`/v1/model/${model.replace('/', '_')}`);
             const data = await result.data;

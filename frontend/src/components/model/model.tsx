@@ -114,7 +114,7 @@ function Model({ selectedModel, coordinates, setCoordinates, modelSpec, submit }
             {model && modelForm && modelForm.jsonSchema ? (
                 <Form
                     schema={modelForm.jsonSchema}
-                    uiSchema={{ ...modelForm.uiSchema, ...uiSchemaforForm }}
+                    uiSchema={modelForm.uiSchema}
                     validator={validator}
                     formData={modelSpec}
                     onSubmit={(e) => { onSubmit(e.formData); }}
