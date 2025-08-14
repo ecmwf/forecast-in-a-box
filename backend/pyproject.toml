@@ -26,7 +26,7 @@ dynamic = [ "version" ]
 # just a minimal set of dependencies to run the servers. Individual tasks install their runtime dependencies on their own
 dependencies = [
   "aiosqlite",
-  "anemoi-inference>=0.7.1",
+  "anemoi-inference @ git+https://github.com/ecmwf/anemoi-inference",
   "cloudpickle",
   "earthkit-workflows>=0.4.6",
   "earthkit-workflows-anemoi>=0.3.4",
@@ -37,8 +37,8 @@ dependencies = [
   "httpx<1",
   "httpx-oauth",
   "jinja2",
-  "mir-python==1.27.1.dev20250627",   # to bring in the binary stack eagerly, TODO unpin once stable
-  "multiolib==2.6.1.dev20250627",     # to bring in the binary stack eagerly, TODO unpin once stable
+  "mir-python==1.27.1.dev20250627",                                   # to bring in the binary stack eagerly, TODO unpin once stable
+  "multiolib==2.6.1.dev20250627",                                     # to bring in the binary stack eagerly, TODO unpin once stable
   "orjson",
   "pproc",
   "psutil",
