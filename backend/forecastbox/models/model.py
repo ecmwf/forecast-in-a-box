@@ -160,8 +160,8 @@ class BaseForecastModel(ABC):
             key: val for key, val in versions.items() if any(key.startswith(start) for start in INFERENCE_FILTER_STARTS)
         }
 
-        inference_env.update(control.pkg_versions)
         inference_env.update(self._pkg_versions)
+        inference_env.update(control.pkg_versions)
         inference_env_list = parse_into_install(inference_env)
 
         initial_conditions_env = parse_into_install(
