@@ -26,7 +26,7 @@ dynamic = [ "version" ]
 # just a minimal set of dependencies to run the servers. Individual tasks install their runtime dependencies on their own
 dependencies = [
   "aiosqlite",
-  "anemoi-inference>=0.4.10",
+  "anemoi-inference>=0.7.1",
   "cloudpickle",
   "earthkit-workflows>=0.4.6",
   "earthkit-workflows-anemoi>=0.3.4",
