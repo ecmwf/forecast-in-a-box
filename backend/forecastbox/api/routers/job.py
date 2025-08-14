@@ -136,7 +136,7 @@ async def update_and_get_progress(job_id: JobId) -> JobProgressResponse:
 
     else:
         progress = "100.00" if job.status == "completed" else "0.00"
-        return JobProgressResponse(progress=progress, created_at=created_at, status=job.status)
+        return JobProgressResponse(progress=progress, created_at=created_at, status=job.status, error=job.error)
 
 
 @router.get("/status")
