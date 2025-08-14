@@ -238,6 +238,10 @@ class BaseForecastModel(ABC):
         """Create a SpecifiedModel instance with the given parameters."""
         return SpecifiedModel(self, lead_time, date, ensemble_members, **kwargs)
 
+    @property
+    def is_global(self) -> bool:
+        return self.control.nested is None
+
     # -------
     # Model Definition Forms
     # -------

@@ -255,8 +255,7 @@ class InteractiveMapProduct(GenericTemporalProduct):
         return formfields
 
     def validate_intersection(self, model: SpecifiedModel) -> bool:
-        from forecastbox.models.globe import GlobalModel
-        if not isinstance(model, GlobalModel):
+        if not model.is_global:
             return False
         return super().validate_intersection(model) and EARTHKIT_PLOTS_IMPORTED
 
