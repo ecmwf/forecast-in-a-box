@@ -93,6 +93,11 @@ class GeneralSettings(BaseModel):
     pproc_schema_dir: str | None = None
     """Path to the directory containing the PPROC schema files."""
 
+    launch_browser: bool = True
+    """Whether a browser window should be opened after start. Used only when
+    standalone.entrypoint.launch_all module is used"""
+
+
     def validate_runtime(self) -> list[str]:
         if self.pproc_schema_dir and not os.path.isdir(self.pproc_schema_dir):
             return ["not a directory: pproc_schema_dir={self.pproc_schema_dir}"]

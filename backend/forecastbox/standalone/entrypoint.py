@@ -181,7 +181,7 @@ def export_recursive(dikt, delimiter, prefix):
                 os.environ[f"{prefix}{k}"] = str(v)
 
 
-def launch_all(config: FIABConfig, is_browser: bool, attempts: int = 20) -> ProcessHandles:
+def launch_all(config: FIABConfig, attempts: int = 20) -> ProcessHandles:
     freeze_support()
     set_start_method("forkserver")
     setup_process()
@@ -209,7 +209,7 @@ def launch_all(config: FIABConfig, is_browser: bool, attempts: int = 20) -> Proc
             api.kill()
         raise
 
-    if is_browser:
+    if config.general.launch_browser:
         webbrowser.open(config.api.local_url())
 
     return ProcessHandles(api=api, cascade_url=config.cascade.cascade_url)
@@ -221,7 +221,7 @@ if __name__ == "__main__":
     config = FIABConfig()
     validate_runtime(config)
     _previous_cleanup()
-    handles = launch_all(config, True)
+    handles = launch_all(config)
     try:
         handles.wait()
     except KeyboardInterrupt:
