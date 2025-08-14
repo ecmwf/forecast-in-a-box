@@ -63,6 +63,7 @@ if __name__ == "__main__":
         config.api.uvicorn_port = 30645
         config.auth.passthrough = True
         config.cascade.cascade_url = "tcp://localhost:30644"
+        config.general.launch_browser = False
         if os.environ.get("UNCLEAN", "") != "yea":
             dbDir = tempfile.TemporaryDirectory()
             config.db.sqlite_userdb_path = f"{dbDir.name}/user.db"
