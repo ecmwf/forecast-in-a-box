@@ -14,13 +14,13 @@ from pathlib import Path
 from anemoi.inference.checkpoint import Checkpoint
 from anemoi.inference.testing import fake_checkpoints
 from earthkit.workflows import fluent
-from forecastbox.models.model import Model, ModelExtra
+from forecastbox.models.globe import ControlMetadata, GlobalModel
 from qubed import Qube
 
 checkpoint_path = (Path(__file__).parent / "../checkpoints/simple.yaml").absolute()
 
 
-class FakeModel(Model):
+class FakeModel(GlobalModel):
     """Test model for testing purposes."""
 
     @property
@@ -28,20 +28,15 @@ class FakeModel(Model):
     def checkpoint(self):
         return Checkpoint(checkpoint_path)
 
-    def versions(self):
-        """Checkpoint has no versions."""
-        return {}
-
     @property
-    def extra_information(self) -> ModelExtra:
-        return ModelExtra()
-
+    def control(self) -> ControlMetadata:
+        return ControlMetadata()
 
 @fake_checkpoints
 def test_model_qube():
     """Test the `qube` method of the model."""
 
-    test_model = FakeModel(checkpoint_path=checkpoint_path, lead_time=72, date="2023-01-01", ensemble_members=1)
+    test_model = FakeModel(checkpoint=checkpoint_path).specify(lead_time=72, date="2023-01-01", ensemble_members=1)
 
     qube = test_model.qube({})
     assert isinstance(qube, Qube), "Qube should be an instance of Qube"
@@ -67,9 +62,8 @@ def test_model_qube():
 def test_model_qube_with_model_assumptions():
     """Test the `qube` method of the model with model assumptions."""
 
-    test_model = test_model = FakeModel(
-        checkpoint_path=checkpoint_path, lead_time=72, date="2023-01-01", ensemble_members=1
-    )
+    test_model = FakeModel(checkpoint=checkpoint_path).specify(lead_time=72, date="2023-01-01", ensemble_members=1)
+
 
     model_assumptions = {
         "options": ["value1", "value2"],
@@ -84,9 +78,7 @@ def test_model_qube_with_model_assumptions():
 def test_graph_creation():
     """Test the creation of a graph from the model."""
 
-    test_model = test_model = FakeModel(
-        checkpoint_path=checkpoint_path, lead_time=72, date="2023-01-01", ensemble_members=1
-    )
-    graph = test_model.graph(fluent.from_source(lambda x: x))
+    test_model = FakeModel(checkpoint=checkpoint_path).specify(lead_time=72, date="2023-01-01", ensemble_members=1)
+    graph = test_model.graph()
 
     assert isinstance(graph, fluent.Action), "Graph should be an instance of fluent.Action"

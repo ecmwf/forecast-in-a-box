@@ -12,10 +12,9 @@ from collections import OrderedDict
 from typing import TYPE_CHECKING, Any, Union
 
 from earthkit.workflows import fluent
-from forecastbox.models import Model
+from forecastbox.models import SpecifiedModel
+from forecastbox.rjsf import ArraySchema, FieldSchema, FieldWithUI, IntegerSchema, StringSchema
 from qubed import Qube
-
-from .rjsf import ArraySchema, FieldSchema, FieldWithUI, IntegerSchema, StringSchema
 
 if TYPE_CHECKING:
     from earthkit.workflows.fluent import Action
@@ -24,11 +23,6 @@ if TYPE_CHECKING:
 
 class Product(ABC):
     """Base Product Class"""
-
-    @property
-    def _name(self):
-        """Name of the product, used for display purposes."""
-        return self.__class__.__name__
 
     @property
     def _name(self):
@@ -122,7 +116,7 @@ class Product(ABC):
             source = source.sel(**{key: value})  # type: ignore
         return source
 
-    def validate_intersection(self, model: Model) -> bool:
+    def validate_intersection(self, model: SpecifiedModel) -> bool:
         """Validate the intersection of the model and product qubes.
 
         By default, if `model_assumptions` are provided, the intersection must contain all of them.
@@ -135,7 +129,7 @@ class Product(ABC):
 
         return len(model_intersection.axes()) > 0
 
-    def model_intersection(self, model: Model) -> "Qube":
+    def model_intersection(self, model: SpecifiedModel) -> "Qube":
         """Get the intersection of the model and product qubes."""
         return model.qube(self.model_assumptions) & self.qube
 
@@ -149,7 +143,7 @@ class Product(ABC):
         return fluent.Payload(payload)
 
     @abstractmethod
-    def execute(self, product_spec: dict[str, Any], model: Model, source: "Action") -> Union["Graph", "Action"]:
+    def execute(self, product_spec: dict[str, Any], model: SpecifiedModel, source: "Action") -> Union["Graph", "Action"]:
         raise NotImplementedError()
 
 
@@ -191,7 +185,7 @@ class GenericParamProduct(Product):
             "levelist": "*",
         }
 
-    def validate_intersection(self, model: Model) -> bool:
+    def validate_intersection(self, model: SpecifiedModel) -> bool:
         """Validate the intersection of the model and product qubes."""
         axes = self.model_intersection(model).axes()
         return all(k in axes for k in self.generic_params if not k == "levelist")
@@ -240,13 +234,13 @@ class GenericTemporalProduct(GenericParamProduct):
         )
         return formfields
 
-    def model_intersection(self, model: Model) -> Qube:
+    def model_intersection(self, model: SpecifiedModel) -> Qube:
         """Get model intersection.
 
         Add step as axis to the model intersection.
         """
         intersection = super().model_intersection(model)
-        result = f"step={'/'.join(map(str, model.timesteps))}" / intersection
+        result = f"step={'/'.join(map(str, model.timesteps()))}" / intersection
         return result
 
 

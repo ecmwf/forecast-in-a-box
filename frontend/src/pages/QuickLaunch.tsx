@@ -47,34 +47,34 @@ const products: Record<string, ProductSpecification[]> = {
             param: [
                 "2t",
                 "msl",
-                "10u",
-                "10v"
+                // "10u",
+                // "10v"
             ],
             levtype: "sfc",
-            domain: "Europe",
+            domain: "DataDefined",
             reduce: "True",
             step: [
                 "*",
             ]
         }
     },
-    // {
-    //   product: "Standard/Output",
-    //   specification: {
-    //         param: [
-    //             "2t",
-    //             "msl",
-    //             "10u",
-    //             "10v"
-    //         ],
-    //         levtype: "sfc",
-    //         reduce: "True",
-    //         format: "grib",
-    //         step: [
-    //             "*"
-    //         ]
-    //   }
-    // }
+    {
+      product: "Standard/Output",
+      specification: {
+            param: [
+                "2t",
+                "msl",
+                "10u",
+                "10v"
+            ],
+            levtype: "sfc",
+            reduce: "True",
+            format: "grib",
+            step: [
+                "*"
+            ]
+      }
+    }
     ],
     'TP, MSLP and Winds': [{
         product: "Plots/Maps",
@@ -82,34 +82,34 @@ const products: Record<string, ProductSpecification[]> = {
             param: [
                 "tp",
                 "msl",
-                "10u",
-                "10v"
+                // "10u",
+                // "10v"
             ],
             levtype: "sfc",
-            domain: "Europe",
+            domain: "DataDefined",
             reduce: "True",
             step: [
                 "*",
             ]
         }
     },
-    // {
-    //   product: "Standard/Output",
-    //   specification: {
-    //         param: [
-    //             "tp",
-    //             "msl",
-    //             "10u",
-    //             "10v"
-    //         ],
-    //         levtype: "sfc",
-    //         reduce: "True",
-    //         format: "grib",
-    //         step: [
-    //             "*"
-    //         ]
-    //   }
-    // }
+    {
+      product: "Standard/Output",
+      specification: {
+            param: [
+                "tp",
+                "msl",
+                "10u",
+                "10v"
+            ],
+            levtype: "sfc",
+            reduce: "True",
+            format: "grib",
+            step: [
+                "*"
+            ]
+      }
+    }
     ],
 }
 
@@ -279,7 +279,7 @@ export default function QuickLaunch() {
                         showNotification(
                             {
                                 title: 'Success',
-                                message: `Graph submitted successfully! Job ID: ${result.id}`,
+                                message: `Job submitted successfully!: ${result.id}`,
                                 color: 'green',
                                 icon: <IconCheck size={16} />,
                             }

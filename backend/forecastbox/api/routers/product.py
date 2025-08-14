@@ -13,13 +13,13 @@ import re
 from collections.abc import Iterable
 from typing import Any, OrderedDict
 
-import forecastbox.products.rjsf.utils as rjsfutils
+import forecastbox.rjsf.utils as rjsfutils
 from fastapi import APIRouter, HTTPException
-from forecastbox.models import Model
+from forecastbox.models import SpecifiedModel, get_model
 from forecastbox.products.interfaces import Interfaces
 from forecastbox.products.product import USER_DEFINED, Product
 from forecastbox.products.registry import Category, get_categories, get_product
-from forecastbox.products.rjsf import ExportedSchemas, FieldWithUI, FormDefinition, StringSchema
+from forecastbox.rjsf import ExportedSchemas, FieldWithUI, FormDefinition, StringSchema
 from qubed import Qube
 
 from ..types import ModelSpecification
@@ -34,12 +34,12 @@ CONFIG_ORDER = ["param", "levtype", "levelist", "step"]
 """Order of configuration parameters for display purposes."""
 
 
-def get_model(model: ModelSpecification) -> Model:
+def create_model(model: ModelSpecification) -> SpecifiedModel:
     """Get the model from the local model repository."""
 
     model_dict = model.model_dump()
-    model_path = get_model_path(model_dict.pop("model").replace("_", "/"))
-    return Model(checkpoint_path=model_path, **model_dict)
+    model_obj = get_model(checkpoint=get_model_path(model_dict.pop("model").replace("_", "/")))
+    return model_obj.specify(**model_dict)
 
 
 def select_from_params(available_spec: Qube, params: dict[str, Any]) -> Qube:
@@ -107,7 +107,7 @@ def product_to_config(
 
     # product_spec = product.qube
 
-    model = get_model(model_spec)
+    model = create_model(model_spec)
     # model_qube = model_spec.qube(product.model_assumptions)
 
     available_product_spec = product.model_intersection(model)
@@ -148,10 +148,7 @@ def product_to_config(
 
         field = FieldWithUI(jsonschema=StringSchema(title=key))
 
-        if key in model.formfields:
-            # Use the model formfield if available
-            field = model.formfields[key]
-        elif key in product.formfields:
+        if key in product.formfields:
             # Use the product formfield if available
             field = product.formfields[key]
 
@@ -208,7 +205,7 @@ async def get_valid_categories(interface: Interfaces, modelspec: ModelSpecificat
     dict[str, Category]
         Dictionary of categories with available options based on the model specification.
     """
-    model_spec = get_model(modelspec)
+    model_spec = create_model(modelspec)
 
     categories = get_categories(interface)
     for key, category in categories.items():

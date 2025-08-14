@@ -1,7 +1,7 @@
-from forecastbox.products.rjsf import utils
-from forecastbox.products.rjsf.forms import FieldWithUI
-from forecastbox.products.rjsf.jsonSchema import ArraySchema, EnumMixin, StringSchema
-from forecastbox.products.rjsf.uiSchema import UIField, UIObjectField
+from forecastbox.rjsf import utils
+from forecastbox.rjsf.forms import FieldWithUI
+from forecastbox.rjsf.jsonSchema import ArraySchema, EnumMixin, StringSchema
+from forecastbox.rjsf.uiSchema import UIField, UIObjectField
 
 
 def test_update_enum_within_field_string():

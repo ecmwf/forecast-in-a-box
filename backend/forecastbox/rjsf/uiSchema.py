@@ -43,6 +43,8 @@ class UIField(BaseModel):
     """Custom description for the field."""
     disabled: bool | None = None
     """If True, the field will be disabled."""
+    enableMarkdownInDescription: bool | None = None
+    """If True, Markdown will be enabled in the description."""
     emptyValue: Any | None = None
     """Value to use when the field is empty."""
     enumDisabled: list[Any] | None = None
@@ -70,6 +72,17 @@ class UIField(BaseModel):
 
     def export_with_prefix(self) -> dict[str, Any]:
         return {"ui:options": self.model_dump(exclude_none=True)}
+
+class UIAdditionalProperties(BaseModel):
+    """Base class for additional properties in UI schema."""
+    additionalProperties: "UISchema | None" = None
+
+    def export_with_prefix(self) -> dict[str, Any]:
+        """Export the UI schema with prefix."""
+        result = {}
+        if self.additionalProperties:
+            result = {"additionalProperties": self.additionalProperties.export_with_prefix()}
+        return result
 
 
 class UIStringField(UIField):
@@ -135,9 +148,12 @@ class UIObjectField(BaseModel):
         return result
 
 
-UISchema = Union[UIStringField, UIIntegerField, UIBooleanField, UIObjectField, UIField]
+
+
+UISchema = Union[UIStringField, UIIntegerField, UIBooleanField, UIObjectField, UIField, UIAdditionalProperties]
 """Union type for all UI schema field types."""
 
 UIObjectField.model_rebuild()
+UIAdditionalProperties.model_rebuild()
 
 __all__ = ["UIField", "UIStringField", "UIIntegerField", "UIBooleanField", "UIObjectField", "UISchema"]

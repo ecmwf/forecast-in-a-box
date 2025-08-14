@@ -14,16 +14,18 @@ from typing import TYPE_CHECKING, Literal
 import earthkit.data as ekd
 from earthkit.workflows.decorators import as_payload
 
+from .product import Product
+
 if TYPE_CHECKING:
     import numpy as np
-    import xarray as xr
 
+FORMAT = Literal["grib", "netcdf", "numpy"]
 OUTPUT_TYPES = ["grib", "netcdf", "numpy"]
 
 
 @as_payload
 def export_fieldlist_as(
-    fields: ekd.FieldList, format: Literal["grib", "netcdf", "numpy"] = "grib"
+    fields: ekd.FieldList, format: FORMAT = "grib"
 ) -> tuple[bytes, str]:
     """Export an earthkit FieldList to a specified format.
     Supported formats are 'grib', 'netcdf', and 'numpy'.
@@ -47,10 +49,9 @@ def export_fieldlist_as(
         fields.to_target("file", buf, encoder="grib")
         written_bytes = buf.getvalue()
     elif format == "netcdf":
-        xr_obj: xr.Dataset = fields.to_xarray()
-        if xr_obj is None:
-            raise ValueError("Data cannot be converted to netcdf.")
-        written_bytes = xr_obj.to_netcdf()
+        buf = io.BytesIO()
+        fields.to_target("file", buf, encoder="netcdf", decode_timedelta=False)
+        written_bytes = buf.getvalue()
     elif format == "numpy":
         np_obj: np.ndarray = fields.to_numpy()  # type: ignore
         if np_obj is None:
@@ -60,3 +61,6 @@ def export_fieldlist_as(
         raise ValueError(f"Unsupported format: {format}. Supported formats are {OUTPUT_TYPES}.")
 
     return written_bytes, f"application/{format}"
+
+class ExportMixin(Product):
+    pass

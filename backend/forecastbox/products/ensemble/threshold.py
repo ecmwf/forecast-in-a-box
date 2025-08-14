@@ -13,12 +13,12 @@ from typing import Any
 import yaml
 from earthkit.workflows import fluent
 from forecastbox.products.ensemble.base import BaseEnsembleProduct, BasePProcEnsembleProduct
+from forecastbox.rjsf import FieldWithUI, StringSchema
 from qubed import Qube
 
 from ..export import export_fieldlist_as
 from ..generic import generic_registry
 from ..product import USER_DEFINED, GenericParamProduct
-from ..rjsf import FieldWithUI, StringSchema
 from . import ensemble_registry
 
 

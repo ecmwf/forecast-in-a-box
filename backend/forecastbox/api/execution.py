@@ -25,7 +25,7 @@ from forecastbox.api.types import EnvironmentSpecification, ExecutionSpecificati
 from forecastbox.api.utils import get_model_path
 from forecastbox.config import config
 from forecastbox.db.job import insert_one
-from forecastbox.models import Model
+from forecastbox.models import get_model
 from forecastbox.products.registry import get_product
 from forecastbox.schemas.user import UserRead
 from pydantic import BaseModel
@@ -41,10 +41,10 @@ def forecast_products_to_cascade(spec: ForecastProducts, environment: Environmen
         ensemble_members=spec.model.ensemble_members,
     )
 
-    model = Model(checkpoint_path=get_model_path(spec.model.model), **model_spec)
+    model = get_model(checkpoint=get_model_path(spec.model.model)).specify(**model_spec) # type: ignore
 
     # Create the model action graph
-    model_action = model.graph(None, environment_kwargs=environment.environment_variables, **spec.model.entries)
+    model_action = model.graph(environment_kwargs=environment.environment_variables)
 
     # Iterate over each product in the specification
     complete_graph = Graph([])

@@ -13,11 +13,11 @@ from typing import Any
 import yaml
 from earthkit.workflows import fluent
 from forecastbox.products.ensemble.base import BasePProcEnsembleProduct
+from forecastbox.rjsf import StringSchema
 from qubed import Qube
 
 from ..generic import generic_registry
 from ..product import USER_DEFINED, GenericTemporalProduct
-from ..rjsf import FieldWithUI, StringSchema
 from . import ensemble_registry
 
 
@@ -28,11 +28,11 @@ class BaseQuantiles(BasePProcEnsembleProduct, GenericTemporalProduct):
     def formfields(self):
         formfields = super().formfields.copy()
         formfields.update(
-            quantile=FieldWithUI(
-                jsonschema=StringSchema(
+            quantile=self._make_field(
+                    multiple=True,
+                    schema=StringSchema,
                     title="Quantiles",
                     description="Computed Quantile",
-                )
             ),
         )
         return formfields
@@ -56,22 +56,23 @@ class BaseQuantiles(BasePProcEnsembleProduct, GenericTemporalProduct):
         requests = []
 
         for para in params:
-            request: dict[str, Any] = {
-                "type": "pb",
-            }
-            from anemoi.utils.grib import shortname_to_paramid
-
-            param_id = shortname_to_paramid(para)
-
-            request.update(
-                {
-                    "levtype": levtype,
-                    "param": param_id,
-                    "step": step,
-                    "quantile": list(map(str, quantile)),
+            for st in step:
+                request: dict[str, Any] = {
+                    "type": "pb",
                 }
-            )
-            requests.append(request)
+                from anemoi.utils.grib import shortname_to_paramid
+
+                param_id = shortname_to_paramid(para)
+
+                request.update(
+                    {
+                        "levtype": levtype,
+                        "param": param_id,
+                        "step": st,
+                        "quantile": list(map(str, quantile)),
+                    }
+                )
+                requests.append(request)
         return requests
 
 

@@ -11,14 +11,14 @@ import importlib.util
 from collections import OrderedDict
 
 from earthkit.workflows.plugins.pproc.fluent import Action as ppAction
-from forecastbox.models import Model
+from forecastbox.models import SpecifiedModel
+from forecastbox.rjsf import FieldWithUI, IntegerSchema
 from qubed import Qube
 
 from .export import export_fieldlist_as
 from .interfaces import Interfaces
 from .product import Product
 from .registry import CategoryRegistry
-from .rjsf import FieldWithUI, IntegerSchema
 
 thermal_indices = CategoryRegistry(
     "thermal", interface=Interfaces.DETAILED, description="Thermal Indices", title="Thermal Indices"
@@ -52,10 +52,10 @@ class BaseThermalIndex(Product):
         )
         return formfields
 
-    def model_intersection(self, model: Model) -> Qube:
-        return f"step={'/'.join(map(str, model.timesteps))}" / Qube.from_datacube({})
+    def model_intersection(self, model: SpecifiedModel) -> Qube:
+        return f"step={'/'.join(map(str, model.timesteps()))}" / Qube.from_datacube({})
 
-    def validate_intersection(self, model: Model) -> bool:
+    def validate_intersection(self, model: SpecifiedModel) -> bool:
         model_intersection = model.qube()
 
         if not THERMOFEEL_IMPORTED or self.param_requirements is None:

@@ -14,12 +14,12 @@ from collections import defaultdict
 import earthkit.data as ekd
 from earthkit.workflows import mark
 from earthkit.workflows.decorators import as_payload
-from earthkit.workflows.plugins.anemoi.fluent import ENSEMBLE_DIMENSION_NAME
-from forecastbox.models import Model
+from earthkit.workflows.plugins.anemoi.types import ENSEMBLE_DIMENSION_NAME
+from forecastbox.models import SpecifiedModel
 from forecastbox.products.ensemble import BaseEnsembleProduct
 from forecastbox.products.product import GenericTemporalProduct
+from forecastbox.rjsf import FieldWithUI, StringSchema, UIStringField
 
-from ..rjsf import FieldWithUI, StringSchema, UIStringField
 from . import plot_product_registry
 
 EARTHKIT_PLOTS_IMPORTED = True
@@ -108,7 +108,7 @@ def quickplot(
     subplot_title: str | None = None,
     figure_title: str | None = None,
     domain: str | None = None,
-    no_pad: bool = True,
+    no_pad: bool = False,
 ):
     from earthkit.plots import Figure  # NOTE we need to import again to mask the possible Any
     from earthkit.plots.components import layouts
@@ -173,9 +173,10 @@ class MapProduct(GenericTemporalProduct):
     This product is a simple wrapper around the `earthkit.plots` library to create maps.
 
     # TODO, Add projection, and title control
+    # TODO, consider how plotting works for LAM models
     """
 
-    domains = ["Global", "Europe", "Australia", "Malawi", "Norway"]
+    domains = ["DataDefined", "Europe", "Australia", "Malawi", "Norway"]
 
     @property
     def formfields(self):
@@ -194,7 +195,7 @@ class MapProduct(GenericTemporalProduct):
                     title="Domain",
                     description="Domain of the map",
                     enum=self.domains,
-                    default="Global",
+                    default="DataDefined",
                 ),
                 ui=UIStringField(
                     widget="select",
@@ -214,7 +215,7 @@ class MapProduct(GenericTemporalProduct):
     def qube(self):
         return self.make_generic_qube(domain=self.domains, reduce=["True", "False"])
 
-    def validate_intersection(self, model: Model) -> bool:
+    def validate_intersection(self, model: SpecifiedModel) -> bool:
         return super().validate_intersection(model) and EARTHKIT_PLOTS_IMPORTED
 
 
@@ -225,7 +226,7 @@ class SimpleMapProduct(MapProduct):
         domain = product_spec.pop("domain", None)
         source = self.select_on_specification(product_spec, source)
 
-        if domain == "Global":
+        if domain == "DataDefined":
             domain = None
 
         if product_spec.get("reduce", "True") == "True":
@@ -253,7 +254,9 @@ class InteractiveMapProduct(GenericTemporalProduct):
         formfields.pop('reduce', None)
         return formfields
 
-    def validate_intersection(self, model: Model) -> bool:
+    def validate_intersection(self, model: SpecifiedModel) -> bool:
+        if not model.is_global:
+            return False
         return super().validate_intersection(model) and EARTHKIT_PLOTS_IMPORTED
 
     @property

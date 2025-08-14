@@ -58,7 +58,7 @@ export default function Result({ job_id, dataset_id, in_modal }: ResultProps) {
 
     return (
         <>
-        <Group justify='space-between' w='90%' mb='xl'>
+        <Group justify='space-between' mb='xl'>
             {!in_modal ? (
                 <Button component="a" href={`/job/${job_id}`} variant="outline" color="blue" size="md" m='xl'>
                     Back to Results
