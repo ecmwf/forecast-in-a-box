@@ -29,7 +29,7 @@ dependencies = [
   "anemoi-inference>=0.4.10",
   "cloudpickle",
   "earthkit-workflows>=0.4.6",
-  "earthkit-workflows-anemoi>=0.3.1",
+  "earthkit-workflows-anemoi>=0.3.4",
   "earthkit-workflows-pproc",
   "fastapi",
   "fastapi-users[oauth]",
