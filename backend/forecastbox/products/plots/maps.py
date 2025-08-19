@@ -162,6 +162,10 @@ def quickplot(
             except Exception:
                 pass
 
+        figure.borders()
+        figure.coastlines()
+        figure.gridlines()
+
     # figure.title(figure_title)
 
     return figure

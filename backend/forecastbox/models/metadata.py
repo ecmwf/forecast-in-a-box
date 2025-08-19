@@ -155,7 +155,7 @@ class ControlMetadata(BaseModel):
                     jsonschema=ObjectSchema(
                         title="Capabilities",
                         properties={
-                            "ensemble": BooleanSchema(title="Ensemble", description="Whether the model supports ensemble forecasts.", default=self.capabilities.ensemble),
+                            "ensemble": BooleanSchema(title="Ensemble", description="Whether the model supports ensemble forecasts."),
                             "max_lead_time": IntegerSchema(title="Max Lead Time", description="Maximum lead time in hours for the model."),
                         },
                     ),
