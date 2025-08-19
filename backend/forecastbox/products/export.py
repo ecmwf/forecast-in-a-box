@@ -49,9 +49,8 @@ def export_fieldlist_as(
         fields.to_target("file", buf, encoder="grib")
         written_bytes = buf.getvalue()
     elif format == "netcdf":
-        buf = io.BytesIO()
-        fields.to_target("file", buf, encoder="netcdf", decode_timedelta=False)
-        written_bytes = buf.getvalue()
+        fields_xr = fields.to_xarray(decode_timedelta=False, add_earthkit_attrs=False)
+        written_bytes = fields_xr.to_netcdf()
     elif format == "numpy":
         np_obj: np.ndarray = fields.to_numpy()  # type: ignore
         if np_obj is None:
