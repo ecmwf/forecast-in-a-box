@@ -101,6 +101,24 @@ export default function StaticImageMap({
     opacity: 1,
   });
 
+  const borders = new TileLayer({
+    source: new TileWMS({
+      url: 'https://era-explorer.ecmwf-development.f.ewcloud.host/geoserver/wms?',
+      params: {
+        LAYERS: 'ne:boundary_lines',
+        // STYLES: 'era:matt_bounrdaies_white',
+        FORMAT: 'image/png',
+        TRANSPARENT: true,
+        VERSION: '1.1.1',
+        SRS: targetProjection,
+      },
+      projection: targetProjection,
+      serverType: 'geoserver',
+      transition: 0,
+    }),
+    opacity: 1,
+  });
+
   const transformedExtent = extentsByProjection[targetProjection];
 
   // Reset zoom/center immediately if projection changed
@@ -120,7 +138,7 @@ export default function StaticImageMap({
 
   const map = new Map({
     target: mapRef.current,
-    layers: [imageLayer, coastlines],
+    layers: [imageLayer, coastlines, borders],
     view,
     controls: mobileMode ? [] : undefined,
   });
