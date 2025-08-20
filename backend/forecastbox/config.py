@@ -141,6 +141,8 @@ class CascadeSettings(BaseModel):
     """Maximum size of the log collection for Cascade."""
     venv_temp_dir: str = "/tmp"
     """Temporary directory for virtual environments."""
+    max_concurrent_jobs: int|None = 1
+    """If more jobs submitted at a given time, all but this many wait in a queue"""
 
     def validate_runtime(self) -> list[str]:
         errors = []
