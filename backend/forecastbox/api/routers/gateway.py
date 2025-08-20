@@ -91,9 +91,10 @@ async def start_gateway() -> str:
     now = dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     log_path = None if os.getenv("FIAB_LOGSTDOUT", "nay") == "yea" else f"{Globals.logs_directory.name}/gateway.{now}.txt"
     logs_directory = None if os.getenv("FIAB_LOGSTDOUT", "nay") == "yea" else Globals.logs_directory.name
+    max_concurrent_jobs = config.cascade.max_concurrent_jobs
     # TODO for some reason changes to os.environ were *not* visible by the child process! Investigate and re-enable:
     # export_recursive(config.model_dump(), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"])
-    process = cascade_platform.get_mp_ctx("gateway").Process(target=launch_cascade, args=(log_path, logs_directory))
+    process = cascade_platform.get_mp_ctx("gateway").Process(target=launch_cascade, args=(log_path, logs_directory, max_concurrent_jobs))
     process.start()
     Globals.gateway = GatewayProcess(log_path=log_path, process=process)
     logger.debug(f"spawned new gateway process with pid {process.pid} and logs at {log_path}")

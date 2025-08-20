@@ -44,7 +44,7 @@ router = APIRouter(
 )
 
 
-STATUS = Literal["running", "completed", "errored", "invalid", "timeout", "unknown"]
+STATUS = Literal["submitted", "running", "completed", "errored", "invalid", "timeout", "unknown"]
 
 
 @dataclass
@@ -92,7 +92,6 @@ async def update_and_get_progress(job_id: JobId) -> JobProgressResponse:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
     created_at = str(job.created_at)
 
-    # NOTE the submitted status currently shouldnt happen due to linearization of submit-insert
     if job.status in ("running", "submitted"):
         try:
             response: api.JobProgressResponse = client.request_response(
@@ -103,26 +102,24 @@ async def update_and_get_progress(job_id: JobId) -> JobProgressResponse:
             return JobProgressResponse(
                 progress="0.00", created_at=created_at, status="timeout", error="failed to communicate with gateway"
             )
-        except Exception:
+        except Exception as e:
+            logger.debug(f"inquiry for {job_id=} failed with {repr(e)}")
             # TODO this is either network or internal (eg serde) problem. Ideally fine-grain network into TimeoutError branch
             await update_one(job_id, status="unknown")
             return JobProgressResponse(
                 progress="0.00", created_at=created_at, status="unknown", error="internal cascade failure"
             )
         if response.error:
-            if response.error.startswith("KeyError"):
-                # NOTE currently can happen only via gateway restart -- but if submit-insert werent
-                # linearized, could happen due to ongoing cascade conversion
-                result = {"status": "invalid", "error": "evicted from gateway"}
-                await update_one(job_id, **result)
-                return JobProgressResponse(progress="0.00", created_at=created_at, **result)
-            else:
-                result = {"status": "unknown", "error": response.error}
-                # NOTE we dont update db because the job may still be running
-                return JobProgressResponse(progress="0.00", created_at=created_at, **result)
+            result = {"status": "unknown", "error": response.error}
+            # NOTE we dont update db because the job may still be running
+            return JobProgressResponse(progress="0.00", created_at=created_at, **result)
 
         jobprogress = response.progresses.get(job_id)
-        if jobprogress.failure:
+        if jobprogress is None:
+            result = {"status": "invalid", "error": "evicted from gateway"}
+            await update_one(job_id, **result)
+            return JobProgressResponse(progress="0.00", created_at=created_at, **result)
+        elif jobprogress.failure:
             result = {"status": "errored", "error": jobprogress.failure}
             await update_one(job_id, **result)
             return JobProgressResponse(progress="0.00", created_at=created_at, **result)
@@ -130,9 +127,10 @@ async def update_and_get_progress(job_id: JobId) -> JobProgressResponse:
             await update_one(job_id, status="completed")
             return JobProgressResponse(progress="100.00", created_at=created_at, status="completed")
         else:
-            if job.status == "submitted":
-                await update_one(job_id, status="running")
-            return JobProgressResponse(progress=jobprogress.pct, created_at=created_at, status="running")
+            if job.status == "submitted" and jobprogress.started:
+                job.status = "running"
+                await update_one(job_id, status=job.status)
+            return JobProgressResponse(progress=jobprogress.pct, created_at=created_at, status=job.status)
 
     else:
         progress = "100.00" if job.status == "completed" else "0.00"

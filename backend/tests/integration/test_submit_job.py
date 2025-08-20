@@ -1,4 +1,5 @@
 import io
+import os
 import time
 import zipfile
 
@@ -15,7 +16,7 @@ def _ensure_completed(backend_client, job_id):
         assert response.is_success
         status = response.json()["progresses"][job_id]["status"]
         # TODO parse response with corresponding class, define a method `not_failed` instead
-        assert status in {"submitting", "submitted", "running", "completed"}
+        assert status in {"submitted", "running", "completed"}
         if status == "completed":
             break
         time.sleep(0.5)
@@ -60,7 +61,7 @@ def test_submit_job(backend_client_with_auth):
     with zipfile.ZipFile(io.BytesIO(logs), "r") as zf:
         # NOTE dbEntity, gwState, gateway, controller, host0, host0.dsr, host0.shm, host0.w1, host0.w2
         expected_log_count = 9
-        assert len(zf.namelist()) == expected_log_count
+        assert len(zf.namelist()) == expected_log_count or os.getenv("FIAB_LOGSTDOUT", "nay") == "yea"
 
     # requests job
     def do_request() -> str:
