@@ -306,7 +306,7 @@ class EnsembleMapProduct(BaseEnsembleProduct, MapProduct):
         quickplot_payload = quickplot(
             domain=domain,
             groupby="member",
-            subplot_title="Member{member}",
+            subplot_title="Member{number}",
             figure_title="{variable_name} over {domain}\nValid time: {valid_time:%H:%M on %-d %B %Y} (T+{lead_time})\n",
         )
         plots = source.map(quickplot_payload)
