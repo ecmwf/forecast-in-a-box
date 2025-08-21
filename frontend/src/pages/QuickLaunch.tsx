@@ -275,7 +275,7 @@ export default function QuickLaunch() {
                             }
                         )
                     } else {
-                        setShowFireworks(true);
+                        // setShowFireworks(true);
                         showNotification(
                             {
                                 title: 'Success',
