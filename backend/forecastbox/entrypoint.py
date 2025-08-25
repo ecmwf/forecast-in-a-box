@@ -22,6 +22,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from forecastbox.db.job import create_db_and_tables as create_job_db
+from forecastbox.db.migrations import migrate
 from forecastbox.db.model import create_db_and_tables as create_model_db
 from forecastbox.db.user import create_db_and_tables as create_user_db
 from starlette.exceptions import HTTPException
@@ -38,6 +39,7 @@ async def lifespan(app: FastAPI):
     await create_user_db()
     await create_job_db()
     await create_model_db()
+    migrate()
     yield
     await gateway.shutdown_processes()
 
