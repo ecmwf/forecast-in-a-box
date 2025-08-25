@@ -15,3 +15,4 @@ class JobRecord(Base):
     created_by = Column(String(255), nullable=True)
     outputs = Column(JSON, nullable=True)
     error = Column(String(255), nullable=True)
+    progress = Column(String(255), nullable=True)
