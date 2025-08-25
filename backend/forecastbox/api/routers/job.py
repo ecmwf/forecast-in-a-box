@@ -34,6 +34,7 @@ from forecastbox.api.visualisation import visualise
 from forecastbox.auth.users import current_active_user
 from forecastbox.config import config
 from forecastbox.db.job import delete_all, delete_one, get_all, get_one, update_one
+from forecastbox.schemas.job import JobRecord
 from forecastbox.schemas.user import UserRead
 
 logger = logging.getLogger(__name__)
@@ -60,6 +61,12 @@ class JobProgressResponse:
     error: str | None = None
     """Error message if the job encountered an error, otherwise None."""
 
+def build_response(record: JobRecord, progress: str|None=None, error: str|None=None, status: STATUS|None=None) -> JobProgressResponse:
+    created_at = str(record.created_at)
+    progress = progress or record.progress or "0.00"
+    error = error or record.error
+    status = status or record.status
+    return JobProgressResponse(progress=progress, created_at=created_at, status=status, error=error)
 
 @dataclass
 class JobProgressResponses:
@@ -90,7 +97,6 @@ async def update_and_get_progress(job_id: JobId) -> JobProgressResponse:
     job = await get_one(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
-    created_at = str(job.created_at)
 
     if job.status in ("running", "submitted"):
         try:
@@ -99,42 +105,37 @@ async def update_and_get_progress(job_id: JobId) -> JobProgressResponse:
             )  # type: ignore
         except TimeoutError:
             # NOTE we dont update db because the job may still be running
-            return JobProgressResponse(
-                progress="0.00", created_at=created_at, status="timeout", error="failed to communicate with gateway"
-            )
+            return build_response(job, status="timeout", error="failed to communicate with gateway")
         except Exception as e:
             logger.debug(f"inquiry for {job_id=} failed with {repr(e)}")
             # TODO this is either network or internal (eg serde) problem. Ideally fine-grain network into TimeoutError branch
-            await update_one(job_id, status="unknown")
-            return JobProgressResponse(
-                progress="0.00", created_at=created_at, status="unknown", error="internal cascade failure"
-            )
+            result = {"status": "unknown", "error": f"internal cascade failure: {repr(e)}"}
+            await update_one(job_id, **result)
+            return build_response(job, **result)
         if response.error:
-            result = {"status": "unknown", "error": response.error}
             # NOTE we dont update db because the job may still be running
-            return JobProgressResponse(progress="0.00", created_at=created_at, **result)
+            return build_response(job, status="unknown", error=response.error)
 
         jobprogress = response.progresses.get(job_id)
         if jobprogress is None:
             result = {"status": "invalid", "error": "evicted from gateway"}
             await update_one(job_id, **result)
-            return JobProgressResponse(progress="0.00", created_at=created_at, **result)
+            return build_response(job, **result)
         elif jobprogress.failure:
             result = {"status": "errored", "error": jobprogress.failure}
             await update_one(job_id, **result)
-            return JobProgressResponse(progress="0.00", created_at=created_at, **result)
+            return build_response(job, **result)
         elif jobprogress.completed or jobprogress.pct == "100.00":
-            await update_one(job_id, status="completed")
-            return JobProgressResponse(progress="100.00", created_at=created_at, status="completed")
+            result = {"status": "completed", "progress": "100.00"}
+            await update_one(job_id, **result)
+            return build_response(job, **result)
         else:
-            if job.status == "submitted" and jobprogress.started:
-                job.status = "running"
-                await update_one(job_id, status=job.status)
-            return JobProgressResponse(progress=jobprogress.pct, created_at=created_at, status=job.status)
+            result = {"status": "running", "progress": jobprogress.pct}
+            await update_one(job_id, **result)
+            return build_response(job, **result)
 
     else:
-        progress = "100.00" if job.status == "completed" else "0.00"
-        return JobProgressResponse(progress=progress, created_at=created_at, status=job.status, error=job.error)
+        return build_response(job)
 
 
 @router.get("/status")
