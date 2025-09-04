@@ -1,4 +1,8 @@
-"""Executed from the bigtest github action"""
+"""Executed from the bigtest github action
+
+Purposefully **NOT** a `test_` !!
+
+"""
 
 import datetime as dt
 import logging
