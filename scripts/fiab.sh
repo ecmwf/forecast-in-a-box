@@ -35,6 +35,9 @@ export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
 export EARTHKIT_DATA_CACHE_POLICY=${EARTHKIT_DATA_CACHE_POLICY:-"user"}
 export EARTHKIT_DATA_MAXIMUM_CACHE_SIZE=${EARTHKIT_DATA_MAXIMUM_CACHE_SIZE:-"50G"}
 FIAB_PY_VERSION=${FIAB_PY_VERSION:-"3.12.7"}
+FIAB_DEV=${FIAB_DEV:-"nay"}
+
+# TODO bake in self-upgrade regime, similarly to how uv cache is pruned
 
 check() {
 	if [ -z "$(which curl || :)" ] ; then

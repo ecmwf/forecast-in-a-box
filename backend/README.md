@@ -1,17 +1,44 @@
 See project's [readme](https://github.com/ecmwf/forecast-in-a-box/blob/main/README.md).
 
-# Gotchas / FAQ / Troubleshooting
-## Infrastructure / Environment
-* `ExecutorFailure(host='h0', detail="ValueError('process on h0.w0 failed to terminate correctly: 1814799 -> -11')")` -- possibly venv incompatibility. You submit from a different venv that executors are using, leading to unstable cloudpickle behaviour. Make sure the venvs are the same, or use JobInstances without cloudpickle.
-* Server not getting any remote traffici, ie, when curling from localhost all works, but from outside the HTTP connection is set up (so it's not a firewall problem) but no actual packets flow -- make sure the device (presumably Mac) has the dialog "allow application Python to receive network traffic" approved.
-* `69:77: execution error: Can't get application "chrome". (-1728)` -- use `fiab__general__launch_browser=False` or install any browser on the machine
-* `Library not loaded: /opt/homebrew/opt/fftw/lib/libfftw3.3.dylib` -- run `brew install fftw` (or wait for this getting fixed on Mac)
-* unpickle issue with `pathlib._local` -- use python3.12+
-* `zmq.error.ZMQError: Operation not supported by device` -- issue on Mac with incorrect self-host detection, should be covered by cascade's platform module
+# Development
 
-## Model Checkpoints
-* `ValueError(TaskFailure(worker=h0.w1, task='run_as_earthkit:97b3503430ebbc42fec29533c043672907647970346c53cce4f4fa8d53f27fc0', detail='AttributeError("module \'torch.mps\' has no attribute \'current_device\'")'))` and similar -- model hardcodes CUDA. Make sure you have sufficiently high versions of the anemoi stack
-  * Similarly, `ModuleNotFoundError: No module named 'flash_attn'` is a sign of a non-portable checkpoint
-* something like `"cannot install anemoi-models-x.y.z.local1"` -- model was trained with local modifications that aren't on pypi
-* `ValueError: ExecutorFailure(host='h0', detail="ValueError('process on h0.w0 failed to terminate correctly: 2488 -> -6')")` -- this *could* mean incompatible versions, like model checkpoint being pickled with torch geometric < 2.4 but unpickled with >= 2.4, or being pickled multiple times in a forked process -- if you are on Mac, preferably don't use fork/forkserver in combination with torch, even with the disable safety envar set to true (fiab by default only spawns on Mac)
-  * A similar error caused by fork/forkserver on Mac manifests as ` ValueError: {'progress': '0.00', 'status': 'errored', 'created_at': '2025-08-06 13:50:02.147142', 'error': 'ValueError(TaskFailure(worker=h0.w5, task=\'run_as_earthkit:bcc898d809ec13faed614e3f64f10158a1f9e2b65ad7ef18114e2096c62b0002\', detail="SyntaxError(\'Compiler encountered XPC_ERROR_CONNECTION_INVALID (is the OS shutting down?)\')"))'}`
+## Setup
+There are two options:
+1. create manually a `venv` and install this as an editable package into it,
+2. use the [`fiab.sh`](../scripts/fiab.sh) script.
+
+The first gives you more control, the second brings more automation -- but both choices are ultimately fine and lead to the same result.
+
+For the first option, active your venv of choice, and then:
+```
+mkdir -p ~/.fiab
+uv pip install --prerelease=allow --upgrade -e .[test] # the --prerelease will eventually disapper, check whether pyproject contains any `dev` pins
+pytest backend # just to ensure all is good
+```
+
+For the second option, check the `fiab.sh` first -- it is configurable via envvars which are listed at the script's start.
+In particular, you can change the directory which will contain the venv, and whether it does a PyPI-released or local-editable install.
+Note however that in case of the local-editable installs, you *must* execute the `fiab.sh` with cwd being the `backend`, as there is `pip install -e.`.
+
+### Frontend Required
+The frontend is actually expected to be present as artifact _inside_ the backend in case of the editable install.
+See the [`justfile`](../justfile)'s `fiabwheel` recipe for instruction how to build the frontend and create a symlink inside the backend.
+
+Backend wheels on pypi do contain a frontend copy -- you can alternatively pull a wheel and extract the built frontend into the local install.
+
+## Developer Flow
+Primary means is running `pytest`, presumably with the `pytest.ini` section from `pyproject.toml` activated.
+
+Type annotations are mostly present, though not enforced at the moment during CI (but expected to in the near future).
+
+In the [`bigtest.py`](../scripts/bigtest.py) there is a larger integration test, triggered at CI in addition to the regular `pytest` -- see the [github action](../.github/workflows/bigtest.yml) for execution.
+
+## Architecture Overview
+Consists of a four primary components:
+1. JavaScript frontend as a stateless page, basically "user form → backend request" -- located at [frontend](../frontend),
+2. FastAPI/Uvicorn application with multiple routes, organized by domain: auth, job submission & status, model download & status, gateway interaction, ...
+3. standalone "gateway" process, expected to be launched at the beginning together with the Uvicorn process, which is the gateway to the [earthkit-workflows](https://github.com/ecmwf/earthkit-workflows),
+4. persistence, based on a local `sqlite` database.
+
+Configuration is handled by the `config.py` using pydantic's BaseSettings, meaning most behaviour is configurable via envvars -- see `fiab.sh` or tests for examples.
+See [tuning and configuration](tuningAndConfiguration.md) guide for more.

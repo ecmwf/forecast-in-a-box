@@ -75,8 +75,6 @@ local_scheme = "no-local-version"
 root = ".."
 fallback_version = "0.0.0"
 
-# TODO remove once released
-
 [tool.ruff]
 line-length = 140
 
@@ -90,6 +88,8 @@ addopts = "-n0 -s"      # NOTE stick to 0 *or* have random server ports in the i
 
 [tool.mypy]
 plugins = "pydantic.mypy"
+
+# TODO remove once released
 
 [tool.uv.sources]
 pproc = { git = "https://github.com/ecmwf/pproc" }

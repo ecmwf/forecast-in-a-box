@@ -35,6 +35,7 @@ jobs:
           # build
           just fiabwheel
           twine check backend/dist/*
+          # TODO run pytest with the wheel installed
           # upload
           if [ "${{ inputs.testpypi }}" = "true" ] ; then
             export TWINE_PASSWORD="$TWINE_PASSWORD_TEST"
