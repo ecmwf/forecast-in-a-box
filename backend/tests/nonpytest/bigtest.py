@@ -75,7 +75,7 @@ if __name__ == "__main__":
             dataDir = tempfile.TemporaryDirectory()
             config.api.data_path = dataDir.name
 
-        handles = launch_all(config, False, attempts=50)
+        handles = launch_all(config, attempts=50)
         client = httpx.Client(base_url=config.api.local_url() + "/api/v1", follow_redirects=True)
 
         # download model
