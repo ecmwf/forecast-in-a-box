@@ -115,6 +115,8 @@ def quickplot(
     from earthkit.plots.schemas import schema
     from earthkit.plots.utils import iter_utils
 
+    schema.use_preferred_units = True
+
     if not isinstance(fields, ekd.FieldList):
         fields = ekd.FieldList.from_fields(fields)
 
