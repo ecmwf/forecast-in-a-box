@@ -20,7 +20,7 @@ class NestedModel(BaseForecastModel):
     @property
     def _regions(self) -> list[str]:
         assert self.control.nested is not None, "NestedModel requires a 'nested' configuration in the control metadata."
-        return list(self.control.nested.keys())[:-1]
+        return list(self.control.nested.keys())
 
     def validate_checkpoint(self):
         if not self.control.nested:
