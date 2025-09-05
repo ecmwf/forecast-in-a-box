@@ -37,8 +37,8 @@ dependencies = [
   "httpx<1",
   "httpx-oauth",
   "jinja2",
-  "mir-python==1.27.1.dev20250627",   # to bring in the binary stack eagerly, TODO unpin once stable
-  "multiolib==2.6.1.dev20250627",     # to bring in the binary stack eagerly, TODO unpin once stable
+  "mir-python==1.27.1.dev20250905",   # to bring in the binary stack eagerly, TODO unpin once stable
+  "multiolib==2.6.1.dev20250905",     # to bring in the binary stack eagerly, TODO unpin once stable
   "orjson",
   "pproc",
   "psutil",
