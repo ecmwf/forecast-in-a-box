@@ -13,7 +13,7 @@ from typing import Any
 from .metadata import ControlMetadata
 from .model import BaseForecastModel
 
-DEFAULT_GLOBAL_INPUT_SOURCE = "mars"
+DEFAULT_GLOBAL_INPUT_SOURCE = "opendata"
 
 
 class GlobalModel(BaseForecastModel):

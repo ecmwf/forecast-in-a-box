@@ -28,7 +28,7 @@ def get_quickstart_job() -> dict:
                 "date": today + "T00",
                 "lead_time": 42,
                 "ensemble_members": 1,
-                "entries": {} if is_mars else { 'input_preference': 'opendata', },
+                "entries": {'input_preference': 'mars' if is_mars else 'opendata'},
             },
             "products": [
                 {
