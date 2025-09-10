@@ -41,19 +41,19 @@ class ControlMetadata(BaseModel):
     pkg_versions: dict[str, str] = Field(default_factory=dict, examples=[{"numpy": "1.23.0", "pandas": "1.4.0"}])
     """Absolute overrides for the packages to install when running."""
 
-    input_source: str | dict[str, str] | None = Field(None, examples=["mars", {'polytope': {'collection': "..."}}])
+    input_source: str | dict[str, str] | None = Field(None, examples=["opendata", {'polytope': {'collection': "..."}}])
     """Source of the input, if dictionary, refers to keys of nested input sources"""
 
     nested: dict[str, dict[str, Any] | str] | None = Field(default=None, examples=[
         {
             "lam": {
-                "mars": {
+                "opendata": {
                     "pre_processors": [
                         {"regrid": {"area": "...", "grid": "..."}}
                     ]
                 }
             },
-            'global': 'mars'
+            'global': 'opendata'
         },
     ])
     """Configuration if using nested input sources. Will use the CutoutInput to combine these sources.
@@ -63,7 +63,7 @@ class ControlMetadata(BaseModel):
     ```
         nested:
         lam:
-            mars:
+            opendata:
                 pre_processors:
                     - regrid:
                         area: ...
