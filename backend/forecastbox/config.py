@@ -102,7 +102,7 @@ class ProductSettings(BaseModel):
     pproc_schema_dir: str | None = None
     """Path to the directory containing the PPROC schema files."""
 
-    plots_schema: str = "default"
+    plots_schema: str = "inbuilt://fiab"
     """earthkit-plots global schema, can be registered schema or path to a yaml file"""
 
     default_input_source: str = "opendata"
