@@ -1,4 +1,4 @@
-# (C) Copyright 2024- ECMWF.
+# (C) Copyright 2025- ECMWF.
 #
 # This software is licensed under the terms of the Apache Licence Version 2.0
 # which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
@@ -7,15 +7,9 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-# Main module interface for React JSON Schema Form (RJSF) integration.
-# Provides pydantic implementations for both JSON Schema and UI Schema components,
-# enabling definition and rendering of forms based on JSON Schema.
-# https://rjsf-team.github.io/react-jsonschema-form/docs/
-
-
 from datetime import date
 from types import NoneType, UnionType
-from typing import Callable, Literal, get_args
+from typing import Callable, Literal, Union, get_args, get_origin
 
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
@@ -159,12 +153,12 @@ PRIMATIVES: dict[type, Callable[[FieldInfo], FieldWithUI]] = {
 def _is_required(field: FieldInfo) -> bool:
     return field.default is PydanticUndefined and field.default_factory is None
 
-def from_pydantic(model: BaseModel) -> tuple[dict[str, FieldWithUI], list[str]]:
+def from_pydantic(model: type[BaseModel] | BaseModel) -> tuple[dict[str, FieldWithUI], list[str]]:
     """Convert a pydantic model to a dictionary of fields, and list of required.
 
     Parameters
     ----------
-    model : BaseModel
+    model : type[BaseModel] | BaseModel
         The pydantic model to convert.
 
     Returns
@@ -186,7 +180,7 @@ def from_pydantic(model: BaseModel) -> tuple[dict[str, FieldWithUI], list[str]]:
         for field_name, field in m.__pydantic_fields__.items():
             if field.exclude:
                 continue
-            field_name = field.serialization_alias or field.alias or field.title or field_name
+            field_name = field.serialization_alias or field.alias or field_name
 
             if not field.annotation:
                 fields[field_name] = _from_string_primative(field)
@@ -195,12 +189,18 @@ def from_pydantic(model: BaseModel) -> tuple[dict[str, FieldWithUI], list[str]]:
             elif field.annotation in PRIMATIVES:
                 fields[field_name] = _get_with_annotation(field.annotation, field)
 
-            elif isinstance(field.annotation, UnionType):
+            elif isinstance(field.annotation, UnionType) or get_origin(field.annotation) is Union:
                 fields[field_name] = _get_with_annotation(get_args(field.annotation)[0], field)
                 if NoneType in get_args(field.annotation):
                     fields[field_name].jsonschema.type = [fields[field_name].jsonschema.type, "null"] # type: ignore
 
-            elif getattr(field.annotation, '__origin__', None) is Literal:
+            elif get_origin(field.annotation) is dict:
+                fields[field_name] = _from_dict_primative(field)
+
+            elif get_origin(field.annotation) is list:
+                fields[field_name] = _from_list_primative(field)
+
+            elif get_origin(field.annotation) is Literal:
                 fields[field_name] = _from_literal_primative(field)
 
             elif hasattr(field.annotation, 'mro'):
@@ -222,7 +222,7 @@ def from_pydantic(model: BaseModel) -> tuple[dict[str, FieldWithUI], list[str]]:
 
                     fields[field_name] = FieldWithUI(jsonschema=schema, uischema=ui)
             else:
-                fields[field_name] = _from_string_primative(field, allow_all=True)
+                fields[field_name] = _from_string_primative(field)
 
             if _is_required(field):
                 required.append(field_name)
