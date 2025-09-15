@@ -108,6 +108,11 @@ class ProductSettings(BaseModel):
     default_input_source: str = "opendata"
     """Default input source for models, if not specified otherwise"""
 
+class ProductSettings(BaseModel):
+    pproc_schema_dir: str | None = None
+    """Path to the directory containing the PPROC schema files."""
+
+
     def validate_runtime(self) -> list[str]:
         if self.pproc_schema_dir and not os.path.isdir(self.pproc_schema_dir):
             return ["not a directory: pproc_schema_dir={self.pproc_schema_dir}"]
