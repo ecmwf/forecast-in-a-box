@@ -14,8 +14,9 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from forecastbox.auth.users import current_active_user
-from forecastbox.config import BackendAPISettings, CascadeSettings, config
+from forecastbox.config import BackendAPISettings, CascadeSettings, ProductSettings, config
 from forecastbox.db.user import async_session_maker
+from forecastbox.rjsf import ExportedSchemas, FormDefinition, from_pydantic
 from forecastbox.schemas.user import UserRead, UserTable, UserUpdate
 from pydantic import UUID4, BaseModel
 from sqlalchemy import delete, select, update
@@ -41,20 +42,34 @@ router = APIRouter(
 class ExposedSettings(BaseModel):
     """Exposed settings for modification"""
 
+    product: ProductSettings = config.product
+
     api: BackendAPISettings = config.api
     cascade: CascadeSettings = config.cascade
 
 
-@router.get("/settings", response_model=ExposedSettings)
-async def get_settings(admin=Depends(get_admin_user)) -> ExposedSettings:
+    def to_rjsf(self) -> FormDefinition:
+        """Convert settings to RJSF form definition"""
+        fields, required = from_pydantic(self)
+        return FormDefinition(
+            title = 'Settings',
+            fields = fields,
+            required = required,
+            formData=self.model_dump(exclude_unset=True),
+        )
+
+
+@router.get("/settings", response_model=ExportedSchemas)
+async def get_settings() -> ExportedSchemas:
     """Get current settings"""
     settings = ExposedSettings()
-    return settings
+    return settings.to_rjsf().export_all()
 
 
-@router.post("/settings", response_class=HTMLResponse)
+@router.patch("/settings", response_class=HTMLResponse)
 async def post_settings(settings: ExposedSettings, admin=Depends(get_admin_user)) -> HTMLResponse:
     """Update settings"""
+    pass
 
     def update(old: BaseModel, new: BaseModel):
         for key, val in new.model_dump().items():
@@ -62,9 +77,12 @@ async def post_settings(settings: ExposedSettings, admin=Depends(get_admin_user)
 
     try:
         update(config.api, settings.api)
+        update(config.product, settings.product)
         update(config.cascade, settings.cascade)
     except Exception as e:
         return HTMLResponse(content=str(e), status_code=500)
+
+    config.save_to_file()
 
     return HTMLResponse(content="Settings updated successfully", status_code=200)
 

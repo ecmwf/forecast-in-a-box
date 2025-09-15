@@ -166,7 +166,7 @@ class FIABConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", env_prefix="fiab__", toml_file=fiab_home / "config.toml")
 
     general: GeneralSettings = Field(default_factory=GeneralSettings)
-    product: ProductSettings = Field(default_factory=ProductSettings)
+    product: ProductSettings = Field(default_factory=ProductSettings, description="Product specific settings")
 
     auth: AuthSettings = Field(default_factory=AuthSettings)
 
@@ -174,19 +174,35 @@ class FIABConfig(BaseSettings):
     api: BackendAPISettings = Field(default_factory=BackendAPISettings)
     cascade: CascadeSettings = Field(default_factory=CascadeSettings)
 
+
+    def _get_toml(self, skip_secrets: bool = True, **k) -> str:
+        json_config = self.model_dump(mode="json", **k)
+
+        if skip_secrets:
+            json_config.get('auth', {}).get('oidc', {}).pop('client_secret', None)
+            json_config.get('auth', {}).pop('jwt_secret', None)
+
+        toml_config = toml.dumps(json_config)
+        return toml_config
+
     def save_to_file(self) -> None:
         """Save current configuration to toml file"""
 
         config_path = fiab_home / "config.toml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
-
-        json_config = self.model_dump(mode="json", exclude_none=True, exclude_defaults=True, exclude={"auth": {"jwt_secret", "oidc.client_secret"}})
-        json_config.get('auth', {}).get('oidc', {}).pop('client_secret', None)
-
-        toml_config = toml.dumps(json_config)
         with open(config_path, 'w') as f:
-            f.write(toml_config)
+            f.write(self._get_toml(exclude_defaults = True, exclude_none = True))
 
+    def save_example_to_file(self) -> None:
+        """Save example configuration to toml file"""
+
+        config_path = fiab_home / "config.toml.example"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(config_path, 'w') as f:
+            f.write(self._get_toml())
+
+    def __del__(self) -> None:
+        self.save_to_file()
 
 def validate_runtime(config: FIABConfig) -> None:
     """Validates that a particular config can be used to execute FIAB in this machine/venv.
@@ -201,5 +217,6 @@ def validate_runtime(config: FIABConfig) -> None:
 
 
 config = FIABConfig()
-config.save_to_file()
+config.save_example_to_file()
+
 logger.debug(f"loaded config: {config.model_dump()}")
