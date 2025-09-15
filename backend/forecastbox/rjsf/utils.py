@@ -98,14 +98,14 @@ def collapse_enums_if_possible(field: FieldWithUI) -> FieldWithUI:
             return field
 
         # If there's only one enum value, collapse it to a read-only field
-        field.jsonschema, field.ui = __collapse_enums(field.jsonschema, field.ui)
+        field.jsonschema, field.uischema = __collapse_enums(field.jsonschema, field.uischema)
 
     elif isinstance(field.jsonschema, ArraySchema) and isinstance(field.jsonschema.items, EnumMixin):
         if not field.jsonschema.items.enum or len(field.jsonschema.items.enum) > 1:
             return field
 
-        field.jsonschema.items, uischema = __collapse_enums(field.jsonschema.items, field.ui)
-        field.ui = UIObjectField(anyOf=[uischema])
+        field.jsonschema.items, uischema = __collapse_enums(field.jsonschema.items, field.uischema)
+        field.uischema = UIObjectField(anyOf=[uischema])
 
     elif isinstance(field.jsonschema, ObjectSchema):
         pass  # TODO: Handle object schemas with enum properties

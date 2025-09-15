@@ -24,8 +24,8 @@ def test_collapse_enums_if_possible_string():
     field = FieldWithUI(jsonschema=StringSchema(type="string", title="X", enum=["only"]), uischema=None)  # type: ignore
     collapsed = utils.collapse_enums_if_possible(field)
     assert collapsed.jsonschema.default == "only"
-    assert isinstance(collapsed.ui, UIField)
-    assert collapsed.ui.disabled is True
+    assert isinstance(collapsed.uischema, UIField)
+    assert collapsed.uischema.disabled is True
 
 
 def test_collapse_enums_if_possible_array():
@@ -34,8 +34,8 @@ def test_collapse_enums_if_possible_array():
     collapsed = utils.collapse_enums_if_possible(field)
     assert isinstance(collapsed.jsonschema, ArraySchema)
     assert collapsed.jsonschema.items.default == "one"
-    assert isinstance(collapsed.ui, UIObjectField)
-    assert hasattr(collapsed.ui, "anyOf")
+    assert isinstance(collapsed.uischema, UIObjectField)
+    assert hasattr(collapsed.uischema, "anyOf")
 
 
 def test_collapse_enums_if_possible_noop():
