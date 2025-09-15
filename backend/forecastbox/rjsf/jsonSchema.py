@@ -76,7 +76,7 @@ class StringSchema(BaseSchema, EnumMixin):
     >>> StringSchema(type="string", enum=["a", "b"])
     """
 
-    type: Literal["string"] = Field(default="string")
+    type: str | list[str] | Literal["string"] = Field(default="string")
     format: str | None = None
     """String format (e.g., 'date', 'email')."""
     minLength: int | None = None
@@ -98,7 +98,7 @@ class IntegerSchema(BaseSchema, EnumMixin):
     >>> IntegerSchema(type="integer", enum=[1, 2, 3])
     """
 
-    type: Literal["integer"] = Field(default="integer")
+    type: str | list[str] | Literal["integer"] = Field(default="integer")
     minimum: int | None = None
     """Minimum value."""
     maximum: int | None = None
@@ -120,7 +120,7 @@ class NumberSchema(BaseSchema, EnumMixin):
     >>> NumberSchema(type="number", enum=[1.1, 2.2])
     """
 
-    type: Literal["number"] = Field(default="number")
+    type: str | list[str] | Literal["number"] = Field(default="number")
     """Must be 'number'."""
     minimum: float | None = None
     """Minimum value."""
@@ -140,7 +140,7 @@ class BooleanSchema(BaseSchema):
     >>> BooleanSchema(type="boolean")
     """
 
-    type: Literal["boolean"] = Field(default="boolean")
+    type: str | list[str] | Literal["boolean"] = Field(default="boolean")
 
 
 class NullSchema(BaseSchema):
@@ -155,7 +155,7 @@ class NullSchema(BaseSchema):
     >>> NullSchema(type="null")
     """
 
-    type: Literal["null"] = Field(default="null")
+    type: str | list[str] | Literal['null'] = Field(default="null")
 
 
 class ObjectSchema(BaseSchema):
@@ -170,7 +170,7 @@ class ObjectSchema(BaseSchema):
     >>> ObjectSchema(type="object", properties={"name": StringSchema(type="string")}, required=["name"])
     """
 
-    type: Literal["object"] = Field(default="object")
+    type: str | list[str] | Literal["object"] = Field(default="object")
     properties: dict[str, "FieldSchema"] = Field(default_factory=dict)
     """Underlying fields of the object."""
     required: list[str] | None = None
@@ -193,7 +193,7 @@ class ArraySchema(BaseSchema):
     >>> ArraySchema(type="array", items=StringSchema(type="string", enum=["test", "wow"]), minItems=1)
     """
 
-    type: Literal["array"] = Field(default="array")
+    type: str | list[str] | Literal["array"] = Field(default="array")
     items: "FieldSchema"
     """Schema for array items."""
     minItems: int | None = None
