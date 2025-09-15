@@ -7,15 +7,16 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+import json
 import os
-import pathlib
 import urllib.parse
+from pathlib import Path
 
 from cascade.low.func import pydantic_recursive_collect
 from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-fiab_home = pathlib.Path.home() / ".fiab"
+fiab_home = Path.home() / ".fiab"
 
 
 def _validate_url(url: str) -> bool:
@@ -37,9 +38,9 @@ class DatabaseSettings(BaseModel):
 
     def validate_runtime(self) -> list[str]:
         errors = []
-        if not pathlib.Path(self.sqlite_userdb_path).parent.is_dir():
+        if not Path(self.sqlite_userdb_path).parent.is_dir():
             errors.append(f"parent directory doesnt exist: sqlite_userdb_path={self.sqlite_userdb_path}")
-        if not pathlib.Path(self.sqlite_jobdb_path).parent.is_dir():
+        if not Path(self.sqlite_jobdb_path).parent.is_dir():
             errors.append(f"parent directory doesnt exist: sqlite_jobdb_path={self.sqlite_jobdb_path}")
         return errors
 
@@ -90,12 +91,14 @@ class AuthSettings(BaseModel):
 
 
 class GeneralSettings(BaseModel):
-    pproc_schema_dir: str | None = None
-    """Path to the directory containing the PPROC schema files."""
-
     launch_browser: bool = True
     """Whether a browser window should be opened after start. Used only when
     standalone.entrypoint.launch_all module is used"""
+
+
+class ProductSettings(BaseModel):
+    pproc_schema_dir: str | None = None
+    """Path to the directory containing the PPROC schema files."""
 
 
     def validate_runtime(self) -> list[str]:
@@ -103,7 +106,6 @@ class GeneralSettings(BaseModel):
             return ["not a directory: pproc_schema_dir={self.pproc_schema_dir}"]
         else:
             return []
-
 
 class BackendAPISettings(BaseModel):
     data_path: str = str(fiab_home / "data_dir")
@@ -157,11 +159,46 @@ class FIABConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", env_prefix="fiab__")
 
     general: GeneralSettings = Field(default_factory=GeneralSettings)
+    product: ProductSettings = Field(default_factory=ProductSettings)
+
     auth: AuthSettings = Field(default_factory=AuthSettings)
 
     db: DatabaseSettings = Field(default_factory=DatabaseSettings)
     api: BackendAPISettings = Field(default_factory=BackendAPISettings)
     cascade: CascadeSettings = Field(default_factory=CascadeSettings)
+
+    @classmethod
+    def load_from_file(cls, config_path: Path | str | None = None) -> 'FIABConfig':
+        """Load configuration from JSON file, falling back to defaults + env vars"""
+        if isinstance(config_path, str):
+            config_path = Path(config_path)
+
+        if config_path is None:
+            config_path = fiab_home / "config.json"
+
+        if config_path.exists():
+            with open(config_path) as f:
+                config_data = json.loads(f.read())
+            return cls(**config_data)
+        else:
+            return cls()
+
+    def save_to_file(self, config_path: Path | str | None = None) -> None:
+        """Save current configuration to JSON file"""
+        if isinstance(config_path, str):
+            config_path = Path(config_path)
+
+        if config_path is None:
+            config_path = fiab_home / "config.json"
+
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(config_path, 'w') as f:
+            f.write(self.model_dump_json(indent=2, exclude_none=True))
+
+
+    def __del__(self):
+        self.save_to_file(os.environ.get("FIAB_CONFIG_PATH"))
+
 
 
 def validate_runtime(config: FIABConfig) -> None:
@@ -176,4 +213,4 @@ def validate_runtime(config: FIABConfig) -> None:
         raise ValueError(f"Errors were found in configuration:\n{errors_formatted}")
 
 
-config = FIABConfig()
+config = FIABConfig.load_from_file(os.environ.get("FIAB_CONFIG_PATH"))
