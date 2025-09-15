@@ -15,7 +15,7 @@ from pathlib import Path
 import toml
 from cascade.low.func import pydantic_recursive_collect
 from pydantic import BaseModel, Field, SecretStr, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict, TomlConfigSettingsSource
 
 fiab_home = Path.home() / ".fiab"
 logger = logging.getLogger(__name__)
@@ -51,9 +51,9 @@ class DatabaseSettings(BaseModel):
 
 
 class OIDCSettings(BaseModel):
-    client_id: str
-    client_secret: SecretStr
-    openid_configuration_endpoint: str
+    client_id: str | None = None
+    client_secret: SecretStr | None = None
+    openid_configuration_endpoint: str | None = None
     name: str = "oidc"
     scopes: list[str] = ["openid", "email"]
     required_roles: list[str] | None = None
@@ -163,7 +163,7 @@ class CascadeSettings(BaseModel):
 
 
 class FIABConfig(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", env_prefix="fiab__", toml_file=fiab_home / "config.toml")
+    model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", env_prefix="fiab__")
 
     general: GeneralSettings = Field(default_factory=GeneralSettings)
     product: ProductSettings = Field(default_factory=ProductSettings, description="Product specific settings")
@@ -174,6 +174,16 @@ class FIABConfig(BaseSettings):
     api: BackendAPISettings = Field(default_factory=BackendAPISettings)
     cascade: CascadeSettings = Field(default_factory=CascadeSettings)
 
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        return env_settings, file_secret_settings, dotenv_settings, TomlConfigSettingsSource(settings_cls, fiab_home / "config.toml"), init_settings
 
     def _get_toml(self, skip_secrets: bool = True, **k) -> str:
         json_config = self.model_dump(mode="json", **k)
