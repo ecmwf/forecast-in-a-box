@@ -72,7 +72,7 @@ class FormDefinition(BaseModel):
         """Exports the form definition as a UI Schema object.
         This includes the UI options for each field that has a UI Schema defined.
         """
-        uischema = {key: field.ui.export_with_prefix() for key, field in self.fields.items() if field.ui}
+        uischema = {key: field.uischema.export_with_prefix() for key, field in self.fields.items() if field.uischema}
         if self.submitButtonOptions:
             uischema["ui:submitButtonOptions"] = self.submitButtonOptions
         return uischema

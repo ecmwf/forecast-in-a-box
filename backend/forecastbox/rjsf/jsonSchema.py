@@ -25,6 +25,8 @@ class BaseSchema(BaseModel):
     >>> BaseSchema(title="Example", description="A base schema", default=None)
     """
 
+    type: str | list[str]
+    """Type of the schema (e.g., 'string', 'object', etc.)."""
     title: str | None = None
     """Title of the schema."""
     description: str | None = None
