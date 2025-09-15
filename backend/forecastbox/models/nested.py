@@ -62,6 +62,6 @@ class NestedModel(BaseForecastModel):
                     enum=self._regions, # type: ignore
                     default=self._regions[0],
                 ),
-                ui=UIStringField(widget="select"),
+                uischema=UIStringField(widget="select"),
             ),
         }

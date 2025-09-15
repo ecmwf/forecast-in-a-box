@@ -206,7 +206,7 @@ class MapProduct(GenericTemporalProduct):
                     enum=self.domains,
                     default="DataDefined",
                 ),
-                ui=UIStringField(
+                uischema=UIStringField(
                     widget="select",
                 ),
             ),
