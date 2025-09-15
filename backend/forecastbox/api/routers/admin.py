@@ -55,7 +55,7 @@ class ExposedSettings(BaseModel):
             title = 'Settings',
             fields = fields,
             required = required,
-            formData=self.model_dump(exclude_unset=True),
+            formData=self.model_dump(),
         )
 
 
