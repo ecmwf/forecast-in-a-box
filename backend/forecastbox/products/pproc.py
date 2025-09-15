@@ -108,7 +108,7 @@ class PProcProduct(Product):
     @property
     def _pproc_schema_path(self) -> str:
         """Get the path to the PPROC schema."""
-        fallback_path = Path(__file__).parent / "schema" / "default.yaml"
+        fallback_path = Path(__file__).parent / "schemas" / "pproc.yaml"
         if config.product.pproc_schema_dir is None:
             return str(fallback_path)
 
@@ -117,8 +117,6 @@ class PProcProduct(Product):
         schema_path = Path(schema_dir) / f"{str(class_name).lower()}.yaml"
 
         if not schema_path.exists():
-            if (schema_dir / "default.yaml").exists():
-                return str(schema_dir / "default.yaml")
             return str(fallback_path)
         return str(schema_path)
 
