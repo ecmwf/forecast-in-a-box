@@ -15,6 +15,7 @@ import earthkit.data as ekd
 from earthkit.workflows import mark
 from earthkit.workflows.decorators import as_payload
 from earthkit.workflows.plugins.anemoi.types import ENSEMBLE_DIMENSION_NAME
+from forecastbox.config import config
 from forecastbox.models import SpecifiedModel
 from forecastbox.products.ensemble import BaseEnsembleProduct
 from forecastbox.products.product import GenericTemporalProduct
@@ -114,6 +115,8 @@ def quickplot(
     from earthkit.plots.components import layouts
     from earthkit.plots.schemas import schema
     from earthkit.plots.utils import iter_utils
+
+    schema.use(config.product.plots_schema)
 
     schema.use_preferred_units = True
 
