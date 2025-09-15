@@ -103,6 +103,9 @@ class ProductSettings(BaseModel):
     plots_schema: str = "default"
     """earthkit-plots global schema, can be registered schema or path to a yaml file"""
 
+    default_input_source: str = "opendata"
+    """Default input source for models, if not specified otherwise"""
+
     def validate_runtime(self) -> list[str]:
         if self.pproc_schema_dir and not os.path.isdir(self.pproc_schema_dir):
             return ["not a directory: pproc_schema_dir={self.pproc_schema_dir}"]
