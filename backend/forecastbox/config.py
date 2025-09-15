@@ -7,16 +7,18 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-import json
+import logging
 import os
 import urllib.parse
 from pathlib import Path
 
+import toml
 from cascade.low.func import pydantic_recursive_collect
 from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 fiab_home = Path.home() / ".fiab"
+logger = logging.getLogger(__name__)
 
 
 def _validate_url(url: str) -> bool:
@@ -161,7 +163,7 @@ class CascadeSettings(BaseModel):
 
 
 class FIABConfig(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", env_prefix="fiab__")
+    model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", env_prefix="fiab__", toml_file=fiab_home / "config.toml")
 
     general: GeneralSettings = Field(default_factory=GeneralSettings)
     product: ProductSettings = Field(default_factory=ProductSettings)
@@ -172,38 +174,18 @@ class FIABConfig(BaseSettings):
     api: BackendAPISettings = Field(default_factory=BackendAPISettings)
     cascade: CascadeSettings = Field(default_factory=CascadeSettings)
 
-    @classmethod
-    def load_from_file(cls, config_path: Path | str | None = None) -> 'FIABConfig':
-        """Load configuration from JSON file, falling back to defaults + env vars"""
-        if isinstance(config_path, str):
-            config_path = Path(config_path)
+    def save_to_file(self) -> None:
+        """Save current configuration to toml file"""
 
-        if config_path is None:
-            config_path = fiab_home / "config.json"
-
-        if config_path.exists():
-            with open(config_path) as f:
-                config_data = json.loads(f.read())
-            return cls(**config_data)
-        else:
-            return cls()
-
-    def save_to_file(self, config_path: Path | str | None = None) -> None:
-        """Save current configuration to JSON file"""
-        if isinstance(config_path, str):
-            config_path = Path(config_path)
-
-        if config_path is None:
-            config_path = fiab_home / "config.json"
-
+        config_path = fiab_home / "config.toml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
+
+        json_config = self.model_dump(mode="json", exclude_none=True, exclude_defaults=True, exclude={"auth": {"jwt_secret", "oidc.client_secret"}})
+        json_config.get('auth', {}).get('oidc', {}).pop('client_secret', None)
+
+        toml_config = toml.dumps(json_config)
         with open(config_path, 'w') as f:
-            f.write(self.model_dump_json(indent=2, exclude_none=True))
-
-
-    def __del__(self):
-        self.save_to_file(os.environ.get("FIAB_CONFIG_PATH"))
-
+            f.write(toml_config)
 
 
 def validate_runtime(config: FIABConfig) -> None:
@@ -218,4 +200,6 @@ def validate_runtime(config: FIABConfig) -> None:
         raise ValueError(f"Errors were found in configuration:\n{errors_formatted}")
 
 
-config = FIABConfig.load_from_file(os.environ.get("FIAB_CONFIG_PATH"))
+config = FIABConfig()
+config.save_to_file()
+logger.debug(f"loaded config: {config.model_dump()}")
