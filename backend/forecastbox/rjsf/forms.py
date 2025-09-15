@@ -40,7 +40,7 @@ class FieldWithUI(BaseModel):
 
     jsonschema: FieldSchema
     """The JSON Schema definition for the field."""
-    ui: UISchema | None = None
+    uischema: UISchema | None = None
     """The UI Schema definition for the field (controls rendering and widgets)."""
 
 

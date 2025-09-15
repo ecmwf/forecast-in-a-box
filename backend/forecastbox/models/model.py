@@ -258,7 +258,7 @@ class BaseForecastModel(ABC):
                     title="Date",
                     description="The date for the forecast",
                 ),
-                ui=UIStringField(widget="date"),
+                uischema=UIStringField(widget="date"),
             ),
             "lead_time": FieldWithUI(
                 jsonschema=IntegerSchema(
@@ -269,7 +269,7 @@ class BaseForecastModel(ABC):
                     maximum=self.control.capabilities.max_lead_time,
                     multipleOf= self.timestep,
                 ),
-                ui=UIIntegerField(),
+                uischema=UIIntegerField(),
             ),
             "ensemble_members": FieldWithUI(
                 jsonschema=IntegerSchema(
@@ -278,7 +278,7 @@ class BaseForecastModel(ABC):
                     default=1,
                     maximum=51,
                 ),
-                ui=UIIntegerField(disabled=not self.control.capabilities.ensemble),
+                uischema=UIIntegerField(disabled=not self.control.capabilities.ensemble),
             ),
         }
         fields.update(self._extra_form_fields)
