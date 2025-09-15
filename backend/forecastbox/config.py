@@ -179,7 +179,7 @@ class FIABConfig(BaseSettings):
         json_config = self.model_dump(mode="json", **k)
 
         if skip_secrets:
-            json_config.get('auth', {}).get('oidc', {}).pop('client_secret', None)
+            (json_config.get('auth', {}).get('oidc', {}) or {}).pop('client_secret', None)
             json_config.get('auth', {}).pop('jwt_secret', None)
 
         toml_config = toml.dumps(json_config)
