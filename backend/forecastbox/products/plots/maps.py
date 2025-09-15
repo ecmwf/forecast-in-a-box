@@ -138,7 +138,7 @@ def quickplot(
         subplot_title = f"{{{groupby}}}"
 
     for i, (group_val, group_args) in enumerate(grouped_data.items()):
-        subplot = figure.add_map(domain=domain)
+        subplot = figure.add_map(domain=map(lambda x: x.strip(), domain.split(',')) if domain else None)
         _plot_fields(subplot, group_args, quickplot=dict(interpolate=True))
 
         if no_pad:
@@ -200,7 +200,7 @@ class MapProduct(GenericTemporalProduct):
                 jsonschema=StringSchema(
                     title="Domain",
                     description="Domain of the map",
-                    enum=self.domains,
+                    # enum=self.domains, # Allow typing of Domains, TODO Add validation
                     default="DataDefined",
                 ),
                 ui=UIStringField(
