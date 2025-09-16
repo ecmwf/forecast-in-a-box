@@ -125,11 +125,17 @@ for arg in "$@"; do
 			exit 0
 			;;
 		"--warmup")
-			export FIAB_CACHE="${FIAB_ROOT}/uvcache"
+            # TODO see the `--offline` for how this should be extended. In the meantime we leave this
+            # option in place just to run the base venv install and update
+			ENTRYPOINT=""
 			;;
 		"--offline")
-			export FIAB_CACHE="${FIAB_ROOT}/uvcache"
-			export FIAB_OFFLINE=YES
+            # TODO we used to have FIAB_CACHE and FIAB_OFFLINE env vars in place, with the assumption
+            # that running in warmup mode would pre-install all job dependencies. This got broken
+            # in the recent development and there is no readily accessible iteration through supported
+            # jobs. We should fix it eventually
+            echo "offline mode not supported now"
+            exit 1
 			;;
 	esac
 done
@@ -140,4 +146,6 @@ maybeInstallPython
 maybeCreateVenv
 maybePruneUvCache
 
-python -m $ENTRYPOINT
+if [ -n "$ENTRYPOINT" ] ; then
+    python -m $ENTRYPOINT
+fi
