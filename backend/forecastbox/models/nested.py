@@ -41,7 +41,7 @@ class NestedModel(BaseForecastModel):
     def _pkg_versions(self) -> dict[str, str]:
         """Model specific override for package versions."""
         return {
-            'anemoi-plugins-ecmwf-inference[mir,regrid]': "0.1.9",
+            'anemoi-plugins-ecmwf-inference[mir,regrid]': "0.1.10",
         }
 
     @property
