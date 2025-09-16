@@ -147,11 +147,11 @@ class ControlMetadata(BaseModel):
                         additionalProperties=StringSchema(),
                         # default=self._dump_yaml(self.nested or {}),
                     ),
-                    ui=UIAdditionalProperties(
+                    uischema=UIAdditionalProperties(
                         additionalProperties=UIStringField(widget="textarea", format="yaml")
                     )
-                    ),
-                    "capabilites": FieldWithUI(
+                ),
+                "capabilites": FieldWithUI(
                     jsonschema=ObjectSchema(
                         title="Capabilities",
                         properties={
