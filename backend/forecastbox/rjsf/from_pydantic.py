@@ -149,10 +149,6 @@ PRIMATIVES: dict[type, Callable[[FieldInfo], FieldWithUI]] = {
     # Literal: _from_literal_primative,
 }
 
-
-def _is_required(field: FieldInfo) -> bool:
-    return field.default is PydanticUndefined and field.default_factory is None
-
 def from_pydantic(model: type[BaseModel] | BaseModel) -> tuple[dict[str, FieldWithUI], list[str]]:
     """Convert a pydantic model to a dictionary of fields, and list of required.
 
@@ -217,14 +213,16 @@ def from_pydantic(model: type[BaseModel] | BaseModel) -> tuple[dict[str, FieldWi
 
                     schema, ui = _set_base_field_info(field, obj_schema, UIObjectField())
                     schema, ui = _update_with_extra_json(field, schema, ui)
+                    print(field_name, field.description, field.title, field)
 
+                    assert isinstance(ui, UIObjectField)
                     ui.anyOf = list(sub_fields_ui.values())
 
                     fields[field_name] = FieldWithUI(jsonschema=schema, uischema=ui)
             else:
                 fields[field_name] = _from_string_primative(field)
 
-            if _is_required(field):
+            if field.is_required():
                 required.append(field_name)
         return fields, required
     return _get_from_model(model)
