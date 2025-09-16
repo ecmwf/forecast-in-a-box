@@ -27,7 +27,7 @@ dynamic = [ "version" ]
 dependencies = [
   "aiosqlite",
   "anemoi-inference>=0.7.1",
-  "anemoi-plugins-ecmwf-inference[opendata]",
+  "anemoi-plugins-ecmwf-inference[opendata]>=0.1.10",
   "cloudpickle",
   "earthkit-workflows>=0.4.7",
   "earthkit-workflows-anemoi>=0.3.4",
