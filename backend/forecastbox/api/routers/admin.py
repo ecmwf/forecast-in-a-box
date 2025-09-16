@@ -60,7 +60,7 @@ class ExposedSettings(BaseModel):
 
 
 @router.get("/settings", response_model=ExportedSchemas)
-async def get_settings() -> ExportedSchemas:
+async def get_settings(admin=Depends(get_admin_user)) -> ExportedSchemas:
     """Get current settings"""
     settings = ExposedSettings()
     return settings.to_rjsf().export_all()
@@ -69,8 +69,6 @@ async def get_settings() -> ExportedSchemas:
 @router.patch("/settings", response_class=HTMLResponse)
 async def post_settings(settings: ExposedSettings, admin=Depends(get_admin_user)) -> HTMLResponse:
     """Update settings"""
-    pass
-
     def update(old: BaseModel, new: BaseModel):
         for key, val in new.model_dump().items():
             setattr(old, key, val)
