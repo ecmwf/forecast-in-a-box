@@ -16,7 +16,10 @@ import {
   ActionIcon,
   Tooltip,
   CopyButton,
+  Modal,
+  Center,
 } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
 
 import {
   IconMail,
@@ -25,7 +28,11 @@ import {
   IconBrandTelegram,
   IconCopy,
   IconCheck,
+  IconQrcode,
 } from '@tabler/icons-react';
+
+import { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
 
 type ImageShareProps = {
   imageUrl: string;
@@ -35,6 +42,16 @@ type ImageShareProps = {
 export default function ImageShare({ imageUrl, title = 'Check this out!' }: ImageShareProps) {
   const encodedImageUrl = encodeURIComponent(imageUrl);
   const encodedTitle = encodeURIComponent(title);
+  const [opened, { open, close }] = useDisclosure(false);
+  const [qrCodeDataURL, setQrCodeDataURL] = useState<string>('');
+
+  useEffect(() => {
+    QRCode.toDataURL(imageUrl, { width: 256 })
+      .then(url => {
+        setQrCodeDataURL(url);
+      })
+      .catch(err => console.error('Error generating QR code:', err));
+  }, [imageUrl]);
 
   const shareLinks = {
     email: `mailto:?subject=${encodedTitle}&body=${encodedTitle}%0A${encodedImageUrl}`,
@@ -88,7 +105,32 @@ export default function ImageShare({ imageUrl, title = 'Check this out!' }: Imag
             </Tooltip>
           )}
         </CopyButton>
+
+        <Tooltip label="QR Code">
+          <ActionIcon onClick={open} color="indigo">
+            <IconQrcode size={20} />
+          </ActionIcon>
+        </Tooltip>
       </Group>
+
+      <Modal opened={opened} onClose={close} title="QR Code" centered>
+        <Center>
+          {qrCodeDataURL ? (
+            <img
+              src={qrCodeDataURL}
+              alt="QR Code for sharing"
+              width={256}
+              height={256}
+              style={{ display: 'block' }}
+            />
+          ) : (
+            <Text>Generating QR code...</Text>
+          )}
+        </Center>
+        <Text ta="center" mt="md" size="sm" c="dimmed">
+          Scan this QR code to open the image
+        </Text>
+      </Modal>
     </Card>
   );
 }
