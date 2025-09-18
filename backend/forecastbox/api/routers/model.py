@@ -276,13 +276,15 @@ async def get_model_metadata_form(model_id: str, admin=Depends(get_admin_user)) 
 
 async def _update_model_metadata(model_id: str, metadata: ControlMetadata) -> ControlMetadata:
     """Update metadata for a specific model."""
-    model_path = get_model_path(model_id.replace("_", "/"))
-    if not model_path.exists():
-        raise HTTPException(status_code=404, detail="Model not found")
-    loop = asyncio.get_running_loop()
-    await loop.run_in_executor(None, set_control_metadata, model_path, metadata)
-    await finish_edit(model_id)
-    return metadata
+    try:
+        model_path = get_model_path(model_id.replace("_", "/"))
+        if not model_path.exists():
+            raise HTTPException(status_code=404, detail="Model not found")
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, set_control_metadata, model_path, metadata)
+        return metadata
+    finally:
+        await finish_edit(model_id)
 
 
 @router.patch("/{model_id}/metadata")
@@ -292,8 +294,15 @@ async def patch_model_metadata(
     """Patch metadata for a specific model."""
     if not model_downloaded(model_id):
         raise HTTPException(status_code=404, detail="Model not found")
-    await start_editing(model_id, str(data.model_dump()))
-    background_tasks.add_task(_update_model_metadata, model_id, data)
+    if not await start_editing(model_id, str(data.model_dump())):
+        raise HTTPException(status_code=409, detail="Concurrent model edit in progress")
+    # background_tasks.add_task(_update_model_metadata, model_id, data)
+    try:
+        await _update_model_metadata(model_id, data)
+    except Exception as e:
+        msg = f"failed to edit model metadata due to {repr(e)}"
+        logger.exception(msg)
+        raise HTTPException(status_code = 400, detail=msg)
 
 
 # section: MODEL INFO
