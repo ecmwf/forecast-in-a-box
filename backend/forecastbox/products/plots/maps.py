@@ -245,7 +245,7 @@ class SimpleMapProduct(MapProduct):
         quickplot_payload = quickplot(
             domain=domain,
             groupby="valid_datetime",
-            subplot_title="T+{lead_time}",
+            subplot_title="{time:%Y-%m-%d %H} UTC (+{lead_time}h)",
             figure_title="{variable_name} over {domain}\n Base time: {base_time: %Y%m%dT%H%M}\n",
         )
         plots = source.map(quickplot_payload).map(export(format="png")).map(self.named_payload("Map"))
