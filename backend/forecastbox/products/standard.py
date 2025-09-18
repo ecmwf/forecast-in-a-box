@@ -47,7 +47,7 @@ class OutputProduct(GenericTemporalProduct):
                     enum=OUTPUT_TYPES,
                     default="grib",
                 ),
-                ui=UIStringField(
+                uischema=UIStringField(
                     widget="select",
                 ),
             ),
