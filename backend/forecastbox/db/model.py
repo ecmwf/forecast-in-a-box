@@ -12,6 +12,7 @@ from forecastbox.config import config
 from forecastbox.db.core import addAndCommit, executeAndCommit, querySingle
 from forecastbox.schemas.model import Base, ModelDownload, ModelEdit
 from sqlalchemy import delete, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 logger = logging.getLogger(__name__)
@@ -59,14 +60,20 @@ async def delete_download(model_id: str|None) -> None:
     await executeAndCommit(stmt, async_session_maker)
 
 
-async def start_editing(model_id: str, metadata: str) -> None:
+async def start_editing(model_id: str, metadata: str) -> bool:
     ref_time = dt.datetime.now()
     entity = ModelEdit(
         model_id=model_id,
         created_at=ref_time,
         metadata=metadata,
     )
-    await addAndCommit(entity, async_session_maker)
+    try:
+        await addAndCommit(entity, async_session_maker)
+        return True
+    except IntegrityError:
+        logger.exception("failed to start editing, assuming concurrent edit")
+        return False
+
 
 
 async def get_edit(model_id: str) -> ModelEdit | None:
