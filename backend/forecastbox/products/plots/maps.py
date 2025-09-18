@@ -206,8 +206,8 @@ class MapProduct(GenericTemporalProduct):
                     description="Domain of the map",
                     default="DataDefined",
                 ),
-                uischema=UIStringField(
-                    widget="select",
+                ui=UIStringField(
+                    widget="text",
                 ),
             ),
         )
