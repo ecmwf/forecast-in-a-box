@@ -21,6 +21,7 @@ from forecastbox.products.ensemble import BaseEnsembleProduct
 from forecastbox.products.product import GenericTemporalProduct
 from forecastbox.rjsf import FieldWithUI, StringSchema, UIStringField
 
+from ..product import USER_DEFINED
 from . import plot_product_registry
 
 EARTHKIT_PLOTS_IMPORTED = True
@@ -203,11 +204,10 @@ class MapProduct(GenericTemporalProduct):
                 jsonschema=StringSchema(
                     title="Domain",
                     description="Domain of the map",
-                    enum=self.domains,
                     default="DataDefined",
                 ),
-                uischema=UIStringField(
-                    widget="select",
+                ui=UIStringField(
+                    widget="text",
                 ),
             ),
         )
@@ -216,13 +216,13 @@ class MapProduct(GenericTemporalProduct):
     @property
     def model_assumptions(self):
         return {
-            "domain": self.domains,
+            "domain": '*',
             "reduce": ["True", "False"],
         }
 
     @property
     def qube(self):
-        return self.make_generic_qube(domain=self.domains, reduce=["True", "False"])
+        return self.make_generic_qube(domain=USER_DEFINED, reduce=["True", "False"])
 
     def validate_intersection(self, model: SpecifiedModel) -> bool:
         return super().validate_intersection(model) and EARTHKIT_PLOTS_IMPORTED
