@@ -183,8 +183,6 @@ class MapProduct(GenericTemporalProduct):
     # TODO, consider how plotting works for LAM models
     """
 
-    domains = ["DataDefined", "Europe", "Australia", "Malawi", "Norway"]
-
     @property
     def formfields(self):
         formfields = super().formfields.copy()
