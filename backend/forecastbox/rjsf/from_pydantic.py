@@ -213,7 +213,6 @@ def from_pydantic(model: type[BaseModel] | BaseModel) -> tuple[dict[str, FieldWi
 
                     schema, ui = _set_base_field_info(field, obj_schema, UIObjectField())
                     schema, ui = _update_with_extra_json(field, schema, ui)
-                    print(field_name, field.description, field.title, field)
 
                     assert isinstance(ui, UIObjectField)
                     ui.anyOf = list(sub_fields_ui.values())
