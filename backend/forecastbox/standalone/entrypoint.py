@@ -190,7 +190,7 @@ def launch_all(config: FIABConfig, attempts: int = 20) -> ProcessHandles:
     setup_process()
     logger.info("main process starting")
     export_recursive(
-        config.model_dump(exclude_unset = True, exclude_defaults=True), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"]
+        config.model_dump(exclude_defaults=True), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"]
     )
 
     api = Process(target=launch_api)
