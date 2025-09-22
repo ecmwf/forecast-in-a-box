@@ -230,7 +230,7 @@ class SimpleMapProduct(MapProduct):
         domain = product_spec.pop("domain", None)
         source = self.select_on_specification(product_spec, source)
 
-        if domain == "DataDefined":
+        if domain in ["DataDefined", "Global"]:
             domain = None
 
         source = source.concatenate("param")
@@ -297,7 +297,7 @@ class EnsembleMapProduct(BaseEnsembleProduct, MapProduct):
         domain = product_spec.pop("domain", None)
         source = self.select_on_specification(product_spec, source)
 
-        if domain == "Global":
+        if domain in ["DataDefined", "Global"]:
             domain = None
 
         source = source.concatenate(ENSEMBLE_DIMENSION_NAME)
