@@ -171,7 +171,6 @@ class BaseForecastModel(ABC):
             }
         )
 
-        inference_environment_variables = (control.environment_variables).copy()
         input_source = self._create_input_configuration(control)
 
         if isinstance(input_source, str):
@@ -196,7 +195,6 @@ class BaseForecastModel(ABC):
             date=date,
             ensemble_members=ensemble_members,
             environment={"inference": inference_env_list, "initial_conditions": initial_conditions_env},
-            env=inference_environment_variables,
             **extra_kwargs,
             **self._execution_kwargs,
         )

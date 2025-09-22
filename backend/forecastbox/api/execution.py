@@ -33,18 +33,20 @@ from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 
 
-def forecast_products_to_cascade(spec: ForecastProducts, environment: EnvironmentSpecification) -> Cascade:
-    # Get the model specification and create a Model instance
+def _get_model(spec: ForecastProducts):
     model_spec = dict(
         lead_time=spec.model.lead_time,
         date=spec.model.date,
         ensemble_members=spec.model.ensemble_members,
     )
 
-    model = get_model(checkpoint=get_model_path(spec.model.model)).specify(**model_spec) # type: ignore
+    return get_model(checkpoint=get_model_path(spec.model.model)).specify(**model_spec) # type: ignore
+
+def forecast_products_to_cascade(spec: ForecastProducts, environment: EnvironmentSpecification) -> tuple[Cascade, dict]:
+    model = _get_model(spec)
 
     # Create the model action graph
-    model_action = model.graph(environment_kwargs=environment.environment_variables)
+    model_action = model.graph()
 
     # Iterate over each product in the specification
     complete_graph = Graph([])
@@ -62,15 +64,18 @@ def forecast_products_to_cascade(spec: ForecastProducts, environment: Environmen
     if len(spec.products) == 0:
         complete_graph += model_action.graph()
 
-    return Cascade(deduplicate_nodes(complete_graph))
+    env_vars = model.control.environment_variables
+    env_vars.update(environment.environment_variables)
+
+    return Cascade(deduplicate_nodes(complete_graph)), env_vars
 
 
-def execution_specification_to_cascade(spec: ExecutionSpecification) -> JobInstance:
+def execution_specification_to_cascade(spec: ExecutionSpecification) -> tuple[JobInstance, dict]:
     if isinstance(spec.job, ForecastProducts):
-        cascade_graph = forecast_products_to_cascade(spec.job, spec.environment)
-        return graph2job(cascade_graph._graph)
+        cascade_graph, environment_variables = forecast_products_to_cascade(spec.job, spec.environment)
+        return graph2job(cascade_graph._graph), environment_variables
     elif isinstance(spec.job, RawCascadeJob):
-        return spec.job.job_instance
+        return spec.job.job_instance, {}
     else:
         assert_never(spec.job)
 
@@ -78,7 +83,7 @@ def execution_specification_to_cascade(spec: ExecutionSpecification) -> JobInsta
 def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobResponse, list[Any]]:
     """Converts spec to JobInstance and submits to cascade api, returning response + list of sinks"""
     try:
-        job = execution_specification_to_cascade(spec)
+        job, job_envvars = execution_specification_to_cascade(spec)
     except Exception as e:
         return api.SubmitJobResponse(job_id=None, error=repr(e)), []
 
@@ -95,7 +100,7 @@ def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobRespons
     )
 
     env_vars = {"TMPDIR": config.cascade.venv_temp_dir}
-    env_vars.update(environment.environment_variables)
+    env_vars.update({k: str(v) for k, v in job_envvars.items()})
 
     r = api.SubmitJobRequest(
         job=api.JobSpec(
