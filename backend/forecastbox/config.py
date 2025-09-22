@@ -210,4 +210,4 @@ def validate_runtime(config: FIABConfig) -> None:
 
 
 config = FIABConfig()
-logger.warning(f"loaded config: {config.model_dump()}")
+logger.debug(f"loaded config: {config.model_dump()}")
