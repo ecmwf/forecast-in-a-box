@@ -14,8 +14,8 @@ import pytest
 from forecastbox.rjsf.forms import FieldWithUI
 from forecastbox.rjsf.from_pydantic import (PRIMATIVES, _from_boolean_primative, _from_date_primative,
                                             _from_dict_primative, _from_integer_primative, _from_list_primative,
-                                            _from_literal_primative, _from_string_primative, _is_required,
-                                            _set_base_field_info, _update_with_extra_json, from_pydantic)
+                                            _from_literal_primative, _from_string_primative, _set_base_field_info,
+                                            _update_with_extra_json, from_pydantic)
 from forecastbox.rjsf.jsonSchema import BooleanSchema, IntegerSchema, ObjectSchema, StringSchema
 from forecastbox.rjsf.uiSchema import UIAdditionalProperties, UIField, UIIntegerField, UIObjectField, UIStringField
 from pydantic import BaseModel, Field
@@ -84,18 +84,6 @@ class TestHelperFunctions:
         updated_schema, updated_ui = _set_base_field_info(field, schema, ui)
 
         assert updated_schema.default == "factory_value"
-
-    def test_is_required_true(self):
-        field = FieldInfo()
-        assert _is_required(field) is True
-
-    def test_is_required_false_with_default(self):
-        field = FieldInfo(default="test")
-        assert _is_required(field) is False
-
-    def test_is_required_false_with_default_factory(self):
-        field = FieldInfo(default_factory=lambda: "test")
-        assert _is_required(field) is False
 
 
 class TestPrimitiveConversions:
