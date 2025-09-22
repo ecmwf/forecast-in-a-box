@@ -80,7 +80,7 @@ def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobRespons
     try:
         job = execution_specification_to_cascade(spec)
     except Exception as e:
-        return api.SubmitJobResponse(job_id=None, error=repr(e)), []
+        return api.SubmitJobResponse(job_id=None, error=str(e)), []
 
     sinks = cascade_views.sinks(job)
     sinks = [s for s in sinks if not s.task.startswith("run_as_earthkit")]
@@ -136,4 +136,6 @@ async def execute(spec: ExecutionSpecification, user: UserRead | None) -> Submit
         spec.model_dump_json(),
         json.dumps(list(map(lambda x: x.task, sinks))),
     )
+    if response.error:
+        raise Exception(response.error)
     return SubmitJobResponse(id=response.job_id)
