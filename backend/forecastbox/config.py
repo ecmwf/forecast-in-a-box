@@ -68,7 +68,7 @@ class OIDCSettings(BaseModel):
 
 
 class AuthSettings(BaseModel):
-    jwt_secret: SecretStr = Field(SecretStr("fiab_secret"))
+    jwt_secret: SecretStr = SecretStr("fiab_secret")
     """JWT secret key for authentication."""
     oidc: OIDCSettings | None = None
     """OIDC settings for authentication, if applicable, if not given no route will be made."""
@@ -97,7 +97,6 @@ class GeneralSettings(BaseModel):
     launch_browser: bool = True
     """Whether a browser window should be opened after start. Used only when
     standalone.entrypoint.launch_all module is used"""
-
 
 class ProductSettings(BaseModel):
     pproc_schema_dir: str | None = None
@@ -139,7 +138,6 @@ class BackendAPISettings(BaseModel):
             errors.append(f"not a valid uvicorn config: {pseudo_url}")
         return errors
 
-
 class CascadeSettings(BaseModel):
     max_hosts: int = 1
     """Number of hosts for Cascade."""
@@ -161,7 +159,6 @@ class CascadeSettings(BaseModel):
         if not _validate_url(self.cascade_url):
             errors.append(f"not an url: cascade_url={self.cascade_url}")
         return errors
-
 
 class FIABConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", env_prefix="fiab__")
