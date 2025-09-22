@@ -31,12 +31,7 @@ class StatusMessage:
     # NOTE this class is here as this is a low place in hierarchy, and we dont want circular imports
     gateway_running = "running"
 
-class Secrets(SecretStr):
-    def __str__(self) -> str:
-        return self.get_secret_value()
 
-    def _display(self) -> str:
-        return self.get_secret_value()
 
 class DatabaseSettings(BaseModel):
     sqlite_userdb_path: str = str(fiab_home / "user.db")
@@ -58,7 +53,7 @@ class DatabaseSettings(BaseModel):
 
 class OIDCSettings(BaseModel):
     client_id: str | None = None
-    client_secret: Secrets | None = None
+    client_secret: SecretStr | None = None
     openid_configuration_endpoint: str | None = None
     name: str = "oidc"
     scopes: list[str] = ["openid", "email"]
@@ -66,14 +61,14 @@ class OIDCSettings(BaseModel):
 
     @model_validator(mode="after")
     def pass_to_secret(self):
-        """Convert the client_secret to a Secrets."""
+        """Convert the client_secret to a SecretStr."""
         if isinstance(self.client_secret, str):
-            self.client_secret = Secrets(self.client_secret)
+            self.client_secret = SecretStr(self.client_secret)
         return self
 
 
 class AuthSettings(BaseModel):
-    jwt_secret: Secrets = Field(Secrets("fiab_secret"))
+    jwt_secret: SecretStr = Field(SecretStr("fiab_secret"))
     """JWT secret key for authentication."""
     oidc: OIDCSettings | None = None
     """OIDC settings for authentication, if applicable, if not given no route will be made."""
@@ -84,9 +79,9 @@ class AuthSettings(BaseModel):
 
     @model_validator(mode="after")
     def pass_to_secret(self):
-        """Convert the jwt_secret to a Secrets."""
+        """Convert the jwt_secret to a SecretStr."""
         if isinstance(self.jwt_secret, str):
-            self.jwt_secret = Secrets(self.jwt_secret)
+            self.jwt_secret = SecretStr(self.jwt_secret)
         if self.oidc is not None and self.public_url is None:
             raise ValueError("when using oidc, public_url must be configured")
         return self
@@ -204,14 +199,6 @@ class FIABConfig(BaseSettings):
         with open(config_path, 'w') as f:
             f.write(self._get_toml(exclude_defaults = True, exclude_none = True))
 
-    def save_example_to_file(self) -> None:
-        """Save example configuration to toml file"""
-
-        config_path = fiab_home / "config.toml.example"
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(config_path, 'w') as f:
-            f.write(self._get_toml())
-
 
 def validate_runtime(config: FIABConfig) -> None:
     """Validates that a particular config can be used to execute FIAB in this machine/venv.
@@ -226,6 +213,4 @@ def validate_runtime(config: FIABConfig) -> None:
 
 
 config = FIABConfig()
-config.save_example_to_file()
-
-logger.debug(f"loaded config: {config.model_dump()}")
+logger.warning(f"loaded config: {config.model_dump()}")
