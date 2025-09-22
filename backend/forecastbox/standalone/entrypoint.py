@@ -171,12 +171,15 @@ class ProcessHandles:
 
 
 def export_recursive(dikt, delimiter, prefix):
+    import json
     for k, v in dikt.items():
         if isinstance(v, dict):
             export_recursive(v, delimiter, f"{prefix}{k}{delimiter}")
         else:
             if isinstance(v, pydantic.SecretStr):
                 v = v.get_secret_value()
+            if isinstance(v, (list, set)):
+                v = json.dumps(list(v))
             if v is not None:
                 os.environ[f"{prefix}{k}"] = str(v)
 
@@ -187,7 +190,7 @@ def launch_all(config: FIABConfig, attempts: int = 20) -> ProcessHandles:
     setup_process()
     logger.info("main process starting")
     export_recursive(
-        config.model_dump(), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"]
+        config.model_dump(exclude_unset = True, exclude_defaults=True), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"]
     )
 
     api = Process(target=launch_api)
