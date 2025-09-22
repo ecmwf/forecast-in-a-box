@@ -40,7 +40,7 @@ export default function GraphVisualiser({ spec, url }: GraphVisualiserProps) {
                     if (spec) {
                         response = await api.post(`/v1/execution/visualise`, { spec: spec, options: options });
                     } else if (url) {
-                        response = await api.post(`${url}`, { options }, { headers: { "Content-Type": "application/json" } });
+                        response = await api.post(`${url}`, { ...options }, { headers: { "Content-Type": "application/json" } });
                     } else {
                         throw new Error("No valid source for fetching the graph.");
                     }
