@@ -141,6 +141,4 @@ async def execute(spec: ExecutionSpecification, user: UserRead | None) -> Submit
         spec.model_dump_json(),
         json.dumps(list(map(lambda x: x.task, sinks))),
     )
-    if response.error:
-        raise Exception(response.error)
     return SubmitJobResponse(id=response.job_id)

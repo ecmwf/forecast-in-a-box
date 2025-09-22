@@ -97,7 +97,7 @@ def test_submit_job(backend_client_with_auth):
     response = backend_client_with_auth.get("/job/status")
     assert response.is_success
     # TODO retry in case of error not present yet
-    assert "FileNotFoundError" in response.json()["progresses"][no_ckpt_id]["error"]
+    assert "No such file or directory" in response.json()["progresses"][no_ckpt_id]["error"]
 
     # valid spec
     spec = ExecutionSpecification(
