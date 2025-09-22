@@ -195,7 +195,7 @@ class MapProduct(GenericTemporalProduct):
             reduce=FieldWithUI(
                 jsonschema=StringSchema(
                     title="Reduce",
-                    description="Combine all steps and parameters into a single plot",
+                    description="Combine all steps into a single plot",
                     enum=["True", "False"],
                     default="True",
                 )
@@ -238,8 +238,8 @@ class SimpleMapProduct(MapProduct):
         if domain == "DataDefined":
             domain = None
 
+        source = source.concatenate("param")
         if product_spec.get("reduce", "True") == "True":
-            source = source.concatenate("param")
             source = source.concatenate("step")
 
         quickplot_payload = quickplot(

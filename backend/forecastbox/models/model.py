@@ -138,11 +138,10 @@ class BaseForecastModel(ABC):
         """Model specific execution kwargs."""
         return {}
 
-
     def graph(self, lead_time: int, date, ensemble_members: int = 1, **kwargs) -> Action:
         """Create the model action graph with specified parameters."""
         versions = self.versions
-        INFERENCE_FILTER_STARTS = ["anemoi-models", "anemoi-graphs", "flash-attn", "torch"]
+        INFERENCE_FILTER_INCLUDE = ["anemoi-models", "anemoi-graphs", "flash-attn", "torch", "torch_geometric"]
         INITIAL_CONDITIONS_FILTER_STARTS = ["anemoi-inference", "earthkit", "anemoi-transform", "anemoi-plugins"]
 
         def parse_into_install(version_dict):
@@ -157,7 +156,7 @@ class BaseForecastModel(ABC):
         control = self.control.update(**kwargs)
 
         inference_env = {
-            key: val for key, val in versions.items() if any(key.startswith(start) for start in INFERENCE_FILTER_STARTS)
+            key: val for key, val in versions.items() if key in INFERENCE_FILTER_INCLUDE
         }
 
         inference_env.update(self._pkg_versions)
@@ -172,7 +171,6 @@ class BaseForecastModel(ABC):
             }
         )
 
-        inference_environment_variables = (control.environment_variables).copy()
         input_source = self._create_input_configuration(control)
 
         if isinstance(input_source, str):
@@ -197,7 +195,6 @@ class BaseForecastModel(ABC):
             date=date,
             ensemble_members=ensemble_members,
             environment={"inference": inference_env_list, "initial_conditions": initial_conditions_env},
-            env=inference_environment_variables,
             **extra_kwargs,
             **self._execution_kwargs,
         )

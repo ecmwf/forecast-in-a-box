@@ -75,8 +75,8 @@ class ControlMetadata(BaseModel):
     pre_processors: dict[str, Any] = Field(default_factory=dict, examples=processor_example)
     post_processors: dict[str, Any] = Field(default_factory=dict, examples=processor_example)
 
-    environment_variables: dict[str, Any] = Field(default_factory=dict, examples=[{"MY_VAR": "value", "ANOTHER_VAR": "another_value"}])
-    """Environment variables for execution."""
+    environment_variables: dict[str, Any] = Field(default_factory=dict, examples=[{"MY_VAR": "value", "ANOTHER_VAR": "another_value"}], description="Global Environment Variables to be set")
+    """Global Environment variables for execution."""
 
     capabilities: Capabilities = Field(default_factory=Capabilities, examples=[{"ensemble": True, "max_lead_time": 240}])
 
