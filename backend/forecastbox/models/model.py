@@ -138,7 +138,7 @@ class BaseForecastModel(ABC):
         """Model specific execution kwargs."""
         return {}
 
-    def graph(self, lead_time: int, date, ensemble_members: int = 1, **kwargs) -> Action:
+    def graph(self, lead_time: int, date, ensemble_members: int | None = 1, **kwargs) -> Action:
         """Create the model action graph with specified parameters."""
         versions = self.versions
         INFERENCE_FILTER_INCLUDE = ["anemoi-models", "anemoi-graphs", "flash-attn", "torch", "torch_geometric"]
@@ -187,6 +187,9 @@ class BaseForecastModel(ABC):
 
         extra_kwargs['pre_processors'].extend(self._pre_processors(kwargs))
         extra_kwargs['post_processors'].extend(self._post_processors(kwargs))
+
+        if ensemble_members == 1:
+            ensemble_members = None
 
         return from_input(
             self.checkpoint_path,
@@ -271,7 +274,7 @@ class BaseForecastModel(ABC):
                 ),
                 ui=UIIntegerField(),
             ),
-            "ensemble_members": FieldWithUI(
+            "ensemble_members": FieldWithUI( # TODO: Allow None in the form
                 jsonschema=IntegerSchema(
                     title="Ensemble Members",
                     description="The number of ensemble members to use.",
