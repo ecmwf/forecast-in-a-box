@@ -9,19 +9,32 @@
 
 
 import io
+import logging
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, Literal
 
 import earthkit.data as ekd
 from earthkit.workflows.decorators import as_payload
-
-from .product import Product
 
 if TYPE_CHECKING:
     import numpy as np
 
 FORMAT = Literal["grib", "netcdf", "numpy"]
 OUTPUT_TYPES = ["grib", "netcdf", "numpy"]
+logger = logging.getLogger(__name__)
 
+@contextmanager
+def debug_metadata(fields: ekd.FieldList):
+    """Context manager for debugging metadata."""
+    try:
+        yield
+    except Exception as e:
+        logger.error(f"Error occurred: {e}")
+        logger.debug("FieldList metadata:", exc_info=True)
+        logger.debug(f"Shape: {fields.to_numpy().shape}")
+        for i, field in enumerate(fields):
+            logger.debug(f"{type(field)} {i} metadata: {field.metadata().dump()}")
+        raise
 
 @as_payload
 def export_fieldlist_as(
@@ -44,22 +57,21 @@ def export_fieldlist_as(
     """
     written_bytes = b''
 
-    if format == "grib":
-        buf = io.BytesIO()
-        fields.to_target("file", buf, encoder="grib")
-        written_bytes = buf.getvalue()
-    elif format == "netcdf":
-        fields_xr = fields.to_xarray(decode_timedelta=False, add_earthkit_attrs=False)
-        written_bytes = fields_xr.to_netcdf()
-    elif format == "numpy":
-        np_obj: np.ndarray = fields.to_numpy()  # type: ignore
-        if np_obj is None:
-            raise ValueError("Data cannot be converted to numpy.")
-        written_bytes = np_obj.tobytes()
-    else:
+    with debug_metadata(fields):
+        if format == "grib":
+            buf = io.BytesIO()
+            fields.to_target("file", buf, encoder="grib")
+            written_bytes = buf.getvalue()
+        elif format == "netcdf":
+            fields_xr = fields.to_xarray(decode_timedelta=False, add_earthkit_attrs=False)
+            written_bytes = fields_xr.to_netcdf()
+        elif format == "numpy":
+            np_obj: np.ndarray = fields.to_numpy()  # type: ignore
+            if np_obj is None:
+                raise ValueError("Data cannot be converted to numpy.")
+            written_bytes = np_obj.tobytes()
+
+    if written_bytes == b'':
         raise ValueError(f"Unsupported format: {format}. Supported formats are {OUTPUT_TYPES}.")
 
     return written_bytes, f"application/{format}"
-
-class ExportMixin(Product):
-    pass
