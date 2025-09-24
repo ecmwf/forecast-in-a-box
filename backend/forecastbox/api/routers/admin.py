@@ -67,7 +67,7 @@ async def get_settings(admin=Depends(get_admin_user)) -> ExportedSchemas:
 
 
 @router.patch("/settings", response_class=HTMLResponse)
-async def post_settings(settings: ExposedSettings, admin=Depends(get_admin_user)) -> HTMLResponse:
+async def update_settings(settings: ExposedSettings, admin=Depends(get_admin_user)) -> HTMLResponse:
     """Update settings"""
     def update(old: BaseModel, new: BaseModel):
         for key, val in new.model_dump().items():
