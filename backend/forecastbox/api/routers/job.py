@@ -139,7 +139,7 @@ async def update_and_get_progress(job_id: JobId) -> JobProgressResponse:
 
 
 @router.get("/status")
-async def get_status() -> JobProgressResponses:
+async def get_status(user = Depends(current_active_user)) -> JobProgressResponses:
     """Get progress of all tasks recorded in the database."""
 
     job_records = await get_all()
@@ -162,7 +162,7 @@ async def get_status() -> JobProgressResponses:
 
 
 @router.get("/{job_id}/status")
-async def get_status_of_job(job_id: JobId = Depends(validate_job_id)) -> JobProgressResponse:
+async def get_status_of_job(job_id: JobId = Depends(validate_job_id), user = Depends(current_active_user)) -> JobProgressResponse:
     """Get progress of a particular job."""
     return await update_and_get_progress(job_id)
 
@@ -178,7 +178,7 @@ async def get_outputs_of_job(job_id: JobId = Depends(validate_job_id)) -> list[T
 
 @router.post("/{job_id}/visualise")
 async def visualise_job(
-    job_id: JobId = Depends(validate_job_id), options: VisualisationOptions = Body(None)
+    job_id: JobId = Depends(validate_job_id), options: VisualisationOptions = Body(None), user = Depends(current_active_user)
 ) -> HTMLResponse:
     """Visualise a job's execution graph.
 
@@ -198,7 +198,7 @@ async def visualise_job(
 
 
 @router.get("/{job_id}/specification")
-async def get_job_specification(job_id: JobId = Depends(validate_job_id)) -> ExecutionSpecification:
+async def get_job_specification(job_id: JobId = Depends(validate_job_id), user = Depends(current_active_user)) -> ExecutionSpecification:
     """Get specification in the database of a job."""
     job = await get_one(job_id)
     if job is None:
@@ -245,13 +245,15 @@ class DatasetAvailabilityResponse:
 
 
 @router.get("/{job_id}/available")
-async def get_job_availablity(job_id: JobId = Depends(validate_job_id)) -> list[TaskId]:
+async def get_job_availablity(job_id: JobId = Depends(validate_job_id), user = Depends(current_active_user)) -> list[TaskId]:
     """Check which results are available for a given job_id.
 
     Parameters
     ----------
     job_id : str
         Job ID of the task
+    user: UserRead | None
+        The current active user, if any.
 
     Returns
     -------
@@ -266,7 +268,7 @@ async def get_job_availablity(job_id: JobId = Depends(validate_job_id)) -> list[
 
 @router.get("/{job_id}/{dataset_id}/available")
 async def get_result_availablity(
-    job_id: JobId = Depends(validate_job_id), dataset_id: TaskId = Depends(validate_dataset_id)
+    job_id: JobId = Depends(validate_job_id), dataset_id: TaskId = Depends(validate_dataset_id), user = Depends(current_active_user)
 ) -> DatasetAvailabilityResponse:
     """Check if the result is available for a given job_id and dataset_id.
 
@@ -278,6 +280,8 @@ async def get_result_availablity(
         Job ID of the task
     dataset_id : str
         Dataset ID of the task
+    user: UserRead | None
+        The current active user, if any.
 
     Returns
     -------
@@ -299,7 +303,7 @@ async def get_result_availablity(
 
 
 @router.get("/{job_id}/logs")
-async def get_logs(job_id: JobId = Depends(validate_job_id)) -> Response:
+async def get_logs(job_id: JobId = Depends(validate_job_id), user = Depends(current_active_user)) -> Response:
     """Returns a zip file with logs and other data for the purpose of troubleshooting"""
 
     logger.debug(f"getting logs for {job_id}")
@@ -363,7 +367,7 @@ async def get_logs(job_id: JobId = Depends(validate_job_id)) -> Response:
 # eg /job_id/available or /job_id/logs become order-dependent / conflicting with output of such name
 @router.get("/{job_id}/{dataset_id}")
 async def get_result(
-    job_id: JobId = Depends(validate_job_id), dataset_id: TaskId = Depends(validate_dataset_id)
+    job_id: JobId = Depends(validate_job_id), dataset_id: TaskId = Depends(validate_dataset_id), user = Depends(current_active_user)
 ) -> Response:
     """Get the result of a job.
 
@@ -373,6 +377,8 @@ async def get_result(
         Job ID of the task, expected to be the id in the database, not the cascade job id.
     dataset_id : TaskId
         Dataset ID of the task, these can be found from /{job_id}/outputs.
+    user: UserRead | None
+        The current active user, if any.
 
     Returns
     -------
@@ -410,7 +416,7 @@ class JobDeletionResponse:
 
 
 @router.post("/flush")
-async def flush_job() -> JobDeletionResponse:
+async def flush_job(user = Depends(current_active_user)) -> JobDeletionResponse:
     """Flush all job from the database and cascade.
 
     Returns number of deleted jobs.
@@ -425,7 +431,7 @@ async def flush_job() -> JobDeletionResponse:
 
 
 @router.delete("/{job_id}")
-async def delete_job(job_id: JobId = Depends(validate_job_id)) -> JobDeletionResponse:
+async def delete_job(job_id: JobId = Depends(validate_job_id), user = Depends(current_active_user)) -> JobDeletionResponse:
     """Delete a job from the database and cascade.
 
     Returns number of deleted jobs.

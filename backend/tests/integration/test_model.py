@@ -1,5 +1,7 @@
 import time
 
+from forecastbox.models.metadata import ControlMetadata
+
 from .conftest import fake_model_name
 from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
 
@@ -53,14 +55,24 @@ def test_download_model(backend_client):
         time.sleep(0.05)
         i -= 1
 
-    time.sleep(4)
     assert i > 0, "Failed to download model"
+
 
     response = backend_client.get("/model/available").raise_for_status()
     assert fake_model_name in response.json()[""]
     for e in range(parallelism):
         assert fake_model_name + str(e) in response.json()[""]
         backend_client.delete(f"/model/{fake_model_name}{e}").raise_for_status()
+
+    metadata = ControlMetadata()
+    expected = '{"detail":"failed to edit model metadata due to BadZipFile(\'File is not a zip file\')"}'
+    response = backend_client.patch(f"/model/{fake_model_name}/metadata", json=metadata.dict())
+    assert response.status_code == 400
+    assert response.text == expected
+    # we try twice to test that the concurrent lock has been lifted
+    response = backend_client.patch(f"/model/{fake_model_name}/metadata", json=metadata.dict())
+    assert response.status_code == 400
+    assert response.text == expected
 
     backend_client.delete(f"/model/{fake_model_name}").raise_for_status()
 

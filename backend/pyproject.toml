@@ -28,6 +28,7 @@ dependencies = [
   "aiosqlite",
   "anemoi-inference>=0.7.1",
   "anemoi-plugins-ecmwf-inference[opendata]>=0.1.10",
+  "anemoi-utils>=0.4.36",
   "cloudpickle",
   "earthkit-workflows>=0.4.7",
   "earthkit-workflows-anemoi>=0.3.4",
@@ -38,8 +39,8 @@ dependencies = [
   "httpx<1",
   "httpx-oauth",
   "jinja2",
-  "mir-python==1.27.4.dev20250905",           # to bring in the binary stack eagerly, TODO unpin once stable
-  "multiolib==2.7.0.dev20250905",             # to bring in the binary stack eagerly, TODO unpin once stable
+  "mir-python==1.27.4.dev20250905",                   # to bring in the binary stack eagerly, TODO unpin once stable
+  "multiolib==2.7.0.dev20250905",                     # to bring in the binary stack eagerly, TODO unpin once stable
   "orjson",
   "pproc",
   "psutil",

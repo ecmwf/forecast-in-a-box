@@ -186,8 +186,6 @@ class MapProduct(GenericTemporalProduct):
     # TODO, consider how plotting works for LAM models
     """
 
-    domains = ["DataDefined", "Europe", "Australia", "Malawi", "Norway"]
-
     @property
     def formfields(self):
         formfields = super().formfields.copy()
@@ -206,7 +204,7 @@ class MapProduct(GenericTemporalProduct):
                     description="Domain of the map",
                     default="DataDefined",
                 ),
-                ui=UIStringField(
+                uischema=UIStringField(
                     widget="text",
                 ),
             ),
@@ -235,7 +233,7 @@ class SimpleMapProduct(MapProduct):
         domain = product_spec.pop("domain", None)
         source = self.select_on_specification(product_spec, source)
 
-        if domain == "DataDefined":
+        if domain in ["DataDefined", "Global"]:
             domain = None
 
         source = source.concatenate("param")
@@ -302,7 +300,7 @@ class EnsembleMapProduct(BaseEnsembleProduct, MapProduct):
         domain = product_spec.pop("domain", None)
         source = self.select_on_specification(product_spec, source)
 
-        if domain == "Global":
+        if domain in ["DataDefined", "Global"]:
             domain = None
 
         source = source.concatenate(ENSEMBLE_DIMENSION_NAME)

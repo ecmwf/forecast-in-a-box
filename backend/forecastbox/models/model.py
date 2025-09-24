@@ -163,13 +163,14 @@ class BaseForecastModel(ABC):
         inference_env.update(control.pkg_versions)
         inference_env_list = parse_into_install(inference_env)
 
-        initial_conditions_env = parse_into_install(
-            {
+
+        initial_conditions_env = {
                 key: val
                 for key, val in versions.items()
                 if any(key.startswith(start) for start in INITIAL_CONDITIONS_FILTER_STARTS)
             }
-        )
+        initial_conditions_env.update(control.pkg_versions)
+        initial_conditions_env_list = parse_into_install(initial_conditions_env)
 
         input_source = self._create_input_configuration(control)
 
@@ -194,7 +195,7 @@ class BaseForecastModel(ABC):
             lead_time=lead_time,
             date=date,
             ensemble_members=ensemble_members,
-            environment={"inference": inference_env_list, "initial_conditions": initial_conditions_env},
+            environment={"inference": inference_env_list, "initial_conditions": initial_conditions_env_list},
             **extra_kwargs,
             **self._execution_kwargs,
         )
