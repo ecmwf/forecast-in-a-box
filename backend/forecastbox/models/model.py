@@ -16,6 +16,7 @@ from typing import Any, Optional
 from anemoi.inference.checkpoint import Checkpoint
 from earthkit.workflows.fluent import Action
 from earthkit.workflows.plugins.anemoi.fluent import from_input
+from earthkit.workflows.plugins.anemoi.types import ENSEMBLE_MEMBER_SPECIFICATION
 from forecastbox.rjsf import FieldWithUI, FormDefinition, IntegerSchema, StringSchema, UIIntegerField, UIStringField
 from pydantic import BaseModel
 from qubed import Qube
@@ -138,7 +139,7 @@ class BaseForecastModel(ABC):
         """Model specific execution kwargs."""
         return {}
 
-    def graph(self, lead_time: int, date, ensemble_members: int | None = 1, **kwargs) -> Action:
+    def graph(self, lead_time: int, date, ensemble_members: ENSEMBLE_MEMBER_SPECIFICATION = 1, **kwargs) -> Action:
         """Create the model action graph with specified parameters."""
         versions = self.versions
         INFERENCE_FILTER_INCLUDE = ["anemoi-models", "anemoi-graphs", "flash-attn", "torch", "torch_geometric"]
@@ -293,7 +294,7 @@ class BaseForecastModel(ABC):
 
 class SpecifiedModel(BaseForecastModel):
     """Model with specified parameters, delegating to a BaseForecastModel instance."""
-    def __init__(self, model: BaseForecastModel, lead_time: int, date, ensemble_members: int = 1, **kwargs):
+    def __init__(self, model: BaseForecastModel, lead_time: int, date, ensemble_members: ENSEMBLE_MEMBER_SPECIFICATION = None, **kwargs):
         self._model = model
         self._kwargs = kwargs
         self._lead_time = lead_time
