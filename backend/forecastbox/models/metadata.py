@@ -297,7 +297,7 @@ def set_control_metadata(checkpoint_path: os.PathLike, control_data: ControlMeta
             {**control_data.model_dump(), "version": control_data._version},
             name=FORECAST_IN_A_BOX_METADATA,
         )
-        return
+        # return
 
     replace_metadata(
         str(checkpoint_path),
