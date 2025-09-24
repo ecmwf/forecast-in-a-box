@@ -15,7 +15,7 @@ from forecastbox.config import config
 from .metadata import ControlMetadata
 from .model import BaseForecastModel
 
-DEFAULT_GLOBAL_INPUT_SOURCE = config.product.default_input_source or 'opendata'
+DEFAULT_GLOBAL_INPUT_SOURCE = config.product.default_input_source
 
 
 class GlobalModel(BaseForecastModel):
