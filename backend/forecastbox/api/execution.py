@@ -85,7 +85,7 @@ def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobRespons
     try:
         job, job_envvars = execution_specification_to_cascade(spec)
     except Exception as e:
-        return api.SubmitJobResponse(job_id=None, error=str(e)), []
+        return api.SubmitJobResponse(job_id=None, error=repr(e)), []
 
     sinks = cascade_views.sinks(job)
     sinks = [s for s in sinks if not s.task.startswith("run_as_earthkit")]
