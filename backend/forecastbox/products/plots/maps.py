@@ -10,6 +10,7 @@
 import io
 import warnings
 from collections import defaultdict
+from pathlib import Path
 
 import earthkit.data as ekd
 from earthkit.workflows import mark
@@ -117,9 +118,16 @@ def quickplot(
     from earthkit.plots.schemas import schema
     from earthkit.plots.utils import iter_utils
 
-    schema.use(config.product.plots_schema)
 
-    schema.use_preferred_units = True
+    selected_schema = config.product.plots_schema
+    schema_dir = (Path(__file__).parent / "schemas").resolve().absolute()
+
+    if 'inbuilt://' in selected_schema:
+        selected_schema = selected_schema.replace('inbuilt://', str(schema_dir) + '/') + '/schema.yaml'
+        schema.use(selected_schema)
+        schema.style_library = Path(selected_schema).parent
+    else:
+        schema.use(selected_schema)
 
     if not isinstance(fields, ekd.FieldList):
         fields = ekd.FieldList.from_fields(fields)
