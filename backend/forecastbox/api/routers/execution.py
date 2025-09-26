@@ -117,4 +117,7 @@ async def execute_api(
     SubmitJobResponse
         Job submission response containing the job ID.
     """
-    return await execute(spec, user=user)
+    try:
+        return await execute(spec, user)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Job execution failed: {repr(e)}")

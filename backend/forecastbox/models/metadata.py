@@ -147,11 +147,11 @@ class ControlMetadata(BaseModel):
                         additionalProperties=StringSchema(),
                         # default=self._dump_yaml(self.nested or {}),
                     ),
-                    ui=UIAdditionalProperties(
+                    uischema=UIAdditionalProperties(
                         additionalProperties=UIStringField(widget="textarea", format="yaml")
                     )
-                    ),
-                    "capabilites": FieldWithUI(
+                ),
+                "capabilites": FieldWithUI(
                     jsonschema=ObjectSchema(
                         title="Capabilities",
                         properties={
@@ -167,7 +167,7 @@ class ControlMetadata(BaseModel):
                         additionalProperties=StringSchema(),
                         # default=list(map(self._dump_yaml, self.pre_processors)),
                     ),
-                    ui=UIAdditionalProperties(
+                    uischema=UIAdditionalProperties(
                         additionalProperties=UIStringField(widget="textarea", format="yaml")
                     )
                 ),
@@ -178,7 +178,7 @@ class ControlMetadata(BaseModel):
                         additionalProperties=StringSchema(),
                         # default=list(map(self._dump_yaml, self.post_processors)),
                     ),
-                    ui=UIAdditionalProperties(
+                    uischema=UIAdditionalProperties(
                         additionalProperties=UIStringField(widget="textarea", format="yaml")
                     )
                 ),
@@ -189,7 +189,7 @@ class ControlMetadata(BaseModel):
                         additionalProperties=StringSchema(format="yaml"),
                         # default=self.pkg_versions,
                     ),
-                    ui=UIAdditionalProperties(
+                    uischema=UIAdditionalProperties(
                         additionalProperties=UIStringField(widget="text")
                     )
 
@@ -201,7 +201,7 @@ class ControlMetadata(BaseModel):
                         additionalProperties=StringSchema(),
                         # default=self.environment_variables or {},
                     ),
-                    ui=UIAdditionalProperties(
+                    uischema=UIAdditionalProperties(
                         additionalProperties=UIStringField(format="yaml")
                     )
                 )

@@ -109,11 +109,11 @@ class PProcProduct(Product):
     def _pproc_schema_path(self) -> str:
         """Get the path to the PPROC schema."""
         fallback_path = Path(__file__).parent / "schema" / "default.yaml"
-        if config.general.pproc_schema_dir is None:
+        if config.product.pproc_schema_dir is None:
             return str(fallback_path)
 
         class_name = self.__class__.__name__
-        schema_dir = Path(config.general.pproc_schema_dir)
+        schema_dir = Path(config.product.pproc_schema_dir)
         schema_path = Path(schema_dir) / f"{str(class_name).lower()}.yaml"
 
         if not schema_path.exists():

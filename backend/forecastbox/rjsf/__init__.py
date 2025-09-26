@@ -14,6 +14,7 @@
 
 
 from .forms import ExportedSchemas, FieldWithUI, FormDefinition
+from .from_pydantic import from_pydantic
 from .jsonSchema import (ArraySchema, BooleanSchema, EnumMixin, FieldSchema, IntegerSchema, NullSchema, NumberSchema,
                          StringSchema)
 from .uiSchema import UIBooleanField, UIIntegerField, UIObjectField, UISchema, UIStringField
@@ -35,4 +36,5 @@ __all__ = [
     "UIObjectField",
     "UIIntegerField",
     "UIBooleanField",
+    "from_pydantic",
 ]

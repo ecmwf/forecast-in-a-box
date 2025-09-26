@@ -8,9 +8,9 @@ def test_export_jsonschema_and_uischema():
     fields = {
         "name": FieldWithUI(
             jsonschema=StringSchema(type="string", title="Name"),
-            ui=UIStringField(widget="text", placeholder="Enter name"),
+            uischema=UIStringField(widget="text", placeholder="Enter name"),
         ),
-        "age": FieldWithUI(jsonschema=IntegerSchema(type="integer", title="Age", minimum=0, maximum=120), ui=None),
+        "age": FieldWithUI(jsonschema=IntegerSchema(type="integer", title="Age", minimum=0, maximum=120), uischema=None),
     }
     form = FormDefinition(title="Person", fields=fields, required=["name"])
     jsonschema = form.export_jsonschema()
@@ -26,7 +26,7 @@ def test_export_jsonschema_and_uischema():
 
 
 def test_export_all_combines_json_and_ui():
-    fields = {"foo": FieldWithUI(jsonschema=StringSchema(type="string", title="Foo"), ui=UIStringField(widget="text"))}
+    fields = {"foo": FieldWithUI(jsonschema=StringSchema(type="string", title="Foo"), uischema=UIStringField(widget="text"))}
     form = FormDefinition(title="Test", fields=fields)
     all_export = form.export_all()
     assert "jsonSchema" in all_export

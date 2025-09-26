@@ -11,95 +11,57 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { Container, Title, Button, TextInput, Group, Loader, Space } from '@mantine/core';
-import { showNotification } from '@mantine/notifications';
-import { IconRefresh } from '@tabler/icons-react';
+import { Container, Title, Button, TextInput, Loader, Space } from '@mantine/core';
 
+import { showNotification } from '@mantine/notifications';
 
 import { useSettings } from '../../SettingsContext';
 
 import {useApi} from '../../api';
 
+import { withTheme } from '@rjsf/core';
+import { Theme } from '@rjsf/mui';
 
-// Define the TypeScript interfaces for settings
-interface APISettings {
-    [key: string]: string | number; // Adjust types based on actual API settings structure
-  }
-
-interface CascadeSettings {
-  [key: string]: string | number; // Adjust types based on actual cascade settings structure
-}
-
-interface Settings {
-  api: APISettings;
-  cascade: CascadeSettings;
-}
-
+const Form = withTheme(Theme);
+import validator from '@rjsf/validator-ajv8';
 
 const Settings = () => {
 
   const api = useApi();
 
   const { settings, updateSetting } = useSettings();
-
-  const [apiSettings, setApiSettings] = useState<Settings | null>(null);
-
   const [apiUrl, setApiUrl] = useState(settings.apiUrl);
 
-  const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
-  const [formValues, setFormValues] = useState({} as Settings);
+  const [settingsConfig, setSettingsConfig] = useState<any>(null);
+  const [backendSettings, setBackendSettings] = useState<any>(null);
+
 
   // Fetch settings from the API
   const fetchSettings = async () => {
-    setLoading(true);
     try {
-      const response = await api.get('/v1/admin/settings');
-      setApiSettings(response.data);
-      setFormValues(response.data); // Initialize form values
+        const result = await api.get(`/v1/admin/settings`);
+        const spec = await result.data;
+        setBackendSettings(spec.formData || {});
+        setSettingsConfig(spec);
     } catch (error) {
-      showNotification({
-        id: 'fetch-settings-error',
-        title: 'Error',
-        message: 'Failed to fetch settings',
-        color: 'red',
-      });
-    } finally {
-      setLoading(false);
+        console.error('Error fetching settings:', error);
     }
   };
 
-  // Update settings via the API
-  const updateApiSettings = async () => {
-    setUpdating(true);
-    try {
-      await api.post('/v1/admin/settings', formValues);
+  const onSubmit = async (data: any) => {
       showNotification({
-        title: 'Success',
-        message: 'Settings updated successfully',
-        color: 'green',
+          color: 'blue',
+          message: 'Updating Settings...'
       });
-    } catch (error) {
-      showNotification({
-        title: 'Error',
-        message: 'Failed to update settings',
-        color: 'red',
-      });
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-  // Handle form input changes
-  const handleInputChange = (section: string, key: string, value: string) => {
-    setFormValues((prev) => ({
-      ...prev,
-      [section]: {
-        ...(prev[section as keyof Settings] as Record<string, any>),
-        [key]: value,
-      },
-    }));
-  };
+      try {
+          await api.patch(`/v1/admin/settings`, data)
+      } catch (error) {
+          showNotification({
+              color: 'red',
+              message: 'Error updating settings',
+          });
+      }
+  }
 
   const handleApiUrlChange = (newUrl: string) => {
     updateSetting('apiUrl', newUrl);
@@ -133,41 +95,22 @@ const Settings = () => {
         <TextInput label='Set Banner text' onChange={(e) => updateSetting('banner_text', e.target.value)} value={settings.banner_text || 'PROTOTYPE'} mt="md" />
       <Space h="md" />
       <Title order={3}></Title>
-      {apiSettings && !loading && (
-        <>
-          <Title order={4}>API Settings</Title>
-          {Object.keys(apiSettings.api).map((key) => (
-            <TextInput
-              key={key}
-              label={key}
-              value={formValues.api[key] || ''}
-              onChange={(e) => handleInputChange('api', key, e.target.value)}
+      {backendSettings && settingsConfig.jsonSchema ? (
+        <Form
+            schema={settingsConfig.jsonSchema}
+            uiSchema={settingsConfig.uiSchema}
+            validator={validator}
+            formData={backendSettings}
+            onChange={(e) => { setBackendSettings(e.formData); }}
+            onSubmit={(e) => { onSubmit(e.formData); }}
+            showErrorList={"bottom"}
+            omitExtraData={true}
             />
-          ))}
-          <Space h="md" />
-          <Title order={4}>Cascade Settings</Title>
-          {Object.keys(apiSettings.cascade).map((key) => (
-            <TextInput
-              key={key}
-              label={key}
-              value={formValues.cascade[key] || ''}
-              onChange={(e) => handleInputChange('cascade', key, e.target.value)}
-            />
-          ))}
-          <Space h="md" />
-          <Group>
-            <Button onClick={fetchSettings} leftSection={<IconRefresh />} disabled={loading}>
-              Refresh
-            </Button>
-            <Button onClick={updateApiSettings} loading={updating} color='red'>
-              Save Changes
-            </Button>
-          </Group>
-        </>
-      )}
-      {loading ? (
-        <Loader />
-      ) : null}
+        ) : (
+          <>
+            <Loader/>
+          </>
+        )}
     </Container>
   );
 }

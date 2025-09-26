@@ -220,7 +220,10 @@ async def restart_job(
     if not spec:
         raise HTTPException(status_code=404, detail=f"Job {job_id} had no specification.")
     spec = ExecutionSpecification(**json.loads(spec))
-    return await execute(spec, user)
+    try:
+        return await execute(spec, user)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Job restart failed: {repr(e)}")
 
 
 @router.post("/upload")

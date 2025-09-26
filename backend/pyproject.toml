@@ -49,6 +49,7 @@ dependencies = [
   "python-multipart",
   "qubed==0.1.12",
   "sse-starlette",
+  "toml",
   "uvicorn",
 ]
 
