@@ -7,6 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+import importlib.resources
 import io
 import warnings
 from collections import defaultdict
@@ -120,7 +121,7 @@ def quickplot(
 
 
     selected_schema = config.product.plots_schema
-    schema_dir = (Path(__file__).parent / "schemas").resolve().absolute()
+    schema_dir = importlib.resources.files("forecastbox.products.plots.schemas")
 
     if 'inbuilt://' in selected_schema:
         selected_schema = selected_schema.replace('inbuilt://', str(schema_dir) + '/') + '/schema.yaml'
