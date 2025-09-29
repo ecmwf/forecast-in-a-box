@@ -102,18 +102,11 @@ class ProductSettings(BaseModel):
     pproc_schema_dir: str | None = None
     """Path to the directory containing the PPROC schema files."""
 
-    plots_schema: str = "default"
+    plots_schema: str = "inbuilt://fiab"
     """earthkit-plots global schema, can be registered schema or path to a yaml file"""
 
     default_input_source: str = "opendata"
     """Default input source for models, if not specified otherwise"""
-
-class ProductSettings(BaseModel):
-    pproc_schema_dir: str | None = None
-    """Path to the directory containing the PPROC schema files."""
-
-    plots_schema: str = "inbuilt://fiab"
-    """earthkit-plots global schema, can be registered schema or path to a yaml file"""
 
     def validate_runtime(self) -> list[str]:
         if self.pproc_schema_dir and not os.path.isdir(self.pproc_schema_dir):
