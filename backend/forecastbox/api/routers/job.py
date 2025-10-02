@@ -72,11 +72,19 @@ def build_response(record: JobRecord, progress: str|None=None, error: str|None=N
 class JobProgressResponses:
     """Job Progress Responses.
 
-    Contains progress information for multiple jobs.
+    Contains progress information for multiple jobs with pagination metadata.
     """
 
     progresses: dict[JobId, JobProgressResponse]
     """A dictionary mapping job IDs to their progress responses."""
+    total: int
+    """Total number of jobs in the database."""
+    page: int
+    """Current page number."""
+    page_size: int
+    """Number of items per page."""
+    total_pages: int
+    """Total number of pages."""
     error: str | None = None
     """An error message if there was an issue retrieving job progress, otherwise None."""
 
@@ -142,7 +150,19 @@ async def update_and_get_progress(job_id: JobId) -> JobProgressResponse:
 async def get_status(user = Depends(current_active_user)) -> JobProgressResponses:
     """Get progress of all tasks recorded in the database."""
 
-    job_records = await get_all()
+    if page < 1 or page_size < 1:
+        raise HTTPException(status_code=400, detail="Page and page_size must be greater than 0.")
+
+    job_records = list(await get_all())
+    total_jobs = len(job_records)
+    start = (page - 1) * page_size
+    end = start + page_size
+    total_pages = (total_jobs + page_size - 1) // page_size if total_jobs > 0 else 0
+
+    if start >= total_jobs and total_jobs > 0:
+        raise HTTPException(status_code=404, detail="Page number out of range.")
+
+    paginated_jobs = job_records[start:end]
 
     progresses = {
         job.job_id: (
@@ -158,7 +178,14 @@ async def get_status(user = Depends(current_active_user)) -> JobProgressResponse
         for job in job_records
     }
 
-    return JobProgressResponses(progresses=progresses, error=None)
+    return JobProgressResponses(
+        progresses=progresses,
+        total=total_jobs,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+        error=None
+    )
 
 
 @router.get("/{job_id}/status")
@@ -231,8 +258,24 @@ async def upload_job(file: UploadFile, user: UserRead | None = Depends(current_a
     """Upload a job specification file and execute it."""
     if not file:
         raise HTTPException(status_code=400, detail="No file provided for upload.")
-    spec = await file.read()
-    spec = ExecutionSpecification(**json.loads(spec))
+
+    # Validate file type
+    if file.content_type not in ["application/json", "text/plain"]:
+        raise HTTPException(status_code=400, detail=f"Invalid file type: {file.content_type}. Only JSON files are accepted.")
+
+    # Validate file size (max 10MB)
+    max_size = 10 * 1024 * 1024
+    content = await file.read()
+    if len(content) > max_size:
+        raise HTTPException(status_code=413, detail=f"File too large. Maximum size is {max_size} bytes.")
+
+    try:
+        spec = ExecutionSpecification(**json.loads(content))
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON format: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid specification format: {str(e)}")
+
     return await execute(spec, user=user)
 
 
@@ -363,9 +406,7 @@ async def get_logs(job_id: JobId = Depends(validate_job_id), user = Depends(curr
         )
 
 
-# TODO refactor this endpoint to /job_id/results/dataset_id, otherwise consumes too much
-# eg /job_id/available or /job_id/logs become order-dependent / conflicting with output of such name
-@router.get("/{job_id}/{dataset_id}")
+@router.get("/{job_id}/results/{dataset_id}")
 async def get_result(
     job_id: JobId = Depends(validate_job_id), dataset_id: TaskId = Depends(validate_dataset_id), user = Depends(current_active_user)
 ) -> Response:
