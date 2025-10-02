@@ -42,7 +42,12 @@ def _get_model(spec: ForecastProducts):
 
     return get_model(checkpoint=get_model_path(spec.model.model)).specify(**model_spec) # type: ignore
 
-def forecast_products_to_cascade(spec: ForecastProducts, environment: EnvironmentSpecification) -> tuple[Cascade, dict]:
+class ProductToOutputId(BaseModel):
+    product_name: str
+    product_spec: dict[str, Any]
+    output_ids: list[str]
+
+def forecast_products_to_cascade(spec: ForecastProducts, environment: EnvironmentSpecification) -> tuple[Cascade, dict, list[ProductToOutputId]]:
     model = _get_model(spec)
 
     # Create the model action graph
@@ -50,6 +55,9 @@ def forecast_products_to_cascade(spec: ForecastProducts, environment: Environmen
 
     # Iterate over each product in the specification
     complete_graph = Graph([])
+
+    product_to_id_mappings = []
+
     for product in spec.products:
         product_spec = product.specification.copy()
         try:
@@ -59,31 +67,35 @@ def forecast_products_to_cascade(spec: ForecastProducts, environment: Environmen
 
         if isinstance(product_graph, fluent.Action):
             product_graph = product_graph.graph()
+
+        output_ids = [x.name for x in product_graph.sinks]
+        product_to_id_mappings.append(ProductToOutputId(product_name=product.product, product_spec=product_spec, output_ids=output_ids))
+
         complete_graph += product_graph
 
     if len(spec.products) == 0:
         complete_graph += model_action.graph()
+        product_to_id_mappings.append(ProductToOutputId(product_name="All Model Outputs", product_spec={}, output_ids=[x.name for x in model_action.graph().sinks]))
 
     env_vars = model.control.environment_variables
     env_vars.update(environment.environment_variables)
 
-    return Cascade(deduplicate_nodes(complete_graph)), env_vars
+    return Cascade(deduplicate_nodes(complete_graph)), env_vars, product_to_id_mappings
 
 
-def execution_specification_to_cascade(spec: ExecutionSpecification) -> tuple[JobInstance, dict]:
+def execution_specification_to_cascade(spec: ExecutionSpecification) -> tuple[JobInstance, dict, list[ProductToOutputId]]:
     if isinstance(spec.job, ForecastProducts):
-        cascade_graph, environment_variables = forecast_products_to_cascade(spec.job, spec.environment)
-        return graph2job(cascade_graph._graph), environment_variables
+        cascade_graph, environment_variables, product_to_id_mappings = forecast_products_to_cascade(spec.job, spec.environment)
+        return graph2job(cascade_graph._graph), environment_variables, product_to_id_mappings
     elif isinstance(spec.job, RawCascadeJob):
-        return spec.job.job_instance, {}
-    else:
-        assert_never(spec.job)
+        return spec.job.job_instance, {}, []
+    assert_never(spec.job)
 
 
-def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobResponse, list[Any]]:
+def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobResponse, list[ProductToOutputId]]:
     """Converts spec to JobInstance and submits to cascade api, returning response + list of sinks"""
     try:
-        job, job_envvars = execution_specification_to_cascade(spec)
+        job, job_envvars, product_to_id_mappings = execution_specification_to_cascade(spec)
     except Exception as e:
         return api.SubmitJobResponse(job_id=None, error=repr(e)), []
 
@@ -117,7 +129,7 @@ def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobRespons
     except Exception as e:
         return api.SubmitJobResponse(job_id=None, error=repr(e)), []
 
-    return submit_job_response, sinks
+    return submit_job_response, product_to_id_mappings
 
 
 class SubmitJobResponse(BaseModel):
@@ -129,16 +141,17 @@ class SubmitJobResponse(BaseModel):
 
 async def execute(spec: ExecutionSpecification, user: UserRead | None) -> SubmitJobResponse:
     loop = asyncio.get_running_loop()
-    response, sinks = await loop.run_in_executor(None, _execute_cascade, spec)  # CPU-bound
+    response, product_to_id_mappings = await loop.run_in_executor(None, _execute_cascade, spec)  # CPU-bound
     if not response.job_id:
         # TODO this best comes from the db... we still have a cascade conflict problem,
         # we best redesign cascade api to allow for uuid acceptance
         response.job_id = str(uuid.uuid4())
+
     await insert_one(
         response.job_id,
         response.error,
         str(user.id) if user else None,
         spec.model_dump_json(),
-        json.dumps(list(map(lambda x: x.task, sinks))),
+        json.dumps([x.model_dump() for x in product_to_id_mappings]),
     )
     return SubmitJobResponse(id=response.job_id)

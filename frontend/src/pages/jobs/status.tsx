@@ -142,7 +142,7 @@ const JobStatusPage = () => {
     try {
       setWorking(true);
       // setLoading(true);
-      const response = await api.get(`/v1/job/${jobId}/restart`, {
+      const response = await api.post(`/v1/job/${jobId}/restart`, {
       headers: { "Content-Type": "application/json" },
       });
 

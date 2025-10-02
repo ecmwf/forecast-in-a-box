@@ -22,7 +22,7 @@ def visualise(spec: ExecutionSpecification, options: VisualisationOptions) -> HT
         return HTMLResponse("Visualisation supported only for ForecastProducts", status_code=400)
 
     try:
-        graph, _ = forecast_products_to_cascade(spec.job, spec.environment)
+        graph, _, _ = forecast_products_to_cascade(spec.job, spec.environment)
     except Exception as e:
         logger.exception("Error converting to cascade")
         return HTMLResponse(str(e), status_code=500)
