@@ -11,7 +11,7 @@ import asyncio
 import json
 import logging
 import uuid
-from typing import Any
+from typing import Any, Sequence
 
 import cascade.gateway.api as api
 import cascade.gateway.client as client
@@ -45,7 +45,7 @@ def _get_model(spec: ForecastProducts):
 class ProductToOutputId(BaseModel):
     product_name: str
     product_spec: dict[str, Any]
-    output_ids: list[str]
+    output_ids: Sequence[str]
 
 def forecast_products_to_cascade(spec: ForecastProducts, environment: EnvironmentSpecification) -> tuple[Cascade, dict, list[ProductToOutputId]]:
     model = _get_model(spec)
@@ -83,12 +83,12 @@ def forecast_products_to_cascade(spec: ForecastProducts, environment: Environmen
     return Cascade(deduplicate_nodes(complete_graph)), env_vars, product_to_id_mappings
 
 
-def execution_specification_to_cascade(spec: ExecutionSpecification) -> tuple[JobInstance, dict, list[ProductToOutputId]]:
+def execution_specification_to_cascade(spec: ExecutionSpecification) -> tuple[JobInstance, dict, list[ProductToOutputId] | None]:
     if isinstance(spec.job, ForecastProducts):
         cascade_graph, environment_variables, product_to_id_mappings = forecast_products_to_cascade(spec.job, spec.environment)
         return graph2job(cascade_graph._graph), environment_variables, product_to_id_mappings
     elif isinstance(spec.job, RawCascadeJob):
-        return spec.job.job_instance, {}, []
+        return spec.job.job_instance, {}, None
     assert_never(spec.job)
 
 
@@ -101,6 +101,9 @@ def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobRespons
 
     sinks = cascade_views.sinks(job)
     sinks = [s for s in sinks if not s.task.startswith("run_as_earthkit")]
+
+    if not product_to_id_mappings:
+        product_to_id_mappings = [ProductToOutputId(product_name="All Outputs", product_spec={}, output_ids=[x.task for x in sinks])]
 
     job.ext_outputs = sinks
 
