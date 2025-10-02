@@ -147,13 +147,41 @@ async def update_and_get_progress(job_id: JobId) -> JobProgressResponse:
 
 
 @router.get("/status")
-async def get_status(user = Depends(current_active_user)) -> JobProgressResponses:
-    """Get progress of all tasks recorded in the database."""
+async def get_status(
+    user: UserRead = Depends(current_active_user),
+    page: int = 1,
+    page_size: int = 10,
+    status: STATUS | None = None
+) -> JobProgressResponses:
+    """Get progress of all tasks recorded in the database with pagination and filtering.
+
+    Parameters
+    ----------
+    user : UserRead
+        The current active user.
+    page : int
+        Page number (1-indexed).
+    page_size : int
+        Number of items per page.
+    status : STATUS | None
+        Filter by job status (submitted, running, completed, errored, invalid, timeout, unknown).
+
+    Returns
+    -------
+    JobProgressResponses
+        Paginated job progress responses with metadata.
+    """
 
     if page < 1 or page_size < 1:
         raise HTTPException(status_code=400, detail="Page and page_size must be greater than 0.")
 
+    # Get all jobs and apply filters
     job_records = list(await get_all())
+
+    # Apply status filter
+    if status:
+        job_records = [job for job in job_records if job.status == status]
+
     total_jobs = len(job_records)
     start = (page - 1) * page_size
     end = start + page_size
@@ -189,7 +217,7 @@ async def get_status(user = Depends(current_active_user)) -> JobProgressResponse
 
 
 @router.get("/{job_id}/status")
-async def get_status_of_job(job_id: JobId = Depends(validate_job_id), user = Depends(current_active_user)) -> JobProgressResponse:
+async def get_status_of_job(job_id: JobId = Depends(validate_job_id), user: UserRead = Depends(current_active_user)) -> JobProgressResponse:
     """Get progress of a particular job."""
     return await update_and_get_progress(job_id)
 
@@ -205,7 +233,7 @@ async def get_outputs_of_job(job_id: JobId = Depends(validate_job_id)) -> list[T
 
 @router.post("/{job_id}/visualise")
 async def visualise_job(
-    job_id: JobId = Depends(validate_job_id), options: VisualisationOptions = Body(None), user = Depends(current_active_user)
+    job_id: JobId = Depends(validate_job_id), options: VisualisationOptions = Body(None), user: UserRead = Depends(current_active_user)
 ) -> HTMLResponse:
     """Visualise a job's execution graph.
 
@@ -225,7 +253,7 @@ async def visualise_job(
 
 
 @router.get("/{job_id}/specification")
-async def get_job_specification(job_id: JobId = Depends(validate_job_id), user = Depends(current_active_user)) -> ExecutionSpecification:
+async def get_job_specification(job_id: JobId = Depends(validate_job_id), user: UserRead = Depends(current_active_user)) -> ExecutionSpecification:
     """Get specification in the database of a job."""
     job = await get_one(job_id)
     if job is None:
@@ -288,7 +316,7 @@ class DatasetAvailabilityResponse:
 
 
 @router.get("/{job_id}/available")
-async def get_job_availablity(job_id: JobId = Depends(validate_job_id), user = Depends(current_active_user)) -> list[TaskId]:
+async def get_job_availability(job_id: JobId = Depends(validate_job_id), user: UserRead = Depends(current_active_user)) -> list[TaskId]:
     """Check which results are available for a given job_id.
 
     Parameters
@@ -306,12 +334,16 @@ async def get_job_availablity(job_id: JobId = Depends(validate_job_id), user = D
     response: api.JobProgressResponse = client.request_response(
         api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}"
     )
+
+    if job_id not in response.datasets:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found in gateway.")
+
     return [x.task for x in response.datasets[job_id]]
 
 
 @router.get("/{job_id}/{dataset_id}/available")
-async def get_result_availablity(
-    job_id: JobId = Depends(validate_job_id), dataset_id: TaskId = Depends(validate_dataset_id), user = Depends(current_active_user)
+async def get_result_availability(
+    job_id: JobId = Depends(validate_job_id), dataset_id: TaskId = Depends(validate_dataset_id), user: UserRead = Depends(current_active_user)
 ) -> DatasetAvailabilityResponse:
     """Check if the result is available for a given job_id and dataset_id.
 
@@ -336,17 +368,17 @@ async def get_result_availablity(
         response: api.JobProgressResponse = client.request_response(
             api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}"
         )
-    except ValueError as e:
-        raise HTTPException(status_code=500, detail=f"Job retrieval failed: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Job retrieval failed: {repr(e)}")
 
     if job_id not in response.datasets:
-        raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found in gateway.")
 
     return DatasetAvailabilityResponse(dataset_id in [x.task for x in response.datasets[job_id]])
 
 
 @router.get("/{job_id}/logs")
-async def get_logs(job_id: JobId = Depends(validate_job_id), user = Depends(current_active_user)) -> Response:
+async def get_logs(job_id: JobId = Depends(validate_job_id), user: UserRead = Depends(current_active_user)) -> Response:
     """Returns a zip file with logs and other data for the purpose of troubleshooting"""
 
     logger.debug(f"getting logs for {job_id}")
@@ -408,7 +440,7 @@ async def get_logs(job_id: JobId = Depends(validate_job_id), user = Depends(curr
 
 @router.get("/{job_id}/results/{dataset_id}")
 async def get_result(
-    job_id: JobId = Depends(validate_job_id), dataset_id: TaskId = Depends(validate_dataset_id), user = Depends(current_active_user)
+    job_id: JobId = Depends(validate_job_id), dataset_id: TaskId = Depends(validate_dataset_id), user: UserRead = Depends(current_active_user)
 ) -> Response:
     """Get the result of a job.
 
@@ -457,7 +489,7 @@ class JobDeletionResponse:
 
 
 @router.post("/flush")
-async def flush_job(user = Depends(current_active_user)) -> JobDeletionResponse:
+async def flush_job(user: UserRead = Depends(current_active_user)) -> JobDeletionResponse:
     """Flush all job from the database and cascade.
 
     Returns number of deleted jobs.
@@ -472,7 +504,7 @@ async def flush_job(user = Depends(current_active_user)) -> JobDeletionResponse:
 
 
 @router.delete("/{job_id}")
-async def delete_job(job_id: JobId = Depends(validate_job_id), user = Depends(current_active_user)) -> JobDeletionResponse:
+async def delete_job(job_id: JobId = Depends(validate_job_id), user: UserRead = Depends(current_active_user)) -> JobDeletionResponse:
     """Delete a job from the database and cascade.
 
     Returns number of deleted jobs.
