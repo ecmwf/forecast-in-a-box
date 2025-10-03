@@ -11,20 +11,15 @@
 "use client";
 
 import { useEffect, useState, useRef} from 'react';
-import { Progress, Container, Title, Text, Divider, Button, Loader, Space, Table, Group, Modal} from '@mantine/core';
+import { Progress, Pagination, Title, Text, Divider, Button, Loader, Space, Table, Group, Modal, Card, Stack, Badge, Code, Collapse, SimpleGrid} from '@mantine/core';
 import { showNotification } from '@mantine/notifications';
 import { AxiosError } from 'axios';
 
-import {IconSearch} from '@tabler/icons-react';
+import {IconSearch, IconLogs, IconChevronDown, IconChevronUp, IconFileText, IconInfoCircle, IconRefresh} from '@tabler/icons-react';
 
-import { DatasetId } from '../interface';
 import GraphVisualiser from '../graph_visualiser';
-
 import {useApi} from '../../api';
-
-
 import Result from '../results/Result';
-
 import { ExecutionSpecification } from '../interface';
 import SummaryModal from '../summary';
 
@@ -74,6 +69,61 @@ function OutputCells({ id, dataset, progress, popout}: { id: string; dataset: st
     );
 }
 
+function OutputCard({ product, id, progress, popout }: { product: ProductOutput; id: string; progress: string | null; popout: boolean }) {
+    const [specOpened, setSpecOpened] = useState(false);
+    const ITEMS_PER_PAGE = 10;
+    const [currentPage, setCurrentPage] = useState(1);
+
+    return (
+        <Card shadow="sm" padding="lg" radius="md" withBorder>
+            <Stack gap="sm">
+                <Group justify="space-between">
+                    <Title order={4}>{product.product_name}</Title>
+                    <Button
+                        variant="subtle"
+                        size="xs"
+                        onClick={() => setSpecOpened(!specOpened)}
+                        leftSection={<IconFileText size={16} />}
+                        rightSection={specOpened ? <IconChevronUp size={16} /> : <IconChevronDown size={16} />}
+                        mb="xs"
+                    >
+                        Specification
+                    </Button>
+                </Group>
+
+                <Collapse in={specOpened}>
+                    <Code block>{JSON.stringify(product.product_spec, null, 2)}</Code>
+                </Collapse>
+
+                <>
+                   
+
+                    <Text size="sm" fw={500} mb="xs">Output IDs:</Text>
+                    <Table striped highlightOnHover>
+                        <Table.Tbody>
+                            {product.output_ids
+                                .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+                                .map((outputId: string, idIndex: number) => (
+                                    <Table.Tr key={idIndex}>
+                                        <OutputCells id={id} dataset={outputId} progress={progress} popout={popout} />
+                                    </Table.Tr>
+                                ))}
+                        </Table.Tbody>
+                    </Table>
+                    <Space h="md" />
+                    {product.output_ids.length > ITEMS_PER_PAGE && (
+                        <Pagination
+                            total={Math.ceil(product.output_ids.length / ITEMS_PER_PAGE)}
+                            value={currentPage}
+                            onChange={setCurrentPage}
+                        />
+                    )}
+                </>
+            </Stack>
+        </Card>
+    );
+}
+
 
 export type ProgressResponse = {
     progress: string;
@@ -81,11 +131,17 @@ export type ProgressResponse = {
     error: string;
   }
 
+export type ProductOutput = {
+    product_name: string;
+    product_spec: Record<string, any>;
+    output_ids: string[];
+}
+
 
 const ProgressComponent = ({ id, popout = false }: { id: string, popout: boolean}) => {
 
     const [progress, setProgress] = useState<ProgressResponse>({} as ProgressResponse);
-    const [outputs, setOutputs] = useState<DatasetId[] | null>([]);
+    const [outputs, setOutputs] = useState<ProductOutput[] | null>([]);
 
     const progressIntervalRef = useRef<number | null>(null);
     const api = useApi();
@@ -169,6 +225,40 @@ const ProgressComponent = ({ id, popout = false }: { id: string, popout: boolean
             });
         }
     };
+    const handleLogs = (jobId: string) => {
+        try {
+            api.get(`/v1/job/${jobId}/logs`, { responseType: 'blob' })
+                .then((response) => {
+                    const url = window.URL.createObjectURL(new Blob([response.data]));
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.setAttribute('download', `logs-${jobId}.zip`);
+                    document.body.appendChild(link);
+                    link.click();
+                    link.parentNode?.removeChild(link);
+                })
+                .catch((error) => {
+                    console.error("Error getting job logs:", error);
+                    showNotification({
+                        id: `more-info-error-${crypto.randomUUID()}`,
+                        position: "top-right",
+                        autoClose: 3000,
+                        title: "Error getting job logs",
+                        message: `${error.response?.data?.detail}`,
+                        color: "red",
+                    });
+                });
+        } catch (error) {
+            showNotification({
+                id: `more-info-error-${crypto.randomUUID()}`,
+                position: "top-right",
+                autoClose: 3000,
+                title: "Error getting job logs",
+                message: `${error instanceof AxiosError ? error.response?.data?.detail : 'Unknown error'}`,
+                color: "red",
+            });
+        }
+    }
 
     useEffect(() => {
         // Start the interval and store its ID in the ref
@@ -192,10 +282,11 @@ const ProgressComponent = ({ id, popout = false }: { id: string, popout: boolean
         <SummaryModal moreInfoSpec={moreInfoSpec} showMoreInfo={showMoreInfo} setShowMoreInfo={setShowMoreInfo}/>
             <Space h="xl"/>
 
-            <Title display={'inline'} order={1}>Progress</Title>
+            <Title display={'inline'} order={1} pb='md'>Progress</Title>
             <Group grow>
                 <GraphVisualiser spec={null} url={`/v1/job/${id}/visualise`} />
-                <Button color='green' onClick={() => handleMoreInfo(id as string)}>More Info</Button>
+                <Button color='green' onClick={() => handleMoreInfo(id as string)} leftSection={<IconInfoCircle />}>More Info</Button>
+                <Button color='orange' onClick={() => handleLogs(id as string)} leftSection={<IconLogs />}>Logs</Button>
                 {/* <Button color='blue' component='a' href={`/v1/job/${id}/download`} target='_blank'>Download</Button> */}
             </Group>
             <Title pt='xl' order={4}>{id} - {progress.status}</Title>
@@ -221,38 +312,37 @@ const ProgressComponent = ({ id, popout = false }: { id: string, popout: boolean
                 variant="outline"
                 color="blue"
                 size="xs"
+                leftSection={<IconRefresh size={16} />}
                 onClick={() => {fetchProgress(); setOutputs([]); fetchOutputs();}}
                 >
                     Refresh
             </Button>
             <Space h='lg'/>
-            <Title order={3}>Output IDs</Title>
+            <Title order={3}>Outputs</Title>
 
             <Space h='lg'/>
-            <Table.ScrollContainer minWidth={500} maxHeight='100%'>
-            <Table mb='xs' w='100%' verticalSpacing='' striped highlightOnHover>
-            <Table.Tbody>
-                {outputs === null || outputs.length === 0 ? (
-                    <Table.Tr>
-                    <Table.Td colSpan={2} style={{ textAlign: "center"}}>
-                     <Space h='lg'/>
+            {outputs === null || outputs.length === 0 ? (
+                <Card shadow="sm" padding="lg" radius="md" withBorder>
+                    <Space h='lg'/>
+                    <Group justify="center">
                         <Loader size="sm" />
-                        <Text ml="sm">Getting output ids...</Text>
-                     <Space h='lg'/>
-                    </Table.Td>
-                    </Table.Tr>
-                ) : (
-                    <>
-                    {outputs.map((dataset: DatasetId, index: number) => (
-                        <Table.Tr key={index}>
-                            <OutputCells id={id as string} dataset={dataset} progress={progress.progress} popout={popout}/>
-                        </Table.Tr>
-                ))}
-                </>
+                        <Text>Getting outputs...</Text>
+                    </Group>
+                    <Space h='lg'/>
+                </Card>
+            ) : (
+                <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+                    {outputs.map((product: ProductOutput, index: number) => (
+                        <OutputCard
+                            key={index}
+                            product={product}
+                            id={id as string}
+                            progress={progress.progress}
+                            popout={popout}
+                        />
+                    ))}
+                </SimpleGrid>
             )}
-            </Table.Tbody>
-            </Table>
-            </Table.ScrollContainer>
         </>
     );
 };

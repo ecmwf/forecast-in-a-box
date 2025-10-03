@@ -74,7 +74,7 @@ async def get_graph_serialised(spec: ExecutionSpecification) -> JobInstance:
         If there is an error serialising the graph, a 500 error is raised with the error message.
     """
     try:
-        return execution_specification_to_cascade(spec)
+        return execution_specification_to_cascade(spec)[0]
     except Exception as e:
         raise HTTPException(
             status_code=500,
