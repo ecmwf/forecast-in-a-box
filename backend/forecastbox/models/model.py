@@ -75,6 +75,7 @@ class BaseForecastModel(ABC):
 
     @cached_property
     def versions(self) -> dict[str, str]:
+        """Get versions from the model"""
         def parse_versions(key, val):
                 if key.startswith("_"):
                     return None, None
@@ -139,39 +140,56 @@ class BaseForecastModel(ABC):
         """Model specific execution kwargs."""
         return {}
 
-    def graph(self, lead_time: int, date, ensemble_members: ENSEMBLE_MEMBER_SPECIFICATION = 1, **kwargs) -> Action:
-        """Create the model action graph with specified parameters."""
-        versions = self.versions
-        INFERENCE_FILTER_INCLUDE = ["anemoi-models", "anemoi-graphs", "flash-attn", "torch", "torch_geometric"]
-        INITIAL_CONDITIONS_FILTER_STARTS = ["anemoi-inference", "earthkit", "anemoi-transform", "anemoi-plugins"]
+    def _get_environments(self, control: ControlMetadata) -> dict[str, list[str]]:
+        """Get the environments for the model."""
+        from importlib import metadata
 
-        def parse_into_install(version_dict):
+        INFERENCE_FILTER_INCLUDE = ["anemoi-models", "anemoi-graphs", "anemoi-transform", "flash-attn", "torch", "torch_geometric"]
+        INITIAL_CONDITIONS_FILTER_STARTS = ["earthkit", "anemoi-transform", "anemoi-plugins"]
+        ENFORCE_GATEWAY_VERSIONS = ['anemoi-inference', 'earthkit-workflows', 'earthkit-workflows-anemoi']
+
+        inference_env = {
+            key: val for key, val in self.versions.items() if key in INFERENCE_FILTER_INCLUDE
+        }
+
+        def parse_into_install(version_dict) -> list[str]:
             install_list = []
             for key, val in version_dict.items():
+                if 'dev' in val:
+                    continue
                 if "://" in val or "git+" in val or val.startswith("/"):
                     install_list.append(f"{key}@{val}")
                 else:
                     install_list.append(f"{key}=={val}")
             return install_list
 
-        control = self.control.update(**kwargs)
+        gateway_env = {key: metadata.version(key) for key in ENFORCE_GATEWAY_VERSIONS}
 
-        inference_env = {
-            key: val for key, val in versions.items() if key in INFERENCE_FILTER_INCLUDE
-        }
+        def combine_envs(*dicts: dict[str, str]) -> list[str]:
+            combined = {}
+            for d in dicts:
+                combined.update(d)
+            return parse_into_install(combined)
 
-        inference_env.update(self._pkg_versions)
-        inference_env.update(control.pkg_versions)
-        inference_env_list = parse_into_install(inference_env)
-
+        inference_env_list = combine_envs(inference_env, control.pkg_versions or {}, gateway_env)
 
         initial_conditions_env = {
                 key: val
-                for key, val in versions.items()
+                for key, val in self.versions.items()
                 if any(key.startswith(start) for start in INITIAL_CONDITIONS_FILTER_STARTS)
             }
-        initial_conditions_env.update(control.pkg_versions)
-        initial_conditions_env_list = parse_into_install(initial_conditions_env)
+        initial_conditions_env_list = combine_envs(initial_conditions_env, control.pkg_versions or {}, gateway_env)
+
+        return {
+            "inference": inference_env_list,
+            "initial_conditions": initial_conditions_env_list,
+        }
+
+    def graph(self, lead_time: int, date, ensemble_members: ENSEMBLE_MEMBER_SPECIFICATION = 1, **kwargs) -> Action:
+        """Create the model action graph with specified parameters."""
+
+        control = self.control.update(**kwargs)
+        environments = self._get_environments(control)
 
         input_source = self._create_input_configuration(control)
 
@@ -191,7 +209,7 @@ class BaseForecastModel(ABC):
         extra_kwargs['post_processors'].extend(self._post_processors(kwargs))
 
         if ensemble_members == 1:
-            ensemble_members = None
+            ensemble_members = None # type: ignore
 
         return from_input(
             self.checkpoint_path,
@@ -199,7 +217,7 @@ class BaseForecastModel(ABC):
             lead_time=lead_time,
             date=date,
             ensemble_members=ensemble_members,
-            environment={"inference": inference_env_list, "initial_conditions": initial_conditions_env_list},
+            environment=environments,
             **extra_kwargs,
             **self._execution_kwargs,
         )
