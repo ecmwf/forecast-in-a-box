@@ -26,7 +26,7 @@ from cascade.controller.report import JobId
 from cascade.low.core import DatasetId, TaskId
 from fastapi import APIRouter, Body, Depends, HTTPException, Response, UploadFile
 from fastapi.responses import HTMLResponse
-from forecastbox.api.execution import SubmitJobResponse, execute
+from forecastbox.api.execution import SubmitJobResponse, execute, ProductToOutputId
 from forecastbox.api.routers.gateway import Globals
 from forecastbox.api.types import ExecutionSpecification, VisualisationOptions
 from forecastbox.api.utils import encode_result
@@ -139,13 +139,28 @@ async def update_and_get_progress(job_id: JobId) -> JobProgressResponse:
 
 
 @router.get("/status")
-async def get_status(user = Depends(current_active_user)) -> JobProgressResponses:
-    """Get progress of all tasks recorded in the database."""
+async def get_status(
+    user = Depends(current_active_user),
+    page: int = 1,
+    page_size: int = 10
+) -> JobProgressResponses:
+    """Get progress of all tasks recorded in the database with pagination."""
 
-    job_records = await get_all()
+    if page < 1 or page_size < 1:
+        raise HTTPException(status_code=400, detail="Page and page_size must be greater than 0.")
+
+    job_records = list(await get_all())
+    total_jobs = len(job_records)
+    start = (page - 1) * page_size
+    end = start + page_size
+
+    if start >= total_jobs and total_jobs > 0:
+        raise HTTPException(status_code=404, detail="Page number out of range.")
+
+    paginated_jobs = job_records[start:end]
 
     progresses = {
-        job.job_id: (
+        str(job.job_id): (
             await update_and_get_progress(job.job_id)
             if job.status in ["running", "submitted"]
             else JobProgressResponse(
@@ -155,7 +170,7 @@ async def get_status(user = Depends(current_active_user)) -> JobProgressResponse
                 error=job.error,
             )
         )
-        for job in job_records
+        for job in paginated_jobs
     }
 
     return JobProgressResponses(progresses=progresses, error=None)
@@ -168,12 +183,17 @@ async def get_status_of_job(job_id: JobId = Depends(validate_job_id), user = Dep
 
 
 @router.get("/{job_id}/outputs")
-async def get_outputs_of_job(job_id: JobId = Depends(validate_job_id)) -> list[TaskId]:
+async def get_outputs_of_job(job_id: JobId = Depends(validate_job_id), user = Depends(current_active_user)) -> list[ProductToOutputId]:
     """Get outputs of a job."""
     job = await get_one(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
-    return json.loads(job.outputs)
+
+    product_to_id_mappings = json.loads(str(job.outputs))
+    if len(product_to_id_mappings) == 0:
+        raise HTTPException(status_code=204, detail=f"Job {job_id} had no outputs recorded.")
+    return [ProductToOutputId(**item) for item in product_to_id_mappings]
+
 
 
 @router.post("/{job_id}/visualise")
@@ -208,7 +228,7 @@ async def get_job_specification(job_id: JobId = Depends(validate_job_id), user =
     return ExecutionSpecification(**json.loads(job.graph_specification))
 
 
-@router.get("/{job_id}/restart")
+@router.post("/{job_id}/restart")
 async def restart_job(
     job_id: JobId = Depends(validate_job_id), user: UserRead | None = Depends(current_active_user)
 ) -> SubmitJobResponse:
