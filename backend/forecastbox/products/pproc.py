@@ -28,7 +28,7 @@ LOG = logging.getLogger(__name__)
 try:
     from earthkit.workflows.plugins.pproc.fluent import Action as ppAction
     from earthkit.workflows.plugins.pproc.templates import derive_template
-except ImportError as e:
+except (OSError, ImportError) as e:
     PPROC_AVAILABLE = False
     LOG.warning("PPROC is not available. %s", e)
 

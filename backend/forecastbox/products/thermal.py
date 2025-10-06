@@ -26,7 +26,7 @@ thermal_indices = CategoryRegistry(
 PPROC_AVAILABLE = True
 try:
     from earthkit.workflows.plugins.pproc.fluent import Action as ppAction
-except ImportError:
+except (OSError, ImportError):
     ppAction = object
     PPROC_AVAILABLE = False
 
