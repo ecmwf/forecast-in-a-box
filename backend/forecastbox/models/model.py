@@ -159,6 +159,8 @@ class BaseForecastModel(ABC):
                     continue
                 if "://" in val or "git+" in val or val.startswith("/"):
                     install_list.append(f"{key}@{val}")
+                elif any(c in val for c in ['<', '>', '==', '~']):
+                    install_list.append(f"{key}{val}")
                 else:
                     install_list.append(f"{key}=={val}")
             return install_list
@@ -166,10 +168,7 @@ class BaseForecastModel(ABC):
         gateway_env = {key: metadata.version(key) for key in ENFORCE_GATEWAY_VERSIONS}
 
         def combine_envs(*dicts: dict[str, str]) -> list[str]:
-            combined = {}
-            for d in dicts:
-                combined.update(d)
-            return parse_into_install(combined)
+            return [item for d in dicts for item in parse_into_install(d)]
 
         inference_env_list = combine_envs(inference_env, control.pkg_versions or {}, gateway_env)
 
