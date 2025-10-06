@@ -209,7 +209,7 @@ class BaseForecastModel(ABC):
         extra_kwargs['post_processors'].extend(self._post_processors(kwargs))
 
         if ensemble_members == 1:
-            ensemble_members = None # type: ignore
+            ensemble_members = None
 
         return from_input(
             self.checkpoint_path,
