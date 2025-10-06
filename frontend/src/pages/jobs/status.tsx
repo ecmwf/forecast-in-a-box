@@ -11,7 +11,7 @@
 "use client";
 
 import { useRef } from 'react';
-import { Container, Grid, Group, Paper, SimpleGrid, Stack } from '@mantine/core';
+import { Container, Grid, Group, Paper, SimpleGrid, Stack, Pagination } from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { Table, Loader, Center, Title, Progress, Button, Flex, Divider, Tooltip, FileButton, Menu, Burger, Modal, Text, Select } from '@mantine/core';
 
@@ -36,6 +36,10 @@ export type ProgressResponse = {
 
 export type StatusResponse = {
   progresses: Record<string, ProgressResponse>;
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
 };
 
 
@@ -55,17 +59,21 @@ const JobStatusPage = () => {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
-  const getStatus = async () => {
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const getStatus = async (page: number = currentPage) => {
     try {
       // Build query parameters
       const params = new URLSearchParams();
+      params.append('page', page.toString());
       if (statusFilter) params.append('status', statusFilter);
 
-      const url = `/v1/job/status${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await api.get(url);
+      const response = await api.get(`/v1/job/status?${params.toString()}`);
 
       const data: StatusResponse = await response.data;
       setJobs(data);
+      setCurrentPage(page);
 
     } catch (error) {
       showNotification({
@@ -295,7 +303,8 @@ const JobStatusPage = () => {
 
   useEffect(() => {
     setLoading(true);
-    getStatus();
+    setCurrentPage(1);
+    getStatus(1);
       // Start the interval and store its ID in the ref
       progressIntervalRef.current = setInterval(() => {
         getStatus();
@@ -312,7 +321,115 @@ const JobStatusPage = () => {
 
   const clearFilters = () => {
     setStatusFilter(null);
+    setCurrentPage(1);
   };
+
+  const handlePageChange = (page: number) => {
+    setLoading(true);
+    getStatus(page);
+  };
+
+  // Reusable function to render job actions
+  const renderJobActions = (jobId: string) => (
+    <Group align='center' grow={isMobile}>
+      <Tooltip label="Download Job">
+        <Button
+          color='blue'
+          onClick={() => downloadJob(jobId)}
+          size='xs'
+          aria-label="Download Job"
+        >
+          <IconDownload/>
+        </Button>
+      </Tooltip>
+      <Tooltip label="Restart Job">
+        <Button
+          color='orange'
+          onClick={() => restartJob(jobId)}
+          size='xs'
+          aria-label="Restart Job"
+        >
+          <IconRefresh/>
+        </Button>
+      </Tooltip>
+      <Tooltip label="Delete Job">
+        <Button
+          color='red'
+          onClick={() => deleteJob(jobId)}
+          size='xs'
+        >
+          <IconTrash/>
+        </Button>
+      </Tooltip>
+    </Group>
+  );
+
+  // Reusable function to render job ID with info button
+  const renderJobIdCell = (jobId: string) => (
+    <Group align='center' gap='xs' wrap='nowrap'>
+      <Tooltip label="More Info">
+        <Burger onClick={() => handleMoreInfo(jobId)}/>
+      </Tooltip>
+      <Tooltip label="Click to view progress">
+        {isMobile ? (
+          <Text
+            c='blue'
+            component='a'
+            href={`/job/${jobId}`}
+            classNames={classes}
+          >
+            {jobId}
+          </Text>
+        ) : (
+          <Button
+            variant="subtle"
+            c="blue"
+            p="xs"
+            component='a'
+            href={`/job/${jobId}`}
+          >
+            <Text classNames={classes}>{jobId}</Text>
+          </Button>
+        )}
+      </Tooltip>
+    </Group>
+  );
+
+  // Reusable function to render progress bar
+  const renderProgress = (progress: string) => (
+    <>
+      <Progress value={parseFloat(progress)} size="sm" style={{ flex: 1 }} />
+      <Text size='sm'>{progress}%</Text>
+    </>
+  );
+
+  // Function to render desktop table row
+  const renderDesktopRow = (jobId: string, progress: ProgressResponse) => (
+    <Table.Tr key={jobId}>
+      <Table.Td align='left'>
+        {renderJobIdCell(jobId)}
+      </Table.Td>
+      <Table.Td>{progress.status}</Table.Td>
+      <Table.Td>{new Date(progress.created_at).toLocaleString()}</Table.Td>
+      <Table.Td>{renderProgress(progress.progress)}</Table.Td>
+      <Table.Td>{renderJobActions(jobId)}</Table.Td>
+    </Table.Tr>
+  );
+
+  // Function to render mobile card
+  const renderMobileCard = (jobId: string, progress: ProgressResponse) => (
+    <Paper key={jobId} shadow="xs" p="md" withBorder w='100%'>
+      <Stack>
+        {renderJobIdCell(jobId)}
+        <Group wrap='nowrap' justify='space-between' align='center' w='100%'>
+          <Text>{progress.status}</Text>
+          <Text>{new Date(progress.created_at).toLocaleString()}</Text>
+        </Group>
+        {renderProgress(progress.progress)}
+        {renderJobActions(jobId)}
+      </Stack>
+    </Paper>
+  );
 
   const UserButtons = () => {
     return [
@@ -415,141 +532,55 @@ const JobStatusPage = () => {
         </Center>
       ) : (
         <>
-        {!isMobile ? (
-          <Table.ScrollContainer minWidth={500} maxHeight='100%'>
-          <Table striped highlightOnHover verticalSpacing="xs">
-          <Table.Thead>
-            <Table.Tr style={{ backgroundColor: "#f0f0f6", textAlign: "left" }}>
-              {columns.map((col) => (
-              <Table.Th key={col}>{col}</Table.Th>
-            ))}
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {Object.keys(jobs.progresses || {}).length === 0 ? (
-              <Table.Tr>
-                <Table.Td colSpan={5} style={{ textAlign: "center", padding: "16px" }}>
+          {!isMobile ? (
+            <Table.ScrollContainer minWidth={500} maxHeight='100%'>
+              <Table striped highlightOnHover verticalSpacing="xs">
+                <Table.Thead>
+                  <Table.Tr style={{ backgroundColor: "#f0f0f6", textAlign: "left" }}>
+                    {columns.map((col) => (
+                      <Table.Th key={col}>{col}</Table.Th>
+                    ))}
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {Object.keys(jobs.progresses || {}).length === 0 ? (
+                    <Table.Tr>
+                      <Table.Td colSpan={5} style={{ textAlign: "center", padding: "16px" }}>
+                        No jobs found.
+                      </Table.Td>
+                    </Table.Tr>
+                  ) : (
+                    Object.entries(jobs.progresses || {}).map(([jobId, progress]: [string, ProgressResponse]) =>
+                      renderDesktopRow(jobId, progress)
+                    )
+                  )}
+                </Table.Tbody>
+              </Table>
+            </Table.ScrollContainer>
+          ) : (
+            <Stack>
+              {Object.keys(jobs.progresses || {}).length === 0 ? (
+                <Paper p="md" withBorder style={{ textAlign: "center" }}>
                   No jobs found.
-                </Table.Td>
-              </Table.Tr>
-            ) : (
-              Object.entries(jobs.progresses || {}).map(([jobId, progress]: [string, ProgressResponse]) => (
-                <Table.Tr key={jobId}>
-                    <Table.Td align='left'>
-                      <Tooltip label="More Info">
-                        <Burger onClick={() => handleMoreInfo(jobId)}/>
-                      </Tooltip>
-                      <Tooltip label="Click to view progress">
-                        <Button
-                          variant="subtle"
-                          c="blue"
-                          p="xs"
-                          component='a'
-                          href={`/job/${jobId}`}
-                        ><Text classNames={classes}>{jobId}</Text>
-                        </Button>
-                      </Tooltip>
-                    </Table.Td>
-                  <Table.Td>
-                    {progress.status}
-                  </Table.Td>
-                  <Table.Td>
-                    {new Date(progress.created_at).toLocaleString()}
-                  </Table.Td>
-                  <Table.Td>
-                    {progress.progress}%
-                    <Progress value={parseFloat(progress.progress)} size="sm" style={{ flex: 1 }} />
-                    </Table.Td>
-                    <Table.Td>
-                      <Group align='center'>
-                        <Tooltip label="Download Job">
-                        <Button
-                          color='blue'
-                          onClick={() => downloadJob(jobId)}
-                          size='xs'
-                          aria-label="Download Job"
-                          ><IconDownload/></Button></Tooltip>
-                        <Tooltip label="Restart Job">
-                        <Button
-                          color='orange'
-                          onClick={() => restartJob(jobId)}
-                          size='xs'
-                          aria-label="Restart Job"
-                          ><IconRefresh/></Button></Tooltip>
-                          <Tooltip label="Delete Job">
-                        <Button
-                          color='red'
-                          onClick={() => deleteJob(jobId)}
-                          size='xs'
-                          ><IconTrash/></Button></Tooltip>
-                      </Group>
-                  </Table.Td>
-                </Table.Tr>
-              ))
-            )}
-          </Table.Tbody>
-        </Table>
-        </Table.ScrollContainer>
-        ) : (
-          <Stack>
-            {Object.keys(jobs.progresses || {}).length === 0 ? (
-              <Paper>
-                  No jobs found.
-              </Paper>
-            ) : (
-              Object.entries(jobs.progresses || {}).map(([jobId, progress]: [string, ProgressResponse]) => (
-                <Paper key={jobId} shadow="xs" p="md" withBorder w='100%'>
-                  <Stack>
-                  <Group justify='space-between' align='center' wrap='nowrap'>
-                    <Tooltip label="More Info">
-                      <Burger onClick={() => handleMoreInfo(jobId)}/>
-                    </Tooltip>
-                    <Tooltip label="Click to view progress">
-                      <Text
-                          c='blue'
-                          component='a'
-                          href={`/job/${jobId}`}
-                          classNames={classes}>{jobId}
-                        </Text>
-                      </Tooltip>
-                    </Group>
-                    <Group wrap='nowrap' justify='space-between' align='center' w='100%'>
-                      <Text>{progress.status}</Text>
-                      <Text>{new Date(progress.created_at).toLocaleString()}</Text>
-                    </Group>
-                    <Group>
-                      <Progress value={parseFloat(progress.progress)} size="sm" style={{ flex: 1 }} />
-                      {progress.progress}%
-                    </Group>
-                      <Group align='center' grow>
-                        <Tooltip label="Download Job">
-                        <Button
-                          color='blue'
-                          onClick={() => downloadJob(jobId)}
-                          size='xs'
-                          aria-label="Download Job"
-                          ><IconDownload/></Button></Tooltip>
-                        <Tooltip label="Restart Job">
-                        <Button
-                          color='orange'
-                          onClick={() => restartJob(jobId)}
-                          size='xs'
-                          aria-label="Restart Job"
-                          ><IconRefresh/></Button></Tooltip>
-                          <Tooltip label="Delete Job">
-                        <Button
-                          color='red'
-                          onClick={() => deleteJob(jobId)}
-                          size='xs'
-                          ><IconTrash/></Button></Tooltip>
-                      </Group>
-                  </Stack>
                 </Paper>
-              ))
-            )}
-          </Stack>
-        )
-        }
+              ) : (
+                Object.entries(jobs.progresses || {}).map(([jobId, progress]: [string, ProgressResponse]) =>
+                  renderMobileCard(jobId, progress)
+                )
+              )}
+            </Stack>
+          )}
+
+          {jobs.total_pages > 1 && (
+            <Center mt="lg">
+              <Pagination
+                total={jobs.total_pages}
+                value={currentPage}
+                onChange={handlePageChange}
+                size={isMobile ? "sm" : "md"}
+              />
+            </Center>
+          )}
         </>
       )}
     </Container>
