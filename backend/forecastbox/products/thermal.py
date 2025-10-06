@@ -10,7 +10,6 @@
 import importlib.util
 from collections import OrderedDict
 
-from earthkit.workflows.plugins.pproc.fluent import Action as ppAction
 from forecastbox.models import SpecifiedModel
 from forecastbox.rjsf import FieldWithUI, IntegerSchema
 from qubed import Qube
@@ -23,6 +22,13 @@ from .registry import CategoryRegistry
 thermal_indices = CategoryRegistry(
     "thermal", interface=Interfaces.DETAILED, description="Thermal Indices", title="Thermal Indices"
 )
+
+PPROC_AVAILABLE = True
+try:
+    from earthkit.workflows.plugins.pproc.fluent import Action as ppAction
+except (OSError, ImportError):
+    ppAction = object
+    PPROC_AVAILABLE = False
 
 THERMOFEEL_IMPORTED = True
 if not importlib.util.find_spec("thermofeel"):
@@ -58,7 +64,7 @@ class BaseThermalIndex(Product):
     def validate_intersection(self, model: SpecifiedModel) -> bool:
         model_intersection = model.qube()
 
-        if not THERMOFEEL_IMPORTED or self.param_requirements is None:
+        if not PPROC_AVAILABLE or not THERMOFEEL_IMPORTED or self.param_requirements is None:
             return False
         return all(x in model_intersection.span("param") for x in self.param_requirements)
 
@@ -69,6 +75,9 @@ class BaseThermalIndex(Product):
 
         selected = self.select_on_specification(product_spec, deaccumulated)
         source = selected.select(param=self.param_requirements)
+
+        if not PPROC_AVAILABLE:
+            raise ImportError("PPROC is not available. Please install earthkit-workflows[pproc] to use PPROC products.")
 
         return (
             ppAction(source.nodes)

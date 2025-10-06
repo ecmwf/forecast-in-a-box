@@ -263,7 +263,7 @@ class BaseForecastModel(ABC):
                     title="Date",
                     description="The date for the forecast",
                 ),
-                uischema=UIStringField(widget="date"),
+                uischema=UIStringField(widget="date", options={'yearsRange': [-20, 0]}),
             ),
             "lead_time": FieldWithUI(
                 jsonschema=IntegerSchema(
