@@ -7,6 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+import logging
 from abc import abstractmethod
 from pathlib import Path
 from typing import Any
@@ -14,8 +15,6 @@ from typing import Any
 from earthkit.workflows import fluent
 from earthkit.workflows.graph import Graph, deduplicate_nodes
 from earthkit.workflows.plugins.anemoi.types import ENSEMBLE_DIMENSION_NAME
-from earthkit.workflows.plugins.pproc.fluent import Action as ppAction
-from earthkit.workflows.plugins.pproc.templates import derive_template
 from forecastbox.config import config
 from forecastbox.models import SpecifiedModel
 from forecastbox.products.product import Product
@@ -23,6 +22,15 @@ from forecastbox.rjsf import StringSchema
 
 from .export import OUTPUT_TYPES, export_fieldlist_as
 
+PPROC_AVAILABLE = True
+LOG = logging.getLogger(__name__)
+
+try:
+    from earthkit.workflows.plugins.pproc.fluent import Action as ppAction
+    from earthkit.workflows.plugins.pproc.templates import derive_template
+except ImportError as e:
+    PPROC_AVAILABLE = False
+    LOG.warning("PPROC is not available. %s", e)
 
 def from_request(
     request: dict, pproc_schema: str, action_kwargs: dict[str, Any] | None = None, **sources: fluent.Action
