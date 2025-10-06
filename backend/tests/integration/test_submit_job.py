@@ -55,7 +55,7 @@ def test_submit_job(backend_client_with_auth):
     outputs = backend_client_with_auth.get(f"/job/{raw_job_id}/outputs").raise_for_status().json()
     assert len(outputs) == 1
     assert "n1" in outputs[0]['output_ids']
-    output = backend_client_with_auth.get(f"/job/{raw_job_id}/n1")
+    output = backend_client_with_auth.get(f"/job/{raw_job_id}/results/n1")
     assert cloudpickle.loads(output.content) == 3
 
     logs = backend_client_with_auth.get(f"/job/{raw_job_id}/logs").raise_for_status().content

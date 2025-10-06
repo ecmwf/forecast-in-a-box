@@ -38,7 +38,7 @@ export default function Result({ job_id, dataset_id, in_modal }: ResultProps) {
         if (job_id && dataset_id) {
             const fetchData = async () => {
                 try {
-                    const response = await api.get(`/v1/job/${job_id}/${dataset_id}`, { responseType: 'blob' });
+                    const response = await api.get(`/v1/job/${job_id}/results/${dataset_id}`, { responseType: 'blob' });
                     setContentType(response.headers['content-type']);
 
                     let contentType = response.headers['content-type'] || 'application/octet-stream';

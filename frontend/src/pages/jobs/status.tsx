@@ -13,9 +13,9 @@
 import { useRef } from 'react';
 import { Container, Grid, Group, Paper, SimpleGrid, Stack } from '@mantine/core';
 import { useEffect, useState } from 'react';
-import { Table, Loader, Center, Title, Progress, Button, Flex, Divider, Tooltip, FileButton, Menu, Burger, Modal, Text } from '@mantine/core';
+import { Table, Loader, Center, Title, Progress, Button, Flex, Divider, Tooltip, FileButton, Menu, Burger, Modal, Text, Select } from '@mantine/core';
 
-import { IconDownload, IconRefresh, IconTrash } from '@tabler/icons-react';
+import { IconDownload, IconRefresh, IconTrash, IconFilter, IconX } from '@tabler/icons-react';
 import { showNotification } from '@mantine/notifications';
 import classes from './status.module.css';
 
@@ -51,9 +51,18 @@ const JobStatusPage = () => {
 
   const isMobile = useMediaQuery('(max-width: 768px)');
 
+  // Filter states
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+
   const getStatus = async () => {
     try {
-      const response = await api.get('/v1/job/status');
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (statusFilter) params.append('status', statusFilter);
+
+      const url = `/v1/job/status${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await api.get(url);
 
       const data: StatusResponse = await response.data;
       setJobs(data);
@@ -299,7 +308,11 @@ const JobStatusPage = () => {
             progressIntervalRef.current = null;
         }
     };
-  }, []);
+  }, [statusFilter]);
+
+  const clearFilters = () => {
+    setStatusFilter(null);
+  };
 
   const UserButtons = () => {
     return [
@@ -310,6 +323,15 @@ const JobStatusPage = () => {
           </Button>
         )}
       </FileButton>,
+      <Button
+        key="filter"
+        onClick={() => setShowFilters(!showFilters)}
+        variant={showFilters ? "filled" : "light"}
+        fullWidth
+        leftSection={<IconFilter size={16} />}
+      >
+        Filter
+      </Button>,
       <Button key="refresh" onClick={() => { setLoading(true); getStatus(); }} fullWidth>
         Refresh
       </Button>,
@@ -356,6 +378,37 @@ const JobStatusPage = () => {
         </Flex>
       </Flex>
       <Divider my='lg' />
+
+      {showFilters && (
+        <Paper shadow="xs" p="md" mb="lg" withBorder>
+          <Stack gap="md">
+            <Select
+              label="Status"
+              placeholder="Filter by status"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              data={[
+                { value: 'submitted', label: 'Submitted' },
+                { value: 'running', label: 'Running' },
+                { value: 'completed', label: 'Completed' },
+                { value: 'errored', label: 'Errored' },
+                { value: 'invalid', label: 'Invalid' },
+                { value: 'timeout', label: 'Timeout' },
+                { value: 'unknown', label: 'Unknown' }
+              ]}
+              clearable
+            />
+            <Button
+              leftSection={<IconX size={16} />}
+              onClick={clearFilters}
+              variant="light"
+              disabled={!statusFilter}
+            >
+              Clear Filters
+            </Button>
+          </Stack>
+        </Paper>
+      )}
       {loading ? (
         <Center>
           <Loader />
@@ -375,7 +428,7 @@ const JobStatusPage = () => {
           <Table.Tbody>
             {Object.keys(jobs.progresses || {}).length === 0 ? (
               <Table.Tr>
-                <Table.Td colSpan={4} style={{ textAlign: "center", padding: "16px" }}>
+                <Table.Td colSpan={5} style={{ textAlign: "center", padding: "16px" }}>
                   No jobs found.
                 </Table.Td>
               </Table.Tr>
