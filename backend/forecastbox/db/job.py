@@ -40,11 +40,26 @@ async def get_one(job_id: JobId) -> JobRecord | None:
     query = select(JobRecord).where(JobRecord.job_id == job_id)
     return await querySingle(query, async_session_maker)
 
+async def get_count(status: str | None = None) -> int:
+    async def function(i: int) -> int:
+        async with async_session_maker() as session:
+            query = select(func.count("*")).select_from(JobRecord)
+            if status is not None:
+                query = query.where(JobRecord.status == status)
+            job_count = (await session.execute(query)).scalar()
+            return job_count
+    return await dbRetry(function)
 
-async def get_all() -> Iterable[JobRecord]:
+async def get_all(status: str|None = None, offset: int = -1, limit: int = -1) -> Iterable[JobRecord]:
     async def function(i: int) -> Iterable[JobRecord]:
         async with async_session_maker() as session:
             query = select(JobRecord)
+            if status is not None:
+                query = query.where(JobRecord.status == status)
+            if offset != -1:
+                query = query.offset(offset)
+            if limit != -1:
+                query = query.limit(limit)
             result = await session.execute(query)
             return (e[0] for e in result.all())
 

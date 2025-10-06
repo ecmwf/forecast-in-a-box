@@ -33,7 +33,7 @@ from forecastbox.api.utils import encode_result
 from forecastbox.api.visualisation import visualise
 from forecastbox.auth.users import current_active_user
 from forecastbox.config import config
-from forecastbox.db.job import delete_all, delete_one, get_all, get_one, update_one
+from forecastbox.db.job import delete_all, delete_one, get_all, get_count, get_one, update_one
 from forecastbox.schemas.job import JobRecord
 from forecastbox.schemas.user import UserRead
 
@@ -78,7 +78,7 @@ class JobProgressResponses:
     progresses: dict[JobId, JobProgressResponse]
     """A dictionary mapping job IDs to their progress responses."""
     total: int
-    """Total number of jobs in the database."""
+    """Total number of jobs in the database matching the filtering status."""
     page: int
     """Current page number."""
     page_size: int
@@ -175,35 +175,22 @@ async def get_status(
     if page < 1 or page_size < 1:
         raise HTTPException(status_code=400, detail="Page and page_size must be greater than 0.")
 
-    # Get all jobs and apply filters
-    job_records = list(await get_all())
-
-    # Apply status filter
-    if status:
-        job_records = [job for job in job_records if job.status == status]
-
-    total_jobs = len(job_records)
+    total_jobs = await get_count(status)
     start = (page - 1) * page_size
-    end = start + page_size
     total_pages = (total_jobs + page_size - 1) // page_size if total_jobs > 0 else 0
 
     if start >= total_jobs and total_jobs > 0:
         raise HTTPException(status_code=404, detail="Page number out of range.")
 
-    paginated_jobs = job_records[start:end]
+    job_records = list(await get_all(status, start, page_size))
 
     progresses = {
         str(job.job_id): (
             await update_and_get_progress(job.job_id)
             if job.status in ["running", "submitted"]
-            else JobProgressResponse(
-                progress="0.00" if not job.status == "completed" else "100.00",
-                status=job.status,
-                created_at=str(job.created_at),
-                error=job.error,
-            )
+            else build_response(job)
         )
-        for job in paginated_jobs
+        for job in job_records
     }
 
     return JobProgressResponses(
