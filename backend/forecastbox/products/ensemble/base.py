@@ -23,7 +23,7 @@ class BaseEnsembleProduct(Product):
         result = super().validate_intersection(model)
         if model._ensemble_members == 1:
             return False
-        return result & True
+        return result
 
 
 class BasePProcEnsembleProduct(BaseEnsembleProduct, PProcProduct):

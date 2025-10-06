@@ -54,6 +54,11 @@ class PProcProduct(Product):
         """
         pass
 
+    def validate_intersection(self, model: SpecifiedModel) -> bool:
+        if not PPROC_AVAILABLE:
+            return False
+        return super().validate_intersection(model)
+
     @property
     def default_request_keys(self) -> dict[str, Any]:
         return {
