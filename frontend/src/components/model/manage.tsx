@@ -124,6 +124,7 @@ function EditModel({ model }: { model: string }) {
                     onSubmit={(e) => { onSubmit(e.formData); }}
                     showErrorList={"bottom"}
                     omitExtraData={true}
+                    disabled={!editable}
                     />
             ) : (
                 <>
