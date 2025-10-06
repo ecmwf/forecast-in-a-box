@@ -16,6 +16,7 @@ from pathlib import Path
 import earthkit.data as ekd
 from earthkit.workflows import mark
 from earthkit.workflows.decorators import as_payload
+from earthkit.workflows.fluent import Payload
 from earthkit.workflows.plugins.anemoi.types import ENSEMBLE_DIMENSION_NAME
 from forecastbox.config import config
 from forecastbox.models import SpecifiedModel
@@ -127,6 +128,8 @@ def quickplot(
         selected_schema = selected_schema.replace('inbuilt://', str(schema_dir) + '/') + '/schema.yaml'
         schema.use(selected_schema)
         schema.style_library = Path(selected_schema).parent
+    elif '@' in selected_schema:
+        schema.use(selected_schema.split('@')[0])
     else:
         schema.use(selected_schema)
 
@@ -184,6 +187,18 @@ def quickplot(
     # figure.title(figure_title)
 
     return figure
+
+
+def add_custom_plot_styles(payload: Payload) -> Payload:
+    """Add custom plot styles from the config to the payload."""
+    if '@' in config.product.plots_schema:
+        style_location = config.product.plots_schema.split('@')[1]
+
+        payload.metadata.setdefault('environment', [])
+        if style_location not in payload.metadata['environment']:
+            payload.metadata['environment'].append(style_location)
+
+    return payload
 
 
 class MapProduct(GenericTemporalProduct):
@@ -249,12 +264,12 @@ class SimpleMapProduct(MapProduct):
         if product_spec.get("reduce", "True") == "True":
             source = source.concatenate("step")
 
-        quickplot_payload = quickplot(
+        quickplot_payload = add_custom_plot_styles(quickplot(
             domain=domain,
             groupby="valid_datetime",
             subplot_title="{time:%Y-%m-%d %H} UTC (+{lead_time}h)",
             figure_title="{variable_name} over {domain}\n Base time: {base_time: %Y%m%dT%H%M}\n",
-        )
+        ))
         plots = source.map(quickplot_payload).map(export(format="png")).map(self.named_payload("Map"))
 
         return plots
@@ -288,11 +303,11 @@ class InteractiveMapProduct(GenericTemporalProduct):
 
         source = source.concatenate("param")
 
-        quickplot_payload = quickplot(
+        quickplot_payload = add_custom_plot_styles(quickplot(
             domain=domain,
             groupby="valid_datetime",
             no_pad=True,
-        )
+        ))
         plots = source.map(quickplot_payload).map(export(format="ipng", dpi = 1000)).map(self.named_payload("Interactive Map"))
 
         return plots
@@ -315,11 +330,11 @@ class EnsembleMapProduct(BaseEnsembleProduct, MapProduct):
         source = source.concatenate(ENSEMBLE_DIMENSION_NAME)
         source = source.concatenate("param")
 
-        quickplot_payload = quickplot(
+        quickplot_payload = add_custom_plot_styles(quickplot(
             domain=domain,
             groupby="number",
             subplot_title="Member{number}",
             figure_title="{variable_name} over {domain}\nValid time: {valid_time:%H:%M on %-d %B %Y} (T+{lead_time})\n",
-        )
+        ))
         plots = source.map(quickplot_payload)
         return plots

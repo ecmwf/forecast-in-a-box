@@ -102,8 +102,12 @@ class ProductSettings(BaseModel):
     pproc_schema_dir: str | None = None
     """Path to the directory containing the PPROC schema files."""
 
-    plots_schema: str = "inbuilt://fiab"
-    """earthkit-plots global schema, can be registered schema or path to a yaml file"""
+    plots_schema: str = Field(default="inbuilt://fiab", description="earthkit-plots global schema", examples=["inbuilt://fiab", "my-schema-package@/path/to/my-schema-package", "my-registered-schema"])
+    """earthkit-plots global schema, can be registered schema or path to a yaml file,
+    If starts with inbuilt:// it is searched in the plots schema dir.
+    If contains @ it is considered a package to be installed in the environment
+    (e.g. my-schema-package@/path/to/my-schema-package)
+    """
 
     default_input_source: str = "opendata"
     """Default input source for models, if not specified otherwise"""
