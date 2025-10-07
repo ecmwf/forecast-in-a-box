@@ -137,6 +137,9 @@ for arg in "$@"; do
             echo "offline mode not supported now"
             exit 1
 			;;
+        "--service")
+            ENTRYPOINT="standalone.service"
+            ;;
 	esac
 done
 
