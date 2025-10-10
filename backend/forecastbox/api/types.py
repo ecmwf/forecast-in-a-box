@@ -122,6 +122,16 @@ class ExecutionSpecification(FIABBaseModel):
     environment: EnvironmentSpecification
     shared: bool = Field(default=False)
 
+class ScheduleSpecification(FIABBaseModel):
+    exec_spec: ExecutionSpecification
+    """The static part of the job, ie, what remains constant across executions"""
+    dynamic_expr: dict[str, str]
+    """Evaluated at each invocation, with keys pointing to paths in the job_spec,
+    and values being dynamic expressions to be injected. Supported expressions:
+    - `$schedule_datetime` -- like '20241012T00'
+    """ # TODO support smth like argo expression language here
+    cron_expr: str
+    """Cron expression for time scheduling"""
 
 class VisualisationOptions(FIABBaseModel):
     preset: str = "blob"
