@@ -29,6 +29,7 @@ dependencies = [
   "anemoi-inference>=0.7.1",
   "anemoi-plugins-ecmwf-inference[opendata]>=0.1.10",
   "anemoi-utils>=0.4.36",
+  "apscheduler",
   "cloudpickle",
   "earthkit-workflows>=0.4.7",
   "earthkit-workflows-anemoi>=0.3.4",
