@@ -12,9 +12,9 @@ import logging
 from typing import Iterable
 
 from forecastbox.config import config
-from forecastbox.db.core import addAndCommit, dbRetry
+from forecastbox.db.core import addAndCommit, dbRetry, executeAndCommit
 from forecastbox.schemas.schedule import Base, ScheduleDefinition
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 logger = logging.getLogger(__name__)
@@ -29,12 +29,28 @@ async def create_db_and_tables():
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-async def get_schedules(schedule_id: ScheduleId|None, offset: int = -1, limit: int = -1) -> Iterable[ScheduleDefinition]:
+async def get_schedules(
+    schedule_id: ScheduleId|None = None,
+    enabled: bool | None = None,
+    created_by: str | None = None,
+    created_at_start: dt.datetime | None = None,
+    created_at_end: dt.datetime | None = None,
+    offset: int = -1,
+    limit: int = -1
+) -> Iterable[ScheduleDefinition]:
     async def function(i: int) -> Iterable[ScheduleDefinition]:
         async with async_session_maker() as session:
             query = select(ScheduleDefinition)
             if schedule_id is not None:
                 query = query.where(ScheduleDefinition.schedule_id == schedule_id)
+            if enabled is not None:
+                query = query.where(ScheduleDefinition.enabled == enabled)
+            if created_by is not None:
+                query = query.where(ScheduleDefinition.created_by == created_by)
+            if created_at_start is not None:
+                query = query.where(ScheduleDefinition.created_at >= created_at_start)
+            if created_at_end is not None:
+                query = query.where(ScheduleDefinition.created_at <= created_at_end)
             if offset != -1:
                 query = query.offset(offset)
             if limit != -1:
@@ -57,3 +73,16 @@ async def insert_one(schedule_id: ScheduleId, user_email: str | None, exec_spec:
         created_by = user_email,
     )
     await addAndCommit(entity, async_session_maker)
+
+
+async def update_one(schedule_id: ScheduleId, **kwargs) -> ScheduleDefinition|None:
+    ref_time = dt.datetime.now()
+    stmt = update(ScheduleDefinition).where(ScheduleDefinition.schedule_id == schedule_id).values(updated_at=ref_time, **kwargs)
+    await executeAndCommit(stmt, async_session_maker)
+
+    # NOTE it would be neater to run this in a single db session but it seems sqlite doesnt support that
+    schedules = list(await get_schedules(schedule_id=schedule_id))
+    if not schedules:
+        return None
+    else:
+        return schedules[0]

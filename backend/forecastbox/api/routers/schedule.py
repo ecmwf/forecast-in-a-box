@@ -9,6 +9,7 @@
 
 """Scheduled jobs"""
 
+import datetime as dt
 import logging
 import uuid
 from dataclasses import dataclass
@@ -16,9 +17,9 @@ from dataclasses import dataclass
 import orjson
 from apscheduler.triggers.cron import CronTrigger
 from fastapi import APIRouter, Depends, HTTPException
-from forecastbox.api.types import ScheduleSpecification
+from forecastbox.api.types import ScheduleSpecification, ScheduleUpdate
 from forecastbox.auth.users import current_active_user
-from forecastbox.db.schedule import ScheduleId, get_schedules, insert_one
+from forecastbox.db.schedule import ScheduleId, get_schedules, insert_one, update_one
 from forecastbox.schemas.schedule import ScheduleDefinition
 from forecastbox.schemas.user import UserRead
 from typing_extensions import Self
@@ -34,6 +35,7 @@ router = APIRouter(
 class GetScheduleResponse:
     """Get Schedule Response."""
 
+    schedule_id: ScheduleId
     cron_expr: str|None
     """Cron expression for the schedule. None if not time-triggered"""
     created_at: str
@@ -53,6 +55,7 @@ class GetScheduleResponse:
     @classmethod
     def from_db(cls, entity: ScheduleDefinition) -> Self:
         return cls(
+            schedule_id=entity.schedule_id,
             cron_expr=entity.cron_expr,
             created_at=str(entity.created_at),
             updated_at=str(entity.updated_at),
@@ -75,6 +78,22 @@ async def get_schedule(schedule_id: ScheduleId, user: UserRead = Depends(current
 
     return GetScheduleResponse.from_db(maybe_schedule[0])
 
+@router.get("/")
+async def get_multiple_schedules(
+    enabled: bool | None = None,
+    created_by: str | None = None,
+    created_at_start: dt.datetime | None = None,
+    created_at_end: dt.datetime | None = None,
+    user: UserRead = Depends(current_active_user)
+) -> list[GetScheduleResponse]:
+    schedules = await get_schedules(
+        enabled=enabled,
+        created_by=created_by,
+        created_at_start=created_at_start,
+        created_at_end=created_at_end,
+    )
+    return [GetScheduleResponse.from_db(s) for s in schedules]
+
 @router.put("/create")
 async def create_schedule(schedule_spec: ScheduleSpecification, user: UserRead | None = Depends(current_active_user)) -> CreateScheduleResponse:
     # TODO validate that the schedule is enabled, ie the scheduler is running
@@ -93,3 +112,25 @@ async def create_schedule(schedule_spec: ScheduleSpecification, user: UserRead |
     )
     # TODO register the schedule
     return CreateScheduleResponse(schedule_id)
+
+@router.post("/{schedule_id}")
+async def update_schedule(
+    schedule_id: ScheduleId,
+    schedule_update: ScheduleUpdate,
+    user: UserRead = Depends(current_active_user)
+) -> GetScheduleResponse:
+    kwargs = {}
+    if schedule_update.exec_spec is not None:
+        kwargs['exec_spec'] = schedule_update.model_dump_json()
+    if schedule_update.dynamic_expr is not None:
+        kwargs['dynamic_expr'] = orjson.dumps(schedule_update.dynamic_expr).decode('ascii')
+    if schedule_update.enabled is not None:
+        kwargs['enabled'] = schedule_update.enabled
+    if schedule_update.cron_expr is not None:
+        kwargs['cron_expr'] = schedule_update.cron_expr
+
+    updated_schedule = await update_one(schedule_id = schedule_id, **kwargs)
+    if not updated_schedule:
+        raise HTTPException(status_code=404, detail=f"Schedule {schedule_id} not found in the database.")
+
+    return GetScheduleResponse.from_db(updated_schedule)

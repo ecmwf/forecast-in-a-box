@@ -14,7 +14,7 @@ for liveness and open the browser window here, with the rest logic happening in 
 
 import logging
 import webbrowser
-from multiprocessing import Process, freeze_support, set_start_method
+from multiprocessing import Process, Event, set_start_method, get_start_method, freeze_support
 
 import forecastbox.standalone.service
 from forecastbox.config import FIABConfig, validate_runtime
@@ -27,7 +27,6 @@ logger = logging.getLogger(__name__ if __name__ != "__main__" else "forecastbox.
 
 
 def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
-    freeze_support()
     set_start_method("forkserver")
     setup_process()
     logger.info("main process starting")

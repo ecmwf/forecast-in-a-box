@@ -133,6 +133,12 @@ class ScheduleSpecification(FIABBaseModel):
     cron_expr: str
     """Cron expression for time scheduling"""
 
+class ScheduleUpdate(FIABBaseModel):
+    exec_spec: ExecutionSpecification | None = None
+    dynamic_expr: dict[str, str] | None = None
+    enabled: bool | None = None
+    cron_expr: str | None = None
+
 class VisualisationOptions(FIABBaseModel):
     preset: str = "blob"
     # width: str | int = '100%'
