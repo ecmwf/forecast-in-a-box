@@ -14,7 +14,7 @@ for liveness and open the browser window here, with the rest logic happening in 
 
 import logging
 import webbrowser
-from multiprocessing import Process, Event, set_start_method, get_start_method, freeze_support
+from multiprocessing import Process, set_start_method
 
 import forecastbox.standalone.service
 from forecastbox.config import FIABConfig, validate_runtime
@@ -23,7 +23,7 @@ from forecastbox.standalone.config import export_recursive, setup_process
 from forecastbox.standalone.launchers import launch_backend
 from forecastbox.standalone.procs import ChildProcessGroup, previous_cleanup
 
-logger = logging.getLogger(__name__ if __name__ != "__main__" else "forecastbox.standalone.entrypoint")
+logger = logging.getLogger(__name__ if __name__ != "__main__" else __package__)
 
 
 def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
