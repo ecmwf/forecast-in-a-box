@@ -19,7 +19,7 @@ from apscheduler.triggers.cron import CronTrigger
 from fastapi import APIRouter, Depends, HTTPException
 from forecastbox.api.types import ScheduleSpecification, ScheduleUpdate
 from forecastbox.auth.users import current_active_user
-from forecastbox.db.schedule import ScheduleId, get_schedules, insert_one, update_one
+from forecastbox.db.schedule import ScheduleId, get_schedules, get_schedules_count, insert_one, update_one
 from forecastbox.schemas.schedule import ScheduleDefinition
 from forecastbox.schemas.user import UserRead
 from typing_extensions import Self
@@ -66,6 +66,25 @@ class GetScheduleResponse:
         )
 
 @dataclass
+class GetMultipleSchedulesResponse:
+    """Get Multiple Schedules Response.
+
+    Contains multiple schedules with pagination metadata.
+    """
+    schedules: dict[ScheduleId, GetScheduleResponse]
+    """A dictionary mapping schedule IDs to their responses."""
+    total: int
+    """Total number of schedules in the database matching the filtering status."""
+    page: int
+    """Current page number."""
+    page_size: int
+    """Number of items per page."""
+    total_pages: int
+    """Total number of pages."""
+    error: str | None = None
+    """An error message if there was an issue retrieving schedules, otherwise None."""
+
+@dataclass
 class CreateScheduleResponse:
     schedule_id: ScheduleId
 
@@ -84,15 +103,45 @@ async def get_multiple_schedules(
     created_by: str | None = None,
     created_at_start: dt.datetime | None = None,
     created_at_end: dt.datetime | None = None,
-    user: UserRead = Depends(current_active_user)
-) -> list[GetScheduleResponse]:
-    schedules = await get_schedules(
+    user: UserRead = Depends(current_active_user),
+    page: int = 1,
+    page_size: int = 10,
+) -> GetMultipleSchedulesResponse:
+    """Get multiple schedules with pagination and filtering."""
+
+    if page < 1 or page_size < 1:
+        raise HTTPException(status_code=400, detail="Page and page_size must be greater than 0.")
+
+    total_schedules = await get_schedules_count(
         enabled=enabled,
         created_by=created_by,
         created_at_start=created_at_start,
         created_at_end=created_at_end,
     )
-    return [GetScheduleResponse.from_db(s) for s in schedules]
+    start = (page - 1) * page_size
+    total_pages = (total_schedules + page_size - 1) // page_size if total_schedules > 0 else 0
+
+    if start >= total_schedules and total_schedules > 0:
+        raise HTTPException(status_code=404, detail="Page number out of range.")
+
+    schedules = await get_schedules(
+        enabled=enabled,
+        created_by=created_by,
+        created_at_start=created_at_start,
+        created_at_end=created_at_end,
+        offset=start,
+        limit=page_size,
+    )
+    schedules_list = [GetScheduleResponse.from_db(s) for s in schedules]
+    schedules_dict = {s.schedule_id: s for s in schedules_list}
+    return GetMultipleSchedulesResponse(
+        schedules=schedules_dict,
+        total=total_schedules,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+        error=None,
+    )
 
 @router.put("/create")
 async def create_schedule(schedule_spec: ScheduleSpecification, user: UserRead | None = Depends(current_active_user)) -> CreateScheduleResponse:

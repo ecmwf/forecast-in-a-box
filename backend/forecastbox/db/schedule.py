@@ -14,7 +14,7 @@ from typing import Iterable
 from forecastbox.config import config
 from forecastbox.db.core import addAndCommit, dbRetry, executeAndCommit
 from forecastbox.schemas.schedule import Base, ScheduleDefinition
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 logger = logging.getLogger(__name__)
@@ -29,6 +29,26 @@ async def create_db_and_tables():
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+def _build_schedules_query(
+    schedule_id: ScheduleId|None = None,
+    enabled: bool | None = None,
+    created_by: str | None = None,
+    created_at_start: dt.datetime | None = None,
+    created_at_end: dt.datetime | None = None,
+):
+    query = select(ScheduleDefinition)
+    if schedule_id is not None:
+        query = query.where(ScheduleDefinition.schedule_id == schedule_id)
+    if enabled is not None:
+        query = query.where(ScheduleDefinition.enabled == enabled)
+    if created_by is not None:
+        query = query.where(ScheduleDefinition.created_by == created_by)
+    if created_at_start is not None:
+        query = query.where(ScheduleDefinition.created_at >= created_at_start)
+    if created_at_end is not None:
+        query = query.where(ScheduleDefinition.created_at <= created_at_end)
+    return query
+
 async def get_schedules(
     schedule_id: ScheduleId|None = None,
     enabled: bool | None = None,
@@ -40,23 +60,40 @@ async def get_schedules(
 ) -> Iterable[ScheduleDefinition]:
     async def function(i: int) -> Iterable[ScheduleDefinition]:
         async with async_session_maker() as session:
-            query = select(ScheduleDefinition)
-            if schedule_id is not None:
-                query = query.where(ScheduleDefinition.schedule_id == schedule_id)
-            if enabled is not None:
-                query = query.where(ScheduleDefinition.enabled == enabled)
-            if created_by is not None:
-                query = query.where(ScheduleDefinition.created_by == created_by)
-            if created_at_start is not None:
-                query = query.where(ScheduleDefinition.created_at >= created_at_start)
-            if created_at_end is not None:
-                query = query.where(ScheduleDefinition.created_at <= created_at_end)
+            query = _build_schedules_query(
+                schedule_id=schedule_id,
+                enabled=enabled,
+                created_by=created_by,
+                created_at_start=created_at_start,
+                created_at_end=created_at_end,
+            )
             if offset != -1:
                 query = query.offset(offset)
             if limit != -1:
                 query = query.limit(limit)
             result = await session.execute(query)
             return (e[0] for e in result.all())
+
+    return await dbRetry(function)
+
+async def get_schedules_count(
+    schedule_id: ScheduleId|None = None,
+    enabled: bool | None = None,
+    created_by: str | None = None,
+    created_at_start: dt.datetime | None = None,
+    created_at_end: dt.datetime | None = None,
+) -> int:
+    async def function(i: int) -> int:
+        async with async_session_maker() as session:
+            query = _build_schedules_query(
+                schedule_id=schedule_id,
+                enabled=enabled,
+                created_by=created_by,
+                created_at_start=created_at_start,
+                created_at_end=created_at_end,
+            )
+            result = await session.execute(select(func.count()).select_from(query.subquery()))
+            return result.scalar_one()
 
     return await dbRetry(function)
 

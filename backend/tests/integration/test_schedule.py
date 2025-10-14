@@ -91,18 +91,25 @@ def test_get_multiple_schedules(backend_client_with_auth):
     # filter: enabled
     response = backend_client_with_auth.get("/schedule/?enabled=true")
     assert response.is_success
-    enabled_schedules = response.json()
-    assert len(enabled_schedules) >= 2 # at least sched_id_1 and sched_id_3
-    assert any(s["schedule_id"] == sched_id_1 for s in enabled_schedules)
-    assert any(s["schedule_id"] == sched_id_3 for s in enabled_schedules)
-    assert not any(s["schedule_id"] == sched_id_2 for s in enabled_schedules)
+    enabled_schedules_response = response.json()
+    enabled_schedules = enabled_schedules_response["schedules"]
+    assert enabled_schedules_response["total"] >= 2
+    assert enabled_schedules_response["page"] == 1
+    assert enabled_schedules_response["page_size"] == 10
+    assert sched_id_1 in enabled_schedules
+    assert sched_id_3 in enabled_schedules
+    assert sched_id_2 not in enabled_schedules
+
     response = backend_client_with_auth.get("/schedule/?enabled=false")
     assert response.is_success
-    disabled_schedules = response.json()
-    assert len(disabled_schedules) >= 1 # at least sched_id_2
-    assert any(s["schedule_id"] == sched_id_2 for s in disabled_schedules)
-    assert not any(s["schedule_id"] == sched_id_1 for s in disabled_schedules)
-    assert not any(s["schedule_id"] == sched_id_3 for s in disabled_schedules)
+    disabled_schedules_response = response.json()
+    disabled_schedules = disabled_schedules_response["schedules"]
+    assert disabled_schedules_response["total"] >= 1
+    assert disabled_schedules_response["page"] == 1
+    assert disabled_schedules_response["page_size"] == 10
+    assert sched_id_2 in disabled_schedules
+    assert sched_id_1 not in disabled_schedules
+    assert sched_id_3 not in disabled_schedules
 
     # filter: created at
     sched_spec_4 = ScheduleSpecification(exec_spec=exec_spec, dynamic_expr={}, cron_expr="0 0 * * *")
@@ -112,9 +119,51 @@ def test_get_multiple_schedules(backend_client_with_auth):
 
     response = backend_client_with_auth.get(f"/schedule/?created_at_end={creation_time.isoformat()}")
     assert response.is_success
-    nonrecent_schedules = response.json()
-    assert len(nonrecent_schedules) >= 3
-    assert any(s["schedule_id"] == sched_id_1 for s in nonrecent_schedules)
-    assert any(s["schedule_id"] == sched_id_2 for s in nonrecent_schedules)
-    assert any(s["schedule_id"] == sched_id_3 for s in nonrecent_schedules)
-    assert not any(s["schedule_id"] == sched_id_4 for s in nonrecent_schedules)
+    nonrecent_schedules_response = response.json()
+    nonrecent_schedules = nonrecent_schedules_response["schedules"]
+    assert nonrecent_schedules_response["total"] >= 3
+    assert nonrecent_schedules_response["page"] == 1
+    assert nonrecent_schedules_response["page_size"] == 10
+    assert sched_id_1 in nonrecent_schedules
+    assert sched_id_2 in nonrecent_schedules
+    assert sched_id_3 in nonrecent_schedules
+    assert sched_id_4 not in nonrecent_schedules
+
+    # pagination
+    response = backend_client_with_auth.get("/schedule/")
+    assert response.is_success
+    all_schedules_response = response.json()
+    total_schedules = all_schedules_response["total"]
+    assert total_schedules >= 4
+
+    # page 1, page_size 2
+    response = backend_client_with_auth.get("/schedule/?page=1&page_size=2")
+    assert response.is_success
+    paginated_response = response.json()
+    assert len(paginated_response["schedules"]) == 2
+    assert paginated_response["total"] == total_schedules
+    assert paginated_response["page"] == 1
+    assert paginated_response["page_size"] == 2
+    assert paginated_response["total_pages"] == (total_schedules + 1) // 2
+
+    # page 2, page_size 2
+    response = backend_client_with_auth.get("/schedule/?page=2&page_size=2")
+    assert response.is_success
+    paginated_response = response.json()
+    assert len(paginated_response["schedules"]) == 2
+    assert paginated_response["total"] == total_schedules
+    assert paginated_response["page"] == 2
+    assert paginated_response["page_size"] == 2
+    assert paginated_response["total_pages"] == (total_schedules + 1) // 2
+
+    # page too high
+    response = backend_client_with_auth.get(f"/schedule/?page={paginated_response['total_pages'] + 1}&page_size=2")
+    assert response.status_code == 404
+
+    # invalid size
+    response = backend_client_with_auth.get("/schedule/?page=1&page_size=0")
+    assert response.status_code == 400
+
+    # page too low
+    response = backend_client_with_auth.get("/schedule/?page=0&page_size=1")
+    assert response.status_code == 400
