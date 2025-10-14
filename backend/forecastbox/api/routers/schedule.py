@@ -14,10 +14,9 @@ import logging
 import uuid
 from dataclasses import dataclass
 
-import orjson
 from apscheduler.triggers.cron import CronTrigger
 from fastapi import APIRouter, Depends, HTTPException
-from forecastbox.api.types import ScheduleSpecification, ScheduleUpdate
+from forecastbox.api.types import ScheduleSpecification, ScheduleUpdate, schedule2db
 from forecastbox.auth.users import current_active_user
 from forecastbox.db.schedule import ScheduleId, get_schedules, get_schedules_count, insert_one, update_one
 from forecastbox.schemas.schedule import ScheduleDefinition
@@ -152,12 +151,13 @@ async def create_schedule(schedule_spec: ScheduleSpecification, user: UserRead |
         raise HTTPException(status_code=400, detail=f"Invalid crontab: {schedule_spec.cron_expr} => {e}")
     schedule_id = str(uuid.uuid4()) # TODO gen from db instead
 
+    schedule_data = schedule2db(schedule_spec)
     await insert_one(
         schedule_id,
         user.email if user is not None else None,
-        schedule_spec.exec_spec.model_dump_json(),
-        orjson.dumps(schedule_spec.dynamic_expr).decode('ascii'),
-        schedule_spec.cron_expr,
+        schedule_data["exec_spec"],
+        schedule_data["dynamic_expr"],
+        schedule_data["cron_expr"],
     )
     # TODO register the schedule
     return CreateScheduleResponse(schedule_id)
@@ -168,15 +168,7 @@ async def update_schedule(
     schedule_update: ScheduleUpdate,
     user: UserRead = Depends(current_active_user)
 ) -> GetScheduleResponse:
-    kwargs = {}
-    if schedule_update.exec_spec is not None:
-        kwargs['exec_spec'] = schedule_update.model_dump_json()
-    if schedule_update.dynamic_expr is not None:
-        kwargs['dynamic_expr'] = orjson.dumps(schedule_update.dynamic_expr).decode('ascii')
-    if schedule_update.enabled is not None:
-        kwargs['enabled'] = schedule_update.enabled
-    if schedule_update.cron_expr is not None:
-        kwargs['cron_expr'] = schedule_update.cron_expr
+    kwargs = schedule2db(schedule_update)
 
     updated_schedule = await update_one(schedule_id = schedule_id, **kwargs)
     if not updated_schedule:
