@@ -1,58 +1,66 @@
 name: FIAB
 services:
-
   frontend:
+    restart: unless-stopped
     container_name: fiab-frontend
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    # image: ghcr.io/ecmwf/forecast-in-a-box/frontend
     ports:
       - "3000:3000"
     networks:
-      - fiab-network
+      - network
 
   backend:
+    restart: unless-stopped
     container_name: fiab-backend
     build:
       context: ./backend
       dockerfile: Dockerfile
-    # image: ghcr.io/ecmwf/forecast-in-a-box/backend
     volumes:
       - data:/app/data_dir
-      - ~/.fiab:/root/.fiab
+      - ~/fiab:/root/.fiab
     ports:
       - "8000:8000"
     environment:
-      # fiab__FRONTEND_URL: "https://DOMAIN"
-      fiab__API__API_URL: "http://backend:8000"
-      fiab__API__DATA_PATH: "/app/data_dir"
-      fiab__API__MODEL_REPOSITORY: "https://sites.ecmwf.int/repository/fiab"
+      fiab__API__DATA_PATH: "/app/data_dir/"
+      fiab__API__MODEL_REPOSITORY: https://sites.ecmwf.int/repository/fiab/
+
       fiab__CASCADE__CASCADE_URL: "tcp://cascade:8067"
+      fiab__AUTH__PUBLIC_URL: ???
 
       ECMWF_API_URL: "https://api.ecmwf.int/v1"
       ECMWF_API_KEY: ${ECMWF_API_KEY}
       ECMWF_API_EMAIL: ${ECMWF_API_EMAIL}
 
+      FIAB__API__SERVE_STATIC: false
+
       FIAB_INSTALL_TYPE: all
     networks:
-      - fiab-network
+      - network
 
   cascade:
+    restart: unless-stopped
     container_name: fiab-cascade
     build:
       context: ./cascade
       dockerfile: Dockerfile
-    # image: ghcr.io/ecmwf/forecast-in-a-box/cascade
-    entrypoint: "python -m cascade.gateway tcp://0.0.0.0:8067"
+    entrypoint: "python -m cascade.gateway tcp://0.0.0.0:8067 --max_jobs 1"
+    environment:
+      EARTHKIT_DATA_USER_CACHE_DIRECTORY: "/app/data_dir/user_cache"
+      EARTHKIT_DATA_MAXIMUM_CACHE_SIZE: "50GB"
+      EARTHKIT_DATA_CACHE_POLICY: "user"
+
+      ANEMOI_INFERENCE_NUM_CHUNKS: 4
+    shm_size: '5gb'
     networks:
-      - fiab-network
+      - network
     ports:
       - "48165:48165"
-    shm_size: '5gb'
     volumes:
       - data:/app/data_dir
       - ~/.ecmwfapirc:/root/.ecmwfapirc:ro
+
 
     deploy:
       resources:
@@ -62,9 +70,8 @@ services:
               count: 1
               capabilities: [gpu]
 
-
 networks:
-  fiab-network:
+  network:
     driver: bridge
   host:
     external: true
@@ -72,4 +79,3 @@ networks:
 
 volumes:
   data:
-  # frontend-dist:
