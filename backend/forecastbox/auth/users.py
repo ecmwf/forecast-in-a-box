@@ -18,7 +18,7 @@ from fastapi_users.db import SQLAlchemyUserDatabase
 from forecastbox.config import config
 from forecastbox.db.user import async_session_maker, get_user_db
 from forecastbox.schemas.user import UserTable
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 
 SECRET = config.auth.jwt_secret.get_secret_value()
 COOKIE_NAME = "forecastbox_auth"
@@ -67,6 +67,11 @@ class UserManager(UUIDIDMixin, BaseUserManager[UserTable, pydantic.UUID4]):
     ):
         if not verify_entitlements(user):
             logger.error(f"User {user.id} does not have the required entitlements.")
+            async with async_session_maker() as session:
+                query = delete(UserTable).where(UserTable.id == user.id)
+                _ = await session.execute(query)
+                await session.commit()
+
             raise HTTPException(
                 status_code=403, detail="You do not have the required entitlements to access this resource."
             )
