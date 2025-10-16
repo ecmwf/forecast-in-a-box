@@ -65,6 +65,7 @@ def backend_client() -> httpx.Client:
         config.api.data_path = str(pathlib.Path(__file__).parent / "data")
         config.api.model_repository = f"http://localhost:{fake_repository_port}"
         config.general.launch_browser = False
+        config.auth.domain_allowlist_registry = ["somewhere.org"]
         handles = launch_all(config)
         p = Process(target=run_repository)
         p.start()

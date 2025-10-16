@@ -45,3 +45,8 @@ def test_admin_flows(backend_client):
     assert not response.is_success
     response = backend_client.get("/users/me")
     assert response.is_success
+
+    headers = {"Content-Type": "application/json"}
+    data = {"email": "user@nowhere.org", "password": "something"}
+    response = backend_client.post("/auth/register", headers=headers, json=data)
+    assert response.status_code == 400
