@@ -96,7 +96,7 @@ function OutputCard({ product, id, progress, popout }: { product: ProductOutput;
                 </Collapse>
 
                 <>
-                   
+
 
                     <Text size="sm" fw={500} mb="xs">Output IDs:</Text>
                     <Table striped highlightOnHover>

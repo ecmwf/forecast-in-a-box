@@ -13,7 +13,6 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 import orjson
-
 from cascade.low.core import JobInstance
 from forecastbox.products.product import USER_DEFINED
 from pydantic import BaseModel, Field, PositiveInt, field_validator, model_validator
