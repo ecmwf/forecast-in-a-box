@@ -10,7 +10,7 @@ from forecastbox.standalone.config import export_recursive, setup_process
 from forecastbox.standalone.launchers import launch_backend
 from forecastbox.standalone.procs import ChildProcessGroup, previous_cleanup
 
-logger = logging.getLogger(__name__ if __name__ != "__main__" else "forecastbox.standalone.service")
+logger = logging.getLogger(__name__ if __name__ != "__main__" else __package__)
 
 pidfile = fiab_home / "pid"
 

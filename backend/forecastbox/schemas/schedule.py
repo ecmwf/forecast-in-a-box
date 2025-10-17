@@ -17,7 +17,6 @@ from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
-
 class ScheduleDefinition(Base):
     __tablename__ = "schedule_definition"
 
