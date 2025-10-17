@@ -47,6 +47,9 @@ if __name__ == "__main__":
     backend = Process(target=launch_backend)
     backend.start()
     handle = ChildProcessGroup([backend])
-    mark_started(backend.pid)
+    if backend.pid:
+        mark_started(backend.pid)
+    else:
+        raise ValueError(f"start failure: {backend.exitcode}")
 
     check_backend_ready(config, handle)

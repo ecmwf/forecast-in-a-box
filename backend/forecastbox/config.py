@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 def _validate_url(url: str) -> bool:
     # TODO add DNS resolution attempt or something
     parse = urllib.parse.urlparse(url)
-    return parse.scheme and parse.netloc
+    return (parse.scheme is not None) and (parse.netloc is not None)
 
 class StatusMessage:
     """Namespace class for status message sharing"""

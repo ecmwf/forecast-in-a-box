@@ -72,8 +72,9 @@ class UserManager(UUIDIDMixin, BaseUserManager[UserTable, pydantic.UUID4]):
                 status_code=403, detail="You do not have the required entitlements to access this resource."
             )
 
-        response.status_code = 302
-        response.headers["location"] = "/"
+        if response is not None:
+            response.status_code = 302
+            response.headers["location"] = "/"
 
     async def on_after_forgot_password(self, user: UserTable, token: str, request: Request | None = None):
         logger.error(f"User {user.id} has forgot their password. Reset token: {token}")

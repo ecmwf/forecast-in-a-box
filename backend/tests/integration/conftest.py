@@ -4,6 +4,7 @@ import tempfile
 import time
 from http.server import SimpleHTTPRequestHandler
 from multiprocessing import Event, Process
+from typing import Any, Generator
 
 import httpx
 import pytest
@@ -47,7 +48,7 @@ class FakeModelRepository(SimpleHTTPRequestHandler):
             self.send_error(404, f"Not Found: {self.path}")
 
 
-def run_repository(shutdown_event: Event):
+def run_repository(shutdown_event: Any): # TODO typing -- is `Event` but thats not correct
     server_address = ("", fake_repository_port)
     with socketserver.ThreadingTCPServer(server_address, FakeModelRepository) as httpd:
         # NOTE dont serve forever, doesnt free the port up correctly
@@ -59,7 +60,7 @@ def run_repository(shutdown_event: Event):
 
 
 @pytest.fixture(scope="session")
-def backend_client() -> httpx.Client:
+def backend_client() -> Generator[httpx.Client, None, None]:
     td = None
     handles = None
     shutdown_event = None

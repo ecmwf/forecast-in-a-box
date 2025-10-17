@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):
     for module_info in pkgutil.iter_modules(forecastbox.db.__path__):
         module = importlib.import_module(f"forecastbox.db.{module_info.name}")
         if hasattr(module, 'create_db_and_tables'):
-            await module.create_db_and_tables()
+            await module.create_db_and_tables() # type: ignore[call-non-callable] # NOTE no module protocol
     migrate()
     yield
     await gateway.shutdown_processes()
