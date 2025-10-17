@@ -9,14 +9,16 @@
 
 
 from pathlib import Path
+from typing import Sequence, cast
 
 import pytest
+from forecastbox.models import SpecifiedModel
 from forecastbox.models.globe import ControlMetadata, GlobalModel
 from forecastbox.products.product import GenericParamProduct, Product
 from qubed import Qube
 
 
-def create_test_product(axis: dict[str, list[str]]) -> Product:
+def create_test_product(axis: dict[str, Sequence[str]]) -> Product:
     """Create a test product with specified axis.
 
     Does not modify the model assumptions.
@@ -37,13 +39,15 @@ def create_test_product(axis: dict[str, list[str]]) -> Product:
             raise NotImplementedError("Testing")
 
     product = TestProduct()
+    model = create_test_model(axis)
+    model = cast(SpecifiedModel, model) # TODO typing -- product model hierarchy
 
     assert product.qube == Qube.from_datacube(axis), "Product qube should match the provided axis"
-    assert product.validate_intersection(create_test_model(axis)), "Product should be valid with the test model"
+    assert product.validate_intersection(model), "Product should be valid with the test model"
     return product
 
 
-def create_test_model(axis: dict[str, list[str]]) -> GlobalModel:
+def create_test_model(axis: dict[str, Sequence[str]]) -> GlobalModel:
     """Create a test model with specified axis."""
 
     class TestModel(GlobalModel):
@@ -69,8 +73,9 @@ def create_test_model(axis: dict[str, list[str]]) -> GlobalModel:
 
 def test_product_selection():
     """Test the selection of a product with a model."""
-    product = create_test_product(dict(options=["value1", "value2"]))
-    model = create_test_model(dict(options=["value1", "value2"]))
+    product = create_test_product({'options': ["value1", "value2"]})
+    model = create_test_model({'options': ["value1", "value2"]})
+    model = cast(SpecifiedModel, model) # TODO typing -- product model hierarchy
 
     assert product.validate_intersection(model), "Product should be valid with the model"
 
@@ -97,6 +102,7 @@ def test_product_validity(product_axis, model_axis, expected):
     """Test the validity of a product with a model based on axis."""
     product = create_test_product(product_axis)
     model = create_test_model(model_axis)
+    model = cast(SpecifiedModel, model) # TODO typing -- product model hierarchy
 
     assert (
         product.validate_intersection(model) == expected

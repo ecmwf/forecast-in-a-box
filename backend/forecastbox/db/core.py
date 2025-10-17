@@ -4,7 +4,7 @@ import asyncio
 import logging
 from asyncio import Lock
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import Any, Awaitable, TypeVar
 
 import sqlalchemy.exc
 
@@ -16,7 +16,7 @@ T = TypeVar("T")
 # TODO integrate with sqlalchemy typing system
 
 
-async def dbRetry(func: Callable[[int], T]) -> T:
+async def dbRetry(func: Callable[[int], Awaitable[T]]) -> T:
     for i in range(retries, -1, -1):
         try:
             async with lock:
@@ -25,15 +25,14 @@ async def dbRetry(func: Callable[[int], T]) -> T:
             if i == 0:
                 raise
             await asyncio.sleep(0.1)
+    raise ValueError # NOTE in case of retries misconfig, we dont want implicit None
 
 
 async def executeAndCommit(stmt, session_maker) -> None:
     async def func(i: int) -> None:
         async with session_maker() as session:
-            # logger.debug(f"db action await (attempt #{retries - i}) {stmt=}")
             await session.execute(stmt)
             await session.commit()
-            # logger.debug(f"db action done (attempt #{retries - i}) {stmt=}")
 
     await dbRetry(func)
 
@@ -41,10 +40,8 @@ async def executeAndCommit(stmt, session_maker) -> None:
 async def addAndCommit(entity, session_maker) -> None:
     async def func(i: int) -> None:
         async with session_maker() as session:
-            # logger.debug(f"db action await (attempt #{retries - i}) {entity=}")
             session.add(entity)
             await session.commit()
-            # logger.debug(f"db action done (attempt #{retries - i}) {entity=}")
 
     await dbRetry(func)
 
@@ -52,11 +49,16 @@ async def addAndCommit(entity, session_maker) -> None:
 async def querySingle(query, session_maker) -> Any:
     async def func(i: int) -> Any:
         async with session_maker() as session:
-            # logger.debug(f"db action await (attempt #{retries - i}) {query=}")
             result = await session.execute(query)
             maybe_row = result.first()
             rv = maybe_row if maybe_row is None else maybe_row[0]
-            # logger.debug(f"db action done (attempt #{retries - i}) {query=}")
             return rv
 
     return await dbRetry(func)
+
+async def queryCount(query, session) -> int:
+    result = (await session.execute(query)).scalar()
+    if result is None or not isinstance(result, int):
+        raise TypeError(result)
+    else:
+        return result

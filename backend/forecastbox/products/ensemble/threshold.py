@@ -37,7 +37,7 @@ class BaseThresholdProbability(BaseEnsembleProduct):
                 jsonschema=StringSchema(
                     title="Operator",
                     description="Operator to apply to the threshold, e.g. '>', '<', '==', etc.",
-                    enum=["<", "<=", "==", ">=", ">"],
+                    enum=["<", "<=", "==", ">=", ">"], # type: ignore[unknown-argument] # NOTE checker failure, this is legit
                 )
             ),
         )

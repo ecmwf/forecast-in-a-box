@@ -9,16 +9,14 @@
 
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Any, Union
+from typing import Any, Union
 
 from earthkit.workflows import fluent
+from earthkit.workflows.fluent import Action
+from earthkit.workflows.graph import Graph
 from forecastbox.models import SpecifiedModel
 from forecastbox.rjsf import ArraySchema, FieldSchema, FieldWithUI, IntegerSchema, StringSchema
 from qubed import Qube
-
-if TYPE_CHECKING:
-    from earthkit.workflows.fluent import Action
-    from earthkit.workflows.graph import Graph
 
 
 class Product(ABC):

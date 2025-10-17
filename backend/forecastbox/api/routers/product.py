@@ -10,8 +10,9 @@
 """Products API Router."""
 
 import re
+from collections import OrderedDict
 from collections.abc import Iterable
-from typing import Any, OrderedDict
+from typing import Any
 
 import forecastbox.rjsf.utils as rjsfutils
 from fastapi import APIRouter, HTTPException
