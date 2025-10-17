@@ -66,11 +66,11 @@ def test_download_model(backend_client):
 
     metadata = ControlMetadata()
     expected = '{"detail":"failed to edit model metadata due to BadZipFile(\'File is not a zip file\')"}'
-    response = backend_client.patch(f"/model/{fake_model_name}/metadata", json=metadata.dict())
+    response = backend_client.patch(f"/model/{fake_model_name}/metadata", json=metadata.model_dump())
     assert response.status_code == 400
     assert response.text == expected
     # we try twice to test that the concurrent lock has been lifted
-    response = backend_client.patch(f"/model/{fake_model_name}/metadata", json=metadata.dict())
+    response = backend_client.patch(f"/model/{fake_model_name}/metadata", json=metadata.model_dump())
     assert response.status_code == 400
     assert response.text == expected
 
