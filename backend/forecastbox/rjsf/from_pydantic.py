@@ -22,7 +22,7 @@ from .uiSchema import UIAdditionalProperties, UIField, UIIntegerField, UIObjectF
 
 def _update_with_extra_json(field: FieldInfo, schema: FieldSchema, ui: UISchema) -> tuple[FieldSchema, UISchema]:
     """Update schema and ui with extra json from field."""
-    if isinstance(field.json_schema_extra, dict) and field.json_schema_extra.get('rjsf') is not None:
+    if isinstance(field.json_schema_extra, dict) and field.json_schema_extra.get('rjsf') is not None: # type: ignore # TODO fix type, didnt diagnose
         assert isinstance(field.json_schema_extra['rjsf'], dict), "rjsf extra must be a dict"
         for k, v in field.json_schema_extra['rjsf'].items():
             if hasattr(schema, k):
@@ -66,7 +66,7 @@ def _from_literal_primative(field: FieldInfo) -> FieldWithUI:
     if not all(isinstance(arg, str) for arg in literal_args):
         raise TypeError("Only Literal[str, ...] is supported")
 
-    schema, ui = _set_base_field_info(field, StringSchema(type="string", enum=list(literal_args)), UIStringField(widget="select"))
+    schema, ui = _set_base_field_info(field, StringSchema(type="string", enum=list(literal_args)), UIStringField(widget="select")) # type: ignore # TODO fix type, didnt diagnose
     schema, ui = _update_with_extra_json(field, schema, ui)
 
     return FieldWithUI(jsonschema=schema, uischema=ui)
@@ -224,4 +224,4 @@ def from_pydantic(model: type[BaseModel] | BaseModel) -> tuple[dict[str, FieldWi
             if field.is_required():
                 required.append(field_name)
         return fields, required
-    return _get_from_model(model)
+    return _get_from_model(model) # type: ignore # TODO fix type, didnt diagnose

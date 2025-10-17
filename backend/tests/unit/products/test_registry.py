@@ -7,9 +7,16 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+from typing import Any
+
 import pytest
+from earthkit.workflows.fluent import Action
+from earthkit.workflows.graph import Graph
+from forecastbox.models import SpecifiedModel
 from forecastbox.products.interfaces import Interfaces
+from forecastbox.products.product import Product
 from forecastbox.products.registry import PRODUCTS, CategoryRegistry, get_categories, get_product, get_product_list
+from qubed import Qube
 
 
 @pytest.fixture(scope="module")
@@ -35,7 +42,7 @@ def test_category_registry_initialisation_with_interface(mocked_products_global_
     """Test the initialization of CategoryRegistry with interfaces."""
     CategoryRegistry(
         "test_category_with_interface",
-        interface="detailed",
+        interface=Interfaces.DETAILED,
         description="Test category with interface",
         title="Test Category with Interface",
     )
@@ -55,12 +62,18 @@ def mocked_category_registry(mocked_products_global_dict):
     return registry
 
 
-class MockProduct:
+class MockProduct(Product):
     """Mock product class for testing"""
 
     name = "mock_product"
     description = "This is a mock product."
     options = ["option1", "option2"]
+
+    def qube(self) -> Qube:
+        raise NotImplementedError
+
+    def execute(self, product_spec: dict[str, Any], model: SpecifiedModel, source: Action) -> Graph|Action:
+        raise NotImplementedError
 
 
 def test_category_registry_add_product(mocked_category_registry: CategoryRegistry):

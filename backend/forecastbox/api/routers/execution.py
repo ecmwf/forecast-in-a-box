@@ -30,7 +30,7 @@ LOG = logging.getLogger(__name__)
 
 
 @router.post("/visualise")
-async def get_graph_visualise(spec: ExecutionSpecification, options: VisualisationOptions = None) -> HTMLResponse:
+async def get_graph_visualise(spec: ExecutionSpecification, options: VisualisationOptions|None = None) -> HTMLResponse:
     """Get an HTML visualisation of the product graph.
 
     Parameters

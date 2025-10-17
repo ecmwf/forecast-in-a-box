@@ -11,6 +11,8 @@ from forecastbox.config import config
 from httpx_oauth.clients.openid import OpenID
 
 if config.auth.oidc is not None:
+    if config.auth.oidc.openid_configuration_endpoint is None or config.auth.oidc.client_id is None:
+        raise TypeError
     oauth_client = OpenID(
         client_id=config.auth.oidc.client_id,
         client_secret=config.auth.oidc.client_secret.get_secret_value(),
