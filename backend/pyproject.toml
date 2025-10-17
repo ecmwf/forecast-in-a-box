@@ -29,6 +29,7 @@ dependencies = [
   "anemoi-inference>=0.7.1",
   "anemoi-plugins-ecmwf-inference[opendata]>=0.1.10",
   "anemoi-utils>=0.4.36",
+  "apscheduler",
   "cloudpickle",
   "earthkit-workflows>=0.4.7",
   "earthkit-workflows-anemoi>=0.3.4",
@@ -54,13 +55,12 @@ dependencies = [
 ]
 
 optional-dependencies.all = [
-  "forecast-in-a-box[plots,test,thermo]",
+  "forecast-in-a-box[plots,thermo,dev]",
 ]
 optional-dependencies.plots = [
   "earthkit-plots>=0.3.5",
   "earthkit-plots-default-styles>=0.1",
 ]
-optional-dependencies.test = [ "pytest-xdist" ]
 optional-dependencies.thermo = [
   "thermofeel>=2.1.1",
 ]
@@ -68,6 +68,11 @@ optional-dependencies.webmars = [
   "ecmwf-api-client>=1.6.5",
 ]
 urls."Source code" = "https://github.com/ecmwf/forecast-in-a-box"
+
+[dependency-groups]
+dev = [
+  "pytest-xdist>=3.8",
+]
 
 [tool.setuptools_scm]
 version_file = "forecastbox/_version.py"

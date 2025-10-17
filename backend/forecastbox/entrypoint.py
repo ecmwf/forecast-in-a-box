@@ -9,25 +9,25 @@
 
 """FastAPI Entrypoint"""
 
+import importlib
 import logging
 import os
+import pkgutil
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+import forecastbox.db
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from forecastbox.db.job import create_db_and_tables as create_job_db
 from forecastbox.db.migrations import migrate
-from forecastbox.db.model import create_db_and_tables as create_model_db
-from forecastbox.db.user import create_db_and_tables as create_user_db
 from starlette.exceptions import HTTPException
 
-from .api.routers import admin, auth, execution, gateway, job, model, product
+from .api.routers import admin, auth, execution, gateway, job, model, product, schedule
 from .config import config
 
 logger = logging.getLogger(__name__)
@@ -35,10 +35,11 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.debug("Starting FIAB with config: %s", config)
-    await create_user_db()
-    await create_job_db()
-    await create_model_db()
+    logger.debug(f"Starting FIAB with config: {config}")
+    for module_info in pkgutil.iter_modules(forecastbox.db.__path__):
+        module = importlib.import_module(f"forecastbox.db.{module_info.name}")
+        if hasattr(module, 'create_db_and_tables'):
+            await module.create_db_and_tables()
     migrate()
     yield
     await gateway.shutdown_processes()
@@ -62,6 +63,7 @@ app.include_router(job.router, prefix="/api/v1/job")
 app.include_router(admin.router, prefix="/api/v1/admin")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(gateway.router, prefix="/api/v1/gateway")
+app.include_router(schedule.router, prefix="/api/v1/schedule")
 
 app.add_middleware(
     CORSMiddleware,

@@ -129,6 +129,8 @@ class BackendAPISettings(BaseModel):
     """Listening host of the whole server."""
     uvicorn_port: int = 8000
     """Listening port of the whole server."""
+    allow_service: bool = False
+    """Whether we assume that a system-level service has been registered"""
 
     def local_url(self) -> str:
         return f"http://localhost:{self.uvicorn_port}"
@@ -216,4 +218,3 @@ def validate_runtime(config: FIABConfig) -> None:
 
 
 config = FIABConfig()
-logger.debug(f"loaded config: {config.model_dump()}")
