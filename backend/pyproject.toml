@@ -72,6 +72,7 @@ urls."Source code" = "https://github.com/ecmwf/forecast-in-a-box"
 [dependency-groups]
 dev = [
   "pytest-xdist>=3.8",
+  "ty>=0.0.1a23",
 ]
 
 [tool.setuptools_scm]
@@ -102,3 +103,7 @@ plugins = "pydantic.mypy"
 [tool.uv.sources]
 pproc = { git = "https://github.com/ecmwf/pproc" }
 earthkit-workflows-pproc = { git = "https://github.com/ecmwf/earthkit-workflows-pproc" }
+
+[tool.ty.rules]
+possibly-missing-attribute = "ignore" # TODO actually fix all those occurrences instead
+possibly-missing-import = "ignore"    # NOTE due to fastapi_users etc
