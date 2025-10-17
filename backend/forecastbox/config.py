@@ -76,6 +76,8 @@ class AuthSettings(BaseModel):
     """If true, all authentication is ignored. Used for single-user standalone regime"""
     public_url: str | None = None
     """Used for OIDC redirects"""
+    domain_allowlist_registry: list[str] = Field(default_factory=list)
+    """List of allowed domains for user registration. If empty, any domain is allowed."""
 
     @model_validator(mode="after")
     def pass_to_secret(self):

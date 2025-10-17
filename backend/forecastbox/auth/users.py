@@ -15,9 +15,10 @@ from fastapi import Depends, HTTPException, Request, responses
 from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
 from fastapi_users.authentication import AuthenticationBackend, CookieTransport, JWTStrategy
 from fastapi_users.db import SQLAlchemyUserDatabase
+from fastapi_users.exceptions import InvalidPasswordException
 from forecastbox.config import config
 from forecastbox.db.user import async_session_maker, get_user_db
-from forecastbox.schemas.user import UserTable
+from forecastbox.schemas.user import UserCreate, UserRead, UserTable
 from sqlalchemy import func, select, update
 
 SECRET = config.auth.jwt_secret.get_secret_value()
@@ -79,6 +80,14 @@ class UserManager(UUIDIDMixin, BaseUserManager[UserTable, pydantic.UUID4]):
 
     async def on_after_request_verify(self, user: UserTable, token: str, request: Request | None = None):
         logger.error(f"Verification requested for user {user.id}. Verification token: {token}")
+
+    # TODO this is a hack, we validate email in this method. Consider a PR to the fastapi_users
+    async def validate_password(self, password: str, user: UserCreate|UserRead) -> None:
+        if config.auth.domain_allowlist_registry:
+            domain = user.email.split('@')[1]
+            if domain not in config.auth.domain_allowlist_registry:
+                raise InvalidPasswordException(reason=f"Domain '{domain}' is not allowed.")
+
 
 
 async def get_user_manager(user_db: SQLAlchemyUserDatabase = Depends(get_user_db)):
