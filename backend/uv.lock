@@ -1446,7 +1446,6 @@ dependencies = [
     { name = "qubed" },
     { name = "sse-starlette" },
     { name = "toml" },
-    { name = "ty" },
     { name = "uvicorn" },
 ]
 
@@ -1470,6 +1469,7 @@ webmars = [
 [package.dev-dependencies]
 dev = [
     { name = "pytest-xdist" },
+    { name = "ty" },
 ]
 
 [package.metadata]
@@ -1505,13 +1505,15 @@ requires-dist = [
     { name = "sse-starlette" },
     { name = "thermofeel", marker = "extra == 'thermo'", specifier = ">=2.1.1" },
     { name = "toml" },
-    { name = "ty", specifier = ">=0.0.1a23" },
     { name = "uvicorn" },
 ]
 provides-extras = ["all", "plots", "thermo", "webmars"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest-xdist", specifier = ">=3.8" }]
+dev = [
+    { name = "pytest-xdist", specifier = ">=3.8" },
+    { name = "ty", specifier = ">=0.0.1a23" },
+]
 
 [[package]]
 name = "frozendict"

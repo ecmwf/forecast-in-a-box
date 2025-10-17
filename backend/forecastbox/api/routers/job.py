@@ -17,7 +17,7 @@ import os
 import pathlib
 import zipfile
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, cast
 
 import cascade.gateway.api as api
 import cascade.gateway.client as client
@@ -63,8 +63,8 @@ class JobProgressResponse:
 
 def build_response(record: JobRecord, progress: str|None=None, error: str|None=None, status: STATUS|None=None) -> JobProgressResponse:
     created_at = str(record.created_at)
-    progress = progress or record.progress or "0.00"
-    error = error or record.error
+    progress = progress or cast(str, record.progress) or "0.00"
+    error = error or cast(str, record.error)
     status = status or record.status
     return JobProgressResponse(progress=progress, created_at=created_at, status=status, error=error)
 
@@ -108,9 +108,10 @@ async def update_and_get_progress(job_id: JobId) -> JobProgressResponse:
 
     if job.status in ("running", "submitted"):
         try:
-            response: api.JobProgressResponse = client.request_response(
+            response = client.request_response(
                 api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}"
-            )  # type: ignore
+            )
+            response = cast(api.JobProgressResponse, response)
         except TimeoutError:
             # NOTE we dont update db because the job may still be running
             return build_response(job, status="timeout", error="failed to communicate with gateway")
@@ -237,9 +238,11 @@ async def visualise_job(
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
     if not options:
         options = VisualisationOptions()
-    if job.graph_specification is None:
+    spec = job.graph_specification
+    if spec is None:
         raise HTTPException(status_code=404, detail=f"Job {job_id} had no specification.")
-    spec = ExecutionSpecification(**json.loads(job.graph_specification))
+    spec = cast(str, spec)
+    spec = ExecutionSpecification(**json.loads(spec))
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, visualise, spec, options)  # CPU bound
 
@@ -252,7 +255,11 @@ async def get_job_specification(job_id: JobId = Depends(validate_job_id), user: 
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
     if job.graph_specification is None:
         raise HTTPException(status_code=404, detail=f"Job {job_id} had no specification.")
-    return ExecutionSpecification(**json.loads(job.graph_specification))
+    spec = job.graph_specification
+    if not spec:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} had no specification.")
+    spec = cast(str, spec)
+    return ExecutionSpecification(**json.loads(spec))
 
 
 @router.post("/{job_id}/restart")
@@ -266,6 +273,7 @@ async def restart_job(
     spec = job.graph_specification
     if not spec:
         raise HTTPException(status_code=404, detail=f"Job {job_id} had no specification.")
+    spec = cast(str, spec)
     spec = ExecutionSpecification(**json.loads(spec))
     try:
         return await execute(spec, user)
@@ -323,9 +331,10 @@ async def get_job_availability(job_id: JobId = Depends(validate_job_id), user: U
     list[TaskId]
         List of dataset IDs that are available for the job.
     """
-    response: api.JobProgressResponse = client.request_response(
+    response = client.request_response(
         api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}"
     )
+    response = cast(api.JobProgressResponse, response)
 
     if job_id not in response.datasets:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found in gateway.")
@@ -357,9 +366,10 @@ async def get_result_availability(
     """
 
     try:
-        response: api.JobProgressResponse = client.request_response(
+        response = client.request_response(
             api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}"
         )
+        response = cast(api.JobProgressResponse, response)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Job retrieval failed: {repr(e)}")
 
@@ -459,6 +469,7 @@ async def get_result(
         api.ResultRetrievalRequest(job_id=job_id, dataset_id=DatasetId(task=dataset_id, output="0")),
         f"{config.cascade.cascade_url}",
     )
+    response = cast(api.ResultRetrievalResponse, response)
 
     if response.error:
         raise HTTPException(500, f"Result retrieval failed: {response.error}")
