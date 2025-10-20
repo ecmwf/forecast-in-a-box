@@ -14,11 +14,13 @@ import logging
 import uuid
 from dataclasses import dataclass
 
-from apscheduler.triggers.cron import CronTrigger
 from fastapi import APIRouter, Depends, HTTPException
+from forecastbox.api.scheduling.dt_utils import next_run, parse_crontab
+from forecastbox.api.scheduling.scheduler_thread import prod_scheduler
 from forecastbox.api.types import ScheduleSpecification, ScheduleUpdate, schedule2db
 from forecastbox.auth.users import current_active_user
-from forecastbox.db.schedule import ScheduleId, get_schedules, get_schedules_count, insert_one, update_one
+from forecastbox.db.schedule import (ScheduleId, get_schedules, get_schedules_count, insert_next_run, insert_one,
+                                     update_one)
 from forecastbox.schemas.schedule import ScheduleDefinition
 from forecastbox.schemas.user import UserRead
 from typing_extensions import Self
@@ -144,9 +146,8 @@ async def get_multiple_schedules(
 
 @router.put("/create")
 async def create_schedule(schedule_spec: ScheduleSpecification, user: UserRead | None = Depends(current_active_user)) -> CreateScheduleResponse:
-    # TODO validate that the schedule is enabled, ie the scheduler is running
     try:
-        CronTrigger.from_crontab(schedule_spec.cron_expr)
+        parse_crontab(schedule_spec.cron_expr)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid crontab: {schedule_spec.cron_expr} => {e}")
     schedule_id = str(uuid.uuid4()) # TODO gen from db instead
@@ -159,7 +160,10 @@ async def create_schedule(schedule_spec: ScheduleSpecification, user: UserRead |
         schedule_data["dynamic_expr"],
         schedule_data["cron_expr"],
     )
-    # TODO register the schedule
+    next_run_at = next_run(dt.datetime.now(), schedule_spec.cron_expr)
+    await insert_next_run(schedule_id, next_run_at)
+    logger.debug(f"Next run of {schedule_id} is at {next_run_at}")
+    prod_scheduler()
     return CreateScheduleResponse(schedule_id)
 
 @router.post("/{schedule_id}")
@@ -174,4 +178,5 @@ async def update_schedule(
     if not updated_schedule:
         raise HTTPException(status_code=404, detail=f"Schedule {schedule_id} not found in the database.")
 
+    # TODO regenerate schedulenext if enabled/crontab were changed
     return GetScheduleResponse.from_db(updated_schedule)

@@ -71,6 +71,7 @@ urls."Source code" = "https://github.com/ecmwf/forecast-in-a-box"
 
 [dependency-groups]
 dev = [
+  "pytest-asyncio",
   "pytest-xdist>=3.8",
   "ty>=0.0.1a23",
 ]

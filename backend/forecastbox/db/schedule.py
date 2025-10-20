@@ -9,12 +9,13 @@
 
 import datetime as dt
 import logging
+import uuid
 from typing import Iterable
 
 from forecastbox.config import config
 from forecastbox.db.core import addAndCommit, dbRetry, executeAndCommit
-from forecastbox.schemas.schedule import Base, ScheduleDefinition
-from sqlalchemy import func, select, update
+from forecastbox.schemas.schedule import Base, ScheduleDefinition, ScheduleNext, ScheduleRun
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 logger = logging.getLogger(__name__)
@@ -123,3 +124,49 @@ async def update_one(schedule_id: ScheduleId, **kwargs) -> ScheduleDefinition|No
         return None
     else:
         return schedules[0]
+
+async def insert_next_run(schedule_id: ScheduleId, at: dt.datetime) -> None:
+    entity = ScheduleNext(
+        schedule_next_id = str(uuid.uuid4()),
+        schedule_id = schedule_id,
+        scheduled_at = at,
+    )
+    await addAndCommit(entity, async_session_maker)
+
+async def insert_schedule_run(schedule_id: ScheduleId, job_id: str, scheduled_at: dt.datetime, attempt_cnt: int = 0, trigger: str = "cron") -> None:
+    entity = ScheduleRun(
+        schedule_run_id = str(uuid.uuid4()),
+        schedule_id = schedule_id,
+        job_id = job_id,
+        attempt_cnt = attempt_cnt,
+        scheduled_at = scheduled_at,
+        trigger = trigger,
+    )
+    await addAndCommit(entity, async_session_maker)
+
+async def get_schedulable(now: dt.datetime) -> Iterable[ScheduleNext]:
+    async def function(i: int) -> Iterable[ScheduleNext]:
+        async with async_session_maker() as session:
+            query = select(ScheduleNext).where(ScheduleNext.scheduled_at <= now)
+            result = await session.execute(query)
+            return list(e[0] for e in result.all())
+
+    return await dbRetry(function)
+
+async def mark_run_executed(next_run_id: str) -> None:
+    async def function(i: int) -> None:
+        async with async_session_maker() as session:
+            stmt = delete(ScheduleNext).where(ScheduleNext.schedule_next_id == next_run_id)
+            await session.execute(stmt)
+            await session.commit()
+
+    await dbRetry(function)
+
+async def next_schedulable() -> dt.datetime | None:
+    async def function(i: int) -> dt.datetime | None:
+        async with async_session_maker() as session:
+            query = select(func.min(ScheduleNext.scheduled_at))
+            result = await session.execute(query)
+            return result.scalar_one_or_none()
+
+    return await dbRetry(function)
