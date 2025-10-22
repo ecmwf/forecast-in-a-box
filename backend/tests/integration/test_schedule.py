@@ -25,6 +25,7 @@ def test_schedule_crud(backend_client_with_auth):
         exec_spec=exec_spec,
         dynamic_expr={},
         cron_expr="0 0 * * *",
+        max_acceptable_delay_hours=24,
     )
 
     # create
@@ -68,15 +69,15 @@ def test_get_multiple_schedules(backend_client_with_auth):
     )
 
     # create
-    sched_spec_1 = ScheduleSpecification(exec_spec=exec_spec, dynamic_expr={}, cron_expr="0 0 * * *")
+    sched_spec_1 = ScheduleSpecification(exec_spec=exec_spec, dynamic_expr={}, cron_expr="0 0 * * *", max_acceptable_delay_hours=24)
     response = backend_client_with_auth.put("/schedule/create", headers=headers, json=sched_spec_1.model_dump())
     assert response.is_success
     sched_id_1 = response.json()["schedule_id"]
-    sched_spec_2 = ScheduleSpecification(exec_spec=exec_spec, dynamic_expr={}, cron_expr="0 0 * * *")
+    sched_spec_2 = ScheduleSpecification(exec_spec=exec_spec, dynamic_expr={}, cron_expr="0 0 * * *", max_acceptable_delay_hours=24)
     response = backend_client_with_auth.put("/schedule/create", headers=headers, json=sched_spec_2.model_dump())
     assert response.is_success
     sched_id_2 = response.json()["schedule_id"]
-    sched_spec_3 = ScheduleSpecification(exec_spec=exec_spec, dynamic_expr={}, cron_expr="0 0 * * *")
+    sched_spec_3 = ScheduleSpecification(exec_spec=exec_spec, dynamic_expr={}, cron_expr="0 0 * * *", max_acceptable_delay_hours=24)
     response = backend_client_with_auth.put("/schedule/create", headers=headers, json=sched_spec_3.model_dump())
     assert response.is_success
     sched_id_3 = response.json()["schedule_id"]
@@ -112,7 +113,7 @@ def test_get_multiple_schedules(backend_client_with_auth):
     assert sched_id_3 not in disabled_schedules
 
     # filter: created at
-    sched_spec_4 = ScheduleSpecification(exec_spec=exec_spec, dynamic_expr={}, cron_expr="0 0 * * *")
+    sched_spec_4 = ScheduleSpecification(exec_spec=exec_spec, dynamic_expr={}, cron_expr="0 0 * * *", max_acceptable_delay_hours=24)
     response = backend_client_with_auth.put("/schedule/create", headers=headers, json=sched_spec_4.model_dump())
     assert response.is_success
     sched_id_4 = response.json()["schedule_id"]

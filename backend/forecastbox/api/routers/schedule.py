@@ -159,6 +159,7 @@ async def create_schedule(schedule_spec: ScheduleSpecification, user: UserRead |
         schedule_data["exec_spec"],
         schedule_data["dynamic_expr"],
         schedule_data["cron_expr"],
+        schedule_data["max_acceptable_delay_hours"],
     )
     next_run_at = next_run(dt.datetime.now(), schedule_spec.cron_expr)
     await insert_next_run(schedule_id, next_run_at)

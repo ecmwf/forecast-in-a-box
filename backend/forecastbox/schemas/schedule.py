@@ -28,6 +28,7 @@ class ScheduleDefinition(Base):
     dynamic_expr = Column(JSON, nullable=False)
     enabled = Column(Boolean, nullable = False)
     created_by = Column(String(255), nullable=True)
+    max_acceptable_delay_hours = Column(Integer, nullable=False)
 
 class ScheduleRun(Base):
     __tablename__ = "schedule_run"

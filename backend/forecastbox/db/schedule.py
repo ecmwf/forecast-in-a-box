@@ -98,7 +98,7 @@ async def get_schedules_count(
 
     return await dbRetry(function)
 
-async def insert_one(schedule_id: ScheduleId, user_email: str | None, exec_spec: str, dynamic_expr: str, cron_expr: str|None) -> None:
+async def insert_one(schedule_id: ScheduleId, user_email: str | None, exec_spec: str, dynamic_expr: str, cron_expr: str|None, max_acceptable_delay_hours: int) -> None:
     ref_time = dt.datetime.now()
     entity = ScheduleDefinition(
         schedule_id = schedule_id,
@@ -109,6 +109,7 @@ async def insert_one(schedule_id: ScheduleId, user_email: str | None, exec_spec:
         dynamic_expr = dynamic_expr,
         enabled = True,
         created_by = user_email,
+        max_acceptable_delay_hours = max_acceptable_delay_hours,
     )
     await addAndCommit(entity, async_session_maker)
 
