@@ -111,3 +111,4 @@ auth_backend = AuthenticationBackend(
 fastapi_users = FastAPIUsers[UserTable, pydantic.UUID4](get_user_manager, [auth_backend])
 
 current_active_user = fastapi_users.current_user(active=True, optional=config.auth.passthrough)
+current_active_optional_user = fastapi_users.current_user(active=True, optional=True)

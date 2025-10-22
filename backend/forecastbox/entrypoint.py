@@ -140,6 +140,7 @@ def status() -> StatusResponse:
 @app.get("/api/v1/share/{job_id}/{dataset_id}", response_class=HTMLResponse, tags=["share"], summary="Share Image")
 async def share_image(request: Request, job_id: str, dataset_id: str):
     """Endpoint to share an image from a job and dataset ID."""
+    # TODO: Consider better way to bypass auth for shared images
     base_url = str(request.base_url).rstrip("/")
     image_url = f"{base_url}/api/v1/job/{job_id}/results/{dataset_id}"
     return templates.TemplateResponse(
