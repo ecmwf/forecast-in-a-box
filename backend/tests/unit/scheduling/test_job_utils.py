@@ -5,6 +5,7 @@ import pytest
 from forecastbox.api.scheduling.job_utils import deep_union, eval_dynamic_expression, schedule2spec
 from forecastbox.api.types import ExecutionSpecification
 from forecastbox.schemas.schedule import ScheduleDefinition
+import orjson
 
 
 def test_deep_union_empty_dicts():
@@ -96,15 +97,15 @@ async def test_schedule2spec_found(mock_get_schedules):
         cron_expr="* * * * *",
         created_at=datetime.now(),
         updated_at=datetime.now(),
-        exec_spec={
+        exec_spec=orjson.dumps({
             "job": {
                 "job_type": "forecast_products",
                 "model": {"model": "test_model", "date": "2025-10-20", "lead_time": 24, "ensemble_members": 1},
                 "products": [{"product": "test_product", "specification": {}}]
             },
             "environment": {"hosts": 1, "workers_per_host": 1}
-        },
-        dynamic_expr={"job": {"model": {"date": "$execution_time"}}},
+        }).decode('ascii'),
+        dynamic_expr=orjson.dumps({"job": {"model": {"date": "$execution_time"}}}).decode('ascii'),
         enabled=True,
         created_by="test_user"
     )
@@ -112,11 +113,12 @@ async def test_schedule2spec_found(mock_get_schedules):
 
     result = await schedule2spec(schedule_id, exec_time)
 
-    assert result.t is not None and result.e is None
-    assert isinstance(result.t[0], ExecutionSpecification)
-    assert result.t[1] == 'test_user'
-    assert result.t[0].job.model.date == "20251020T10" # Check dynamic replacement
-    assert result.t[0].environment.hosts == 1
+    assert result.e is None
+    assert result.t is not None
+    assert isinstance(result.t.exec_spec, ExecutionSpecification)
+    assert result.t.created_by == 'test_user'
+    assert result.t.exec_spec.job.model.date == "20251020T10" # Check dynamic replacement
+    assert result.t.exec_spec.environment.hosts == 1
 
 @pytest.mark.asyncio
 @patch("forecastbox.api.scheduling.job_utils.get_schedules")
