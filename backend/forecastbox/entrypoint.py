@@ -141,7 +141,7 @@ def status() -> StatusResponse:
 async def share_image(request: Request, job_id: str, dataset_id: str):
     """Endpoint to share an image from a job and dataset ID."""
     base_url = str(request.base_url).rstrip("/")
-    image_url = f"{base_url}/api/v1/job/{job_id}/{dataset_id}"
+    image_url = f"{base_url}/api/v1/job/{job_id}/results/{dataset_id}"
     return templates.TemplateResponse(
         "share.html", {"request": request, "image_url": image_url, "image_name": f"{job_id}_{dataset_id}"}
     )
