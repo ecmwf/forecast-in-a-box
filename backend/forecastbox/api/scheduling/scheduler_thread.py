@@ -23,12 +23,14 @@ from datetime import datetime
 from typing import cast
 
 from forecastbox.api.execution import execute
+from forecastbox.api.scheduling.dt_utils import next_run
 from forecastbox.api.scheduling.job_utils import schedule2spec
 from forecastbox.db.schedule import (get_schedulable, insert_next_run, insert_schedule_run, mark_run_executed,
-                                     next_schedulable)
+                                     next_schedulable, delete_schedule_next_run)
 
 logger = logging.getLogger(__name__)
 
+# NOTE this lock can be locked externally, eg when updating schedules.
 scheduler_lock = threading.Lock()
 
 class SchedulerThread(threading.Thread):
@@ -132,3 +134,14 @@ def prod_scheduler():
 
 def status_scheduler():
     return "up" if Globals.scheduler is not None else "down"
+
+# NOTE this is not a class method of scheduler because its called from a different thread
+async def regenerate_schedule_next(schedule_id: str, cron_expr: str, enabled: bool) -> None:
+    await delete_schedule_next_run(schedule_id)
+
+    if enabled:
+        next_run_at = next_run(datetime.now(), cron_expr)
+        await insert_next_run(schedule_id, next_run_at)
+        logger.debug(f"Regenerated next run for {schedule_id} at {next_run_at}")
+    else:
+        logger.debug(f"Schedule {schedule_id} is disabled, no next run inserted.")

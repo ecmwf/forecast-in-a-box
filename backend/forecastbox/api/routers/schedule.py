@@ -13,10 +13,11 @@ import datetime as dt
 import logging
 import uuid
 from dataclasses import dataclass
+from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException
 from forecastbox.api.scheduling.dt_utils import next_run, parse_crontab
-from forecastbox.api.scheduling.scheduler_thread import prod_scheduler
+from forecastbox.api.scheduling.scheduler_thread import prod_scheduler, scheduler_lock, regenerate_schedule_next
 from forecastbox.api.types import ScheduleSpecification, ScheduleUpdate, schedule2db
 from forecastbox.auth.users import current_active_user
 from forecastbox.db.schedule import (ScheduleId, get_schedules, get_schedules_count, insert_next_run, insert_one,
@@ -175,9 +176,18 @@ async def update_schedule(
 ) -> GetScheduleResponse:
     kwargs = schedule2db(schedule_update)
 
-    updated_schedule = await update_one(schedule_id = schedule_id, **kwargs)
-    if not updated_schedule:
-        raise HTTPException(status_code=404, detail=f"Schedule {schedule_id} not found in the database.")
+    with scheduler_lock: # NOTE this may block the async pool a bit!
+        updated_schedule = await update_one(schedule_id = schedule_id, **kwargs)
+        if not updated_schedule:
+            raise HTTPException(status_code=404, detail=f"Schedule {schedule_id} not found in the database.")
 
-    # TODO regenerate schedulenext if enabled/crontab were changed
+        if ("cron_expr" in kwargs or "enabled" in kwargs):
+            await regenerate_schedule_next(
+                cast(str, updated_schedule.schedule_id),
+                cast(str, updated_schedule.cron_expr),
+                cast(bool, updated_schedule.enabled),
+            )
+
+    prod_scheduler()
+
     return GetScheduleResponse.from_db(updated_schedule)

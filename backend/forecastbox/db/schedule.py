@@ -163,6 +163,15 @@ async def mark_run_executed(next_run_id: str) -> None:
 
     await dbRetry(function)
 
+async def delete_schedule_next_run(schedule_id: ScheduleId) -> None:
+    async def function(i: int) -> None:
+        async with async_session_maker() as session:
+            stmt = delete(ScheduleNext).where(ScheduleNext.schedule_id == schedule_id)
+            await session.execute(stmt)
+            await session.commit()
+
+    await dbRetry(function)
+
 async def next_schedulable() -> dt.datetime | None:
     async def function(i: int) -> dt.datetime | None:
         async with async_session_maker() as session:
