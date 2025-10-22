@@ -36,7 +36,7 @@ class ScheduleRun(Base):
     schedule_run_id = Column(String(255), primary_key=True, nullable=False)
     # TODO have foreign keys here
     schedule_id = Column(String(255), nullable=False)
-    job_id = Column(String(255), nullable=False)
+    job_id = Column(String(255), nullable=True)
 
     attempt_cnt = Column(Integer, nullable=False)
     scheduled_at = Column(DateTime, nullable=False)

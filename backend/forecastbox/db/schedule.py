@@ -134,7 +134,7 @@ async def insert_next_run(schedule_id: ScheduleId, at: dt.datetime) -> None:
     )
     await addAndCommit(entity, async_session_maker)
 
-async def insert_schedule_run(schedule_id: ScheduleId, job_id: str, scheduled_at: dt.datetime, attempt_cnt: int = 0, trigger: str = "cron") -> None:
+async def insert_schedule_run(schedule_id: ScheduleId, scheduled_at: dt.datetime, job_id: str|None = None, attempt_cnt: int = 0, trigger: str = "cron") -> None:
     entity = ScheduleRun(
         schedule_run_id = str(uuid.uuid4()),
         schedule_id = schedule_id,

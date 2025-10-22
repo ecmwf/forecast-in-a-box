@@ -50,15 +50,20 @@ class SchedulerThread(threading.Thread):
             logger.debug(f"Processing scheduled run {schedule_next_id_str} for schedule {schedule_id_str} at {scheduled_at_dt}")
 
             get_spec_result = await schedule2spec(schedule_id_str, scheduled_at_dt)
-            # TODO validate that scheduled_at_dt is not older than allowed by schedule definition
 
             if get_spec_result.t is not None:
-                exec_result = await execute(get_spec_result.t.exec_spec, get_spec_result.t.created_by)
-                if exec_result.t is not None:
-                    logger.debug(f"Job {exec_result.t.id} submitted for schedule {schedule_id_str}")
-                    await insert_schedule_run(schedule_id_str, exec_result.t.id, scheduled_at_dt)
+                if get_spec_result.t.max_acceptable_delay_hours is not None and \
+                   (now - scheduled_at_dt).total_seconds() / 3600 > get_spec_result.t.max_acceptable_delay_hours:
+                    logger.warning(f"Skipping scheduled run {schedule_next_id_str} for schedule {schedule_id_str} at {scheduled_at_dt} "
+                                   f"because it is older than max_acceptable_delay_hours ({get_spec_result.t.max_acceptable_delay_hours} hours).")
+                    await insert_schedule_run(schedule_id_str, scheduled_at_dt, job_id=None, trigger="cron_skipped")
                 else:
-                    logger.error(f"Failed to submit job for schedule {schedule_id_str} because of {exec_result.e}")
+                    exec_result = await execute(get_spec_result.t.exec_spec, get_spec_result.t.created_by)
+                    if exec_result.t is not None:
+                        logger.debug(f"Job {exec_result.t.id} submitted for schedule {schedule_id_str}")
+                        await insert_schedule_run(schedule_id_str, scheduled_at_dt, exec_result.t.id)
+                    else:
+                        logger.error(f"Failed to submit job for schedule {schedule_id_str} because of {exec_result.e}")
             else:
                 logger.error(f"Could not create schedule spec for schedule {schedule_id_str}")
 
