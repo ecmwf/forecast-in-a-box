@@ -42,10 +42,10 @@ async def lifespan(app: FastAPI):
         if hasattr(module, 'create_db_and_tables'):
             await module.create_db_and_tables() # type: ignore[call-non-callable] # NOTE no module protocol
     migrate()
-    if True: # config.api.allow_service:
+    if config.api.allow_scheduler:
         start_scheduler()
     yield
-    if True: # config.api.allow_service:
+    if config.api.allow_scheduler:
         stop_scheduler()
     await gateway.shutdown_processes()
 
