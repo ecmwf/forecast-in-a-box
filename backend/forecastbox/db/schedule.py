@@ -136,9 +136,10 @@ async def insert_next_run(schedule_id: ScheduleId, at: dt.datetime) -> None:
     )
     await addAndCommit(entity, async_session_maker)
 
-async def insert_schedule_run(schedule_id: ScheduleId, scheduled_at: dt.datetime, job_id: str|None = None, attempt_cnt: int = 0, trigger: str = "cron") -> None:
+async def insert_schedule_run(schedule_id: ScheduleId, scheduled_at: dt.datetime, job_id: str|None = None, attempt_cnt: int = 0, trigger: str = "cron") -> str:
+    schedule_run_id = str(uuid.uuid4())
     entity = ScheduleRun(
-        schedule_run_id = str(uuid.uuid4()),
+        schedule_run_id = schedule_run_id,
         schedule_id = schedule_id,
         job_id = job_id,
         attempt_cnt = attempt_cnt,
@@ -146,6 +147,7 @@ async def insert_schedule_run(schedule_id: ScheduleId, scheduled_at: dt.datetime
         trigger = trigger,
     )
     await addAndCommit(entity, async_session_maker)
+    return schedule_run_id
 
 async def get_schedulable(now: dt.datetime) -> Iterable[ScheduleNext]:
     async def function(i: int) -> Iterable[ScheduleNext]:
@@ -190,6 +192,30 @@ async def get_next_run(schedule_id: ScheduleId) -> dt.datetime | None:
             result = await session.execute(query)
             return result.scalar_one_or_none()
 
+    return await dbRetry(function)
+
+async def run2schedule(schedule_run_id: str) -> ScheduleDefinition|None:
+    async def function(i: int) -> ScheduleDefinition|None:
+        async with async_session_maker() as session:
+            query = select(ScheduleDefinition).join(ScheduleRun, ScheduleDefinition.schedule_id == ScheduleRun.schedule_id).where(ScheduleRun.schedule_run_id == schedule_run_id)
+            result = await session.execute(query)
+            return result.scalar_one_or_none()
+    return await dbRetry(function)
+
+async def run2date(schedule_run_id: str) -> dt.datetime|None:
+    async def function(i: int) -> dt.datetime|None:
+        async with async_session_maker() as session:
+            query = select(ScheduleRun.scheduled_at).where(ScheduleRun.schedule_run_id == schedule_run_id)
+            result = await session.execute(query)
+            return result.scalar_one_or_none()
+    return await dbRetry(function)
+
+async def max_attempt_cnt(schedule_id: ScheduleId) -> int:
+    async def function(i: int) -> int:
+        async with async_session_maker() as session:
+            query = select(func.max(ScheduleRun.attempt_cnt)).where(ScheduleRun.schedule_id == schedule_id)
+            result = await session.execute(query)
+            return result.scalar_one_or_none() or 0
     return await dbRetry(function)
 
 def _build_schedule_runs_query(

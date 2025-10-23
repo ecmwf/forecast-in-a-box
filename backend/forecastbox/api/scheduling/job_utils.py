@@ -17,7 +17,8 @@ import orjson
 from cascade.low.func import Either
 from forecastbox.api.scheduling.dt_utils import calculate_next_run
 from forecastbox.api.types import ExecutionSpecification
-from forecastbox.db.schedule import get_schedules
+from forecastbox.db.schedule import get_schedules, run2schedule, run2date, max_attempt_cnt
+from typing import cast
 
 
 def deep_union(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
@@ -47,6 +48,9 @@ class RunnableSchedule:
     exec_spec: ExecutionSpecification
     created_by: str|None
     next_run_at: dt.datetime
+    attempt_cnt: int
+    max_acceptable_delay_hours: int
+    schedule_id: str
 
 async def schedule2spec(schedule_id: str, exec_time: dt.datetime) -> Either[RunnableSchedule, str]: # type: ignore[invalid-argument] # NOTE type checker issue
     """Converts a ScheduleDefinition into an ExecutionSpecification by evaluating dynamic expressions and merging."""
@@ -61,12 +65,46 @@ async def schedule2spec(schedule_id: str, exec_time: dt.datetime) -> Either[Runn
 
         dynamic_evaluated = eval_dynamic_expression(dynamic_expr, exec_time)
         merged_spec = deep_union(exec_spec, dynamic_evaluated)
-        next_run_at = calculate_next_run(exec_time, schedule_def.cron_expr)
+        next_run_at = calculate_next_run(exec_time, cast(str, schedule_def.cron_expr))
         rv = RunnableSchedule(
             exec_spec = ExecutionSpecification(**merged_spec),
             created_by = schedule_def.created_by,
             next_run_at = next_run_at,
+            attempt_cnt = 0,
+            max_acceptable_delay_hours = cast(int, schedule_def.max_acceptable_delay_hours),
+            schedule_id = schedule_def.schedule_id,
         )
         return Either.ok(rv)
     except Exception as e:
         return Either.error(repr(e))
+
+async def rerun_params(schedule_run_id: str) -> Either[RunnableSchedule, str]: # type: ignore[invalid-argument] # NOTE type checker issue
+    """Converts a ScheduleRun into an ExecutionSpecification by evaluating dynamic expressions and merging."""
+    schedule_def = await run2schedule(schedule_run_id)
+    if schedule_def is None:
+        return Either.error(f"schedule corresponding to run {schedule_run_id} not found")
+
+    attempt_cnt = await max_attempt_cnt(cast(str, schedule_def.schedule_id)) + 1
+
+    scheduled_at = await run2date(schedule_run_id)
+    if scheduled_at is None:
+        return Either.error(f"schedule run {schedule_run_id} not found")
+
+    try:
+        dynamic_expr = orjson.loads(schedule_def.dynamic_expr.encode('ascii'))
+        exec_spec = orjson.loads(schedule_def.exec_spec.encode('ascii'))
+
+        dynamic_evaluated = eval_dynamic_expression(dynamic_expr, scheduled_at)
+        merged_spec = deep_union(exec_spec, dynamic_evaluated)
+        next_run_at = calculate_next_run(scheduled_at, cast(str, schedule_def.cron_expr))
+        rv = RunnableSchedule(
+            exec_spec = ExecutionSpecification(**merged_spec),
+            created_by = cast(str|None, schedule_def.created_by),
+            next_run_at = next_run_at,
+            attempt_cnt = attempt_cnt,
+            max_acceptable_delay_hours = cast(int, schedule_def.max_acceptable_delay_hours),
+            schedule_id = cast(str, schedule_def.schedule_id),
+        )
+        return Either.ok(rv)
+    except Exception as e:
+        return Either.error(f"Failed to build a job because of {repr(e)}")

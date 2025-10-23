@@ -58,12 +58,12 @@ class SchedulerThread(threading.Thread):
                    (now - scheduled_at_dt).total_seconds() / 3600 > get_spec_result.t.max_acceptable_delay_hours:
                     logger.warning(f"Skipping scheduled run {schedule_next_id_str} for schedule {schedule_id_str} at {scheduled_at_dt} "
                                    f"because it is older than max_acceptable_delay_hours ({get_spec_result.t.max_acceptable_delay_hours} hours).")
-                    await insert_schedule_run(schedule_id_str, scheduled_at_dt, job_id=None, trigger="cron_skipped")
+                    await insert_schedule_run(schedule_id_str, scheduled_at_dt, job_id=None, trigger="cron_skipped", attempt_cnt = get_spec_result.t.attempt_cnt)
                 else:
                     exec_result = await execute(get_spec_result.t.exec_spec, get_spec_result.t.created_by)
                     if exec_result.t is not None:
                         logger.debug(f"Job {exec_result.t.id} submitted for schedule {schedule_id_str}")
-                        await insert_schedule_run(schedule_id_str, scheduled_at_dt, exec_result.t.id)
+                        await insert_schedule_run(schedule_id_str, scheduled_at_dt, exec_result.t.id, attempt_cnt = get_spec_result.t.attempt_cnt)
                     else:
                         logger.error(f"Failed to submit job for schedule {schedule_id_str} because of {exec_result.e}")
             else:

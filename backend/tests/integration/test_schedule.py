@@ -1,8 +1,10 @@
 from datetime import datetime as dt
+import uuid
 
 from cascade.low.builders import JobBuilder, TaskBuilder
 from forecastbox.api.types import (EnvironmentSpecification, ExecutionSpecification, RawCascadeJob,
                                    ScheduleSpecification, ScheduleUpdate)
+from forecastbox.db.schedule import insert_schedule_run, async_session_maker
 
 
 def test_schedule_crud(backend_client_with_auth):
@@ -51,7 +53,6 @@ def test_schedule_crud(backend_client_with_auth):
     retrieved_schedule = response.json()
     assert retrieved_schedule["cron_expr"] == updated_cron_expr
     assert retrieved_schedule["enabled"] is False
-
 
 def test_get_multiple_schedules(backend_client_with_auth):
     headers = {"Content-Type": "application/json"}

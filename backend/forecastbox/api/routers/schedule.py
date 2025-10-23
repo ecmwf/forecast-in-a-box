@@ -14,12 +14,15 @@ from dataclasses import dataclass
 from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException
+from forecastbox.api.execution import execute
 from forecastbox.api.scheduling.dt_utils import calculate_next_run, parse_crontab
+from forecastbox.api.scheduling.job_utils import rerun_params
 from forecastbox.api.scheduling.scheduler_thread import prod_scheduler, scheduler_lock, regenerate_schedule_next
 from forecastbox.api.types import ScheduleSpecification, ScheduleUpdate, schedule2db
 from forecastbox.auth.users import current_active_user
 from forecastbox.db.schedule import (ScheduleId, get_schedules, get_schedules_count, insert_next_run, insert_one,
-                                     update_one, get_next_run, select_runs, select_runs_count)
+                                     update_one, get_next_run, select_runs, select_runs_count,
+                                     insert_schedule_run, run2schedule)
 from forecastbox.schemas.schedule import ScheduleDefinition, ScheduleRun
 from forecastbox.schemas.job import JobRecord
 from forecastbox.schemas.user import UserRead
@@ -271,3 +274,23 @@ async def update_schedule(
     prod_scheduler()
 
     return GetScheduleResponse.from_db(updated_schedule)
+
+@router.post("/run/{schedule_run_id}")
+async def rerun_schedule(
+    schedule_run_id: str,
+    user: UserRead = Depends(current_active_user)
+) -> str:
+    """Returns the schedule_run_id of the re-run"""
+    runnable_schedule_either = await rerun_params(schedule_run_id)
+    if runnable_schedule_either.t is None:
+        raise HTTPException(status_code=404, detail=f"Failed to re-run {schedule_run_id} because of {runnable_schedule_either.e}")
+    runnable_schedule = runnable_schedule_either.t
+
+    exec_result = await execute(runnable_schedule.exec_spec, user.user_id)
+    if exec_result.t is not None:
+        logger.debug(f"Job {exec_result.t.id} submitted for schedule run {schedule_run_id}")
+        new_schedule_run_id = str(uuid.uuid4())
+        return await insert_schedule_run(runnable_schedule.schedule_id, runnable_schedule.next_run_at, exec_result.t.id, attempt_cnt = runnable_schedule.attempt_cnt, trigger="rerun")
+    else:
+        logger.error(f"Failed to submit job for schedule run {schedule_run_id} because of {exec_result.e}")
+        raise HTTPException(status_code=500, detail=f"Failed to rerun schedule: {exec_result.e}")
