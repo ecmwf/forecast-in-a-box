@@ -13,8 +13,9 @@ import uuid
 from typing import Iterable
 
 from forecastbox.config import config
-from forecastbox.db.core import addAndCommit, dbRetry, executeAndCommit
+from forecastbox.db.core import addAndCommit, dbRetry, executeAndCommit, queryCount
 from forecastbox.schemas.schedule import Base, ScheduleDefinition, ScheduleNext, ScheduleRun
+from forecastbox.schemas.job import JobRecord
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -93,8 +94,8 @@ async def get_schedules_count(
                 created_at_start=created_at_start,
                 created_at_end=created_at_end,
             )
-            result = await session.execute(select(func.count()).select_from(query.subquery()))
-            return result.scalar_one()
+            query = select(func.count("*")).select_from(query.subquery())
+            return await queryCount(query, session)
 
     return await dbRetry(function)
 
@@ -189,3 +190,64 @@ async def get_next_run(schedule_id: ScheduleId) -> dt.datetime | None:
             return result.scalar_one_or_none()
 
     return await dbRetry(function)
+
+def _build_schedule_runs_query(
+    schedule_id: ScheduleId,
+    since_dt: dt.datetime | None = None,
+    before_dt: dt.datetime | None = None,
+    status: str | None = None,
+):
+    query = select(ScheduleRun).where(ScheduleRun.schedule_id == schedule_id)
+    query = query.join(JobRecord, ScheduleRun.job_id == JobRecord.job_id, isouter=True)
+    if since_dt is not None:
+        query = query.where(ScheduleRun.scheduled_at >= since_dt)
+    if before_dt is not None:
+        query = query.where(ScheduleRun.scheduled_at <= before_dt)
+    if status is not None:
+        query = query.where(JobRecord.status == status)
+    return query
+
+async def select_runs(
+    schedule_id: ScheduleId,
+    since_dt: dt.datetime | None = None,
+    before_dt: dt.datetime | None = None,
+    status: str | None = None,
+    offset: int = -1,
+    limit: int = -1,
+) -> Iterable[tuple[ScheduleRun, JobRecord]]:
+    async def function(i: int) -> Iterable[ScheduleRun]:
+        async with async_session_maker() as session:
+            query = _build_schedule_runs_query(
+                schedule_id=schedule_id,
+                since_dt=since_dt,
+                before_dt=before_dt,
+                status=status,
+            )
+            if offset != -1:
+                query = query.offset(offset)
+            if limit != -1:
+                query = query.limit(limit)
+            result = await session.execute(query)
+            return (e[0] for e in result.all())
+
+    return await dbRetry(function)
+
+async def select_runs_count(
+    schedule_id: ScheduleId,
+    since_dt: dt.datetime | None = None,
+    before_dt: dt.datetime | None = None,
+    status: str | None = None,
+) -> int:
+    async def function(i: int) -> int:
+        async with async_session_maker() as session:
+            query = _build_schedule_runs_query(
+                schedule_id=schedule_id,
+                since_dt=since_dt,
+                before_dt=before_dt,
+                status=status,
+            )
+            query = select(func.count("*")).select_from(query.subquery())
+            return await queryCount(query, session)
+
+    return await dbRetry(function)
+

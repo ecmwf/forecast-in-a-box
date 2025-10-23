@@ -7,8 +7,6 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Scheduled jobs"""
-
 import datetime as dt
 import logging
 import uuid
@@ -21,10 +19,12 @@ from forecastbox.api.scheduling.scheduler_thread import prod_scheduler, schedule
 from forecastbox.api.types import ScheduleSpecification, ScheduleUpdate, schedule2db
 from forecastbox.auth.users import current_active_user
 from forecastbox.db.schedule import (ScheduleId, get_schedules, get_schedules_count, insert_next_run, insert_one,
-                                     update_one, get_next_run)
-from forecastbox.schemas.schedule import ScheduleDefinition
+                                     update_one, get_next_run, select_runs, select_runs_count)
+from forecastbox.schemas.schedule import ScheduleDefinition, ScheduleRun
+from forecastbox.schemas.job import JobRecord
 from forecastbox.schemas.user import UserRead
 from typing_extensions import Self
+from forecastbox.api.routers.job import STATUS
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,37 @@ router = APIRouter(
     tags=["schedule"],
     responses={404: {"description": "Not found"}},
 )
+
+@dataclass
+class GetScheduleRunResponse:
+    schedule_run_id: str
+    schedule_id: ScheduleId
+    job_id: str | None
+    attempt_cnt: int
+    scheduled_at: str
+    trigger: str
+    status: STATUS | None = None
+
+    @classmethod
+    def from_db(cls, row: tuple[ScheduleRun, JobRecord]) -> Self:
+        return cls(
+            schedule_run_id=row[0].schedule_run_id,
+            schedule_id=row[0].schedule_id,
+            job_id=row[0].job_id,
+            attempt_cnt=row[0].attempt_cnt,
+            scheduled_at=str(row[0].scheduled_at),
+            trigger=row[0].trigger,
+            status=row[1].status if row[1] is not None else None,
+        )
+
+@dataclass
+class GetScheduleRunsResponse:
+    runs: dict[str, GetScheduleRunResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+    error: str | None = None
 
 @dataclass
 class GetScheduleResponse:
@@ -98,6 +129,48 @@ async def get_schedule(schedule_id: ScheduleId, user: UserRead = Depends(current
         raise HTTPException(status_code=404, detail=f"Schedule {schedule_id} not found in the database.")
 
     return GetScheduleResponse.from_db(maybe_schedule[0])
+
+@router.get("/{schedule_id}/runs")
+async def get_schedule_runs(
+    schedule_id: ScheduleId,
+    user: UserRead = Depends(current_active_user),
+    since_dt: dt.datetime | None = None,
+    before_dt: dt.datetime | None = None,
+    status: STATUS | None = None,
+    page: int = 1,
+    page_size: int = 10,
+) -> GetScheduleRunsResponse:
+    """Get all runs for a given schedule with pagination and filtering."""
+
+    if page < 1 or page_size < 1:
+        raise HTTPException(status_code=400, detail="Page and page_size must be greater than 0.")
+
+    total_runs = await select_runs_count(schedule_id=schedule_id, since_dt=since_dt, before_dt=before_dt, status=status)
+    start = (page - 1) * page_size
+    total_pages = (total_runs + page_size - 1) // page_size if total_runs > 0 else 0
+
+    if start >= total_runs and total_runs > 0:
+        raise HTTPException(status_code=404, detail="Page number out of range.")
+
+    runs = await select_runs(
+        schedule_id=schedule_id,
+        since_dt=since_dt,
+        before_dt=before_dt,
+        status=status,
+        offset=start,
+        limit=page_size,
+    )
+    runs_iter = (GetScheduleRunResponse.from_db(r) for r in runs)
+    runs_dict = {r.schedule_run_id: r for r in runs_iter}
+
+    return GetScheduleRunsResponse(
+        runs=runs_dict,
+        total=total_runs,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+        error=None,
+    )
 
 @router.get("/{schedule_id}/next_run")
 async def get_next_schedule_run(schedule_id: ScheduleId, user: UserRead = Depends(current_active_user)) -> str:
