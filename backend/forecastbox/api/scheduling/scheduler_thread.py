@@ -31,7 +31,9 @@ from forecastbox.db.schedule import (delete_schedule_next_run, get_schedulable, 
 
 logger = logging.getLogger(__name__)
 
-# NOTE this lock can be locked externally, eg when updating schedules.
+# NOTE this lock can be locked externally, eg when updating schedules. For all operations
+# potentially involving the ScheduleNext table etc, as well as scheduler instance itself
+# to guarantee the singleton nature
 scheduler_lock = threading.Lock()
 
 # NOTE this does not really affect how often scheduler checks for new jobs --
@@ -90,6 +92,7 @@ class SchedulerThread(threading.Thread):
 
         next_schedulable_at = await next_schedulable()
 
+        sleep_duration = sleep_duration_min
         if next_schedulable_at:
             time_to_next_schedulable_at = (next_schedulable_at - dt.datetime.now()).total_seconds()
             if time_to_next_schedulable_at > 0:
@@ -130,14 +133,23 @@ class Globals:
     scheduler: SchedulerThread | None = None
 
 def start_scheduler():
-    if Globals.scheduler is not None:
-        raise ValueError("double start")
-    Globals.scheduler = SchedulerThread()
-    Globals.scheduler.start()
+    with scheduler_lock:
+        if Globals.scheduler is not None:
+            raise ValueError("double start")
+        Globals.scheduler = SchedulerThread()
+        Globals.scheduler.start()
 
 def stop_scheduler():
-    if Globals.scheduler is None:
-        raise ValueError("unexpected stop")
+    with scheduler_lock:
+        if Globals.scheduler is None:
+            raise ValueError("unexpected stop")
+        Globals.scheduler.stop()
+        Globals.scheduler.prod()
+        if Globals.scheduler.is_alive(): # just in case it wasnt even started
+            Globals.scheduler.join(1)
+        if Globals.scheduler.is_alive():
+            logger.warning(f"scheduler thread {Globals.scheduler.name} / {Globals.scheduler.native_id} is alive despite stop/join!")
+        Globals.scheduler = None
 
 def prod_scheduler():
     if Globals.scheduler is None:
@@ -156,8 +168,8 @@ def status_scheduler():
         return "down"
     Globals.scheduler.liveness_signal.wait(0) # we do this just for ensuring a multithread sync
     now = dt.datetime.now()
-    if (now - Globals.scheduler.liveness_timestamp) < dt.timedelta(minutes=sleep_duration_min) * 2:
-        logger.warning("scheduler reported down due to failing liveness check")
+    if (now - Globals.scheduler.liveness_timestamp) > dt.timedelta(minutes=sleep_duration_min) * 2:
+        logger.warning(f"scheduler reported down due to failing liveness check: {now} >> {Globals.scheduler.liveness_timestamp}")
         return "down"
     return "up"
 
