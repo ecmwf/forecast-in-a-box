@@ -15,7 +15,7 @@ from typing import Any
 
 import orjson
 from cascade.low.func import Either
-from forecastbox.api.scheduling.dt_utils import next_run
+from forecastbox.api.scheduling.dt_utils import calculate_next_run
 from forecastbox.api.types import ExecutionSpecification
 from forecastbox.db.schedule import get_schedules
 
@@ -61,7 +61,7 @@ async def schedule2spec(schedule_id: str, exec_time: dt.datetime) -> Either[Runn
 
         dynamic_evaluated = eval_dynamic_expression(dynamic_expr, exec_time)
         merged_spec = deep_union(exec_spec, dynamic_evaluated)
-        next_run_at = next_run(exec_time, schedule_def.cron_expr)
+        next_run_at = calculate_next_run(exec_time, schedule_def.cron_expr)
         rv = RunnableSchedule(
             exec_spec = ExecutionSpecification(**merged_spec),
             created_by = schedule_def.created_by,

@@ -16,12 +16,12 @@ from dataclasses import dataclass
 from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException
-from forecastbox.api.scheduling.dt_utils import next_run, parse_crontab
+from forecastbox.api.scheduling.dt_utils import calculate_next_run, parse_crontab
 from forecastbox.api.scheduling.scheduler_thread import prod_scheduler, scheduler_lock, regenerate_schedule_next
 from forecastbox.api.types import ScheduleSpecification, ScheduleUpdate, schedule2db
 from forecastbox.auth.users import current_active_user
 from forecastbox.db.schedule import (ScheduleId, get_schedules, get_schedules_count, insert_next_run, insert_one,
-                                     update_one)
+                                     update_one, get_next_run)
 from forecastbox.schemas.schedule import ScheduleDefinition
 from forecastbox.schemas.user import UserRead
 from typing_extensions import Self
@@ -99,6 +99,13 @@ async def get_schedule(schedule_id: ScheduleId, user: UserRead = Depends(current
 
     return GetScheduleResponse.from_db(maybe_schedule[0])
 
+@router.get("/{schedule_id}/next_run")
+async def get_next_schedule_run(schedule_id: ScheduleId, user: UserRead = Depends(current_active_user)) -> str:
+    next_run_at = await get_next_run(schedule_id)
+    if next_run_at is None:
+        return "not scheduled currently"
+    return str(next_run_at)
+
 @router.get("/")
 async def get_multiple_schedules(
     enabled: bool | None = None,
@@ -162,7 +169,7 @@ async def create_schedule(schedule_spec: ScheduleSpecification, user: UserRead |
         schedule_data["cron_expr"],
         schedule_data["max_acceptable_delay_hours"],
     )
-    next_run_at = next_run(dt.datetime.now(), schedule_spec.cron_expr)
+    next_run_at = calculate_next_run(dt.datetime.now(), schedule_spec.cron_expr)
     await insert_next_run(schedule_id, next_run_at)
     logger.debug(f"Next run of {schedule_id} is at {next_run_at}")
     prod_scheduler()

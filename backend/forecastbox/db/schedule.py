@@ -180,3 +180,12 @@ async def next_schedulable() -> dt.datetime | None:
             return result.scalar_one_or_none()
 
     return await dbRetry(function)
+
+async def get_next_run(schedule_id: ScheduleId) -> dt.datetime | None:
+    async def function(i: int) -> dt.datetime | None:
+        async with async_session_maker() as session:
+            query = select(ScheduleNext.scheduled_at).where(ScheduleNext.schedule_id == schedule_id)
+            result = await session.execute(query)
+            return result.scalar_one_or_none()
+
+    return await dbRetry(function)

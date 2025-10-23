@@ -2,7 +2,7 @@ import re
 from datetime import datetime
 
 import pytest
-from forecastbox.api.scheduling.dt_utils import next_run, parse_crontab
+from forecastbox.api.scheduling.dt_utils import calculate_next_run, parse_crontab
 
 
 def test_parse_crontab_valid():
@@ -46,46 +46,46 @@ def test_next_run_every_minute():
     after = datetime(2025, 10, 20, 10, 0, 0)
     cron_tab = "* * * * *"
     expected = datetime(2025, 10, 20, 10, 1, 0)
-    assert next_run(after, cron_tab) == expected
+    assert calculate_next_run(after, cron_tab) == expected
 
 def test_next_run_specific_time():
     after = datetime(2025, 10, 20, 10, 0, 0)
     cron_tab = "30 11 * * *"
     expected = datetime(2025, 10, 20, 11, 30, 0)
-    assert next_run(after, cron_tab) == expected
+    assert calculate_next_run(after, cron_tab) == expected
 
 def test_next_run_next_day():
     after = datetime(2025, 10, 20, 23, 30, 0)
     cron_tab = "0 0 * * *"
     expected = datetime(2025, 10, 21, 0, 0, 0)
-    assert next_run(after, cron_tab) == expected
+    assert calculate_next_run(after, cron_tab) == expected
 
 def test_next_run_invalid_crontab():
     after = datetime(2025, 10, 20, 10, 0, 0)
     cron_tab = "invalid cron"
     with pytest.raises(ValueError):
-        next_run(after, cron_tab)
+        calculate_next_run(after, cron_tab)
 
 def test_next_run_no_future_run():
     after = datetime(2025, 10, 20, 10, 0, 0)
     cron_tab = "0 0 1 1 1"
     with pytest.raises(ValueError):
-        next_run(after, cron_tab)
+        calculate_next_run(after, cron_tab)
 
 def test_next_run_step_value():
     after = datetime(2025, 10, 20, 10, 0, 0)
     cron_tab = "*/15 * * * *"
     expected = datetime(2025, 10, 20, 10, 15, 0)
-    assert next_run(after, cron_tab) == expected
+    assert calculate_next_run(after, cron_tab) == expected
 
 def test_next_run_range_value():
     after = datetime(2025, 10, 20, 10, 0, 0)
     cron_tab = "0 10-12 * * *"
     expected = datetime(2025, 10, 20, 11, 0, 0)
-    assert next_run(after, cron_tab) == expected
+    assert calculate_next_run(after, cron_tab) == expected
 
 def test_next_run_list_value():
     after = datetime(2025, 10, 20, 10, 0, 0)
     cron_tab = "0 10,12 * * *"
     expected = datetime(2025, 10, 20, 12, 0, 0)
-    assert next_run(after, cron_tab) == expected
+    assert calculate_next_run(after, cron_tab) == expected

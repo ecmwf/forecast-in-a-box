@@ -23,7 +23,7 @@ from datetime import datetime
 from typing import cast
 
 from forecastbox.api.execution import execute
-from forecastbox.api.scheduling.dt_utils import next_run
+from forecastbox.api.scheduling.dt_utils import calculate_next_run
 from forecastbox.api.scheduling.job_utils import schedule2spec
 from forecastbox.db.schedule import (get_schedulable, insert_next_run, insert_schedule_run, mark_run_executed,
                                      next_schedulable, delete_schedule_next_run)
@@ -140,7 +140,7 @@ async def regenerate_schedule_next(schedule_id: str, cron_expr: str, enabled: bo
     await delete_schedule_next_run(schedule_id)
 
     if enabled:
-        next_run_at = next_run(datetime.now(), cron_expr)
+        next_run_at = calculate_next_run(datetime.now(), cron_expr)
         await insert_next_run(schedule_id, next_run_at)
         logger.debug(f"Regenerated next run for {schedule_id} at {next_run_at}")
     else:

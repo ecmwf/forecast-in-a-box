@@ -79,7 +79,7 @@ class Crontab:
     months: list[int]
     days_of_week: list[int]
 
-def next_run(after: datetime, crontab: str) -> datetime:
+def calculate_next_run(after: datetime, crontab: str) -> datetime:
     """Calculates the next run datetime according to the crontab expression."""
     crontab_values = parse_crontab(crontab)
 
