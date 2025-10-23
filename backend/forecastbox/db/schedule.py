@@ -69,6 +69,7 @@ async def get_schedules(
                 created_at_start=created_at_start,
                 created_at_end=created_at_end,
             )
+            query = query.order_by(ScheduleDefinition.created_at.asc())
             if offset != -1:
                 query = query.offset(offset)
             if limit != -1:
@@ -223,6 +224,7 @@ async def select_runs(
                 before_dt=before_dt,
                 status=status,
             )
+            query = query.order_by(ScheduleRun.scheduled_at.asc())
             if offset != -1:
                 query = query.offset(offset)
             if limit != -1:
