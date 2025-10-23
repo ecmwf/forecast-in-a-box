@@ -68,7 +68,6 @@ async def shutdown_processes():
 router = APIRouter(
     tags=["gateway"],
     responses={404: {"description": "Not found"}},
-    on_shutdown=[shutdown_processes],
 )
 
 

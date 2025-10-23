@@ -1,8 +1,10 @@
 from datetime import datetime as dt
+import uuid
 
 from cascade.low.builders import JobBuilder, TaskBuilder
 from forecastbox.api.types import (EnvironmentSpecification, ExecutionSpecification, RawCascadeJob,
                                    ScheduleSpecification, ScheduleUpdate)
+from forecastbox.db.schedule import insert_schedule_run, async_session_maker
 
 
 def test_schedule_crud(backend_client_with_auth):
@@ -25,6 +27,7 @@ def test_schedule_crud(backend_client_with_auth):
         exec_spec=exec_spec,
         dynamic_expr={},
         cron_expr="0 0 * * *",
+        max_acceptable_delay_hours=24,
     )
 
     # create
@@ -51,7 +54,6 @@ def test_schedule_crud(backend_client_with_auth):
     assert retrieved_schedule["cron_expr"] == updated_cron_expr
     assert retrieved_schedule["enabled"] is False
 
-
 def test_get_multiple_schedules(backend_client_with_auth):
     headers = {"Content-Type": "application/json"}
 
@@ -68,15 +70,15 @@ def test_get_multiple_schedules(backend_client_with_auth):
     )
 
     # create
-    sched_spec_1 = ScheduleSpecification(exec_spec=exec_spec, dynamic_expr={}, cron_expr="0 0 * * *")
+    sched_spec_1 = ScheduleSpecification(exec_spec=exec_spec, dynamic_expr={}, cron_expr="0 0 * * *", max_acceptable_delay_hours=24)
     response = backend_client_with_auth.put("/schedule/create", headers=headers, json=sched_spec_1.model_dump())
     assert response.is_success
     sched_id_1 = response.json()["schedule_id"]
-    sched_spec_2 = ScheduleSpecification(exec_spec=exec_spec, dynamic_expr={}, cron_expr="0 0 * * *")
+    sched_spec_2 = ScheduleSpecification(exec_spec=exec_spec, dynamic_expr={}, cron_expr="0 0 * * *", max_acceptable_delay_hours=24)
     response = backend_client_with_auth.put("/schedule/create", headers=headers, json=sched_spec_2.model_dump())
     assert response.is_success
     sched_id_2 = response.json()["schedule_id"]
-    sched_spec_3 = ScheduleSpecification(exec_spec=exec_spec, dynamic_expr={}, cron_expr="0 0 * * *")
+    sched_spec_3 = ScheduleSpecification(exec_spec=exec_spec, dynamic_expr={}, cron_expr="0 0 * * *", max_acceptable_delay_hours=24)
     response = backend_client_with_auth.put("/schedule/create", headers=headers, json=sched_spec_3.model_dump())
     assert response.is_success
     sched_id_3 = response.json()["schedule_id"]
@@ -112,7 +114,7 @@ def test_get_multiple_schedules(backend_client_with_auth):
     assert sched_id_3 not in disabled_schedules
 
     # filter: created at
-    sched_spec_4 = ScheduleSpecification(exec_spec=exec_spec, dynamic_expr={}, cron_expr="0 0 * * *")
+    sched_spec_4 = ScheduleSpecification(exec_spec=exec_spec, dynamic_expr={}, cron_expr="0 0 * * *", max_acceptable_delay_hours=24)
     response = backend_client_with_auth.put("/schedule/create", headers=headers, json=sched_spec_4.model_dump())
     assert response.is_success
     sched_id_4 = response.json()["schedule_id"]
@@ -167,3 +169,56 @@ def test_get_multiple_schedules(backend_client_with_auth):
     # page too low
     response = backend_client_with_auth.get("/schedule/?page=0&page_size=1")
     assert response.status_code == 400
+
+def test_get_next_schedule_run_endpoint(backend_client_with_auth):
+    headers = {"Content-Type": "application/json"}
+
+    job_instance = (
+        JobBuilder().with_node("n1", TaskBuilder.from_callable(eval).with_values("1+2")).build().get_or_raise()
+    )
+    env = EnvironmentSpecification(hosts=1, workers_per_host=2)
+    exec_spec = ExecutionSpecification(
+        job=RawCascadeJob(
+            job_type="raw_cascade_job",
+            job_instance=job_instance,
+        ),
+        environment=env,
+    )
+    sched_spec = ScheduleSpecification(
+        exec_spec=exec_spec,
+        dynamic_expr={},
+        cron_expr="0 0 * * *",
+        max_acceptable_delay_hours=24,
+    )
+
+    response = backend_client_with_auth.put("/schedule/create", headers=headers, json=sched_spec.model_dump())
+    assert response.is_success
+    schedule_id = response.json()["schedule_id"]
+
+    # without changes
+    response = backend_client_with_auth.get(f"/schedule/{schedule_id}/next_run")
+    assert response.is_success
+    initial_next_run = response.json()
+    assert "00:00:00" in initial_next_run
+
+    # regenerate by changing cron expr
+    updated_cron_expr = "0 2 * * *" # Change to 2 AM
+    schedule_update = ScheduleUpdate(cron_expr=updated_cron_expr)
+    response = backend_client_with_auth.post(f"/schedule/{schedule_id}", headers=headers, json=schedule_update.model_dump(exclude_unset=True))
+    assert response.is_success
+
+    response = backend_client_with_auth.get(f"/schedule/{schedule_id}/next_run")
+    assert response.is_success
+    updated_next_run = response.json()
+    assert updated_next_run != initial_next_run
+    assert "02:00:00" in updated_next_run
+
+    # regenerate by disabling
+    schedule_update_disable = ScheduleUpdate(enabled=False)
+    response = backend_client_with_auth.post(f"/schedule/{schedule_id}", headers=headers, json=schedule_update_disable.model_dump(exclude_unset=True))
+    assert response.is_success
+
+    response = backend_client_with_auth.get(f"/schedule/{schedule_id}/next_run")
+    assert response.is_success
+    disabled_next_run = response.json()
+    assert disabled_next_run == "not scheduled currently"

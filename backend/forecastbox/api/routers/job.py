@@ -26,7 +26,7 @@ from cascade.controller.report import JobId
 from cascade.low.core import DatasetId, TaskId
 from fastapi import APIRouter, Body, Depends, HTTPException, Response, UploadFile
 from fastapi.responses import HTMLResponse
-from forecastbox.api.execution import ProductToOutputId, SubmitJobResponse, execute
+from forecastbox.api.execution import ProductToOutputId, SubmitJobResponse, execute2response
 from forecastbox.api.routers.gateway import Globals
 from forecastbox.api.types import ExecutionSpecification, VisualisationOptions
 from forecastbox.api.utils import encode_result
@@ -275,10 +275,7 @@ async def restart_job(
         raise HTTPException(status_code=404, detail=f"Job {job_id} had no specification.")
     spec = cast(str, spec)
     spec = ExecutionSpecification(**json.loads(spec))
-    try:
-        return await execute(spec, user)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Job restart failed: {repr(e)}")
+    return await execute2response(spec, user)
 
 
 @router.post("/upload")
@@ -304,7 +301,7 @@ async def upload_job(file: UploadFile, user: UserRead | None = Depends(current_a
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid specification format: {str(e)}")
 
-    return await execute(spec, user=user)
+    return await execute2response(spec, user)
 
 
 @dataclass

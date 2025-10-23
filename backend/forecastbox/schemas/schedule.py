@@ -13,7 +13,7 @@ Note that those reside in the jobdb as well -- there is no scheduledb
 """
 
 from sqlalchemy import JSON, Boolean, Column, DateTime, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
@@ -28,6 +28,7 @@ class ScheduleDefinition(Base):
     dynamic_expr = Column(JSON, nullable=False)
     enabled = Column(Boolean, nullable = False)
     created_by = Column(String(255), nullable=True)
+    max_acceptable_delay_hours = Column(Integer, nullable=False)
 
 class ScheduleRun(Base):
     __tablename__ = "schedule_run"
@@ -35,8 +36,15 @@ class ScheduleRun(Base):
     schedule_run_id = Column(String(255), primary_key=True, nullable=False)
     # TODO have foreign keys here
     schedule_id = Column(String(255), nullable=False)
-    job_id = Column(String(255), nullable=False)
+    job_id = Column(String(255), nullable=True)
 
     attempt_cnt = Column(Integer, nullable=False)
     scheduled_at = Column(DateTime, nullable=False)
     trigger = Column(String(64), nullable=False) # probably an enum like `cron`, `event` (or event_id?), `request`
+
+class ScheduleNext(Base):
+    __tablename__ = "schedule_next"
+
+    schedule_next_id = Column(String(255), primary_key=True, nullable=False)
+    schedule_id = Column(String(255), nullable=False, unique=True) # Foreign key to ScheduleDefinition
+    scheduled_at = Column(DateTime, nullable=False)

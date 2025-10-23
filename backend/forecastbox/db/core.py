@@ -1,3 +1,12 @@
+# (C) Copyright 2024- ECMWF.
+#
+# This software is licensed under the terms of the Apache Licence Version 2.0
+# which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# In applying this licence, ECMWF does not waive the privileges and immunities
+# granted to it by virtue of its status as an intergovernmental organisation
+# nor does it submit to any jurisdiction.
+
 """Common session maker invocation, db locking, retries"""
 
 import asyncio
@@ -57,6 +66,7 @@ async def querySingle(query, session_maker) -> Any:
     return await dbRetry(func)
 
 async def queryCount(query, session) -> int:
+    # TODO scalar_one
     result = (await session.execute(query)).scalar()
     if result is None or not isinstance(result, int):
         raise TypeError(result)

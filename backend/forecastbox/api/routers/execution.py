@@ -15,7 +15,7 @@ import logging
 from cascade.low.core import JobInstance
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
-from forecastbox.api.execution import SubmitJobResponse, execute, execution_specification_to_cascade
+from forecastbox.api.execution import SubmitJobResponse, execute2response, execution_specification_to_cascade
 from forecastbox.api.types import ExecutionSpecification, VisualisationOptions
 from forecastbox.api.visualisation import visualise
 from forecastbox.auth.users import current_active_user
@@ -117,7 +117,4 @@ async def execute_api(
     SubmitJobResponse
         Job submission response containing the job ID.
     """
-    try:
-        return await execute(spec, user)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Job execution failed: {repr(e)}")
+    return await execute2response(spec, user)

@@ -17,10 +17,11 @@ import cascade.gateway.api as api
 import cascade.gateway.client as client
 from cascade.low import views as cascade_views
 from cascade.low.core import JobInstance
-from cascade.low.func import assert_never
+from cascade.low.func import Either, assert_never
 from cascade.low.into import graph2job
 from earthkit.workflows import Cascade, fluent
 from earthkit.workflows.graph import Graph, deduplicate_nodes
+from fastapi import HTTPException
 from forecastbox.api.types import EnvironmentSpecification, ExecutionSpecification, ForecastProducts, RawCascadeJob
 from forecastbox.api.utils import get_model_path
 from forecastbox.config import config
@@ -142,19 +143,29 @@ class SubmitJobResponse(BaseModel):
     """Id of the submitted job."""
 
 
-async def execute(spec: ExecutionSpecification, user: UserRead | None) -> SubmitJobResponse:
-    loop = asyncio.get_running_loop()
-    response, product_to_id_mappings = await loop.run_in_executor(None, _execute_cascade, spec)  # CPU-bound
-    if not response.job_id:
-        # TODO this best comes from the db... we still have a cascade conflict problem,
-        # we best redesign cascade api to allow for uuid acceptance
-        response.job_id = str(uuid.uuid4())
+async def execute(spec: ExecutionSpecification, user_id: str|None) -> Either[SubmitJobResponse, str]: # type: ignore[invalid-argument] # NOTE type checker issue
+    try:
+        loop = asyncio.get_running_loop()
+        response, product_to_id_mappings = await loop.run_in_executor(None, _execute_cascade, spec)  # CPU-bound
+        if not response.job_id:
+            # TODO this best comes from the db... we still have a cascade conflict problem,
+            # we best redesign cascade api to allow for uuid acceptance
+            response.job_id = str(uuid.uuid4())
 
-    await insert_one(
-        response.job_id,
-        response.error,
-        str(user.id) if user else None,
-        spec.model_dump_json(),
-        json.dumps([x.model_dump() for x in product_to_id_mappings]),
-    )
-    return SubmitJobResponse(id=response.job_id)
+        await insert_one(
+            response.job_id,
+            response.error,
+            user_id,
+            spec.model_dump_json(),
+            json.dumps([x.model_dump() for x in product_to_id_mappings]),
+        )
+        return Either.ok(SubmitJobResponse(id=response.job_id))
+    except Exception as e:
+        return Either.error(repr(e))
+
+async def execute2response(spec: ExecutionSpecification, user: UserRead|None) -> SubmitJobResponse:
+    result = await execute(spec, str(user.id) if user is not None else None)
+    if result.e is not None:
+        raise HTTPException(status_code=500, detail=f"Failed to execute because of {result.error}")
+    else:
+        return result.t

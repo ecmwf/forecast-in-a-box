@@ -133,12 +133,15 @@ class ScheduleSpecification(FIABBaseModel):
     """ # TODO support smth like argo expression language here
     cron_expr: str
     """Cron expression for time scheduling"""
+    max_acceptable_delay_hours: PositiveInt
+    """Maximum acceptable delay in hours for a scheduled run. If the scheduler is down for longer than this, the run will be skipped."""
 
 class ScheduleUpdate(FIABBaseModel):
     exec_spec: ExecutionSpecification | None = None
     dynamic_expr: dict[str, str] | None = None
     enabled: bool | None = None
     cron_expr: str | None = None
+    max_acceptable_delay_hours: PositiveInt | None = None
 
 def schedule2db(schedule_obj: ScheduleSpecification|ScheduleUpdate) -> dict[str, Any]:
     data = {}
@@ -150,6 +153,8 @@ def schedule2db(schedule_obj: ScheduleSpecification|ScheduleUpdate) -> dict[str,
         data["cron_expr"] = schedule_obj.cron_expr
     if hasattr(schedule_obj, "enabled") and schedule_obj.enabled is not None:
         data["enabled"] = schedule_obj.enabled
+    if hasattr(schedule_obj, "max_acceptable_delay_hours") and schedule_obj.max_acceptable_delay_hours is not None:
+        data["max_acceptable_delay_hours"] = schedule_obj.max_acceptable_delay_hours
     return data
 
 class VisualisationOptions(FIABBaseModel):
