@@ -27,7 +27,7 @@ PPROC_AVAILABLE = True
 try:
     from earthkit.workflows.plugins.pproc.fluent import Action as ppAction
 except (OSError, ImportError):
-    ppAction = object
+    ppAction = object # type: ignore # NOTE implicit shadowing, intentional
     PPROC_AVAILABLE = False
 
 THERMOFEEL_IMPORTED = True

@@ -280,7 +280,7 @@ class BaseForecastModel(ABC):
                     title="Date",
                     description="The date for the forecast",
                 ),
-                uischema=UIStringField(widget="date", options={'yearsRange': [-20, 0]}),
+                uischema=UIStringField(widget="date", options={'yearsRange': [-20, 0]}), # type: ignore[unknown-argument] # TODO harrison `options` does really not seem to be declared!
             ),
             "lead_time": FieldWithUI(
                 jsonschema=IntegerSchema(
