@@ -31,7 +31,7 @@ from forecastbox.api.routers.gateway import Globals
 from forecastbox.api.types import ExecutionSpecification, VisualisationOptions
 from forecastbox.api.utils import encode_result
 from forecastbox.api.visualisation import visualise
-from forecastbox.auth.users import current_active_user
+from forecastbox.auth.users import current_active_optional_user, current_active_user
 from forecastbox.config import config
 from forecastbox.db.job import delete_all, delete_one, get_all, get_count, get_one, update_one
 from forecastbox.schemas.job import JobRecord
@@ -432,7 +432,7 @@ async def get_logs(job_id: JobId = Depends(validate_job_id), user: UserRead = De
 
 @router.get("/{job_id}/results/{dataset_id}")
 async def get_result(
-    job_id: JobId = Depends(validate_job_id), dataset_id: TaskId = Depends(validate_dataset_id), user: UserRead = Depends(current_active_user)
+    job_id: JobId = Depends(validate_job_id), dataset_id: TaskId = Depends(validate_dataset_id), user: UserRead = Depends(current_active_optional_user)
 ) -> Response:
     """Get the result of a job.
 
