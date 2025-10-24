@@ -10,7 +10,7 @@
 
 "use client";
 
-import { Container, TextInput, PasswordInput, Button, Paper, Text, Title } from '@mantine/core'
+import { Container, TextInput, PasswordInput, Button, Paper, Text, Title, Alert} from '@mantine/core'
 import { useState } from 'react'
 
 import { useApi } from '../api'
@@ -19,7 +19,7 @@ import { useNavigate} from 'react-router-dom'
 
 import MainLayout from '../layouts/MainLayout';
 import { useEffect } from 'react'
-
+import { IconInfoCircle } from '@tabler/icons-react';
 
 export default function Login() {
   const params = new URLSearchParams(location.search)
@@ -131,6 +131,9 @@ export default function Login() {
             <Button fullWidth mt="xl" onClick={handleLogin}>Login</Button>
           <Button fullWidth mt="sm" variant="outline" onClick={handleSSO}>Login with ECMWF</Button>
         </Paper>
+        <Alert variant="filled" color="red" title="Restricted Access" icon={<IconInfoCircle />} >
+            As this is still an early prototype, access is restricted to authorised users only.
+        </Alert>
       </Container>
       </MainLayout>
   )
