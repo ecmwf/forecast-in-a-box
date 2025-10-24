@@ -11,6 +11,7 @@
 "use client";
 
 import Intro from '../components/landing/intro';
+import Blurb from '../components/landing/blurb';
 import DAG from '../components/landing/dag';
 import Building from '../components/landing/building_on';
 import Collaboration from '../components/landing/collaboration';
@@ -21,6 +22,7 @@ export default function LandingPage() {
   return (
     <MainLayout>
       <Intro />
+      <Blurb />
       <DAG />
       <Building />
       <Collaboration />
