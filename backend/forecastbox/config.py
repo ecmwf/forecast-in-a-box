@@ -130,7 +130,9 @@ class BackendAPISettings(BaseModel):
     uvicorn_port: int = 8000
     """Listening port of the whole server."""
     allow_service: bool = False
-    """Whether we assume that a system-level service has been registered"""
+    """Whether we assume that a system-level service has been registered. Affects standalone.entrypoint behaviour"""
+    allow_scheduler: bool = False
+    """Whether scheduler thread should be started. Best combine with allow_service=True"""
 
     def local_url(self) -> str:
         return f"http://localhost:{self.uvicorn_port}"

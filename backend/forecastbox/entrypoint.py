@@ -24,6 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from forecastbox.api.scheduling.scheduler_thread import start_scheduler, status_scheduler, stop_scheduler
 from forecastbox.db.migrations import migrate
 from starlette.exceptions import HTTPException
 
@@ -41,7 +42,11 @@ async def lifespan(app: FastAPI):
         if hasattr(module, 'create_db_and_tables'):
             await module.create_db_and_tables() # type: ignore[call-non-callable] # NOTE no module protocol
     migrate()
+    if config.api.allow_scheduler:
+        start_scheduler()
     yield
+    if config.api.allow_scheduler:
+        stop_scheduler()
     await gateway.shutdown_processes()
 
 
@@ -106,6 +111,7 @@ class StatusResponse:
     api: str
     cascade: str
     ecmwf: str
+    scheduler: str
 
 
 @app.get("/api/v1/status", tags=["status"])
@@ -113,7 +119,7 @@ def status() -> StatusResponse:
     """Status endpoint"""
     from forecastbox.config import config
 
-    status = {"api": "up", "cascade": "up", "ecmwf": "up"}
+    status = {"api": "up", "cascade": "up", "ecmwf": "up", "scheduler": "up"}
 
     from cascade.gateway import api, client
 
@@ -121,8 +127,14 @@ def status() -> StatusResponse:
         client.request_response(api.JobProgressRequest(job_ids=[]), config.cascade.cascade_url, timeout_ms=1000)
         status["cascade"] = "up"
     except Exception as e:
-        logger.warning(f"Error connecting to Cascade: {e}")
+        logger.warning(f"Error connecting to Cascade: {repr(e)}")
         status["cascade"] = "down"
+
+    try:
+        status["scheduler"] = status_scheduler()
+    except Exception as e:
+        logger.warning(f"Error discerning scheduler status: {repr(e)}")
+        status["scheduler"] = "down"
 
     # Check connection to model_repository
     import requests
