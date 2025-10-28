@@ -48,9 +48,9 @@ jobs:
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ fromJSON('{"ghcr": "ghcr.io", "eccr": "eccr.ecmwf.int"}')[matrix.registry] }}
+          registry: ${{ matrix.platform == 'ghcr' && 'ghcr.io' || 'eccr.ecmwf.int' }}
           username: ${{ matrix.platform == 'ghcr' && github.actor || secrets.ECMWF_DOCKER_REGISTRY_USERNAME }}
-          password: ${{ secrets[ fromJSON('{"ghcr": "GITHUB_TOKEN", "eccr": "ECMWF_DOCKER_REGISTRY_ACCESS_TOKEN" }')[matrix.registry] ] }}
+          password: ${{ matrix.platform == 'ghcr' && secrets.GITHUB_TOKEN || secrets.ECMWF_DOCKER_REGISTRY_ACCESS_TOKEN }}
 
       - name: Set env variables
         run: |
