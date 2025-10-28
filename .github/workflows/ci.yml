@@ -20,9 +20,10 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        arch_type: [ARM64, X64]
+        arch_type: [ARM64] # , X64 NOTE: we dont run on X64 anymore as it does not support eg newer pytorches
         python_version: ["3.11", "3.12", "3.13"]
     runs-on: [self-hosted, macOS, "${{ matrix.arch_type }}"]
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - run: |
