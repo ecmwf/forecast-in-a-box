@@ -31,7 +31,7 @@ class NestedModel(BaseForecastModel):
     def _create_input_configuration(self, control: ControlMetadata) -> dict[str, dict[str, Any]]:
         assert control.nested is not None, "NestedModel requires a 'nested' configuration in the control metadata."
         return {
-            'cutout': control.nested,
+            'cutout': {'sources': control.nested, 'variables': None},
         }
 
     def _post_processors(self, kwargs: dict[str, Any]) -> list[dict[str, Any]]:
