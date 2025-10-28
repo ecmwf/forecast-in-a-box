@@ -48,9 +48,9 @@ jobs:
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ matrix.platform == 'ghcr' && 'ghcr.io' || 'eccr.ecmwf.int' }}
-          username: ${{ matrix.platform == 'ghcr' && github.actor || secrets.ECMWF_DOCKER_REGISTRY_USERNAME }}
-          password: ${{ matrix.platform == 'ghcr' && secrets.GITHUB_TOKEN || secrets.ECMWF_DOCKER_REGISTRY_ACCESS_TOKEN }}
+          registry: ${{ matrix.registry == 'ghcr' && 'ghcr.io' || 'eccr.ecmwf.int' }}
+          username: ${{ matrix.registry == 'ghcr' && github.actor || secrets.ECMWF_DOCKER_REGISTRY_USERNAME }}
+          password: ${{ matrix.registry == 'ghcr' && secrets.GITHUB_TOKEN || secrets.ECMWF_DOCKER_REGISTRY_ACCESS_TOKEN }}
 
       - name: Set env variables
         run: |
@@ -61,7 +61,7 @@ jobs:
           fi
           echo "TAG=$TAG" >> $GITHUB_ENV
           echo "IMAGE_NAME=${{ matrix.image }}" >> $GITHUB_ENV
-          if [[ "${{ matrix.platform }}" == "ghcr" ]]; then
+          if [[ "${{ matrix.registry }}" == "ghcr" ]]; then
             echo "REPO_IMAGE=ghcr.io/${{ github.repository }}/${{ matrix.image }}:$TAG" >> $GITHUB_ENV
           else
             echo "REPO_IMAGE=eccr.ecmwf.int/forecast-in-a-box/${{ matrix.image }}:$TAG" >> $GITHUB_ENV
@@ -70,7 +70,7 @@ jobs:
       - name: Build image
         run: |
           echo "Building image: $IMAGE_NAME - with tag: ${TAG}"
-          if [[ "${{ matrix.platform }}" == "ghcr" ]]; then
+          if [[ "${{ matrix.registry }}" == "ghcr" ]]; then
             docker compose build --build-arg TAG=${TAG} $IMAGE_NAME
           else
             docker compose -f docker-compose-ewc.yml build --build-arg TAG=${TAG} $IMAGE_NAME
