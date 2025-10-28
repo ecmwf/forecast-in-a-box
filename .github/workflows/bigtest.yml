@@ -15,9 +15,10 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        arch_type: [ARM64] # [ARM64, X64]
-        python_version: ["3.11"] # ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        arch_type: [ARM64]
+        python_version: ["3.11"] # replace with 3.14 in ~26/01, once all wheels etc available
     runs-on: [self-hosted, macOS, "${{ matrix.arch_type }}"]
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - run: |

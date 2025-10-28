@@ -19,8 +19,10 @@ on:
         default: true
 
 jobs:
+  # TODO add a prerequisite step `bigtest.yml` workflow, but make sure its reliable first
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
