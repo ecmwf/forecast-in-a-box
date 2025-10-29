@@ -33,4 +33,4 @@ jobs:
           uv run ty check
           mkdir /tmp/tmpFiabHome
           mkdir forecastbox/static && touch forecastbox/static/index.html # TODO replace with proper static file build
-          FIAB_PY_VERSION="${{ matrix.python_version }}" FIAB_DEV=yea FIAB_ROOT=/tmp/tmpFiabHome ENTRYPOINT=pytest ../scripts/fiab.sh
+          uv run pytest

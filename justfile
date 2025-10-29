@@ -9,16 +9,17 @@ drun:
 
 fiabwheel:
     #!/usr/bin/env bash
-    cd frontend
+    pushd frontend
     npm install --force # TODO fix the npm dependencies to get rid of --force !!!
     npm run prodbuild
-    cd ../backend
+    popd
+
+    pushd backend
     rm -rf forecastbox/static
     ln -s ../../frontend/dist forecastbox/static
     find forecastbox/static/ -type f | sed 's/.*/include &/' > MANIFEST.in
-    # we dirty the repo with the frontend build, and I found no other way to make setuptools scm ignore it
-    export SETUPTOOLS_SCM_PRETEND_VERSION=$(git describe --tags --long --match '*[0-9]*' | cut -f 1 -d\- | tr -d v)
-    python -m build --installer uv .
+    SETUPTOOLS_DEBUG_SCM=1 python -m build --installer uv .
+    popd
 
 clean:
 	find . -name '*.egg-info' -exec rm -fr {} +
