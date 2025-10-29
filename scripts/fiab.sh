@@ -12,10 +12,10 @@ This script:
 1. checks for the 'uv' binary on the system, and if missing downloads into fiab
    root directory (~/.fiab)
 2. checks for a python interpreter of desired version, and if missing installs it
-3. checks for a venv in fiab root directory, and if missing creates it
+3. checks for presence of uv.lock, and if missin, downloads the latest from fiab github
+4. checks for a venv in fiab root directory, and if missing creates it
    and installs the fiab wheel in there from pypi
-4. checks for a yarn install, and if missing installs it
-4. executes the user's command
+5. executes the user's command
 
 There are currently three user's command supported:
 - regular (no extra arguments) -- launches the fiab standalone regime, with
@@ -35,13 +35,12 @@ export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
 export EARTHKIT_DATA_CACHE_POLICY=${EARTHKIT_DATA_CACHE_POLICY:-"user"}
 export EARTHKIT_DATA_MAXIMUM_CACHE_SIZE=${EARTHKIT_DATA_MAXIMUM_CACHE_SIZE:-"50G"}
 FIAB_PY_VERSION=${FIAB_PY_VERSION:-"3.12.7"}
-FIAB_DEV=${FIAB_DEV:-"nay"}
 
 # TODO bake in self-upgrade regime, similarly to how uv cache is pruned
 
 check() {
 	if [ -z "$(which curl || :)" ] ; then
-		echo "command 'curl' not found, please install"
+		>&2 echo "command 'curl' not found, please install"
 		exit 1
 	fi
 	mkdir -p "$FIAB_ROOT"
@@ -52,17 +51,17 @@ maybeInstallUv() {
 	# checks whether uv binary exists on the system, exports UV_PATH to hold the binary's path
 	if [ -n "$UV_PATH" ] ; then
 		if [ -x "$UV_PATH" ] ; then
-			echo "using 'uv' on $UV_PATH"
+			>&2 echo "using 'uv' on $UV_PATH"
 		else
-			echo "'UV_PATH' provided but does not point to an executable: $UV_PATH"
+			>&2 echo "'UV_PATH' provided but does not point to an executable: $UV_PATH"
 			exit 1
 		fi
 		export PATH="$UV_PATH:$PATH"
 	elif [ -d "$FIAB_ROOT/uvdir" ] ; then
-		echo "using 'uv' in $FIAB_ROOT/uvdir"
+		>&2 echo "using 'uv' in $FIAB_ROOT/uvdir"
 		export PATH="$FIAB_ROOT/uvdir:$PATH"
 	elif [ -n "$(which uv || :)" ] ; then
-		echo "'uv' found, using that"
+		>&2 echo "'uv' found, using that"
 	else
 		curl -LsSf https://astral.sh/uv/install.sh > "$FIAB_ROOT/uvinstaller.sh"
 		CARGO_DIST_FORCE_INSTALL_DIR="$FIAB_ROOT/uvdir" sh "$FIAB_ROOT/uvinstaller.sh"
@@ -76,30 +75,72 @@ maybeInstallPython() {
     # NOTE somehow this regexp isn't portable, but we dont really need the full binary path
     MAYBE_PYTHON="$(uv python list | grep python"$FIAB_PY_VERSION" || :)"
 	if [ -z "$MAYBE_PYTHON" ] ; then
-		uv python install --python-preference only-managed "$FIAB_PY_VERSION" # TODO install to fiab home instead?
+		uv python install --python-preference only-managed "$FIAB_PY_VERSION"
 	fi
     # export UV_PY="$MAYBE_PYTHON"
     export UV_PY="python$FIAB_PY_VERSION"
 }
 
+getMostRecentRelease() {
+    releases_json=$(curl --silent "https://api.github.com/repos/$repo/releases?per_page=1")
+    get_releases_status=$?
+    if [ $get_releases_status -ne 0 ] ; then
+        >&2 echo "failed to get most recent fiab release: $get_releases_status, crashing!"
+        exit 1
+    fi
+    most_recent=$(>&2 echo $releases_json  | sed 's/.*tag\/\([^"]*\).*/\1/')
+    echo $most_recent
+}
+
+LOCK="${FIAB_ROOT}/pylock.toml"
+maybeDownloadLock() {
+    most_recent=$1
+    # checks whether requirements is present at fiab root, and downloads if not
+    if [ ! -f $LOCK ] ; then
+        >&2 echo "not found uv.lock in $LOCK, downloading"
+        >&2 echo "will download uv lock for release $most_recent"
+        lock_url=https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/tags/$most_recent/install/pylock.toml
+        lock_url=https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/heads/tmpDevel/install/pylock.toml # TODO clear after the most recent release actually has this lock
+		curl -LsSf $lock_url > "$LOCK"
+        >&2 echo "$(date +%s):$(echo $most_recent | tr -d 'v')" > $LOCK.timestamp
+    fi
+}
+
+maybeGetDefaultConfig() {
+    most_recent=$1
+    if [ ! -f "${FIAB_ROOT}/config.toml" ] ; then
+        >&2 echo "no config file, downloading a default for release $most_recent"
+        config_url=https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/tags/$most_recent/install/config.toml
+        config_url=https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/heads/tmpDevel/install/config.toml # TODO clear after the most recent release actually has this lock
+		curl -LsSf $config_url > "${FIAB_ROOT}/config.toml"
+    fi
+}
+
 VENV="${FIAB_ROOT}/venv"
+
+updateVenv() {
+    FIAB_VERSION=$(cat $LOCK.timestamp | cut -f 2 -d : )
+    >&2 echo "using fiab version $FIAB_VERSION"
+    uv pip install -r $LOCK
+    uv pip install "forecastbox==$FIAB_VERSION"
+    touch $VENV.timestamp
+}
+
 maybeCreateVenv() {
 	# checks whether the correct venv exists, installing via uv if not, and source-activates
 	if [ -d "$VENV" ] ; then
-		# TODO check packages
-		source "${VENV}/bin/activate" # or export the paths?
+		source "${VENV}/bin/activate"
+        if [ ! -f $VENV.timestamp ] ; then
+            updateVenv
+        elif [ $VENV.timestamp -ot $LOCK.timestamp ] ; then
+            updateVenv
+        fi
 	else
 		uv venv -p "$UV_PY" --python-preference only-managed "$VENV"
-		source "${VENV}/bin/activate" # or export the paths?
+		source "${VENV}/bin/activate"
+        updateVenv
 	fi
 
-    if [ "$FIAB_DEV" == 'yea' ] ; then
-        uv pip install --prerelease=allow --group dev --upgrade -e .
-    else
-        uv pip install --prerelease=allow --upgrade pproc@git+https://github.com/ecmwf/pproc earthkit-workflows-pproc@git+https://github.com/ecmwf/earthkit-workflows-pproc 'git+https://github.com/ecmwf/anemoi-plugins-ecmwf#subdirectory=inference[opendata]' earthkit-workflows-anemoi # TODO remove pproc and ekw-pproc once published
-        uv pip install --prerelease=allow ---upgrade -group dev 'forecast-in-a-box[plots,webmars]>=0.2.2' # TODO remove prerelease once bin wheels stable
-        export fiab__auth__passthrough=True # NOTE we dont passthrough in `dev` mode as we use it to run strict tests
-    fi
 }
 
 maybePruneUvCache() {
@@ -107,7 +148,7 @@ maybePruneUvCache() {
     PRUNETS=$FIAB_ROOT/uvcache.prunetimestamp
     if [ -f "$PRUNETS" ] ; then
         if find "$PRUNETS" -mtime +30 | grep "$PRUNETS" ; then
-            echo "uv cache pruned more than 30 days ago: pruning"
+            >&2 echo "uv cache pruned more than 30 days ago: pruning"
             uv cache prune
             touch "$PRUNETS"
         fi
@@ -135,7 +176,7 @@ for arg in "$@"; do
             # that running in warmup mode would pre-install all job dependencies. This got broken
             # in the recent development and there is no readily accessible iteration through supported
             # jobs. We should fix it eventually
-            echo "offline mode not supported now"
+            >&2 echo "offline mode not supported now"
             exit 1
 			;;
         "--service")
@@ -147,6 +188,9 @@ done
 check
 maybeInstallUv
 maybeInstallPython
+mostRecentRelease=$(getMostRecentRelease)
+maybeDownloadLock $mostRecentRelease
+maybeGetDefaultConfig $mostRecentRelease
 maybeCreateVenv
 maybePruneUvCache
 
