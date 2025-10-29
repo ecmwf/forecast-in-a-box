@@ -21,9 +21,8 @@ import cascade.executor.platform as cascade_platform
 import cascade.gateway.api
 import cascade.gateway.client
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import StreamingResponse
 from forecastbox.config import StatusMessage, config
-from forecastbox.standalone.entrypoint import launch_cascade
+from forecastbox.standalone.launchers import launch_cascade
 from sse_starlette.sse import EventSourceResponse
 
 logger = logging.getLogger(__name__)
@@ -69,7 +68,6 @@ async def shutdown_processes():
 router = APIRouter(
     tags=["gateway"],
     responses={404: {"description": "Not found"}},
-    on_shutdown=[shutdown_processes],
 )
 
 
@@ -113,7 +111,7 @@ async def get_status() -> str:
 
 
 @router.get("/logs")
-async def stream_logs(request: Request) -> StreamingResponse:
+async def stream_logs(request: Request) -> EventSourceResponse:
     """Stream logs from the Cascade Gateway process."""
 
     if Globals.gateway is None:

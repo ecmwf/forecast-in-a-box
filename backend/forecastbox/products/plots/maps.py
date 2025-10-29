@@ -34,8 +34,8 @@ except ImportError:
     from typing import Any
 
     EARTHKIT_PLOTS_IMPORTED = False
-    Figure = Any
-    Subplot = Any
+    Figure = Any # type: ignore # NOTE intentional shadowing
+    Subplot = Any # type: ignore # NOTE intentional shadowing
 
 WIND_SHORTNAMES = ["u", "v", "10u", "10v", "100u", "100v"]
 
@@ -56,7 +56,7 @@ def _plot_fields(subplot: Subplot, fields: ekd.FieldList, **kwargs: dict[str, di
         Top level keys are the method names, and values are dictionaries of keyword arguments for that method.
     """
     plot_categories = defaultdict(lambda: defaultdict(list))
-    for index, field in enumerate(fields):
+    for index, field in enumerate(fields): # type: ignore[invalid-argument-type] # NOTE fields doest seem to declare Iterable
         if field.metadata().get("shortName", None) in WIND_SHORTNAMES:
             plot_categories["quiver"][field.metadata().get("levtype", None)].append(field)
             continue
@@ -155,7 +155,7 @@ def quickplot(
 
     for i, (group_val, group_args) in enumerate(grouped_data.items()):
         subplot = figure.add_map(domain=domain)
-        _plot_fields(subplot, group_args, quickplot=dict(interpolate=True))
+        _plot_fields(subplot, group_args, quickplot=dict(interpolate=True)) # type: ignore[invalid-argument-type] # NOTE this is valid, checker failure
 
         if no_pad:
             subplot.ax.axis("off")
@@ -218,7 +218,7 @@ class MapProduct(GenericTemporalProduct):
                 jsonschema=StringSchema(
                     title="Reduce",
                     description="Combine all steps into a single plot",
-                    enum=["True", "False"],
+                    enum=["True", "False"], # type: ignore[unknown-argument] # NOTE checker failure, this is legit
                     default="True",
                 )
             ),

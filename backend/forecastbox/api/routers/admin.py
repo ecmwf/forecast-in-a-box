@@ -90,7 +90,7 @@ async def get_users(admin=Depends(get_admin_user)) -> list[UserRead]:
     """Get all users"""
     async with async_session_maker() as session:
         query = select(UserTable)
-        return (await session.execute(query)).unique().scalars().all()
+        return (await session.execute(query)).unique().scalars().all() # type: ignore[invalid-return-type] # NOTE db...
 
 
 @router.get("/users/{user_id}", response_model=UserRead)
@@ -121,7 +121,7 @@ async def delete_user(user_id: UUID4, admin=Depends(get_admin_user)) -> HTMLResp
 async def update_user(user_id: UUID4, user_data: UserUpdate, admin=Depends(get_admin_user)) -> UserRead:
     """Update a user by ID"""
     async with async_session_maker() as session:
-        update_dict = {k: v for k, v in user_data.dict().items() if v is not None}
+        update_dict = {k: v for k, v in user_data.model_dump().items() if v is not None}
         # TODO the password is actually stored as 'hash_password' -- invoke some of the auth meths here
         if "password" in update_dict:
             raise HTTPException(status_code=404, detail="Password update not supported")
