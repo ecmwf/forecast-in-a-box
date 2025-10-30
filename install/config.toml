@@ -1,2 +1,2 @@
-[fiab.auth]
+[auth]
 passthrough = true

@@ -82,25 +82,26 @@ maybeInstallPython() {
 }
 
 getMostRecentRelease() {
+    repo=ecmwf/forecast-in-a-box
     releases_json=$(curl --silent "https://api.github.com/repos/$repo/releases?per_page=1")
     get_releases_status=$?
     if [ $get_releases_status -ne 0 ] ; then
         >&2 echo "failed to get most recent fiab release: $get_releases_status, crashing!"
         exit 1
     fi
-    most_recent=$(>&2 echo $releases_json  | sed 's/.*tag\/\([^"]*\).*/\1/')
+    most_recent=$(echo $releases_json  | sed 's/.*tag\/\([^"]*\).*/\1/')
     echo $most_recent
 }
 
 LOCK="${FIAB_ROOT}/pylock.toml"
+FIAB_GITHUB_FROM="${FIAB_GITHUB_FROM:-tags}" # when we want to install from a specific branch, we set this to heads & set FIAB_RELEASE to that branch
 maybeDownloadLock() {
     most_recent=$1
     # checks whether requirements is present at fiab root, and downloads if not
     if [ ! -f $LOCK ] ; then
         >&2 echo "not found uv.lock in $LOCK, downloading"
         >&2 echo "will download uv lock for release $most_recent"
-        lock_url=https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/tags/$most_recent/install/pylock.toml
-        lock_url=https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/heads/tmpDevel/install/pylock.toml # TODO clear after the most recent release actually has this lock
+        lock_url=https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/$FIAB_GITHUB_FROM/$most_recent/install/pylock.toml
 		curl -LsSf $lock_url > "$LOCK"
         >&2 echo "$(date +%s):$(echo $most_recent | tr -d 'v')" > $LOCK.timestamp
     fi
@@ -110,8 +111,7 @@ maybeGetDefaultConfig() {
     most_recent=$1
     if [ ! -f "${FIAB_ROOT}/config.toml" ] ; then
         >&2 echo "no config file, downloading a default for release $most_recent"
-        config_url=https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/tags/$most_recent/install/config.toml
-        config_url=https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/heads/tmpDevel/install/config.toml # TODO clear after the most recent release actually has this lock
+        config_url=https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/$FIAB_GITHUB_FROM/$most_recent/install/config.toml
 		curl -LsSf $config_url > "${FIAB_ROOT}/config.toml"
     fi
 }
@@ -122,7 +122,7 @@ updateVenv() {
     FIAB_VERSION=$(cat $LOCK.timestamp | cut -f 2 -d : )
     >&2 echo "using fiab version $FIAB_VERSION"
     uv pip install -r $LOCK
-    uv pip install "forecastbox==$FIAB_VERSION"
+    uv pip install --prerelease allow "forecast-in-a-box==$FIAB_VERSION"
     touch $VENV.timestamp
 }
 
@@ -188,9 +188,9 @@ done
 check
 maybeInstallUv
 maybeInstallPython
-mostRecentRelease=$(getMostRecentRelease)
-maybeDownloadLock $mostRecentRelease
-maybeGetDefaultConfig $mostRecentRelease
+selectedRelease=${FIAB_RELEASE:-$(getMostRecentRelease)}
+maybeDownloadLock $selectedRelease
+maybeGetDefaultConfig $selectedRelease
 maybeCreateVenv
 maybePruneUvCache
 
