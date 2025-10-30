@@ -18,7 +18,7 @@ fiabwheel:
     rm -rf forecastbox/static
     ln -s ../../frontend/dist forecastbox/static
     find forecastbox/static/ -type f | sed 's/.*/include &/' > MANIFEST.in
-    SETUPTOOLS_DEBUG_SCM=1 python -m build --installer uv .
+    python -m build --installer uv .
     popd
 
 clean:

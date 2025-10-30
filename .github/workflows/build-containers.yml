@@ -3,7 +3,7 @@ name: Build and Push Docker Images to registries
 on:
   push:
     tags:
-      - '*'
+      - 'v*' # NOTE we exclude 'd*' tags for now, but we may want to create some test containers for them too one day
 
   workflow_dispatch:
     inputs:
