@@ -1,12 +1,15 @@
-import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
 import json
-from datetime import datetime
 import re
-from forecastbox.api.updates import Release, get_most_recent_release, get_lock_timestamp, get_local_release, get_pylock, save_pylock
-from pathlib import Path
-import pytest_asyncio
 import tempfile
+from datetime import datetime
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+import pytest_asyncio
+from forecastbox.api.updates import (Release, get_local_release, get_lock_timestamp, get_most_recent_release,
+                                     get_pylock, save_pylock)
+
 
 def test_release_from_string():
     assert Release.from_string("1.2.3") == Release(1, 2, 3)

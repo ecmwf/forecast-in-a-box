@@ -11,14 +11,13 @@
 
 import datetime as dt
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import orjson
 from cascade.low.func import Either
 from forecastbox.api.scheduling.dt_utils import calculate_next_run
 from forecastbox.api.types import ExecutionSpecification
-from forecastbox.db.schedule import get_schedules, run2schedule, run2date, max_attempt_cnt
-from typing import cast
+from forecastbox.db.schedule import get_schedules, max_attempt_cnt, run2date, run2schedule
 
 
 def deep_union(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:

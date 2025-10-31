@@ -1,6 +1,8 @@
-from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
 from forecastbox.api.routers.admin import GetReleaseStatusResponse
 from forecastbox.api.updates import Release
+
+from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
+
 
 def test_admin_flows(backend_client):
     # TODO this test is a bit flaky, because it must be executed first to ensure admin actually ending up admin
@@ -60,5 +62,3 @@ def test_admin_flows(backend_client):
     data = {"email": "user@nowhere.org", "password": "something"}
     response = backend_client.post("/auth/register", headers=headers, json=data)
     assert response.status_code == 400
-
-

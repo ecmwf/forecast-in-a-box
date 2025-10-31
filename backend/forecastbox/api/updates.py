@@ -1,10 +1,9 @@
 import dataclasses
-import re
-import httpx
-from pathlib import Path
-from datetime import datetime
-from forecastbox.config import fiab_home
 import logging
+from datetime import datetime
+
+import httpx
+from forecastbox.config import fiab_home
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +31,9 @@ async def get_most_recent_release() -> Release:
         releases = response.json()
         if not releases:
             raise ValueError("No releases found on GitHub.")
-        if not "tag_name" in releases[0]:
+        if "tag_name" not in releases[0]:
             logger.error(f"mangled release: {releases[0]}")
-            raise ValueError(f"Recent release is missing tag information")
+            raise ValueError("Recent release is missing tag information")
         latest_release_tag = releases[0]["tag_name"]
         return Release.from_string(latest_release_tag)
 
@@ -48,7 +47,7 @@ def get_local_release() -> tuple[datetime, Release]:
     timestamp_str = get_lock_timestamp()
     if not timestamp_str:
         raise ValueError("pylock.toml.timestamp file is empty or does not exist.")
-    
+
     head, *lines = timestamp_str.splitlines()
     if lines:
         raise ValueError("Invalid format in pylock.toml.timestamp: expected exactly one line.")
