@@ -3,9 +3,10 @@ from unittest.mock import patch, MagicMock, AsyncMock
 import json
 from datetime import datetime
 import re
-from forecastbox.api.updates import Release, get_most_recent_release, get_lock_timestamp, get_local_release
+from forecastbox.api.updates import Release, get_most_recent_release, get_lock_timestamp, get_local_release, get_pylock, save_pylock
 from pathlib import Path
 import pytest_asyncio
+import tempfile
 
 def test_release_from_string():
     assert Release.from_string("1.2.3") == Release(1, 2, 3)
@@ -101,3 +102,44 @@ def test_get_local_release(mock_get_lock_timestamp):
     mock_get_lock_timestamp.return_value = "1761908420:invalid_release"
     with pytest.raises(ValueError, match=re.escape("invalid literal for int() with base 10: 'invalid_release'")):
         get_local_release()
+
+@pytest.mark.asyncio
+async def test_get_pylock(mock_httpx_client):
+    mock_pylock_content = "[tool.uv]\npython = \"3.12\"\n"
+    mock_response_obj = MagicMock()
+    mock_response_obj.text = mock_pylock_content
+    mock_response_obj.raise_for_status.return_value = None
+    mock_httpx_client.get.return_value = mock_response_obj
+
+    test_release = Release(1, 2, 3)
+    expected_url = "https://github.com/ecmwf/forecast-in-a-box/releases/download/v1.2.3/pylock.toml"
+
+    content = await get_pylock(test_release)
+
+    mock_httpx_client.get.assert_called_once_with(expected_url)
+    assert content == mock_pylock_content
+
+@patch("forecastbox.api.updates.fiab_home")
+def test_save_pylock(mock_fiab_home):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        temp_path = Path(tmpdir)
+
+        # Configure the mock_fiab_home to behave like temp_path
+        mock_fiab_home.__truediv__.side_effect = lambda x: temp_path / x
+        mock_fiab_home.mkdir.side_effect = temp_path.mkdir
+
+        test_pylock_content = "[tool.uv]\npython = \"3.12\"\n"
+        test_release = Release(0, 2, 0)
+
+        save_pylock(test_pylock_content, test_release)
+
+        pylock_file = temp_path / "pylock.toml"
+        timestamp_file = temp_path / "pylock.toml.timestamp"
+
+        assert pylock_file.is_file()
+        assert timestamp_file.is_file()
+        assert pylock_file.read_text() == test_pylock_content
+
+        dt, release = get_local_release()
+        assert release == test_release
+        assert isinstance(dt, datetime)

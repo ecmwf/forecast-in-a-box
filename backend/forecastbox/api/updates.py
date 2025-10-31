@@ -64,3 +64,19 @@ def get_local_release() -> tuple[datetime, Release]:
         raise ValueError(f"Failure to parse datetime. {dt_str[:32]}, {repr(e)}")
     release_obj = Release.from_string(release_str)
     return dt_obj, release_obj
+
+async def get_pylock(release: Release) -> str:
+    url = f"https://github.com/ecmwf/forecast-in-a-box/releases/download/v{release}/pylock.toml"
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url)
+        response.raise_for_status()
+        return response.text
+
+def save_pylock(pylock: str, release: Release) -> None:
+    pylock_file_path = fiab_home / "pylock.toml"
+    timestamp_file_path = fiab_home / "pylock.toml.timestamp"
+
+    fiab_home.mkdir(parents=True, exist_ok=True)
+
+    pylock_file_path.write_text(pylock)
+    timestamp_file_path.write_text(f"{int(datetime.now().timestamp())}:v{release}")
