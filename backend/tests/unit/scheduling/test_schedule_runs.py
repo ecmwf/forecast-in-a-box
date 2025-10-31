@@ -1,14 +1,15 @@
 
 import datetime as dt
 import uuid
-from unittest.mock import AsyncMock, patch
 from typing import cast
+from unittest.mock import AsyncMock, patch
 
 import pytest
-from forecastbox.api.routers.schedule import GetScheduleRunResponse, GetScheduleRunsResponse, get_schedule_runs
-from forecastbox.db.schedule import ScheduleId, ScheduleRun, JobRecord
-from forecastbox.schemas.user import UserRead
 from fastapi import HTTPException
+from forecastbox.api.routers.schedule import GetScheduleRunsResponse, get_schedule_runs
+from forecastbox.db.schedule import JobRecord, ScheduleRun
+from forecastbox.schemas.user import UserRead
+
 
 @pytest.fixture
 def mock_schedule_run_row():
@@ -104,8 +105,8 @@ async def test_get_schedule_runs_invalid_page_params(mock_user):
 
 @pytest.mark.asyncio
 async def test_get_schedule_runs_page_out_of_range(mock_schedule_run_row, mock_user):
-    with patch("forecastbox.api.routers.schedule.select_runs", AsyncMock(return_value=[])) as mock_select_runs, \
-         patch("forecastbox.api.routers.schedule.select_runs_count", AsyncMock(return_value=1)) as mock_select_runs_count:
+    with patch("forecastbox.api.routers.schedule.select_runs", AsyncMock(return_value=[])), \
+         patch("forecastbox.api.routers.schedule.select_runs_count", AsyncMock(return_value=1)):
 
         with pytest.raises(HTTPException) as exc_info:
             await get_schedule_runs(schedule_id="test_schedule_id", user=mock_user, page=2, page_size=1)

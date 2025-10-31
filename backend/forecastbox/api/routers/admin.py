@@ -10,9 +10,11 @@
 """Admin API Router."""
 
 import logging
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
+from forecastbox.api.updates import Release, get_local_release, get_most_recent_release, get_pylock, save_pylock
 from forecastbox.auth.users import current_active_user
 from forecastbox.config import BackendAPISettings, CascadeSettings, ProductSettings, config
 from forecastbox.db.user import async_session_maker
@@ -57,6 +59,45 @@ class ExposedSettings(BaseModel):
             required = required,
             formData=self.model_dump(),
         )
+
+
+class GetReleaseStatusResponse(BaseModel):
+    local_release: Release
+    local_release_age_days: int
+    newest_available_release: Release
+
+
+class UpdateReleaseResponse(BaseModel):
+    release: Release
+
+
+@router.get("/release", response_model=GetReleaseStatusResponse)
+async def get_release_status(admin=Depends(get_admin_user)) -> GetReleaseStatusResponse:
+    """Get release status"""
+    local_dt, local_release = get_local_release()
+    newest_available_release = await get_most_recent_release()
+
+    local_release_age_days = (datetime.now(timezone.utc) - local_dt.astimezone(timezone.utc)).days
+
+    return GetReleaseStatusResponse(
+        local_release=local_release,
+        local_release_age_days=local_release_age_days,
+        newest_available_release=newest_available_release,
+    )
+
+
+@router.post("/release", response_model=UpdateReleaseResponse)
+async def update_release(tag: str | None = None, admin=Depends(get_admin_user)) -> UpdateReleaseResponse:
+    """Update release"""
+    if tag:
+        release = Release.from_string(tag)
+    else:
+        release = await get_most_recent_release()
+
+    pylock_content = await get_pylock(release)
+    save_pylock(pylock_content, release)
+
+    return UpdateReleaseResponse(release=release)
 
 
 @router.get("/settings", response_model=ExportedSchemas)

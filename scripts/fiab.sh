@@ -105,7 +105,7 @@ maybeDownloadLock() {
         >&2 echo "not found uv.lock in $LOCK, downloading"
         >&2 echo "will download uv lock for release $selectedRelease"
         lock_url=https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/$FIAB_GITHUB_FROM/$selectedRelease/install/pylock.toml
-		curl -LsSf $lock_url > "$LOCK"
+        curl -LsSf $lock_url > "$LOCK"
         >&2 echo "$(date +%s):$(echo $selectedRelease | tr -d 'v')" > $LOCK.timestamp
     fi
 }

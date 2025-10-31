@@ -19,8 +19,11 @@ repos:
   - id: trailing-whitespace # Trailing whitespace checker
   - id: no-commit-to-branch # Prevent committing to main / master
   - id: check-added-large-files # Check for large files added to git
-    exclude: '.*uv.lock'
-    exclude: '.*pylock.toml'
+    exclude: |
+      (?x)(
+        .*uv.lock|
+        .*pylock.toml
+      )
   - id: check-merge-conflict # Check for files that contain merge conflict
 -   repo: https://github.com/pre-commit/pygrep-hooks
     rev: v1.10.0  # Use the ref you want to point at

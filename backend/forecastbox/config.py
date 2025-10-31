@@ -17,7 +17,7 @@ from cascade.low.func import pydantic_recursive_collect
 from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict, TomlConfigSettingsSource
 
-fiab_home = Path.home() / ".fiab"
+fiab_home = Path(os.environ['FIAB_ROOT']) if 'FIAB_ROOT' in os.environ else (Path.home() / ".fiab")
 logger = logging.getLogger(__name__)
 
 

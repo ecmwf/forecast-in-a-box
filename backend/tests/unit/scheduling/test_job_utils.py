@@ -1,11 +1,11 @@
 from datetime import datetime
 from unittest.mock import patch
 
+import orjson
 import pytest
 from forecastbox.api.scheduling.job_utils import deep_union, eval_dynamic_expression, schedule2spec
 from forecastbox.api.types import ExecutionSpecification
 from forecastbox.schemas.schedule import ScheduleDefinition
-import orjson
 
 
 def test_deep_union_empty_dicts():
