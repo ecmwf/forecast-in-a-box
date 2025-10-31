@@ -14,8 +14,8 @@ from typing import Iterable
 
 from forecastbox.config import config
 from forecastbox.db.core import addAndCommit, dbRetry, executeAndCommit, queryCount
-from forecastbox.schemas.schedule import Base, ScheduleDefinition, ScheduleNext, ScheduleRun
 from forecastbox.schemas.job import JobRecord
+from forecastbox.schemas.schedule import Base, ScheduleDefinition, ScheduleNext, ScheduleRun
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -278,4 +278,3 @@ async def select_runs_count(
             return await queryCount(query, session)
 
     return await dbRetry(function)
-
