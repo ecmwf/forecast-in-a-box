@@ -40,8 +40,8 @@ dependencies = [
   "httpx<1",
   "httpx-oauth",
   "jinja2",
-  "mir-python==1.27.4.dev20250905",                   # to bring in the binary stack eagerly, TODO unpin once stable
-  "multiolib==2.7.0.dev20250905",                     # to bring in the binary stack eagerly, TODO unpin once stable
+  "mir-python==1.27.10.5",                            # NOTE once the pinning is fixed for mir-python, we can remove both this and multiolib pin
+  "multiolib==2.7.1.5",
   "orjson",
   "pproc",
   "psutil",
@@ -84,6 +84,7 @@ __version__ = "{version}"
 local_scheme = "no-local-version"
 root = ".."
 fallback_version = "0.0.0"
+tag_regex = '^[vd](?P<version>\d+(?:\.\d+){0,2}[^\+]*)(?:\+.*)?$'
 
 [tool.ruff]
 line-length = 140
