@@ -10,6 +10,7 @@
 """Admin API Router."""
 
 import logging
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
@@ -20,6 +21,7 @@ from forecastbox.rjsf import ExportedSchemas, FormDefinition, from_pydantic
 from forecastbox.schemas.user import UserRead, UserTable, UserUpdate
 from pydantic import UUID4, BaseModel
 from sqlalchemy import delete, select, update
+from forecastbox.api.updates import Release, get_local_release, get_most_recent_release
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +59,27 @@ class ExposedSettings(BaseModel):
             required = required,
             formData=self.model_dump(),
         )
+
+
+class GetReleaseStatusResponse(BaseModel):
+    local_release: Release
+    local_release_age_days: int
+    newest_available_release: Release
+
+
+@router.get("/release", response_model=GetReleaseStatusResponse)
+async def get_release_status(admin=Depends(get_admin_user)) -> GetReleaseStatusResponse:
+    """Get release status"""
+    local_dt, local_release = get_local_release()
+    newest_available_release = await get_most_recent_release()
+    
+    local_release_age_days = (datetime.now(timezone.utc) - local_dt.astimezone(timezone.utc)).days
+
+    return GetReleaseStatusResponse(
+        local_release=local_release,
+        local_release_age_days=local_release_age_days,
+        newest_available_release=newest_available_release,
+    )
 
 
 @router.get("/settings", response_model=ExportedSchemas)

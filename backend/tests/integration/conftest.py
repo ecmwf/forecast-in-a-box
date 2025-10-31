@@ -1,3 +1,4 @@
+import os
 import pathlib
 import socketserver
 import tempfile
@@ -68,6 +69,8 @@ def backend_client() -> Generator[httpx.Client, None, None]:
     client = None
     try:
         td = tempfile.TemporaryDirectory()
+        os.environ['FIAB_ROOT'] = td.name
+        (pathlib.Path(td.name) / "pylock.toml.timestamp").write_text("1761908420:d0.0.1")
         config = FIABConfig()
         config.api.uvicorn_port = 30645
         config.cascade.cascade_url = "tcp://localhost:30644"
