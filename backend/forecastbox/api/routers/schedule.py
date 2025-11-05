@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from forecastbox.api.execution import execute
 from forecastbox.api.routers.job import STATUS
 from forecastbox.api.scheduling.dt_utils import calculate_next_run, parse_crontab
-from forecastbox.api.scheduling.job_utils import rerun_params
+from forecastbox.api.scheduling.job_utils import run2runnable
 from forecastbox.api.scheduling.scheduler_thread import (prod_scheduler, regenerate_schedule_next, scheduler_lock,
                                                          start_scheduler, stop_scheduler)
 from forecastbox.api.types import ScheduleSpecification, ScheduleUpdate, schedule2db
@@ -281,7 +281,7 @@ async def rerun_schedule(
     user: UserRead = Depends(current_active_user)
 ) -> str:
     """Returns the schedule_run_id of the re-run"""
-    runnable_schedule_either = await rerun_params(schedule_run_id)
+    runnable_schedule_either = await run2runnable(schedule_run_id)
     if runnable_schedule_either.t is None:
         raise HTTPException(status_code=404, detail=f"Failed to re-run {schedule_run_id} because of {runnable_schedule_either.e}")
     runnable_schedule = runnable_schedule_either.t
@@ -289,7 +289,7 @@ async def rerun_schedule(
     exec_result = await execute(runnable_schedule.exec_spec, user.user_id)
     if exec_result.t is not None:
         logger.debug(f"Job {exec_result.t.id} submitted for schedule run {schedule_run_id}")
-        return await insert_schedule_run(runnable_schedule.schedule_id, runnable_schedule.next_run_at, exec_result.t.id, attempt_cnt = runnable_schedule.attempt_cnt, trigger="rerun")
+        return await insert_schedule_run(runnable_schedule.schedule_id, runnable_schedule.schedule_at, exec_result.t.id, attempt_cnt = runnable_schedule.attempt_cnt, trigger="rerun")
     else:
         logger.error(f"Failed to submit job for schedule run {schedule_run_id} because of {exec_result.e}")
         raise HTTPException(status_code=500, detail=f"Failed to rerun schedule: {exec_result.e}")

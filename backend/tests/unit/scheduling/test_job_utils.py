@@ -1,11 +1,11 @@
 from datetime import datetime
 from unittest.mock import patch
 
+import orjson
 import pytest
-from forecastbox.api.scheduling.job_utils import deep_union, eval_dynamic_expression, schedule2spec
+from forecastbox.api.scheduling.job_utils import deep_union, eval_dynamic_expression, schedule2runnable
 from forecastbox.api.types import ExecutionSpecification
 from forecastbox.schemas.schedule import ScheduleDefinition
-import orjson
 
 
 def test_deep_union_empty_dicts():
@@ -88,7 +88,7 @@ def test_eval_dynamic_expression_partial_match():
 
 @pytest.mark.asyncio
 @patch("forecastbox.api.scheduling.job_utils.get_schedules")
-async def test_schedule2spec_found(mock_get_schedules):
+async def test_schedule2runnable_found(mock_get_schedules):
     schedule_id = "test_schedule_id"
     exec_time = datetime(2025, 10, 20, 10, 30)
 
@@ -111,7 +111,7 @@ async def test_schedule2spec_found(mock_get_schedules):
     )
     mock_get_schedules.return_value = [mock_schedule_def]
 
-    result = await schedule2spec(schedule_id, exec_time)
+    result = await schedule2runnable(schedule_id, exec_time)
 
     assert result.e is None
     assert result.t is not None
@@ -122,12 +122,12 @@ async def test_schedule2spec_found(mock_get_schedules):
 
 @pytest.mark.asyncio
 @patch("forecastbox.api.scheduling.job_utils.get_schedules")
-async def test_schedule2spec_not_found(mock_get_schedules):
+async def test_schedule2runnable_not_found(mock_get_schedules):
     schedule_id = "non_existent_id"
     exec_time = datetime(2025, 10, 20, 10, 30)
 
     mock_get_schedules.return_value = []
 
-    result = await schedule2spec(schedule_id, exec_time)
+    result = await schedule2runnable(schedule_id, exec_time)
 
     assert result.t is None and result.e is not None

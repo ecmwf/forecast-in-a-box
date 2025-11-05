@@ -24,7 +24,7 @@ from typing import cast
 
 from forecastbox.api.execution import execute
 from forecastbox.api.scheduling.dt_utils import calculate_next_run
-from forecastbox.api.scheduling.job_utils import schedule2spec
+from forecastbox.api.scheduling.job_utils import schedule2runnable
 from forecastbox.config import config
 from forecastbox.db.schedule import (delete_schedule_next_run, get_schedulable, insert_next_run, insert_schedule_run,
                                      mark_run_executed, next_schedulable)
@@ -67,7 +67,7 @@ class SchedulerThread(threading.Thread):
             schedule_next_id_str: str = cast(str, run.schedule_next_id)
             logger.debug(f"Processing scheduled run {schedule_next_id_str} for schedule {schedule_id_str} at {scheduled_at_dt}")
 
-            get_spec_result = await schedule2spec(schedule_id_str, scheduled_at_dt)
+            get_spec_result = await schedule2runnable(schedule_id_str, scheduled_at_dt)
 
             if get_spec_result.t is not None:
                 if get_spec_result.t.max_acceptable_delay_hours is not None and \
@@ -87,8 +87,12 @@ class SchedulerThread(threading.Thread):
 
             await mark_run_executed(schedule_next_id_str)
             if get_spec_result.t is not None:
-                logger.debug(f"Next run for {schedule_id_str} will be at {get_spec_result.t.next_run_at}")
-                await insert_next_run(schedule_id_str, get_spec_result.t.next_run_at)
+                if get_spec_result.t.next_run_at:
+                    logger.debug(f"Next run for {schedule_id_str} will be at {get_spec_result.t.next_run_at}")
+                    await insert_next_run(schedule_id_str, get_spec_result.t.next_run_at)
+                else:
+                    logger.warning(f"No next run for {schedule_id_str}, not scheduling")
+                    # logging as warning because its not expected rn, but presumably we'll supported bounded-ocurrence schedules eventually
 
         next_schedulable_at = await next_schedulable()
 

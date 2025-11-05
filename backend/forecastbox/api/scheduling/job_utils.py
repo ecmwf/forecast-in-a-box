@@ -11,14 +11,13 @@
 
 import datetime as dt
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import orjson
 from cascade.low.func import Either
 from forecastbox.api.scheduling.dt_utils import calculate_next_run
 from forecastbox.api.types import ExecutionSpecification
-from forecastbox.db.schedule import get_schedules, run2schedule, run2date, max_attempt_cnt
-from typing import cast
+from forecastbox.db.schedule import get_schedules, max_attempt_cnt, run2date, run2schedule
 
 
 def deep_union(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
@@ -47,13 +46,14 @@ def eval_dynamic_expression(data: dict[str, Any], execution_time: dt.datetime) -
 class RunnableSchedule:
     exec_spec: ExecutionSpecification
     created_by: str|None
-    next_run_at: dt.datetime
+    next_run_at: dt.datetime|None
+    scheduled_at: dt.datetime
     attempt_cnt: int
     max_acceptable_delay_hours: int
     schedule_id: str
 
-async def schedule2spec(schedule_id: str, exec_time: dt.datetime) -> Either[RunnableSchedule, str]: # type: ignore[invalid-argument] # NOTE type checker issue
-    """Converts a ScheduleDefinition into an ExecutionSpecification by evaluating dynamic expressions and merging."""
+async def schedule2runnable(schedule_id: str, exec_time: dt.datetime) -> Either[RunnableSchedule, str]: # type: ignore[invalid-argument] # NOTE type checker issue
+    """Converts a ScheduleDefinition into a RunnableSchedule by evaluating dynamic expressions and merging."""
     schedules = list(await get_schedules(schedule_id=schedule_id))
     if not schedules:
         return Either.error("not found")
@@ -70,6 +70,7 @@ async def schedule2spec(schedule_id: str, exec_time: dt.datetime) -> Either[Runn
             exec_spec = ExecutionSpecification(**merged_spec),
             created_by = schedule_def.created_by,
             next_run_at = next_run_at,
+            scheduled_at = exec_time,
             attempt_cnt = 0,
             max_acceptable_delay_hours = cast(int, schedule_def.max_acceptable_delay_hours),
             schedule_id = schedule_def.schedule_id,
@@ -78,8 +79,8 @@ async def schedule2spec(schedule_id: str, exec_time: dt.datetime) -> Either[Runn
     except Exception as e:
         return Either.error(repr(e))
 
-async def rerun_params(schedule_run_id: str) -> Either[RunnableSchedule, str]: # type: ignore[invalid-argument] # NOTE type checker issue
-    """Converts a ScheduleRun into an ExecutionSpecification by evaluating dynamic expressions and merging."""
+async def run2runnable(schedule_run_id: str) -> Either[RunnableSchedule, str]: # type: ignore[invalid-argument] # NOTE type checker issue
+    """Converts a ScheduleRun into a RunnableSchedule, with all the original parameters. Intended for re-runs"""
     schedule_def = await run2schedule(schedule_run_id)
     if schedule_def is None:
         return Either.error(f"schedule corresponding to run {schedule_run_id} not found")
@@ -96,11 +97,11 @@ async def rerun_params(schedule_run_id: str) -> Either[RunnableSchedule, str]: #
 
         dynamic_evaluated = eval_dynamic_expression(dynamic_expr, scheduled_at)
         merged_spec = deep_union(exec_spec, dynamic_evaluated)
-        next_run_at = calculate_next_run(scheduled_at, cast(str, schedule_def.cron_expr))
         rv = RunnableSchedule(
             exec_spec = ExecutionSpecification(**merged_spec),
             created_by = cast(str|None, schedule_def.created_by),
-            next_run_at = next_run_at,
+            next_run_at = None,
+            scheduled_at = scheduled_at,
             attempt_cnt = attempt_cnt,
             max_acceptable_delay_hours = cast(int, schedule_def.max_acceptable_delay_hours),
             schedule_id = cast(str, schedule_def.schedule_id),
