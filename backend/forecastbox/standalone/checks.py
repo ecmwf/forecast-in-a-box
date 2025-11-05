@@ -51,8 +51,6 @@ def check_backend_ready(config: FIABConfig, handles: ChildProcessGroup|None = No
             _wait_for(client, config.api.local_url() + "/api/v1/status", attempts, _call_succ)
             if spawn_gateway:
                 client.post(config.api.local_url() + "/api/v1/gateway/start").raise_for_status()
-            if config.auth.passthrough:
-                client.post(config.api.local_url() + "/api/v1/model/flush").raise_for_status()
             gw_check = lambda resp, _: resp.raise_for_status().text == f"\"{StatusMessage.gateway_running}\""
             _wait_for(client, config.api.local_url() + "/api/v1/gateway/status", attempts, gw_check)
     except StartupError as e:

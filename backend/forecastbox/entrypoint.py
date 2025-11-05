@@ -26,6 +26,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from forecastbox.api.scheduling.scheduler_thread import start_scheduler, status_scheduler, stop_scheduler
 from forecastbox.db.migrations import migrate
+from forecastbox.db.model import delete_download
 from starlette.exceptions import HTTPException
 
 from .api.routers import admin, auth, execution, gateway, job, model, product, schedule
@@ -44,6 +45,7 @@ async def lifespan(app: FastAPI):
     migrate()
     if config.api.allow_scheduler:
         start_scheduler()
+    await delete_download(None) # to get rid of db entries left over from previous run.. consider switching to pid table column instead, to mark failed and allow retry?
     yield
     if config.api.allow_scheduler:
         stop_scheduler()
