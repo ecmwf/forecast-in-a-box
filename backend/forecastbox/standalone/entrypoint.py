@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__ if __name__ != "__main__" else __package__)
 
 
 def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
-    set_start_method("forkserver")
+    set_start_method("forkserver", force=True) # we force because of pytest plugins
     setup_process()
     logger.info("main process starting")
     logger.debug(f"loaded config {config.model_dump()}")
