@@ -12,7 +12,7 @@ license-files = [ "LICENSE" ]
 authors = [
   { name = "European Centre for Medium-Range Weather Forecasts (ECMWF)", email = "software.support@ecmwf.int" },
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14" # NOTE we need to restrict python until all dependencies have a 3.14 release
 # [tool.setuptools]
 # packages = ["forecastbox"]
 classifiers = [
