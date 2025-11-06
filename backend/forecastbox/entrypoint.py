@@ -25,6 +25,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from forecastbox.api.scheduling.scheduler_thread import start_scheduler, status_scheduler, stop_scheduler
+from forecastbox.api.updates import get_local_release
 from forecastbox.db.migrations import migrate
 from forecastbox.db.model import delete_download
 from starlette.exceptions import HTTPException
@@ -46,6 +47,8 @@ async def lifespan(app: FastAPI):
     if config.api.allow_scheduler:
         start_scheduler()
     await delete_download(None) # to get rid of db entries left over from previous run.. consider switching to pid table column instead, to mark failed and allow retry?
+    release_time, release_version = get_local_release()
+    app.version = f"{release_version}@{release_time}"
     yield
     if config.api.allow_scheduler:
         stop_scheduler()
@@ -114,6 +117,7 @@ class StatusResponse:
     cascade: str
     ecmwf: str
     scheduler: str
+    version: str
 
 
 @app.get("/api/v1/status", tags=["status"])
@@ -121,7 +125,7 @@ def status() -> StatusResponse:
     """Status endpoint"""
     from forecastbox.config import config
 
-    status = {"api": "up", "cascade": "up", "ecmwf": "up", "scheduler": "up"}
+    status = {"api": "up", "cascade": "up", "ecmwf": "up", "scheduler": "up", "version": app.version}
 
     from cascade.gateway import api, client
 
