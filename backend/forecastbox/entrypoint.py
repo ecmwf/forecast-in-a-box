@@ -89,15 +89,13 @@ app.add_middleware(
 #         raise HTTPException(status_code=403, detail="Forbidden")
 #     return await call_next(request)
 
-
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
     start_time = time.time()
     response = await call_next(request)
-    logger.info(f"Request took {time.time() - start_time:0.2f} sec")
+    logger.debug(f"Request took {time.time() - start_time:0.2f} sec")
     return response
-
-
+    
 @app.middleware("http")
 async def circumvent_auth(request: Request, call_next):
     # TODO this is a hotfix, we'd instead like to fix properly in api/routers/auth.py
