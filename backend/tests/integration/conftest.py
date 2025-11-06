@@ -1,9 +1,11 @@
+import os
 import pathlib
 import socketserver
 import tempfile
 import time
 from http.server import SimpleHTTPRequestHandler
-from multiprocessing import Process
+from multiprocessing import Event, Process
+from typing import Any, Generator
 
 import httpx
 import pytest
@@ -47,16 +49,28 @@ class FakeModelRepository(SimpleHTTPRequestHandler):
             self.send_error(404, f"Not Found: {self.path}")
 
 
-def run_repository():
+def run_repository(shutdown_event: Any): # TODO typing -- is `Event` but thats not correct
     server_address = ("", fake_repository_port)
     with socketserver.ThreadingTCPServer(server_address, FakeModelRepository) as httpd:
-        httpd.serve_forever()
+        # NOTE dont serve forever, doesnt free the port up correctly
+        # httpd.serve_forever()
+        httpd.timeout = 1
+        while not shutdown_event.is_set():
+            httpd.handle_request()
+        httpd.shutdown()
 
 
 @pytest.fixture(scope="session")
-def backend_client() -> httpx.Client:
+def backend_client() -> Generator[httpx.Client, None, None]:
+    td = None
+    handles = None
+    shutdown_event = None
+    p = None
+    client = None
     try:
         td = tempfile.TemporaryDirectory()
+        os.environ['FIAB_ROOT'] = td.name
+        (pathlib.Path(td.name) / "pylock.toml.timestamp").write_text("1761908420:d0.0.1")
         config = FIABConfig()
         config.api.uvicorn_port = 30645
         config.cascade.cascade_url = "tcp://localhost:30644"
@@ -67,17 +81,24 @@ def backend_client() -> httpx.Client:
         config.general.launch_browser = False
         config.auth.domain_allowlist_registry = ["somewhere.org"]
         handles = launch_all(config)
-        p = Process(target=run_repository)
+        shutdown_event = Event()
+        p = Process(target=run_repository, args=(shutdown_event,))
         p.start()
         client = httpx.Client(base_url=config.api.local_url() + "/api/v1", follow_redirects=True)
         yield client
     finally:
-        p.terminate()
-        td.cleanup()
-        client.close()
-        handles.shutdown()
-        p.join()
-
+        if client is not None:
+            client.close()
+        if shutdown_event is not None:
+            shutdown_event.set()
+        if p is not None:
+            p.join(timeout=2)
+            if p.is_alive():
+                p.terminate()
+        if handles is not None:
+            handles.shutdown()
+        if td is not None:
+            td.cleanup()
 
 @pytest.fixture(scope="session")
 def backend_client_with_auth(backend_client):

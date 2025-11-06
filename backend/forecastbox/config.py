@@ -17,14 +17,14 @@ from cascade.low.func import pydantic_recursive_collect
 from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict, TomlConfigSettingsSource
 
-fiab_home = Path.home() / ".fiab"
+fiab_home = Path(os.environ['FIAB_ROOT']) if 'FIAB_ROOT' in os.environ else (Path.home() / ".fiab")
 logger = logging.getLogger(__name__)
 
 
 def _validate_url(url: str) -> bool:
     # TODO add DNS resolution attempt or something
     parse = urllib.parse.urlparse(url)
-    return parse.scheme and parse.netloc
+    return (parse.scheme is not None) and (parse.netloc is not None)
 
 class StatusMessage:
     """Namespace class for status message sharing"""
@@ -129,6 +129,10 @@ class BackendAPISettings(BaseModel):
     """Listening host of the whole server."""
     uvicorn_port: int = 8000
     """Listening port of the whole server."""
+    allow_service: bool = False
+    """Whether we assume that a system-level service has been registered. Affects standalone.entrypoint behaviour"""
+    allow_scheduler: bool = False
+    """Whether scheduler thread should be started. Best combine with allow_service=True"""
 
     def local_url(self) -> str:
         return f"http://localhost:{self.uvicorn_port}"
@@ -216,4 +220,3 @@ def validate_runtime(config: FIABConfig) -> None:
 
 
 config = FIABConfig()
-logger.debug(f"loaded config: {config.model_dump()}")

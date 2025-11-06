@@ -10,9 +10,11 @@
 """Admin API Router."""
 
 import logging
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
+from forecastbox.api.updates import Release, get_local_release, get_most_recent_release, get_pylock, save_pylock
 from forecastbox.auth.users import current_active_user
 from forecastbox.config import BackendAPISettings, CascadeSettings, ProductSettings, config
 from forecastbox.db.user import async_session_maker
@@ -59,6 +61,45 @@ class ExposedSettings(BaseModel):
         )
 
 
+class GetReleaseStatusResponse(BaseModel):
+    local_release: Release
+    local_release_age_days: int
+    newest_available_release: Release
+
+
+class UpdateReleaseResponse(BaseModel):
+    release: Release
+
+
+@router.get("/release", response_model=GetReleaseStatusResponse)
+async def get_release_status(admin=Depends(get_admin_user)) -> GetReleaseStatusResponse:
+    """Get release status"""
+    local_dt, local_release = get_local_release()
+    newest_available_release = await get_most_recent_release()
+
+    local_release_age_days = (datetime.now(timezone.utc) - local_dt.astimezone(timezone.utc)).days
+
+    return GetReleaseStatusResponse(
+        local_release=local_release,
+        local_release_age_days=local_release_age_days,
+        newest_available_release=newest_available_release,
+    )
+
+
+@router.post("/release", response_model=UpdateReleaseResponse)
+async def update_release(tag: str | None = None, admin=Depends(get_admin_user)) -> UpdateReleaseResponse:
+    """Update release"""
+    if tag:
+        release = Release.from_string(tag)
+    else:
+        release = await get_most_recent_release()
+
+    pylock_content = await get_pylock(release)
+    save_pylock(pylock_content, release)
+
+    return UpdateReleaseResponse(release=release)
+
+
 @router.get("/settings", response_model=ExportedSchemas)
 async def get_settings(admin=Depends(get_admin_user)) -> ExportedSchemas:
     """Get current settings"""
@@ -90,7 +131,7 @@ async def get_users(admin=Depends(get_admin_user)) -> list[UserRead]:
     """Get all users"""
     async with async_session_maker() as session:
         query = select(UserTable)
-        return (await session.execute(query)).unique().scalars().all()
+        return (await session.execute(query)).unique().scalars().all() # type: ignore[invalid-return-type] # NOTE db...
 
 
 @router.get("/users/{user_id}", response_model=UserRead)
@@ -121,7 +162,7 @@ async def delete_user(user_id: UUID4, admin=Depends(get_admin_user)) -> HTMLResp
 async def update_user(user_id: UUID4, user_data: UserUpdate, admin=Depends(get_admin_user)) -> UserRead:
     """Update a user by ID"""
     async with async_session_maker() as session:
-        update_dict = {k: v for k, v in user_data.dict().items() if v is not None}
+        update_dict = {k: v for k, v in user_data.model_dump().items() if v is not None}
         # TODO the password is actually stored as 'hash_password' -- invoke some of the auth meths here
         if "password" in update_dict:
             raise HTTPException(status_code=404, detail="Password update not supported")

@@ -1,3 +1,6 @@
+from forecastbox.api.routers.admin import GetReleaseStatusResponse
+from forecastbox.api.updates import Release
+
 from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
 
 
@@ -30,6 +33,15 @@ def test_admin_flows(backend_client):
     assert response.is_success
     assert response.json()["email"] == "admin@somewhere.org"
 
+    # get release
+    response = backend_client.get("/admin/release")
+    assert response.is_success
+    release_status = GetReleaseStatusResponse(**response.json())
+    assert isinstance(release_status.local_release, Release)
+    assert isinstance(release_status.local_release_age_days, int)
+    assert isinstance(release_status.newest_available_release, Release)
+
+    # register
     headers = {"Content-Type": "application/json"}
     data = {"email": "user@somewhere.org", "password": "something"}
     response = backend_client.post("/auth/register", headers=headers, json=data)

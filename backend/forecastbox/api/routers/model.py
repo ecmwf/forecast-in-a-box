@@ -75,21 +75,21 @@ def download2response(model_download: ModelDownload | None) -> DownloadResponse:
     if model_download:
         if model_download.error:
             return DownloadResponse(
-                download_id=model_download.model_id,
+                download_id=model_download.model_id, # type: ignore[invalid-argument-type] # NOTE sqlalchemy quirk
                 message="Download failed. To retry, call delete_model first",
                 status="errored",
                 progress=0.0,
-                error=model_download.error,
+                error=model_download.error, # type: ignore[invalid-argument-type] # NOTE sqlalchemy quirk
             )
         if model_download.progress >= 100:
             return DownloadResponse(
-                download_id=model_download.model_id,
+                download_id=model_download.model_id, # type: ignore[invalid-argument-type] # NOTE sqlalchemy quirk
                 message="Download already completed.",
                 status="completed",
                 progress=100.0,
             )
         return DownloadResponse(
-            download_id=model_download.model_id,
+            download_id=model_download.model_id, # type: ignore[invalid-argument-type] # NOTE sqlalchemy quirk
             message="Download in progress.",
             status="in_progress",
             progress=float(model_download.progress),

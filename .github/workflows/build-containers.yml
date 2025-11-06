@@ -1,9 +1,9 @@
-name: Build and Push Docker Images to ghcr.io
+name: Build and Push Docker Images to registries
 
 on:
   push:
     tags:
-      - '*'
+      - 'v*' # NOTE we exclude 'd*' tags for now, but we may want to create some test containers for them too one day
 
   workflow_dispatch:
     inputs:
@@ -15,12 +15,14 @@ on:
 jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       matrix:
         image:
           - backend
           - frontend
           - cascade
+        registry: ["ghcr", "eccr"]
     steps:
       - name: Free Disk Space Before Build
         run: |
@@ -42,12 +44,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GitHub Container Registry
+      - name: Log in to a Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ${{ matrix.registry == 'ghcr' && 'ghcr.io' || 'eccr.ecmwf.int' }}
+          username: ${{ matrix.registry == 'ghcr' && github.actor || secrets.ECMWF_DOCKER_REGISTRY_USERNAME }}
+          password: ${{ matrix.registry == 'ghcr' && secrets.GITHUB_TOKEN || secrets.ECMWF_DOCKER_REGISTRY_ACCESS_TOKEN }}
 
       - name: Set env variables
         run: |
@@ -58,12 +60,20 @@ jobs:
           fi
           echo "TAG=$TAG" >> $GITHUB_ENV
           echo "IMAGE_NAME=${{ matrix.image }}" >> $GITHUB_ENV
-          echo "REPO_IMAGE=ghcr.io/${{ github.repository }}/${{ matrix.image }}:$TAG" >> $GITHUB_ENV
+          if [[ "${{ matrix.registry }}" == "ghcr" ]]; then
+            echo "REPO_IMAGE=ghcr.io/${{ github.repository }}/${{ matrix.image }}:$TAG" >> $GITHUB_ENV
+          else
+            echo "REPO_IMAGE=eccr.ecmwf.int/forecast-in-a-box/${{ matrix.image }}:$TAG" >> $GITHUB_ENV
+          fi
 
       - name: Build image
         run: |
           echo "Building image: $IMAGE_NAME - with tag: ${TAG}"
-          docker compose build --build-arg TAG=${TAG} $IMAGE_NAME
+          if [[ "${{ matrix.registry }}" == "ghcr" ]]; then
+            docker compose build --build-arg TAG=${TAG} $IMAGE_NAME
+          else
+            docker compose -f docker-compose-ewc.yml build --build-arg TAG=${TAG} $IMAGE_NAME
+          fi
         env:
           TAG: ${{ env.TAG }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
@@ -79,6 +89,6 @@ jobs:
       - name: Push image
         run: |
           echo "Pushing image: $REPO_IMAGE"
-          docker push $REPO_IMAGE
+          docker push $REPO_IMAGE # TODO enable once tested
         env:
           REPO_IMAGE: ${{ env.REPO_IMAGE }}
