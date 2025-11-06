@@ -30,3 +30,11 @@ There are the following guides:
 * [Tuning and Configuration](docs/tuningAndConfiguration.md) -- advanced tweaking. Audience: Operator
 * [Frontend Development](frontend/README.md) -- specifics to the javascript frontend. Audience: Developer
 * [Backend Development](backend/README.md#Development) -- specifics to the python backend. Audience: Developer
+
+## Contributions and Support
+Due to the maturity and status of the project, there is no support provided -- unless the usage of this project happens within some higher-status initiative that ECMWF participates at.
+External contributions and created issues will be looked at, but are not guaranteed to be accepted or responded to.
+In general, follow ECMWF's guidelines for [external contributions](https://github.com/ecmwf/codex/tree/main/External%20Contributions).
+
+## License
+See [license](./LICENSE).
