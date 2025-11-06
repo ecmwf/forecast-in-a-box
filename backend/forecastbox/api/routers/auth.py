@@ -19,6 +19,8 @@ SECRET = config.auth.jwt_secret.get_secret_value()
 # OAuth routes
 
 if oauth_client is not None:
+    if config.auth.public_url is None:
+        raise TypeError
     oauth_router = fastapi_users.get_oauth_router(
         oauth_client,
         auth_backend,

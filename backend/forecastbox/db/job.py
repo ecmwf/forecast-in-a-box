@@ -1,10 +1,19 @@
+# (C) Copyright 2024- ECMWF.
+#
+# This software is licensed under the terms of the Apache Licence Version 2.0
+# which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# In applying this licence, ECMWF does not waive the privileges and immunities
+# granted to it by virtue of its status as an intergovernmental organisation
+# nor does it submit to any jurisdiction.
+
 import datetime as dt
 import logging
 from collections.abc import Iterable
 
 from cascade.controller.report import JobId
 from forecastbox.config import config
-from forecastbox.db.core import addAndCommit, dbRetry, executeAndCommit, querySingle
+from forecastbox.db.core import addAndCommit, dbRetry, executeAndCommit, queryCount, querySingle
 from forecastbox.schemas.job import Base, JobRecord
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -46,8 +55,7 @@ async def get_count(status: str | None = None) -> int:
             query = select(func.count("*")).select_from(JobRecord)
             if status is not None:
                 query = query.where(JobRecord.status == status)
-            job_count = (await session.execute(query)).scalar()
-            return job_count
+            return await queryCount(query, session)
     return await dbRetry(function)
 
 async def get_all(status: str|None = None, offset: int = -1, limit: int = -1) -> Iterable[JobRecord]:
@@ -56,6 +64,7 @@ async def get_all(status: str|None = None, offset: int = -1, limit: int = -1) ->
             query = select(JobRecord)
             if status is not None:
                 query = query.where(JobRecord.status == status)
+            query = query.order_by(JobRecord.created_at.asc())
             if offset != -1:
                 query = query.offset(offset)
             if limit != -1:
@@ -71,12 +80,11 @@ async def update_one(job_id: JobId, **kwargs) -> None:
     stmt = update(JobRecord).where(JobRecord.job_id == job_id).values(updated_at=ref_time, **kwargs)
     await executeAndCommit(stmt, async_session_maker)
 
-
 async def delete_all() -> int:
     async def function(i: int) -> int:
         async with async_session_maker() as session:
             query = select(func.count("*")).select_from(JobRecord)
-            user_count = (await session.execute(query)).scalar()
+            user_count = await queryCount(query, session)
             stmt = delete(JobRecord)
             await session.execute(stmt)
             await session.commit()
@@ -90,7 +98,7 @@ async def delete_one(job_id: JobId) -> int:
         async with async_session_maker() as session:
             where = JobRecord.job_id == job_id
             query = select(func.count("*")).select_from(JobRecord).where(where)
-            user_count = (await session.execute(query)).scalar()
+            user_count = await queryCount(query, session)
             stmt = delete(JobRecord).where(where)
             await session.execute(stmt)
             await session.commit()

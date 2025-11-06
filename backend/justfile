@@ -1,0 +1,4 @@
+val:
+    uv run ty check
+    uv run pytest tests/unit
+    uv run pytest tests/integration
