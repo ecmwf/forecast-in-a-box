@@ -1,0 +1,16 @@
+[project]
+name = "FIAB-Experimental"
+version = "0.1.0"
+description = "Experimental codes for FIAB"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "earthkit-workflows-anemoi>=0.3.8",
+    "earthkit-workflows>=0.4.7",
+    "eccodeslib==2.44.0.1",
+    "pydantic>=2.12.0",
+    "qubed>=0.2.3",
+]
+
+[tool.uv.sources]
+qubed = { git = "https://github.com/ecmwf/qubed" }
