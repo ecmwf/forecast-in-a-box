@@ -3,6 +3,8 @@
 *.swp
 
 lib
+# frontend-v2 requires the lib folder to be included in the repository to avoid config issues using shadcn UI components
+!frontend-v2/src/lib
 data_dir
 *.ckpt
 dist
