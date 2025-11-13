@@ -76,19 +76,22 @@ class BaseForecastModel(ABC):
     @cached_property
     def versions(self) -> dict[str, str]:
         """Get versions from the model"""
-        def parse_versions(key, val):
-                if key.startswith("_"):
-                    return None, None
-                key = key.replace(".", "-")
-                if "://" in val:
-                    return key, val
 
-                val = val.split("+")[0]
-                return key, ".".join(val.split(".")[:3])
+        def parse_versions(key, val):
+            if key.startswith("_"):
+                return None, None
+            key = key.replace(".", "-")
+            if "://" in val:
+                return key, val
+
+            val = val.split("+")[0]
+            return key, ".".join(val.split(".")[:3])
 
         versions = {
             key: val
-            for key, val in (parse_versions(key, val) for key, val in self.checkpoint.provenance_training().get("module_versions", {}).items())
+            for key, val in (
+                parse_versions(key, val) for key, val in self.checkpoint.provenance_training().get("module_versions", {}).items()
+            )
             if key is not None and val is not None
         }
 
@@ -96,7 +99,6 @@ class BaseForecastModel(ABC):
         versions.update(extra_versions or {})
 
         return versions
-
 
     @property
     def ignore_in_select(self) -> list[str]:
@@ -113,7 +115,6 @@ class BaseForecastModel(ABC):
         """
         return convert_to_model_spec(self.checkpoint, assumptions=assumptions)
 
-
     # -------
     # Abstract methods
     # To define graph execution and input configuration
@@ -126,6 +127,7 @@ class BaseForecastModel(ABC):
     def _pre_processors(self, kwargs: dict[str, Any]) -> list[dict[str, Any]]:
         """Get the pre-processors for the model."""
         return []
+
     def _post_processors(self, kwargs: dict[str, Any]) -> list[dict[str, Any]]:
         """Get the post-processors for the model."""
         return []
@@ -146,20 +148,18 @@ class BaseForecastModel(ABC):
 
         INFERENCE_FILTER_INCLUDE = ["anemoi-models", "anemoi-graphs", "anemoi-transform", "flash-attn", "torch", "torch_geometric"]
         INITIAL_CONDITIONS_FILTER_STARTS = ["earthkit", "anemoi-transform", "anemoi-plugins"]
-        ENFORCE_GATEWAY_VERSIONS = ['anemoi-inference', 'earthkit-workflows', 'earthkit-workflows-anemoi']
+        ENFORCE_GATEWAY_VERSIONS = ["anemoi-inference", "earthkit-workflows", "earthkit-workflows-anemoi"]
 
-        inference_env = {
-            key: val for key, val in self.versions.items() if key in INFERENCE_FILTER_INCLUDE
-        }
+        inference_env = {key: val for key, val in self.versions.items() if key in INFERENCE_FILTER_INCLUDE}
 
         def parse_into_install(version_dict) -> list[str]:
             install_list = []
             for key, val in version_dict.items():
-                if 'dev' in val:
+                if "dev" in val:
                     continue
                 if "://" in val or "git+" in val or val.startswith("/"):
                     install_list.append(f"{key}@{val}")
-                elif any(c in val for c in ['<', '>', '==', '~']):
+                elif any(c in val for c in ["<", ">", "==", "~"]):
                     install_list.append(f"{key}{val}")
                 else:
                     install_list.append(f"{key}=={val}")
@@ -173,10 +173,8 @@ class BaseForecastModel(ABC):
         inference_env_list = combine_envs(inference_env, control.pkg_versions or {}, gateway_env)
 
         initial_conditions_env = {
-                key: val
-                for key, val in self.versions.items()
-                if any(key.startswith(start) for start in INITIAL_CONDITIONS_FILTER_STARTS)
-            }
+            key: val for key, val in self.versions.items() if any(key.startswith(start) for start in INITIAL_CONDITIONS_FILTER_STARTS)
+        }
         initial_conditions_env_list = combine_envs(initial_conditions_env, control.pkg_versions or {}, gateway_env)
 
         return {
@@ -196,16 +194,16 @@ class BaseForecastModel(ABC):
             input_source = {input_source: {}}
 
         extra_kwargs = {
-            'pre_processors': [],
-            'post_processors': [],
+            "pre_processors": [],
+            "post_processors": [],
         }
         if control.pre_processors:
             extra_kwargs["pre_processors"].extend(control.pre_processors)
         if control.post_processors:
             extra_kwargs["post_processors"].extend(control.post_processors)
 
-        extra_kwargs['pre_processors'].extend(self._pre_processors(kwargs))
-        extra_kwargs['post_processors'].extend(self._post_processors(kwargs))
+        extra_kwargs["pre_processors"].extend(self._pre_processors(kwargs))
+        extra_kwargs["post_processors"].extend(self._post_processors(kwargs))
 
         if ensemble_members == 1:
             ensemble_members = None
@@ -280,7 +278,7 @@ class BaseForecastModel(ABC):
                     title="Date",
                     description="The date for the forecast",
                 ),
-                uischema=UIStringField(widget="date", options={'yearsRange': [-20, 0]}), # type: ignore[unknown-argument] # TODO harrison `options` does really not seem to be declared!
+                uischema=UIStringField(widget="date", options={"yearsRange": [-20, 0]}),  # type: ignore[unknown-argument] # TODO harrison `options` does really not seem to be declared!
             ),
             "lead_time": FieldWithUI(
                 jsonschema=IntegerSchema(
@@ -289,11 +287,11 @@ class BaseForecastModel(ABC):
                     minimum=self.timestep,
                     default=self.control.capabilities.max_lead_time or 72,
                     maximum=self.control.capabilities.max_lead_time,
-                    multipleOf= self.timestep,
+                    multipleOf=self.timestep,
                 ),
                 uischema=UIIntegerField(),
             ),
-            "ensemble_members": FieldWithUI( # TODO: Allow None in the form
+            "ensemble_members": FieldWithUI(  # TODO: Allow None in the form
                 jsonschema=IntegerSchema(
                     title="Ensemble Members",
                     description="The number of ensemble members to use.",
@@ -310,8 +308,10 @@ class BaseForecastModel(ABC):
             required=["date", "lead_time", "ensemble_members"],
         )
 
+
 class SpecifiedModel(BaseForecastModel):
     """Model with specified parameters, delegating to a BaseForecastModel instance."""
+
     def __init__(self, model: BaseForecastModel, lead_time: int, date, ensemble_members: ENSEMBLE_MEMBER_SPECIFICATION = None, **kwargs):
         self._model = model
         self._kwargs = kwargs
@@ -322,7 +322,7 @@ class SpecifiedModel(BaseForecastModel):
     def _create_input_configuration(self, control: ControlMetadata) -> str | dict[str, Any]:
         return self._model._create_input_configuration(control)
 
-    def timesteps(self) -> list[int]: # type: ignore[override]
+    def timesteps(self) -> list[int]:  # type: ignore[override]
         return self._model.timesteps(self._lead_time)
 
     @property
@@ -335,7 +335,7 @@ class SpecifiedModel(BaseForecastModel):
             **self._kwargs,
         }
 
-    def graph(self, **kwargs) -> Action: # type: ignore[override]
+    def graph(self, **kwargs) -> Action:  # type: ignore[override]
         """Create the model action graph with specified parameters."""
         k = self._kwargs.copy()
         k.update(kwargs)
@@ -348,7 +348,6 @@ class SpecifiedModel(BaseForecastModel):
 
     def __getattr__(self, key):
         return getattr(self._model, key)
-
 
 
 # class Model(BaseModel, FormFieldProvider):
@@ -385,6 +384,7 @@ class ModelInfo(BaseModel):
     versions: dict[str, str]
     type: str
 
+
 def model_info(checkpoint_path: os.PathLike) -> ModelInfo:
     """Get basic information about the model from the checkpoint.
     This includes the timestep, diagnostic and prognostic variables,
@@ -393,9 +393,7 @@ def model_info(checkpoint_path: os.PathLike) -> ModelInfo:
     model = get_model(checkpoint_path)
 
     anemoi_versions = {
-        k: v
-        for k, v in model.versions.items()
-        if any(k.startswith(prefix) for prefix in ["anemoi-", "earthkit-", "torch", "flash-attn"])
+        k: v for k, v in model.versions.items() if any(k.startswith(prefix) for prefix in ["anemoi-", "earthkit-", "torch", "flash-attn"])
     }
 
     return ModelInfo(
@@ -407,7 +405,6 @@ def model_info(checkpoint_path: os.PathLike) -> ModelInfo:
         versions=anemoi_versions,
         type=model.__class__.__name__,
     )
-
 
 
 def convert_to_model_spec(ckpt: Checkpoint, assumptions: dict[str, Any] | None = None) -> Qube:

@@ -38,9 +38,7 @@ def test_uiarrayfield_and_uiobjectfield_export():
     obj_field = UIObjectField(anyOf=[UIStringField(), UIIntegerField()])
     # Should export with only set fields
     assert arr_field.export_with_prefix() == {}
-    assert obj_field.export_with_prefix() == {
-        "anyOf": [{"ui:options": {"widget": "text"}}, {"ui:options": {"widget": "updown"}}]
-    }
+    assert obj_field.export_with_prefix() == {"anyOf": [{"ui:options": {"widget": "text"}}, {"ui:options": {"widget": "updown"}}]}
 
 
 def test_uifield_all_options():

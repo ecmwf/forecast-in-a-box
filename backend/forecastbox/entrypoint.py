@@ -41,12 +41,14 @@ async def lifespan(app: FastAPI):
     logger.debug(f"Starting FIAB with config: {config}")
     for module_info in pkgutil.iter_modules(forecastbox.db.__path__):
         module = importlib.import_module(f"forecastbox.db.{module_info.name}")
-        if hasattr(module, 'create_db_and_tables'):
-            await module.create_db_and_tables() # type: ignore[call-non-callable] # NOTE no module protocol
+        if hasattr(module, "create_db_and_tables"):
+            await module.create_db_and_tables()  # type: ignore[call-non-callable] # NOTE no module protocol
     migrate()
     if config.api.allow_scheduler:
         start_scheduler()
-    await delete_download(None) # to get rid of db entries left over from previous run.. consider switching to pid table column instead, to mark failed and allow retry?
+    await delete_download(
+        None
+    )  # to get rid of db entries left over from previous run.. consider switching to pid table column instead, to mark failed and allow retry?
     release_time, release_version = get_local_release()
     app.version = f"{release_version}@{release_time}"
     yield
@@ -89,20 +91,22 @@ app.add_middleware(
 #         raise HTTPException(status_code=403, detail="Forbidden")
 #     return await call_next(request)
 
+
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
     start_time = time.time()
     response = await call_next(request)
     logger.debug(f"Request took {time.time() - start_time:0.2f} sec")
     return response
-    
+
+
 @app.middleware("http")
 async def circumvent_auth(request: Request, call_next):
     # TODO this is a hotfix, we'd instead like to fix properly in api/routers/auth.py
     if request.url.path == "/api/v1/users/me" and config.auth.passthrough:
         from starlette.responses import JSONResponse
 
-        return JSONResponse({'is_superuser': True})
+        return JSONResponse({"is_superuser": True})
     else:
         return await call_next(request)
 
@@ -160,9 +164,7 @@ async def share_image(request: Request, job_id: str, dataset_id: str):
     """Endpoint to share an image from a job and dataset ID."""
     base_url = str(request.base_url).rstrip("/")
     image_url = f"{base_url}/api/v1/job/{job_id}/{dataset_id}"
-    return templates.TemplateResponse(
-        "share.html", {"request": request, "image_url": image_url, "image_name": f"{job_id}_{dataset_id}"}
-    )
+    return templates.TemplateResponse("share.html", {"request": request, "image_url": image_url, "image_name": f"{job_id}_{dataset_id}"})
 
 
 frontend = os.path.join(os.path.dirname(__file__), "static")

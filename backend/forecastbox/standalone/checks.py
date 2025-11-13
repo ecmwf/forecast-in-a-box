@@ -11,7 +11,9 @@ from forecastbox.standalone.procs import ChildProcessGroup
 
 logger = logging.getLogger(__name__)
 
-CallResult = httpx.Response|httpx.HTTPError
+CallResult = httpx.Response | httpx.HTTPError
+
+
 def _call_succ(response: CallResult, url: str) -> bool:
     if isinstance(response, httpx.Response):
         if response.status_code == 200:
@@ -25,8 +27,10 @@ def _call_succ(response: CallResult, url: str) -> bool:
     else:
         assert_never(response)
 
+
 class StartupError(ValueError):
     pass
+
 
 def _wait_for(client: httpx.Client, url: str, attempts: int, condition: Callable[[CallResult, str], bool]) -> None:
     """Calls /status endpoint, retry on ConnectError"""
@@ -45,13 +49,13 @@ def _wait_for(client: httpx.Client, url: str, attempts: int, condition: Callable
     raise StartupError(f"failure on {url}: no more retries")
 
 
-def check_backend_ready(config: FIABConfig, handles: ChildProcessGroup|None = None, attempts: int = 20, spawn_gateway: bool=True):
+def check_backend_ready(config: FIABConfig, handles: ChildProcessGroup | None = None, attempts: int = 20, spawn_gateway: bool = True):
     try:
         with httpx.Client() as client:
             _wait_for(client, config.api.local_url() + "/api/v1/status", attempts, _call_succ)
             if spawn_gateway:
                 client.post(config.api.local_url() + "/api/v1/gateway/start").raise_for_status()
-            gw_check = lambda resp, _: resp.raise_for_status().text == f"\"{StatusMessage.gateway_running}\""
+            gw_check = lambda resp, _: resp.raise_for_status().text == f'"{StatusMessage.gateway_running}"'
             _wait_for(client, config.api.local_url() + "/api/v1/gateway/status", attempts, gw_check)
     except StartupError as e:
         logger.error(f"failed to start the backend: {e}")

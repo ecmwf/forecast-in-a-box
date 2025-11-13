@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class GatewayProcess:
-    log_path: str|None
+    log_path: str | None
     process: Process
 
     def cleanup(self) -> None:
@@ -123,9 +123,7 @@ async def stream_logs(request: Request) -> EventSourceResponse:
     async def event_generator():
         # NOTE consider rewriting to aiofile, eg https://github.com/kuralabs/logserver/blob/master/server/server.py
 
-        pipe = subprocess.Popen(
-            ["tail", "-F", Globals.gateway.log_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-        )
+        pipe = subprocess.Popen(["tail", "-F", Globals.gateway.log_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         poller = select.poll()
         poller.register(pipe.stdout)
 

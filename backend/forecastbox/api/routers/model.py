@@ -23,8 +23,7 @@ import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from forecastbox.api.utils import get_model_path
 from forecastbox.config import config
-from forecastbox.db.model import (delete_download, finish_edit, get_download, get_edit, start_download, start_editing,
-                                  update_progress)
+from forecastbox.db.model import delete_download, finish_edit, get_download, get_edit, start_download, start_editing, update_progress
 from forecastbox.models.metadata import ControlMetadata, set_control_metadata
 from forecastbox.models.model import ModelInfo, get_model, model_info
 from forecastbox.rjsf import ExportedSchemas
@@ -75,21 +74,21 @@ def download2response(model_download: ModelDownload | None) -> DownloadResponse:
     if model_download:
         if model_download.error:
             return DownloadResponse(
-                download_id=model_download.model_id, # type: ignore[invalid-argument-type] # NOTE sqlalchemy quirk
+                download_id=model_download.model_id,  # type: ignore[invalid-argument-type] # NOTE sqlalchemy quirk
                 message="Download failed. To retry, call delete_model first",
                 status="errored",
                 progress=0.0,
-                error=model_download.error, # type: ignore[invalid-argument-type] # NOTE sqlalchemy quirk
+                error=model_download.error,  # type: ignore[invalid-argument-type] # NOTE sqlalchemy quirk
             )
         if model_download.progress >= 100:
             return DownloadResponse(
-                download_id=model_download.model_id, # type: ignore[invalid-argument-type] # NOTE sqlalchemy quirk
+                download_id=model_download.model_id,  # type: ignore[invalid-argument-type] # NOTE sqlalchemy quirk
                 message="Download already completed.",
                 status="completed",
                 progress=100.0,
             )
         return DownloadResponse(
-            download_id=model_download.model_id, # type: ignore[invalid-argument-type] # NOTE sqlalchemy quirk
+            download_id=model_download.model_id,  # type: ignore[invalid-argument-type] # NOTE sqlalchemy quirk
             message="Download in progress.",
             status="in_progress",
             progress=float(model_download.progress),
@@ -302,7 +301,7 @@ async def patch_model_metadata(
     except Exception as e:
         msg = f"failed to edit model metadata due to {repr(e)}"
         logger.exception(msg)
-        raise HTTPException(status_code = 400, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)
 
 
 # section: MODEL INFO

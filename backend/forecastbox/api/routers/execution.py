@@ -30,7 +30,7 @@ LOG = logging.getLogger(__name__)
 
 
 @router.post("/visualise")
-async def get_graph_visualise(spec: ExecutionSpecification, options: VisualisationOptions|None = None) -> HTMLResponse:
+async def get_graph_visualise(spec: ExecutionSpecification, options: VisualisationOptions | None = None) -> HTMLResponse:
     """Get an HTML visualisation of the product graph.
 
     Parameters
@@ -100,9 +100,7 @@ async def get_graph_download(spec: ExecutionSpecification) -> str:
 
 
 @router.post("/execute")
-async def execute_api(
-    spec: ExecutionSpecification, user: UserRead | None = Depends(current_active_user)
-) -> SubmitJobResponse:
+async def execute_api(spec: ExecutionSpecification, user: UserRead | None = Depends(current_active_user)) -> SubmitJobResponse:
     """Execute a job based on the provided execution specification.
 
     Parameters

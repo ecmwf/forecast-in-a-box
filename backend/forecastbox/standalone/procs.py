@@ -1,6 +1,6 @@
 """Process-related utilities, mostly for non-service mode:
-    - ChildProcessGroup for gracefully terminating the backend,
-    - previous_cleanup in case the previous backend instance didnt finish cleanly.
+- ChildProcessGroup for gracefully terminating the backend,
+- previous_cleanup in case the previous backend instance didnt finish cleanly.
 """
 
 import logging
@@ -11,12 +11,13 @@ import psutil
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
-class ChildProcessGroup():
+class ChildProcessGroup:
     procs: list[Process]
 
     def wait(self):
-        if self.procs: # NOTE wait([]) actually stucks forever
+        if self.procs:  # NOTE wait([]) actually stucks forever
             connection.wait([p.sentinel for p in self.procs])
 
     def shutdown(self):
@@ -37,12 +38,14 @@ def previous_cleanup():
     # persits pids, etc, but ultimately those sound less reliable / less safe
     self = psutil.Process()
     executable = self.exe()
+
     def filtering(p: psutil.Process):
         try:
             return p.exe() == executable and p.pid != self.pid
         except (psutil.AccessDenied, psutil.ZombieProcess):
             return False
-    processes = [p for p in psutil.process_iter(['pid', 'exe']) if filtering(p)]
+
+    processes = [p for p in psutil.process_iter(["pid", "exe"]) if filtering(p)]
     for p in processes:
         try:
             logger.warning(f"stopping process {p.pid}, believing it a remnant of previous run")

@@ -22,6 +22,7 @@ from forecastbox.standalone.config import setup_process
 
 logger = logging.getLogger(__name__)
 
+
 async def _uvicorn_run(app_name: str, host: str, port: int) -> None:
     # NOTE we pass None to log config to not interfere with original logging setting
     config = uvicorn.Config(
@@ -54,7 +55,8 @@ def launch_backend():
     except KeyboardInterrupt:
         pass  # no need to spew stacktrace to log
 
-def launch_cascade(log_path: str|None, log_base: str|None, max_concurrent_jobs: int|None):
+
+def launch_cascade(log_path: str | None, log_base: str | None, max_concurrent_jobs: int | None):
     config = FIABConfig()
     # TODO this configuration of log_path is very unsystematic, improve!
     # TODO we may want this to propagate to controller/executors -- but stripped the gateway.txt etc

@@ -1,4 +1,3 @@
-
 import datetime as dt
 import uuid
 from typing import cast
@@ -29,24 +28,29 @@ def mock_schedule_run_row():
             updated_at=dt.datetime(2025, 10, 23, 10, 0, 5),
             graph_specification="{}",
             created_by="test@example.com",
-            outputs = "{}",
+            outputs="{}",
             error=None,
             progress="100%",
         ),
     )
 
+
 @pytest.fixture
 def mock_user():
     return UserRead(id=str(uuid.uuid4()), email="test@example.com", is_active=True, is_superuser=False, is_verified=True)
 
+
 @pytest.mark.asyncio
 async def test_get_schedule_runs_success(mock_schedule_run_row, mock_user):
-    with patch("forecastbox.api.routers.schedule.select_runs", AsyncMock(return_value=[mock_schedule_run_row])) as mock_select_runs, \
-         patch("forecastbox.api.routers.schedule.select_runs_count", AsyncMock(return_value=1)) as mock_select_runs_count:
-
+    with (
+        patch("forecastbox.api.routers.schedule.select_runs", AsyncMock(return_value=[mock_schedule_run_row])) as mock_select_runs,
+        patch("forecastbox.api.routers.schedule.select_runs_count", AsyncMock(return_value=1)) as mock_select_runs_count,
+    ):
         response = await get_schedule_runs(schedule_id="test_schedule_id", user=mock_user)
 
-        mock_select_runs.assert_called_once_with(schedule_id="test_schedule_id", since_dt=None, before_dt=None, offset=0, limit=10, status=None)
+        mock_select_runs.assert_called_once_with(
+            schedule_id="test_schedule_id", since_dt=None, before_dt=None, offset=0, limit=10, status=None
+        )
         mock_select_runs_count.assert_called_once_with(schedule_id="test_schedule_id", since_dt=None, before_dt=None, status=None)
 
         assert isinstance(response, GetScheduleRunsResponse)
@@ -60,14 +64,18 @@ async def test_get_schedule_runs_success(mock_schedule_run_row, mock_user):
         assert response.total_pages == 1
         assert response.error is None
 
+
 @pytest.mark.asyncio
 async def test_get_schedule_runs_pagination(mock_schedule_run_row, mock_user):
-    with patch("forecastbox.api.routers.schedule.select_runs", AsyncMock(return_value=[mock_schedule_run_row])) as mock_select_runs, \
-         patch("forecastbox.api.routers.schedule.select_runs_count", AsyncMock(return_value=1)) as mock_select_runs_count:
-
+    with (
+        patch("forecastbox.api.routers.schedule.select_runs", AsyncMock(return_value=[mock_schedule_run_row])) as mock_select_runs,
+        patch("forecastbox.api.routers.schedule.select_runs_count", AsyncMock(return_value=1)) as mock_select_runs_count,
+    ):
         response = await get_schedule_runs(schedule_id="test_schedule_id", user=mock_user, page=1, page_size=1)
 
-        mock_select_runs.assert_called_once_with(schedule_id="test_schedule_id", since_dt=None, before_dt=None, offset=0, limit=1, status=None)
+        mock_select_runs.assert_called_once_with(
+            schedule_id="test_schedule_id", since_dt=None, before_dt=None, offset=0, limit=1, status=None
+        )
         mock_select_runs_count.assert_called_once_with(schedule_id="test_schedule_id", since_dt=None, before_dt=None, status=None)
         assert isinstance(response, GetScheduleRunsResponse)
         assert len(response.runs) == 1
@@ -76,14 +84,18 @@ async def test_get_schedule_runs_pagination(mock_schedule_run_row, mock_user):
         assert response.page_size == 1
         assert response.total_pages == 1
 
+
 @pytest.mark.asyncio
 async def test_get_schedule_runs_no_runs(mock_user):
-    with patch("forecastbox.api.routers.schedule.select_runs", AsyncMock(return_value=[])) as mock_select_runs, \
-         patch("forecastbox.api.routers.schedule.select_runs_count", AsyncMock(return_value=0)) as mock_select_runs_count:
-
+    with (
+        patch("forecastbox.api.routers.schedule.select_runs", AsyncMock(return_value=[])) as mock_select_runs,
+        patch("forecastbox.api.routers.schedule.select_runs_count", AsyncMock(return_value=0)) as mock_select_runs_count,
+    ):
         response = await get_schedule_runs(schedule_id="test_schedule_id", user=mock_user)
 
-        mock_select_runs.assert_called_once_with(schedule_id="test_schedule_id", since_dt=None, before_dt=None, offset=0, limit=10, status=None)
+        mock_select_runs.assert_called_once_with(
+            schedule_id="test_schedule_id", since_dt=None, before_dt=None, offset=0, limit=10, status=None
+        )
         mock_select_runs_count.assert_called_once_with(schedule_id="test_schedule_id", since_dt=None, before_dt=None, status=None)
         assert isinstance(response, GetScheduleRunsResponse)
         assert len(response.runs) == 0
@@ -92,6 +104,7 @@ async def test_get_schedule_runs_no_runs(mock_user):
         assert response.page_size == 10
         assert response.total_pages == 0
         assert response.error is None
+
 
 @pytest.mark.asyncio
 async def test_get_schedule_runs_invalid_page_params(mock_user):
@@ -103,11 +116,13 @@ async def test_get_schedule_runs_invalid_page_params(mock_user):
         await get_schedule_runs(schedule_id="test_schedule_id", user=mock_user, page_size=0)
     assert "Page and page_size must be greater than 0." in cast(HTTPException, exc_info.value).detail
 
+
 @pytest.mark.asyncio
 async def test_get_schedule_runs_page_out_of_range(mock_schedule_run_row, mock_user):
-    with patch("forecastbox.api.routers.schedule.select_runs", AsyncMock(return_value=[])), \
-         patch("forecastbox.api.routers.schedule.select_runs_count", AsyncMock(return_value=1)):
-
+    with (
+        patch("forecastbox.api.routers.schedule.select_runs", AsyncMock(return_value=[])),
+        patch("forecastbox.api.routers.schedule.select_runs_count", AsyncMock(return_value=1)),
+    ):
         with pytest.raises(HTTPException) as exc_info:
             await get_schedule_runs(schedule_id="test_schedule_id", user=mock_user, page=2, page_size=1)
         assert "Page number out of range." in cast(HTTPException, exc_info.value).detail

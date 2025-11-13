@@ -123,6 +123,7 @@ class ExecutionSpecification(FIABBaseModel):
     environment: EnvironmentSpecification
     shared: bool = Field(default=False)
 
+
 class ScheduleSpecification(FIABBaseModel):
     exec_spec: ExecutionSpecification
     """The static part of the job, ie, what remains constant across executions"""
@@ -130,11 +131,12 @@ class ScheduleSpecification(FIABBaseModel):
     """Evaluated at each invocation, with keys pointing to paths in the job_spec,
     and values being dynamic expressions to be injected. Supported expressions:
     - `$schedule_datetime` -- like '20241012T00'
-    """ # TODO support smth like argo expression language here
+    """  # TODO support smth like argo expression language here
     cron_expr: str
     """Cron expression for time scheduling"""
     max_acceptable_delay_hours: PositiveInt
     """Maximum acceptable delay in hours for a scheduled run. If the scheduler is down for longer than this, the run will be skipped."""
+
 
 class ScheduleUpdate(FIABBaseModel):
     exec_spec: ExecutionSpecification | None = None
@@ -143,12 +145,13 @@ class ScheduleUpdate(FIABBaseModel):
     cron_expr: str | None = None
     max_acceptable_delay_hours: PositiveInt | None = None
 
-def schedule2db(schedule_obj: ScheduleSpecification|ScheduleUpdate) -> dict[str, Any]:
+
+def schedule2db(schedule_obj: ScheduleSpecification | ScheduleUpdate) -> dict[str, Any]:
     data = {}
     if schedule_obj.exec_spec is not None:
         data["exec_spec"] = schedule_obj.exec_spec.model_dump_json()
     if schedule_obj.dynamic_expr is not None:
-        data["dynamic_expr"] = orjson.dumps(schedule_obj.dynamic_expr).decode('ascii')
+        data["dynamic_expr"] = orjson.dumps(schedule_obj.dynamic_expr).decode("ascii")
     if schedule_obj.cron_expr is not None:
         data["cron_expr"] = schedule_obj.cron_expr
     if hasattr(schedule_obj, "enabled") and schedule_obj.enabled is not None:
@@ -156,6 +159,7 @@ def schedule2db(schedule_obj: ScheduleSpecification|ScheduleUpdate) -> dict[str,
     if hasattr(schedule_obj, "max_acceptable_delay_hours") and schedule_obj.max_acceptable_delay_hours is not None:
         data["max_acceptable_delay_hours"] = schedule_obj.max_acceptable_delay_hours
     return data
+
 
 class VisualisationOptions(FIABBaseModel):
     preset: str = "blob"

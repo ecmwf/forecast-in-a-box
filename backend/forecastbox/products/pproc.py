@@ -32,9 +32,8 @@ except (OSError, ImportError) as e:
     PPROC_AVAILABLE = False
     LOG.warning("PPROC is not available. %s", e)
 
-def from_request(
-    request: dict, pproc_schema: str, action_kwargs: dict[str, Any] | None = None, **sources: fluent.Action
-) -> fluent.Action:
+
+def from_request(request: dict, pproc_schema: str, action_kwargs: dict[str, Any] | None = None, **sources: fluent.Action) -> fluent.Action:
     inputs = []
     for source in sources.values():
         inputs.append({k: list(source.nodes.coords[k].values) for k in source.nodes.coords.keys()})
@@ -91,10 +90,7 @@ class PProcProduct(Product):
     #         **super().model_assumptions,
     #    }
 
-
-    def get_sources(
-        self, product_spec: dict[str, Any], model: SpecifiedModel, source: fluent.Action
-    ) -> dict[str, fluent.Action]:
+    def get_sources(self, product_spec: dict[str, Any], model: SpecifiedModel, source: fluent.Action) -> dict[str, fluent.Action]:
         """Get sources for pproc action.
 
         By default just provides the model source as 'forecast'
@@ -179,8 +175,8 @@ class PProcProduct(Product):
         full_requests = []
         for req in request:
             req_full = {
-                "date": model.specification['date'],
-                "time": model.specification.get('time', '00'),
+                "date": model.specification["date"],
+                "time": model.specification.get("time", "00"),
                 "domain": getattr(model, "domain", "g"),
                 **self.default_request_keys,
             }

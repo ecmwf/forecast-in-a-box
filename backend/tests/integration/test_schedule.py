@@ -1,8 +1,7 @@
 from datetime import datetime as dt
 
 from cascade.low.builders import JobBuilder, TaskBuilder
-from forecastbox.api.types import (EnvironmentSpecification, ExecutionSpecification, RawCascadeJob,
-                                   ScheduleSpecification, ScheduleUpdate)
+from forecastbox.api.types import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob, ScheduleSpecification, ScheduleUpdate
 
 
 def test_schedule_crud(backend_client_with_auth):
@@ -10,9 +9,7 @@ def test_schedule_crud(backend_client_with_auth):
     response = backend_client_with_auth.get("/schedule/notToBeFound")
     assert response.status_code == 404
 
-    job_instance = (
-        JobBuilder().with_node("n1", TaskBuilder.from_callable(eval).with_values("1+2")).build().get_or_raise()
-    )
+    job_instance = JobBuilder().with_node("n1", TaskBuilder.from_callable(eval).with_values("1+2")).build().get_or_raise()
     env = EnvironmentSpecification(hosts=1, workers_per_host=2)
     exec_spec = ExecutionSpecification(
         job=RawCascadeJob(
@@ -52,12 +49,11 @@ def test_schedule_crud(backend_client_with_auth):
     assert retrieved_schedule["cron_expr"] == updated_cron_expr
     assert retrieved_schedule["enabled"] is False
 
+
 def test_get_multiple_schedules(backend_client_with_auth):
     headers = {"Content-Type": "application/json"}
 
-    job_instance = (
-        JobBuilder().with_node("n1", TaskBuilder.from_callable(eval).with_values("1+2")).build().get_or_raise()
-    )
+    job_instance = JobBuilder().with_node("n1", TaskBuilder.from_callable(eval).with_values("1+2")).build().get_or_raise()
     env = EnvironmentSpecification(hosts=1, workers_per_host=2)
     exec_spec = ExecutionSpecification(
         job=RawCascadeJob(
@@ -83,10 +79,12 @@ def test_get_multiple_schedules(backend_client_with_auth):
 
     # update: disable
     schedule_update_2 = ScheduleUpdate(enabled=False)
-    response = backend_client_with_auth.post(f"/schedule/{sched_id_2}", headers=headers, json=schedule_update_2.model_dump(exclude_unset=True))
+    response = backend_client_with_auth.post(
+        f"/schedule/{sched_id_2}", headers=headers, json=schedule_update_2.model_dump(exclude_unset=True)
+    )
     assert response.is_success
 
-    creation_time = dt.now() # we do it a bit later, to ensure db in sync
+    creation_time = dt.now()  # we do it a bit later, to ensure db in sync
 
     # filter: enabled
     response = backend_client_with_auth.get("/schedule/?enabled=true")
@@ -168,12 +166,11 @@ def test_get_multiple_schedules(backend_client_with_auth):
     response = backend_client_with_auth.get("/schedule/?page=0&page_size=1")
     assert response.status_code == 400
 
+
 def test_get_next_schedule_run_endpoint(backend_client_with_auth):
     headers = {"Content-Type": "application/json"}
 
-    job_instance = (
-        JobBuilder().with_node("n1", TaskBuilder.from_callable(eval).with_values("1+2")).build().get_or_raise()
-    )
+    job_instance = JobBuilder().with_node("n1", TaskBuilder.from_callable(eval).with_values("1+2")).build().get_or_raise()
     env = EnvironmentSpecification(hosts=1, workers_per_host=2)
     exec_spec = ExecutionSpecification(
         job=RawCascadeJob(
@@ -200,9 +197,11 @@ def test_get_next_schedule_run_endpoint(backend_client_with_auth):
     assert "00:00:00" in initial_next_run
 
     # regenerate by changing cron expr
-    updated_cron_expr = "0 2 * * *" # Change to 2 AM
+    updated_cron_expr = "0 2 * * *"  # Change to 2 AM
     schedule_update = ScheduleUpdate(cron_expr=updated_cron_expr)
-    response = backend_client_with_auth.post(f"/schedule/{schedule_id}", headers=headers, json=schedule_update.model_dump(exclude_unset=True))
+    response = backend_client_with_auth.post(
+        f"/schedule/{schedule_id}", headers=headers, json=schedule_update.model_dump(exclude_unset=True)
+    )
     assert response.is_success
 
     response = backend_client_with_auth.get(f"/schedule/{schedule_id}/next_run")
@@ -213,7 +212,9 @@ def test_get_next_schedule_run_endpoint(backend_client_with_auth):
 
     # regenerate by disabling
     schedule_update_disable = ScheduleUpdate(enabled=False)
-    response = backend_client_with_auth.post(f"/schedule/{schedule_id}", headers=headers, json=schedule_update_disable.model_dump(exclude_unset=True))
+    response = backend_client_with_auth.post(
+        f"/schedule/{schedule_id}", headers=headers, json=schedule_update_disable.model_dump(exclude_unset=True)
+    )
     assert response.is_success
 
     response = backend_client_with_auth.get(f"/schedule/{schedule_id}/next_run")

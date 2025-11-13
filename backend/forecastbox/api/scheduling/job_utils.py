@@ -30,6 +30,7 @@ def deep_union(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
             merged[key] = value
     return merged
 
+
 def eval_dynamic_expression(data: dict[str, Any], execution_time: dt.datetime) -> dict[str, Any]:
     """Recursively evaluates '$execution_time' etc, returns a new copy of `data`."""
     processed_data = {}
@@ -42,17 +43,19 @@ def eval_dynamic_expression(data: dict[str, Any], execution_time: dt.datetime) -
             processed_data[key] = value
     return processed_data
 
+
 @dataclass
 class RunnableSchedule:
     exec_spec: ExecutionSpecification
-    created_by: str|None
-    next_run_at: dt.datetime|None
+    created_by: str | None
+    next_run_at: dt.datetime | None
     scheduled_at: dt.datetime
     attempt_cnt: int
     max_acceptable_delay_hours: int
     schedule_id: str
 
-async def schedule2runnable(schedule_id: str, exec_time: dt.datetime) -> Either[RunnableSchedule, str]: # type: ignore[invalid-argument] # NOTE type checker issue
+
+async def schedule2runnable(schedule_id: str, exec_time: dt.datetime) -> Either[RunnableSchedule, str]:  # type: ignore[invalid-argument] # NOTE type checker issue
     """Converts a ScheduleDefinition into a RunnableSchedule by evaluating dynamic expressions and merging."""
     schedules = list(await get_schedules(schedule_id=schedule_id))
     if not schedules:
@@ -60,26 +63,27 @@ async def schedule2runnable(schedule_id: str, exec_time: dt.datetime) -> Either[
     schedule_def = schedules[0]
 
     try:
-        dynamic_expr = orjson.loads(schedule_def.dynamic_expr.encode('ascii'))
-        exec_spec = orjson.loads(schedule_def.exec_spec.encode('ascii'))
+        dynamic_expr = orjson.loads(schedule_def.dynamic_expr.encode("ascii"))
+        exec_spec = orjson.loads(schedule_def.exec_spec.encode("ascii"))
 
         dynamic_evaluated = eval_dynamic_expression(dynamic_expr, exec_time)
         merged_spec = deep_union(exec_spec, dynamic_evaluated)
         next_run_at = calculate_next_run(exec_time, cast(str, schedule_def.cron_expr))
         rv = RunnableSchedule(
-            exec_spec = ExecutionSpecification(**merged_spec),
-            created_by = schedule_def.created_by,
-            next_run_at = next_run_at,
-            scheduled_at = exec_time,
-            attempt_cnt = 0,
-            max_acceptable_delay_hours = cast(int, schedule_def.max_acceptable_delay_hours),
-            schedule_id = schedule_def.schedule_id,
+            exec_spec=ExecutionSpecification(**merged_spec),
+            created_by=schedule_def.created_by,
+            next_run_at=next_run_at,
+            scheduled_at=exec_time,
+            attempt_cnt=0,
+            max_acceptable_delay_hours=cast(int, schedule_def.max_acceptable_delay_hours),
+            schedule_id=schedule_def.schedule_id,
         )
         return Either.ok(rv)
     except Exception as e:
         return Either.error(repr(e))
 
-async def run2runnable(schedule_run_id: str) -> Either[RunnableSchedule, str]: # type: ignore[invalid-argument] # NOTE type checker issue
+
+async def run2runnable(schedule_run_id: str) -> Either[RunnableSchedule, str]:  # type: ignore[invalid-argument] # NOTE type checker issue
     """Converts a ScheduleRun into a RunnableSchedule, with all the original parameters. Intended for re-runs"""
     schedule_def = await run2schedule(schedule_run_id)
     if schedule_def is None:
@@ -92,19 +96,19 @@ async def run2runnable(schedule_run_id: str) -> Either[RunnableSchedule, str]: #
         return Either.error(f"schedule run {schedule_run_id} not found")
 
     try:
-        dynamic_expr = orjson.loads(schedule_def.dynamic_expr.encode('ascii'))
-        exec_spec = orjson.loads(schedule_def.exec_spec.encode('ascii'))
+        dynamic_expr = orjson.loads(schedule_def.dynamic_expr.encode("ascii"))
+        exec_spec = orjson.loads(schedule_def.exec_spec.encode("ascii"))
 
         dynamic_evaluated = eval_dynamic_expression(dynamic_expr, scheduled_at)
         merged_spec = deep_union(exec_spec, dynamic_evaluated)
         rv = RunnableSchedule(
-            exec_spec = ExecutionSpecification(**merged_spec),
-            created_by = cast(str|None, schedule_def.created_by),
-            next_run_at = None,
-            scheduled_at = scheduled_at,
-            attempt_cnt = attempt_cnt,
-            max_acceptable_delay_hours = cast(int, schedule_def.max_acceptable_delay_hours),
-            schedule_id = cast(str, schedule_def.schedule_id),
+            exec_spec=ExecutionSpecification(**merged_spec),
+            created_by=cast(str | None, schedule_def.created_by),
+            next_run_at=None,
+            scheduled_at=scheduled_at,
+            attempt_cnt=attempt_cnt,
+            max_acceptable_delay_hours=cast(int, schedule_def.max_acceptable_delay_hours),
+            schedule_id=cast(str, schedule_def.schedule_id),
         )
         return Either.ok(rv)
     except Exception as e:

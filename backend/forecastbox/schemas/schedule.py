@@ -17,6 +17,7 @@ from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
+
 class ScheduleDefinition(Base):
     __tablename__ = "schedule_definition"
 
@@ -26,9 +27,10 @@ class ScheduleDefinition(Base):
     updated_at = Column(DateTime, nullable=False)
     exec_spec = Column(JSON, nullable=False)
     dynamic_expr = Column(JSON, nullable=False)
-    enabled = Column(Boolean, nullable = False)
+    enabled = Column(Boolean, nullable=False)
     created_by = Column(String(255), nullable=True)
     max_acceptable_delay_hours = Column(Integer, nullable=False)
+
 
 class ScheduleRun(Base):
     __tablename__ = "schedule_run"
@@ -40,11 +42,12 @@ class ScheduleRun(Base):
 
     attempt_cnt = Column(Integer, nullable=False)
     scheduled_at = Column(DateTime, nullable=False)
-    trigger = Column(String(64), nullable=False) # probably an enum like `cron`, `event` (or event_id?), `request`
+    trigger = Column(String(64), nullable=False)  # probably an enum like `cron`, `event` (or event_id?), `request`
+
 
 class ScheduleNext(Base):
     __tablename__ = "schedule_next"
 
     schedule_next_id = Column(String(255), primary_key=True, nullable=False)
-    schedule_id = Column(String(255), nullable=False, unique=True) # Foreign key to ScheduleDefinition
+    schedule_id = Column(String(255), nullable=False, unique=True)  # Foreign key to ScheduleDefinition
     scheduled_at = Column(DateTime, nullable=False)

@@ -61,12 +61,16 @@ class JobProgressResponse:
     error: str | None = None
     """Error message if the job encountered an error, otherwise None."""
 
-def build_response(record: JobRecord, progress: str|None=None, error: str|None=None, status: STATUS|None=None) -> JobProgressResponse:
+
+def build_response(
+    record: JobRecord, progress: str | None = None, error: str | None = None, status: STATUS | None = None
+) -> JobProgressResponse:
     created_at = str(record.created_at)
     progress = progress or cast(str, record.progress) or "0.00"
     error = error or cast(str, record.error)
     status = status or record.status
     return JobProgressResponse(progress=progress, created_at=created_at, status=status, error=error)
+
 
 @dataclass
 class JobProgressResponses:
@@ -108,9 +112,7 @@ async def update_and_get_progress(job_id: JobId) -> JobProgressResponse:
 
     if job.status in ("running", "submitted"):
         try:
-            response = client.request_response(
-                api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}"
-            )
+            response = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}")
             response = cast(api.JobProgressResponse, response)
         except TimeoutError:
             # NOTE we dont update db because the job may still be running
@@ -149,10 +151,7 @@ async def update_and_get_progress(job_id: JobId) -> JobProgressResponse:
 
 @router.get("/status")
 async def get_status(
-    user: UserRead = Depends(current_active_user),
-    page: int = 1,
-    page_size: int = 10,
-    status: STATUS | None = None
+    user: UserRead = Depends(current_active_user), page: int = 1, page_size: int = 10, status: STATUS | None = None
 ) -> JobProgressResponses:
     """Get progress of all tasks recorded in the database with pagination and filtering.
 
@@ -186,21 +185,12 @@ async def get_status(
     job_records = list(await get_all(status, start, page_size))
 
     progresses = {
-        str(job.job_id): (
-            await update_and_get_progress(job.job_id)
-            if job.status in ["running", "submitted"]
-            else build_response(job)
-        )
+        str(job.job_id): (await update_and_get_progress(job.job_id) if job.status in ["running", "submitted"] else build_response(job))
         for job in job_records
     }
 
     return JobProgressResponses(
-        progresses=progresses,
-        total=total_jobs,
-        page=page,
-        page_size=page_size,
-        total_pages=total_pages,
-        error=None
+        progresses=progresses, total=total_jobs, page=page, page_size=page_size, total_pages=total_pages, error=None
     )
 
 
@@ -211,7 +201,7 @@ async def get_status_of_job(job_id: JobId = Depends(validate_job_id), user: User
 
 
 @router.get("/{job_id}/outputs")
-async def get_outputs_of_job(job_id: JobId = Depends(validate_job_id), user = Depends(current_active_user)) -> list[ProductToOutputId]:
+async def get_outputs_of_job(job_id: JobId = Depends(validate_job_id), user=Depends(current_active_user)) -> list[ProductToOutputId]:
     """Get outputs of a job."""
     job = await get_one(job_id)
     if job is None:
@@ -221,7 +211,6 @@ async def get_outputs_of_job(job_id: JobId = Depends(validate_job_id), user = De
     if len(product_to_id_mappings) == 0:
         raise HTTPException(status_code=204, detail=f"Job {job_id} had no outputs recorded.")
     return [ProductToOutputId(**item) for item in product_to_id_mappings]
-
 
 
 @router.post("/{job_id}/visualise")
@@ -248,7 +237,9 @@ async def visualise_job(
 
 
 @router.get("/{job_id}/specification")
-async def get_job_specification(job_id: JobId = Depends(validate_job_id), user: UserRead = Depends(current_active_user)) -> ExecutionSpecification:
+async def get_job_specification(
+    job_id: JobId = Depends(validate_job_id), user: UserRead = Depends(current_active_user)
+) -> ExecutionSpecification:
     """Get specification in the database of a job."""
     job = await get_one(job_id)
     if job is None:
@@ -263,9 +254,7 @@ async def get_job_specification(job_id: JobId = Depends(validate_job_id), user: 
 
 
 @router.post("/{job_id}/restart")
-async def restart_job(
-    job_id: JobId = Depends(validate_job_id), user: UserRead | None = Depends(current_active_user)
-) -> SubmitJobResponse:
+async def restart_job(job_id: JobId = Depends(validate_job_id), user: UserRead | None = Depends(current_active_user)) -> SubmitJobResponse:
     """Restart a job by executing its specification."""
     job = await get_one(job_id)
     if job is None:
@@ -328,9 +317,7 @@ async def get_job_availability(job_id: JobId = Depends(validate_job_id), user: U
     list[TaskId]
         List of dataset IDs that are available for the job.
     """
-    response = client.request_response(
-        api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}"
-    )
+    response = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}")
     response = cast(api.JobProgressResponse, response)
 
     if job_id not in response.datasets:
@@ -341,7 +328,9 @@ async def get_job_availability(job_id: JobId = Depends(validate_job_id), user: U
 
 @router.get("/{job_id}/{dataset_id}/available")
 async def get_result_availability(
-    job_id: JobId = Depends(validate_job_id), dataset_id: TaskId = Depends(validate_dataset_id), user: UserRead = Depends(current_active_user)
+    job_id: JobId = Depends(validate_job_id),
+    dataset_id: TaskId = Depends(validate_dataset_id),
+    user: UserRead = Depends(current_active_user),
 ) -> DatasetAvailabilityResponse:
     """Check if the result is available for a given job_id and dataset_id.
 
@@ -363,9 +352,7 @@ async def get_result_availability(
     """
 
     try:
-        response = client.request_response(
-            api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}"
-        )
+        response = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}")
         response = cast(api.JobProgressResponse, response)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Job retrieval failed: {repr(e)}")
@@ -412,7 +399,7 @@ async def get_logs(job_id: JobId = Depends(validate_job_id), user: UserRead = De
                         for f in os.listdir(p):
                             jPref = f"job.{job_id}"
                             if f.startswith("gateway") or f.startswith(jPref):
-                                zf.write(f"{p/f}", arcname=f)
+                                zf.write(f"{p / f}", arcname=f)
                     except Exception as e:
                         zf.writestr("logs_directory.error.txt", f"{f} => {repr(e)}")
             return buffer.getvalue(), ""
@@ -439,7 +426,9 @@ async def get_logs(job_id: JobId = Depends(validate_job_id), user: UserRead = De
 
 @router.get("/{job_id}/results/{dataset_id}")
 async def get_result(
-    job_id: JobId = Depends(validate_job_id), dataset_id: TaskId = Depends(validate_dataset_id), user: UserRead = Depends(current_active_user)
+    job_id: JobId = Depends(validate_job_id),
+    dataset_id: TaskId = Depends(validate_dataset_id),
+    user: UserRead = Depends(current_active_user),
 ) -> Response:
     """Get the result of a job.
 
