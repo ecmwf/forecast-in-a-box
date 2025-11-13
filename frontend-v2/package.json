@@ -10,8 +10,7 @@
     "test": "vitest run",
     "lint": "eslint",
     "format": "prettier",
-    "check": "prettier --write . && eslint --fix",
-    "prepare": "cd .. && husky frontend-v2/.husky"
+    "check": "prettier --write . && eslint --fix"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
@@ -45,7 +44,6 @@
     "@types/react": "^19.2.3",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
-    "husky": "^9.1.7",
     "i18next-cli": "^1.23.5",
     "jsdom": "^27.2.0",
     "prettier": "^3.6.2",
