@@ -20,12 +20,36 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        arch_type: [ARM64] # , X64 NOTE: we dont run on X64 anymore as it does not support eg newer pytorches
+        arch_type: [ARM64] # NOTE: we dont run on X64 anymore as it does not support eg newer pytorches
         python_version: ["3.11", "3.12", "3.13"]
     runs-on: [self-hosted, macOS, "${{ matrix.arch_type }}"]
+    # NOTE we want to trigger this only in origin2origin or fork2origin scenarios, not in fork2fork scenarios
+    if: github.event.pull_request.base.repo.full_name == 'ecmwf/forecast-in-a-box'
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - run: |
+          set -euo pipefail
+          cd backend
+          uv sync --extra plots --python "${{ matrix.python_version }}"
+          uv run ty check
+          mkdir /tmp/tmpFiabHome
+          mkdir forecastbox/static && touch forecastbox/static/index.html # TODO replace with proper static file build
+          uv run pytest
+  ubuntu:
+    name: ubuntu
+    strategy:
+      fail-fast: true
+      matrix:
+        python_version: ["3.11", "3.12", "3.13"]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # NOTE we trigger this for both fork- and origin- targeting PRs, as those are github runners
+    steps:
+      - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v3
+      - uses: astral-sh/setup-uv@v7
+      - uses: actions/setup-node@v4
       - run: |
           set -euo pipefail
           cd backend
