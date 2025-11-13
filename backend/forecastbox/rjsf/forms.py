@@ -81,4 +81,4 @@ class FormDefinition(BaseModel):
         """Exports both JSON Schema and UI Schema in a combined format.
         This is useful for rendering forms in RJSF.
         """
-        return {"jsonSchema": self.export_jsonschema(), "uiSchema": self.export_uischema(), 'formData': self.formData}
+        return {"jsonSchema": self.export_jsonschema(), "uiSchema": self.export_uischema(), "formData": self.formData}

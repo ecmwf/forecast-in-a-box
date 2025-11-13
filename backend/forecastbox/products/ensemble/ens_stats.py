@@ -33,8 +33,8 @@ class BaseEnsembleStats(BasePProcEnsembleProduct, GenericTemporalProduct):
         params = product_spec["param"]
         step = product_spec["step"]
         spec = {"param": params, "step": step}
-        if 'levelist' in product_spec:
-            spec['levelist'] = product_spec['levelist']
+        if "levelist" in product_spec:
+            spec["levelist"] = product_spec["levelist"]
         return {"forecast": self.select_on_specification(spec, source)}
 
     def mars_request(self, product_spec: dict[str, Any]):

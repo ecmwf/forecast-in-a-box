@@ -32,6 +32,7 @@ class FakeModel(GlobalModel):
     def control(self) -> ControlMetadata:
         return ControlMetadata()
 
+
 @fake_checkpoints
 def test_model_qube():
     """Test the `qube` method of the model."""
@@ -63,7 +64,6 @@ def test_model_qube_with_model_assumptions():
     """Test the `qube` method of the model with model assumptions."""
 
     test_model = FakeModel(checkpoint=checkpoint_path).specify(lead_time=72, date="2023-01-01", ensemble_members=1)
-
 
     model_assumptions = {
         "options": ["value1", "value2"],

@@ -49,7 +49,7 @@ class FakeModelRepository(SimpleHTTPRequestHandler):
             self.send_error(404, f"Not Found: {self.path}")
 
 
-def run_repository(shutdown_event: Any): # TODO typing -- is `Event` but thats not correct
+def run_repository(shutdown_event: Any):  # TODO typing -- is `Event` but thats not correct
     server_address = ("", fake_repository_port)
     with socketserver.ThreadingTCPServer(server_address, FakeModelRepository) as httpd:
         # NOTE dont serve forever, doesnt free the port up correctly
@@ -69,7 +69,7 @@ def backend_client() -> Generator[httpx.Client, None, None]:
     client = None
     try:
         td = tempfile.TemporaryDirectory()
-        os.environ['FIAB_ROOT'] = td.name
+        os.environ["FIAB_ROOT"] = td.name
         (pathlib.Path(td.name) / "pylock.toml.timestamp").write_text("1761908420:d0.0.1")
         config = FIABConfig()
         config.api.uvicorn_port = 30645
@@ -100,15 +100,14 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         if td is not None:
             td.cleanup()
 
+
 @pytest.fixture(scope="session")
 def backend_client_with_auth(backend_client):
     headers = {"Content-Type": "application/json"}
     data = {"email": "authenticated_user@somewhere.org", "password": "something"}
     response = backend_client.post("/auth/register", headers=headers, json=data)
     assert response.is_success
-    response = backend_client.post(
-        "/auth/jwt/login", data={"username": "authenticated_user@somewhere.org", "password": "something"}
-    )
+    response = backend_client.post("/auth/jwt/login", data={"username": "authenticated_user@somewhere.org", "password": "something"})
     token = extract_auth_token_from_response(response)
     assert token is not None, "Token should not be None"
     backend_client.cookies.set(**prepare_cookie_with_auth_token(token))

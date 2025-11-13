@@ -41,14 +41,18 @@ def _get_model(spec: ForecastProducts):
         ensemble_members=spec.model.ensemble_members,
     )
 
-    return get_model(checkpoint=get_model_path(spec.model.model)).specify(**model_spec) # type: ignore
+    return get_model(checkpoint=get_model_path(spec.model.model)).specify(**model_spec)  # type: ignore
+
 
 class ProductToOutputId(BaseModel):
     product_name: str
     product_spec: dict[str, Any]
     output_ids: Sequence[str]
 
-def forecast_products_to_cascade(spec: ForecastProducts, environment: EnvironmentSpecification) -> tuple[Cascade, dict, list[ProductToOutputId]]:
+
+def forecast_products_to_cascade(
+    spec: ForecastProducts, environment: EnvironmentSpecification
+) -> tuple[Cascade, dict, list[ProductToOutputId]]:
     model = _get_model(spec)
 
     # Create the model action graph
@@ -76,7 +80,9 @@ def forecast_products_to_cascade(spec: ForecastProducts, environment: Environmen
 
     if len(spec.products) == 0:
         complete_graph += model_action.graph()
-        product_to_id_mappings.append(ProductToOutputId(product_name="All Model Outputs", product_spec={}, output_ids=[x.name for x in model_action.graph().sinks]))
+        product_to_id_mappings.append(
+            ProductToOutputId(product_name="All Model Outputs", product_spec={}, output_ids=[x.name for x in model_action.graph().sinks])
+        )
 
     env_vars = model.control.environment_variables
     env_vars.update(environment.environment_variables)
@@ -111,9 +117,7 @@ def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobRespons
     environment = spec.environment
 
     hosts = min(config.cascade.max_hosts, environment.hosts or config.cascade.max_hosts)
-    workers_per_host = min(
-        config.cascade.max_workers_per_host, environment.workers_per_host or config.cascade.max_workers_per_host
-    )
+    workers_per_host = min(config.cascade.max_workers_per_host, environment.workers_per_host or config.cascade.max_workers_per_host)
 
     env_vars = {"TMPDIR": config.cascade.venv_temp_dir}
     env_vars.update({k: str(v) for k, v in job_envvars.items()})
@@ -143,7 +147,7 @@ class SubmitJobResponse(BaseModel):
     """Id of the submitted job."""
 
 
-async def execute(spec: ExecutionSpecification, user_id: str|None) -> Either[SubmitJobResponse, str]: # type: ignore[invalid-argument] # NOTE type checker issue
+async def execute(spec: ExecutionSpecification, user_id: str | None) -> Either[SubmitJobResponse, str]:  # type: ignore[invalid-argument] # NOTE type checker issue
     try:
         loop = asyncio.get_running_loop()
         response, product_to_id_mappings = await loop.run_in_executor(None, _execute_cascade, spec)  # CPU-bound
@@ -163,7 +167,8 @@ async def execute(spec: ExecutionSpecification, user_id: str|None) -> Either[Sub
     except Exception as e:
         return Either.error(repr(e))
 
-async def execute2response(spec: ExecutionSpecification, user: UserRead|None) -> SubmitJobResponse:
+
+async def execute2response(spec: ExecutionSpecification, user: UserRead | None) -> SubmitJobResponse:
     result = await execute(spec, str(user.id) if user is not None else None)
     if result.e is not None:
         raise HTTPException(status_code=500, detail=f"Failed to execute because of {result.error}")

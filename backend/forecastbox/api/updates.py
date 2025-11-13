@@ -7,6 +7,7 @@ from forecastbox.config import fiab_home
 
 logger = logging.getLogger(__name__)
 
+
 @dataclasses.dataclass(frozen=True)
 class Release:
     major: int
@@ -24,6 +25,7 @@ class Release:
     def __str__(self) -> str:
         return f"{self.major}.{self.minor}.{self.patch}"
 
+
 async def get_most_recent_release() -> Release:
     async with httpx.AsyncClient() as client:
         response = await client.get("https://api.github.com/repos/ecmwf/forecast-in-a-box/releases?per_page=1")
@@ -37,11 +39,13 @@ async def get_most_recent_release() -> Release:
         latest_release_tag = releases[0]["tag_name"]
         return Release.from_string(latest_release_tag)
 
+
 def get_lock_timestamp() -> str:
     lock_file_path = fiab_home / "pylock.toml.timestamp"
     if not lock_file_path.is_file():
         return ""
     return lock_file_path.read_text().strip()
+
 
 def get_local_release() -> tuple[datetime, Release]:
     timestamp_str = get_lock_timestamp()
@@ -64,12 +68,14 @@ def get_local_release() -> tuple[datetime, Release]:
     release_obj = Release.from_string(release_str)
     return dt_obj, release_obj
 
+
 async def get_pylock(release: Release) -> str:
     url = f"https://github.com/ecmwf/forecast-in-a-box/releases/download/v{release}/pylock.toml"
     async with httpx.AsyncClient() as client:
         response = await client.get(url)
         response.raise_for_status()
         return response.text
+
 
 def save_pylock(pylock: str, release: Release) -> None:
     pylock_file_path = fiab_home / "pylock.toml"

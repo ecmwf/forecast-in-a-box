@@ -12,10 +12,19 @@ from typing import Dict, List, Literal, Optional, Union
 
 import pytest
 from forecastbox.rjsf.forms import FieldWithUI
-from forecastbox.rjsf.from_pydantic import (PRIMATIVES, _from_boolean_primative, _from_date_primative,
-                                            _from_dict_primative, _from_integer_primative, _from_list_primative,
-                                            _from_literal_primative, _from_string_primative, _set_base_field_info,
-                                            _update_with_extra_json, from_pydantic)
+from forecastbox.rjsf.from_pydantic import (
+    PRIMATIVES,
+    _from_boolean_primative,
+    _from_date_primative,
+    _from_dict_primative,
+    _from_integer_primative,
+    _from_list_primative,
+    _from_literal_primative,
+    _from_string_primative,
+    _set_base_field_info,
+    _update_with_extra_json,
+    from_pydantic,
+)
 from forecastbox.rjsf.jsonSchema import BooleanSchema, IntegerSchema, ObjectSchema, StringSchema
 from forecastbox.rjsf.uiSchema import UIAdditionalProperties, UIField, UIIntegerField, UIObjectField, UIStringField
 from pydantic import BaseModel, Field
@@ -406,27 +415,13 @@ class TestFromPydantic:
 
         assert len(fields) == 2
         assert "fullName" in fields  # Uses title as field name
-        assert "userId" in fields     # Uses serialization_alias as field name
+        assert "userId" in fields  # Uses serialization_alias as field name
         assert set(required) == {"fullName", "userId"}
 
     def test_model_with_rjsf_extra(self):
         class RJSFModel(BaseModel):
-            description: str = Field(
-                json_schema_extra={
-                    "rjsf": {
-                        "widget": "textarea",
-                        "placeholder": "Enter description here"
-                    }
-                }
-            )
-            priority: int = Field(
-                json_schema_extra={
-                    "rjsf": {
-                        "minimum": 1,
-                        "maximum": 10
-                    }
-                }
-            )
+            description: str = Field(json_schema_extra={"rjsf": {"widget": "textarea", "placeholder": "Enter description here"}})
+            priority: int = Field(json_schema_extra={"rjsf": {"minimum": 1, "maximum": 10}})
 
         fields, required = from_pydantic(RJSFModel)
 

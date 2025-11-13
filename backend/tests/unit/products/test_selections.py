@@ -40,7 +40,7 @@ def create_test_product(axis: dict[str, Sequence[str]]) -> Product:
 
     product = TestProduct()
     model = create_test_model(axis)
-    model = cast(SpecifiedModel, model) # TODO typing -- product model hierarchy
+    model = cast(SpecifiedModel, model)  # TODO typing -- product model hierarchy
 
     assert product.qube == Qube.from_datacube(axis), "Product qube should match the provided axis"
     assert product.validate_intersection(model), "Product should be valid with the test model"
@@ -73,18 +73,16 @@ def create_test_model(axis: dict[str, Sequence[str]]) -> GlobalModel:
 
 def test_product_selection():
     """Test the selection of a product with a model."""
-    product = create_test_product({'options': ["value1", "value2"]})
-    model = create_test_model({'options': ["value1", "value2"]})
-    model = cast(SpecifiedModel, model) # TODO typing -- product model hierarchy
+    product = create_test_product({"options": ["value1", "value2"]})
+    model = create_test_model({"options": ["value1", "value2"]})
+    model = cast(SpecifiedModel, model)  # TODO typing -- product model hierarchy
 
     assert product.validate_intersection(model), "Product should be valid with the model"
 
     product_qube = product.model_intersection(model)
     assert "options" in product_qube.axes(), "Product qube should have 'options' axis"
 
-    assert product_qube.axes()["options"] == set(
-        ["value1", "value2"]
-    ), "Product qube should have 'value1' and 'value2' in 'options' axis"
+    assert product_qube.axes()["options"] == set(["value1", "value2"]), "Product qube should have 'value1' and 'value2' in 'options' axis"
 
 
 @pytest.mark.parametrize(
@@ -102,11 +100,11 @@ def test_product_validity(product_axis, model_axis, expected):
     """Test the validity of a product with a model based on axis."""
     product = create_test_product(product_axis)
     model = create_test_model(model_axis)
-    model = cast(SpecifiedModel, model) # TODO typing -- product model hierarchy
+    model = cast(SpecifiedModel, model)  # TODO typing -- product model hierarchy
 
-    assert (
-        product.validate_intersection(model) == expected
-    ), f"Product with axis {product_axis} should{' not' if not expected else ''} be valid with model axis {model_axis}"
+    assert product.validate_intersection(model) == expected, (
+        f"Product with axis {product_axis} should{' not' if not expected else ''} be valid with model axis {model_axis}"
+    )
 
 
 def test_generic_param_product():

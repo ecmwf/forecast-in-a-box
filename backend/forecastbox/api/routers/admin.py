@@ -49,14 +49,13 @@ class ExposedSettings(BaseModel):
     api: BackendAPISettings = config.api
     cascade: CascadeSettings = config.cascade
 
-
     def to_rjsf(self) -> FormDefinition:
         """Convert settings to RJSF form definition"""
         fields, required = from_pydantic(self)
         return FormDefinition(
-            title = 'Settings',
-            fields = fields,
-            required = required,
+            title="Settings",
+            fields=fields,
+            required=required,
             formData=self.model_dump(),
         )
 
@@ -110,6 +109,7 @@ async def get_settings(admin=Depends(get_admin_user)) -> ExportedSchemas:
 @router.patch("/settings", response_class=HTMLResponse)
 async def update_settings(settings: ExposedSettings, admin=Depends(get_admin_user)) -> HTMLResponse:
     """Update settings"""
+
     def update(old: BaseModel, new: BaseModel):
         for key, val in new.model_dump().items():
             setattr(old, key, val)
@@ -131,7 +131,7 @@ async def get_users(admin=Depends(get_admin_user)) -> list[UserRead]:
     """Get all users"""
     async with async_session_maker() as session:
         query = select(UserTable)
-        return (await session.execute(query)).unique().scalars().all() # type: ignore[invalid-return-type] # NOTE db...
+        return (await session.execute(query)).unique().scalars().all()  # type: ignore[invalid-return-type] # NOTE db...
 
 
 @router.get("/users/{user_id}", response_model=UserRead)

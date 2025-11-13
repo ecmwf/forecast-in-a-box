@@ -17,7 +17,7 @@ from cascade.low.func import pydantic_recursive_collect
 from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict, TomlConfigSettingsSource
 
-fiab_home = Path(os.environ['FIAB_ROOT']) if 'FIAB_ROOT' in os.environ else (Path.home() / ".fiab")
+fiab_home = Path(os.environ["FIAB_ROOT"]) if "FIAB_ROOT" in os.environ else (Path.home() / ".fiab")
 logger = logging.getLogger(__name__)
 
 
@@ -26,11 +26,12 @@ def _validate_url(url: str) -> bool:
     parse = urllib.parse.urlparse(url)
     return (parse.scheme is not None) and (parse.netloc is not None)
 
+
 class StatusMessage:
     """Namespace class for status message sharing"""
+
     # NOTE this class is here as this is a low place in hierarchy, and we dont want circular imports
     gateway_running = "running"
-
 
 
 class DatabaseSettings(BaseModel):
@@ -100,11 +101,16 @@ class GeneralSettings(BaseModel):
     """Whether a browser window should be opened after start. Used only when
     standalone.entrypoint.launch_all module is used"""
 
+
 class ProductSettings(BaseModel):
     pproc_schema_dir: str | None = None
     """Path to the directory containing the PPROC schema files."""
 
-    plots_schema: str = Field(default="inbuilt://fiab", description="earthkit-plots global schema", examples=["inbuilt://fiab", "my-schema-package@/path/to/my-schema-package", "my-registered-schema"])
+    plots_schema: str = Field(
+        default="inbuilt://fiab",
+        description="earthkit-plots global schema",
+        examples=["inbuilt://fiab", "my-schema-package@/path/to/my-schema-package", "my-registered-schema"],
+    )
     """earthkit-plots global schema, can be registered schema or path to a yaml file,
     If starts with inbuilt:// it is searched in the plots schema dir.
     If contains @ it is considered a package to be installed in the environment
@@ -119,6 +125,7 @@ class ProductSettings(BaseModel):
             return ["not a directory: pproc_schema_dir={self.pproc_schema_dir}"]
         else:
             return []
+
 
 class BackendAPISettings(BaseModel):
     data_path: str = str(fiab_home / "data_dir")
@@ -148,6 +155,7 @@ class BackendAPISettings(BaseModel):
             errors.append(f"not a valid uvicorn config: {pseudo_url}")
         return errors
 
+
 class CascadeSettings(BaseModel):
     max_hosts: int = 1
     """Number of hosts for Cascade."""
@@ -159,7 +167,7 @@ class CascadeSettings(BaseModel):
     """Maximum size of the log collection for Cascade."""
     venv_temp_dir: str = "/tmp"
     """Temporary directory for virtual environments."""
-    max_concurrent_jobs: int|None = 1
+    max_concurrent_jobs: int | None = 1
     """If more jobs submitted at a given time, all but this many wait in a queue"""
 
     def validate_runtime(self) -> list[str]:
@@ -169,6 +177,7 @@ class CascadeSettings(BaseModel):
         if not _validate_url(self.cascade_url):
             errors.append(f"not an url: cascade_url={self.cascade_url}")
         return errors
+
 
 class FIABConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", env_prefix="fiab__")
@@ -191,7 +200,13 @@ class FIABConfig(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        return env_settings, file_secret_settings, dotenv_settings, TomlConfigSettingsSource(settings_cls, fiab_home / "config.toml"), init_settings
+        return (
+            env_settings,
+            file_secret_settings,
+            dotenv_settings,
+            TomlConfigSettingsSource(settings_cls, fiab_home / "config.toml"),
+            init_settings,
+        )
 
     def _get_toml(self, **k) -> str:
         json_config = self.model_dump(mode="json", **k)
@@ -203,8 +218,8 @@ class FIABConfig(BaseSettings):
 
         config_path = fiab_home / "config.toml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(config_path, 'w') as f:
-            f.write(self._get_toml(exclude_defaults = True, exclude_none = True))
+        with open(config_path, "w") as f:
+            f.write(self._get_toml(exclude_defaults=True, exclude_none=True))
 
 
 def validate_runtime(config: FIABConfig) -> None:

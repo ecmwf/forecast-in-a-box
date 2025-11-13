@@ -72,7 +72,7 @@ class MockProduct(Product):
     def qube(self) -> Qube:
         raise NotImplementedError
 
-    def execute(self, product_spec: dict[str, Any], model: SpecifiedModel, source: Action) -> Graph|Action:
+    def execute(self, product_spec: dict[str, Any], model: SpecifiedModel, source: Action) -> Graph | Action:
         raise NotImplementedError
 
 

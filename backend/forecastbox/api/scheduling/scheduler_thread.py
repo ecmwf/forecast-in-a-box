@@ -26,8 +26,14 @@ from forecastbox.api.execution import execute
 from forecastbox.api.scheduling.dt_utils import calculate_next_run
 from forecastbox.api.scheduling.job_utils import schedule2runnable
 from forecastbox.config import config
-from forecastbox.db.schedule import (delete_schedule_next_run, get_schedulable, insert_next_run, insert_schedule_run,
-                                     mark_run_executed, next_schedulable)
+from forecastbox.db.schedule import (
+    delete_schedule_next_run,
+    get_schedulable,
+    insert_next_run,
+    insert_schedule_run,
+    mark_run_executed,
+    next_schedulable,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,12 +48,13 @@ scheduler_lock = threading.Lock()
 # implement liveness checks correctly
 sleep_duration_min: int = 15 * 60
 
+
 class SchedulerThread(threading.Thread):
     def __init__(self):
         super().__init__()
         self.stop_event = threading.Event()
         self.sleep_condition = threading.Condition()
-        self.liveness_timestamp: dt.datetime|None = None
+        self.liveness_timestamp: dt.datetime | None = None
         self.liveness_signal = threading.Event()
 
     def mark_alive(self) -> dt.datetime:
@@ -70,16 +77,24 @@ class SchedulerThread(threading.Thread):
             get_spec_result = await schedule2runnable(schedule_id_str, scheduled_at_dt)
 
             if get_spec_result.t is not None:
-                if get_spec_result.t.max_acceptable_delay_hours is not None and \
-                   (now - scheduled_at_dt).total_seconds() / 3600 > get_spec_result.t.max_acceptable_delay_hours:
-                    logger.warning(f"Skipping scheduled run {schedule_next_id_str} for schedule {schedule_id_str} at {scheduled_at_dt} "
-                                   f"because it is older than max_acceptable_delay_hours ({get_spec_result.t.max_acceptable_delay_hours} hours).")
-                    await insert_schedule_run(schedule_id_str, scheduled_at_dt, job_id=None, trigger="cron_skipped", attempt_cnt = get_spec_result.t.attempt_cnt)
+                if (
+                    get_spec_result.t.max_acceptable_delay_hours is not None
+                    and (now - scheduled_at_dt).total_seconds() / 3600 > get_spec_result.t.max_acceptable_delay_hours
+                ):
+                    logger.warning(
+                        f"Skipping scheduled run {schedule_next_id_str} for schedule {schedule_id_str} at {scheduled_at_dt} "
+                        f"because it is older than max_acceptable_delay_hours ({get_spec_result.t.max_acceptable_delay_hours} hours)."
+                    )
+                    await insert_schedule_run(
+                        schedule_id_str, scheduled_at_dt, job_id=None, trigger="cron_skipped", attempt_cnt=get_spec_result.t.attempt_cnt
+                    )
                 else:
                     exec_result = await execute(get_spec_result.t.exec_spec, get_spec_result.t.created_by)
                     if exec_result.t is not None:
                         logger.debug(f"Job {exec_result.t.id} submitted for schedule {schedule_id_str}")
-                        await insert_schedule_run(schedule_id_str, scheduled_at_dt, exec_result.t.id, attempt_cnt = get_spec_result.t.attempt_cnt)
+                        await insert_schedule_run(
+                            schedule_id_str, scheduled_at_dt, exec_result.t.id, attempt_cnt=get_spec_result.t.attempt_cnt
+                        )
                     else:
                         logger.error(f"Failed to submit job for schedule {schedule_id_str} because of {exec_result.e}")
             else:
@@ -133,8 +148,10 @@ class SchedulerThread(threading.Thread):
             logger.debug("Prodding possibly sleeping scheduler.")
             self.sleep_condition.notify()
 
+
 class Globals:
     scheduler: SchedulerThread | None = None
+
 
 def start_scheduler():
     with scheduler_lock:
@@ -143,23 +160,26 @@ def start_scheduler():
         Globals.scheduler = SchedulerThread()
         Globals.scheduler.start()
 
+
 def stop_scheduler():
     with scheduler_lock:
         if Globals.scheduler is None:
             raise ValueError("unexpected stop")
         Globals.scheduler.stop()
         Globals.scheduler.prod()
-        if Globals.scheduler.is_alive(): # just in case it wasnt even started
+        if Globals.scheduler.is_alive():  # just in case it wasnt even started
             Globals.scheduler.join(1)
         if Globals.scheduler.is_alive():
             logger.warning(f"scheduler thread {Globals.scheduler.name} / {Globals.scheduler.native_id} is alive despite stop/join!")
         Globals.scheduler = None
+
 
 def prod_scheduler():
     if Globals.scheduler is None:
         logger.warning("scheduler is None! No prodding")
     else:
         Globals.scheduler.prod()
+
 
 def status_scheduler():
     if not config.api.allow_scheduler:
@@ -170,12 +190,13 @@ def status_scheduler():
     if not Globals.scheduler.is_alive():
         logger.warning("scheduler reported down due to thread not being alive")
         return "down"
-    Globals.scheduler.liveness_signal.wait(0) # we do this just for ensuring a multithread sync
+    Globals.scheduler.liveness_signal.wait(0)  # we do this just for ensuring a multithread sync
     now = dt.datetime.now()
     if (now - Globals.scheduler.liveness_timestamp) > dt.timedelta(minutes=sleep_duration_min) * 2:
         logger.warning(f"scheduler reported down due to failing liveness check: {now} >> {Globals.scheduler.liveness_timestamp}")
         return "down"
     return "up"
+
 
 # NOTE this is not a class method of scheduler because its called from a different thread
 async def regenerate_schedule_next(schedule_id: str, cron_expr: str, enabled: bool) -> None:

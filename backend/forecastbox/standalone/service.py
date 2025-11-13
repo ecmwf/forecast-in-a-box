@@ -14,8 +14,10 @@ logger = logging.getLogger(__name__ if __name__ != "__main__" else __package__)
 
 pidfile = fiab_home / "pid"
 
+
 def mark_started(pid: int):
     pidfile.write_text(f"{pid}")
+
 
 def is_running() -> bool:
     if not pidfile.is_file():
@@ -42,7 +44,9 @@ if __name__ == "__main__":
 
     previous_cleanup()
     export_recursive(
-        config.model_dump(exclude_defaults=True), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"],
+        config.model_dump(exclude_defaults=True),
+        config.model_config["env_nested_delimiter"],
+        config.model_config["env_prefix"],
     )
     backend = Process(target=launch_backend)
     backend.start()

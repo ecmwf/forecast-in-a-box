@@ -5,8 +5,14 @@ import zipfile
 
 import cloudpickle
 from cascade.low.builders import JobBuilder, TaskBuilder
-from forecastbox.api.types import (EnvironmentSpecification, ExecutionSpecification, ForecastProducts,
-                                   ModelSpecification, ProductSpecification, RawCascadeJob)
+from forecastbox.api.types import (
+    EnvironmentSpecification,
+    ExecutionSpecification,
+    ForecastProducts,
+    ModelSpecification,
+    ProductSpecification,
+    RawCascadeJob,
+)
 
 
 def _ensure_completed(backend_client, job_id):
@@ -37,9 +43,7 @@ def test_submit_job(backend_client_with_auth):
     assert response.status_code == 404
 
     # raw job
-    job_instance = (
-        JobBuilder().with_node("n1", TaskBuilder.from_callable(eval).with_values("1+2")).build().get_or_raise()
-    )
+    job_instance = JobBuilder().with_node("n1", TaskBuilder.from_callable(eval).with_values("1+2")).build().get_or_raise()
     spec = ExecutionSpecification(
         job=RawCascadeJob(
             job_type="raw_cascade_job",
@@ -54,7 +58,7 @@ def test_submit_job(backend_client_with_auth):
 
     outputs = backend_client_with_auth.get(f"/job/{raw_job_id}/outputs").raise_for_status().json()
     assert len(outputs) == 1
-    assert "n1" in outputs[0]['output_ids']
+    assert "n1" in outputs[0]["output_ids"]
     output = backend_client_with_auth.get(f"/job/{raw_job_id}/results/n1")
     assert cloudpickle.loads(output.content) == 3
 
@@ -125,9 +129,7 @@ def test_submit_job(backend_client_with_auth):
 
         time.sleep(secs)
 
-    job_instance = (
-        JobBuilder().with_node("n1", TaskBuilder.from_callable(sleep_with_sgn).with_values(10)).build().get_or_raise()
-    )
+    job_instance = JobBuilder().with_node("n1", TaskBuilder.from_callable(sleep_with_sgn).with_values(10)).build().get_or_raise()
     spec = ExecutionSpecification(
         job=RawCascadeJob(
             job_type="raw_cascade_job",

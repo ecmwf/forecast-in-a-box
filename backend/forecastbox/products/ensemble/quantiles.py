@@ -29,10 +29,10 @@ class BaseQuantiles(BasePProcEnsembleProduct, GenericTemporalProduct):
         formfields = super().formfields.copy()
         formfields.update(
             quantile=self._make_field(
-                    multiple=True,
-                    schema=StringSchema,
-                    title="Quantiles",
-                    description="Computed Quantile",
+                multiple=True,
+                schema=StringSchema,
+                title="Quantiles",
+                description="Computed Quantile",
             ),
         )
         return formfields

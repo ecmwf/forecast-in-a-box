@@ -73,9 +73,7 @@ def test_object_schema():
 def test_object_schema_properties_and_required():
     prop1 = jsonSchema.StringSchema(type="string", title="Name")
     prop2 = jsonSchema.IntegerSchema(type="integer", title="Age")
-    obj = jsonSchema.ObjectSchema(
-        type="object", title="Person", properties={"name": prop1, "age": prop2}, required=["name"]
-    )
+    obj = jsonSchema.ObjectSchema(type="object", title="Person", properties={"name": prop1, "age": prop2}, required=["name"])
     assert obj.type == "object"
     assert obj.title == "Person"
     assert set(obj.properties.keys()) == {"name", "age"}
@@ -107,9 +105,7 @@ def test_array_schema():
 
 def test_array_schema_items_and_limits():
     item_schema = jsonSchema.StringSchema(type="string", title="Item")
-    arr = jsonSchema.ArraySchema(
-        type="array", title="StringArray", items=item_schema, minItems=2, maxItems=5, uniqueItems=True
-    )
+    arr = jsonSchema.ArraySchema(type="array", title="StringArray", items=item_schema, minItems=2, maxItems=5, uniqueItems=True)
     assert arr.type == "array"
     assert arr.title == "StringArray"
     assert arr.items == item_schema

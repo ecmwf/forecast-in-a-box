@@ -49,6 +49,7 @@ async def get_one(job_id: JobId) -> JobRecord | None:
     query = select(JobRecord).where(JobRecord.job_id == job_id)
     return await querySingle(query, async_session_maker)
 
+
 async def get_count(status: str | None = None) -> int:
     async def function(i: int) -> int:
         async with async_session_maker() as session:
@@ -56,9 +57,11 @@ async def get_count(status: str | None = None) -> int:
             if status is not None:
                 query = query.where(JobRecord.status == status)
             return await queryCount(query, session)
+
     return await dbRetry(function)
 
-async def get_all(status: str|None = None, offset: int = -1, limit: int = -1) -> Iterable[JobRecord]:
+
+async def get_all(status: str | None = None, offset: int = -1, limit: int = -1) -> Iterable[JobRecord]:
     async def function(i: int) -> Iterable[JobRecord]:
         async with async_session_maker() as session:
             query = select(JobRecord)
@@ -79,6 +82,7 @@ async def update_one(job_id: JobId, **kwargs) -> None:
     ref_time = dt.datetime.now()
     stmt = update(JobRecord).where(JobRecord.job_id == job_id).values(updated_at=ref_time, **kwargs)
     await executeAndCommit(stmt, async_session_maker)
+
 
 async def delete_all() -> int:
     async def function(i: int) -> int:
