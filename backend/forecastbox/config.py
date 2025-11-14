@@ -90,7 +90,7 @@ class AuthSettings(BaseModel):
 
     def validate_runtime(self) -> list[str]:
         errors = []
-        if self.public_url is not None:
+        if self.public_url is not None and not _validate_url(self.public_url):
             errors.append(f"not an url: public_url={self.public_url}")
         return errors
 
