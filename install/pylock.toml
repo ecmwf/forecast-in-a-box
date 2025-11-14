@@ -34,10 +34,10 @@ wheels = [{ url = "https://files.pythonhosted.org/packages/27/b6/e186d386ecbe317
 
 [[packages]]
 name = "anemoi-plugins-ecmwf-inference"
-version = "0.1.14"
+version = "0.1.17"
 index = "https://pypi.org/simple"
-sdist = { url = "https://files.pythonhosted.org/packages/6d/4d/f85992cc4c163bd4d8addd66cb4c7fd1a55617bfde4c2ba8dc9e64451d45/anemoi_plugins_ecmwf_inference-0.1.14.tar.gz", upload-time = 2025-10-03T13:52:15Z, size = 36098, hashes = { sha256 = "cde240bb8bcee66243424e10f4002bd4cf62f6a9cf543c85deda47d671186c55" } }
-wheels = [{ url = "https://files.pythonhosted.org/packages/b7/50/ae8c9ca8c4618190243dcfbd1fd5da890f92412f6b710a5eb01484934c59/anemoi_plugins_ecmwf_inference-0.1.14-py3-none-any.whl", upload-time = 2025-10-03T13:52:14Z, size = 40708, hashes = { sha256 = "e59d40add4fe2942d4b04ca72021d54bc15a3c36530394d194646fc2eb4638f4" } }]
+sdist = { url = "https://files.pythonhosted.org/packages/ff/ea/c89e66d5520b43fb2c5697f904fef496f599d7c8e599d34be85f50d02532/anemoi_plugins_ecmwf_inference-0.1.17.tar.gz", upload-time = 2025-11-07T08:37:18Z, size = 40081, hashes = { sha256 = "198143682655e032f33f1dd6961a00813fc59e326b976a86cf4dcaed95611faf" } }
+wheels = [{ url = "https://files.pythonhosted.org/packages/da/81/d2b8144942465f4252a4acfa03981e2ae86a1c8415fe295646fe5956a4c3/anemoi_plugins_ecmwf_inference-0.1.17-py3-none-any.whl", upload-time = 2025-11-07T08:37:17Z, size = 42552, hashes = { sha256 = "040924ed1348f35784b61b7fa3c67bab620b68f903810992d086a85c562cfbda" } }]
 
 [[packages]]
 name = "anemoi-transform"
@@ -733,7 +733,7 @@ wheels = [{ url = "https://files.pythonhosted.org/packages/5b/f9/a454f5052d5ae6a
 
 [[packages]]
 name = "earthkit-workflows-pproc"
-version = "0.4.0"
+version = "0.0.7"
 vcs = { type = "git", url = "https://github.com/ecmwf/earthkit-workflows-pproc", commit-id = "a0bdb10d10ad7bf7389dba5df59844ae166260b3" }
 
 [[packages]]
@@ -2077,7 +2077,7 @@ wheels = [{ url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d920
 
 [[packages]]
 name = "pproc"
-version = "0.4.0"
+version = "0.0.7"
 vcs = { type = "git", url = "https://github.com/ecmwf/pproc", commit-id = "0a27f2c3d551a2e71273a685cfe5d58969424930" }
 
 [[packages]]
