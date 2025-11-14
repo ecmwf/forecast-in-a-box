@@ -733,7 +733,7 @@ wheels = [{ url = "https://files.pythonhosted.org/packages/5b/f9/a454f5052d5ae6a
 
 [[packages]]
 name = "earthkit-workflows-pproc"
-version = "0.0.7"
+version = "0.4.1"
 vcs = { type = "git", url = "https://github.com/ecmwf/earthkit-workflows-pproc", commit-id = "a0bdb10d10ad7bf7389dba5df59844ae166260b3" }
 
 [[packages]]
@@ -2077,7 +2077,7 @@ wheels = [{ url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d920
 
 [[packages]]
 name = "pproc"
-version = "0.0.7"
+version = "0.4.1"
 vcs = { type = "git", url = "https://github.com/ecmwf/pproc", commit-id = "0a27f2c3d551a2e71273a685cfe5d58969424930" }
 
 [[packages]]
