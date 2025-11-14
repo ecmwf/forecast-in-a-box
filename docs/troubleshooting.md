@@ -1,5 +1,8 @@
 # Installation
 * If on MacOS, you may be required to `brew install fftw` first when using older versions of the `atlas` library in the workflows.
+* If you get `Cache is currently in-use, waiting for other uv process to finish` whenever running `fiab.sh`, this signifies there is another `uv` process running or hanging on your system. You can either:
+  1. locate it and terminate it (this applies to when you explicitly use `uv` yourself elsewhere),
+  2. run `uv cache prune --force` (this applies when you are not aware of `uv` being executed, and should just solve the problem), then run your `fiab.sh` again as you did before.
 
 # Infrastructure / Environment
 * `ExecutorFailure(host='h0', detail="ValueError('process on h0.w0 failed to terminate correctly: 1814799 -> -11')")` -- possibly venv incompatibility. You submit from a different venv that executors are using, leading to unstable cloudpickle behaviour. Make sure the venvs are the same, or use JobInstances without cloudpickle.
