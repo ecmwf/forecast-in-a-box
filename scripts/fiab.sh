@@ -98,6 +98,7 @@ getMostRecentRelease() {
 
 LOCK="${FIAB_ROOT}/pylock.toml"
 FIAB_GITHUB_FROM="${FIAB_GITHUB_FROM:-tags}" # when we want to install from a specific branch, we set this to heads & set FIAB_RELEASE to that branch
+FIAB_PIP_EXTRA="${FIAB_PIP_EXTRA:-""}" # eg when we install from test pypi. Applies *only* to the forecastbox wheel itself! And put there the full `-i http://testpypi`
 maybeDownloadLock() {
     selectedRelease=$1
     # checks whether requirements is present at fiab root, and downloads if not
@@ -106,7 +107,7 @@ maybeDownloadLock() {
         >&2 echo "will download uv lock for release $selectedRelease"
         lock_url=https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/$FIAB_GITHUB_FROM/$selectedRelease/install/pylock.toml
         curl -LsSf $lock_url > "$LOCK"
-        >&2 echo "$(date +%s):$(echo $selectedRelease | tr -d 'v')" > $LOCK.timestamp
+        >&2 echo "$(date +%s):$(echo $selectedRelease | tr -d 'vd')" > $LOCK.timestamp
     fi
 }
 
@@ -125,7 +126,7 @@ updateVenv() {
     FIAB_VERSION=$(cat $LOCK.timestamp | cut -f 2 -d : )
     >&2 echo "using fiab version $FIAB_VERSION"
     uv pip install -r $LOCK
-    uv pip install "forecast-in-a-box==$FIAB_VERSION"
+    uv pip install $FIAB_PIP_EXTRA "forecast-in-a-box==$FIAB_VERSION"
     touch $VENV.timestamp
 }
 
