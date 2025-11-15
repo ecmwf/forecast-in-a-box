@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__ if __name__ != "__main__" else __package__)
 
 
 def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
-    set_start_method("forkserver", force=True) # we force because of pytest plugins
+    set_start_method("forkserver", force=True)  # we force because of pytest plugins
     setup_process()
     logger.info("main process starting")
     logger.debug(f"loaded config {config.model_dump()}")
@@ -35,7 +35,9 @@ def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
     if not config.api.allow_service:
         previous_cleanup()
         export_recursive(
-            config.model_dump(exclude_defaults=True), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"],
+            config.model_dump(exclude_defaults=True),
+            config.model_config["env_nested_delimiter"],
+            config.model_config["env_prefix"],
         )
         backend = Process(target=launch_backend)
         backend.start()

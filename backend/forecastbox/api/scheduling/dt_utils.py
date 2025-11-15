@@ -42,6 +42,7 @@ def _validate_field(field: str, min_val: int, max_val: int, label: str) -> None:
     else:
         raise ValueError(f"Invalid cron field format: {field} of {label}")
 
+
 def _get_field_values(field: str, min_val: int, max_val: int, label: str) -> list[int]:
     _validate_field(field, min_val, max_val, label)
     values = set()
@@ -71,6 +72,7 @@ def _get_field_values(field: str, min_val: int, max_val: int, label: str) -> lis
     else:
         raise ValueError(f"failed to generate range for {field}")
 
+
 @dataclass
 class Crontab:
     minutes: list[int]
@@ -78,6 +80,7 @@ class Crontab:
     days_of_month: list[int]
     months: list[int]
     days_of_week: list[int]
+
 
 def calculate_next_run(after: datetime, crontab: str) -> datetime:
     """Calculates the next run datetime according to the crontab expression."""
@@ -92,7 +95,7 @@ def calculate_next_run(after: datetime, crontab: str) -> datetime:
             for day_of_month in crontab_values.days_of_month:
                 try:
                     test_date = datetime(year, month, day_of_month)
-                except ValueError: # NOTE february issues etc
+                except ValueError:  # NOTE february issues etc
                     continue
 
                 if test_date.weekday() not in crontab_values.days_of_week:
@@ -104,6 +107,7 @@ def calculate_next_run(after: datetime, crontab: str) -> datetime:
                         if candidate_run > after:
                             return candidate_run
     raise ValueError("cron next run failure")
+
 
 def parse_crontab(crontab: str) -> Crontab:
     """Parses a crontab expression into field ranges. If invalid, raises ValueError"""

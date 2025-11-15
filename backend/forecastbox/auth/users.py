@@ -63,14 +63,10 @@ class UserManager(UUIDIDMixin, BaseUserManager[UserTable, pydantic.UUID4]):
                 _ = await session.execute(query)
                 await session.commit()
 
-    async def on_after_login(
-        self, user: UserTable, request: Request | None = None, response: responses.Response | None = None
-    ):
+    async def on_after_login(self, user: UserTable, request: Request | None = None, response: responses.Response | None = None):
         if not verify_entitlements(user):
             logger.error(f"User {user.id} does not have the required entitlements.")
-            raise HTTPException(
-                status_code=403, detail="You do not have the required entitlements to access this resource."
-            )
+            raise HTTPException(status_code=403, detail="You do not have the required entitlements to access this resource.")
 
         if response is not None:
             response.status_code = 302
@@ -83,12 +79,11 @@ class UserManager(UUIDIDMixin, BaseUserManager[UserTable, pydantic.UUID4]):
         logger.error(f"Verification requested for user {user.id}. Verification token: {token}")
 
     # TODO this is a hack, we validate email in this method. Consider a PR to the fastapi_users
-    async def validate_password(self, password: str, user: UserCreate|UserRead) -> None:
+    async def validate_password(self, password: str, user: UserCreate | UserRead) -> None:
         if config.auth.domain_allowlist_registry:
-            domain = user.email.split('@')[1]
+            domain = user.email.split("@")[1]
             if domain not in config.auth.domain_allowlist_registry:
                 raise InvalidPasswordException(reason=f"Domain '{domain}' is not allowed.")
-
 
 
 async def get_user_manager(user_db: SQLAlchemyUserDatabase = Depends(get_user_db)):

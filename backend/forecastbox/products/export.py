@@ -24,9 +24,7 @@ OUTPUT_TYPES = ["grib", "netcdf", "numpy"]
 
 
 @as_payload
-def export_fieldlist_as(
-    fields: ekd.FieldList, format: FORMAT = "grib"
-) -> tuple[bytes, str]:
+def export_fieldlist_as(fields: ekd.FieldList, format: FORMAT = "grib") -> tuple[bytes, str]:
     """Export an earthkit FieldList to a specified format.
     Supported formats are 'grib', 'netcdf', and 'numpy'.
 
@@ -42,7 +40,7 @@ def export_fieldlist_as(
     tuple[bytes, str]
         A tuple containing the serialized data as bytes and the MIME type.
     """
-    written_bytes = b''
+    written_bytes = b""
 
     if format == "grib":
         buf = io.BytesIO()
@@ -60,6 +58,7 @@ def export_fieldlist_as(
         raise ValueError(f"Unsupported format: {format}. Supported formats are {OUTPUT_TYPES}.")
 
     return written_bytes, f"application/{format}"
+
 
 class ExportMixin(Product):
     pass

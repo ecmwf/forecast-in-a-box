@@ -18,12 +18,27 @@ from forecastbox.api.execution import execute
 from forecastbox.api.routers.job import STATUS
 from forecastbox.api.scheduling.dt_utils import calculate_next_run, parse_crontab
 from forecastbox.api.scheduling.job_utils import run2runnable
-from forecastbox.api.scheduling.scheduler_thread import (prod_scheduler, regenerate_schedule_next, scheduler_lock,
-                                                         start_scheduler, stop_scheduler)
+from forecastbox.api.scheduling.scheduler_thread import (
+    prod_scheduler,
+    regenerate_schedule_next,
+    scheduler_lock,
+    start_scheduler,
+    stop_scheduler,
+)
 from forecastbox.api.types import ScheduleSpecification, ScheduleUpdate, schedule2db
 from forecastbox.auth.users import current_active_user
-from forecastbox.db.schedule import (ScheduleId, get_next_run, get_schedules, get_schedules_count, insert_next_run,
-                                     insert_one, insert_schedule_run, select_runs, select_runs_count, update_one)
+from forecastbox.db.schedule import (
+    ScheduleId,
+    get_next_run,
+    get_schedules,
+    get_schedules_count,
+    insert_next_run,
+    insert_one,
+    insert_schedule_run,
+    select_runs,
+    select_runs_count,
+    update_one,
+)
 from forecastbox.schemas.job import JobRecord
 from forecastbox.schemas.schedule import ScheduleDefinition, ScheduleRun
 from forecastbox.schemas.user import UserRead
@@ -35,6 +50,7 @@ router = APIRouter(
     tags=["schedule"],
     responses={404: {"description": "Not found"}},
 )
+
 
 @dataclass
 class GetScheduleRunResponse:
@@ -58,6 +74,7 @@ class GetScheduleRunResponse:
             status=row[1].status if row[1] is not None else None,
         )
 
+
 @dataclass
 class GetScheduleRunsResponse:
     runs: dict[str, GetScheduleRunResponse]
@@ -67,12 +84,13 @@ class GetScheduleRunsResponse:
     total_pages: int
     error: str | None = None
 
+
 @dataclass
 class GetScheduleResponse:
     """Get Schedule Response."""
 
     schedule_id: ScheduleId
-    cron_expr: str|None
+    cron_expr: str | None
     """Cron expression for the schedule. None if not time-triggered"""
     created_at: str
     """Creation timestamp of the schedule."""
@@ -84,7 +102,7 @@ class GetScheduleResponse:
     """Dynamic expressions used by the schedule."""
     enabled: bool
     """Whether the schedule is currently enabled to run."""
-    created_by: str|None
+    created_by: str | None
     """Email of the user who created this schedule"""
     # TODO add next run?
 
@@ -101,12 +119,14 @@ class GetScheduleResponse:
             created_by=entity.created_by,
         )
 
+
 @dataclass
 class GetMultipleSchedulesResponse:
     """Get Multiple Schedules Response.
 
     Contains multiple schedules with pagination metadata.
     """
+
     schedules: dict[ScheduleId, GetScheduleResponse]
     """A dictionary mapping schedule IDs to their responses."""
     total: int
@@ -120,6 +140,7 @@ class GetMultipleSchedulesResponse:
     error: str | None = None
     """An error message if there was an issue retrieving schedules, otherwise None."""
 
+
 @dataclass
 class CreateScheduleResponse:
     schedule_id: ScheduleId
@@ -127,11 +148,12 @@ class CreateScheduleResponse:
 
 @router.get("/{schedule_id}")
 async def get_schedule(schedule_id: ScheduleId, user: UserRead = Depends(current_active_user)) -> GetScheduleResponse:
-    maybe_schedule = list(await get_schedules(schedule_id = schedule_id))
+    maybe_schedule = list(await get_schedules(schedule_id=schedule_id))
     if not maybe_schedule:
         raise HTTPException(status_code=404, detail=f"Schedule {schedule_id} not found in the database.")
 
     return GetScheduleResponse.from_db(maybe_schedule[0])
+
 
 @router.get("/{schedule_id}/runs")
 async def get_schedule_runs(
@@ -175,12 +197,14 @@ async def get_schedule_runs(
         error=None,
     )
 
+
 @router.get("/{schedule_id}/next_run")
 async def get_next_schedule_run(schedule_id: ScheduleId, user: UserRead = Depends(current_active_user)) -> str:
     next_run_at = await get_next_run(schedule_id)
     if next_run_at is None:
         return "not scheduled currently"
     return str(next_run_at)
+
 
 @router.get("/")
 async def get_multiple_schedules(
@@ -228,13 +252,16 @@ async def get_multiple_schedules(
         error=None,
     )
 
+
 @router.put("/create")
-async def create_schedule(schedule_spec: ScheduleSpecification, user: UserRead | None = Depends(current_active_user)) -> CreateScheduleResponse:
+async def create_schedule(
+    schedule_spec: ScheduleSpecification, user: UserRead | None = Depends(current_active_user)
+) -> CreateScheduleResponse:
     try:
         parse_crontab(schedule_spec.cron_expr)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid crontab: {schedule_spec.cron_expr} => {e}")
-    schedule_id = str(uuid.uuid4()) # TODO gen from db instead
+    schedule_id = str(uuid.uuid4())  # TODO gen from db instead
 
     schedule_data = schedule2db(schedule_spec)
     await insert_one(
@@ -251,20 +278,19 @@ async def create_schedule(schedule_spec: ScheduleSpecification, user: UserRead |
     prod_scheduler()
     return CreateScheduleResponse(schedule_id)
 
+
 @router.post("/{schedule_id}")
 async def update_schedule(
-    schedule_id: ScheduleId,
-    schedule_update: ScheduleUpdate,
-    user: UserRead = Depends(current_active_user)
+    schedule_id: ScheduleId, schedule_update: ScheduleUpdate, user: UserRead = Depends(current_active_user)
 ) -> GetScheduleResponse:
     kwargs = schedule2db(schedule_update)
 
-    with scheduler_lock: # NOTE this may block the async pool a bit!
-        updated_schedule = await update_one(schedule_id = schedule_id, **kwargs)
+    with scheduler_lock:  # NOTE this may block the async pool a bit!
+        updated_schedule = await update_one(schedule_id=schedule_id, **kwargs)
         if not updated_schedule:
             raise HTTPException(status_code=404, detail=f"Schedule {schedule_id} not found in the database.")
 
-        if ("cron_expr" in kwargs or "enabled" in kwargs):
+        if "cron_expr" in kwargs or "enabled" in kwargs:
             await regenerate_schedule_next(
                 cast(str, updated_schedule.schedule_id),
                 cast(str, updated_schedule.cron_expr),
@@ -275,11 +301,9 @@ async def update_schedule(
 
     return GetScheduleResponse.from_db(updated_schedule)
 
+
 @router.post("/run/{schedule_run_id}")
-async def rerun_schedule(
-    schedule_run_id: str,
-    user: UserRead = Depends(current_active_user)
-) -> str:
+async def rerun_schedule(schedule_run_id: str, user: UserRead = Depends(current_active_user)) -> str:
     """Returns the schedule_run_id of the re-run"""
     runnable_schedule_either = await run2runnable(schedule_run_id)
     if runnable_schedule_either.t is None:
@@ -289,10 +313,17 @@ async def rerun_schedule(
     exec_result = await execute(runnable_schedule.exec_spec, user.user_id)
     if exec_result.t is not None:
         logger.debug(f"Job {exec_result.t.id} submitted for schedule run {schedule_run_id}")
-        return await insert_schedule_run(runnable_schedule.schedule_id, runnable_schedule.schedule_at, exec_result.t.id, attempt_cnt = runnable_schedule.attempt_cnt, trigger="rerun")
+        return await insert_schedule_run(
+            runnable_schedule.schedule_id,
+            runnable_schedule.schedule_at,
+            exec_result.t.id,
+            attempt_cnt=runnable_schedule.attempt_cnt,
+            trigger="rerun",
+        )
     else:
         logger.error(f"Failed to submit job for schedule run {schedule_run_id} because of {exec_result.e}")
         raise HTTPException(status_code=500, detail=f"Failed to rerun schedule: {exec_result.e}")
+
 
 @router.post("/restart")
 async def restart_scheduler() -> None:

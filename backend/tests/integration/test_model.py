@@ -57,7 +57,6 @@ def test_download_model(backend_client):
 
     assert i > 0, "Failed to download model"
 
-
     response = backend_client.get("/model/available").raise_for_status()
     assert fake_model_name in response.json()[""]
     for e in range(parallelism):

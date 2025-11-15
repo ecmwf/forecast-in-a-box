@@ -18,6 +18,7 @@ logger = logging.getLogger("forecastbox.bigtest")
 
 is_mars = os.getenv("FIAB_BIGTEST_ISMARS", "nay") == "yea"
 
+
 def get_quickstart_job() -> dict:
     today = (dt.date.today() - dt.timedelta(2)).strftime("%Y%m%d")
     return {
@@ -28,7 +29,7 @@ def get_quickstart_job() -> dict:
                 "date": today + "T00",
                 "lead_time": 42,
                 "ensemble_members": 1,
-                "entries": {'input_preference': 'mars' if is_mars else 'opendata'},
+                "entries": {"input_preference": "mars" if is_mars else "opendata"},
             },
             "products": [
                 {

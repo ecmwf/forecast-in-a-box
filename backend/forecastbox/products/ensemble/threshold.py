@@ -30,14 +30,12 @@ class BaseThresholdProbability(BaseEnsembleProduct):
         formfields = super().formfields.copy()
         formfields.update(
             step=FieldWithUI(jsonschema=StringSchema(title="Step", description="Forecast step, e.g. 0-24, 0-168")),
-            threshold=FieldWithUI(
-                jsonschema=StringSchema(title="Threshold", description="Threshold value to apply, e.g. 0, 5, 10, etc.")
-            ),
+            threshold=FieldWithUI(jsonschema=StringSchema(title="Threshold", description="Threshold value to apply, e.g. 0, 5, 10, etc.")),
             operator=FieldWithUI(
                 jsonschema=StringSchema(
                     title="Operator",
                     description="Operator to apply to the threshold, e.g. '>', '<', '==', etc.",
-                    enum=["<", "<=", "==", ">=", ">"], # type: ignore[unknown-argument] # NOTE checker failure, this is legit
+                    enum=["<", "<=", "==", ">=", ">"],  # type: ignore[unknown-argument] # NOTE checker failure, this is legit
                 )
             ),
         )
@@ -50,7 +48,6 @@ class BaseThresholdProbability(BaseEnsembleProduct):
 
 @generic_registry("Threshold Probability")
 class GenericThresholdProbability(BaseThresholdProbability, GenericParamProduct):
-
     @property
     def qube(self):
         return self.make_generic_qube(threshold=USER_DEFINED, operator=USER_DEFINED, step=USER_DEFINED)
@@ -134,9 +131,7 @@ class DefinedThresholdProbability(BaseThresholdProbability, BasePProcEnsemblePro
 
         paramid = self.get_out_paramid(levtype, param, product_spec.get("levlist", None), threshold, operator)
         if paramid is None:
-            raise KeyError(
-                f"Could not identify output paramid for {param!r} with threshold {threshold!r} and operator {operator!r}."
-            )
+            raise KeyError(f"Could not identify output paramid for {param!r} with threshold {threshold!r} and operator {operator!r}.")
 
         request = {
             "type": "ep",

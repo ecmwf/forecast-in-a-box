@@ -34,7 +34,7 @@ async def dbRetry(func: Callable[[int], Awaitable[T]]) -> T:
             if i == 0:
                 raise
             await asyncio.sleep(0.1)
-    raise ValueError # NOTE in case of retries misconfig, we dont want implicit None
+    raise ValueError  # NOTE in case of retries misconfig, we dont want implicit None
 
 
 async def executeAndCommit(stmt, session_maker) -> None:
@@ -64,6 +64,7 @@ async def querySingle(query, session_maker) -> Any:
             return rv
 
     return await dbRetry(func)
+
 
 async def queryCount(query, session) -> int:
     # TODO scalar_one

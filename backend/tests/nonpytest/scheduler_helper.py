@@ -1,4 +1,3 @@
-
 import httpx
 from cascade.low.builders import JobBuilder, TaskBuilder
 from forecastbox.api.types import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob, ScheduleSpecification
@@ -7,10 +6,9 @@ from forecastbox.api.types import EnvironmentSpecification, ExecutionSpecificati
 # In particular this needs launching the instance with a clean scheduling table, and with allow_scheduling
 # Then one should observe in the logs that every minute a job is launched
 
+
 def get_job():
-    job_instance = (
-        JobBuilder().with_node("n1", TaskBuilder.from_callable(eval).with_values("1+2")).build().get_or_raise()
-    )
+    job_instance = JobBuilder().with_node("n1", TaskBuilder.from_callable(eval).with_values("1+2")).build().get_or_raise()
     env = EnvironmentSpecification(hosts=1, workers_per_host=2)
     exec_spec = ExecutionSpecification(
         job=RawCascadeJob(
@@ -20,6 +18,7 @@ def get_job():
         environment=env,
     )
     return exec_spec
+
 
 def get_sched():
     exec_spec = get_job()
@@ -31,11 +30,13 @@ def get_sched():
     )
     return sched_spec
 
+
 def create_schedule():
-    client = httpx.Client(base_url='http://localhost:8000/api/v1', follow_redirects=True)
+    client = httpx.Client(base_url="http://localhost:8000/api/v1", follow_redirects=True)
     resp = client.put("/schedule/create", json=get_sched().model_dump())
     print(resp)
     print(resp.json())
+
 
 if __name__ == "__main__":
     create_schedule()

@@ -23,17 +23,20 @@ FORECAST_IN_A_BOX_METADATA = "forecast-in-a-box.json"
 logger = logging.getLogger(__name__)
 
 
-processor_example = [{
-    "regrid": {
-        "area": "global",
-        "grid": "0.25deg",
+processor_example = [
+    {
+        "regrid": {
+            "area": "global",
+            "grid": "0.25deg",
+        }
     }
-}]
+]
 
 
 class Capabilities(BaseModel):
     ensemble: bool = True
     max_lead_time: int | None = None
+
 
 class ControlMetadata(BaseModel):
     _version: str = "1.0.0"
@@ -41,21 +44,15 @@ class ControlMetadata(BaseModel):
     pkg_versions: dict[str, str] = Field(default_factory=dict, examples=[{"numpy": "1.23.0", "pandas": "1.4.0"}])
     """Absolute overrides for the packages to install when running."""
 
-    input_source: str | dict[str, str] | None = Field(None, examples=["opendata", {'polytope': {'collection': "..."}}])
+    input_source: str | dict[str, str] | None = Field(None, examples=["opendata", {"polytope": {"collection": "..."}}])
     """Source of the input, if dictionary, refers to keys of nested input sources"""
 
-    nested: dict[str, dict[str, Any] | str] | None = Field(default=None, examples=[
-        {
-            "lam": {
-                "opendata": {
-                    "pre_processors": [
-                        {"regrid": {"area": "...", "grid": "..."}}
-                    ]
-                }
-            },
-            'global': 'opendata'
-        },
-    ])
+    nested: dict[str, dict[str, Any] | str] | None = Field(
+        default=None,
+        examples=[
+            {"lam": {"opendata": {"pre_processors": [{"regrid": {"area": "...", "grid": "..."}}]}}, "global": "opendata"},
+        ],
+    )
     """Configuration if using nested input sources. Will use the CutoutInput to combine these sources.
 
     E.g.
@@ -75,7 +72,11 @@ class ControlMetadata(BaseModel):
     pre_processors: dict[str, Any] = Field(default_factory=dict, examples=processor_example)
     post_processors: dict[str, Any] = Field(default_factory=dict, examples=processor_example)
 
-    environment_variables: dict[str, Any] = Field(default_factory=dict, examples=[{"MY_VAR": "value", "ANOTHER_VAR": "another_value"}], description="Global Environment Variables to be set")
+    environment_variables: dict[str, Any] = Field(
+        default_factory=dict,
+        examples=[{"MY_VAR": "value", "ANOTHER_VAR": "another_value"}],
+        description="Global Environment Variables to be set",
+    )
     """Global Environment variables for execution."""
 
     capabilities: Capabilities = Field(default_factory=Capabilities, examples=[{"ensemble": True, "max_lead_time": 240}])
@@ -96,6 +97,7 @@ class ControlMetadata(BaseModel):
                     return yaml.safe_load(val)
                 except yaml.YAMLError as e:
                     from pydantic import ValidationError
+
                     raise ValidationError(f"Invalid YAML format: {e}") from e
             elif isinstance(val, dict):
                 return {k: parse_yaml(v) for k, v in val.items()}
@@ -116,13 +118,13 @@ class ControlMetadata(BaseModel):
     @property
     def form(self) -> FormDefinition:
         data = self.model_dump(exclude_none=True)
-        data.pop('_version', None)  # Remove version from form data
+        data.pop("_version", None)  # Remove version from form data
 
         for key in list(data.keys()):
             if isinstance(data[key], dict) and len(data[key]) == 0:
                 data.pop(key)
 
-        nested_dictionaries = ['nested', 'pre_processors', 'post_processors']
+        nested_dictionaries = ["nested", "pre_processors", "post_processors"]
 
         for key in nested_dictionaries:
             if key in data and isinstance(data[key], dict):
@@ -147,9 +149,7 @@ class ControlMetadata(BaseModel):
                         additionalProperties=StringSchema(),
                         # default=self._dump_yaml(self.nested or {}),
                     ),
-                    uischema=UIAdditionalProperties(
-                        additionalProperties=UIStringField(widget="textarea", format="yaml")
-                    )
+                    uischema=UIAdditionalProperties(additionalProperties=UIStringField(widget="textarea", format="yaml")),
                 ),
                 "capabilites": FieldWithUI(
                     jsonschema=ObjectSchema(
@@ -167,9 +167,7 @@ class ControlMetadata(BaseModel):
                         additionalProperties=StringSchema(),
                         # default=list(map(self._dump_yaml, self.pre_processors)),
                     ),
-                    uischema=UIAdditionalProperties(
-                        additionalProperties=UIStringField(widget="textarea", format="yaml")
-                    )
+                    uischema=UIAdditionalProperties(additionalProperties=UIStringField(widget="textarea", format="yaml")),
                 ),
                 "post_processors": FieldWithUI(
                     jsonschema=ObjectSchema(
@@ -178,9 +176,7 @@ class ControlMetadata(BaseModel):
                         additionalProperties=StringSchema(),
                         # default=list(map(self._dump_yaml, self.post_processors)),
                     ),
-                    uischema=UIAdditionalProperties(
-                        additionalProperties=UIStringField(widget="textarea", format="yaml")
-                    )
+                    uischema=UIAdditionalProperties(additionalProperties=UIStringField(widget="textarea", format="yaml")),
                 ),
                 "pkg_versions": FieldWithUI(
                     jsonschema=ObjectSchema(
@@ -189,10 +185,7 @@ class ControlMetadata(BaseModel):
                         additionalProperties=StringSchema(format="yaml"),
                         # default=self.pkg_versions,
                     ),
-                    uischema=UIAdditionalProperties(
-                        additionalProperties=UIStringField(widget="text")
-                    )
-
+                    uischema=UIAdditionalProperties(additionalProperties=UIStringField(widget="text")),
                 ),
                 "environment_variables": FieldWithUI(
                     jsonschema=ObjectSchema(
@@ -201,18 +194,16 @@ class ControlMetadata(BaseModel):
                         additionalProperties=StringSchema(),
                         # default=self.environment_variables or {},
                     ),
-                    uischema=UIAdditionalProperties(
-                        additionalProperties=UIStringField(format="yaml")
-                    )
-                )
-            }
+                    uischema=UIAdditionalProperties(additionalProperties=UIStringField(format="yaml")),
+                ),
+            },
         )
 
     def update(self, **kwargs: Any) -> "ControlMetadata":
         """Update the current metadata."""
         self_dump = self.model_dump(exclude_none=True)
 
-        def merge(s,o):
+        def merge(s, o):
             """Merge two dictionaries, with `o` overwriting `s`."""
             for key, value in o.items():
                 if isinstance(value, dict) and key in s:
@@ -233,6 +224,7 @@ class ControlMetadata(BaseModel):
         """Save metadata to a checkpoint."""
         set_control_metadata(checkpoint_path, self)
 
+
 def get_control_metadata(checkpoint_path: os.PathLike) -> ControlMetadata:
     """Get the control metadata from a checkpoint."""
     from anemoi.utils.checkpoints import has_metadata, load_metadata
@@ -242,7 +234,7 @@ def get_control_metadata(checkpoint_path: os.PathLike) -> ControlMetadata:
 
     loaded_metadata = load_metadata(str(checkpoint_path), name=FORECAST_IN_A_BOX_METADATA)
     try:
-       return ControlMetadata(**loaded_metadata)
+        return ControlMetadata(**loaded_metadata)
     except Exception as e:
         logger.warning(
             f"Failed to load control metadata from {checkpoint_path}: {e}. "
@@ -256,12 +248,14 @@ def get_control_metadata(checkpoint_path: os.PathLike) -> ControlMetadata:
         # Otherwise, run it synchronously
 
         if loop := asyncio.get_running_loop():
+
             def async_replace():
                 replace_metadata(
                     str(checkpoint_path),
                     {"version": ControlMetadata()._version},
                     name=FORECAST_IN_A_BOX_METADATA,
                 )
+
             loop.run_in_executor(None, async_replace)
         else:
             replace_metadata(

@@ -31,17 +31,17 @@ class NestedModel(BaseForecastModel):
     def _create_input_configuration(self, control: ControlMetadata) -> dict[str, dict[str, Any]]:
         assert control.nested is not None, "NestedModel requires a 'nested' configuration in the control metadata."
         return {
-            'cutout': {'sources': control.nested, 'variables': None},
+            "cutout": {"sources": control.nested, "variables": None},
         }
 
     def _post_processors(self, kwargs: dict[str, Any]) -> list[dict[str, Any]]:
-        return [{'extract_from_state': kwargs.get('region', self._regions[0])}]
+        return [{"extract_from_state": kwargs.get("region", self._regions[0])}]
 
     @property
     def _pkg_versions(self) -> dict[str, str]:
         """Model specific override for package versions."""
         return {
-            'anemoi-plugins-ecmwf-inference[mir,regrid]': "0.1.10",
+            "anemoi-plugins-ecmwf-inference[mir,regrid]": "0.1.10",
         }
 
     @property
@@ -59,7 +59,7 @@ class NestedModel(BaseForecastModel):
                 jsonschema=StringSchema(
                     title="Region",
                     description="The region to extract of the nested model.",
-                    enum=self._regions, # type: ignore
+                    enum=self._regions,  # type: ignore
                     default=self._regions[0],
                 ),
                 uischema=UIStringField(widget="select"),
