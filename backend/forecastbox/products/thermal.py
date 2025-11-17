@@ -19,15 +19,13 @@ from .interfaces import Interfaces
 from .product import Product
 from .registry import CategoryRegistry
 
-thermal_indices = CategoryRegistry(
-    "thermal", interface=Interfaces.DETAILED, description="Thermal Indices", title="Thermal Indices"
-)
+thermal_indices = CategoryRegistry("thermal", interface=Interfaces.DETAILED, description="Thermal Indices", title="Thermal Indices")
 
 PPROC_AVAILABLE = True
 try:
     from earthkit.workflows.plugins.pproc.fluent import Action as ppAction
 except (OSError, ImportError):
-    ppAction = object # type: ignore # NOTE implicit shadowing, intentional
+    ppAction = object  # type: ignore # NOTE implicit shadowing, intentional
     PPROC_AVAILABLE = False
 
 THERMOFEEL_IMPORTED = True

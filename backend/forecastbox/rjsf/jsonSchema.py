@@ -155,7 +155,7 @@ class NullSchema(BaseSchema):
     >>> NullSchema(type="null")
     """
 
-    type: str | list[str] | Literal['null'] = Field(default="null")
+    type: str | list[str] | Literal["null"] = Field(default="null")
 
 
 class ObjectSchema(BaseSchema):

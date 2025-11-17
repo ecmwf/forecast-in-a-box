@@ -34,8 +34,8 @@ except ImportError:
     from typing import Any
 
     EARTHKIT_PLOTS_IMPORTED = False
-    Figure = Any # type: ignore # NOTE intentional shadowing
-    Subplot = Any # type: ignore # NOTE intentional shadowing
+    Figure = Any  # type: ignore # NOTE intentional shadowing
+    Subplot = Any  # type: ignore # NOTE intentional shadowing
 
 WIND_SHORTNAMES = ["u", "v", "10u", "10v", "100u", "100v"]
 
@@ -56,7 +56,7 @@ def _plot_fields(subplot: Subplot, fields: ekd.FieldList, **kwargs: dict[str, di
         Top level keys are the method names, and values are dictionaries of keyword arguments for that method.
     """
     plot_categories = defaultdict(lambda: defaultdict(list))
-    for index, field in enumerate(fields): # type: ignore[invalid-argument-type] # NOTE fields doest seem to declare Iterable
+    for index, field in enumerate(fields):  # type: ignore[invalid-argument-type] # NOTE fields doest seem to declare Iterable
         if field.metadata().get("shortName", None) in WIND_SHORTNAMES:
             plot_categories["quiver"][field.metadata().get("levtype", None)].append(field)
             continue
@@ -73,6 +73,7 @@ def _plot_fields(subplot: Subplot, fields: ekd.FieldList, **kwargs: dict[str, di
                     ekd.FieldList.from_fields(sub_fields),
                     **kwargs.get("quickplot", {}),
                 )
+
 
 @as_payload
 @mark.environment_requirements(["earthkit-plots"])
@@ -99,8 +100,7 @@ def export(figure: Figure, format: str = "png", dpi: int = 100, no_pad: bool = F
     """
     export_format = format[1:] if format.startswith("i") else format
     buf = io.BytesIO()
-    figure.save(buf, format=export_format, dpi = dpi, pad_inches=(0 if no_pad else None))
-
+    figure.save(buf, format=export_format, dpi=dpi, pad_inches=(0 if no_pad else None))
 
     return buf.getvalue(), f"image/{format}"
 
@@ -120,16 +120,15 @@ def quickplot(
     from earthkit.plots.schemas import schema
     from earthkit.plots.utils import iter_utils
 
-
     selected_schema = config.product.plots_schema
     schema_dir = importlib.resources.files("forecastbox.products.plots.schemas")
 
-    if 'inbuilt://' in selected_schema:
-        selected_schema = selected_schema.replace('inbuilt://', str(schema_dir) + '/') + '/schema.yaml'
+    if "inbuilt://" in selected_schema:
+        selected_schema = selected_schema.replace("inbuilt://", str(schema_dir) + "/") + "/schema.yaml"
         schema.use(selected_schema)
         schema.style_library = Path(selected_schema).parent
-    elif '@' in selected_schema:
-        schema.use(selected_schema.split('@')[0])
+    elif "@" in selected_schema:
+        schema.use(selected_schema.split("@")[0])
     else:
         schema.use(selected_schema)
 
@@ -155,7 +154,7 @@ def quickplot(
 
     for i, (group_val, group_args) in enumerate(grouped_data.items()):
         subplot = figure.add_map(domain=domain)
-        _plot_fields(subplot, group_args, quickplot=dict(interpolate=True)) # type: ignore[invalid-argument-type] # NOTE this is valid, checker failure
+        _plot_fields(subplot, group_args, quickplot=dict(interpolate=True))  # type: ignore[invalid-argument-type] # NOTE this is valid, checker failure
 
         if no_pad:
             subplot.ax.axis("off")
@@ -167,11 +166,7 @@ def quickplot(
                 try:
                     getattr(subplot, m)(*args)
                 except Exception as err:
-                    warnings.warn(
-                        f"Failed to execute {m} on given data with: \n"
-                        f"{repr(err)}\n\n"
-                        "consider constructing the plot manually."
-                    )
+                    warnings.warn(f"Failed to execute {m} on given data with: \n{repr(err)}\n\nconsider constructing the plot manually.")
 
     if not no_pad:
         for m in schema.quickmap_figure_workflow:
@@ -191,12 +186,12 @@ def quickplot(
 
 def add_custom_plot_styles(payload: Payload) -> Payload:
     """Add custom plot styles from the config to the payload."""
-    if '@' in config.product.plots_schema:
-        style_location = config.product.plots_schema.split('@')[1]
+    if "@" in config.product.plots_schema:
+        style_location = config.product.plots_schema.split("@")[1]
 
-        payload.metadata.setdefault('environment', [])
-        if style_location not in payload.metadata['environment']:
-            payload.metadata['environment'].append(style_location)
+        payload.metadata.setdefault("environment", [])
+        if style_location not in payload.metadata["environment"]:
+            payload.metadata["environment"].append(style_location)
 
     return payload
 
@@ -218,7 +213,7 @@ class MapProduct(GenericTemporalProduct):
                 jsonschema=StringSchema(
                     title="Reduce",
                     description="Combine all steps into a single plot",
-                    enum=["True", "False"], # type: ignore[unknown-argument] # NOTE checker failure, this is legit
+                    enum=["True", "False"],  # type: ignore[unknown-argument] # NOTE checker failure, this is legit
                     default="True",
                 )
             ),
@@ -238,7 +233,7 @@ class MapProduct(GenericTemporalProduct):
     @property
     def model_assumptions(self):
         return {
-            "domain": '*',
+            "domain": "*",
             "reduce": ["True", "False"],
         }
 
@@ -252,7 +247,6 @@ class MapProduct(GenericTemporalProduct):
 
 @plot_product_registry("Maps")
 class SimpleMapProduct(MapProduct):
-
     def execute(self, product_spec, model, source):
         domain = product_spec.pop("domain", None)
         source = self.select_on_specification(product_spec, source)
@@ -264,25 +258,29 @@ class SimpleMapProduct(MapProduct):
         if product_spec.get("reduce", "True") == "True":
             source = source.concatenate("step")
 
-        quickplot_payload = add_custom_plot_styles(quickplot(
-            domain=domain,
-            groupby="valid_datetime",
-            subplot_title="{time:%Y-%m-%d %H} UTC (+{lead_time}h)",
-            figure_title="{variable_name} over {domain}\n Base time: {base_time: %Y%m%dT%H%M}\n",
-        ))
+        quickplot_payload = add_custom_plot_styles(
+            quickplot(
+                domain=domain,
+                groupby="valid_datetime",
+                subplot_title="{time:%Y-%m-%d %H} UTC (+{lead_time}h)",
+                figure_title="{variable_name} over {domain}\n Base time: {base_time: %Y%m%dT%H%M}\n",
+            )
+        )
         plots = source.map(quickplot_payload).map(export(format="png")).map(self.named_payload("Map"))
 
         return plots
 
+
 @plot_product_registry("Interactive Map")
 class InteractiveMapProduct(GenericTemporalProduct):
     """Interactive Map Product."""
+
     allow_multiple_steps = True
 
     @property
     def formfields(self):
         formfields = super().formfields.copy()
-        formfields.pop('reduce', None)
+        formfields.pop("reduce", None)
         return formfields
 
     def validate_intersection(self, model: SpecifiedModel) -> bool:
@@ -303,12 +301,14 @@ class InteractiveMapProduct(GenericTemporalProduct):
 
         source = source.concatenate("param")
 
-        quickplot_payload = add_custom_plot_styles(quickplot(
-            domain=domain,
-            groupby="valid_datetime",
-            no_pad=True,
-        ))
-        plots = source.map(quickplot_payload).map(export(format="ipng", dpi = 1000)).map(self.named_payload("Interactive Map"))
+        quickplot_payload = add_custom_plot_styles(
+            quickplot(
+                domain=domain,
+                groupby="valid_datetime",
+                no_pad=True,
+            )
+        )
+        plots = source.map(quickplot_payload).map(export(format="ipng", dpi=1000)).map(self.named_payload("Interactive Map"))
 
         return plots
 
@@ -330,11 +330,13 @@ class EnsembleMapProduct(BaseEnsembleProduct, MapProduct):
         source = source.concatenate(ENSEMBLE_DIMENSION_NAME)
         source = source.concatenate("param")
 
-        quickplot_payload = add_custom_plot_styles(quickplot(
-            domain=domain,
-            groupby="number",
-            subplot_title="Member{number}",
-            figure_title="{variable_name} over {domain}\nValid time: {valid_time:%H:%M on %-d %B %Y} (T+{lead_time})\n",
-        ))
+        quickplot_payload = add_custom_plot_styles(
+            quickplot(
+                domain=domain,
+                groupby="number",
+                subplot_title="Member{number}",
+                figure_title="{variable_name} over {domain}\nValid time: {valid_time:%H:%M on %-d %B %Y} (T+{lead_time})\n",
+            )
+        )
         plots = source.map(quickplot_payload)
         return plots

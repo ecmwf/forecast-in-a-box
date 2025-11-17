@@ -36,7 +36,7 @@ class OutputProduct(GenericTemporalProduct):
                 jsonschema=StringSchema(
                     title="Reduce",
                     description="Combine all steps and parameters into a single output",
-                    enum=["True", "False"], # type: ignore[unknown-argument] # NOTE checker failure, this is legit
+                    enum=["True", "False"],  # type: ignore[unknown-argument] # NOTE checker failure, this is legit
                     default="True",
                 )
             ),
@@ -44,7 +44,7 @@ class OutputProduct(GenericTemporalProduct):
                 jsonschema=StringSchema(
                     title="Format",
                     description="Output format",
-                    enum=OUTPUT_TYPES, # type: ignore[unknown-argument] # NOTE checker failure, this is legit
+                    enum=OUTPUT_TYPES,  # type: ignore[unknown-argument] # NOTE checker failure, this is legit
                     default="grib",
                 ),
                 uischema=UIStringField(
@@ -75,7 +75,7 @@ class OutputProduct(GenericTemporalProduct):
         format = product_spec.get("format", "grib")
 
         conversion_payload = export_fieldlist_as(format=format)
-        conversion_payload.func.__name__ = f"convert_to_{format}" # type: ignore # TODO fix typing, the lside should have always name
+        conversion_payload.func.__name__ = f"convert_to_{format}"  # type: ignore # TODO fix typing, the lside should have always name
 
         source = source.map(conversion_payload).map(self.named_payload(f"output-{format}"))
         return source

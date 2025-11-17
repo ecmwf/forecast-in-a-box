@@ -10,6 +10,4 @@
 from ..interfaces import Interfaces
 from ..registry import CategoryRegistry
 
-extreme_registry = CategoryRegistry(
-    "extreme", interface=Interfaces.DETAILED, description="Extreme Value Indices", title="Extreme Indices"
-)
+extreme_registry = CategoryRegistry("extreme", interface=Interfaces.DETAILED, description="Extreme Value Indices", title="Extreme Indices")

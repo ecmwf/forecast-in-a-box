@@ -59,18 +59,19 @@ def select_from_params(available_spec: Qube, params: dict[str, Any]) -> Qube:
 
     return available_spec
 
+
 def _sort_values(values: Iterable[Any]) -> Iterable[Any]:
     """Sort values in a way that numbers come before strings, and numbers are sorted numerically."""
     convert = lambda text: int(text) if text.isdigit() else text
-    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
+    alphanum_key = lambda key: [convert(c) for c in re.split("([0-9]+)", key)]
     return sorted(values, key=alphanum_key)
+
 
 def _convert_to_int(value: Iterable[Any]) -> Any:
     """Convert a value to int if it is a digit."""
     if all(isinstance(v, str) and v.isdigit() for v in value):
         return [float(v) for v in value]
     return value
-
 
 
 def _sort_fields(fields: dict) -> dict:
@@ -86,9 +87,7 @@ def _sort_fields(fields: dict) -> dict:
     return new_fields
 
 
-def product_to_config(
-    product: Product, model_spec: ModelSpecification, params: dict[str, Any]
-) -> ExportedSchemas:
+def product_to_config(product: Product, model_spec: ModelSpecification, params: dict[str, Any]) -> ExportedSchemas:
     """Convert a product to a configuration dictionary.
 
     Parameters
@@ -141,11 +140,7 @@ def product_to_config(
 
         # Select from the available product specification based on all parameters except the current key
         updated_params = {**params, **inferred_constraints}
-        val = (
-            select_from_params(available_product_spec, {k: v for k, v in updated_params.items() if not k == key})
-            .axes()
-            .get(key, val)
-        )
+        val = select_from_params(available_product_spec, {k: v for k, v in updated_params.items() if not k == key}).axes().get(key, val)
 
         field = FieldWithUI(jsonschema=StringSchema(title=key))
 
@@ -224,9 +219,7 @@ async def get_valid_categories(interface: Interfaces, modelspec: ModelSpecificat
 
 
 @router.post("/configuration/{category}/{product}")
-async def get_product_configuration(
-    category: str, product: str, model: ModelSpecification, spec: dict[str, Any]
-) -> ExportedSchemas:
+async def get_product_configuration(category: str, product: str, model: ModelSpecification, spec: dict[str, Any]) -> ExportedSchemas:
     """Get the product configuration for a given category and product.
 
     Validates the product against the model specification and returns a configuration object.

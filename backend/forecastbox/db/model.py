@@ -51,7 +51,7 @@ async def start_download(model_id: str) -> None:
     await addAndCommit(entity, async_session_maker)
 
 
-async def delete_download(model_id: str|None) -> None:
+async def delete_download(model_id: str | None) -> None:
     if model_id:
         where = ModelDownload.model_id == model_id
         stmt = delete(ModelDownload).where(where)
@@ -73,7 +73,6 @@ async def start_editing(model_id: str, metadata: str) -> bool:
     except IntegrityError:
         logger.exception("failed to start editing, assuming concurrent edit")
         return False
-
 
 
 async def get_edit(model_id: str) -> ModelEdit | None:

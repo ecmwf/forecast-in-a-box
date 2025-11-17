@@ -22,9 +22,9 @@ from .uiSchema import UIAdditionalProperties, UIField, UIIntegerField, UIObjectF
 
 def _update_with_extra_json(field: FieldInfo, schema: FieldSchema, ui: UISchema) -> tuple[FieldSchema, UISchema]:
     """Update schema and ui with extra json from field."""
-    if isinstance(field.json_schema_extra, dict) and field.json_schema_extra.get('rjsf') is not None: # type: ignore # TODO fix type, didnt diagnose
-        assert isinstance(field.json_schema_extra['rjsf'], dict), "rjsf extra must be a dict"
-        for k, v in field.json_schema_extra['rjsf'].items():
+    if isinstance(field.json_schema_extra, dict) and field.json_schema_extra.get("rjsf") is not None:  # type: ignore # TODO fix type, didnt diagnose
+        assert isinstance(field.json_schema_extra["rjsf"], dict), "rjsf extra must be a dict"
+        for k, v in field.json_schema_extra["rjsf"].items():
             if hasattr(schema, k):
                 setattr(schema, k, v)
             elif hasattr(ui, k):
@@ -33,12 +33,13 @@ def _update_with_extra_json(field: FieldInfo, schema: FieldSchema, ui: UISchema)
                 raise ValueError(f"Unknown rjsf extra key: {k}")
     return schema, ui
 
+
 def _set_base_field_info(field: FieldInfo, schema: FieldSchema, ui: UISchema) -> tuple[FieldSchema, UISchema]:
     """Set base field info from pydantic field to schema and ui."""
     if field.default is not PydanticUndefined:
         schema.default = field.default
     if field.default_factory is not None:
-        schema.default = field.default_factory() # type: ignore
+        schema.default = field.default_factory()  # type: ignore
     if field.title:
         schema.title = field.title
     if field.description:
@@ -46,53 +47,53 @@ def _set_base_field_info(field: FieldInfo, schema: FieldSchema, ui: UISchema) ->
         ui.description = field.description
     return schema, ui
 
-def _from_string_primative(field: FieldInfo) -> FieldWithUI:
 
+def _from_string_primative(field: FieldInfo) -> FieldWithUI:
     schema, ui = _set_base_field_info(field, StringSchema(type="string"), UIStringField())
     schema, ui = _update_with_extra_json(field, schema, ui)
 
     return FieldWithUI(jsonschema=schema, uischema=ui)
 
-def _from_date_primative(field: FieldInfo) -> FieldWithUI:
 
+def _from_date_primative(field: FieldInfo) -> FieldWithUI:
     schema, ui = _set_base_field_info(field, StringSchema(type="string", format="date"), UIStringField(widget="date"))
     schema, ui = _update_with_extra_json(field, schema, ui)
 
     return FieldWithUI(jsonschema=schema, uischema=ui)
 
-def _from_literal_primative(field: FieldInfo) -> FieldWithUI:
 
+def _from_literal_primative(field: FieldInfo) -> FieldWithUI:
     literal_args = get_args(field.annotation)
     if not all(isinstance(arg, str) for arg in literal_args):
         raise TypeError("Only Literal[str, ...] is supported")
 
-    schema, ui = _set_base_field_info(field, StringSchema(type="string", enum=list(literal_args)), UIStringField(widget="select")) # type: ignore # TODO fix type, didnt diagnose
+    schema, ui = _set_base_field_info(field, StringSchema(type="string", enum=list(literal_args)), UIStringField(widget="select"))  # type: ignore # TODO fix type, didnt diagnose
     schema, ui = _update_with_extra_json(field, schema, ui)
 
     return FieldWithUI(jsonschema=schema, uischema=ui)
 
-def _from_integer_primative(field: FieldInfo) -> FieldWithUI:
 
+def _from_integer_primative(field: FieldInfo) -> FieldWithUI:
     schema, ui = _set_base_field_info(field, IntegerSchema(type="integer"), UIIntegerField())
     schema, ui = _update_with_extra_json(field, schema, ui)
 
     return FieldWithUI(jsonschema=schema, uischema=ui)
 
-def _from_boolean_primative(field: FieldInfo) -> FieldWithUI:
 
+def _from_boolean_primative(field: FieldInfo) -> FieldWithUI:
     schema, ui = _set_base_field_info(field, BooleanSchema(type="boolean"), UIField(widget="checkbox"))
     schema, ui = _update_with_extra_json(field, schema, ui)
 
     return FieldWithUI(jsonschema=schema, uischema=ui)
 
-def _from_dict_primative(field: FieldInfo) -> FieldWithUI:
 
+def _from_dict_primative(field: FieldInfo) -> FieldWithUI:
     schema, ui = _set_base_field_info(field, ObjectSchema(type="object", properties={}), UIAdditionalProperties())
     schema, ui = _update_with_extra_json(field, schema, ui)
 
     assert isinstance(ui, UIAdditionalProperties)
 
-    if field.annotation and hasattr(field.annotation, '__args__') and len(field.annotation.__args__) == 2:
+    if field.annotation and hasattr(field.annotation, "__args__") and len(field.annotation.__args__) == 2:
         _, value_type = get_args(field.annotation)
         if value_type is str:
             schema.additionalProperties = StringSchema(type="string")
@@ -111,15 +112,15 @@ def _from_dict_primative(field: FieldInfo) -> FieldWithUI:
 
     return FieldWithUI(jsonschema=schema, uischema=ui)
 
-def _from_list_primative(field: FieldInfo) -> FieldWithUI:
 
+def _from_list_primative(field: FieldInfo) -> FieldWithUI:
     schema, ui = _set_base_field_info(field, ArraySchema(type="array", items=StringSchema(type="string")), UIObjectField())
     schema, ui = _update_with_extra_json(field, schema, ui)
 
     assert isinstance(schema, ArraySchema)
     assert isinstance(ui, UIObjectField)
 
-    if field.annotation and hasattr(field.annotation, '__args__') and len(field.annotation.__args__) == 1:
+    if field.annotation and hasattr(field.annotation, "__args__") and len(field.annotation.__args__) == 1:
         item_type = get_args(field.annotation)[0]
         if item_type is str:
             schema.items = StringSchema(type="string")
@@ -138,6 +139,7 @@ def _from_list_primative(field: FieldInfo) -> FieldWithUI:
 
     return FieldWithUI(jsonschema=schema, uischema=ui)
 
+
 PRIMATIVES: dict[type, Callable[[FieldInfo], FieldWithUI]] = {
     str: _from_string_primative,
     int: _from_integer_primative,
@@ -148,6 +150,7 @@ PRIMATIVES: dict[type, Callable[[FieldInfo], FieldWithUI]] = {
     object: _from_string_primative,
     # Literal: _from_literal_primative,
 }
+
 
 def from_pydantic(model: type[BaseModel] | BaseModel) -> tuple[dict[str, FieldWithUI], list[str]]:
     """Convert a pydantic model to a dictionary of fields, and list of required.
@@ -188,7 +191,7 @@ def from_pydantic(model: type[BaseModel] | BaseModel) -> tuple[dict[str, FieldWi
             elif isinstance(field.annotation, UnionType) or get_origin(field.annotation) is Union:
                 fields[field_name] = _get_with_annotation(get_args(field.annotation)[0], field)
                 if NoneType in get_args(field.annotation):
-                    fields[field_name].jsonschema.type = [fields[field_name].jsonschema.type, "null"] # type: ignore
+                    fields[field_name].jsonschema.type = [fields[field_name].jsonschema.type, "null"]  # type: ignore
 
             elif get_origin(field.annotation) is dict:
                 fields[field_name] = _from_dict_primative(field)
@@ -199,7 +202,7 @@ def from_pydantic(model: type[BaseModel] | BaseModel) -> tuple[dict[str, FieldWi
             elif get_origin(field.annotation) is Literal:
                 fields[field_name] = _from_literal_primative(field)
 
-            elif hasattr(field.annotation, 'mro'):
+            elif hasattr(field.annotation, "mro"):
                 if BaseModel in field.annotation.mro():
                     sub_fields, sub_required = _get_from_model(field.annotation)
 
@@ -224,4 +227,5 @@ def from_pydantic(model: type[BaseModel] | BaseModel) -> tuple[dict[str, FieldWi
             if field.is_required():
                 required.append(field_name)
         return fields, required
-    return _get_from_model(model) # type: ignore # TODO fix type, didnt diagnose
+
+    return _get_from_model(model)  # type: ignore # TODO fix type, didnt diagnose
