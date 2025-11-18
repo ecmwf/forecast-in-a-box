@@ -1,5 +1,4 @@
 repos:
-# Empty notebooks
 - repo: local
   hooks:
   - id: frontend-v2-npm-check
