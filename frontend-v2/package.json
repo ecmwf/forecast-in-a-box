@@ -44,6 +44,7 @@
     "@types/react": "^19.2.3",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
+    "eslint-plugin-license-header": "^0.8.0",
     "i18next-cli": "^1.23.5",
     "jsdom": "^27.2.0",
     "prettier": "^3.6.2",
