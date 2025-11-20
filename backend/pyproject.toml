@@ -31,6 +31,7 @@ dependencies = [
   "anemoi-utils>=0.4.36",
   "apscheduler",
   "cloudpickle",
+  "earthkit-plots>=0.3.5",
   "earthkit-workflows>=0.4.7",
   "earthkit-workflows-anemoi>=0.3.12",
   "earthkit-workflows-pproc",
@@ -55,11 +56,7 @@ dependencies = [
 ]
 
 optional-dependencies.all = [
-  "forecast-in-a-box[plots,thermo,dev]",
-]
-optional-dependencies.plots = [
-  "earthkit-plots>=0.3.5",
-  "earthkit-plots-default-styles>=0.1",
+  "forecast-in-a-box[thermo,dev]",
 ]
 optional-dependencies.thermo = [
   "thermofeel>=2.1.1",
