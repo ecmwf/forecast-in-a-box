@@ -31,7 +31,7 @@ jobs:
       - run: |
           set -euo pipefail
           cd backend
-          uv sync --extra plots --python "${{ matrix.python_version }}"
+          uv sync --python "${{ matrix.python_version }}"
           uv run ty check
           mkdir /tmp/tmpFiabHome
           mkdir forecastbox/static && touch forecastbox/static/index.html # TODO replace with proper static file build
@@ -53,7 +53,7 @@ jobs:
       - run: |
           set -euo pipefail
           cd backend
-          uv sync --extra plots --python "${{ matrix.python_version }}"
+          uv sync --python "${{ matrix.python_version }}"
           uv run ty check
           mkdir /tmp/tmpFiabHome
           mkdir forecastbox/static && touch forecastbox/static/index.html # TODO replace with proper static file build
