@@ -35,6 +35,10 @@ jobs:
           uv run ty check
           mkdir /tmp/tmpFiabHome
           mkdir forecastbox/static && touch forecastbox/static/index.html # TODO replace with proper static file build
+          if [[ "${{ matrix.python_version }}" != "3.13" ]] ; then
+            # see tests of the admin/release endpoint for explanation
+            export CI_GITHUB_RATELIMIT=yes
+          fi
           uv run pytest
   ubuntu:
     name: ubuntu
@@ -57,4 +61,8 @@ jobs:
           uv run ty check
           mkdir /tmp/tmpFiabHome
           mkdir forecastbox/static && touch forecastbox/static/index.html # TODO replace with proper static file build
+          if [[ "${{ matrix.python_version }}" != "3.13" ]] ; then
+            # see tests of the admin/release endpoint for explanation
+            export CI_GITHUB_RATELIMIT=yes
+          fi
           uv run pytest
