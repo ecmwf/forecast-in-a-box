@@ -73,10 +73,6 @@ dev = [
   "ty==0.0.1a23",
 ]
 
-[tool.setuptools.packages.find]
-where = ["forecastbox"]
-exclude = ["tests"]
-
 [tool.setuptools_scm]
 version_file = "forecastbox/_version.py"
 write_to_template = '''# Do not change! Do not track in version control!
