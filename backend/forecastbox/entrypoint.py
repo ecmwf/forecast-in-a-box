@@ -49,8 +49,12 @@ async def lifespan(app: FastAPI):
     await delete_download(
         None
     )  # to get rid of db entries left over from previous run.. consider switching to pid table column instead, to mark failed and allow retry?
-    release_time, release_version = get_local_release()
-    app.version = f"{release_version}@{release_time}"
+    try:
+        release_time, release_version = get_local_release()
+        app.version = f"{release_version}@{release_time}"
+    except Exception as e:
+        logger.exception(f"failed to determine local version due to {repr(e)}")
+        app.version = "unknown"
     yield
     if config.api.allow_scheduler:
         stop_scheduler()

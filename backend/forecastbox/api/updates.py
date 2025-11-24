@@ -48,10 +48,11 @@ def get_lock_timestamp() -> str:
 
 
 def get_local_release() -> tuple[datetime, Release]:
+    """Reads the version & time from the pylock.toml.timestamp. If file not found / malformed,
+    raises exception"""
     timestamp_str = get_lock_timestamp()
     if not timestamp_str:
-        logger.warning("No local pylock.toml.timestamp file found.")
-        return datetime.min, Release(0, 0, 0)
+        raise ValueError("No local pylock.toml.timestamp file found.")
 
     head, *lines = timestamp_str.splitlines()
     if lines:
