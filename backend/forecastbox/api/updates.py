@@ -52,7 +52,7 @@ def get_local_release() -> tuple[datetime, Release]:
     raises exception"""
     timestamp_str = get_lock_timestamp()
     if not timestamp_str:
-        raise ValueError("No local pylock.toml.timestamp file found.")
+        raise ValueError("pylock.toml.timestamp file is empty or does not exist.")
 
     head, *lines = timestamp_str.splitlines()
     if lines:
