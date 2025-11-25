@@ -9,6 +9,7 @@ from typing import Any, Generator
 
 import httpx
 import pytest
+import forecastbox.config
 from forecastbox.config import FIABConfig
 from forecastbox.standalone.entrypoint import launch_all
 
@@ -71,6 +72,9 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         td = tempfile.TemporaryDirectory()
         os.environ["FIAB_ROOT"] = td.name
         (pathlib.Path(td.name) / "pylock.toml.timestamp").write_text("1761908420:d0.0.1")
+        # we need to monkeypath this, because of eager import this was already initialised
+        # to user's personal config file
+        forecastbox.config.fiab_home = pathlib.Path(td.name)
         config = FIABConfig()
         config.api.uvicorn_port = 30645
         config.cascade.cascade_url = "tcp://localhost:30644"

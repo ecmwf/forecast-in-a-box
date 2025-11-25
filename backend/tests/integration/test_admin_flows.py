@@ -1,3 +1,5 @@
+import os
+
 from forecastbox.api.routers.admin import GetReleaseStatusResponse
 from forecastbox.api.updates import Release
 
@@ -34,12 +36,14 @@ def test_admin_flows(backend_client):
     assert response.json()["email"] == "admin@somewhere.org"
 
     # get release
-    response = backend_client.get("/admin/release")
-    assert response.is_success
-    release_status = GetReleaseStatusResponse(**response.json())
-    assert isinstance(release_status.local_release, Release)
-    assert isinstance(release_status.local_release_age_days, int)
-    assert isinstance(release_status.newest_available_release, Release)
+    if os.environ.get("CI_GITHUB_RATELIMIT", "no") != "yes":
+        # NOTE this endpoint can fail with rate limit exceeded => we best not test in full matrix
+        response = backend_client.get("/admin/release")
+        assert response.is_success
+        release_status = GetReleaseStatusResponse(**response.json())
+        assert isinstance(release_status.local_release, Release)
+        assert isinstance(release_status.local_release_age_days, int)
+        assert isinstance(release_status.newest_available_release, Release)
 
     # register
     headers = {"Content-Type": "application/json"}
