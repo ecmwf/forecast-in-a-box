@@ -73,7 +73,11 @@ class UpdateReleaseResponse(BaseModel):
 @router.get("/release", response_model=GetReleaseStatusResponse)
 async def get_release_status(admin=Depends(get_admin_user)) -> GetReleaseStatusResponse:
     """Get release status"""
-    local_dt, local_release = get_local_release()
+    try:
+        local_dt, local_release = get_local_release()
+    except Exception as e:
+        logger.exception(f"failed to determine local version due to {repr(e)}")
+        raise HTTPException(status_code=500, detail="Unable to get local release status")
     newest_available_release = await get_most_recent_release()
 
     local_release_age_days = (datetime.now(timezone.utc) - local_dt.astimezone(timezone.utc)).days
