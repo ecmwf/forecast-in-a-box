@@ -18,6 +18,7 @@ from earthkit.workflows import mark
 from earthkit.workflows.decorators import as_payload
 from earthkit.workflows.fluent import Payload
 from earthkit.workflows.plugins.anemoi.types import ENSEMBLE_DIMENSION_NAME
+
 from forecastbox.config import config
 from forecastbox.models import SpecifiedModel
 from forecastbox.products.ensemble import BaseEnsembleProduct

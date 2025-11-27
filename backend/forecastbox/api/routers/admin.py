@@ -14,14 +14,15 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
+from pydantic import UUID4, BaseModel
+from sqlalchemy import delete, select, update
+
 from forecastbox.api.updates import Release, get_local_release, get_most_recent_release, get_pylock, save_pylock
 from forecastbox.auth.users import current_active_user
 from forecastbox.config import BackendAPISettings, CascadeSettings, ProductSettings, config
 from forecastbox.db.user import async_session_maker
 from forecastbox.rjsf import ExportedSchemas, FormDefinition, from_pydantic
 from forecastbox.schemas.user import UserRead, UserTable, UserUpdate
-from pydantic import UUID4, BaseModel
-from sqlalchemy import delete, select, update
 
 logger = logging.getLogger(__name__)
 

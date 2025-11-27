@@ -8,12 +8,13 @@ Note that those reside in the jobdb as well -- there is no modeldb
 import datetime as dt
 import logging
 
-from forecastbox.config import config
-from forecastbox.db.core import addAndCommit, executeAndCommit, querySingle
-from forecastbox.schemas.model import Base, ModelDownload, ModelEdit
 from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+from forecastbox.config import config
+from forecastbox.db.core import addAndCommit, executeAndCommit, querySingle
+from forecastbox.schemas.model import Base, ModelDownload, ModelEdit
 
 logger = logging.getLogger(__name__)
 

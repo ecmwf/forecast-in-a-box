@@ -12,10 +12,11 @@ from pathlib import Path
 from typing import Sequence, cast
 
 import pytest
+from qubed import Qube
+
 from forecastbox.models import SpecifiedModel
 from forecastbox.models.globe import ControlMetadata, GlobalModel
 from forecastbox.products.product import GenericParamProduct, Product
-from qubed import Qube
 
 
 def create_test_product(axis: dict[str, Sequence[str]]) -> Product:

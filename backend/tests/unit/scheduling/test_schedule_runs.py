@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import HTTPException
+
 from forecastbox.api.routers.schedule import GetScheduleRunsResponse, get_schedule_runs
 from forecastbox.db.schedule import JobRecord, ScheduleRun
 from forecastbox.schemas.user import UserRead

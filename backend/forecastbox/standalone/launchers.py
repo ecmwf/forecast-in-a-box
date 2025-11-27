@@ -17,6 +17,7 @@ import asyncio
 import logging
 
 import uvicorn
+
 from forecastbox.config import FIABConfig
 from forecastbox.standalone.config import setup_process
 

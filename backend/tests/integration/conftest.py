@@ -9,6 +9,7 @@ from typing import Any, Generator
 
 import httpx
 import pytest
+
 import forecastbox.config
 from forecastbox.config import FIABConfig
 from forecastbox.standalone.entrypoint import launch_all

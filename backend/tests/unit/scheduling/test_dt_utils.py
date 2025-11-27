@@ -2,6 +2,7 @@ import re
 from datetime import datetime
 
 import pytest
+
 from forecastbox.api.scheduling.dt_utils import calculate_next_run, parse_crontab
 
 

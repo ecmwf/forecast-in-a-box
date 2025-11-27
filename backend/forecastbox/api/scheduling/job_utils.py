@@ -15,6 +15,7 @@ from typing import Any, cast
 
 import orjson
 from cascade.low.func import Either
+
 from forecastbox.api.scheduling.dt_utils import calculate_next_run
 from forecastbox.api.types import ExecutionSpecification
 from forecastbox.db.schedule import get_schedules, max_attempt_cnt, run2date, run2schedule

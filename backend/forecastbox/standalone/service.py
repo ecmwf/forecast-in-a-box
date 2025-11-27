@@ -4,6 +4,7 @@ import logging
 from multiprocessing import Process, freeze_support, set_start_method
 
 import psutil
+
 from forecastbox.config import FIABConfig, fiab_home, validate_runtime
 from forecastbox.standalone.checks import check_backend_ready
 from forecastbox.standalone.config import export_recursive, setup_process

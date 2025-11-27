@@ -21,6 +21,8 @@ from typing import Any, Literal
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from pydantic import BaseModel
+
 from forecastbox.api.utils import get_model_path
 from forecastbox.config import config
 from forecastbox.db.model import delete_download, finish_edit, get_download, get_edit, start_download, start_editing, update_progress
@@ -28,7 +30,6 @@ from forecastbox.models.metadata import ControlMetadata, set_control_metadata
 from forecastbox.models.model import ModelInfo, get_model, model_info
 from forecastbox.rjsf import ExportedSchemas
 from forecastbox.schemas.model import ModelDownload
-from pydantic import BaseModel
 
 from ..types import ModelName
 from .admin import get_admin_user

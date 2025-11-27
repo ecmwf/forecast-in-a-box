@@ -15,12 +15,14 @@ repos:
 - repo: https://github.com/astral-sh/ruff-pre-commit
   rev: v0.12.2
   hooks:
-  - id: ruff # better black/flake
+  - id: ruff # better black/flake/isort
     files: ^backend/
     args:
+    - --select
+    - I # isorting
     - --fix
     - --exit-non-zero-on-fix
-  - id: ruff-format # better isort
+  - id: ruff-format
     files: ^backend/
 ci:
   autoupdate_schedule: monthly

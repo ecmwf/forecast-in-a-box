@@ -18,17 +18,18 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-import forecastbox.db
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.exceptions import HTTPException
+
+import forecastbox.db
 from forecastbox.api.scheduling.scheduler_thread import start_scheduler, status_scheduler, stop_scheduler
 from forecastbox.api.updates import get_local_release
 from forecastbox.db.migrations import migrate
 from forecastbox.db.model import delete_download
-from starlette.exceptions import HTTPException
 
 from .api.routers import admin, auth, execution, gateway, job, model, product, schedule
 from .config import config

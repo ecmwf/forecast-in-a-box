@@ -8,8 +8,9 @@
 # nor does it submit to any jurisdiction.
 
 
-from forecastbox.products.product import GenericParamProduct
 from qubed import Qube
+
+from forecastbox.products.product import GenericParamProduct
 
 
 class TestProduct(GenericParamProduct):
