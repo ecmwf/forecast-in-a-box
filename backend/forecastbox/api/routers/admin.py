@@ -21,7 +21,7 @@ from sqlalchemy import delete, select, update
 
 from forecastbox.api.updates import Release, get_local_release, get_most_recent_release, get_pylock, save_pylock
 from forecastbox.auth.users import current_active_user
-from forecastbox.config import BackendAPISettings, CascadeSettings, ProductSettings, config, OIDCSettings
+from forecastbox.config import BackendAPISettings, CascadeSettings, ProductSettings, config
 from forecastbox.db.user import async_session_maker
 from forecastbox.rjsf import ExportedSchemas, FormDefinition, from_pydantic
 from forecastbox.schemas.user import UserRead, UserTable, UserUpdate
@@ -193,13 +193,13 @@ async def patch_user(user_id: UUID4, update_dict: dict, admin: UserRead = Depend
 class ConfigResponse:
     language_iso639_1: str
     authType: Literal["anonymous", "authenticated"]
-    oidcConfig: OIDCSettings | None  # is None <=> authType is anonymous
+    loginEndpoint: str | None  # is None <=> authType is anonymous
 
 
 config_response = ConfigResponse(
     language_iso639_1="en",
     authType="anonymous" if config.auth.passthrough else "authenticated",
-    oidcConfig=config.auth.oidc if not config.auth.passthrough else None,
+    loginEndpoint="/v1/auth/oidc/authorize" if not config.auth.passthrough else None,
 )
 
 

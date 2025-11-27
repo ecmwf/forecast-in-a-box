@@ -1,6 +1,6 @@
 import os
 
-from forecastbox.api.routers.admin import GetReleaseStatusResponse, ConfigResponse
+from forecastbox.api.routers.admin import ConfigResponse, GetReleaseStatusResponse
 from forecastbox.api.updates import Release
 
 from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
