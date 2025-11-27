@@ -1,6 +1,6 @@
 import os
 
-from forecastbox.api.routers.admin import GetReleaseStatusResponse
+from forecastbox.api.routers.admin import GetReleaseStatusResponse, ConfigResponse
 from forecastbox.api.updates import Release
 
 from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
@@ -10,6 +10,10 @@ def test_admin_flows(backend_client):
     # TODO this test is a bit flaky, because it must be executed first to ensure admin actually ending up admin
     # but then the impl itself is flaky
     # NOTE there is additionally dependence of test_model.py on this test
+
+    response = backend_client.get("/admin/uiConfig")
+    assert response.is_success
+    ConfigResponse(**response.json())
 
     # curl -XPOST -H 'Content-Type: application/json' -d '{"email": "admin@somewhere.org", "password": "something"}' localhost:8000/api/v1/auth/register
     headers = {"Content-Type": "application/json"}
