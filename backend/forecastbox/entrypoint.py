@@ -30,7 +30,7 @@ from forecastbox.db.migrations import migrate
 from forecastbox.db.model import delete_download
 from starlette.exceptions import HTTPException
 
-from .api.routers import admin, auth, execution, gateway, job, model, product, schedule
+from .api.routers import admin, auth, execution, gateway, job, model, product, schedule, graph_building
 from .config import config
 
 logger = logging.getLogger(__name__)
@@ -68,6 +68,7 @@ app = FastAPI(
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 
+# TODO replace with iter modules, this is awkward
 app.include_router(model.router, prefix="/api/v1/model")
 app.include_router(product.router, prefix="/api/v1/product")
 app.include_router(execution.router, prefix="/api/v1/execution")
@@ -76,6 +77,7 @@ app.include_router(admin.router, prefix="/api/v1/admin")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(gateway.router, prefix="/api/v1/gateway")
 app.include_router(schedule.router, prefix="/api/v1/schedule")
+app.include_router(graph_building.router, prefix="/api/v1/graph_building")
 
 app.add_middleware(
     CORSMiddleware,
