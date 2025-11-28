@@ -14,7 +14,7 @@ repos:
   hooks:
   - id: check-yaml # Check YAML files for syntax errors only
     args: [--unsafe, --allow-multiple-documents]
-  - id: no-commit-to-branch # Prevent committing to main / master
+#  - id: no-commit-to-branch # NOTE prevents commit to main/master, but since we run prek on that branch it makes no sense
   - id: check-added-large-files
     exclude: |
       (?x)(
