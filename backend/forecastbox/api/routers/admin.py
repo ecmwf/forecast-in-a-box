@@ -10,7 +10,9 @@
 """Admin API Router."""
 
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
@@ -185,3 +187,23 @@ async def patch_user(user_id: UUID4, update_dict: dict, admin: UserRead = Depend
         _ = await session.execute(query)
         await session.commit()
         return HTMLResponse(content="User updated successfully", status_code=200)
+
+
+@dataclass
+class ConfigResponse:
+    language_iso639_1: str
+    authType: Literal["anonymous", "authenticated"]
+    loginEndpoint: str | None  # is None <=> authType is anonymous
+
+
+config_response = ConfigResponse(
+    language_iso639_1="en",
+    authType="anonymous" if config.auth.passthrough else "authenticated",
+    loginEndpoint="/v1/auth/oidc/authorize" if not config.auth.passthrough else None,
+)
+
+
+@router.get("/uiConfig")
+async def get_ui_config() -> ConfigResponse:
+    """Config for the frontend to properly configure itself. Contains no internal or sensitive data"""
+    return config_response
