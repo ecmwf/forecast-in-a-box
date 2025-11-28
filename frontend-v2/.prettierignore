@@ -1,0 +1,10 @@
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Template files (not valid JS until processed)
+public/config.template.js
+
+# Other ignores
+.env
+.env.*

@@ -7,16 +7,16 @@ drun-mongo:
 drun:
     docker run --rm -it --network host --name fiab-be fiab-be
 
-fiabwheel:
+fiabwheel frontend_dir="frontend":
     #!/usr/bin/env bash
-    pushd frontend
+    pushd {{frontend_dir}}
     npm install --force # TODO fix the npm dependencies to get rid of --force !!!
     npm run prodbuild
     popd
 
     pushd backend
     rm -rf forecastbox/static
-    ln -s ../../frontend/dist forecastbox/static
+    ln -s ../../{{frontend_dir}}/dist forecastbox/static
     find forecastbox/static/ -type f | sed 's/.*/include &/' > MANIFEST.in
     python -m build --installer uv .
     popd

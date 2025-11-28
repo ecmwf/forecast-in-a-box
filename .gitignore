@@ -2,7 +2,7 @@
 .venv
 *.swp
 
-lib
+frontend/**/lib
 data_dir
 *.ckpt
 dist
