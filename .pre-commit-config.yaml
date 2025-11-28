@@ -3,7 +3,7 @@ repos:
   hooks:
   - id: frontend-v2-npm-check
     name: frontend-v2 npm-check
-    entry: bash -c 'cd frontend-v2 && npm run check' # Run check script on frontend-v2
+    entry: bash -c 'cd frontend-v2 && npm install && npm run check' # Run check script on frontend-v2
     language: system  # Use system's node/npm installation
     files: ^frontend-v2/  # Only run when frontend-v2 files change
     pass_filenames: false # Don't pass individual filenames to the script

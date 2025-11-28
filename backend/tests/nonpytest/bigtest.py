@@ -18,7 +18,7 @@ from forecastbox.standalone.entrypoint import launch_all
 logger = logging.getLogger("forecastbox.bigtest")
 
 is_mars = os.getenv("FIAB_BIGTEST_ISMARS", "nay") == "yea"
-model_id = "testing_aifs-global-o48" # must be located at https://sites.ecmwf.int/repository/fiab/testing/, though mind the `.ckpt` suffix is *not* here and there is _ => /
+model_id = "testing_aifs-global-o48"  # must be located at https://sites.ecmwf.int/repository/fiab/testing/, though mind the `.ckpt` suffix is *not* here and there is _ => /
 
 
 def get_quickstart_job() -> dict:
