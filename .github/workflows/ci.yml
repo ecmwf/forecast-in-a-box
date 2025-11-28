@@ -27,8 +27,7 @@ jobs:
     if: github.event.pull_request.base.repo.full_name == 'ecmwf/forecast-in-a-box'
     timeout-minutes: 20
     steps:
-      - uses: actions/setup-node@v6
-      - run: npm --version # tmp: test that npm was installed, as the next step fails on not found
+      - uses: actions/setup-node@v6 # NOTE does not actually work !!!
       - uses: actions/checkout@v4
       - run: |
           set -euo pipefail
