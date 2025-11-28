@@ -31,7 +31,9 @@ jobs:
       - run: |
           set -euo pipefail
           cd backend
+          export UV_FROZEN=1
           uv sync --extra plots --python "${{ matrix.python_version }}"
+          uv run prek --all-files
           uv run ty check
           mkdir /tmp/tmpFiabHome
           mkdir forecastbox/static && touch forecastbox/static/index.html # TODO replace with proper static file build
@@ -57,7 +59,9 @@ jobs:
       - run: |
           set -euo pipefail
           cd backend
+          export UV_FROZEN=1
           uv sync --extra plots --python "${{ matrix.python_version }}"
+          uv run prek --all-files
           uv run ty check
           mkdir /tmp/tmpFiabHome
           mkdir forecastbox/static && touch forecastbox/static/index.html # TODO replace with proper static file build

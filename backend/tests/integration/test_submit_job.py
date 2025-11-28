@@ -5,6 +5,7 @@ import zipfile
 
 import cloudpickle
 from cascade.low.builders import JobBuilder, TaskBuilder
+
 from forecastbox.api.types import (
     EnvironmentSpecification,
     ExecutionSpecification,

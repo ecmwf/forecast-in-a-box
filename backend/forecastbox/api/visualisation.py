@@ -11,6 +11,7 @@ import logging
 import tempfile
 
 from fastapi.responses import HTMLResponse
+
 from forecastbox.api.execution import forecast_products_to_cascade
 from forecastbox.api.types import ExecutionSpecification, ForecastProducts, VisualisationOptions
 

@@ -8,6 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 from fastapi import APIRouter
+
 from forecastbox.auth.oidc import oauth_client
 from forecastbox.auth.users import auth_backend, fastapi_users
 from forecastbox.config import config

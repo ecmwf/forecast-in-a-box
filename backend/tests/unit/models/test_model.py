@@ -14,8 +14,9 @@ from pathlib import Path
 from anemoi.inference.checkpoint import Checkpoint
 from anemoi.inference.testing import fake_checkpoints
 from earthkit.workflows import fluent
-from forecastbox.models.globe import ControlMetadata, GlobalModel
 from qubed import Qube
+
+from forecastbox.models.globe import ControlMetadata, GlobalModel
 
 checkpoint_path = (Path(__file__).parent / "../checkpoints/simple.yaml").absolute()
 

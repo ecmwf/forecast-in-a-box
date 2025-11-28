@@ -10,9 +10,10 @@
 import importlib.util
 from collections import OrderedDict
 
+from qubed import Qube
+
 from forecastbox.models import SpecifiedModel
 from forecastbox.rjsf import FieldWithUI, IntegerSchema
-from qubed import Qube
 
 from .export import export_fieldlist_as
 from .interfaces import Interfaces

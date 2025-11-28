@@ -26,6 +26,7 @@ from cascade.controller.report import JobId
 from cascade.low.core import DatasetId, TaskId
 from fastapi import APIRouter, Body, Depends, HTTPException, Response, UploadFile
 from fastapi.responses import HTMLResponse
+
 from forecastbox.api.execution import ProductToOutputId, SubmitJobResponse, execute2response
 from forecastbox.api.routers.gateway import Globals
 from forecastbox.api.types import ExecutionSpecification, VisualisationOptions

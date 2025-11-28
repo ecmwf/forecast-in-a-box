@@ -74,6 +74,7 @@ dev = [
   "pytest-asyncio",
   "pytest-xdist>=3.8",
   "ty>=0.0.1a23",
+  "prek",
 ]
 
 [tool.setuptools_scm]

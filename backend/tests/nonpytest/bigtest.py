@@ -11,6 +11,7 @@ import tempfile
 import time
 
 import httpx
+
 from forecastbox.config import FIABConfig, config
 from forecastbox.standalone.entrypoint import launch_all
 

@@ -12,12 +12,13 @@ import logging
 import uuid
 from typing import Iterable
 
+from sqlalchemy import delete, func, select, update
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
 from forecastbox.config import config
 from forecastbox.db.core import addAndCommit, dbRetry, executeAndCommit, queryCount
 from forecastbox.schemas.job import JobRecord
 from forecastbox.schemas.schedule import Base, ScheduleDefinition, ScheduleNext, ScheduleRun
-from sqlalchemy import delete, func, select, update
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 logger = logging.getLogger(__name__)
 

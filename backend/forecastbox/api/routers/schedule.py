@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException
+from typing_extensions import Self
+
 from forecastbox.api.execution import execute
 from forecastbox.api.routers.job import STATUS
 from forecastbox.api.scheduling.dt_utils import calculate_next_run, parse_crontab
@@ -42,7 +44,6 @@ from forecastbox.db.schedule import (
 from forecastbox.schemas.job import JobRecord
 from forecastbox.schemas.schedule import ScheduleDefinition, ScheduleRun
 from forecastbox.schemas.user import UserRead
-from typing_extensions import Self
 
 logger = logging.getLogger(__name__)
 

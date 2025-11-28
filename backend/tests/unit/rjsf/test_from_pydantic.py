@@ -11,6 +11,9 @@ from datetime import date
 from typing import Dict, List, Literal, Optional, Union
 
 import pytest
+from pydantic import BaseModel, Field
+from pydantic.fields import FieldInfo
+
 from forecastbox.rjsf.forms import FieldWithUI
 from forecastbox.rjsf.from_pydantic import (
     PRIMATIVES,
@@ -27,8 +30,6 @@ from forecastbox.rjsf.from_pydantic import (
 )
 from forecastbox.rjsf.jsonSchema import BooleanSchema, IntegerSchema, ObjectSchema, StringSchema
 from forecastbox.rjsf.uiSchema import UIAdditionalProperties, UIField, UIIntegerField, UIObjectField, UIStringField
-from pydantic import BaseModel, Field
-from pydantic.fields import FieldInfo
 
 
 class TestHelperFunctions:

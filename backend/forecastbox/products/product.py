@@ -14,9 +14,10 @@ from typing import Any, Union
 from earthkit.workflows import fluent
 from earthkit.workflows.fluent import Action
 from earthkit.workflows.graph import Graph
+from qubed import Qube
+
 from forecastbox.models import SpecifiedModel
 from forecastbox.rjsf import ArraySchema, FieldSchema, FieldWithUI, IntegerSchema, StringSchema
-from qubed import Qube
 
 
 class Product(ABC):

@@ -12,10 +12,11 @@ import os
 from typing import Any
 
 import yaml
+from pydantic import BaseModel, Field, model_validator
+
 from forecastbox.rjsf import FieldWithUI, FormDefinition
 from forecastbox.rjsf.jsonSchema import BooleanSchema, IntegerSchema, ObjectSchema, StringSchema
 from forecastbox.rjsf.uiSchema import UIAdditionalProperties, UIStringField
-from pydantic import BaseModel, Field, model_validator
 
 from .utils import open_checkpoint
 

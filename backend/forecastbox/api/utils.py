@@ -17,6 +17,7 @@ import earthkit.data as ekd
 import numpy as np
 import xarray as xr
 from cascade.gateway.api import decoded_result
+
 from forecastbox.config import config
 
 logger = logging.getLogger(__name__)

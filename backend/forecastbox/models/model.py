@@ -17,9 +17,10 @@ from anemoi.inference.checkpoint import Checkpoint
 from earthkit.workflows.fluent import Action
 from earthkit.workflows.plugins.anemoi.fluent import from_input
 from earthkit.workflows.plugins.anemoi.types import ENSEMBLE_MEMBER_SPECIFICATION
-from forecastbox.rjsf import FieldWithUI, FormDefinition, IntegerSchema, StringSchema, UIIntegerField, UIStringField
 from pydantic import BaseModel
 from qubed import Qube
+
+from forecastbox.rjsf import FieldWithUI, FormDefinition, IntegerSchema, StringSchema, UIIntegerField, UIStringField
 
 from .metadata import ControlMetadata, get_control_metadata
 from .utils import open_checkpoint
