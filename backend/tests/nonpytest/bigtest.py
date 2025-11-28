@@ -18,6 +18,7 @@ from forecastbox.standalone.entrypoint import launch_all
 logger = logging.getLogger("forecastbox.bigtest")
 
 is_mars = os.getenv("FIAB_BIGTEST_ISMARS", "nay") == "yea"
+model_id = "testing_aifs-global-o48"  # must be located at https://sites.ecmwf.int/repository/fiab/testing/, though mind the `.ckpt` suffix is *not* here and there is _ => /
 
 
 def get_quickstart_job() -> dict:
@@ -26,7 +27,7 @@ def get_quickstart_job() -> dict:
         "job": {
             "job_type": "forecast_products",
             "model": {
-                "model": "testing/o48-pretrained",
+                "model": model_id,
                 "date": today + "T00",
                 "lead_time": 42,
                 "ensemble_members": 1,
@@ -81,13 +82,13 @@ if __name__ == "__main__":
         client = httpx.Client(base_url=config.api.local_url() + "/api/v1", follow_redirects=True)
 
         # download model
-        client.post("/model/testing_o48-pretrained/download").raise_for_status()
+        client.post(f"/model/{model_id}/download").raise_for_status()
         i = 100
         while True:
             if i <= 0:
                 raise TimeoutError("no more retries")
             time.sleep(2)
-            response = client.post("/model/testing_o48-pretrained/download").json()
+            response = client.post(f"/model/{model_id}/download").json()
             if response["status"] == "completed":
                 break
             elif response["status"] in {"errored", "not_downloaded"}:

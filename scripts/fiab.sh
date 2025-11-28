@@ -213,8 +213,3 @@ case "$COMMAND" in
         >&2 echo "unknown command $COMMAND"
         exit 1
 esac
-
-
-if [ -n "$ENTRYPOINT" ] ; then
-    python -m $ENTRYPOINT
-fi
