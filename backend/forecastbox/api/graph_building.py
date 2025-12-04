@@ -143,3 +143,19 @@ def compile(graph: GraphBuilder) -> RawCascadeJob:
         job_type="raw_cascade_job",
         job_instance=JobInstance(tasks={}, edges=[]),
     )
+
+
+"""
+Further extension requirements (only as a comment to keep the first PR reasonably sized)
+    - localization support -- presumably the /catalog endpoint will allow lang parameter and lookup translation strings
+    - rich typing on the ActionConfigurationOptions, in particular we want:
+      enum-fixed[1, 2, 3] -- so that frontend can show like radio
+      enum-dynam[aifs1.0, aifs1.1, bris1.0] -- so that frontend can show like dropdown
+      constant[42] -- just display non-editable field
+    - configuration option prefills
+      we want to set hard restrictions on admin level, like "always use 8 ensemble members for aifs1.0 model"
+      we want to set overriddable defaults on any level, like "start with location: malawi for any model"
+      => this would require endpoint "storeActionConfig", keyed by actionId and optionally any number of option keyvalues, and soft/hard bool
+      => if keyed only by actionId, we can make do with existing interface; for the multikeyed we need to extend the ActionConfigurationOption
+    - graph builder persistence -- we want a new endpoint that allows storing graph builder instances, for like favorites, quickstarts, work interrupts, etc
+"""
