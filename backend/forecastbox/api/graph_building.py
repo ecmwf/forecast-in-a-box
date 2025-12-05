@@ -146,7 +146,7 @@ def compile(graph: GraphBuilder) -> RawCascadeJob:
 
 
 """
-Further extension requirements (only as a comment to keep the first PR reasonably sized)
+Further *frontend* extension requirements (only as a comment to keep the first PR reasonably sized)
     - localization support -- presumably the /catalog endpoint will allow lang parameter and lookup translation strings
     - rich typing on the ActionConfigurationOptions, in particular we want:
       enum-fixed[1, 2, 3] -- so that frontend can show like radio
@@ -158,4 +158,15 @@ Further extension requirements (only as a comment to keep the first PR reasonabl
       => this would require endpoint "storeActionConfig", keyed by actionId and optionally any number of option keyvalues, and soft/hard bool
       => if keyed only by actionId, we can make do with existing interface; for the multikeyed we need to extend the ActionConfigurationOption
     - graph builder persistence -- we want a new endpoint that allows storing graph builder instances, for like favorites, quickstarts, work interrupts, etc
+      we dont want to force the user to go through the from-scratch building every time -- there will be multiple stories/endpoints on top of
+      the persist/load, providing a simplified path, though possibly with the option to "fully customize" that would expose the builder+/expand
+
+Further *backend* discussion questions
+    - do we treat the compilation as "source-product-sink" single line and then deduplicate, or do we instead compile the dag at once?
+      the dag approach has better support for multi-input products, the deduplicate is more in line with the current codebase
+    - do we compile to fluent at every /expand's validate, or do we validate at a higher level only during these steps, with
+      fluent validation happening only during /compile? Advantage of frequent compilation is eg less code duplication, disadvantage
+      is more pressure on compilation speed and a challenge to lift fluent errors to ui errors
+    - what protocol would a "catalog entry" be required, and how do we capture it? It has 4 concerns, ActionFactory, ActionInstance
+      validation, ActionInstance expansion, and compiling into fluent
 """
