@@ -11,9 +11,9 @@ from typing import Literal
 from forecastbox.api.types.base import FIABBaseModel as BaseModel
 
 
-class ActionConfigurationOption(BaseModel):
+class BlockConfigurationOption(BaseModel):
     title: str
-    """Brief string to display in the ActionFactory detail"""
+    """Brief string to display in the BlockFactory detail"""
     description: str
     """Extended description, possibly with example values and their effect"""
     value_type: str
@@ -21,51 +21,51 @@ class ActionConfigurationOption(BaseModel):
     # TODO do we want Literal instead of str for values? Do we prefer nesting or flattening for complex config?
 
 
-ActionKind = Literal["source", "transform", "product", "sink"]
+BlockKind = Literal["source", "transform", "product", "sink"]
 
 
-class ActionFactory(BaseModel):
-    """When building a graph, user selects from an avaliable catalog of ActionFactories which
+class BlockFactory(BaseModel):
+    """When building a graph, user selects from an avaliable catalogue of BlockFactories which
     have description of what they do and specification of configuration options they offer"""
 
-    kind: ActionKind
-    """Which role in a job does this action plays"""
+    kind: BlockKind
+    """Which role in a job does this block plays"""
     title: str
-    """How to display in the catalog listing / partial graph"""
+    """How to display in the catalogue listing / partial graph"""
     description: str
     """Extended detail for the user"""
-    configuration_options: dict[str, ActionConfigurationOption]
+    configuration_options: dict[str, BlockConfigurationOption]
     """A key-value of config-option-key, config-option"""
     inputs: list[str]
     """A list of input names, such as 'initial conditions' or 'forecast', for the purpose of description/configuration"""
 
 
-ActionFactoryId = str
-ActionInstanceId = str
+BlockFactoryId = str
+BlockInstanceId = str
 
 
-class ActionFactoryCatalog(BaseModel):
-    factories: dict[ActionFactoryId, ActionFactory]
+class BlockFactoryCatalogue(BaseModel):
+    factories: dict[BlockFactoryId, BlockFactory]
 
 
-class ActionInstance(BaseModel):
-    """As produced by ActionFactory *by the client* -- basically the configuration/inputs values"""
+class BlockInstance(BaseModel):
+    """As produced by BlockFactory *by the client* -- basically the configuration/inputs values"""
 
-    action_factory_id: ActionFactoryId
+    block_factory_id: BlockFactoryId
     configuration_values: dict[str, str]
     """Keys come frome factory's `configuration_options`, values are serialized actual configuration values"""
-    input_ids: dict[str, ActionInstanceId]
-    """Keys come from factory's `inputs`, values are other actions in the (partial) graph"""
+    input_ids: dict[str, BlockInstanceId]
+    """Keys come from factory's `inputs`, values are other blocks in the (partial) graph"""
 
 
 class GraphBuilder(BaseModel):
-    actions: dict[ActionInstanceId, ActionInstance]
+    blocks: dict[BlockInstanceId, BlockInstance]
 
 
 class GraphValidationExpansion(BaseModel):
     """When user submits invalid GraphBuilder, backend returns a structured validation result and completion options"""
 
     global_errors: list[str]
-    action_errors: dict[ActionInstanceId, list[str]]
-    possible_sources: list[ActionFactoryId]
-    possible_expansions: dict[ActionInstanceId, list[ActionFactoryId]]
+    block_errors: dict[BlockInstanceId, list[str]]
+    possible_sources: list[BlockFactoryId]
+    possible_expansions: dict[BlockInstanceId, list[BlockFactoryId]]

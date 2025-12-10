@@ -13,7 +13,7 @@ validate/extend partial graphs, compile graphs into jobs."""
 from fastapi import APIRouter
 
 from forecastbox.api.types import RawCascadeJob
-from forecastbox.api.types.graph_building import ActionFactoryCatalog, GraphValidationExpansion, GraphBuilder
+from forecastbox.api.types.graph_building import BlockFactoryCatalogue, GraphValidationExpansion, GraphBuilder
 import forecastbox.api.graph_building as example
 
 router = APIRouter(
@@ -23,10 +23,10 @@ router = APIRouter(
 
 
 # Endpoints
-@router.get("/catalog")
-def get_catalog() -> ActionFactoryCatalog:
-    """All actions this backend is capable of evaluating within a graph"""
-    return example.catalog
+@router.get("/catalogue")
+def get_catalogue() -> BlockFactoryCatalogue:
+    """All blocks this backend is capable of evaluating within a graph"""
+    return example.catalogue
 
 
 @router.get("/expand")
