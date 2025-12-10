@@ -7,7 +7,12 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+"""
+Types pertaining to Forecast As BLock Expression (Fable): builders and blocks
+"""
+
 from typing import Literal
+
 from forecastbox.api.types.base import FIABBaseModel as BaseModel
 
 
@@ -25,13 +30,13 @@ BlockKind = Literal["source", "transform", "product", "sink"]
 
 
 class BlockFactory(BaseModel):
-    """When building a graph, user selects from an avaliable catalogue of BlockFactories which
+    """When building a fable, user selects from an avaliable catalogue of BlockFactories which
     have description of what they do and specification of configuration options they offer"""
 
     kind: BlockKind
     """Which role in a job does this block plays"""
     title: str
-    """How to display in the catalogue listing / partial graph"""
+    """How to display in the catalogue listing / partial fable"""
     description: str
     """Extended detail for the user"""
     configuration_options: dict[str, BlockConfigurationOption]
@@ -55,15 +60,15 @@ class BlockInstance(BaseModel):
     configuration_values: dict[str, str]
     """Keys come frome factory's `configuration_options`, values are serialized actual configuration values"""
     input_ids: dict[str, BlockInstanceId]
-    """Keys come from factory's `inputs`, values are other blocks in the (partial) graph"""
+    """Keys come from factory's `inputs`, values are other blocks in the (partial) fable"""
 
 
-class GraphBuilder(BaseModel):
+class FableBuilder(BaseModel):
     blocks: dict[BlockInstanceId, BlockInstance]
 
 
-class GraphValidationExpansion(BaseModel):
-    """When user submits invalid GraphBuilder, backend returns a structured validation result and completion options"""
+class FableValidationExpansion(BaseModel):
+    """When user submits invalid FableBuilder, backend returns a structured validation result and completion options"""
 
     global_errors: list[str]
     block_errors: dict[BlockInstanceId, list[str]]

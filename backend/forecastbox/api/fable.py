@@ -1,16 +1,22 @@
-from itertools import groupby
 from collections import defaultdict
-from forecastbox.api.types.graph_building import (
-    BlockKind,
-    BlockFactoryId,
-    BlockFactoryCatalogue,
-    GraphValidationExpansion,
-    BlockFactory,
-    BlockConfigurationOption,
-    GraphBuilder,
-)
-from forecastbox.api.types import RawCascadeJob
+from itertools import groupby
+
 from cascade.low.core import JobInstance
+
+from forecastbox.api.types import RawCascadeJob
+from forecastbox.api.types.fable import (
+    BlockConfigurationOption,
+    BlockFactory,
+    BlockFactoryCatalogue,
+    BlockFactoryId,
+    BlockKind,
+    FableBuilder,
+    FableValidationExpansion,
+)
+
+"""
+Fundamental APIs of Forecast As BLock Expression (Fable)
+"""
 
 # NOTE this will not be hardcoded like this, but partially hardcoded in submodules and extended by plugins
 catalogue = BlockFactoryCatalogue(
@@ -65,7 +71,7 @@ catalogue = BlockFactoryCatalogue(
             inputs=[
                 "forecast1",
                 "forecast2",
-            ],  # NOTE this opens up an interesting question -- how to "tab-completion" with two inputs? My suggestion is to include this product as a possible completion to every source (as if it were a single-sourced product), but when the user clicks on it, the frontend recognizes "oh there are two inputs", and would give the user dialog with forecast1=the-block-user-clicked-on prefilled, and forecast2=(selection UI with every other block in the graph that had this product in its extension options). This will not work correctly if we have heterogeneous multiple inputs -- do we expect that? Like "compare model forecast to ground truth?"
+            ],  # NOTE this opens up an interesting question -- how to "tab-completion" with two inputs? My suggestion is to include this product as a possible completion to every source (as if it were a single-sourced product), but when the user clicks on it, the frontend recognizes "oh there are two inputs", and would give the user dialog with forecast1=the-block-user-clicked-on prefilled, and forecast2=(selection UI with every other block in the fable that had this product in its extension options). This will not work correctly if we have heterogeneous multiple inputs -- do we expect that? Like "compare model forecast to ground truth?"
         ),
         "store_local_fdb": BlockFactory(
             kind="sink",
@@ -95,11 +101,11 @@ blocksOfKind: dict[BlockKind, list[BlockFactoryId]] = {
 }
 
 
-def validate_expand(graph: GraphBuilder) -> GraphValidationExpansion:
+def validate_expand(fable: FableBuilder) -> FableValidationExpansion:
     possible_sources = blocksOfKind["source"]
     possible_expansions = {}
     block_errors = defaultdict(list)
-    for blockId, blockInstance in graph.blocks.items():
+    for blockId, blockInstance in fable.blocks.items():
         # validate basic consistency
         if blockId not in catalogue:
             block_errors[blockId] += ["BlockFactory not found in the catalogue"]
@@ -120,7 +126,7 @@ def validate_expand(graph: GraphBuilder) -> GraphValidationExpansion:
         # validate config values are mutually consistent
         # TODO -- block specific hook registration
 
-        # calculate graph expansions
+        # calculate fable expansions
         # NOTE very simple now, simply source >> product >> sink. Eventually blocks would be able to decide on their own
         if blockFactory.kind == "source":
             possible_expansions[blockId] = blocksOfKind["product"]
@@ -129,7 +135,7 @@ def validate_expand(graph: GraphBuilder) -> GraphValidationExpansion:
 
     global_errors = []  # cant think of any rn
 
-    return GraphValidationExpansion(
+    return FableValidationExpansion(
         possible_sources=possible_sources,
         possible_expansions=possible_expansions,
         block_errors=block_errors,
@@ -137,7 +143,7 @@ def validate_expand(graph: GraphBuilder) -> GraphValidationExpansion:
     )
 
 
-def compile(graph: GraphBuilder) -> RawCascadeJob:
+def compile(fable: FableBuilder) -> RawCascadeJob:
     # TODO instead something very much like api.execution.forecast_products_to_cascade
     return RawCascadeJob(
         job_type="raw_cascade_job",
@@ -157,7 +163,7 @@ Further *frontend* extension requirements (only as a comment to keep the first P
       we want to set overriddable defaults on any level, like "start with location: malawi for any model"
       => this would require endpoint "storeBlockConfig", keyed by blockId and optionally any number of option keyvalues, and soft/hard bool
       => if keyed only by blockId, we can make do with existing interface; for the multikeyed we need to extend the BlockConfigurationOption
-    - graph builder persistence -- we want a new endpoint that allows storing graph builder instances, for like favorites, quickstarts, work interrupts, etc
+    - fable builder persistence -- we want a new endpoint that allows storing fable builder instances, for like favorites, quickstarts, work interrupts, etc
       we dont want to force the user to go through the from-scratch building every time -- there will be multiple stories/endpoints on top of
       the persist/load, providing a simplified path, though possibly with the option to "fully customize" that would expose the builder+/expand
 

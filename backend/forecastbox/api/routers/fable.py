@@ -7,14 +7,15 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Building jobs -- provide components for high level graph building and configuring,
-validate/extend partial graphs, compile graphs into jobs."""
+"""Building fables (Forecast As BLock Expressions) -- provide components for high
+level fable building and configuring, validate/extend partial fables, compile fables
+into jobs."""
 
 from fastapi import APIRouter
 
+import forecastbox.api.fable as example
 from forecastbox.api.types import RawCascadeJob
-from forecastbox.api.types.graph_building import BlockFactoryCatalogue, GraphValidationExpansion, GraphBuilder
-import forecastbox.api.graph_building as example
+from forecastbox.api.types.fable import BlockFactoryCatalogue, FableBuilder, FableValidationExpansion
 
 router = APIRouter(
     tags=["build"],
@@ -25,21 +26,21 @@ router = APIRouter(
 # Endpoints
 @router.get("/catalogue")
 def get_catalogue() -> BlockFactoryCatalogue:
-    """All blocks this backend is capable of evaluating within a graph"""
+    """All blocks this backend is capable of evaluating within a fable"""
     return example.catalogue
 
 
 @router.get("/expand")
-def expand_graph(graph: GraphBuilder) -> GraphValidationExpansion:
-    """Given a partially constructed graph, return whether there are any validation errors,
+def expand_fable(fable: FableBuilder) -> FableValidationExpansion:
+    """Given a partially constructed fable, return whether there are any validation errors,
     and what are further completion/expansion options. Note that presence of validation
     errors does not affect return code, ie its still 200 OK"""
-    return example.validate_expand(graph)
+    return example.validate_expand(fable)
 
 
 @router.get("/compile")
-def compile_graph(graph: GraphBuilder) -> RawCascadeJob:
+def compile_fable(fable: FableBuilder) -> RawCascadeJob:
     """Converts to a raw cascade job, which can then be used in a ExecutionSpecification
-    in the /execution router's methods. Assumes the graph is valid, and throws a 4xx
+    in the /execution router's methods. Assumes the fable is valid, and throws a 4xx
     otherwise"""
-    return example.compile(graph)
+    return example.compile(fable)

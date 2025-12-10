@@ -8,18 +8,16 @@
 # nor does it submit to any jurisdiction.
 
 """API types"""
-# TODO split into submodules! Like api/types/{base, graph_building}.py
+# TODO split into submodules! Like api/types/{base, fable}.py
 
 from dataclasses import dataclass
 from typing import Any, Literal
 
 import orjson
 from cascade.low.core import JobInstance
-from forecastbox.products.product import USER_DEFINED
 from pydantic import Field, PositiveInt, field_validator, model_validator
 
 from forecastbox.api.types.base import FIABBaseModel
-
 from forecastbox.products.product import USER_DEFINED
 
 CONFIG_ORDER = ["param", "levtype", "levelist"]
