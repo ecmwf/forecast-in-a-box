@@ -147,7 +147,7 @@ class BaseForecastModel(ABC):
         """Get the environments for the model."""
         from importlib import metadata
 
-        INFERENCE_FILTER_INCLUDE = ["anemoi-models", "anemoi-graphs", "anemoi-transform", "flash-attn", "torch", "torch_geometric"]
+        INFERENCE_FILTER_INCLUDE = ["anemoi-models", "anemoi-graphs", "anemoi-transform", "flash-attn", "torch_geometric"]
         INITIAL_CONDITIONS_FILTER_STARTS = ["earthkit", "anemoi-transform", "anemoi-plugins"]
         ENFORCE_GATEWAY_VERSIONS = ["anemoi-inference", "earthkit-workflows", "earthkit-workflows-anemoi"]
 
