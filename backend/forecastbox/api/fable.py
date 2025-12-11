@@ -10,7 +10,7 @@ from forecastbox.api.types.fable import (
     BlockFactoryCatalogue,
     BlockFactoryId,
     BlockKind,
-    FableBuilder,
+    FableBuilderV1,
     FableValidationExpansion,
 )
 
@@ -101,7 +101,7 @@ blocksOfKind: dict[BlockKind, list[BlockFactoryId]] = {
 }
 
 
-def validate_expand(fable: FableBuilder) -> FableValidationExpansion:
+def validate_expand(fable: FableBuilderV1) -> FableValidationExpansion:
     possible_sources = blocksOfKind["source"]
     possible_expansions = {}
     block_errors = defaultdict(list)
@@ -143,7 +143,7 @@ def validate_expand(fable: FableBuilder) -> FableValidationExpansion:
     )
 
 
-def compile(fable: FableBuilder) -> RawCascadeJob:
+def compile(fable: FableBuilderV1) -> RawCascadeJob:
     # TODO instead something very much like api.execution.forecast_products_to_cascade
     return RawCascadeJob(
         job_type="raw_cascade_job",
