@@ -63,12 +63,12 @@ class BlockInstance(BaseModel):
     """Keys come from factory's `inputs`, values are other blocks in the (partial) fable"""
 
 
-class FableBuilder(BaseModel):
+class FableBuilderV1(BaseModel):
     blocks: dict[BlockInstanceId, BlockInstance]
 
 
 class FableValidationExpansion(BaseModel):
-    """When user submits invalid FableBuilder, backend returns a structured validation result and completion options"""
+    """When user submits invalid FableBuilderV1, backend returns a structured validation result and completion options"""
 
     global_errors: list[str]
     block_errors: dict[BlockInstanceId, list[str]]
