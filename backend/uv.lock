@@ -58,7 +58,7 @@ wheels = [
 
 [[package]]
 name = "anemoi-inference"
-version = "0.8.1"
+version = "0.8.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anemoi-transform" },
@@ -73,12 +73,13 @@ dependencies = [
     { name = "packaging" },
     { name = "pydantic" },
     { name = "pyyaml" },
+    { name = "rich" },
     { name = "semantic-version" },
     { name = "torch" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/87/d1/3133cb4cdda63109df8609437b3a886983d8375c90148998d6d56b3083a6/anemoi_inference-0.8.1.tar.gz", hash = "sha256:1ceec9e350eb2cd281462843b90be14dd5be6c163c4aece3bd5dedaf07853649", size = 1410543, upload-time = "2025-11-06T09:29:13.089Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ff/7a/0e57cdd3b8817322d647c3c519bfbaff0c2f6c82ef91eebaab5df26d077c/anemoi_inference-0.8.3.tar.gz", hash = "sha256:2cca60774f088ac2d0cb4aff0dda904757b5bdc78fc9ce4c07ef5fdbdf6cf609", size = 1420448, upload-time = "2025-12-10T11:25:49.181Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/27/b6/e186d386ecbe317b88d773e278be45bf7ebf353056ce2e73e8577ac1bb25/anemoi_inference-0.8.1-py3-none-any.whl", hash = "sha256:96e94437d6cb108a73956d959dd3bd4f7b5e1fedcbc868d9599d7f5f77b4f364", size = 215857, upload-time = "2025-11-06T09:29:11.947Z" },
+    { url = "https://files.pythonhosted.org/packages/ce/8b/6a6c07f27af93f0d38a3a7aeb5e30224564237c049506d7cbd8305f0aee0/anemoi_inference-0.8.3-py3-none-any.whl", hash = "sha256:dd2744318c15ffb10870387f7723a842a32316d9f027bf3144c010e7726f75d0", size = 222100, upload-time = "2025-12-10T11:25:47.571Z" },
 ]
 
 [[package]]
@@ -99,6 +100,9 @@ opendata = [
     { name = "earthkit-regrid" },
     { name = "ecmwf-opendata" },
     { name = "mir-python" },
+]
+polytope = [
+    { name = "earthkit-data", extra = ["polytope"] },
 ]
 
 [[package]]
@@ -903,6 +907,15 @@ wheels = [
 ]
 
 [[package]]
+name = "docstring-parser"
+version = "0.17.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b2/9d/c3b43da9515bd270df0f80548d9944e389870713cc1fe2b8fb35fe2bcefd/docstring_parser-0.17.0.tar.gz", hash = "sha256:583de4a309722b3315439bb31d64ba3eebada841f2e2cee23b99df001434c912", size = 27442, upload-time = "2025-07-21T07:35:01.868Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/55/e2/2537ebcff11c1ee1ff17d8d0b6f4db75873e3b0fb32c2d4a2ee31ecb310a/docstring_parser-0.17.0-py3-none-any.whl", hash = "sha256:cf2569abd23dce8099b300f9b4fa8191e9582dda731fd533daf54c4551658708", size = 36896, upload-time = "2025-07-21T07:35:00.684Z" },
+]
+
+[[package]]
 name = "earthkit-data"
 version = "0.18.2"
 source = { registry = "https://pypi.org/simple" }
@@ -930,6 +943,11 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c5/a4/a78a78258093ea85f11bf2b5b90274403f0c88fe82c2b53070f4ab0d4bdb/earthkit_data-0.18.2.tar.gz", hash = "sha256:fbbb9ade7898b872456913af70dea2f680734cd414747dd368739804794670df", size = 5554363, upload-time = "2025-11-18T19:35:09.109Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/57/cb/d6d435c7ce7782fa3c7aaf260f779cab80f6944c13a1546a0a3aed797b69/earthkit_data-0.18.2-py3-none-any.whl", hash = "sha256:0c61b5f61c7decb921ff3543f9c73b4988b6f2c88d6e8b68ee1ee34bee9d3573", size = 389574, upload-time = "2025-11-18T19:35:07.334Z" },
+]
+
+[package.optional-dependencies]
+polytope = [
+    { name = "polytope-client" },
 ]
 
 [[package]]
@@ -1404,7 +1422,7 @@ source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
     { name = "anemoi-inference" },
-    { name = "anemoi-plugins-ecmwf-inference", extra = ["opendata"] },
+    { name = "anemoi-plugins-ecmwf-inference", extra = ["opendata", "polytope"] },
     { name = "anemoi-utils" },
     { name = "apscheduler" },
     { name = "cloudpickle" },
@@ -1459,8 +1477,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiosqlite" },
-    { name = "anemoi-inference", specifier = ">=0.8.1" },
-    { name = "anemoi-plugins-ecmwf-inference", extras = ["opendata"], specifier = ">=0.1.17" },
+    { name = "anemoi-inference", specifier = "==0.8.3" },
+    { name = "anemoi-plugins-ecmwf-inference", extras = ["opendata", "polytope"], specifier = ">=0.1.17" },
     { name = "anemoi-utils", specifier = ">=0.4.36" },
     { name = "apscheduler" },
     { name = "cloudpickle" },
@@ -2932,6 +2950,23 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe6ef3fa267035b518369d9511ffab804f839851d2779/pluggy-1.6.0.tar.gz", hash = "sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3", size = 69412, upload-time = "2025-05-15T12:30:07.975Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746", size = 20538, upload-time = "2025-05-15T12:30:06.134Z" },
+]
+
+[[package]]
+name = "polytope-client"
+version = "0.7.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "click" },
+    { name = "docstring-parser" },
+    { name = "jsonschema" },
+    { name = "pyyaml" },
+    { name = "requests" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/64/90/48ef2c6d7eaa86622f571230a687bb3b80a34318857d8173497e35b14338/polytope_client-0.7.9.tar.gz", hash = "sha256:45b76d4a3d6beb007ffb16ece32ffa3c270de52f074d302a5cea9f20ce9fd753", size = 45810, upload-time = "2025-10-22T17:17:36.269Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e9/b7/5d7ffad4dd6fba63641d9d3f8289e83009d621ff1f487ba923502ffff20f/polytope_client-0.7.9-py3-none-any.whl", hash = "sha256:5531670e3f81b58caef7ffda88082380e81b1cbd78c0a1b60b80899bf746a6d9", size = 52422, upload-time = "2025-10-22T17:17:35.04Z" },
 ]
 
 [[package]]
