@@ -20,7 +20,7 @@ class NestedModel(BaseForecastModel):
     @property
     def _regions(self) -> list[str]:
         assert self.control.nested is not None, "NestedModel requires a 'nested' configuration in the control metadata."
-        return list(self.control.nested.keys())
+        return [k.identifier for k in self.control.nested]
 
     def validate_checkpoint(self):
         if not self.control.nested:
@@ -31,7 +31,7 @@ class NestedModel(BaseForecastModel):
     def _create_input_configuration(self, control: ControlMetadata) -> dict[str, dict[str, Any]]:
         assert control.nested is not None, "NestedModel requires a 'nested' configuration in the control metadata."
         return {
-            "cutout": {"sources": control.nested},
+            "cutout": {"sources": [k.dump_to_inference() for k in control.nested]},
         }
 
     def _post_processors(self, kwargs: dict[str, Any]) -> list[dict[str, Any]]:
