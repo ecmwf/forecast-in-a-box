@@ -27,10 +27,10 @@ wheels = [{ url = "https://files.pythonhosted.org/packages/2b/90/18bcc05c82810d4
 
 [[packages]]
 name = "anemoi-inference"
-version = "0.8.1"
+version = "0.8.3"
 index = "https://pypi.org/simple"
-sdist = { url = "https://files.pythonhosted.org/packages/87/d1/3133cb4cdda63109df8609437b3a886983d8375c90148998d6d56b3083a6/anemoi_inference-0.8.1.tar.gz", upload-time = 2025-11-06T09:29:13Z, size = 1410543, hashes = { sha256 = "1ceec9e350eb2cd281462843b90be14dd5be6c163c4aece3bd5dedaf07853649" } }
-wheels = [{ url = "https://files.pythonhosted.org/packages/27/b6/e186d386ecbe317b88d773e278be45bf7ebf353056ce2e73e8577ac1bb25/anemoi_inference-0.8.1-py3-none-any.whl", upload-time = 2025-11-06T09:29:11Z, size = 215857, hashes = { sha256 = "96e94437d6cb108a73956d959dd3bd4f7b5e1fedcbc868d9599d7f5f77b4f364" } }]
+sdist = { url = "https://files.pythonhosted.org/packages/ff/7a/0e57cdd3b8817322d647c3c519bfbaff0c2f6c82ef91eebaab5df26d077c/anemoi_inference-0.8.3.tar.gz", upload-time = 2025-12-10T11:25:49Z, size = 1420448, hashes = { sha256 = "2cca60774f088ac2d0cb4aff0dda904757b5bdc78fc9ce4c07ef5fdbdf6cf609" } }
+wheels = [{ url = "https://files.pythonhosted.org/packages/ce/8b/6a6c07f27af93f0d38a3a7aeb5e30224564237c049506d7cbd8305f0aee0/anemoi_inference-0.8.3-py3-none-any.whl", upload-time = 2025-12-10T11:25:47Z, size = 222100, hashes = { sha256 = "dd2744318c15ffb10870387f7723a842a32316d9f027bf3144c010e7726f75d0" } }]
 
 [[packages]]
 name = "anemoi-plugins-ecmwf-inference"
@@ -681,6 +681,13 @@ version = "2.8.0"
 index = "https://pypi.org/simple"
 sdist = { url = "https://files.pythonhosted.org/packages/8c/8b/57666417c0f90f08bcafa776861060426765fdb422eb10212086fb811d26/dnspython-2.8.0.tar.gz", upload-time = 2025-09-07T18:58:00Z, size = 368251, hashes = { sha256 = "181d3c6996452cb1189c4046c61599b84a5a86e099562ffde77d26984ff26d0f" } }
 wheels = [{ url = "https://files.pythonhosted.org/packages/ba/5a/18ad964b0086c6e62e2e7500f7edc89e3faa45033c71c1893d34eed2b2de/dnspython-2.8.0-py3-none-any.whl", upload-time = 2025-09-07T18:57:58Z, size = 331094, hashes = { sha256 = "01d9bbc4a2d76bf0db7c1f729812ded6d912bd318d3b1cf81d30c0f845dbf3af" } }]
+
+[[packages]]
+name = "docstring-parser"
+version = "0.17.0"
+index = "https://pypi.org/simple"
+sdist = { url = "https://files.pythonhosted.org/packages/b2/9d/c3b43da9515bd270df0f80548d9944e389870713cc1fe2b8fb35fe2bcefd/docstring_parser-0.17.0.tar.gz", upload-time = 2025-07-21T07:35:01Z, size = 27442, hashes = { sha256 = "583de4a309722b3315439bb31d64ba3eebada841f2e2cee23b99df001434c912" } }
+wheels = [{ url = "https://files.pythonhosted.org/packages/55/e2/2537ebcff11c1ee1ff17d8d0b6f4db75873e3b0fb32c2d4a2ee31ecb310a/docstring_parser-0.17.0-py3-none-any.whl", upload-time = 2025-07-21T07:35:00Z, size = 36896, hashes = { sha256 = "cf2569abd23dce8099b300f9b4fa8191e9582dda731fd533daf54c4551658708" } }]
 
 [[packages]]
 name = "earthkit-data"
@@ -2154,6 +2161,13 @@ version = "1.6.0"
 index = "https://pypi.org/simple"
 sdist = { url = "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe6ef3fa267035b518369d9511ffab804f839851d2779/pluggy-1.6.0.tar.gz", upload-time = 2025-05-15T12:30:07Z, size = 69412, hashes = { sha256 = "7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3" } }
 wheels = [{ url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", upload-time = 2025-05-15T12:30:06Z, size = 20538, hashes = { sha256 = "e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746" } }]
+
+[[packages]]
+name = "polytope-client"
+version = "0.7.9"
+index = "https://pypi.org/simple"
+sdist = { url = "https://files.pythonhosted.org/packages/64/90/48ef2c6d7eaa86622f571230a687bb3b80a34318857d8173497e35b14338/polytope_client-0.7.9.tar.gz", upload-time = 2025-10-22T17:17:36Z, size = 45810, hashes = { sha256 = "45b76d4a3d6beb007ffb16ece32ffa3c270de52f074d302a5cea9f20ce9fd753" } }
+wheels = [{ url = "https://files.pythonhosted.org/packages/e9/b7/5d7ffad4dd6fba63641d9d3f8289e83009d621ff1f487ba923502ffff20f/polytope_client-0.7.9-py3-none-any.whl", upload-time = 2025-10-22T17:17:35Z, size = 52422, hashes = { sha256 = "5531670e3f81b58caef7ffda88082380e81b1cbd78c0a1b60b80899bf746a6d9" } }]
 
 [[packages]]
 name = "pproc"
