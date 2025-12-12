@@ -4,6 +4,8 @@
 """
 
 import logging
+import os
+import signal
 from dataclasses import dataclass
 from multiprocessing import Process, connection
 
@@ -22,9 +24,16 @@ class ChildProcessGroup:
 
     def shutdown(self):
         for p in self.procs:
-            p.terminate()
-            p.join(1)
-            p.kill()
+            if p.is_alive():
+                # p.interrupt() # TODO after 3.14 add
+                os.kill(p.pid, signal.SIGINT)
+                p.join(3)
+            if p.is_alive():
+                p.terminate()
+                p.join(3)
+            if p.is_alive():
+                p.kill()
+                p.join(3)
 
 
 def previous_cleanup():
