@@ -1033,7 +1033,7 @@ wheels = [
 
 [[package]]
 name = "earthkit-workflows"
-version = "0.4.7"
+version = "0.5.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "array-api-compat" },
@@ -1051,9 +1051,9 @@ dependencies = [
     { name = "xarray" },
     { name = "zmq" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/26/ac/952604d694e4644fdb223028d254222df7098b421e411c4a492e77de45b2/earthkit_workflows-0.4.7.tar.gz", hash = "sha256:b1be3de07050a99a016967c4a5363e07f8f74d62f03d1eef6e2f056b08700c5c", size = 10497031, upload-time = "2025-08-20T12:38:44.18Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fc/77/f0eaf66a9a693ca45c3702bb722ebf5cd6f3e63cb57202f7bb392f640a8c/earthkit_workflows-0.5.1.tar.gz", hash = "sha256:76b570128a28fbb205030fb1a5a78483814813c956c6b982e8d2db680f0186b5", size = 10510881, upload-time = "2025-12-12T14:32:03.203Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8a/4e/7cbdfed17cf8167bcca7e72a97e97415b372f8bcc4367a6a5f5d48915a33/earthkit_workflows-0.4.7-py3-none-any.whl", hash = "sha256:24bc0e7174163711cd73d3892550776c6fb4788154a936f2826824c5737dbb1b", size = 158186, upload-time = "2025-08-20T12:38:42.762Z" },
+    { url = "https://files.pythonhosted.org/packages/67/23/7528a3a7c49b213fbfa5e15ff694c480a2a3bec211c22d3e35a1443f5463/earthkit_workflows-0.5.1-py3-none-any.whl", hash = "sha256:213aa7e6c6160947b36cb8c8e4a99c29671d776d5f2f3458de3eb0b414a4c849", size = 162452, upload-time = "2025-12-12T14:32:01.688Z" },
 ]
 
 [[package]]
@@ -1484,7 +1484,7 @@ requires-dist = [
     { name = "cloudpickle" },
     { name = "earthkit-plots", marker = "extra == 'plots'", specifier = ">=0.3.5" },
     { name = "earthkit-plots-default-styles", marker = "extra == 'plots'", specifier = ">=0.1" },
-    { name = "earthkit-workflows", specifier = ">=0.4.7" },
+    { name = "earthkit-workflows", specifier = ">=0.5.1" },
     { name = "earthkit-workflows-anemoi", specifier = ">=0.3.12" },
     { name = "earthkit-workflows-pproc", git = "https://github.com/ecmwf/earthkit-workflows-pproc" },
     { name = "ecmwf-api-client", marker = "extra == 'webmars'", specifier = ">=1.6.5" },

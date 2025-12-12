@@ -31,7 +31,7 @@ dependencies = [
   "anemoi-utils>=0.4.36",
   "apscheduler",
   "cloudpickle",
-  "earthkit-workflows>=0.4.7",
+  "earthkit-workflows>=0.5.1",
   "earthkit-workflows-anemoi>=0.3.12",
   "earthkit-workflows-pproc",
   "fastapi",
@@ -97,6 +97,12 @@ log_cli = true
 log_cli_level = "DEBUG"
 testpaths = [ "tests" ]
 addopts = "-n0 -s"      # NOTE stick to 0 *or* have random server ports in the integration tests
+# TODO once the diagnostic_/prognostic_ warning addressed, remove
+filterwarnings = [
+    "error",
+    'ignore:diagnostic_variables is unsupported:deprecation.UnsupportedWarning',
+    'ignore:prognostic_variables is unsupported:deprecation.UnsupportedWarning'
+]
 
 [tool.mypy]
 plugins = "pydantic.mypy"
