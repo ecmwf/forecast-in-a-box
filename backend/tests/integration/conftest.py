@@ -97,9 +97,12 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         if shutdown_event is not None:
             shutdown_event.set()
         if p is not None:
-            p.join(timeout=2)
+            p.join(timeout=3)
             if p.is_alive():
                 p.terminate()
+            p.join(timeout=3)
+            if p.is_alive():
+                p.kill()
         if handles is not None:
             handles.shutdown()
         if td is not None:

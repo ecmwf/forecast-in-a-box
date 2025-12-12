@@ -13,6 +13,8 @@ for liveness and open the browser window here, with the rest logic happening in 
 """
 
 import logging
+import signal
+import sys
 import webbrowser
 from multiprocessing import Process, set_start_method
 
@@ -27,7 +29,7 @@ logger = logging.getLogger(__name__ if __name__ != "__main__" else __package__)
 
 
 def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
-    set_start_method("forkserver", force=True)  # we force because of pytest plugins
+    set_start_method("forkserver", force=True)  # NOTE force because of pytest
     setup_process()
     logger.info("main process starting")
     logger.debug(f"loaded config {config.model_dump()}")
@@ -61,8 +63,14 @@ if __name__ == "__main__":
     config = FIABConfig()
     validate_runtime(config)
     handles = launch_all(config)
+
+    def sigterm_handler(_signo, _stack_frame):
+        handles.shutdown()
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, sigterm_handler)
     try:
         handles.wait()
     except KeyboardInterrupt:
         logger.info("keyboard interrupt, application shutting down")
-        pass  # no need to spew stacktrace to log
+        handles.wait()
