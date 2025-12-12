@@ -11,7 +11,7 @@
 level fable building and configuring, validate/extend partial fables, compile fables
 into jobs."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Query
 
 import forecastbox.api.fable as example
 from forecastbox.api.types import RawCascadeJob
@@ -25,9 +25,21 @@ router = APIRouter(
 
 # Endpoints
 @router.get("/catalogue")
-def get_catalogue() -> BlockFactoryCatalogue:
+def get_catalogue(language: str = Query("en", title="language")) -> BlockFactoryCatalogue:
     """All blocks this backend is capable of evaluating within a fable"""
-    return example.catalogue
+    if language == "en":
+        return example.catalogue
+    else:
+        from forecastbox.api.localization import translate_block_factory_catalogue
+
+        try:
+            return translate_block_factory_catalogue(example.catalogue, language)
+        except Exception as e:
+            # TODO explicate list of supported languages instead
+            if "not a valid model" in str(e):
+                raise HTTPException(404, f"Language not supported: {language}")
+            else:
+                raise
 
 
 @router.get("/expand")
