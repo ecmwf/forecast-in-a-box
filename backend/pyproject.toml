@@ -52,6 +52,8 @@ dependencies = [
   "sse-starlette",
   "toml",
   "uvicorn",
+  "transformers", # for localization
+  "sentencepiece", # for localization
 ]
 
 optional-dependencies.all = [
