@@ -1,7 +1,7 @@
 """Utility functions related to the backend running as a service, as well as entrypoint to start it"""
 
 import logging
-from multiprocessing import Process, freeze_support, set_start_method
+from multiprocessing import Process, freeze_support, get_context
 
 import psutil
 
@@ -37,7 +37,6 @@ if __name__ == "__main__":
     validate_runtime(config)
 
     freeze_support()
-    set_start_method("forkserver")
     setup_process()
 
     if not config.api.allow_service:
@@ -49,7 +48,7 @@ if __name__ == "__main__":
         config.model_config["env_nested_delimiter"],
         config.model_config["env_prefix"],
     )
-    backend = Process(target=launch_backend)
+    backend = get_context("forkserver").Process(target=launch_backend)
     backend.start()
     handle = ChildProcessGroup([backend])
     if backend.pid:
