@@ -97,12 +97,13 @@ log_cli = true
 log_cli_level = "DEBUG"
 testpaths = [ "tests" ]
 addopts = "-n0 -s --log-disable findlibs"      # NOTE stick to 0 *or* have random server ports in the integration tests
+# NOTE this is hotfix disabled because it completely destroys the test suite on macos
 # TODO once the diagnostic_/prognostic_ warning addressed, remove
-filterwarnings = [
-    "error",
-    'ignore:diagnostic_variables is unsupported:deprecation.UnsupportedWarning',
-    'ignore:prognostic_variables is unsupported:deprecation.UnsupportedWarning'
-]
+# filterwarnings = [
+#     "error",
+#     'ignore:diagnostic_variables is unsupported:deprecation.UnsupportedWarning',
+#     'ignore:prognostic_variables is unsupported:deprecation.UnsupportedWarning'
+# ]
 
 [tool.mypy]
 plugins = "pydantic.mypy"
