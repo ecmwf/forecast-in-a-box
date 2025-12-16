@@ -16,7 +16,7 @@ import logging
 import signal
 import sys
 import webbrowser
-from multiprocessing import Process, set_start_method
+from multiprocessing import Process, get_context
 
 import forecastbox.standalone.service
 from forecastbox.config import FIABConfig, validate_runtime
@@ -29,7 +29,6 @@ logger = logging.getLogger(__name__ if __name__ != "__main__" else __package__)
 
 
 def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
-    set_start_method("forkserver", force=True)  # NOTE force because of pytest
     setup_process()
     logger.info("main process starting")
     logger.debug(f"loaded config {config.model_dump()}")
@@ -41,7 +40,8 @@ def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
             config.model_config["env_nested_delimiter"],
             config.model_config["env_prefix"],
         )
-        backend = Process(target=launch_backend)
+        # TODO migrate to cascade_platform -- but we *need* forkserver for linux. Mind service.py here as well
+        backend = get_context("forkserver").Process(target=launch_backend)
         backend.start()
         handle = ChildProcessGroup([backend])
         spawn_gateway = True

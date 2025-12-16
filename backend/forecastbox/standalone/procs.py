@@ -7,7 +7,8 @@ import logging
 import os
 import signal
 from dataclasses import dataclass
-from multiprocessing import Process, connection
+from multiprocessing import connection
+from multiprocessing.process import BaseProcess as Process
 
 import psutil
 
@@ -45,16 +46,19 @@ def previous_cleanup():
     # NOTE we implement by "was launched from the same executable", which should be
     # the safest given we have fiab-only python. We could filter by name, by user,
     # persits pids, etc, but ultimately those sound less reliable / less safe
+    # NOTE this is inherently risky because it kills all descendants of this process!
+    # We protect immediate children to not have issues in pytest / resource_tracker,
+    # but this method must not be called before any other children are actually created
     self = psutil.Process()
     executable = self.exe()
 
     def filtering(p: psutil.Process):
         try:
-            return p.exe() == executable and p.pid != self.pid
+            return p.exe() == executable and p.pid != self.pid and p.ppid() != self.pid
         except (psutil.AccessDenied, psutil.ZombieProcess):
             return False
 
-    processes = [p for p in psutil.process_iter(["pid", "exe"]) if filtering(p)]
+    processes = [p for p in psutil.process_iter(["pid", "exe", "ppid"]) if filtering(p)]
     for p in processes:
         try:
             logger.warning(f"stopping process {p.pid}, believing it a remnant of previous run")
