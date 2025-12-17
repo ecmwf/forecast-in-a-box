@@ -70,7 +70,7 @@ class OutputProduct(GenericTemporalProduct):
 
         if product_spec.get("reduce", "True") == "True":
             for dim in source.nodes.dims:
-                source = source.concatenate(dim)
+                source = source.concatenate(dim)  # type: ignore[invalid-argument-type] # dim is not a string?
 
         format = product_spec.get("format", "grib")
 

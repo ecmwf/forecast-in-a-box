@@ -64,6 +64,8 @@ class ConfigEntry(FIABBaseModel):
         return self
 
     def _sort_values(self):
+        if self.values is None:
+            return
         if all(str(x).isdigit() for x in self.values):
             self.values = list(map(str, sorted(self.values, key=float)))
             return

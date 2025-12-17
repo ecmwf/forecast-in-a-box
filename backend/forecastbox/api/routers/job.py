@@ -69,7 +69,7 @@ def build_response(
     created_at = str(record.created_at)
     progress = progress or cast(str, record.progress) or "0.00"
     error = error or cast(str, record.error)
-    status = status or record.status
+    status = status or cast(STATUS, record.status)
     return JobProgressResponse(progress=progress, created_at=created_at, status=status, error=error)
 
 
@@ -123,7 +123,7 @@ async def update_and_get_progress(job_id: JobId) -> JobProgressResponse:
             # TODO this is either network or internal (eg serde) problem. Ideally fine-grain network into TimeoutError branch
             result = {"status": "unknown", "error": f"internal cascade failure: {repr(e)}"}
             await update_one(job_id, **result)
-            return build_response(job, **result)
+            return build_response(job, **result)  # type: ignore[invalid-argument-type] # literal not recognized
         if response.error:
             # NOTE we dont update db because the job may still be running
             return build_response(job, status="unknown", error=response.error)
@@ -132,19 +132,19 @@ async def update_and_get_progress(job_id: JobId) -> JobProgressResponse:
         if jobprogress is None:
             result = {"status": "invalid", "error": "evicted from gateway"}
             await update_one(job_id, **result)
-            return build_response(job, **result)
+            return build_response(job, **result)  # type: ignore[invalid-argument-type] # literal not recognized
         elif jobprogress.failure:
             result = {"status": "errored", "error": jobprogress.failure}
             await update_one(job_id, **result)
-            return build_response(job, **result)
+            return build_response(job, **result)  # type: ignore[invalid-argument-type] # literal not recognized
         elif jobprogress.completed or jobprogress.pct == "100.00":
             result = {"status": "completed", "progress": "100.00"}
             await update_one(job_id, **result)
-            return build_response(job, **result)
+            return build_response(job, **result)  # type: ignore[invalid-argument-type] # literal not recognized
         else:
             result = {"status": "running", "progress": jobprogress.pct}
             await update_one(job_id, **result)
-            return build_response(job, **result)
+            return build_response(job, **result)  # type: ignore[invalid-argument-type] # literal not recognized
 
     else:
         return build_response(job)

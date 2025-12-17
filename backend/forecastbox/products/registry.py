@@ -64,9 +64,9 @@ class CategoryRegistry:
         self._title = title or category
 
     def to_category_info(self) -> Category:
-        return Category(
-            title=self._title, description=self._description, options=list(map(str, self._products.keys()))
-        )  # {"title": self._title, "description": self._description, "options": list(map(str, self._products.keys()))}
+        if self._description is None:
+            raise ValueError(f"{self} has no description")
+        return Category(title=self._title, description=self._description, options=list(map(str, self._products.keys())))
 
     def __call__(self, product: str) -> Callable[[type[Product]], type[Product]]:
         """Register a product.

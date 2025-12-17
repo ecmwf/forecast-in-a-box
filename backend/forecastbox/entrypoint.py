@@ -81,7 +81,7 @@ app.include_router(schedule.router, prefix="/api/v1/schedule")
 app.include_router(fable.router, prefix="/api/v1/fable")
 
 app.add_middleware(
-    CORSMiddleware,
+    CORSMiddleware,  # type: ignore[invalid-argument-type]
     allow_origins=["127.0.0.1"],
     allow_credentials=True,
     allow_methods=["*"],
