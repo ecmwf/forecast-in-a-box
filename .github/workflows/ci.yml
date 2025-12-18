@@ -14,6 +14,7 @@ on:
   # Trigger the workflow manually
   workflow_dispatch: ~
 
+# TODO unify with a single matrix over platforms
 jobs:
   macos:
     name: macos
@@ -27,22 +28,25 @@ jobs:
     if: github.event.pull_request.base.repo.full_name == 'ecmwf/forecast-in-a-box'
     timeout-minutes: 20
     steps:
-      - uses: actions/setup-node@v6 # NOTE does not actually work !!!
       - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v3
+      - uses: astral-sh/setup-uv@v7
+      - uses: actions/setup-node@v6 # NOTE does not actually work on macos !!!
       - run: |
           set -euo pipefail
-          cd backend
+          pushd backend
           export UV_FROZEN=1
           uv sync --extra plots --python "${{ matrix.python_version }}"
           uv run prek --all-files
-          uv run ty check
           mkdir /tmp/tmpFiabHome
-          mkdir forecastbox/static && touch forecastbox/static/index.html # TODO replace with proper static file build
+          mkdir src/forecastbox/static && touch src/forecastbox/static/index.html # TODO replace with proper static file build
           if [[ "${{ matrix.python_version }}" != "3.13" ]] ; then
             # see tests of the admin/release endpoint for explanation
             export CI_GITHUB_RATELIMIT=yes
           fi
-          uv run pytest
+          popd
+
+          just val
   ubuntu:
     name: ubuntu
     strategy:
@@ -59,15 +63,16 @@ jobs:
       - uses: actions/setup-node@v6
       - run: |
           set -euo pipefail
-          cd backend
+          pushd backend
           export UV_FROZEN=1
           uv sync --extra plots --python "${{ matrix.python_version }}"
           uv run prek --all-files
-          uv run ty check
           mkdir /tmp/tmpFiabHome
-          mkdir forecastbox/static && touch forecastbox/static/index.html # TODO replace with proper static file build
+          mkdir src/forecastbox/static && touch src/forecastbox/static/index.html # TODO replace with proper static file build
           if [[ "${{ matrix.python_version }}" != "3.13" ]] ; then
             # see tests of the admin/release endpoint for explanation
             export CI_GITHUB_RATELIMIT=yes
           fi
-          uv run pytest
+          popd
+
+          just val
