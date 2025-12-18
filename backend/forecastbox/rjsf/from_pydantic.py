@@ -44,7 +44,7 @@ def _set_base_field_info(field: FieldInfo, schema: FieldSchema, ui: UISchema) ->
         schema.title = field.title
     if field.description:
         schema.description = field.description
-        ui.description = field.description
+        ui.description = field.description  # type: ignore[invalid-assignment] # ???
     return schema, ui
 
 
@@ -218,7 +218,7 @@ def from_pydantic(model: type[BaseModel] | BaseModel) -> tuple[dict[str, FieldWi
                     schema, ui = _update_with_extra_json(field, schema, ui)
 
                     assert isinstance(ui, UIObjectField)
-                    ui.anyOf = list(sub_fields_ui.values())
+                    ui.anyOf = list(sub_fields_ui.values())  # type: ignore # ???
 
                     fields[field_name] = FieldWithUI(jsonschema=schema, uischema=ui)
             else:

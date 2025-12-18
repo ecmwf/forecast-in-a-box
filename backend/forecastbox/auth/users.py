@@ -60,7 +60,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[UserTable, pydantic.UUID4]):
             query = select(func.count("*")).select_from(UserTable)
             user_count = (await session.execute(query)).scalar()
             if user_count == 1:
-                query = update(UserTable).where(UserTable.id == user.id).values(is_superuser=True)
+                query = update(UserTable).where(UserTable.id == user.id).values(is_superuser=True)  # type: ignore[invalid-argument-type] # db
                 _ = await session.execute(query)
                 await session.commit()
 
@@ -80,7 +80,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[UserTable, pydantic.UUID4]):
         logger.error(f"Verification requested for user {user.id}. Verification token: {token}")
 
     # TODO this is a hack, we validate email in this method. Consider a PR to the fastapi_users
-    async def validate_password(self, password: str, user: UserCreate | UserRead) -> None:
+    async def validate_password(self, password: str, user: UserCreate | UserRead) -> None:  # type: ignore[invalid-method-override]
         if config.auth.domain_allowlist_registry:
             domain = user.email.split("@")[1]
             if domain not in config.auth.domain_allowlist_registry:

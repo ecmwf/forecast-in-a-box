@@ -63,7 +63,7 @@ UI = TypeVar("UI", bound=UISchema)
 
 
 def __collapse_enums(jsonschema: FieldSchema, uischema: UI | None = None) -> tuple[StringSchema, UI | UIField]:
-    resolved_uischema: UISchema = uischema or UIField(widget="text")
+    resolved_uischema: UISchema = uischema or UIField(widget="text")  # type: ignore # ???
     if not isinstance(resolved_uischema, UIField):
         raise TypeError("UI schema must be a UIField to collapse enums")
 

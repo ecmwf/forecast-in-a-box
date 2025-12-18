@@ -214,8 +214,8 @@ class TestPrimitiveConversions:
         assert isinstance(result.jsonschema.items, StringSchema)
         assert result.jsonschema.items.type == "string"
         assert isinstance(result.uischema, UIObjectField)
-        assert len(result.uischema.anyOf) == 1
-        assert isinstance(result.uischema.anyOf[0], UIStringField)
+        assert len(result.uischema.anyOf) == 1  # type: ignore
+        assert isinstance(result.uischema.anyOf[0], UIStringField)  # type: ignore
 
     def test_from_list_primitive_int_items(self):
         field = FieldInfo(annotation=List[int])
@@ -224,7 +224,7 @@ class TestPrimitiveConversions:
         assert isinstance(result, FieldWithUI)
         assert isinstance(result.jsonschema.items, IntegerSchema)
         assert result.jsonschema.items.type == "integer"
-        assert isinstance(result.uischema.anyOf[0], UIIntegerField)
+        assert isinstance(result.uischema.anyOf[0], UIIntegerField)  # type: ignore
 
     def test_from_list_primitive_bool_items(self):
         field = FieldInfo(annotation=List[bool])
@@ -233,8 +233,8 @@ class TestPrimitiveConversions:
         assert isinstance(result, FieldWithUI)
         assert isinstance(result.jsonschema.items, BooleanSchema)
         assert result.jsonschema.items.type == "boolean"
-        assert isinstance(result.uischema.anyOf[0], UIField)
-        assert result.uischema.anyOf[0].widget == "checkbox"
+        assert isinstance(result.uischema.anyOf[0], UIField)  # type: ignore
+        assert result.uischema.anyOf[0].widget == "checkbox"  # type: ignore
 
     def test_from_list_primitive_unsupported_item_type(self):
         field = FieldInfo(annotation=List[float])
@@ -393,7 +393,7 @@ class TestFromPydantic:
         assert fields["address"].jsonschema.required == ["street", "city", "zipCode"]
 
         assert isinstance(fields["address"].uischema, UIObjectField)
-        assert len(fields["address"].uischema.anyOf) == 3
+        assert len(fields["address"].uischema.anyOf) == 3  # type: ignore
 
     def test_model_with_excluded_field(self):
         class ModelWithExcluded(BaseModel):

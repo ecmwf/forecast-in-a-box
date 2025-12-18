@@ -9,6 +9,7 @@ import signal
 from dataclasses import dataclass
 from multiprocessing import connection
 from multiprocessing.process import BaseProcess as Process
+from typing import cast
 
 import psutil
 
@@ -27,7 +28,7 @@ class ChildProcessGroup:
         for p in self.procs:
             if p.is_alive():
                 # p.interrupt() # TODO after 3.14 add
-                os.kill(p.pid, signal.SIGINT)
+                os.kill(cast(int, p.pid), signal.SIGINT)
                 p.join(3)
             if p.is_alive():
                 p.terminate()

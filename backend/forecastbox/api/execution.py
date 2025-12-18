@@ -171,7 +171,7 @@ async def execute(spec: ExecutionSpecification, user_id: str | None) -> Either[S
 
 async def execute2response(spec: ExecutionSpecification, user: UserRead | None) -> SubmitJobResponse:
     result = await execute(spec, str(user.id) if user is not None else None)
-    if result.e is not None:
+    if result.t is None:
         raise HTTPException(status_code=500, detail=f"Failed to execute because of {result.error}")
     else:
         return result.t

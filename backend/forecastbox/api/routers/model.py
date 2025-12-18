@@ -92,7 +92,7 @@ def download2response(model_download: ModelDownload | None) -> DownloadResponse:
             download_id=model_download.model_id,  # type: ignore[invalid-argument-type] # NOTE sqlalchemy quirk
             message="Download in progress.",
             status="in_progress",
-            progress=float(model_download.progress),
+            progress=float(model_download.progress),  # type: ignore[invalid-argument-type] # NOTE sqlachemy quirk
         )
     return DownloadResponse(
         download_id=None,
@@ -187,7 +187,7 @@ async def download(model_id: str, background_tasks: BackgroundTasks, admin=Depen
         )
 
     await start_download(model_id)
-    background_tasks.add_task(download_file, model_id, model_path, model_download_path)
+    background_tasks.add_task(download_file, model_id, model_path, str(model_download_path))
     return DownloadResponse(
         download_id=model_id,
         message="Download started.",

@@ -134,14 +134,14 @@ async def get_users(admin=Depends(get_admin_user)) -> list[UserRead]:
     """Get all users"""
     async with async_session_maker() as session:
         query = select(UserTable)
-        return (await session.execute(query)).unique().scalars().all()  # type: ignore[invalid-return-type] # NOTE db...
+        return (await session.execute(query)).unique().scalars().all()  # type: ignore[invalid-return-type] # NOTE db
 
 
 @router.get("/users/{user_id}", response_model=UserRead)
 async def get_user(user_id: UUID4, admin=Depends(get_admin_user)) -> UserRead:
     """Get a specific user by ID"""
     async with async_session_maker() as session:
-        query = select(UserTable).where(UserTable.id == user_id)
+        query = select(UserTable).where(UserTable.id == user_id)  # type: ignore[invalid-argument-type] # NOTE db
         user = (await session.execute(query)).unique().scalars().all()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -152,7 +152,7 @@ async def get_user(user_id: UUID4, admin=Depends(get_admin_user)) -> UserRead:
 async def delete_user(user_id: UUID4, admin=Depends(get_admin_user)) -> HTMLResponse:
     """Delete a user by ID"""
     async with async_session_maker() as session:
-        query = delete(UserTable).where(UserTable.id == user_id)
+        query = delete(UserTable).where(UserTable.id == user_id)  # type: ignore[invalid-argument-type] # NOTE db
         _ = await session.execute(query)
         await session.commit()
         # NOTE is there a way to get number of affected rows from the result? Except for running two selects...
@@ -169,10 +169,10 @@ async def update_user(user_id: UUID4, user_data: UserUpdate, admin=Depends(get_a
         # TODO the password is actually stored as 'hash_password' -- invoke some of the auth meths here
         if "password" in update_dict:
             raise HTTPException(status_code=404, detail="Password update not supported")
-        query = update(UserTable).where(UserTable.id == user_id).values(**update_dict)
+        query = update(UserTable).where(UserTable.id == user_id).values(**update_dict)  # type: ignore[invalid-argument-type] # NOTE db
         _ = await session.execute(query)
         await session.commit()
-        query = select(UserTable).where(UserTable.id == user_id)
+        query = select(UserTable).where(UserTable.id == user_id)  # type: ignore[invalid-argument-type] # NOTE db
         user = (await session.execute(query)).scalars().all()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -183,7 +183,7 @@ async def update_user(user_id: UUID4, user_data: UserUpdate, admin=Depends(get_a
 async def patch_user(user_id: UUID4, update_dict: dict, admin: UserRead = Depends(get_admin_user)) -> HTMLResponse:
     """Patch a user by ID"""
     async with async_session_maker() as session:
-        query = update(UserTable).where(UserTable.id == user_id).values(**update_dict)
+        query = update(UserTable).where(UserTable.id == user_id).values(**update_dict)  # type: ignore[invalid-argument-type] # NOTE db
         _ = await session.execute(query)
         await session.commit()
         return HTMLResponse(content="User updated successfully", status_code=200)

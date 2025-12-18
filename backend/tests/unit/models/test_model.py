@@ -27,7 +27,7 @@ class FakeModel(GlobalModel):
     @property
     @fake_checkpoints
     def checkpoint(self):
-        return Checkpoint(checkpoint_path)
+        return Checkpoint(str(checkpoint_path))
 
     @property
     def control(self) -> ControlMetadata:

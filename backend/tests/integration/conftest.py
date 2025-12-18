@@ -28,7 +28,7 @@ class FakeModelRepository(SimpleHTTPRequestHandler):
             self.send_header("Transfer-Encoding", "chunked")
             chunk_size = 256
             chunks = 8
-            self.send_header("Content-Length", chunk_size * chunks)
+            self.send_header("Content-Length", str(chunk_size * chunks))
             self.end_headers()
             chunk = b"x" * chunk_size
             chunk_header = hex(len(chunk))[2:].encode("ascii")  # Get hex size of chunk, remove '0x'
