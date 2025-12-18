@@ -12,3 +12,6 @@ try:
 except ImportError:
     # assuming editable install etc
     pass
+
+# TODO remove after a test works
+from fiab_core import main

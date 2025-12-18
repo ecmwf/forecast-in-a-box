@@ -14,6 +14,7 @@ on:
   # Trigger the workflow manually
   workflow_dispatch: ~
 
+# TODO unify with a single matrix over platforms
 jobs:
   macos:
     name: macos
@@ -37,7 +38,7 @@ jobs:
           uv run prek --all-files
           uv run ty check
           mkdir /tmp/tmpFiabHome
-          mkdir forecastbox/static && touch forecastbox/static/index.html # TODO replace with proper static file build
+          mkdir src/forecastbox/static && touch src/forecastbox/static/index.html # TODO replace with proper static file build
           if [[ "${{ matrix.python_version }}" != "3.13" ]] ; then
             # see tests of the admin/release endpoint for explanation
             export CI_GITHUB_RATELIMIT=yes
@@ -65,7 +66,7 @@ jobs:
           uv run prek --all-files
           uv run ty check
           mkdir /tmp/tmpFiabHome
-          mkdir forecastbox/static && touch forecastbox/static/index.html # TODO replace with proper static file build
+          mkdir src/forecastbox/static && touch src/forecastbox/static/index.html # TODO replace with proper static file build
           if [[ "${{ matrix.python_version }}" != "3.13" ]] ; then
             # see tests of the admin/release endpoint for explanation
             export CI_GITHUB_RATELIMIT=yes

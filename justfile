@@ -15,12 +15,22 @@ fiabwheel frontend_dir="frontend":
     popd
 
     pushd backend
-    rm -rf forecastbox/static
-    ln -s ../../{{frontend_dir}}/dist forecastbox/static
-    find forecastbox/static/ -type f | sed 's/.*/include &/' > MANIFEST.in
+    rm -rf src/forecastbox/static
+    ln -s ../../../{{frontend_dir}}/dist src/forecastbox/static
+    find src/forecastbox/static/ -type f | sed 's/.*/include &/' > MANIFEST.in
     python -m build --installer uv .
+
+    mkdir prereqs
+    for e in $(ls -d packages/*) ; do 
+        pushd $e
+        python -m build --installer uv .
+        mv dist/*whl ../../prereqs
+        popd
+    done
+
     popd
 
 clean:
-	find . -name '*.egg-info' -exec rm -fr {} +
-	find . -name '__pycache__' -exec rm -fr {} +
+	find backend -name '*.egg-info' -exec rm -fr {} +
+	find backend -name '__pycache__' -exec rm -fr {} +
+	find backend -name 'dist' -type d -exec rm -rf {} +

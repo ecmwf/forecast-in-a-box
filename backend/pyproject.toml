@@ -13,8 +13,7 @@ authors = [
   { name = "European Centre for Medium-Range Weather Forecasts (ECMWF)", email = "software.support@ecmwf.int" },
 ]
 requires-python = ">=3.11"
-# [tool.setuptools]
-# packages = ["forecastbox"]
+
 classifiers = [
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.11",
@@ -37,6 +36,7 @@ dependencies = [
   "fastapi",
   "fastapi-users[oauth]",
   "fastapi-users-db-sqlalchemy",
+  "fiab-core",
   "httpx<1",
   "httpx-oauth",
   "jinja2",
@@ -78,7 +78,7 @@ dev = [
 ]
 
 [tool.setuptools_scm]
-version_file = "forecastbox/_version.py"
+version_file = "src/forecastbox/_version.py"
 write_to_template = '''# Do not change! Do not track in version control!
 __version__ = "{version}"
 '''
@@ -112,6 +112,12 @@ plugins = "pydantic.mypy"
 [tool.uv.sources]
 pproc = { git = "https://github.com/ecmwf/pproc" }
 earthkit-workflows-pproc = { git = "https://github.com/ecmwf/earthkit-workflows-pproc" }
+fiab-core = {workspace = true}
+
+[tool.uv.workspace]
+members = [
+    "packages/fiab-core",
+]
 
 [tool.ty.rules]
 possibly-missing-attribute = "ignore" # TODO actually fix all those occurrences instead
