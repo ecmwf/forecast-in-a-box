@@ -8,59 +8,11 @@
 # nor does it submit to any jurisdiction.
 
 """
-Types pertaining to Forecast As BLock Expression (Fable): builders and blocks
+Types pertaining to Forecast As BLock Expression (Fable): builders and top-level API
 """
 
-from typing import Literal
-
-from forecastbox.api.types.base import FIABBaseModel as BaseModel
-
-
-class BlockConfigurationOption(BaseModel):
-    title: str
-    """Brief string to display in the BlockFactory detail"""
-    description: str
-    """Extended description, possibly with example values and their effect"""
-    value_type: str
-    """Will be used when deserializing the actual value"""
-    # TODO do we want Literal instead of str for values? Do we prefer nesting or flattening for complex config?
-
-
-BlockKind = Literal["source", "transform", "product", "sink"]
-
-
-class BlockFactory(BaseModel):
-    """When building a fable, user selects from an avaliable catalogue of BlockFactories which
-    have description of what they do and specification of configuration options they offer"""
-
-    kind: BlockKind
-    """Which role in a job does this block plays"""
-    title: str
-    """How to display in the catalogue listing / partial fable"""
-    description: str
-    """Extended detail for the user"""
-    configuration_options: dict[str, BlockConfigurationOption]
-    """A key-value of config-option-key, config-option"""
-    inputs: list[str]
-    """A list of input names, such as 'initial conditions' or 'forecast', for the purpose of description/configuration"""
-
-
-BlockFactoryId = str
-BlockInstanceId = str
-
-
-class BlockFactoryCatalogue(BaseModel):
-    factories: dict[BlockFactoryId, BlockFactory]
-
-
-class BlockInstance(BaseModel):
-    """As produced by BlockFactory *by the client* -- basically the configuration/inputs values"""
-
-    block_factory_id: BlockFactoryId
-    configuration_values: dict[str, str]
-    """Keys come frome factory's `configuration_options`, values are serialized actual configuration values"""
-    input_ids: dict[str, BlockInstanceId]
-    """Keys come from factory's `inputs`, values are other blocks in the (partial) fable"""
+from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId
+from pydantic import BaseModel
 
 
 class FableBuilderV1(BaseModel):

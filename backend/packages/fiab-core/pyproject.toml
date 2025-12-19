@@ -16,7 +16,10 @@ requires-python = ">=3.11"
 
 dynamic = [ "version" ]
 
-dependencies = []
+dependencies = [
+    "pydantic",
+    "earthkit-workflows", # NOTE technically we would need just cascade.low.core and some fluent.core, not the whole runtime -- possibly split down there as well
+]
 
 [dependency-groups]
 dev = [

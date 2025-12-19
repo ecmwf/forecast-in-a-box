@@ -15,11 +15,12 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, status
 from fastapi.exceptions import HTTPException
+from fiab_core.fable import BlockFactoryCatalogue
 
 import forecastbox.api.fable as example
 import forecastbox.db.fable as db_fable
 from forecastbox.api.types import RawCascadeJob
-from forecastbox.api.types.fable import BlockFactoryCatalogue, FableBuilderV1, FableValidationExpansion
+from forecastbox.api.types.fable import FableBuilderV1, FableValidationExpansion
 from forecastbox.auth.users import current_active_user
 from forecastbox.schemas.user import UserRead
 
