@@ -27,8 +27,8 @@ Expander = Callable[[BlockInstanceOutput], list[BlockFactoryId]]
 """Given a block instance output (including from other plugin), provide which block factories from this plugin can expand it"""
 
 Compiler = Callable[
-    [JobBuilder, DataPartitionLookup, BlockInstanceId, BlockInstance], Either[tuple[JobBuilder, DataPartitionLookup], Error]
-]  # type:ignore[invalid-argument] # semigroup
+    [JobBuilder, DataPartitionLookup, BlockInstanceId, BlockInstance], Either[tuple[JobBuilder, DataPartitionLookup], Error]  # type:ignore[invalid-argument] # semigroup
+]
 """Given a cascade builder and a block instance corresponding to this plugin's Factory, either update the builder with corresponding tasks or provide error"""
 # NOTE JobBuilder + DataPartitionLookup to be replaced with Fluent
 
