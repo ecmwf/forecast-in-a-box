@@ -118,6 +118,8 @@ fiab-core = {workspace = true}
 [tool.uv.workspace]
 members = [
     "packages/fiab-core",
+    "packages/fiab-core/fiab-plugin-toy",
+    "packages/fiab-plugin-toy-impl",
 ]
 
 [tool.ty.rules]
