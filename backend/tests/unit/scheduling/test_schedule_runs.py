@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import HTTPException
+
 from forecastbox.api.routers.schedule import GetScheduleRunsResponse, get_schedule_runs
 from forecastbox.db.schedule import JobRecord, ScheduleRun
 from forecastbox.schemas.user import UserRead
@@ -37,7 +38,7 @@ def mock_schedule_run_row():
 
 @pytest.fixture
 def mock_user():
-    return UserRead(id=str(uuid.uuid4()), email="test@example.com", is_active=True, is_superuser=False, is_verified=True)
+    return UserRead(id=str(uuid.uuid4()), email="test@example.com", is_active=True, is_superuser=False, is_verified=True)  # type: ignore[invalid-argument-type] # uuid-str
 
 
 @pytest.mark.asyncio
@@ -110,11 +111,11 @@ async def test_get_schedule_runs_no_runs(mock_user):
 async def test_get_schedule_runs_invalid_page_params(mock_user):
     with pytest.raises(HTTPException) as exc_info:
         await get_schedule_runs(schedule_id="test_schedule_id", user=mock_user, page=0)
-    assert "Page and page_size must be greater than 0." in cast(HTTPException, exc_info.value).detail
+    assert "Page and page_size must be greater than 0." in exc_info.value.detail
 
     with pytest.raises(HTTPException) as exc_info:
         await get_schedule_runs(schedule_id="test_schedule_id", user=mock_user, page_size=0)
-    assert "Page and page_size must be greater than 0." in cast(HTTPException, exc_info.value).detail
+    assert "Page and page_size must be greater than 0." in exc_info.value.detail
 
 
 @pytest.mark.asyncio
@@ -125,4 +126,4 @@ async def test_get_schedule_runs_page_out_of_range(mock_schedule_run_row, mock_u
     ):
         with pytest.raises(HTTPException) as exc_info:
             await get_schedule_runs(schedule_id="test_schedule_id", user=mock_user, page=2, page_size=1)
-        assert "Page number out of range." in cast(HTTPException, exc_info.value).detail
+        assert "Page number out of range." in exc_info.value.detail

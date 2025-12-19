@@ -3,6 +3,7 @@ import logging
 from datetime import datetime
 
 import httpx
+
 from forecastbox.config import fiab_home
 
 logger = logging.getLogger(__name__)

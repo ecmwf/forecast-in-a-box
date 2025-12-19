@@ -1,19 +1,20 @@
 repos:
-- repo: local
-  hooks:
-  - id: frontend-v2-npm-check
-    name: frontend-v2 npm-check
-    entry: bash -c 'cd frontend-v2 && npm run check' # Run check script on frontend-v2
-    language: system  # Use system's node/npm installation
-    files: ^frontend-v2/  # Only run when frontend-v2 files change
-    pass_filenames: false # Don't pass individual filenames to the script
-    stages: [pre-commit]  # Run during pre-commit stage
+# NOTE disabled until we fix npm install on macos runners
+#- repo: local
+#  hooks:
+#  - id: frontend-v2-npm-check
+#    name: frontend-v2 npm-check
+#    entry: bash -c 'cd frontend-v2 && npm install && npm run check' # Run check script on frontend-v2
+#    language: system  # Use system's node/npm installation
+#    files: ^frontend-v2/  # Only run when frontend-v2 files change
+#    pass_filenames: false # Don't pass individual filenames to the script
+#    stages: [pre-commit]  # Run during pre-commit stage
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v6.0.0
   hooks:
   - id: check-yaml # Check YAML files for syntax errors only
     args: [--unsafe, --allow-multiple-documents]
-  - id: no-commit-to-branch # Prevent committing to main / master
+#  - id: no-commit-to-branch # NOTE prevents commit to main/master, but since we run prek on that branch it makes no sense
   - id: check-added-large-files
     exclude: |
       (?x)(
@@ -24,12 +25,14 @@ repos:
 - repo: https://github.com/astral-sh/ruff-pre-commit
   rev: v0.12.2
   hooks:
-  - id: ruff # better black/flake
+  - id: ruff # better black/flake/isort
     files: ^backend/
     args:
+    - --select
+    - I # isorting
     - --fix
     - --exit-non-zero-on-fix
-  - id: ruff-format # better isort
+  - id: ruff-format
     files: ^backend/
 ci:
   autoupdate_schedule: monthly

@@ -17,9 +17,10 @@ from anemoi.inference.checkpoint import Checkpoint
 from earthkit.workflows.fluent import Action
 from earthkit.workflows.plugins.anemoi.fluent import from_input
 from earthkit.workflows.plugins.anemoi.types import ENSEMBLE_MEMBER_SPECIFICATION
-from forecastbox.rjsf import FieldWithUI, FormDefinition, IntegerSchema, StringSchema, UIIntegerField, UIStringField
 from pydantic import BaseModel
 from qubed import Qube
+
+from forecastbox.rjsf import FieldWithUI, FormDefinition, IntegerSchema, StringSchema, UIIntegerField, UIStringField
 
 from .metadata import ControlMetadata, get_control_metadata
 from .utils import open_checkpoint
@@ -146,7 +147,7 @@ class BaseForecastModel(ABC):
         """Get the environments for the model."""
         from importlib import metadata
 
-        INFERENCE_FILTER_INCLUDE = ["anemoi-models", "anemoi-graphs", "anemoi-transform", "flash-attn", "torch", "torch_geometric"]
+        INFERENCE_FILTER_INCLUDE = ["anemoi-models", "anemoi-graphs", "anemoi-transform", "flash-attn", "torch_geometric"]
         INITIAL_CONDITIONS_FILTER_STARTS = ["earthkit", "anemoi-transform", "anemoi-plugins"]
         ENFORCE_GATEWAY_VERSIONS = ["anemoi-inference", "earthkit-workflows", "earthkit-workflows-anemoi"]
 
@@ -198,9 +199,9 @@ class BaseForecastModel(ABC):
             "post_processors": [],
         }
         if control.pre_processors:
-            extra_kwargs["pre_processors"].extend(control.pre_processors)
+            extra_kwargs["pre_processors"].extend([p.dump_to_inference() for p in control.pre_processors])
         if control.post_processors:
-            extra_kwargs["post_processors"].extend(control.post_processors)
+            extra_kwargs["post_processors"].extend([p.dump_to_inference() for p in control.post_processors])
 
         extra_kwargs["pre_processors"].extend(self._pre_processors(kwargs))
         extra_kwargs["post_processors"].extend(self._post_processors(kwargs))
@@ -370,7 +371,7 @@ def get_model(checkpoint: os.PathLike) -> BaseForecastModel:
 
     control = get_control_metadata(checkpoint)
 
-    if control.nested is not None:
+    if control.nested:
         return NestedModel(checkpoint)
     return GlobalModel(checkpoint)
 

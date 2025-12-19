@@ -12,11 +12,12 @@ import logging
 from collections.abc import Iterable
 
 from cascade.controller.report import JobId
+from sqlalchemy import delete, func, select, update
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
 from forecastbox.config import config
 from forecastbox.db.core import addAndCommit, dbRetry, executeAndCommit, queryCount, querySingle
 from forecastbox.schemas.job import Base, JobRecord
-from sqlalchemy import delete, func, select, update
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 logger = logging.getLogger(__name__)
 

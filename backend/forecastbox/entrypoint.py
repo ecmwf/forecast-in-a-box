@@ -18,19 +18,20 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-import forecastbox.db
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.exceptions import HTTPException
+
+import forecastbox.db
 from forecastbox.api.scheduling.scheduler_thread import start_scheduler, status_scheduler, stop_scheduler
 from forecastbox.api.updates import get_local_release
 from forecastbox.db.migrations import migrate
 from forecastbox.db.model import delete_download
-from starlette.exceptions import HTTPException
 
-from .api.routers import admin, auth, execution, gateway, job, model, product, schedule
+from .api.routers import admin, auth, execution, fable, gateway, job, model, product, schedule
 from .config import config
 
 logger = logging.getLogger(__name__)
@@ -68,6 +69,7 @@ app = FastAPI(
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 
+# TODO replace with iter modules, this is awkward
 app.include_router(model.router, prefix="/api/v1/model")
 app.include_router(product.router, prefix="/api/v1/product")
 app.include_router(execution.router, prefix="/api/v1/execution")
@@ -76,9 +78,10 @@ app.include_router(admin.router, prefix="/api/v1/admin")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(gateway.router, prefix="/api/v1/gateway")
 app.include_router(schedule.router, prefix="/api/v1/schedule")
+app.include_router(fable.router, prefix="/api/v1/fable")
 
 app.add_middleware(
-    CORSMiddleware,
+    CORSMiddleware,  # type: ignore[invalid-argument-type]
     allow_origins=["127.0.0.1"],
     allow_credentials=True,
     allow_methods=["*"],

@@ -21,9 +21,10 @@ import cascade.executor.platform as cascade_platform
 import cascade.gateway.api
 import cascade.gateway.client
 from fastapi import APIRouter, HTTPException, Request
+from sse_starlette.sse import EventSourceResponse
+
 from forecastbox.config import StatusMessage, config
 from forecastbox.standalone.launchers import launch_cascade
-from sse_starlette.sse import EventSourceResponse
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +93,7 @@ async def start_gateway() -> str:
     max_concurrent_jobs = config.cascade.max_concurrent_jobs
     # TODO for some reason changes to os.environ were *not* visible by the child process! Investigate and re-enable:
     # export_recursive(config.model_dump(), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"])
-    process = cascade_platform.get_mp_ctx("gateway").Process(target=launch_cascade, args=(log_path, logs_directory, max_concurrent_jobs))
+    process = cascade_platform.get_mp_ctx("gateway").Process(target=launch_cascade, args=(log_path, logs_directory, max_concurrent_jobs))  # type: ignore[unresolved-attribute] # context
     process.start()
     Globals.gateway = GatewayProcess(log_path=log_path, process=process)
     logger.debug(f"spawned new gateway process with pid {process.pid} and logs at {log_path}")
@@ -123,9 +124,9 @@ async def stream_logs(request: Request) -> EventSourceResponse:
     async def event_generator():
         # NOTE consider rewriting to aiofile, eg https://github.com/kuralabs/logserver/blob/master/server/server.py
 
-        pipe = subprocess.Popen(["tail", "-F", Globals.gateway.log_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        pipe = subprocess.Popen(["tail", "-F", Globals.gateway.log_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)  # type: ignore[no-matching-overload] # Popen
         poller = select.poll()
-        poller.register(pipe.stdout)
+        poller.register(pipe.stdout)  # type: ignore[invalid-argument-type] # pipe
 
         while Globals.gateway.process.is_alive() and not (await request.is_disconnected()):
             while poller.poll(5):

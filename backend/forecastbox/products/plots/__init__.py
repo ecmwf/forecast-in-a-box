@@ -18,6 +18,8 @@ plot_product_registry = CategoryRegistry(
     title="Plots",
 )
 
-from . import maps  # noqa: F401, E402
-from . import meteogram  # noqa: F401, E402
-from . import vertical_profile  # noqa: F401, E402
+from . import (
+    maps,  # noqa: F401, E402
+    meteogram,  # noqa: F401, E402
+    vertical_profile,  # noqa: F401, E402
+)

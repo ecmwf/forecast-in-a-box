@@ -2,8 +2,9 @@
 
 import logging
 
-from forecastbox.config import config
 from sqlalchemy import MetaData, create_engine, text
+
+from forecastbox.config import config
 
 logger = logging.getLogger(__name__)
 

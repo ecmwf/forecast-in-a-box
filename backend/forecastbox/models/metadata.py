@@ -12,10 +12,11 @@ import os
 from typing import Any
 
 import yaml
-from forecastbox.rjsf import FieldWithUI, FormDefinition
-from forecastbox.rjsf.jsonSchema import BooleanSchema, IntegerSchema, ObjectSchema, StringSchema
-from forecastbox.rjsf.uiSchema import UIAdditionalProperties, UIStringField
 from pydantic import BaseModel, Field, model_validator
+
+from forecastbox.rjsf import FieldWithUI, FormDefinition
+from forecastbox.rjsf.jsonSchema import ArraySchema, BooleanSchema, IntegerSchema, ObjectSchema, StringSchema
+from forecastbox.rjsf.uiSchema import UIAdditionalProperties, UIItems, UIStringField
 
 from .utils import open_checkpoint
 
@@ -38,8 +39,16 @@ class Capabilities(BaseModel):
     max_lead_time: int | None = None
 
 
+class KeyedConfig(BaseModel):
+    identifier: str
+    configuration: dict[str, Any] | str
+
+    def dump_to_inference(self) -> dict[str, Any]:
+        return {self.identifier: self.configuration}
+
+
 class ControlMetadata(BaseModel):
-    _version: str = "1.0.0"
+    _version: str = "2.0.0"
 
     pkg_versions: dict[str, str] = Field(default_factory=dict, examples=[{"numpy": "1.23.0", "pandas": "1.4.0"}])
     """Absolute overrides for the packages to install when running."""
@@ -47,30 +56,11 @@ class ControlMetadata(BaseModel):
     input_source: str | dict[str, str] | None = Field(None, examples=["opendata", {"polytope": {"collection": "..."}}])
     """Source of the input, if dictionary, refers to keys of nested input sources"""
 
-    nested: dict[str, dict[str, Any] | str] | None = Field(
-        default=None,
-        examples=[
-            {"lam": {"opendata": {"pre_processors": [{"regrid": {"area": "...", "grid": "..."}}]}}, "global": "opendata"},
-        ],
-    )
-    """Configuration if using nested input sources. Will use the CutoutInput to combine these sources.
+    nested: list[KeyedConfig] | None = Field(default_factory=list)
+    """Configuration if using nested input sources. Will use the CutoutInput to combine these sources"""
 
-    E.g.
-    ----
-    ```
-        nested:
-        lam:
-            opendata:
-                pre_processors:
-                    - regrid:
-                        area: ...
-                        grid: ...
-        global: {}
-    ```
-    """
-
-    pre_processors: dict[str, Any] = Field(default_factory=dict, examples=processor_example)
-    post_processors: dict[str, Any] = Field(default_factory=dict, examples=processor_example)
+    pre_processors: list[KeyedConfig] = Field(default_factory=list, examples=processor_example)
+    post_processors: list[KeyedConfig] = Field(default_factory=list, examples=processor_example)
 
     environment_variables: dict[str, Any] = Field(
         default_factory=dict,
@@ -80,6 +70,14 @@ class ControlMetadata(BaseModel):
     """Global Environment variables for execution."""
 
     capabilities: Capabilities = Field(default_factory=Capabilities, examples=[{"ensemble": True, "max_lead_time": 240}])
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_to_keyed_config(cls, values):
+        for field in ["pre_processors", "post_processors", "nested"]:
+            if field in values and isinstance(values[field], dict):
+                values[field] = [KeyedConfig(identifier=k, configuration=v) for k, v in values[field].items()]
+        return values
 
     @model_validator(mode="before")
     @classmethod
@@ -101,6 +99,8 @@ class ControlMetadata(BaseModel):
                     raise ValidationError(f"Invalid YAML format: {e}") from e
             elif isinstance(val, dict):
                 return {k: parse_yaml(v) for k, v in val.items()}
+            elif isinstance(val, list):
+                return [parse_yaml(item) for item in val]
             return val
 
         for field in dict_fields:
@@ -108,12 +108,21 @@ class ControlMetadata(BaseModel):
                 values[field] = parse_yaml(values.get(field))
         return values
 
-    @staticmethod
-    def _dump_yaml(val: dict[str, Any] | str) -> str:
+    @classmethod
+    def _dump_yaml(cls, val: dict[str, Any] | str) -> str:
         """Dump a dictionary to a YAML string."""
         if isinstance(val, str):
             return val
         return yaml.safe_dump(val, indent=2, sort_keys=False)
+
+    @classmethod
+    def _nested_dump(cls, val: dict | list | list[dict] | str):
+        """Dump nested configuration to a YAML string."""
+        if isinstance(val, dict):
+            return {k: cls._dump_yaml(v) for k, v in val.items()}
+        elif isinstance(val, list):
+            return [cls._nested_dump(item) for item in val]
+        return cls._dump_yaml(val)
 
     @property
     def form(self) -> FormDefinition:
@@ -124,12 +133,10 @@ class ControlMetadata(BaseModel):
             if isinstance(data[key], dict) and len(data[key]) == 0:
                 data.pop(key)
 
-        nested_dictionaries = ["nested", "pre_processors", "post_processors"]
+        nested = ["nested", "pre_processors", "post_processors"]
 
-        for key in nested_dictionaries:
-            if key in data and isinstance(data[key], dict):
-                for k in data[key]:
-                    data[key][k] = self._dump_yaml(data[key][k])
+        for key in nested:
+            data[key] = self._nested_dump(data.get(key, {}))
 
         return FormDefinition(
             title="Control Metadata",
@@ -143,13 +150,18 @@ class ControlMetadata(BaseModel):
                     ),
                 ),
                 "nested": FieldWithUI(
-                    jsonschema=ObjectSchema(
+                    jsonschema=ArraySchema(
                         title="Nested Input Sources",
                         description="Configuration for nested input sources.",
-                        additionalProperties=StringSchema(),
+                        items=ObjectSchema(
+                            properties={
+                                "identifier": StringSchema(),
+                                "configuration": StringSchema(format="yaml"),
+                            }
+                        ),
                         # default=self._dump_yaml(self.nested or {}),
                     ),
-                    uischema=UIAdditionalProperties(additionalProperties=UIStringField(widget="textarea", format="yaml")),
+                    uischema=UIItems(items={"configuration": UIStringField(widget="textarea", format="yaml")}),
                 ),
                 "capabilites": FieldWithUI(
                     jsonschema=ObjectSchema(
@@ -161,22 +173,32 @@ class ControlMetadata(BaseModel):
                     ),
                 ),
                 "pre_processors": FieldWithUI(
-                    jsonschema=ObjectSchema(
+                    jsonschema=ArraySchema(
                         title="Pre-processors",
                         description="Pre-processors to apply to the input data. Key is the name of the pre-processor, value is the configuration.",
-                        additionalProperties=StringSchema(),
+                        items=ObjectSchema(
+                            properties={
+                                "identifier": StringSchema(),
+                                "configuration": StringSchema(format="yaml"),
+                            }
+                        ),
                         # default=list(map(self._dump_yaml, self.pre_processors)),
                     ),
-                    uischema=UIAdditionalProperties(additionalProperties=UIStringField(widget="textarea", format="yaml")),
+                    uischema=UIItems(items={"configuration": UIStringField(widget="textarea", format="yaml")}),
                 ),
                 "post_processors": FieldWithUI(
-                    jsonschema=ObjectSchema(
+                    jsonschema=ArraySchema(
                         title="Post-processors",
                         description="List of post-processors to apply to the output data.",
-                        additionalProperties=StringSchema(),
+                        items=ObjectSchema(
+                            properties={
+                                "identifier": StringSchema(),
+                                "configuration": StringSchema(format="yaml"),
+                            }
+                        ),
                         # default=list(map(self._dump_yaml, self.post_processors)),
                     ),
-                    uischema=UIAdditionalProperties(additionalProperties=UIStringField(widget="textarea", format="yaml")),
+                    uischema=UIItems(items={"configuration": UIStringField(widget="textarea", format="yaml")}),
                 ),
                 "pkg_versions": FieldWithUI(
                     jsonschema=ObjectSchema(

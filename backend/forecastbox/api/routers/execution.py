@@ -15,6 +15,7 @@ import logging
 from cascade.low.core import JobInstance
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
+
 from forecastbox.api.execution import SubmitJobResponse, execute2response, execution_specification_to_cascade
 from forecastbox.api.types import ExecutionSpecification, VisualisationOptions
 from forecastbox.api.visualisation import visualise

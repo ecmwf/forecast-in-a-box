@@ -15,6 +15,7 @@ from typing import Any
 from earthkit.workflows import fluent
 from earthkit.workflows.graph import Graph, deduplicate_nodes
 from earthkit.workflows.plugins.anemoi.types import ENSEMBLE_DIMENSION_NAME
+
 from forecastbox.config import config
 from forecastbox.models import SpecifiedModel
 from forecastbox.products.product import Product

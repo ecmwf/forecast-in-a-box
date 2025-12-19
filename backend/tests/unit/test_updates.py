@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
+
 from forecastbox.api.updates import Release, get_local_release, get_lock_timestamp, get_most_recent_release, get_pylock, save_pylock
 
 

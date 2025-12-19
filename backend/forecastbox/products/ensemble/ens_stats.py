@@ -11,6 +11,7 @@ import itertools
 from typing import Any
 
 from earthkit.workflows import fluent
+
 from forecastbox.products.ensemble.base import BasePProcEnsembleProduct
 from forecastbox.products.product import GenericTemporalProduct
 

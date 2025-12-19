@@ -24,4 +24,8 @@ jobs:
       - run: |
           set -euo pipefail
           mkdir /tmp/tmpFiabHome # we want a clean env for install
-          FIAB_LOGSTDOUT=yea FIAB_ROOT=/tmp/tmpFiabHome PYTHONPATH=backend/tests/nonpytest ENTRYPOINT=bigtest ./scripts/fiab.sh
+          export FIAB_LOGSTDOUT=yea
+          export FIAB_ROOT=/tmp/tmpFiabHome
+          bash ./scripts/fiab.sh warmup
+          source /tmp/tmpFiabHome/venv/bin/activate
+          PYTHONPATH=backend/tests/nonpytest python -m bigtest

@@ -21,6 +21,8 @@ from typing import Any, Literal
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from pydantic import BaseModel
+
 from forecastbox.api.utils import get_model_path
 from forecastbox.config import config
 from forecastbox.db.model import delete_download, finish_edit, get_download, get_edit, start_download, start_editing, update_progress
@@ -28,7 +30,6 @@ from forecastbox.models.metadata import ControlMetadata, set_control_metadata
 from forecastbox.models.model import ModelInfo, get_model, model_info
 from forecastbox.rjsf import ExportedSchemas
 from forecastbox.schemas.model import ModelDownload
-from pydantic import BaseModel
 
 from ..types import ModelName
 from .admin import get_admin_user
@@ -91,7 +92,7 @@ def download2response(model_download: ModelDownload | None) -> DownloadResponse:
             download_id=model_download.model_id,  # type: ignore[invalid-argument-type] # NOTE sqlalchemy quirk
             message="Download in progress.",
             status="in_progress",
-            progress=float(model_download.progress),
+            progress=float(model_download.progress),  # type: ignore[invalid-argument-type] # NOTE sqlachemy quirk
         )
     return DownloadResponse(
         download_id=None,
@@ -186,7 +187,7 @@ async def download(model_id: str, background_tasks: BackgroundTasks, admin=Depen
         )
 
     await start_download(model_id)
-    background_tasks.add_task(download_file, model_id, model_path, model_download_path)
+    background_tasks.add_task(download_file, model_id, model_path, str(model_download_path))
     return DownloadResponse(
         download_id=model_id,
         message="Download started.",

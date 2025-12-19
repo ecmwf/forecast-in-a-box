@@ -15,9 +15,11 @@ ensemble_registry = CategoryRegistry(
     "ensemble", interface=Interfaces.DETAILED, description="Capture the distribution of the ensemble", title="Ensemble"
 )
 
-from . import ens_stats  # noqa: F401, E402
-from . import quantiles  # noqa: F401, E402
-from . import threshold  # noqa: F401, E402
+from . import (
+    ens_stats,  # noqa: F401, E402
+    quantiles,  # noqa: F401, E402
+    threshold,  # noqa: F401, E402
+)
 from .base import BaseEnsembleProduct  # noqa: F401, E402
 
 __all__ = [

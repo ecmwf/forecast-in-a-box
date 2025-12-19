@@ -14,14 +14,15 @@ from collections import OrderedDict
 from collections.abc import Iterable
 from typing import Any
 
-import forecastbox.rjsf.utils as rjsfutils
 from fastapi import APIRouter, HTTPException
+from qubed import Qube
+
+import forecastbox.rjsf.utils as rjsfutils
 from forecastbox.models import SpecifiedModel, get_model
 from forecastbox.products.interfaces import Interfaces
 from forecastbox.products.product import USER_DEFINED, Product
 from forecastbox.products.registry import Category, get_categories, get_product
 from forecastbox.rjsf import ExportedSchemas, FieldWithUI, FormDefinition, StringSchema
-from qubed import Qube
 
 from ..types import ModelSpecification
 from .model import get_model_path

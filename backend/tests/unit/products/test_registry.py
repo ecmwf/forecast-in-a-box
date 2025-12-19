@@ -12,11 +12,12 @@ from typing import Any
 import pytest
 from earthkit.workflows.fluent import Action
 from earthkit.workflows.graph import Graph
+from qubed import Qube
+
 from forecastbox.models import SpecifiedModel
 from forecastbox.products.interfaces import Interfaces
 from forecastbox.products.product import Product
 from forecastbox.products.registry import PRODUCTS, CategoryRegistry, get_categories, get_product, get_product_list
-from qubed import Qube
 
 
 @pytest.fixture(scope="module")

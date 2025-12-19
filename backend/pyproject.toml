@@ -26,12 +26,12 @@ dynamic = [ "version" ]
 # just a minimal set of dependencies to run the servers. Individual tasks install their runtime dependencies on their own
 dependencies = [
   "aiosqlite",
-  "anemoi-inference>=0.8.1",
-  "anemoi-plugins-ecmwf-inference[opendata]>=0.1.17",
+  "anemoi-inference==0.8.3",
+  "anemoi-plugins-ecmwf-inference[opendata,polytope]>=0.1.17",
   "anemoi-utils>=0.4.36",
   "apscheduler",
   "cloudpickle",
-  "earthkit-workflows>=0.4.7",
+  "earthkit-workflows>=0.5.1",
   "earthkit-workflows-anemoi>=0.3.12",
   "earthkit-workflows-pproc",
   "fastapi",
@@ -73,7 +73,8 @@ urls."Source code" = "https://github.com/ecmwf/forecast-in-a-box"
 dev = [
   "pytest-asyncio",
   "pytest-xdist>=3.8",
-  "ty>=0.0.1a23",
+  "ty==0.0.2",
+  "prek",
 ]
 
 [tool.setuptools_scm]
@@ -95,7 +96,13 @@ lint.ignore = [ "E731" ]
 log_cli = true
 log_cli_level = "DEBUG"
 testpaths = [ "tests" ]
-addopts = "-n0 -s"      # NOTE stick to 0 *or* have random server ports in the integration tests
+addopts = "-n0 -s --log-disable findlibs"      # NOTE stick to 0 *or* have random server ports in the integration tests
+# TODO once the diagnostic_/prognostic_ warning addressed, remove
+filterwarnings = [
+    "error",
+    'ignore:diagnostic_variables is unsupported:deprecation.UnsupportedWarning',
+    'ignore:prognostic_variables is unsupported:deprecation.UnsupportedWarning'
+]
 
 [tool.mypy]
 plugins = "pydantic.mypy"

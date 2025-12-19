@@ -8,22 +8,21 @@
 # nor does it submit to any jurisdiction.
 
 """API types"""
+# TODO split into submodules! Like api/types/{base, fable}.py
 
 from dataclasses import dataclass
 from typing import Any, Literal
 
 import orjson
 from cascade.low.core import JobInstance
+from pydantic import Field, PositiveInt, field_validator, model_validator
+
+from forecastbox.api.types.base import FIABBaseModel
 from forecastbox.products.product import USER_DEFINED
-from pydantic import BaseModel, Field, PositiveInt, field_validator, model_validator
 
 CONFIG_ORDER = ["param", "levtype", "levelist"]
 
 ModelName = str
-
-
-class FIABBaseModel(BaseModel):
-    pass
 
 
 class ModelSpecification(FIABBaseModel):
@@ -65,6 +64,8 @@ class ConfigEntry(FIABBaseModel):
         return self
 
     def _sort_values(self):
+        if self.values is None:
+            return
         if all(str(x).isdigit() for x in self.values):
             self.values = list(map(str, sorted(self.values, key=float)))
             return

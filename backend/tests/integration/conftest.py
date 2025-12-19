@@ -9,6 +9,8 @@ from typing import Any, Generator
 
 import httpx
 import pytest
+
+import forecastbox.config
 from forecastbox.config import FIABConfig
 from forecastbox.standalone.entrypoint import launch_all
 
@@ -26,7 +28,7 @@ class FakeModelRepository(SimpleHTTPRequestHandler):
             self.send_header("Transfer-Encoding", "chunked")
             chunk_size = 256
             chunks = 8
-            self.send_header("Content-Length", chunk_size * chunks)
+            self.send_header("Content-Length", str(chunk_size * chunks))
             self.end_headers()
             chunk = b"x" * chunk_size
             chunk_header = hex(len(chunk))[2:].encode("ascii")  # Get hex size of chunk, remove '0x'
@@ -71,6 +73,9 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         td = tempfile.TemporaryDirectory()
         os.environ["FIAB_ROOT"] = td.name
         (pathlib.Path(td.name) / "pylock.toml.timestamp").write_text("1761908420:d0.0.1")
+        # we need to monkeypath this, because of eager import this was already initialised
+        # to user's personal config file
+        forecastbox.config.fiab_home = pathlib.Path(td.name)
         config = FIABConfig()
         config.api.uvicorn_port = 30645
         config.cascade.cascade_url = "tcp://localhost:30644"
@@ -92,9 +97,12 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         if shutdown_event is not None:
             shutdown_event.set()
         if p is not None:
-            p.join(timeout=2)
+            p.join(timeout=3)
             if p.is_alive():
                 p.terminate()
+            p.join(timeout=3)
+            if p.is_alive():
+                p.kill()
         if handles is not None:
             handles.shutdown()
         if td is not None:

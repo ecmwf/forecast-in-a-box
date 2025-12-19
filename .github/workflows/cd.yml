@@ -13,6 +13,8 @@ on:
         required: false
         default: false
 
+# TODO integrate with https://github.com/googleapis/release-please
+
 jobs:
   # TODO add a prerequisite step `bigtest.yml` workflow, but make sure its reliable first
   deploy:

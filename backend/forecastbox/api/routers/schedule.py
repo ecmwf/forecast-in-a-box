@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException
+from typing_extensions import Self
+
 from forecastbox.api.execution import execute
 from forecastbox.api.routers.job import STATUS
 from forecastbox.api.scheduling.dt_utils import calculate_next_run, parse_crontab
@@ -42,7 +44,6 @@ from forecastbox.db.schedule import (
 from forecastbox.schemas.job import JobRecord
 from forecastbox.schemas.schedule import ScheduleDefinition, ScheduleRun
 from forecastbox.schemas.user import UserRead
-from typing_extensions import Self
 
 logger = logging.getLogger(__name__)
 
@@ -65,13 +66,13 @@ class GetScheduleRunResponse:
     @classmethod
     def from_db(cls, row: tuple[ScheduleRun, JobRecord]) -> Self:
         return cls(
-            schedule_run_id=row[0].schedule_run_id,
-            schedule_id=row[0].schedule_id,
-            job_id=row[0].job_id,
-            attempt_cnt=row[0].attempt_cnt,
+            schedule_run_id=row[0].schedule_run_id,  # ty: ignore[invalid-argument-type]
+            schedule_id=row[0].schedule_id,  # ty: ignore[invalid-argument-type]
+            job_id=row[0].job_id,  # ty: ignore[invalid-argument-type]
+            attempt_cnt=row[0].attempt_cnt,  # ty: ignore[invalid-argument-type]
             scheduled_at=str(row[0].scheduled_at),
-            trigger=row[0].trigger,
-            status=row[1].status if row[1] is not None else None,
+            trigger=row[0].trigger,  # ty: ignore[invalid-argument-type]
+            status=row[1].status if row[1] is not None else None,  # ty: ignore[invalid-argument-type]
         )
 
 
@@ -109,14 +110,14 @@ class GetScheduleResponse:
     @classmethod
     def from_db(cls, entity: ScheduleDefinition) -> Self:
         return cls(
-            schedule_id=entity.schedule_id,
-            cron_expr=entity.cron_expr,
+            schedule_id=entity.schedule_id,  # ty: ignore[invalid-argument-type]
+            cron_expr=entity.cron_expr,  # ty: ignore[invalid-argument-type]
             created_at=str(entity.created_at),
             updated_at=str(entity.updated_at),
-            exec_spec=entity.exec_spec,
-            dynamic_expr=entity.dynamic_expr,
-            enabled=entity.enabled,
-            created_by=entity.created_by,
+            exec_spec=entity.exec_spec,  # ty: ignore[invalid-argument-type]
+            dynamic_expr=entity.dynamic_expr,  # ty: ignore[invalid-argument-type]
+            enabled=entity.enabled,  # ty: ignore[invalid-argument-type]
+            created_by=entity.created_by,  # ty: ignore[invalid-argument-type]
         )
 
 
@@ -310,7 +311,7 @@ async def rerun_schedule(schedule_run_id: str, user: UserRead = Depends(current_
         raise HTTPException(status_code=404, detail=f"Failed to re-run {schedule_run_id} because of {runnable_schedule_either.e}")
     runnable_schedule = runnable_schedule_either.t
 
-    exec_result = await execute(runnable_schedule.exec_spec, user.user_id)
+    exec_result = await execute(runnable_schedule.exec_spec, user.user_id)  # type: ignore[unresolved-attribute] # user_id
     if exec_result.t is not None:
         logger.debug(f"Job {exec_result.t.id} submitted for schedule run {schedule_run_id}")
         return await insert_schedule_run(

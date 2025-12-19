@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 import orjson
 import pytest
+
 from forecastbox.api.scheduling.job_utils import deep_union, eval_dynamic_expression, schedule2runnable
 from forecastbox.api.types import ExecutionSpecification
 from forecastbox.schemas.schedule import ScheduleDefinition

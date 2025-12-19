@@ -22,6 +22,8 @@ from cascade.low.into import graph2job
 from earthkit.workflows import Cascade, fluent
 from earthkit.workflows.graph import Graph, deduplicate_nodes
 from fastapi import HTTPException
+from pydantic import BaseModel
+
 from forecastbox.api.types import EnvironmentSpecification, ExecutionSpecification, ForecastProducts, RawCascadeJob
 from forecastbox.api.utils import get_model_path
 from forecastbox.config import config
@@ -29,7 +31,6 @@ from forecastbox.db.job import insert_one
 from forecastbox.models import get_model
 from forecastbox.products.registry import get_product
 from forecastbox.schemas.user import UserRead
-from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +171,7 @@ async def execute(spec: ExecutionSpecification, user_id: str | None) -> Either[S
 
 async def execute2response(spec: ExecutionSpecification, user: UserRead | None) -> SubmitJobResponse:
     result = await execute(spec, str(user.id) if user is not None else None)
-    if result.e is not None:
+    if result.t is None:
         raise HTTPException(status_code=500, detail=f"Failed to execute because of {result.error}")
     else:
         return result.t

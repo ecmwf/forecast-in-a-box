@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 import httpx
 from cascade.low.func import assert_never
+
 from forecastbox.config import FIABConfig, StatusMessage
 from forecastbox.standalone.procs import ChildProcessGroup
 

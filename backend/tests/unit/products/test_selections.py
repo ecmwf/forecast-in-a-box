@@ -12,10 +12,11 @@ from pathlib import Path
 from typing import Sequence, cast
 
 import pytest
+from qubed import Qube
+
 from forecastbox.models import SpecifiedModel
 from forecastbox.models.globe import ControlMetadata, GlobalModel
 from forecastbox.products.product import GenericParamProduct, Product
-from qubed import Qube
 
 
 def create_test_product(axis: dict[str, Sequence[str]]) -> Product:
@@ -53,7 +54,7 @@ def create_test_model(axis: dict[str, Sequence[str]]) -> GlobalModel:
     class TestModel(GlobalModel):
         """Test model for testing purposes."""
 
-        def qube(self, assumptions) -> Qube:
+        def qube(self, assumptions) -> Qube:  # type: ignore
             assert assumptions == {}, "Model assumptions should be empty for this test"
             return Qube.from_datacube(axis)
 

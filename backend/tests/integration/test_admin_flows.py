@@ -1,4 +1,6 @@
-from forecastbox.api.routers.admin import GetReleaseStatusResponse
+import os
+
+from forecastbox.api.routers.admin import ConfigResponse, GetReleaseStatusResponse
 from forecastbox.api.updates import Release
 
 from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
@@ -8,6 +10,10 @@ def test_admin_flows(backend_client):
     # TODO this test is a bit flaky, because it must be executed first to ensure admin actually ending up admin
     # but then the impl itself is flaky
     # NOTE there is additionally dependence of test_model.py on this test
+
+    response = backend_client.get("/admin/uiConfig")
+    assert response.is_success
+    ConfigResponse(**response.json())
 
     # curl -XPOST -H 'Content-Type: application/json' -d '{"email": "admin@somewhere.org", "password": "something"}' localhost:8000/api/v1/auth/register
     headers = {"Content-Type": "application/json"}
@@ -34,12 +40,14 @@ def test_admin_flows(backend_client):
     assert response.json()["email"] == "admin@somewhere.org"
 
     # get release
-    response = backend_client.get("/admin/release")
-    assert response.is_success
-    release_status = GetReleaseStatusResponse(**response.json())
-    assert isinstance(release_status.local_release, Release)
-    assert isinstance(release_status.local_release_age_days, int)
-    assert isinstance(release_status.newest_available_release, Release)
+    if os.environ.get("CI_GITHUB_RATELIMIT", "no") != "yes":
+        # NOTE this endpoint can fail with rate limit exceeded => we best not test in full matrix
+        response = backend_client.get("/admin/release")
+        assert response.is_success
+        release_status = GetReleaseStatusResponse(**response.json())
+        assert isinstance(release_status.local_release, Release)
+        assert isinstance(release_status.local_release_age_days, int)
+        assert isinstance(release_status.newest_available_release, Release)
 
     # register
     headers = {"Content-Type": "application/json"}
