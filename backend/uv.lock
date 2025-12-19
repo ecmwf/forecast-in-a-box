@@ -7,6 +7,12 @@ resolution-markers = [
     "python_full_version < '3.12'",
 ]
 
+[manifest]
+members = [
+    "fiab-core",
+    "forecast-in-a-box",
+]
+
 [[package]]
 name = "adjusttext"
 version = "1.3.0"
@@ -1314,6 +1320,20 @@ wheels = [
 ]
 
 [[package]]
+name = "fiab-core"
+source = { editable = "packages/fiab-core" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "ty" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [{ name = "ty", specifier = "==0.0.2" }]
+
+[[package]]
 name = "filelock"
 version = "3.20.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1432,6 +1452,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "fastapi-users", extra = ["oauth"] },
     { name = "fastapi-users-db-sqlalchemy" },
+    { name = "fiab-core" },
     { name = "httpx" },
     { name = "httpx-oauth" },
     { name = "jinja2" },
@@ -1491,6 +1512,7 @@ requires-dist = [
     { name = "fastapi" },
     { name = "fastapi-users", extras = ["oauth"] },
     { name = "fastapi-users-db-sqlalchemy" },
+    { name = "fiab-core", editable = "packages/fiab-core" },
     { name = "forecast-in-a-box", extras = ["dev", "plots", "thermo"], marker = "extra == 'all'" },
     { name = "httpx", specifier = "<1" },
     { name = "httpx-oauth" },

@@ -63,6 +63,5 @@ __pycache__/
 venv
 .aider*
 
-backend/forecastbox/static
 **/_version.py
 backend/MANIFEST.in
