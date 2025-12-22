@@ -26,12 +26,14 @@ from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException
 
 import forecastbox.db
+from forecastbox.api.plugin import PluginsStatus, join_updater_thread, submit_load_plugins
+from forecastbox.api.plugin import status_brief as status_plugins
 from forecastbox.api.scheduling.scheduler_thread import start_scheduler, status_scheduler, stop_scheduler
 from forecastbox.api.updates import get_local_release
 from forecastbox.db.migrations import migrate
 from forecastbox.db.model import delete_download
 
-from .api.routers import admin, auth, execution, fable, gateway, job, model, product, schedule
+from .api.routers import admin, auth, execution, fable, gateway, job, model, plugin, product, schedule
 from .config import config
 
 logger = logging.getLogger(__name__)
@@ -52,10 +54,12 @@ async def lifespan(app: FastAPI):
     )  # to get rid of db entries left over from previous run.. consider switching to pid table column instead, to mark failed and allow retry?
     release_time, release_version = get_local_release()
     app.version = f"{release_version}@{release_time}"
+    submit_load_plugins()
     yield
     if config.api.allow_scheduler:
         stop_scheduler()
     await gateway.shutdown_processes()
+    join_updater_thread(timeout_sec=10)
 
 
 app = FastAPI(
@@ -79,6 +83,7 @@ app.include_router(auth.router, prefix="/api/v1")
 app.include_router(gateway.router, prefix="/api/v1/gateway")
 app.include_router(schedule.router, prefix="/api/v1/schedule")
 app.include_router(fable.router, prefix="/api/v1/fable")
+app.include_router(plugin.router, prefix="/api/v1/plugin")
 
 app.add_middleware(
     CORSMiddleware,  # type: ignore[invalid-argument-type]
@@ -123,6 +128,7 @@ class StatusResponse:
     ecmwf: str
     scheduler: str
     version: str
+    plugins: str
 
 
 @app.get("/api/v1/status", tags=["status"])
@@ -146,6 +152,12 @@ def status() -> StatusResponse:
     except Exception as e:
         logger.warning(f"Error discerning scheduler status: {repr(e)}")
         status["scheduler"] = "down"
+
+    try:
+        status["plugins"] = status_plugins()
+    except Exception as e:
+        logger.warning(f"Error discerning plugins status: {repr(e)}")
+        status["plugins"] = f"failure getting status"
 
     # Check connection to model_repository
     import requests

@@ -2,14 +2,16 @@ from collections import defaultdict
 from itertools import groupby
 
 from cascade.low.core import JobInstance
-
-from forecastbox.api.types import RawCascadeJob
-from forecastbox.api.types.fable import (
+from fiab_core.fable import (
     BlockConfigurationOption,
     BlockFactory,
     BlockFactoryCatalogue,
     BlockFactoryId,
     BlockKind,
+)
+
+from forecastbox.api.types import RawCascadeJob
+from forecastbox.api.types.fable import (
     FableBuilderV1,
     FableValidationExpansion,
 )

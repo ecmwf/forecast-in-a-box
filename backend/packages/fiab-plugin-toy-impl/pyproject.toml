@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 requires = [ "setuptools>=80", "setuptools-scm[toml]>=6.2" ]
 
 [project]
-name = "fiab-core"
-description = "Weather Forecast in a Box, core schemata and definitions"
+name = "fiab-plugin-toy-impl"
+description = "Weather Forecast in a Box, toy plugin implementation"
 readme = "README.md"
 license = "Apache-2.0"
 license-files = [ "LICENSE" ]
@@ -17,8 +17,9 @@ requires-python = ">=3.11"
 dynamic = [ "version" ]
 
 dependencies = [
-    "pydantic",
-    "earthkit-workflows", # NOTE technically we would need just cascade.low.core and some fluent.core, not the whole runtime -- possibly split down there as well
+    "earthkit-data>=0.18.2",
+    "earthkit>=0.13.2",
+    "xarray>=2025.11.0",
 ]
 
 [dependency-groups]
@@ -27,7 +28,7 @@ dev = [
 ]
 
 [tool.setuptools_scm]
-version_file = "src/fiab_core/_version.py"
+version_file = "src/fiab_plugin_toy_impl/_version.py"
 write_to_template = '''# Do not change! Do not track in version control!
 __version__ = "{version}"
 '''
