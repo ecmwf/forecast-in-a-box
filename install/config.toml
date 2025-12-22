@@ -1,2 +1,7 @@
+[product]
+[[product.plugins]]
+pip_source = "fiab_plugin_toy"
+module_name = "fiab_plugin_toy"
+
 [auth]
 passthrough = true

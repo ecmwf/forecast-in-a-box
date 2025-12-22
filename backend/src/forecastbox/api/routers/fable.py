@@ -25,7 +25,7 @@ from forecastbox.auth.users import current_active_user
 from forecastbox.schemas.user import UserRead
 
 router = APIRouter(
-    tags=["build"],
+    tags=["fable"],
     responses={404: {"description": "Not found"}},
 )
 
