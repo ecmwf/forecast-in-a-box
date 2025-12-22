@@ -11,6 +11,7 @@ import logging
 import os
 import urllib.parse
 from pathlib import Path
+from typing import Literal
 
 import toml
 from cascade.low.func import pydantic_recursive_collect
@@ -102,6 +103,20 @@ class GeneralSettings(BaseModel):
     standalone.entrypoint.launch_all module is used"""
 
 
+PluginRefreshStrategy = Literal["automatic", "manual"]
+
+
+class PluginSettings(BaseModel):
+    """A pip-installable plugin with an importible module"""
+
+    pip_source: str
+    """Name of the package if assuming PyPI, or a local path, git repo, ... Anything that pip accepts"""
+    module_name: str
+    """A string such that `importlib.import_module(module_name)` gives a module that has a `plugin` attribute of type fiab_core.plugin.Plugin`"""
+    update_strategy: PluginRefreshStrategy = "manual"
+    """Whether we should invoke `pip install --update <plugin>` on every launch, or let user handle that manually or via API"""
+
+
 class ProductSettings(BaseModel):
     pproc_schema_dir: str | None = None
     """Path to the directory containing the PPROC schema files."""
@@ -119,6 +134,8 @@ class ProductSettings(BaseModel):
 
     default_input_source: str = "opendata"
     """Default input source for models, if not specified otherwise"""
+
+    plugins: list[PluginSettings] = Field(default_factory=list)
 
     def validate_runtime(self) -> list[str]:
         if self.pproc_schema_dir and not os.path.isdir(self.pproc_schema_dir):
