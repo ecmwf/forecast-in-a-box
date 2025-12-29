@@ -1,6 +1,6 @@
 from collections import defaultdict
 from itertools import groupby
-from typing import cast
+from typing import Iterator, cast
 
 from cascade.low.builders import JobBuilder
 from cascade.low.core import JobInstance
@@ -9,6 +9,7 @@ from fiab_core.fable import (
     BlockFactory,
     BlockFactoryCatalogue,
     BlockFactoryId,
+    BlockInstanceId,
     BlockKind,
     PluginBlockFactoryId,
 )
@@ -25,6 +26,27 @@ Fundamental APIs of Forecast As BLock Expression (Fable)
 """
 
 
+def topological_order(fable: FableBuilderV1) -> Iterator[BlockInstanceId]:
+    remaining = {}
+    children = defaultdict(list)
+    queue = []
+    for blockId, blockInstance in fable.blocks.items():
+        l = len(blockInstance.input_ids)
+        if l == 0:
+            queue.append(blockId)
+        else:
+            remaining[blockId] = l
+        for parent in blockInstance.input_ids:
+            children[parent].append(blockId)
+    while queue:
+        head = queue.pop(0)
+        yield head
+        for child in children[head]:
+            remaining[child] -= 1
+            if remaining[child] == 0:
+                queue.append(child)
+
+
 def validate_expand(fable: FableBuilderV1) -> FableValidationExpansion:
     # TODO this will be repeatedly called -- we probably need to cache a lot here
 
@@ -38,7 +60,8 @@ def validate_expand(fable: FableBuilderV1) -> FableValidationExpansion:
     possible_expansions = {}
     block_errors = defaultdict(list)
     outputs = {}
-    for blockId, blockInstance in fable.blocks.items():
+    for blockId in topological_order(fable):
+        blockInstance = fable.blocks[blockId]
         # validate basic consistency
         plugin = plugins.get(blockInstance.factory_id.plugin, None)
         if not plugin:
@@ -59,7 +82,6 @@ def validate_expand(fable: FableBuilderV1) -> FableValidationExpansion:
         # validate config values can be deserialized
         # TODO -- some general purp deser
 
-        # TODO we need to ensure traversal in topological order !!!
         inputs = {input_id: outputs[source_id] for input_id, source_id in blockInstance.input_ids.items()}
         output_or_error = plugin.validator(blockInstance, inputs)
         if output_or_error.t is None:
@@ -88,8 +110,8 @@ def compile(fable: FableBuilderV1) -> RawCascadeJob:
     plugins = PluginManager.plugins  # TODO we are avoiding a lock here! See the TODO at api/plugin.py
     data_partition_lookup = {}
 
-    # TODO topological order!
-    for blockId, blockInstance in fable.blocks.items():
+    for blockId in topological_order(fable):
+        blockInstance = fable.blocks[blockId]
         plugin = plugins.get(blockInstance.factory_id.plugin, None)
         if not plugin:
             raise ValueError(f"plugin for {blockId=} not found")
