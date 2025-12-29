@@ -60,7 +60,7 @@ catalogue = BlockFactoryCatalogue(
 
 def validator(block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type: ignore[invalid-argument] # semigroup
     output: XarrayOutput
-    match block.block_factory_id:
+    match block.factory_id.factory:
         case "exampleSource" | "ekdSource":
             output = XarrayOutput(variables=["2t", "msl"], coords=["lat", "lon"])
         case "meanProduct":
@@ -84,7 +84,7 @@ def expander(block: BlockInstanceOutput) -> list[BlockFactoryId]:
 def compiler(
     jobBuilder: JobBuilder, partitions: DataPartitionLookup, block_id: BlockInstanceId, block: BlockInstance
 ) -> Either[tuple[JobBuilder, DataPartitionLookup], Error]:  # type: ignore[invalid-argument] # semigroup
-    match block.block_factory_id:
+    match block.factory_id.factory:
         case "exampleSource":
             task = TaskBuilder.from_entrypoint(
                 entrypoint="fiab_plugin_toy_impl.datasource.from_example",

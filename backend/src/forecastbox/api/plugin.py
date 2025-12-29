@@ -25,6 +25,11 @@ for status or when running the initial plugin load -- but inside the updater
 threads, we lock for long.
 """
 
+# NOTE this is not really healthy design, we lock too much just for the sake
+# of possible runtime updates which are dubious anyway.
+# Replace the Plugins dict lock with an atomic reference, and the dict itself
+# with a pyrsistent map or smth like that
+
 import importlib
 import importlib.metadata
 import logging
@@ -36,9 +41,11 @@ from types import ModuleType
 from typing import Iterator, Literal
 
 from cascade.low.func import assert_never
+from fiab_core.fable import BlockFactoryCatalogue
 from fiab_core.plugin import Plugin
 from pydantic import BaseModel
 
+from forecastbox.api.types.fable import PluginId
 from forecastbox.config import PluginSettings, config
 
 logger = logging.getLogger(__name__)
@@ -64,8 +71,8 @@ def _try_install(pip_source: str) -> None:
 
 class PluginManager:
     lock: threading.Lock = threading.Lock()
-    plugins: dict[str, Plugin] = {}
-    errors: dict[str, str] = {}
+    plugins: dict[PluginId, Plugin] = {}
+    errors: dict[PluginId, str] = {}
     updater: threading.Thread | None = None
     updater_error: str | None = None
 
@@ -190,6 +197,10 @@ def status_brief() -> str:
         return "ok"
 
 
+def plugins_ready() -> bool:
+    return status_brief() == "ok"
+
+
 def status_full() -> PluginsStatus:
     with timed_acquire(PluginManager.lock, 0.2) as result:
         if not result:
@@ -210,6 +221,14 @@ def status_full() -> PluginsStatus:
         plugin_errors=plugin_errors,
         plugin_versions=plugin_versions,
     )
+
+
+def catalogue_view() -> dict[PluginId, BlockFactoryCatalogue] | bool:
+    with timed_acquire(PluginManager.lock, 1.0) as result:
+        if not result:
+            return False
+        else:
+            return {plugin_id: plugin.catalogue for plugin_id, plugin in PluginManager.plugins.items()}
 
 
 def submit_update_single(plugin_name: str) -> str:

@@ -13,7 +13,7 @@ Types pertaining to Forecast As BLock Expression (Fable): blocks
 
 from typing import Literal
 
-from forecastbox.api.types.base import FIABBaseModel as BaseModel
+from pydantic import BaseModel
 
 
 class BlockConfigurationOption(BaseModel):
@@ -47,6 +47,12 @@ class BlockFactory(BaseModel):
 
 BlockFactoryId = str
 BlockInstanceId = str
+PluginId = str
+
+
+class PluginBlockFactoryId(BaseModel):
+    plugin: PluginId
+    factory: BlockFactoryId
 
 
 class BlockFactoryCatalogue(BaseModel):
@@ -56,7 +62,7 @@ class BlockFactoryCatalogue(BaseModel):
 class BlockInstance(BaseModel):
     """As produced by BlockFactory *by the client* -- basically the configuration/inputs values"""
 
-    block_factory_id: BlockFactoryId
+    factory_id: PluginBlockFactoryId
     configuration_values: dict[str, str]
     """Keys come frome factory's `configuration_options`, values are serialized actual configuration values"""
     input_ids: dict[str, BlockInstanceId]

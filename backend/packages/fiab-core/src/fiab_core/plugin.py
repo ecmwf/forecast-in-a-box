@@ -17,7 +17,15 @@ from typing import Callable
 from cascade.low.builders import JobBuilder
 from cascade.low.func import Either
 
-from fiab_core.fable import BlockFactoryCatalogue, BlockFactoryId, BlockInstance, BlockInstanceId, BlockInstanceOutput, DataPartitionLookup
+from fiab_core.fable import (
+    BlockFactoryCatalogue,
+    BlockFactoryId,
+    BlockInstance,
+    BlockInstanceId,
+    BlockInstanceOutput,
+    DataPartitionLookup,
+    PluginId,
+)
 
 Error = str
 Validator = Callable[[BlockInstance, dict[str, BlockInstanceOutput]], Either[BlockInstanceOutput, Error]]  # type:ignore[invalid-argument] # semigroup

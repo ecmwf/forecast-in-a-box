@@ -1,6 +1,8 @@
 from collections import defaultdict
 from itertools import groupby
+from typing import cast
 
+from cascade.low.builders import JobBuilder
 from cascade.low.core import JobInstance
 from fiab_core.fable import (
     BlockConfigurationOption,
@@ -8,8 +10,10 @@ from fiab_core.fable import (
     BlockFactoryCatalogue,
     BlockFactoryId,
     BlockKind,
+    PluginBlockFactoryId,
 )
 
+from forecastbox.api.plugin import PluginManager
 from forecastbox.api.types import RawCascadeJob
 from forecastbox.api.types.fable import (
     FableBuilderV1,
@@ -20,100 +24,30 @@ from forecastbox.api.types.fable import (
 Fundamental APIs of Forecast As BLock Expression (Fable)
 """
 
-# NOTE this will not be hardcoded like this, but partially hardcoded in submodules and extended by plugins
-catalogue = BlockFactoryCatalogue(
-    factories={
-        "model_forecast": BlockFactory(
-            kind="source",
-            title="Compute Model Forecast",
-            description="Download initial conditions, run model forecast",
-            configuration_options={
-                "model": BlockConfigurationOption(title="Model Name", description="Locally available checkpoint to run", value_type="str"),
-                "date": BlockConfigurationOption(
-                    title="Initial Conditions DateTime", description="DateTime of the initial conditions", value_type="datetime"
-                ),
-                "lead_time": BlockConfigurationOption(title="Lead Time", description="Lead Time of the forecast", value_type="int"),
-                "ensemble_members": BlockConfigurationOption(
-                    title="Ensemble Members", description="How many ensemble member to use", value_type="int"
-                ),
-            },
-            inputs=[],
-        ),
-        "mars_aifs_external": BlockFactory(
-            kind="source",
-            title="Download AIFS Forecast",
-            description="Download an existing published AIFS forecast from MARS",
-            configuration_options={
-                "date": BlockConfigurationOption(
-                    title="Initial Conditions DateTime", description="DateTime of the initial conditions", value_type="datetime"
-                ),
-                "lead_time": BlockConfigurationOption(title="Lead Time", description="Lead Time of the forecast", value_type="int"),
-            },
-            inputs=[],
-        ),
-        "product_123": BlockFactory(
-            kind="product",
-            title="Thingily-Dingily Index",
-            description="Calculate the Thingily-Dingily index",
-            configuration_options={
-                "variables": BlockConfigurationOption(
-                    title="Variables", description="Which variables (st, precip, cc, ...) to compute the index for", value_type="list[str]"
-                ),
-                "thingily-dingily-coefficient": BlockConfigurationOption(
-                    title="Thingily-Dingily Coefficient", description="Coefficient of the Thingily-Dingiliness", value_type="float"
-                ),
-            },
-            inputs=["forecast"],
-        ),
-        "product_456": BlockFactory(
-            kind="product",
-            title="Comparity-Romparity Ratio",
-            description="Estimate the Comparity-Romparity ratio between two forecasts",
-            configuration_options={},
-            inputs=[
-                "forecast1",
-                "forecast2",
-            ],  # NOTE this opens up an interesting question -- how to "tab-completion" with two inputs? My suggestion is to include this product as a possible completion to every source (as if it were a single-sourced product), but when the user clicks on it, the frontend recognizes "oh there are two inputs", and would give the user dialog with forecast1=the-block-user-clicked-on prefilled, and forecast2=(selection UI with every other block in the fable that had this product in its extension options). This will not work correctly if we have heterogeneous multiple inputs -- do we expect that? Like "compare model forecast to ground truth?"
-        ),
-        "store_local_fdb": BlockFactory(
-            kind="sink",
-            title="Local FDB persistence",
-            description="Store any grib data to local fdb",
-            configuration_options={
-                "fdb_key_prefix": BlockConfigurationOption(title="FDB prefix", description="Like /experiments/run123", value_type="str"),
-            },
-            inputs=["data"],
-        ),
-        "plot": BlockFactory(
-            kind="sink",
-            description="Visualize",
-            title="Visualize the result as a plot",
-            configuration_options={
-                "ekp_subcommand": BlockConfigurationOption(
-                    title="Earthkit-Plots Subcommond", description="Full subcommand as understood by earthkit-plots", value_type="str"
-                ),
-            },
-            inputs=["data"],
-        ),
-    }
-)
-
-blocksOfKind: dict[BlockKind, list[BlockFactoryId]] = {
-    kind: [afk for (afk, _) in it] for kind, it in groupby(catalogue.factories.items(), lambda afkv: afkv[1].kind)
-}
-
 
 def validate_expand(fable: FableBuilderV1) -> FableValidationExpansion:
-    possible_sources = blocksOfKind["source"]
+    # TODO this will be repeatedly called -- we probably need to cache a lot here
+
+    plugins = PluginManager.plugins  # TODO we are avoiding a lock here! See the TODO at api/plugin.py
+    possible_sources = [
+        PluginBlockFactoryId(plugin=plugin_id, factory=block_factory_id)
+        for plugin_id, plugin in plugins.items()
+        for block_factory_id, block_factory in plugin.catalogue.factories.items()
+        if block_factory.kind == "source" and not block_factory.inputs
+    ]
     possible_expansions = {}
     block_errors = defaultdict(list)
+    outputs = {}
     for blockId, blockInstance in fable.blocks.items():
         # validate basic consistency
-        if blockId not in catalogue:
+        plugin = plugins.get(blockInstance.factory_id.plugin, None)
+        if not plugin:
+            block_errors[blockId] += ["Plugin not found"]
+            continue
+        blockFactory = plugin.catalogue.factories.get(blockInstance.factory_id.factory, None)
+        if not blockFactory:
             block_errors[blockId] += ["BlockFactory not found in the catalogue"]
             continue
-        blockFactory = catalogue.factories[blockId]
-        # NOTE ty does not support walrus correctly yet
         extraConfig = blockInstance.configuration_values.keys() - blockFactory.configuration_options.keys()
         if extraConfig:
             block_errors[blockId] += ["Block contains extra config: {extraConfig}"]
@@ -125,15 +59,19 @@ def validate_expand(fable: FableBuilderV1) -> FableValidationExpansion:
         # validate config values can be deserialized
         # TODO -- some general purp deser
 
-        # validate config values are mutually consistent
-        # TODO -- block specific hook registration
+        # TODO we need to ensure traversal in topological order !!!
+        inputs = {input_id: outputs[source_id] for input_id, source_id in blockInstance.input_ids.items()}
+        output_or_error = plugin.validator(blockInstance, inputs)
+        if output_or_error.t is None:
+            block_errors[blockId] += cast(str, output_or_error.e)
+            continue
+        outputs[blockId] = output_or_error.t
 
-        # calculate fable expansions
-        # NOTE very simple now, simply source >> product >> sink. Eventually blocks would be able to decide on their own
-        if blockFactory.kind == "source":
-            possible_expansions[blockId] = blocksOfKind["product"]
-        elif blockFactory.kind == "product":
-            possible_expansions[blockId] = blocksOfKind["sink"]
+        possible_expansions[blockId] = [
+            PluginBlockFactoryId(plugin=any_plugin_id, factory=block_factory_id)
+            for any_plugin_id, any_plugin in plugins.items()
+            for block_factory_id in any_plugin.expander(output_or_error.t)
+        ]
 
     global_errors = []  # cant think of any rn
 
@@ -146,11 +84,27 @@ def validate_expand(fable: FableBuilderV1) -> FableValidationExpansion:
 
 
 def compile(fable: FableBuilderV1) -> RawCascadeJob:
+    builder = JobBuilder()
+    plugins = PluginManager.plugins  # TODO we are avoiding a lock here! See the TODO at api/plugin.py
+    data_partition_lookup = {}
+
+    # TODO topological order!
+    for blockId, blockInstance in fable.blocks.items():
+        plugin = plugins.get(blockInstance.factory_id.plugin, None)
+        if not plugin:
+            raise ValueError(f"plugin for {blockId=} not found")
+        result = plugin.compiler(builder, data_partition_lookup, blockId, blockInstance)
+        if result.t is None:
+            raise ValueError(f"compile failed at {blockId=} with {result.e}")
+        builder, data_partition_lookup = result.t
+
+    result = builder.build()
+    if result.t is None:
+        error = ";".join(cast(list[str], result.e))
+        raise ValueError(f"final compilation failed with {error}")
+
     # TODO instead something very much like api.execution.forecast_products_to_cascade
-    return RawCascadeJob(
-        job_type="raw_cascade_job",
-        job_instance=JobInstance(tasks={}, edges=[]),
-    )
+    return RawCascadeJob(job_type="raw_cascade_job", job_instance=result.t)
 
 
 """

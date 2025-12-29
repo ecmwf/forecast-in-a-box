@@ -17,8 +17,9 @@ from fastapi import APIRouter, Depends, status
 from fastapi.exceptions import HTTPException
 from fiab_core.fable import BlockFactoryCatalogue
 
-import forecastbox.api.fable as example
+import forecastbox.api.fable as api_fable
 import forecastbox.db.fable as db_fable
+from forecastbox.api.plugin import PluginId, catalogue_view, plugins_ready
 from forecastbox.api.types import RawCascadeJob
 from forecastbox.api.types.fable import FableBuilderV1, FableValidationExpansion
 from forecastbox.auth.users import current_active_user
@@ -32,9 +33,16 @@ router = APIRouter(
 
 # Endpoints
 @router.get("/catalogue")
-def get_catalogue() -> BlockFactoryCatalogue:
+def get_catalogue() -> dict[PluginId, BlockFactoryCatalogue]:
     """All blocks this backend is capable of evaluating within a fable"""
-    return example.catalogue
+    if not plugins_ready():
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Plugins not ready")
+    else:
+        catalogue = catalogue_view()
+        if isinstance(catalogue, bool):
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Plugins not ready")
+        else:
+            return catalogue
 
 
 @router.get("/expand")
@@ -42,7 +50,7 @@ def expand_fable(fable: FableBuilderV1) -> FableValidationExpansion:
     """Given a partially constructed fable, return whether there are any validation errors,
     and what are further completion/expansion options. Note that presence of validation
     errors does not affect return code, ie its still 200 OK"""
-    return example.validate_expand(fable)
+    return api_fable.validate_expand(fable)
 
 
 @router.get("/compile")
@@ -50,7 +58,7 @@ def compile_fable(fable: FableBuilderV1) -> RawCascadeJob:
     """Converts to a raw cascade job, which can then be used in a ExecutionSpecification
     in the /execution router's methods. Assumes the fable is valid, and throws a 4xx
     otherwise"""
-    return example.compile(fable)
+    return api_fable.compile(fable)
 
 
 @router.get("/retrieve")

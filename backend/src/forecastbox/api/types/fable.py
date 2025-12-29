@@ -11,7 +11,8 @@
 Types pertaining to Forecast As BLock Expression (Fable): builders and top-level API
 """
 
-from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId
+from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId, PluginBlockFactoryId
+from fiab_core.plugin import PluginId
 from pydantic import BaseModel
 
 
@@ -24,5 +25,5 @@ class FableValidationExpansion(BaseModel):
 
     global_errors: list[str]
     block_errors: dict[BlockInstanceId, list[str]]
-    possible_sources: list[BlockFactoryId]
-    possible_expansions: dict[BlockInstanceId, list[BlockFactoryId]]
+    possible_sources: list[PluginBlockFactoryId]
+    possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]]
