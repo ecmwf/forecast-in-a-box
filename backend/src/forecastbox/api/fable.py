@@ -1,3 +1,17 @@
+# (C) Copyright 2024- ECMWF.
+#
+# This software is licensed under the terms of the Apache Licence Version 2.0
+# which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# In applying this licence, ECMWF does not waive the privileges and immunities
+# granted to it by virtue of its status as an intergovernmental organisation
+# nor does it submit to any jurisdiction.
+
+"""
+Fundamental APIs of Forecast As BLock Expression (Fable)
+"""
+
+import logging
 from collections import defaultdict
 from itertools import groupby
 from typing import Iterator, cast
@@ -21,9 +35,7 @@ from forecastbox.api.types.fable import (
     FableValidationExpansion,
 )
 
-"""
-Fundamental APIs of Forecast As BLock Expression (Fable)
-"""
+logger = logging.getLogger(__name__)
 
 
 def topological_order(fable: FableBuilderV1) -> Iterator[BlockInstanceId]:
@@ -36,7 +48,7 @@ def topological_order(fable: FableBuilderV1) -> Iterator[BlockInstanceId]:
             queue.append(blockId)
         else:
             remaining[blockId] = l
-        for parent in blockInstance.input_ids:
+        for parent in blockInstance.input_ids.values():
             children[parent].append(blockId)
     while queue:
         head = queue.pop(0)

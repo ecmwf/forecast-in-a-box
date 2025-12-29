@@ -98,7 +98,7 @@ def load_single(plugin: PluginSettings) -> Plugin | str:
     elif not isinstance(getattr(plugin_impl, "plugin"), Plugin):
         errors.append(f"plugin {plugin.module_name}'s `plugin` is not a Plugin")
     else:
-        return plugin_impl.getattr("plugin")
+        return getattr(plugin_impl, "plugin")
     return "\n".join(errors)
 
 
@@ -134,6 +134,7 @@ def load_plugins(plugins: list[PluginSettings]) -> None:
                 raise ValueError("failed to acquire the shared lock")
             PluginManager.plugins = lookup
             PluginManager.errors = errors
+        logger.debug("global plugin loading finished")
     except Exception as e:
         logger.exception(f"updating thread failed with {repr(e)}")
         with timed_acquire(PluginManager.lock, 5) as _:
@@ -161,6 +162,7 @@ def update_single(plugin: PluginSettings) -> None:
                 PluginManager.errors[plugin.module_name] = result
             else:
                 assert_never(result)
+        logger.debug("single plugin loading finished: {plugin.module_name}")
     except Exception as e:
         logger.exception(f"updating thread failed with {repr(e)}")
         with timed_acquire(PluginManager.lock, 5) as _:
@@ -191,7 +193,7 @@ def status_brief() -> str:
     # NOTE this may be called without locking, we don't risk collection mutation during iteration
     if PluginManager.updater_error is not None:
         return f"failure: {PluginManager.updater_error}"
-    elif PluginManager.updater is not None:
+    elif PluginManager.updater.is_alive():
         return "running"
     else:
         return "ok"

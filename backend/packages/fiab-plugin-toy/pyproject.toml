@@ -24,7 +24,7 @@ dev = [
 ]
 
 [tool.setuptools_scm]
-version_file = "src/fiab_core/_version.py"
+version_file = "src/fiab_plugin_toy/_version.py"
 write_to_template = '''# Do not change! Do not track in version control!
 __version__ = "{version}"
 '''

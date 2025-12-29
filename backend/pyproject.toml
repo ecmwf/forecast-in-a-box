@@ -76,6 +76,8 @@ dev = [
   "pytest-xdist>=3.8",
   "ty==0.0.2",
   "prek",
+  "fiab-plugin-toy", # TODO remove after first publish
+  "fiab-plugin-toy-impl", # TODO remove after first publish
 ]
 
 [tool.setuptools_scm]
@@ -108,17 +110,19 @@ filterwarnings = [
 [tool.mypy]
 plugins = "pydantic.mypy"
 
-# TODO remove once released
 
 [tool.uv.sources]
+# TODO remove pproc and ekw-pproc once released
 pproc = { git = "https://github.com/ecmwf/pproc" }
 earthkit-workflows-pproc = { git = "https://github.com/ecmwf/earthkit-workflows-pproc" }
 fiab-core = {workspace = true}
+fiab-plugin-toy = {workspace = true}
+fiab-plugin-toy-impl = {workspace = true}
 
 [tool.uv.workspace]
 members = [
     "packages/fiab-core",
-    "packages/fiab-core/fiab-plugin-toy",
+    "packages/fiab-plugin-toy",
     "packages/fiab-plugin-toy-impl",
 ]
 
