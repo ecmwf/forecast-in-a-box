@@ -316,7 +316,7 @@ async def get_job_availability(job_id: JobId = Depends(validate_job_id), user: U
     Returns
     -------
     list[TaskId]
-        List of dataset IDs that are available for the job.
+        List of TaskIds that have an available output within this job.
     """
     response = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}")
     response = cast(api.JobProgressResponse, response)
@@ -334,6 +334,7 @@ async def get_result_availability(
     user: UserRead = Depends(current_active_user),
 ) -> DatasetAvailabilityResponse:
     """Check if the result is available for a given job_id and dataset_id.
+    *DEPRECATED* use `get_job_availability` -- this one may malfunction for long or slashy or proxyed dataset_ids
 
     This is used to check if the result is available for download.
 
@@ -342,7 +343,8 @@ async def get_result_availability(
     job_id : str
         Job ID of the task
     dataset_id : str
-        Dataset ID of the task
+        Dataset Id of the task
+        NOTE -- the param is TaskId, and we check if any of the actual DatasetIds corresponds to that task
     user: UserRead | None
         The current active user, if any.
 
@@ -425,7 +427,7 @@ async def get_logs(job_id: JobId = Depends(validate_job_id), user: UserRead = De
         )
 
 
-@router.get("/{job_id}/results/{dataset_id}")
+@router.get("/{job_id}/results")
 async def get_result(
     job_id: JobId = Depends(validate_job_id),
     dataset_id: TaskId = Depends(validate_dataset_id),
@@ -438,7 +440,8 @@ async def get_result(
     job_id : JobId
         Job ID of the task, expected to be the id in the database, not the cascade job id.
     dataset_id : TaskId
-        Dataset ID of the task, these can be found from /{job_id}/outputs.
+        Dataset Id of the task, these can be found from /{job_id}/outputs.
+        NOTE -- the param is TaskId, the actual DatasetId is formed by appending "0"
     user: UserRead | None
         The current active user, if any.
 
@@ -468,6 +471,19 @@ async def get_result(
         raise HTTPException(500, f"Result decoding failed: {repr(e)}")
 
     return Response(bytez, media_type=media_type)
+
+
+@router.get("/{job_id}/results/{dataset_id}")
+async def get_result_old(
+    job_id: JobId = Depends(validate_job_id),
+    dataset_id: TaskId = Depends(validate_dataset_id),
+    user: UserRead = Depends(current_active_user),
+) -> Response:
+    """Get the result of a job.
+    **Deprecated**: dataset_id may contain slashes, be too long, thwarted by proxy... Use `get_results` instead
+    """
+
+    return await get_result(job_id, dataset_id, user)
 
 
 @dataclass
