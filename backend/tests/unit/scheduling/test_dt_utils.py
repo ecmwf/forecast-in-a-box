@@ -99,3 +99,10 @@ def test_next_run_list_value():
     cron_tab = "0 10,12 * * *"
     expected = datetime(2025, 10, 20, 12, 0, 0)
     assert calculate_next_run(after, cron_tab) == expected
+
+
+def test_next_run_endofyear():
+    after = datetime(2025, 12, 31, 23, 00)
+    cron_tab = "0 0 * * *"
+    expected = datetime(2026, 1, 1, 0, 0, 0)
+    assert calculate_next_run(after, cron_tab) == expected
