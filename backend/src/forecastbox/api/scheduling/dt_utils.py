@@ -88,7 +88,7 @@ def calculate_next_run(after: datetime, crontab: str) -> datetime:
 
     # TODO naive search, optimize!
     current_time = after + timedelta(minutes=1)
-    for year in range(current_time.year, current_time.year + 1):
+    for year in (current_time.year, current_time.year + 1):
         for month in crontab_values.months:
             if month < current_time.month and year == current_time.year:
                 continue
@@ -106,7 +106,7 @@ def calculate_next_run(after: datetime, crontab: str) -> datetime:
                         candidate_run = datetime(year, month, day_of_month, hour, minute)
                         if candidate_run > after:
                             return candidate_run
-    raise ValueError("cron next run failure")
+    raise ValueError(f"cron next run failure for {after} and {crontab}")
 
 
 def parse_crontab(crontab: str) -> Crontab:
