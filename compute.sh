@@ -1,1 +1,0 @@
-ecinteractive -t 08:00:00 -m 32 -c 16 -f 8067 -f 8000 -s 100 -g
