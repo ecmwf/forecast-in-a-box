@@ -6,13 +6,19 @@ import pytest
 from forecastbox.api.scheduling.dt_utils import calculate_next_run, parse_crontab
 
 
-def test_parse_crontab_valid():
-    parse_crontab("0 0 * * *")
-    parse_crontab("*/15 * * * *")
-    parse_crontab("1,5,10-12 * * * *")
-    parse_crontab("0 0 1 * *")
-    parse_crontab("0 0 * 1 *")
-    parse_crontab("0 0 * * 0")
+def test_parse_crontab_valid(subtests):
+    valid_tabs = [
+        "0 0 * * *",
+        "*/15 * * * *",
+        "1,5,10-12 * * * *",
+        "0 0 1 * *",
+        "0 0 * 1 *",
+        "0 0 * * 0",
+    ]
+
+    for tab in valid_tabs:
+        with subtests.test(msg=f"Valid tab {tab}"):
+            parse_crontab(tab)
 
 
 def test_parse_crontab_invalid():
