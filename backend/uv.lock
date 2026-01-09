@@ -12,6 +12,7 @@ members = [
     "fiab-core",
     "fiab-plugin-toy",
     "fiab-plugin-toy-impl",
+    "fiab-plugin-toy2",
     "forecast-in-a-box",
 ]
 
@@ -1563,6 +1564,33 @@ requires-dist = [
 dev = [{ name = "ty", specifier = "==0.0.2" }]
 
 [[package]]
+name = "fiab-plugin-toy2"
+source = { editable = "packages/fiab-plugin-toy2" }
+
+[package.optional-dependencies]
+runtime = [
+    { name = "earthkit" },
+    { name = "earthkit-data" },
+    { name = "xarray" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "ty" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "earthkit", marker = "extra == 'runtime'", specifier = ">=0.13.2" },
+    { name = "earthkit-data", marker = "extra == 'runtime'", specifier = ">=0.18.2" },
+    { name = "xarray", marker = "extra == 'runtime'", specifier = ">=2025.11.0" },
+]
+provides-extras = ["runtime"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "ty", specifier = "==0.0.2" }]
+
+[[package]]
 name = "filelock"
 version = "3.20.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1720,6 +1748,7 @@ webmars = [
 dev = [
     { name = "fiab-plugin-toy" },
     { name = "fiab-plugin-toy-impl" },
+    { name = "fiab-plugin-toy2", extra = ["runtime"] },
     { name = "prek" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -1770,6 +1799,7 @@ provides-extras = ["all", "plots", "thermo", "webmars"]
 dev = [
     { name = "fiab-plugin-toy", editable = "packages/fiab-plugin-toy" },
     { name = "fiab-plugin-toy-impl", editable = "packages/fiab-plugin-toy-impl" },
+    { name = "fiab-plugin-toy2", extras = ["runtime"], editable = "packages/fiab-plugin-toy2" },
     { name = "prek" },
     { name = "pytest" },
     { name = "pytest-asyncio" },

@@ -94,12 +94,12 @@ def compiler(
     jobBuilder: JobBuilder, partitions: DataPartitionLookup, block_id: BlockInstanceId, block: BlockInstance
 ) -> Either[tuple[JobBuilder, DataPartitionLookup], Error]:  # type: ignore[invalid-argument] # semigroup
     # NOTE this is commented out since the plugin is not actually published, but instead installed via the `dev` group
-    # environment = ["fiab-plugin-toy-impl"]
+    # environment = ["fiab-plugin-toy2[runtime]"]
     environment = []
     match block.factory_id.factory:
         case "exampleSource":
             task = TaskBuilder.from_entrypoint(
-                entrypoint="fiab_plugin_toy_impl.datasource.from_example",
+                entrypoint="fiab_plugin_toy2.runtime.datasource.from_example",
                 input_schema={},
                 output_class="xarray.Dataset",
                 environment=environment,
@@ -115,7 +115,7 @@ def compiler(
                 "date": block.configuration_values["date"],
             }
             task = TaskBuilder.from_entrypoint(
-                entrypoint="fiab_plugin_toy_impl.datasource.from_source",
+                entrypoint="fiab_plugin_toy2.runtime.datasource.from_source",
                 input_schema={
                     "source": "str",
                     "request_params_json": "str",
@@ -135,7 +135,7 @@ def compiler(
                 return Either.error("meanProduct supports only trivial partitioning, gotten {pc}")
             input_task_id = list(input_task_partitions.values())[0]
             taskSelect = TaskBuilder.from_entrypoint(
-                entrypoint="fiab_plugin_toy_impl.product.select",
+                entrypoint="fiab_plugin_toy2.runtime.product.select",
                 input_schema={
                     "dataset": "xarray.Dataset",
                     "variable": "str",
@@ -144,7 +144,7 @@ def compiler(
                 environment=environment,
             ).with_values(variable=block.configuration_values["variable"])
             taskCalculate = TaskBuilder.from_entrypoint(
-                entrypoint="fiab_plugin_toy_impl.product.mean",
+                entrypoint="fiab_plugin_toy2.runtime.product.mean",
                 input_schema={"array": "xarray.DataArray"},
                 output_class="xarray.Dataset",
                 environment=environment,

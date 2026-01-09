@@ -141,7 +141,8 @@ def compile(fable: FableBuilderV1) -> RawCascadeJob:
 
 
 """
-Further *frontend* extension requirements (only as a comment to keep the first PR reasonably sized)
+TODO move this elsewhere
+Further *frontend* extension requirements
     - localization support -- presumably the /catalogue endpoint will allow lang parameter and lookup translation strings
     - rich typing on the BlockConfigurationOptions, in particular we want:
       enum-fixed[1, 2, 3] -- so that frontend can show like radio
@@ -170,4 +171,9 @@ Further *plugin* discussion questions
     - parity between the plugin catalogues and runtimes -- a plugin catalogue operates with signatures of functions from runtime,
       when declaring configuration options, compiling task graphs, etc. How do we ensure that this signature matches the actual
       signature? Roughly three options: 1/ hope 2/ automated parity testing 3/ actually generate parts of the catalogue with eg tracing
+
+Further automation questions:
+    - CD for plugins -- do we want the same release triggers/pace? Or finegrain tags?
+    - integration test for plugins (there is a helper file already but its rather raw)
+    - existing plugins lookup as a static file + UI/UX for plugin installation
 """

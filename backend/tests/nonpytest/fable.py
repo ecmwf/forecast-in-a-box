@@ -20,16 +20,16 @@ r.json()
 
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId
 
-source = BlockInstance(
-    factory_id=PluginBlockFactoryId(plugin="fiab_plugin_toy", factory="exampleSource"), configuration_values={}, input_ids={}
-)
+pluginId = "fiab_plugin_toy2"
+
+source = BlockInstance(factory_id=PluginBlockFactoryId(plugin=pluginId, factory="exampleSource"), configuration_values={}, input_ids={})
 builder = FableBuilderV1(blocks={"source1": source})
 r = client.request(url="api/v1/fable/expand", method="get", json=builder.model_dump())
 r.json()
 # {'global_errors': [], 'block_errors': {}, 'possible_sources': [{'plugin': 'fiab_plugin_toy', 'factory': 'exampleSource'}, {'plugin': 'fiab_plugin_toy', 'factory': 'ekdSource'}], 'possible_expansions': {'source1': [{'plugin': 'fiab_plugin_toy', 'factory': 'meanProduct'}]}}
 
 product = BlockInstance(
-    factory_id=PluginBlockFactoryId(plugin="fiab_plugin_toy", factory="meanProduct"),
+    factory_id=PluginBlockFactoryId(plugin=pluginId, factory="meanProduct"),
     configuration_values={"variable": "2t"},
     input_ids={"dataset": "source1"},
 )
