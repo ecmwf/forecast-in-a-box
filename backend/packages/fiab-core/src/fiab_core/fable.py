@@ -30,7 +30,7 @@ BlockKind = Literal["source", "transform", "product", "sink"]
 
 
 class BlockFactory(BaseModel):
-    """When building a fable, user selects from an avaliable catalogue of BlockFactories which
+    """When building a fable, user selects from an available catalogue of BlockFactories which
     have description of what they do and specification of configuration options they offer"""
 
     kind: BlockKind
