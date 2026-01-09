@@ -71,7 +71,8 @@ urls."Source code" = "https://github.com/ecmwf/forecast-in-a-box"
 
 [dependency-groups]
 dev = [
-  "pytest>=9.0",
+  "pytest",
+  "pytest-subtests", # TODO replace with pytest>=0 once the pygribjump issue fixed
   "pytest-asyncio",
   "pytest-xdist>=3.8",
   "ty==0.0.2",
