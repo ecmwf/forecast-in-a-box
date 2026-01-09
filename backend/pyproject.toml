@@ -79,6 +79,7 @@ dev = [
   "prek",
   "fiab-plugin-toy", # TODO remove after first publish
   "fiab-plugin-toy-impl", # TODO remove after first publish
+  "fiab-plugin-toy2[runtime]", # TODO remove after first publish
 ]
 
 [tool.setuptools_scm]
@@ -119,12 +120,14 @@ earthkit-workflows-pproc = { git = "https://github.com/ecmwf/earthkit-workflows-
 fiab-core = {workspace = true}
 fiab-plugin-toy = {workspace = true}
 fiab-plugin-toy-impl = {workspace = true}
+fiab-plugin-toy2 = {workspace = true}
 
 [tool.uv.workspace]
 members = [
     "packages/fiab-core",
     "packages/fiab-plugin-toy",
     "packages/fiab-plugin-toy-impl",
+    "packages/fiab-plugin-toy2",
 ]
 
 [tool.ty.rules]
