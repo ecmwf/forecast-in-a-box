@@ -40,7 +40,9 @@ async def get_fable_builder(fable_builder_id: str) -> Optional[FableBuilderV1]:
     return None
 
 
-async def upsert_fable_builder(builder: FableBuilderV1, fable_builder_id: Optional[str], tags: list[str], created_by_user: str) -> str:
+async def upsert_fable_builder(
+    builder: FableBuilderV1, fable_builder_id: Optional[str], tags: list[str], created_by_user: str | None
+) -> str:
     ref_time = dt.datetime.now()
     returned_id: str
 
