@@ -26,7 +26,7 @@ dynamic = [ "version" ]
 dependencies = [
   "aiosqlite",
   "anemoi-inference==0.8.3",
-  "anemoi-plugins-ecmwf-inference[opendata,polytope]>=0.1.17",
+  "anemoi-plugins-ecmwf-inference[opendata,polytope]>=0.1.20",
   "anemoi-utils>=0.4.36",
   "apscheduler",
   "cloudpickle",
