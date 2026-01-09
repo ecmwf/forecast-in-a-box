@@ -137,7 +137,6 @@ def compile(fable: FableBuilderV1) -> RawCascadeJob:
         error = ";".join(cast(list[str], result.e))
         raise ValueError(f"final compilation failed with {error}")
 
-    # TODO instead something very much like api.execution.forecast_products_to_cascade
     return RawCascadeJob(job_type="raw_cascade_job", job_instance=result.t)
 
 
@@ -153,16 +152,22 @@ Further *frontend* extension requirements (only as a comment to keep the first P
       we want to set overriddable defaults on any level, like "start with location: malawi for any model"
       => this would require endpoint "storeBlockConfig", keyed by blockId and optionally any number of option keyvalues, and soft/hard bool
       => if keyed only by blockId, we can make do with existing interface; for the multikeyed we need to extend the BlockConfigurationOption
-    - fable builder persistence -- we want a new endpoint that allows storing fable builder instances, for like favorites, quickstarts, work interrupts, etc
-      we dont want to force the user to go through the from-scratch building every time -- there will be multiple stories/endpoints on top of
-      the persist/load, providing a simplified path, though possibly with the option to "fully customize" that would expose the builder+/expand
+    - dynamic configuration restrictions: imagine a Product allows for variables v1 v2 v3, and is being connected to a BlockInstanceOutput
+      which provides v1 v2. Then we obviously want to offer to the user only v1 v2. This needs to be handled by extending the `extend`
+      method in the plugins
 
 Further *backend* discussion questions
-    - do we treat the compilation as "source-product-sink" single line and then deduplicate, or do we instead compile the dag at once?
-      the dag approach has better support for multi-input products, the deduplicate is more in line with the current codebase
     - do we compile to fluent at every /expand's validate, or do we validate at a higher level only during these steps, with
       fluent validation happening only during /compile? Advantage of frequent compilation is eg less code duplication, disadvantage
       is more pressure on compilation speed and a challenge to lift fluent errors to ui errors
-    - what protocol would a "catalogue entry" be required, and how do we capture it? It has 4 concerns, BlockFactory, BlockInstance
-      validation, BlockInstance expansion, and compiling into fluent
+    - does the compile endpoint return RawCascadeJob, ie, after fluent2cascade compilation, or do we instead return some fluent object?
+      The latter has the advantage of being smaller, and subsequent higher level operations on it will be easier
+
+Further *plugin* discussion questions
+    - vocabulary/rich objects for BlockInstanceOutput: we want to drop the current "xarray" object, and replace with a union of
+      some image concept and a proper earthkit-dataset representation, including qubed as well as unified vocabulary for variables,
+      possibly also gridspec
+    - parity between the plugin catalogues and runtimes -- a plugin catalogue operates with signatures of functions from runtime,
+      when declaring configuration options, compiling task graphs, etc. How do we ensure that this signature matches the actual
+      signature? Roughly three options: 1/ hope 2/ automated parity testing 3/ actually generate parts of the catalogue with eg tracing
 """
