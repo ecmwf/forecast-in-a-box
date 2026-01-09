@@ -72,11 +72,14 @@ async def get_fable_builder(fable_builder_id: str) -> FableBuilderV1:
 
 @router.post("/upsert")
 async def upsert_fable_builder(
-    builder: FableBuilderV1, fable_builder_id: Optional[str] = None, tags: list[str] = [], user: UserRead = Depends(current_active_user)
+    builder: FableBuilderV1,
+    fable_builder_id: Optional[str] = None,
+    tags: list[str] = [],
+    user: UserRead | None = Depends(current_active_user),
 ) -> str:
     """Create or update a FableBuilderV1."""
     try:
-        return await db_fable.upsert_fable_builder(builder, fable_builder_id, tags, str(user.id))
+        return await db_fable.upsert_fable_builder(builder, fable_builder_id, tags, str(user.id) if user is not None else None)
     except KeyError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except PermissionError as e:
