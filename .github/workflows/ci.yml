@@ -5,11 +5,17 @@ on:
   push:
     branches:
       - 'main'
+    paths:
+      - 'backend/**'
+      - 'frontend-v2/**'
     tags-ignore:
       - '**'
 
   # Trigger the workflow on pull request
-  pull_request: ~
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'frontend-v2/**'
 
   # Trigger the workflow manually
   workflow_dispatch: ~
