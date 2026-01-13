@@ -16,14 +16,28 @@ A static file on github, in this repo's install/ folder -- which already hosts s
 * plugin author
 
 ### Backend API changes
-* add a get pluginStore() endpoint which pulls the plugin store data (in a cached manner -> there will be optional forceRefresh param) and returns the list of plugin metadata as above + possibly status if installed (version, install date?, possible import error)
-* add an post install(plugin_id) endpoint which just installs (or updates if already installed)
-* add an post uninstall(plugin_id) endpoint which just uninstall
+* config has a new element `[pluginStoreUrl]`, coming with a default url of ecmwf plugin store, and can be changed -- but this is not exposed via backend API
+* add a get pluginData endpoint which pulls the plugin store data from each configured store (in a cached manner -> there will be optional forceRefresh param) and returns a merged list of plugin metadata:
+  - plugin id
+  - from store
+    - plugin display name, plugin display description, plugin id
+    - plugin store id & name
+    - plugin author
+  - from pypi
+    - plugin most recent version & release date (_note_: i will need to check if those data are reasonably accessible -- we don't control this)
+  - from installation (if installed)
+    - plugin version, plugin install time, plugin status (disabled/error/imported) 
+    - _note_: plugin id can be used to look up in the fable catalog to see which blockFactories are corresponding to that plugin
+* add a post install(pluginId, targetVersion: optional|latest) endpoint which just installs, or updates if already installed
+* add a post uninstall(pluginId) endpoint which just uninstalls
+* add a post setStatus(pluginId, enabled: bool)
 
 ### Backend new areas of concern
 * add manipulation of the config file (to persist the install/uninstall commands)
-* add github file fetch
-* add metadata file
+* add plugin store config section
+* add plugin store file fetch from github
+* investigate how to derive the install time etc
+* support the setStatus
 * ...
 
 ### Tooling/CI
