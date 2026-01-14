@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import httpx
 import orjson
@@ -7,8 +7,7 @@ import pytest
 from forecastbox.api.plugin.store import PluginStore, PluginStoreConfig, PluginStoreEntry
 
 
-@pytest.mark.asyncio
-async def test_fetch(mocker):
+def test_fetch():
     fake_store = PluginStore(
         display_name="ecmwf",
         plugins={
@@ -31,9 +30,9 @@ async def test_fetch(mocker):
         request=mock_request,
     )
 
-    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mocked_get:
+    with patch("httpx.Client.get") as mocked_get:
         mocked_get.return_value = mock_response
-        async with httpx.AsyncClient() as client:
-            result = await PluginStore.fetch(client, store_config)
+        with httpx.Client() as client:
+            result = PluginStore.fetch(client, store_config)
 
     assert result == fake_store

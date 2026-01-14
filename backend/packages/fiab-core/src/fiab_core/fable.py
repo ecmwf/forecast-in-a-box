@@ -13,7 +13,8 @@ Types pertaining to Forecast As BLock Expression (Fable): blocks
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+from typing_extensions import Self
 
 
 class BlockConfigurationOption(BaseModel):
@@ -48,10 +49,28 @@ class BlockFactory(BaseModel):
 BlockFactoryId = str
 BlockInstanceId = str
 PluginId = str
+PluginStoreId = str
+
+
+class PluginCompositeId(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    store: PluginStoreId
+    local: PluginId
+
+    @classmethod
+    def from_str(cls, v) -> "PluginCompositeId":
+        if not ":" in v:
+            raise ValueError("must be of the form store:local")
+        store, local = v.split(":", 1)
+        return cls(store=store, local=local)
+
+    @staticmethod
+    def to_str(k: Self) -> str:
+        return f"{k.store}:{k.local}"
 
 
 class PluginBlockFactoryId(BaseModel):
-    plugin: PluginId
+    plugin: PluginCompositeId
     factory: BlockFactoryId
 
 

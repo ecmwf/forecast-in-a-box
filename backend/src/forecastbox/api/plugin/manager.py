@@ -45,7 +45,7 @@ from fiab_core.plugin import Plugin
 from pydantic import BaseModel
 
 from forecastbox.api.ecpyutil import timed_acquire
-from forecastbox.api.types.fable import PluginId
+from forecastbox.api.types.fable import PluginCompositeId
 from forecastbox.config import PluginSettings, PluginsSettings, config
 
 logger = logging.getLogger(__name__)
@@ -56,6 +56,14 @@ def _try_import(module_name: str) -> ModuleType | None:
         return importlib.import_module(module_name)
     except ModuleNotFoundError:
         return None
+
+
+def _try_version(pluginSettings: PluginSettings) -> str:
+    try:
+        return importlib.metadata.version(pluginSettings.pip_source)
+    except importlib.metadata.PackageNotFoundError:
+        # TODO try _version of module_name?
+        return "unknown"
 
 
 def _try_install(pip_source: str) -> None:
@@ -71,8 +79,9 @@ def _try_install(pip_source: str) -> None:
 
 class PluginManager:
     lock: threading.Lock = threading.Lock()
-    plugins: dict[PluginId, Plugin] = {}
-    errors: dict[PluginId, str] = {}
+    plugins: dict[PluginCompositeId, Plugin] = {}
+    versions: dict[PluginCompositeId, str] = {}
+    errors: dict[PluginCompositeId, str] = {}
     updater: threading.Thread | None = None
     updater_error: str | None = None
 
@@ -96,6 +105,7 @@ def load_plugins(plugins: PluginsSettings) -> None:
     try:
         lookup = {}
         errors = {}
+        versions = {}
         for pluginKey, pluginSettings in plugins.items():
             # TODO consider running all pip invocations at once -- worse error reporting but better perf
             if pluginSettings.update_strategy == "auto":
@@ -117,12 +127,14 @@ def load_plugins(plugins: PluginsSettings) -> None:
                     errors[pluginKey] = result
                 else:
                     assert_never(result)
+                versions[pluginKey] = _try_version(pluginSettings)
 
         with timed_acquire(PluginManager.lock, 60) as result:
             if not result:
                 raise ValueError("failed to acquire the shared lock")
             PluginManager.plugins = lookup
             PluginManager.errors = errors
+            PluginManager.versions = versions
         logger.debug("global plugin loading finished")
     except Exception as e:
         logger.exception(f"updating thread failed with {repr(e)}")
@@ -131,7 +143,7 @@ def load_plugins(plugins: PluginsSettings) -> None:
             PluginManager.updater_error = repr(e)
 
 
-def update_single(pluginId: PluginId, pluginSettings: PluginSettings) -> None:
+def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings) -> None:
     try:
         if pluginId not in PluginManager.plugins:
             raise ValueError(f"attempted to update {pluginId} but was not loaded")
@@ -151,6 +163,7 @@ def update_single(pluginId: PluginId, pluginSettings: PluginSettings) -> None:
                 PluginManager.errors[pluginId] = result
             else:
                 assert_never(result)
+            PluginManager.versions[pluginId] = _try_version(pluginSettings)
         logger.debug("single plugin loading finished: {plugin.module_name}")
     except Exception as e:
         logger.exception(f"updating thread failed with {repr(e)}")
@@ -174,8 +187,8 @@ def submit_load_plugins():
 
 class PluginsStatus(BaseModel):
     updater_status: Literal["ok", "running", "retrieving"] | str
-    plugin_errors: dict[str, str]
-    plugin_versions: dict[str, str]
+    plugin_errors: dict[PluginCompositeId, str]
+    plugin_versions: dict[PluginCompositeId, str]
 
 
 def status_brief() -> str:
@@ -201,12 +214,7 @@ def status_full() -> PluginsStatus:
         else:
             status = status_brief()
             plugin_errors = {plugin: error for plugin, error in PluginManager.errors.items()}
-            plugin_versions = {}
-            for plugin in PluginManager.plugins.keys():
-                try:
-                    plugin_versions[plugin] = importlib.metadata.version(plugin)
-                except importlib.metadata.PackageNotFoundError:
-                    plugin_errors[plugin] = f"failed to determine version of {plugin}"
+            plugin_versions = {plugin: version for plugin, version in PluginManager.versions.items()}
     return PluginsStatus(
         updater_status=status,
         plugin_errors=plugin_errors,
@@ -214,7 +222,7 @@ def status_full() -> PluginsStatus:
     )
 
 
-def catalogue_view() -> dict[PluginId, BlockFactoryCatalogue] | bool:
+def catalogue_view() -> dict[PluginCompositeId, BlockFactoryCatalogue] | bool:
     with timed_acquire(PluginManager.lock, 1.0) as result:
         if not result:
             return False
@@ -222,7 +230,7 @@ def catalogue_view() -> dict[PluginId, BlockFactoryCatalogue] | bool:
             return {plugin_id: plugin.catalogue for plugin_id, plugin in PluginManager.plugins.items()}
 
 
-def submit_update_single(pluginId: PluginId) -> str:
+def submit_update_single(pluginId: PluginCompositeId) -> str:
     # NOTE consider caching this lookup
     pluginSettings = config.product.plugins.get(pluginId, None)
     if pluginSettings is None:
@@ -246,6 +254,7 @@ def submit_update_single(pluginId: PluginId) -> str:
 
 
 def join_updater_thread(timeout_sec: int) -> None:
+    # TODO candidate for ecpyutil, duplicated in plugin.store
     barrier = (time.perf_counter_ns() / 1e9) + timeout_sec
     with timed_acquire(PluginManager.lock, timeout_sec) as result:
         if not result:

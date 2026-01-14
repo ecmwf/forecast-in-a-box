@@ -9,6 +9,10 @@
 
 """API for Plugin Stores -- data parsing and extractions"""
 
+import logging
+import threading
+import time
+
 import httpx
 import orjson
 from cascade.low.func import assert_never
@@ -16,8 +20,11 @@ from pydantic import BaseModel
 from typing_extensions import Self
 
 from forecastbox.api.ecpyutil import timed_acquire
-from forecastbox.api.types.fable import PluginId
-from forecastbox.config import PluginStoreConfig, PluginStoreId, PluginStoresConfig, config, config_edit_lock
+from forecastbox.api.plugin.manager import submit_update_single
+from forecastbox.api.types.fable import PluginCompositeId, PluginId
+from forecastbox.config import PluginSettings, PluginStoreConfig, PluginStoreId, PluginStoresConfig, config, config_edit_lock
+
+logger = logging.getLogger(__name__)
 
 
 class PluginStoreEntry(BaseModel):
@@ -41,10 +48,10 @@ class PluginStore(BaseModel):
     plugins: dict[PluginId, PluginStoreEntry]
 
     @classmethod
-    async def fetch(cls, client: httpx.AsyncClient, plugin_store_config: PluginStoreConfig) -> Self:
+    def fetch(cls, client: httpx.Client, plugin_store_config: PluginStoreConfig) -> Self:
         match plugin_store_config.method:
             case "file":
-                response = await client.get(plugin_store_config.url)
+                response = client.get(plugin_store_config.url)
                 response.raise_for_status()
                 raw = response.content
                 as_json = orjson.loads(raw)
@@ -53,30 +60,77 @@ class PluginStore(BaseModel):
                 assert_never(s)
 
 
-class Globals:
-    stores: dict[PluginStoreId, PluginStore]
-
-    @classmethod
-    async def initialize(cls, plugin_stores_config: PluginStoresConfig) -> None:
-        async with httpx.AsyncClient() as client:
-            cls.stores = {key: await PluginStore.fetch(client, value) for key, value in plugin_stores_config.items()}
+class StoresManager:
+    stores: dict[PluginStoreId, PluginStore] = {}
+    stores_lock: threading.Lock = threading.Lock()
+    stores_updater: threading.Thread | None = None
 
 
-def install_plugin(plugin_store_id: PluginStoreId, plugin_id: PluginId) -> None:
-    # TODO if installed, return
-    with timed_acquire(config_edit_lock, 5) as result:
-        # TODO invoke install
+def initialize_stores(plugin_stores_config: PluginStoresConfig) -> None:
+    # assumed to be submitted from a thread
+    with timed_acquire(StoresManager.stores_lock, 600) as result:
+        # NOTE we lock for long because two concurrent updates make no sense
         if not result:
-            raise ValueError("failed to acquire the shared lock")
-        config.save_to_file()
-    # TODO invoke the update?
+            raise ValueError("failed to acquire lock")
+        with httpx.Client() as client:
+            # a thread pool / async could work here but we dont expect many stores here
+            stores = {key: PluginStore.fetch(client, value) for key, value in plugin_stores_config.items()}
+        StoresManager.stores = stores
+
+
+def submit_initialize_stores():
+    with timed_acquire(StoresManager.stores_lock, 10) as result:
+        if not result:
+            logger.error("failed to initialize stores")
+            return
+        StoresManager.stores_updater = threading.Thread(target=initialize_stores, args=(config.product.plugin_stores,))
+        StoresManager.stores_updater.start()
+
+
+def submit_install_plugin(plugin_composite_key: PluginCompositeId) -> None:
+    with timed_acquire(StoresManager.stores_lock, 10) as result:
+        if not result:
+            raise ValueError("failed to acquire lock")
+        if not StoresManager.stores:
+            raise ValueError("stores not initialized")
+    storeId, pluginId = plugin_composite_key.store, plugin_composite_key.local
+    store = StoresManager.stores.get(storeId, None)
+    if store is None:
+        raise ValueError(f"store with id {storeId} not known")
+    pluginStoreEntry = store.plugins.get(pluginId, None)
+    if pluginStoreEntry is None:
+        raise ValueError(f"plugin with id {pluginId} not known to store {storeId}")
+
+    if plugin_composite_key not in config.product.plugins:
+        with timed_acquire(config_edit_lock, 5) as result:
+            if not result:
+                raise ValueError("failed to acquire the shared lock")
+            config.product.plugins[plugin_composite_key] = PluginSettings(
+                pip_source=pluginStoreEntry.pip_source,
+                module_name=pluginStoreEntry.module_name,
+                update_strategy="manual",
+            )
+            config.save_to_file()
+
+    submit_update_single(plugin_composite_key)
+
+
+def join_stores_thread(timeout_sec: int) -> None:
+    # TODO candidate for ecpyutil, duplicated in plugin.manager
+    barrier = (time.perf_counter_ns() / 1e9) + timeout_sec
+    with timed_acquire(StoresManager.stores_lock, timeout_sec) as result:
+        if not result:
+            logger.error("failed to lock for joining updater thread")
+        else:
+            if StoresManager.stores_updater is not None:
+                budget = barrier - (time.perf_counter_ns() / 1e9)
+                StoresManager.stores_updater.join(budget)
+                if StoresManager.stores_updater.is_alive():
+                    logger.error("failed to join PluginManager updater thread")
 
 
 """
 taskList
-    [inprog] rekey plugins everywhere to be store+id_
-    install single -- lock<add to config, persist config>, then submit update
-        the current method assumes installed -- replace
     uninstall single -- lock<remove from config, persist config>, then implement new function in the plugin manager
     toggleEnabled single -- extend config with enabled/disabled, plugin manager lock + pop/load
     get plugins

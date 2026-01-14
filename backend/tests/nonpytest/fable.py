@@ -18,9 +18,9 @@ r = client.request(url="api/v1/fable/expand", method="get", json=builder.model_d
 r.json()
 # {'global_errors': [], 'block_errors': {}, 'possible_sources': [{'plugin': 'fiab_plugin_toy', 'factory': 'exampleSource'}, {'plugin': 'fiab_plugin_toy', 'factory': 'ekdSource'}], 'possible_expansions': {}}
 
-from fiab_core.fable import BlockInstance, PluginBlockFactoryId
+from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
-pluginId = "fiab_plugin_toy2"
+pluginId = PluginCompositeId(store="ecmwf", local="toy2")
 
 source = BlockInstance(factory_id=PluginBlockFactoryId(plugin=pluginId, factory="exampleSource"), configuration_values={}, input_ids={})
 builder = FableBuilderV1(blocks={"source1": source})

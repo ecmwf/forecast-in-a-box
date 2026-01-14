@@ -13,17 +13,8 @@ Types pertaining to Forecast As BLock Expression (Fable): builders and top-level
 
 from dataclasses import dataclass
 
-from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId, PluginBlockFactoryId
-from fiab_core.plugin import PluginId
+from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId, PluginBlockFactoryId, PluginCompositeId, PluginId, PluginStoreId
 from pydantic import BaseModel
-
-PluginStoreId = str
-
-
-@dataclass
-class PluginCompositeId:
-    store: PluginStoreId
-    local: PluginId
 
 
 class FableBuilderV1(BaseModel):

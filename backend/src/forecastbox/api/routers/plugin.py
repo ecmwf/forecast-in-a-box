@@ -18,7 +18,9 @@ In particular
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from forecastbox.api.plugin.manager import PluginsStatus, status_full, submit_update_single
+from forecastbox.api.plugin.store import submit_install_plugin
 from forecastbox.api.routers.admin import get_admin_user
+from forecastbox.api.types.fable import PluginCompositeId
 
 router = APIRouter(
     tags=["fable"],
@@ -31,8 +33,15 @@ def get_plugins_status_full() -> PluginsStatus:
     return status_full()
 
 
-@router.post("/update/{module_name}")
-def update_plugin(pluginKey: str, admin=Depends(get_admin_user)) -> None:
-    result = submit_update_single(pluginKey)
+@router.post("/update")
+def update_plugin(pluginCompositeId: PluginCompositeId, admin=Depends(get_admin_user)) -> None:
+    # TODO add optional version parameter
+    result = submit_update_single(pluginCompositeId)
     if result:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result)
+
+
+@router.post("/install")
+def install_plugin(pluginCompositeId: PluginCompositeId, admin=Depends(get_admin_user)) -> None:
+    # TODO add optional version parameter
+    submit_install_plugin(pluginCompositeId)
