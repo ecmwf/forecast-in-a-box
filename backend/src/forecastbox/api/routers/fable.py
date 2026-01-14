@@ -19,7 +19,7 @@ from fiab_core.fable import BlockFactoryCatalogue
 
 import forecastbox.api.fable as api_fable
 import forecastbox.db.fable as db_fable
-from forecastbox.api.plugin import PluginId, catalogue_view, plugins_ready
+from forecastbox.api.plugin.manager import PluginId, catalogue_view, plugins_ready
 from forecastbox.api.types import RawCascadeJob
 from forecastbox.api.types.fable import FableBuilderV1, FableValidationExpansion
 from forecastbox.auth.users import current_active_user

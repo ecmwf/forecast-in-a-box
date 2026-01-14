@@ -26,8 +26,8 @@ from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException
 
 import forecastbox.db
-from forecastbox.api.plugin import PluginsStatus, join_updater_thread, submit_load_plugins
-from forecastbox.api.plugin import status_brief as status_plugins
+from forecastbox.api.plugin.manager import PluginsStatus, join_updater_thread, submit_load_plugins
+from forecastbox.api.plugin.manager import status_brief as status_plugins
 from forecastbox.api.scheduling.scheduler_thread import start_scheduler, status_scheduler, stop_scheduler
 from forecastbox.api.updates import get_local_release
 from forecastbox.db.migrations import migrate

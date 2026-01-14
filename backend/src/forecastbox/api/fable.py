@@ -28,7 +28,7 @@ from fiab_core.fable import (
     PluginBlockFactoryId,
 )
 
-from forecastbox.api.plugin import PluginManager
+from forecastbox.api.plugin.manager import PluginManager
 from forecastbox.api.types import RawCascadeJob
 from forecastbox.api.types.fable import (
     FableBuilderV1,

@@ -17,7 +17,7 @@ In particular
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from forecastbox.api.plugin import PluginsStatus, status_full, submit_update_single
+from forecastbox.api.plugin.manager import PluginsStatus, status_full, submit_update_single
 from forecastbox.api.routers.admin import get_admin_user
 
 router = APIRouter(

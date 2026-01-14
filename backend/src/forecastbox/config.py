@@ -117,6 +117,26 @@ class PluginSettings(BaseModel):
     """Whether we should invoke `pip install --update <plugin>` on every launch, or let user handle that manually or via API"""
 
 
+PluginStoreId = str
+
+
+class PluginStoreConfig(BaseModel):
+    url: str
+    method: Literal["file"]
+
+
+PluginStoresConfig = dict[PluginStoreId, PluginStoreConfig]
+
+
+def _default_plugin_stores() -> PluginStoresConfig:
+    return {
+        "ecmwf": PluginStoreConfig(
+            url="https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/heads/main/install/plugins.json",
+            method="file",
+        ),
+    }
+
+
 class ProductSettings(BaseModel):
     pproc_schema_dir: str | None = None
     """Path to the directory containing the PPROC schema files."""
@@ -136,6 +156,7 @@ class ProductSettings(BaseModel):
     """Default input source for models, if not specified otherwise"""
 
     plugins: list[PluginSettings] = Field(default_factory=list)
+    plugin_stores: PluginStoresConfig = Field(default_factory=_default_plugin_stores)
 
     def validate_runtime(self) -> list[str]:
         if self.pproc_schema_dir and not os.path.isdir(self.pproc_schema_dir):
