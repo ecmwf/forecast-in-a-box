@@ -95,7 +95,6 @@ def expander(block: BlockInstanceOutput) -> list[BlockFactoryId]:
 def compiler(partitions: DataPartitionLookup, block_id: BlockInstanceId, block: BlockInstance) -> Either[DataPartitionLookup, Error]:  # type: ignore[invalid-argument] # semigroup
     # NOTE this is commented out since the plugin is not actually published, but instead installed via the `dev` group
     # environment = ["fiab-plugin-toy2[runtime]"]
-    environment = []
     match block.factory_id.factory:
         case "exampleSource":
             action = from_source([runtime.datasource.from_example])
@@ -118,6 +117,8 @@ def compiler(partitions: DataPartitionLookup, block_id: BlockInstanceId, block: 
         case "meanProduct":
             input_task = block.input_ids["dataset"]
             input_task_action = partitions[input_task]
+            if input_task_action.nodes.size != 1:
+                return Either.error(f"meanProduct supports only trivial partitioning, gotten {input_task_action.nodes.size}")
             action = input_task_action.map(Payload(runtime.product.select, [block.configuration_values["variable"]])).map(
                 Payload(runtime.product.mean)
             )
