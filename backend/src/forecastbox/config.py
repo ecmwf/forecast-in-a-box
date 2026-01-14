@@ -117,6 +117,8 @@ class PluginSettings(BaseModel):
     """A string such that `importlib.import_module(module_name)` gives a module that has a `plugin` attribute of type fiab_core.plugin.Plugin`"""
     update_strategy: PluginRefreshStrategy = "manual"
     """Whether we should invoke `pip install --update <plugin>` on every launch, or let user handle that manually or via API"""
+    enabled: bool = True
+    """Whether the plugin should be considered when loading"""
 
 
 PluginCompositeIdReadable = Annotated[

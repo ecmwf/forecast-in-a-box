@@ -46,7 +46,7 @@ from pydantic import BaseModel
 
 from forecastbox.api.ecpyutil import timed_acquire
 from forecastbox.api.types.fable import PluginCompositeId
-from forecastbox.config import PluginSettings, PluginsSettings, config
+from forecastbox.config import PluginSettings, PluginsSettings, config, config_edit_lock
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +107,8 @@ def load_plugins(plugins: PluginsSettings) -> None:
         errors = {}
         versions = {}
         for pluginKey, pluginSettings in plugins.items():
+            if not pluginSettings.enabled:
+                continue
             # TODO consider running all pip invocations at once -- worse error reporting but better perf
             if pluginSettings.update_strategy == "auto":
                 logger.info(f"auto-updating {pluginSettings.module_name}")
@@ -143,7 +145,8 @@ def load_plugins(plugins: PluginsSettings) -> None:
             PluginManager.updater_error = repr(e)
 
 
-def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings) -> None:
+def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, isUpdate: bool, isLoad: bool) -> None:
+    # TODO obey the two flags
     try:
         if pluginId not in PluginManager.plugins:
             raise ValueError(f"attempted to update {pluginId} but was not loaded")
@@ -170,6 +173,17 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings) -
         with timed_acquire(PluginManager.lock, 5) as _:
             # NOTE we ignore result -- we rather corrupt than deadlock
             PluginManager.updater_error = repr(e)
+
+
+def unload_single(pluginId: PluginCompositeId) -> None:
+    # NOTE we should lock here but probably not worth it
+    if pluginId in PluginManager.plugins:
+        PluginManager.plugins.pop(pluginId)
+    if pluginId in PluginManager.errors:
+        PluginManager.errors.pop(pluginId)
+    if pluginId in PluginManager.versions:
+        PluginManager.versions.pop(pluginId)
+    # TODO update the catalog view
 
 
 def submit_load_plugins():
@@ -230,8 +244,7 @@ def catalogue_view() -> dict[PluginCompositeId, BlockFactoryCatalogue] | bool:
             return {plugin_id: plugin.catalogue for plugin_id, plugin in PluginManager.plugins.items()}
 
 
-def submit_update_single(pluginId: PluginCompositeId) -> str:
-    # NOTE consider caching this lookup
+def submit_update_single(pluginId: PluginCompositeId, isUpdate: bool, isLoad: bool) -> str:
     pluginSettings = config.product.plugins.get(pluginId, None)
     if pluginSettings is None:
         return f"plugin {pluginId} not configured"
@@ -248,9 +261,32 @@ def submit_update_single(pluginId: PluginCompositeId) -> str:
                 else:
                     PluginManager.updater.join(0)
                     # we join despite thread not being alive to ensure resource collection
-            PluginManager.updater = threading.Thread(target=update_single, args=(pluginSettings,))
+            PluginManager.updater = threading.Thread(target=update_single, args=(pluginId, pluginSettings, isUpdate, isLoad))
             PluginManager.updater.start()
     return ""
+
+
+def uninstall_plugin(pluginId: PluginCompositeId) -> None:
+    if pluginId not in config.product.plugins:
+        raise ValueError(f"plugin {pluginId} not installed")
+    with timed_acquire(config_edit_lock, 5) as result:
+        if not result:
+            raise ValueError("failed to acquire the shared lock")
+        config.product.plugins.pop(pluginId)
+        config.save_to_file()
+    unload_single(pluginId)
+
+
+def modify_enabled(pluginId: PluginCompositeId, isEnabled: bool) -> None:
+    with timed_acquire(config_edit_lock, 5) as result:
+        if not result:
+            raise ValueError("failed to acquire the shared lock")
+        config.product.plugins[pluginId].enabled = isEnabled
+        config.save_to_file()
+    if not isEnabled:
+        unload_single(pluginId)
+    else:
+        submit_update_single(pluginId, isUpdate=False, isLoad=True)
 
 
 def join_updater_thread(timeout_sec: int) -> None:

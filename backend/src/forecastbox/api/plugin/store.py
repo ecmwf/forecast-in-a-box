@@ -112,7 +112,7 @@ def submit_install_plugin(plugin_composite_key: PluginCompositeId) -> None:
             )
             config.save_to_file()
 
-    submit_update_single(plugin_composite_key)
+    submit_update_single(plugin_composite_key, isUpdate=True, isLoad=True)
 
 
 def join_stores_thread(timeout_sec: int) -> None:
@@ -126,17 +126,4 @@ def join_stores_thread(timeout_sec: int) -> None:
                 budget = barrier - (time.perf_counter_ns() / 1e9)
                 StoresManager.stores_updater.join(budget)
                 if StoresManager.stores_updater.is_alive():
-                    logger.error("failed to join PluginManager updater thread")
-
-
-"""
-taskList
-    uninstall single -- lock<remove from config, persist config>, then implement new function in the plugin manager
-    toggleEnabled single -- extend config with enabled/disabled, plugin manager lock + pop/load
-    get plugins
-        we need plugin dynamic metadata class
-        we need plugin dynamic metadata filling from pypi
-        we need plugin dynamic metadata filling from local + join with the plugin manager
-        then reroute the plugin status from manager to here (perhaps keep that one as updater status)
-        and implement forceRefresh... -- sorta managed thread like in manager
-"""
+                    logger.error("failed to join StoresManager updater thread")
