@@ -11,7 +11,7 @@ import json
 from typing import cast
 
 from cascade.low.func import Either
-from earthkit.workflows.fluent import from_source, Payload
+from earthkit.workflows.fluent import Payload, from_source
 from fiab_core.fable import (
     BlockConfigurationOption,
     BlockFactory,
@@ -25,6 +25,7 @@ from fiab_core.fable import (
     XarrayOutput,
 )
 from fiab_core.plugin import Error, Plugin
+
 from fiab_plugin_toy2 import runtime
 
 exampleSource = BlockFactory(
@@ -91,17 +92,13 @@ def expander(block: BlockInstanceOutput) -> list[BlockFactoryId]:
     return []
 
 
-def compiler(
-    partitions: DataPartitionLookup, block_id: BlockInstanceId, block: BlockInstance
-) -> Either[DataPartitionLookup, Error]:  # type: ignore[invalid-argument] # semigroup
+def compiler(partitions: DataPartitionLookup, block_id: BlockInstanceId, block: BlockInstance) -> Either[DataPartitionLookup, Error]:  # type: ignore[invalid-argument] # semigroup
     # NOTE this is commented out since the plugin is not actually published, but instead installed via the `dev` group
     # environment = ["fiab-plugin-toy2[runtime]"]
     environment = []
     match block.factory_id.factory:
         case "exampleSource":
-            action = from_source(
-                [runtime.datasource.from_example]
-            )
+            action = from_source([runtime.datasource.from_example])
         case "ekdSource":
             request_params = {
                 "param": ["2t", "msl"],
@@ -121,15 +118,15 @@ def compiler(
         case "meanProduct":
             input_task = block.input_ids["dataset"]
             input_task_action = partitions[input_task]
-            action = (
-                input_task_action.map(Payload(runtime.product.select, [block.configuration_values["variable"]]))
-                .map(Payload(runtime.product.mean))
+            action = input_task_action.map(Payload(runtime.product.select, [block.configuration_values["variable"]])).map(
+                Payload(runtime.product.mean)
             )
         case unmatched:
             raise TypeError(f"unexpected factory id {unmatched}")
 
     partitions[block_id] = action
     return Either.ok(partitions)
+
 
 plugin = Plugin(
     catalogue=catalogue,
