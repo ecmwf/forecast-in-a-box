@@ -16,8 +16,8 @@ from collections import defaultdict
 from itertools import groupby
 from typing import Iterator, cast
 
-from cascade.low.builders import JobBuilder
-from cascade.low.core import JobInstance
+from cascade.low.into import graph2job
+from earthkit.workflows.graph import Graph, deduplicate_nodes
 from fiab_core.fable import (
     BlockConfigurationOption,
     BlockFactory,
@@ -118,7 +118,7 @@ def validate_expand(fable: FableBuilderV1) -> FableValidationExpansion:
 
 
 def compile(fable: FableBuilderV1) -> RawCascadeJob:
-    builder = JobBuilder()
+    graph = Graph([])
     plugins = PluginManager.plugins  # TODO we are avoiding a lock here! See the TODO at api/plugin.py
     data_partition_lookup = {}
 
@@ -127,17 +127,16 @@ def compile(fable: FableBuilderV1) -> RawCascadeJob:
         plugin = plugins.get(blockInstance.factory_id.plugin, None)
         if not plugin:
             raise ValueError(f"plugin for {blockId=} not found")
-        result = plugin.compiler(builder, data_partition_lookup, blockId, blockInstance)
+        result = plugin.compiler(data_partition_lookup, blockId, blockInstance)
         if result.t is None:
             raise ValueError(f"compile failed at {blockId=} with {result.e}")
-        builder, data_partition_lookup = result.t
+        data_partition_lookup = result.t
+        block_factory = plugin.catalogue.factories[blockInstance.factory_id.factory]
+        if block_factory.kind == "sink":
+            graph += data_partition_lookup[blockId].graph()
 
-    result = builder.build()
-    if result.t is None:
-        error = ";".join(cast(list[str], result.e))
-        raise ValueError(f"final compilation failed with {error}")
-
-    return RawCascadeJob(job_type="raw_cascade_job", job_instance=result.t)
+    result = graph2job(deduplicate_nodes(graph))
+    return RawCascadeJob(job_type="raw_cascade_job", job_instance=result)
 
 
 """
