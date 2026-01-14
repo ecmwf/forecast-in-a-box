@@ -10,8 +10,8 @@
 import json
 from typing import cast
 
-from cascade.low.builders import JobBuilder, TaskBuilder
 from cascade.low.func import Either
+from earthkit.workflows.fluent import from_source, Payload
 from fiab_core.fable import (
     BlockConfigurationOption,
     BlockFactory,
@@ -25,6 +25,7 @@ from fiab_core.fable import (
     XarrayOutput,
 )
 from fiab_core.plugin import Error, Plugin
+from fiab_plugin_toy2 import runtime
 
 exampleSource = BlockFactory(
     kind="source",
@@ -91,21 +92,16 @@ def expander(block: BlockInstanceOutput) -> list[BlockFactoryId]:
 
 
 def compiler(
-    jobBuilder: JobBuilder, partitions: DataPartitionLookup, block_id: BlockInstanceId, block: BlockInstance
-) -> Either[tuple[JobBuilder, DataPartitionLookup], Error]:  # type: ignore[invalid-argument] # semigroup
+    partitions: DataPartitionLookup, block_id: BlockInstanceId, block: BlockInstance
+) -> Either[DataPartitionLookup, Error]:  # type: ignore[invalid-argument] # semigroup
     # NOTE this is commented out since the plugin is not actually published, but instead installed via the `dev` group
     # environment = ["fiab-plugin-toy2[runtime]"]
     environment = []
     match block.factory_id.factory:
         case "exampleSource":
-            task = TaskBuilder.from_entrypoint(
-                entrypoint="fiab_plugin_toy2.runtime.datasource.from_example",
-                input_schema={},
-                output_class="xarray.Dataset",
-                environment=environment,
+            action = from_source(
+                [runtime.datasource.from_example]
             )
-            partitions[block_id] = {"": block_id}
-            return Either.ok((jobBuilder.with_node(block_id, task), partitions))
         case "ekdSource":
             request_params = {
                 "param": ["2t", "msl"],
@@ -114,56 +110,26 @@ def compiler(
                 "grid": [2, 2],
                 "date": block.configuration_values["date"],
             }
-            task = TaskBuilder.from_entrypoint(
-                entrypoint="fiab_plugin_toy2.runtime.datasource.from_source",
-                input_schema={
-                    "source": "str",
-                    "request_params_json": "str",
-                },
-                output_class="xarray.Dataset",
-                environment=environment,
-            ).with_values(
-                source=block.configuration_values["source"],
-                request_params_json=json.dumps(request_params),
+            action = from_source(
+                [
+                    Payload(
+                        runtime.datasource.from_source,
+                        [block.configuration_values["source"], request_params],
+                    )
+                ]
             )
-            partitions[block_id] = {"": block_id}
-            return Either.ok((jobBuilder.with_node(block_id, task), partitions))
         case "meanProduct":
             input_task = block.input_ids["dataset"]
-            input_task_partitions = partitions[input_task]
-            if (pc := len(input_task_partitions.values())) != 1:
-                return Either.error("meanProduct supports only trivial partitioning, gotten {pc}")
-            input_task_id = list(input_task_partitions.values())[0]
-            taskSelect = TaskBuilder.from_entrypoint(
-                entrypoint="fiab_plugin_toy2.runtime.product.select",
-                input_schema={
-                    "dataset": "xarray.Dataset",
-                    "variable": "str",
-                },
-                output_class="xarray.DataArray",
-                environment=environment,
-            ).with_values(variable=block.configuration_values["variable"])
-            taskCalculate = TaskBuilder.from_entrypoint(
-                entrypoint="fiab_plugin_toy2.runtime.product.mean",
-                input_schema={"array": "xarray.DataArray"},
-                output_class="xarray.Dataset",
-                environment=environment,
-            )
-            partitions[block_id] = {"": block_id + "/calculate"}
-            return Either.ok(
-                (
-                    (
-                        jobBuilder.with_node(block_id + "/select", taskSelect)
-                        .with_node(block_id + "/calculate", taskCalculate)
-                        .with_edge(input_task_id, block_id + "/select", "dataset")
-                        .with_edge(block_id + "/select", block_id + "/calculate", "array")
-                    ),
-                    partitions,
-                )
+            input_task_action = partitions[input_task]
+            action = (
+                input_task_action.map(Payload(runtime.product.select, [block.configuration_values["variable"]]))
+                .map(Payload(runtime.product.mean))
             )
         case unmatched:
             raise TypeError(f"unexpected factory id {unmatched}")
 
+    partitions[block_id] = action
+    return Either.ok(partitions)
 
 plugin = Plugin(
     catalogue=catalogue,
