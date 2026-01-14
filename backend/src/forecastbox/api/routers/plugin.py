@@ -32,7 +32,7 @@ def get_plugins_status_full() -> PluginsStatus:
 
 
 @router.post("/update/{module_name}")
-def update_plugin(module_name: str, admin=Depends(get_admin_user)) -> None:
-    result = submit_update_single(module_name)
+def update_plugin(pluginKey: str, admin=Depends(get_admin_user)) -> None:
+    result = submit_update_single(pluginKey)
     if result:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result)

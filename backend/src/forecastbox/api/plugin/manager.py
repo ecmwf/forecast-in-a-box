@@ -36,7 +36,6 @@ import logging
 import subprocess
 import threading
 import time
-from contextlib import contextmanager
 from types import ModuleType
 from typing import Iterator, Literal
 
@@ -45,8 +44,9 @@ from fiab_core.fable import BlockFactoryCatalogue
 from fiab_core.plugin import Plugin
 from pydantic import BaseModel
 
+from forecastbox.api.ecpyutil import timed_acquire
 from forecastbox.api.types.fable import PluginId
-from forecastbox.config import PluginSettings, config
+from forecastbox.config import PluginSettings, PluginsSettings, config
 
 logger = logging.getLogger(__name__)
 
@@ -77,17 +77,6 @@ class PluginManager:
     updater_error: str | None = None
 
 
-@contextmanager
-def timed_acquire(lock: threading.Lock, timeout: float) -> Iterator[bool]:
-    # TODO move to ecpyutil
-    result = lock.acquire(timeout=timeout)
-    try:
-        yield result
-    finally:
-        if result:
-            lock.release()
-
-
 def load_single(plugin: PluginSettings) -> Plugin | str:
     errors = []
     plugin_impl = _try_import(plugin.module_name)
@@ -102,30 +91,30 @@ def load_single(plugin: PluginSettings) -> Plugin | str:
     return "\n".join(errors)
 
 
-def load_plugins(plugins: list[PluginSettings]) -> None:
+def load_plugins(plugins: PluginsSettings) -> None:
     logger.info("starting initial plugin load")
     try:
         lookup = {}
         errors = {}
-        for plugin in plugins:
+        for pluginKey, pluginSettings in plugins.items():
             # TODO consider running all pip invocations at once -- worse error reporting but better perf
-            if plugin.update_strategy == "auto":
-                logger.info(f"auto-updating {plugin.module_name}")
-                _try_install(plugin.pip_source)
+            if pluginSettings.update_strategy == "auto":
+                logger.info(f"auto-updating {pluginSettings.module_name}")
+                _try_install(pluginSettings.pip_source)
             else:
-                if _try_import(plugin.module_name) is None:
-                    logger.info(f"installing {plugin.module_name} for the first time")
-                    _try_install(plugin.pip_source)
+                if _try_import(pluginSettings.module_name) is None:
+                    logger.info(f"installing {pluginSettings.module_name} for the first time")
+                    _try_install(pluginSettings.pip_source)
 
-            if plugin.module_name in plugins:
-                errors[plugin.module_name] = f"plugin {plugin.module_name} is provided by more than just {plugin.pip_source}"
+            if pluginKey in plugins:
+                errors[pluginKey] = f"plugin {pluginKey} is provided by more than just {pluginSettings.pip_source}"
             else:
-                result = load_single(plugin)
-                logger.debug(f"plugin {plugin} loaded with success: {isinstance(result, Plugin)}")
+                result = load_single(pluginSettings)
+                logger.debug(f"plugin {pluginKey} loaded with success: {isinstance(result, Plugin)}")
                 if isinstance(result, Plugin):
-                    lookup[plugin.module_name] = result
+                    lookup[pluginKey] = result
                 elif isinstance(result, str):
-                    errors[plugin.module_name] = result
+                    errors[pluginKey] = result
                 else:
                     assert_never(result)
 
@@ -142,24 +131,24 @@ def load_plugins(plugins: list[PluginSettings]) -> None:
             PluginManager.updater_error = repr(e)
 
 
-def update_single(plugin: PluginSettings) -> None:
+def update_single(pluginId: PluginId, pluginSettings: PluginSettings) -> None:
     try:
-        if plugin.module_name not in PluginManager.plugins:
-            result = "attempted to update but was not installed"
+        if pluginId not in PluginManager.plugins:
+            raise ValueError(f"attempted to update {pluginId} but was not loaded")
         else:
-            _try_install(plugin.pip_source)
+            _try_install(pluginSettings.pip_source)
             # NOTE we recommend in the docs to re-launch app after an update, this need not cover all cases
-            importlib.reload(importlib.import_module(plugin.module_name))
-            plugin_impl = _try_import(plugin.module_name)
-            result = load_single(plugin)
-            logger.debug(f"plugin {plugin} loaded with success: {isinstance(result, Plugin)}")
+            importlib.reload(importlib.import_module(pluginSettings.module_name))
+            plugin_impl = _try_import(pluginSettings.module_name)
+            result = load_single(pluginSettings)
+            logger.debug(f"plugin {pluginId} loaded with success: {isinstance(result, Plugin)}")
         with timed_acquire(PluginManager.lock, 60) as acquire_result:
             if not acquire_result:
                 raise ValueError("failed to acquire the shared lock")
             if isinstance(result, Plugin):
-                PluginManager.plugins[plugin.module_name] = result
+                PluginManager.plugins[pluginId] = result
             elif isinstance(result, str):
-                PluginManager.errors[plugin.module_name] = result
+                PluginManager.errors[pluginId] = result
             else:
                 assert_never(result)
         logger.debug("single plugin loading finished: {plugin.module_name}")
@@ -233,11 +222,11 @@ def catalogue_view() -> dict[PluginId, BlockFactoryCatalogue] | bool:
             return {plugin_id: plugin.catalogue for plugin_id, plugin in PluginManager.plugins.items()}
 
 
-def submit_update_single(plugin_name: str) -> str:
+def submit_update_single(pluginId: PluginId) -> str:
     # NOTE consider caching this lookup
-    lookup = {e.module_name: e.pip_source for e in config.product.plugins}
-    if plugin_name not in lookup:
-        return f"plugin {plugin_name} not configured"
+    pluginSettings = config.product.plugins.get(pluginId, None)
+    if pluginSettings is None:
+        return f"plugin {pluginId} not configured"
     else:
         with timed_acquire(PluginManager.lock, 0.5) as result:
             if not result:
@@ -251,7 +240,7 @@ def submit_update_single(plugin_name: str) -> str:
                 else:
                     PluginManager.updater.join(0)
                     # we join despite thread not being alive to ensure resource collection
-            PluginManager.updater = threading.Thread(target=update_single, args=(lookup[plugin_name],))
+            PluginManager.updater = threading.Thread(target=update_single, args=(pluginSettings,))
             PluginManager.updater.start()
     return ""
 

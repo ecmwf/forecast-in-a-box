@@ -9,6 +9,7 @@
 
 import logging
 import os
+import threading
 import urllib.parse
 from pathlib import Path
 from typing import Literal
@@ -17,6 +18,8 @@ import toml
 from cascade.low.func import pydantic_recursive_collect
 from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict, TomlConfigSettingsSource
+
+from forecastbox.api.types.fable import PluginCompositeId, PluginId, PluginStoreId
 
 fiab_home = Path(os.environ["FIAB_ROOT"]) if "FIAB_ROOT" in os.environ else (Path.home() / ".fiab")
 logger = logging.getLogger(__name__)
@@ -117,7 +120,7 @@ class PluginSettings(BaseModel):
     """Whether we should invoke `pip install --update <plugin>` on every launch, or let user handle that manually or via API"""
 
 
-PluginStoreId = str
+PluginsSettings = dict[PluginId, PluginSettings]
 
 
 class PluginStoreConfig(BaseModel):
@@ -155,7 +158,7 @@ class ProductSettings(BaseModel):
     default_input_source: str = "opendata"
     """Default input source for models, if not specified otherwise"""
 
-    plugins: list[PluginSettings] = Field(default_factory=list)
+    plugins: PluginsSettings = Field(default_factory=dict)
     plugin_stores: PluginStoresConfig = Field(default_factory=_default_plugin_stores)
 
     def validate_runtime(self) -> list[str]:
@@ -273,3 +276,4 @@ def validate_runtime(config: FIABConfig) -> None:
 
 
 config = FIABConfig()
+config_edit_lock = threading.Lock()

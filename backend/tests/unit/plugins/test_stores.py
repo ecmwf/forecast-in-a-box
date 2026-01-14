@@ -18,6 +18,7 @@ async def test_fetch(mocker):
                 display_title="display_title",
                 display_description="display_description",
                 display_author="display_author",
+                comment="comment",
             ),
         },
     )
