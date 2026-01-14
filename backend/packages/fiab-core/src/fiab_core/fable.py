@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict
 from typing_extensions import Self
 
 from earthkit.workflows.fluent import Action
+from pydantic import BaseModel
 
 
 class BlockConfigurationOption(BaseModel):
