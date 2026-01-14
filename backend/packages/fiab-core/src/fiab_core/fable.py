@@ -15,6 +15,8 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from earthkit.workflows.fluent import Action
+
 
 class BlockConfigurationOption(BaseModel):
     title: str
@@ -77,4 +79,4 @@ class XarrayOutput(BaseModel):  # NOTE eventually Qubed
 BlockInstanceOutput = XarrayOutput  # NOTE eventually a Union
 
 # NOTE placeholder, this will be replaced with Fluent
-DataPartitionLookup = dict[BlockInstanceId, dict[str, str]]
+DataPartitionLookup = dict[BlockInstanceId, Action]
