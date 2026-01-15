@@ -78,7 +78,7 @@ catalogue = BlockFactoryCatalogue(
     factories={
         "ekdSource": ekdSource,
         "ensembleStatistics": ensembleStatistics,
-        "dummySink": dummySink,
+        "dummySink": dummySink,  # TODO: remove this once we have real sinks
     },
 )
 
@@ -104,7 +104,7 @@ def validator(block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> E
 def expander(block: BlockInstanceOutput) -> list[BlockFactoryId]:
     if len(block.variables) == 0:
         return []
-    expansions = []
+    expansions = ["dummySink"]
     if isinstance(block, XarrayOutput):
         if ENSEMBLE_DIM in block.coords:
             expansions.append("ensembleStatistics")
