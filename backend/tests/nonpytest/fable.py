@@ -38,6 +38,13 @@ r = client.request(url="api/v1/fable/expand", method="get", json=builder.model_d
 r.json()
 # {'global_errors': [], 'block_errors': {}, 'possible_sources': [{'plugin': 'fiab_plugin_toy', 'factory': 'exampleSource'}, {'plugin': 'fiab_plugin_toy', 'factory': 'ekdSource'}], 'possible_expansions': {'source1': [{'plugin': 'fiab_plugin_toy', 'factory': 'meanProduct'}]}}
 
+sink = BlockInstance(
+    factory_id=PluginBlockFactoryId(plugin=pluginId, factory="dummySink"),
+    configuration_values={},
+    input_ids={"dataset": "product1"},
+)
+builder = FableBuilderV1(blocks={"source1": source, "product1": product, "sink1": sink})
+
 r = client.request(url="api/v1/fable/compile", method="get", json=builder.model_dump())
 r.json()
 # {'job_type': 'raw_cascade_job', 'job_instance': {'tasks': {'source1': {'definition': {'entrypoint': 'fiab_plugin_toy_impl.datasource.from_example', 'func': None, 'environment': ['fiab-plugin-toy-impl'], 'input_schema': {}, 'output_schema': [['0', 'xarray.Dataset']], 'needs_gpu': False}, 'static_input_kw': {}, 'static_input_ps': {}}, 'product1/select': {'definition': {'entrypoint': 'fiab_plugin_toy_impl.product.select', 'func': None, 'environment': ['fiab-plugin-toy-impl'], 'input_schema': {'dataset': 'xarray.Dataset', 'variable': 'str'}, 'output_schema': [['0', 'xarray.DataArray']], 'needs_gpu': False}, 'static_input_kw': {'variable': '2t'}, 'static_input_ps': {}}, 'product1/calculate': {'definition': {'entrypoint': 'fiab_plugin_toy_impl.product.mean', 'func': None, 'environment': ['fiab-plugin-toy-impl'], 'input_schema': {'array': 'xarray.DataArray'}, 'output_schema': [['0', 'xarray.Dataset']], 'needs_gpu': False}, 'static_input_kw': {}, 'static_input_ps': {}}}, 'edges': [{'source': {'task': 'source1', 'output': '0'}, 'sink_task': 'product1/select', 'sink_input_kw': 'dataset', 'sink_input_ps': None}, {'source': {'task': 'product1/select', 'output': '0'}, 'sink_task': 'product1/calculate', 'sink_input_kw': 'array', 'sink_input_ps': None}], 'serdes': {}, 'ext_outputs': [], 'constraints': []}}
