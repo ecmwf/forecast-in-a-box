@@ -10,6 +10,7 @@ resolution-markers = [
 [manifest]
 members = [
     "fiab-core",
+    "fiab-plugin-ecmwf",
     "fiab-plugin-toy",
     "fiab-plugin-toy-impl",
     "fiab-plugin-toy2",
@@ -93,14 +94,14 @@ wheels = [
 
 [[package]]
 name = "anemoi-plugins-ecmwf-inference"
-version = "0.1.18"
+version = "0.1.21"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anemoi-inference" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c9/c1/fd1ba8a9169395bdb6afc4e6a8616e30bec10453a3913eb0072582e8e24e/anemoi_plugins_ecmwf_inference-0.1.18.tar.gz", hash = "sha256:d63ef476230d05214e7029b529616e29aea826085f0d1eaf45306badb0e84043", size = 40119, upload-time = "2025-11-18T16:11:35.976Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7b/bb/e804248f5b27790d7601fb3acb9be697a182a663201b3e944f3c445f12a8/anemoi_plugins_ecmwf_inference-0.1.21.tar.gz", hash = "sha256:6a923b245bdb6ff3beebdf850ab891cd07cc26eb2ba4282646918f8840684476", size = 40609, upload-time = "2026-01-13T11:00:42.943Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/98/c9/63a87a8aeab6fc7e03c0b7f743d318db33f6381fb538a3fded477765288a/anemoi_plugins_ecmwf_inference-0.1.18-py3-none-any.whl", hash = "sha256:c8634cbd321ea74fe202e6775f154d1336f8621cc4ebf7139fc3e52374884999", size = 42579, upload-time = "2025-11-18T16:11:31.524Z" },
+    { url = "https://files.pythonhosted.org/packages/76/d9/285192b330ab3fb031b65196425522e08862aa7c697497c4ca2791a84e82/anemoi_plugins_ecmwf_inference-0.1.21-py3-none-any.whl", hash = "sha256:76c692717898d96c76629fa2c95337ee8be1ee09ac1beb7c0551e33fd826fc0e", size = 42589, upload-time = "2026-01-13T11:00:41.567Z" },
 ]
 
 [package.optional-dependencies]
@@ -1526,6 +1527,31 @@ requires-dist = [
 dev = [{ name = "ty", specifier = "==0.0.2" }]
 
 [[package]]
+name = "fiab-plugin-ecmwf"
+source = { editable = "packages/fiab-plugin-ecmwf" }
+
+[package.optional-dependencies]
+runtime = [
+    { name = "earthkit" },
+    { name = "earthkit-data" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "ty" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "earthkit", marker = "extra == 'runtime'", specifier = ">=0.13.2" },
+    { name = "earthkit-data", marker = "extra == 'runtime'", specifier = ">=0.18.2" },
+]
+provides-extras = ["runtime"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "ty", specifier = "==0.0.2" }]
+
+[[package]]
 name = "fiab-plugin-toy"
 source = { editable = "packages/fiab-plugin-toy" }
 
@@ -1746,6 +1772,7 @@ webmars = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "fiab-plugin-ecmwf" },
     { name = "fiab-plugin-toy" },
     { name = "fiab-plugin-toy-impl" },
     { name = "fiab-plugin-toy2", extra = ["runtime"] },
@@ -1797,6 +1824,7 @@ provides-extras = ["all", "plots", "thermo", "webmars"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "fiab-plugin-ecmwf", editable = "packages/fiab-plugin-ecmwf" },
     { name = "fiab-plugin-toy", editable = "packages/fiab-plugin-toy" },
     { name = "fiab-plugin-toy-impl", editable = "packages/fiab-plugin-toy-impl" },
     { name = "fiab-plugin-toy2", extras = ["runtime"], editable = "packages/fiab-plugin-toy2" },
