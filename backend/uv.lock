@@ -10,6 +10,7 @@ resolution-markers = [
 [manifest]
 members = [
     "fiab-core",
+    "fiab-plugin-ecmwf",
     "fiab-plugin-toy",
     "fiab-plugin-toy-impl",
     "fiab-plugin-toy2",
@@ -1526,6 +1527,31 @@ requires-dist = [
 dev = [{ name = "ty", specifier = "==0.0.2" }]
 
 [[package]]
+name = "fiab-plugin-ecmwf"
+source = { editable = "packages/fiab-plugin-ecmwf" }
+
+[package.optional-dependencies]
+runtime = [
+    { name = "earthkit" },
+    { name = "earthkit-data" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "ty" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "earthkit", marker = "extra == 'runtime'", specifier = ">=0.13.2" },
+    { name = "earthkit-data", marker = "extra == 'runtime'", specifier = ">=0.18.2" },
+]
+provides-extras = ["runtime"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "ty", specifier = "==0.0.2" }]
+
+[[package]]
 name = "fiab-plugin-toy"
 source = { editable = "packages/fiab-plugin-toy" }
 
@@ -1746,6 +1772,7 @@ webmars = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "fiab-plugin-ecmwf" },
     { name = "fiab-plugin-toy" },
     { name = "fiab-plugin-toy-impl" },
     { name = "fiab-plugin-toy2", extra = ["runtime"] },
@@ -1798,6 +1825,7 @@ provides-extras = ["all", "plots", "thermo", "webmars"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "fiab-plugin-ecmwf", editable = "packages/fiab-plugin-ecmwf" },
     { name = "fiab-plugin-toy", editable = "packages/fiab-plugin-toy" },
     { name = "fiab-plugin-toy-impl", editable = "packages/fiab-plugin-toy-impl" },
     { name = "fiab-plugin-toy2", extras = ["runtime"], editable = "packages/fiab-plugin-toy2" },

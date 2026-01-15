@@ -21,7 +21,6 @@ dependencies = []
 optional-dependencies.runtime = [
     "earthkit-data>=0.18.2",
     "earthkit>=0.13.2",
-    "xarray>=2025.11.0",
 ]
 
 [dependency-groups]
