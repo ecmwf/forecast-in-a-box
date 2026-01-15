@@ -43,9 +43,29 @@ class PluginStoreEntry(BaseModel):
     comment: str
 
 
+class PluginRemoteInfo(BaseModel):
+    """Data from eg PyPI such as the most recent version"""
+
+    version: str
+
+
+def get_latest_version(package_name: str, client: httpx.Client) -> str:
+    url = f"https://pypi.org/pypi/{package_name}/json"
+    response = client.get(url)
+    if response.status_code == 200:
+        try:
+            return response.json()["info"]["version"]
+        except Exception:
+            logger.exception(f"getting version of {package_name=} => failure {response=}")
+    else:
+        logger.exception(f"getting version of {package_name=} => failure {response=}")
+    return "unknown"
+
+
 class PluginStore(BaseModel):
     display_name: str
-    plugins: dict[PluginId, PluginStoreEntry]
+    plugins: dict[PluginId, PluginStoreEntry] = {}
+    remote: dict[PluginId, PluginRemoteInfo] = {}
 
     @classmethod
     def fetch(cls, client: httpx.Client, plugin_store_config: PluginStoreConfig) -> Self:
@@ -58,6 +78,12 @@ class PluginStore(BaseModel):
                 return cls(**as_json)
             case s:
                 assert_never(s)
+
+    def populate(self, client: httpx.Client) -> None:
+        for pluginId, storeEntry in self.plugins.items():
+            self.remote[pluginId] = PluginRemoteInfo(
+                version=get_latest_version(storeEntry.pip_source, client),
+            )
 
 
 class StoresManager:
@@ -75,7 +101,24 @@ def initialize_stores(plugin_stores_config: PluginStoresConfig) -> None:
         with httpx.Client() as client:
             # a thread pool / async could work here but we dont expect many stores here
             stores = {key: PluginStore.fetch(client, value) for key, value in plugin_stores_config.items()}
+            for store in stores.values():
+                store.populate(client)
         StoresManager.stores = stores
+
+
+def get_plugins_detail() -> dict[PluginCompositeId, tuple[PluginStoreEntry, PluginRemoteInfo]]:
+    with timed_acquire(StoresManager.stores_lock, 5) as result:
+        # NOTE we lock to prevent collection-changed-during-iteration error
+        if not result:
+            raise ValueError("failed to acquire lock")
+        return {
+            PluginCompositeId(store=storeId, local=pluginId): (
+                store.plugins[pluginId],
+                store.remote[pluginId],
+            )
+            for storeId, store in StoresManager.stores.items()
+            for pluginId in store.plugins.keys()
+        }
 
 
 def submit_initialize_stores():
@@ -112,7 +155,7 @@ def submit_install_plugin(plugin_composite_key: PluginCompositeId) -> None:
             )
             config.save_to_file()
 
-    submit_update_single(plugin_composite_key, isUpdate=True, isLoad=True)
+    submit_update_single(plugin_composite_key, isUpdate=True)
 
 
 def join_stores_thread(timeout_sec: int) -> None:
