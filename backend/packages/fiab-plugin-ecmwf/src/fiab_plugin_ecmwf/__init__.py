@@ -52,12 +52,6 @@ ekdSource = BlockFactory(
     inputs=[],
 )
 
-# Product types:
-# - derived parameters (e.g. wind speed, thermal indices) [param]
-# - temporal statistics (e.g. weekly or monthly means) [step]
-# - ensemble statistics (e.g. ensms, probabilities, significance) [param?, step?, number]
-# Chaining allows building complex products (e.g. monthly ensemble mean of wind speed)
-# How product is produced depends on the forecast - so can not be statically defined
 ensembleStatistics = BlockFactory(
     kind="product",
     title="Ensemble Statistics",
