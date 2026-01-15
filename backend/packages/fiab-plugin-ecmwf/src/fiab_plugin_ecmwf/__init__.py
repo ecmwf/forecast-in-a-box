@@ -9,6 +9,7 @@
 
 from typing import cast
 
+import earthkit.data
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Payload, from_source
 from fiab_core.fable import (
@@ -23,15 +24,13 @@ from fiab_core.fable import (
     XarrayOutput,
 )
 from fiab_core.plugin import Error, Plugin
-import earthkit.data
-
 
 IFS_REQUEST = {
-    "class": "od", 
-    "stream": "enfo", 
-    "param": ["10u","10v","2d","2t","msl","skt","sp","stl1","stl2","tcw", "msl"],
+    "class": "od",
+    "stream": "enfo",
+    "param": ["10u", "10v", "2d", "2t", "msl", "skt", "sp", "stl1", "stl2", "tcw", "msl"],
     "levtype": "sfc",
-    "step": list[range(0, 361, 6)], 
+    "step": list[range(0, 361, 6)],
     "type": "pf",
     "number": list(range(1, 51)),
 }
@@ -58,14 +57,16 @@ ekdSource = BlockFactory(
 # - temporal statistics (e.g. weekly or monthly means) [step]
 # - ensemble statistics (e.g. ensms, probabilities, significance) [param?, step?, number]
 # Chaining allows building complex products (e.g. monthly ensemble mean of wind speed)
-# How product is produced depends on the forecast - so can not be statically defined 
+# How product is produced depends on the forecast - so can not be statically defined
 ensembleStatistics = BlockFactory(
     kind="product",
     title="Ensemble Statistics",
     description="Computes ensemble mean or standard deviation",
     configuration_options={
         "variable": BlockConfigurationOption(title="Variable", description="Variable name like '2t'", value_type="str"),
-        "statistic": BlockConfigurationOption(title="Statistic", description="Statistic to compute over the ensemble", value_type="enum['mean', 'std']"),
+        "statistic": BlockConfigurationOption(
+            title="Statistic", description="Statistic to compute over the ensemble", value_type="enum['mean', 'std']"
+        ),
     },
     inputs=["dataset"],
 )
@@ -111,11 +112,11 @@ def compiler(partitions: DataPartitionLookup, block_id: BlockInstanceId, block: 
                         Payload(
                             earthkit.data.from_source,
                             [block.configuration_values["source"]],
-                            {"request": {**IFS_REQUEST, "param": param}}, 
+                            {"request": {**IFS_REQUEST, "param": param}},
                         )
                         for param in IFS_REQUEST["param"]
                     ],
-                    coords={x: IFS_REQUEST[x] for x in ["param"]}
+                    coords={x: IFS_REQUEST[x] for x in ["param"]},
                 )
                 .expand((ENSEMBLE_DIM, IFS_REQUEST["number"]), "number")
                 .expand((STEP_DIM, IFS_REQUEST["step"]), "step")
