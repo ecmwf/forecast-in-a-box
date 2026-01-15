@@ -60,11 +60,20 @@ meanProduct = BlockFactory(
     inputs=["dataset"],
 )
 
+dummySink = BlockFactory(
+    kind="sink",
+    title="Dummy Sink",
+    description="A dummy sink",
+    configuration_options={},
+    inputs=["dataset"],
+)
+
 catalogue = BlockFactoryCatalogue(
     factories={
         "exampleSource": exampleSource,
         "ekdSource": ekdSource,
         "meanProduct": meanProduct,
+        "dummySink": dummySink,
     },
 )
 
@@ -80,16 +89,21 @@ def validator(block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> E
             if mean_variable not in input_dataset.variables:
                 return Either.error(f"variable {mean_variable} is not in the input variables: {input_dataset.variables}")
             output = XarrayOutput(variables=[mean_variable], coords=[])
+        case "dummySink":
+            output = XarrayOutput(variables=[], coords=[])
         case unmatched:
             raise TypeError(f"unexpected factory id {unmatched}")
     return Either.ok(output)
 
 
 def expander(block: BlockInstanceOutput) -> list[BlockFactoryId]:
+    if len(block.variables) == 0:
+        return []
+    expansions = ["dummySink"]
     if isinstance(block, XarrayOutput):
         if block.variables:
-            return ["meanProduct"]
-    return []
+            expansions.append("meanProduct")
+    return expansions
 
 
 def compiler(partitions: DataPartitionLookup, block_id: BlockInstanceId, block: BlockInstance) -> Either[DataPartitionLookup, Error]:  # type: ignore[invalid-argument] # semigroup
@@ -119,9 +133,12 @@ def compiler(partitions: DataPartitionLookup, block_id: BlockInstanceId, block: 
             input_task_action = partitions[input_task]
             if input_task_action.nodes.size != 1:
                 return Either.error(f"meanProduct supports only trivial partitioning, gotten {input_task_action.nodes.size}")
-            action = input_task_action.map(Payload(runtime.product.select, [block.configuration_values["variable"]])).map(
-                Payload(runtime.product.mean)
-            )
+            action = input_task_action.map(
+                Payload(runtime.product.select, kwargs={"variable": block.configuration_values["variable"]})
+            ).map(Payload(runtime.product.mean))
+        case "dummySink":
+            input_task = block.input_ids["dataset"]
+            action = partitions[input_task]
         case unmatched:
             raise TypeError(f"unexpected factory id {unmatched}")
 
