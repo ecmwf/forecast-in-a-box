@@ -26,8 +26,9 @@ from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException
 
 import forecastbox.db
-from forecastbox.api.plugin import PluginsStatus, join_updater_thread, submit_load_plugins
-from forecastbox.api.plugin import status_brief as status_plugins
+from forecastbox.api.plugin.manager import PluginsStatus, join_updater_thread, submit_load_plugins
+from forecastbox.api.plugin.manager import status_brief as status_plugins
+from forecastbox.api.plugin.store import join_stores_thread, submit_initialize_stores
 from forecastbox.api.scheduling.scheduler_thread import start_scheduler, status_scheduler, stop_scheduler
 from forecastbox.api.updates import get_local_release
 from forecastbox.db.migrations import migrate
@@ -55,11 +56,13 @@ async def lifespan(app: FastAPI):
     release_time, release_version = get_local_release()
     app.version = f"{release_version}@{release_time}"
     submit_load_plugins()
+    submit_initialize_stores()
     yield
     if config.api.allow_scheduler:
         stop_scheduler()
     await gateway.shutdown_processes()
     join_updater_thread(timeout_sec=10)
+    join_stores_thread(timeout_sec=10)
 
 
 app = FastAPI(

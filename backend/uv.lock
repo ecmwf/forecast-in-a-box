@@ -93,14 +93,14 @@ wheels = [
 
 [[package]]
 name = "anemoi-plugins-ecmwf-inference"
-version = "0.1.18"
+version = "0.1.21"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anemoi-inference" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c9/c1/fd1ba8a9169395bdb6afc4e6a8616e30bec10453a3913eb0072582e8e24e/anemoi_plugins_ecmwf_inference-0.1.18.tar.gz", hash = "sha256:d63ef476230d05214e7029b529616e29aea826085f0d1eaf45306badb0e84043", size = 40119, upload-time = "2025-11-18T16:11:35.976Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7b/bb/e804248f5b27790d7601fb3acb9be697a182a663201b3e944f3c445f12a8/anemoi_plugins_ecmwf_inference-0.1.21.tar.gz", hash = "sha256:6a923b245bdb6ff3beebdf850ab891cd07cc26eb2ba4282646918f8840684476", size = 40609, upload-time = "2026-01-13T11:00:42.943Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/98/c9/63a87a8aeab6fc7e03c0b7f743d318db33f6381fb538a3fded477765288a/anemoi_plugins_ecmwf_inference-0.1.18-py3-none-any.whl", hash = "sha256:c8634cbd321ea74fe202e6775f154d1336f8621cc4ebf7139fc3e52374884999", size = 42579, upload-time = "2025-11-18T16:11:31.524Z" },
+    { url = "https://files.pythonhosted.org/packages/76/d9/285192b330ab3fb031b65196425522e08862aa7c697497c4ca2791a84e82/anemoi_plugins_ecmwf_inference-0.1.21-py3-none-any.whl", hash = "sha256:76c692717898d96c76629fa2c95337ee8be1ee09ac1beb7c0551e33fd826fc0e", size = 42589, upload-time = "2026-01-13T11:00:41.567Z" },
 ]
 
 [package.optional-dependencies]
@@ -1752,6 +1752,7 @@ dev = [
     { name = "prek" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
+    { name = "pytest-mock" },
     { name = "pytest-subtests" },
     { name = "pytest-xdist" },
     { name = "ty" },
@@ -1761,7 +1762,7 @@ dev = [
 requires-dist = [
     { name = "aiosqlite" },
     { name = "anemoi-inference", specifier = "==0.8.3" },
-    { name = "anemoi-plugins-ecmwf-inference", extras = ["opendata", "polytope"], specifier = ">=0.1.17" },
+    { name = "anemoi-plugins-ecmwf-inference", extras = ["opendata", "polytope"], specifier = ">=0.1.20" },
     { name = "anemoi-utils", specifier = ">=0.4.36" },
     { name = "apscheduler" },
     { name = "cloudpickle" },
@@ -1803,6 +1804,7 @@ dev = [
     { name = "prek" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
+    { name = "pytest-mock", specifier = ">=3.15.1" },
     { name = "pytest-subtests" },
     { name = "pytest-xdist", specifier = ">=3.8" },
     { name = "ty", specifier = "==0.0.2" },
@@ -3826,6 +3828,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/90/2c/8af215c0f776415f3590cac4f9086ccefd6fd463befeae41cd4d3f193e5a/pytest_asyncio-1.3.0.tar.gz", hash = "sha256:d7f52f36d231b80ee124cd216ffb19369aa168fc10095013c6b014a34d3ee9e5", size = 50087, upload-time = "2025-11-10T16:07:47.256Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e5/35/f8b19922b6a25bc0880171a2f1a003eaeb93657475193ab516fd87cac9da/pytest_asyncio-1.3.0-py3-none-any.whl", hash = "sha256:611e26147c7f77640e6d0a92a38ed17c3e9848063698d5c93d5aa7aa11cebff5", size = 15075, upload-time = "2025-11-10T16:07:45.537Z" },
+]
+
+[[package]]
+name = "pytest-mock"
+version = "3.15.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/68/14/eb014d26be205d38ad5ad20d9a80f7d201472e08167f0bb4361e251084a9/pytest_mock-3.15.1.tar.gz", hash = "sha256:1849a238f6f396da19762269de72cb1814ab44416fa73a8686deac10b0d87a0f", size = 34036, upload-time = "2025-09-16T16:37:27.081Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5a/cc/06253936f4a7fa2e0f48dfe6d851d9c56df896a9ab09ac019d70b760619c/pytest_mock-3.15.1-py3-none-any.whl", hash = "sha256:0a25e2eb88fe5168d535041d09a4529a188176ae608a6d249ee65abc0949630d", size = 10095, upload-time = "2025-09-16T16:37:25.734Z" },
 ]
 
 [[package]]
