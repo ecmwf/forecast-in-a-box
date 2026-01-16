@@ -70,6 +70,12 @@ class PluginCompositeId(BaseModel):
 
 
 class PluginBlockFactoryId(BaseModel):
+    """Note to plugin authors: This is a routing class. When you implement your BlockFactories for the catalogue,
+    you dont use this, you only need to declare a BlockFactoryId unique inside your plugin. Similarly, when you
+    return which BlockFactories are possible in the expand method, you only return your BlockFactoryIds. This
+    appears only when you receive BlockInstances in the compile/validate -- and again, you just need to use the
+    BlockFactoryId part of this class, as the PluginCompositeId is guaranteed to correspond to your plugin"""
+
     plugin: PluginCompositeId
     factory: BlockFactoryId
 
