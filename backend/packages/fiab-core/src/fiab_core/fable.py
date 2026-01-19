@@ -13,7 +13,8 @@ Types pertaining to Forecast As BLock Expression (Fable): blocks
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+from typing_extensions import Self
 
 
 class BlockConfigurationOption(BaseModel):
@@ -48,10 +49,34 @@ class BlockFactory(BaseModel):
 BlockFactoryId = str
 BlockInstanceId = str
 PluginId = str
+PluginStoreId = str
+
+
+class PluginCompositeId(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    store: PluginStoreId
+    local: PluginId
+
+    @classmethod
+    def from_str(cls, v) -> "PluginCompositeId":
+        if not ":" in v:
+            raise ValueError("must be of the form store:local")
+        store, local = v.split(":", 1)
+        return cls(store=store, local=local)
+
+    @staticmethod
+    def to_str(k: Self) -> str:
+        return f"{k.store}:{k.local}"
 
 
 class PluginBlockFactoryId(BaseModel):
-    plugin: PluginId
+    """Note to plugin authors: This is a routing class. When you implement your BlockFactories for the catalogue,
+    you dont use this, you only need to declare a BlockFactoryId unique inside your plugin. Similarly, when you
+    return which BlockFactories are possible in the expand method, you only return your BlockFactoryIds. This
+    appears only when you receive BlockInstances in the compile/validate -- and again, you just need to use the
+    BlockFactoryId part of this class, as the PluginCompositeId is guaranteed to correspond to your plugin"""
+
+    plugin: PluginCompositeId
     factory: BlockFactoryId
 
 

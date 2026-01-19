@@ -9,13 +9,15 @@
 
 import logging
 import os
+import threading
 import urllib.parse
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 import toml
 from cascade.low.func import pydantic_recursive_collect
-from pydantic import BaseModel, Field, SecretStr, model_validator
+from fiab_core.fable import PluginCompositeId, PluginId, PluginStoreId
+from pydantic import BaseModel, BeforeValidator, Field, PlainSerializer, SecretStr, model_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict, TomlConfigSettingsSource
 
 fiab_home = Path(os.environ["FIAB_ROOT"]) if "FIAB_ROOT" in os.environ else (Path.home() / ".fiab")
@@ -115,6 +117,31 @@ class PluginSettings(BaseModel):
     """A string such that `importlib.import_module(module_name)` gives a module that has a `plugin` attribute of type fiab_core.plugin.Plugin`"""
     update_strategy: PluginRefreshStrategy = "manual"
     """Whether we should invoke `pip install --update <plugin>` on every launch, or let user handle that manually or via API"""
+    enabled: bool = True
+    """Whether the plugin should be considered when loading"""
+
+
+PluginCompositeIdReadable = Annotated[
+    PluginCompositeId, BeforeValidator(PluginCompositeId.from_str), PlainSerializer(PluginCompositeId.to_str, return_type=str)
+]
+PluginsSettings = dict[PluginCompositeIdReadable, PluginSettings]
+
+
+class PluginStoreConfig(BaseModel):
+    url: str
+    method: Literal["file"]
+
+
+PluginStoresConfig = dict[PluginStoreId, PluginStoreConfig]
+
+
+def _default_plugin_stores() -> PluginStoresConfig:
+    return {
+        "ecmwf": PluginStoreConfig(
+            url="https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/heads/main/install/plugins.json",
+            method="file",
+        ),
+    }
 
 
 class ProductSettings(BaseModel):
@@ -135,7 +162,8 @@ class ProductSettings(BaseModel):
     default_input_source: str = "opendata"
     """Default input source for models, if not specified otherwise"""
 
-    plugins: list[PluginSettings] = Field(default_factory=list)
+    plugins: PluginsSettings = Field(default_factory=dict)
+    plugin_stores: PluginStoresConfig = Field(default_factory=_default_plugin_stores)
 
     def validate_runtime(self) -> list[str]:
         if self.pproc_schema_dir and not os.path.isdir(self.pproc_schema_dir):
@@ -252,3 +280,4 @@ def validate_runtime(config: FIABConfig) -> None:
 
 
 config = FIABConfig()
+config_edit_lock = threading.Lock()

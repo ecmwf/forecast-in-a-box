@@ -30,13 +30,14 @@ threads, we lock for long.
 # Replace the Plugins dict lock with an atomic reference, and the dict itself
 # with a pyrsistent map or smth like that
 
+import datetime as dt
 import importlib
 import importlib.metadata
 import logging
+import pathlib
 import subprocess
 import threading
 import time
-from contextlib import contextmanager
 from types import ModuleType
 from typing import Iterator, Literal
 
@@ -45,8 +46,9 @@ from fiab_core.fable import BlockFactoryCatalogue
 from fiab_core.plugin import Plugin
 from pydantic import BaseModel
 
-from forecastbox.api.types.fable import PluginId
-from forecastbox.config import PluginSettings, config
+from forecastbox.api.ecpyutil import timed_acquire
+from forecastbox.api.types.fable import PluginCompositeId
+from forecastbox.config import PluginSettings, PluginsSettings, config, config_edit_lock
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +58,38 @@ def _try_import(module_name: str) -> ModuleType | None:
         return importlib.import_module(module_name)
     except ModuleNotFoundError:
         return None
+
+
+def _try_version(pluginSettings: PluginSettings) -> str:
+    try:
+        return importlib.metadata.version(pluginSettings.pip_source)
+    except importlib.metadata.PackageNotFoundError:
+        module = _try_import(pluginSettings.module_name)
+        if module is not None:
+            if hasattr(module, "_version"):
+                version = module._version
+                if isinstance(version, str):
+                    return version
+        return "unknown"
+
+
+def _try_updatedate(pluginSettings: PluginSettings) -> str:
+    try:
+        dist = importlib.metadata.distribution(pluginSettings.pip_source)
+    except importlib.metadata.PackageNotFoundError:
+        return "unknown"
+    if dist.files is None:
+        return "unknown"
+    try:
+        mtdf = next(f for f in dist.files if f.name == "METADATA")
+    except StopIteration:
+        return "unknown"
+    try:
+        path = pathlib.Path(mtdf.locate())
+        install_time = dt.datetime.fromtimestamp(path.stat().st_ctime)
+        return install_time.strftime("%Y/%m/%d")
+    except Exception:  # too much could happen -- file not exist, no rights, malformed ts, etc
+        return "unknown"
 
 
 def _try_install(pip_source: str) -> None:
@@ -71,21 +105,12 @@ def _try_install(pip_source: str) -> None:
 
 class PluginManager:
     lock: threading.Lock = threading.Lock()
-    plugins: dict[PluginId, Plugin] = {}
-    errors: dict[PluginId, str] = {}
+    plugins: dict[PluginCompositeId, Plugin] = {}
+    versions: dict[PluginCompositeId, str] = {}
+    errors: dict[PluginCompositeId, str] = {}
+    updatedate: dict[PluginCompositeId, str] = {}
     updater: threading.Thread | None = None
     updater_error: str | None = None
-
-
-@contextmanager
-def timed_acquire(lock: threading.Lock, timeout: float) -> Iterator[bool]:
-    # TODO move to ecpyutil
-    result = lock.acquire(timeout=timeout)
-    try:
-        yield result
-    finally:
-        if result:
-            lock.release()
 
 
 def load_single(plugin: PluginSettings) -> Plugin | str:
@@ -102,38 +127,46 @@ def load_single(plugin: PluginSettings) -> Plugin | str:
     return "\n".join(errors)
 
 
-def load_plugins(plugins: list[PluginSettings]) -> None:
+def load_plugins(plugins: PluginsSettings) -> None:
     logger.info("starting initial plugin load")
     try:
         lookup = {}
         errors = {}
-        for plugin in plugins:
-            # TODO consider running all pip invocations at once -- worse error reporting but better perf
-            if plugin.update_strategy == "auto":
-                logger.info(f"auto-updating {plugin.module_name}")
-                _try_install(plugin.pip_source)
+        versions = {}
+        updatedate = {}
+        for pluginKey, pluginSettings in plugins.items():
+            if not pluginSettings.enabled:
+                continue
+            # NOTE consider running all pip invocations at once -- worse error reporting but better perf
+            if pluginSettings.update_strategy == "auto":
+                logger.info(f"auto-updating {pluginSettings.module_name}")
+                _try_install(pluginSettings.pip_source)
             else:
-                if _try_import(plugin.module_name) is None:
-                    logger.info(f"installing {plugin.module_name} for the first time")
-                    _try_install(plugin.pip_source)
+                if _try_import(pluginSettings.module_name) is None:
+                    logger.info(f"installing {pluginSettings.module_name} for the first time")
+                    _try_install(pluginSettings.pip_source)
 
-            if plugin.module_name in plugins:
-                errors[plugin.module_name] = f"plugin {plugin.module_name} is provided by more than just {plugin.pip_source}"
+            if pluginKey in plugins:
+                errors[pluginKey] = f"plugin {pluginKey} is provided by more than just {pluginSettings.pip_source}"
             else:
-                result = load_single(plugin)
-                logger.debug(f"plugin {plugin} loaded with success: {isinstance(result, Plugin)}")
+                result = load_single(pluginSettings)
+                logger.debug(f"plugin {pluginKey} loaded with success: {isinstance(result, Plugin)}")
                 if isinstance(result, Plugin):
-                    lookup[plugin.module_name] = result
+                    lookup[pluginKey] = result
                 elif isinstance(result, str):
-                    errors[plugin.module_name] = result
+                    errors[pluginKey] = result
                 else:
                     assert_never(result)
+                versions[pluginKey] = _try_version(pluginSettings)
+                updatedate[pluginKey] = _try_updatedate(pluginSettings)
 
         with timed_acquire(PluginManager.lock, 60) as result:
             if not result:
                 raise ValueError("failed to acquire the shared lock")
             PluginManager.plugins = lookup
             PluginManager.errors = errors
+            PluginManager.versions = versions
+            PluginManager.updatedate = updatedate
         logger.debug("global plugin loading finished")
     except Exception as e:
         logger.exception(f"updating thread failed with {repr(e)}")
@@ -142,32 +175,42 @@ def load_plugins(plugins: list[PluginSettings]) -> None:
             PluginManager.updater_error = repr(e)
 
 
-def update_single(plugin: PluginSettings) -> None:
+def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, isUpdate: bool) -> None:
     try:
-        if plugin.module_name not in PluginManager.plugins:
-            result = "attempted to update but was not installed"
-        else:
-            _try_install(plugin.pip_source)
-            # NOTE we recommend in the docs to re-launch app after an update, this need not cover all cases
-            importlib.reload(importlib.import_module(plugin.module_name))
-            plugin_impl = _try_import(plugin.module_name)
-            result = load_single(plugin)
-            logger.debug(f"plugin {plugin} loaded with success: {isinstance(result, Plugin)}")
+        if isUpdate:
+            _try_install(pluginSettings.pip_source)
+        # NOTE we need to recommend in the docs to re-launch app after this change, this wont cover all cases
+        importlib.reload(importlib.import_module(pluginSettings.module_name))
+        plugin_impl = _try_import(pluginSettings.module_name)
+        result = load_single(pluginSettings)
+        logger.debug(f"plugin {pluginId} loaded with success: {isinstance(result, Plugin)}")
         with timed_acquire(PluginManager.lock, 60) as acquire_result:
             if not acquire_result:
                 raise ValueError("failed to acquire the shared lock")
             if isinstance(result, Plugin):
-                PluginManager.plugins[plugin.module_name] = result
+                PluginManager.plugins[pluginId] = result
             elif isinstance(result, str):
-                PluginManager.errors[plugin.module_name] = result
+                PluginManager.errors[pluginId] = result
             else:
                 assert_never(result)
+            PluginManager.versions[pluginId] = _try_version(pluginSettings)
+            PluginManager.updatedate[pluginId] = _try_updatedate(pluginSettings)
         logger.debug("single plugin loading finished: {plugin.module_name}")
     except Exception as e:
         logger.exception(f"updating thread failed with {repr(e)}")
         with timed_acquire(PluginManager.lock, 5) as _:
             # NOTE we ignore result -- we rather corrupt than deadlock
             PluginManager.updater_error = repr(e)
+
+
+def unload_single(pluginId: PluginCompositeId) -> None:
+    # TODO we could lock here but probably not worth it
+    if pluginId in PluginManager.plugins:
+        PluginManager.plugins.pop(pluginId)
+    if pluginId in PluginManager.errors:
+        PluginManager.errors.pop(pluginId)
+    if pluginId in PluginManager.versions:
+        PluginManager.versions.pop(pluginId)
 
 
 def submit_load_plugins():
@@ -185,8 +228,9 @@ def submit_load_plugins():
 
 class PluginsStatus(BaseModel):
     updater_status: Literal["ok", "running", "retrieving"] | str
-    plugin_errors: dict[str, str]
-    plugin_versions: dict[str, str]
+    plugin_errors: dict[PluginCompositeId, str]
+    plugin_versions: dict[PluginCompositeId, str]
+    plugin_updatedate: dict[PluginCompositeId, str]
 
 
 def status_brief() -> str:
@@ -209,23 +253,21 @@ def status_full() -> PluginsStatus:
             status = "retrieving"
             plugin_errors = {}
             plugin_versions = {}
+            plugin_updatedate = {}
         else:
             status = status_brief()
             plugin_errors = {plugin: error for plugin, error in PluginManager.errors.items()}
-            plugin_versions = {}
-            for plugin in PluginManager.plugins.keys():
-                try:
-                    plugin_versions[plugin] = importlib.metadata.version(plugin)
-                except importlib.metadata.PackageNotFoundError:
-                    plugin_errors[plugin] = f"failed to determine version of {plugin}"
+            plugin_versions = {plugin: version for plugin, version in PluginManager.versions.items()}
+            plugin_updatedate = {plugin: updatedate for plugin, updatedate in PluginManager.updatedate.items()}
     return PluginsStatus(
         updater_status=status,
         plugin_errors=plugin_errors,
         plugin_versions=plugin_versions,
+        plugin_updatedate=plugin_updatedate,
     )
 
 
-def catalogue_view() -> dict[PluginId, BlockFactoryCatalogue] | bool:
+def catalogue_view() -> dict[PluginCompositeId, BlockFactoryCatalogue] | bool:
     with timed_acquire(PluginManager.lock, 1.0) as result:
         if not result:
             return False
@@ -233,11 +275,10 @@ def catalogue_view() -> dict[PluginId, BlockFactoryCatalogue] | bool:
             return {plugin_id: plugin.catalogue for plugin_id, plugin in PluginManager.plugins.items()}
 
 
-def submit_update_single(plugin_name: str) -> str:
-    # NOTE consider caching this lookup
-    lookup = {e.module_name: e.pip_source for e in config.product.plugins}
-    if plugin_name not in lookup:
-        return f"plugin {plugin_name} not configured"
+def submit_update_single(pluginId: PluginCompositeId, isUpdate: bool) -> str:
+    pluginSettings = config.product.plugins.get(pluginId, None)
+    if pluginSettings is None:
+        return f"plugin {pluginId} not configured"
     else:
         with timed_acquire(PluginManager.lock, 0.5) as result:
             if not result:
@@ -251,12 +292,36 @@ def submit_update_single(plugin_name: str) -> str:
                 else:
                     PluginManager.updater.join(0)
                     # we join despite thread not being alive to ensure resource collection
-            PluginManager.updater = threading.Thread(target=update_single, args=(lookup[plugin_name],))
+            PluginManager.updater = threading.Thread(target=update_single, args=(pluginId, pluginSettings, isUpdate))
             PluginManager.updater.start()
     return ""
 
 
+def uninstall_plugin(pluginId: PluginCompositeId) -> None:
+    if pluginId not in config.product.plugins:
+        raise ValueError(f"plugin {pluginId} not installed")
+    with timed_acquire(config_edit_lock, 5) as result:
+        if not result:
+            raise ValueError("failed to acquire the shared lock")
+        config.product.plugins.pop(pluginId)
+        config.save_to_file()
+    unload_single(pluginId)
+
+
+def modify_enabled(pluginId: PluginCompositeId, isEnabled: bool) -> None:
+    with timed_acquire(config_edit_lock, 5) as result:
+        if not result:
+            raise ValueError("failed to acquire the shared lock")
+        config.product.plugins[pluginId].enabled = isEnabled
+        config.save_to_file()
+    if not isEnabled:
+        unload_single(pluginId)
+    else:
+        submit_update_single(pluginId, isUpdate=False)
+
+
 def join_updater_thread(timeout_sec: int) -> None:
+    # TODO candidate for ecpyutil, duplicated in plugin.store
     barrier = (time.perf_counter_ns() / 1e9) + timeout_sec
     with timed_acquire(PluginManager.lock, timeout_sec) as result:
         if not result:
