@@ -10,6 +10,7 @@
 import json
 from typing import cast
 
+import numpy as np
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Payload, from_source
 from fiab_core.fable import (
@@ -111,7 +112,7 @@ def compiler(partitions: DataPartitionLookup, block_id: BlockInstanceId, block: 
     # environment = ["fiab-plugin-toy2[runtime]"]
     match block.factory_id.factory:
         case "exampleSource":
-            action = from_source([runtime.datasource.from_example])
+            action = from_source(np.array([runtime.datasource.from_example]))
         case "ekdSource":
             request_params = {
                 "param": ["2t", "msl"],
@@ -121,12 +122,14 @@ def compiler(partitions: DataPartitionLookup, block_id: BlockInstanceId, block: 
                 "date": block.configuration_values["date"],
             }
             action = from_source(
-                [
-                    Payload(
-                        runtime.datasource.from_source,
-                        [block.configuration_values["source"], request_params],
-                    )
-                ]
+                np.array(
+                    [
+                        Payload(
+                            runtime.datasource.from_source,
+                            [block.configuration_values["source"], request_params],
+                        )
+                    ]
+                )
             )
         case "meanProduct":
             input_task = block.input_ids["dataset"]
