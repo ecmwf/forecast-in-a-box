@@ -125,12 +125,11 @@ def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobRespons
 
     r = api.SubmitJobRequest(
         job=api.JobSpec(
-            benchmark_name=None,
             workers_per_host=workers_per_host,
             hosts=hosts,
             envvars=env_vars,
             use_slurm=False,
-            job_instance=job,
+            job_instance=api.JobInstanceRich(jobInstance=job, checkpointSpec=None),
         )
     )
     try:
@@ -172,6 +171,6 @@ async def execute(spec: ExecutionSpecification, user_id: str | None) -> Either[S
 async def execute2response(spec: ExecutionSpecification, user: UserRead | None) -> SubmitJobResponse:
     result = await execute(spec, str(user.id) if user is not None else None)
     if result.t is None:
-        raise HTTPException(status_code=500, detail=f"Failed to execute because of {result.error}")
+        raise HTTPException(status_code=500, detail=f"Failed to execute because of {result.e}")
     else:
         return result.t
