@@ -7,7 +7,6 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-import json
 from typing import cast
 
 import numpy as np
@@ -21,13 +20,10 @@ from fiab_core.fable import (
     BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
-    BlockKind,
     DataPartitionLookup,
     XarrayOutput,
 )
 from fiab_core.plugin import Error, Plugin
-
-from fiab_plugin_toy2 import runtime
 
 exampleSource = BlockFactory(
     kind="source",
@@ -112,7 +108,7 @@ def compiler(partitions: DataPartitionLookup, block_id: BlockInstanceId, block: 
     # environment = ["fiab-plugin-toy2[runtime]"]
     match block.factory_id.factory:
         case "exampleSource":
-            action = from_source(np.array([runtime.datasource.from_example]))
+            action = from_source(np.array(["fiab_plugin_toy2.runtime.datasource.from_example"]))
         case "ekdSource":
             request_params = {
                 "param": ["2t", "msl"],
@@ -125,7 +121,7 @@ def compiler(partitions: DataPartitionLookup, block_id: BlockInstanceId, block: 
                 np.array(
                     [
                         Payload(
-                            runtime.datasource.from_source,
+                            "fiab_plugin_toy2.runtime.datasource.from_source",
                             [block.configuration_values["source"], request_params],
                         )
                     ]
@@ -137,8 +133,8 @@ def compiler(partitions: DataPartitionLookup, block_id: BlockInstanceId, block: 
             if input_task_action.nodes.size != 1:
                 return Either.error(f"meanProduct supports only trivial partitioning, gotten {input_task_action.nodes.size}")
             action = input_task_action.map(
-                Payload(runtime.product.select, kwargs={"variable": block.configuration_values["variable"]})
-            ).map(Payload(runtime.product.mean))
+                Payload("fiab_plugin_toy2.runtime.product.select", kwargs={"variable": block.configuration_values["variable"]})
+            ).map(Payload("fiab_plugin_toy2.runtime.product.mean"))
         case "dummySink":
             input_task = block.input_ids["dataset"]
             action = partitions[input_task]

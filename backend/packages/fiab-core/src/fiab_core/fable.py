@@ -13,11 +13,9 @@ Types pertaining to Forecast As BLock Expression (Fable): blocks
 
 from typing import Literal
 
+from earthkit.workflows.fluent import Action
 from pydantic import BaseModel, ConfigDict
 from typing_extensions import Self
-
-from earthkit.workflows.fluent import Action
-from pydantic import BaseModel
 
 
 class BlockConfigurationOption(BaseModel):
