@@ -17,7 +17,6 @@ from fiab_core.fable import (
     DataPartitionLookup,
 )
 from fiab_core.plugin import Error, Plugin
-
 from fiab_plugin_ecmwf.blocks import dummySink, ekdSource, ensembleStatistics
 
 catalogue = BlockFactoryCatalogue(
@@ -38,12 +37,7 @@ def expander(block: BlockInstanceOutput) -> list[BlockFactoryId]:
     if len(block.variables) == 0:
         return []
     expansions: list[BlockFactoryId] = []
-    dummy_sink = catalogue.factories["dummySink"]
-    if dummy_sink.intersect(block):
-        expansions.append("dummySink")
     for factory_id, factory in catalogue.factories.items():
-        if factory_id == "dummySink":
-            continue
         if factory.intersect(block):
             expansions.append(factory_id)
     return expansions
@@ -52,6 +46,7 @@ def expander(block: BlockInstanceOutput) -> list[BlockFactoryId]:
 def compiler(partitions: DataPartitionLookup, block_id: BlockInstanceId, block: BlockInstance) -> Either[DataPartitionLookup, Error]:  # type: ignore[invalid-argument] # semigroup
     factory = catalogue.factories[block.factory_id.factory]
     return factory.compile(partitions, block_id, block)
+
 
 plugin = Plugin(
     catalogue=catalogue,
