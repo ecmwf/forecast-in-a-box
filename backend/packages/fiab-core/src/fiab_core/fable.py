@@ -104,3 +104,55 @@ BlockInstanceOutput = XarrayOutput  # NOTE eventually a Union
 
 # NOTE placeholder, this will be replaced with Fluent
 DataPartitionLookup = dict[BlockInstanceId, Action]
+
+
+class SourceFactory(BlockFactory):
+    kind: Literal["source"] = "source"
+
+    def validate(self, block: "BlockInstance", inputs: dict[str, "BlockInstanceOutput"]):
+        raise NotImplementedError
+
+    def compile(self, partitions: "DataPartitionLookup", block_id: "BlockInstanceId", block: "BlockInstance"):
+        raise NotImplementedError
+
+    def intersect(self, output: "BlockInstanceOutput") -> bool:
+        return False
+
+
+class ProductFactory(BlockFactory):
+    kind: Literal["product"] = "product"
+
+    def validate(self, block: "BlockInstance", inputs: dict[str, "BlockInstanceOutput"]):
+        raise NotImplementedError
+
+    def compile(self, partitions: "DataPartitionLookup", block_id: "BlockInstanceId", block: "BlockInstance"):
+        raise NotImplementedError
+
+    def intersect(self, output: "BlockInstanceOutput") -> bool:
+        return False
+
+
+class SinkFactory(BlockFactory):
+    kind: Literal["sink"] = "sink"
+
+    def validate(self, block: "BlockInstance", inputs: dict[str, "BlockInstanceOutput"]):
+        raise NotImplementedError
+
+    def compile(self, partitions: "DataPartitionLookup", block_id: "BlockInstanceId", block: "BlockInstance"):
+        raise NotImplementedError
+
+    def intersect(self, output: "BlockInstanceOutput") -> bool:
+        return False
+
+
+class TransformFactory(BlockFactory):
+    kind: Literal["transform"] = "transform"
+
+    def validate(self, block: "BlockInstance", inputs: dict[str, "BlockInstanceOutput"]):
+        raise NotImplementedError
+
+    def compile(self, partitions: "DataPartitionLookup", block_id: "BlockInstanceId", block: "BlockInstance"):
+        raise NotImplementedError
+
+    def intersect(self, output: "BlockInstanceOutput") -> bool:
+        return False
