@@ -12,15 +12,13 @@ from typing import cast
 import earthkit.data
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Payload, from_source
+from fiab_core.blocks import ProductFactory, SinkFactory, SourceFactory
 from fiab_core.fable import (
     BlockConfigurationOption,
     BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
     DataPartitionLookup,
-    ProductFactory,
-    SinkFactory,
-    SourceFactory,
     XarrayOutput,
 )
 from fiab_core.plugin import Error
@@ -28,7 +26,19 @@ from fiab_core.plugin import Error
 IFS_REQUEST = {
     "class": "od",
     "stream": "enfo",
-    "param": ["10u", "10v", "2d", "2t", "msl", "skt", "sp", "stl1", "stl2", "tcw", "msl"],
+    "param": [
+        "10u",
+        "10v",
+        "2d",
+        "2t",
+        "msl",
+        "skt",
+        "sp",
+        "stl1",
+        "stl2",
+        "tcw",
+        "msl",
+    ],
     "levtype": "sfc",
     "step": list(range(0, 61, 6)),
     "type": "pf",
@@ -40,12 +50,19 @@ STEP_DIM = "step"
 
 
 class EkdSourceFactory(SourceFactory):
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:
-        output = XarrayOutput(variables=IFS_REQUEST["param"], coords=[STEP_DIM, ENSEMBLE_DIM])
+    def validate(
+        self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]
+    ) -> Either[BlockInstanceOutput, Error]:
+        output = XarrayOutput(
+            variables=IFS_REQUEST["param"], coords=[STEP_DIM, ENSEMBLE_DIM]
+        )
         return Either.ok(output)
 
     def compile(
-        self, partitions: DataPartitionLookup, block_id: BlockInstanceId, block: BlockInstance
+        self,
+        partitions: DataPartitionLookup,
+        block_id: BlockInstanceId,
+        block: BlockInstance,
     ) -> Either[DataPartitionLookup, Error]:
         action = (
             from_source(
@@ -66,8 +83,16 @@ class EkdSourceFactory(SourceFactory):
                 ],
                 coords={PARAM_DIM: IFS_REQUEST[x] for x in ["param"]},
             )
-            .expand((ENSEMBLE_DIM, IFS_REQUEST["number"]), "number", dim_size=len(IFS_REQUEST["number"]))
-            .expand((STEP_DIM, IFS_REQUEST["step"]), "step", dim_size=len(IFS_REQUEST["step"]))
+            .expand(
+                (ENSEMBLE_DIM, IFS_REQUEST["number"]),
+                "number",
+                dim_size=len(IFS_REQUEST["number"]),
+            )
+            .expand(
+                (STEP_DIM, IFS_REQUEST["step"]),
+                "step",
+                dim_size=len(IFS_REQUEST["step"]),
+            )
         )
         partitions[block_id] = action
         return Either.ok(partitions)
@@ -78,31 +103,52 @@ ekdSource = EkdSourceFactory(
     description="Fetch data from mars or ecmwf open data",
     configuration_options={
         "source": BlockConfigurationOption(
-            title="Source", description="Top level source for earthkit data", value_type="enum['mars', 'ecmwf-open-data']"
+            title="Source",
+            description="Top level source for earthkit data",
+            value_type="enum['mars', 'ecmwf-open-data']",
         ),
-        "date": BlockConfigurationOption(title="Date", description="The date dimension of the data", value_type="date-iso8601"),
-        "expver": BlockConfigurationOption(title="Expver", description="The expver value of the forecast", value_type="str"),
+        "date": BlockConfigurationOption(
+            title="Date",
+            description="The date dimension of the data",
+            value_type="date-iso8601",
+        ),
+        "expver": BlockConfigurationOption(
+            title="Expver",
+            description="The expver value of the forecast",
+            value_type="str",
+        ),
     },
     inputs=[],
 )
 
 
 class EnsembleStatisticsFactory(ProductFactory):
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:
-        input_dataset = cast(XarrayOutput, inputs["dataset"])  # type:ignore[redundant-cast] # NOTE the warning is correct but we expect more
+    def validate(
+        self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]
+    ) -> Either[BlockInstanceOutput, Error]:
+        input_dataset = cast(
+            XarrayOutput, inputs["dataset"]
+        )  # type:ignore[redundant-cast] # NOTE the warning is correct but we expect more
         variable = block.configuration_values["variable"]
         if variable not in input_dataset.variables:
-            return Either.error(f"variable {variable} is not in the input variables: {input_dataset.variables}")
+            return Either.error(
+                f"variable {variable} is not in the input variables: {input_dataset.variables}"
+            )
         output = XarrayOutput(variables=[variable], coords=[STEP_DIM])
         return Either.ok(output)
 
     def compile(
-        self, partitions: DataPartitionLookup, block_id: BlockInstanceId, block: BlockInstance
+        self,
+        partitions: DataPartitionLookup,
+        block_id: BlockInstanceId,
+        block: BlockInstance,
     ) -> Either[DataPartitionLookup, Error]:
         input_task = block.input_ids["dataset"]
         input_task_action = partitions[input_task]
         stat = block.configuration_values["statistic"]
-        param = input_task_action.select({PARAM_DIM: block.configuration_values["variable"]})
+        param = input_task_action.select(
+            {PARAM_DIM: block.configuration_values["variable"]}
+        )
         if stat == "mean":
             action = param.mean(dim=ENSEMBLE_DIM)
         elif stat == "std":
@@ -111,16 +157,24 @@ class EnsembleStatisticsFactory(ProductFactory):
         return Either.ok(partitions)
 
     def intersect(self, output: BlockInstanceOutput) -> bool:
-        return isinstance(output, XarrayOutput) and output.variables and ENSEMBLE_DIM in output.coords
+        return (
+            isinstance(output, XarrayOutput)
+            and output.variables
+            and ENSEMBLE_DIM in output.coords
+        )
 
 
 ensembleStatistics = EnsembleStatisticsFactory(
     title="Ensemble Statistics",
     description="Computes ensemble mean or standard deviation",
     configuration_options={
-        "variable": BlockConfigurationOption(title="Variable", description="Variable name like '2t'", value_type="str"),
+        "variable": BlockConfigurationOption(
+            title="Variable", description="Variable name like '2t'", value_type="str"
+        ),
         "statistic": BlockConfigurationOption(
-            title="Statistic", description="Statistic to compute over the ensemble", value_type="enum['mean', 'std']"
+            title="Statistic",
+            description="Statistic to compute over the ensemble",
+            value_type="enum['mean', 'std']",
         ),
     },
     inputs=["dataset"],
@@ -128,12 +182,17 @@ ensembleStatistics = EnsembleStatisticsFactory(
 
 
 class DummySinkFactory(SinkFactory):
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:
+    def validate(
+        self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]
+    ) -> Either[BlockInstanceOutput, Error]:
         output = XarrayOutput(variables=[], coords=[])
         return Either.ok(output)
 
     def compile(
-        self, partitions: DataPartitionLookup, block_id: BlockInstanceId, block: BlockInstance
+        self,
+        partitions: DataPartitionLookup,
+        block_id: BlockInstanceId,
+        block: BlockInstance,
     ) -> Either[DataPartitionLookup, Error]:
         input_task = block.input_ids["dataset"]
         action = partitions[input_task]
