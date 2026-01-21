@@ -33,8 +33,8 @@ class SourceFactory(BlockFactory):
     ):
         raise NotImplementedError
 
-    def intersect(self, output: BlockInstanceOutput | None) -> bool:
-        return output is None
+    def intersect(self, input: BlockInstanceOutput | None) -> bool:
+        return input is None
 
 
 class ProductFactory(BlockFactory):
