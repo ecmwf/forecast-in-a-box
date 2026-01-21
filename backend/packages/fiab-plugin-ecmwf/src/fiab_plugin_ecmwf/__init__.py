@@ -17,13 +17,13 @@ from fiab_core.fable import (
     DataPartitionLookup,
 )
 from fiab_core.plugin import Error, Plugin
-from fiab_plugin_ecmwf.blocks import dummySink, ekdSource, ensembleStatistics
+from fiab_plugin_ecmwf.blocks import ekdSource, ensembleStatistics, zarrSink
 
 catalogue = BlockFactoryCatalogue(
     factories={
         "ekdSource": ekdSource,
         "ensembleStatistics": ensembleStatistics,
-        "dummySink": dummySink,  # TODO: remove this once we have real sinks
+        "zarrSink": zarrSink,
     },
 )
 
