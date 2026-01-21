@@ -181,7 +181,11 @@ ensembleStatistics = EnsembleStatisticsFactory(
 )
 
 
-class DummySinkFactory(SinkFactory):
+def write_zarr(dataset, path: str) -> None:
+    dataset.to_zarr(path, mode="w")
+
+
+class ZarrSinkFactory(SinkFactory):
     def validate(
         self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]
     ) -> Either[BlockInstanceOutput, Error]:
@@ -195,7 +199,9 @@ class DummySinkFactory(SinkFactory):
         block: BlockInstance,
     ) -> Either[DataPartitionLookup, Error]:
         input_task = block.input_ids["dataset"]
-        action = partitions[input_task]
+        action = partitions[input_task].map(
+            Payload(write_zarr, kwargs={"path": block.configuration_values["path"]})
+        )
         partitions[block_id] = action
         return Either.ok(partitions)
 
@@ -203,9 +209,15 @@ class DummySinkFactory(SinkFactory):
         return len(output.variables) > 0
 
 
-dummySink = DummySinkFactory(
-    title="Dummy Sink",
-    description="A dummy sink",
-    configuration_options={},
+zarrSink = ZarrSinkFactory(
+    title="Zarr Sink",
+    description="Write dataset to a zarr on the local filesystem",
+    configuration_options={
+        "path": BlockConfigurationOption(
+            title="Zarr Path",
+            description="Filesystem path where the zarr should be written",
+            value_type="str",
+        )
+    },
     inputs=["dataset"],
 )
