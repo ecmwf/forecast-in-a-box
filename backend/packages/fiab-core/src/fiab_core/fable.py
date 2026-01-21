@@ -116,7 +116,7 @@ class SourceFactory(BlockFactory):
         raise NotImplementedError
 
     def intersect(self, output: "BlockInstanceOutput") -> bool:
-        return False
+        return output is None
 
 
 class ProductFactory(BlockFactory):
