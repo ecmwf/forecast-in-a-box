@@ -95,7 +95,7 @@ def validate_expand(fable: FableBuilderV1) -> FableValidationExpansion:
         # TODO -- some general purp deser
 
         inputs = {input_id: outputs[source_id] for input_id, source_id in blockInstance.input_ids.items()}
-        output_or_error = plugin.validator(blockInstance, inputs)
+        output_or_error = plugin.validate(blockInstance, inputs)
         if output_or_error.t is None:
             block_errors[blockId] += cast(str, output_or_error.e)
             continue
@@ -104,7 +104,7 @@ def validate_expand(fable: FableBuilderV1) -> FableValidationExpansion:
         possible_expansions[blockId] = [
             PluginBlockFactoryId(plugin=any_plugin_id, factory=block_factory_id)
             for any_plugin_id, any_plugin in plugins.items()
-            for block_factory_id in any_plugin.expander(output_or_error.t)
+            for block_factory_id in any_plugin.expand(output_or_error.t)
         ]
 
     global_errors = []  # cant think of any rn
@@ -127,7 +127,7 @@ def compile(fable: FableBuilderV1) -> RawCascadeJob:
         plugin = plugins.get(blockInstance.factory_id.plugin, None)
         if not plugin:
             raise ValueError(f"plugin for {blockId=} not found")
-        result = plugin.compiler(data_partition_lookup, blockId, blockInstance)
+        result = plugin.compile(data_partition_lookup, blockId, blockInstance)
         if result.t is None:
             raise ValueError(f"compile failed at {blockId=} with {result.e}")
         data_partition_lookup = result.t
