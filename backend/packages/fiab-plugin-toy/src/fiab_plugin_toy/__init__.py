@@ -145,9 +145,22 @@ def compiler(partitions: DataPartitionLookup, block_id: BlockInstanceId, block: 
     return Either.ok(partitions)
 
 
-plugin = Plugin(
-    catalogue=catalogue,
-    validator=validator,
-    expander=expander,
-    compiler=compiler,
-)
+class ToyPlugin(Plugin):
+    def validate(
+        self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]
+    ) -> Either[BlockInstanceOutput, Error]:  # type: ignore[invalid-argument] # semigroup
+        return validator(block, inputs)
+
+    def expand(self, block: BlockInstanceOutput) -> list[BlockFactoryId]:
+        return expander(block)
+
+    def compile(
+        self,
+        partitions: DataPartitionLookup,
+        block_id: BlockInstanceId,
+        block: BlockInstance,
+    ) -> Either[DataPartitionLookup, Error]:  # type: ignore[invalid-argument] # semigroup
+        return compiler(partitions, block_id, block)
+
+
+plugin = ToyPlugin(catalogue=catalogue)
