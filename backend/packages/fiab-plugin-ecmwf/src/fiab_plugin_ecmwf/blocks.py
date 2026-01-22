@@ -9,7 +9,6 @@
 
 from typing import cast
 
-import earthkit.data
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Payload, from_source
 from fiab_core.blocks import ProductFactory, SinkFactory, SourceFactory
@@ -68,7 +67,7 @@ class EkdSourceFactory(SourceFactory):
             from_source(
                 [
                     Payload(
-                        earthkit.data.from_source,
+                        "earthkit.data.from_source",
                         [block.configuration_values["source"]],
                         {
                             "request": {
