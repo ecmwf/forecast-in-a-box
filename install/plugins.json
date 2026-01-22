@@ -8,6 +8,13 @@
             "display_title": "Toy Plugin",
             "display_description": "Example Fable Workflows",
             "display_author": "ECMWF"
+        },
+        "ecmwf": {
+            "pip_source": "fiab-plugin-ecmwf",
+            "module_name": "fiab_plugin_ecmwf",
+            "display_title": "ECMWF Plugin",
+            "display_description": "ECMWF plugin for Earthkit-data sources and products",
+            "display_author": "ECMWF"
         }
     }
 }
