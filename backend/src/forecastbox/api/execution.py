@@ -16,7 +16,7 @@ from typing import Any, Sequence
 import cascade.gateway.api as api
 import cascade.gateway.client as client
 from cascade.low import views as cascade_views
-from cascade.low.core import JobInstance
+from cascade.low.core import JobInstance, JobInstanceRich
 from cascade.low.func import Either, assert_never
 from cascade.low.into import graph2job
 from earthkit.workflows import Cascade, fluent
@@ -125,12 +125,11 @@ def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobRespons
 
     r = api.SubmitJobRequest(
         job=api.JobSpec(
-            benchmark_name=None,
             workers_per_host=workers_per_host,
             hosts=hosts,
             envvars=env_vars,
             use_slurm=False,
-            job_instance=job,
+            job_instance=JobInstanceRich(jobInstance=job, checkpointSpec=None),
         )
     )
     try:
