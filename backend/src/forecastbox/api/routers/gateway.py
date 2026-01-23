@@ -14,7 +14,7 @@ import os
 import select
 import subprocess
 from dataclasses import dataclass
-from multiprocessing import Process
+from multiprocessing.process import BaseProcess
 from tempfile import TemporaryDirectory
 
 import cascade.executor.platform as cascade_platform
@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class GatewayProcess:
     log_path: str | None
-    process: Process
+    process: BaseProcess
 
     def cleanup(self) -> None:
         pass

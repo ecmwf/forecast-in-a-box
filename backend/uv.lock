@@ -1208,7 +1208,7 @@ wheels = [
 
 [[package]]
 name = "earthkit-workflows"
-version = "0.5.1"
+version = "0.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "array-api-compat" },
@@ -1222,13 +1222,13 @@ dependencies = [
     { name = "pydantic" },
     { name = "pyrsistent" },
     { name = "pyvis" },
+    { name = "pyzmq" },
     { name = "sortedcontainers" },
     { name = "xarray" },
-    { name = "zmq" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/fc/77/f0eaf66a9a693ca45c3702bb722ebf5cd6f3e63cb57202f7bb392f640a8c/earthkit_workflows-0.5.1.tar.gz", hash = "sha256:76b570128a28fbb205030fb1a5a78483814813c956c6b982e8d2db680f0186b5", size = 10510881, upload-time = "2025-12-12T14:32:03.203Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/70/28/67366739c510703a04e3c999c43d2c090c15dac7f5ba60443cfcbc6d54c2/earthkit_workflows-0.6.0.tar.gz", hash = "sha256:703bb6d2aa831e62f29d59ab01761608e785b4c2e1fe7c799c5a60a2fae79f87", size = 10672375, upload-time = "2026-01-23T09:26:09.619Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/67/23/7528a3a7c49b213fbfa5e15ff694c480a2a3bec211c22d3e35a1443f5463/earthkit_workflows-0.5.1-py3-none-any.whl", hash = "sha256:213aa7e6c6160947b36cb8c8e4a99c29671d776d5f2f3458de3eb0b414a4c849", size = 162452, upload-time = "2025-12-12T14:32:01.688Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/c2/ad2cf00d9ab20933a4b3016fac3a129240e89f64317b266f07d3809b9d01/earthkit_workflows-0.6.0-py3-none-any.whl", hash = "sha256:97941956fde7b7303b280a5f9edbfe94be62f5909840e75363c2b3c3f09be517", size = 167645, upload-time = "2026-01-23T09:26:06.634Z" },
 ]
 
 [[package]]
@@ -1768,7 +1768,7 @@ requires-dist = [
     { name = "cloudpickle" },
     { name = "earthkit-plots", marker = "extra == 'plots'", specifier = ">=0.3.5" },
     { name = "earthkit-plots-default-styles", marker = "extra == 'plots'", specifier = ">=0.1" },
-    { name = "earthkit-workflows", specifier = ">=0.5.1" },
+    { name = "earthkit-workflows", specifier = ">=0.6.0" },
     { name = "earthkit-workflows-anemoi", specifier = ">=0.3.12" },
     { name = "earthkit-workflows-pproc", git = "https://github.com/ecmwf/earthkit-workflows-pproc" },
     { name = "ecmwf-api-client", marker = "extra == 'webmars'", specifier = ">=1.6.5" },
@@ -5002,12 +5002,3 @@ sdist = { url = "https://files.pythonhosted.org/packages/e3/02/0f2892c661036d50e
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2e/54/647ade08bf0db230bfea292f893923872fd20be6ac6f53b2b936ba839d75/zipp-3.23.0-py3-none-any.whl", hash = "sha256:071652d6115ed432f5ce1d34c336c0adfd6a884660d1e9712a256d3d3bd4b14e", size = 10276, upload-time = "2025-06-08T17:06:38.034Z" },
 ]
-
-[[package]]
-name = "zmq"
-version = "0.0.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pyzmq" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/6e/78/833b2808793c1619835edb1a4e17a023d5d625f4f97ff25ffff986d1f472/zmq-0.0.0.tar.gz", hash = "sha256:6b1a1de53338646e8c8405803cffb659e8eb7bb02fff4c9be62a7acfac8370c9", size = 966, upload-time = "2015-05-21T17:34:26.603Z" }
