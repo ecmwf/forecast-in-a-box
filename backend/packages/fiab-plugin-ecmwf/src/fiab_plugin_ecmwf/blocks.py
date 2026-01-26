@@ -9,9 +9,9 @@
 
 from typing import cast
 
+import numpy as np
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Payload, from_source
-from fiab_core.blocks import ProductFactory, SinkFactory, SourceFactory
 from fiab_core.fable import (
     BlockConfigurationOption,
     BlockInstance,
@@ -21,10 +21,11 @@ from fiab_core.fable import (
     XarrayOutput,
 )
 from fiab_core.plugin import Error
+from fiab_core.tools.blocks import Product, Sink, Source
 
 IFS_REQUEST = {
-    "class": "od",
-    "stream": "enfo",
+    "class": ["od"],
+    "stream": ["enfo"],
     "param": [
         "10u",
         "10v",
@@ -38,23 +39,19 @@ IFS_REQUEST = {
         "tcw",
         "msl",
     ],
-    "levtype": "sfc",
-    "step": list(range(0, 61, 6)),
-    "type": "pf",
-    "number": list(range(1, 6)),
+    "levtype": ["sfc"],
+    "step": list(map(str, range(0, 61, 6))),
+    "type": ["pf"],
+    "number": list(map(str, range(1, 6))),
 }
 PARAM_DIM = "param"
 ENSEMBLE_DIM = "number"
 STEP_DIM = "step"
 
 
-class EkdSourceFactory(SourceFactory):
-    def validate(
-        self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]
-    ) -> Either[BlockInstanceOutput, Error]:
-        output = XarrayOutput(
-            variables=IFS_REQUEST["param"], coords=[STEP_DIM, ENSEMBLE_DIM]
-        )
+class EkdSource(Source):
+    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        output = XarrayOutput(variables=IFS_REQUEST["param"], coords=[STEP_DIM, ENSEMBLE_DIM])
         return Either.ok(output)
 
     def compile(
@@ -62,24 +59,26 @@ class EkdSourceFactory(SourceFactory):
         partitions: DataPartitionLookup,
         block_id: BlockInstanceId,
         block: BlockInstance,
-    ) -> Either[DataPartitionLookup, Error]:
+    ) -> Either[DataPartitionLookup, Error]:  # type:ignore[invalid-argument] # semigroup
         action = (
             from_source(
-                [
-                    Payload(
-                        "earthkit.data.from_source",
-                        [block.configuration_values["source"]],
-                        {
-                            "request": {
-                                **IFS_REQUEST,
-                                "date": block.configuration_values["date"],
-                                "expver": block.configuration_values["expver"],
-                                "param": param,
-                            }
-                        },
-                    )
-                    for param in IFS_REQUEST["param"]
-                ],
+                np.asarray(
+                    [
+                        Payload(
+                            "earthkit.data.from_source",
+                            [block.configuration_values["source"]],
+                            {
+                                "request": {
+                                    **IFS_REQUEST,
+                                    "date": block.configuration_values["date"],
+                                    "expver": block.configuration_values["expver"],
+                                    "param": param,
+                                }
+                            },
+                        )
+                        for param in IFS_REQUEST["param"]
+                    ]
+                ),
                 coords={PARAM_DIM: IFS_REQUEST[x] for x in ["param"]},
             )
             .expand(
@@ -97,7 +96,7 @@ class EkdSourceFactory(SourceFactory):
         return Either.ok(partitions)
 
 
-ekdSource = EkdSourceFactory(
+ekdSource = EkdSource(
     title="Earthkit Data Source",
     description="Fetch data from mars or ecmwf open data",
     configuration_options={
@@ -121,19 +120,13 @@ ekdSource = EkdSourceFactory(
 )
 
 
-class EnsembleStatisticsFactory(ProductFactory):
-    def validate(
-        self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]
-    ) -> Either[BlockInstanceOutput, Error]:
-        input_dataset = cast(
-            XarrayOutput, inputs["dataset"]
-        )  # type:ignore[redundant-cast] # NOTE the warning is correct but we expect more
+class EnsembleStatistics(Product):
+    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_dataset = cast(XarrayOutput, inputs["dataset"])  # type:ignore[redundant-cast] # NOTE the warning is correct but we expect more
         variable = block.configuration_values["variable"]
         if variable not in input_dataset.variables:
-            return Either.error(
-                f"variable {variable} is not in the input variables: {input_dataset.variables}"
-            )
-        output = XarrayOutput(variables=[variable], coords=[STEP_DIM])
+            return Either.error(f"variable {variable} is not in the input variables: {input_dataset.variables}")
+        output = XarrayOutput(variables=[variable], coords=[x for x in input_dataset.coords if x != ENSEMBLE_DIM])
         return Either.ok(output)
 
     def compile(
@@ -141,13 +134,11 @@ class EnsembleStatisticsFactory(ProductFactory):
         partitions: DataPartitionLookup,
         block_id: BlockInstanceId,
         block: BlockInstance,
-    ) -> Either[DataPartitionLookup, Error]:
+    ) -> Either[DataPartitionLookup, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
         input_task_action = partitions[input_task]
         stat = block.configuration_values["statistic"]
-        param = input_task_action.select(
-            {PARAM_DIM: block.configuration_values["variable"]}
-        )
+        param = input_task_action.select({PARAM_DIM: block.configuration_values["variable"]})
         if stat == "mean":
             action = param.mean(dim=ENSEMBLE_DIM)
         elif stat == "std":
@@ -155,21 +146,15 @@ class EnsembleStatisticsFactory(ProductFactory):
         partitions[block_id] = action
         return Either.ok(partitions)
 
-    def intersect(self, output: BlockInstanceOutput) -> bool:
-        return (
-            isinstance(output, XarrayOutput)
-            and output.variables
-            and ENSEMBLE_DIM in output.coords
-        )
+    def intersect(self, input: BlockInstanceOutput) -> bool:
+        return isinstance(input, XarrayOutput) and len(input.variables) > 0 and ENSEMBLE_DIM in input.coords
 
 
-ensembleStatistics = EnsembleStatisticsFactory(
+ensembleStatistics = EnsembleStatistics(
     title="Ensemble Statistics",
     description="Computes ensemble mean or standard deviation",
     configuration_options={
-        "variable": BlockConfigurationOption(
-            title="Variable", description="Variable name like '2t'", value_type="str"
-        ),
+        "variable": BlockConfigurationOption(title="Variable", description="Variable name like '2t'", value_type="str"),
         "statistic": BlockConfigurationOption(
             title="Statistic",
             description="Statistic to compute over the ensemble",
@@ -180,14 +165,61 @@ ensembleStatistics = EnsembleStatisticsFactory(
 )
 
 
-def write_zarr(dataset, path: str) -> None:
-    dataset.to_zarr(path, mode="w")
+class TemporalStatistics(Product):
+    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_dataset = cast(XarrayOutput, inputs["dataset"])  # type:ignore[redundant-cast] # NOTE the warning is correct but we expect more
+        variable = block.configuration_values["variable"]
+        if variable not in input_dataset.variables:
+            return Either.error(f"variable {variable} is not in the input variables: {input_dataset.variables}")
+        output = XarrayOutput(variables=[variable], coords=[x for x in input_dataset.coords if x != STEP_DIM])
+        return Either.ok(output)
+
+    def compile(
+        self,
+        partitions: DataPartitionLookup,
+        block_id: BlockInstanceId,
+        block: BlockInstance,
+    ) -> Either[DataPartitionLookup, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_task = block.input_ids["dataset"]
+        input_task_action = partitions[input_task]
+        stat = block.configuration_values["statistic"]
+        param = input_task_action.select({PARAM_DIM: block.configuration_values["variable"]})
+        if stat == "mean":
+            action = param.mean(dim=STEP_DIM)
+        elif stat == "std":
+            action = param.std(dim=STEP_DIM)
+        elif stat == "min":
+            action = param.min(dim=STEP_DIM)
+        elif stat == "max":
+            action = param.max(dim=STEP_DIM)
+        partitions[block_id] = action
+        return Either.ok(partitions)
+
+    def intersect(self, input: BlockInstanceOutput) -> bool:
+        return isinstance(input, XarrayOutput) and len(input.variables) > 0 and STEP_DIM in input.coords
 
 
-class ZarrSinkFactory(SinkFactory):
-    def validate(
-        self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]
-    ) -> Either[BlockInstanceOutput, Error]:
+temporalStatistics = TemporalStatistics(
+    title="Temporal Statistics",
+    description="Computes temporal statistics",
+    configuration_options={
+        "variable": BlockConfigurationOption(title="Variable", description="Variable name like '2t'", value_type="str"),
+        "statistic": BlockConfigurationOption(
+            title="Statistic",
+            description="Statistic to compute over steps",
+            value_type="enum['mean', 'std', 'min', 'max']",
+        ),
+    },
+    inputs=["dataset"],
+)
+
+
+def write_zarr(fieldlist, path: str) -> None:
+    fieldlist.to_xarray().to_zarr(path, mode="w")
+
+
+class ZarrSink(Sink):
+    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         output = XarrayOutput(variables=[], coords=[])
         return Either.ok(output)
 
@@ -196,19 +228,17 @@ class ZarrSinkFactory(SinkFactory):
         partitions: DataPartitionLookup,
         block_id: BlockInstanceId,
         block: BlockInstance,
-    ) -> Either[DataPartitionLookup, Error]:
+    ) -> Either[DataPartitionLookup, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
-        action = partitions[input_task].map(
-            Payload(write_zarr, kwargs={"path": block.configuration_values["path"]})
-        )
+        action = partitions[input_task].map(Payload(write_zarr, kwargs={"path": block.configuration_values["path"]}))
         partitions[block_id] = action
         return Either.ok(partitions)
 
-    def intersect(self, output: BlockInstanceOutput) -> bool:
-        return len(output.variables) > 0
+    def intersect(self, input: BlockInstanceOutput) -> bool:
+        return len(input.variables) > 0
 
 
-zarrSink = ZarrSinkFactory(
+zarrSink = ZarrSink(
     title="Zarr Sink",
     description="Write dataset to a zarr on the local filesystem",
     configuration_options={
