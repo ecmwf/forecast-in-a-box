@@ -7,17 +7,15 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from fiab_core.fable import BlockFactoryCatalogue
-from fiab_core.plugin import Plugin
+from fiab_core.tools.blocks import FableImplementation
+from fiab_core.tools.factory import PluginFactory
+
 from fiab_plugin_ecmwf.blocks import ekdSource, ensembleStatistics, zarrSink
 
-catalogue = BlockFactoryCatalogue(
-    factories={
-        "ekdSource": ekdSource,
-        "ensembleStatistics": ensembleStatistics,
-        "zarrSink": zarrSink,
-    },
-)
+implementations: dict[str, FableImplementation] = {
+    "ekdSource": ekdSource,
+    "ensembleStatistics": ensembleStatistics,
+    "zarrSink": zarrSink,
+}
 
-
-plugin = Plugin(catalogue=catalogue)
+plugin = PluginFactory(implementations=implementations).as_plugin()

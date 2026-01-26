@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from cascade.low.func import Either
+
 from fiab_core.fable import (
     BlockFactoryCatalogue,
     BlockFactoryId,
@@ -25,6 +26,17 @@ from fiab_core.fable import (
 )
 
 Error = str
+Validator = Callable[[BlockInstance, dict[str, BlockInstanceOutput]], Either[BlockInstanceOutput, Error]]  # type:ignore[invalid-argument] # semigroup
+"""Given a block instance corresponding to this plugin's Factory and its inputs, either provide error or determine what it outputs"""
+
+Expander = Callable[[BlockInstanceOutput], list[BlockFactoryId]]
+"""Given a block instance output (including from other plugin), provide which block factories from this plugin can expand it"""
+
+Compiler = Callable[
+    [DataPartitionLookup, BlockInstanceId, BlockInstance], Either[DataPartitionLookup, Error]  # type:ignore[invalid-argument] # semigroup
+]
+"""Given a cascade builder and a block instance corresponding to this plugin's Factory, either update the builder with corresponding tasks or provide error"""
+# NOTE JobBuilder + DataPartitionLookup to be replaced with Fluent
 
 
 @dataclass
@@ -36,30 +48,6 @@ class Plugin:
     """
 
     catalogue: BlockFactoryCatalogue
-
-    def validate(
-        self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]
-    ) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        """Given a block instance corresponding to this plugin's Factory and its inputs, either provide error or determine what it outputs"""
-        factory = self.catalogue.factories[block.factory_id.factory]
-        return factory.validate(block, inputs)
-
-    def expand(self, block: BlockInstanceOutput) -> list[BlockFactoryId]:
-        """Given a block instance output (including from other plugin), provide which block factories from this plugin can expand it"""
-        if len(block.variables) == 0:
-            return []
-        expansions: list[BlockFactoryId] = []
-        for factory_id, factory in self.catalogue.factories.items():
-            if factory.intersect(block):
-                expansions.append(factory_id)
-        return expansions
-
-    def compile(
-        self,
-        partitions: DataPartitionLookup,
-        block_id: BlockInstanceId,
-        block: BlockInstance,
-    ) -> Either[DataPartitionLookup, Error]:  # type:ignore[invalid-argument] # semigroup
-        """Given a cascade builder and a block instance corresponding to this plugin's Factory, either update the builder with corresponding tasks or provide error"""
-        factory = self.catalogue.factories[block.factory_id.factory]
-        return factory.compile(partitions, block_id, block)
+    validator: Validator
+    expander: Expander
+    compiler: Compiler
