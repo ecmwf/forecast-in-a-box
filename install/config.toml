@@ -1,5 +1,5 @@
 [product]
-[[product.plugins]]
+[product.plugins."ecmwf:toy1"]
 pip_source = "fiab-plugin-toy"
 module_name = "fiab_plugin_toy"
 

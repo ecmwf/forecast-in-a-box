@@ -146,7 +146,7 @@ def load_plugins(plugins: PluginsSettings) -> None:
                     logger.info(f"installing {pluginSettings.module_name} for the first time")
                     _try_install(pluginSettings.pip_source)
 
-            if pluginKey in plugins:
+            if pluginKey in lookup:
                 errors[pluginKey] = f"plugin {pluginKey} is provided by more than just {pluginSettings.pip_source}"
             else:
                 result = load_single(pluginSettings)
