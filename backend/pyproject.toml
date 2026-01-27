@@ -78,6 +78,7 @@ dev = [
   "pytest-mock>=3.15.1",
   "ty==0.0.2",
   "prek",
+  "pre-commit",
   "fiab-plugin-toy", # TODO remove after first publish
   "fiab-plugin-toy-impl", # TODO remove after first publish
   "fiab-plugin-toy2[runtime]", # TODO remove after first publish
