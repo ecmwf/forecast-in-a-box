@@ -11,12 +11,15 @@ from fiab_core.tools.blocks import FableImplementation
 from fiab_core.tools.factory import PluginFactory
 
 from fiab_plugin_ecmwf.blocks import EkdSource, EnsembleStatistics, TemporalStatistics, ZarrSink
+from fiab_plugin_ecmwf.anemoi.blocks import AnemoiSource, AnemoiTransform
 
 implementations: dict[str, FableImplementation] = {
     "ekdSource": EkdSource(),
     "ensembleStatistics": EnsembleStatistics(),
     "temporalStatistics": TemporalStatistics(),
     "zarrSink": ZarrSink(),
+    "anemoiSource": AnemoiSource(),
+    "anemoiTransform": AnemoiTransform(),
 }
 
 plugin = PluginFactory(implementations=implementations).as_plugin()
