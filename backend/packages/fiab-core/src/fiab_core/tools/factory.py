@@ -1,3 +1,5 @@
+from cascade.low.func import Either
+
 from fiab_core.fable import (
     BlockFactoryCatalogue,
     BlockFactoryId,
@@ -6,7 +8,7 @@ from fiab_core.fable import (
     BlockInstanceOutput,
     DataPartitionLookup,
 )
-from fiab_core.plugin import Plugin
+from fiab_core.plugin import Error, Plugin
 from fiab_core.tools.blocks import FableImplementation
 
 

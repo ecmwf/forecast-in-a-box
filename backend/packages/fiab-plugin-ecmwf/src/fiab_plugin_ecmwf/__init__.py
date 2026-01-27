@@ -10,11 +10,12 @@
 from fiab_core.tools.blocks import FableImplementation
 from fiab_core.tools.factory import PluginFactory
 
-from fiab_plugin_ecmwf.blocks import ekdSource, ensembleStatistics, zarrSink
+from fiab_plugin_ecmwf.blocks import ekdSource, ensembleStatistics, temporalStatistics, zarrSink
 
 implementations: dict[str, FableImplementation] = {
     "ekdSource": ekdSource,
     "ensembleStatistics": ensembleStatistics,
+    "temporalStatistics": temporalStatistics,
     "zarrSink": zarrSink,
 }
 

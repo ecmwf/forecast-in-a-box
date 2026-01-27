@@ -24,8 +24,8 @@ from fiab_core.plugin import Error
 from fiab_core.tools.blocks import Product, Sink, Source
 
 IFS_REQUEST = {
-    "class": ["od"],
-    "stream": ["enfo"],
+    "class": "od",
+    "stream": "enfo",
     "param": [
         "10u",
         "10v",
@@ -39,10 +39,10 @@ IFS_REQUEST = {
         "tcw",
         "msl",
     ],
-    "levtype": ["sfc"],
-    "step": list(map(str, range(0, 61, 6))),
-    "type": ["pf"],
-    "number": list(map(str, range(1, 6))),
+    "levtype": "sfc",
+    "step": list(range(0, 61, 6)),
+    "type": "pf",
+    "number": list(range(1, 6)),
 }
 PARAM_DIM = "param"
 ENSEMBLE_DIM = "number"
@@ -51,7 +51,7 @@ STEP_DIM = "step"
 
 class EkdSource(Source):
     def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        output = XarrayOutput(variables=IFS_REQUEST["param"], coords=[STEP_DIM, ENSEMBLE_DIM])
+        output = XarrayOutput(variables=cast(list[str], IFS_REQUEST["param"]), coords=[STEP_DIM, ENSEMBLE_DIM])
         return Either.ok(output)
 
     def compile(
@@ -65,7 +65,7 @@ class EkdSource(Source):
                 np.asarray(
                     [
                         Payload(
-                            "earthkit.data.from_source",
+                            "fiab_plugin_ecmwf.runtime.source.earthkit_source",
                             [block.configuration_values["source"]],
                             {
                                 "request": {
@@ -82,14 +82,16 @@ class EkdSource(Source):
                 coords={PARAM_DIM: IFS_REQUEST[x] for x in ["param"]},
             )
             .expand(
-                (ENSEMBLE_DIM, IFS_REQUEST["number"]),
+                (ENSEMBLE_DIM, cast(list[int], IFS_REQUEST["number"])),
                 "number",
                 dim_size=len(IFS_REQUEST["number"]),
+                backend_kwargs={"method": "isel"},
             )
             .expand(
-                (STEP_DIM, IFS_REQUEST["step"]),
+                (STEP_DIM, cast(list[int], IFS_REQUEST["step"])),
                 "step",
                 dim_size=len(IFS_REQUEST["step"]),
+                backend_kwargs={"method": "isel"},
             )
         )
         partitions[block_id] = action
@@ -214,10 +216,6 @@ temporalStatistics = TemporalStatistics(
 )
 
 
-def write_zarr(fieldlist, path: str) -> None:
-    fieldlist.to_xarray().to_zarr(path, mode="w")
-
-
 class ZarrSink(Sink):
     def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         output = XarrayOutput(variables=[], coords=[])
@@ -230,7 +228,9 @@ class ZarrSink(Sink):
         block: BlockInstance,
     ) -> Either[DataPartitionLookup, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
-        action = partitions[input_task].map(Payload(write_zarr, kwargs={"path": block.configuration_values["path"]}))
+        action = partitions[input_task].map(
+            Payload("fiab_plugin_ecmwf.runtime.sinks.write_zarr", kwargs={"path": block.configuration_values["path"]})
+        )
         partitions[block_id] = action
         return Either.ok(partitions)
 
