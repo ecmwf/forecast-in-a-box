@@ -50,6 +50,27 @@ STEP_DIM = "step"
 
 
 class EkdSource(Source):
+    title: str = "Earthkit Data Source"
+    description: str = "Fetch data from mars or ecmwf open data"
+    configuration_options: dict[str, BlockConfigurationOption] = {
+        "source": BlockConfigurationOption(
+            title="Source",
+            description="Top level source for earthkit data",
+            value_type="enum['mars', 'ecmwf-open-data']",
+        ),
+        "date": BlockConfigurationOption(
+            title="Date",
+            description="The date dimension of the data",
+            value_type="date-iso8601",
+        ),
+        "expver": BlockConfigurationOption(
+            title="Expver",
+            description="The expver value of the forecast",
+            value_type="str",
+        ),
+    }
+    inputs: list[str] = []
+
     def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         output = XarrayOutput(variables=cast(list[str], IFS_REQUEST["param"]), coords=[STEP_DIM, ENSEMBLE_DIM])
         return Either.ok(output)
@@ -98,31 +119,19 @@ class EkdSource(Source):
         return Either.ok(partitions)
 
 
-ekdSource = EkdSource(
-    title="Earthkit Data Source",
-    description="Fetch data from mars or ecmwf open data",
-    configuration_options={
-        "source": BlockConfigurationOption(
-            title="Source",
-            description="Top level source for earthkit data",
-            value_type="enum['mars', 'ecmwf-open-data']",
-        ),
-        "date": BlockConfigurationOption(
-            title="Date",
-            description="The date dimension of the data",
-            value_type="date-iso8601",
-        ),
-        "expver": BlockConfigurationOption(
-            title="Expver",
-            description="The expver value of the forecast",
-            value_type="str",
-        ),
-    },
-    inputs=[],
-)
-
-
 class EnsembleStatistics(Product):
+    title: str = "Ensemble Statistics"
+    description: str = "Computes ensemble mean or standard deviation"
+    configuration_options: dict[str, BlockConfigurationOption] = {
+        "variable": BlockConfigurationOption(title="Variable", description="Variable name like '2t'", value_type="str"),
+        "statistic": BlockConfigurationOption(
+            title="Statistic",
+            description="Statistic to compute over the ensemble",
+            value_type="enum['mean', 'std']",
+        ),
+    }
+    inputs: list[str] = ["dataset"]
+
     def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         input_dataset = cast(XarrayOutput, inputs["dataset"])  # type:ignore[redundant-cast] # NOTE the warning is correct but we expect more
         variable = block.configuration_values["variable"]
@@ -152,22 +161,19 @@ class EnsembleStatistics(Product):
         return isinstance(input, XarrayOutput) and len(input.variables) > 0 and ENSEMBLE_DIM in input.coords
 
 
-ensembleStatistics = EnsembleStatistics(
-    title="Ensemble Statistics",
-    description="Computes ensemble mean or standard deviation",
-    configuration_options={
+class TemporalStatistics(Product):
+    title: str = "Temporal Statistics"
+    description: str = "Computes temporal statistics"
+    configuration_options: dict[str, BlockConfigurationOption] = {
         "variable": BlockConfigurationOption(title="Variable", description="Variable name like '2t'", value_type="str"),
         "statistic": BlockConfigurationOption(
             title="Statistic",
-            description="Statistic to compute over the ensemble",
-            value_type="enum['mean', 'std']",
+            description="Statistic to compute over steps",
+            value_type="enum['mean', 'std', 'min', 'max']",
         ),
-    },
-    inputs=["dataset"],
-)
+    }
+    inputs: list[str] = ["dataset"]
 
-
-class TemporalStatistics(Product):
     def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         input_dataset = cast(XarrayOutput, inputs["dataset"])  # type:ignore[redundant-cast] # NOTE the warning is correct but we expect more
         variable = block.configuration_values["variable"]
@@ -201,22 +207,18 @@ class TemporalStatistics(Product):
         return isinstance(input, XarrayOutput) and len(input.variables) > 0 and STEP_DIM in input.coords
 
 
-temporalStatistics = TemporalStatistics(
-    title="Temporal Statistics",
-    description="Computes temporal statistics",
-    configuration_options={
-        "variable": BlockConfigurationOption(title="Variable", description="Variable name like '2t'", value_type="str"),
-        "statistic": BlockConfigurationOption(
-            title="Statistic",
-            description="Statistic to compute over steps",
-            value_type="enum['mean', 'std', 'min', 'max']",
-        ),
-    },
-    inputs=["dataset"],
-)
-
-
 class ZarrSink(Sink):
+    title: str = "Zarr Sink"
+    description: str = "Write dataset to a zarr on the local filesystem"
+    configuration_options: dict[str, BlockConfigurationOption] = {
+        "path": BlockConfigurationOption(
+            title="Zarr Path",
+            description="Filesystem path where the zarr should be written",
+            value_type="str",
+        )
+    }
+    inputs: list[str] = ["dataset"]
+
     def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         output = XarrayOutput(variables=[], coords=[])
         return Either.ok(output)
@@ -236,17 +238,3 @@ class ZarrSink(Sink):
 
     def intersect(self, input: BlockInstanceOutput) -> bool:
         return len(input.variables) > 0
-
-
-zarrSink = ZarrSink(
-    title="Zarr Sink",
-    description="Write dataset to a zarr on the local filesystem",
-    configuration_options={
-        "path": BlockConfigurationOption(
-            title="Zarr Path",
-            description="Filesystem path where the zarr should be written",
-            value_type="str",
-        )
-    },
-    inputs=["dataset"],
-)
