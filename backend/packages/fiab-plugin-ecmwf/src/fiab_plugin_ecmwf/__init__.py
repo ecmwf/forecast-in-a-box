@@ -7,16 +7,16 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from fiab_core.tools.blocks import FableImplementation
-from fiab_core.tools.factory import PluginFactory
+from fiab_core.tools.blocks import BlockBuilder
+from fiab_core.tools.plugins import PluginBuilder
 
 from fiab_plugin_ecmwf.blocks import EkdSource, EnsembleStatistics, TemporalStatistics, ZarrSink
 
-implementations: dict[str, FableImplementation] = {
+blocks: dict[str, BlockBuilder] = {
     "ekdSource": EkdSource(),
     "ensembleStatistics": EnsembleStatistics(),
     "temporalStatistics": TemporalStatistics(),
     "zarrSink": ZarrSink(),
 }
 
-plugin = PluginFactory(implementations=implementations).as_plugin()
+plugin = PluginBuilder(block_builders=blocks).as_plugin()
