@@ -9,7 +9,7 @@
             "display_description": "Example Fable Workflows",
             "display_author": "ECMWF"
         },
-        "base": {
+        "ecmwf-base": {
             "pip_source": "fiab-plugin-ecmwf",
             "module_name": "fiab_plugin_ecmwf",
             "display_title": "ECMWF Plugin",
