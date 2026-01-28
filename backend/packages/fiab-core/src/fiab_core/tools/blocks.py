@@ -24,19 +24,11 @@ from fiab_core.plugin import Error
 
 
 class FableImplementation(abc.ABC):
-    def __init__(
-        self,
-        kind: BlockKind,
-        title: str,
-        description: str,
-        configuration_options: dict[str, BlockConfigurationOption],
-        inputs: list[str],
-    ):
-        self.kind = kind
-        self.title = title
-        self.description = description
-        self.configuration_options = configuration_options
-        self.inputs = inputs
+    kind: BlockKind
+    title: str
+    description: str
+    configuration_options: dict[str, BlockConfigurationOption]
+    inputs: list[str]
 
     def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         raise NotImplementedError
@@ -63,47 +55,19 @@ class FableImplementation(abc.ABC):
 
 
 class Source(FableImplementation):
-    def __init__(
-        self,
-        title: str,
-        description: str,
-        configuration_options: dict[str, BlockConfigurationOption],
-        inputs: list[str],
-    ):
-        super().__init__("source", title, description, configuration_options, inputs)
+    kind: BlockKind = "source"
 
     def intersect(self, input: BlockInstanceOutput) -> bool:
         return False
 
 
 class Product(FableImplementation):
-    def __init__(
-        self,
-        title: str,
-        description: str,
-        configuration_options: dict[str, BlockConfigurationOption],
-        inputs: list[str],
-    ):
-        super().__init__("product", title, description, configuration_options, inputs)
+    kind: BlockKind = "product"
 
 
 class Sink(FableImplementation):
-    def __init__(
-        self,
-        title: str,
-        description: str,
-        configuration_options: dict[str, BlockConfigurationOption],
-        inputs: list[str],
-    ):
-        super().__init__("sink", title, description, configuration_options, inputs)
+    kind: BlockKind = "sink"
 
 
 class Transform(FableImplementation):
-    def __init__(
-        self,
-        title: str,
-        description: str,
-        configuration_options: dict[str, BlockConfigurationOption],
-        inputs: list[str],
-    ):
-        super().__init__("transform", title, description, configuration_options, inputs)
+    kind: BlockKind = "transform"
