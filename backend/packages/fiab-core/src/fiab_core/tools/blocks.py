@@ -23,7 +23,7 @@ from fiab_core.fable import (
 from fiab_core.plugin import Error
 
 
-class FableImplementation(abc.ABC):
+class BlockBuilder(abc.ABC):
     kind: BlockKind
     title: str
     description: str
@@ -54,20 +54,20 @@ class FableImplementation(abc.ABC):
         )
 
 
-class Source(FableImplementation):
+class Source(BlockBuilder):
     kind: BlockKind = "source"
 
     def intersect(self, input: BlockInstanceOutput) -> bool:
         return False
 
 
-class Product(FableImplementation):
+class Product(BlockBuilder):
     kind: BlockKind = "product"
 
 
-class Sink(FableImplementation):
+class Sink(BlockBuilder):
     kind: BlockKind = "sink"
 
 
-class Transform(FableImplementation):
+class Transform(BlockBuilder):
     kind: BlockKind = "transform"
