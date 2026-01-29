@@ -81,6 +81,7 @@ dev = [
   "fiab-plugin-toy", # TODO remove after first publish
   "fiab-plugin-toy-impl", # TODO remove after first publish
   "fiab-plugin-toy2[runtime]", # TODO remove after first publish
+  "fiab-plugin-ecmwf[runtime]", # TODO remove after first publish
 ]
 
 [tool.setuptools_scm]
@@ -122,6 +123,7 @@ fiab-core = {workspace = true}
 fiab-plugin-toy = {workspace = true}
 fiab-plugin-toy-impl = {workspace = true}
 fiab-plugin-toy2 = {workspace = true}
+fiab-plugin-ecmwf = {workspace = true}
 
 [tool.uv.workspace]
 members = [
@@ -129,6 +131,7 @@ members = [
     "packages/fiab-plugin-toy",
     "packages/fiab-plugin-toy-impl",
     "packages/fiab-plugin-toy2",
+    "packages/fiab-plugin-ecmwf",
 ]
 
 [tool.ty.rules]

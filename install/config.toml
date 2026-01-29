@@ -1,7 +1,7 @@
 [product]
-[product.plugins."ecmwf:toy1"]
-pip_source = "fiab-plugin-toy"
-module_name = "fiab_plugin_toy"
+[product.plugins."ecmwf:ecmwf-base"]
+pip_source = "fiab-plugin-ecmwf"
+module_name = "fiab_plugin_ecmwf"
 
 [auth]
 passthrough = true

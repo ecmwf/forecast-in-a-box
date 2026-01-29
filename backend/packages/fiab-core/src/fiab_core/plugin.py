@@ -8,7 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 """
-Types pertaining to declaring FIAB Plugins, in particular their Fable-based interface
+Types pertaining to declaring FIAB Plugins, in particular their Fable-based interface.
 """
 
 from dataclasses import dataclass
@@ -23,7 +23,6 @@ from fiab_core.fable import (
     BlockInstanceId,
     BlockInstanceOutput,
     DataPartitionLookup,
-    PluginId,
 )
 
 Error = str
@@ -42,6 +41,12 @@ Compiler = Callable[
 
 @dataclass
 class Plugin:
+    """Base plugin with a block catalogue and default validate/expand/compile behavior.
+
+    Override the methods in subclasses when a plugin needs custom logic that does not
+    map 1:1 to the BlockFactory implementations.
+    """
+
     catalogue: BlockFactoryCatalogue
     validator: Validator
     expander: Expander
