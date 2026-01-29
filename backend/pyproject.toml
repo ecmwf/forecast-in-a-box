@@ -81,7 +81,7 @@ dev = [
   "fiab-plugin-toy", # TODO remove after first publish
   "fiab-plugin-toy-impl", # TODO remove after first publish
   "fiab-plugin-toy2[runtime]", # TODO remove after first publish
-  "fiab-plugin-ecmwf", # TODO remove after first publish
+  "fiab-plugin-ecmwf[runtime]", # TODO remove after first publish
 ]
 
 [tool.setuptools_scm]
