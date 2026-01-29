@@ -31,6 +31,7 @@ def test_download_model(backend_client):
     # NOTE any failure here presumably caused by previous run not finishing succ -- just clean the dir
     assert response.json() == {"": ["test"]}
 
+    time.sleep(2)
     response = backend_client.get("/model").raise_for_status()
 
     assert fake_model_name in response.json()
