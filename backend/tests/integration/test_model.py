@@ -1,8 +1,11 @@
+import os
 import time
+
+import httpx
 
 from forecastbox.models.metadata import ControlMetadata
 
-from .conftest import fake_model_name
+from .conftest import fake_model_name, fake_repository_port
 from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
 
 
@@ -31,7 +34,18 @@ def test_download_model(backend_client):
     # NOTE any failure here presumably caused by previous run not finishing succ -- just clean the dir
     assert response.json() == {"": ["test"]}
 
-    time.sleep(2)
+    # In order for the "/model" to work, the fake model repository must be up, which is not guaranteed
+    # at this stage. Thus we check explicitly, to have a cleaner error message in case it is not.
+    # It can happen in a few ways -- if it fails to start (eg due to port binding issue) we get
+    # a connect error right away, but in case of eg mystic system overload, we get all connection
+    # attempts failed -- in which case we *may* get saved by exp backoff retries via a transport
+    try:
+        client = httpx.Client(transport=httpx.HTTPTransport(retries=3))
+        manifest_response = client.get(os.path.join(f"http://localhost:{fake_repository_port}", "MANIFEST"))
+        assert manifest_response.is_success, "Failed to start Fake Model Repository properly"
+    except httpx.ConnectError:
+        assert False, "Failed to start Fake Model Repository properly"
+
     response = backend_client.get("/model").raise_for_status()
 
     assert fake_model_name in response.json()
