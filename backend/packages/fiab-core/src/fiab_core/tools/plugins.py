@@ -43,7 +43,9 @@ class PluginBuilder:
 
     def as_plugin(self) -> Plugin:
         return Plugin(
-            catalogue=BlockFactoryCatalogue(factories={factory_id: factory.as_catalogue() for factory_id, factory in self.block_builders.items()}),
+            catalogue=BlockFactoryCatalogue(
+                factories={factory_id: factory.as_catalogue() for factory_id, factory in self.block_builders.items()}
+            ),
             validator=self.validate,
             expander=self.expand,
             compiler=self.compile,
