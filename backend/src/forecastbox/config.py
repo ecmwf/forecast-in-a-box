@@ -76,7 +76,7 @@ class AuthSettings(BaseModel):
     """JWT secret key for authentication."""
     oidc: OIDCSettings | None = None
     """OIDC settings for authentication, if applicable, if not given no route will be made."""
-    passthrough: bool = False
+    passthrough: bool = True
     """If true, all authentication is ignored. Used for single-user standalone regime"""
     public_url: str | None = None
     """Used for OIDC redirects"""

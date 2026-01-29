@@ -2,6 +2,3 @@
 [product.plugins."ecmwf:ecmwf-base"]
 pip_source = "fiab-plugin-ecmwf"
 module_name = "fiab_plugin_ecmwf"
-
-[auth]
-passthrough = true
