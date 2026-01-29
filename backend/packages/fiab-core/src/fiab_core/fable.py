@@ -13,6 +13,7 @@ Types pertaining to Forecast As BLock Expression (Fable): blocks
 
 from typing import Literal
 
+from earthkit.workflows.fluent import Action
 from pydantic import BaseModel, ConfigDict
 from typing_extensions import Self
 
@@ -102,4 +103,4 @@ class XarrayOutput(BaseModel):  # NOTE eventually Qubed
 BlockInstanceOutput = XarrayOutput  # NOTE eventually a Union
 
 # NOTE placeholder, this will be replaced with Fluent
-DataPartitionLookup = dict[BlockInstanceId, dict[str, str]]
+DataPartitionLookup = dict[BlockInstanceId, Action]

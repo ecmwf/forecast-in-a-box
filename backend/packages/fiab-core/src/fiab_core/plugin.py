@@ -8,13 +8,12 @@
 # nor does it submit to any jurisdiction.
 
 """
-Types pertaining to declaring FIAB Plugins, in particular their Fable-based interface
+Types pertaining to declaring FIAB Plugins, in particular their Fable-based interface.
 """
 
 from dataclasses import dataclass
 from typing import Callable
 
-from cascade.low.builders import JobBuilder
 from cascade.low.func import Either
 
 from fiab_core.fable import (
@@ -24,7 +23,6 @@ from fiab_core.fable import (
     BlockInstanceId,
     BlockInstanceOutput,
     DataPartitionLookup,
-    PluginId,
 )
 
 Error = str
@@ -35,7 +33,7 @@ Expander = Callable[[BlockInstanceOutput], list[BlockFactoryId]]
 """Given a block instance output (including from other plugin), provide which block factories from this plugin can expand it"""
 
 Compiler = Callable[
-    [JobBuilder, DataPartitionLookup, BlockInstanceId, BlockInstance], Either[tuple[JobBuilder, DataPartitionLookup], Error]  # type:ignore[invalid-argument] # semigroup
+    [DataPartitionLookup, BlockInstanceId, BlockInstance], Either[DataPartitionLookup, Error]  # type:ignore[invalid-argument] # semigroup
 ]
 """Given a cascade builder and a block instance corresponding to this plugin's Factory, either update the builder with corresponding tasks or provide error"""
 # NOTE JobBuilder + DataPartitionLookup to be replaced with Fluent
@@ -43,6 +41,12 @@ Compiler = Callable[
 
 @dataclass
 class Plugin:
+    """Base plugin with a block catalogue and default validate/expand/compile behavior.
+
+    Override the methods in subclasses when a plugin needs custom logic that does not
+    map 1:1 to the BlockFactory implementations.
+    """
+
     catalogue: BlockFactoryCatalogue
     validator: Validator
     expander: Expander
