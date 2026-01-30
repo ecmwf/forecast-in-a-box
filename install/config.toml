@@ -1,7 +1,4 @@
-[product]
-[product.plugins."ecmwf:ecmwf-base"]
-pip_source = "fiab-plugin-ecmwf"
-module_name = "fiab_plugin_ecmwf"
+# default config is empty atm
+# for all possible keys and values, consult the forecastbox/config.py file for now
 
-[auth]
-passthrough = true
+# eventually we'll have like a default.singlelaptop.toml and default.server.toml, but not yet

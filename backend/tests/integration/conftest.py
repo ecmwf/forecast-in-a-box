@@ -85,6 +85,7 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         config.api.model_repository = f"http://localhost:{fake_repository_port}"
         config.general.launch_browser = False
         config.auth.domain_allowlist_registry = ["somewhere.org"]
+        config.auth.passthrough = False
         handles = launch_all(config)
         shutdown_event = Event()
         p = Process(target=run_repository, args=(shutdown_event,))

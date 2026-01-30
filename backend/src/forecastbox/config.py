@@ -76,7 +76,7 @@ class AuthSettings(BaseModel):
     """JWT secret key for authentication."""
     oidc: OIDCSettings | None = None
     """OIDC settings for authentication, if applicable, if not given no route will be made."""
-    passthrough: bool = False
+    passthrough: bool = True
     """If true, all authentication is ignored. Used for single-user standalone regime"""
     public_url: str | None = None
     """Used for OIDC redirects"""
@@ -133,6 +133,15 @@ class PluginStoreConfig(BaseModel):
 
 
 PluginStoresConfig = dict[PluginStoreId, PluginStoreConfig]
+
+
+def _default_plugins() -> PluginsSettings:
+    return {
+        PluginCompositeIdReadable.from_str("ecmwf:ecmwf-base"): PluginSettings(
+            pip_source="fiab-plugin-ecmwf",
+            module_name="fiab_plugin_ecmwf",
+        ),
+    }
 
 
 def _default_plugin_stores() -> PluginStoresConfig:
