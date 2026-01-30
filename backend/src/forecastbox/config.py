@@ -103,6 +103,8 @@ class GeneralSettings(BaseModel):
     launch_browser: bool = True
     """Whether a browser window should be opened after start. Used only when
     standalone.entrypoint.launch_all module is used"""
+    frontend_version: Literal["v1", "v2"] = "v1"
+    """Which of the static subfolders to use for universal routing"""
 
 
 PluginRefreshStrategy = Literal["automatic", "manual"]
