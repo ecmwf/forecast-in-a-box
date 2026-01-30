@@ -40,7 +40,7 @@ class PluginStoreEntry(BaseModel):
     """What the frontend should display as the plugin's author"""
     display_author: str
     """Any comment or clarification to developers or maintainers. Not propagated to the frontend"""
-    comment: str
+    comment: str = ""
 
 
 class PluginRemoteInfo(BaseModel):

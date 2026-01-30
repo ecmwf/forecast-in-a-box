@@ -1,5 +1,6 @@
 import os
 import pathlib
+import socket
 import socketserver
 import tempfile
 import time
@@ -53,7 +54,14 @@ class FakeModelRepository(SimpleHTTPRequestHandler):
 
 def run_repository(shutdown_event: Any):  # TODO typing -- is `Event` but thats not correct
     server_address = ("", fake_repository_port)
-    with socketserver.ThreadingTCPServer(server_address, FakeModelRepository) as httpd:
+
+    # We need to allow reuse address on the socket, because kernel helpfully keeps it in zombie
+    # for like a minute or two. Reuse is generally dangerous because we may get packets from
+    # a queue, but in this get-only repository its a legit thing
+    class WhyExposeFieldsInConstructorWhenYouCanSubclass(socketserver.ThreadingTCPServer):
+        allow_reuse_address = True
+
+    with WhyExposeFieldsInConstructorWhenYouCanSubclass(server_address, FakeModelRepository) as httpd:
         # NOTE dont serve forever, doesnt free the port up correctly
         # httpd.serve_forever()
         httpd.timeout = 1
