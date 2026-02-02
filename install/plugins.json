@@ -1,14 +1,6 @@
 {
     "display_name": "ECMWF Plugin Store",
     "plugins": {
-        "toy1": {
-            "comment": "just a placeholder for now",
-            "pip_source": "fiab-plugin-toy",
-            "module_name": "fiab_plugin_toy",
-            "display_title": "Toy Plugin",
-            "display_description": "Example Fable Workflows",
-            "display_author": "ECMWF"
-        },
         "ecmwf-base": {
             "pip_source": "fiab-plugin-ecmwf",
             "module_name": "fiab_plugin_ecmwf",

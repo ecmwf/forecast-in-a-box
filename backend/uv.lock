@@ -1529,6 +1529,9 @@ dev = [{ name = "ty", specifier = "==0.0.2" }]
 [[package]]
 name = "fiab-plugin-ecmwf"
 source = { editable = "packages/fiab-plugin-ecmwf" }
+dependencies = [
+    { name = "fiab-core" },
+]
 
 [package.optional-dependencies]
 runtime = [
@@ -1545,6 +1548,7 @@ dev = [
 requires-dist = [
     { name = "earthkit", marker = "extra == 'runtime'", specifier = ">=0.13.2" },
     { name = "earthkit-data", marker = "extra == 'runtime'", specifier = ">=0.18.2" },
+    { name = "fiab-core", editable = "packages/fiab-core" },
 ]
 provides-extras = ["runtime"]
 

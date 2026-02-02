@@ -16,7 +16,9 @@ requires-python = ">=3.11"
 
 dynamic = [ "version" ]
 
-dependencies = []
+dependencies = [
+    "fiab-core>=0.0.1,<1.0.0", # ~=0.0
+]
 
 optional-dependencies.runtime = [
     "earthkit-data>=0.18.2",

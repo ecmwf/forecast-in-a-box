@@ -195,7 +195,7 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
                 assert_never(result)
             PluginManager.versions[pluginId] = _try_version(pluginSettings)
             PluginManager.updatedate[pluginId] = _try_updatedate(pluginSettings)
-        logger.debug("single plugin loading finished: {plugin.module_name}")
+        logger.debug(f"single plugin loading finished: {pluginId}")
     except Exception as e:
         logger.exception(f"updating thread failed with {repr(e)}")
         with timed_acquire(PluginManager.lock, 5) as _:
