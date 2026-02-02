@@ -2,6 +2,13 @@
 set -e
 set -o pipefail
 
+# NOTE when making changes here, make sure you consult api/updates.py, as some logic is shared with that file
+# Namely, it is capable of updating the lock and the release marker. There are additionally subtle couplings with
+# - config.py
+# - standalone/entrypoint.py
+# NOTE if you are trying to understand this -- first read the two sections at the very end: the case-switch and then the ensureEnvironment function.
+# The rest of this file is just auxiliary functions
+
 usage() {
     cat <<EOF
 fiab.sh
@@ -46,8 +53,15 @@ check() {
 		>&2 echo "command 'curl' not found, please install"
 		exit 1
 	fi
-	mkdir -p "$FIAB_ROOT"
-	mkdir -p "$FIAB_ROOT/data_dir"
+    if [ -d "$FIAB_ROOT" ] ; then
+        >&2 echo ".fiab directory not found, assuming this is first run"
+        export FIAB_FIRST_RUN="true"
+        mkdir -p "$FIAB_ROOT"
+        mkdir -p "$FIAB_ROOT/data_dir"
+    else
+        >&2 echo ".fiab directory found, assuming this is not first run"
+        export FIAB_FIRST_RUN="false"
+    fi
 }
 
 maybeInstallUv() {
@@ -96,6 +110,33 @@ getMostRecentRelease() {
     echo $most_recent
 }
 
+export FIAB_RELEASE_MARKER="${FIAB_ROOT}/release"
+markRelease() {
+    selectedRelease=$1
+    echo "$selectedRelease" > "$FIAB_RELEASE_MARKER"
+}
+getMarkedRelease() {
+    if [ -f "$FIAB_RELEASE_MARKER" ] ; then
+        $(cat "$releaseMarker")
+    else
+        ;
+    fi
+}
+
+selectRelease() {
+    # pick in this order 1/ envvar 2/ saved release in the config dir 3/ most recent one
+    if [ -z "${FIAB_RELEASE:-}" ] ; then
+        echo "$FIAB_RELEASE"
+    else 
+        markedRelease=$(getMarkedRelease)
+        if [ -z "$markedRelease" ] ; then
+            echo "$markedRelease"
+        else
+            getMostRecentRelease
+        fi
+    fi
+}
+
 LOCK="${FIAB_ROOT}/pylock.toml"
 FIAB_GITHUB_FROM="${FIAB_GITHUB_FROM:-tags}" # when we want to install from a specific branch, we set this to heads & set FIAB_RELEASE to that branch
 FIAB_PIP_EXTRA="${FIAB_PIP_EXTRA:-""}" # eg when we install from test pypi. Applies *only* to the forecastbox wheel itself! And put there the full `-i http://testpypi`
@@ -118,6 +159,8 @@ maybeGetDefaultConfig() {
         config_url=https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/$FIAB_GITHUB_FROM/$selectedRelease/install/config.toml
 		curl -LsSf $config_url > "${FIAB_ROOT}/config.toml"
     fi
+    # TODO we should separate default and user config, and always download the default config when the release changes.
+    # However, we currently purposefully keep the default config empty and have defaults in code, meaning this is not urgent
 }
 
 VENV="${FIAB_ROOT}/venv"
@@ -161,11 +204,39 @@ maybePruneUvCache() {
     fi
 }
 
+replaceLauncher() {
+    selectedRelease=$1
+    >&2 echo "Will download launcher for release $selectedRelease"
+    launcherPath=$(readlink -f "$0")
+    launcherUrl=https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/$FIAB_GITHUB_FROM/$selectedRelease/scripts/fiab.sh
+    curl -LsSf $launcherUrl > "$launcherPath"
+    markRelease
+}
+
+maybeReplaceLauncher() {
+    selectedRelease=$1
+    # if we have a *change* of release, download new launcher and exec again
+    if [ ! -f "$releaseMarker" ] ; then
+        # no idea about previous release => assume launcher up-to-date, just mark it
+        markRelease "$selectedRelease"
+    else
+        previousRelease=$(getMarkedRelease)
+        if [ "$previousRelease" != "$selectedRelease" ] ; then
+            >&2 echo "Launcher presumed to come from $previousRelease but desired release is $selectedRelease. Will replace"
+            replaceLauncher $selectedRelease
+            launcherPath=$(readlink -f "$0")
+            exec "$launcherPath" "$@"
+        fi
+        # else no-op -- previous and selected are the same
+    fi
+}
+
 ensureEnvironment() {
     check
     maybeInstallUv
     maybeInstallPython
-    selectedRelease=${FIAB_RELEASE:-$(getMostRecentRelease)}
+    selectedRelease=$(selectRelease)
+    maybeReplaceLauncher $selectedRelease
     maybeDownloadLock $selectedRelease
     maybeGetDefaultConfig $selectedRelease
     maybeCreateVenv
@@ -198,12 +269,10 @@ case "$COMMAND" in
     "full-reinstall")
         uv cache prune
         rm -rf $FIAB_ROOT
-        selectedRelease=${FIAB_RELEASE:-$(getMostRecentRelease)}
-        >&2 echo "Will download launcher for release $selectedRelease"
-        launcherPath=$(readlink -f "$0")
-        launcherUrl=https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/$FIAB_GITHUB_FROM/$selectedRelease/scripts/fiab.sh
-		curl -LsSf $launcherUrl > "$launcherPath"
+        selectedRelease=$(selectRelease) # NOTE we have deleted $FIAB_ROOT so the marked release is absent
+        replaceLauncher "$selectedRelease"
         >&2 echo "The launcher has been updated in-place at $launcherPath. Run it again to start"
+        # NOTE we dont exec here because the full-reinstall was given!
         ;;
     "run")
         ensureEnvironment

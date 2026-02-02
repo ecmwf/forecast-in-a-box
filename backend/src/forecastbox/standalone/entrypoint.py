@@ -18,9 +18,12 @@ import sys
 import webbrowser
 from multiprocessing import Process, get_context
 
+from fiab_core.fable import PluginCompositeId
+
 import forecastbox.standalone.service
+from forecastbox.api.updates import should_install_default_plugin
 from forecastbox.config import FIABConfig, validate_runtime
-from forecastbox.standalone.checks import check_backend_ready
+from forecastbox.standalone.checks import check_backend_ready, install_default_plugins
 from forecastbox.standalone.config import export_recursive, setup_process
 from forecastbox.standalone.launchers import launch_backend
 from forecastbox.standalone.procs import ChildProcessGroup, previous_cleanup
@@ -52,6 +55,8 @@ def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
         spawn_gateway = False
 
     check_backend_ready(config, handle, attempts, spawn_gateway)
+    if should_install_default_plugin():
+        install_default_plugins(config)
 
     if config.general.launch_browser:
         webbrowser.open(config.api.local_url())
