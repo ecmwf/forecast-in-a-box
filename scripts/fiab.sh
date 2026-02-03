@@ -9,6 +9,12 @@ set -o pipefail
 # NOTE if you are trying to understand this -- first read the two sections at the very end: the case-switch and then the ensureEnvironment function.
 # The rest of this file is just auxiliary functions
 
+# NOTE to test before a release, you need to:
+# - have your branch on github up to date
+# - build the wheel locally with `just fiabwheel`
+# - run the following with the wheel version and branch set to the right values
+# FIAB_CUSTOM_VERSION=<local wheel version> FIAB_GITHUB_FROM=heads FIAB_RELEASE=<your-branch> FIAB_PIP_EXTRA='--no-cache --find-links ~/src/forecast-in-a-box/backend/dist' FIAB_ROOT='/tmp/tmpFiabInstall' ~/src/forecast-in-a-box/scripts/fiab.sh
+
 usage() {
     cat <<EOF
 fiab.sh
@@ -54,13 +60,13 @@ check() {
 		exit 1
 	fi
     if [ -d "$FIAB_ROOT" ] ; then
+        >&2 echo ".fiab directory found, assuming this is not first run"
+        export FIAB_FIRST_RUN="false"
+    else
         >&2 echo ".fiab directory not found, assuming this is first run"
         export FIAB_FIRST_RUN="true"
         mkdir -p "$FIAB_ROOT"
         mkdir -p "$FIAB_ROOT/data_dir"
-    else
-        >&2 echo ".fiab directory found, assuming this is not first run"
-        export FIAB_FIRST_RUN="false"
     fi
 }
 
@@ -119,44 +125,53 @@ getMarkedRelease() {
     if [ -f "$FIAB_RELEASE_MARKER" ] ; then
         $(cat "$releaseMarker")
     else
-        ;
+        :
     fi
 }
 
 selectRelease() {
     # pick in this order 1/ envvar 2/ saved release in the config dir 3/ most recent one
-    if [ -z "${FIAB_RELEASE:-}" ] ; then
+    if [ -n "${FIAB_RELEASE:-}" ] ; then
+        >&2 echo "Release specified by envavr: $FIAB_RELEASE"
         echo "$FIAB_RELEASE"
     else 
         markedRelease=$(getMarkedRelease)
-        if [ -z "$markedRelease" ] ; then
+        if [ -n "$markedRelease" ] ; then
+            >&2 echo "Release specified by mark: $markedRelease"
             echo "$markedRelease"
         else
+            >&2 echo "Determining most recent release"
             getMostRecentRelease
         fi
     fi
 }
 
 LOCK="${FIAB_ROOT}/pylock.toml"
-FIAB_GITHUB_FROM="${FIAB_GITHUB_FROM:-tags}" # when we want to install from a specific branch, we set this to heads & set FIAB_RELEASE to that branch
+FIAB_GITHUB_FROM="${FIAB_GITHUB_FROM:-tags}" # when we want to install from a specific branch, we set this to heads & set FIAB_RELEASE to that branch & set FIAB_CUSTOM_VERSION to the actual version
 FIAB_PIP_EXTRA="${FIAB_PIP_EXTRA:-""}" # eg when we install from test pypi. Applies *only* to the forecastbox wheel itself! And put there the full `-i http://testpypi`
 maybeDownloadLock() {
     selectedRelease=$1
     # checks whether requirements is present at fiab root, and downloads if not
     if [ ! -f $LOCK ] ; then
         >&2 echo "not found uv.lock in $LOCK, downloading"
-        >&2 echo "will download uv lock for release $selectedRelease"
         lock_url=https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/$FIAB_GITHUB_FROM/$selectedRelease/install/pylock.toml
+        >&2 echo "will download uv lock for release $selectedRelease from $lock_url"
         curl -LsSf $lock_url > "$LOCK"
-        >&2 echo "$(date +%s):$(echo $selectedRelease | tr -d 'vd')" > $LOCK.timestamp
+        if [ "$FIAB_GITHUB_FROM" = "tags" ] ; then
+            # the release is like v1.2.3 or d0.0.1, we need to drop the character for a valid version
+            echo "$(date +%s):$(echo $selectedRelease | tr -d 'vd')" > $LOCK.timestamp
+        else
+            # for branch-based development, we want to put a custom version there
+            echo "$(date +%s):$(echo $FIAB_CUSTOM_VERSION)" > $LOCK.timestamp
+        fi
     fi
 }
 
 maybeGetDefaultConfig() {
     selectedRelease=$1
     if [ ! -f "${FIAB_ROOT}/config.toml" ] ; then
-        >&2 echo "no config file, downloading a default for release $selectedRelease"
         config_url=https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/$FIAB_GITHUB_FROM/$selectedRelease/install/config.toml
+        >&2 echo "no config file, downloading a default for release $selectedRelease from $config_url"
 		curl -LsSf $config_url > "${FIAB_ROOT}/config.toml"
     fi
     # TODO we should separate default and user config, and always download the default config when the release changes.
@@ -236,6 +251,7 @@ ensureEnvironment() {
     maybeInstallUv
     maybeInstallPython
     selectedRelease=$(selectRelease)
+    >&2 echo "Selected release is $selectedRelease"
     maybeReplaceLauncher $selectedRelease
     maybeDownloadLock $selectedRelease
     maybeGetDefaultConfig $selectedRelease

@@ -31,10 +31,13 @@ class Release:
     @classmethod
     def from_string(cls, release_string: str) -> "Release":
         cleaned_string = release_string.lstrip("vd")
-        parts = list(map(int, cleaned_string.split(".")))
-        if len(parts) != 3:
+        try:
+            # NOTE there may be a .devXX suffix etc when doing a local work, but we dont care
+            parts = list(map(int, cleaned_string.split(".")[:3]))
+            return cls(major=parts[0], minor=parts[1], patch=parts[2])
+        except Exception as e:
+            logger.exception(f"Invalid release string format: {release_string}")
             raise ValueError(f"Invalid release string format: {release_string}")
-        return cls(major=parts[0], minor=parts[1], patch=parts[2])
 
     def __str__(self) -> str:
         return f"{self.major}.{self.minor}.{self.patch}"
