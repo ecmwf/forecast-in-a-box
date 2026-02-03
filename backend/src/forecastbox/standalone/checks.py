@@ -68,7 +68,7 @@ def check_backend_ready(config: FIABConfig, handles: ChildProcessGroup | None = 
 def install_default_plugins(config: FIABConfig):
     """Installs default plugins as specified by configs. Log-swallows all exceptions"""
     try:
-        with httpx.Client() as client:
+        with httpx.Client(follow_redirects=True) as client:
             for pluginId in _default_plugins().keys():
                 url = config.api.local_url() + "/api/v1/plugin/install"
                 try:
