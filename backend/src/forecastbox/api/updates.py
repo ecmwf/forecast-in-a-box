@@ -36,8 +36,8 @@ class Release:
             parts = list(map(int, cleaned_string.split(".")[:3]))
             return cls(major=parts[0], minor=parts[1], patch=parts[2])
         except Exception as e:
-            logger.exception(f"Invalid release string format: {release_string}")
-            raise ValueError(f"Invalid release string format: {release_string}")
+            logger.exception(f"Invalid release string format: '{release_string}'")
+            raise ValueError(f"Invalid release string format: '{release_string}'")
 
     def __str__(self) -> str:
         return f"{self.major}.{self.minor}.{self.patch}"
