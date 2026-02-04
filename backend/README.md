@@ -27,9 +27,10 @@ See the [`justfile`](../justfile)'s `fiabwheel` recipe for instruction how to bu
 Backend wheels on pypi do contain a frontend copy -- you can alternatively pull a wheel and extract the built frontend into the local install.
 
 ## Developer Flow
-Primary means is running `pytest`, presumably with the `pytest.ini` section from `pyproject.toml` activated.
+Primary means is running `ruff`, `ty`, and `pytest`, with the config being in `pyproject.toml`.
+Ideally, you utilize the `val` recipe from the [justfile](./justfile) here, and install pre-commit hooks.
 
-Type annotations are mostly present, though not enforced at the moment during CI (but expected to in the near future).
+Type annotations are present and enforced.
 
 In the [`bigtest.py`](../scripts/bigtest.py) there is a larger integration test, triggered at CI in addition to the regular `pytest` -- see the [github action](../.github/workflows/bigtest.yml) for execution.
 
@@ -41,4 +42,4 @@ Consists of a four primary components:
 4. persistence, based on a local `sqlite` database.
 
 Configuration is handled by the `config.py` using pydantic's BaseSettings, meaning most behaviour is configurable via envvars -- see `fiab.sh` or tests for examples.
-See [tuning and configuration](tuningAndConfiguration.md) guide for more.
+See [tuning and configuration](../docs/tuningAndConfiguration.md) guide for more.
