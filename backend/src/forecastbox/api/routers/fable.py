@@ -45,7 +45,8 @@ def get_catalogue() -> dict[PluginCompositeId, BlockFactoryCatalogue]:
             return catalogue
 
 
-@router.get("/expand")
+# NOTE its a put but get would be better -- but browsers dont support get+json body
+@router.put("/expand")
 def expand_fable(fable: FableBuilderV1) -> FableValidationExpansion:
     """Given a partially constructed fable, return whether there are any validation errors,
     and what are further completion/expansion options. Note that presence of validation
@@ -53,7 +54,8 @@ def expand_fable(fable: FableBuilderV1) -> FableValidationExpansion:
     return api_fable.validate_expand(fable)
 
 
-@router.get("/compile")
+# NOTE its a put but get would be better -- but browsers dont support get+json body
+@router.put("/compile")
 def compile_fable(fable: FableBuilderV1) -> RawCascadeJob:
     """Converts to a raw cascade job, which can then be used in a ExecutionSpecification
     in the /execution router's methods. Assumes the fable is valid, and throws a 4xx
