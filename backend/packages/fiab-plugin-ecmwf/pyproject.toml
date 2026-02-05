@@ -18,6 +18,7 @@ dynamic = [ "version" ]
 
 dependencies = [
     "fiab-core>=0.0.1,<1.0.0", # ~=0.0
+    "earthkit-workflows",
 ]
 
 optional-dependencies.runtime = [
@@ -44,3 +45,6 @@ tag_regex = '^[vd](?P<version>\d+(?:\.\d+){0,2}[^\+]*)(?:\+.*)?$'
 line-length = 140
 
 lint.ignore = [ "E731" ]
+
+[tool.uv.sources]
+earthkit-workflows = { git = "https://github.com/ecmwf/earthkit-workflows", rev = "feat/expand-as-qubed" }

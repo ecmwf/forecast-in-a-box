@@ -19,10 +19,13 @@ dynamic = [ "version" ]
 dependencies = [
     "pydantic",
     "earthkit-workflows", # NOTE technically we would need just cascade.low.core and some fluent.core, not the whole runtime -- possibly split down there as well
+    "qubed>=0.3.0",
 ]
 
 [dependency-groups]
 dev = [
+  "pytest>=8.4.2",
+  "pytest-xdist>=3.8.0",
   "ty==0.0.2",
 ]
 
@@ -40,3 +43,6 @@ tag_regex = '^[vd](?P<version>\d+(?:\.\d+){0,2}[^\+]*)(?:\+.*)?$'
 line-length = 140
 
 lint.ignore = [ "E731" ]
+
+[tool.uv.sources]
+earthkit-workflows = { git = "https://github.com/ecmwf/earthkit-workflows", rev = "feat/expand-as-qubed" }
