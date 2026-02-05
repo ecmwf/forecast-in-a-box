@@ -99,7 +99,7 @@ def get_plugin_details(forceRefresh: bool = False) -> PluginListing:
 # TODO ideally we'd return the redirect here, but that is basically guaranteed to end up with a 503 because
 # the plugins aren't ready yet -- we probably need to await here or smth
 # get_catalogue_redirect = lambda request: RedirectResponse(request.url_for("get_catalogue"), status_code=status.HTTP_303_SEE_OTHER)
-get_catalogue_redirect = lambda request: Response(status_code=200)
+get_catalogue_redirect = lambda request: Response(status_code=202)
 
 
 @router.post("/update")
