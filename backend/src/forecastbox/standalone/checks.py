@@ -77,3 +77,4 @@ def install_default_plugins(config: FIABConfig):
                     logger.exception(f"failed to install default plugin {pluginId}")
     except Exception:
         logger.exception(f"failed to install default plugins")
+    # TODO here we should, in a finally, touch the first run marker, instead of fiab launcher doing it. And rename the top entry function 'first_run_setup' instead of 'default_plugin_install'
