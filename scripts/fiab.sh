@@ -51,22 +51,22 @@ export FIAB_ROOT=${FIAB_ROOT:-"$HOME/.fiab"}
 export EARTHKIT_DATA_CACHE_POLICY=${EARTHKIT_DATA_CACHE_POLICY:-"user"}
 export EARTHKIT_DATA_MAXIMUM_CACHE_SIZE=${EARTHKIT_DATA_MAXIMUM_CACHE_SIZE:-"50G"}
 FIAB_PY_VERSION=${FIAB_PY_VERSION:-"3.12.7"}
-
-# TODO bake in self-upgrade regime, similarly to how uv cache is pruned
+FIAB_FIRSTRUN_MARKER=$FIAB_ROOT/firstrun
 
 check() {
 	if [ -z "$(which curl || :)" ] ; then
 		>&2 echo "command 'curl' not found, please install"
 		exit 1
 	fi
-    if [ -d "$FIAB_ROOT" ] ; then
-        >&2 echo ".fiab directory found, assuming this is not first run"
-        export FIAB_FIRST_RUN="false"
+    mkdir -p "$FIAB_ROOT"
+    mkdir -p "$FIAB_ROOT/data_dir"
+    if [ -f "$FIAB_FIRSTRUN_MARKER" ] ; then
+        >&2 echo ".fiab firstrun found, assuming this is not first run"
+        export FIAB_FIRSTRUN="false"
     else
-        >&2 echo ".fiab directory not found, assuming this is first run"
-        export FIAB_FIRST_RUN="true"
-        mkdir -p "$FIAB_ROOT"
-        mkdir -p "$FIAB_ROOT/data_dir"
+        >&2 echo ".fiab firstrun not found, assuming this is first run"
+        export FIAB_FIRSTRUN="true"
+        touch "$FIAB_FIRSTRUN_MARKER" # TODO create this in the python command instead!
     fi
 }
 
@@ -123,7 +123,7 @@ markRelease() {
 }
 getMarkedRelease() {
     if [ -f "$FIAB_RELEASE_MARKER" ] ; then
-        $(cat "$releaseMarker")
+        cat "$FIAB_RELEASE_MARKER"
     else
         :
     fi
@@ -231,7 +231,7 @@ replaceLauncher() {
 maybeReplaceLauncher() {
     selectedRelease=$1
     # if we have a *change* of release, download new launcher and exec again
-    if [ ! -f "$releaseMarker" ] ; then
+    if [ ! -f "$FIAB_RELEASE_MARKER" ] ; then
         # no idea about previous release => assume launcher up-to-date, just mark it
         markRelease "$selectedRelease"
     else
@@ -284,7 +284,7 @@ case "$COMMAND" in
         ;;
     "full-reinstall")
         uv cache prune
-        rm -rf $FIAB_ROOT
+        rm -rf $FIAB_ROOT && mkdir -p $FIAB_ROOT
         selectedRelease=$(selectRelease) # NOTE we have deleted $FIAB_ROOT so the marked release is absent
         replaceLauncher "$selectedRelease"
         >&2 echo "The launcher has been updated in-place at $launcherPath. Run it again to start"
