@@ -20,13 +20,14 @@ fiabwheel frontend_dir="frontend":
     find src/forecastbox/static/ -type f | sed 's/.*/include &/' > MANIFEST.in
     python -m build --installer uv .
 
-    mkdir prereqs
-    for e in $(ls -d packages/*) ; do 
-        pushd $e
-        python -m build --installer uv .
-        mv dist/* ../../prereqs
-        popd
-    done
+    # NOTE building packagesDist disabled for now
+    # mkdir packagesDist
+    # for e in $(ls -d packages/*) ; do 
+    #     pushd $e
+    #     python -m build --installer uv .
+    #     mv dist/* ../../packagesDist
+    #     popd
+    # done
 
     popd
 
