@@ -224,8 +224,15 @@ replaceLauncher() {
     >&2 echo "Will download launcher for release $selectedRelease"
     launcherPath=$(readlink -f "$0")
     launcherUrl=https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/$FIAB_GITHUB_FROM/$selectedRelease/scripts/fiab.sh
-    curl -LsSf $launcherUrl > "$launcherPath"
-    markRelease
+    curl -LsSf $launcherUrl > /tmp/fiabLauncherNextV
+    if [[ "$(file /tmp/fiabLauncherNextV)" == *"Bourne-Again"* ]] ; then
+        mv /tmp/fiabLauncherNextV "$launcherPath"
+        markRelease
+    else
+        >&2 echo "Downloaded file does not look like a launcher script, refusing to download!"
+        >&2 echo "$(file /tmp/fiabLauncherNextV)"
+        exit 1
+    fi
 }
 
 maybeReplaceLauncher() {
