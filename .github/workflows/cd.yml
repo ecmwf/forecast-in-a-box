@@ -96,7 +96,7 @@ jobs:
             export TWINE_PASSWORD="$TWINE_PASSWORD_PROD"
             TARGET=""
           fi
-          twine upload --verbose $TARGET backend/dist/* backend/prereqs/*
+          twine upload --verbose $TARGET backend/dist/* # backend/prereqs/* # NOTE uploading prereqs disabled for now
 
           # commit & tag
           git add install/pylock.toml
