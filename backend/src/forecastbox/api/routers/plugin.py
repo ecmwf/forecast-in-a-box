@@ -117,12 +117,14 @@ def install_plugin(request: Request, pluginCompositeId: PluginCompositeId, admin
 
 
 @router.post("/uninstall")
-def uninstall_plugin(request: Request, pluginCompositeId: PluginCompositeId, admin=Depends(get_admin_user)) -> Response:
+def uninstall_plugin_endpoint(request: Request, pluginCompositeId: PluginCompositeId, admin=Depends(get_admin_user)) -> Response:
     uninstall_plugin(pluginCompositeId)
     return get_catalogue_redirect(request)
 
 
 @router.post("/modifyEnabled")
-def modify_enabled(request: Request, pluginCompositeId: PluginCompositeId, isEnabled: bool, admin=Depends(get_admin_user)) -> Response:
+def modify_enabled_endpoint(
+    request: Request, pluginCompositeId: PluginCompositeId, isEnabled: bool, admin=Depends(get_admin_user)
+) -> Response:
     modify_enabled(pluginCompositeId, isEnabled)
     return get_catalogue_redirect(request)
