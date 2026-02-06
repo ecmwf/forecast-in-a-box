@@ -30,7 +30,7 @@ dependencies = [
   "anemoi-utils>=0.4.36",
   "apscheduler",
   "cloudpickle",
-  "earthkit-workflows>=0.6.0",
+  "earthkit-workflows>=0.6.1",
   "earthkit-workflows-anemoi>=0.3.12",
   "earthkit-workflows-pproc",
   "fastapi",
