@@ -185,7 +185,7 @@ async def share_image(request: Request, job_id: str, dataset_id: str):
     return templates.TemplateResponse("share.html", {"request": request, "image_url": image_url, "image_name": f"{job_id}_{dataset_id}"})
 
 
-frontend = os.path.join(os.path.dirname(__file__), "static")
+frontend = os.path.join(os.path.dirname(__file__), f"static/{config.general.frontend_version}")
 
 
 class SPAStaticFiles(StaticFiles):
