@@ -1,12 +1,25 @@
+"""This module tries to collect all functionality related to updating fiab itself.
+As such, it is tightly coupled with the fiab.sh launcher -- make sure updates to either
+are done in concert, and that the coupling does not leak to other parts of the code.
+"""
+
 import dataclasses
 import logging
+import os
 from datetime import datetime
+from pathlib import Path
 
 import httpx
 
 from forecastbox.config import fiab_home
 
 logger = logging.getLogger(__name__)
+
+
+class Globals:
+    # those are exported by fiab.sh
+    ReleaseMarker = os.environ.get("FIAB_RELEASE_MARKER", None)
+    FirstRun = os.environ.get("FIAB_FIRST_RUN", "false") == "true"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -18,10 +31,13 @@ class Release:
     @classmethod
     def from_string(cls, release_string: str) -> "Release":
         cleaned_string = release_string.lstrip("vd")
-        parts = list(map(int, cleaned_string.split(".")))
-        if len(parts) != 3:
-            raise ValueError(f"Invalid release string format: {release_string}")
-        return cls(major=parts[0], minor=parts[1], patch=parts[2])
+        try:
+            # NOTE there may be a .devXX suffix etc when doing a local work, but we dont care
+            parts = list(map(int, cleaned_string.split(".")[:3]))
+            return cls(major=parts[0], minor=parts[1], patch=parts[2])
+        except Exception as e:
+            logger.exception(f"Invalid release string format: '{release_string}'")
+            raise ValueError(f"Invalid release string format: '{release_string}'")
 
     def __str__(self) -> str:
         return f"{self.major}.{self.minor}.{self.patch}"
@@ -86,3 +102,15 @@ def save_pylock(pylock: str, release: Release) -> None:
 
     pylock_file_path.write_text(pylock)
     timestamp_file_path.write_text(f"{int(datetime.now().timestamp())}:v{release}")
+
+
+def mark_release(release: Release) -> None:
+    if not Globals.ReleaseMarker:
+        raise ValueError("couldnt determine Release Marker path -- fiab.sh launcher incorrectly executed?")
+    releaseMarker = Path(Globals.ReleaseMarker)
+    releaseMarker.write_text(f"{release}")
+
+
+def should_install_default_plugin() -> bool:
+    return False  # TODO enable post-LTS release
+    # return Globals.FirstRun

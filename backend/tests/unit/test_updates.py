@@ -16,13 +16,12 @@ def test_release_from_string():
     assert Release.from_string("v1.2.3") == Release(1, 2, 3)
     assert Release.from_string("d1.2.3") == Release(1, 2, 3)
     assert Release.from_string("10.20.30") == Release(10, 20, 30)
+    assert Release.from_string("1.2.3.dev4") == Release(1, 2, 3)
 
 
 def test_release_from_string_invalid():
     with pytest.raises(ValueError):
         Release.from_string("1.2")
-    with pytest.raises(ValueError):
-        Release.from_string("1.2.3.4")
     with pytest.raises(ValueError):
         Release.from_string("abc")
 
@@ -109,7 +108,7 @@ def test_get_local_release(mock_get_lock_timestamp):
 
     # Test case: invalid release string
     mock_get_lock_timestamp.return_value = "1761908420:invalid_release"
-    with pytest.raises(ValueError, match=re.escape("invalid literal for int() with base 10: 'invalid_release'")):
+    with pytest.raises(ValueError, match=re.escape("Invalid release string format: 'invalid_release'")):
         get_local_release()
 
 

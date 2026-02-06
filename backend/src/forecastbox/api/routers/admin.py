@@ -19,7 +19,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import UUID4, BaseModel
 from sqlalchemy import delete, select, update
 
-from forecastbox.api.updates import Release, get_local_release, get_most_recent_release, get_pylock, save_pylock
+from forecastbox.api.updates import Release, get_local_release, get_most_recent_release, get_pylock, mark_release, save_pylock
 from forecastbox.auth.users import current_active_user
 from forecastbox.config import BackendAPISettings, CascadeSettings, ProductSettings, config
 from forecastbox.db.user import async_session_maker
@@ -97,7 +97,10 @@ async def update_release(tag: str | None = None, admin=Depends(get_admin_user)) 
         release = await get_most_recent_release()
 
     pylock_content = await get_pylock(release)
+    mark_release(release)
     save_pylock(pylock_content, release)
+
+    # NOTE it would be tempting to just re-launch the entrypoint. But alas we need to re-launch whole fiab.sh
 
     return UpdateReleaseResponse(release=release)
 

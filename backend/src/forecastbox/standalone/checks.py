@@ -7,7 +7,7 @@ from collections.abc import Callable
 import httpx
 from cascade.low.func import assert_never
 
-from forecastbox.config import FIABConfig, StatusMessage
+from forecastbox.config import FIABConfig, StatusMessage, _default_plugins
 from forecastbox.standalone.procs import ChildProcessGroup
 
 logger = logging.getLogger(__name__)
@@ -63,3 +63,18 @@ def check_backend_ready(config: FIABConfig, handles: ChildProcessGroup | None = 
         if handles is not None:
             handles.shutdown()
         raise
+
+
+def install_default_plugins(config: FIABConfig):
+    """Installs default plugins as specified by configs. Log-swallows all exceptions"""
+    try:
+        with httpx.Client(follow_redirects=True) as client:
+            for pluginId in _default_plugins().keys():
+                url = config.api.local_url() + "/api/v1/plugin/install"
+                try:
+                    client.post(url, json=pluginId.model_dump()).raise_for_status()
+                except Exception:
+                    logger.exception(f"failed to install default plugin {pluginId}")
+    except Exception:
+        logger.exception(f"failed to install default plugins")
+    # TODO here we should, in a finally, touch the first run marker, instead of fiab launcher doing it. And rename the top entry function 'first_run_setup' instead of 'default_plugin_install'
