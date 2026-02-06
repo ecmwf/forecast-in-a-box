@@ -83,7 +83,7 @@ jobs:
           uv pip install -r ../install/pylock.toml
           # NOTE uploading packagesDist disabled for now
           uv pip install ./dist/*whl # ./packagesDist/*whl
-          uv pip install pytest pytest-xdist pytest-asyncio # TODO how to get this from pyproject?
+          uv pip install pytest pytest-xdist pytest-asyncio pytest-subtests # TODO how to get this from pyproject?
           # TODO redesign the workflow to allow for arch-platform matrix here...? But from where to push the lock?
           pytest ./tests
           popd
