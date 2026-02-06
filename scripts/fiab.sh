@@ -227,7 +227,8 @@ replaceLauncher() {
     curl -LsSf $launcherUrl > /tmp/fiabLauncherNextV
     if [[ "$(file /tmp/fiabLauncherNextV)" == *"Bourne-Again"* ]] ; then
         mv /tmp/fiabLauncherNextV "$launcherPath"
-        markRelease
+        chmod a+x "$launcherPath" # TODO copy the properties of the original launcher instead!
+        markRelease $selectedRelease
     else
         >&2 echo "Downloaded file does not look like a launcher script, refusing to download!"
         >&2 echo "$(file /tmp/fiabLauncherNextV)"
