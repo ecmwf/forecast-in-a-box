@@ -75,7 +75,9 @@ jobs:
           pushd backend
           # NOTE checking packagesDist disabled for now
           twine check ./dist/* # ./packagesDist/*
-          uv export -o pylock.toml --no-emit-workspace --all-extras --no-dev > ../install/pylock.toml
+          uv export -o pylock.toml --no-emit-workspace --all-extras --no-dev > /dev/null
+          echo "# a comment to make git not fail even if no changes" >> pylock.toml
+          mv pylock.toml ../install/pylock.toml
           popd
 
           # test
