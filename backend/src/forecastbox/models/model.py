@@ -179,6 +179,10 @@ class BaseForecastModel(ABC):
         initial_conditions_env_list = combine_envs(initial_conditions_env, control.pkg_versions or {}, gateway_env)
 
         return {
+            "inference": [],
+            "initial_conditions": [],
+        }
+        return {
             "inference": inference_env_list,
             "initial_conditions": initial_conditions_env_list,
         }
