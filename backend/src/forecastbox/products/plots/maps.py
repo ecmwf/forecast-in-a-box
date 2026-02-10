@@ -77,7 +77,7 @@ def _plot_fields(subplot: Subplot, fields: ekd.FieldList, **kwargs: dict[str, di
 
 
 @as_payload
-@mark.environment_requirements(["earthkit-plots"])
+# @mark.environment_requirements(["earthkit-plots"])
 def export(figure: Figure, format: str = "png", dpi: int = 100, no_pad: bool = False) -> tuple[bytes, str]:
     """Export a figure to a specified format.
 
@@ -107,7 +107,7 @@ def export(figure: Figure, format: str = "png", dpi: int = 100, no_pad: bool = F
 
 
 @as_payload
-@mark.environment_requirements(["earthkit-plots", "earthkit-plots-default-styles"])
+# @mark.environment_requirements(["earthkit-plots", "earthkit-plots-default-styles"])
 def quickplot(
     fields: ekd.FieldList,
     groupby: str | None = None,

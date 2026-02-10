@@ -58,6 +58,7 @@ dependencies = [
   "anemoi-transform==0.1.15",
   "torch==2.8.0",
   "torch-geometric==2.6.1",
+  "earthkit-plots>=0.5.2",
 ]
 
 optional-dependencies.all = [
