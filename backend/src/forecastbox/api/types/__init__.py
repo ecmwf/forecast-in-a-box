@@ -18,7 +18,9 @@ from cascade.low.core import JobInstance
 from pydantic import Field, PositiveInt, field_validator, model_validator
 
 from forecastbox.api.types.base import FIABBaseModel
-from forecastbox.products.product import USER_DEFINED
+
+USER_DEFINED = "USER_DEFINED"
+"""User defined value, used to indicate that the value is not known."""
 
 CONFIG_ORDER = ["param", "levtype", "levelist"]
 

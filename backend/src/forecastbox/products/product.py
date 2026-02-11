@@ -16,6 +16,7 @@ from earthkit.workflows.fluent import Action
 from earthkit.workflows.graph import Graph
 from qubed import Qube
 
+from forecastbox.api.types import USER_DEFINED
 from forecastbox.models import SpecifiedModel
 from forecastbox.rjsf import ArraySchema, FieldSchema, FieldWithUI, IntegerSchema, StringSchema
 
@@ -241,7 +242,3 @@ class GenericTemporalProduct(GenericParamProduct):
         intersection = super().model_intersection(model)
         result = f"step={'/'.join(map(str, model.timesteps()))}" / intersection
         return result
-
-
-USER_DEFINED = "USER_DEFINED"
-"""User defined value, used to indicate that the value is not known."""
