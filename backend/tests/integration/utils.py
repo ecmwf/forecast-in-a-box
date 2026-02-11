@@ -1,3 +1,6 @@
+import time
+
+
 def extract_auth_token_from_response(response) -> None | str:
     """Extracts the authentication token from the response cookies.
 
@@ -38,3 +41,19 @@ def prepare_cookie_with_auth_token(token) -> dict:
         A dictionary representing the cookie with the token.
     """
     return {"name": "forecastbox_auth", "value": token}
+
+
+def ensure_completed(backend_client, job_id, sleep=0.5):
+    i = 20
+    while i > 0:
+        response = backend_client.get("/job/status", timeout=10)
+        assert response.is_success
+        status = response.json()["progresses"][job_id]["status"]
+        # TODO parse response with corresponding class, define a method `not_failed` instead
+        assert status in {"submitted", "running", "completed"}
+        if status == "completed":
+            break
+        time.sleep(sleep)
+        i -= 1
+
+    assert i > 0, f"Failed to finish job {job_id}"
