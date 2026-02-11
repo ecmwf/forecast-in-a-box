@@ -15,6 +15,20 @@ from fiab_plugin_ecmwf.blocks import EkdSource, EnsembleStatistics, TemporalStat
 
 
 @pytest.fixture
+def dummy_blockinstance() -> BlockInstance:
+    return BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="dummy"),  # type: ignore
+        input_ids={},
+        configuration_values={},
+    )
+
+
+@pytest.fixture
+def dummy_blockinstance_output() -> BlockInstanceOutput:
+    return BlockInstanceOutput()
+
+
+@pytest.fixture
 def ekdsource_configuration() -> BlockInstance:
     return BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="EkdSource"),  # type: ignore
@@ -28,8 +42,8 @@ def ekdsource_configuration() -> BlockInstance:
 
 
 @pytest.fixture
-def ekdsource_output() -> BlockInstanceOutput:
-    return EkdSource().validate(block=None, inputs={}).get_or_raise()
+def ekdsource_output(dummy_blockinstance: BlockInstance) -> BlockInstanceOutput:
+    return EkdSource().validate(block=dummy_blockinstance, inputs={}).get_or_raise()
 
 
 @pytest.fixture
@@ -68,11 +82,11 @@ def zarr_sink_configuration() -> BlockInstance:
 
 
 class TestEkdSource:
-    def test_creation(self):
+    def test_creation(self, dummy_blockinstance: BlockInstance, dummy_blockinstance_output: BlockInstanceOutput):
         block = EkdSource()
 
-        assert not block.intersect(input=None)
-        output: BlockInstanceOutput = block.validate(block=None, inputs={}).get_or_raise()
+        assert not block.intersect(input=dummy_blockinstance_output)
+        output: BlockInstanceOutput = block.validate(block=dummy_blockinstance, inputs={}).get_or_raise()
         assert output.dataqube is not None
         assert "param" in output
 

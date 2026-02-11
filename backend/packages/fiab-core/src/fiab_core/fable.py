@@ -12,7 +12,7 @@ Types pertaining to Forecast As BLock Expression (Fable): blocks
 """
 
 import functools
-from typing import Literal, Sequence, cast
+from typing import Any, Literal, Sequence, cast
 
 from earthkit.workflows.fluent import Action
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -145,7 +145,7 @@ class BlockInstanceOutput(BaseModel):
 
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
-    dataqube: Qube = Field(default_factory=Qube.empty)
+    dataqube: Qube | dict[str, Any] = Field(default_factory=Qube.empty)
     metadata: OutputMetadata = Field(default_factory=OutputMetadata)
 
     @field_validator("dataqube", mode="before")
@@ -199,6 +199,7 @@ class BlockInstanceOutput(BaseModel):
         >>> axes['time']
         {0, 1, 2}
         """
+        assert isinstance(self.dataqube, Qube)
         return self.dataqube.axes()
 
     def dimensions(self) -> set[str]:
@@ -245,6 +246,7 @@ class BlockInstanceOutput(BaseModel):
         >>> expanded.axes()
         {'ensemble': {'ens1', 'ens2'}, 'param': {'2t', 'tp'}, 'time': {0, 1, 2}}
         """
+        assert isinstance(self.dataqube, Qube)
 
         qube = functools.reduce(
             lambda q, kv: Qube.make_root([Qube.make_node(kv[0], list(kv[1]), q.children)]), dimension.items(), self.dataqube
@@ -278,6 +280,7 @@ class BlockInstanceOutput(BaseModel):
         >>> 'level' in collapsed
         False
         """
+        assert isinstance(self.dataqube, Qube)
         axes = [axis] if isinstance(axis, str) else axis
         if not all(ax in self.dimensions() for ax in axes):
             raise ValueError(f"Dimension '{axis}' not in dataqube dimensions {self.dimensions()}")
@@ -341,6 +344,7 @@ class BlockInstanceOutput(BaseModel):
         >>> {'param': ['2t'], 'time': [0, 3], } in output
         False
         """
+        assert isinstance(self.dataqube, Qube)
         if isinstance(item, str):
             return item in self.dimensions()
         elif isinstance(item, Qube):
