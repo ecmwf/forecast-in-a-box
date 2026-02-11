@@ -48,13 +48,13 @@ async def upsert_fable_builder(
 
     if fable_builder_id:
         # Attempt to update an existing record
-        query = select(FableRecord.created_by).where(FableRecord.fable_builder_id == fable_builder_id)
-        existing_created_by = await querySingle(query, async_session_maker)
+        query = select(FableRecord).where(FableRecord.fable_builder_id == fable_builder_id)
+        existing_record = await querySingle(query, async_session_maker)
 
-        if not existing_created_by:
+        if not existing_record:
             raise KeyError(f"FableBuilderV1 with ID {fable_builder_id} not found")
 
-        if existing_created_by.created_by != created_by_user:
+        if existing_record.created_by != created_by_user:
             raise PermissionError("User not authorized to modify this fable builder")
 
         stmt = (
