@@ -1,5 +1,5 @@
 # Repository and Organization
-* this is a monorepo with multiple packages, which combine togetehr to form a single installable python wheel
+* this is a monorepo with multiple packages, which combine together to form a single installable python wheel
 * the code directories:
   * frontend/ where javascript code is located,
   * backend/ where code for the python bacend is located, and which is the final `forecastbox` package whose wheel contains everything
