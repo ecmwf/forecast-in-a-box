@@ -15,7 +15,7 @@ import functools
 from typing import Literal, Sequence, cast
 
 from earthkit.workflows.fluent import Action
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from qubed import Qube
 from typing_extensions import Self
 
@@ -107,7 +107,7 @@ class BlockInstance(BaseModel):
 class OutputMetadata(BaseModel):
     """Broad metadata about the output produced by a BlockInstance"""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="allow")
 
     datatype: str = Field(default="")
     """e.g. 'xarray', 'grib', 'netcdf', 'plot'"""
@@ -147,6 +147,37 @@ class BlockInstanceOutput(BaseModel):
 
     dataqube: Qube = Field(default_factory=Qube.empty)
     metadata: OutputMetadata = Field(default_factory=OutputMetadata)
+
+    @field_validator("dataqube", mode="before")
+    def ensure_qube(field):
+        if isinstance(field, Qube):
+            return field
+        elif isinstance(field, dict):
+            return Qube.from_datacube(field)
+        else:
+            raise ValueError("dataqube must be a Qube or a dict")
+
+    def is_empty(self) -> bool:
+        """Check if the dataqube is empty (i.e., has no data).
+
+        Returns
+        -------
+        bool
+            True if the dataqube is empty, False otherwise.
+
+        Usage
+        -----
+        >>> output = BlockInstanceOutput(dataqube=Qube.empty())
+        >>> output.is_empty()
+        True
+        >>> output_with_data = BlockInstanceOutput(dataqube=Qube.from_datacube({
+        ...     'param': ['2t', 'tp'],
+        ...     'time': [0, 1, 2],
+        ... }))
+        >>> output_with_data.is_empty()
+        False
+        """
+        return len(self.axes()) == 0
 
     def axes(self) -> dict[str, set[str]]:
         """Return the axes of the dataqube.
@@ -315,14 +346,13 @@ class BlockInstanceOutput(BaseModel):
         elif isinstance(item, Qube):
             item: dict = item.axes()
 
-        result = self.dataqube
-        for key, values in item.items():
-            result = result.select({key: list(values)})
+        dict_cast_to_list = {k: list(v) if isinstance(v, (set, tuple)) else [v] for k, v in item.items()}
+        result = self.dataqube.select(dict_cast_to_list)
 
         def contains(key, values):
             return key in result.axes() and all(v in result.axes()[key] for v in values)
 
-        return all(contains(k, v) for k, v in item.items())
+        return all(contains(k, v) for k, v in dict_cast_to_list.items())
 
 
 # NOTE placeholder, this will be replaced with Fluent
