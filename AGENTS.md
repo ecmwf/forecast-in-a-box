@@ -2,7 +2,7 @@
 * this is a monorepo with multiple packages, which combine together to form a single installable python wheel
 * the code directories:
   * frontend/ where javascript code is located,
-  * backend/ where code for the python bacend is located, and which is the final `forecastbox` package whose wheel contains everything
+  * backend/ where code for the python backend is located, and which is the final `forecastbox` package whose wheel contains everything
   * backend/packages/* are auxiliary python wheels which are optional or mandatory requirements of the `forecastbox` wheel
 * additionally, there are scripts/ and install/ directories, which facilitate getting the wheel installed and configured correctly on target hosts
 * lastly, docs/ contains documentation -- currently contains all of end-user docs, developer docs, faqs and troubleshootings
