@@ -1,0 +1,20 @@
+[project]
+name = "fiab-registry-client"
+version = "0.1.0"
+description = "Lightweight client for accessing Registries for FIAB: Model Registry for model checkpoints, and Datasource Registry for data streams"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = [ "LICENSE" ]
+authors = [
+  { name = "European Centre for Medium-Range Weather Forecasts (ECMWF)", email = "software.support@ecmwf.int" },
+]
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.12.5",
+]
+
+
+
+[build-system]
+requires = ["uv_build>=0.9.2,<0.10.0"]
+build-backend = "uv_build"
