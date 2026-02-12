@@ -17,7 +17,6 @@ from itertools import groupby
 from typing import Iterator, cast
 
 from cascade.low.into import graph2job
-from earthkit.workflows import visualise
 from earthkit.workflows.graph import Graph, deduplicate_nodes
 from fiab_core.fable import (
     BlockConfigurationOption,
@@ -136,9 +135,7 @@ def compile(fable: FableBuilderV1) -> RawCascadeJob:
         if block_factory.kind == "sink":
             graph += data_partition_lookup[blockId].graph()
 
-    graph = deduplicate_nodes(graph)
-    visualise(graph, "fable_compile_graph.html")
-    result = graph2job(graph)
+    result = graph2job(deduplicate_nodes(graph))
     return RawCascadeJob(job_type="raw_cascade_job", job_instance=result)
 
 
