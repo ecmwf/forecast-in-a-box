@@ -72,5 +72,5 @@ def previous_cleanup():
         except ProcessLookupError:
             # NOTE likely some earlier kill brought this one down too
             pass
-        except Exception:
-            logger.error("failed to stop {p.pid()} with {repr(e)}, continuing despite that")
+        except Exception as e:
+            logger.error(f"failed to stop {p.pid()} with {repr(e)}, continuing despite that")
