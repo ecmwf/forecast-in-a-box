@@ -43,9 +43,8 @@ def prepare_cookie_with_auth_token(token) -> dict:
     return {"name": "forecastbox_auth", "value": token}
 
 
-def ensure_completed(backend_client, job_id, sleep=0.5):
-    i = 20
-    while i > 0:
+def ensure_completed(backend_client, job_id, sleep=0.5, attempts=20):
+    while attempts > 0:
         response = backend_client.get("/job/status", timeout=10)
         assert response.is_success
         status = response.json()["progresses"][job_id]["status"]
@@ -56,6 +55,6 @@ def ensure_completed(backend_client, job_id, sleep=0.5):
         if status == "completed":
             break
         time.sleep(sleep)
-        i -= 1
+        attempts -= 1
 
-    assert i > 0, f"Failed to finish job {job_id}"
+    assert attempts > 0, f"Failed to finish job {job_id}"

@@ -72,8 +72,8 @@ def test_fable_contruction(tmpdir, backend_client_with_auth):
     response = backend_client_with_auth.post("/execution/execute", json=spec.model_dump())
     assert response.is_success
     job_id = response.json()["id"]
-    ensure_completed(backend_client_with_auth, job_id, sleep=120)
+    ensure_completed(backend_client_with_auth, job_id, sleep=1, attempts=120)
 
     response = backend_client_with_auth.get(url=f"/job/{job_id}/outputs")
-    assert len(response.json()["output_ids"]) == 1
+    assert len(response.json()) == 1
     assert os.path.exists(f"{tmpdir}/output.zarr")
