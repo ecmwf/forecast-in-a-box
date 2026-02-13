@@ -112,5 +112,4 @@ def mark_release(release: Release) -> None:
 
 
 def should_install_default_plugin() -> bool:
-    return False  # TODO enable post-LTS release
-    # return Globals.FirstRun
+    return Globals.FirstRun
