@@ -36,7 +36,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: extractions/setup-just@v3
-      - uses: astral-sh/setup-uv@v7
+      # NOTE if setup uv used, make sure to configure uv cache correctly, to not fill home. But should be already installed and configured
+      # - uses: astral-sh/setup-uv@v7
       - uses: actions/setup-node@v6 # NOTE does not actually work on macos !!!
       - run: |
           set -euo pipefail
