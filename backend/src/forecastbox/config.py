@@ -153,6 +153,27 @@ def _default_plugin_stores() -> PluginStoresConfig:
     }
 
 
+ArtifactStoreId = str
+
+
+class ArtifactStoreConfig(BaseModel):
+    url: str
+    method: Literal["file"]
+
+
+ArtifactStoresConfig = dict[ArtifactStoreId, ArtifactStoreConfig]
+
+
+def _default_artifact_stores() -> ArtifactStoresConfig:
+    return {
+        "ecmwf": ArtifactStoreConfig(
+            # TODO fix pre merge
+            url="https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/d092af0130a1bc4b09d25d9f1785b94fe1e54b18/install/artifacts.json",
+            method="file",
+        ),
+    }
+
+
 class ProductSettings(BaseModel):
     pproc_schema_dir: str | None = None
     """Path to the directory containing the PPROC schema files."""
@@ -173,6 +194,7 @@ class ProductSettings(BaseModel):
 
     plugins: PluginsSettings = Field(default_factory=dict)
     plugin_stores: PluginStoresConfig = Field(default_factory=_default_plugin_stores)
+    artifact_stores: ArtifactStoresConfig = Field(default_factory=_default_artifact_stores)
 
     def validate_runtime(self) -> list[str]:
         if self.pproc_schema_dir and not os.path.isdir(self.pproc_schema_dir):
