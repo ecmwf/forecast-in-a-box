@@ -18,6 +18,8 @@ from pydantic import BaseModel, Field
 # NOTE we may eventually fine-grain this with like cuda versions or architecture etc, form a hierarchy, etc. Or maybe not and this will be enough.
 Platform = Literal["macos", "linux"]
 
+MlModelCheckpointId = str
+
 
 class MlModelCheckpoint(BaseModel):
     url: str = Field(
