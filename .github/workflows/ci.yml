@@ -39,6 +39,7 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - uses: actions/setup-node@v6 # NOTE does not actually work on macos !!!
       - run: |
+          uv cache dir
           set -euo pipefail
           pushd backend
           export UV_FROZEN=1
