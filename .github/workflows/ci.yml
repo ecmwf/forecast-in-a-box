@@ -16,6 +16,7 @@ on:
     paths:
       - 'backend/**'
       - 'frontend-v2/**'
+      - '.github/workflows/ci.yml'
 
   # Trigger the workflow manually
   workflow_dispatch: ~
