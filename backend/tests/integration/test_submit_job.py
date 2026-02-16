@@ -1,5 +1,6 @@
 import io
 import os
+import sys
 import time
 import zipfile
 
@@ -60,6 +61,11 @@ def test_submit_job(backend_client_with_auth):
     outputs = backend_client_with_auth.get(f"/job/{raw_job_id}/outputs").raise_for_status().json()
     assert len(outputs) == 1
     assert "n1" in outputs[0]["output_ids"]
+    # NOTE increased timeout below for mac because of delayed import
+    kw_tm = {"timeout": 20.0} if sys.platform == "darwin" else {}
+    output = backend_client_with_auth.get(f"/job/{raw_job_id}/results/n1", **kw_tm)
+    assert cloudpickle.loads(output.content) == 3
+    # NOTE we run the same request again, without timeout, to verify it was indeed delayed import
     output = backend_client_with_auth.get(f"/job/{raw_job_id}/results/n1")
     assert cloudpickle.loads(output.content) == 3
 

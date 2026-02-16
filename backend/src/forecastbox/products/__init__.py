@@ -7,7 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from . import ensemble, forecast, plots, standard, thermal
+from . import ensemble, forecast, standard, thermal
 from .definitions import DESCRIPTIONS, LABELS
 
-__all__ = ["DESCRIPTIONS", "LABELS", "ensemble", "forecast", "thermal", "extreme", "standard", "plots"]
+__all__ = ["DESCRIPTIONS", "LABELS", "ensemble", "forecast", "thermal", "extreme", "standard"]
