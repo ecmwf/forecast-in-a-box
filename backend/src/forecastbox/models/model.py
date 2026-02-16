@@ -198,7 +198,7 @@ class BaseForecastModel(ABC):
         if isinstance(input_source, str):
             input_source = {input_source: {}}
 
-        extra_kwargs = {
+        extra_kwargs: dict[str, Any] = {
             "pre_processors": [],
             "post_processors": [],
             "env": {},
@@ -211,7 +211,7 @@ class BaseForecastModel(ABC):
         extra_kwargs["pre_processors"].extend(self._pre_processors(kwargs))
         extra_kwargs["post_processors"].extend(self._post_processors(kwargs))
 
-        extra_kwargs['env']['ANEMOI_INFERENCE_NUM_CHUNKS'] = 4
+        extra_kwargs["env"]["ANEMOI_INFERENCE_NUM_CHUNKS"] = 4
 
         if ensemble_members == 1:
             ensemble_members = None
