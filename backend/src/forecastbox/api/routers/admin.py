@@ -192,7 +192,7 @@ async def patch_user(user_id: UUID4, update_dict: dict, admin: UserRead = Depend
         return HTMLResponse(content="User updated successfully", status_code=200)
 
 
-@dataclass
+@dataclass(frozen=True, eq=True, slots=True)
 class ConfigResponse:
     language_iso639_1: str
     authType: Literal["anonymous", "authenticated"]

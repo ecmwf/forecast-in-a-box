@@ -53,7 +53,7 @@ router = APIRouter(
 )
 
 
-@dataclass
+@dataclass(frozen=True, eq=True, slots=True)
 class GetScheduleRunResponse:
     schedule_run_id: str
     schedule_id: ScheduleId
@@ -76,7 +76,7 @@ class GetScheduleRunResponse:
         )
 
 
-@dataclass
+@dataclass(frozen=True, eq=True, slots=True)
 class GetScheduleRunsResponse:
     runs: dict[str, GetScheduleRunResponse]
     total: int
@@ -86,7 +86,7 @@ class GetScheduleRunsResponse:
     error: str | None = None
 
 
-@dataclass
+@dataclass(frozen=True, eq=True, slots=True)
 class GetScheduleResponse:
     """Get Schedule Response."""
 
@@ -121,7 +121,7 @@ class GetScheduleResponse:
         )
 
 
-@dataclass
+@dataclass(frozen=True, eq=True, slots=True)
 class GetMultipleSchedulesResponse:
     """Get Multiple Schedules Response.
 
@@ -142,7 +142,7 @@ class GetMultipleSchedulesResponse:
     """An error message if there was an issue retrieving schedules, otherwise None."""
 
 
-@dataclass
+@dataclass(frozen=True, eq=True, slots=True)
 class CreateScheduleResponse:
     schedule_id: ScheduleId
 

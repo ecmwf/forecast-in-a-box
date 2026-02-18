@@ -73,7 +73,7 @@ def _get_field_values(field: str, min_val: int, max_val: int, label: str) -> lis
         raise ValueError(f"failed to generate range for {field}")
 
 
-@dataclass
+@dataclass(frozen=True, eq=True, slots=True)
 class Crontab:
     minutes: list[int]
     hours: list[int]

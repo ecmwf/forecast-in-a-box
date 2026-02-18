@@ -96,7 +96,7 @@ class ProductConfiguration(FIABBaseModel):
         return self
 
 
-@dataclass
+@dataclass(frozen=True, eq=True, slots=True)
 class ProductSpecification:
     product: str
     specification: dict[str, Any]

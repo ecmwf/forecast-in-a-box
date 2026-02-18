@@ -45,7 +45,7 @@ def eval_dynamic_expression(data: dict[str, Any], execution_time: dt.datetime) -
     return processed_data
 
 
-@dataclass
+@dataclass(frozen=True, eq=True, slots=True)
 class RunnableSchedule:
     exec_spec: ExecutionSpecification
     created_by: str | None

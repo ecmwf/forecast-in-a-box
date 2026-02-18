@@ -49,7 +49,7 @@ router = APIRouter(
 STATUS = Literal["submitted", "running", "completed", "errored", "invalid", "timeout", "unknown"]
 
 
-@dataclass
+@dataclass(frozen=True, eq=True, slots=True)
 class JobProgressResponse:
     """Job Progress Response."""
 
@@ -73,7 +73,7 @@ def build_response(
     return JobProgressResponse(progress=progress, created_at=created_at, status=status, error=error)
 
 
-@dataclass
+@dataclass(frozen=True, eq=True, slots=True)
 class JobProgressResponses:
     """Job Progress Responses.
 
@@ -294,7 +294,7 @@ async def upload_job(file: UploadFile, user: UserRead | None = Depends(current_a
     return await execute2response(spec, user)
 
 
-@dataclass
+@dataclass(frozen=True, eq=True, slots=True)
 class DatasetAvailabilityResponse:
     """Dataset Availability Response."""
 
@@ -486,7 +486,7 @@ async def get_result_old(
     return await get_result(job_id, dataset_id, user)
 
 
-@dataclass
+@dataclass(frozen=True, eq=True, slots=True)
 class JobDeletionResponse:
     """Job Deletion Response."""
 
