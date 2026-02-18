@@ -26,15 +26,12 @@ from forecastbox.config import ArtifactStoreId, ArtifactStoresConfig
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=True, slots=True)
 class CompositeArtifactId:
     """Composite identifier for an artifact combining store and checkpoint IDs"""
 
     artifact_store_id: ArtifactStoreId
     ml_model_checkpoint_id: MlModelCheckpointId
-
-    def __hash__(self) -> int:
-        return hash((self.artifact_store_id, self.ml_model_checkpoint_id))
 
 
 ArtifactCatalog = dict[CompositeArtifactId, MlModelCheckpoint]
