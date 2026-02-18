@@ -26,6 +26,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException
 
 import forecastbox.db
+from forecastbox.api.artifacts.manager import join_artifact_manager, submit_refresh_catalog
 from forecastbox.api.plugin.manager import PluginsStatus, join_updater_thread, submit_load_plugins
 from forecastbox.api.plugin.manager import status_brief as status_plugins
 from forecastbox.api.plugin.store import join_stores_thread, submit_initialize_stores
@@ -34,7 +35,7 @@ from forecastbox.api.updates import get_local_release
 from forecastbox.db.migrations import migrate
 from forecastbox.db.model import delete_download
 
-from .api.routers import admin, auth, execution, fable, gateway, job, model, plugin, product, schedule
+from .api.routers import admin, artifacts, auth, execution, fable, gateway, job, model, plugin, product, schedule
 from .config import config
 
 logger = logging.getLogger(__name__)
@@ -57,12 +58,14 @@ async def lifespan(app: FastAPI):
     app.version = f"{release_version}@{release_time}"
     submit_load_plugins()
     submit_initialize_stores()
+    submit_refresh_catalog()
     yield
     if config.api.allow_scheduler:
         stop_scheduler()
     await gateway.shutdown_processes()
     join_updater_thread(timeout_sec=10)
     join_stores_thread(timeout_sec=10)
+    join_artifact_manager(timeout_sec=10)
 
 
 app = FastAPI(
@@ -87,6 +90,7 @@ app.include_router(gateway.router, prefix="/api/v1/gateway")
 app.include_router(schedule.router, prefix="/api/v1/schedule")
 app.include_router(fable.router, prefix="/api/v1/fable")
 app.include_router(plugin.router, prefix="/api/v1/plugin")
+app.include_router(artifacts.router, prefix="/api/v1/artifacts")
 
 app.add_middleware(
     CORSMiddleware,  # type: ignore[invalid-argument-type]
