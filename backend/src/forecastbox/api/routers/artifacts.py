@@ -23,14 +23,20 @@ router = APIRouter(
 @router.get("/list_models")
 def list_models_endpoint() -> list[MlModelOverview]:
     """List all available ML models with overview information."""
-    return list_models()
+    try:
+        return list_models()
+    except TimeoutError:
+        raise HTTPException(status_code=503, detail=f"Corresponding internal component is busy")
 
 
 @router.post("/model_details")
 def get_model_details_endpoint(composite_id: CompositeArtifactId) -> MlModelDetail:
     """Get detailed information for a specific ML model."""
-    detail = get_model_details(composite_id)
-    if detail is None:
+    try:
+        detail = get_model_details(composite_id)
+    except TimeoutError:
+        raise HTTPException(status_code=503, detail=f"Corresponding internal component is busy")
+    except KeyError:
         raise HTTPException(status_code=404, detail=f"Model {composite_id} not found")
     return detail
 
@@ -38,7 +44,8 @@ def get_model_details_endpoint(composite_id: CompositeArtifactId) -> MlModelDeta
 @router.post("/download_model")
 def download_model_endpoint(composite_id: CompositeArtifactId) -> dict[str, str]:
     """Submit a download request for a specific ML model."""
-    error = submit_artifact_download(composite_id)
-    if error:
-        raise HTTPException(status_code=400, detail=error)
+    # TODO when there is a download in progress, this should return status instead of submit again
+    maybe_error = submit_artifact_download(composite_id)
+    if maybe_error.e is not None:
+        raise HTTPException(status_code=400, detail=maybe_error.e)
     return {"status": "download submitted", "composite_id": str(composite_id)}
