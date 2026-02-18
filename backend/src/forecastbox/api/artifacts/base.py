@@ -41,7 +41,7 @@ class MlModelOverview:
 
 @dataclass(frozen=True, eq=True, slots=True)
 class MlModelDetail:
-    """Detailed information for a specific ML model (excludes comment field)"""
+    """Detailed information for a specific ML model"""
 
     composite_id: CompositeArtifactId
     display_name: str
