@@ -19,10 +19,10 @@ from cascade.low.func import assert_never
 from pydantic import BaseModel
 from typing_extensions import Self
 
-from forecastbox.ecpyutil import timed_acquire
 from forecastbox.api.plugin.manager import submit_update_single
 from forecastbox.api.types.fable import PluginCompositeId, PluginId
 from forecastbox.config import PluginSettings, PluginStoreConfig, PluginStoreId, PluginStoresConfig, config, config_edit_lock
+from forecastbox.ecpyutil import timed_acquire
 
 logger = logging.getLogger(__name__)
 

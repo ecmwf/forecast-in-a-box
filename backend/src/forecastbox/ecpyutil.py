@@ -29,14 +29,14 @@ def timed_acquire(lock: threading.Lock, timeout: float) -> Iterator[bool]:
 
 def frozendc(cls: type[_T]) -> type[_T]:
     """Frozen dataclass decorator that creates immutable, slotted dataclasses.
-    
+
     This is a convenience wrapper for @dataclass(frozen=True, eq=True, slots=True).
     Use this for data transfer objects and value types that should be immutable and
     memory-efficient. Benefits: thread-safe, hashable (can be dict keys), prevents
     accidental mutation, reduced memory footprint via slots. Only use on classes
     without inheritance and that don't need post-init mutation.
-    
-    Note: Type checkers may not fully understand this decorator. If you get type errors
-    at usage sites, add `# ty: ignore` comment after the decorator.
+
+    Note: Type checkers may not fully understand this decorator. Don't use it yet.
+    We also tried a pyi stub, but `ty` isn't ready.
     """
     return dataclasses.dataclass(frozen=True, eq=True, slots=True)(cls)  # type: ignore[return-value]

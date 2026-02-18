@@ -96,9 +96,6 @@ class ProductConfiguration(FIABBaseModel):
         return self
 
 
-from forecastbox.ecpyutil import frozendc
-
-
 @dataclass(frozen=True, eq=True, slots=True)
 class ProductSpecification:
     product: str

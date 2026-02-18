@@ -6,6 +6,7 @@
   * backend/packages/* are auxiliary python wheels which are optional or mandatory requirements of the `forecastbox` wheel
 * additionally, there are scripts/ and install/ directories, which facilitate getting the wheel installed and configured correctly on target hosts
 * lastly, docs/ contains documentation -- currently contains all of end-user docs, developer docs, faqs and troubleshootings
+* there is pre-commit configured. Ideally do `uv run prek` before every commit
 
 # Python-Related
 * utilize `just` for command running -- `just val` in backend is the "typechecking and testing". Always run this after you make any changes to python code
@@ -18,7 +19,7 @@
   * use typing.cast when the code logic is implicitly erasing the type information
 * prioritize using pydantic.BaseModel or dataclasses.dataclass object for capturing contracts and interfaces.
   * ideally keep them plain, stateless, frozen, without functions -- we end up serializing those objects often over to other python processes or different languages
-  * for simple immutable data transfer objects, use `@dataclass(frozen=True, eq=True, slots=True)` directly for best type checker support -- provides immutability, hashability, and memory efficiency via slots
+  * for simple immutable data transfer objects, use `@dataclass(frozen=True, eq=True, slots=True)` directly for best type checker support -- provides immutability, hashability, and memory efficiency via slots. We set `eq=True` explicitly, despite being a default, for clarity.
   * a convenience decorator `frozendc` exists in `forecastbox.ecpyutil` but direct decorator syntax is preferred for type safety
 * when adding new fields to config.py, make sure they contain defaults -- we need to be backwards compatible wrt users configs
 * when adding new fields to database schemata, make sure you explicitly handle migrations -- we need to be backwards compatible wrt users sqlite instances
