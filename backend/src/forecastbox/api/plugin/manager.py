@@ -46,7 +46,7 @@ from fiab_core.fable import BlockFactoryCatalogue
 from fiab_core.plugin import Plugin
 from pydantic import BaseModel
 
-from forecastbox.api.ecpyutil import timed_acquire
+from forecastbox.ecpyutil import timed_acquire
 from forecastbox.api.types.fable import PluginCompositeId
 from forecastbox.config import PluginSettings, PluginsSettings, config, config_edit_lock
 

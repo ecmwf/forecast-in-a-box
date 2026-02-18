@@ -122,7 +122,7 @@ async def circumvent_auth(request: Request, call_next):
         return await call_next(request)
 
 
-@dataclass
+@dataclass(frozen=True, eq=True, slots=True)
 class StatusResponse:
     """Status response model"""
 

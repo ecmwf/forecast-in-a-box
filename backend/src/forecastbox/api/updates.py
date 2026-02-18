@@ -22,7 +22,7 @@ class Globals:
     FirstRun = os.environ.get("FIAB_FIRST_RUN", "false") == "true"
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, eq=True, slots=True)
 class Release:
     major: int
     minor: int
