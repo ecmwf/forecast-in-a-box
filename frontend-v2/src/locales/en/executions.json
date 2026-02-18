@@ -1,0 +1,111 @@
+{
+  "page": {
+    "title": "Forecast Job Executions",
+    "description": "Monitor and manage your forecast job executions"
+  },
+  "detail": {
+    "backLink": "Executions",
+    "untitledJob": "Untitled Job",
+    "showConfig": "Show config",
+    "hideConfig": "Hide config",
+    "graphUnavailable": "Graph visualisation unavailable",
+    "graphUnavailableDescription": "The pipeline graph is not available for this job.",
+    "specUnavailable": "Specification not available",
+    "specUnavailableDescription": "The original configuration was not stored for this job."
+  },
+  "status": {
+    "submitted": "Submitted",
+    "running": "Running",
+    "completed": "Completed",
+    "errored": "Errored",
+    "invalid": "Invalid",
+    "timeout": "Timeout",
+    "unknown": "Unknown"
+  },
+  "tabs": {
+    "outputs": "Outputs",
+    "logs": "Logs",
+    "specification": "Specification"
+  },
+  "actions": {
+    "restart": "Restart",
+    "restartJob": "Restart Job",
+    "delete": "Delete",
+    "deleteJob": "Delete Job",
+    "edit": "Edit",
+    "editDetails": "Edit Details",
+    "save": "Save",
+    "editConfiguration": "Edit Configuration",
+    "downloadLogs": "Download Full Logs",
+    "confirmRestart": "This will re-execute the job with the same specification. Continue?",
+    "confirmDelete": "This will permanently delete this job and its results. This action cannot be undone."
+  },
+  "submit": {
+    "title": "Submit Forecast Job",
+    "name": "Name",
+    "namePlaceholder": "Enter a name for this job",
+    "description": "Description",
+    "descriptionPlaceholder": "Optional notes about this execution",
+    "tags": "Tags",
+    "tagsPlaceholder": "Add a tag",
+    "advancedTitle": "Advanced: Execution Environment",
+    "hosts": "Hosts",
+    "hostsPlaceholder": "Default (auto)",
+    "workersPerHost": "Workers per host",
+    "workersPerHostPlaceholder": "Default (auto)",
+    "envVariables": "Environment variables",
+    "envKeyPlaceholder": "Variable name",
+    "envValuePlaceholder": "Value",
+    "addVariable": "Add variable",
+    "cancel": "Cancel",
+    "submit": "Submit Job",
+    "submitting": "Submitting..."
+  },
+  "outputs": {
+    "generated": "Generated",
+    "noOutputs": "No outputs available yet",
+    "noOutputsRunning": "Outputs will appear here as they are generated.",
+    "view": "View",
+    "download": "Download",
+    "inspect": "Inspect"
+  },
+  "logs": {
+    "title": "Gateway Log",
+    "searchPlaceholder": "Filter logs...",
+    "jumpToBottom": "Jump to bottom",
+    "connected": "Connected",
+    "connecting": "Connecting...",
+    "disconnected": "Disconnected",
+    "executionEnded": "Job execution ended"
+  },
+  "errors": {
+    "executionFailed": "Execution Failed",
+    "jobNotFound": "Job not found",
+    "jobNotFoundDescription": "The requested job could not be found.",
+    "backToExecutions": "Back to Executions"
+  },
+  "empty": {
+    "title": "No executions",
+    "description": "You haven't run any forecast jobs yet. Start by creating a new forecast configuration.",
+    "action": "Create Forecast"
+  },
+  "filter": {
+    "allStatuses": "All statuses",
+    "filterByStatus": "Filter by status",
+    "all": "All",
+    "submitted": "Submitted",
+    "running": "Running",
+    "completed": "Completed",
+    "errored": "Errored",
+    "searchPlaceholder": "Search executions..."
+  },
+  "list": {
+    "loading": "Loading executions...",
+    "error": "Failed to load executions"
+  },
+  "pagination": {
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page {{current}} of {{total}}"
+  }
+}

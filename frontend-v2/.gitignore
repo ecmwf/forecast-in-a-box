@@ -8,11 +8,12 @@ count.txt
 .nitro
 .tanstack
 .wrangler
-.mcp.json
-CLAUDE.md
-.claude
 .env*
 
-# Reconsider at a later stage
-CONFIGURATION.md
-RUNTIME_CONFIG.md
+# Test artifacts
+playwright-report/
+.playwright-mcp/
+test-results/
+coverage/
+**/__screenshots__/
+

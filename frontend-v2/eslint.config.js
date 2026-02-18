@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2025- ECMWF and individual contributors.
+ * (C) Copyright 2026- ECMWF and individual contributors.
  *
  * This software is licensed under the terms of the Apache Licence Version 2.0
  * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
@@ -17,6 +17,11 @@ export default [
   { ignores: ['dist', '*.config.js', 'public'] },
   ...pluginQuery.configs['flat/recommended'],
   ...tanstackConfig,
+  {
+    rules: {
+      'no-restricted-imports': ['error', { patterns: ['@radix-ui/*'] }],
+    },
+  },
   {
     files: ['!src/components/ui/**'],
     plugins: {

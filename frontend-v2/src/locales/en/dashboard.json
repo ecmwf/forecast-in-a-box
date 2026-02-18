@@ -1,0 +1,141 @@
+{
+  "welcome": {
+    "title": "Welcome back, {{name}}",
+    "titleAnonymous": "Welcome back",
+    "stats": {
+      "systemStatus": "System Status",
+      "checking": "Checking...",
+      "loadingStatus": "Loading status",
+      "allOk": "All OK",
+      "operational": "Operational",
+      "partialOutage": "Partial Outage",
+      "someIssues": "Some services unavailable",
+      "systemDown": "System Down",
+      "notOperational": "Not operational",
+      "currentlyRunning": "Currently Running",
+      "activeForecasts": "Active forecasts",
+      "availableModels": "Available Models",
+      "of": "of {{total}}",
+      "downloadedModels": "Downloaded models",
+      "totalForecasts": "Total Forecasts",
+      "thisMonth": "Executed this month",
+      "executionStatus": "Execution Status",
+      "totalJobs": "Total",
+      "noActiveJobs": "No active jobs"
+    },
+    "actions": {
+      "managePlugins": "Manage Plugins",
+      "manageSources": "Manage Sources",
+      "manageExecutions": "Manage Job Executions",
+      "myPresets": "Manage Configuration Presets",
+      "scheduledForecasts": "Manage Scheduled Forecasts"
+    }
+  },
+  "community": {
+    "title": "Forecast-in-a-Box Community News",
+    "latestModels": "Latest Available Models",
+    "latestTopics": "Latest Forum Topics",
+    "new": "New",
+    "released": "Released {{time}}",
+    "postedBy": "Posted by {{author}} • {{time}}",
+    "viewRegistry": "View Model Registry",
+    "visitForum": "Visit Community Forum"
+  },
+  "gettingStarted": {
+    "title": "Getting Started Presets",
+    "subtitle": "Choose how to start your forecast configuration",
+    "quickStart": {
+      "title": "Quick Start",
+      "description": "Start with optimised defaults using the ECMWF plugin blocks and run immediately.",
+      "tags": {
+        "blocks": "4 Blocks",
+        "connected": "Pre-connected",
+        "ready": "Run Now"
+      }
+    },
+    "customForecast": {
+      "title": "Custom Forecast",
+      "description": "Build a forecast from scratch with full control over every parameter.",
+      "tags": {
+        "canvas": "Blank Canvas",
+        "control": "Full Control",
+        "advanced": "Advanced"
+      }
+    },
+    "standard": {
+      "title": "Standard Forecast",
+      "description": "Balanced settings for typical weather forecasts with flexible configuration.",
+      "comingSoon": "Coming soon",
+      "tags": {
+        "model": "Choose Model",
+        "time": "120h",
+        "config": "Configurable"
+      }
+    },
+    "dataset": {
+      "title": "Dataset Forecast",
+      "description": "Start with pre-existing forecast data from ECMWF AIFS operational forecasts.",
+      "comingSoon": "Coming soon",
+      "tags": {
+        "data": "AIFS Data",
+        "source": "External Source",
+        "ready": "Ready to Use"
+      }
+    }
+  },
+  "journal": {
+    "title": "Forecast Journal",
+    "searchPlaceholder": "Search or add filters...",
+    "noResults": "No forecasts found matching your criteria.",
+    "loadMore": "Load more history",
+    "filters": {
+      "all": "All",
+      "running": "Running",
+      "completed": "Completed",
+      "error": "Error",
+      "bookmarked": "Bookmarked"
+    },
+    "item": {
+      "model": "Model: {{model}}",
+      "started": "Started: {{time}}",
+      "products": "{{count}} products",
+      "scheduled": "Scheduled",
+      "viewResults": "View Results",
+      "viewError": "View Error"
+    }
+  },
+  "presets": {
+    "title": "My Configuration Presets",
+    "subtitle": "Your saved forecast configurations",
+    "viewAll": "View all presets",
+    "load": "Use this Preset",
+    "delete": "Delete",
+    "bookmark": "Bookmark",
+    "rename": "Rename",
+    "renameTitle": "Rename Preset",
+    "renameDescription": "Update the title and comments for this preset.",
+    "searchPlaceholder": "Search presets...",
+    "filters": {
+      "all": "All",
+      "bookmarked": "Bookmarked"
+    },
+    "page": {
+      "title": "Configuration Presets",
+      "description": "Manage your saved forecast configurations"
+    },
+    "empty": {
+      "title": "No saved presets yet",
+      "description": "Save a configuration from the Fable Builder to see it here.",
+      "filtered": "No presets match your search."
+    },
+    "pagination": {
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {{current}} of {{total}}"
+    }
+  },
+  "notification": {
+    "newModels": "New models and model versions have been published in the",
+    "registryLink": "ECMWF registry"
+  }
+}

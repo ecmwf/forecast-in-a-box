@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2025- ECMWF and individual contributors.
+ * (C) Copyright 2026- ECMWF and individual contributors.
  *
  * This software is licensed under the terms of the Apache Licence Version 2.0
  * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
@@ -10,28 +10,19 @@
 
 /**
  * Application-wide constants
+ *
+ * Note: API endpoint paths are defined in src/api/endpoints.ts
  */
 
 /**
- * API configuration
+ * API configuration (timeouts only - endpoints are in src/api/endpoints.ts)
  */
 export const API_CONSTANTS = {
-  PREFIX: '/api',
-  ENDPOINTS: {
-    STATUS: '/v1/status',
-  },
   TIMEOUTS: {
     DEFAULT: 30000, // 30 seconds
     LONG: 60000, // 1 minute
   },
 } as const
-
-/**
- * Build API endpoint path
- */
-export function buildApiPath(endpoint: string): string {
-  return `${API_CONSTANTS.PREFIX}${endpoint}`
-}
 
 /**
  * Query configuration

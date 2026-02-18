@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2025- ECMWF and individual contributors.
+ * (C) Copyright 2026- ECMWF and individual contributors.
  *
  * This software is licensed under the terms of the Apache Licence Version 2.0
  * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
@@ -16,13 +16,31 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 
-// Import translation resources
-import translationEN from '@/locales/en/translation.json'
+// Import translation resources by namespace
+import commonEN from '@/locales/en/common.json'
+import statusEN from '@/locales/en/status.json'
+import landingEN from '@/locales/en/landing.json'
+import authEN from '@/locales/en/auth.json'
+import errorsEN from '@/locales/en/errors.json'
+import validationEN from '@/locales/en/validation.json'
+import dashboardEN from '@/locales/en/dashboard.json'
+import pluginsEN from '@/locales/en/plugins.json'
+import sourcesEN from '@/locales/en/sources.json'
+import executionsEN from '@/locales/en/executions.json'
 
-// Translation resources
+// Translation resources organized by namespace
 const resources = {
   en: {
-    translation: translationEN,
+    common: commonEN,
+    status: statusEN,
+    landing: landingEN,
+    auth: authEN,
+    errors: errorsEN,
+    validation: validationEN,
+    dashboard: dashboardEN,
+    plugins: pluginsEN,
+    sources: sourcesEN,
+    executions: executionsEN,
   },
 }
 
@@ -35,8 +53,19 @@ i18n
     fallbackLng: 'en', // Fallback language if translation not found
 
     // Namespace configuration
-    defaultNS: 'translation',
-    ns: ['translation'],
+    defaultNS: 'common', // Default namespace for translations
+    ns: [
+      'common',
+      'status',
+      'landing',
+      'auth',
+      'errors',
+      'validation',
+      'dashboard',
+      'plugins',
+      'sources',
+      'executions',
+    ],
 
     // Interpolation options
     interpolation: {

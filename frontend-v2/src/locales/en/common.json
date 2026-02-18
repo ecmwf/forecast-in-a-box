@@ -1,0 +1,42 @@
+{
+  "loading": "Loading...",
+  "error": "Error",
+  "retry": "Retry",
+  "cancel": "Cancel",
+  "confirm": "Confirm",
+  "save": "Save",
+  "delete": "Delete",
+  "edit": "Edit",
+  "close": "Close",
+  "back": "Back",
+  "next": "Next",
+  "previous": "Previous",
+  "submit": "Submit",
+  "search": "Search",
+  "filter": "Filter",
+  "clear": "Clear",
+  "yes": "Yes",
+  "no": "No",
+  "nav": {
+    "label": "Main navigation",
+    "overview": "Overview",
+    "configuration": "Configuration",
+    "executions": "Executions"
+  },
+  "status": {
+    "title": "System Status",
+    "allSystemsNormal": "All Systems Normal",
+    "partialOutage": "Partial Outage",
+    "systemOutage": "System Outage",
+    "components": "Components",
+    "componentUp": "Online",
+    "componentDown": "Offline",
+    "componentOff": "Disabled",
+    "apiServer": "API Server",
+    "cascade": "Cascade",
+    "ecmwfData": "ECMWF Data",
+    "scheduler": "Scheduler",
+    "refresh": "Refresh Status",
+    "lastUpdated": "Last updated"
+  }
+}
