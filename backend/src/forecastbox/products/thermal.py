@@ -22,23 +22,22 @@ from .registry import CategoryRegistry
 
 thermal_indices = CategoryRegistry("thermal", interface=Interfaces.DETAILED, description="Thermal Indices", title="Thermal Indices")
 
-PPROC_AVAILABLE = True
-try:
-    from earthkit.workflows.plugins.pproc.fluent import Action as ppAction
-except (OSError, ImportError):
-    ppAction = object  # type: ignore # NOTE implicit shadowing, intentional
-    PPROC_AVAILABLE = False
-
-THERMOFEEL_IMPORTED = True
-if not importlib.util.find_spec("thermofeel"):
-    THERMOFEEL_IMPORTED = False
-
 
 class BaseThermalIndex(Product):
     """Base Thermal Index Product"""
 
     param_requirements: list[str] | None = None
     output_param: str
+
+    def __init__(self):
+        try:
+            import earthkit.workflows.plugins.pproc
+
+            self.pproc_available = True
+        except (OSError, ImportError):
+            self.pproc_available = False
+        self.thermofeel_imported = bool(importlib.util.find_spec("thermofeel"))
+        super().__init__()
 
     @property
     def qube(self):
@@ -63,7 +62,7 @@ class BaseThermalIndex(Product):
     def validate_intersection(self, model: SpecifiedModel) -> bool:
         model_intersection = model.qube()
 
-        if not PPROC_AVAILABLE or not THERMOFEEL_IMPORTED or self.param_requirements is None:
+        if not self.pproc_available or not self.thermofeel_imported or self.param_requirements is None:
             return False
         return all(x in model_intersection.span("param") for x in self.param_requirements)
 
@@ -75,8 +74,9 @@ class BaseThermalIndex(Product):
         selected = self.select_on_specification(product_spec, deaccumulated)
         source = selected.select(param=self.param_requirements)
 
-        if not PPROC_AVAILABLE:
+        if not self.pproc_available:
             raise ImportError("PPROC is not available. Please install earthkit-workflows[pproc] to use PPROC products.")
+        from earthkit.workflows.plugins.pproc.fluent import Action as ppAction
 
         return (
             ppAction(source.nodes)
