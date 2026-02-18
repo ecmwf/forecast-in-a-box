@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2025- ECMWF and individual contributors.
+ * (C) Copyright 2026- ECMWF and individual contributors.
  *
  * This software is licensed under the terms of the Apache Licence Version 2.0
  * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
@@ -9,28 +9,70 @@
  */
 
 import { Outlet, createRootRoute } from '@tanstack/react-router'
-import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
-import { TanStackDevtools } from '@tanstack/react-devtools'
-import { logConfig } from '@/utils/env.ts'
+import { Suspense, lazy, useEffect } from 'react'
+import {
+  useBackendBaseUrl,
+  useConfig,
+  useDebugMode,
+  useEnvironment,
+} from '@/hooks/useConfig'
+import { useLanguageSync } from '@/hooks/useLanguageSync'
+import { createLogger } from '@/lib/logger'
+
+const CommandPalette = lazy(() =>
+  import('@/components/CommandPalette').then((m) => ({
+    default: m.CommandPalette,
+  })),
+)
+
+const log = createLogger('Root')
 
 export const Route = createRootRoute({
   component: () => {
-    logConfig()
+    const config = useConfig()
+    const debugMode = useDebugMode()
+    const backendBaseUrl = useBackendBaseUrl()
+    const environment = useEnvironment()
+
+    // Sync language between configStore, globalStore, and i18next
+    useLanguageSync()
+
+    // Log configuration in debug mode
+    useEffect(() => {
+      if (debugMode && config) {
+        log.debug('Application Configuration', {
+          backendBaseUrl,
+          environment,
+          debugMode,
+          language: config.language_iso639_1,
+          authType: config.authType,
+          loginEndpoint: config.loginEndpoint,
+          config,
+        })
+      }
+    }, [config, debugMode, backendBaseUrl, environment])
 
     return (
       <>
+        {/* Header and Footer are rendered by individual layouts */}
         <Outlet />
-        <TanStackDevtools
-          config={{
-            position: 'bottom-right',
-          }}
-          plugins={[
-            {
-              name: 'Tanstack Router',
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-          ]}
-        />
+        {/* Global command palette (⌘K / Ctrl+K) */}
+        <Suspense fallback={null}>
+          <CommandPalette />
+        </Suspense>
+        {/* {debugMode && (*/}
+        {/*  <TanStackDevtools*/}
+        {/*    config={{*/}
+        {/*      position: 'bottom-right',*/}
+        {/*    }}*/}
+        {/*    plugins={[*/}
+        {/*      {*/}
+        {/*        name: 'Tanstack Router',*/}
+        {/*        render: <TanStackRouterDevtoolsPanel />,*/}
+        {/*      },*/}
+        {/*    ]}*/}
+        {/*  />*/}
+        {/* )}*/}
       </>
     )
   },
