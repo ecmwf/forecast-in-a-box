@@ -9,32 +9,23 @@
 
 """
 Downloading and managing artifacts such as ml model checkpoints
+
+All the methods here are blocking -- see manager for nonblocking invocations
 """
 
 import logging
 import shutil
 import tempfile
-from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
 from cascade.low.func import assert_never
-from fiab_core.artifacts import MlModelCheckpoint, MlModelCheckpointId
+from fiab_core.artifacts import MlModelCheckpoint
 
+from forecastbox.api.artifacts.base import ArtifactCatalog, CompositeArtifactId, artifacts_subdir, get_artifact_local_path
 from forecastbox.config import ArtifactStoreId, ArtifactStoresConfig
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True, eq=True, slots=True)
-class CompositeArtifactId:
-    """Composite identifier for an artifact combining store and checkpoint IDs"""
-
-    artifact_store_id: ArtifactStoreId
-    ml_model_checkpoint_id: MlModelCheckpointId
-
-
-ArtifactCatalog = dict[CompositeArtifactId, MlModelCheckpoint]
 
 
 def get_artifacts_catalog(artifact_stores_config: ArtifactStoresConfig) -> ArtifactCatalog:
@@ -60,7 +51,7 @@ def get_artifacts_catalog(artifact_stores_config: ArtifactStoresConfig) -> Artif
 
 def list_local_storage(artifacts_catalog: ArtifactCatalog, data_dir: Path) -> list[CompositeArtifactId]:
     """List locally stored artifacts by traversing the artifacts directory under data_dir/artifacts/{store_id}/{checkpoint_id}."""
-    artifacts_base = data_dir / "artifacts"
+    artifacts_base = data_dir / artifacts_subdir
 
     if not artifacts_base.exists():
         return []
@@ -93,21 +84,6 @@ def list_local_storage(artifacts_catalog: ArtifactCatalog, data_dir: Path) -> li
                 logger.warning(f"Found local artifact not in catalog: {composite_id}")
 
     return local_artifacts
-
-
-def get_artifact_local_path(composite_id: CompositeArtifactId, data_dir: Path) -> Path:
-    """Get the local filesystem path for an artifact file, raising ValueError if the composite ID contains invalid path characters."""
-    # Validate that the IDs don't contain path traversal or invalid characters
-    store_id = composite_id.artifact_store_id
-    checkpoint_id = composite_id.ml_model_checkpoint_id
-
-    invalid_chars = {"..", "/", "\\", "\0"}
-    if any(char in store_id for char in invalid_chars) or any(char in checkpoint_id for char in invalid_chars):
-        raise ValueError(f"Invalid characters in artifact ID: {composite_id}")
-
-    artifact_path = data_dir / "artifacts" / store_id / checkpoint_id
-
-    return artifact_path
 
 
 def download_artifact(composite_id: CompositeArtifactId, artifacts_catalog: ArtifactCatalog, data_dir: Path) -> None:

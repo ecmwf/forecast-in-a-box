@@ -16,11 +16,13 @@ import httpx
 import pytest
 from fiab_core.artifacts import MlModelCheckpoint
 
-from forecastbox.api.artifacts import (
+from forecastbox.api.artifacts.base import (
     ArtifactCatalog,
     CompositeArtifactId,
-    download_artifact,
     get_artifact_local_path,
+)
+from forecastbox.api.artifacts.io import (
+    download_artifact,
     get_artifacts_catalog,
     list_local_storage,
 )
