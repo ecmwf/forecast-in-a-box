@@ -1,5 +1,4 @@
 import os
-from datetime import datetime, timedelta
 
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
@@ -7,6 +6,8 @@ from forecastbox.api.types import EnvironmentSpecification, ExecutionSpecificati
 from forecastbox.api.types.fable import FableBuilderV1
 
 from .utils import ensure_completed
+
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
 
 def test_fable_contruction(tmpdir, backend_client_with_auth):
@@ -23,7 +24,7 @@ def test_fable_contruction(tmpdir, backend_client_with_auth):
         factory_id=PluginBlockFactoryId(plugin=pluginId, factory="ekdSource"),
         configuration_values={
             "source": "ecmwf-open-data",
-            "date": (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"),
+            "date": "2026-02-18",
             "expver": "0001",
         },
         input_ids={},
@@ -69,6 +70,17 @@ def test_fable_contruction(tmpdir, backend_client_with_auth):
         job=RawCascadeJob(**response.json()),
         environment=EnvironmentSpecification(hosts=1, workers_per_host=1),
     )
+
+    # Replace open data retrieval with reading from test data file
+    for task in spec.job.job_instance.tasks.values():
+        if task.definition.entrypoint == "fiab_plugin_ecmwf.runtime.source.earthkit_source":
+            request = task.static_input_kw["request"]
+            # Check request matches data inside test file
+            assert request["number"] == list(range(1, 6, 1))
+            assert request["step"] == list(range(0, 61, 6))
+            task.static_input_ps["0"] = "file"
+            task.static_input_kw["path"] = os.path.join(DATA_DIR, "test.grib")
+
     response = backend_client_with_auth.post("/execution/execute", json=spec.model_dump())
     assert response.is_success
     job_id = response.json()["id"]
