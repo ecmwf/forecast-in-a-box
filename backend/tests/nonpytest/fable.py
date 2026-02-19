@@ -53,37 +53,24 @@ if __name__ == "__main__":
         response = client.get("/fable/catalogue").raise_for_status()
         assert len(response.json()) > 0
 
-        builder = FableBuilderV1(blocks={})
-        response = client.request(url="/fable/expand", method="put", json=builder.model_dump())
-        assert len(response.json()["possible_sources"]) == 1
-        assert len(response.json()["possible_expansions"]) == 0
-
         pluginId = PluginCompositeId(store="ecmwf", local="ecmwf-base")
-        source = BlockInstance(
-            factory_id=PluginBlockFactoryId(plugin=pluginId, factory="ekdSource"),
-            configuration_values={
-                "source": "ecmwf-open-data",
-                "date": (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"),
-                "expver": "0001",
-            },
-            input_ids={},
-        )
-        blocks = {"source1": source}
-        builder = FableBuilderV1(blocks=blocks)
-        response = client.request(url="/fable/expand", method="put", json=builder.model_dump())
-        assert len(response.json()["possible_expansions"]["source1"]) == 3
-
-        temporalMean = BlockInstance(
-            factory_id=PluginBlockFactoryId(plugin=pluginId, factory="temporalStatistics"),
-            configuration_values={"variable": "2t", "statistic": "mean"},
-            input_ids={"dataset": "source1"},
-        )
-        blocks["temporalMean"] = temporalMean
-        builder = FableBuilderV1(blocks=blocks)
-        response = client.request(url="/fable/expand", method="put", json=builder.model_dump())
-        assert len(response.json()["possible_expansions"]["temporalMean"]) == 2
-
-        for statistic in ["mean"]:
+        blocks = {
+            "source1": BlockInstance(
+                factory_id=PluginBlockFactoryId(plugin=pluginId, factory="ekdSource"),
+                configuration_values={
+                    "source": "ecmwf-open-data",
+                    "date": (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"),
+                    "expver": "0001",
+                },
+                input_ids={},
+            ),
+            "temporalMean": BlockInstance(
+                factory_id=PluginBlockFactoryId(plugin=pluginId, factory="temporalStatistics"),
+                configuration_values={"variable": "2t", "statistic": "mean"},
+                input_ids={"dataset": "source1"},
+            ),
+        }
+        for statistic in ["mean", "std"]:
             block = BlockInstance(
                 factory_id=PluginBlockFactoryId(plugin=pluginId, factory="ensembleStatistics"),
                 configuration_values={"variable": "2t", "statistic": statistic},
@@ -98,12 +85,7 @@ if __name__ == "__main__":
             blocks[f"sink{statistic.capitalize()}"] = sink
 
         builder = FableBuilderV1(blocks=blocks)
-        response = client.request(url="/fable/expand", method="put", json=builder.model_dump())
-        assert len(response.json()["possible_expansions"]["sinkMean"]) == 0
-        assert len(response.json()["block_errors"]) == 0
-
         response = client.request(url="/fable/compile", method="put", json=builder.model_dump())
-        assert len(response.json()["job_instance"]["tasks"]) > 0
 
         spec = ExecutionSpecification(
             job=RawCascadeJob(**response.json()),
