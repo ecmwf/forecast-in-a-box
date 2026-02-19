@@ -7,7 +7,7 @@ public/config.template.js
 
 # Non-frontend files
 .claude/
-docs/
+development_guidelines/
 
 # Other ignores
 .env

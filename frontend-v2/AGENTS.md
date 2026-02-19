@@ -164,7 +164,7 @@ Use `showToast` from `@/lib/toast` for user notifications. Let TanStack Query ha
 
 Two Playwright configs: `playwright.config.ts` (MSW-mocked) and `playwright.config.stack.ts` (real backend). All E2E tests must work against both.
 
-See [docs/TESTING.md](./docs/TESTING.md) for patterns and strategy.
+See [development_guidelines/TESTING.md](./development_guidelines/TESTING.md) for patterns and strategy.
 
 ## Common Tasks
 
@@ -186,5 +186,5 @@ See [docs/TESTING.md](./docs/TESTING.md) for patterns and strategy.
 
 ## Reference Docs
 
-- [docs/TESTING.md](./docs/TESTING.md) — Test patterns and strategy
-- [docs/UI_DESIGN.md](./docs/UI_DESIGN.md) — Design guidelines
+- [development_guidelines/TESTING.md](./development_guidelines/TESTING.md) — Test patterns and strategy
+- [development_guidelines/UI_DESIGN.md](./development_guidelines/UI_DESIGN.md) — Design guidelines
