@@ -1,0 +1,190 @@
+# AGENTS.md
+
+Guidance for AI Assistants working with this frontend codebase.
+
+## Guidelines
+
+Follow these behavioral rules to avoid common LLM coding mistakes.
+
+### 1. Think Before Coding
+
+Don't assume. Don't hide confusion. Surface tradeoffs.
+
+- State assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them — don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+### 2. Simplicity First
+
+Minimum code that solves the problem. Nothing speculative.
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+### 3. Surgical Changes
+
+Touch only what you must. Clean up only your own mess.
+
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it — don't delete it.
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+
+### 4. Goal-Driven Execution
+
+Define success criteria. Loop until verified.
+
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan with verifiable checks.
+
+---
+
+## Project Overview
+
+Frontend UI for **Forecast-in-a-Box** (FIAB), a portable ML-based weather forecasting system for ECMWF.
+
+## Technology Stack
+
+| Category  | Technology                                    |
+| --------- | --------------------------------------------- |
+| Framework | React 19 + TypeScript (strict)                |
+| Build     | Vite 7                                        |
+| State     | Zustand (client) + TanStack Query v5 (server) |
+| Routing   | TanStack Router (file-based)                  |
+| Styling   | Tailwind CSS v4 (CSS-based config)            |
+| UI        | shadcn/ui (Base-UI only, no Radix)            |
+| Forms     | Zod 4                                         |
+| i18n      | i18next                                       |
+| HTTP      | Native fetch (no axios)                       |
+| Testing   | Vitest Browser Mode + Playwright + MSW v2     |
+| Linting   | ESLint (TanStack config) + Prettier           |
+
+## Commands
+
+```bash
+# Development
+npm run dev              # Dev server (real backend)
+npm run dev:mock         # Dev server (mocked API)
+
+# Build & Test
+npm run build            # Production build
+npm run validate         # Fix + test + build (full check)
+npm run test             # Vitest watch mode
+npm run test:run         # Vitest single run (CI)
+npm run test:unit        # Unit tests only
+npm run test:integration # Integration tests only
+npm run test:coverage    # With coverage report
+npm run test:e2e         # Playwright E2E against MSW mocks
+npm run test:e2e:stack   # Playwright E2E against real backend (port 8000)
+npm run analyze          # Bundle visualization (dist/stats.html)
+
+# Code Quality
+npm run check            # Lint + format check (CI)
+npm run fix              # Auto-fix lint + format
+```
+
+## Project Structure
+
+```
+src/
+├── api/                 # HTTP client, endpoints, TanStack Query hooks, types
+├── components/
+│   ├── base/            # Custom base components
+│   ├── common/          # Shared components (LoadingSpinner, ErrorBoundary, etc.)
+│   ├── layout/          # AppShell, Header, Sidebar, Footer
+│   └── ui/              # shadcn/ui components (auto-generated, do not edit)
+├── features/            # Feature modules (admin, auth, dashboard, fable-builder, landing, plugins, sources, status)
+├── hooks/               # Shared custom hooks
+├── lib/                 # Utilities (logger, toast, queryClient, utils)
+├── locales/             # i18n translations (en/)
+├── providers/           # React context providers
+├── routes/              # TanStack Router (file-based, auto-generates routeTree)
+├── stores/              # Zustand stores (configStore, uiStore)
+├── types/               # Global TypeScript types
+└── utils/               # Helper functions
+
+mocks/                   # MSW handlers and test data
+tests/                   # Unit, integration, E2E tests
+```
+
+## Key Rules
+
+- **No `any`** — use `unknown` with type guards
+- **No axios** — use native fetch via `src/api/client.ts`
+- **No `console.*`** — use `createLogger()` from `@/lib/logger`
+- **No hardcoded strings** — use i18next
+- **No `tailwind.config.js`** — config is in `src/styles.css`
+- **No editing `src/components/ui/`** — these are auto-generated by shadcn/ui
+- **Minimum font size: 14px (`text-sm`)** — avoid `text-xs`
+- **Never swallow errors** — always propagate to users via `showToast` from `@/lib/toast` and log with `createLogger()`. Silent `catch {}` blocks are forbidden.
+- **Path aliases:** `@/*` → `./src/*`, `@tests/*` → `./tests/*`
+
+## API Layer
+
+All endpoint paths live in `src/api/endpoints.ts`. Hooks use TanStack Query with Zod validation:
+
+```typescript
+import { API_ENDPOINTS } from '@/api/endpoints'
+import { apiClient } from '@/api/client'
+```
+
+## Error Handling
+
+```typescript
+import { createLogger } from '@/lib/logger'
+const log = createLogger('MyComponent')
+log.error('Failed:', { id, error }) // Always logged
+log.debug('Debug info') // Dev only
+```
+
+Use `showToast` from `@/lib/toast` for user notifications. Let TanStack Query handle API errors globally.
+
+## Testing
+
+**Vitest Browser Mode** (real Chromium, not JSDOM) + MSW v2 + Playwright for E2E.
+
+| Layer | Location             | Tool             | Files |
+| ----- | -------------------- | ---------------- | ----- |
+| Unit  | `tests/unit/`        | Vitest           | 40    |
+| Integ | `tests/integration/` | Vitest + MSW     | 16    |
+| E2E   | `tests/e2e/`         | Playwright + MSW | 7     |
+
+Two Playwright configs: `playwright.config.ts` (MSW-mocked) and `playwright.config.stack.ts` (real backend). All E2E tests must work against both.
+
+See [development_guidelines/TESTING.md](./development_guidelines/TESTING.md) for patterns and strategy.
+
+## Common Tasks
+
+### Add API endpoint
+
+1. Add path to `src/api/endpoints.ts`
+2. Add types in `src/api/types/`
+3. Add TanStack Query hook in `src/api/hooks/`
+4. Add MSW handler in `mocks/handlers/`
+
+### Add route
+
+1. Create file in `src/routes/` — route tree auto-generates
+
+### Add translation
+
+1. Add keys to `locales/en/{namespace}.json`
+2. Use `t('namespace:key')`
+
+## Reference Docs
+
+- [development_guidelines/TESTING.md](./development_guidelines/TESTING.md) — Test patterns and strategy
+- [development_guidelines/UI_DESIGN.md](./development_guidelines/UI_DESIGN.md) — Design guidelines

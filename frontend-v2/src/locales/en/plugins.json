@@ -1,0 +1,121 @@
+{
+  "title": "Plugin Store",
+  "subtitle": "Manage installed AI models, data connectors, and processing extensions. Browse the ECMWF Plugin Store to expand your capabilities.",
+  "actions": {
+    "checkUpdates": "Check Updates",
+    "install": "Install",
+    "installing": "Installing...",
+    "uninstall": "Uninstall",
+    "enable": "Enable",
+    "disable": "Disable",
+    "update": "Update",
+    "updateNow": "Update Now",
+    "viewDetails": "View Details",
+    "viewDocs": "Documentation",
+    "viewOnPyPI": "View on PyPI",
+    "reportIssue": "Report Issue",
+    "releaseNotes": "Release Notes"
+  },
+  "stats": {
+    "installed": "Installed",
+    "active": "Active",
+    "loaded": "Loaded",
+    "disabled": "Disabled",
+    "updatesAvailable": "Updates",
+    "uninstalled": "Uninstalled",
+    "available": "Available",
+    "errored": "Errored"
+  },
+  "filters": {
+    "searchPlaceholder": "Search installed plugins by name, ID or author...",
+    "status": {
+      "all": "All Statuses",
+      "active": "Active",
+      "loaded": "Loaded",
+      "disabled": "Disabled",
+      "updates": "Updates Available",
+      "uninstalled": "Uninstalled",
+      "available": "Available",
+      "errored": "Errored"
+    },
+    "capability": {
+      "all": "All Capabilities",
+      "source": "Source",
+      "transform": "Transform",
+      "product": "Product",
+      "sink": "Sink"
+    }
+  },
+  "table": {
+    "headers": {
+      "plugin": "Plugin Details",
+      "author": "Author",
+      "status": "Status",
+      "actions": "Actions"
+    }
+  },
+  "status": {
+    "active": "Active",
+    "loaded": "Loaded",
+    "disabled": "Disabled",
+    "uninstalled": "Uninstalled",
+    "available": "Available",
+    "errored": "Errored",
+    "updateAvailable": "Update Available",
+    "incompatible": "Incompatible"
+  },
+  "updatesSection": {
+    "title": "Updates Available",
+    "description": "The following plugins have updates available.",
+    "updateAll": "Update All",
+    "currentVersion": "Current: v{{version}}"
+  },
+  "installedSection": {
+    "title": "Installed plugins",
+    "total": "Total: {{count}}"
+  },
+  "uninstalledSection": {
+    "title": "Available plugins",
+    "description": "Browse and install plugins from the ECMWF Plugin Store.",
+    "total": "Total: {{count}}",
+    "searchPlaceholder": "Search available plugins...",
+    "incompatibleMessage": "This plugin requires FIAB {{version}} or higher",
+    "releasedAgo": "Released {{time}}",
+    "new": "New"
+  },
+  "emptyState": {
+    "title": "No plugins found",
+    "description": "Try adjusting your search or filter criteria.",
+    "noInstalled": "No plugins installed",
+    "noInstalledDescription": "Browse the available plugins to discover and install plugins.",
+    "noUninstalled": "No available plugins",
+    "noUninstalledDescription": "All plugins are already installed."
+  },
+  "confirmRemove": {
+    "title": "Remove Plugin",
+    "description": "Are you sure you want to remove {{name}}? This action cannot be undone.",
+    "confirm": "Remove",
+    "cancel": "Cancel"
+  },
+  "item": {
+    "version": "v{{version}}",
+    "installedAgo": "Installed {{time}}"
+  },
+  "pagination": {
+    "showing": "Showing {{start}}-{{end}} of {{total}} plugins",
+    "previous": "Previous",
+    "next": "Next"
+  },
+  "blockFactory": {
+    "useInConfig": "Use {{kind}} in Configuration",
+    "sourceOnlyTooltip": "Configurations must start with a source block"
+  },
+  "detail": {
+    "backToPlugins": "Back to Plugins",
+    "useAllBlocks": "Use All Blocks ({{count}})",
+    "blockFactories": "Block Factories",
+    "searchBlocks": "Search blocks...",
+    "noMatchingBlocks": "No blocks match your search.",
+    "noBlocks": "This plugin does not provide any block factories."
+  }
+}

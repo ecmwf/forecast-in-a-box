@@ -24,3 +24,7 @@
 * when adding new fields to config.py, make sure they contain defaults -- we need to be backwards compatible wrt users configs
 * when adding new fields to database schemata, make sure you explicitly handle migrations -- we need to be backwards compatible wrt users sqlite instances
 * use comments sparingly, for non-obvious code only. Add docstrings to functions called from other modules only. When adding docstring, use compact style -- dont separate out Args and Returns, describe everything in one or two paragraphs.
+
+# Frontend
+* there are currently two frontends in the project: `frontend/` is the currently used frontend, and `frontend-v2/` is the next-version frontend currently being developed
+* for additional information related to the frontend-v2 codebase, refer to the `AGENTS.md` file in the `frontend-v2/` directory

@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2025- ECMWF and individual contributors.
+ * (C) Copyright 2026- ECMWF and individual contributors.
  *
  * This software is licensed under the terms of the Apache Licence Version 2.0
  * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
@@ -11,17 +11,19 @@
 import { StrictMode } from 'react'
 import ReactDOM from 'react-dom/client'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
-import { QueryClientProvider } from '@tanstack/react-query'
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen'
-import reportWebVitals from './reportWebVitals.ts'
-import { queryClient } from '@/lib/queryClient'
-
-// Initialize i18n before app renders
-import '@/lib/i18n'
+import { ConfigLoader } from '@/components/ConfigLoader.tsx'
+import { AppProviders } from '@/providers'
+import { ErrorBoundary } from '@/components/common/ErrorBoundary'
 
 import './styles.css'
+
+// Initialize global error handlers for uncaught errors
+import { setupGlobalErrorHandlers } from '@/lib/globalErrorHandler'
+
+setupGlobalErrorHandlers()
 
 // Create a new router instance
 const router = createRouter({
@@ -40,20 +42,33 @@ declare module '@tanstack/react-router' {
   }
 }
 
+// Enable API mocking in development
+async function enableMocking() {
+  if (import.meta.env.VITE_ENABLE_MOCKS !== 'true') {
+    return
+  }
+
+  const { worker } = await import('../mocks/browser')
+  return worker.start({
+    onUnhandledRequest: 'bypass',
+  })
+}
+
 // Render the app
 const rootElement = document.getElementById('app')
 if (rootElement && !rootElement.innerHTML) {
-  const root = ReactDOM.createRoot(rootElement)
-  root.render(
-    <StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
-      </QueryClientProvider>
-    </StrictMode>,
-  )
+  enableMocking().then(() => {
+    const root = ReactDOM.createRoot(rootElement)
+    root.render(
+      <StrictMode>
+        <ErrorBoundary>
+          <ConfigLoader>
+            <AppProviders>
+              <RouterProvider router={router} />
+            </AppProviders>
+          </ConfigLoader>
+        </ErrorBoundary>
+      </StrictMode>,
+    )
+  })
 }
-
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
-reportWebVitals()

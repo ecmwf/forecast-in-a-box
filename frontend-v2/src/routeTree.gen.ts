@@ -9,38 +9,224 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AboutRouteImport } from './routes/about'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedPresetsRouteImport } from './routes/_authenticated/presets'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedConfigureRouteImport } from './routes/_authenticated/configure'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedExecutionsIndexRouteImport } from './routes/_authenticated/executions.index'
+import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
+import { Route as AuthenticatedExecutionsJobIdRouteImport } from './routes/_authenticated/executions.$jobId'
+import { Route as AuthenticatedConfigureFableIdRouteImport } from './routes/_authenticated/configure.$fableId'
+import { Route as AuthenticatedAdminSourcesRouteImport } from './routes/_authenticated/admin/sources'
+import { Route as AuthenticatedAdminPluginsRouteImport } from './routes/_authenticated/admin/plugins'
+import { Route as AuthenticatedAdminPluginsIndexRouteImport } from './routes/_authenticated/admin/plugins.index'
+import { Route as AuthenticatedAdminPluginsPluginIdRouteImport } from './routes/_authenticated/admin/plugins.$pluginId'
 
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedPresetsRoute = AuthenticatedPresetsRouteImport.update({
+  id: '/presets',
+  path: '/presets',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedConfigureRoute = AuthenticatedConfigureRouteImport.update({
+  id: '/configure',
+  path: '/configure',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedExecutionsIndexRoute =
+  AuthenticatedExecutionsIndexRouteImport.update({
+    id: '/executions/',
+    path: '/executions/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const AuthenticatedExecutionsJobIdRoute =
+  AuthenticatedExecutionsJobIdRouteImport.update({
+    id: '/executions/$jobId',
+    path: '/executions/$jobId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedConfigureFableIdRoute =
+  AuthenticatedConfigureFableIdRouteImport.update({
+    id: '/$fableId',
+    path: '/$fableId',
+    getParentRoute: () => AuthenticatedConfigureRoute,
+  } as any)
+const AuthenticatedAdminSourcesRoute =
+  AuthenticatedAdminSourcesRouteImport.update({
+    id: '/sources',
+    path: '/sources',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminPluginsRoute =
+  AuthenticatedAdminPluginsRouteImport.update({
+    id: '/plugins',
+    path: '/plugins',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminPluginsIndexRoute =
+  AuthenticatedAdminPluginsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedAdminPluginsRoute,
+  } as any)
+const AuthenticatedAdminPluginsPluginIdRoute =
+  AuthenticatedAdminPluginsPluginIdRouteImport.update({
+    id: '/$pluginId',
+    path: '/$pluginId',
+    getParentRoute: () => AuthenticatedAdminPluginsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/configure': typeof AuthenticatedConfigureRouteWithChildren
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/presets': typeof AuthenticatedPresetsRoute
+  '/admin/plugins': typeof AuthenticatedAdminPluginsRouteWithChildren
+  '/admin/sources': typeof AuthenticatedAdminSourcesRoute
+  '/configure/$fableId': typeof AuthenticatedConfigureFableIdRoute
+  '/executions/$jobId': typeof AuthenticatedExecutionsJobIdRoute
+  '/admin/': typeof AuthenticatedAdminIndexRoute
+  '/executions/': typeof AuthenticatedExecutionsIndexRoute
+  '/admin/plugins/$pluginId': typeof AuthenticatedAdminPluginsPluginIdRoute
+  '/admin/plugins/': typeof AuthenticatedAdminPluginsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/configure': typeof AuthenticatedConfigureRouteWithChildren
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/presets': typeof AuthenticatedPresetsRoute
+  '/admin/sources': typeof AuthenticatedAdminSourcesRoute
+  '/configure/$fableId': typeof AuthenticatedConfigureFableIdRoute
+  '/executions/$jobId': typeof AuthenticatedExecutionsJobIdRoute
+  '/admin': typeof AuthenticatedAdminIndexRoute
+  '/executions': typeof AuthenticatedExecutionsIndexRoute
+  '/admin/plugins/$pluginId': typeof AuthenticatedAdminPluginsPluginIdRoute
+  '/admin/plugins': typeof AuthenticatedAdminPluginsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/about': typeof AboutRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/_authenticated/configure': typeof AuthenticatedConfigureRouteWithChildren
+  '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/presets': typeof AuthenticatedPresetsRoute
+  '/_authenticated/admin/plugins': typeof AuthenticatedAdminPluginsRouteWithChildren
+  '/_authenticated/admin/sources': typeof AuthenticatedAdminSourcesRoute
+  '/_authenticated/configure/$fableId': typeof AuthenticatedConfigureFableIdRoute
+  '/_authenticated/executions/$jobId': typeof AuthenticatedExecutionsJobIdRoute
+  '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
+  '/_authenticated/executions/': typeof AuthenticatedExecutionsIndexRoute
+  '/_authenticated/admin/plugins/$pluginId': typeof AuthenticatedAdminPluginsPluginIdRoute
+  '/_authenticated/admin/plugins/': typeof AuthenticatedAdminPluginsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/about'
+    | '/admin'
+    | '/configure'
+    | '/dashboard'
+    | '/presets'
+    | '/admin/plugins'
+    | '/admin/sources'
+    | '/configure/$fableId'
+    | '/executions/$jobId'
+    | '/admin/'
+    | '/executions/'
+    | '/admin/plugins/$pluginId'
+    | '/admin/plugins/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/about'
+    | '/configure'
+    | '/dashboard'
+    | '/presets'
+    | '/admin/sources'
+    | '/configure/$fableId'
+    | '/executions/$jobId'
+    | '/admin'
+    | '/executions'
+    | '/admin/plugins/$pluginId'
+    | '/admin/plugins'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/about'
+    | '/_authenticated/admin'
+    | '/_authenticated/configure'
+    | '/_authenticated/dashboard'
+    | '/_authenticated/presets'
+    | '/_authenticated/admin/plugins'
+    | '/_authenticated/admin/sources'
+    | '/_authenticated/configure/$fableId'
+    | '/_authenticated/executions/$jobId'
+    | '/_authenticated/admin/'
+    | '/_authenticated/executions/'
+    | '/_authenticated/admin/plugins/$pluginId'
+    | '/_authenticated/admin/plugins/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  AboutRoute: typeof AboutRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +234,165 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/presets': {
+      id: '/_authenticated/presets'
+      path: '/presets'
+      fullPath: '/presets'
+      preLoaderRoute: typeof AuthenticatedPresetsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/configure': {
+      id: '/_authenticated/configure'
+      path: '/configure'
+      fullPath: '/configure'
+      preLoaderRoute: typeof AuthenticatedConfigureRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/executions/': {
+      id: '/_authenticated/executions/'
+      path: '/executions'
+      fullPath: '/executions/'
+      preLoaderRoute: typeof AuthenticatedExecutionsIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/': {
+      id: '/_authenticated/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/executions/$jobId': {
+      id: '/_authenticated/executions/$jobId'
+      path: '/executions/$jobId'
+      fullPath: '/executions/$jobId'
+      preLoaderRoute: typeof AuthenticatedExecutionsJobIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/configure/$fableId': {
+      id: '/_authenticated/configure/$fableId'
+      path: '/$fableId'
+      fullPath: '/configure/$fableId'
+      preLoaderRoute: typeof AuthenticatedConfigureFableIdRouteImport
+      parentRoute: typeof AuthenticatedConfigureRoute
+    }
+    '/_authenticated/admin/sources': {
+      id: '/_authenticated/admin/sources'
+      path: '/sources'
+      fullPath: '/admin/sources'
+      preLoaderRoute: typeof AuthenticatedAdminSourcesRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/plugins': {
+      id: '/_authenticated/admin/plugins'
+      path: '/plugins'
+      fullPath: '/admin/plugins'
+      preLoaderRoute: typeof AuthenticatedAdminPluginsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/plugins/': {
+      id: '/_authenticated/admin/plugins/'
+      path: '/'
+      fullPath: '/admin/plugins/'
+      preLoaderRoute: typeof AuthenticatedAdminPluginsIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminPluginsRoute
+    }
+    '/_authenticated/admin/plugins/$pluginId': {
+      id: '/_authenticated/admin/plugins/$pluginId'
+      path: '/$pluginId'
+      fullPath: '/admin/plugins/$pluginId'
+      preLoaderRoute: typeof AuthenticatedAdminPluginsPluginIdRouteImport
+      parentRoute: typeof AuthenticatedAdminPluginsRoute
+    }
   }
 }
 
+interface AuthenticatedAdminPluginsRouteChildren {
+  AuthenticatedAdminPluginsPluginIdRoute: typeof AuthenticatedAdminPluginsPluginIdRoute
+  AuthenticatedAdminPluginsIndexRoute: typeof AuthenticatedAdminPluginsIndexRoute
+}
+
+const AuthenticatedAdminPluginsRouteChildren: AuthenticatedAdminPluginsRouteChildren =
+  {
+    AuthenticatedAdminPluginsPluginIdRoute:
+      AuthenticatedAdminPluginsPluginIdRoute,
+    AuthenticatedAdminPluginsIndexRoute: AuthenticatedAdminPluginsIndexRoute,
+  }
+
+const AuthenticatedAdminPluginsRouteWithChildren =
+  AuthenticatedAdminPluginsRoute._addFileChildren(
+    AuthenticatedAdminPluginsRouteChildren,
+  )
+
+interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminPluginsRoute: typeof AuthenticatedAdminPluginsRouteWithChildren
+  AuthenticatedAdminSourcesRoute: typeof AuthenticatedAdminSourcesRoute
+  AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
+}
+
+const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminPluginsRoute: AuthenticatedAdminPluginsRouteWithChildren,
+  AuthenticatedAdminSourcesRoute: AuthenticatedAdminSourcesRoute,
+  AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
+}
+
+const AuthenticatedAdminRouteWithChildren =
+  AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
+
+interface AuthenticatedConfigureRouteChildren {
+  AuthenticatedConfigureFableIdRoute: typeof AuthenticatedConfigureFableIdRoute
+}
+
+const AuthenticatedConfigureRouteChildren: AuthenticatedConfigureRouteChildren =
+  {
+    AuthenticatedConfigureFableIdRoute: AuthenticatedConfigureFableIdRoute,
+  }
+
+const AuthenticatedConfigureRouteWithChildren =
+  AuthenticatedConfigureRoute._addFileChildren(
+    AuthenticatedConfigureRouteChildren,
+  )
+
+interface AuthenticatedRouteChildren {
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
+  AuthenticatedConfigureRoute: typeof AuthenticatedConfigureRouteWithChildren
+  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedPresetsRoute: typeof AuthenticatedPresetsRoute
+  AuthenticatedExecutionsJobIdRoute: typeof AuthenticatedExecutionsJobIdRoute
+  AuthenticatedExecutionsIndexRoute: typeof AuthenticatedExecutionsIndexRoute
+}
+
+const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
+  AuthenticatedConfigureRoute: AuthenticatedConfigureRouteWithChildren,
+  AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedPresetsRoute: AuthenticatedPresetsRoute,
+  AuthenticatedExecutionsJobIdRoute: AuthenticatedExecutionsJobIdRoute,
+  AuthenticatedExecutionsIndexRoute: AuthenticatedExecutionsIndexRoute,
+}
+
+const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
+  AuthenticatedRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  AboutRoute: AboutRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

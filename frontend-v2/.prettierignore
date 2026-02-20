@@ -5,6 +5,10 @@ yarn.lock
 # Template files (not valid JS until processed)
 public/config.template.js
 
+# Non-frontend files
+.claude/
+development_guidelines/
+
 # Other ignores
 .env
 .env.*

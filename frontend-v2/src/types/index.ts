@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2025- ECMWF and individual contributors.
+ * (C) Copyright 2026- ECMWF and individual contributors.
  *
  * This software is licensed under the terms of the Apache Licence Version 2.0
  * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
@@ -14,7 +14,9 @@
 
 // Export types
 export type * from './api.types'
+export type * from './config.types'
 export type * from './status.types'
+export type * from './user.types'
 
 // Export Zod schemas
 export {
@@ -23,8 +25,12 @@ export {
   httpMethodSchema,
 } from './api.types'
 
+export { appConfigSchema, apiConfigResponseSchema } from './config.types'
+
 export {
   statusValueSchema,
   statusResponseSchema,
   serviceStatusSchema,
 } from './status.types'
+
+export { userSchema } from './user.types'
