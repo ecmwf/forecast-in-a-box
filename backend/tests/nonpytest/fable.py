@@ -1,74 +1,110 @@
-# TODO rewrite into an actual integration test
+import os
+import tempfile
+import time
+from datetime import datetime, timedelta
 
 import httpx
-
-client = httpx.Client(base_url="http://localhost:8000", follow_redirects=True)
-r = client.get("api/v1/status")
-r.json()
-# {'api': 'up', 'cascade': 'up', 'ecmwf': 'up', 'scheduler': 'off', 'version': '0.4.0@2025-11-13 14:51:51', 'plugins': 'ok'}
-
-r = client.get("api/v1/fable/catalogue")
-r.json()
-# {'fiab_plugin_toy': {'factories': {'exampleSource': {'kind': 'source', 'title': 'The earthkit test.grib example file', 'description': 'A dataset sample for testing out workflows', 'configuration_options': {}, 'inputs': []}, 'ekdSource': {'kind': 'source', 'title': 'Earthkit Data Source', 'description': 'Fetch data from mars or ecmwf open data', 'configuration_options': {'source_name': {'title': 'Source', 'description': 'Top level source for earthkit data', 'value_type': "enum['mars', 'ecmwf-open-data']"}, 'date': {'title': 'Date', 'description': 'The date dimension of the data', 'value_type': 'date-iso8601'}}, 'inputs': []}, 'meanProduct': {'kind': 'product', 'title': 'Mean', 'description': 'Computes a mean of the given variable over all coords/dims', 'configuration_options': {'variable': {'title': 'Variable', 'description': "Variable name like '2t'", 'value_type': 'str'}}, 'inputs': ['dataset']}}}}
-
-from forecastbox.api.types.fable import FableBuilderV1
-
-builder = FableBuilderV1(blocks={})
-r = client.request(url="api/v1/fable/expand", method="put", json=builder.model_dump())
-r.json()
-# {'global_errors': [], 'block_errors': {}, 'possible_sources': [{'plugin': 'fiab_plugin_toy', 'factory': 'exampleSource'}, {'plugin': 'fiab_plugin_toy', 'factory': 'ekdSource'}], 'possible_expansions': {}}
-
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
-pluginId = PluginCompositeId(store="ecmwf", local="toy2")
-
-source = BlockInstance(factory_id=PluginBlockFactoryId(plugin=pluginId, factory="exampleSource"), configuration_values={}, input_ids={})
-builder = FableBuilderV1(blocks={"source1": source})
-r = client.request(url="api/v1/fable/expand", method="put", json=builder.model_dump())
-r.json()
-# {'global_errors': [], 'block_errors': {}, 'possible_sources': [{'plugin': 'fiab_plugin_toy', 'factory': 'exampleSource'}, {'plugin': 'fiab_plugin_toy', 'factory': 'ekdSource'}], 'possible_expansions': {'source1': [{'plugin': 'fiab_plugin_toy', 'factory': 'meanProduct'}]}}
-
-product = BlockInstance(
-    factory_id=PluginBlockFactoryId(plugin=pluginId, factory="meanProduct"),
-    configuration_values={"variable": "2t"},
-    input_ids={"dataset": "source1"},
-)
-builder = FableBuilderV1(blocks={"source1": source, "product1": product})
-r = client.request(url="api/v1/fable/expand", method="put", json=builder.model_dump())
-r.json()
-# {'global_errors': [], 'block_errors': {}, 'possible_sources': [{'plugin': 'fiab_plugin_toy', 'factory': 'exampleSource'}, {'plugin': 'fiab_plugin_toy', 'factory': 'ekdSource'}], 'possible_expansions': {'source1': [{'plugin': 'fiab_plugin_toy', 'factory': 'meanProduct'}]}}
-
-sink = BlockInstance(
-    factory_id=PluginBlockFactoryId(plugin=pluginId, factory="dummySink"),
-    configuration_values={},
-    input_ids={"dataset": "product1"},
-)
-builder = FableBuilderV1(blocks={"source1": source, "product1": product, "sink1": sink})
-
-r = client.request(url="api/v1/fable/compile", method="put", json=builder.model_dump())
-r.json()
-# {'job_type': 'raw_cascade_job', 'job_instance': {'tasks': {'source1': {'definition': {'entrypoint': 'fiab_plugin_toy_impl.datasource.from_example', 'func': None, 'environment': ['fiab-plugin-toy-impl'], 'input_schema': {}, 'output_schema': [['0', 'xarray.Dataset']], 'needs_gpu': False}, 'static_input_kw': {}, 'static_input_ps': {}}, 'product1/select': {'definition': {'entrypoint': 'fiab_plugin_toy_impl.product.select', 'func': None, 'environment': ['fiab-plugin-toy-impl'], 'input_schema': {'dataset': 'xarray.Dataset', 'variable': 'str'}, 'output_schema': [['0', 'xarray.DataArray']], 'needs_gpu': False}, 'static_input_kw': {'variable': '2t'}, 'static_input_ps': {}}, 'product1/calculate': {'definition': {'entrypoint': 'fiab_plugin_toy_impl.product.mean', 'func': None, 'environment': ['fiab-plugin-toy-impl'], 'input_schema': {'array': 'xarray.DataArray'}, 'output_schema': [['0', 'xarray.Dataset']], 'needs_gpu': False}, 'static_input_kw': {}, 'static_input_ps': {}}}, 'edges': [{'source': {'task': 'source1', 'output': '0'}, 'sink_task': 'product1/select', 'sink_input_kw': 'dataset', 'sink_input_ps': None}, {'source': {'task': 'product1/select', 'output': '0'}, 'sink_task': 'product1/calculate', 'sink_input_kw': 'array', 'sink_input_ps': None}], 'serdes': {}, 'ext_outputs': [], 'constraints': []}}
-
 from forecastbox.api.types import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
+from forecastbox.api.types.fable import FableBuilderV1
+from forecastbox.config import FIABConfig
+from forecastbox.standalone.entrypoint import launch_all
 
-job = RawCascadeJob(**r.json())  # TODO temporarily handle the environment issue
 
-env = EnvironmentSpecification(hosts=1, workers_per_host=1)
-spec = ExecutionSpecification(job=job, environment=env)
-r = client.post("api/v1/execution/execute", json=spec.model_dump())
-r.json()
-# {'id': '40d0c04c-7bb4-4d13-b638-a4877a74ff7b'}
-job_id = r.json()["id"]
+def ensure_completed(backend_client, job_id, sleep=0.5, attempts=20):
+    while attempts > 0:
+        response = backend_client.get("/job/status", timeout=10)
+        assert response.is_success
+        status = response.json()["progresses"][job_id]["status"]
+        if status == "failed":
+            raise RuntimeError(f"Job {job_id} failed: {response.json()['progresses'][job_id]['error']}")
+        # TODO parse response with corresponding class, define a method `not_failed` instead
+        assert status in {"submitted", "running", "completed"}
+        if status == "completed":
+            break
+        time.sleep(sleep)
+        attempts -= 1
 
-r = client.get(f"api/v1/job/{job_id}/status")
-r.json()
-# {'progress': '100.00', 'status': 'completed', 'created_at': '2025-12-29 17:11:04.558643', 'error': None}
+    assert attempts > 0, f"Failed to finish job {job_id}"
 
-r = client.get(url=f"api/v1/job/{job_id}/outputs")
-r.json()
-# [{'product_name': 'All Outputs', 'product_spec': {}, 'output_ids': ['product1/calculate']}]
-r = client.get(f"api/v1/job/{job_id}/results", params={"dataset_id": "product1/calculate"})
-r
-# <Response [500 Internal Server Error]>
-# ... ValueError: cannot write NetCDF files with format='NETCDF4' because none of the suitable backend libraries (h5netcdf) are installed
-# thats a success :)
+
+if __name__ == "__main__":
+    handles = None
+    dbDir = None
+    dataDir = None
+    try:
+        config = FIABConfig()
+        config.api.uvicorn_port = 30645
+        config.auth.passthrough = True
+        config.cascade.cascade_url = "tcp://localhost:30644"
+        config.general.launch_browser = False
+        if os.environ.get("UNCLEAN", "") != "yea":
+            dbDir = tempfile.TemporaryDirectory()
+            config.db.sqlite_userdb_path = f"{dbDir.name}/user.db"
+            config.db.sqlite_jobdb_path = f"{dbDir.name}/job.db"
+            dataDir = tempfile.TemporaryDirectory()
+            config.api.data_path = dataDir.name
+
+        handles = launch_all(config, attempts=50)
+        client = httpx.Client(base_url=config.api.local_url() + "/api/v1", follow_redirects=True)
+
+        tmpdir = tempfile.TemporaryDirectory()
+        response = client.get("/fable/catalogue").raise_for_status()
+        assert len(response.json()) > 0
+
+        pluginId = PluginCompositeId(store="ecmwf", local="ecmwf-base")
+        blocks = {
+            "source1": BlockInstance(
+                factory_id=PluginBlockFactoryId(plugin=pluginId, factory="ekdSource"),
+                configuration_values={
+                    "source": "ecmwf-open-data",
+                    "date": (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"),
+                    "expver": "0001",
+                },
+                input_ids={},
+            ),
+            "temporalMean": BlockInstance(
+                factory_id=PluginBlockFactoryId(plugin=pluginId, factory="temporalStatistics"),
+                configuration_values={"variable": "2t", "statistic": "mean"},
+                input_ids={"dataset": "source1"},
+            ),
+        }
+        for statistic in ["mean", "std"]:
+            block = BlockInstance(
+                factory_id=PluginBlockFactoryId(plugin=pluginId, factory="ensembleStatistics"),
+                configuration_values={"variable": "2t", "statistic": statistic},
+                input_ids={"dataset": "temporalMean"},
+            )
+            sink = BlockInstance(
+                factory_id=PluginBlockFactoryId(plugin=pluginId, factory="zarrSink"),
+                configuration_values={"path": f"{tmpdir}/output.zarr"},
+                input_ids={"dataset": f"ensemble{statistic.capitalize()}"},
+            )
+            blocks[f"ensemble{statistic.capitalize()}"] = block
+            blocks[f"sink{statistic.capitalize()}"] = sink
+
+        builder = FableBuilderV1(blocks=blocks)
+        response = client.request(url="/fable/compile", method="put", json=builder.model_dump())
+
+        spec = ExecutionSpecification(
+            job=RawCascadeJob(**response.json()),
+            environment=EnvironmentSpecification(hosts=1, workers_per_host=1),
+        )
+        response = client.post("/execution/execute", json=spec.model_dump())
+        assert response.is_success
+        job_id = response.json()["id"]
+        ensure_completed(client, job_id, sleep=1, attempts=120)
+
+        response = client.get(url=f"/job/{job_id}/outputs")
+        assert len(response.json()) == 1
+        assert os.path.exists(f"{tmpdir}/output.zarr")
+        tmpdir.cleanup()
+
+    finally:
+        if handles is not None:
+            handles.shutdown()
+        if dataDir is not None:
+            dataDir.cleanup()
+        if dbDir is not None:
+            dbDir.cleanup()
