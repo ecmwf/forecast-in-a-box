@@ -26,5 +26,4 @@
 * use comments sparingly, for non-obvious code only. Add docstrings to functions called from other modules only. When adding docstring, use compact style -- dont separate out Args and Returns, describe everything in one or two paragraphs.
 
 # Frontend
-* there are currently two frontends in the project: `frontend/` is the currently used frontend, and `frontend-v2/` is the next-version frontend currently being developed
-* for additional information related to the frontend-v2 codebase, refer to the `AGENTS.md` file in the `frontend-v2/` directory
+* if you would develop frontend features, consult the `frontend/AGENTS.md`.
