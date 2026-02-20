@@ -29,12 +29,14 @@ jobs:
     permissions:
       pull-requests: read
     outputs:
-      backend: ${{ steps.filter.outputs.backend }}
-      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend || steps.all-true.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend || steps.all-true.outputs.frontend }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
         id: filter
+        # Skip path filtering for workflow_dispatch and push events - run all jobs
+        if: github.event_name == 'pull_request'
         with:
           filters: |
             backend:
@@ -43,12 +45,19 @@ jobs:
             frontend:
               - 'frontend/**'
               - '.github/workflows/ci.yml'
+      # For workflow_dispatch and push events, set all outputs to true
+      - name: Set outputs for non-PR events
+        if: github.event_name != 'pull_request'
+        id: all-true
+        run: |
+          echo "backend=true" >> "$GITHUB_OUTPUT"
+          echo "frontend=true" >> "$GITHUB_OUTPUT"
 
   macos:
     name: macos
     needs: changes
-    # NOTE: Run only when backend changes AND only for origin2origin or fork2origin scenarios (not fork2fork)
-    if: needs.changes.outputs.backend == 'true' && github.event.pull_request.base.repo.full_name == 'ecmwf/forecast-in-a-box'
+    # NOTE: Run when backend changes OR workflow_dispatch, AND only for origin2origin or fork2origin scenarios (not fork2fork)
+    if: needs.changes.outputs.backend == 'true' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.base.repo.full_name == 'ecmwf/forecast-in-a-box')
     strategy:
       fail-fast: true
       matrix:
