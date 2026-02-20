@@ -48,7 +48,7 @@ dependencies = [
   "pydantic-settings",
   "pyrsistent",
   "python-multipart",
-  "qubed==0.1.12",
+  "qubed",
   "sse-starlette",
   "toml",
   "uvicorn",

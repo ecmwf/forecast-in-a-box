@@ -23,8 +23,6 @@ class PluginBuilder:
 
     def expand(self, block: BlockInstanceOutput) -> list[BlockFactoryId]:
         """Given a block instance output (including from other plugin), provide which block factories from this plugin can expand it"""
-        if len(block.variables) == 0:
-            return []
         expansions: list[BlockFactoryId] = []
         for factory_id, factory in self.block_builders.items():
             if factory.intersect(block):

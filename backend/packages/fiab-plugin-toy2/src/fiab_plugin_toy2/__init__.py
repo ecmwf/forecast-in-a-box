@@ -21,7 +21,6 @@ from fiab_core.fable import (
     BlockInstanceId,
     BlockInstanceOutput,
     DataPartitionLookup,
-    XarrayOutput,
 )
 from fiab_core.plugin import Error, Plugin
 
@@ -76,30 +75,29 @@ catalogue = BlockFactoryCatalogue(
 
 
 def validator(block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type: ignore[invalid-argument] # semigroup
-    output: XarrayOutput
+    output: BlockInstanceOutput
     match block.factory_id.factory:
         case "exampleSource" | "ekdSource":
-            output = XarrayOutput(variables=["2t", "msl"], coords=["lat", "lon"])
+            output = BlockInstanceOutput(dataqube={"variables": ["2t", "msl"], "coords": ["lat", "lon"]})
         case "meanProduct":
-            input_dataset = cast(XarrayOutput, inputs["dataset"])  # type:ignore[redundant-cast] # NOTE the warning is correct but we expect more
+            input_dataset = inputs["dataset"]
             mean_variable = block.configuration_values["variable"]
-            if mean_variable not in input_dataset.variables:
-                return Either.error(f"variable {mean_variable} is not in the input variables: {input_dataset.variables}")
-            output = XarrayOutput(variables=[mean_variable], coords=[])
+            if mean_variable not in input_dataset.axes()["variables"]:
+                return Either.error(f"variable {mean_variable} is not in the input variables: {input_dataset.axes()['variables']}")
+            output = BlockInstanceOutput(dataqube={"variables": [mean_variable], "coords": []})
         case "dummySink":
-            output = XarrayOutput(variables=[], coords=[])
+            output = BlockInstanceOutput(dataqube={"variables": [], "coords": []})
         case unmatched:
             raise TypeError(f"unexpected factory id {unmatched}")
     return Either.ok(output)
 
 
 def expander(block: BlockInstanceOutput) -> list[BlockFactoryId]:
-    if len(block.variables) == 0:
+    if len(block.axes()["variables"]) == 0:
         return []
     expansions = ["dummySink"]
-    if isinstance(block, XarrayOutput):
-        if block.variables:
-            expansions.append("meanProduct")
+    if block.axes()["variables"]:
+        expansions.append("meanProduct")
     return expansions
 
 
