@@ -47,6 +47,7 @@ jobs:
   macos:
     name: macos
     needs: changes
+    # NOTE: Run only when backend changes AND only for origin2origin or fork2origin scenarios (not fork2fork)
     if: needs.changes.outputs.backend == 'true' && github.event.pull_request.base.repo.full_name == 'ecmwf/forecast-in-a-box'
     strategy:
       fail-fast: true
@@ -80,6 +81,7 @@ jobs:
   ubuntu:
     name: ubuntu
     needs: changes
+    # NOTE: Run when backend changes; triggers for both fork- and origin- targeting PRs (using github runners)
     if: needs.changes.outputs.backend == 'true'
     strategy:
       fail-fast: true
@@ -112,6 +114,7 @@ jobs:
   frontend:
     name: frontend
     needs: changes
+    # NOTE: Run when frontend changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
