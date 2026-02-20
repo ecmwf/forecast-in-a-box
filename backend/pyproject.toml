@@ -59,6 +59,7 @@ dependencies = [
   "torch==2.8.0",
   "torch-geometric==2.6.1",
   "earthkit-plots>=0.5.2",
+  "earthkit-plots-dccms-styles",
 ]
 
 optional-dependencies.all = [
@@ -131,6 +132,7 @@ fiab-plugin-toy = {workspace = true}
 fiab-plugin-toy-impl = {workspace = true}
 fiab-plugin-toy2 = {workspace = true}
 fiab-plugin-ecmwf = {workspace = true}
+earthkit-plots-dccms-styles = { git = "https://github.com/metno/earthkit-plots-dccms-styles" }
 
 [tool.uv.workspace]
 members = [

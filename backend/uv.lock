@@ -1308,6 +1308,14 @@ wheels = [
 ]
 
 [[package]]
+name = "earthkit-plots-dccms-styles"
+version = "0.1.dev4+g07a4cdebd"
+source = { git = "https://github.com/metno/earthkit-plots-dccms-styles#07a4cdebd7cbea5df8910d8b86673b494b54b12f" }
+dependencies = [
+    { name = "earthkit-plots" },
+]
+
+[[package]]
 name = "earthkit-plots-default-styles"
 version = "0.1.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1910,6 +1918,7 @@ dependencies = [
     { name = "apscheduler" },
     { name = "cloudpickle" },
     { name = "earthkit-plots" },
+    { name = "earthkit-plots-dccms-styles" },
     { name = "earthkit-workflows" },
     { name = "earthkit-workflows-anemoi" },
     { name = "earthkit-workflows-pproc" },
@@ -1982,6 +1991,7 @@ requires-dist = [
     { name = "cloudpickle" },
     { name = "earthkit-plots", specifier = ">=0.5.2" },
     { name = "earthkit-plots", marker = "extra == 'plots'", specifier = ">=0.3.5" },
+    { name = "earthkit-plots-dccms-styles", git = "https://github.com/metno/earthkit-plots-dccms-styles" },
     { name = "earthkit-plots-default-styles", marker = "extra == 'plots'", specifier = ">=0.1" },
     { name = "earthkit-workflows", specifier = ">=0.6.2" },
     { name = "earthkit-workflows-anemoi", specifier = ">=0.3.12" },
