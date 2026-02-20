@@ -104,6 +104,19 @@ def _from_dict_primative(field: FieldInfo) -> FieldWithUI:
         elif value_type is bool:
             schema.additionalProperties = BooleanSchema(type="boolean")
             ui.additionalProperties = UIField(widget="checkbox")
+        elif issubclass(value_type, BaseModel):
+            sub_fields, sub_required = from_pydantic(value_type)
+
+            sub_fields_schema = {k: v.jsonschema for k, v in sub_fields.items()}
+            sub_fields_ui = {k: v.uischema for k, v in sub_fields.items()}
+
+            obj_schema = ObjectSchema(type="object", properties=sub_fields_schema)
+
+            if sub_required:
+                obj_schema.required = sub_required
+
+            schema.additionalProperties = obj_schema
+            ui.additionalProperties = UIObjectField(anyOf=list(sub_fields_ui.values()))  # type: ignore
         else:
             raise ValueError(f"Unsupported dict value type: {value_type}")
     else:
