@@ -79,16 +79,19 @@ class UIField(BaseModel):
         return {"ui:options": model_dump}
 
 
-class UIItems(BaseModel):
+class UIItems(UIField):
     """Base class for items in UI schema."""
 
     items: "dict[str, UISchema] | None" = None
 
-    def export_with_prefix(self) -> dict[str, Any]:
+    def export_with_prefix(self, *, ignore_keys: list[str] | None = None) -> dict[str, Any]:
         """Export the UI schema with prefix."""
-        result = {}
+        ignore_keys = ignore_keys or []
+        ignore_keys.append("items")
+
+        result = super().export_with_prefix(ignore_keys=ignore_keys)
         if self.items:
-            result = {"items": {k: v.export_with_prefix() for k, v in self.items.items()}}
+            result = {"items": {k: v.export_with_prefix(ignore_keys=ignore_keys) for k, v in self.items.items()}}
         return result
 
 

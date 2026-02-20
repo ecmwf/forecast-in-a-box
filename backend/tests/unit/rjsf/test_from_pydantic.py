@@ -187,6 +187,7 @@ class TestPrimitiveConversions:
         assert isinstance(result, FieldWithUI)
         assert isinstance(result.jsonschema.additionalProperties, IntegerSchema)
         assert result.jsonschema.additionalProperties.type == "integer"
+        assert isinstance(result.uischema, UIAdditionalProperties)
         assert isinstance(result.uischema.additionalProperties, UIIntegerField)
 
     def test_from_dict_primitive_bool_values(self):
@@ -196,6 +197,7 @@ class TestPrimitiveConversions:
         assert isinstance(result, FieldWithUI)
         assert isinstance(result.jsonschema.additionalProperties, BooleanSchema)
         assert result.jsonschema.additionalProperties.type == "boolean"
+        assert isinstance(result.uischema, UIAdditionalProperties)
         assert isinstance(result.uischema.additionalProperties, UIField)
         assert result.uischema.additionalProperties.widget == "checkbox"
 
@@ -221,6 +223,7 @@ class TestPrimitiveConversions:
         assert "name" in additional_props.properties
         assert "value" in additional_props.properties
         assert "is_active" in additional_props.properties
+        assert additional_props.required is not None
         assert set(additional_props.required) == {"name", "value"}  # is_active has default
 
         # Check the properties have correct types
@@ -232,6 +235,7 @@ class TestPrimitiveConversions:
         # Check UI schema
         assert isinstance(result.uischema, UIAdditionalProperties)
         assert isinstance(result.uischema.additionalProperties, UIObjectField)
+        assert result.uischema.additionalProperties.anyOf is not None
         assert len(result.uischema.additionalProperties.anyOf) == 3
 
     def test_from_dict_primitive_nested_basemodel_values(self):
@@ -262,6 +266,7 @@ class TestPrimitiveConversions:
         assert address_prop.required == ["street", "city"]
 
         # Check required fields (age has default, so not required)
+        assert additional_props.required is not None
         assert set(additional_props.required) == {"name", "address"}
 
     def test_from_dict_primitive_unsupported_value_type(self):
@@ -772,6 +777,7 @@ class TestDictBaseModelIntegration:
         assert isinstance(fields_config.jsonschema.additionalProperties, ObjectSchema)
 
         field_config_schema = fields_config.jsonschema.additionalProperties
+        assert field_config_schema.required is not None
         assert set(field_config_schema.required) == {"label", "validation"}
 
         # Test nested structure - FieldConfig contains Validation BaseModel
@@ -784,6 +790,7 @@ class TestDictBaseModelIntegration:
         # Test Literal field in nested BaseModel
         rule_prop = validation_prop.properties["rule"]
         assert rule_prop.type == "string"
+        assert rule_prop.enum is not None
         assert set(rule_prop.enum) == {"required", "optional", "conditional"}
 
         # Test default values in nested structure
