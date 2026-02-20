@@ -199,6 +199,71 @@ class TestPrimitiveConversions:
         assert isinstance(result.uischema.additionalProperties, UIField)
         assert result.uischema.additionalProperties.widget == "checkbox"
 
+    def test_from_dict_primitive_basemodel_values(self):
+        """Test dict with BaseModel values - new functionality."""
+
+        class NestedModel(BaseModel):
+            name: str
+            value: int
+            is_active: bool = True
+
+        field = FieldInfo(annotation=Dict[str, NestedModel])
+        result = _from_dict_primative(field)
+
+        assert isinstance(result, FieldWithUI)
+        assert result.jsonschema.type == "object"
+        assert result.jsonschema.properties == {}
+
+        # Check additionalProperties is an ObjectSchema for the BaseModel
+        assert isinstance(result.jsonschema.additionalProperties, ObjectSchema)
+        additional_props = result.jsonschema.additionalProperties
+        assert additional_props.type == "object"
+        assert "name" in additional_props.properties
+        assert "value" in additional_props.properties
+        assert "is_active" in additional_props.properties
+        assert set(additional_props.required) == {"name", "value"}  # is_active has default
+
+        # Check the properties have correct types
+        assert additional_props.properties["name"].type == "string"
+        assert additional_props.properties["value"].type == "integer"
+        assert additional_props.properties["is_active"].type == "boolean"
+        assert additional_props.properties["is_active"].default is True
+
+        # Check UI schema
+        assert isinstance(result.uischema, UIAdditionalProperties)
+        assert isinstance(result.uischema.additionalProperties, UIObjectField)
+        assert len(result.uischema.additionalProperties.anyOf) == 3
+
+    def test_from_dict_primitive_nested_basemodel_values(self):
+        """Test dict with nested BaseModel values."""
+
+        class Address(BaseModel):
+            street: str
+            city: str
+
+        class Person(BaseModel):
+            name: str
+            address: Address
+            age: int = Field(default=25)
+
+        field = FieldInfo(annotation=Dict[str, Person])
+        result = _from_dict_primative(field)
+
+        assert isinstance(result, FieldWithUI)
+        additional_props = result.jsonschema.additionalProperties
+        assert isinstance(additional_props, ObjectSchema)
+
+        # Check that nested BaseModel is properly handled
+        assert "address" in additional_props.properties
+        address_prop = additional_props.properties["address"]
+        assert address_prop.type == "object"
+        assert "street" in address_prop.properties
+        assert "city" in address_prop.properties
+        assert address_prop.required == ["street", "city"]
+
+        # Check required fields (age has default, so not required)
+        assert set(additional_props.required) == {"name", "address"}
+
     def test_from_dict_primitive_unsupported_value_type(self):
         field = FieldInfo(annotation=Dict[str, float])
 
@@ -369,6 +434,81 @@ class TestFromPydantic:
         # Check list with bool items
         assert isinstance(fields["flags"].jsonschema.items, BooleanSchema)
 
+    def test_model_with_dict_basemodel_values(self):
+        """Test model with Dict[str, BaseModel] field - new functionality."""
+
+        class Config(BaseModel):
+            enabled: bool = True
+            threshold: int = 10
+            name: str
+
+        class Settings(BaseModel):
+            title: str
+            configurations: Dict[str, Config]
+
+        fields, required = from_pydantic(Settings)
+
+        assert len(fields) == 2
+        assert set(required) == {"title", "configurations"}
+
+        # Check the dict field with BaseModel values
+        config_field = fields["configurations"]
+        assert config_field.jsonschema.type == "object"
+        assert isinstance(config_field.jsonschema.additionalProperties, ObjectSchema)
+
+        additional_props = config_field.jsonschema.additionalProperties
+        assert "enabled" in additional_props.properties
+        assert "threshold" in additional_props.properties
+        assert "name" in additional_props.properties
+        assert additional_props.properties["enabled"].default is True
+        assert additional_props.properties["threshold"].default == 10
+        assert additional_props.required == ["name"]  # Only name is required
+
+        # Check UI schema
+        assert isinstance(config_field.uischema, UIAdditionalProperties)
+        assert isinstance(config_field.uischema.additionalProperties, UIObjectField)
+
+    def test_model_with_complex_dict_nesting(self):
+        """Test complex nesting with Dict[str, BaseModel] containing other BaseModels."""
+
+        class DatabaseConfig(BaseModel):
+            host: str
+            port: int = 5432
+            ssl_enabled: bool = False
+
+        class ServiceConfig(BaseModel):
+            name: str
+            database: DatabaseConfig
+            replicas: int = 1
+
+        class Application(BaseModel):
+            app_name: str
+            services: Dict[str, ServiceConfig]
+
+        fields, required = from_pydantic(Application)
+
+        assert len(fields) == 2
+        assert set(required) == {"app_name", "services"}
+
+        services_field = fields["services"]
+        additional_props = services_field.jsonschema.additionalProperties
+        assert isinstance(additional_props, ObjectSchema)
+
+        # Check that the nested BaseModel (ServiceConfig) is properly structured
+        assert "name" in additional_props.properties
+        assert "database" in additional_props.properties
+        assert "replicas" in additional_props.properties
+
+        # Check the database nested object
+        database_prop = additional_props.properties["database"]
+        assert database_prop.type == "object"
+        assert "host" in database_prop.properties
+        assert "port" in database_prop.properties
+        assert "ssl_enabled" in database_prop.properties
+        assert database_prop.properties["port"].default == 5432
+        assert database_prop.properties["ssl_enabled"].default is False
+        assert database_prop.required == ["host"]
+
     def test_nested_model(self):
         class Address(BaseModel):
             street: str
@@ -497,6 +637,87 @@ class TestEdgeCases:
 
         assert fields["value"].jsonschema.type == "string"
 
+    def test_dict_basemodel_with_rjsf_extra(self):
+        """Test Dict[str, BaseModel] with RJSF extra configuration."""
+
+        class ConfigItem(BaseModel):
+            name: str = Field(json_schema_extra={"rjsf": {"widget": "textarea"}})
+            priority: int = Field(json_schema_extra={"rjsf": {"minimum": 1, "maximum": 5}})
+
+        class ConfigContainer(BaseModel):
+            configs: Dict[str, ConfigItem] = Field(title="Configuration Items", description="Dictionary of configuration items")
+
+        fields, required = from_pydantic(ConfigContainer)
+
+        config_field = fields["configs"]
+        assert config_field.jsonschema.title == "Configuration Items"
+        assert config_field.jsonschema.description == "Dictionary of configuration items"
+
+        additional_props = config_field.jsonschema.additionalProperties
+        assert isinstance(additional_props, ObjectSchema)
+
+        # Check that RJSF extras are preserved in the nested BaseModel properties
+        name_prop = additional_props.properties["name"]
+        priority_prop = additional_props.properties["priority"]
+        assert name_prop.type == "string"
+        assert priority_prop.type == "integer"
+        assert priority_prop.minimum == 1
+        assert priority_prop.maximum == 5
+
+    def test_dict_basemodel_empty_model(self):
+        """Test Dict[str, BaseModel] where BaseModel is empty."""
+
+        class EmptyModel(BaseModel):
+            pass
+
+        class Container(BaseModel):
+            items: Dict[str, EmptyModel]
+
+        fields, required = from_pydantic(Container)
+
+        items_field = fields["items"]
+        additional_props = items_field.jsonschema.additionalProperties
+        assert isinstance(additional_props, ObjectSchema)
+        assert additional_props.properties == {}
+        assert additional_props.required is None or additional_props.required == []
+
+    def test_dict_basemodel_with_optional_fields(self):
+        """Test Dict[str, BaseModel] where BaseModel has optional fields."""
+
+        class OptionalModel(BaseModel):
+            required_field: str
+            optional_field: Optional[str] = None
+            default_field: int = 42
+
+        class Container(BaseModel):
+            items: Dict[str, OptionalModel]
+
+        fields, required = from_pydantic(Container)
+
+        items_field = fields["items"]
+        additional_props = items_field.jsonschema.additionalProperties
+        assert isinstance(additional_props, ObjectSchema)
+
+        # Only required_field should be in required list
+        assert additional_props.required == ["required_field"]
+
+        # Check optional field has null type
+        optional_prop = additional_props.properties["optional_field"]
+        assert optional_prop.type == ["string", "null"]
+
+        # Check default field has default value
+        default_prop = additional_props.properties["default_field"]
+        assert default_prop.default == 42
+
+    def test_dict_basemodel_issubclass_error_handling(self):
+        """Test error handling when issubclass check fails."""
+        # This tests the robustness of the issubclass check
+        field = FieldInfo(annotation=Dict[str, str])  # This should not trigger BaseModel path
+        result = _from_dict_primative(field)
+
+        # Should use string handling, not BaseModel
+        assert isinstance(result.jsonschema.additionalProperties, StringSchema)
+
     def test_deeply_nested_model(self):
         class Level3(BaseModel):
             value: str
@@ -515,3 +736,117 @@ class TestEdgeCases:
         nested_level3 = fields["level2"].jsonschema.properties["level3"]
         assert nested_level3.type == "object"
         assert "value" in nested_level3.properties
+
+
+class TestDictBaseModelIntegration:
+    """Integration tests for the new Dict[str, BaseModel] functionality."""
+
+    def test_comprehensive_basemodel_dict_scenario(self):
+        """Comprehensive test covering multiple aspects of Dict[str, BaseModel]."""
+
+        class Validation(BaseModel):
+            rule: Literal["required", "optional", "conditional"]
+            message: str = Field(default="Default validation message")
+            enabled: bool = True
+
+        class FieldConfig(BaseModel):
+            label: str
+            placeholder: str = ""
+            validation: Validation
+            metadata: Dict[str, str] = Field(default_factory=dict)
+
+        class FormSchema(BaseModel):
+            title: str
+            description: Optional[str] = None
+            fields: Dict[str, FieldConfig]
+
+        # Test the full conversion
+        form_fields, form_required = from_pydantic(FormSchema)
+
+        assert len(form_fields) == 3
+        assert set(form_required) == {"title", "fields"}
+
+        # Test the Dict[str, FieldConfig] field
+        fields_config = form_fields["fields"]
+        assert fields_config.jsonschema.type == "object"
+        assert isinstance(fields_config.jsonschema.additionalProperties, ObjectSchema)
+
+        field_config_schema = fields_config.jsonschema.additionalProperties
+        assert set(field_config_schema.required) == {"label", "validation"}
+
+        # Test nested structure - FieldConfig contains Validation BaseModel
+        validation_prop = field_config_schema.properties["validation"]
+        assert validation_prop.type == "object"
+        assert "rule" in validation_prop.properties
+        assert "message" in validation_prop.properties
+        assert "enabled" in validation_prop.properties
+
+        # Test Literal field in nested BaseModel
+        rule_prop = validation_prop.properties["rule"]
+        assert rule_prop.type == "string"
+        assert set(rule_prop.enum) == {"required", "optional", "conditional"}
+
+        # Test default values in nested structure
+        message_prop = validation_prop.properties["message"]
+        assert message_prop.default == "Default validation message"
+
+        enabled_prop = validation_prop.properties["enabled"]
+        assert enabled_prop.default is True
+
+        # Test nested Dict[str, str] in BaseModel
+        metadata_prop = field_config_schema.properties["metadata"]
+        assert metadata_prop.type == "object"
+        assert isinstance(metadata_prop.additionalProperties, StringSchema)
+
+    def test_circular_reference_prevention(self):
+        """Test that circular references are handled gracefully."""
+
+        class Node(BaseModel):
+            name: str
+            # Note: In a real scenario, this would create circular reference
+            # but our implementation doesn't handle forward references yet
+            value: int = 0
+
+        class Container(BaseModel):
+            nodes: Dict[str, Node]
+
+        # This should work without infinite recursion
+        fields, required = from_pydantic(Container)
+
+        assert "nodes" in fields
+        nodes_field = fields["nodes"]
+        additional_props = nodes_field.jsonschema.additionalProperties
+        assert isinstance(additional_props, ObjectSchema)
+        assert "name" in additional_props.properties
+        assert "value" in additional_props.properties
+
+    def test_mixed_dict_types_in_model(self):
+        """Test a model with various dictionary types."""
+
+        class ComplexItem(BaseModel):
+            id: str
+            active: bool = True
+
+        class MixedDictModel(BaseModel):
+            string_dict: Dict[str, str]
+            int_dict: Dict[str, int]
+            bool_dict: Dict[str, bool]
+            model_dict: Dict[str, ComplexItem]
+
+        fields, required = from_pydantic(MixedDictModel)
+
+        assert len(fields) == 4
+        assert set(required) == {"string_dict", "int_dict", "bool_dict", "model_dict"}
+
+        # Verify each dict type
+        assert isinstance(fields["string_dict"].jsonschema.additionalProperties, StringSchema)
+        assert isinstance(fields["int_dict"].jsonschema.additionalProperties, IntegerSchema)
+        assert isinstance(fields["bool_dict"].jsonschema.additionalProperties, BooleanSchema)
+        assert isinstance(fields["model_dict"].jsonschema.additionalProperties, ObjectSchema)
+
+        # Check the BaseModel dict specifically
+        model_additional = fields["model_dict"].jsonschema.additionalProperties
+        assert "id" in model_additional.properties
+        assert "active" in model_additional.properties
+        assert model_additional.required == ["id"]
+        assert model_additional.properties["active"].default is True

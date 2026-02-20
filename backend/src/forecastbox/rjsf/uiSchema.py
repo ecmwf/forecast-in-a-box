@@ -70,8 +70,13 @@ class UIField(BaseModel):
     title: str | None = None
     """Custom title for the field."""
 
-    def export_with_prefix(self) -> dict[str, Any]:
-        return {"ui:options": self.model_dump(exclude_none=True)}
+    def export_with_prefix(self, *, ignore_keys: list[str] | None = None) -> dict[str, Any]:
+        model_dump = self.model_dump(exclude_none=True)
+        if ignore_keys:
+            model_dump = {k: v for k, v in model_dump.items() if k not in ignore_keys}
+        if not model_dump:
+            return {}
+        return {"ui:options": model_dump}
 
 
 class UIItems(BaseModel):
@@ -87,16 +92,19 @@ class UIItems(BaseModel):
         return result
 
 
-class UIAdditionalProperties(BaseModel):
+class UIAdditionalProperties(UIField):
     """Base class for additional properties in UI schema."""
 
     additionalProperties: "UISchema | None" = None
 
-    def export_with_prefix(self) -> dict[str, Any]:
+    def export_with_prefix(self, *, ignore_keys: list[str] | None = None) -> dict[str, Any]:
         """Export the UI schema with prefix."""
-        result = {}
+        ignore_keys = ignore_keys or []
+        ignore_keys.append("additionalProperties")
+
+        result = super().export_with_prefix(ignore_keys=ignore_keys)
         if self.additionalProperties:
-            result = {"additionalProperties": self.additionalProperties.export_with_prefix()}
+            result = {"additionalProperties": self.additionalProperties.export_with_prefix(ignore_keys=ignore_keys)}
         return result
 
 
@@ -138,7 +146,7 @@ class UIBooleanField(UIField):
     """Widget type for boolean fields, default is 'checkbox'."""
 
 
-class UIObjectField(BaseModel):
+class UIObjectField(UIField):
     """UI schema for object fields.
 
     Allows for setting the anyOf, oneOf keys.
@@ -153,13 +161,16 @@ class UIObjectField(BaseModel):
     oneOf: list["UISchema"] | None = None
     """list of schemas for 'oneOf' condition."""
 
-    def export_with_prefix(self) -> dict[str, Any]:
+    def export_with_prefix(self, *, ignore_keys: list[str] | None = None) -> dict[str, Any]:
         """Export the UI schema with prefix."""
-        result = {}
+        ignore_keys = ignore_keys or []
+        ignore_keys.extend(["anyOf", "oneOf"])
+        result = super().export_with_prefix(ignore_keys=ignore_keys)
+
         if self.anyOf:
-            result["anyOf"] = [schema.export_with_prefix() for schema in self.anyOf]
+            result["anyOf"] = [schema.export_with_prefix(ignore_keys=ignore_keys) for schema in self.anyOf]
         if self.oneOf:
-            result["oneOf"] = [schema.export_with_prefix() for schema in self.oneOf]
+            result["oneOf"] = [schema.export_with_prefix(ignore_keys=ignore_keys) for schema in self.oneOf]
         return result
 
 
