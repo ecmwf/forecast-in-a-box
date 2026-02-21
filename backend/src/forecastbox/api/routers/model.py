@@ -9,6 +9,8 @@
 
 """Models API Router."""
 
+# NOTE this whole file is deprecated and will soon vanish completely
+
 import asyncio
 import logging
 import os
