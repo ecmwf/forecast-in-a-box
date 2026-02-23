@@ -79,7 +79,7 @@ def test_fable_contruction(tmpdir, backend_client_with_auth):
             assert request["number"] == list(range(1, 6, 1))
             assert request["step"] == list(range(0, 61, 6))
             task.static_input_ps["0"] = "file"
-            task.static_input_kw["path"] = os.path.join(DATA_DIR, "test.grib")
+            task.static_input_kw["path"] = os.path.join(DATA_DIR, "fable_test.grib")
 
     response = backend_client_with_auth.post("/execution/execute", json=spec.model_dump())
     assert response.is_success
