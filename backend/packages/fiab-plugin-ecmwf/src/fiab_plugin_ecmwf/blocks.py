@@ -18,7 +18,6 @@ from fiab_core.fable import (
     BlockInstanceId,
     BlockInstanceOutput,
     DataPartitionLookup,
-    XarrayOutput,
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import Product, Sink, Source
@@ -72,7 +71,13 @@ class EkdSource(Source):
     inputs: list[str] = []
 
     def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        output = XarrayOutput(variables=cast(list[str], IFS_REQUEST["param"]), coords=[STEP_DIM, ENSEMBLE_DIM])
+        output = BlockInstanceOutput(
+            dataqube={
+                PARAM_DIM: cast(list[str], IFS_REQUEST[PARAM_DIM]),
+                ENSEMBLE_DIM: cast(list[int], IFS_REQUEST[ENSEMBLE_DIM]),
+                STEP_DIM: cast(list[int], IFS_REQUEST[STEP_DIM]),
+            }
+        )
         return Either.ok(output)
 
     def compile(
@@ -93,14 +98,14 @@ class EkdSource(Source):
                                     **IFS_REQUEST,
                                     "date": block.configuration_values["date"],
                                     "expver": block.configuration_values["expver"],
-                                    "param": param,
+                                    PARAM_DIM: param,
                                 }
                             },
                         )
-                        for param in IFS_REQUEST["param"]
+                        for param in IFS_REQUEST[PARAM_DIM]
                     ]
                 ),
-                coords={PARAM_DIM: IFS_REQUEST[x] for x in ["param"]},
+                coords={PARAM_DIM: IFS_REQUEST[x] for x in [PARAM_DIM]},
             )
             .expand(
                 (ENSEMBLE_DIM, cast(list[int], IFS_REQUEST["number"])),
@@ -123,7 +128,7 @@ class EnsembleStatistics(Product):
     title: str = "Ensemble Statistics"
     description: str = "Computes ensemble mean or standard deviation"
     configuration_options: dict[str, BlockConfigurationOption] = {
-        "variable": BlockConfigurationOption(title="Variable", description="Variable name like '2t'", value_type="str"),
+        PARAM_DIM: BlockConfigurationOption(title="Variable", description="Variable name like '2t'", value_type="str"),
         "statistic": BlockConfigurationOption(
             title="Statistic",
             description="Statistic to compute over the ensemble",
@@ -133,11 +138,13 @@ class EnsembleStatistics(Product):
     inputs: list[str] = ["dataset"]
 
     def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_dataset = cast(XarrayOutput, inputs["dataset"])  # type:ignore[redundant-cast] # NOTE the warning is correct but we expect more
-        variable = block.configuration_values["variable"]
-        if variable not in input_dataset.variables:
-            return Either.error(f"variable {variable} is not in the input variables: {input_dataset.variables}")
-        output = XarrayOutput(variables=[variable], coords=[x for x in input_dataset.coords if x != ENSEMBLE_DIM])
+        input_dataset = inputs["dataset"]
+
+        param = block.configuration_values[PARAM_DIM]
+        if {PARAM_DIM: param} not in input_dataset:
+            return Either.error(f"param {param} is not in the input variables: {input_dataset.axes().get('param', [])}")
+
+        output = input_dataset.collapse(["param", ENSEMBLE_DIM]).expand({"param": [param]})
         return Either.ok(output)
 
     def compile(
@@ -154,18 +161,20 @@ class EnsembleStatistics(Product):
             action = param.mean(dim=ENSEMBLE_DIM)
         elif stat == "std":
             action = param.std(dim=ENSEMBLE_DIM)
+        else:
+            return Either.error(f"Unsupported statistic {stat}")
         partitions[block_id] = action
         return Either.ok(partitions)
 
     def intersect(self, input: BlockInstanceOutput) -> bool:
-        return isinstance(input, XarrayOutput) and len(input.variables) > 0 and ENSEMBLE_DIM in input.coords
+        return ENSEMBLE_DIM in input and "param" in input
 
 
 class TemporalStatistics(Product):
     title: str = "Temporal Statistics"
     description: str = "Computes temporal statistics"
     configuration_options: dict[str, BlockConfigurationOption] = {
-        "variable": BlockConfigurationOption(title="Variable", description="Variable name like '2t'", value_type="str"),
+        PARAM_DIM: BlockConfigurationOption(title=PARAM_DIM, description="Param name like '2t'", value_type="str"),
         "statistic": BlockConfigurationOption(
             title="Statistic",
             description="Statistic to compute over steps",
@@ -175,11 +184,11 @@ class TemporalStatistics(Product):
     inputs: list[str] = ["dataset"]
 
     def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_dataset = cast(XarrayOutput, inputs["dataset"])  # type:ignore[redundant-cast] # NOTE the warning is correct but we expect more
-        variable = block.configuration_values["variable"]
-        if variable not in input_dataset.variables:
-            return Either.error(f"variable {variable} is not in the input variables: {input_dataset.variables}")
-        output = XarrayOutput(variables=[variable], coords=[x for x in input_dataset.coords if x != STEP_DIM])
+        input_dataset = inputs["dataset"]
+        param = block.configuration_values[PARAM_DIM]
+        if {"param": param} not in input_dataset:
+            return Either.error(f"param {param} is not in the input variables: {input_dataset.axes().get('param', [])}")
+        output = input_dataset.collapse(["param", STEP_DIM]).expand({"param": [param]})
         return Either.ok(output)
 
     def compile(
@@ -191,7 +200,7 @@ class TemporalStatistics(Product):
         input_task = block.input_ids["dataset"]
         input_task_action = partitions[input_task]
         stat = block.configuration_values["statistic"]
-        param = input_task_action.select({PARAM_DIM: block.configuration_values["variable"]})
+        param = input_task_action.select({PARAM_DIM: block.configuration_values[PARAM_DIM]})
         if stat == "mean":
             action = param.mean(dim=STEP_DIM)
         elif stat == "std":
@@ -200,11 +209,13 @@ class TemporalStatistics(Product):
             action = param.min(dim=STEP_DIM)
         elif stat == "max":
             action = param.max(dim=STEP_DIM)
+        else:
+            return Either.error(f"Unsupported statistic {stat}")
         partitions[block_id] = action
         return Either.ok(partitions)
 
     def intersect(self, input: BlockInstanceOutput) -> bool:
-        return isinstance(input, XarrayOutput) and len(input.variables) > 0 and STEP_DIM in input.coords
+        return STEP_DIM in input and "param" in input
 
 
 class ZarrSink(Sink):
@@ -220,8 +231,7 @@ class ZarrSink(Sink):
     inputs: list[str] = ["dataset"]
 
     def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        output = XarrayOutput(variables=[], coords=[])
-        return Either.ok(output)
+        return Either.ok(BlockInstanceOutput())
 
     def compile(
         self,
@@ -237,4 +247,4 @@ class ZarrSink(Sink):
         return Either.ok(partitions)
 
     def intersect(self, input: BlockInstanceOutput) -> bool:
-        return len(input.variables) > 0
+        return "param" in input and len(input.axes()["param"]) > 0
