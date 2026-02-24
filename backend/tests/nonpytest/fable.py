@@ -34,72 +34,75 @@ if __name__ == "__main__":
     dbDir = None
     dataDir = None
     try:
-        config = FIABConfig()
-        config.api.uvicorn_port = 30645
-        config.auth.passthrough = True
-        config.cascade.cascade_url = "tcp://localhost:30644"
-        config.general.launch_browser = False
-        if os.environ.get("UNCLEAN", "") != "yea":
-            dbDir = tempfile.TemporaryDirectory()
-            config.db.sqlite_userdb_path = f"{dbDir.name}/user.db"
-            config.db.sqlite_jobdb_path = f"{dbDir.name}/job.db"
-            dataDir = tempfile.TemporaryDirectory()
-            config.api.data_path = dataDir.name
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = FIABConfig()
+            config.api.uvicorn_port = 30645
+            config.auth.passthrough = True
+            config.cascade.cascade_url = "tcp://localhost:30644"
+            config.general.launch_browser = False
+            if os.environ.get("UNCLEAN", "") != "yea":
+                dbDir = tempfile.TemporaryDirectory()
+                config.db.sqlite_userdb_path = f"{dbDir.name}/user.db"
+                config.db.sqlite_jobdb_path = f"{dbDir.name}/job.db"
+                dataDir = tempfile.TemporaryDirectory()
+                config.api.data_path = dataDir.name
 
-        handles = launch_all(config, attempts=50)
-        client = httpx.Client(base_url=config.api.local_url() + "/api/v1", follow_redirects=True)
+            handles = launch_all(config, attempts=50)
+            client = httpx.Client(base_url=config.api.local_url() + "/api/v1", follow_redirects=True)
 
-        tmpdir = tempfile.TemporaryDirectory()
-        response = client.get("/fable/catalogue").raise_for_status()
-        assert len(response.json()) > 0
+            response = client.get("/fable/catalogue").raise_for_status()
+            assert len(response.json()) > 0
 
-        pluginId = PluginCompositeId(store="ecmwf", local="ecmwf-base")
-        blocks = {
-            "source1": BlockInstance(
-                factory_id=PluginBlockFactoryId(plugin=pluginId, factory="ekdSource"),
-                configuration_values={
-                    "source": "ecmwf-open-data",
-                    "date": (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"),
-                    "expver": "0001",
-                },
-                input_ids={},
-            ),
-            "temporalMean": BlockInstance(
-                factory_id=PluginBlockFactoryId(plugin=pluginId, factory="temporalStatistics"),
-                configuration_values={"variable": "2t", "statistic": "mean"},
-                input_ids={"dataset": "source1"},
-            ),
-        }
-        for statistic in ["mean", "std"]:
-            block = BlockInstance(
-                factory_id=PluginBlockFactoryId(plugin=pluginId, factory="ensembleStatistics"),
-                configuration_values={"variable": "2t", "statistic": statistic},
-                input_ids={"dataset": "temporalMean"},
+            pluginId = PluginCompositeId(store="ecmwf", local="ecmwf-base")
+            blocks = {
+                "source1": BlockInstance(
+                    factory_id=PluginBlockFactoryId(plugin=pluginId, factory="ekdSource"),
+                    configuration_values={
+                        "source": "ecmwf-open-data",
+                        "date": (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"),
+                        "expver": "0001",
+                    },
+                    input_ids={},
+                ),
+                "temporalMean": BlockInstance(
+                    factory_id=PluginBlockFactoryId(plugin=pluginId, factory="temporalStatistics"),
+                    configuration_values={"variable": "2t", "statistic": "mean"},
+                    input_ids={"dataset": "source1"},
+                ),
+            }
+            for statistic in ["mean", "std"]:
+                block = BlockInstance(
+                    factory_id=PluginBlockFactoryId(plugin=pluginId, factory="ensembleStatistics"),
+                    configuration_values={"variable": "2t", "statistic": statistic},
+                    input_ids={"dataset": "temporalMean"},
+                )
+                sink = BlockInstance(
+                    factory_id=PluginBlockFactoryId(plugin=pluginId, factory="zarrSink"),
+                    configuration_values={"path": f"{tmpdir}/output{statistic.capitalize()}.zarr"},
+                    input_ids={"dataset": f"ensemble{statistic.capitalize()}"},
+                )
+                blocks[f"ensemble{statistic.capitalize()}"] = block
+                blocks[f"sink{statistic.capitalize()}"] = sink
+
+            builder = FableBuilderV1(blocks=blocks)
+            response = client.request(url="/fable/compile", method="put", json=builder.model_dump())
+
+            spec = ExecutionSpecification(
+                job=RawCascadeJob(**response.json()),
+                environment=EnvironmentSpecification(hosts=1, workers_per_host=1),
             )
-            sink = BlockInstance(
-                factory_id=PluginBlockFactoryId(plugin=pluginId, factory="zarrSink"),
-                configuration_values={"path": f"{tmpdir}/output.zarr"},
-                input_ids={"dataset": f"ensemble{statistic.capitalize()}"},
-            )
-            blocks[f"ensemble{statistic.capitalize()}"] = block
-            blocks[f"sink{statistic.capitalize()}"] = sink
+            response = client.post("/execution/execute", json=spec.model_dump())
+            assert response.is_success
+            job_id = response.json()["id"]
+            ensure_completed(client, job_id, sleep=1, attempts=120)
 
-        builder = FableBuilderV1(blocks=blocks)
-        response = client.request(url="/fable/compile", method="put", json=builder.model_dump())
-
-        spec = ExecutionSpecification(
-            job=RawCascadeJob(**response.json()),
-            environment=EnvironmentSpecification(hosts=1, workers_per_host=1),
-        )
-        response = client.post("/execution/execute", json=spec.model_dump())
-        assert response.is_success
-        job_id = response.json()["id"]
-        ensure_completed(client, job_id, sleep=1, attempts=120)
-
-        response = client.get(url=f"/job/{job_id}/outputs")
-        assert len(response.json()) == 1
-        assert os.path.exists(f"{tmpdir}/output.zarr")
-        tmpdir.cleanup()
+            response = client.get(url=f"/job/{job_id}/outputs")
+            assert response.is_success
+            outputs = response.json()
+            assert len(outputs) == 1
+            assert len(outputs[0]["output_ids"]) == 2
+            assert os.path.exists(f"{tmpdir}/outputMean.zarr")
+            assert os.path.exists(f"{tmpdir}/outputStd.zarr")
 
     finally:
         if handles is not None:

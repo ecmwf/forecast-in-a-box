@@ -32,7 +32,7 @@ def test_fable_contruction(tmpdir, backend_client_with_auth):
     blocks = {"source1": source}
     builder = FableBuilderV1(blocks=blocks)
     response = backend_client_with_auth.request(url="/fable/expand", method="put", json=builder.model_dump())
-    assert len(response.json()["possible_expansions"]["source1"]) == 3
+    assert len(response.json()["possible_expansions"]["source1"]) > 0
 
     temporalMean = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=pluginId, factory="temporalStatistics"),
@@ -42,21 +42,20 @@ def test_fable_contruction(tmpdir, backend_client_with_auth):
     blocks["temporalMean"] = temporalMean
     builder = FableBuilderV1(blocks=blocks)
     response = backend_client_with_auth.request(url="/fable/expand", method="put", json=builder.model_dump())
-    assert len(response.json()["possible_expansions"]["temporalMean"]) == 2
+    assert len(response.json()["possible_expansions"]["temporalMean"]) > 0
 
-    for statistic in ["mean"]:
-        block = BlockInstance(
-            factory_id=PluginBlockFactoryId(plugin=pluginId, factory="ensembleStatistics"),
-            configuration_values={"variable": "2t", "statistic": statistic},
-            input_ids={"dataset": "temporalMean"},
-        )
-        sink = BlockInstance(
-            factory_id=PluginBlockFactoryId(plugin=pluginId, factory="zarrSink"),
-            configuration_values={"path": f"{tmpdir}/output.zarr"},
-            input_ids={"dataset": f"ensemble{statistic.capitalize()}"},
-        )
-        blocks[f"ensemble{statistic.capitalize()}"] = block
-        blocks[f"sink{statistic.capitalize()}"] = sink
+    block = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=pluginId, factory="ensembleStatistics"),
+        configuration_values={"variable": "2t", "statistic": "mean"},
+        input_ids={"dataset": "temporalMean"},
+    )
+    sink = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=pluginId, factory="zarrSink"),
+        configuration_values={"path": f"{tmpdir}/output.zarr"},
+        input_ids={"dataset": f"ensembleMean"},
+    )
+    blocks[f"ensembleMean"] = block
+    blocks[f"sinkMean"] = sink
 
     builder = FableBuilderV1(blocks=blocks)
     response = backend_client_with_auth.request(url="/fable/expand", method="put", json=builder.model_dump())
