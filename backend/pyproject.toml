@@ -30,7 +30,7 @@ dependencies = [
   "anemoi-utils>=0.4.36",
   "apscheduler",
   "cloudpickle",
-  "earthkit-workflows>=0.6.1",
+  "earthkit-workflows>=0.8.0",
   "earthkit-workflows-anemoi>=0.3.12",
   "earthkit-workflows-pproc",
   "fastapi",
@@ -48,7 +48,7 @@ dependencies = [
   "pydantic-settings",
   "pyrsistent",
   "python-multipart",
-  "qubed==0.1.12",
+  "qubed",
   "sse-starlette",
   "toml",
   "uvicorn",
@@ -108,7 +108,8 @@ addopts = "-n0 -s --log-disable findlibs"      # NOTE stick to 0 *or* have rando
 filterwarnings = [
     "error",
     'ignore:diagnostic_variables is unsupported:deprecation.UnsupportedWarning',
-    'ignore:prognostic_variables is unsupported:deprecation.UnsupportedWarning'
+    'ignore:prognostic_variables is unsupported:deprecation.UnsupportedWarning',
+    'ignore:fix this test -- it was written for old qubed'
 ]
 
 [tool.mypy]
