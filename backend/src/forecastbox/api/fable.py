@@ -16,7 +16,7 @@ from collections import defaultdict
 from itertools import groupby
 from typing import Iterator, cast
 
-from cascade.low.into import graph2job
+from earthkit.workflows.compilers import graph2job
 from earthkit.workflows.graph import Graph, deduplicate_nodes
 from fiab_core.fable import (
     BlockConfigurationOption,

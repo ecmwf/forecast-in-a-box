@@ -18,8 +18,8 @@ import cascade.gateway.client as client
 from cascade.low import views as cascade_views
 from cascade.low.core import JobInstance, JobInstanceRich
 from cascade.low.func import Either, assert_never
-from cascade.low.into import graph2job
 from earthkit.workflows import Cascade, fluent
+from earthkit.workflows.compilers import graph2job
 from earthkit.workflows.graph import Graph, deduplicate_nodes
 from fastapi import HTTPException
 from pydantic import BaseModel
