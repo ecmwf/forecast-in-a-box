@@ -47,6 +47,7 @@ class ArtifactManager:
     lock: threading.Lock = threading.Lock()
     catalog: ArtifactCatalog = {}
     locally_available: set[CompositeArtifactId] = set()
+    ongoing_downloads: dict[CompositeArtifactId, int | str] = {}
     executor: ThreadPoolExecutor | None = None
     refresh_error: str | None = None
 
@@ -96,30 +97,64 @@ def _download_artifact_task(composite_id: CompositeArtifactId) -> None:
                 raise ValueError("failed to acquire lock for catalog access")
             catalog = ArtifactManager.catalog
 
-        download_artifact(composite_id, catalog, Path(config.api.data_path))
+        def progress_callback(progress: int) -> None:
+            report_artifact_download_progress(composite_id, progress=progress)
+
+        download_artifact(composite_id, catalog, Path(config.api.data_path), progress_callback=progress_callback)
 
         with timed_acquire(ArtifactManager.lock, timeout_acquire_task) as result:
             if not result:
                 logger.error("failed to acquire lock to update locally_available")
             else:
                 ArtifactManager.locally_available.add(composite_id)
+                if composite_id in ArtifactManager.ongoing_downloads:
+                    ArtifactManager.ongoing_downloads.pop(composite_id)
+                else:
+                    logger.warning(f"expected {composite_id} to be in ongoing downloads")
         logger.info(f"Successfully downloaded artifact {composite_id}")
     except Exception as e:
         logger.exception(f"artifact download failed for {composite_id}: {repr(e)}")
+        report_artifact_download_progress(composite_id, failure=repr(e))
 
 
-def submit_artifact_download(composite_id: CompositeArtifactId) -> Either[None, str]:  # type: ignore[invalid-argument] # NOTE type checker issue
-    """Submit artifact download task. Returns None on success."""
+def submit_artifact_download(composite_id: CompositeArtifactId) -> Either[int, str]:  # ty: ignore[invalid-type-arguments]
+    """Submit artifact download task. Returns progress (0-100) on success or ongoing download, error message on failure."""
     with timed_acquire(ArtifactManager.lock, timeout_acquire_request) as result:
         if not result:
             return Either.error("Corresponding internal component is busy")
         if composite_id not in ArtifactManager.catalog:
             return Either.error(f"ArtifactId not found: {composite_id}")
         if composite_id in ArtifactManager.locally_available:
-            return Either.error("ArtifactId already available {composite_id}")
+            return Either.ok(100)
+        if composite_id in ArtifactManager.ongoing_downloads:
+            progress = ArtifactManager.ongoing_downloads[composite_id]
+            if isinstance(progress, int):
+                return Either.ok(progress)
+            else:
+                return Either.error(progress)
         ArtifactManager._ensure_pool()
+        ArtifactManager.ongoing_downloads[composite_id] = 0
 
     ArtifactManager.executor.submit(_download_artifact_task, composite_id)
+    return Either.ok(0)
+
+
+def report_artifact_download_progress(composite_id: CompositeArtifactId, progress: int | None = None, failure: str | None = None) -> None:
+    """Report progress or failure for an ongoing artifact download."""
+    # NOTE we block shortly even though we are in a background thread because we dont
+    # want to get a timeout on ongoing download
+    with timed_acquire(ArtifactManager.lock, timeout_acquire_request) as result:
+        if not result:
+            logger.warning(f"Failed to acquire lock to report progress for {composite_id}")
+            return
+
+        if composite_id in ArtifactManager.ongoing_downloads:
+            if failure is not None:
+                ArtifactManager.ongoing_downloads[composite_id] = failure
+            elif progress is not None:
+                ArtifactManager.ongoing_downloads[composite_id] = progress
+        else:
+            logger.warning(f"Attempted to report {progress=}, {failure=}, but {composite_id=} not found")
 
 
 def join_artifact_manager(timeout_sec: int) -> None:
@@ -179,15 +214,3 @@ def get_model_details(composite_id: CompositeArtifactId) -> MlModelDetail:
         )
 
         return detail
-
-
-"""
-Specification for monitoring progress of artifacts download:
-1. Inspect this file, as well as forecastbox.api.routers.artifacts. There is the endpoint download_model, which returns status of the download. However, it correctly returns only on the first call for the given id, all subsequent invocations return a 400, Artifact already available. You need to fix that.
-2. Have the manager object in this file additionally keep track of ongoing downloads, like dict[CompositeArtifactId, int|str]. Keep in mind that writes to this dict should be done only when the manager lock is held. The int would be for progress (like 0-100), and str for error in case it fails
-3. Change the return type of submit artifact download to be Either[int, str], where the int would be the numeric progress. If the model is already available, return 100. If the model is present in the ongoing downloads, return the number from there (or error)
-4. Upon successful submit (while you hold the lock, so after the ensure pool call success), insert into this dict
-5. Have a new manager method report_artifact_download_progress(progress: int|None, failure: str|None), which locks and sets the value. If fails to lock just log warning and continue
-6. Inspect the forecastbox.api.artifacts.io -- there is already TODO for reporting progress. Replace with a call of the report from previous point. Additionally, in the except clause of that method, report failure
-7. Inspect all tests whether they are affected by this -- if yes, make sure they utilize the extended behaviour. Don't implement new big tests from scratch.
-"""

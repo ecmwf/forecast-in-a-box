@@ -16,6 +16,7 @@ All the methods here are blocking -- see manager for nonblocking invocations
 import logging
 import shutil
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 
 import httpx
@@ -86,7 +87,12 @@ def list_local_storage(artifacts_catalog: ArtifactCatalog, data_dir: Path) -> li
     return local_artifacts
 
 
-def download_artifact(composite_id: CompositeArtifactId, artifacts_catalog: ArtifactCatalog, data_dir: Path) -> None:
+def download_artifact(
+    composite_id: CompositeArtifactId,
+    artifacts_catalog: ArtifactCatalog,
+    data_dir: Path,
+    progress_callback: Callable[[int], None] | None = None,
+) -> None:
     """Download an artifact from its remote URL to local storage, raising KeyError if not found in catalog or httpx.HTTPError if download fails."""
     if composite_id not in artifacts_catalog:
         raise KeyError(f"Artifact not found in catalog: {composite_id}")
@@ -113,10 +119,11 @@ def download_artifact(composite_id: CompositeArtifactId, artifacts_catalog: Arti
                         if chunk:
                             file.write(chunk)
                             downloaded += len(chunk)
-                            # TODO report progress
                             if total > 0:
-                                progress = float(downloaded) / total * 100
-                                logger.debug(f"Download progress: {progress:.1f}%")
+                                progress = int(float(downloaded) / total * 100)
+                                logger.debug(f"Download progress: {progress}%")
+                                if progress_callback:
+                                    progress_callback(progress)
 
             logger.debug(f"Download completed for {composite_id}, total bytes: {downloaded}")
             shutil.move(str(temp_path), str(artifact_path))
