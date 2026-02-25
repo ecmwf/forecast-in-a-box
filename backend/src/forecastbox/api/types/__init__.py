@@ -106,6 +106,7 @@ class EnvironmentSpecification(FIABBaseModel):
     hosts: PositiveInt | None = Field(default=None)
     workers_per_host: PositiveInt | None = Field(default=None)
     environment_variables: dict[str, str] = Field(default_factory=dict)
+    runtime_artifacts: list = Field(default_factory=list)  # list[CompositeArtifactId]
 
 
 class ForecastProducts(FIABBaseModel):
@@ -117,15 +118,6 @@ class ForecastProducts(FIABBaseModel):
 class RawCascadeJob(FIABBaseModel):
     job_type: Literal["raw_cascade_job"]
     job_instance: JobInstance
-
-    """Specs: we want to be able to register checkpoints during compilation as "needed for a job run". To do that:
-1/ refactor the class CompositeArtifactId from forecastbox.api.artifacts.base to fiab_core.artifacts
-2/ extend the forecastbox.api.types.EnvironmentSpecification with runtime_artifacts: list[CompositeArtifactId]
-3/ inspect the api.execution to see how the ExecutionSpecification is being processed. At the start of the _execute_cascade, inspect the ExecutionSpecification's environment for runtime artifacts. Inspect the api.artifacts.manager locally_available (dont lock, we are ok with a race for now), put there a `# TODO if any are missing update the db status`, and for all that are missing call submit_artifact_download. Then run a loop with time.sleep(1) where you inspect the progress of each such -- and leave there a `# TODO replace this with Future await`
-4/ after all are downloaded, continue with the original logic of _execute_cascade
-
-No need to update any test -- only make sure `just val` keeps passing
-"""
 
 
 class ExecutionSpecification(FIABBaseModel):

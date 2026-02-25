@@ -10,6 +10,7 @@
 import asyncio
 import json
 import logging
+import time
 import uuid
 from typing import Any, Sequence
 
@@ -102,6 +103,51 @@ def execution_specification_to_cascade(spec: ExecutionSpecification) -> tuple[Jo
 
 def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobResponse, list[ProductToOutputId]]:
     """Converts spec to JobInstance and submits to cascade api, returning response + list of sinks"""
+
+    # Handle runtime artifacts download before job execution
+    runtime_artifacts = spec.environment.runtime_artifacts
+    if runtime_artifacts:
+        from forecastbox.api.artifacts.manager import ArtifactManager, submit_artifact_download
+
+        # Check which artifacts are not locally available (without locking)
+        missing_artifacts = [art for art in runtime_artifacts if art not in ArtifactManager.locally_available]
+
+        # TODO if any are missing update the db status
+
+        # Submit downloads for missing artifacts
+        download_ids = []
+        for artifact_id in missing_artifacts:
+            result = submit_artifact_download(artifact_id)
+            if result.e:
+                error_msg = f"Failed to submit download for {artifact_id}: {result.e}"
+                logger.error(error_msg)
+                return api.SubmitJobResponse(job_id=None, error=error_msg), []
+            download_ids.append(artifact_id)
+
+        # TODO replace this with Future await
+        # Poll for download completion
+        if download_ids:
+            max_wait_seconds = 3600  # 1 hour timeout
+            start_time = time.time()
+
+            while True:
+                all_complete = True
+                for artifact_id in download_ids:
+                    if artifact_id not in ArtifactManager.locally_available:
+                        all_complete = False
+                        break
+
+                if all_complete:
+                    logger.info(f"All runtime artifacts downloaded: {download_ids}")
+                    break
+
+                if time.time() - start_time > max_wait_seconds:
+                    error_msg = f"Timeout waiting for runtime artifacts to download"
+                    logger.error(error_msg)
+                    return api.SubmitJobResponse(job_id=None, error=error_msg), []
+
+                time.sleep(1)
+
     try:
         job, job_envvars, product_to_id_mappings = execution_specification_to_cascade(spec)
     except Exception as e:

@@ -11,6 +11,7 @@
 Declarations related to Artifacts such as ML Model Checkpoints.
 """
 
+from dataclasses import dataclass
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -19,6 +20,15 @@ from pydantic import BaseModel, Field
 Platform = Literal["macos", "linux"]
 
 MlModelCheckpointId = str
+ArtifactStoreId = str
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class CompositeArtifactId:
+    """Composite identifier for an artifact combining store and checkpoint IDs"""
+
+    artifact_store_id: ArtifactStoreId
+    ml_model_checkpoint_id: MlModelCheckpointId
 
 
 class MlModelCheckpoint(BaseModel):
