@@ -4,12 +4,8 @@ import httpx
 
 from forecastbox.models.metadata import ControlMetadata
 
-from .conftest import fake_artifact_checkpoint_id, fake_artifact_store_id, fake_model_name, fake_repository_port
+from .conftest import fake_artifact_checkpoint_id, fake_artifact_registry_port, fake_artifact_store_id
 from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
-
-"""
-Spec: this test utilizes the /model endpoints. Instead, we want to utilize the /artifacts endpoint. Study both APIs, compare their differences, then redo this test to use the artifacts instead. You will need to fake the 'artifact registry' -- see the conftest.py as well.
-"""
 
 
 def test_download_model(backend_client):
@@ -32,13 +28,13 @@ def test_download_model(backend_client):
     assert token_admin is not None, "Token should not be None"
     backend_client.cookies.set(**prepare_cookie_with_auth_token(token_admin))
 
-    # In order for the "/artifacts" to work, the fake artifact registry must be up
+    # Verify fake artifact registry is up
     try:
         client = httpx.Client(transport=httpx.HTTPTransport(retries=3))
-        catalog_response = client.get(f"http://localhost:{fake_repository_port}/MANIFEST")
-        assert catalog_response.is_success, "Failed to start Fake Model Repository properly"
+        catalog_response = client.get(f"http://localhost:{fake_artifact_registry_port}/artifacts.json")
+        assert catalog_response.is_success, "Failed to start Fake Artifact Registry properly"
     except httpx.ConnectError:
-        assert False, "Failed to start Fake Model Repository properly"
+        assert False, "Failed to start Fake Artifact Registry properly"
 
     # List all available models
     response = backend_client.get("/artifacts/list_models").raise_for_status()
