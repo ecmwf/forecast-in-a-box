@@ -179,3 +179,15 @@ def get_model_details(composite_id: CompositeArtifactId) -> MlModelDetail:
         )
 
         return detail
+
+
+"""
+Specification for monitoring progress of artifacts download:
+1. Inspect this file, as well as forecastbox.api.routers.artifacts. There is the endpoint download_model, which returns status of the download. However, it correctly returns only on the first call for the given id, all subsequent invocations return a 400, Artifact already available. You need to fix that.
+2. Have the manager object in this file additionally keep track of ongoing downloads, like dict[CompositeArtifactId, int|str]. Keep in mind that writes to this dict should be done only when the manager lock is held. The int would be for progress (like 0-100), and str for error in case it fails
+3. Change the return type of submit artifact download to be Either[int, str], where the int would be the numeric progress. If the model is already available, return 100. If the model is present in the ongoing downloads, return the number from there (or error)
+4. Upon successful submit (while you hold the lock, so after the ensure pool call success), insert into this dict
+5. Have a new manager method report_artifact_download_progress(progress: int|None, failure: str|None), which locks and sets the value. If fails to lock just log warning and continue
+6. Inspect the forecastbox.api.artifacts.io -- there is already TODO for reporting progress. Replace with a call of the report from previous point. Additionally, in the except clause of that method, report failure
+7. Inspect all tests whether they are affected by this -- if yes, make sure they utilize the extended behaviour. Don't implement new big tests from scratch.
+"""
