@@ -1,0 +1,183 @@
+From 6754185e1d1545fb5f9fd366a683a5e6922d5a41 Mon Sep 17 00:00:00 2001
+From: copilot-swe-agent[bot] <198982749+Copilot@users.noreply.github.com>
+Date: Wed, 25 Feb 2026 09:44:50 +0000
+Subject: [PATCH] Implement model download progress tracking
+
+This patch implements progress tracking for artifact downloads in the
+forecast-in-a-box project. It addresses the issue where the download_model
+endpoint returned 400 errors for already-available or in-progress downloads.
+
+Changes:
+1. Added ongoing_downloads dict to ArtifactManager to track progress
+2. Modified submit_artifact_download to return Either[int, str] with progress (0-100)
+3. Added report_artifact_download_progress method for thread-safe updates
+4. Updated _download_artifact_task to report progress and cleanup
+5. Updated download_artifact to accept optional progress callback
+6. Modified download_model_endpoint to return status with progress
+
+All modifications to ongoing_downloads are protected by ArtifactManager.lock.
+
+To apply this patch:
+  cd <repository-root>
+  git checkout feat/modelDownloadProgress  # or your target branch
+  git apply model-download-progress-implementation.patch
+
+---
+ backend/src/forecastbox/api/artifacts/io.py   | 10 ++--
+ .../src/forecastbox/api/artifacts/manager.py  | 48 +++++++++++++------
+ .../src/forecastbox/api/routers/artifacts.py  | 20 +++++---
+ 3 files changed, 52 insertions(+), 26 deletions(-)
+diff --git a/backend/src/forecastbox/api/artifacts/io.py b/backend/src/forecastbox/api/artifacts/io.py
+index a908acd..394a701 100644
+--- a/backend/src/forecastbox/api/artifacts/io.py
++++ b/backend/src/forecastbox/api/artifacts/io.py
+@@ -16,6 +16,7 @@ All the methods here are blocking -- see manager for nonblocking invocations
+ import logging
+ import shutil
+ import tempfile
++from collections.abc import Callable
+ from pathlib import Path
+ 
+ import httpx
+@@ -86,7 +87,7 @@ def list_local_storage(artifacts_catalog: ArtifactCatalog, data_dir: Path) -> li
+     return local_artifacts
+ 
+ 
+-def download_artifact(composite_id: CompositeArtifactId, artifacts_catalog: ArtifactCatalog, data_dir: Path) -> None:
++def download_artifact(composite_id: CompositeArtifactId, artifacts_catalog: ArtifactCatalog, data_dir: Path, progress_callback: Callable[[int], None] | None = None) -> None:
+     """Download an artifact from its remote URL to local storage, raising KeyError if not found in catalog or httpx.HTTPError if download fails."""
+     if composite_id not in artifacts_catalog:
+         raise KeyError(f"Artifact not found in catalog: {composite_id}")
+@@ -113,10 +114,11 @@ def download_artifact(composite_id: CompositeArtifactId, artifacts_catalog: Arti
+                         if chunk:
+                             file.write(chunk)
+                             downloaded += len(chunk)
+-                            # TODO report progress
+                             if total > 0:
+-                                progress = float(downloaded) / total * 100
+-                                logger.debug(f"Download progress: {progress:.1f}%")
++                                progress = int(float(downloaded) / total * 100)
++                                logger.debug(f"Download progress: {progress}%")
++                                if progress_callback:
++                                    progress_callback(progress)
+ 
+             logger.debug(f"Download completed for {composite_id}, total bytes: {downloaded}")
+             shutil.move(str(temp_path), str(artifact_path))
+diff --git a/backend/src/forecastbox/api/artifacts/manager.py b/backend/src/forecastbox/api/artifacts/manager.py
+index 69c0cb6..b44b3b7 100644
+--- a/backend/src/forecastbox/api/artifacts/manager.py
++++ b/backend/src/forecastbox/api/artifacts/manager.py
+@@ -47,6 +47,7 @@ class ArtifactManager:
+     lock: threading.Lock = threading.Lock()
+     catalog: ArtifactCatalog = {}
+     locally_available: set[CompositeArtifactId] = set()
++    ongoing_downloads: dict[CompositeArtifactId, int | str] = {}
+     executor: ThreadPoolExecutor | None = None
+     refresh_error: str | None = None
+ 
+@@ -96,30 +97,58 @@ def _download_artifact_task(composite_id: CompositeArtifactId) -> None:
+                 raise ValueError("failed to acquire lock for catalog access")
+             catalog = ArtifactManager.catalog
+ 
+-        download_artifact(composite_id, catalog, Path(config.api.data_path))
++        def progress_callback(progress: int) -> None:
++            report_artifact_download_progress(composite_id, progress=progress)
++
++        download_artifact(composite_id, catalog, Path(config.api.data_path), progress_callback=progress_callback)
+ 
+         with timed_acquire(ArtifactManager.lock, timeout_acquire_task) as result:
+             if not result:
+                 logger.error("failed to acquire lock to update locally_available")
+             else:
+                 ArtifactManager.locally_available.add(composite_id)
++                if composite_id in ArtifactManager.ongoing_downloads:
++                    del ArtifactManager.ongoing_downloads[composite_id]
+         logger.info(f"Successfully downloaded artifact {composite_id}")
+     except Exception as e:
+         logger.exception(f"artifact download failed for {composite_id}: {repr(e)}")
++        report_artifact_download_progress(composite_id, failure=repr(e))
+ 
+ 
+-def submit_artifact_download(composite_id: CompositeArtifactId) -> Either[None, str]:  # type: ignore[invalid-argument] # NOTE type checker issue
+-    """Submit artifact download task. Returns None on success."""
++def submit_artifact_download(composite_id: CompositeArtifactId) -> Either[int, str]:
++    """Submit artifact download task. Returns progress (0-100) on success or ongoing download, error message on failure."""
+     with timed_acquire(ArtifactManager.lock, timeout_acquire_request) as result:
+         if not result:
+             return Either.error("Corresponding internal component is busy")
+         if composite_id not in ArtifactManager.catalog:
+             return Either.error(f"ArtifactId not found: {composite_id}")
+         if composite_id in ArtifactManager.locally_available:
+-            return Either.error("ArtifactId already available {composite_id}")
++            return Either.ok(100)
++        if composite_id in ArtifactManager.ongoing_downloads:
++            progress = ArtifactManager.ongoing_downloads[composite_id]
++            if isinstance(progress, int):
++                return Either.ok(progress)
++            else:
++                return Either.error(progress)
+         ArtifactManager._ensure_pool()
++        ArtifactManager.ongoing_downloads[composite_id] = 0
+ 
+     ArtifactManager.executor.submit(_download_artifact_task, composite_id)
++    return Either.ok(0)
++
++
++def report_artifact_download_progress(composite_id: CompositeArtifactId, progress: int | None = None, failure: str | None = None) -> None:
++    """Report progress or failure for an ongoing artifact download."""
++    with timed_acquire(ArtifactManager.lock, timeout_acquire_request) as result:
++        if not result:
++            logger.warning(f"Failed to acquire lock to report progress for {composite_id}")
++            return
++        
++        if composite_id in ArtifactManager.ongoing_downloads:
++            if failure is not None:
++                ArtifactManager.ongoing_downloads[composite_id] = failure
++            elif progress is not None:
++                ArtifactManager.ongoing_downloads[composite_id] = progress
+ 
+ 
+ def join_artifact_manager(timeout_sec: int) -> None:
+@@ -180,14 +209,3 @@ def get_model_details(composite_id: CompositeArtifactId) -> MlModelDetail:
+ 
+         return detail
+ 
+-
+-"""
+-Specification for monitoring progress of artifacts download:
+-1. Inspect this file, as well as forecastbox.api.routers.artifacts. There is the endpoint download_model, which returns status of the download. However, it correctly returns only on the first call for the given id, all subsequent invocations return a 400, Artifact already available. You need to fix that.
+-2. Have the manager object in this file additionally keep track of ongoing downloads, like dict[CompositeArtifactId, int|str]. Keep in mind that writes to this dict should be done only when the manager lock is held. The int would be for progress (like 0-100), and str for error in case it fails
+-3. Change the return type of submit artifact download to be Either[int, str], where the int would be the numeric progress. If the model is already available, return 100. If the model is present in the ongoing downloads, return the number from there (or error)
+-4. Upon successful submit (while you hold the lock, so after the ensure pool call success), insert into this dict
+-5. Have a new manager method report_artifact_download_progress(progress: int|None, failure: str|None), which locks and sets the value. If fails to lock just log warning and continue
+-6. Inspect the forecastbox.api.artifacts.io -- there is already TODO for reporting progress. Replace with a call of the report from previous point. Additionally, in the except clause of that method, report failure
+-7. Inspect all tests whether they are affected by this -- if yes, make sure they utilize the extended behaviour. Don't implement new big tests from scratch.
+-"""
+diff --git a/backend/src/forecastbox/api/routers/artifacts.py b/backend/src/forecastbox/api/routers/artifacts.py
+index 5ee43fa..569a3dc 100644
+--- a/backend/src/forecastbox/api/routers/artifacts.py
++++ b/backend/src/forecastbox/api/routers/artifacts.py
+@@ -42,10 +42,16 @@ def get_model_details_endpoint(composite_id: CompositeArtifactId) -> MlModelDeta
+ 
+ 
+ @router.post("/download_model")
+-def download_model_endpoint(composite_id: CompositeArtifactId) -> dict[str, str]:
+-    """Submit a download request for a specific ML model."""
+-    # TODO when there is a download in progress, this should return status instead of submit again
+-    maybe_error = submit_artifact_download(composite_id)
+-    if maybe_error.e is not None:
+-        raise HTTPException(status_code=400, detail=maybe_error.e)
+-    return {"status": "download submitted", "composite_id": str(composite_id)}
++def download_model_endpoint(composite_id: CompositeArtifactId) -> dict[str, str | int]:
++    """Submit a download request for a specific ML model or get status of ongoing download."""
++    result = submit_artifact_download(composite_id)
++    if result.e is not None:
++        raise HTTPException(status_code=400, detail=result.e)
++    
++    progress = result.ok
++    if progress == 100:
++        return {"status": "available", "progress": 100, "composite_id": str(composite_id)}
++    elif progress == 0:
++        return {"status": "download submitted", "progress": 0, "composite_id": str(composite_id)}
++    else:
++        return {"status": "download in progress", "progress": progress, "composite_id": str(composite_id)}
