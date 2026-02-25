@@ -25,6 +25,7 @@ from earthkit.workflows.graph import Graph, deduplicate_nodes
 from fastapi import HTTPException
 from pydantic import BaseModel
 
+from forecastbox.api.artifacts.manager import ArtifactManager, submit_artifact_download
 from forecastbox.api.types import EnvironmentSpecification, ExecutionSpecification, ForecastProducts, RawCascadeJob
 from forecastbox.api.utils import get_model_path
 from forecastbox.config import config
@@ -107,8 +108,6 @@ def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobRespons
     # Handle runtime artifacts download before job execution
     runtime_artifacts = spec.environment.runtime_artifacts
     if runtime_artifacts:
-        from forecastbox.api.artifacts.manager import ArtifactManager, submit_artifact_download
-
         # Check which artifacts are not locally available (without locking)
         missing_artifacts = [art for art in runtime_artifacts if art not in ArtifactManager.locally_available]
 
@@ -131,13 +130,10 @@ def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobRespons
             start_time = time.time()
 
             while True:
-                all_complete = True
-                for artifact_id in download_ids:
-                    if artifact_id not in ArtifactManager.locally_available:
-                        all_complete = False
-                        break
+                # Check for remaining downloads using set difference
+                remaining = set(download_ids) - ArtifactManager.locally_available
 
-                if all_complete:
+                if not remaining:
                     logger.info(f"All runtime artifacts downloaded: {download_ids}")
                     break
 

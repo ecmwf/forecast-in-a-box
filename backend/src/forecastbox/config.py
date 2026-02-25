@@ -16,6 +16,7 @@ from typing import Annotated, Literal
 
 import toml
 from cascade.low.func import pydantic_recursive_collect
+from fiab_core.artifacts import ArtifactStoreId
 from fiab_core.fable import PluginCompositeId, PluginId, PluginStoreId
 from pydantic import BaseModel, BeforeValidator, Field, PlainSerializer, SecretStr, model_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict, TomlConfigSettingsSource
@@ -151,9 +152,6 @@ def _default_plugin_stores() -> PluginStoresConfig:
             method="file",
         ),
     }
-
-
-ArtifactStoreId = str
 
 
 class ArtifactStoreConfig(BaseModel):

@@ -21,10 +21,10 @@ from pathlib import Path
 
 import httpx
 from cascade.low.func import assert_never
-from fiab_core.artifacts import MlModelCheckpoint
+from fiab_core.artifacts import ArtifactStoreId, MlModelCheckpoint
 
 from forecastbox.api.artifacts.base import ArtifactCatalog, CompositeArtifactId, artifacts_subdir, get_artifact_local_path
-from forecastbox.config import ArtifactStoreId, ArtifactStoresConfig
+from forecastbox.config import ArtifactStoresConfig
 
 logger = logging.getLogger(__name__)
 
