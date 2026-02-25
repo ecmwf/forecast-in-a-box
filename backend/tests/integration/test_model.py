@@ -41,12 +41,12 @@ def test_download_model(backend_client):
     models = response.json()
     assert len(models) >= 4, f"Expected at least 4 models, got {len(models)}"
 
-    # Find our test model
+    # Find our test model (test_checkpoint0 is the main one)
     test_model = None
     for model in models:
         if (
             model["composite_id"]["artifact_store_id"] == fake_artifact_store_id
-            and model["composite_id"]["ml_model_checkpoint_id"] == fake_artifact_checkpoint_id
+            and model["composite_id"]["ml_model_checkpoint_id"] == f"{fake_artifact_checkpoint_id}0"
         ):
             test_model = model
             break
@@ -54,10 +54,10 @@ def test_download_model(backend_client):
     assert test_model is not None, "Test model not found in list"
     assert test_model["is_available"] == False, "Model should not be downloaded yet"
 
-    # Download models in parallel
+    # Download models in parallel (test_checkpoint1, test_checkpoint2, test_checkpoint3)
     parallelism = 3
     composite_ids = []
-    for e in range(parallelism):
+    for e in range(1, parallelism + 1):
         composite_id = {
             "artifact_store_id": fake_artifact_store_id,
             "ml_model_checkpoint_id": f"{fake_artifact_checkpoint_id}{e}",
@@ -67,10 +67,10 @@ def test_download_model(backend_client):
         assert result["status"] in ["download submitted", "download in progress"], f"Unexpected status: {result}"
         composite_ids.append(composite_id)
 
-    # Download the main test model
+    # Download the main test model (test_checkpoint0)
     main_composite_id = {
         "artifact_store_id": fake_artifact_store_id,
-        "ml_model_checkpoint_id": fake_artifact_checkpoint_id,
+        "ml_model_checkpoint_id": f"{fake_artifact_checkpoint_id}0",
     }
     response = backend_client.post("/artifacts/download_model", json=main_composite_id).raise_for_status()
     result = response.json()
@@ -97,14 +97,14 @@ def test_download_model(backend_client):
         if model["composite_id"]["artifact_store_id"] == fake_artifact_store_id and model["is_available"]:
             available_checkpoints.add(model["composite_id"]["ml_model_checkpoint_id"])
 
-    assert fake_artifact_checkpoint_id in available_checkpoints, "Main model should be available"
-    for e in range(parallelism):
-        assert f"{fake_artifact_checkpoint_id}{e}" in available_checkpoints, f"Model {e} should be available"
+    assert f"{fake_artifact_checkpoint_id}0" in available_checkpoints, "Main model (test_checkpoint0) should be available"
+    for e in range(1, parallelism + 1):
+        assert f"{fake_artifact_checkpoint_id}{e}" in available_checkpoints, f"Model test_checkpoint{e} should be available"
 
     # Test model details endpoint
     response = backend_client.post("/artifacts/model_details", json=main_composite_id).raise_for_status()
     details = response.json()
     assert details["composite_id"]["artifact_store_id"] == fake_artifact_store_id
-    assert details["composite_id"]["ml_model_checkpoint_id"] == fake_artifact_checkpoint_id
-    assert details["display_name"] == "Test Model Checkpoint"
+    assert details["composite_id"]["ml_model_checkpoint_id"] == f"{fake_artifact_checkpoint_id}0"
+    assert details["display_name"] == "Test Model Checkpoint 0"
     assert details["is_available"] == True

@@ -8,6 +8,13 @@
 * lastly, docs/ contains documentation -- currently contains all of end-user docs, developer docs, faqs and troubleshootings
 * there is pre-commit configured. Ideally do `uv run prek` before every commit
 
+# GitHub and Pull Requests
+* when asked to fetch PR review comments, use the GitHub API directly instead of `gh pr view`:
+  ```bash
+  gh api repos/ecmwf/forecast-in-a-box/pulls/PR_NUMBER/comments | jq -r '.[] | "File: \(.path)\nLine: \(.line // .original_line)\nComment: \(.body)\n---"'
+  ```
+  This provides the actual inline review comments which `gh pr view` doesn't show properly.
+
 # Python-Related
 * utilize `just` for command running -- `just val` in backend is the "typechecking and testing". Always run this after you make any changes to python code
 * project is managed by `uv` -- utilize that for running any python-related subcommands like `uv run pytest` or `uv run ty` for typechecking

@@ -28,16 +28,14 @@ class FakeArtifactRegistry(SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
-            
+
             def make_artifact(i):
-                suffix = "" if i == 0 else str(i - 1)
-                checkpoint_id = f"{fake_artifact_checkpoint_id}{suffix}"
-                display_suffix = "" if i == 0 else f" {i - 1}"
+                checkpoint_id = f"{fake_artifact_checkpoint_id}{i}"
                 return {
                     "url": f"http://localhost:{fake_artifact_registry_port}/{checkpoint_id}",
-                    "display_name": f"Test Model Checkpoint{display_suffix}",
+                    "display_name": f"Test Model Checkpoint {i}",
                     "display_author": "Test Author",
-                    "display_description": f"A test model checkpoint{display_suffix} for integration tests",
+                    "display_description": f"A test model checkpoint {i} for integration tests",
                     "comment": "",
                     "disk_size_bytes": 2048,
                     "pip_package_constraints": ["torch>=2.0.0"],
@@ -45,13 +43,10 @@ class FakeArtifactRegistry(SimpleHTTPRequestHandler):
                     "output_characteristics": ["test_output"],
                     "input_characteristics": ["test_input"],
                 }
-            
+
             catalog = {
                 "display_name": "Test Artifact Store",
-                "artifacts": {
-                    f"{fake_artifact_checkpoint_id}{'' if i == 0 else str(i - 1)}": make_artifact(i)
-                    for i in range(4)
-                },
+                "artifacts": {f"{fake_artifact_checkpoint_id}{i}": make_artifact(i) for i in range(4)},
             }
             import json
 
@@ -107,12 +102,12 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         # we need to monkeypath this, because of eager import this was already initialised
         # to user's personal config file
         forecastbox.config.fiab_home = pathlib.Path(td.name)
-        
+
         # Create symlink to test.ckpt in temporary data directory for other tests
         original_test_ckpt = pathlib.Path(__file__).parent / "data" / "test.ckpt"
         temp_test_ckpt = pathlib.Path(td_data.name) / "test.ckpt"
         temp_test_ckpt.symlink_to(original_test_ckpt)
-        
+
         config = FIABConfig()
         config.api.uvicorn_port = 30645
         config.cascade.cascade_url = "tcp://localhost:30644"
