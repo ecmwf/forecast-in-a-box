@@ -7,8 +7,23 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-# NOTE we are utilizing pyrsistent immutable structures so that reads are safe
-# without locks. We only need to lock when swapping the top-level structure pointer.
+"""API for internal plugin management -- importing configured plugins, invoking
+pip install.
+
+Assumed to be invoked from the plugins router in API, and during application
+startup.
+
+The synchronization logic is handled by a PluginManager with a single lock.
+Pyrsistent immutable structures are used for shared state (plugins, versions,
+errors, updatedate), making reads safe without locks. The lock is only acquired
+when swapping the top-level structure pointers on writes.
+
+There is at most one thread at any time doing any pip/importlib operations,
+thus inside these updater threads we don't need any other critical sections.
+We pay attention not to block forever on acquiring when inquiring for status
+or when running the initial plugin load -- but inside the updater threads,
+we lock for longer.
+"""
 
 import datetime as dt
 import importlib
@@ -212,6 +227,7 @@ def submit_load_plugins():
 
 
 class PluginsStatus(BaseModel):
+    # TODO: Change these fields to use pyrsistent types (PMap) instead of dict once we solve pydantic serialization
     updater_status: Literal["ok", "running", "retrieving"] | str
     plugin_errors: dict[PluginCompositeId, str]
     plugin_versions: dict[PluginCompositeId, str]

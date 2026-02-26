@@ -35,6 +35,9 @@ from forecastbox.ecpyutil import timed_acquire
 
 logger = logging.getLogger(__name__)
 
+# TODO consider rewriting all those managers with thread to utilize a single pool or at least a single
+# thread dispatcher class, and only track Futures on each individual manager level
+
 timeout_acquire_request = 1  # aggressive timeout, we dont want to block async worker for long
 timeout_acquire_init = 5  # moderate timeout during init, just in case some python background business
 timeout_acquire_task = 10  # leisure timeout, this is a background thread and it can wait
@@ -67,7 +70,7 @@ def _refresh_catalog_task() -> None:
         with timed_acquire(ArtifactManager.lock, timeout_acquire_task) as result:
             if not result:
                 raise ValueError("failed to acquire the shared lock")
-            ArtifactManager.catalog = pmap(catalog)
+            ArtifactManager.catalog = catalog
             ArtifactManager.locally_available = pset(local_artifacts)
         logger.info(f"Artifact catalog refreshed: {len(catalog)} total, {len(local_artifacts)} local")
     except Exception as e:
@@ -90,13 +93,15 @@ def _download_artifact_task(composite_id: CompositeArtifactId) -> None:
     """Background task to download a single artifact."""
     try:
         logger.info(f"Starting download for artifact {composite_id}")
-        # Read catalog without lock - safe with pyrsistent
-        catalog = dict(ArtifactManager.catalog)
+        # Read checkpoint without lock - safe with pyrsistent
+        checkpoint = ArtifactManager.catalog.get(composite_id, None)
+        if checkpoint is None:
+            raise ValueError(f"Artifact not found in catalog: {composite_id}")
 
         def progress_callback(progress: int) -> None:
             report_artifact_download_progress(composite_id, progress=progress)
 
-        download_artifact(composite_id, catalog, Path(config.api.data_path), progress_callback=progress_callback)
+        download_artifact(composite_id, checkpoint, Path(config.api.data_path), progress_callback=progress_callback)
 
         with timed_acquire(ArtifactManager.lock, timeout_acquire_task) as result:
             if not result:

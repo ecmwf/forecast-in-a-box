@@ -102,7 +102,6 @@ def initialize_stores(plugin_stores_config: PluginStoresConfig) -> None:
         for store in stores.values():
             store.populate(client)
     with timed_acquire(StoresManager.stores_lock, 600) as result:
-        # NOTE we lock only for the swap, two concurrent updates make no sense
         if not result:
             raise ValueError("failed to acquire lock")
         StoresManager.stores = pmap(stores)
