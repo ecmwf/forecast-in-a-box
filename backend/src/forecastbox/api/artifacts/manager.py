@@ -46,7 +46,7 @@ timeout_acquire_error = 2  # something failed, report quickly so that can be joi
 
 class ArtifactManager:
     lock: threading.Lock = threading.Lock()
-    catalog: PMap[CompositeArtifactId, MlModelCheckpoint] = pmap()
+    catalog: ArtifactCatalog = pmap()
     locally_available: PSet[CompositeArtifactId] = pset()
     ongoing_downloads: PMap[CompositeArtifactId, int | str] = pmap()
     executor: ThreadPoolExecutor | None = None
@@ -96,7 +96,7 @@ def _download_artifact_task(composite_id: CompositeArtifactId) -> None:
         # Read checkpoint without lock - safe with pyrsistent
         checkpoint = ArtifactManager.catalog.get(composite_id, None)
         if checkpoint is None:
-            raise ValueError(f"Artifact not found in catalog: {composite_id}")
+            raise KeyError(f"Artifact not found in catalog: {composite_id}")
 
         def progress_callback(progress: int) -> None:
             report_artifact_download_progress(composite_id, progress=progress)
