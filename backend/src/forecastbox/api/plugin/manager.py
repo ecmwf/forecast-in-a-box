@@ -7,28 +7,8 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""API for internal plugin management -- importing configured plugins, invoking
-pip installed.
-
-Assumed to be invoked from the plugins router in API, and during application
-startup.
-
-The synchronization logic is handled by a PluginManager with a single lock,
-which is locked whenever we read/write the shared status, which consists of
- - what plugin versions are loaded,
- - which plugins failed to load and with what error,
- - whether there is a background thread running an update.
-In particular, there is at most one thread at any time doing any pip/importlib
-operations, thus inside these updater thread we dont need any other critical
-sections. We pay attention not to block forever on acquiring when inquiring
-for status or when running the initial plugin load -- but inside the updater
-threads, we lock for long.
-"""
-
-# NOTE this is not really healthy design, we lock too much just for the sake
-# of possible runtime updates which are dubious anyway.
-# Replace the Plugins dict lock with an atomic reference, and the dict itself
-# with a pyrsistent map or smth like that
+# NOTE we are utilizing pyrsistent immutable structures so that reads are safe
+# without locks. We only need to lock when swapping the top-level structure pointer.
 
 import datetime as dt
 import importlib
@@ -45,6 +25,8 @@ from cascade.low.func import assert_never
 from fiab_core.fable import BlockFactoryCatalogue
 from fiab_core.plugin import Plugin
 from pydantic import BaseModel
+from pyrsistent import pmap
+from pyrsistent.typing import PMap
 
 from forecastbox.api.types.fable import PluginCompositeId
 from forecastbox.config import PluginSettings, PluginsSettings, config, config_edit_lock
@@ -105,10 +87,10 @@ def _try_install(pip_source: str) -> None:
 
 class PluginManager:
     lock: threading.Lock = threading.Lock()
-    plugins: dict[PluginCompositeId, Plugin] = {}
-    versions: dict[PluginCompositeId, str] = {}
-    errors: dict[PluginCompositeId, str] = {}
-    updatedate: dict[PluginCompositeId, str] = {}
+    plugins: PMap[PluginCompositeId, Plugin] = pmap()
+    versions: PMap[PluginCompositeId, str] = pmap()
+    errors: PMap[PluginCompositeId, str] = pmap()
+    updatedate: PMap[PluginCompositeId, str] = pmap()
     updater: threading.Thread | None = None
     updater_error: str | None = None
 
@@ -163,10 +145,10 @@ def load_plugins(plugins: PluginsSettings) -> None:
         with timed_acquire(PluginManager.lock, 60) as result:
             if not result:
                 raise ValueError("failed to acquire the shared lock")
-            PluginManager.plugins = lookup
-            PluginManager.errors = errors
-            PluginManager.versions = versions
-            PluginManager.updatedate = updatedate
+            PluginManager.plugins = pmap(lookup)
+            PluginManager.errors = pmap(errors)
+            PluginManager.versions = pmap(versions)
+            PluginManager.updatedate = pmap(updatedate)
         logger.debug("global plugin loading finished")
     except Exception as e:
         logger.exception(f"updating thread failed with {repr(e)}")
@@ -188,13 +170,13 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
             if not acquire_result:
                 raise ValueError("failed to acquire the shared lock")
             if isinstance(result, Plugin):
-                PluginManager.plugins[pluginId] = result
+                PluginManager.plugins = PluginManager.plugins.set(pluginId, result)
             elif isinstance(result, str):
-                PluginManager.errors[pluginId] = result
+                PluginManager.errors = PluginManager.errors.set(pluginId, result)
             else:
                 assert_never(result)
-            PluginManager.versions[pluginId] = _try_version(pluginSettings)
-            PluginManager.updatedate[pluginId] = _try_updatedate(pluginSettings)
+            PluginManager.versions = PluginManager.versions.set(pluginId, _try_version(pluginSettings))
+            PluginManager.updatedate = PluginManager.updatedate.set(pluginId, _try_updatedate(pluginSettings))
         logger.debug(f"single plugin loading finished: {pluginId}")
     except Exception as e:
         logger.exception(f"updating thread failed with {repr(e)}")
@@ -204,13 +186,16 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
 
 
 def unload_single(pluginId: PluginCompositeId) -> None:
-    # TODO we could lock here but probably not worth it
-    if pluginId in PluginManager.plugins:
-        PluginManager.plugins.pop(pluginId)
-    if pluginId in PluginManager.errors:
-        PluginManager.errors.pop(pluginId)
-    if pluginId in PluginManager.versions:
-        PluginManager.versions.pop(pluginId)
+    with timed_acquire(PluginManager.lock, 5) as result:
+        if not result:
+            logger.warning("failed to acquire lock for unload_single")
+            return
+        if pluginId in PluginManager.plugins:
+            PluginManager.plugins = PluginManager.plugins.remove(pluginId)
+        if pluginId in PluginManager.errors:
+            PluginManager.errors = PluginManager.errors.remove(pluginId)
+        if pluginId in PluginManager.versions:
+            PluginManager.versions = PluginManager.versions.remove(pluginId)
 
 
 def submit_load_plugins():
@@ -256,9 +241,9 @@ def status_full() -> PluginsStatus:
             plugin_updatedate = {}
         else:
             status = status_brief()
-            plugin_errors = {plugin: error for plugin, error in PluginManager.errors.items()}
-            plugin_versions = {plugin: version for plugin, version in PluginManager.versions.items()}
-            plugin_updatedate = {plugin: updatedate for plugin, updatedate in PluginManager.updatedate.items()}
+            plugin_errors = dict(PluginManager.errors)
+            plugin_versions = dict(PluginManager.versions)
+            plugin_updatedate = dict(PluginManager.updatedate)
     return PluginsStatus(
         updater_status=status,
         plugin_errors=plugin_errors,
