@@ -9,7 +9,7 @@ MCP (Model Context Protocol) server for Forecast in a Box, enabling AI agents to
   "mcpServers": {
     "forecast-in-a-box": {
       "command": "sh",
-      "args": ["-c", "uvx", "fiab_mcp_server", "--url", "$FIAB_URL"]
+      "args": ["-c", "uvx", "fiab-mcp-server", "--url", "$FIAB_URL"]
     }
   }
 }

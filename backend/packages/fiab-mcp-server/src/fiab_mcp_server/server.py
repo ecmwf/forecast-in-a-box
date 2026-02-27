@@ -9,7 +9,6 @@
 
 """MCP Server for Forecast in a Box - enables AI agents to build forecast workflows."""
 
-import argparse
 import asyncio
 from typing import Any
 
@@ -296,17 +295,3 @@ Understanding the catalogue helps you build valid workflows.""",
         """Run the MCP server using stdio transport."""
         async with stdio_server() as (read_stream, write_stream):
             await self.server.run(read_stream, write_stream, self.server.create_initialization_options())
-
-
-def main() -> None:
-    """Main entrypoint for the MCP server."""
-    parser = argparse.ArgumentParser(description="Forecast in a Box MCP Server")
-    parser.add_argument("--url", required=True, help="Base URL of the FIAB backend (e.g., http://localhost:8000)")
-    args = parser.parse_args()
-
-    server = FiabMcpServer(args.url)
-    asyncio.run(server.run())
-
-
-if __name__ == "__main__":
-    main()

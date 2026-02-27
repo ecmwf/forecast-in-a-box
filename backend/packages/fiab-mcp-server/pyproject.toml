@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 requires = [ "setuptools>=80", "setuptools-scm[toml]>=6.2" ]
 
 [project]
-name = "fiab_mcp_server"
+name = "fiab-mcp-server"
 description = "MCP Server for Forecast in a Box - enables AI agents to build forecast workflows"
 readme = "README.md"
 license = "Apache-2.0"
@@ -28,7 +28,7 @@ dev = [
 ]
 
 [project.scripts]
-fiab_mcp_server = "fiab_mcp_server.server:main"
+fiab-mcp-server = "fiab_mcp_server.__main__:main"
 
 [tool.setuptools_scm]
 version_file = "src/fiab_mcp_server/_version.py"

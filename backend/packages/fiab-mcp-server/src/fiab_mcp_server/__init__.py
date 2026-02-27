@@ -9,6 +9,7 @@
 
 """MCP Server for Forecast in a Box."""
 
-from fiab_mcp_server.server import main
+from fiab_mcp_server.__main__ import main
+from fiab_mcp_server.server import FiabMcpServer
 
-__all__ = ["main"]
+__all__ = ["main", "FiabMcpServer"]
