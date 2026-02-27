@@ -51,17 +51,26 @@ class FiabMcpServer:
 
         @self.server.read_resource()
         async def read_resource(uri: AnyUrl) -> str:
-            uri_str = str(uri)
-            if uri_str == "fable://catalogue":
-                route = "api/v1/fable/catalogue"
-                logger.debug(f"GET {route}, params=None, body=None")
-                response = await self.client.get(route)
-                response.raise_for_status()
-                return response.text
-            elif uri_str == "fable://builders":
-                return '{"message": "Listing builders not yet implemented - use fable_load with specific IDs"}'
-            else:
-                raise ValueError(f"Unknown resource URI: {uri}")
+            try:
+                uri_str = str(uri)
+                if uri_str == "fable://catalogue":
+                    route = "api/v1/fable/catalogue"
+                    logger.debug(f"GET {route}, params=None, body=None")
+                    response = await self.client.get(route)
+                    response.raise_for_status()
+                    return response.text
+                elif uri_str == "fable://builders":
+                    return '{"message": "Listing builders not yet implemented - use fable_load with specific IDs"}'
+                else:
+                    raise ValueError(f"Unknown resource URI: {uri}")
+            except httpx.HTTPStatusError as e:
+                error_msg = f"HTTP {e.response.status_code} error: {e.response.text}"
+                logger.error(f"Resource {uri} failed: {error_msg}")
+                return f'{{"error": "{error_msg}"}}'
+            except Exception as e:
+                error_msg = f"{type(e).__name__}: {str(e)}"
+                logger.error(f"Resource {uri} failed: {error_msg}")
+                return f'{{"error": "{error_msg}"}}'
 
         @self.server.list_tools()
         async def list_tools() -> list[Tool]:
@@ -178,70 +187,80 @@ class FiabMcpServer:
 
         @self.server.call_tool()
         async def call_tool(name: str, arguments: Any) -> list[TextContent]:
-            if name == "fable_start_building":
-                result = {"blocks": {}}
-                return [TextContent(type="text", text=str(result))]
+            try:
+                if name == "fable_start_building":
+                    result = {"blocks": {}}
+                    return [TextContent(type="text", text=str(result))]
 
-            elif name == "fable_add_block":
-                builder = arguments["builder"]
-                block_id = arguments["block_id"]
-                plugin = arguments["plugin"]
-                factory = arguments["factory"]
-                configuration = arguments.get("configuration", {})
-                inputs = arguments.get("inputs", {})
+                elif name == "fable_add_block":
+                    builder = arguments["builder"]
+                    block_id = arguments["block_id"]
+                    plugin = arguments["plugin"]
+                    factory = arguments["factory"]
+                    configuration = arguments.get("configuration", {})
+                    inputs = arguments.get("inputs", {})
 
-                new_block = {
-                    "factory_id": {"plugin": plugin, "factory": factory},
-                    "configuration_values": configuration,
-                    "input_ids": inputs,
-                }
+                    new_block = {
+                        "factory_id": {"plugin": plugin, "factory": factory},
+                        "configuration_values": configuration,
+                        "input_ids": inputs,
+                    }
 
-                builder["blocks"][block_id] = new_block
+                    builder["blocks"][block_id] = new_block
 
-                route = "api/v1/fable/expand"
-                logger.debug(f"PUT {route}, params=None, body={builder}")
-                response = await self.client.request(url=route, method="put", json=builder)
-                response.raise_for_status()
-                result = response.json()
+                    route = "api/v1/fable/expand"
+                    logger.debug(f"PUT {route}, params=None, body={builder}")
+                    response = await self.client.request(url=route, method="put", json=builder)
+                    response.raise_for_status()
+                    result = response.json()
 
-                return [TextContent(type="text", text=f"Block added. Validation: {result}")]
+                    return [TextContent(type="text", text=f"Block added. Validation: {result}")]
 
-            elif name == "fable_validate_expand":
-                builder = arguments["builder"]
-                route = "api/v1/fable/expand"
-                logger.debug(f"PUT {route}, params=None, body={builder}")
-                response = await self.client.request(url=route, method="put", json=builder)
-                response.raise_for_status()
-                return [TextContent(type="text", text=response.text)]
+                elif name == "fable_validate_expand":
+                    builder = arguments["builder"]
+                    route = "api/v1/fable/expand"
+                    logger.debug(f"PUT {route}, params=None, body={builder}")
+                    response = await self.client.request(url=route, method="put", json=builder)
+                    response.raise_for_status()
+                    return [TextContent(type="text", text=response.text)]
 
-            elif name == "fable_save":
-                builder = arguments["builder"]
-                fable_id = arguments.get("fable_id")
-                tags = arguments.get("tags", [])
+                elif name == "fable_save":
+                    builder = arguments["builder"]
+                    fable_id = arguments.get("fable_id")
+                    tags = arguments.get("tags", [])
 
-                params: dict[str, Any] = {"tags": tags}
-                if fable_id:
-                    params["fable_builder_id"] = fable_id
+                    params: dict[str, Any] = {"tags": tags}
+                    if fable_id:
+                        params["fable_builder_id"] = fable_id
 
-                route = "api/v1/fable/upsert"
-                logger.debug(f"POST {route}, params={params}, body={builder}")
-                response = await self.client.post(route, json=builder, params=params)
-                response.raise_for_status()
-                saved_id = response.json()
+                    route = "api/v1/fable/upsert"
+                    logger.debug(f"POST {route}, params={params}, body={builder}")
+                    response = await self.client.post(route, json=builder, params=params)
+                    response.raise_for_status()
+                    saved_id = response.json()
 
-                return [TextContent(type="text", text=f"Fable saved with ID: {saved_id}")]
+                    return [TextContent(type="text", text=f"Fable saved with ID: {saved_id}")]
 
-            elif name == "fable_load":
-                fable_id = arguments["fable_id"]
-                route = "api/v1/fable/retrieve"
-                params = {"fable_builder_id": fable_id}
-                logger.debug(f"GET {route}, params={params}, body=None")
-                response = await self.client.get(route, params=params)
-                response.raise_for_status()
-                return [TextContent(type="text", text=response.text)]
+                elif name == "fable_load":
+                    fable_id = arguments["fable_id"]
+                    route = "api/v1/fable/retrieve"
+                    params = {"fable_builder_id": fable_id}
+                    logger.debug(f"GET {route}, params={params}, body=None")
+                    response = await self.client.get(route, params=params)
+                    response.raise_for_status()
+                    return [TextContent(type="text", text=response.text)]
 
-            else:
-                raise ValueError(f"Unknown tool: {name}")
+                else:
+                    raise ValueError(f"Unknown tool: {name}")
+
+            except httpx.HTTPStatusError as e:
+                error_msg = f"HTTP {e.response.status_code} error: {e.response.text}"
+                logger.error(f"Tool {name} failed: {error_msg}")
+                return [TextContent(type="text", text=f"Error: {error_msg}")]
+            except Exception as e:
+                error_msg = f"{type(e).__name__}: {str(e)}"
+                logger.error(f"Tool {name} failed: {error_msg}")
+                return [TextContent(type="text", text=f"Error: {error_msg}")]
 
         @self.server.list_prompts()
         async def list_prompts() -> list[Any]:
