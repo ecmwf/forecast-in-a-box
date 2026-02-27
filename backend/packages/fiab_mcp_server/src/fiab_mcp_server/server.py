@@ -1,0 +1,312 @@
+# (C) Copyright 2024- ECMWF.
+#
+# This software is licensed under the terms of the Apache Licence Version 2.0
+# which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# In applying this licence, ECMWF does not waive the privileges and immunities
+# granted to it by virtue of its status as an intergovernmental organisation
+# nor does it submit to any jurisdiction.
+
+"""MCP Server for Forecast in a Box - enables AI agents to build forecast workflows."""
+
+import argparse
+import asyncio
+from typing import Any
+
+import httpx
+from mcp.server import Server
+from mcp.server.stdio import stdio_server
+from mcp.types import Resource, TextContent, Tool
+from pydantic import AnyUrl
+
+
+class FiabMcpServer:
+    """MCP Server that interfaces with Forecast in a Box backend."""
+
+    def __init__(self, base_url: str):
+        self.base_url = base_url.rstrip("/")
+        self.client = httpx.AsyncClient(base_url=self.base_url, follow_redirects=True, timeout=30.0)
+        self.server = Server("fiab_mcp_server")
+        self._setup_handlers()
+
+    def _setup_handlers(self) -> None:
+        @self.server.list_resources()
+        async def list_resources() -> list[Resource]:
+            return [
+                Resource(
+                    uri=AnyUrl("fable://catalogue"),
+                    name="Fable Catalogue",
+                    mimeType="application/json",
+                    description="Discover available block factories for building workflows",
+                ),
+                Resource(
+                    uri=AnyUrl("fable://builders"),
+                    name="Saved Builders",
+                    mimeType="application/json",
+                    description="List of saved workflow builders",
+                ),
+            ]
+
+        @self.server.read_resource()
+        async def read_resource(uri: AnyUrl) -> str:
+            uri_str = str(uri)
+            if uri_str == "fable://catalogue":
+                response = await self.client.get("api/v1/fable/catalogue")
+                response.raise_for_status()
+                return response.text
+            elif uri_str == "fable://builders":
+                return '{"message": "Listing builders not yet implemented - use fable_load with specific IDs"}'
+            else:
+                raise ValueError(f"Unknown resource URI: {uri}")
+
+        @self.server.list_tools()
+        async def list_tools() -> list[Tool]:
+            return [
+                Tool(
+                    name="fable_start_building",
+                    description="Initialize a new fable workflow builder. Returns an empty builder ready for adding blocks.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {},
+                    },
+                ),
+                Tool(
+                    name="fable_add_block",
+                    description="Add a block to the builder. Provide the current builder state, the block to add with its ID, factory specification, configuration, and inputs. Returns validation results and expansion options.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "builder": {
+                                "type": "object",
+                                "description": "Current FableBuilderV1 state",
+                                "properties": {
+                                    "blocks": {
+                                        "type": "object",
+                                        "description": "Dictionary of block_id to BlockInstance",
+                                    }
+                                },
+                                "required": ["blocks"],
+                            },
+                            "block_id": {
+                                "type": "string",
+                                "description": "Unique identifier for this block instance (e.g., 'source1', 'product1')",
+                            },
+                            "plugin": {
+                                "type": "object",
+                                "description": "Plugin composite ID with store and local fields",
+                                "properties": {"store": {"type": "string"}, "local": {"type": "string"}},
+                                "required": ["store", "local"],
+                            },
+                            "factory": {
+                                "type": "string",
+                                "description": "Factory name (e.g., 'exampleSource', 'meanProduct')",
+                            },
+                            "configuration": {
+                                "type": "object",
+                                "description": "Configuration values for the block",
+                                "additionalProperties": True,
+                            },
+                            "inputs": {
+                                "type": "object",
+                                "description": "Input connections mapping input names to block IDs",
+                                "additionalProperties": {"type": "string"},
+                            },
+                        },
+                        "required": ["builder", "block_id", "plugin", "factory"],
+                    },
+                ),
+                Tool(
+                    name="fable_validate_expand",
+                    description="Validate a fable builder and get expansion options without adding a new block. Returns validation errors and possible next blocks.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "builder": {
+                                "type": "object",
+                                "description": "FableBuilderV1 to validate",
+                                "properties": {"blocks": {"type": "object"}},
+                                "required": ["blocks"],
+                            }
+                        },
+                        "required": ["builder"],
+                    },
+                ),
+                Tool(
+                    name="fable_save",
+                    description="Save the builder for later use. Optionally provide a fable_id to update an existing builder, or leave blank to create new. Returns the fable ID.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "builder": {
+                                "type": "object",
+                                "description": "FableBuilderV1 to save",
+                                "properties": {"blocks": {"type": "object"}},
+                                "required": ["blocks"],
+                            },
+                            "fable_id": {
+                                "type": "string",
+                                "description": "Optional: existing fable ID to update",
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Optional: tags for categorizing the fable",
+                            },
+                        },
+                        "required": ["builder"],
+                    },
+                ),
+                Tool(
+                    name="fable_load",
+                    description="Load a previously saved workflow builder by its ID. Returns the FableBuilderV1.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "fable_id": {
+                                "type": "string",
+                                "description": "The ID of the fable to load",
+                            }
+                        },
+                        "required": ["fable_id"],
+                    },
+                ),
+            ]
+
+        @self.server.call_tool()
+        async def call_tool(name: str, arguments: Any) -> list[TextContent]:
+            if name == "fable_start_building":
+                result = {"blocks": {}}
+                return [TextContent(type="text", text=str(result))]
+
+            elif name == "fable_add_block":
+                builder = arguments["builder"]
+                block_id = arguments["block_id"]
+                plugin = arguments["plugin"]
+                factory = arguments["factory"]
+                configuration = arguments.get("configuration", {})
+                inputs = arguments.get("inputs", {})
+
+                new_block = {
+                    "factory_id": {"plugin": plugin, "factory": factory},
+                    "configuration_values": configuration,
+                    "input_ids": inputs,
+                }
+
+                builder["blocks"][block_id] = new_block
+
+                response = await self.client.request(url="api/v1/fable/expand", method="put", json=builder)
+                response.raise_for_status()
+                result = response.json()
+
+                return [TextContent(type="text", text=f"Block added. Validation: {result}")]
+
+            elif name == "fable_validate_expand":
+                builder = arguments["builder"]
+                response = await self.client.request(url="api/v1/fable/expand", method="put", json=builder)
+                response.raise_for_status()
+                return [TextContent(type="text", text=response.text)]
+
+            elif name == "fable_save":
+                builder = arguments["builder"]
+                fable_id = arguments.get("fable_id")
+                tags = arguments.get("tags", [])
+
+                params: dict[str, Any] = {"tags": tags}
+                if fable_id:
+                    params["fable_builder_id"] = fable_id
+
+                response = await self.client.post("api/v1/fable/upsert", json=builder, params=params)
+                response.raise_for_status()
+                saved_id = response.json()
+
+                return [TextContent(type="text", text=f"Fable saved with ID: {saved_id}")]
+
+            elif name == "fable_load":
+                fable_id = arguments["fable_id"]
+                response = await self.client.get("api/v1/fable/retrieve", params={"fable_builder_id": fable_id})
+                response.raise_for_status()
+                return [TextContent(type="text", text=response.text)]
+
+            else:
+                raise ValueError(f"Unknown tool: {name}")
+
+        @self.server.list_prompts()
+        async def list_prompts() -> list[Any]:
+            return [
+                {
+                    "name": "create_simple_workflow",
+                    "description": "Guide to creating a simple data processing workflow using the example source and mean product",
+                    "arguments": [],
+                },
+                {
+                    "name": "explore_catalogue",
+                    "description": "Guide to exploring available blocks and understanding the fable catalogue structure",
+                    "arguments": [],
+                },
+            ]
+
+        @self.server.get_prompt()
+        async def get_prompt(name: str, arguments: dict[str, str] | None) -> Any:
+            if name == "create_simple_workflow":
+                return {
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": {
+                                "type": "text",
+                                "text": """Let's create a simple workflow that processes weather data:
+
+1. First, check the catalogue resource (fable://catalogue) to see available blocks
+2. Start a new builder with fable_start_building
+3. Add an 'exampleSource' as the data source (usually from fiab_plugin_toy)
+4. Add a 'meanProduct' to calculate the mean of the 2t variable
+5. Validate the workflow with fable_validate_expand
+6. Save it with fable_save and appropriate tags
+
+Each step should validate that the workflow is being built correctly.""",
+                            },
+                        }
+                    ]
+                }
+            elif name == "explore_catalogue":
+                return {
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": {
+                                "type": "text",
+                                "text": """Let's explore what blocks are available:
+
+1. Read the fable://catalogue resource to see all available plugins
+2. Look for different types of blocks:
+   - 'source' blocks: provide initial data
+   - 'product' blocks: transform or process data
+   - 'sink' blocks: output or store results
+3. Note the configuration options and inputs required for each block type
+
+Understanding the catalogue helps you build valid workflows.""",
+                            },
+                        }
+                    ]
+                }
+            else:
+                raise ValueError(f"Unknown prompt: {name}")
+
+    async def run(self) -> None:
+        """Run the MCP server using stdio transport."""
+        async with stdio_server() as (read_stream, write_stream):
+            await self.server.run(read_stream, write_stream, self.server.create_initialization_options())
+
+
+def main() -> None:
+    """Main entrypoint for the MCP server."""
+    parser = argparse.ArgumentParser(description="Forecast in a Box MCP Server")
+    parser.add_argument("--url", required=True, help="Base URL of the FIAB backend (e.g., http://localhost:8000)")
+    args = parser.parse_args()
+
+    server = FiabMcpServer(args.url)
+    asyncio.run(server.run())
+
+
+if __name__ == "__main__":
+    main()
