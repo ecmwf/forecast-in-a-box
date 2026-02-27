@@ -171,7 +171,7 @@ class ProductSettings(BaseModel):
     default_input_source: str = "opendata"
     """Default input source for models, if not specified otherwise"""
 
-    plugins: PluginsSettings = Field(default_factory=dict)
+    plugins: PluginsSettings = Field(default_factory=_default_plugins)
     plugin_stores: PluginStoresConfig = Field(default_factory=_default_plugin_stores)
 
     def validate_runtime(self) -> list[str]:

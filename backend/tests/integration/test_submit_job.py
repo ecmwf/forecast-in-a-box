@@ -16,21 +16,7 @@ from forecastbox.api.types import (
     RawCascadeJob,
 )
 
-
-def _ensure_completed(backend_client, job_id):
-    i = 20
-    while i > 0:
-        response = backend_client.get("/job/status")
-        assert response.is_success
-        status = response.json()["progresses"][job_id]["status"]
-        # TODO parse response with corresponding class, define a method `not_failed` instead
-        assert status in {"submitted", "running", "completed"}
-        if status == "completed":
-            break
-        time.sleep(0.5)
-        i -= 1
-
-    assert i > 0, f"Failed to finish job {job_id}"
+from .utils import ensure_completed
 
 
 def test_submit_job(backend_client_with_auth):
@@ -56,7 +42,7 @@ def test_submit_job(backend_client_with_auth):
     response = backend_client_with_auth.post("/execution/execute", headers=headers, json=spec.model_dump())
     assert response.is_success
     raw_job_id = response.json()["id"]
-    _ensure_completed(backend_client_with_auth, raw_job_id)
+    ensure_completed(backend_client_with_auth, raw_job_id)
 
     outputs = backend_client_with_auth.get(f"/job/{raw_job_id}/outputs").raise_for_status().json()
     assert len(outputs) == 1
@@ -91,7 +77,7 @@ def test_submit_job(backend_client_with_auth):
     response = backend_client_with_auth.post("/execution/execute", headers=headers, json=spec.model_dump())
     assert response.is_success
     requests_job_id = response.json()["id"]
-    _ensure_completed(backend_client_with_auth, requests_job_id)
+    ensure_completed(backend_client_with_auth, requests_job_id)
 
     # no ckpt spec
     spec = ExecutionSpecification(
