@@ -77,7 +77,7 @@ class FiabMcpServer:
             return [
                 Tool(
                     name="fable_start_building",
-                    description="Initialize a new fable workflow builder. Returns an empty builder ready for adding blocks.",
+                    description="Initialize a new fable workflow builder. Returns an empty FableBuilderV1 ready for adding blocks.",
                     inputSchema={
                         "type": "object",
                         "properties": {},
@@ -85,17 +85,17 @@ class FiabMcpServer:
                 ),
                 Tool(
                     name="fable_add_block",
-                    description="Add a block to the builder. Provide the current builder state, the block to add with its ID, factory specification, configuration, and inputs. Returns validation results and expansion options.",
+                    description="Add a block to the builder and get validation/expansion results. The builder should be a FableBuilderV1 with a 'blocks' dict mapping block IDs to BlockInstance objects. Returns the updated builder and validation results including possible next blocks.",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "builder": {
                                 "type": "object",
-                                "description": "Current FableBuilderV1 state",
+                                "description": "Current FableBuilderV1 state with 'blocks' dict",
                                 "properties": {
                                     "blocks": {
                                         "type": "object",
-                                        "description": "Dictionary of block_id to BlockInstance",
+                                        "description": "Dictionary mapping block_id to BlockInstance objects",
                                     }
                                 },
                                 "required": ["blocks"],
@@ -104,44 +104,42 @@ class FiabMcpServer:
                                 "type": "string",
                                 "description": "Unique identifier for this block instance (e.g., 'source1', 'product1')",
                             },
-                            "plugin": {
+                            "block": {
                                 "type": "object",
-                                "description": "Plugin composite ID with store and local fields",
-                                "properties": {"store": {"type": "string"}, "local": {"type": "string"}},
-                                "required": ["store", "local"],
-                            },
-                            "factory": {
-                                "type": "string",
-                                "description": "Factory name (e.g., 'exampleSource', 'meanProduct')",
-                            },
-                            "configuration": {
-                                "type": "object",
-                                "description": "Configuration values for the block",
-                                "additionalProperties": True,
-                            },
-                            "inputs": {
-                                "type": "object",
-                                "description": "Input connections mapping input names to block IDs",
-                                "additionalProperties": {"type": "string"},
+                                "description": "BlockInstance with factory_id, configuration_values, and input_ids",
+                                "properties": {
+                                    "factory_id": {
+                                        "type": "object",
+                                        "description": "PluginBlockFactoryId with plugin and factory fields",
+                                        "properties": {
+                                            "plugin": {
+                                                "type": "object",
+                                                "description": "PluginCompositeId with store and local fields",
+                                                "properties": {
+                                                    "store": {"type": "string", "description": "e.g., 'ecmwf'"},
+                                                    "local": {"type": "string", "description": "e.g., 'toy2'"},
+                                                },
+                                                "required": ["store", "local"],
+                                            },
+                                            "factory": {"type": "string", "description": "Factory name, e.g., 'exampleSource'"},
+                                        },
+                                        "required": ["plugin", "factory"],
+                                    },
+                                    "configuration_values": {
+                                        "type": "object",
+                                        "description": "Configuration values for the block",
+                                        "additionalProperties": True,
+                                    },
+                                    "input_ids": {
+                                        "type": "object",
+                                        "description": "Input connections mapping input names to block IDs",
+                                        "additionalProperties": {"type": "string"},
+                                    },
+                                },
+                                "required": ["factory_id", "configuration_values", "input_ids"],
                             },
                         },
-                        "required": ["builder", "block_id", "plugin", "factory"],
-                    },
-                ),
-                Tool(
-                    name="fable_validate_expand",
-                    description="Validate a fable builder and get expansion options without adding a new block. Returns validation errors and possible next blocks.",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "builder": {
-                                "type": "object",
-                                "description": "FableBuilderV1 to validate",
-                                "properties": {"blocks": {"type": "object"}},
-                                "required": ["blocks"],
-                            }
-                        },
-                        "required": ["builder"],
+                        "required": ["builder", "block_id", "block"],
                     },
                 ),
                 Tool(
@@ -152,8 +150,13 @@ class FiabMcpServer:
                         "properties": {
                             "builder": {
                                 "type": "object",
-                                "description": "FableBuilderV1 to save",
-                                "properties": {"blocks": {"type": "object"}},
+                                "description": "FableBuilderV1 to save with 'blocks' dict",
+                                "properties": {
+                                    "blocks": {
+                                        "type": "object",
+                                        "description": "Dictionary mapping block_id to BlockInstance objects",
+                                    }
+                                },
                                 "required": ["blocks"],
                             },
                             "fable_id": {
@@ -195,18 +198,9 @@ class FiabMcpServer:
                 elif name == "fable_add_block":
                     builder = arguments["builder"]
                     block_id = arguments["block_id"]
-                    plugin = arguments["plugin"]
-                    factory = arguments["factory"]
-                    configuration = arguments.get("configuration", {})
-                    inputs = arguments.get("inputs", {})
+                    block = arguments["block"]
 
-                    new_block = {
-                        "factory_id": {"plugin": plugin, "factory": factory},
-                        "configuration_values": configuration,
-                        "input_ids": inputs,
-                    }
-
-                    builder["blocks"][block_id] = new_block
+                    builder["blocks"][block_id] = block
 
                     route = "api/v1/fable/expand"
                     logger.debug(f"PUT {route}, params=None, body={builder}")
@@ -215,14 +209,6 @@ class FiabMcpServer:
                     result = response.json()
 
                     return [TextContent(type="text", text=f"Block added. Validation: {result}")]
-
-                elif name == "fable_validate_expand":
-                    builder = arguments["builder"]
-                    route = "api/v1/fable/expand"
-                    logger.debug(f"PUT {route}, params=None, body={builder}")
-                    response = await self.client.request(url=route, method="put", json=builder)
-                    response.raise_for_status()
-                    return [TextContent(type="text", text=response.text)]
 
                 elif name == "fable_save":
                     builder = arguments["builder"]
@@ -291,11 +277,13 @@ class FiabMcpServer:
 1. First, check the catalogue resource (fable://catalogue) to see available blocks
 2. Start a new builder with fable_start_building
 3. Add an 'exampleSource' as the data source (usually from fiab_plugin_toy)
+   - Use fable_add_block with proper BlockInstance structure (factory_id, configuration_values, input_ids)
 4. Add a 'meanProduct' to calculate the mean of the 2t variable
-5. Validate the workflow with fable_validate_expand
+   - Connect it to the source using input_ids
+5. Each add_block call returns validation results showing if the workflow is valid and what blocks can be added next
 6. Save it with fable_save and appropriate tags
 
-Each step should validate that the workflow is being built correctly.""",
+Remember: Use the exact server schema - factory_id (with plugin and factory), configuration_values, and input_ids.""",
                             },
                         }
                     ]
