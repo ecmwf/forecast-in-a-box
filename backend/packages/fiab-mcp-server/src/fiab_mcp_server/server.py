@@ -10,6 +10,7 @@
 """MCP Server for Forecast in a Box - enables AI agents to build forecast workflows."""
 
 import asyncio
+import logging
 from typing import Any
 
 import httpx
@@ -17,6 +18,8 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Resource, TextContent, Tool
 from pydantic import AnyUrl
+
+logger = logging.getLogger(__name__)
 
 
 class FiabMcpServer:
@@ -50,7 +53,9 @@ class FiabMcpServer:
         async def read_resource(uri: AnyUrl) -> str:
             uri_str = str(uri)
             if uri_str == "fable://catalogue":
-                response = await self.client.get("api/v1/fable/catalogue")
+                route = "api/v1/fable/catalogue"
+                logger.debug(f"GET {route}, params=None, body=None")
+                response = await self.client.get(route)
                 response.raise_for_status()
                 return response.text
             elif uri_str == "fable://builders":
@@ -193,7 +198,9 @@ class FiabMcpServer:
 
                 builder["blocks"][block_id] = new_block
 
-                response = await self.client.request(url="api/v1/fable/expand", method="put", json=builder)
+                route = "api/v1/fable/expand"
+                logger.debug(f"PUT {route}, params=None, body={builder}")
+                response = await self.client.request(url=route, method="put", json=builder)
                 response.raise_for_status()
                 result = response.json()
 
@@ -201,7 +208,9 @@ class FiabMcpServer:
 
             elif name == "fable_validate_expand":
                 builder = arguments["builder"]
-                response = await self.client.request(url="api/v1/fable/expand", method="put", json=builder)
+                route = "api/v1/fable/expand"
+                logger.debug(f"PUT {route}, params=None, body={builder}")
+                response = await self.client.request(url=route, method="put", json=builder)
                 response.raise_for_status()
                 return [TextContent(type="text", text=response.text)]
 
@@ -214,7 +223,9 @@ class FiabMcpServer:
                 if fable_id:
                     params["fable_builder_id"] = fable_id
 
-                response = await self.client.post("api/v1/fable/upsert", json=builder, params=params)
+                route = "api/v1/fable/upsert"
+                logger.debug(f"POST {route}, params={params}, body={builder}")
+                response = await self.client.post(route, json=builder, params=params)
                 response.raise_for_status()
                 saved_id = response.json()
 
@@ -222,7 +233,10 @@ class FiabMcpServer:
 
             elif name == "fable_load":
                 fable_id = arguments["fable_id"]
-                response = await self.client.get("api/v1/fable/retrieve", params={"fable_builder_id": fable_id})
+                route = "api/v1/fable/retrieve"
+                params = {"fable_builder_id": fable_id}
+                logger.debug(f"GET {route}, params={params}, body=None")
+                response = await self.client.get(route, params=params)
                 response.raise_for_status()
                 return [TextContent(type="text", text=response.text)]
 
