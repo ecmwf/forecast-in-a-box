@@ -215,13 +215,13 @@ class FiabMcpServer:
                     fable_id = arguments.get("fable_id")
                     tags = arguments.get("tags", [])
 
-                    params: dict[str, Any] = {"tags": tags}
+                    body: dict[str, Any] = {"builder": builder, "tags": tags}
                     if fable_id:
-                        params["fable_builder_id"] = fable_id
+                        body["fable_builder_id"] = fable_id
 
                     route = "api/v1/fable/upsert"
-                    logger.debug(f"POST {route}, params={params}, body={builder}")
-                    response = await self.client.post(route, json=builder, params=params)
+                    logger.debug(f"POST {route}, params=None, body={body}")
+                    response = await self.client.post(route, json=body)
                     response.raise_for_status()
                     saved_id = response.json()
 
