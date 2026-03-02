@@ -10,6 +10,9 @@ on:
       - 'frontend/**'
     tags-ignore:
       - '**'
+    paths:
+      - frontend_v2/**
+      - backend/**
 
   # Trigger the workflow on pull request
   pull_request:
