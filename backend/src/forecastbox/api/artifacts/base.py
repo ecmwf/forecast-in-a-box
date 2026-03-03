@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from fiab_core.artifacts import CompositeArtifactId, MlModelCheckpoint, MlModelCheckpointId, Platform
+from pyrsistent.typing import PMap
 
 
 @dataclass(frozen=True, eq=True, slots=True)
@@ -46,7 +47,7 @@ class MlModelDetail:
     is_available: bool
 
 
-ArtifactCatalog = dict[CompositeArtifactId, MlModelCheckpoint]
+ArtifactCatalog = PMap[CompositeArtifactId, MlModelCheckpoint]
 
 artifacts_subdir = "artifacts"
 
