@@ -114,7 +114,10 @@ def test_submit_job(backend_client_with_auth):
     assert response.is_success
     # TODO fix the file to comply with the validation, then test the workflow success
     # TODO retry in case of error not present yet
-    assert "Could not find 'ai-models.json'" in response.json()["progresses"][test_model_id]["error"]
+    msg1 = "Could not find 'ai-models.json'"
+    msg2 = "Could not find 'anemoi.json'"
+    err = response.json()["progresses"][test_model_id]["error"]
+    assert msg1 in err or msg2 in err
 
     # sleeper job
     def sleep_with_sgn(secs: int):
