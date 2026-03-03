@@ -15,6 +15,7 @@ from typing import Any, Literal
 
 import orjson
 from cascade.low.core import JobInstance
+from fiab_core.artifacts import CompositeArtifactId
 from pydantic import Field, PositiveInt, field_validator, model_validator
 
 from forecastbox.api.types.base import FIABBaseModel
@@ -106,6 +107,7 @@ class EnvironmentSpecification(FIABBaseModel):
     hosts: PositiveInt | None = Field(default=None)
     workers_per_host: PositiveInt | None = Field(default=None)
     environment_variables: dict[str, str] = Field(default_factory=dict)
+    runtime_artifacts: list[CompositeArtifactId] = Field(default_factory=list)
 
 
 class ForecastProducts(FIABBaseModel):
