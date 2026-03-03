@@ -400,7 +400,7 @@ async def get_logs(job_id: JobId = Depends(validate_job_id), user: UserRead = De
                     f = ""
                     try:
                         for f in os.listdir(p):
-                            jPref = f"job.{job_id}"
+                            jPref = f"job_{job_id}"
                             if f.startswith("gateway") or f.startswith(jPref):
                                 zf.write(f"{p / f}", arcname=f)
                     except Exception as e:
