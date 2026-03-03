@@ -21,17 +21,18 @@ from pathlib import Path
 
 import httpx
 from cascade.low.func import assert_never
-from fiab_core.artifacts import MlModelCheckpoint
+from fiab_core.artifacts import ArtifactStoreId, MlModelCheckpoint
+from pyrsistent import pmap
 
 from forecastbox.api.artifacts.base import ArtifactCatalog, CompositeArtifactId, artifacts_subdir, get_artifact_local_path
-from forecastbox.config import ArtifactStoreId, ArtifactStoresConfig
+from forecastbox.config import ArtifactStoresConfig
 
 logger = logging.getLogger(__name__)
 
 
 def get_artifacts_catalog(artifact_stores_config: ArtifactStoresConfig) -> ArtifactCatalog:
     """Query each artifact store and return a composed catalog of all available artifacts."""
-    catalog: ArtifactCatalog = {}
+    catalog = {}
 
     for store_id, store_config in artifact_stores_config.items():
         if store_config.method == "file":
@@ -47,7 +48,7 @@ def get_artifacts_catalog(artifact_stores_config: ArtifactStoresConfig) -> Artif
         else:
             assert_never(store_config.method)
 
-    return catalog
+    return pmap(catalog)
 
 
 def list_local_storage(artifacts_catalog: ArtifactCatalog, data_dir: Path) -> list[CompositeArtifactId]:
@@ -89,15 +90,11 @@ def list_local_storage(artifacts_catalog: ArtifactCatalog, data_dir: Path) -> li
 
 def download_artifact(
     composite_id: CompositeArtifactId,
-    artifacts_catalog: ArtifactCatalog,
+    checkpoint: MlModelCheckpoint,
     data_dir: Path,
     progress_callback: Callable[[int], None] | None = None,
 ) -> None:
-    """Download an artifact from its remote URL to local storage, raising KeyError if not found in catalog or httpx.HTTPError if download fails."""
-    if composite_id not in artifacts_catalog:
-        raise KeyError(f"Artifact not found in catalog: {composite_id}")
-
-    checkpoint = artifacts_catalog[composite_id]
+    """Download an artifact from its remote URL to local storage, raising httpx.HTTPError if download fails."""
     artifact_path = get_artifact_local_path(composite_id, data_dir)
     artifact_path.parent.mkdir(parents=True, exist_ok=True)
 

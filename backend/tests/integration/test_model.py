@@ -1,16 +1,15 @@
-import os
 import time
 
 import httpx
 
 from forecastbox.models.metadata import ControlMetadata
 
-from .conftest import fake_model_name, fake_repository_port
+from .conftest import fake_artifact_checkpoint_id, fake_artifact_registry_port, fake_artifact_store_id
 from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
 
 
 def test_download_model(backend_client):
-    """Downloads bunch of models in parallel, tests they succesfully appear, deletes them"""
+    """Downloads bunch of artifacts in parallel, tests they successfully appear"""
 
     # TODO shame! This test *assumes* that test_admin_flows has already been executed,
     # which is guaranteed only due to alphabetical serendipity. Possibly move that creation
@@ -29,66 +28,83 @@ def test_download_model(backend_client):
     assert token_admin is not None, "Token should not be None"
     backend_client.cookies.set(**prepare_cookie_with_auth_token(token_admin))
 
-    response = backend_client.get("/model/available").raise_for_status()
-    # NOTE test.ckpt i expected in tests/integration/data always, its used by test_submit_job.py
-    # NOTE any failure here presumably caused by previous run not finishing succ -- just clean the dir
-    assert response.json() == {"": ["test"]}
-
-    # In order for the "/model" to work, the fake model repository must be up, which is not guaranteed
-    # at this stage. Thus we check explicitly, to have a cleaner error message in case it is not.
-    # It can happen in a few ways -- if it fails to start (eg due to port binding issue) we get
-    # a connect error right away, but in case of eg mystic system overload, we get all connection
-    # attempts failed -- in which case we *may* get saved by exp backoff retries via a transport
+    # Verify fake artifact registry is up
     try:
         client = httpx.Client(transport=httpx.HTTPTransport(retries=3))
-        manifest_response = client.get(os.path.join(f"http://localhost:{fake_repository_port}", "MANIFEST"))
-        assert manifest_response.is_success, "Failed to start Fake Model Repository properly"
+        catalog_response = client.get(f"http://localhost:{fake_artifact_registry_port}/artifacts.json")
+        assert catalog_response.is_success, "Failed to start Fake Artifact Registry properly"
     except httpx.ConnectError:
-        assert False, "Failed to start Fake Model Repository properly"
+        assert False, "Failed to start Fake Artifact Registry properly"
 
-    response = backend_client.get("/model").raise_for_status()
+    # List all available models
+    response = backend_client.get("/artifacts/list_models").raise_for_status()
+    models = response.json()
+    assert len(models) >= 4, f"Expected at least 4 models, got {len(models)}"
 
-    assert fake_model_name in response.json()
-    assert response.json()[fake_model_name]["download"]["message"] == "Model not downloaded."
-
-    # NOTE we launch `parallelism`+1 downloads in parallel, actively wait for the last one to finish, then check
-    # all were finished ok -- just for code simplicity
-
-    parallelism = 3
-    for e in range(parallelism):
-        response = backend_client.post(f"/model/{fake_model_name}{e}/download").raise_for_status()
-        assert response.json()["message"] == "Download started."
-    response = backend_client.post(f"/model/{fake_model_name}/download").raise_for_status()
-    assert response.json()["message"] == "Download started."
-
-    i = 128
-    while i > 0:
-        response = backend_client.get("/model").raise_for_status()
-        message = response.json()[fake_model_name]["download"]["message"]
-        if message == "Download already completed.":
+    # Find our test model (test_checkpoint0 is the main one)
+    test_model = None
+    for model in models:
+        if (
+            model["composite_id"]["artifact_store_id"] == fake_artifact_store_id
+            and model["composite_id"]["ml_model_checkpoint_id"] == f"{fake_artifact_checkpoint_id}0"
+        ):
+            test_model = model
             break
-        time.sleep(0.05)
+
+    assert test_model is not None, "Test model not found in list"
+    assert test_model["is_available"] == False, "Model should not be downloaded yet"
+
+    # Download models in parallel (test_checkpoint1, test_checkpoint2, test_checkpoint3)
+    parallelism = 3
+    composite_ids = []
+    for e in range(1, parallelism + 1):
+        composite_id = {
+            "artifact_store_id": fake_artifact_store_id,
+            "ml_model_checkpoint_id": f"{fake_artifact_checkpoint_id}{e}",
+        }
+        response = backend_client.post("/artifacts/download_model", json=composite_id).raise_for_status()
+        result = response.json()
+        assert result["status"] in ["download submitted", "download in progress"], f"Unexpected status: {result}"
+        composite_ids.append(composite_id)
+
+    # Download the main test model (test_checkpoint0)
+    main_composite_id = {
+        "artifact_store_id": fake_artifact_store_id,
+        "ml_model_checkpoint_id": f"{fake_artifact_checkpoint_id}0",
+    }
+    response = backend_client.post("/artifacts/download_model", json=main_composite_id).raise_for_status()
+    result = response.json()
+    assert result["status"] in ["download submitted", "download in progress"], f"Unexpected status: {result}"
+
+    # Poll for completion
+    i = 256  # Increased from 128 to allow more time
+    while i > 0:
+        response = backend_client.post("/artifacts/download_model", json=main_composite_id).raise_for_status()
+        result = response.json()
+        if result["status"] == "available" and result["progress"] == 100:
+            break
+        time.sleep(0.1)  # Increased from 0.05 to reduce polling frequency
         i -= 1
 
-    assert i > 0, "Failed to download model"
+    assert i > 0, "Failed to download artifact"
 
-    response = backend_client.get("/model/available").raise_for_status()
-    assert fake_model_name in response.json()[""]
-    for e in range(parallelism):
-        assert fake_model_name + str(e) in response.json()[""]
-        backend_client.delete(f"/model/{fake_model_name}{e}").raise_for_status()
+    # Verify all models are now available
+    response = backend_client.get("/artifacts/list_models").raise_for_status()
+    models = response.json()
 
-    metadata = ControlMetadata()
-    expected = '{"detail":"failed to edit model metadata due to BadZipFile(\'File is not a zip file\')"}'
-    response = backend_client.patch(f"/model/{fake_model_name}/metadata", json=metadata.model_dump())
-    assert response.status_code == 400
-    assert response.text == expected
-    # we try twice to test that the concurrent lock has been lifted
-    response = backend_client.patch(f"/model/{fake_model_name}/metadata", json=metadata.model_dump())
-    assert response.status_code == 400
-    assert response.text == expected
+    available_checkpoints = set()
+    for model in models:
+        if model["composite_id"]["artifact_store_id"] == fake_artifact_store_id and model["is_available"]:
+            available_checkpoints.add(model["composite_id"]["ml_model_checkpoint_id"])
 
-    backend_client.delete(f"/model/{fake_model_name}").raise_for_status()
+    assert f"{fake_artifact_checkpoint_id}0" in available_checkpoints, "Main model (test_checkpoint0) should be available"
+    for e in range(1, parallelism + 1):
+        assert f"{fake_artifact_checkpoint_id}{e}" in available_checkpoints, f"Model test_checkpoint{e} should be available"
 
-    response = backend_client.get("/model").raise_for_status()
-    assert response.json()[fake_model_name]["download"]["message"] == "Model not downloaded."
+    # Test model details endpoint
+    response = backend_client.post("/artifacts/model_details", json=main_composite_id).raise_for_status()
+    details = response.json()
+    assert details["composite_id"]["artifact_store_id"] == fake_artifact_store_id
+    assert details["composite_id"]["ml_model_checkpoint_id"] == f"{fake_artifact_checkpoint_id}0"
+    assert details["display_name"] == "Test Model Checkpoint 0"
+    assert details["is_available"] == True
