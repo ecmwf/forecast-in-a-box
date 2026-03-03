@@ -18,6 +18,7 @@
 # Python-Related
 * utilize `just` for command running -- `just val` in backend is the "typechecking and testing". Always run this after you make any changes to python code
 * project is managed by `uv` -- utilize that for running any python-related subcommands like `uv run pytest` or `uv run ty` for typechecking
+* when you are creating a new package in backend/packages, initialize it with uv, add it to the backend/pyproject.toml workspace listing, and create there a basic justfile with the val recipe
 * tests are separated into `tests/unit` which are quick to run with mocks, and `tests/integration` which are heavyweight
   * when adding new functionality, try to add both unit tests and integration tests
 * always use type annotations, it is enforced

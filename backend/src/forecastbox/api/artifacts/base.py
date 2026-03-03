@@ -14,17 +14,8 @@ Base definitions pertaining to artifacts such as ml model checkpoints
 from dataclasses import dataclass
 from pathlib import Path
 
-from fiab_core.artifacts import MlModelCheckpoint, MlModelCheckpointId, Platform
-
-from forecastbox.config import ArtifactStoreId
-
-
-@dataclass(frozen=True, eq=True, slots=True)
-class CompositeArtifactId:
-    """Composite identifier for an artifact combining store and checkpoint IDs"""
-
-    artifact_store_id: ArtifactStoreId
-    ml_model_checkpoint_id: MlModelCheckpointId
+from fiab_core.artifacts import CompositeArtifactId, MlModelCheckpoint, MlModelCheckpointId, Platform
+from pyrsistent.typing import PMap
 
 
 @dataclass(frozen=True, eq=True, slots=True)
@@ -56,7 +47,7 @@ class MlModelDetail:
     is_available: bool
 
 
-ArtifactCatalog = dict[CompositeArtifactId, MlModelCheckpoint]
+ArtifactCatalog = PMap[CompositeArtifactId, MlModelCheckpoint]
 
 artifacts_subdir = "artifacts"
 
