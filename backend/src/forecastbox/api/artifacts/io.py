@@ -132,3 +132,12 @@ def download_artifact(
             temp_path.unlink()
         logger.error(f"Failed to download artifact {composite_id}: {e}")
         raise
+
+
+def delete_artifact(composite_id: CompositeArtifactId, data_dir: Path) -> None:
+    """Delete a locally stored artifact file, raising FileNotFoundError if it doesn't exist."""
+    artifact_path = get_artifact_local_path(composite_id, data_dir)
+    if not artifact_path.exists():
+        raise FileNotFoundError(f"Artifact file not found: {artifact_path}")
+    artifact_path.unlink()
+    logger.info(f"Deleted artifact {composite_id} from {artifact_path}")

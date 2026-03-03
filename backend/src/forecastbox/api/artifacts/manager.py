@@ -29,7 +29,7 @@ from pyrsistent import pmap, pset
 from pyrsistent.typing import PMap, PSet
 
 from forecastbox.api.artifacts.base import ArtifactCatalog, CompositeArtifactId, MlModelCheckpoint, MlModelDetail, MlModelOverview
-from forecastbox.api.artifacts.io import download_artifact, get_artifacts_catalog, list_local_storage
+from forecastbox.api.artifacts.io import delete_artifact, download_artifact, get_artifacts_catalog, list_local_storage
 from forecastbox.config import config
 from forecastbox.ecpyutil import timed_acquire
 
@@ -215,3 +215,32 @@ def get_model_details(composite_id: CompositeArtifactId) -> MlModelDetail:
         )
 
         return detail
+
+
+def delete_model(composite_id: CompositeArtifactId) -> Either[str, str]:  # ty: ignore[invalid-type-arguments]
+    """Delete a locally available model. Returns confirmation message on success, error message on failure.
+    Raises TimeoutError if lock cannot be acquired, KeyError if model not in catalog."""
+    with timed_acquire(ArtifactManager.lock, timeout_acquire_request) as result:
+        if not result:
+            raise TimeoutError
+        if composite_id not in ArtifactManager.catalog:
+            raise KeyError(f"Model {composite_id} not found")
+        if composite_id not in ArtifactManager.locally_available:
+            return Either.error(f"Model {composite_id} is not locally available")
+        if composite_id in ArtifactManager.ongoing_downloads:
+            return Either.error(f"Model {composite_id} has an ongoing download")
+
+    try:
+        delete_artifact(composite_id, Path(config.api.data_path))
+    except Exception as e:
+        logger.exception(f"Failed to delete artifact {composite_id}: {repr(e)}")
+        return Either.error(f"Failed to delete: {repr(e)}")
+
+    with timed_acquire(ArtifactManager.lock, timeout_acquire_request) as result:
+        if not result:
+            logger.error("Failed to acquire lock to update locally_available after delete")
+            return Either.error("Failed to update state after deletion")
+        ArtifactManager.locally_available = ArtifactManager.locally_available.remove(composite_id)
+
+    logger.info(f"Successfully deleted model {composite_id}")
+    return Either.ok(f"Model {composite_id} deleted")

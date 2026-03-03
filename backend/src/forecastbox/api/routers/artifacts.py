@@ -12,7 +12,7 @@
 from fastapi import APIRouter, HTTPException
 
 from forecastbox.api.artifacts.base import CompositeArtifactId, MlModelDetail, MlModelOverview
-from forecastbox.api.artifacts.manager import get_model_details, list_models, submit_artifact_download
+from forecastbox.api.artifacts.manager import delete_model, get_model_details, list_models, submit_artifact_download
 
 router = APIRouter(
     tags=["artifacts"],
@@ -56,10 +56,16 @@ def download_model_endpoint(composite_id: CompositeArtifactId) -> dict[str, str 
         raise HTTPException(status_code=400, detail=result.e)
 
 
-"""
-TODO delete model
-- add endpoint for deleting a model
-- follow the structure -- use api/artifacts/manager for updating the state using a lock, use api/artifacts/io for implementing the actual io operation
-- we dont expect the delete to take long, so this can be handled within the async task as blocking -- ie, no need to run in a thread
-- no need to add tests for this
-"""
+@router.post("/delete_model")
+def delete_model_endpoint(composite_id: CompositeArtifactId) -> dict[str, str]:
+    """Delete a locally available ML model."""
+    try:
+        result = delete_model(composite_id)
+    except TimeoutError:
+        raise HTTPException(status_code=503, detail="Corresponding internal component is busy")
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Model {composite_id} not found")
+    if result.t is not None:
+        return {"status": "deleted", "composite_id": str(composite_id)}
+    else:
+        raise HTTPException(status_code=400, detail=result.e)
