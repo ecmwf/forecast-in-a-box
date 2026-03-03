@@ -54,3 +54,12 @@ def download_model_endpoint(composite_id: CompositeArtifactId) -> dict[str, str 
             return {"status": "download in progress", "progress": result.t, "composite_id": str(composite_id)}
     else:
         raise HTTPException(status_code=400, detail=result.e)
+
+
+"""
+TODO delete model
+- add endpoint for deleting a model
+- follow the structure -- use api/artifacts/manager for updating the state using a lock, use api/artifacts/io for implementing the actual io operation
+- we dont expect the delete to take long, so this can be handled within the async task as blocking -- ie, no need to run in a thread
+- no need to add tests for this
+"""
