@@ -33,9 +33,8 @@ from forecastbox.api.plugin.store import join_stores_thread, submit_initialize_s
 from forecastbox.api.scheduling.scheduler_thread import start_scheduler, status_scheduler, stop_scheduler
 from forecastbox.api.updates import get_local_release
 from forecastbox.db.migrations import migrate
-from forecastbox.db.model import delete_download
 
-from .api.routers import admin, artifacts, auth, execution, fable, gateway, job, model, plugin, product, schedule
+from .api.routers import admin, artifacts, auth, execution, fable, gateway, job, plugin, schedule
 from .config import config
 
 logger = logging.getLogger(__name__)
@@ -51,9 +50,6 @@ async def lifespan(app: FastAPI):
     migrate()
     if config.api.allow_scheduler:
         start_scheduler()
-    await delete_download(
-        None
-    )  # to get rid of db entries left over from previous run.. consider switching to pid table column instead, to mark failed and allow retry?
     release_time, release_version = get_local_release()
     app.version = f"{release_version}@{release_time}"
     submit_load_plugins()
@@ -80,8 +76,6 @@ templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 
 # TODO replace with iter modules, this is awkward
-app.include_router(model.router, prefix="/api/v1/model")
-app.include_router(product.router, prefix="/api/v1/product")
 app.include_router(execution.router, prefix="/api/v1/execution")
 app.include_router(job.router, prefix="/api/v1/job")
 app.include_router(admin.router, prefix="/api/v1/admin")
