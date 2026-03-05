@@ -102,5 +102,4 @@ class XarrayOutput(BaseModel):  # NOTE eventually Qubed
 
 BlockInstanceOutput = XarrayOutput  # NOTE eventually a Union
 
-# NOTE placeholder, this will be replaced with Fluent
 DataPartitionLookup = dict[BlockInstanceId, Action]

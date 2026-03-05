@@ -36,7 +36,6 @@ Compiler = Callable[
     [DataPartitionLookup, BlockInstanceId, BlockInstance], Either[DataPartitionLookup, Error]  # type:ignore[invalid-argument] # semigroup
 ]
 """Given a cascade builder and a block instance corresponding to this plugin's Factory, either update the builder with corresponding tasks or provide error"""
-# NOTE JobBuilder + DataPartitionLookup to be replaced with Fluent
 
 
 @dataclass
