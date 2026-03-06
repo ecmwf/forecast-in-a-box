@@ -18,6 +18,7 @@ from typing import Iterator, cast
 
 from earthkit.workflows.compilers import graph2job
 from earthkit.workflows.graph import Graph, deduplicate_nodes
+from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import (
     BlockConfigurationOption,
     BlockFactory,
@@ -117,6 +118,22 @@ def validate_expand(fable: FableBuilderV1) -> FableValidationExpansion:
     )
 
 
+def _get_artifacts_list(graph: Graph) -> list[CompositeArtifactId]:
+    # TODO move into earthkit.workflows.fluent somehow
+    payloads = (node.payload for node in graph.nodes())
+    artifactLists = (
+        payload.metadata.get("artifacts", []) for payload in payloads if hasattr(payload, "metadata") and isinstance(payload.metadata, dict)
+    )
+    artifacts = set(
+        artifact
+        for artifactList in artifactLists
+        if isinstance(artifactList, list)
+        for artifact in artifactList
+        if isinstance(artifact, CompositeArtifactId)
+    )
+    return list(artifacts)
+
+
 def compile(fable: FableBuilderV1) -> ExecutionSpecification:
     graph = Graph([])
     plugins = PluginManager.plugins
@@ -136,12 +153,10 @@ def compile(fable: FableBuilderV1) -> ExecutionSpecification:
         if block_factory.kind == "sink":
             graph += action_lookup[blockId].graph()
 
-    jobInstance = graph2job(deduplicate_nodes(graph))
-    environment = EnvironmentSpecification()
-    return ExecutionSpecification(
-        job=RawCascadeJob(job_type="raw_cascade_job", job_instance=jobInstance),
-        environment=environment,
-    )
+    graph = deduplicate_nodes(graph)
+    job = RawCascadeJob(job_type="raw_cascade_job", job_instance=graph2job(graph))
+    environment = EnvironmentSpecification(runtime_artifacts=_get_artifacts_list(graph))
+    return ExecutionSpecification(job=job, environment=environment)
 
 
 """
