@@ -62,13 +62,12 @@ def test_fable_contruction(tmpdir, backend_client_with_auth):
     assert len(response.json()["possible_expansions"]["sinkMean"]) == 0
     assert len(response.json()["block_errors"]) == 0
 
-    response = backend_client_with_auth.request(url="/fable/compile", method="put", json=builder.model_dump())
-    assert len(response.json()["job_instance"]["tasks"]) > 0
+    response = backend_client_with_auth.request(url="/fable/compile", method="put", json=builder.model_dump()).json()
+    assert len(response["job"]["job_instance"]["tasks"]) > 0
 
-    spec = ExecutionSpecification(
-        job=RawCascadeJob(**response.json()),
-        environment=EnvironmentSpecification(hosts=1, workers_per_host=1),
-    )
+    spec = ExecutionSpecification(**response)
+    spec.environment.hosts = 1
+    spec.environment.workers_per_host = 1
 
     # Replace open data retrieval with reading from test data file
     for task in spec.job.job_instance.tasks.values():
