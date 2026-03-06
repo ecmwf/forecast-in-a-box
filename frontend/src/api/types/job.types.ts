@@ -58,7 +58,7 @@ export interface ProductToOutputId {
   output_ids: Array<string>
 }
 
-/** POST /execution/execute */
+/** POST /job/execute */
 export interface SubmitJobResponse {
   id: string
 }

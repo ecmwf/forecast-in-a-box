@@ -34,7 +34,7 @@ from forecastbox.api.scheduling.scheduler_thread import start_scheduler, status_
 from forecastbox.api.updates import get_local_release
 from forecastbox.db.migrations import migrate
 
-from .api.routers import admin, artifacts, auth, execution, fable, gateway, job, plugin, schedule
+from .api.routers import admin, artifacts, auth, fable, gateway, job, plugin, schedule
 from .config import config
 
 logger = logging.getLogger(__name__)
@@ -76,7 +76,6 @@ templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 
 # TODO replace with iter modules, this is awkward
-app.include_router(execution.router, prefix="/api/v1/execution")
 app.include_router(job.router, prefix="/api/v1/job")
 app.include_router(admin.router, prefix="/api/v1/admin")
 app.include_router(auth.router, prefix="/api/v1")

@@ -136,17 +136,7 @@ export const API_ENDPOINTS = {
   },
 
   /**
-   * Execution endpoints
-   */
-  execution: {
-    /** POST - Submit a job for execution */
-    execute: `${API_PREFIX}/execution/execute`,
-    /** POST - Visualise an execution specification */
-    visualise: `${API_PREFIX}/execution/visualise`,
-  },
-
-  /**
-   * Job monitoring endpoints
+   * Job monitoring and execution endpoints
    */
   job: {
     /** GET - Get paginated status of all jobs */
@@ -168,6 +158,8 @@ export const API_ENDPOINTS = {
     restart: (jobId: string) => `${API_PREFIX}/job/${jobId}/restart`,
     /** DELETE - Delete a job */
     delete: (jobId: string) => `${API_PREFIX}/job/${jobId}`,
+    /** POST - Submit a job for execution */
+    execute: `${API_PREFIX}/job/execute`,
   },
 
   /**

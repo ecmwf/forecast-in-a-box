@@ -24,7 +24,7 @@ import type { ExecutionSpecification, JobStatus } from '@/api/types/job.types'
 import { API_ENDPOINTS, API_PATTERNS } from '@/api/endpoints'
 
 export const jobHandlers = [
-  http.post(API_ENDPOINTS.execution.execute, async ({ request }) => {
+  http.post(API_ENDPOINTS.job.execute, async ({ request }) => {
     await delay(400)
 
     let spec: ExecutionSpecification
@@ -39,11 +39,6 @@ export const jobHandlers = [
 
     const job = addJob(spec)
     return HttpResponse.json({ id: job.id })
-  }),
-
-  http.post(API_ENDPOINTS.execution.visualise, async () => {
-    await delay(300)
-    return HttpResponse.json({ id: `vis-${Date.now()}` })
   }),
 
   http.get(API_ENDPOINTS.job.status, async ({ request }) => {

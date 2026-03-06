@@ -1,7 +1,8 @@
 import httpx
 from cascade.low.builders import JobBuilder, TaskBuilder
 
-from forecastbox.api.types import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob, ScheduleSpecification
+from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
+from forecastbox.api.types.scheduling import ScheduleSpecification
 
 # TODO this is just a helper script to test an existing instance. Ideally turn it into a proper bigtest
 # In particular this needs launching the instance with a clean scheduling table, and with allow_scheduling

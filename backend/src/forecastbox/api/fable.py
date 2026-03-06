@@ -29,11 +29,11 @@ from fiab_core.fable import (
 )
 
 from forecastbox.api.plugin.manager import PluginManager
-from forecastbox.api.types import RawCascadeJob
 from forecastbox.api.types.fable import (
     FableBuilderV1,
     FableValidationExpansion,
 )
+from forecastbox.api.types.jobs import RawCascadeJob
 
 logger = logging.getLogger(__name__)
 

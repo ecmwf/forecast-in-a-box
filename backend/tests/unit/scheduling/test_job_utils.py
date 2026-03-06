@@ -5,7 +5,7 @@ import orjson
 import pytest
 
 from forecastbox.api.scheduling.job_utils import deep_union, eval_dynamic_expression, schedule2runnable
-from forecastbox.api.types import ExecutionSpecification
+from forecastbox.api.types.jobs import ExecutionSpecification
 from forecastbox.schemas.schedule import ScheduleDefinition
 
 
@@ -114,14 +114,20 @@ async def test_schedule2runnable_found(mock_get_schedules):
         exec_spec=orjson.dumps(
             {
                 "job": {
-                    "job_type": "forecast_products",
-                    "model": {"model": "test_model", "date": "2025-10-20", "lead_time": 24, "ensemble_members": 1},
-                    "products": [{"product": "test_product", "specification": {}}],
+                    "job_type": "raw_cascade_job",
+                    "job_instance": {
+                        "tasks": {},
+                        "edges": [],
+                    },
                 },
-                "environment": {"hosts": 1, "workers_per_host": 1},
+                "environment": {
+                    "hosts": 1,
+                    "workers_per_host": 1,
+                    "environment_variables": {"date": "2020-10-10"},
+                },
             }
         ).decode("ascii"),
-        dynamic_expr=orjson.dumps({"job": {"model": {"date": "$execution_time"}}}).decode("ascii"),
+        dynamic_expr=orjson.dumps({"environment": {"environment_variables": {"date": "$execution_time"}}}).decode("ascii"),
         enabled=True,
         created_by="test_user",
     )
@@ -133,7 +139,7 @@ async def test_schedule2runnable_found(mock_get_schedules):
     assert result.t is not None
     assert isinstance(result.t.exec_spec, ExecutionSpecification)
     assert result.t.created_by == "test_user"
-    assert result.t.exec_spec.job.model.date == "20251020T10"  # Check dynamic replacement
+    assert result.t.exec_spec.environment.environment_variables["date"] == "20251020T10"  # Check dynamic replacement
     assert result.t.exec_spec.environment.hosts == 1
 
 

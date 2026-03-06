@@ -6,8 +6,8 @@ from datetime import datetime, timedelta
 import httpx
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
-from forecastbox.api.types import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
 from forecastbox.api.types.fable import FableBuilderV1
+from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
 from forecastbox.config import FIABConfig
 from forecastbox.standalone.entrypoint import launch_all
 
