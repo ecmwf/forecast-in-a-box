@@ -95,9 +95,16 @@ export const fableHandlers = [
     }
 
     return HttpResponse.json({
-      job_type: 'raw_cascade_job',
-      job_instance: { tasks: {}, edges: [] },
-      job_id: `job_${Date.now()}`,
+      job: {
+        job_type: 'raw_cascade_job',
+        job_instance: { tasks: {}, edges: [] },
+      },
+      environment: {
+        hosts: null,
+        workers_per_host: null,
+        environment_variables: {},
+      },
+      shared: false,
     })
   }),
 
