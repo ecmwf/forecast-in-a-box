@@ -21,9 +21,6 @@ members = [
     "fiab-core",
     "fiab-mcp-server",
     "fiab-plugin-ecmwf",
-    "fiab-plugin-toy",
-    "fiab-plugin-toy-impl",
-    "fiab-plugin-toy2",
     "forecast-in-a-box",
 ]
 
@@ -1664,71 +1661,6 @@ provides-extras = ["runtime"]
 dev = [{ name = "ty", specifier = "==0.0.2" }]
 
 [[package]]
-name = "fiab-plugin-toy"
-source = { editable = "packages/fiab-plugin-toy" }
-
-[package.dev-dependencies]
-dev = [
-    { name = "ty" },
-]
-
-[package.metadata]
-
-[package.metadata.requires-dev]
-dev = [{ name = "ty", specifier = "==0.0.2" }]
-
-[[package]]
-name = "fiab-plugin-toy-impl"
-source = { editable = "packages/fiab-plugin-toy-impl" }
-dependencies = [
-    { name = "earthkit" },
-    { name = "earthkit-data" },
-    { name = "xarray" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "ty" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "earthkit", specifier = ">=0.13.2" },
-    { name = "earthkit-data", specifier = ">=0.18.2" },
-    { name = "xarray", specifier = ">=2025.11.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "ty", specifier = "==0.0.2" }]
-
-[[package]]
-name = "fiab-plugin-toy2"
-source = { editable = "packages/fiab-plugin-toy2" }
-
-[package.optional-dependencies]
-runtime = [
-    { name = "earthkit" },
-    { name = "earthkit-data" },
-    { name = "xarray" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "ty" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "earthkit", marker = "extra == 'runtime'", specifier = ">=0.13.2" },
-    { name = "earthkit-data", marker = "extra == 'runtime'", specifier = ">=0.18.2" },
-    { name = "xarray", marker = "extra == 'runtime'", specifier = ">=2025.11.0" },
-]
-provides-extras = ["runtime"]
-
-[package.metadata.requires-dev]
-dev = [{ name = "ty", specifier = "==0.0.2" }]
-
-[[package]]
 name = "filelock"
 version = "3.25.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1912,9 +1844,6 @@ webmars = [
 [package.dev-dependencies]
 dev = [
     { name = "fiab-plugin-ecmwf", extra = ["runtime"] },
-    { name = "fiab-plugin-toy" },
-    { name = "fiab-plugin-toy-impl" },
-    { name = "fiab-plugin-toy2", extra = ["runtime"] },
     { name = "prek" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -1965,9 +1894,6 @@ provides-extras = ["all", "plots", "thermo", "webmars"]
 [package.metadata.requires-dev]
 dev = [
     { name = "fiab-plugin-ecmwf", extras = ["runtime"], editable = "packages/fiab-plugin-ecmwf" },
-    { name = "fiab-plugin-toy", editable = "packages/fiab-plugin-toy" },
-    { name = "fiab-plugin-toy-impl", editable = "packages/fiab-plugin-toy-impl" },
-    { name = "fiab-plugin-toy2", extras = ["runtime"], editable = "packages/fiab-plugin-toy2" },
     { name = "prek" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
