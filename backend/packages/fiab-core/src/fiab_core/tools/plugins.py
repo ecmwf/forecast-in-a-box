@@ -1,12 +1,13 @@
 from cascade.low.func import Either
+from earthkit.workflows.fluent import Action
 
 from fiab_core.fable import (
+    ActionLookup,
     BlockFactoryCatalogue,
     BlockFactoryId,
     BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
-    DataPartitionLookup,
 )
 from fiab_core.plugin import Error, Plugin
 from fiab_core.tools.blocks import BlockBuilder
@@ -33,13 +34,13 @@ class PluginBuilder:
 
     def compile(
         self,
-        partitions: DataPartitionLookup,
+        inputs: ActionLookup,
         block_id: BlockInstanceId,
         block: BlockInstance,
-    ) -> Either[DataPartitionLookup, Error]:  # type:ignore[invalid-argument] # semigroup
+    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         """Given a cascade builder and a block instance corresponding to this plugin's Factory, either update the builder with corresponding tasks or provide error"""
         factory = self.block_builders[block.factory_id.factory]
-        return factory.compile(partitions, block_id, block)
+        return factory.compile(inputs, block_id, block)
 
     def as_plugin(self) -> Plugin:
         return Plugin(

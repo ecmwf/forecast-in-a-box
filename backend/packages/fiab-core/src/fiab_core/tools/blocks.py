@@ -10,15 +10,16 @@
 import abc
 
 from cascade.low.func import Either
+from earthkit.workflows.fluent import Action
 
 from fiab_core.fable import (
+    ActionLookup,
     BlockConfigurationOption,
     BlockFactory,
     BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
     BlockKind,
-    DataPartitionLookup,
 )
 from fiab_core.plugin import Error
 
@@ -35,10 +36,10 @@ class BlockBuilder(abc.ABC):
 
     def compile(
         self,
-        partitions: DataPartitionLookup,
+        inputs: ActionLookup,
         block_id: BlockInstanceId,
         block: BlockInstance,
-    ) -> Either[DataPartitionLookup, Error]:  # type:ignore[invalid-argument] # semigroup
+    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         raise NotImplementedError
 
     def intersect(self, input: BlockInstanceOutput) -> bool:

@@ -15,14 +15,15 @@ from dataclasses import dataclass
 from typing import Callable
 
 from cascade.low.func import Either
+from earthkit.workflows.fluent import Action
 
 from fiab_core.fable import (
+    ActionLookup,
     BlockFactoryCatalogue,
     BlockFactoryId,
     BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
-    DataPartitionLookup,
 )
 
 Error = str
@@ -33,9 +34,9 @@ Expander = Callable[[BlockInstanceOutput], list[BlockFactoryId]]
 """Given a block instance output (including from other plugin), provide which block factories from this plugin can expand it"""
 
 Compiler = Callable[
-    [DataPartitionLookup, BlockInstanceId, BlockInstance], Either[DataPartitionLookup, Error]  # type:ignore[invalid-argument] # semigroup
+    [ActionLookup, BlockInstanceId, BlockInstance], Either[Action, Error]  # type:ignore[invalid-argument] # semigroup
 ]
-"""Given a cascade builder and a block instance corresponding to this plugin's Factory, either update the builder with corresponding tasks or provide error"""
+"""Given a cascade builder, represented as lookup of fluent actions, and a block instance corresponding to this plugin's Factory, either return the fluent action resulting from this block or an error"""
 
 
 @dataclass
