@@ -33,7 +33,7 @@ from forecastbox.api.types.fable import (
     FableBuilderV1,
     FableValidationExpansion,
 )
-from forecastbox.api.types.jobs import RawCascadeJob
+from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +117,7 @@ def validate_expand(fable: FableBuilderV1) -> FableValidationExpansion:
     )
 
 
-def compile(fable: FableBuilderV1) -> RawCascadeJob:
+def compile(fable: FableBuilderV1) -> ExecutionSpecification:
     graph = Graph([])
     plugins = PluginManager.plugins
     action_lookup = {}
@@ -136,8 +136,12 @@ def compile(fable: FableBuilderV1) -> RawCascadeJob:
         if block_factory.kind == "sink":
             graph += action_lookup[blockId].graph()
 
-    result = graph2job(deduplicate_nodes(graph))
-    return RawCascadeJob(job_type="raw_cascade_job", job_instance=result)
+    jobInstance = graph2job(deduplicate_nodes(graph))
+    environment = EnvironmentSpecification()
+    return ExecutionSpecification(
+        job=RawCascadeJob(job_type="raw_cascade_job", job_instance=jobInstance),
+        environment=environment,
+    )
 
 
 """
