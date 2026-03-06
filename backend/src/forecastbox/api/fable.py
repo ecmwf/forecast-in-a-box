@@ -119,21 +119,22 @@ def validate_expand(fable: FableBuilderV1) -> FableValidationExpansion:
 
 def compile(fable: FableBuilderV1) -> RawCascadeJob:
     graph = Graph([])
-    plugins = PluginManager.plugins  # TODO we are avoiding a lock here! See the TODO at api/plugin.py
-    data_partition_lookup = {}
+    plugins = PluginManager.plugins
+    action_lookup = {}
 
     for blockId in topological_order(fable):
         blockInstance = fable.blocks[blockId]
         plugin = plugins.get(blockInstance.factory_id.plugin, None)
         if not plugin:
             raise ValueError(f"plugin for {blockId=} not found")
-        result = plugin.compiler(data_partition_lookup, blockId, blockInstance)
+        result = plugin.compiler(action_lookup, blockId, blockInstance)
         if result.t is None:
+            # NOTE we fail eagerly, but we could proceed with non-descedant actions and collect/emit all
             raise ValueError(f"compile failed at {blockId=} with {result.e}")
-        data_partition_lookup = result.t
+        action_lookup[blockId] = result.t
         block_factory = plugin.catalogue.factories[blockInstance.factory_id.factory]
         if block_factory.kind == "sink":
-            graph += data_partition_lookup[blockId].graph()
+            graph += action_lookup[blockId].graph()
 
     result = graph2job(deduplicate_nodes(graph))
     return RawCascadeJob(job_type="raw_cascade_job", job_instance=result)

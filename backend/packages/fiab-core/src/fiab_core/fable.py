@@ -102,4 +102,4 @@ class XarrayOutput(BaseModel):  # NOTE eventually Qubed
 
 BlockInstanceOutput = XarrayOutput  # NOTE eventually a Union
 
-DataPartitionLookup = dict[BlockInstanceId, Action]
+ActionLookup = dict[BlockInstanceId, Action]
