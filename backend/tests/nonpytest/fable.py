@@ -85,12 +85,12 @@ if __name__ == "__main__":
                 blocks[f"sink{statistic.capitalize()}"] = sink
 
             builder = FableBuilderV1(blocks=blocks)
-            response = client.request(url="/fable/compile", method="put", json=builder.model_dump())
+            response = client.request(url="/fable/compile", method="put", json=builder.model_dump()).json()
 
-            spec = ExecutionSpecification(
-                job=RawCascadeJob(**response.json()),
-                environment=EnvironmentSpecification(hosts=1, workers_per_host=1),
-            )
+            spec = ExecutionSpecification(**response)
+            spec.environment.hosts = 1
+            spec.environment.workers_per_host = 1
+
             response = client.post("/execution/execute", json=spec.model_dump())
             assert response.is_success
             job_id = response.json()["id"]

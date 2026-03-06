@@ -18,6 +18,7 @@ from typing import Iterator, cast
 
 from earthkit.workflows.compilers import graph2job
 from earthkit.workflows.graph import Graph, deduplicate_nodes
+from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import (
     BlockConfigurationOption,
     BlockFactory,
@@ -33,7 +34,7 @@ from forecastbox.api.types.fable import (
     FableBuilderV1,
     FableValidationExpansion,
 )
-from forecastbox.api.types.jobs import RawCascadeJob
+from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
 
 logger = logging.getLogger(__name__)
 
@@ -117,26 +118,45 @@ def validate_expand(fable: FableBuilderV1) -> FableValidationExpansion:
     )
 
 
-def compile(fable: FableBuilderV1) -> RawCascadeJob:
+def _get_artifacts_list(graph: Graph) -> list[CompositeArtifactId]:
+    # TODO move into earthkit.workflows.fluent somehow
+    payloads = (node.payload for node in graph.nodes())
+    artifactLists = (
+        payload.metadata.get("artifacts", []) for payload in payloads if hasattr(payload, "metadata") and isinstance(payload.metadata, dict)
+    )
+    artifacts = set(
+        artifact
+        for artifactList in artifactLists
+        if isinstance(artifactList, list)
+        for artifact in artifactList
+        if isinstance(artifact, CompositeArtifactId)
+    )
+    return list(artifacts)
+
+
+def compile(fable: FableBuilderV1) -> ExecutionSpecification:
     graph = Graph([])
-    plugins = PluginManager.plugins  # TODO we are avoiding a lock here! See the TODO at api/plugin.py
-    data_partition_lookup = {}
+    plugins = PluginManager.plugins
+    action_lookup = {}
 
     for blockId in topological_order(fable):
         blockInstance = fable.blocks[blockId]
         plugin = plugins.get(blockInstance.factory_id.plugin, None)
         if not plugin:
             raise ValueError(f"plugin for {blockId=} not found")
-        result = plugin.compiler(data_partition_lookup, blockId, blockInstance)
+        result = plugin.compiler(action_lookup, blockId, blockInstance)
         if result.t is None:
+            # NOTE we fail eagerly, but we could proceed with non-descedant actions and collect/emit all
             raise ValueError(f"compile failed at {blockId=} with {result.e}")
-        data_partition_lookup = result.t
+        action_lookup[blockId] = result.t
         block_factory = plugin.catalogue.factories[blockInstance.factory_id.factory]
         if block_factory.kind == "sink":
-            graph += data_partition_lookup[blockId].graph()
+            graph += action_lookup[blockId].graph()
 
-    result = graph2job(deduplicate_nodes(graph))
-    return RawCascadeJob(job_type="raw_cascade_job", job_instance=result)
+    graph = deduplicate_nodes(graph)
+    job = RawCascadeJob(job_type="raw_cascade_job", job_instance=graph2job(graph))
+    environment = EnvironmentSpecification(runtime_artifacts=_get_artifacts_list(graph))
+    return ExecutionSpecification(job=job, environment=environment)
 
 
 """

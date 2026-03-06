@@ -7,6 +7,9 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+from fiab_plugin_ecmwf.blocks import *
 
-def main() -> None:
-    print("Hello from fiab-plugin-toy-impl!")
+
+def test_ok():
+    """Tests, as a minimum, that everything can be imported"""
+    assert True

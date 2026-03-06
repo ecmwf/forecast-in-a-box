@@ -23,10 +23,7 @@ import type {
   SubmitJobResponse,
 } from '@/api/types/job.types'
 import type { JobMetadata } from '@/features/executions/stores/useJobMetadataStore'
-import {
-  createDefaultEnvironment,
-  isTerminalStatus,
-} from '@/api/types/job.types'
+import { isTerminalStatus } from '@/api/types/job.types'
 import {
   deleteJob,
   executeJob,
@@ -139,15 +136,14 @@ export function useSubmitFable() {
 
   return useMutation<SubmitJobResponse, Error, SubmitFableParams>({
     mutationFn: async ({ fable, environment }) => {
-      const cascadeJob = await compileFable(fable)
+      const spec = await compileFable(fable)
 
-      const spec = {
-        job: cascadeJob as {
-          job_type: 'raw_cascade_job'
-          job_instance: unknown
-        },
-        environment: environment ?? createDefaultEnvironment(),
-        shared: false,
+      // Merge user-provided environment settings into backend-provided spec
+      if (environment) {
+        spec.environment = {
+          ...spec.environment,
+          ...environment,
+        }
       }
 
       return executeJob(spec)

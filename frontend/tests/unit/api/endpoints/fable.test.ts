@@ -152,7 +152,18 @@ describe('compileFable', () => {
   })
 
   it('compiles fable configuration', async () => {
-    const mockCompiled = { compiled: true, output: 'some-output' }
+    const mockCompiled = {
+      job: {
+        job_type: 'raw_cascade_job',
+        job_instance: { tasks: {}, edges: [] },
+      },
+      environment: {
+        hosts: null,
+        workers_per_host: null,
+        environment_variables: {},
+      },
+      shared: false,
+    }
 
     worker.use(
       http.put(API_ENDPOINTS.fable.compile, () => {
