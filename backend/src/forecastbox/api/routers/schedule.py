@@ -27,7 +27,7 @@ from forecastbox.api.scheduling.scheduler_thread import (
     start_scheduler,
     stop_scheduler,
 )
-from forecastbox.api.types import ScheduleSpecification, ScheduleUpdate, schedule2db
+from forecastbox.api.types.scheduling import ScheduleSpecification, ScheduleUpdate, schedule2db
 from forecastbox.auth.users import current_active_user
 from forecastbox.db.schedule import (
     ScheduleId,

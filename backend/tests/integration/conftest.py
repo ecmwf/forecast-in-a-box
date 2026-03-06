@@ -103,11 +103,6 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         # to user's personal config file
         forecastbox.config.fiab_home = pathlib.Path(td.name)
 
-        # Create symlink to test.ckpt in temporary data directory for other tests
-        original_test_ckpt = pathlib.Path(__file__).parent / "data" / "test.ckpt"
-        temp_test_ckpt = pathlib.Path(td_data.name) / "test.ckpt"
-        temp_test_ckpt.symlink_to(original_test_ckpt)
-
         config = FIABConfig()
         config.api.uvicorn_port = 30645
         config.cascade.cascade_url = "tcp://localhost:30644"

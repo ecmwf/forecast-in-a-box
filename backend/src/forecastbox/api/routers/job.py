@@ -29,9 +29,8 @@ from fastapi.responses import HTMLResponse
 
 from forecastbox.api.execution import ProductToOutputId, SubmitJobResponse, execute2response
 from forecastbox.api.routers.gateway import Globals
-from forecastbox.api.types import ExecutionSpecification, VisualisationOptions
+from forecastbox.api.types.jobs import ExecutionSpecification
 from forecastbox.api.utils import encode_result
-from forecastbox.api.visualisation import visualise
 from forecastbox.auth.users import current_active_user
 from forecastbox.config import config
 from forecastbox.db.job import delete_all, delete_one, get_all, get_count, get_one, update_one
@@ -212,29 +211,6 @@ async def get_outputs_of_job(job_id: JobId = Depends(validate_job_id), user=Depe
     if len(product_to_id_mappings) == 0:
         raise HTTPException(status_code=204, detail=f"Job {job_id} had no outputs recorded.")
     return [ProductToOutputId(**item) for item in product_to_id_mappings]
-
-
-@router.post("/{job_id}/visualise")
-async def visualise_job(
-    job_id: JobId = Depends(validate_job_id), options: VisualisationOptions = Body(None), user: UserRead = Depends(current_active_user)
-) -> HTMLResponse:
-    """Visualise a job's execution graph.
-
-    Retrieves the job's graph specification from the database, converts it to a cascade graph,
-    and generates an HTML visualisation of the graph.
-    """
-    job = await get_one(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
-    if not options:
-        options = VisualisationOptions()
-    spec = job.graph_specification
-    if spec is None:
-        raise HTTPException(status_code=404, detail=f"Job {job_id} had no specification.")
-    spec = cast(str, spec)
-    spec = ExecutionSpecification(**json.loads(spec))
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, visualise, spec, options)  # CPU bound
 
 
 @router.get("/{job_id}/specification")
@@ -522,3 +498,22 @@ async def delete_job(job_id: JobId = Depends(validate_job_id), user: UserRead = 
     finally:
         deleted_count = await delete_one(job_id)
     return JobDeletionResponse(deleted_count=deleted_count)
+
+
+@router.post("/execute")
+async def execute_api(spec: ExecutionSpecification, user: UserRead | None = Depends(current_active_user)) -> SubmitJobResponse:
+    """Execute a job based on the provided execution specification.
+
+    Parameters
+    ----------
+    spec : ExecutionSpecification
+        Execution specification containing model and product details.
+    user : UserRead, optional
+        User object, by default Depends(current_active_user)
+
+    Returns
+    -------
+    SubmitJobResponse
+        Job submission response containing the job ID.
+    """
+    return await execute2response(spec, user)

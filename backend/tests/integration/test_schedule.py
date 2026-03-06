@@ -2,7 +2,8 @@ from datetime import datetime as dt
 
 from cascade.low.builders import JobBuilder, TaskBuilder
 
-from forecastbox.api.types import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob, ScheduleSpecification, ScheduleUpdate
+from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
+from forecastbox.api.types.scheduling import ScheduleSpecification, ScheduleUpdate
 
 
 def test_schedule_crud(backend_client_with_auth):
