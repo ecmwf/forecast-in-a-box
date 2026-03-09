@@ -112,8 +112,8 @@ getMostRecentRelease() {
         >&2 echo "failed to get most recent fiab release: $get_releases_status, crashing!"
         exit 1
     fi
-    # GitHub API returns releases newest-first; pick the first tag matching the v0.5.* line
-    most_recent=$(echo "$releases_json" | grep -o '"tag_name":"v0\.5\.[^"]*"' | head -1 | sed 's/"tag_name":"//;s/"//')
+    # GitHub API returns releases newest-first; pick the first tag matching the v0.5.* line -- that corresponds to the v1/freeze-for-bris-checkpoint release line
+    most_recent=$(echo "$releases_json" | grep -o '"tag_name":[ ]*"v0\.5\.[^"]*"' | head -1 | sed 's/"tag_name":[ ]*"//;s/"//')
     if [ -z "$most_recent" ] ; then
         >&2 echo "failed to find a v0.5.* release in the most recent 100 releases, crashing!"
         exit 1
