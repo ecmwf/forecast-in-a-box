@@ -326,6 +326,16 @@ async def rerun_schedule(schedule_run_id: str, user: UserRead = Depends(current_
         raise HTTPException(status_code=500, detail=f"Failed to rerun schedule: {exec_result.e}")
 
 
+"""
+# TODO add a delete_schedule endpoint here. Do it by adding a delete schedule function into the db/schedule.
+The delete should be cascade, ie, you start a transaction, first find by join all rows in ScheduleRun,
+then all rows in JobRecord, then delete the ScheduleRun rows, then delete the JobRecord rows, then delete
+the ScheduleDefinition, then commit the transaction.
+
+Make sure you extend the tests in the tests/integration/test_schedule
+"""
+
+
 @router.post("/restart")
 async def restart_scheduler() -> None:
     stop_scheduler()
