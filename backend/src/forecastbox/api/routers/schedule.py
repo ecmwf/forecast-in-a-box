@@ -31,6 +31,7 @@ from forecastbox.api.types.scheduling import ScheduleSpecification, ScheduleUpda
 from forecastbox.auth.users import current_active_user
 from forecastbox.db.schedule import (
     ScheduleId,
+    delete_schedule,
     get_next_run,
     get_schedules,
     get_schedules_count,
@@ -145,6 +146,11 @@ class GetMultipleSchedulesResponse:
 @dataclass(frozen=True, eq=True, slots=True)
 class CreateScheduleResponse:
     schedule_id: ScheduleId
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class DeleteScheduleResponse:
+    deleted_count: int
 
 
 @router.get("/{schedule_id}")
@@ -324,6 +330,16 @@ async def rerun_schedule(schedule_run_id: str, user: UserRead = Depends(current_
     else:
         logger.error(f"Failed to submit job for schedule run {schedule_run_id} because of {exec_result.e}")
         raise HTTPException(status_code=500, detail=f"Failed to rerun schedule: {exec_result.e}")
+
+
+@router.delete("/{schedule_id}")
+async def delete_schedule_endpoint(schedule_id: ScheduleId, user: UserRead = Depends(current_active_user)) -> DeleteScheduleResponse:
+    with scheduler_lock:
+        deleted_count = await delete_schedule(schedule_id)
+    if deleted_count == 0:
+        raise HTTPException(status_code=404, detail=f"Schedule {schedule_id} not found in the database.")
+    prod_scheduler()
+    return DeleteScheduleResponse(deleted_count=deleted_count)
 
 
 @router.post("/restart")
