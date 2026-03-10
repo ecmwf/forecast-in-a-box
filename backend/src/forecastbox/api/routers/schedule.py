@@ -26,6 +26,7 @@ from forecastbox.api.scheduling.scheduler_thread import (
     scheduler_lock,
     start_scheduler,
     stop_scheduler,
+    timeout_acquire_request,
 )
 from forecastbox.api.types.scheduling import ScheduleSpecification, ScheduleUpdate, schedule2db
 from forecastbox.auth.users import current_active_user
@@ -42,6 +43,7 @@ from forecastbox.db.schedule import (
     select_runs_count,
     update_one,
 )
+from forecastbox.ecpyutil import timed_acquire
 from forecastbox.schemas.job import JobRecord
 from forecastbox.schemas.schedule import ScheduleDefinition, ScheduleRun
 from forecastbox.schemas.user import UserRead
@@ -292,7 +294,9 @@ async def update_schedule(
 ) -> GetScheduleResponse:
     kwargs = schedule2db(schedule_update)
 
-    with scheduler_lock:  # NOTE this may block the async pool a bit!
+    with timed_acquire(scheduler_lock, timeout_acquire_request) as acquired:  # frontend-request context: short timeout
+        if not acquired:
+            raise HTTPException(status_code=503, detail="Scheduler is busy, please retry.")
         updated_schedule = await update_one(schedule_id=schedule_id, **kwargs)
         if not updated_schedule:
             raise HTTPException(status_code=404, detail=f"Schedule {schedule_id} not found in the database.")
@@ -334,7 +338,9 @@ async def rerun_schedule(schedule_run_id: str, user: UserRead = Depends(current_
 
 @router.delete("/{schedule_id}")
 async def delete_schedule_endpoint(schedule_id: ScheduleId, user: UserRead = Depends(current_active_user)) -> DeleteScheduleResponse:
-    with scheduler_lock:
+    with timed_acquire(scheduler_lock, timeout_acquire_request) as acquired:  # frontend-request context: short timeout
+        if not acquired:
+            raise HTTPException(status_code=503, detail="Scheduler is busy, please retry.")
         deleted_count = await delete_schedule(schedule_id)
     if deleted_count == 0:
         raise HTTPException(status_code=404, detail=f"Schedule {schedule_id} not found in the database.")
