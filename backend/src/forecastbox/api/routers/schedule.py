@@ -31,6 +31,7 @@ from forecastbox.api.types.scheduling import ScheduleSpecification, ScheduleUpda
 from forecastbox.auth.users import current_active_user
 from forecastbox.db.schedule import (
     ScheduleId,
+    delete_schedule,
     get_next_run,
     get_schedules,
     get_schedules_count,
@@ -145,6 +146,11 @@ class GetMultipleSchedulesResponse:
 @dataclass(frozen=True, eq=True, slots=True)
 class CreateScheduleResponse:
     schedule_id: ScheduleId
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class DeleteScheduleResponse:
+    deleted_count: int
 
 
 @router.get("/{schedule_id}")
@@ -326,14 +332,14 @@ async def rerun_schedule(schedule_run_id: str, user: UserRead = Depends(current_
         raise HTTPException(status_code=500, detail=f"Failed to rerun schedule: {exec_result.e}")
 
 
-"""
-# TODO add a delete_schedule endpoint here. Do it by adding a delete schedule function into the db/schedule.
-The delete should be cascade, ie, you start a transaction, first find by join all rows in ScheduleRun,
-then all rows in JobRecord, then delete the ScheduleRun rows, then delete the JobRecord rows, then delete
-the ScheduleDefinition, then commit the transaction.
-
-Make sure you extend the tests in the tests/integration/test_schedule
-"""
+@router.delete("/{schedule_id}")
+async def delete_schedule_endpoint(schedule_id: ScheduleId, user: UserRead = Depends(current_active_user)) -> DeleteScheduleResponse:
+    with scheduler_lock:
+        deleted_count = await delete_schedule(schedule_id)
+    if deleted_count == 0:
+        raise HTTPException(status_code=404, detail=f"Schedule {schedule_id} not found in the database.")
+    prod_scheduler()
+    return DeleteScheduleResponse(deleted_count=deleted_count)
 
 
 @router.post("/restart")

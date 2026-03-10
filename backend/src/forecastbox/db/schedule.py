@@ -313,3 +313,42 @@ async def select_runs_count(
             return await queryCount(query, session)
 
     return await dbRetry(function)
+
+
+async def delete_schedule(schedule_id: ScheduleId) -> int:
+    """Delete a schedule and all its related runs and jobs in a single transaction.
+
+    Cascades through ScheduleRun and JobRecord before removing the ScheduleDefinition.
+    Returns 1 if the schedule was found and deleted, 0 otherwise.
+    """
+
+    async def function(i: int) -> int:
+        async with async_session_maker() as session:
+            # Find all ScheduleRun rows for this schedule to collect job_ids
+            runs_result = await session.execute(select(ScheduleRun).where(ScheduleRun.schedule_id == schedule_id))
+            schedule_runs = [r[0] for r in runs_result.all()]
+            job_ids = [run.job_id for run in schedule_runs if run.job_id is not None]
+
+            # Check if the schedule exists before deleting
+            count_result = await session.execute(
+                select(func.count("*")).select_from(ScheduleDefinition).where(ScheduleDefinition.schedule_id == schedule_id)
+            )
+            exists = (count_result.scalar_one() or 0) > 0
+
+            # Delete ScheduleRun rows
+            await session.execute(delete(ScheduleRun).where(ScheduleRun.schedule_id == schedule_id))
+
+            # Delete JobRecord rows referenced by the schedule runs
+            if job_ids:
+                await session.execute(delete(JobRecord).where(JobRecord.job_id.in_(job_ids)))
+
+            # Delete ScheduleNext row for this schedule
+            await session.execute(delete(ScheduleNext).where(ScheduleNext.schedule_id == schedule_id))
+
+            # Delete the ScheduleDefinition itself
+            await session.execute(delete(ScheduleDefinition).where(ScheduleDefinition.schedule_id == schedule_id))
+
+            await session.commit()
+            return 1 if exists else 0
+
+    return await dbRetry(function)

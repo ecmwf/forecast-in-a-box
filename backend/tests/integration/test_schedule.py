@@ -223,3 +223,49 @@ def test_get_next_schedule_run_endpoint(backend_client_with_auth):
     assert response.is_success
     disabled_next_run = response.json()
     assert disabled_next_run == "not scheduled currently"
+
+
+def test_delete_schedule(backend_client_with_auth):
+    headers = {"Content-Type": "application/json"}
+
+    job_instance = JobBuilder().with_node("n1", TaskBuilder.from_callable(eval).with_values("1+2")).build().get_or_raise()
+    env = EnvironmentSpecification(hosts=1, workers_per_host=2)
+    exec_spec = ExecutionSpecification(
+        job=RawCascadeJob(
+            job_type="raw_cascade_job",
+            job_instance=job_instance,
+        ),
+        environment=env,
+    )
+    sched_spec = ScheduleSpecification(
+        exec_spec=exec_spec,
+        dynamic_expr={},
+        cron_expr="0 0 * * *",
+        max_acceptable_delay_hours=24,
+    )
+
+    # create
+    response = backend_client_with_auth.put("/schedule/create", headers=headers, json=sched_spec.model_dump())
+    assert response.is_success
+    sched_id = response.json()["schedule_id"]
+
+    # verify it exists
+    response = backend_client_with_auth.get(f"/schedule/{sched_id}")
+    assert response.is_success
+
+    # delete
+    response = backend_client_with_auth.delete(f"/schedule/{sched_id}")
+    assert response.is_success
+    assert response.json()["deleted_count"] == 1
+
+    # verify it's gone
+    response = backend_client_with_auth.get(f"/schedule/{sched_id}")
+    assert response.status_code == 404
+
+    # delete again - should 404
+    response = backend_client_with_auth.delete(f"/schedule/{sched_id}")
+    assert response.status_code == 404
+
+    # delete nonexistent - should 404
+    response = backend_client_with_auth.delete("/schedule/nonexistent-id")
+    assert response.status_code == 404
