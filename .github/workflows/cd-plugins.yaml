@@ -23,6 +23,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
       - uses: extractions/setup-just@v3
       - run: |
           set -euo pipefail
@@ -30,16 +31,17 @@ jobs:
             set -x
           fi
           TAG_PREF="v"
-          VERSION_NUMBERS=${LATEST_TAG#$TAG_PREF}
+          TAG_FULL="${{ inputs.tag }}"
+          VERSION_NUMBERS=${TAG_FULL#$TAG_PREF}
 
-          cd backend/packages
+          cd backend
           uv venv venv && source venv/bin/activate
           uv pip install twine build
           mkdir packagesDist
           for e in $(ls -d packages/*) ; do 
               pushd $e
               python -m build --installer uv .
-              mv dist/* ../packagesDist
+              mv dist/* ../../packagesDist
               popd
           done
           twine check ./packagesDist/*
