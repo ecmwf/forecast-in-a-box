@@ -326,7 +326,7 @@ async def delete_schedule(schedule_id: ScheduleId) -> int:
         async with async_session_maker() as session:
             # Find all ScheduleRun rows for this schedule to collect job_ids
             runs_result = await session.execute(select(ScheduleRun).where(ScheduleRun.schedule_id == schedule_id))
-            schedule_runs = [r[0] for r in runs_result.all()]
+            schedule_runs = (r[0] for r in runs_result.all())
             job_ids = [run.job_id for run in schedule_runs if run.job_id is not None]
 
             # Check if the schedule exists before deleting
