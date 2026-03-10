@@ -32,7 +32,7 @@ jobs:
           fi
           TAG_PREF="v"
           TAG_FULL="${{ inputs.tag }}"
-          VERSION_NUMBERS=${TAG_FULL#$TAG_PREF}
+          export SETUPTOOLS_SCM_PRETEND_VERSION=${TAG_FULL#$TAG_PREF}
 
           cd backend
           uv venv venv && source venv/bin/activate
