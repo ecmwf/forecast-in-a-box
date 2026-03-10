@@ -106,14 +106,19 @@ maybeInstallPython() {
 
 getMostRecentRelease() {
     repo=ecmwf/forecast-in-a-box
-    releases_json=$(curl --silent "https://api.github.com/repos/$repo/releases?per_page=1")
+    releases_json=$(curl --silent "https://api.github.com/repos/$repo/releases?per_page=100")
     get_releases_status=$?
     if [ $get_releases_status -ne 0 ] ; then
         >&2 echo "failed to get most recent fiab release: $get_releases_status, crashing!"
         exit 1
     fi
-    most_recent=$(echo $releases_json  | sed 's/.*tag\/\([^"]*\).*/\1/')
-    echo $most_recent
+    # GitHub API returns releases newest-first; pick the first tag matching the v0.5.* line -- that corresponds to the v1/freeze-for-bris-checkpoint release line
+    most_recent=$(echo "$releases_json" | grep -o '"tag_name":[ ]*"v0\.5\.[^"]*"' | head -1 | sed 's/"tag_name":[ ]*"//;s/"//')
+    if [ -z "$most_recent" ] ; then
+        >&2 echo "failed to find a v0.5.* release in the most recent 100 releases, crashing!"
+        exit 1
+    fi
+    echo "$most_recent"
 }
 
 export FIAB_RELEASE_MARKER="${FIAB_ROOT}/release"
