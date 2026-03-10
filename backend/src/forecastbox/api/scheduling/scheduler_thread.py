@@ -34,6 +34,7 @@ from forecastbox.db.schedule import (
     mark_run_executed,
     next_schedulable,
 )
+from forecastbox.ecpyutil import timed_acquire
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,6 @@ logger = logging.getLogger(__name__)
 # potentially involving the ScheduleNext table etc, as well as scheduler instance itself
 # to guarantee the singleton nature
 scheduler_lock = threading.Lock()
-# TODO at many places in the codebase, we do `with scheduler_lock`. This is dangerous, because it could lock the whole async thread forever, making the frontend irresponsive. Inspect the modules like api/plugin/manager or api/artifacts/manager for usage of timed_acquire, and rewrite all acquisitions of this lock to use it as well. Each time this lock is about to be acquired, analyze the context -- is it a background thread, is it a frontend-request serving thread? Based on that choose the timeout value
 
 
 # NOTE this does not really affect how often scheduler checks for new jobs --
@@ -125,7 +125,10 @@ class SchedulerThread(threading.Thread):
 
     async def _run(self):
         while not self.stop_event.is_set():
-            with scheduler_lock:
+            with timed_acquire(scheduler_lock, 60) as acquired:
+                if not acquired:
+                    logger.warning("Scheduler could not acquire scheduler_lock within timeout, skipping iteration.")
+                    continue
                 sleep_duration = await self._try_schedule()
 
             if sleep_duration > 0:
@@ -156,7 +159,9 @@ class Globals:
 
 
 def start_scheduler():
-    with scheduler_lock:
+    with timed_acquire(scheduler_lock, 10) as acquired:
+        if not acquired:
+            raise ValueError("Could not acquire scheduler_lock within timeout during start")
         if Globals.scheduler is not None:
             raise ValueError("double start")
         Globals.scheduler = SchedulerThread()
@@ -164,7 +169,9 @@ def start_scheduler():
 
 
 def stop_scheduler():
-    with scheduler_lock:
+    with timed_acquire(scheduler_lock, 10) as acquired:
+        if not acquired:
+            raise ValueError("Could not acquire scheduler_lock within timeout during stop")
         if Globals.scheduler is None:
             raise ValueError("unexpected stop")
         Globals.scheduler.stop()
