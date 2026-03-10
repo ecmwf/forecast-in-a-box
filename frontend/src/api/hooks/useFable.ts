@@ -16,6 +16,7 @@ import type {
   FableValidationExpansion,
   PluginBlockFactoryId,
 } from '@/api/types/fable.types'
+import type { ExecutionSpecification } from '@/api/types/job.types'
 import {
   compileFable,
   expandFable,
@@ -94,7 +95,7 @@ export function useFableValidation(
 }
 
 export function useCompileFable() {
-  return useMutation<unknown, Error, FableBuilderV1>({
+  return useMutation<ExecutionSpecification, Error, FableBuilderV1>({
     mutationFn: compileFable,
   })
 }

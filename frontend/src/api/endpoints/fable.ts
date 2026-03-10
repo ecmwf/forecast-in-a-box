@@ -19,6 +19,7 @@ import type {
   FableBuilderV1,
   FableValidationExpansion,
 } from '@/api/types/fable.types'
+import type { ExecutionSpecification } from '@/api/types/job.types'
 import { apiClient } from '@/api/client'
 import { API_ENDPOINTS } from '@/api/endpoints'
 import {
@@ -65,7 +66,9 @@ export async function expandFable(
 /**
  * Compile a fable configuration
  */
-export async function compileFable(fable: FableBuilderV1): Promise<unknown> {
+export async function compileFable(
+  fable: FableBuilderV1,
+): Promise<ExecutionSpecification> {
   return apiClient.put(API_ENDPOINTS.fable.compile, fable)
 }
 

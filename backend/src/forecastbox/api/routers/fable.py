@@ -21,7 +21,7 @@ import forecastbox.api.fable as api_fable
 import forecastbox.db.fable as db_fable
 from forecastbox.api.plugin.manager import PluginCompositeId, catalogue_view, plugins_ready
 from forecastbox.api.types.fable import FableBuilderV1, FableValidationExpansion
-from forecastbox.api.types.jobs import RawCascadeJob
+from forecastbox.api.types.jobs import ExecutionSpecification
 from forecastbox.auth.users import current_active_user
 from forecastbox.schemas.user import UserRead
 
@@ -56,10 +56,9 @@ def expand_fable(fable: FableBuilderV1) -> FableValidationExpansion:
 
 # NOTE its a put but get would be better -- but browsers dont support get+json body
 @router.put("/compile")
-def compile_fable(fable: FableBuilderV1) -> RawCascadeJob:
-    """Converts to a raw cascade job, which can then be used in a ExecutionSpecification
-    in the /execution router's methods. Assumes the fable is valid, and throws a 4xx
-    otherwise"""
+def compile_fable(fable: FableBuilderV1) -> ExecutionSpecification:
+    """Converts to an ExecutionSpecification which can then be used in the /job router's methods.
+    Assumes the fable is valid, and throws a 4xx otherwise"""
     return api_fable.compile(fable)
 
 

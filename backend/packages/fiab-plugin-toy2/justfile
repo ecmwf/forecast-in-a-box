@@ -1,4 +1,0 @@
-val:
-    uv run ty check
-    uv run pytest
-
