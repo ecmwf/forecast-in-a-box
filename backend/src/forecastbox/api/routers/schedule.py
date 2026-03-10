@@ -26,6 +26,7 @@ from forecastbox.api.scheduling.scheduler_thread import (
     scheduler_lock,
     start_scheduler,
     stop_scheduler,
+    timeout_acquire_request,
 )
 from forecastbox.api.types.scheduling import ScheduleSpecification, ScheduleUpdate, schedule2db
 from forecastbox.auth.users import current_active_user
@@ -293,7 +294,7 @@ async def update_schedule(
 ) -> GetScheduleResponse:
     kwargs = schedule2db(schedule_update)
 
-    with timed_acquire(scheduler_lock, 5) as acquired:  # frontend-request context: short timeout
+    with timed_acquire(scheduler_lock, timeout_acquire_request) as acquired:  # frontend-request context: short timeout
         if not acquired:
             raise HTTPException(status_code=503, detail="Scheduler is busy, please retry.")
         updated_schedule = await update_one(schedule_id=schedule_id, **kwargs)
@@ -337,7 +338,7 @@ async def rerun_schedule(schedule_run_id: str, user: UserRead = Depends(current_
 
 @router.delete("/{schedule_id}")
 async def delete_schedule_endpoint(schedule_id: ScheduleId, user: UserRead = Depends(current_active_user)) -> DeleteScheduleResponse:
-    with timed_acquire(scheduler_lock, 5) as acquired:  # frontend-request context: short timeout
+    with timed_acquire(scheduler_lock, timeout_acquire_request) as acquired:  # frontend-request context: short timeout
         if not acquired:
             raise HTTPException(status_code=503, detail="Scheduler is busy, please retry.")
         deleted_count = await delete_schedule(schedule_id)

@@ -42,6 +42,9 @@ logger = logging.getLogger(__name__)
 # potentially involving the ScheduleNext table etc, as well as scheduler instance itself
 # to guarantee the singleton nature
 scheduler_lock = threading.Lock()
+timeout_acquire_request = 1  # aggressive timeout, we dont want to block async worker for long
+timeout_acquire_lifecycle = 5  # moderate timeout during scheduler startup/shutdown
+timeout_acquire_background = 10  # leisure timeout for the scheduler background thread
 
 
 # NOTE this does not really affect how often scheduler checks for new jobs --
@@ -125,7 +128,7 @@ class SchedulerThread(threading.Thread):
 
     async def _run(self):
         while not self.stop_event.is_set():
-            with timed_acquire(scheduler_lock, 60) as acquired:
+            with timed_acquire(scheduler_lock, timeout_acquire_background) as acquired:
                 if not acquired:
                     logger.warning("Scheduler could not acquire scheduler_lock within timeout, skipping iteration.")
                     continue
@@ -159,7 +162,7 @@ class Globals:
 
 
 def start_scheduler():
-    with timed_acquire(scheduler_lock, 10) as acquired:
+    with timed_acquire(scheduler_lock, timeout_acquire_lifecycle) as acquired:
         if not acquired:
             raise ValueError("Could not acquire scheduler_lock within timeout during start")
         if Globals.scheduler is not None:
@@ -169,7 +172,7 @@ def start_scheduler():
 
 
 def stop_scheduler():
-    with timed_acquire(scheduler_lock, 10) as acquired:
+    with timed_acquire(scheduler_lock, timeout_acquire_lifecycle) as acquired:
         if not acquired:
             raise ValueError("Could not acquire scheduler_lock within timeout during stop")
         if Globals.scheduler is None:
