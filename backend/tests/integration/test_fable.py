@@ -2,8 +2,8 @@ import os
 
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
-from forecastbox.api.types import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
 from forecastbox.api.types.fable import FableBuilderV1
+from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
 
 from .utils import ensure_completed
 
@@ -80,7 +80,7 @@ def test_fable_contruction(tmpdir, backend_client_with_auth):
             task.static_input_ps["0"] = "file"
             task.static_input_kw["path"] = os.path.join(DATA_DIR, "fable_test.grib")
 
-    response = backend_client_with_auth.post("/execution/execute", json=spec.model_dump())
+    response = backend_client_with_auth.post("/job/execute", json=spec.model_dump())
     assert response.is_success
     job_id = response.json()["id"]
     ensure_completed(backend_client_with_auth, job_id, sleep=1, attempts=120)

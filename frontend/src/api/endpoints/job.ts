@@ -28,7 +28,7 @@ import { STORAGE_KEYS } from '@/lib/storage-keys'
 export async function executeJob(
   spec: ExecutionSpecification,
 ): Promise<SubmitJobResponse> {
-  return apiClient.post(API_ENDPOINTS.execution.execute, spec)
+  return apiClient.post(API_ENDPOINTS.job.execute, spec)
 }
 
 export async function getJobsStatus(

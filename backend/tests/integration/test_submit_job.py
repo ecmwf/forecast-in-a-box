@@ -7,12 +7,9 @@ import zipfile
 import cloudpickle
 from cascade.low.builders import JobBuilder, TaskBuilder
 
-from forecastbox.api.types import (
+from forecastbox.api.types.jobs import (
     EnvironmentSpecification,
     ExecutionSpecification,
-    ForecastProducts,
-    ModelSpecification,
-    ProductSpecification,
     RawCascadeJob,
 )
 
@@ -39,7 +36,7 @@ def test_submit_job(backend_client_with_auth):
         ),
         environment=env,
     )
-    response = backend_client_with_auth.post("/execution/execute", headers=headers, json=spec.model_dump())
+    response = backend_client_with_auth.post("/job/execute", headers=headers, json=spec.model_dump())
     assert response.is_success
     raw_job_id = response.json()["id"]
     ensure_completed(backend_client_with_auth, raw_job_id)
@@ -74,50 +71,10 @@ def test_submit_job(backend_client_with_auth):
         job=RawCascadeJob(job_type="raw_cascade_job", job_instance=job_instance),
         environment=env,
     )
-    response = backend_client_with_auth.post("/execution/execute", headers=headers, json=spec.model_dump())
+    response = backend_client_with_auth.post("/job/execute", headers=headers, json=spec.model_dump())
     assert response.is_success
     requests_job_id = response.json()["id"]
     ensure_completed(backend_client_with_auth, requests_job_id)
-
-    # no ckpt spec
-    spec = ExecutionSpecification(
-        job=ForecastProducts(
-            job_type="forecast_products",
-            model=ModelSpecification(model="missing", date="today", lead_time=1, ensemble_members=1),
-            products=[ProductSpecification(product="test", specification={})],
-        ),
-        environment=env,
-    )
-    response = backend_client_with_auth.post("/execution/execute", headers=headers, json=spec.model_dump())
-    assert response.is_success
-    no_ckpt_id = response.json()["id"]
-
-    response = backend_client_with_auth.get("/job/status")
-    assert response.is_success
-    # TODO retry in case of error not present yet
-    assert "No such file or directory" in response.json()["progresses"][no_ckpt_id]["error"]
-
-    # valid spec
-    spec = ExecutionSpecification(
-        job=ForecastProducts(
-            job_type="forecast_products",
-            model=ModelSpecification(model="test", date="today", lead_time=1, ensemble_members=1),
-            products=[],
-        ),
-        environment=env,
-    )
-    response = backend_client_with_auth.post("/execution/execute", headers=headers, json=spec.model_dump())
-    assert response.is_success
-    test_model_id = response.json()["id"]
-
-    response = backend_client_with_auth.get("/job/status")
-    assert response.is_success
-    # TODO fix the file to comply with the validation, then test the workflow success
-    # TODO retry in case of error not present yet
-    msg1 = "Could not find 'ai-models.json'"
-    msg2 = "Could not find 'anemoi.json'"
-    err = response.json()["progresses"][test_model_id]["error"]
-    assert msg1 in err or msg2 in err
 
     # sleeper job
     def sleep_with_sgn(secs: int):
@@ -133,7 +90,7 @@ def test_submit_job(backend_client_with_auth):
         ),
         environment=env,
     )
-    response = backend_client_with_auth.post("/execution/execute", headers=headers, json=spec.model_dump())
+    response = backend_client_with_auth.post("/job/execute", headers=headers, json=spec.model_dump())
     assert response.is_success
     sleeper_id = response.json()["id"]
 
@@ -141,22 +98,22 @@ def test_submit_job(backend_client_with_auth):
     response = backend_client_with_auth.delete(f"/job/{raw_job_id}").raise_for_status().json()
     assert response["deleted_count"] == 1
     response = backend_client_with_auth.get("/job/status").raise_for_status().json()
-    assert len(response["progresses"].keys()) == 4
+    assert len(response["progresses"].keys()) == 2
 
     # gateway unavailable/restarted
     backend_client_with_auth.post("/gateway/kill").raise_for_status()
     response = backend_client_with_auth.get("/job/status").raise_for_status().json()
-    assert len(response["progresses"].keys()) == 4
+    assert len(response["progresses"].keys()) == 2
     assert response["progresses"][sleeper_id]["status"] == "timeout"
     assert response["progresses"][sleeper_id]["error"] == "failed to communicate with gateway"
 
     backend_client_with_auth.post("/gateway/start").raise_for_status()
     response = backend_client_with_auth.get("/job/status").raise_for_status().json()
-    assert len(response["progresses"].keys()) == 4
+    assert len(response["progresses"].keys()) == 2
     assert response["progresses"][sleeper_id]["status"] == "invalid"
     assert response["progresses"][sleeper_id]["error"] == "evicted from gateway"
 
     # delete all jobs
     response = backend_client_with_auth.post("/job/flush").raise_for_status().json()
-    assert response["deleted_count"] == 4
+    assert response["deleted_count"] == 2
     response = backend_client_with_auth.get("/job/status").raise_for_status().json()
