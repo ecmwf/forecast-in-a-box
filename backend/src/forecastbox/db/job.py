@@ -68,7 +68,7 @@ async def get_all(status: str | None = None, offset: int = -1, limit: int = -1) 
             query = select(JobRecord)
             if status is not None:
                 query = query.where(JobRecord.status == status)
-            query = query.order_by(JobRecord.created_at.asc())
+            query = query.order_by(JobRecord.created_at.desc())
             if offset != -1:
                 query = query.offset(offset)
             if limit != -1:

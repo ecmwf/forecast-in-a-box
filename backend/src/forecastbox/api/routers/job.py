@@ -154,6 +154,7 @@ async def get_status(
     user: UserRead = Depends(current_active_user), page: int = 1, page_size: int = 10, status: STATUS | None = None
 ) -> JobProgressResponses:
     """Get progress of all tasks recorded in the database with pagination and filtering.
+    Orders by creation time, descending.
 
     Parameters
     ----------
