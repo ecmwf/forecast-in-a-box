@@ -1,0 +1,59 @@
+name: CD for plugins (core+ecmwf)
+
+# Temporary action for releases of plugins and fiab core until we have something better in place
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Explicit tag. Use vX.Y.Z, make sure its free on pypi
+        type: string
+        required: true
+      testpypi:
+        description: Whether to upload to testpypi instead of pypi.
+        type: boolean
+        required: false
+        default: false
+
+
+jobs:
+  buildupload:
+    name: "Build and upload"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v3
+      - run: |
+          set -euo pipefail
+          if [ "${{ inputs.testpypi }}" = "true" ] ; then
+            set -x
+          fi
+          TAG_PREF="v"
+          VERSION_NUMBERS=${LATEST_TAG#$TAG_PREF}
+
+          cd backend/packages
+          uv venv venv && source venv/bin/activate
+          uv pip install twine build
+          mkdir packagesDist
+          for e in $(ls -d packages/*) ; do 
+              pushd $e
+              python -m build --installer uv .
+              mv dist/* ../packagesDist
+              popd
+          done
+          twine check ./packagesDist/*
+
+          # upload
+          if [ "${{ inputs.testpypi }}" = "true" ] ; then
+            export TWINE_PASSWORD="$TWINE_PASSWORD_TEST"
+            TARGET="--repository testpypi"
+          else
+            export TWINE_PASSWORD="$TWINE_PASSWORD_PROD"
+            TARGET=""
+          fi
+          twine upload --verbose $TARGET packagesDist/*
+        env:
+          TWINE_PASSWORD_PROD: ${{ secrets.PYPI_API_TOKEN }}
+          TWINE_PASSWORD_TEST: ${{ secrets.PYPI_TEST_API_TOKEN }}
+
