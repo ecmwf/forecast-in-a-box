@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 scheduler_lock = threading.Lock()
 timeout_acquire_request = 1  # aggressive timeout, we dont want to block async worker for long
 timeout_acquire_lifecycle = 5  # moderate timeout during scheduler startup/shutdown
-timeout_acquire_background = 10  # leisure timeout for the scheduler background thread
+timeout_acquire_background = 60  # leisure timeout for the scheduler background thread
 
 
 # NOTE this does not really affect how often scheduler checks for new jobs --
