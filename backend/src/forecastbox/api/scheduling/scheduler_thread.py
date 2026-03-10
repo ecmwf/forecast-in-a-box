@@ -41,6 +41,8 @@ logger = logging.getLogger(__name__)
 # potentially involving the ScheduleNext table etc, as well as scheduler instance itself
 # to guarantee the singleton nature
 scheduler_lock = threading.Lock()
+# TODO at many places in the codebase, we do `with scheduler_lock`. This is dangerous, because it could lock the whole async thread forever, making the frontend irresponsive. Inspect the modules like api/plugin/manager or api/artifacts/manager for usage of timed_acquire, and rewrite all acquisitions of this lock to use it as well. Each time this lock is about to be acquired, analyze the context -- is it a background thread, is it a frontend-request serving thread? Based on that choose the timeout value
+
 
 # NOTE this does not really affect how often scheduler checks for new jobs --
 # if anything is scheduled for earlier, we sleep for shorter time in advance,
