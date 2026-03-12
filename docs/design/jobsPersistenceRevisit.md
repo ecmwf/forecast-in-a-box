@@ -70,6 +70,9 @@ Each of these stages would be marked as done by an integration test:
 - for the third stage, the relevant tests are in `test_submit_job.py` and `test_fable.py` -- you should copy these tests, adjust the endpoints and parameters.
 - for the fourth stage, the relevant tests are in `test_schedule.py` -- copy them over.
 
+In neither stage delete or change any existing endpoints, or migrate the frontend to the new endpoints.
+That will happen afterwards.
+
 # Left Over for the Future
 These are purposefully *not* covered for now:
  - implementation of the garbage collection
