@@ -155,7 +155,12 @@ def compile(fable: FableBuilderV1) -> ExecutionSpecification:
 
     graph = deduplicate_nodes(graph)
     job = RawCascadeJob(job_type="raw_cascade_job", job_instance=graph2job(graph))
-    environment = EnvironmentSpecification(runtime_artifacts=_get_artifacts_list(graph))
+    graph_artifacts = _get_artifacts_list(graph)
+    if fable.environment is not None:
+        merged_artifacts = list(set(fable.environment.runtime_artifacts) + set(graph_artifacts))
+        environment = fable.environment.model_copy(update={"runtime_artifacts": merged_artifacts})
+    else:
+        environment = EnvironmentSpecification(runtime_artifacts=graph_artifacts)
     return ExecutionSpecification(job=job, environment=environment)
 
 
