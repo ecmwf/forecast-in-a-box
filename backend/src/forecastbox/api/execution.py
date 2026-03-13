@@ -29,12 +29,13 @@ import forecastbox.api.fable as api_fable
 import forecastbox.db.jobs2 as db_jobs2
 from forecastbox.api.artifacts.manager import ArtifactManager, submit_artifact_download
 from forecastbox.api.types.fable import FableBuilderV1
-from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, JobExecuteV2Request, JobExecuteV2Response, RawCascadeJob
+from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, JobExecuteV2Response, RawCascadeJob
 from forecastbox.api.utils import get_model_path
 from forecastbox.config import config
 from forecastbox.db.job import insert_one
 from forecastbox.models import get_model
 from forecastbox.products.registry import get_product
+from forecastbox.schemas.jobs2 import JobDefinition
 from forecastbox.schemas.user import UserRead
 
 logger = logging.getLogger(__name__)
@@ -155,36 +156,28 @@ async def execute2response(spec: ExecutionSpecification, user: UserRead | None) 
         return result.t
 
 
-async def execute_v2(request: JobExecuteV2Request, user_id: str | None) -> Either[JobExecuteV2Response, str]:  # type: ignore[invalid-argument]
-    """v2 execute path: always creates a JobExecution linked to a JobDefinition.
+async def get_job_definition_for_execution(definition_id: str, definition_version: int | None) -> JobDefinition | None:
+    """Retrieve a JobDefinition from the jobs2 store by id and optional version."""
+    return await db_jobs2.get_job_definition(definition_id, definition_version)
 
-    If `request.job_definition_id` is set the referenced definition is loaded from
-    jobs2 db and compiled.  If `request.spec` is set a one-off JobDefinition is
-    first persisted with source=oneoff_execution, then the spec is submitted directly.
-    Either way the cascade submission also writes to the v1 job.db for backward
-    compatibility with existing status/polling endpoints.
+
+async def execute_v2(definition: JobDefinition, user_id: str | None) -> Either[JobExecuteV2Response, str]:  # type: ignore[invalid-argument]
+    """v2 execute path: always creates a JobExecution linked to the given JobDefinition.
+
+    Compiles the definition's blocks via the fable compiler, submits the resulting
+    spec to cascade, persists a JobExecution row, and mirrors the submission to the
+    v1 job.db for backward-compatible status polling.
     """
-    if request.job_definition_id is not None:
-        definition = await db_jobs2.get_job_definition(request.job_definition_id, request.job_definition_version)
-        if definition is None:
-            return Either.error(f"JobDefinition {request.job_definition_id!r} not found")
-        if not definition.blocks:
-            return Either.error(f"JobDefinition {request.job_definition_id!r} has no compilable blocks")
-        builder = FableBuilderV1(
-            blocks=definition.blocks,  # ty:ignore[invalid-argument-type]
-            environment=EnvironmentSpecification.model_validate(definition.environment_spec) if definition.environment_spec else None,
-        )
-        spec = api_fable.compile(builder)
-        definition_id = str(definition.id)  # ty:ignore[invalid-argument-type]
-        definition_version = cast(int, definition.version)
-    else:
-        # request.spec is guaranteed non-None by the model validator
-        spec = request.spec  # type: ignore[assignment]
-        definition_id, definition_version = await db_jobs2.upsert_job_definition(
-            source="oneoff_execution",
-            created_by=user_id,
-            environment_spec=spec.environment.model_dump(mode="json"),
-        )
+    if not definition.blocks:
+        return Either.error(f"JobDefinition {definition.id!r} has no compilable blocks")
+
+    builder = FableBuilderV1(
+        blocks=definition.blocks,  # ty:ignore[invalid-argument-type]
+        environment=EnvironmentSpecification.model_validate(definition.environment_spec) if definition.environment_spec else None,
+    )
+    spec = api_fable.compile(builder)
+    definition_id = str(definition.id)  # ty:ignore[invalid-argument-type]
+    definition_version = cast(int, definition.version)
 
     execution_id, attempt_count = await db_jobs2.upsert_job_execution(
         job_definition_id=definition_id,
@@ -215,21 +208,7 @@ async def execute_v2(request: JobExecuteV2Request, user_id: str | None) -> Eithe
             update_kwargs["outputs"] = [x.model_dump() for x in product_to_id_mappings]
         await db_jobs2.update_job_execution_runtime(execution_id, attempt_count, **update_kwargs)
 
-        return Either.ok(
-            JobExecuteV2Response(
-                execution_id=execution_id,
-                id=cascade_job_id,
-                definition_id=definition_id,
-                definition_version=definition_version,
-            )
-        )
+        return Either.ok(JobExecuteV2Response(execution_id=execution_id, attempt_count=attempt_count))
     except Exception as e:
         await db_jobs2.update_job_execution_runtime(execution_id, attempt_count, status="failed", error=repr(e)[:255])
         return Either.error(repr(e))
-
-
-async def execute_v2_to_response(request: JobExecuteV2Request, user: UserRead | None) -> JobExecuteV2Response:
-    result = await execute_v2(request, str(user.id) if user is not None else None)
-    if result.t is None:
-        raise HTTPException(status_code=500, detail=f"Failed to execute because of {result.e}")
-    return result.t

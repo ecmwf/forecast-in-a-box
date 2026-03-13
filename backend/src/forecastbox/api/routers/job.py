@@ -27,7 +27,7 @@ from cascade.low.core import DatasetId, TaskId
 from fastapi import APIRouter, Body, Depends, HTTPException, Response, UploadFile
 from fastapi.responses import HTMLResponse
 
-from forecastbox.api.execution import ProductToOutputId, SubmitJobResponse, execute2response, execute_v2_to_response
+from forecastbox.api.execution import ProductToOutputId, SubmitJobResponse, execute2response, execute_v2, get_job_definition_for_execution
 from forecastbox.api.routers.gateway import Globals
 from forecastbox.api.types.jobs import ExecutionSpecification, JobExecuteV2Request, JobExecuteV2Response
 from forecastbox.api.utils import encode_result
@@ -523,21 +523,26 @@ async def execute_api(spec: ExecutionSpecification, user: UserRead | None = Depe
 async def execute_v2_api(request: JobExecuteV2Request, user: UserRead | None = Depends(current_active_user)) -> JobExecuteV2Response:
     """Execute a job via the v2 persistence path.
 
-    Always creates a JobExecution row in the jobs2 database.  Accepts either a
-    reference to an existing saved JobDefinition or a raw ExecutionSpecification
-    that is first persisted as a one-off definition.
+    Loads the referenced JobDefinition from the jobs2 store, compiles it, and
+    submits it to cascade, always creating a linked JobExecution row.
 
     Parameters
     ----------
     request : JobExecuteV2Request
-        Either job_definition_id (+ optional version) or a raw spec.
+        job_definition_id (+ optional version) referencing a saved JobDefinition.
     user : UserRead, optional
         The current active user.
 
     Returns
     -------
     JobExecuteV2Response
-        Contains the logical execution_id, the cascade job id (id), and the
-        linked definition_id / definition_version.
+        Contains the logical execution_id and attempt_count.
     """
-    return await execute_v2_to_response(request, user)
+    definition = await get_job_definition_for_execution(request.job_definition_id, request.job_definition_version)
+    if definition is None:
+        raise HTTPException(status_code=404, detail=f"JobDefinition {request.job_definition_id!r} not found")
+    user_id = str(user.id) if user is not None else None
+    result = await execute_v2(definition, user_id)
+    if result.t is None:
+        raise HTTPException(status_code=500, detail=f"Failed to execute because of {result.e}")
+    return result.t
