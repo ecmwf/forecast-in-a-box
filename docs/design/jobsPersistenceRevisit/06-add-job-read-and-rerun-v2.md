@@ -12,10 +12,12 @@ Add the read-side and rerun semantics for `JobExecution`, including latest-attem
 - Make `restart_v2` create a new `JobExecution` attempt under the same logical `id`.
 - For specification reads, return the linked `JobDefinition` payload or compiled spec in a way that supports re-execution and debugging.
 - Keep v1 job read endpoints unchanged.
+- Current `forecastbox.api.execution.execute_v2` method inserts into v1 jobs table, so that it can be polled/retrieved using v1 endpoints -- you can now remove that, since you will repalce that polling/retrieval with the new endpoints you are adding.
 
 ## Main files
 - `backend/src/forecastbox/api/routers/job.py`
-- jobs2 execution/db helpers
+- `backend/src/forecastbox/api/execution.py`
+- jobs2 db helpers and schema
 - focused unit tests around latest-attempt resolution
 
 ## Validation
