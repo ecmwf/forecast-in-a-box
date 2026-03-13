@@ -32,3 +32,24 @@ class ExecutionSpecification(BaseModel):
     job: RawCascadeJob  # = Field(discriminator="job_type")
     environment: EnvironmentSpecification
     shared: bool = Field(default=False)
+
+
+class JobExecuteV2Request(BaseModel):
+    """Request body for POST /job/execute_v2.
+
+    References an existing saved JobDefinition by id and optional version.
+    """
+
+    job_definition_id: str
+    """Reference to an existing saved JobDefinition."""
+    job_definition_version: int | None = None
+    """Specific version to use; omit to use the latest version."""
+
+
+class JobExecuteV2Response(BaseModel):
+    """Response from POST /job/execute_v2."""
+
+    execution_id: str
+    """Logical v2 execution id (JobExecution.id)."""
+    attempt_count: int
+    """Attempt number; always 1 on a fresh execution."""

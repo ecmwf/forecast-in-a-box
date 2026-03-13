@@ -9,11 +9,25 @@
 * there is pre-commit configured. Ideally do `uv run prek` before every commit
 
 # GitHub and Pull Requests
-* when asked to fetch PR review comments, use the GitHub API directly instead of `gh pr view`:
+* when asked to fetch PR review comments, use the GitHub GraphQL API to fetch only **unresolved** threads:
   ```bash
-  gh api repos/ecmwf/forecast-in-a-box/pulls/PR_NUMBER/comments | jq -r '.[] | "File: \(.path)\nLine: \(.line // .original_line)\nComment: \(.body)\n---"'
+  gh api graphql -f query='
+  {
+    repository(owner: "ecmwf", name: "forecast-in-a-box") {
+      pullRequest(number: PR_NUMBER) {
+        reviewThreads(first: 50) {
+          nodes {
+            isResolved
+            comments(first: 1) {
+              nodes { path line originalLine body }
+            }
+          }
+        }
+      }
+    }
+  }' | jq -r '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | "File: \(.comments.nodes[0].path)\nLine: \(.comments.nodes[0].line // .comments.nodes[0].originalLine)\nComment: \(.comments.nodes[0].body)\n---"'
   ```
-  This provides the actual inline review comments which `gh pr view` doesn't show properly.
+  This provides the actual inline review comments which `gh pr view` doesn't show properly, and filters out resolved threads.
 
 # Python-Related
 * utilize `just` for command running -- `just val` in backend is the "typechecking and testing". Always run this after you make any changes to python code

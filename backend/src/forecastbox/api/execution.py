@@ -12,7 +12,7 @@ import json
 import logging
 import time
 import uuid
-from typing import Any, Sequence
+from typing import Any, Sequence, cast
 
 import cascade.gateway.api as api
 import cascade.gateway.client as client
@@ -25,13 +25,17 @@ from earthkit.workflows.graph import Graph, deduplicate_nodes
 from fastapi import HTTPException
 from pydantic import BaseModel
 
+import forecastbox.api.fable as api_fable
+import forecastbox.db.jobs2 as db_jobs2
 from forecastbox.api.artifacts.manager import ArtifactManager, submit_artifact_download
-from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
+from forecastbox.api.types.fable import FableBuilderV1
+from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, JobExecuteV2Response, RawCascadeJob
 from forecastbox.api.utils import get_model_path
 from forecastbox.config import config
 from forecastbox.db.job import insert_one
 from forecastbox.models import get_model
 from forecastbox.products.registry import get_product
+from forecastbox.schemas.jobs2 import JobDefinition
 from forecastbox.schemas.user import UserRead
 
 logger = logging.getLogger(__name__)
@@ -150,3 +154,61 @@ async def execute2response(spec: ExecutionSpecification, user: UserRead | None) 
         raise HTTPException(status_code=500, detail=f"Failed to execute because of {result.e}")
     else:
         return result.t
+
+
+async def get_job_definition_for_execution(definition_id: str, definition_version: int | None) -> JobDefinition | None:
+    """Retrieve a JobDefinition from the jobs2 store by id and optional version."""
+    return await db_jobs2.get_job_definition(definition_id, definition_version)
+
+
+async def execute_v2(definition: JobDefinition, user_id: str | None) -> Either[JobExecuteV2Response, str]:  # type: ignore[invalid-argument]
+    """v2 execute path: always creates a JobExecution linked to the given JobDefinition.
+
+    Compiles the definition's blocks via the fable compiler, submits the resulting
+    spec to cascade, persists a JobExecution row, and mirrors the submission to the
+    v1 job.db for backward-compatible status polling.
+    """
+    if not definition.blocks:
+        return Either.error(f"JobDefinition {definition.id!r} has no compilable blocks")
+
+    builder = FableBuilderV1(
+        blocks=definition.blocks,  # ty:ignore[invalid-argument-type]
+        environment=EnvironmentSpecification.model_validate(definition.environment_spec) if definition.environment_spec else None,
+    )
+    spec = api_fable.compile(builder)
+    definition_id = str(definition.id)  # ty:ignore[invalid-argument-type]
+    definition_version = cast(int, definition.version)
+
+    execution_id, attempt_count = await db_jobs2.upsert_job_execution(
+        job_definition_id=definition_id,
+        job_definition_version=definition_version,
+        created_by=user_id,
+        status="submitted",
+    )
+
+    try:
+        loop = asyncio.get_running_loop()
+        response, product_to_id_mappings = await loop.run_in_executor(None, _execute_cascade, spec)
+        cascade_job_id = response.job_id or str(uuid.uuid4())
+
+        # Record in v1 job.db so existing status/polling endpoints keep working
+        await insert_one(
+            cascade_job_id,
+            response.error,
+            user_id,
+            spec.model_dump_json(),
+            json.dumps([x.model_dump() for x in product_to_id_mappings]),
+        )
+
+        update_kwargs: dict[str, object] = {"cascade_job_id": cascade_job_id}
+        if response.error:
+            update_kwargs["status"] = "failed"
+            update_kwargs["error"] = response.error[:255]
+        else:
+            update_kwargs["outputs"] = [x.model_dump() for x in product_to_id_mappings]
+        await db_jobs2.update_job_execution_runtime(execution_id, attempt_count, **update_kwargs)
+
+        return Either.ok(JobExecuteV2Response(execution_id=execution_id, attempt_count=attempt_count))
+    except Exception as e:
+        await db_jobs2.update_job_execution_runtime(execution_id, attempt_count, status="failed", error=repr(e)[:255])
+        return Either.error(repr(e))

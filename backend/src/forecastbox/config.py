@@ -43,6 +43,8 @@ class DatabaseSettings(BaseModel):
     """Location of the sqlite file for user auth+info"""
     sqlite_jobdb_path: str = str(fiab_home / "job.db")
     """Location of the sqlite file for job progress tracking"""
+    sqlite_jobs2db_path: str = str(fiab_home / "jobs2.db")
+    """Location of the sqlite file for the v2 jobs persistence layer"""
 
     def validate_runtime(self) -> list[str]:
         errors = []
@@ -50,6 +52,8 @@ class DatabaseSettings(BaseModel):
             errors.append(f"parent directory doesnt exist: sqlite_userdb_path={self.sqlite_userdb_path}")
         if not Path(self.sqlite_jobdb_path).parent.is_dir():
             errors.append(f"parent directory doesnt exist: sqlite_jobdb_path={self.sqlite_jobdb_path}")
+        if not Path(self.sqlite_jobs2db_path).parent.is_dir():
+            errors.append(f"parent directory doesnt exist: sqlite_jobs2db_path={self.sqlite_jobs2db_path}")
         return errors
 
     # TODO consider renaming to just userdb_url and make protocol part of it
