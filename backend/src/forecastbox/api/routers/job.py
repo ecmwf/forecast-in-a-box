@@ -27,9 +27,9 @@ from cascade.low.core import DatasetId, TaskId
 from fastapi import APIRouter, Body, Depends, HTTPException, Response, UploadFile
 from fastapi.responses import HTMLResponse
 
-from forecastbox.api.execution import ProductToOutputId, SubmitJobResponse, execute2response
+from forecastbox.api.execution import ProductToOutputId, SubmitJobResponse, execute2response, execute_v2_to_response
 from forecastbox.api.routers.gateway import Globals
-from forecastbox.api.types.jobs import ExecutionSpecification
+from forecastbox.api.types.jobs import ExecutionSpecification, JobExecuteV2Request, JobExecuteV2Response
 from forecastbox.api.utils import encode_result
 from forecastbox.auth.users import current_active_user
 from forecastbox.config import config
@@ -517,3 +517,27 @@ async def execute_api(spec: ExecutionSpecification, user: UserRead | None = Depe
         Job submission response containing the job ID.
     """
     return await execute2response(spec, user)
+
+
+@router.post("/execute_v2")
+async def execute_v2_api(request: JobExecuteV2Request, user: UserRead | None = Depends(current_active_user)) -> JobExecuteV2Response:
+    """Execute a job via the v2 persistence path.
+
+    Always creates a JobExecution row in the jobs2 database.  Accepts either a
+    reference to an existing saved JobDefinition or a raw ExecutionSpecification
+    that is first persisted as a one-off definition.
+
+    Parameters
+    ----------
+    request : JobExecuteV2Request
+        Either job_definition_id (+ optional version) or a raw spec.
+    user : UserRead, optional
+        The current active user.
+
+    Returns
+    -------
+    JobExecuteV2Response
+        Contains the logical execution_id, the cascade job id (id), and the
+        linked definition_id / definition_version.
+    """
+    return await execute_v2_to_response(request, user)
