@@ -28,7 +28,7 @@ from forecastbox.api.types.fable import (
     FableSaveV2Response,
     FableValidationExpansion,
 )
-from forecastbox.api.types.jobs import ExecutionSpecification
+from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification
 from forecastbox.auth.users import current_active_user
 from forecastbox.schemas.user import UserRead
 
@@ -113,6 +113,7 @@ async def upsert_fable_builder_v2(
             source="user_defined",
             created_by=created_by,
             builder_spec=payload.builder.model_dump(mode="json"),
+            environment_spec=payload.environment.model_dump(mode="json") if payload.environment is not None else None,
             display_name=payload.display_name,
             display_description=payload.display_description,
             tags=payload.tags if payload.tags else None,
@@ -141,6 +142,7 @@ async def retrieve_fable_builder_v2(
         id=definition.id,  # ty:ignore[invalid-argument-type]
         version=definition.version,  # ty:ignore[invalid-argument-type]
         builder=FableBuilderV1.model_validate(definition.builder_spec),
+        environment=EnvironmentSpecification.model_validate(definition.environment_spec) if definition.environment_spec is not None else None,
         display_name=definition.display_name,  # ty:ignore[invalid-argument-type]
         display_description=definition.display_description,  # ty:ignore[invalid-argument-type]
         tags=definition.tags or [],  # ty:ignore[invalid-argument-type]
