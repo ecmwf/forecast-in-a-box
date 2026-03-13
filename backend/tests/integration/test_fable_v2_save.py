@@ -27,10 +27,9 @@ def _make_builder() -> FableBuilderV1:
 
 def test_fable_v2_save_and_retrieve(backend_client_with_auth):
     builder = _make_builder()
-    env = EnvironmentSpecification(hosts=2, workers_per_host=4)
+    builder.environment = EnvironmentSpecification(hosts=2, workers_per_host=4)
     payload = FableSaveV2Request(
         builder=builder,
-        environment=env,
         display_name="Test Fable",
         display_description="A fable saved via the v2 API",
         tags=["test", "integration"],
@@ -53,11 +52,11 @@ def test_fable_v2_save_and_retrieve(backend_client_with_auth):
     assert retrieved["display_name"] == "Test Fable"
     assert retrieved["tags"] == ["test", "integration"]
     assert retrieved["builder"]["blocks"]["source1"]["factory_id"]["factory"] == "ekdSource"
-    assert retrieved["environment"]["hosts"] == 2
-    assert retrieved["environment"]["workers_per_host"] == 4
+    assert retrieved["builder"]["environment"]["hosts"] == 2
+    assert retrieved["builder"]["environment"]["workers_per_host"] == 4
 
     # Saving again with the same id creates a new version
-    payload2 = FableSaveV2Request(builder=builder, display_name="Test Fable v2")
+    payload2 = FableSaveV2Request(builder=_make_builder(), display_name="Test Fable v2")
     response = backend_client_with_auth.post(
         "/fable/upsert_v2", params={"fable_id": fable_id}, json=payload2.model_dump()
     )
@@ -72,7 +71,7 @@ def test_fable_v2_save_and_retrieve(backend_client_with_auth):
     latest = response.json()
     assert latest["version"] == 2
     assert latest["display_name"] == "Test Fable v2"
-    assert latest["environment"] is None
+    assert latest["builder"]["environment"] is None
 
     # Retrieve specific version 1 still works
     response = backend_client_with_auth.get("/fable/retrieve_v2", params={"fable_id": fable_id, "version": 1})

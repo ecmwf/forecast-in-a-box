@@ -47,7 +47,7 @@ async def test_jobs2_job_definition_insert_and_get(mem_session_maker, monkeypatc
         source="user_defined",
         created_by="user1",
         display_name="My job",
-        builder_spec={"blocks": []},
+        blocks={"source1": {}},
         tags=["tag1"],
     )
     assert v1 == 1
@@ -343,7 +343,7 @@ async def test_jobs2_experiment_next_upsert(mem_session_maker, monkeypatch):
 async def test_jobs2_upsert_job_definition_unknown_id_raises(mem_session_maker, monkeypatch):
     monkeypatch.setattr(jobs2_db, "async_session_maker", mem_session_maker)
 
-    with pytest.raises(ValueError, match="No JobDefinition"):
+    with pytest.raises(KeyError, match="No JobDefinition"):
         await jobs2_db.upsert_job_definition(
             id="nonexistent-id", source="user_defined", created_by="user1"
         )
@@ -355,7 +355,7 @@ async def test_jobs2_upsert_experiment_definition_unknown_id_raises(mem_session_
 
     job_id, job_v = await jobs2_db.upsert_job_definition(source="user_defined", created_by="user1")
 
-    with pytest.raises(ValueError, match="No ExperimentDefinition"):
+    with pytest.raises(KeyError, match="No ExperimentDefinition"):
         await jobs2_db.upsert_experiment_definition(
             id="nonexistent-id",
             job_definition_id=job_id,
@@ -371,7 +371,7 @@ async def test_jobs2_upsert_job_execution_unknown_id_raises(mem_session_maker, m
 
     job_id, job_v = await jobs2_db.upsert_job_definition(source="user_defined", created_by="user1")
 
-    with pytest.raises(ValueError, match="No JobExecution"):
+    with pytest.raises(KeyError, match="No JobExecution"):
         await jobs2_db.upsert_job_execution(
             id="nonexistent-id",
             job_definition_id=job_id,

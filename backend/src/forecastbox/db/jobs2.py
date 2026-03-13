@@ -59,7 +59,7 @@ async def upsert_job_definition(
     id: str | None = None,
     source: JobDefinitionSource,
     created_by: str | None,
-    builder_spec: dict | None = None,
+    blocks: dict | None = None,
     environment_spec: dict | None = None,
     display_name: str | None = None,
     display_description: str | None = None,
@@ -70,7 +70,7 @@ async def upsert_job_definition(
 
     If `id` is omitted a fresh UUID is generated (version 1).
     If `id` is supplied the next version number is derived from the database;
-    a ValueError is raised if that id does not exist yet.
+    a KeyError is raised if that id does not exist yet.
     """
     id_provided = id is not None
     definition_id = id or str(uuid.uuid4())
@@ -83,7 +83,7 @@ async def upsert_job_definition(
             )
             max_version: int | None = result.scalar()
             if id_provided and max_version is None:
-                raise ValueError(f"No JobDefinition with id={definition_id!r} exists; cannot add a new version.")
+                raise KeyError(f"No JobDefinition with id={definition_id!r} exists; cannot add a new version.")
             new_version = (max_version or 0) + 1
             session.add(
                 JobDefinition(
@@ -96,7 +96,7 @@ async def upsert_job_definition(
                     display_name=display_name,
                     display_description=display_description,
                     tags=tags,
-                    builder_spec=builder_spec,
+                    blocks=blocks,
                     environment_spec=environment_spec,
                     is_deleted=False,
                 )
@@ -174,7 +174,7 @@ async def upsert_experiment_definition(
 
     If `id` is omitted a fresh UUID is generated (version 1).
     If `id` is supplied the next version number is derived from the database;
-    a ValueError is raised if that id does not exist yet.
+    a KeyError is raised if that id does not exist yet.
     """
     id_provided = id is not None
     experiment_id = id or str(uuid.uuid4())
@@ -187,7 +187,7 @@ async def upsert_experiment_definition(
             )
             max_version: int | None = result.scalar()
             if id_provided and max_version is None:
-                raise ValueError(f"No ExperimentDefinition with id={experiment_id!r} exists; cannot add a new version.")
+                raise KeyError(f"No ExperimentDefinition with id={experiment_id!r} exists; cannot add a new version.")
             new_version = (max_version or 0) + 1
             session.add(
                 ExperimentDefinition(
@@ -281,7 +281,7 @@ async def upsert_job_execution(
     If `id` is omitted a fresh UUID is generated (attempt 1).
     If `id` is supplied the next attempt number is derived from the database,
     enabling re-run tracking under the same execution identity;
-    a ValueError is raised if that id does not exist yet.
+    a KeyError is raised if that id does not exist yet.
     """
     id_provided = id is not None
     execution_id = id or str(uuid.uuid4())
@@ -294,7 +294,7 @@ async def upsert_job_execution(
             )
             max_attempt: int | None = result.scalar()
             if id_provided and max_attempt is None:
-                raise ValueError(f"No JobExecution with id={execution_id!r} exists; cannot add a new attempt.")
+                raise KeyError(f"No JobExecution with id={execution_id!r} exists; cannot add a new attempt.")
             new_attempt = (max_attempt or 0) + 1
             session.add(
                 JobExecution(

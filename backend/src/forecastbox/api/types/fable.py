@@ -21,6 +21,7 @@ from forecastbox.api.types.jobs import EnvironmentSpecification
 
 class FableBuilderV1(BaseModel):
     blocks: dict[BlockInstanceId, BlockInstance]
+    environment: EnvironmentSpecification | None = None
 
 
 class FableValidationExpansion(BaseModel):
@@ -36,7 +37,6 @@ class FableSaveV2Request(BaseModel):
     """Payload for saving a fable builder via the v2 persistence path."""
 
     builder: FableBuilderV1
-    environment: EnvironmentSpecification | None = None
     display_name: str | None = None
     display_description: str | None = None
     tags: list[str] = []
@@ -56,7 +56,6 @@ class FableRetrieveV2Response(BaseModel):
     id: str
     version: int
     builder: FableBuilderV1
-    environment: EnvironmentSpecification | None = None
     display_name: str | None = None
     display_description: str | None = None
     tags: list[str] = []
