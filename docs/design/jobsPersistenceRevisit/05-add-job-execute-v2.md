@@ -22,7 +22,7 @@ Add a v2 execution write path that always creates a `JobExecution` and can eithe
 - Use the stable raw-job patterns from `tests/integration/test_submit_job.py` for focused v2 validation.
 - `cd backend && uv run ty check`
 - `cd backend && uv run pytest tests/integration -k submit_job_v2_execute`
-- If baseline noise is resolved on the branch, also run `cd backend && just val`.
+- At the very end run `cd backend && just val`.
 
 ## Non-goals
 - No restart / rerun semantics yet

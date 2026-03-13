@@ -2,7 +2,7 @@
 Add a v2 save/load path for persisted job definitions while leaving the current fable endpoints untouched.
 
 ## Scope
-- Add `POST /api/v1/fable/save_v2`.
+- Add `POST /api/v1/fable/upsert_v2`.
 - Add `GET /api/v1/fable/retrieve_v2`.
 - Persist saved fables as `JobDefinition` rows with `source=user_defined`.
 - Store enough payload to reconstruct the current builder-oriented workflow: at minimum the builder JSON plus display metadata/tags/source/parent linkage fields needed by the new schema.
@@ -20,7 +20,7 @@ Add a v2 save/load path for persisted job definitions while leaving the current 
 - Existing `/fable/upsert` and `/fable/retrieve` behavior is unchanged.
 - `cd backend && uv run ty check`
 - `cd backend && uv run pytest tests/integration -k fable_v2_save`
-- If baseline noise is resolved on the branch, also run `cd backend && just val`.
+- At the very end run `cd backend && just val`.
 
 ## Non-goals
 - No compile behavior yet

@@ -25,7 +25,7 @@ Add v2 schedule persistence backed by `ExperimentDefinition` and `ExperimentNext
 - A copied v2 integration test mirrors the stable CRUD/list/next-run checks from `tests/integration/test_schedule.py`.
 - `cd backend && uv run ty check`
 - `cd backend && uv run pytest tests/integration -k schedule_v2_persistence`
-- If baseline noise is resolved on the branch, also run `cd backend && just val`.
+- At the very end run `cd backend && just val`.
 
 ## Non-goals
 - No scheduler-thread execution yet

@@ -25,7 +25,7 @@ Add the read-side and rerun semantics for `JobExecution`, including latest-attem
 - `cd backend && uv run ty check`
 - `cd backend && uv run pytest tests/unit -k latest_attempt`
 - `cd backend && uv run pytest tests/integration -k submit_job_v2_read`
-- If baseline noise is resolved on the branch, also run `cd backend && just val`.
+- At the very end run `cd backend && just val`.
 
 ## Non-goals
 - No endpoint deletion

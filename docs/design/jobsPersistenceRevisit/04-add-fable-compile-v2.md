@@ -19,7 +19,7 @@ Compile a persisted `JobDefinition` through a new v2 endpoint instead of compili
 - The returned `ExecutionSpecification` is usable by the later v2 execution work.
 - `cd backend && uv run ty check`
 - `cd backend && uv run pytest tests/integration -k fable_v2_compile`
-- If baseline noise is resolved on the branch, also run `cd backend && just val`.
+- At the very end run `cd backend && just val`.
 
 ## Non-goals
 - No execution submission yet

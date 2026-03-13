@@ -22,7 +22,7 @@ Make the scheduler and schedule run read-model work against v2 persistence so sc
 - `cd backend && uv run ty check`
 - `cd backend && uv run pytest tests/unit -k experiment_runnable`
 - `cd backend && uv run pytest tests/integration -k schedule_v2_runs`
-- If baseline noise is resolved on the branch, also run `cd backend && just val`.
+- At the very end run `cd backend && just val`.
 
 ## Non-goals
 - No garbage collection

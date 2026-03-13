@@ -28,7 +28,7 @@ Create the new persistence model and DB helpers behind the new database, includi
 - Soft-delete helpers exclude deleted rows from normal reads.
 - `cd backend && uv run ty check`
 - `cd backend && uv run pytest tests/unit -k jobs2`
-- If baseline noise is resolved on the branch, also run `cd backend && just val`.
+- At the very end run `cd backend && just val`.
 
 ## Non-goals
 - No router changes yet
