@@ -19,8 +19,8 @@ from fiab_core.fable import BlockFactoryCatalogue
 
 import forecastbox.api.fable as api_fable
 import forecastbox.db.fable as db_fable
-from forecastbox.api.plugin.manager import PluginCompositeId, catalogue_view, plugins_ready
 import forecastbox.db.jobs2 as db_jobs2
+from forecastbox.api.plugin.manager import PluginCompositeId, catalogue_view, plugins_ready
 from forecastbox.api.types.fable import (
     FableBuilderV1,
     FableCompileV2Request,

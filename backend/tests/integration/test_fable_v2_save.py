@@ -57,9 +57,7 @@ def test_fable_v2_save_and_retrieve(backend_client_with_auth):
 
     # Saving again with the same id creates a new version
     payload2 = FableSaveV2Request(builder=_make_builder(), display_name="Test Fable v2")
-    response = backend_client_with_auth.post(
-        "/fable/upsert_v2", params={"fable_id": fable_id}, json=payload2.model_dump()
-    )
+    response = backend_client_with_auth.post("/fable/upsert_v2", params={"fable_id": fable_id}, json=payload2.model_dump())
     assert response.is_success, response.text
     saved2 = response.json()
     assert saved2["id"] == fable_id
@@ -89,9 +87,7 @@ def test_fable_v2_upsert_nonexistent_id(backend_client_with_auth):
     """Attempting to add a version to a non-existent id returns 404."""
     builder = _make_builder()
     payload = FableSaveV2Request(builder=builder)
-    response = backend_client_with_auth.post(
-        "/fable/upsert_v2", params={"fable_id": "no-such-id"}, json=payload.model_dump()
-    )
+    response = backend_client_with_auth.post("/fable/upsert_v2", params={"fable_id": "no-such-id"}, json=payload.model_dump())
     assert response.status_code == 404
 
 

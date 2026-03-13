@@ -78,9 +78,7 @@ async def upsert_job_definition(
 
     async def function(i: int) -> int:
         async with async_session_maker() as session:
-            result = await session.execute(
-                select(func.max(JobDefinition.version)).where(JobDefinition.id == definition_id)
-            )
+            result = await session.execute(select(func.max(JobDefinition.version)).where(JobDefinition.id == definition_id))
             max_version: int | None = result.scalar()
             if id_provided and max_version is None:
                 raise KeyError(f"No JobDefinition with id={definition_id!r} exists; cannot add a new version.")
@@ -182,9 +180,7 @@ async def upsert_experiment_definition(
 
     async def function(i: int) -> int:
         async with async_session_maker() as session:
-            result = await session.execute(
-                select(func.max(ExperimentDefinition.version)).where(ExperimentDefinition.id == experiment_id)
-            )
+            result = await session.execute(select(func.max(ExperimentDefinition.version)).where(ExperimentDefinition.id == experiment_id))
             max_version: int | None = result.scalar()
             if id_provided and max_version is None:
                 raise KeyError(f"No ExperimentDefinition with id={experiment_id!r} exists; cannot add a new version.")
@@ -246,8 +242,7 @@ async def list_experiment_definitions() -> Iterable[ExperimentDefinition]:
             )
             query = select(ExperimentDefinition).join(
                 subq,
-                (ExperimentDefinition.id == subq.c.id)
-                & (ExperimentDefinition.version == subq.c.max_version),
+                (ExperimentDefinition.id == subq.c.id) & (ExperimentDefinition.version == subq.c.max_version),
             )
             result = await session.execute(query)
             return [r[0] for r in result.all()]
@@ -289,9 +284,7 @@ async def upsert_job_execution(
 
     async def function(i: int) -> int:
         async with async_session_maker() as session:
-            result = await session.execute(
-                select(func.max(JobExecution.attempt_count)).where(JobExecution.id == execution_id)
-            )
+            result = await session.execute(select(func.max(JobExecution.attempt_count)).where(JobExecution.id == execution_id))
             max_attempt: int | None = result.scalar()
             if id_provided and max_attempt is None:
                 raise KeyError(f"No JobExecution with id={execution_id!r} exists; cannot add a new attempt.")
@@ -340,9 +333,7 @@ async def update_job_execution_runtime(id: str, attempt_count: int, **kwargs: ob
     """Update mutable runtime fields on a specific JobExecution attempt."""
     ref_time = dt.datetime.now()
     stmt = (
-        update(JobExecution)
-        .where(JobExecution.id == id, JobExecution.attempt_count == attempt_count)
-        .values(updated_at=ref_time, **kwargs)
+        update(JobExecution).where(JobExecution.id == id, JobExecution.attempt_count == attempt_count).values(updated_at=ref_time, **kwargs)
     )
     await executeAndCommit(stmt, async_session_maker)
 

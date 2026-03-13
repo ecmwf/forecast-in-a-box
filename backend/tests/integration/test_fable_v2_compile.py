@@ -82,9 +82,7 @@ def test_fable_v2_compile_specific_version(tmpdir, backend_client_with_auth):
         }
     )
     payload_v2 = FableSaveV2Request(builder=source_only, display_name="Version Test v2")
-    save_resp2 = backend_client_with_auth.post(
-        "/fable/upsert_v2", params={"fable_id": fable_id}, json=payload_v2.model_dump()
-    )
+    save_resp2 = backend_client_with_auth.post("/fable/upsert_v2", params={"fable_id": fable_id}, json=payload_v2.model_dump())
     assert save_resp2.is_success, save_resp2.text
     assert save_resp2.json()["version"] == 2
 

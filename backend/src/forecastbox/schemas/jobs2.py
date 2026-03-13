@@ -17,7 +17,7 @@ supported on all main tables via `is_deleted`.
 
 from typing import Literal
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKeyConstraint, Integer, JSON, String
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKeyConstraint, Integer, String
 from sqlalchemy.orm import DeclarativeBase
 
 JobDefinitionSource = Literal["plugin_template", "user_defined", "oneoff_execution"]

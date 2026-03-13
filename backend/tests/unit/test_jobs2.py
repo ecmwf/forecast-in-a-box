@@ -344,9 +344,7 @@ async def test_jobs2_upsert_job_definition_unknown_id_raises(mem_session_maker, 
     monkeypatch.setattr(jobs2_db, "async_session_maker", mem_session_maker)
 
     with pytest.raises(KeyError, match="No JobDefinition"):
-        await jobs2_db.upsert_job_definition(
-            id="nonexistent-id", source="user_defined", created_by="user1"
-        )
+        await jobs2_db.upsert_job_definition(id="nonexistent-id", source="user_defined", created_by="user1")
 
 
 @pytest.mark.asyncio
