@@ -23,6 +23,7 @@ from forecastbox.api.plugin.manager import PluginCompositeId, catalogue_view, pl
 import forecastbox.db.jobs2 as db_jobs2
 from forecastbox.api.types.fable import (
     FableBuilderV1,
+    FableCompileV2Request,
     FableRetrieveV2Response,
     FableSaveV2Request,
     FableSaveV2Response,
@@ -155,3 +156,24 @@ async def retrieve_fable_builder_v2(
         tags=definition.tags or [],  # ty:ignore[invalid-argument-type]
         parent_id=definition.parent_id,  # ty:ignore[invalid-argument-type]
     )
+
+
+@router.put("/compile_v2")
+async def compile_fable_v2(request: FableCompileV2Request) -> ExecutionSpecification:
+    """Load a saved builder from the v2 store by reference and compile it to an ExecutionSpecification.
+
+    If `version` is omitted the latest non-deleted version is used. The returned
+    ExecutionSpecification has the same shape as the one from /compile.
+    """
+    definition = await db_jobs2.get_job_definition(request.id, request.version)
+    if definition is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fable definition not found")
+    if definition.blocks is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fable definition has no builder spec")
+    builder = FableBuilderV1(blocks=definition.blocks)  # ty:ignore[invalid-argument-type]
+    if definition.environment_spec is not None:
+        builder.environment = EnvironmentSpecification.model_validate(definition.environment_spec)
+    try:
+        return api_fable.compile(builder)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))

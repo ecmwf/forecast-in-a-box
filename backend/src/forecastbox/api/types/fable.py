@@ -60,3 +60,10 @@ class FableRetrieveV2Response(BaseModel):
     display_description: str | None = None
     tags: list[str] = []
     parent_id: str | None = None
+
+
+class FableCompileV2Request(BaseModel):
+    """Reference to a saved JobDefinition for compile_v2."""
+
+    id: str
+    version: int | None = None
