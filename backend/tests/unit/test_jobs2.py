@@ -43,7 +43,7 @@ async def mem_session_maker():
 async def test_jobs2_job_definition_insert_and_get(mem_session_maker, monkeypatch):
     monkeypatch.setattr(jobs2_db, "async_session_maker", mem_session_maker)
 
-    job_id, v1 = await jobs2_db.insert_job_definition(
+    job_id, v1 = await jobs2_db.upsert_job_definition(
         source="user_defined",
         created_by="user1",
         display_name="My job",
@@ -65,15 +65,20 @@ async def test_jobs2_job_definition_insert_and_get(mem_session_maker, monkeypatc
 async def test_jobs2_job_definition_latest_version(mem_session_maker, monkeypatch):
     monkeypatch.setattr(jobs2_db, "async_session_maker", mem_session_maker)
 
-    job_id, v1 = await jobs2_db.insert_job_definition(source="user_defined", created_by="user1")
-    assert v1 == 1
+    job_id, v1 = await jobs2_db.upsert_job_definition(source="user_defined", created_by="user1")
+    _, v2 = await jobs2_db.upsert_job_definition(id=job_id, source="user_defined", created_by="user1")
+    _, v3 = await jobs2_db.upsert_job_definition(id=job_id, source="user_defined", created_by="user1")
 
-    # Default get returns version 1
+    assert v1 == 1
+    assert v2 == 2
+    assert v3 == 3
+
+    # Latest version returned when no explicit version given
     latest = await jobs2_db.get_job_definition(job_id)
     assert latest is not None
-    assert latest.version == 1
+    assert latest.version == 3
 
-    # Explicit version lookup also works
+    # Explicit version lookup still works
     specific = await jobs2_db.get_job_definition(job_id, version=1)
     assert specific is not None
     assert specific.version == 1
@@ -83,7 +88,7 @@ async def test_jobs2_job_definition_latest_version(mem_session_maker, monkeypatc
 async def test_jobs2_job_definition_soft_delete(mem_session_maker, monkeypatch):
     monkeypatch.setattr(jobs2_db, "async_session_maker", mem_session_maker)
 
-    job_id, _ = await jobs2_db.insert_job_definition(source="user_defined", created_by="user1")
+    job_id, _ = await jobs2_db.upsert_job_definition(source="user_defined", created_by="user1")
 
     await jobs2_db.soft_delete_job_definition(job_id)
 
@@ -99,19 +104,22 @@ async def test_jobs2_job_definition_soft_delete(mem_session_maker, monkeypatch):
 async def test_jobs2_list_job_definitions_latest_only(mem_session_maker, monkeypatch):
     monkeypatch.setattr(jobs2_db, "async_session_maker", mem_session_maker)
 
-    job_id, _ = await jobs2_db.insert_job_definition(source="user_defined", created_by="user1")
+    job_id, _ = await jobs2_db.upsert_job_definition(source="user_defined", created_by="user1")
+    await jobs2_db.upsert_job_definition(id=job_id, source="user_defined", created_by="user1")
+    await jobs2_db.upsert_job_definition(id=job_id, source="user_defined", created_by="user1")
 
     # A second independent definition
-    other_id, _ = await jobs2_db.insert_job_definition(source="oneoff_execution", created_by="user2")
+    other_id, _ = await jobs2_db.upsert_job_definition(source="oneoff_execution", created_by="user2")
 
     definitions = list(await jobs2_db.list_job_definitions())
     ids = [d.id for d in definitions]
     assert job_id in ids
     assert other_id in ids
 
-    # Each definition appears exactly once
-    assert sum(1 for d in definitions if d.id == job_id) == 1
-    assert sum(1 for d in definitions if d.id == other_id) == 1
+    # Only the latest version for job_id is returned
+    matching = [d for d in definitions if d.id == job_id]
+    assert len(matching) == 1
+    assert matching[0].version == 3
 
 
 # ---------------------------------------------------------------------------
@@ -123,9 +131,9 @@ async def test_jobs2_list_job_definitions_latest_only(mem_session_maker, monkeyp
 async def test_jobs2_experiment_definition_versioning(mem_session_maker, monkeypatch):
     monkeypatch.setattr(jobs2_db, "async_session_maker", mem_session_maker)
 
-    job_id, job_v = await jobs2_db.insert_job_definition(source="user_defined", created_by="user1")
+    job_id, job_v = await jobs2_db.upsert_job_definition(source="user_defined", created_by="user1")
 
-    exp_id, v1 = await jobs2_db.insert_experiment_definition(
+    exp_id, v1 = await jobs2_db.upsert_experiment_definition(
         job_definition_id=job_id,
         job_definition_version=job_v,
         experiment_type="cron_schedule",
@@ -134,18 +142,28 @@ async def test_jobs2_experiment_definition_versioning(mem_session_maker, monkeyp
     )
     assert v1 == 1
 
+    _, v2 = await jobs2_db.upsert_experiment_definition(
+        id=exp_id,
+        job_definition_id=job_id,
+        job_definition_version=job_v,
+        experiment_type="cron_schedule",
+        created_by="user1",
+        experiment_definition={"cron": "30 * * * *"},
+    )
+    assert v2 == 2
+
     latest = await jobs2_db.get_experiment_definition(exp_id)
     assert latest is not None
-    assert latest.version == 1
-    assert latest.experiment_definition == {"cron": "0 * * * *"}
+    assert latest.version == 2
+    assert latest.experiment_definition == {"cron": "30 * * * *"}
 
 
 @pytest.mark.asyncio
 async def test_jobs2_experiment_definition_soft_delete(mem_session_maker, monkeypatch):
     monkeypatch.setattr(jobs2_db, "async_session_maker", mem_session_maker)
 
-    job_id, job_v = await jobs2_db.insert_job_definition(source="user_defined", created_by="user1")
-    exp_id, _ = await jobs2_db.insert_experiment_definition(
+    job_id, job_v = await jobs2_db.upsert_job_definition(source="user_defined", created_by="user1")
+    exp_id, _ = await jobs2_db.upsert_experiment_definition(
         job_definition_id=job_id,
         job_definition_version=job_v,
         experiment_type="cron_schedule",
@@ -168,9 +186,9 @@ async def test_jobs2_experiment_definition_soft_delete(mem_session_maker, monkey
 async def test_jobs2_job_execution_latest_attempt(mem_session_maker, monkeypatch):
     monkeypatch.setattr(jobs2_db, "async_session_maker", mem_session_maker)
 
-    job_id, job_v = await jobs2_db.insert_job_definition(source="user_defined", created_by="user1")
+    job_id, job_v = await jobs2_db.upsert_job_definition(source="user_defined", created_by="user1")
 
-    exec_id, a1 = await jobs2_db.insert_job_execution(
+    exec_id, a1 = await jobs2_db.upsert_job_execution(
         job_definition_id=job_id,
         job_definition_version=job_v,
         created_by="user1",
@@ -178,10 +196,19 @@ async def test_jobs2_job_execution_latest_attempt(mem_session_maker, monkeypatch
     )
     assert a1 == 1
 
-    # Default get returns the single attempt
+    _, a2 = await jobs2_db.upsert_job_execution(
+        id=exec_id,
+        job_definition_id=job_id,
+        job_definition_version=job_v,
+        created_by="user1",
+        status="submitted",
+    )
+    assert a2 == 2
+
+    # Latest attempt returned by default
     latest = await jobs2_db.get_job_execution(exec_id)
     assert latest is not None
-    assert latest.attempt_count == 1
+    assert latest.attempt_count == 2
 
     # Explicit attempt lookup works
     first = await jobs2_db.get_job_execution(exec_id, attempt_count=1)
@@ -193,8 +220,8 @@ async def test_jobs2_job_execution_latest_attempt(mem_session_maker, monkeypatch
 async def test_jobs2_update_job_execution_runtime(mem_session_maker, monkeypatch):
     monkeypatch.setattr(jobs2_db, "async_session_maker", mem_session_maker)
 
-    job_id, job_v = await jobs2_db.insert_job_definition(source="user_defined", created_by="user1")
-    exec_id, attempt = await jobs2_db.insert_job_execution(
+    job_id, job_v = await jobs2_db.upsert_job_definition(source="user_defined", created_by="user1")
+    exec_id, attempt = await jobs2_db.upsert_job_execution(
         job_definition_id=job_id,
         job_definition_version=job_v,
         created_by="user1",
@@ -216,8 +243,8 @@ async def test_jobs2_update_job_execution_runtime(mem_session_maker, monkeypatch
 async def test_jobs2_job_execution_soft_delete(mem_session_maker, monkeypatch):
     monkeypatch.setattr(jobs2_db, "async_session_maker", mem_session_maker)
 
-    job_id, job_v = await jobs2_db.insert_job_definition(source="user_defined", created_by="user1")
-    exec_id, _ = await jobs2_db.insert_job_execution(
+    job_id, job_v = await jobs2_db.upsert_job_definition(source="user_defined", created_by="user1")
+    exec_id, _ = await jobs2_db.upsert_job_execution(
         job_definition_id=job_id,
         job_definition_version=job_v,
         created_by="user1",
@@ -235,8 +262,8 @@ async def test_jobs2_job_execution_soft_delete(mem_session_maker, monkeypatch):
 async def test_jobs2_list_job_executions_latest_only(mem_session_maker, monkeypatch):
     monkeypatch.setattr(jobs2_db, "async_session_maker", mem_session_maker)
 
-    job_id, job_v = await jobs2_db.insert_job_definition(source="user_defined", created_by="user1")
-    exec_id, _ = await jobs2_db.insert_job_execution(
+    job_id, job_v = await jobs2_db.upsert_job_definition(source="user_defined", created_by="user1")
+    exec_id, _ = await jobs2_db.upsert_job_execution(
         job_definition_id=job_id, job_definition_version=job_v, created_by="user1", status="submitted"
     )
 
@@ -280,8 +307,8 @@ async def test_jobs2_global_defaults(mem_session_maker, monkeypatch):
 async def test_jobs2_experiment_next_upsert(mem_session_maker, monkeypatch):
     monkeypatch.setattr(jobs2_db, "async_session_maker", mem_session_maker)
 
-    job_id, job_v = await jobs2_db.insert_job_definition(source="user_defined", created_by="user1")
-    exp_id, _ = await jobs2_db.insert_experiment_definition(
+    job_id, job_v = await jobs2_db.upsert_job_definition(source="user_defined", created_by="user1")
+    exp_id, _ = await jobs2_db.upsert_experiment_definition(
         job_definition_id=job_id,
         job_definition_version=job_v,
         experiment_type="cron_schedule",
@@ -305,3 +332,50 @@ async def test_jobs2_experiment_next_upsert(mem_session_maker, monkeypatch):
 
     # Only one row per experiment_id
     assert result2.id == result.id
+
+
+# ---------------------------------------------------------------------------
+# id-provided guard
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_jobs2_upsert_job_definition_unknown_id_raises(mem_session_maker, monkeypatch):
+    monkeypatch.setattr(jobs2_db, "async_session_maker", mem_session_maker)
+
+    with pytest.raises(ValueError, match="No JobDefinition"):
+        await jobs2_db.upsert_job_definition(
+            id="nonexistent-id", source="user_defined", created_by="user1"
+        )
+
+
+@pytest.mark.asyncio
+async def test_jobs2_upsert_experiment_definition_unknown_id_raises(mem_session_maker, monkeypatch):
+    monkeypatch.setattr(jobs2_db, "async_session_maker", mem_session_maker)
+
+    job_id, job_v = await jobs2_db.upsert_job_definition(source="user_defined", created_by="user1")
+
+    with pytest.raises(ValueError, match="No ExperimentDefinition"):
+        await jobs2_db.upsert_experiment_definition(
+            id="nonexistent-id",
+            job_definition_id=job_id,
+            job_definition_version=job_v,
+            experiment_type="cron_schedule",
+            created_by="user1",
+        )
+
+
+@pytest.mark.asyncio
+async def test_jobs2_upsert_job_execution_unknown_id_raises(mem_session_maker, monkeypatch):
+    monkeypatch.setattr(jobs2_db, "async_session_maker", mem_session_maker)
+
+    job_id, job_v = await jobs2_db.upsert_job_definition(source="user_defined", created_by="user1")
+
+    with pytest.raises(ValueError, match="No JobExecution"):
+        await jobs2_db.upsert_job_execution(
+            id="nonexistent-id",
+            job_definition_id=job_id,
+            job_definition_version=job_v,
+            created_by="user1",
+            status="submitted",
+        )

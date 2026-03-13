@@ -54,8 +54,9 @@ async def create_db_and_tables() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def insert_job_definition(
+async def upsert_job_definition(
     *,
+    id: str | None = None,
     source: JobDefinitionSource,
     created_by: str | None,
     builder_spec: dict | None = None,
@@ -65,25 +66,46 @@ async def insert_job_definition(
     tags: list[str] | None = None,
     parent_id: str | None = None,
 ) -> tuple[str, int]:
-    """Insert a new JobDefinition and return (id, version)."""
-    definition_id = str(uuid.uuid4())
+    """Insert a new version of a JobDefinition and return (id, version).
+
+    If `id` is omitted a fresh UUID is generated (version 1).
+    If `id` is supplied the next version number is derived from the database;
+    a ValueError is raised if that id does not exist yet.
+    """
+    id_provided = id is not None
+    definition_id = id or str(uuid.uuid4())
     ref_time = dt.datetime.now()
-    entity = JobDefinition(
-        id=definition_id,
-        version=1,
-        created_by=created_by,
-        created_at=ref_time,
-        source=source,
-        parent_id=parent_id,
-        display_name=display_name,
-        display_description=display_description,
-        tags=tags,
-        builder_spec=builder_spec,
-        environment_spec=environment_spec,
-        is_deleted=False,
-    )
-    await addAndCommit(entity, async_session_maker)
-    return definition_id, 1
+
+    async def function(i: int) -> int:
+        async with async_session_maker() as session:
+            result = await session.execute(
+                select(func.max(JobDefinition.version)).where(JobDefinition.id == definition_id)
+            )
+            max_version: int | None = result.scalar()
+            if id_provided and max_version is None:
+                raise ValueError(f"No JobDefinition with id={definition_id!r} exists; cannot add a new version.")
+            new_version = (max_version or 0) + 1
+            session.add(
+                JobDefinition(
+                    id=definition_id,
+                    version=new_version,
+                    created_by=created_by,
+                    created_at=ref_time,
+                    source=source,
+                    parent_id=parent_id,
+                    display_name=display_name,
+                    display_description=display_description,
+                    tags=tags,
+                    builder_spec=builder_spec,
+                    environment_spec=environment_spec,
+                    is_deleted=False,
+                )
+            )
+            await session.commit()
+            return new_version
+
+    new_version = await dbRetry(function)
+    return definition_id, new_version
 
 
 async def get_job_definition(id: str, version: int | None = None) -> JobDefinition | None:
@@ -136,8 +158,9 @@ async def soft_delete_job_definition(id: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def insert_experiment_definition(
+async def upsert_experiment_definition(
     *,
+    id: str | None = None,
     job_definition_id: str,
     job_definition_version: int,
     experiment_type: ExperimentType,
@@ -147,25 +170,46 @@ async def insert_experiment_definition(
     display_description: str | None = None,
     tags: list[str] | None = None,
 ) -> tuple[str, int]:
-    """Insert a new ExperimentDefinition and return (id, version)."""
-    experiment_id = str(uuid.uuid4())
+    """Insert a new version of an ExperimentDefinition and return (id, version).
+
+    If `id` is omitted a fresh UUID is generated (version 1).
+    If `id` is supplied the next version number is derived from the database;
+    a ValueError is raised if that id does not exist yet.
+    """
+    id_provided = id is not None
+    experiment_id = id or str(uuid.uuid4())
     ref_time = dt.datetime.now()
-    entity = ExperimentDefinition(
-        id=experiment_id,
-        version=1,
-        created_by=created_by,
-        created_at=ref_time,
-        display_name=display_name,
-        display_description=display_description,
-        tags=tags,
-        job_definition_id=job_definition_id,
-        job_definition_version=job_definition_version,
-        experiment_type=experiment_type,
-        experiment_definition=experiment_definition,
-        is_deleted=False,
-    )
-    await addAndCommit(entity, async_session_maker)
-    return experiment_id, 1
+
+    async def function(i: int) -> int:
+        async with async_session_maker() as session:
+            result = await session.execute(
+                select(func.max(ExperimentDefinition.version)).where(ExperimentDefinition.id == experiment_id)
+            )
+            max_version: int | None = result.scalar()
+            if id_provided and max_version is None:
+                raise ValueError(f"No ExperimentDefinition with id={experiment_id!r} exists; cannot add a new version.")
+            new_version = (max_version or 0) + 1
+            session.add(
+                ExperimentDefinition(
+                    id=experiment_id,
+                    version=new_version,
+                    created_by=created_by,
+                    created_at=ref_time,
+                    display_name=display_name,
+                    display_description=display_description,
+                    tags=tags,
+                    job_definition_id=job_definition_id,
+                    job_definition_version=job_definition_version,
+                    experiment_type=experiment_type,
+                    experiment_definition=experiment_definition,
+                    is_deleted=False,
+                )
+            )
+            await session.commit()
+            return new_version
+
+    new_version = await dbRetry(function)
+    return experiment_id, new_version
 
 
 async def get_experiment_definition(id: str, version: int | None = None) -> ExperimentDefinition | None:
@@ -222,8 +266,9 @@ async def soft_delete_experiment_definition(id: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def insert_job_execution(
+async def upsert_job_execution(
     *,
+    id: str | None = None,
     job_definition_id: str,
     job_definition_version: int,
     created_by: str | None,
@@ -231,24 +276,46 @@ async def insert_job_execution(
     experiment_id: str | None = None,
     compiler_runtime_context: dict | None = None,
 ) -> tuple[str, int]:
-    """Insert a new JobExecution and return (id, attempt_count)."""
-    execution_id = str(uuid.uuid4())
+    """Insert a new attempt of a JobExecution and return (id, attempt_count).
+
+    If `id` is omitted a fresh UUID is generated (attempt 1).
+    If `id` is supplied the next attempt number is derived from the database,
+    enabling re-run tracking under the same execution identity;
+    a ValueError is raised if that id does not exist yet.
+    """
+    id_provided = id is not None
+    execution_id = id or str(uuid.uuid4())
     ref_time = dt.datetime.now()
-    entity = JobExecution(
-        id=execution_id,
-        attempt_count=1,
-        created_by=created_by,
-        created_at=ref_time,
-        updated_at=ref_time,
-        job_definition_id=job_definition_id,
-        job_definition_version=job_definition_version,
-        experiment_id=experiment_id,
-        compiler_runtime_context=compiler_runtime_context,
-        status=status,
-        is_deleted=False,
-    )
-    await addAndCommit(entity, async_session_maker)
-    return execution_id, 1
+
+    async def function(i: int) -> int:
+        async with async_session_maker() as session:
+            result = await session.execute(
+                select(func.max(JobExecution.attempt_count)).where(JobExecution.id == execution_id)
+            )
+            max_attempt: int | None = result.scalar()
+            if id_provided and max_attempt is None:
+                raise ValueError(f"No JobExecution with id={execution_id!r} exists; cannot add a new attempt.")
+            new_attempt = (max_attempt or 0) + 1
+            session.add(
+                JobExecution(
+                    id=execution_id,
+                    attempt_count=new_attempt,
+                    created_by=created_by,
+                    created_at=ref_time,
+                    updated_at=ref_time,
+                    job_definition_id=job_definition_id,
+                    job_definition_version=job_definition_version,
+                    experiment_id=experiment_id,
+                    compiler_runtime_context=compiler_runtime_context,
+                    status=status,
+                    is_deleted=False,
+                )
+            )
+            await session.commit()
+            return new_attempt
+
+    new_attempt = await dbRetry(function)
+    return execution_id, new_attempt
 
 
 async def get_job_execution(id: str, attempt_count: int | None = None) -> JobExecution | None:
