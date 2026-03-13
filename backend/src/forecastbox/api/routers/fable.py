@@ -20,7 +20,14 @@ from fiab_core.fable import BlockFactoryCatalogue
 import forecastbox.api.fable as api_fable
 import forecastbox.db.fable as db_fable
 from forecastbox.api.plugin.manager import PluginCompositeId, catalogue_view, plugins_ready
-from forecastbox.api.types.fable import FableBuilderV1, FableValidationExpansion
+import forecastbox.db.jobs2 as db_jobs2
+from forecastbox.api.types.fable import (
+    FableBuilderV1,
+    FableRetrieveV2Response,
+    FableSaveV2Request,
+    FableSaveV2Response,
+    FableValidationExpansion,
+)
 from forecastbox.api.types.jobs import ExecutionSpecification
 from forecastbox.auth.users import current_active_user
 from forecastbox.schemas.user import UserRead
@@ -85,3 +92,57 @@ async def upsert_fable_builder(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except PermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+@router.post("/upsert_v2")
+async def upsert_fable_builder_v2(
+    payload: FableSaveV2Request,
+    fable_id: Optional[str] = None,
+    user: UserRead | None = Depends(current_active_user),
+) -> FableSaveV2Response:
+    """Save a FableBuilderV1 as a JobDefinition (v2 persistence path).
+
+    If `fable_id` is omitted a new definition is created (version 1). If
+    `fable_id` is supplied the existing definition gains a new version; a 404
+    is returned if that id does not exist.
+    """
+    created_by = str(user.id) if user is not None else None
+    try:
+        definition_id, version = await db_jobs2.upsert_job_definition(
+            id=fable_id,
+            source="user_defined",
+            created_by=created_by,
+            builder_spec=payload.builder.model_dump(mode="json"),
+            display_name=payload.display_name,
+            display_description=payload.display_description,
+            tags=payload.tags if payload.tags else None,
+            parent_id=payload.parent_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    return FableSaveV2Response(id=definition_id, version=version)
+
+
+@router.get("/retrieve_v2")
+async def retrieve_fable_builder_v2(
+    fable_id: str,
+    version: Optional[int] = None,
+) -> FableRetrieveV2Response:
+    """Retrieve a saved FableBuilderV1 by id (and optionally version) from the v2 store.
+
+    If `version` is omitted the latest non-deleted version is returned.
+    """
+    definition = await db_jobs2.get_job_definition(fable_id, version)
+    if definition is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fable definition not found")
+    if definition.builder_spec is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fable definition has no builder spec")
+    return FableRetrieveV2Response(
+        id=definition.id,  # ty:ignore[invalid-argument-type]
+        version=definition.version,  # ty:ignore[invalid-argument-type]
+        builder=FableBuilderV1.model_validate(definition.builder_spec),
+        display_name=definition.display_name,  # ty:ignore[invalid-argument-type]
+        display_description=definition.display_description,  # ty:ignore[invalid-argument-type]
+        tags=definition.tags or [],  # ty:ignore[invalid-argument-type]
+        parent_id=definition.parent_id,  # ty:ignore[invalid-argument-type]
+    )

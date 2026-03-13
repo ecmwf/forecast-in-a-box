@@ -28,3 +28,32 @@ class FableValidationExpansion(BaseModel):
     block_errors: dict[BlockInstanceId, list[str]]
     possible_sources: list[PluginBlockFactoryId]
     possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]]
+
+
+class FableSaveV2Request(BaseModel):
+    """Payload for saving a fable builder via the v2 persistence path."""
+
+    builder: FableBuilderV1
+    display_name: str | None = None
+    display_description: str | None = None
+    tags: list[str] = []
+    parent_id: str | None = None
+
+
+class FableSaveV2Response(BaseModel):
+    """Returned by upsert_v2; contains the stable id and the new version number."""
+
+    id: str
+    version: int
+
+
+class FableRetrieveV2Response(BaseModel):
+    """Full payload returned by retrieve_v2."""
+
+    id: str
+    version: int
+    builder: FableBuilderV1
+    display_name: str | None = None
+    display_description: str | None = None
+    tags: list[str] = []
+    parent_id: str | None = None
