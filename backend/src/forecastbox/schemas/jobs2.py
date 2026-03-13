@@ -11,12 +11,18 @@
 
 Tables are versioned/immutable (JobDefinition, ExperimentDefinition) or
 append-only with a mutable runtime state (JobExecution).  Soft-delete is
-supported on all main tables via `is_deleted`; garbage collection is out of
-scope for this stage.
+supported on all main tables via `is_deleted`.
+# TODO for later: implement garbage collection
 """
+
+from typing import Literal
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKeyConstraint, Integer, JSON, String
 from sqlalchemy.orm import DeclarativeBase
+
+JobDefinitionSource = Literal["plugin_template", "user_defined", "oneoff_execution"]
+ExperimentType = Literal["cron_schedule", "batch_execution", "external_trigger"]
+JobExecutionStatus = Literal["submitted", "preparing", "running", "finished", "failed"]
 
 
 class Base(DeclarativeBase):
@@ -39,9 +45,9 @@ class JobDefinition(Base):
     created_by = Column(String(255), nullable=True)
     created_at = Column(DateTime, nullable=False)
 
-    # Extensible string enum: plugin_template | user_defined | oneoff_execution
+    # TODO later -- make sure entity validates this
     source = Column(String(64), nullable=False)
-    # Optional lineage reference – deliberately no version to keep it stable
+    # Optional lineage reference – deliberately no version to keep it discoverable
     parent_id = Column(String(255), nullable=True)
 
     display_name = Column(String(255), nullable=True)
@@ -49,7 +55,10 @@ class JobDefinition(Base):
     tags = Column(JSON, nullable=True)
 
     # Payload stored as JSON to avoid over-normalisation
+    # stores forecastbox.api.types.fable.FableBuilderV1
     builder_spec = Column(JSON, nullable=True)
+    # stores forecastbox.api.types.jobs.EnvironmentSpecification
+    environment_spec = Column(JSON, nullable=True)
 
     is_deleted = Column(Boolean, nullable=False, default=False)
 
@@ -76,7 +85,7 @@ class ExperimentDefinition(Base):
     job_definition_id = Column(String(255), nullable=False)
     job_definition_version = Column(Integer, nullable=False)
 
-    # Extensible string enum: cron_schedule | batch_execution | external_trigger
+    # TODO later -- make sure entity validates this
     experiment_type = Column(String(64), nullable=False)
     experiment_definition = Column(JSON, nullable=True)
 
@@ -114,6 +123,7 @@ class JobExecution(Base):
     experiment_id = Column(String(255), nullable=True)
     compiler_runtime_context = Column(JSON, nullable=True)
 
+    # TODO later -- make sure entity validates this
     status = Column(String(50), nullable=False)
     outputs = Column(JSON, nullable=True)
     error = Column(String(255), nullable=True)
@@ -121,7 +131,7 @@ class JobExecution(Base):
 
     # Filled after successful cascade submission
     cascade_job_id = Column(String(255), nullable=True)
-    cascade_proc = Column(String(255), nullable=True)
+    cascade_proc = Column(Integer, nullable=True)
 
     is_deleted = Column(Boolean, nullable=False, default=False)
 
@@ -134,10 +144,7 @@ class JobExecution(Base):
 
 
 class GlobalDefaults(Base):
-    """Stores installation-wide default option and value specs.
-
-    Schema is complete now; business logic is deferred to a future stage.
-    """
+    """Stores installation-wide default option and value specs."""
 
     __tablename__ = "global_defaults"
 

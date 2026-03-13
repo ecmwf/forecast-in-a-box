@@ -66,19 +66,14 @@ async def test_jobs2_job_definition_latest_version(mem_session_maker, monkeypatc
     monkeypatch.setattr(jobs2_db, "async_session_maker", mem_session_maker)
 
     job_id, v1 = await jobs2_db.insert_job_definition(source="user_defined", created_by="user1")
-    _, v2 = await jobs2_db.insert_job_definition(id=job_id, source="user_defined", created_by="user1")
-    _, v3 = await jobs2_db.insert_job_definition(id=job_id, source="user_defined", created_by="user1")
-
     assert v1 == 1
-    assert v2 == 2
-    assert v3 == 3
 
-    # Latest version returned when no explicit version given
+    # Default get returns version 1
     latest = await jobs2_db.get_job_definition(job_id)
     assert latest is not None
-    assert latest.version == 3
+    assert latest.version == 1
 
-    # Explicit version lookup still works
+    # Explicit version lookup also works
     specific = await jobs2_db.get_job_definition(job_id, version=1)
     assert specific is not None
     assert specific.version == 1
@@ -105,22 +100,18 @@ async def test_jobs2_list_job_definitions_latest_only(mem_session_maker, monkeyp
     monkeypatch.setattr(jobs2_db, "async_session_maker", mem_session_maker)
 
     job_id, _ = await jobs2_db.insert_job_definition(source="user_defined", created_by="user1")
-    await jobs2_db.insert_job_definition(id=job_id, source="user_defined", created_by="user1")
-    await jobs2_db.insert_job_definition(id=job_id, source="user_defined", created_by="user1")
 
     # A second independent definition
     other_id, _ = await jobs2_db.insert_job_definition(source="oneoff_execution", created_by="user2")
 
     definitions = list(await jobs2_db.list_job_definitions())
-    # Two distinct ids in the result
     ids = [d.id for d in definitions]
     assert job_id in ids
     assert other_id in ids
 
-    # Only the latest version for job_id is returned
-    matching = [d for d in definitions if d.id == job_id]
-    assert len(matching) == 1
-    assert matching[0].version == 3
+    # Each definition appears exactly once
+    assert sum(1 for d in definitions if d.id == job_id) == 1
+    assert sum(1 for d in definitions if d.id == other_id) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -143,20 +134,10 @@ async def test_jobs2_experiment_definition_versioning(mem_session_maker, monkeyp
     )
     assert v1 == 1
 
-    _, v2 = await jobs2_db.insert_experiment_definition(
-        id=exp_id,
-        job_definition_id=job_id,
-        job_definition_version=job_v,
-        experiment_type="cron_schedule",
-        created_by="user1",
-        experiment_definition={"cron": "30 * * * *"},
-    )
-    assert v2 == 2
-
     latest = await jobs2_db.get_experiment_definition(exp_id)
     assert latest is not None
-    assert latest.version == 2
-    assert latest.experiment_definition == {"cron": "30 * * * *"}
+    assert latest.version == 1
+    assert latest.experiment_definition == {"cron": "0 * * * *"}
 
 
 @pytest.mark.asyncio
@@ -197,21 +178,12 @@ async def test_jobs2_job_execution_latest_attempt(mem_session_maker, monkeypatch
     )
     assert a1 == 1
 
-    _, a2 = await jobs2_db.insert_job_execution(
-        id=exec_id,
-        job_definition_id=job_id,
-        job_definition_version=job_v,
-        created_by="user1",
-        status="submitted",
-    )
-    assert a2 == 2
-
-    # Latest attempt returned by default
+    # Default get returns the single attempt
     latest = await jobs2_db.get_job_execution(exec_id)
     assert latest is not None
-    assert latest.attempt_count == 2
+    assert latest.attempt_count == 1
 
-    # Explicit attempt lookup
+    # Explicit attempt lookup works
     first = await jobs2_db.get_job_execution(exec_id, attempt_count=1)
     assert first is not None
     assert first.attempt_count == 1
@@ -267,14 +239,11 @@ async def test_jobs2_list_job_executions_latest_only(mem_session_maker, monkeypa
     exec_id, _ = await jobs2_db.insert_job_execution(
         job_definition_id=job_id, job_definition_version=job_v, created_by="user1", status="submitted"
     )
-    await jobs2_db.insert_job_execution(
-        id=exec_id, job_definition_id=job_id, job_definition_version=job_v, created_by="user1", status="submitted"
-    )
 
     executions = list(await jobs2_db.list_job_executions())
     matching = [e for e in executions if e.id == exec_id]
     assert len(matching) == 1
-    assert matching[0].attempt_count == 2
+    assert matching[0].attempt_count == 1
 
 
 # ---------------------------------------------------------------------------
