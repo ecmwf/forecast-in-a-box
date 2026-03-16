@@ -16,6 +16,7 @@ from typing import cast
 from fastapi import APIRouter, Depends, HTTPException
 from typing_extensions import Self
 
+import forecastbox.db.jobs2 as db_jobs2
 from forecastbox.api.execution import execute
 from forecastbox.api.routers.job import STATUS
 from forecastbox.api.scheduling.dt_utils import calculate_next_run, parse_crontab
@@ -27,7 +28,7 @@ from forecastbox.api.scheduling.scheduler_thread import (
     start_scheduler,
     stop_scheduler,
 )
-from forecastbox.api.types.scheduling import ScheduleSpecification, ScheduleUpdate, schedule2db
+from forecastbox.api.types.scheduling import ScheduleSpecification, ScheduleUpdate, ScheduleSpecificationV2, ScheduleUpdateV2, schedule2db
 from forecastbox.auth.users import current_active_user
 from forecastbox.db.schedule import (
     ScheduleId,
@@ -42,6 +43,7 @@ from forecastbox.db.schedule import (
     update_one,
 )
 from forecastbox.schemas.job import JobRecord
+from forecastbox.schemas.jobs2 import ExperimentDefinition
 from forecastbox.schemas.schedule import ScheduleDefinition, ScheduleRun
 from forecastbox.schemas.user import UserRead
 
@@ -145,6 +147,67 @@ class GetMultipleSchedulesResponse:
 @dataclass(frozen=True, eq=True, slots=True)
 class CreateScheduleResponse:
     schedule_id: ScheduleId
+
+
+# ---------------------------------------------------------------------------
+# V2 response types (defined here so endpoint functions below can reference them)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class CreateScheduleV2Response:
+    experiment_id: str
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class ScheduleDefinitionV2Response:
+    experiment_id: str
+    experiment_version: int
+    job_definition_id: str
+    job_definition_version: int
+    cron_expr: str
+    dynamic_expr: dict[str, str]
+    max_acceptable_delay_hours: int
+    enabled: bool
+    created_at: str
+    created_by: str | None
+    display_name: str | None
+    display_description: str | None
+    tags: list[str] | None = None
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class ListSchedulesV2Response:
+    schedules: list[ScheduleDefinitionV2Response]
+    total: int
+
+
+def _experiment_to_v2_response(exp: ExperimentDefinition) -> ScheduleDefinitionV2Response:
+    exp_def = cast(dict, exp.experiment_definition) or {}
+    return ScheduleDefinitionV2Response(
+        experiment_id=str(exp.id),  # ty:ignore[invalid-argument-type]
+        experiment_version=cast(int, exp.version),
+        job_definition_id=str(exp.job_definition_id),  # ty:ignore[invalid-argument-type]
+        job_definition_version=cast(int, exp.job_definition_version),
+        cron_expr=str(exp_def.get("cron_expr", "")),
+        dynamic_expr=cast(dict, exp_def.get("dynamic_expr", {})),
+        max_acceptable_delay_hours=int(exp_def.get("max_acceptable_delay_hours", 24)),
+        enabled=bool(exp_def.get("enabled", True)),
+        created_at=str(exp.created_at),
+        created_by=cast(str | None, exp.created_by),
+        display_name=cast(str | None, exp.display_name),
+        display_description=cast(str | None, exp.display_description),
+        tags=cast(list[str] | None, exp.tags),
+    )
+
+
+# /list_v2 must be registered before the parameterized /{schedule_id} route so that FastAPI
+# resolves this exact-path endpoint first.
+@router.get("/list_v2")
+async def list_schedules_v2(user: UserRead = Depends(current_active_user)) -> ListSchedulesV2Response:
+    all_experiments = list(await db_jobs2.list_experiment_definitions())
+    schedules = [_experiment_to_v2_response(exp) for exp in all_experiments if exp.experiment_type == "cron_schedule"]
+    return ListSchedulesV2Response(schedules=schedules, total=len(schedules))
 
 
 @router.get("/{schedule_id}")
@@ -330,3 +393,125 @@ async def rerun_schedule(schedule_run_id: str, user: UserRead = Depends(current_
 async def restart_scheduler() -> None:
     stop_scheduler()
     start_scheduler()
+
+
+# ---------------------------------------------------------------------------
+# V2 schedule endpoints – backed by ExperimentDefinition / ExperimentNext
+# ---------------------------------------------------------------------------
+
+
+@router.put("/create_v2")
+async def create_schedule_v2(
+    schedule_spec: ScheduleSpecificationV2, user: UserRead | None = Depends(current_active_user)
+) -> CreateScheduleV2Response:
+    try:
+        parse_crontab(schedule_spec.cron_expr)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid crontab: {schedule_spec.cron_expr} => {e}")
+
+    job_def = await db_jobs2.get_job_definition(schedule_spec.job_definition_id, schedule_spec.job_definition_version)
+    if job_def is None:
+        raise HTTPException(status_code=404, detail=f"JobDefinition {schedule_spec.job_definition_id!r} not found")
+
+    job_def_id = str(job_def.id)  # ty:ignore[invalid-argument-type]
+    job_def_version = cast(int, job_def.version)
+
+    experiment_definition = {
+        "cron_expr": schedule_spec.cron_expr,
+        "dynamic_expr": schedule_spec.dynamic_expr,
+        "max_acceptable_delay_hours": schedule_spec.max_acceptable_delay_hours,
+        "enabled": True,
+    }
+    experiment_id, _ = await db_jobs2.upsert_experiment_definition(
+        job_definition_id=job_def_id,
+        job_definition_version=job_def_version,
+        experiment_type="cron_schedule",
+        created_by=user.email if user is not None else None,  # ty:ignore[unresolved-attribute]
+        experiment_definition=experiment_definition,
+        display_name=schedule_spec.display_name,
+        display_description=schedule_spec.display_description,
+        tags=schedule_spec.tags,
+    )
+
+    next_run_at = calculate_next_run(dt.datetime.now(), schedule_spec.cron_expr)
+    await db_jobs2.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=next_run_at)
+    logger.debug(f"V2 schedule {experiment_id}: next run at {next_run_at}")
+
+    return CreateScheduleV2Response(experiment_id=experiment_id)
+
+
+@router.get("/{experiment_id}/get_v2")
+async def get_schedule_v2(experiment_id: str, user: UserRead = Depends(current_active_user)) -> ScheduleDefinitionV2Response:
+    exp_def = await db_jobs2.get_experiment_definition(experiment_id)
+    if exp_def is None or exp_def.experiment_type != "cron_schedule":
+        raise HTTPException(status_code=404, detail=f"Schedule {experiment_id} not found")
+    return _experiment_to_v2_response(exp_def)
+
+
+@router.post("/{experiment_id}/update_v2")
+async def update_schedule_v2(
+    experiment_id: str, update: ScheduleUpdateV2, user: UserRead = Depends(current_active_user)
+) -> ScheduleDefinitionV2Response:
+    current = await db_jobs2.get_experiment_definition(experiment_id)
+    if current is None or current.experiment_type != "cron_schedule":
+        raise HTTPException(status_code=404, detail=f"Schedule {experiment_id} not found")
+
+    current_def = cast(dict, current.experiment_definition) or {}
+
+    new_cron_expr = update.cron_expr if update.cron_expr is not None else str(current_def.get("cron_expr", ""))
+    if update.cron_expr is not None:
+        try:
+            parse_crontab(update.cron_expr)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid crontab: {update.cron_expr} => {e}")
+
+    new_enabled = update.enabled if update.enabled is not None else bool(current_def.get("enabled", True))
+    new_dynamic_expr = update.dynamic_expr if update.dynamic_expr is not None else cast(dict, current_def.get("dynamic_expr", {}))
+    new_max_delay = (
+        update.max_acceptable_delay_hours
+        if update.max_acceptable_delay_hours is not None
+        else int(current_def.get("max_acceptable_delay_hours", 24))
+    )
+
+    new_experiment_definition = {
+        "cron_expr": new_cron_expr,
+        "dynamic_expr": new_dynamic_expr,
+        "max_acceptable_delay_hours": new_max_delay,
+        "enabled": new_enabled,
+    }
+
+    await db_jobs2.upsert_experiment_definition(
+        id=experiment_id,
+        job_definition_id=str(current.job_definition_id),  # ty:ignore[invalid-argument-type]
+        job_definition_version=cast(int, current.job_definition_version),
+        experiment_type="cron_schedule",
+        created_by=user.email,  # ty:ignore[unresolved-attribute]
+        experiment_definition=new_experiment_definition,
+        display_name=cast(str | None, current.display_name),
+        display_description=cast(str | None, current.display_description),
+        tags=cast(list[str] | None, current.tags),
+    )
+
+    if update.cron_expr is not None or update.enabled is not None:
+        if new_enabled:
+            next_run_at = calculate_next_run(dt.datetime.now(), new_cron_expr)
+            await db_jobs2.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=next_run_at)
+            logger.debug(f"V2 schedule {experiment_id}: regenerated next run at {next_run_at}")
+        else:
+            await db_jobs2.delete_experiment_next(experiment_id)
+            logger.debug(f"V2 schedule {experiment_id}: disabled, next run cleared")
+
+    updated = await db_jobs2.get_experiment_definition(experiment_id)
+    assert updated is not None
+    return _experiment_to_v2_response(updated)
+
+
+@router.get("/{experiment_id}/next_run_v2")
+async def get_next_run_v2(experiment_id: str, user: UserRead = Depends(current_active_user)) -> str:
+    exp_def = await db_jobs2.get_experiment_definition(experiment_id)
+    if exp_def is None or exp_def.experiment_type != "cron_schedule":
+        raise HTTPException(status_code=404, detail=f"Schedule {experiment_id} not found")
+    next_entry = await db_jobs2.get_experiment_next(experiment_id)
+    if next_entry is None:
+        return "not scheduled currently"
+    return str(next_entry.scheduled_at)

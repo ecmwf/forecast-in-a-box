@@ -21,6 +21,7 @@ import datetime as dt
 import uuid
 from collections.abc import Iterable
 
+from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -447,3 +448,9 @@ async def get_experiment_next(experiment_id: str) -> ExperimentNext | None:
     """Return the next scheduled run entry for an experiment."""
     query = select(ExperimentNext).where(ExperimentNext.experiment_id == experiment_id)
     return await querySingle(query, async_session_maker)
+
+
+async def delete_experiment_next(experiment_id: str) -> None:
+    """Remove the next scheduled run entry for an experiment, clearing the pending tick."""
+    stmt = sa_delete(ExperimentNext).where(ExperimentNext.experiment_id == experiment_id)
+    await executeAndCommit(stmt, async_session_maker)
