@@ -27,13 +27,14 @@ from cascade.low.core import DatasetId, TaskId
 from fastapi import APIRouter, Body, Depends, HTTPException, Response, UploadFile
 from fastapi.responses import HTMLResponse
 
-from forecastbox.api.execution import ProductToOutputId, SubmitJobResponse, execute2response, execute_v2, get_job_definition_for_execution
+from forecastbox.api.execution import ProductToOutputId, SubmitJobResponse, execute2response, execute_v2, get_job_definition_for_execution, get_job_execution_specification_v2, restart_job_execution_v2
 from forecastbox.api.routers.gateway import Globals
-from forecastbox.api.types.jobs import ExecutionSpecification, JobExecuteV2Request, JobExecuteV2Response
+from forecastbox.api.types.jobs import ExecutionSpecification, JobExecuteV2Request, JobExecuteV2Response, JobExecutionListV2, JobExecutionStatusV2, JobSpecificationV2
 from forecastbox.api.utils import encode_result
 from forecastbox.auth.users import current_active_user
 from forecastbox.config import config
 from forecastbox.db.job import delete_all, delete_one, get_all, get_count, get_one, update_one
+import forecastbox.db.jobs2 as db_jobs2
 from forecastbox.schemas.job import JobRecord
 from forecastbox.schemas.user import UserRead
 
@@ -545,4 +546,146 @@ async def execute_v2_api(request: JobExecuteV2Request, user: UserRead | None = D
     result = await execute_v2(definition, user_id)
     if result.t is None:
         raise HTTPException(status_code=500, detail=f"Failed to execute because of {result.e}")
+    return result.t
+
+
+# ---------------------------------------------------------------------------
+# v2 read endpoints
+# ---------------------------------------------------------------------------
+
+
+def _execution_to_status_v2(execution: object) -> JobExecutionStatusV2:
+    from forecastbox.schemas.jobs2 import JobExecution as JobExecutionModel
+
+    ex = cast(JobExecutionModel, execution)  # ty:ignore[redundant-cast]
+    return JobExecutionStatusV2(
+        execution_id=str(ex.id),  # ty:ignore[invalid-argument-type]
+        attempt_count=cast(int, ex.attempt_count),
+        status=cast(str, ex.status),
+        created_at=str(ex.created_at),
+        updated_at=str(ex.updated_at),
+        job_definition_id=str(ex.job_definition_id),  # ty:ignore[invalid-argument-type]
+        job_definition_version=cast(int, ex.job_definition_version),
+        error=cast(str | None, ex.error),
+        progress=cast(str | None, ex.progress),
+        cascade_job_id=cast(str | None, ex.cascade_job_id),
+    )
+
+
+async def _poll_and_update_v2(execution_id: str, attempt_count: int | None) -> JobExecutionStatusV2:
+    """Fetch a JobExecution, poll cascade if active, update db, and return current status."""
+    from forecastbox.schemas.jobs2 import JobExecution as JobExecutionModel
+
+    execution = await db_jobs2.get_job_execution(execution_id, attempt_count)
+    if execution is None:
+        raise HTTPException(status_code=404, detail=f"JobExecution {execution_id!r} not found.")
+
+    ex = cast(JobExecutionModel, execution)  # ty:ignore[redundant-cast]
+    actual_attempt = cast(int, ex.attempt_count)
+    cascade_job_id = cast(str | None, ex.cascade_job_id)
+    status = cast(str, ex.status)
+
+    def _build(status_override: str | None = None, error_override: str | None = None, progress_override: str | None = None) -> JobExecutionStatusV2:
+        return JobExecutionStatusV2(
+            execution_id=str(ex.id),  # ty:ignore[invalid-argument-type]
+            attempt_count=actual_attempt,
+            status=status_override or status,
+            created_at=str(ex.created_at),
+            updated_at=str(ex.updated_at),
+            job_definition_id=str(ex.job_definition_id),  # ty:ignore[invalid-argument-type]
+            job_definition_version=cast(int, ex.job_definition_version),
+            error=error_override if error_override is not None else cast(str | None, ex.error),
+            progress=progress_override if progress_override is not None else cast(str | None, ex.progress),
+            cascade_job_id=cascade_job_id,
+        )
+
+    if status in ("submitted", "preparing", "running") and cascade_job_id:
+        try:
+            response = client.request_response(api.JobProgressRequest(job_ids=[cascade_job_id]), f"{config.cascade.cascade_url}")
+            response = cast(api.JobProgressResponse, response)
+        except TimeoutError:
+            return _build(status_override="unknown", error_override="failed to communicate with gateway")
+        except Exception as e:
+            return _build(status_override="unknown", error_override=f"internal cascade failure: {repr(e)}")
+
+        if response.error:
+            return _build(status_override="unknown", error_override=response.error)
+
+        jobprogress = response.progresses.get(cascade_job_id)
+        if jobprogress is None:
+            await db_jobs2.update_job_execution_runtime(execution_id, actual_attempt, status="failed", error="evicted from gateway")
+            return _build(status_override="failed", error_override="evicted from gateway")
+        elif jobprogress.failure:
+            await db_jobs2.update_job_execution_runtime(execution_id, actual_attempt, status="failed", error=jobprogress.failure)
+            return _build(status_override="failed", error_override=jobprogress.failure)
+        elif jobprogress.completed or jobprogress.pct == "100.00":
+            await db_jobs2.update_job_execution_runtime(execution_id, actual_attempt, status="finished", progress="100.00")
+            return _build(status_override="finished", progress_override="100.00")
+        else:
+            await db_jobs2.update_job_execution_runtime(execution_id, actual_attempt, status="running", progress=jobprogress.pct)
+            return _build(status_override="running", progress_override=jobprogress.pct)
+
+    return _build()
+
+
+@router.get("/status_v2")
+async def get_status_v2(user: UserRead = Depends(current_active_user)) -> JobExecutionListV2:
+    """List the latest attempt of every v2 job execution."""
+    executions = list(await db_jobs2.list_job_executions())
+    statuses = [_execution_to_status_v2(e) for e in executions]
+    return JobExecutionListV2(executions=statuses, total=len(statuses))
+
+
+@router.get("/{execution_id}/status_v2")
+async def get_status_of_execution_v2(
+    execution_id: str,
+    attempt_count: int | None = None,
+    user: UserRead = Depends(current_active_user),
+) -> JobExecutionStatusV2:
+    """Get status for a specific v2 execution; defaults to the latest attempt."""
+    return await _poll_and_update_v2(execution_id, attempt_count)
+
+
+@router.get("/{execution_id}/outputs_v2")
+async def get_outputs_of_execution_v2(
+    execution_id: str,
+    attempt_count: int | None = None,
+    user: UserRead = Depends(current_active_user),
+) -> list[ProductToOutputId]:
+    """Get outputs for a specific v2 execution; defaults to the latest attempt."""
+    execution = await db_jobs2.get_job_execution(execution_id, attempt_count)
+    if execution is None:
+        raise HTTPException(status_code=404, detail=f"JobExecution {execution_id!r} not found.")
+    from forecastbox.schemas.jobs2 import JobExecution as JobExecutionModel
+
+    ex = cast(JobExecutionModel, execution)  # ty:ignore[redundant-cast]
+    raw_outputs = ex.outputs
+    if not raw_outputs:
+        raise HTTPException(status_code=204, detail=f"JobExecution {execution_id!r} has no outputs recorded.")
+    return [ProductToOutputId(**item) for item in cast(list[dict], raw_outputs)]
+
+
+@router.get("/{execution_id}/specification_v2")
+async def get_specification_of_execution_v2(
+    execution_id: str,
+    attempt_count: int | None = None,
+    user: UserRead = Depends(current_active_user),
+) -> JobSpecificationV2:
+    """Get the linked JobDefinition specification for a v2 execution attempt."""
+    spec = await get_job_execution_specification_v2(execution_id, attempt_count)
+    if spec is None:
+        raise HTTPException(status_code=404, detail=f"JobExecution {execution_id!r} or its definition not found.")
+    return spec
+
+
+@router.post("/{execution_id}/restart_v2")
+async def restart_execution_v2(
+    execution_id: str,
+    user: UserRead | None = Depends(current_active_user),
+) -> JobExecuteV2Response:
+    """Create a new attempt of an existing v2 execution under the same logical id."""
+    user_id = str(user.id) if user is not None else None
+    result = await restart_job_execution_v2(execution_id, user_id)
+    if result.t is None:
+        raise HTTPException(status_code=500, detail=f"Failed to restart: {result.e}")
     return result.t

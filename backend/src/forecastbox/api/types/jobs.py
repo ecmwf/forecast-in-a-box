@@ -53,3 +53,34 @@ class JobExecuteV2Response(BaseModel):
     """Logical v2 execution id (JobExecution.id)."""
     attempt_count: int
     """Attempt number; always 1 on a fresh execution."""
+
+
+class JobExecutionStatusV2(BaseModel):
+    """Status of a single v2 job execution attempt."""
+
+    execution_id: str
+    attempt_count: int
+    status: str
+    created_at: str
+    updated_at: str
+    job_definition_id: str
+    job_definition_version: int
+    error: str | None = None
+    progress: str | None = None
+    cascade_job_id: str | None = None
+
+
+class JobExecutionListV2(BaseModel):
+    """List of latest-attempt v2 job execution statuses."""
+
+    executions: list[JobExecutionStatusV2]
+    total: int
+
+
+class JobSpecificationV2(BaseModel):
+    """Specification payload linked to a v2 job execution attempt."""
+
+    definition_id: str
+    definition_version: int
+    blocks: dict | None = None
+    environment_spec: dict | None = None

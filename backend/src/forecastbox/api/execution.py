@@ -29,7 +29,7 @@ import forecastbox.api.fable as api_fable
 import forecastbox.db.jobs2 as db_jobs2
 from forecastbox.api.artifacts.manager import ArtifactManager, submit_artifact_download
 from forecastbox.api.types.fable import FableBuilderV1
-from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, JobExecuteV2Response, RawCascadeJob
+from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, JobExecuteV2Response, JobSpecificationV2, RawCascadeJob
 from forecastbox.api.utils import get_model_path
 from forecastbox.config import config
 from forecastbox.db.job import insert_one
@@ -161,6 +161,73 @@ async def get_job_definition_for_execution(definition_id: str, definition_versio
     return await db_jobs2.get_job_definition(definition_id, definition_version)
 
 
+async def get_job_execution_specification_v2(execution_id: str, attempt_count: int | None) -> JobSpecificationV2 | None:
+    """Return the JobSpecificationV2 for the given execution attempt (latest if attempt_count is None)."""
+    execution = await db_jobs2.get_job_execution(execution_id, attempt_count)
+    if execution is None:
+        return None
+    definition = await db_jobs2.get_job_definition(
+        str(execution.job_definition_id),  # ty:ignore[invalid-argument-type]
+        cast(int, execution.job_definition_version),
+    )
+    if definition is None:
+        return None
+    return JobSpecificationV2(
+        definition_id=str(definition.id),  # ty:ignore[invalid-argument-type]
+        definition_version=cast(int, definition.version),
+        blocks=cast(dict | None, definition.blocks),
+        environment_spec=cast(dict | None, definition.environment_spec),
+    )
+
+
+async def restart_job_execution_v2(execution_id: str, user_id: str | None) -> Either[JobExecuteV2Response, str]:  # type: ignore[invalid-argument]
+    """Create a new attempt under an existing execution_id, re-running its linked JobDefinition."""
+    existing = await db_jobs2.get_job_execution(execution_id)
+    if existing is None:
+        return Either.error(f"JobExecution {execution_id!r} not found")
+
+    definition_id = str(existing.job_definition_id)  # ty:ignore[invalid-argument-type]
+    definition_version = cast(int, existing.job_definition_version)
+    definition = await db_jobs2.get_job_definition(definition_id, definition_version)
+    if definition is None:
+        return Either.error(f"JobDefinition {definition_id!r} v{definition_version} not found")
+
+    if not definition.blocks:
+        return Either.error(f"JobDefinition {definition_id!r} has no compilable blocks")
+
+    builder = FableBuilderV1(
+        blocks=definition.blocks,  # ty:ignore[invalid-argument-type]
+        environment=EnvironmentSpecification.model_validate(definition.environment_spec) if definition.environment_spec else None,
+    )
+    spec = api_fable.compile(builder)
+
+    new_execution_id, new_attempt_count = await db_jobs2.upsert_job_execution(
+        id=execution_id,
+        job_definition_id=definition_id,
+        job_definition_version=definition_version,
+        created_by=user_id,
+        status="submitted",
+    )
+
+    try:
+        loop = asyncio.get_running_loop()
+        response, product_to_id_mappings = await loop.run_in_executor(None, _execute_cascade, spec)
+        cascade_job_id = response.job_id or str(uuid.uuid4())
+
+        update_kwargs: dict[str, object] = {"cascade_job_id": cascade_job_id}
+        if response.error:
+            update_kwargs["status"] = "failed"
+            update_kwargs["error"] = response.error[:255]
+        else:
+            update_kwargs["outputs"] = [x.model_dump() for x in product_to_id_mappings]
+        await db_jobs2.update_job_execution_runtime(new_execution_id, new_attempt_count, **update_kwargs)
+
+        return Either.ok(JobExecuteV2Response(execution_id=new_execution_id, attempt_count=new_attempt_count))
+    except Exception as e:
+        await db_jobs2.update_job_execution_runtime(new_execution_id, new_attempt_count, status="failed", error=repr(e)[:255])
+        return Either.error(repr(e))
+
+
 async def execute_v2(definition: JobDefinition, user_id: str | None) -> Either[JobExecuteV2Response, str]:  # type: ignore[invalid-argument]
     """v2 execute path: always creates a JobExecution linked to the given JobDefinition.
 
@@ -190,15 +257,6 @@ async def execute_v2(definition: JobDefinition, user_id: str | None) -> Either[J
         loop = asyncio.get_running_loop()
         response, product_to_id_mappings = await loop.run_in_executor(None, _execute_cascade, spec)
         cascade_job_id = response.job_id or str(uuid.uuid4())
-
-        # Record in v1 job.db so existing status/polling endpoints keep working
-        await insert_one(
-            cascade_job_id,
-            response.error,
-            user_id,
-            spec.model_dump_json(),
-            json.dumps([x.model_dump() for x in product_to_id_mappings]),
-        )
 
         update_kwargs: dict[str, object] = {"cascade_job_id": cascade_job_id}
         if response.error:
