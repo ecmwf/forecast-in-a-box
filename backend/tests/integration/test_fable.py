@@ -1,14 +1,191 @@
-import os
+# (C) Copyright 2024- ECMWF.
+#
+# This software is licensed under the terms of the Apache Licence Version 2.0
+# which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# In applying this licence, ECMWF does not waive the privileges and immunities
+# granted to it by virtue of its status as an intergovernmental organisation
+# nor does it submit to any jurisdiction.
+
+"""Integration tests for the v2 fable and job endpoints."""
 
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
-from forecastbox.api.types.fable import FableBuilderV1
-from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
+from forecastbox.api.types.fable import FableBuilderV1, FableSaveV2Request
+from forecastbox.api.types.jobs import EnvironmentSpecification, JobExecuteV2Response
 
-from .utils import ensure_completed
+from .utils import ensure_completed_v2
 
 
-def test_fable_contruction(tmpdir, backend_client_with_auth):
+def _make_builder_source_only() -> FableBuilderV1:
+    plugin_id = PluginCompositeId(store="ecmwf", local="ecmwf-base")
+    source = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=plugin_id, factory="ekdSource"),
+        configuration_values={"source": "ecmwf-open-data", "date": "2026-01-01", "expver": "0001"},
+        input_ids={},
+    )
+    return FableBuilderV1(blocks={"source1": source})
+
+
+def _make_builder_full(tmpdir: str) -> FableBuilderV1:
+    plugin_id = PluginCompositeId(store="ecmwf", local="ecmwf-base")
+    source = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=plugin_id, factory="ekdSource"),
+        configuration_values={"source": "ecmwf-open-data", "date": "2026-02-18", "expver": "0001"},
+        input_ids={},
+    )
+    temporal_mean = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=plugin_id, factory="temporalStatistics"),
+        configuration_values={"variable": "2t", "statistic": "mean"},
+        input_ids={"dataset": "source1"},
+    )
+    ensemble_mean = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=plugin_id, factory="ensembleStatistics"),
+        configuration_values={"variable": "2t", "statistic": "mean"},
+        input_ids={"dataset": "temporalMean"},
+    )
+    sink = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=plugin_id, factory="zarrSink"),
+        configuration_values={"path": f"{tmpdir}/output.zarr"},
+        input_ids={"dataset": "ensembleMean"},
+    )
+    return FableBuilderV1(
+        blocks={
+            "source1": source,
+            "temporalMean": temporal_mean,
+            "ensembleMean": ensemble_mean,
+            "sinkMean": sink,
+        }
+    )
+
+
+def test_fable_v2_save_and_retrieve(backend_client_with_auth):
+    builder = _make_builder_source_only()
+    builder.environment = EnvironmentSpecification(hosts=2, workers_per_host=4)
+    payload = FableSaveV2Request(
+        builder=builder,
+        display_name="Test Fable",
+        display_description="A fable saved via the v2 API",
+        tags=["test", "integration"],
+    )
+
+    # Save new definition
+    response = backend_client_with_auth.post("/fable/upsert_v2", json=payload.model_dump())
+    assert response.is_success, response.text
+    saved = response.json()
+    assert "id" in saved
+    assert saved["version"] == 1
+
+    # Retrieve by id (latest version)
+    response = backend_client_with_auth.get("/fable/retrieve_v2", params={"fable_id": saved["id"]})
+    assert response.is_success, response.text
+    retrieved = response.json()
+    assert retrieved["id"] == saved["id"]
+    assert retrieved["version"] == 1
+    assert retrieved["display_name"] == "Test Fable"
+    assert retrieved["tags"] == ["test", "integration"]
+    assert retrieved["builder"]["blocks"]["source1"]["factory_id"]["factory"] == "ekdSource"
+    assert retrieved["builder"]["environment"]["hosts"] == 2
+    assert retrieved["builder"]["environment"]["workers_per_host"] == 4
+
+    # Saving again with the same id creates a new version
+    payload2 = FableSaveV2Request(builder=_make_builder_source_only(), display_name="Test Fable v2")
+    response = backend_client_with_auth.post("/fable/upsert_v2", params={"fable_id": saved["id"]}, json=payload2.model_dump())
+    assert response.is_success, response.text
+    saved2 = response.json()
+    assert saved2["id"] == saved["id"]
+    assert saved2["version"] == 2
+
+    # Retrieve latest returns version 2
+    response = backend_client_with_auth.get("/fable/retrieve_v2", params={"fable_id": saved["id"]})
+    assert response.is_success, response.text
+    latest = response.json()
+    assert latest["version"] == 2
+    assert latest["display_name"] == "Test Fable v2"
+    assert latest["builder"]["environment"] is None
+
+    # Retrieve specific version 1 still works
+    response = backend_client_with_auth.get("/fable/retrieve_v2", params={"fable_id": saved["id"], "version": 1})
+    assert response.is_success, response.text
+    assert response.json()["version"] == 1
+    assert response.json()["display_name"] == "Test Fable"
+
+
+def test_fable_v2_retrieve_nonexistent(backend_client_with_auth):
+    response = backend_client_with_auth.get("/fable/retrieve_v2", params={"fable_id": "does-not-exist"})
+    assert response.status_code == 404
+
+
+def test_fable_v2_upsert_nonexistent_id(backend_client_with_auth):
+    """Attempting to add a version to a non-existent id returns 404."""
+    builder = _make_builder_source_only()
+    payload = FableSaveV2Request(builder=builder)
+    response = backend_client_with_auth.post("/fable/upsert_v2", params={"fable_id": "no-such-id"}, json=payload.model_dump())
+    assert response.status_code == 404
+
+
+def test_fable_v2_existing_upsert_retrieve_unaffected(backend_client_with_auth):
+    """Legacy /upsert and /retrieve endpoints still work alongside v2 endpoints."""
+    builder = _make_builder_source_only()
+    # FastAPI wraps the builder in {"builder": ...} because `tags: list[str]` is also a body param
+    response = backend_client_with_auth.post("/fable/upsert", json={"builder": builder.model_dump()})
+    assert response.is_success, response.text
+    old_id = response.json()
+
+    response = backend_client_with_auth.get("/fable/retrieve", params={"fable_builder_id": old_id})
+    assert response.is_success, response.text
+    assert response.json()["blocks"]["source1"]["factory_id"]["factory"] == "ekdSource"
+
+
+def test_fable_v2_compile_latest_version(tmpdir, backend_client_with_auth):
+    """A builder saved via upsert_v2 can be compiled by reference (no version = latest)."""
+    builder = _make_builder_full(str(tmpdir))
+    payload = FableSaveV2Request(builder=builder, display_name="Compile Test")
+    save_resp = backend_client_with_auth.post("/fable/upsert_v2", json=payload.model_dump())
+    assert save_resp.is_success, save_resp.text
+    fable_id = save_resp.json()["id"]
+
+    compile_resp = backend_client_with_auth.put("/fable/compile_v2", json={"id": fable_id})
+    assert compile_resp.is_success, compile_resp.text
+    spec = compile_resp.json()
+    assert "job" in spec
+    assert "environment" in spec
+    assert len(spec["job"]["job_instance"]["tasks"]) > 0
+
+
+def test_fable_v2_compile_specific_version(tmpdir, backend_client_with_auth):
+    """Omitting version resolves to latest; specifying version compiles that exact version."""
+    builder_v1 = _make_builder_full(str(tmpdir.mkdir("v1")))
+    payload_v1 = FableSaveV2Request(builder=builder_v1, display_name="Version Test v1")
+    save_resp = backend_client_with_auth.post("/fable/upsert_v2", json=payload_v1.model_dump())
+    assert save_resp.is_success, save_resp.text
+    fable_id = save_resp.json()["id"]
+
+    # Save a second version with a different builder (source-only, no sink)
+    source_only = _make_builder_source_only()
+    payload_v2 = FableSaveV2Request(builder=source_only, display_name="Version Test v2")
+    save_resp2 = backend_client_with_auth.post("/fable/upsert_v2", params={"fable_id": fable_id}, json=payload_v2.model_dump())
+    assert save_resp2.is_success, save_resp2.text
+    assert save_resp2.json()["version"] == 2
+
+    # Compile v1 explicitly — should produce tasks (has a sink)
+    resp_v1 = backend_client_with_auth.put("/fable/compile_v2", json={"id": fable_id, "version": 1})
+    assert resp_v1.is_success, resp_v1.text
+    assert len(resp_v1.json()["job"]["job_instance"]["tasks"]) > 0
+
+    # Compile latest (v2, source-only, no sink) — produces empty tasks
+    resp_latest = backend_client_with_auth.put("/fable/compile_v2", json={"id": fable_id})
+    assert resp_latest.is_success, resp_latest.text
+    assert len(resp_latest.json()["job"]["job_instance"]["tasks"]) == 0
+
+
+def test_fable_v2_compile_nonexistent(backend_client_with_auth):
+    """Compiling an unknown fable id returns 404."""
+    resp = backend_client_with_auth.put("/fable/compile_v2", json={"id": "does-not-exist"})
+    assert resp.status_code == 404
+
+
+def test_fable_expand(tmpdir, backend_client_with_auth):
     response = backend_client_with_auth.get("/fable/catalogue").raise_for_status()
     assert len(response.json()) > 0
 
@@ -60,21 +237,92 @@ def test_fable_contruction(tmpdir, backend_client_with_auth):
     assert len(response.json()["possible_expansions"]["sinkMean"]) == 0
     assert len(response.json()["block_errors"]) == 0
 
-    response = backend_client_with_auth.request(url="/fable/compile", method="put", json=builder.model_dump()).json()
-    assert len(response["job"]["job_instance"]["tasks"]) > 0
+    save_req = FableSaveV2Request(builder=builder)
+    save_resp = backend_client_with_auth.post("/fable/upsert_v2", json=save_req.model_dump())
+    assert save_resp.is_success, save_resp.text
+    fable_id = save_resp.json()["id"]
+    compile_resp = backend_client_with_auth.put("/fable/compile_v2", json={"id": fable_id})
+    assert compile_resp.is_success, compile_resp.text
 
-    spec = ExecutionSpecification(**response)
-    spec.environment.hosts = 1
-    spec.environment.workers_per_host = 1
 
-    response = backend_client_with_auth.post("/job/execute", json=spec.model_dump())
-    assert response.is_success
-    job_id = response.json()["id"]
-    ensure_completed(backend_client_with_auth, job_id, sleep=1, attempts=120)
+def test_fable_v2_basic_execute(tmpdir, backend_client_with_auth):
+    builder = _make_builder_full(tmpdir)
+    save_req = FableSaveV2Request(builder=builder)
+    save_resp = backend_client_with_auth.post("/fable/upsert_v2", json=save_req.model_dump())
+    assert save_resp.is_success, save_resp.text
+    fable_id = save_resp.json()["id"]
+    exec_response = backend_client_with_auth.post("/job/execute_v2", json={"job_definition_id": fable_id})
+    assert exec_response.is_success, exec_response.text
+    response = JobExecuteV2Response(**exec_response.json())
+    execution_id = response.execution_id
+    assert response.attempt_count == 1
+    ensure_completed_v2(backend_client_with_auth, execution_id, sleep=1, attempts=120)
 
-    response = backend_client_with_auth.get(url=f"/job/{job_id}/outputs")
-    assert len(response.json()) == 1
-    assert os.path.exists(f"{tmpdir}/output.zarr")
+    list_resp = backend_client_with_auth.get("/job/status_v2")
+    assert list_resp.is_success, list_resp.text
+    data = list_resp.json()
+    assert "executions" in data
+    assert "total" in data
+    assert "page" in data
+    assert "page_size" in data
+    assert "total_pages" in data
+    assert data["total"] >= 1
+    ids = [e["execution_id"] for e in data["executions"]]
+    assert execution_id in ids
 
-    response = backend_client_with_auth.post(url=f"/job/flush")
-    assert response.is_success
+    resp = backend_client_with_auth.get(f"/job/{execution_id}/specification_v2")
+    assert resp.is_success, resp.text
+    data = resp.json()
+    assert data["definition_id"] == fable_id
+    assert data["definition_version"] == 1
+    assert "blocks" in data
+    assert data["blocks"] is not None
+
+    restart_resp = backend_client_with_auth.post(f"/job/{execution_id}/restart_v2")
+    assert restart_resp.is_success, restart_resp.text
+    data = restart_resp.json()
+    assert data["execution_id"] == execution_id
+    assert data["attempt_count"] == 2
+
+    # Latest-attempt status reflects attempt 2
+    status_resp = backend_client_with_auth.get(f"/job/{execution_id}/status_v2")
+    assert status_resp.is_success, status_resp.text
+    assert status_resp.json()["attempt_count"] == 2
+
+    # Attempt 1 is still accessible explicitly
+    status_1_resp = backend_client_with_auth.get(f"/job/{execution_id}/status_v2", params={"attempt_count": 1})
+    assert status_1_resp.is_success, status_1_resp.text
+    assert status_1_resp.json()["attempt_count"] == 1
+
+    ensure_completed_v2(backend_client_with_auth, execution_id, sleep=1, attempts=120)
+
+
+def test_submit_job_v2_execute_missing_definition_id(backend_client_with_auth):
+    """Omitting job_definition_id (required field) returns 422."""
+    response = backend_client_with_auth.post("/job/execute_v2", json={})
+    assert response.status_code == 422
+
+
+def test_submit_job_v2_execute_unknown_definition(backend_client_with_auth):
+    """Referencing a non-existent JobDefinition returns 404."""
+    payload = {"job_definition_id": "does-not-exist"}
+    response = backend_client_with_auth.post("/job/execute_v2", json=payload)
+    assert response.status_code == 404
+
+
+def test_submit_job_v2_read_status_not_found(backend_client_with_auth):
+    """GET /job/{execution_id}/status_v2 with unknown id returns 404."""
+    resp = backend_client_with_auth.get("/job/nonexistent-exec-id/status_v2")
+    assert resp.status_code == 404
+
+
+def test_submit_job_v2_read_specification_not_found(backend_client_with_auth):
+    """GET /job/{execution_id}/specification_v2 with unknown id returns 404."""
+    resp = backend_client_with_auth.get("/job/nonexistent-exec-id/specification_v2")
+    assert resp.status_code == 404
+
+
+def test_submit_job_v2_restart_not_found(backend_client_with_auth):
+    """POST /job/{execution_id}/restart_v2 with unknown id returns 500 (execution not found)."""
+    resp = backend_client_with_auth.post("/job/nonexistent-exec-id/restart_v2")
+    assert resp.status_code == 500

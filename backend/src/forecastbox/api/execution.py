@@ -269,8 +269,8 @@ async def poll_and_update_execution_v2(execution_id: str, attempt_count: int | N
             await db_jobs2.update_job_execution_runtime(execution_id, actual_attempt, status="failed", error=jobprogress.failure)
             return _build(status_override="failed", error_override=jobprogress.failure)
         elif jobprogress.completed or jobprogress.pct == "100.00":
-            await db_jobs2.update_job_execution_runtime(execution_id, actual_attempt, status="finished", progress="100.00")
-            return _build(status_override="finished", progress_override="100.00")
+            await db_jobs2.update_job_execution_runtime(execution_id, actual_attempt, status="completed", progress="100.00")
+            return _build(status_override="completed", progress_override="100.00")
         else:
             await db_jobs2.update_job_execution_runtime(execution_id, actual_attempt, status="running", progress=jobprogress.pct)
             return _build(status_override="running", progress_override=jobprogress.pct)

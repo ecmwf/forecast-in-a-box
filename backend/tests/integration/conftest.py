@@ -10,6 +10,7 @@ from typing import Any, Generator
 
 import httpx
 import pytest
+from pydantic import SecretStr
 
 import forecastbox.config
 from forecastbox.config import ArtifactStoreConfig, FIABConfig
@@ -106,6 +107,7 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         forecastbox.config.fiab_home = pathlib.Path(td.name)
 
         config = FIABConfig()
+        config.auth.jwt_secret = SecretStr("x" * 32)
         config.api.uvicorn_port = 30645
         config.cascade.cascade_url = "tcp://localhost:30644"
         config.db.sqlite_userdb_path = f"{td.name}/user.db"

@@ -1,5 +1,7 @@
 import time
 
+from forecastbox.api.types.jobs import JobExecutionDetail
+
 
 def extract_auth_token_from_response(response) -> None | str:
     """Extracts the authentication token from the response cookies.
@@ -54,6 +56,24 @@ def ensure_completed(backend_client, job_id, sleep=0.5, attempts=20):
         # TODO parse response with corresponding class, define a method `not_failed` instead
         assert status in {"submitted", "running", "completed"}
         if status == "completed":
+            break
+        time.sleep(sleep)
+        i -= 1
+
+    assert i > 0, f"Failed to finish job {job_id}"
+
+
+def ensure_completed_v2(backend_client, job_id, sleep=0.5, attempts=20):
+    i = attempts
+    while i > 0:
+        response = backend_client.get(f"/job/{job_id}/status_v2", timeout=10)
+        assert response.is_success, response.text
+        detail = JobExecutionDetail(**response.json())
+        if detail.status == "failed":
+            raise RuntimeError(f"Job {job_id} failed: {detail}")
+        # TODO define a method `not_failed` instead
+        assert detail.status in {"submitted", "running", "completed"}, detail.status
+        if detail.status == "completed":
             break
         time.sleep(sleep)
         i -= 1
