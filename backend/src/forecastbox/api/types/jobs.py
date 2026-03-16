@@ -71,10 +71,17 @@ class JobExecutionDetail(BaseModel):
 
 
 class JobExecutionListV2(BaseModel):
-    """List of latest-attempt v2 job execution details."""
+    """List of latest-attempt v2 job execution details with pagination metadata."""
 
     executions: list[JobExecutionDetail]
     total: int
+    """Total number of executions in the database."""
+    page: int
+    """Current page number."""
+    page_size: int
+    """Number of items per page."""
+    total_pages: int
+    """Total number of pages."""
 
 
 class JobSpecificationV2(BaseModel):

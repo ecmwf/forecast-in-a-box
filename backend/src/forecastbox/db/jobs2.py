@@ -338,8 +338,8 @@ async def update_job_execution_runtime(id: str, attempt_count: int, **kwargs: ob
     await executeAndCommit(stmt, async_session_maker)
 
 
-async def list_job_executions() -> Iterable[JobExecution]:
-    """Return the latest non-deleted attempt of every JobExecution."""
+async def list_job_executions(offset: int = 0, limit: int | None = None) -> Iterable[JobExecution]:
+    """Return the latest non-deleted attempt of every JobExecution, with optional paging."""
 
     async def function(i: int) -> list[JobExecution]:
         async with async_session_maker() as session:
@@ -352,9 +352,24 @@ async def list_job_executions() -> Iterable[JobExecution]:
             query = select(JobExecution).join(
                 subq,
                 (JobExecution.id == subq.c.id) & (JobExecution.attempt_count == subq.c.max_attempt),
-            )
+            ).offset(offset)
+            if limit is not None:
+                query = query.limit(limit)
             result = await session.execute(query)
             return [r[0] for r in result.all()]
+
+    return await dbRetry(function)
+
+
+async def count_job_executions() -> int:
+    """Return the total number of distinct (non-deleted) JobExecution ids."""
+
+    async def function(i: int) -> int:
+        async with async_session_maker() as session:
+            result = await session.execute(
+                select(func.count(func.distinct(JobExecution.id))).where(JobExecution.is_deleted.is_(False))
+            )
+            return result.scalar() or 0
 
     return await dbRetry(function)
 

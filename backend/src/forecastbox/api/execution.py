@@ -192,40 +192,9 @@ async def restart_job_execution_v2(execution_id: str, user_id: str | None) -> Ei
     if definition is None:
         return Either.error(f"JobDefinition {definition_id!r} v{definition_version} not found")
 
-    if not definition.blocks:
-        return Either.error(f"JobDefinition {definition_id!r} has no compilable blocks")
-
-    builder = FableBuilderV1(
-        blocks=definition.blocks,  # ty:ignore[invalid-argument-type]
-        environment=EnvironmentSpecification.model_validate(definition.environment_spec) if definition.environment_spec else None,
-    )
-    spec = api_fable.compile(builder)
-
-    new_execution_id, new_attempt_count = await db_jobs2.upsert_job_execution(
-        id=execution_id,
-        job_definition_id=definition_id,
-        job_definition_version=definition_version,
-        created_by=user_id,
-        status="submitted",
-    )
-
-    try:
-        loop = asyncio.get_running_loop()
-        response, product_to_id_mappings = await loop.run_in_executor(None, _execute_cascade, spec)
-        cascade_job_id = response.job_id or str(uuid.uuid4())
-
-        update_kwargs: dict[str, object] = {"cascade_job_id": cascade_job_id}
-        if response.error:
-            update_kwargs["status"] = "failed"
-            update_kwargs["error"] = response.error[:255]
-        else:
-            update_kwargs["outputs"] = [x.model_dump() for x in product_to_id_mappings]
-        await db_jobs2.update_job_execution_runtime(new_execution_id, new_attempt_count, **update_kwargs)
-
-        return Either.ok(JobExecuteV2Response(execution_id=new_execution_id, attempt_count=new_attempt_count))
-    except Exception as e:
-        await db_jobs2.update_job_execution_runtime(new_execution_id, new_attempt_count, status="failed", error=repr(e)[:255])
-        return Either.error(repr(e))
+    # Reuse execute_v2 with the existing execution_id so the new attempt is appended under it
+    result = await execute_v2(definition, user_id, execution_id=execution_id)
+    return result
 
 
 def execution_to_detail(execution: JobExecution) -> JobExecutionDetail:
@@ -300,12 +269,13 @@ async def poll_and_update_execution_v2(execution_id: str, attempt_count: int | N
     return _build()
 
 
-async def execute_v2(definition: JobDefinition, user_id: str | None) -> Either[JobExecuteV2Response, str]:  # type: ignore[invalid-argument]
+async def execute_v2(definition: JobDefinition, user_id: str | None, execution_id: str | None = None) -> Either[JobExecuteV2Response, str]:  # type: ignore[invalid-argument]
     """v2 execute path: always creates a JobExecution linked to the given JobDefinition.
 
     Compiles the definition's blocks via the fable compiler, submits the resulting
-    spec to cascade, persists a JobExecution row, and mirrors the submission to the
-    v1 job.db for backward-compatible status polling.
+    spec to cascade, and persists a JobExecution row. When `execution_id` is supplied,
+    the new attempt is appended under that existing id (restart semantics); otherwise a
+    fresh id is generated.
     """
     if not definition.blocks:
         return Either.error(f"JobDefinition {definition.id!r} has no compilable blocks")
@@ -318,7 +288,8 @@ async def execute_v2(definition: JobDefinition, user_id: str | None) -> Either[J
     definition_id = str(definition.id)  # ty:ignore[invalid-argument-type]
     definition_version = cast(int, definition.version)
 
-    execution_id, attempt_count = await db_jobs2.upsert_job_execution(
+    new_execution_id, attempt_count = await db_jobs2.upsert_job_execution(
+        id=execution_id,
         job_definition_id=definition_id,
         job_definition_version=definition_version,
         created_by=user_id,
@@ -336,9 +307,9 @@ async def execute_v2(definition: JobDefinition, user_id: str | None) -> Either[J
             update_kwargs["error"] = response.error[:255]
         else:
             update_kwargs["outputs"] = [x.model_dump() for x in product_to_id_mappings]
-        await db_jobs2.update_job_execution_runtime(execution_id, attempt_count, **update_kwargs)
+        await db_jobs2.update_job_execution_runtime(new_execution_id, attempt_count, **update_kwargs)
 
-        return Either.ok(JobExecuteV2Response(execution_id=execution_id, attempt_count=attempt_count))
+        return Either.ok(JobExecuteV2Response(execution_id=new_execution_id, attempt_count=attempt_count))
     except Exception as e:
-        await db_jobs2.update_job_execution_runtime(execution_id, attempt_count, status="failed", error=repr(e)[:255])
+        await db_jobs2.update_job_execution_runtime(new_execution_id, attempt_count, status="failed", error=repr(e)[:255])
         return Either.error(repr(e))

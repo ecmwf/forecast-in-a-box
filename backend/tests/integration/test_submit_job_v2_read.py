@@ -43,7 +43,7 @@ def _save_and_execute(client, tmpdir) -> tuple[str, int, str]:
 
 
 def test_submit_job_v2_read_status_list(tmpdir, backend_client_with_auth):
-    """GET /job/status_v2 returns a list containing the submitted execution."""
+    """GET /job/status_v2 returns a paginated list containing the submitted execution."""
     _, _, execution_id = _save_and_execute(backend_client_with_auth, tmpdir)
 
     resp = backend_client_with_auth.get("/job/status_v2")
@@ -51,6 +51,9 @@ def test_submit_job_v2_read_status_list(tmpdir, backend_client_with_auth):
     data = resp.json()
     assert "executions" in data
     assert "total" in data
+    assert "page" in data
+    assert "page_size" in data
+    assert "total_pages" in data
     assert data["total"] >= 1
     ids = [e["execution_id"] for e in data["executions"]]
     assert execution_id in ids

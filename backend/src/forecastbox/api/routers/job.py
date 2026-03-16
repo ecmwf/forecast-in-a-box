@@ -555,11 +555,25 @@ async def execute_v2_api(request: JobExecuteV2Request, user: UserRead | None = D
 
 
 @router.get("/status_v2")
-async def get_status_v2(user: UserRead = Depends(current_active_user)) -> JobExecutionListV2:
-    """List the latest attempt of every v2 job execution."""
-    executions = list(await db_jobs2.list_job_executions())
+async def get_status_v2(
+    user: UserRead = Depends(current_active_user),
+    page: int = 1,
+    page_size: int = 10,
+) -> JobExecutionListV2:
+    """List the latest attempt of every v2 job execution, with pagination."""
+    if page < 1 or page_size < 1:
+        raise HTTPException(status_code=400, detail="Page and page_size must be greater than 0.")
+
+    total = await db_jobs2.count_job_executions()
+    start = (page - 1) * page_size
+    total_pages = (total + page_size - 1) // page_size if total > 0 else 0
+
+    if start >= total and total > 0:
+        raise HTTPException(status_code=404, detail="Page number out of range.")
+
+    executions = list(await db_jobs2.list_job_executions(offset=start, limit=page_size))
     details = [execution_to_detail(e) for e in executions]
-    return JobExecutionListV2(executions=details, total=len(details))
+    return JobExecutionListV2(executions=details, total=total, page=page, page_size=page_size, total_pages=total_pages)
 
 
 @router.get("/{execution_id}/status_v2")
