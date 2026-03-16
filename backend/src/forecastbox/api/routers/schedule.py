@@ -411,6 +411,7 @@ async def get_schedule_runs_v2(
     return ScheduleRunsV2Response(runs=runs, total=total, page=page, page_size=page_size, total_pages=total_pages)
 
 
+@router.get("/{schedule_id}")
 async def get_schedule(schedule_id: ScheduleId, user: UserRead = Depends(current_active_user)) -> GetScheduleResponse:
     maybe_schedule = list(await get_schedules(schedule_id=schedule_id))
     if not maybe_schedule:
