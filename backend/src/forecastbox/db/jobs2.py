@@ -349,10 +349,14 @@ async def list_job_executions(offset: int = 0, limit: int | None = None) -> Iter
                 .group_by(JobExecution.id)
                 .subquery()
             )
-            query = select(JobExecution).join(
-                subq,
-                (JobExecution.id == subq.c.id) & (JobExecution.attempt_count == subq.c.max_attempt),
-            ).offset(offset)
+            query = (
+                select(JobExecution)
+                .join(
+                    subq,
+                    (JobExecution.id == subq.c.id) & (JobExecution.attempt_count == subq.c.max_attempt),
+                )
+                .offset(offset)
+            )
             if limit is not None:
                 query = query.limit(limit)
             result = await session.execute(query)
@@ -366,9 +370,7 @@ async def count_job_executions() -> int:
 
     async def function(i: int) -> int:
         async with async_session_maker() as session:
-            result = await session.execute(
-                select(func.count(func.distinct(JobExecution.id))).where(JobExecution.is_deleted.is_(False))
-            )
+            result = await session.execute(select(func.count(func.distinct(JobExecution.id))).where(JobExecution.is_deleted.is_(False)))
             return result.scalar() or 0
 
     return await dbRetry(function)

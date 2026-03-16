@@ -27,14 +27,31 @@ from cascade.low.core import DatasetId, TaskId
 from fastapi import APIRouter, Body, Depends, HTTPException, Response, UploadFile
 from fastapi.responses import HTMLResponse
 
-from forecastbox.api.execution import ProductToOutputId, SubmitJobResponse, execute2response, execute_v2, execution_to_detail, get_job_definition_for_execution, get_job_execution_specification_v2, poll_and_update_execution_v2, restart_job_execution_v2
+import forecastbox.db.jobs2 as db_jobs2
+from forecastbox.api.execution import (
+    ProductToOutputId,
+    SubmitJobResponse,
+    execute2response,
+    execute_v2,
+    execution_to_detail,
+    get_job_definition_for_execution,
+    get_job_execution_specification_v2,
+    poll_and_update_execution_v2,
+    restart_job_execution_v2,
+)
 from forecastbox.api.routers.gateway import Globals
-from forecastbox.api.types.jobs import ExecutionSpecification, JobExecuteV2Request, JobExecuteV2Response, JobExecutionDetail, JobExecutionListV2, JobSpecificationV2
+from forecastbox.api.types.jobs import (
+    ExecutionSpecification,
+    JobExecuteV2Request,
+    JobExecuteV2Response,
+    JobExecutionDetail,
+    JobExecutionListV2,
+    JobSpecificationV2,
+)
 from forecastbox.api.utils import encode_result
 from forecastbox.auth.users import current_active_user
 from forecastbox.config import config
 from forecastbox.db.job import delete_all, delete_one, get_all, get_count, get_one, update_one
-import forecastbox.db.jobs2 as db_jobs2
 from forecastbox.schemas.job import JobRecord
 from forecastbox.schemas.user import UserRead
 

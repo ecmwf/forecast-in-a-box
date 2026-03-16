@@ -29,7 +29,14 @@ import forecastbox.api.fable as api_fable
 import forecastbox.db.jobs2 as db_jobs2
 from forecastbox.api.artifacts.manager import ArtifactManager, submit_artifact_download
 from forecastbox.api.types.fable import FableBuilderV1
-from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, JobExecuteV2Response, JobExecutionDetail, JobSpecificationV2, RawCascadeJob
+from forecastbox.api.types.jobs import (
+    EnvironmentSpecification,
+    ExecutionSpecification,
+    JobExecuteV2Response,
+    JobExecutionDetail,
+    JobSpecificationV2,
+    RawCascadeJob,
+)
 from forecastbox.api.utils import get_model_path
 from forecastbox.config import config
 from forecastbox.db.job import insert_one
@@ -226,7 +233,9 @@ async def poll_and_update_execution_v2(execution_id: str, attempt_count: int | N
     cascade_job_id = cast(str | None, execution.cascade_job_id)
     status = cast(str, execution.status)
 
-    def _build(status_override: str | None = None, error_override: str | None = None, progress_override: str | None = None) -> JobExecutionDetail:
+    def _build(
+        status_override: str | None = None, error_override: str | None = None, progress_override: str | None = None
+    ) -> JobExecutionDetail:
         return JobExecutionDetail(
             execution_id=str(execution.id),  # ty:ignore[invalid-argument-type]
             attempt_count=actual_attempt,

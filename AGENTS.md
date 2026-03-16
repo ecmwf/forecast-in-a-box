@@ -46,6 +46,7 @@
 * when adding new fields to config.py, make sure they contain defaults -- we need to be backwards compatible wrt users configs
 * when adding new fields to database schemata, make sure you explicitly handle migrations -- we need to be backwards compatible wrt users sqlite instances
 * use comments sparingly, for non-obvious code only. Add docstrings to functions called from other modules only. When adding docstring, use compact style -- dont separate out Args and Returns, describe everything in one or two paragraphs.
+* all imports belong to top level of the file, dont import inside function definitions unless necessiated by runtime. Dont alias imports unless there is a name collision
 
 # Frontend
 * if you would develop frontend features, consult the `frontend/AGENTS.md`.
