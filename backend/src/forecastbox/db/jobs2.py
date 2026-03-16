@@ -497,3 +497,91 @@ async def delete_experiment_next(experiment_id: str) -> None:
     """Remove the next scheduled run entry for an experiment, clearing the pending tick."""
     stmt = sa_delete(ExperimentNext).where(ExperimentNext.experiment_id == experiment_id)
     await executeAndCommit(stmt, async_session_maker)
+
+
+async def get_schedulable_experiments(now: dt.datetime) -> list[tuple[ExperimentNext, ExperimentDefinition]]:
+    """Return (ExperimentNext, ExperimentDefinition) pairs due for execution.
+
+    Joins ExperimentNext with the latest non-deleted ExperimentDefinition of type
+    'cron_schedule'. Disabled schedules have their ExperimentNext row deleted at
+    update time, so no explicit enabled check is needed here.
+    """
+
+    async def function(i: int) -> list[tuple[ExperimentNext, ExperimentDefinition]]:
+        async with async_session_maker() as session:
+            subq = (
+                select(ExperimentDefinition.id, func.max(ExperimentDefinition.version).label("max_version"))
+                .where(ExperimentDefinition.is_deleted.is_(False))
+                .group_by(ExperimentDefinition.id)
+                .subquery()
+            )
+            query = (
+                select(ExperimentNext, ExperimentDefinition)
+                .where(ExperimentNext.scheduled_at <= now)
+                .join(subq, ExperimentNext.experiment_id == subq.c.id)
+                .join(
+                    ExperimentDefinition,
+                    (ExperimentDefinition.id == subq.c.id) & (ExperimentDefinition.version == subq.c.max_version),
+                )
+                .where(ExperimentDefinition.experiment_type == "cron_schedule")
+            )
+            result = await session.execute(query)
+            return [(row[0], row[1]) for row in result.all()]
+
+    return await dbRetry(function)
+
+
+async def next_schedulable_experiment() -> dt.datetime | None:
+    """Return the earliest scheduled_at across all ExperimentNext rows."""
+
+    async def function(i: int) -> dt.datetime | None:
+        async with async_session_maker() as session:
+            query = select(func.min(ExperimentNext.scheduled_at))
+            result = await session.execute(query)
+            return result.scalar_one_or_none()
+
+    return await dbRetry(function)
+
+
+async def list_job_executions_by_experiment(experiment_id: str, offset: int = 0, limit: int | None = None) -> Iterable[JobExecution]:
+    """Return the latest attempt of each JobExecution linked to an experiment, ordered by created_at descending."""
+
+    async def function(i: int) -> list[JobExecution]:
+        async with async_session_maker() as session:
+            subq = (
+                select(JobExecution.id, func.max(JobExecution.attempt_count).label("max_attempt"))
+                .where(JobExecution.experiment_id == experiment_id, JobExecution.is_deleted.is_(False))
+                .group_by(JobExecution.id)
+                .subquery()
+            )
+            query = (
+                select(JobExecution)
+                .join(
+                    subq,
+                    (JobExecution.id == subq.c.id) & (JobExecution.attempt_count == subq.c.max_attempt),
+                )
+                .order_by(JobExecution.created_at.desc())
+                .offset(offset)
+            )
+            if limit is not None:
+                query = query.limit(limit)
+            result = await session.execute(query)
+            return [r[0] for r in result.all()]
+
+    return await dbRetry(function)
+
+
+async def count_job_executions_by_experiment(experiment_id: str) -> int:
+    """Return the total number of distinct non-deleted JobExecution ids linked to an experiment."""
+
+    async def function(i: int) -> int:
+        async with async_session_maker() as session:
+            result = await session.execute(
+                select(func.count(func.distinct(JobExecution.id))).where(
+                    JobExecution.experiment_id == experiment_id,
+                    JobExecution.is_deleted.is_(False),
+                )
+            )
+            return result.scalar() or 0
+
+    return await dbRetry(function)

@@ -322,3 +322,48 @@ async def execute_v2(definition: JobDefinition, user_id: str | None, execution_i
     except Exception as e:
         await db_jobs2.update_job_execution_runtime(new_execution_id, attempt_count, status="failed", error=repr(e)[:255])
         return Either.error(repr(e))
+
+
+async def execute_experiment_run(
+    exec_spec: ExecutionSpecification,
+    user_id: str | None,
+    experiment_id: str,
+    job_definition_id: str,
+    job_definition_version: int,
+    compiler_runtime_context: dict,
+    execution_id: str | None = None,
+) -> Either[JobExecuteV2Response, str]:  # type: ignore[invalid-argument]
+    """Submit a pre-compiled scheduled experiment run, creating a JobExecution linked to the experiment.
+
+    Uses a spec already compiled by the caller (with dynamic expressions applied).
+    Stores experiment_id and compiler_runtime_context on the created JobExecution so
+    runs_v2 can read trigger type and original scheduled_at.
+    When execution_id is supplied, the new attempt is appended under that id (rerun semantics).
+    """
+    new_execution_id, attempt_count = await db_jobs2.upsert_job_execution(
+        id=execution_id,
+        job_definition_id=job_definition_id,
+        job_definition_version=job_definition_version,
+        created_by=user_id,
+        status="submitted",
+        experiment_id=experiment_id,
+        compiler_runtime_context=compiler_runtime_context,
+    )
+
+    try:
+        loop = asyncio.get_running_loop()
+        response, product_to_id_mappings = await loop.run_in_executor(None, _execute_cascade, exec_spec)
+        cascade_job_id = response.job_id or str(uuid.uuid4())
+
+        update_kwargs: dict[str, object] = {"cascade_job_id": cascade_job_id}
+        if response.error:
+            update_kwargs["status"] = "failed"
+            update_kwargs["error"] = response.error[:255]
+        else:
+            update_kwargs["outputs"] = [x.model_dump() for x in product_to_id_mappings]
+        await db_jobs2.update_job_execution_runtime(new_execution_id, attempt_count, **update_kwargs)
+
+        return Either.ok(JobExecuteV2Response(execution_id=new_execution_id, attempt_count=attempt_count))
+    except Exception as e:
+        await db_jobs2.update_job_execution_runtime(new_execution_id, attempt_count, status="failed", error=repr(e)[:255])
+        return Either.error(repr(e))

@@ -186,6 +186,27 @@ class ListSchedulesV2Response:
     error: str | None = None
 
 
+@dataclass(frozen=True, eq=True, slots=True)
+class ScheduleRunV2Response:
+    execution_id: str
+    attempt_count: int
+    status: str
+    created_at: str
+    updated_at: str
+    trigger: str
+    scheduled_at: str | None
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class ScheduleRunsV2Response:
+    runs: list[ScheduleRunV2Response]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+    error: str | None = None
+
+
 def _experiment_to_v2_response(exp: ExperimentDefinition) -> ScheduleDefinitionV2Response:
     exp_def = cast(dict, exp.experiment_definition) or {}
     return ScheduleDefinitionV2Response(
@@ -262,6 +283,7 @@ async def create_schedule_v2(
     next_run_at = calculate_next_run(dt.datetime.now(), schedule_spec.cron_expr)
     await db_jobs2.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=next_run_at)
     logger.debug(f"V2 schedule {experiment_id}: next run at {next_run_at}")
+    prod_scheduler()
 
     return CreateScheduleV2Response(experiment_id=experiment_id)
 
@@ -327,6 +349,7 @@ async def update_schedule_v2(
             else:
                 await db_jobs2.delete_experiment_next(experiment_id)
                 logger.debug(f"V2 schedule {experiment_id}: disabled, next run cleared")
+        prod_scheduler()
 
     updated = await db_jobs2.get_experiment_definition(experiment_id)
     assert updated is not None
@@ -342,6 +365,50 @@ async def get_next_run_v2(experiment_id: str, user: UserRead = Depends(current_a
     if next_entry is None:
         return "not scheduled currently"
     return str(next_entry.scheduled_at)
+
+
+@router.get("/runs_v2")
+async def get_schedule_runs_v2(
+    experiment_id: str,
+    user: UserRead = Depends(current_active_user),
+    page: int = 1,
+    page_size: int = 10,
+) -> ScheduleRunsV2Response:
+    """Return paginated JobExecution rows linked to a v2 cron schedule experiment.
+
+    Each run includes a trigger field ('cron' or 'rerun') sourced from
+    compiler_runtime_context so callers can distinguish normal scheduled runs
+    from manual reruns.
+    """
+    if page < 1 or page_size < 1:
+        raise HTTPException(status_code=400, detail="Page and page_size must be greater than 0.")
+
+    exp_def = await db_jobs2.get_experiment_definition(experiment_id)
+    if exp_def is None or exp_def.experiment_type != "cron_schedule":
+        raise HTTPException(status_code=404, detail=f"Schedule {experiment_id} not found")
+
+    total = await db_jobs2.count_job_executions_by_experiment(experiment_id)
+    start = (page - 1) * page_size
+    total_pages = (total + page_size - 1) // page_size if total > 0 else 0
+
+    if start >= total and total > 0:
+        raise HTTPException(status_code=404, detail="Page number out of range.")
+
+    executions = list(await db_jobs2.list_job_executions_by_experiment(experiment_id, offset=start, limit=page_size))
+
+    runs = [
+        ScheduleRunV2Response(
+            execution_id=str(ex.id),  # ty:ignore[invalid-argument-type]
+            attempt_count=cast(int, ex.attempt_count),
+            status=cast(str, ex.status),
+            created_at=str(ex.created_at),
+            updated_at=str(ex.updated_at),
+            trigger=cast(dict, ex.compiler_runtime_context or {}).get("trigger", "cron"),
+            scheduled_at=cast(dict, ex.compiler_runtime_context or {}).get("scheduled_at"),
+        )
+        for ex in executions
+    ]
+    return ScheduleRunsV2Response(runs=runs, total=total, page=page, page_size=page_size, total_pages=total_pages)
 
 
 async def get_schedule(schedule_id: ScheduleId, user: UserRead = Depends(current_active_user)) -> GetScheduleResponse:

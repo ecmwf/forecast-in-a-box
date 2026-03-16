@@ -22,9 +22,10 @@ import logging
 import threading
 from typing import cast
 
-from forecastbox.api.execution import execute
+import forecastbox.db.jobs2 as db_jobs2
+from forecastbox.api.execution import execute, execute_experiment_run
 from forecastbox.api.scheduling.dt_utils import calculate_next_run
-from forecastbox.api.scheduling.job_utils import schedule2runnable
+from forecastbox.api.scheduling.job_utils import experiment2runnable, schedule2runnable
 from forecastbox.config import config
 from forecastbox.db.schedule import (
     delete_schedule_next_run,
@@ -109,7 +110,12 @@ class SchedulerThread(threading.Thread):
                     logger.warning(f"No next run for {schedule_id_str}, not scheduling")
                     # logging as warning because its not expected rn, but presumably we'll supported bounded-ocurrence schedules eventually
 
-        next_schedulable_at = await next_schedulable()
+        await self._try_schedule_v2(now)
+
+        next_schedulable_at_v1 = await next_schedulable()
+        next_schedulable_at_v2 = await db_jobs2.next_schedulable_experiment()
+        candidates = [t for t in [next_schedulable_at_v1, next_schedulable_at_v2] if t is not None]
+        next_schedulable_at = min(candidates) if candidates else None
 
         sleep_duration = sleep_duration_min
         if next_schedulable_at:
@@ -120,6 +126,48 @@ class SchedulerThread(threading.Thread):
                 sleep_duration = 0
 
         return sleep_duration
+
+    async def _try_schedule_v2(self, now: dt.datetime) -> None:
+        """Check and submit due v2 (ExperimentDefinition) scheduled runs."""
+        schedulable = await db_jobs2.get_schedulable_experiments(now)
+
+        for exp_next, _exp_def in schedulable:
+            experiment_id = cast(str, exp_next.experiment_id)
+            scheduled_at = cast(dt.datetime, exp_next.scheduled_at)
+            logger.debug(f"[v2] Processing scheduled experiment {experiment_id} at {scheduled_at}")
+
+            get_spec_result = await experiment2runnable(experiment_id, scheduled_at)
+
+            if get_spec_result.t is not None:
+                runnable = get_spec_result.t
+                if (now - scheduled_at).total_seconds() / 3600 > runnable.max_acceptable_delay_hours:
+                    logger.warning(
+                        f"[v2] Skipping experiment {experiment_id} at {scheduled_at}: "
+                        f"older than max_acceptable_delay_hours ({runnable.max_acceptable_delay_hours} hours)."
+                    )
+                else:
+                    exec_result = await execute_experiment_run(
+                        exec_spec=runnable.exec_spec,
+                        user_id=runnable.created_by,
+                        experiment_id=experiment_id,
+                        job_definition_id=runnable.job_definition_id,
+                        job_definition_version=runnable.job_definition_version,
+                        compiler_runtime_context=runnable.compiler_runtime_context,
+                    )
+                    if exec_result.t is not None:
+                        logger.debug(f"[v2] Execution {exec_result.t.execution_id} submitted for experiment {experiment_id}")
+                    else:
+                        logger.error(f"[v2] Failed to submit experiment {experiment_id}: {exec_result.e}")
+
+                await db_jobs2.delete_experiment_next(experiment_id)
+                if runnable.next_run_at:
+                    await db_jobs2.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=runnable.next_run_at)
+                    logger.debug(f"[v2] Next run for {experiment_id}: {runnable.next_run_at}")
+                else:
+                    logger.warning(f"[v2] No next run computed for {experiment_id}")
+            else:
+                logger.error(f"[v2] Could not create runnable for experiment {experiment_id}: {get_spec_result.e}")
+                await db_jobs2.delete_experiment_next(experiment_id)
 
     async def _run(self):
         while not self.stop_event.is_set():
@@ -211,3 +259,15 @@ async def regenerate_schedule_next(schedule_id: str, cron_expr: str, enabled: bo
         logger.debug(f"Regenerated next run for {schedule_id} at {next_run_at}")
     else:
         logger.debug(f"Schedule {schedule_id} is disabled, no next run inserted.")
+
+
+async def regenerate_experiment_next(experiment_id: str, cron_expr: str, enabled: bool) -> None:
+    """Regenerate the ExperimentNext row for a v2 cron schedule after an update."""
+    await db_jobs2.delete_experiment_next(experiment_id)
+
+    if enabled:
+        next_run_at = calculate_next_run(dt.datetime.now(), cron_expr)
+        await db_jobs2.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=next_run_at)
+        logger.debug(f"[v2] Regenerated next run for {experiment_id} at {next_run_at}")
+    else:
+        logger.debug(f"[v2] Experiment {experiment_id} is disabled, no next run inserted.")
