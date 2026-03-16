@@ -12,6 +12,7 @@ Fundamental APIs of Forecast As BLock Expression (Fable)
 """
 
 import logging
+import os
 from collections import defaultdict
 from itertools import groupby
 from typing import Iterator, cast
@@ -154,7 +155,19 @@ def compile(fable: FableBuilderV1) -> ExecutionSpecification:
             graph += action_lookup[blockId].graph()
 
     graph = deduplicate_nodes(graph)
-    job = RawCascadeJob(job_type="raw_cascade_job", job_instance=graph2job(graph))
+    job_instance = graph2job(graph)
+    if data_dir := os.environ.get("IS_TEST_DATA_DIR", ""):
+        # TODO solve this properly
+        for task in job_instance.tasks.values():
+            if task.definition.entrypoint == "fiab_plugin_ecmwf.runtime.source.earthkit_source":
+                request = task.static_input_kw["request"]
+                # Check request matches data inside test file
+                assert request["number"] == list(range(1, 6, 1))
+                assert request["step"] == list(range(0, 61, 6))
+                task.static_input_ps["0"] = "file"
+                task.static_input_kw["path"] = os.path.join(data_dir, "fable_test.grib")
+    job = RawCascadeJob(job_type="raw_cascade_job", job_instance=job_instance)
+
     graph_artifacts = _get_artifacts_list(graph)
     if fable.environment is not None:
         merged_artifacts = list(set(fable.environment.runtime_artifacts).union(set(graph_artifacts)))

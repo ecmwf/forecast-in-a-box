@@ -98,6 +98,8 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         td = tempfile.TemporaryDirectory()
         td_data = tempfile.TemporaryDirectory()
         os.environ["FIAB_ROOT"] = td.name
+        # NOTE we set test data dir because of a hack in api.fable.compile -- can be removed after that is solved
+        os.environ["IS_TEST_DATA_DIR"] = os.path.join(os.path.dirname(__file__), "data")
         (pathlib.Path(td.name) / "pylock.toml.timestamp").write_text("1761908420:d0.0.1")
         # we need to monkeypath this, because of eager import this was already initialised
         # to user's personal config file

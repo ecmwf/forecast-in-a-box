@@ -7,8 +7,6 @@ from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecif
 
 from .utils import ensure_completed
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-
 
 def test_fable_contruction(tmpdir, backend_client_with_auth):
     response = backend_client_with_auth.get("/fable/catalogue").raise_for_status()
@@ -68,16 +66,6 @@ def test_fable_contruction(tmpdir, backend_client_with_auth):
     spec = ExecutionSpecification(**response)
     spec.environment.hosts = 1
     spec.environment.workers_per_host = 1
-
-    # Replace open data retrieval with reading from test data file
-    for task in spec.job.job_instance.tasks.values():
-        if task.definition.entrypoint == "fiab_plugin_ecmwf.runtime.source.earthkit_source":
-            request = task.static_input_kw["request"]
-            # Check request matches data inside test file
-            assert request["number"] == list(range(1, 6, 1))
-            assert request["step"] == list(range(0, 61, 6))
-            task.static_input_ps["0"] = "file"
-            task.static_input_kw["path"] = os.path.join(DATA_DIR, "fable_test.grib")
 
     response = backend_client_with_auth.post("/job/execute", json=spec.model_dump())
     assert response.is_success
