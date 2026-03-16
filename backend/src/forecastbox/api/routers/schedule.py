@@ -28,7 +28,7 @@ from forecastbox.api.scheduling.scheduler_thread import (
     start_scheduler,
     stop_scheduler,
 )
-from forecastbox.api.types.scheduling import ScheduleSpecification, ScheduleUpdate, ScheduleSpecificationV2, ScheduleUpdateV2, schedule2db
+from forecastbox.api.types.scheduling import ScheduleSpecification, ScheduleSpecificationV2, ScheduleUpdate, ScheduleUpdateV2, schedule2db
 from forecastbox.auth.users import current_active_user
 from forecastbox.db.schedule import (
     ScheduleId,
@@ -205,8 +205,6 @@ def _experiment_to_v2_response(exp: ExperimentDefinition) -> ScheduleDefinitionV
     )
 
 
-# /list_v2 must be registered before the parameterized /{schedule_id} route so that FastAPI
-# resolves this exact-path endpoint first.
 @router.get("/list_v2")
 async def list_schedules_v2(
     user: UserRead = Depends(current_active_user),
@@ -227,9 +225,6 @@ async def list_schedules_v2(
     schedules = [_experiment_to_v2_response(exp) for exp in experiments]
     return ListSchedulesV2Response(schedules=schedules, total=total, page=page, page_size=page_size, total_pages=total_pages)
 
-
-# All remaining v2 endpoints use query params and must be registered before the
-# parameterized /{schedule_id} routes to prevent path collision.
 
 @router.put("/create_v2")
 async def create_schedule_v2(
@@ -347,7 +342,6 @@ async def get_next_run_v2(experiment_id: str, user: UserRead = Depends(current_a
     if next_entry is None:
         return "not scheduled currently"
     return str(next_entry.scheduled_at)
-
 
 
 async def get_schedule(schedule_id: ScheduleId, user: UserRead = Depends(current_active_user)) -> GetScheduleResponse:
