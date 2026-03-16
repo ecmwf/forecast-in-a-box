@@ -227,8 +227,10 @@ async def get_experiment_definition(id: str, version: int | None = None) -> Expe
     return await querySingle(query, async_session_maker)
 
 
-async def list_experiment_definitions() -> Iterable[ExperimentDefinition]:
-    """Return the latest non-deleted version of every ExperimentDefinition."""
+async def list_experiment_definitions(
+    experiment_type: str | None = None, offset: int = 0, limit: int | None = None
+) -> Iterable[ExperimentDefinition]:
+    """Return the latest non-deleted version of every ExperimentDefinition, with optional type filter and paging."""
 
     async def function(i: int) -> list[ExperimentDefinition]:
         async with async_session_maker() as session:
@@ -245,8 +247,49 @@ async def list_experiment_definitions() -> Iterable[ExperimentDefinition]:
                 subq,
                 (ExperimentDefinition.id == subq.c.id) & (ExperimentDefinition.version == subq.c.max_version),
             )
+            if experiment_type is not None:
+                query = query.where(ExperimentDefinition.experiment_type == experiment_type)
+            query = query.offset(offset)
+            if limit is not None:
+                query = query.limit(limit)
             result = await session.execute(query)
             return [r[0] for r in result.all()]
+
+    return await dbRetry(function)
+
+
+async def count_experiment_definitions(experiment_type: str | None = None) -> int:
+    """Return the number of distinct non-deleted ExperimentDefinition ids, with optional type filter."""
+
+    async def function(i: int) -> int:
+        async with async_session_maker() as session:
+            subq = (
+                select(ExperimentDefinition.id)
+                .where(ExperimentDefinition.is_deleted.is_(False))
+                .group_by(ExperimentDefinition.id)
+                .subquery()
+            )
+            query = select(func.count()).select_from(subq)
+            if experiment_type is not None:
+                # Re-filter on latest version rows
+                subq2 = (
+                    select(ExperimentDefinition.id, func.max(ExperimentDefinition.version).label("max_version"))
+                    .where(ExperimentDefinition.is_deleted.is_(False))
+                    .group_by(ExperimentDefinition.id)
+                    .subquery()
+                )
+                inner = (
+                    select(ExperimentDefinition.id)
+                    .join(
+                        subq2,
+                        (ExperimentDefinition.id == subq2.c.id) & (ExperimentDefinition.version == subq2.c.max_version),
+                    )
+                    .where(ExperimentDefinition.experiment_type == experiment_type)
+                    .subquery()
+                )
+                query = select(func.count()).select_from(inner)
+            result = await session.execute(query)
+            return result.scalar() or 0
 
     return await dbRetry(function)
 

@@ -36,7 +36,7 @@ def test_schedule_v2_crud(backend_client_with_auth):
     job_def_id, job_def_version = _save_fable(backend_client_with_auth)
 
     # miss on unknown experiment_id
-    response = backend_client_with_auth.get("/schedule/notToBeFound/get_v2")
+    response = backend_client_with_auth.get("/schedule/get_v2", params={"experiment_id": "notToBeFound"})
     assert response.status_code == 404
 
     # create
@@ -54,7 +54,7 @@ def test_schedule_v2_crud(backend_client_with_auth):
     assert experiment_id
 
     # get
-    response = backend_client_with_auth.get(f"/schedule/{experiment_id}/get_v2")
+    response = backend_client_with_auth.get("/schedule/get_v2", params={"experiment_id": experiment_id})
     assert response.is_success, response.text
     data = response.json()
     assert data["experiment_id"] == experiment_id
@@ -65,14 +65,16 @@ def test_schedule_v2_crud(backend_client_with_auth):
     # update cron and enabled
     updated_cron = "0 1 * * *"
     update = ScheduleUpdateV2(cron_expr=updated_cron, enabled=False)
-    response = backend_client_with_auth.post(f"/schedule/{experiment_id}/update_v2", headers=headers, json=update.model_dump(exclude_unset=True))
+    response = backend_client_with_auth.post(
+        "/schedule/update_v2", params={"experiment_id": experiment_id}, headers=headers, json=update.model_dump(exclude_unset=True)
+    )
     assert response.is_success, response.text
     updated = response.json()
     assert updated["cron_expr"] == updated_cron
     assert updated["enabled"] is False
 
     # confirm updated values are persisted
-    response = backend_client_with_auth.get(f"/schedule/{experiment_id}/get_v2")
+    response = backend_client_with_auth.get("/schedule/get_v2", params={"experiment_id": experiment_id})
     assert response.is_success, response.text
     persisted = response.json()
     assert persisted["cron_expr"] == updated_cron
@@ -80,7 +82,7 @@ def test_schedule_v2_crud(backend_client_with_auth):
 
 
 def test_schedule_v2_list(backend_client_with_auth):
-    """Creating v2 schedules makes them appear in the list_v2 endpoint."""
+    """Creating v2 schedules makes them appear in the list_v2 endpoint with pagination."""
     headers = {"Content-Type": "application/json"}
     job_def_id, job_def_version = _save_fable(backend_client_with_auth)
 
@@ -110,9 +112,25 @@ def test_schedule_v2_list(backend_client_with_auth):
     assert response.is_success, response.text
     list_data = response.json()
     assert list_data["total"] == baseline_total + 2
+    assert list_data["page"] == 1
+    assert list_data["page_size"] == 10
     experiment_ids = [s["experiment_id"] for s in list_data["schedules"]]
     assert exp_id_1 in experiment_ids
     assert exp_id_2 in experiment_ids
+
+    # pagination: page_size=1
+    response = backend_client_with_auth.get("/schedule/list_v2", params={"page": 1, "page_size": 1})
+    assert response.is_success, response.text
+    paged = response.json()
+    assert len(paged["schedules"]) == 1
+    assert paged["total"] == baseline_total + 2
+    assert paged["total_pages"] == baseline_total + 2
+
+    # invalid params
+    response = backend_client_with_auth.get("/schedule/list_v2", params={"page": 0, "page_size": 1})
+    assert response.status_code == 400
+    response = backend_client_with_auth.get("/schedule/list_v2", params={"page": 1, "page_size": 0})
+    assert response.status_code == 400
 
 
 def test_schedule_v2_next_run(backend_client_with_auth):
@@ -130,17 +148,19 @@ def test_schedule_v2_next_run(backend_client_with_auth):
     experiment_id = response.json()["experiment_id"]
 
     # initial next run at midnight
-    response = backend_client_with_auth.get(f"/schedule/{experiment_id}/next_run_v2")
+    response = backend_client_with_auth.get("/schedule/next_run_v2", params={"experiment_id": experiment_id})
     assert response.is_success, response.text
     initial_next_run = response.json()
     assert "00:00:00" in initial_next_run
 
     # update cron to 2 AM
     update = ScheduleUpdateV2(cron_expr="0 2 * * *")
-    response = backend_client_with_auth.post(f"/schedule/{experiment_id}/update_v2", headers=headers, json=update.model_dump(exclude_unset=True))
+    response = backend_client_with_auth.post(
+        "/schedule/update_v2", params={"experiment_id": experiment_id}, headers=headers, json=update.model_dump(exclude_unset=True)
+    )
     assert response.is_success, response.text
 
-    response = backend_client_with_auth.get(f"/schedule/{experiment_id}/next_run_v2")
+    response = backend_client_with_auth.get("/schedule/next_run_v2", params={"experiment_id": experiment_id})
     assert response.is_success, response.text
     updated_next_run = response.json()
     assert updated_next_run != initial_next_run
@@ -148,10 +168,12 @@ def test_schedule_v2_next_run(backend_client_with_auth):
 
     # disable: next run should be cleared
     disable_update = ScheduleUpdateV2(enabled=False)
-    response = backend_client_with_auth.post(f"/schedule/{experiment_id}/update_v2", headers=headers, json=disable_update.model_dump(exclude_unset=True))
+    response = backend_client_with_auth.post(
+        "/schedule/update_v2", params={"experiment_id": experiment_id}, headers=headers, json=disable_update.model_dump(exclude_unset=True)
+    )
     assert response.is_success, response.text
 
-    response = backend_client_with_auth.get(f"/schedule/{experiment_id}/next_run_v2")
+    response = backend_client_with_auth.get("/schedule/next_run_v2", params={"experiment_id": experiment_id})
     assert response.is_success, response.text
     assert response.json() == "not scheduled currently"
 
