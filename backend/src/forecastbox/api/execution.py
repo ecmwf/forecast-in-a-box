@@ -29,13 +29,13 @@ import forecastbox.api.fable as api_fable
 import forecastbox.db.jobs2 as db_jobs2
 from forecastbox.api.artifacts.manager import ArtifactManager, submit_artifact_download
 from forecastbox.api.types.fable import FableBuilderV1
-from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, JobExecuteV2Response, JobSpecificationV2, RawCascadeJob
+from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, JobExecuteV2Response, JobExecutionDetail, JobSpecificationV2, RawCascadeJob
 from forecastbox.api.utils import get_model_path
 from forecastbox.config import config
 from forecastbox.db.job import insert_one
 from forecastbox.models import get_model
 from forecastbox.products.registry import get_product
-from forecastbox.schemas.jobs2 import JobDefinition
+from forecastbox.schemas.jobs2 import JobDefinition, JobExecution
 from forecastbox.schemas.user import UserRead
 
 logger = logging.getLogger(__name__)
@@ -226,6 +226,78 @@ async def restart_job_execution_v2(execution_id: str, user_id: str | None) -> Ei
     except Exception as e:
         await db_jobs2.update_job_execution_runtime(new_execution_id, new_attempt_count, status="failed", error=repr(e)[:255])
         return Either.error(repr(e))
+
+
+def execution_to_detail(execution: JobExecution) -> JobExecutionDetail:
+    """Convert a JobExecution ORM row to a JobExecutionDetail response model."""
+    return JobExecutionDetail(
+        execution_id=str(execution.id),  # ty:ignore[invalid-argument-type]
+        attempt_count=cast(int, execution.attempt_count),
+        status=cast(str, execution.status),
+        created_at=str(execution.created_at),
+        updated_at=str(execution.updated_at),
+        job_definition_id=str(execution.job_definition_id),  # ty:ignore[invalid-argument-type]
+        job_definition_version=cast(int, execution.job_definition_version),
+        error=cast(str | None, execution.error),
+        progress=cast(str | None, execution.progress),
+        cascade_job_id=cast(str | None, execution.cascade_job_id),
+    )
+
+
+async def poll_and_update_execution_v2(execution_id: str, attempt_count: int | None) -> JobExecutionDetail | None:
+    """Fetch a JobExecution, poll cascade if active, update db, and return current detail.
+
+    Returns None if the execution is not found.
+    """
+    execution = await db_jobs2.get_job_execution(execution_id, attempt_count)
+    if execution is None:
+        return None
+
+    actual_attempt = cast(int, execution.attempt_count)
+    cascade_job_id = cast(str | None, execution.cascade_job_id)
+    status = cast(str, execution.status)
+
+    def _build(status_override: str | None = None, error_override: str | None = None, progress_override: str | None = None) -> JobExecutionDetail:
+        return JobExecutionDetail(
+            execution_id=str(execution.id),  # ty:ignore[invalid-argument-type]
+            attempt_count=actual_attempt,
+            status=status_override or status,
+            created_at=str(execution.created_at),
+            updated_at=str(execution.updated_at),
+            job_definition_id=str(execution.job_definition_id),  # ty:ignore[invalid-argument-type]
+            job_definition_version=cast(int, execution.job_definition_version),
+            error=error_override if error_override is not None else cast(str | None, execution.error),
+            progress=progress_override if progress_override is not None else cast(str | None, execution.progress),
+            cascade_job_id=cascade_job_id,
+        )
+
+    if status in ("submitted", "preparing", "running") and cascade_job_id:
+        try:
+            response = client.request_response(api.JobProgressRequest(job_ids=[cascade_job_id]), f"{config.cascade.cascade_url}")
+            response = cast(api.JobProgressResponse, response)
+        except TimeoutError:
+            return _build(status_override="unknown", error_override="failed to communicate with gateway")
+        except Exception as e:
+            return _build(status_override="unknown", error_override=f"internal cascade failure: {repr(e)}")
+
+        if response.error:
+            return _build(status_override="unknown", error_override=response.error)
+
+        jobprogress = response.progresses.get(cascade_job_id)
+        if jobprogress is None:
+            await db_jobs2.update_job_execution_runtime(execution_id, actual_attempt, status="failed", error="evicted from gateway")
+            return _build(status_override="failed", error_override="evicted from gateway")
+        elif jobprogress.failure:
+            await db_jobs2.update_job_execution_runtime(execution_id, actual_attempt, status="failed", error=jobprogress.failure)
+            return _build(status_override="failed", error_override=jobprogress.failure)
+        elif jobprogress.completed or jobprogress.pct == "100.00":
+            await db_jobs2.update_job_execution_runtime(execution_id, actual_attempt, status="finished", progress="100.00")
+            return _build(status_override="finished", progress_override="100.00")
+        else:
+            await db_jobs2.update_job_execution_runtime(execution_id, actual_attempt, status="running", progress=jobprogress.pct)
+            return _build(status_override="running", progress_override=jobprogress.pct)
+
+    return _build()
 
 
 async def execute_v2(definition: JobDefinition, user_id: str | None) -> Either[JobExecuteV2Response, str]:  # type: ignore[invalid-argument]

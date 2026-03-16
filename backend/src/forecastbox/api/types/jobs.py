@@ -55,8 +55,8 @@ class JobExecuteV2Response(BaseModel):
     """Attempt number; always 1 on a fresh execution."""
 
 
-class JobExecutionStatusV2(BaseModel):
-    """Status of a single v2 job execution attempt."""
+class JobExecutionDetail(BaseModel):
+    """Detail of a single v2 job execution attempt."""
 
     execution_id: str
     attempt_count: int
@@ -71,9 +71,9 @@ class JobExecutionStatusV2(BaseModel):
 
 
 class JobExecutionListV2(BaseModel):
-    """List of latest-attempt v2 job execution statuses."""
+    """List of latest-attempt v2 job execution details."""
 
-    executions: list[JobExecutionStatusV2]
+    executions: list[JobExecutionDetail]
     total: int
 
 
