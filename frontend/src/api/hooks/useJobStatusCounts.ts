@@ -39,7 +39,7 @@ export function useJobStatusCounts() {
 
   if (query.data) {
     for (const exec of query.data.executions) {
-      const status = exec.status as JobStatus
+      const status = exec.status
       if (status in counts) {
         counts[status]++
       }

@@ -146,7 +146,10 @@ export function useSubmitFable() {
       })
 
       // Execute the persisted definition by reference
-      return executeJobV2({ job_definition_id: id, job_definition_version: version })
+      return executeJobV2({
+        job_definition_id: id,
+        job_definition_version: version,
+      })
     },
     onSuccess: (response, params) => {
       const metadata: JobMetadata = {

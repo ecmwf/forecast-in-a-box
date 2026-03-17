@@ -23,7 +23,11 @@ import {
   getExecution,
   getJob,
 } from '../data/job.data'
-import type { ExecutionSpecification, JobExecuteV2Request, JobStatus } from '@/api/types/job.types'
+import type {
+  ExecutionSpecification,
+  JobExecuteV2Request,
+  JobStatus,
+} from '@/api/types/job.types'
 import { API_ENDPOINTS, API_PATTERNS } from '@/api/endpoints'
 
 export const jobHandlers = [
@@ -132,7 +136,10 @@ export const jobHandlers = [
     const exec = getExecution(executionId)
 
     if (!exec) {
-      return HttpResponse.json({ detail: 'Execution not found' }, { status: 404 })
+      return HttpResponse.json(
+        { detail: 'Execution not found' },
+        { status: 404 },
+      )
     }
 
     return HttpResponse.json(exec)

@@ -235,11 +235,15 @@ export function getAllExecutions(): Array<JobExecutionDetail> {
   })
 }
 
-export function getExecution(executionId: string): JobExecutionDetail | undefined {
+export function getExecution(
+  executionId: string,
+): JobExecutionDetail | undefined {
   return executionsState[executionId]
 }
 
-export function addExecution(request: JobExecuteV2Request): JobExecuteV2Response {
+export function addExecution(
+  request: JobExecuteV2Request,
+): JobExecuteV2Response {
   const execution_id = `exec-mock-${String(executionIdCounter++).padStart(3, '0')}`
   const timestamp = new Date().toISOString()
   executionsState[execution_id] = {
