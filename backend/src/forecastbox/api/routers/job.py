@@ -38,8 +38,8 @@ from forecastbox.api.types.jobs import (
     JobExecuteV2Request,
     JobExecuteV2Response,
     JobExecutionDetail,
-    JobExecutionListV2,
-    JobSpecificationV2,
+    JobExecutionList,
+    JobSpecification,
 )
 from forecastbox.api.utils import encode_result
 from forecastbox.auth.users import current_active_user
@@ -148,7 +148,7 @@ async def get_status_v2(
     user: UserRead = Depends(current_active_user),
     page: int = 1,
     page_size: int = 10,
-) -> JobExecutionListV2:
+) -> JobExecutionList:
     """List the latest attempt of every v2 job execution, with pagination."""
     if page < 1 or page_size < 1:
         raise HTTPException(status_code=400, detail="Page and page_size must be greater than 0.")
@@ -162,7 +162,7 @@ async def get_status_v2(
 
     executions = list(await db_jobs2.list_job_executions(offset=start, limit=page_size))
     details = [execution_to_detail(e) for e in executions]
-    return JobExecutionListV2(executions=details, total=total, page=page, page_size=page_size, total_pages=total_pages)
+    return JobExecutionList(executions=details, total=total, page=page, page_size=page_size, total_pages=total_pages)
 
 
 @router.get("/{execution_id}/status_v2")
@@ -199,7 +199,7 @@ async def get_specification_of_execution_v2(
     execution_id: str,
     attempt_count: int | None = None,
     user: UserRead = Depends(current_active_user),
-) -> JobSpecificationV2:
+) -> JobSpecification:
     """Get the linked JobDefinition specification for a v2 execution attempt."""
     spec = await get_job_execution_specification_v2(execution_id, attempt_count)
     if spec is None:

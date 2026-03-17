@@ -21,7 +21,7 @@ import forecastbox.api.fable as api_fable
 import forecastbox.db.jobs2 as db_jobs2
 from forecastbox.api.plugin.manager import PluginCompositeId, catalogue_view, plugins_ready
 from forecastbox.api.types.fable import (
-    FableBuilderV1,
+    FableBuilder,
     FableCompileV2Request,
     FableRetrieveV2Response,
     FableSaveV2Request,
@@ -54,7 +54,7 @@ def get_catalogue() -> dict[PluginCompositeId, BlockFactoryCatalogue]:
 
 # NOTE its a put but get would be better -- but browsers dont support get+json body
 @router.put("/expand")
-def expand_fable(fable: FableBuilderV1) -> FableValidationExpansion:
+def expand_fable(fable: FableBuilder) -> FableValidationExpansion:
     """Given a partially constructed fable, return whether there are any validation errors,
     and what are further completion/expansion options. Note that presence of validation
     errors does not affect return code, ie its still 200 OK"""
@@ -67,7 +67,7 @@ async def upsert_fable_builder_v2(
     fable_id: Optional[str] = None,
     user: UserRead | None = Depends(current_active_user),
 ) -> FableSaveV2Response:
-    """Save a FableBuilderV1 as a JobDefinition (v2 persistence path).
+    """Save a FableBuilder as a JobDefinition (v2 persistence path).
 
     If `fable_id` is omitted a new definition is created (version 1). If
     `fable_id` is supplied the existing definition gains a new version; a 404
@@ -101,7 +101,7 @@ async def retrieve_fable_builder_v2(
     fable_id: str,
     version: Optional[int] = None,
 ) -> FableRetrieveV2Response:
-    """Retrieve a saved FableBuilderV1 by id (and optionally version) from the v2 store.
+    """Retrieve a saved FableBuilder by id (and optionally version) from the v2 store.
 
     If `version` is omitted the latest non-deleted version is returned.
     """
@@ -110,7 +110,7 @@ async def retrieve_fable_builder_v2(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fable definition not found")
     if definition.blocks is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fable definition has no builder spec")
-    builder = FableBuilderV1(blocks=definition.blocks)  # ty:ignore[invalid-argument-type]
+    builder = FableBuilder(blocks=definition.blocks)  # ty:ignore[invalid-argument-type]
     if definition.environment_spec is not None:
         builder.environment = EnvironmentSpecification.model_validate(definition.environment_spec)
     return FableRetrieveV2Response(
@@ -136,7 +136,7 @@ async def compile_fable_v2(request: FableCompileV2Request) -> ExecutionSpecifica
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fable definition not found")
     if definition.blocks is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fable definition has no builder spec")
-    builder = FableBuilderV1(blocks=definition.blocks)  # ty:ignore[invalid-argument-type]
+    builder = FableBuilder(blocks=definition.blocks)  # ty:ignore[invalid-argument-type]
     if definition.environment_spec is not None:
         builder.environment = EnvironmentSpecification.model_validate(definition.environment_spec)
     try:

@@ -28,23 +28,23 @@ test_submit_job.py
 
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
-from forecastbox.api.types.fable import FableBuilderV1, FableSaveV2Request
+from forecastbox.api.types.fable import FableBuilder, FableSaveV2Request
 from forecastbox.api.types.jobs import EnvironmentSpecification, JobExecuteV2Response
 
 from .utils import ensure_completed_v2
 
 
-def _make_builder_source_only() -> FableBuilderV1:
+def _make_builder_source_only() -> FableBuilder:
     plugin_id = PluginCompositeId(store="ecmwf", local="ecmwf-base")
     source = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=plugin_id, factory="ekdSource"),
         configuration_values={"source": "ecmwf-open-data", "date": "2026-01-01", "expver": "0001"},
         input_ids={},
     )
-    return FableBuilderV1(blocks={"source1": source})
+    return FableBuilder(blocks={"source1": source})
 
 
-def _make_builder_full(tmpdir: str) -> FableBuilderV1:
+def _make_builder_full(tmpdir: str) -> FableBuilder:
     plugin_id = PluginCompositeId(store="ecmwf", local="ecmwf-base")
     source = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=plugin_id, factory="ekdSource"),
@@ -66,7 +66,7 @@ def _make_builder_full(tmpdir: str) -> FableBuilderV1:
         configuration_values={"path": f"{tmpdir}/output.zarr"},
         input_ids={"dataset": "ensembleMean"},
     )
-    return FableBuilderV1(
+    return FableBuilder(
         blocks={
             "source1": source,
             "temporalMean": temporal_mean,
@@ -193,7 +193,7 @@ def test_fable_expand(tmpdir, backend_client_with_auth):
     response = backend_client_with_auth.get("/fable/catalogue").raise_for_status()
     assert len(response.json()) > 0
 
-    builder = FableBuilderV1(blocks={})
+    builder = FableBuilder(blocks={})
     response = backend_client_with_auth.request(url="/fable/expand", method="put", json=builder.model_dump())
     assert len(response.json()["possible_sources"]) == 1
     assert len(response.json()["possible_expansions"]) == 0
@@ -209,7 +209,7 @@ def test_fable_expand(tmpdir, backend_client_with_auth):
         input_ids={},
     )
     blocks = {"source1": source}
-    builder = FableBuilderV1(blocks=blocks)
+    builder = FableBuilder(blocks=blocks)
     response = backend_client_with_auth.request(url="/fable/expand", method="put", json=builder.model_dump())
     assert len(response.json()["possible_expansions"]["source1"]) > 0
 
@@ -219,7 +219,7 @@ def test_fable_expand(tmpdir, backend_client_with_auth):
         input_ids={"dataset": "source1"},
     )
     blocks["temporalMean"] = temporalMean
-    builder = FableBuilderV1(blocks=blocks)
+    builder = FableBuilder(blocks=blocks)
     response = backend_client_with_auth.request(url="/fable/expand", method="put", json=builder.model_dump())
     assert len(response.json()["possible_expansions"]["temporalMean"]) > 0
 
@@ -236,7 +236,7 @@ def test_fable_expand(tmpdir, backend_client_with_auth):
     blocks[f"ensembleMean"] = block
     blocks[f"sinkMean"] = sink
 
-    builder = FableBuilderV1(blocks=blocks)
+    builder = FableBuilder(blocks=blocks)
     response = backend_client_with_auth.request(url="/fable/expand", method="put", json=builder.model_dump())
     assert len(response.json()["possible_expansions"]["sinkMean"]) == 0
     assert len(response.json()["block_errors"]) == 0

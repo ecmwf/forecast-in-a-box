@@ -28,13 +28,13 @@ from pydantic import BaseModel
 import forecastbox.api.fable as api_fable
 import forecastbox.db.jobs2 as db_jobs2
 from forecastbox.api.artifacts.manager import ArtifactManager, submit_artifact_download
-from forecastbox.api.types.fable import FableBuilderV1
+from forecastbox.api.types.fable import FableBuilder
 from forecastbox.api.types.jobs import (
     EnvironmentSpecification,
     ExecutionSpecification,
     JobExecuteV2Response,
     JobExecutionDetail,
-    JobSpecificationV2,
+    JobSpecification,
     RawCascadeJob,
 )
 from forecastbox.api.utils import get_model_path
@@ -168,8 +168,8 @@ async def get_job_definition_for_execution(definition_id: str, definition_versio
     return await db_jobs2.get_job_definition(definition_id, definition_version)
 
 
-async def get_job_execution_specification_v2(execution_id: str, attempt_count: int | None) -> JobSpecificationV2 | None:
-    """Return the JobSpecificationV2 for the given execution attempt (latest if attempt_count is None)."""
+async def get_job_execution_specification_v2(execution_id: str, attempt_count: int | None) -> JobSpecification | None:
+    """Return the JobSpecification for the given execution attempt (latest if attempt_count is None)."""
     execution = await db_jobs2.get_job_execution(execution_id, attempt_count)
     if execution is None:
         return None
@@ -179,7 +179,7 @@ async def get_job_execution_specification_v2(execution_id: str, attempt_count: i
     )
     if definition is None:
         return None
-    return JobSpecificationV2(
+    return JobSpecification(
         definition_id=str(definition.id),  # ty:ignore[invalid-argument-type]
         definition_version=cast(int, definition.version),
         blocks=cast(dict | None, definition.blocks),
@@ -289,7 +289,7 @@ async def execute_v2(definition: JobDefinition, user_id: str | None, execution_i
     if not definition.blocks:
         return Either.error(f"JobDefinition {definition.id!r} has no compilable blocks")
 
-    builder = FableBuilderV1(
+    builder = FableBuilder(
         blocks=definition.blocks,  # ty:ignore[invalid-argument-type]
         environment=EnvironmentSpecification.model_validate(definition.environment_spec) if definition.environment_spec else None,
     )

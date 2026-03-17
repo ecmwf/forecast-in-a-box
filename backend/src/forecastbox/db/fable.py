@@ -15,7 +15,7 @@ from typing import Optional
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from forecastbox.api.types.fable import FableBuilderV1
+from forecastbox.api.types.fable import FableBuilder
 from forecastbox.config import config
 from forecastbox.db.core import addAndCommit, dbRetry, executeAndCommit, querySingle
 from forecastbox.schemas.fable import Base, FableRecord
@@ -32,17 +32,15 @@ async def create_db_and_tables():
         await conn.run_sync(Base.metadata.create_all)
 
 
-async def get_fable_builder(fable_builder_id: str) -> Optional[FableBuilderV1]:
+async def get_fable_builder(fable_builder_id: str) -> Optional[FableBuilder]:
     query = select(FableRecord).where(FableRecord.fable_builder_id == fable_builder_id)
     record = await querySingle(query, async_session_maker)
     if record:  # type: ignore
-        return FableBuilderV1.model_validate(record.fable_builder_v1)
+        return FableBuilder.model_validate(record.fable_builder_v1)
     return None
 
 
-async def upsert_fable_builder(
-    builder: FableBuilderV1, fable_builder_id: Optional[str], tags: list[str], created_by_user: str | None
-) -> str:
+async def upsert_fable_builder(builder: FableBuilder, fable_builder_id: Optional[str], tags: list[str], created_by_user: str | None) -> str:
     ref_time = dt.datetime.now()
     returned_id: str
 
@@ -52,7 +50,7 @@ async def upsert_fable_builder(
         existing_record = await querySingle(query, async_session_maker)
 
         if not existing_record:
-            raise KeyError(f"FableBuilderV1 with ID {fable_builder_id} not found")
+            raise KeyError(f"FableBuilder with ID {fable_builder_id} not found")
 
         if existing_record.created_by != created_by_user:
             raise PermissionError("User not authorized to modify this fable builder")

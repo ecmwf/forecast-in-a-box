@@ -19,13 +19,13 @@ from pydantic import BaseModel
 from forecastbox.api.types.jobs import EnvironmentSpecification
 
 
-class FableBuilderV1(BaseModel):
+class FableBuilder(BaseModel):
     blocks: dict[BlockInstanceId, BlockInstance]
     environment: EnvironmentSpecification | None = None
 
 
 class FableValidationExpansion(BaseModel):
-    """When user submits invalid FableBuilderV1, backend returns a structured validation result and completion options"""
+    """When user submits invalid FableBuilder, backend returns a structured validation result and completion options"""
 
     global_errors: list[str]
     block_errors: dict[BlockInstanceId, list[str]]
@@ -36,7 +36,7 @@ class FableValidationExpansion(BaseModel):
 class FableSaveV2Request(BaseModel):
     """Payload for saving a fable builder via the v2 persistence path."""
 
-    builder: FableBuilderV1
+    builder: FableBuilder
     display_name: str | None = None
     display_description: str | None = None
     tags: list[str] = []
@@ -55,7 +55,7 @@ class FableRetrieveV2Response(BaseModel):
 
     id: str
     version: int
-    builder: FableBuilderV1
+    builder: FableBuilder
     display_name: str | None = None
     display_description: str | None = None
     tags: list[str] = []

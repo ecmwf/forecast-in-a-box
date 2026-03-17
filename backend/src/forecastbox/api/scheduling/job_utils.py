@@ -19,7 +19,7 @@ from cascade.low.func import Either
 import forecastbox.api.fable as api_fable
 import forecastbox.db.jobs2 as db_jobs2
 from forecastbox.api.scheduling.dt_utils import calculate_next_run
-from forecastbox.api.types.fable import FableBuilderV1
+from forecastbox.api.types.fable import FableBuilder
 from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification
 from forecastbox.db.schedule import get_schedules, max_attempt_cnt, run2date, run2schedule
 
@@ -158,7 +158,7 @@ async def experiment2runnable(experiment_id: str, exec_time: dt.datetime) -> Eit
 
     try:
         blocks = cast(dict, job_def.blocks) or {}
-        builder = FableBuilderV1(
+        builder = FableBuilder(
             blocks=blocks,
             environment=EnvironmentSpecification.model_validate(job_def.environment_spec) if job_def.environment_spec else None,
         )
@@ -229,7 +229,7 @@ async def rerun2runnable_v2(execution_id: str) -> Either[RunnableExperiment, str
 
     try:
         blocks = cast(dict, job_def.blocks) or {}
-        builder = FableBuilderV1(
+        builder = FableBuilder(
             blocks=blocks,
             environment=EnvironmentSpecification.model_validate(job_def.environment_spec) if job_def.environment_spec else None,
         )

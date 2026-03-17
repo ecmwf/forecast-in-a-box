@@ -32,7 +32,7 @@ from fiab_core.fable import (
 
 from forecastbox.api.plugin.manager import PluginManager
 from forecastbox.api.types.fable import (
-    FableBuilderV1,
+    FableBuilder,
     FableValidationExpansion,
 )
 from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
@@ -40,7 +40,7 @@ from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecif
 logger = logging.getLogger(__name__)
 
 
-def topological_order(fable: FableBuilderV1) -> Iterator[BlockInstanceId]:
+def topological_order(fable: FableBuilder) -> Iterator[BlockInstanceId]:
     remaining = {}
     children = defaultdict(list)
     queue = []
@@ -61,7 +61,7 @@ def topological_order(fable: FableBuilderV1) -> Iterator[BlockInstanceId]:
                 queue.append(child)
 
 
-def validate_expand(fable: FableBuilderV1) -> FableValidationExpansion:
+def validate_expand(fable: FableBuilder) -> FableValidationExpansion:
     # TODO this will be repeatedly called -- we probably need to cache a lot here
 
     plugins = PluginManager.plugins  # TODO we are avoiding a lock here! See the TODO at api/plugin.py
@@ -135,7 +135,7 @@ def _get_artifacts_list(graph: Graph) -> list[CompositeArtifactId]:
     return list(artifacts)
 
 
-def compile(fable: FableBuilderV1) -> ExecutionSpecification:
+def compile(fable: FableBuilder) -> ExecutionSpecification:
     graph = Graph([])
     plugins = PluginManager.plugins
     action_lookup = {}

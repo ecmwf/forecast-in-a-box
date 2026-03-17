@@ -55,7 +55,7 @@ class JobDefinition(Base):
     tags = Column(JSON, nullable=True)
 
     # Payload stored as JSON to avoid over-normalisation
-    # stores the blocks field of forecastbox.api.types.fable.FableBuilderV1
+    # stores the blocks field of forecastbox.api.types.fable.FableBuilder
     blocks = Column(JSON, nullable=True)
     # stores forecastbox.api.types.jobs.EnvironmentSpecification
     environment_spec = Column(JSON, nullable=True)

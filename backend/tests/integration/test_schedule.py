@@ -15,21 +15,21 @@ import datetime as dt
 
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
-from forecastbox.api.types.fable import FableBuilderV1, FableSaveV2Request
+from forecastbox.api.types.fable import FableBuilder, FableSaveV2Request
 from forecastbox.api.types.scheduling import ScheduleSpecificationV2, ScheduleUpdateV2
 
 # *** helpers **
 
 
 def _save_fable(client) -> tuple[str, int]:
-    """Save a minimal FableBuilderV1 and return (job_definition_id, version)."""
+    """Save a minimal FableBuilder and return (job_definition_id, version)."""
     plugin_id = PluginCompositeId(store="ecmwf", local="ecmwf-base")
     source = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=plugin_id, factory="ekdSource"),
         configuration_values={"source": "ecmwf-open-data", "date": "2026-01-01", "expver": "0001"},
         input_ids={},
     )
-    builder = FableBuilderV1(blocks={"source1": source})
+    builder = FableBuilder(blocks={"source1": source})
     resp = client.post("/fable/upsert_v2", json=FableSaveV2Request(builder=builder, display_name="sched-v2 test").model_dump())
     assert resp.is_success, resp.text
     data = resp.json()

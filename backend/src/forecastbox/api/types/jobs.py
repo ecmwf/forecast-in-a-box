@@ -70,7 +70,7 @@ class JobExecutionDetail(BaseModel):
     cascade_job_id: str | None = None
 
 
-class JobExecutionListV2(BaseModel):
+class JobExecutionList(BaseModel):
     """List of latest-attempt v2 job execution details with pagination metadata."""
 
     executions: list[JobExecutionDetail]
@@ -84,7 +84,7 @@ class JobExecutionListV2(BaseModel):
     """Total number of pages."""
 
 
-class JobSpecificationV2(BaseModel):
+class JobSpecification(BaseModel):
     """Specification payload linked to a v2 job execution attempt."""
 
     definition_id: str
