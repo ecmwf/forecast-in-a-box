@@ -141,19 +141,6 @@ def test_fable_v2_upsert_nonexistent_id(backend_client_with_auth):
     assert response.status_code == 404
 
 
-def test_fable_v2_existing_upsert_retrieve_unaffected(backend_client_with_auth):
-    """Legacy /upsert and /retrieve endpoints still work alongside v2 endpoints."""
-    builder = _make_builder_source_only()
-    # FastAPI wraps the builder in {"builder": ...} because `tags: list[str]` is also a body param
-    response = backend_client_with_auth.post("/fable/upsert", json={"builder": builder.model_dump()})
-    assert response.is_success, response.text
-    old_id = response.json()
-
-    response = backend_client_with_auth.get("/fable/retrieve", params={"fable_builder_id": old_id})
-    assert response.is_success, response.text
-    assert response.json()["blocks"]["source1"]["factory_id"]["factory"] == "ekdSource"
-
-
 def test_fable_v2_compile_latest_version(tmpdir, backend_client_with_auth):
     """A builder saved via upsert_v2 can be compiled by reference (no version = latest)."""
     builder = _make_builder_full(str(tmpdir))

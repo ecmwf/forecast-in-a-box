@@ -18,7 +18,6 @@ from fastapi.exceptions import HTTPException
 from fiab_core.fable import BlockFactoryCatalogue
 
 import forecastbox.api.fable as api_fable
-import forecastbox.db.fable as db_fable
 import forecastbox.db.jobs2 as db_jobs2
 from forecastbox.api.plugin.manager import PluginCompositeId, catalogue_view, plugins_ready
 from forecastbox.api.types.fable import (
@@ -60,39 +59,6 @@ def expand_fable(fable: FableBuilderV1) -> FableValidationExpansion:
     and what are further completion/expansion options. Note that presence of validation
     errors does not affect return code, ie its still 200 OK"""
     return api_fable.validate_expand(fable)
-
-
-# NOTE its a put but get would be better -- but browsers dont support get+json body
-@router.put("/compile")
-def compile_fable(fable: FableBuilderV1) -> ExecutionSpecification:
-    """Converts to an ExecutionSpecification which can then be used in the /job router's methods.
-    Assumes the fable is valid, and throws a 4xx otherwise"""
-    return api_fable.compile(fable)
-
-
-@router.get("/retrieve")
-async def get_fable_builder(fable_builder_id: str) -> FableBuilderV1:
-    """Retrieve a FableBuilderV1 by its ID."""
-    fable_builder = await db_fable.get_fable_builder(fable_builder_id)
-    if not fable_builder:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="FableBuilderV1 not found")
-    return fable_builder
-
-
-@router.post("/upsert")
-async def upsert_fable_builder(
-    builder: FableBuilderV1,
-    fable_builder_id: Optional[str] = None,
-    tags: list[str] = [],
-    user: UserRead | None = Depends(current_active_user),
-) -> str:
-    """Create or update a FableBuilderV1."""
-    try:
-        return await db_fable.upsert_fable_builder(builder, fable_builder_id, tags, str(user.id) if user is not None else None)
-    except KeyError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 
 @router.post("/upsert_v2")
