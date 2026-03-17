@@ -104,8 +104,8 @@ export function JobListPage() {
     progressMap[exec.execution_id] = exec
   }
   let jobIds = Object.keys(progressMap).sort((a, b) => {
-    const aTime = progressMap[a].created_at ?? ''
-    const bTime = progressMap[b].created_at ?? ''
+    const aTime = progressMap[a].created_at
+    const bTime = progressMap[b].created_at
     return bTime.localeCompare(aTime)
   })
   const totalPages = data?.total_pages ?? 1
