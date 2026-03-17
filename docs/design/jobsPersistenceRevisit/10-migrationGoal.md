@@ -11,6 +11,10 @@ Document the frontend migration target from v1 endpoints to the v2 endpoints tha
 - `/api/v1/job/{job_id}/outputs -> /api/v1/job/{execution_id}/outputs_v2`: path identifier changes from job id to execution id; optional `attempt_count` query param is introduced; semantics stay close to v1 in that the response is still `list[ProductToOutputId]`, but it is now sourced from the execution row.
 - `/api/v1/job/{job_id}/specification -> /api/v1/job/{execution_id}/specification_v2`: path identifier changes from job id to execution id; optional `attempt_count` query param is introduced; response changes from full `ExecutionSpecification` to `{ definition_id, definition_version, blocks, environment_spec }`.
 - `/api/v1/job/{job_id}/restart -> /api/v1/job/{execution_id}/restart_v2`: path identifier changes from job id to execution id; response changes from a fresh v1 job id to `{ execution_id, attempt_count }`; semantics change from creating a new top-level job id to creating another attempt under the same logical execution id.
+- `/api/v1/job/{job_id}/available` -> `/api/v1/job/{execution_id}/available_v2`: path identifier changes from job id to execution id; optional `attempt_count` query param is introduced
+- `/api/v1/job/{job_id}/results` -> `/api/v1/job/{execution_id}/results_v2`: path identifier changes from job id to execution id; optional `attempt_count` query param is introduced
+- `/api/v1/job/{job_id}/logs` -> `/api/v1/job/{execution_id}/logs_v2`: path identifier changes from job id to execution id; optional `attempt_count` query param is introduced
+- `/api/v1/job/{job_id}` (delete) -> `/api/v1/job/delete_v2` (delete): path identifier vanishes, instead execution id and optional `attempt_count` are introduced as query params. No return value as opposed to deleted job count
 - `/api/v1/schedule/ -> /api/v1/schedule/list_v2`: route changes from path-root listing to explicit `/list_v2`; response changes from a dictionary keyed by `schedule_id` to an array of `ScheduleDefinitionV2Response`; semantics change from schedule records to versioned experiment definitions.
 - `/api/v1/schedule/create -> /api/v1/schedule/create_v2`: request changes from embedded `exec_spec` to `job_definition_id` plus optional `job_definition_version`; v2 also adds `display_name`, `display_description`, and `tags`; response changes from `{ schedule_id }` to `{ experiment_id }`.
 - `/api/v1/schedule/{schedule_id} [GET] -> /api/v1/schedule/get_v2`: path parameter becomes query parameter `experiment_id`; response changes from `GetScheduleResponse` with serialized `exec_spec`/`dynamic_expr` strings to `ScheduleDefinitionV2Response` with typed fields and version metadata.
@@ -21,9 +25,9 @@ Document the frontend migration target from v1 endpoints to the v2 endpoints tha
 ## Important non-migrations
 These v1 routes are still used by the frontend today but do not currently have v2 counterparts in the backend:
 
-- Fable: `/api/v1/fable/catalogue`, `/api/v1/fable/expand`
-- Job: `/api/v1/job/{job_id}/available`, `/api/v1/job/{job_id}/results`, `/api/v1/job/{job_id}/logs`, `/api/v1/job/{job_id}` (delete), `/api/v1/job/upload`, `/api/v1/job/flush`
-- Schedule: `/api/v1/schedule/run/{schedule_run_id}`, `/api/v1/schedule/restart`
+- Fable: `/api/v1/fable/catalogue`, `/api/v1/fable/expand` (these will stay in their v1 version, it meets all needs)
+- Job: `/api/v1/job/upload`, `/api/v1/job/flush` -- these are deprecated and should not be used by the frontend
+- Schedule: `/api/v1/schedule/run/{schedule_run_id}`, `/api/v1/schedule/restart` -- these are deprecated and should not be used by the frontend
 
 ## Consequences for the frontend plan
 - Fable save/load can migrate fully to v2.

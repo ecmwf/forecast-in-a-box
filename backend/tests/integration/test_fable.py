@@ -313,7 +313,7 @@ def test_fable_v2_basic_execute(tmpdir, backend_client_with_auth):
 
     ensure_completed_v2(backend_client_with_auth, execution_id, sleep=1, attempts=120)
 
-    avail_resp = backend_client_with_auth.get(f"/job/{execution_id}/available_2")
+    avail_resp = backend_client_with_auth.get(f"/job/{execution_id}/available_v2")
     assert avail_resp.is_success, avail_resp.text
     available_tasks = avail_resp.json()
     assert isinstance(available_tasks, list)

@@ -265,6 +265,7 @@ async def restart_job(job_id: JobId = Depends(validate_job_id), user: UserRead |
 @router.post("/upload")
 async def upload_job(file: UploadFile, user: UserRead | None = Depends(current_active_user)) -> SubmitJobResponse:
     """Upload a job specification file and execute it."""
+    # TODO deprecated -- this should be replaced with a JobDefinition upload, ie, FableBuilder+Environment
     if not file:
         raise HTTPException(status_code=400, detail="No file provided for upload.")
 
@@ -360,32 +361,21 @@ async def get_result_availability(
     return DatasetAvailabilityResponse(dataset_id in [x.task for x in response.datasets[job_id]])
 
 
-@router.get("/{job_id}/logs")
-async def get_logs(job_id: JobId = Depends(validate_job_id), user: UserRead = Depends(current_active_user)) -> Response:
-    """Returns a zip file with logs and other data for the purpose of troubleshooting"""
-
-    logger.debug(f"getting logs for {job_id}")
+async def _get_logs(cascade_job_id: JobId, db_entity_ser: bytes) -> Response:
     try:
-        db_entity_raw = await get_one(job_id)
-        db_entity = {c.name: getattr(db_entity_raw, c.name) for c in db_entity_raw.__table__.columns}
-    except Exception as e:
-        db_entity = {"error": repr(e)}
-    logger.debug(f"{db_entity=} for {job_id}")
-
-    try:
-        request = api.JobProgressRequest(job_ids=[job_id])
+        request = api.JobProgressRequest(job_ids=[cascade_job_id])
         gw_state = client.request_response(request, f"{config.cascade.cascade_url}").model_dump()
     except TimeoutError:
         gw_state = {"progresses": {}, "datasets": {}, "error": "TimeoutError"}
     except Exception as e:
         gw_state = {"progresses": {}, "datasets": {}, "error": repr(e)}
-    logger.debug(f"{gw_state=} for {job_id}")
+    logger.debug(f"{gw_state=} for {cascade_job_id}")
 
     def _build_zip() -> tuple[bytes, str]:
         try:
             buffer = io.BytesIO()
             with zipfile.ZipFile(buffer, "a", zipfile.ZIP_DEFLATED) as zf:
-                zf.writestr("db_entity.json", orjson.dumps(db_entity))
+                zf.writestr("db_entity.json", db_entity_ser)
                 zf.writestr("gw_state.json", orjson.dumps(gw_state))
                 if not Globals.logs_directory:
                     zf.writestr("logs_directory.error.txt", "logs directory missing")
@@ -394,7 +384,7 @@ async def get_logs(job_id: JobId = Depends(validate_job_id), user: UserRead = De
                     f = ""
                     try:
                         for f in os.listdir(p):
-                            jPref = f"job_{job_id}"
+                            jPref = f"job_{cascade_job_id}"
                             if f.startswith("gateway") or f.startswith(jPref):
                                 zf.write(f"{p / f}", arcname=f)
                     except Exception as e:
@@ -419,6 +409,20 @@ async def get_logs(job_id: JobId = Depends(validate_job_id), user: UserRead = De
             status_code=500,
             media_type="text/plain",
         )
+
+
+@router.get("/{job_id}/logs")
+async def get_logs(job_id: JobId = Depends(validate_job_id), user: UserRead = Depends(current_active_user)) -> Response:
+    """Returns a zip file with logs and other data for the purpose of troubleshooting"""
+
+    logger.debug(f"getting logs for {job_id}")
+    try:
+        db_entity_raw = await get_one(job_id)
+        db_entity = {c.name: getattr(db_entity_raw, c.name) for c in db_entity_raw.__table__.columns}
+    except Exception as e:
+        db_entity = {"error": repr(e)}
+    logger.debug(f"{db_entity=} for {job_id}")
+    return await _get_logs(job_id, orjson.dumps(db_entity))
 
 
 @router.get("/{job_id}/results")
@@ -494,6 +498,7 @@ async def flush_job(user: UserRead = Depends(current_active_user)) -> JobDeletio
 
     Returns number of deleted jobs.
     """
+    # TODO deprecated, delete
     try:
         client.request_response(api.ResultDeletionRequest(datasets={}), f"{config.cascade.cascade_url}")  # type: ignore
     except Exception as e:
@@ -648,11 +653,7 @@ async def restart_execution_v2(
     return result.t
 
 
-@router.get("/{execution_id}/available_2")
-async def get_job_availability_v2(
-    execution_id: str, attempt_count: int | None = None, user: UserRead = Depends(current_active_user)
-) -> list[TaskId]:
-    """Check which results are available for a given v2 execution."""
+async def _id2cascExecution(execution_id: str, attempt_count: int | None = None) -> tuple[db_jobs2.JobExecution, str]:
     execution = await db_jobs2.get_job_execution(execution_id, attempt_count)
     if execution is None:
         raise HTTPException(status_code=404, detail=f"JobExecution {execution_id!r} not found.")
@@ -660,11 +661,64 @@ async def get_job_availability_v2(
     cascade_job_id = cast(str | None, execution.cascade_job_id)
     if cascade_job_id is None:
         raise HTTPException(status_code=409, detail=f"JobExecution {execution_id!r} has not been submitted to cascade yet.")
+    return execution, cascade_job_id
 
+
+@router.get("/{execution_id}/available_v2")
+async def get_job_availability_v2(
+    execution_id: str, attempt_count: int | None = None, user: UserRead = Depends(current_active_user)
+) -> list[TaskId]:
+    """Check which results are available for a given v2 execution."""
+    _, cascade_job_id = await _id2cascExecution(execution_id, attempt_count)
     response = client.request_response(api.JobProgressRequest(job_ids=[cascade_job_id]), f"{config.cascade.cascade_url}")
     response = cast(api.JobProgressResponse, response)
-
     if cascade_job_id not in response.datasets:
         raise HTTPException(status_code=404, detail=f"Job {cascade_job_id} not found in gateway.")
 
     return [x.task for x in response.datasets[cascade_job_id]]
+
+
+@router.get("/{execution_id}/results_v2")
+async def get_result_v2(
+    execution_id: str,
+    attempt_count: int | None = None,
+    dataset_id: TaskId = Depends(validate_dataset_id),
+    user: UserRead = Depends(current_active_user),
+) -> Response:
+    """Get the result of a job. Returns response containing the result of the job, encoded as bytes."""
+    _, cascade_job_id = await _id2cascExecution(execution_id, attempt_count)
+    response = client.request_response(
+        api.ResultRetrievalRequest(job_id=cascade_job_id, dataset_id=DatasetId(task=dataset_id, output="0")),
+        f"{config.cascade.cascade_url}",
+    )
+    response = cast(api.ResultRetrievalResponse, response)
+
+    if response.error:
+        raise HTTPException(500, f"Result retrieval failed: {response.error}")
+
+    try:
+        bytez, media_type = encode_result(response)
+    except Exception as e:
+        logger.exception("decoding failure")
+        raise HTTPException(500, f"Result decoding failed: {repr(e)}")
+
+    return Response(bytez, media_type=media_type)
+
+
+@router.get("/{job_id}/logs_v2")
+async def get_logs_v2(execution_id: str, attempt_count: int | None = None, user: UserRead = Depends(current_active_user)) -> Response:
+    db_entity, cascade_job_id = await _id2cascExecution(execution_id, attempt_count)
+    return await _get_logs(cascade_job_id, orjson.dumps(db_entity))
+
+
+@router.delete("/delete_v2")
+async def delete_job(execution_id: str, attempt_count: int | None = None, user: UserRead = Depends(current_active_user)) -> None:
+    """Delete a job from the database and cascade."""
+    _, cascade_job_id = await _id2cascExecution(execution_id, attempt_count)
+    try:
+        client.request_response(api.ResultDeletionRequest(datasets={cascade_job_id: []}), f"{config.cascade.cascade_url}")  # type: ignore
+    except Exception as e:
+        raise HTTPException(500, f"Job deletion failed: {e}")
+    finally:
+        # TODO consider the attempt count here, return the deleted count
+        await db_jobs2.soft_delete_job_execution(execution_id)
