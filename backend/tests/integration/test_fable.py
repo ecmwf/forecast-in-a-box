@@ -7,7 +7,24 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Integration tests for the v2 fable and job endpoints."""
+"""Integration tests for the v2 fable and job endpoints.
+
+There are two very important tests:
+ - test_fable_expand -- the interactive building which UI does
+ - test_fable_v2_basic_execute -- an actual execution
+Those two must be preserved under any refactoring, and their failure is always
+suspicious. The remaining ones test edge cases and funcionality which is
+possibly subject of changes, and their failure may be a legitimate behavioral
+change (such as change of return error code).
+
+The tests currently rely on a data file and a mocked ecmwf plugin (where
+the mocking is actually hacked inside the non-test code). We would rather
+test the ecmwf plugin only in the nonpytest scenario, and here utilize
+some sort of test plugin or a proper mock.
+
+Therefore there is not enough coverage in terms of job variety -- see the
+test_submit_job.py
+"""
 
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 

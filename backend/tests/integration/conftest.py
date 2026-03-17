@@ -63,7 +63,7 @@ class FakeArtifactRegistry(SimpleHTTPRequestHandler):
             chunk = b"x" * chunk_size
             chunk_header = hex(len(chunk))[2:].encode("ascii")
             for _ in range(chunks):
-                time.sleep(0.3)
+                time.sleep(0.1)
                 self.wfile.write(chunk_header + b"\r\n")
                 self.wfile.write(chunk + b"\r\n")
                 self.wfile.flush()
