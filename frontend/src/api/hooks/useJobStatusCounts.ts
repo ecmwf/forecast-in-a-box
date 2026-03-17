@@ -38,8 +38,11 @@ export function useJobStatusCounts() {
   let total = 0
 
   if (query.data) {
-    for (const job of Object.values(query.data.progresses)) {
-      counts[job.status]++
+    for (const exec of query.data.executions) {
+      const status = exec.status
+      if (status in counts) {
+        counts[status]++
+      }
       total++
     }
   }

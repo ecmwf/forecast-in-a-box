@@ -14,22 +14,26 @@
 
 import { HttpResponse, delay, http } from 'msw'
 import {
-  addJob,
+  addExecution,
   createMockPngBlob,
-  deleteJob,
-  getAllJobs,
+  deleteExecution,
+  getAllExecutions,
+  getExecution,
   getJob,
+  restartExecution,
 } from '../data/job.data'
-import type { ExecutionSpecification, JobStatus } from '@/api/types/job.types'
+import type { JobExecuteRequest, JobStatus } from '@/api/types/job.types'
 import { API_ENDPOINTS, API_PATTERNS } from '@/api/endpoints'
 
 export const jobHandlers = [
+  // ─── v2 handlers ────────────────────────────────────────────────────────
+
   http.post(API_ENDPOINTS.job.execute, async ({ request }) => {
     await delay(400)
 
-    let spec: ExecutionSpecification
+    let body: JobExecuteRequest
     try {
-      spec = (await request.json()) as ExecutionSpecification
+      body = (await request.json()) as JobExecuteRequest
     } catch {
       return HttpResponse.json(
         { message: 'Invalid request body' },
@@ -37,8 +41,8 @@ export const jobHandlers = [
       )
     }
 
-    const job = addJob(spec)
-    return HttpResponse.json({ id: job.id })
+    const result = addExecution(body)
+    return HttpResponse.json(result)
   }),
 
   http.get(API_ENDPOINTS.job.status, async ({ request }) => {
@@ -49,78 +53,106 @@ export const jobHandlers = [
     const pageSize = parseInt(url.searchParams.get('page_size') ?? '10', 10)
     const statusFilter = url.searchParams.get('status') as JobStatus | null
 
-    let jobs = getAllJobs()
+    let executions = getAllExecutions()
     if (statusFilter) {
-      jobs = jobs.filter((j) => j.status.status === statusFilter)
+      executions = executions.filter((e) => e.status === statusFilter)
     }
 
-    const total = jobs.length
+    const total = executions.length
     const totalPages = Math.max(1, Math.ceil(total / pageSize))
     const start = (page - 1) * pageSize
-    const pageJobs = jobs.slice(start, start + pageSize)
-
-    const progresses: Record<string, (typeof pageJobs)[number]['status']> = {}
-    for (const job of pageJobs) {
-      progresses[job.id] = job.status
-    }
+    const pageExecutions = executions.slice(start, start + pageSize)
 
     return HttpResponse.json({
-      progresses,
+      executions: pageExecutions,
       total,
       page,
       page_size: pageSize,
       total_pages: totalPages,
-      error: null,
     })
   }),
 
   http.get(API_PATTERNS.job.statusById, async ({ params }) => {
     await delay(150)
 
-    const jobId = params.jobId as string
-    const job = getJob(jobId)
+    const executionId = params.executionId as string
+    const exec = getExecution(executionId)
 
-    if (!job) {
-      return HttpResponse.json({ detail: 'Job not found' }, { status: 404 })
+    if (!exec) {
+      return HttpResponse.json(
+        { detail: 'Execution not found' },
+        { status: 404 },
+      )
     }
 
-    return HttpResponse.json(job.status)
+    return HttpResponse.json(exec)
+  }),
+
+  // ─── v2 artifact handlers ────────────────────────────────────────────────
+
+  http.post(API_PATTERNS.job.restart, async ({ params }) => {
+    await delay(400)
+
+    const executionId = params.executionId as string
+    const result = restartExecution(executionId)
+
+    if (!result) {
+      return HttpResponse.json(
+        { detail: 'Execution not found' },
+        { status: 404 },
+      )
+    }
+
+    return HttpResponse.json(result)
   }),
 
   http.get(API_PATTERNS.job.outputs, async ({ params }) => {
     await delay(200)
 
-    const jobId = params.jobId as string
-    const job = getJob(jobId)
+    const executionId = params.executionId as string
+    const exec = getExecution(executionId)
 
-    if (!job) {
-      return HttpResponse.json({ detail: 'Job not found' }, { status: 404 })
+    if (!exec) {
+      return HttpResponse.json(
+        { detail: 'Execution not found' },
+        { status: 404 },
+      )
     }
 
-    return HttpResponse.json(job.outputs)
+    // Fall back to the v1 job outputs for shared mock IDs
+    const job = getJob(executionId)
+    return HttpResponse.json(job?.outputs ?? [])
   }),
 
   http.get(API_PATTERNS.job.available, async ({ params }) => {
     await delay(150)
 
-    const jobId = params.jobId as string
-    const job = getJob(jobId)
+    const executionId = params.executionId as string
+    const exec = getExecution(executionId)
 
-    if (!job) {
-      return HttpResponse.json({ detail: 'Job not found' }, { status: 404 })
+    if (!exec) {
+      return HttpResponse.json(
+        { detail: 'Execution not found' },
+        { status: 404 },
+      )
     }
 
-    return HttpResponse.json(job.available)
+    // Fall back to the v1 job available list for shared mock IDs
+    const job = getJob(executionId)
+    return HttpResponse.json(job?.available ?? [])
   }),
 
   http.get(API_PATTERNS.job.results, async ({ params, request }) => {
     await delay(300)
 
-    const jobId = params.jobId as string
-    const job = getJob(jobId)
+    const executionId = params.executionId as string
+    const exec = getExecution(executionId)
 
-    if (!job) {
-      return HttpResponse.json({ detail: 'Job not found' }, { status: 404 })
+    if (!exec) {
+      return HttpResponse.json(
+        { detail: 'Execution not found' },
+        { status: 404 },
+      )
     }
 
     const url = new URL(request.url)
@@ -145,11 +177,14 @@ export const jobHandlers = [
   http.get(API_PATTERNS.job.logs, async ({ params }) => {
     await delay(200)
 
-    const jobId = params.jobId as string
-    const job = getJob(jobId)
+    const executionId = params.executionId as string
+    const exec = getExecution(executionId)
 
-    if (!job) {
-      return HttpResponse.json({ detail: 'Job not found' }, { status: 404 })
+    if (!exec) {
+      return HttpResponse.json(
+        { detail: 'Execution not found' },
+        { status: 404 },
+      )
     }
 
     const zipBytes = new Uint8Array([
@@ -159,48 +194,33 @@ export const jobHandlers = [
     return new HttpResponse(zipBytes, {
       headers: {
         'Content-Type': 'application/zip',
-        'Content-Disposition': `attachment; filename="${jobId}-logs.zip"`,
+        'Content-Disposition': `attachment; filename="${executionId}-logs.zip"`,
       },
     })
   }),
 
-  http.get(API_PATTERNS.job.specification, async ({ params }) => {
+  http.delete(API_PATTERNS.job.delete, async ({ request }) => {
     await delay(200)
 
-    const jobId = params.jobId as string
-    const job = getJob(jobId)
+    const url = new URL(request.url)
+    const executionId = url.searchParams.get('execution_id')
 
-    if (!job) {
-      return HttpResponse.json({ detail: 'Job not found' }, { status: 404 })
+    if (!executionId) {
+      return HttpResponse.json(
+        { detail: 'Missing execution_id parameter' },
+        { status: 400 },
+      )
     }
 
-    return HttpResponse.json(job.specification)
-  }),
-
-  http.post(API_PATTERNS.job.restart, async ({ params }) => {
-    await delay(400)
-
-    const jobId = params.jobId as string
-    const job = getJob(jobId)
-
-    if (!job) {
-      return HttpResponse.json({ detail: 'Job not found' }, { status: 404 })
-    }
-
-    const newJob = addJob(job.specification)
-    return HttpResponse.json({ id: newJob.id })
-  }),
-
-  http.delete(API_PATTERNS.job.delete, async ({ params }) => {
-    await delay(200)
-
-    const jobId = params.jobId as string
-    const deleted = deleteJob(jobId)
+    const deleted = deleteExecution(executionId)
 
     if (!deleted) {
-      return HttpResponse.json({ detail: 'Job not found' }, { status: 404 })
+      return HttpResponse.json(
+        { detail: 'Execution not found' },
+        { status: 404 },
+      )
     }
 
-    return HttpResponse.json({ deleted_count: 1 })
+    return new HttpResponse(null, { status: 200 })
   }),
 ]

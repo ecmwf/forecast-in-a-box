@@ -18,10 +18,17 @@ from fastapi.exceptions import HTTPException
 from fiab_core.fable import BlockFactoryCatalogue
 
 import forecastbox.api.fable as api_fable
-import forecastbox.db.fable as db_fable
+import forecastbox.db.jobs as db_jobs
 from forecastbox.api.plugin.manager import PluginCompositeId, catalogue_view, plugins_ready
-from forecastbox.api.types.fable import FableBuilderV1, FableValidationExpansion
-from forecastbox.api.types.jobs import ExecutionSpecification
+from forecastbox.api.types.fable import (
+    FableBuilder,
+    FableCompileRequest,
+    FableRetrieveResponse,
+    FableSaveRequest,
+    FableSaveResponse,
+    FableValidationExpansion,
+)
+from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification
 from forecastbox.auth.users import current_active_user
 from forecastbox.schemas.user import UserRead
 
@@ -47,41 +54,92 @@ def get_catalogue() -> dict[PluginCompositeId, BlockFactoryCatalogue]:
 
 # NOTE its a put but get would be better -- but browsers dont support get+json body
 @router.put("/expand")
-def expand_fable(fable: FableBuilderV1) -> FableValidationExpansion:
+def expand_fable(fable: FableBuilder) -> FableValidationExpansion:
     """Given a partially constructed fable, return whether there are any validation errors,
     and what are further completion/expansion options. Note that presence of validation
     errors does not affect return code, ie its still 200 OK"""
     return api_fable.validate_expand(fable)
 
 
-# NOTE its a put but get would be better -- but browsers dont support get+json body
-@router.put("/compile")
-def compile_fable(fable: FableBuilderV1) -> ExecutionSpecification:
-    """Converts to an ExecutionSpecification which can then be used in the /job router's methods.
-    Assumes the fable is valid, and throws a 4xx otherwise"""
-    return api_fable.compile(fable)
+@router.post("/upsert")
+async def upsert_fable_builder(
+    payload: FableSaveRequest,
+    fable_id: Optional[str] = None,
+    user: UserRead | None = Depends(current_active_user),
+) -> FableSaveResponse:
+    """Save a FableBuilder as a JobDefinition.
+
+    If `fable_id` is omitted a new definition is created (version 1). If
+    `fable_id` is supplied the existing definition gains a new version; a 404
+    is returned if that id does not exist.
+
+    `source` is derived from `display_name`: `user_defined` when a name is
+    provided, `oneoff_execution` otherwise.
+    """
+    created_by = str(user.id) if user is not None else None
+    source: str = "user_defined" if payload.display_name is not None else "oneoff_execution"
+    env = payload.builder.environment
+    try:
+        definition_id, version = await db_jobs.upsert_job_definition(
+            id=fable_id,
+            source=source,
+            created_by=created_by,
+            blocks=payload.builder.model_dump(mode="json")["blocks"],
+            environment_spec=env.model_dump(mode="json") if env is not None else None,
+            display_name=payload.display_name,
+            display_description=payload.display_description,
+            tags=payload.tags if payload.tags else None,
+            parent_id=payload.parent_id,
+        )
+    except KeyError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    return FableSaveResponse(id=definition_id, version=version)
 
 
 @router.get("/retrieve")
-async def get_fable_builder(fable_builder_id: str) -> FableBuilderV1:
-    """Retrieve a FableBuilderV1 by its ID."""
-    fable_builder = await db_fable.get_fable_builder(fable_builder_id)
-    if not fable_builder:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="FableBuilderV1 not found")
-    return fable_builder
+async def retrieve_fable_builder(
+    fable_id: str,
+    version: Optional[int] = None,
+) -> FableRetrieveResponse:
+    """Retrieve a saved FableBuilder by id (and optionally version) from the store.
+
+    If `version` is omitted the latest non-deleted version is returned.
+    """
+    definition = await db_jobs.get_job_definition(fable_id, version)
+    if definition is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fable definition not found")
+    if definition.blocks is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fable definition has no builder spec")
+    builder = FableBuilder(blocks=definition.blocks)  # ty:ignore[invalid-argument-type]
+    if definition.environment_spec is not None:
+        builder.environment = EnvironmentSpecification.model_validate(definition.environment_spec)
+    return FableRetrieveResponse(
+        id=definition.id,  # ty:ignore[invalid-argument-type]
+        version=definition.version,  # ty:ignore[invalid-argument-type]
+        builder=builder,
+        display_name=definition.display_name,  # ty:ignore[invalid-argument-type]
+        display_description=definition.display_description,  # ty:ignore[invalid-argument-type]
+        tags=definition.tags or [],  # ty:ignore[invalid-argument-type]
+        parent_id=definition.parent_id,  # ty:ignore[invalid-argument-type]
+    )
 
 
-@router.post("/upsert")
-async def upsert_fable_builder(
-    builder: FableBuilderV1,
-    fable_builder_id: Optional[str] = None,
-    tags: list[str] = [],
-    user: UserRead | None = Depends(current_active_user),
-) -> str:
-    """Create or update a FableBuilderV1."""
+@router.put("/compile")
+async def compile_fable(request: FableCompileRequest) -> ExecutionSpecification:
+    """Load a saved builder from the store by reference and compile it to an ExecutionSpecification.
+
+    If `version` is omitted the latest non-deleted version is used. The returned
+    ExecutionSpecification has the same shape as the one from /compile.
+    """
+    definition = await db_jobs.get_job_definition(request.id, request.version)
+    if definition is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fable definition not found")
+    if definition.blocks is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fable definition has no builder spec")
+    builder = FableBuilder(blocks=definition.blocks)  # ty:ignore[invalid-argument-type]
+    if definition.environment_spec is not None:
+        builder.environment = EnvironmentSpecification.model_validate(definition.environment_spec)
     try:
-        return await db_fable.upsert_fable_builder(builder, fable_builder_id, tags, str(user.id) if user is not None else None)
-    except KeyError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        return api_fable.compile(builder)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))

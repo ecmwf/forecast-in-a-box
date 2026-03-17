@@ -12,7 +12,7 @@ import { HttpResponse, http } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { worker } from '@tests/../mocks/browser'
 import { renderWithProviders } from '@tests/utils/render'
-import type { JobProgressResponses } from '@/api/types/job.types'
+import type { JobExecutionList } from '@/api/types/job.types'
 import { JobStatusDetailsPopover } from '@/features/dashboard/components/JobStatusDetailsPopover'
 import { API_ENDPOINTS } from '@/api/endpoints'
 
@@ -20,44 +20,73 @@ vi.mock('@/utils/env', () => ({
   getBackendBaseUrl: vi.fn(() => ''),
 }))
 
-const mockJobsResponse: JobProgressResponses = {
-  progresses: {
-    'job-1': {
-      progress: '45',
+const mockJobsResponse: JobExecutionList = {
+  executions: [
+    {
+      execution_id: 'exec-1',
+      attempt_count: 1,
       status: 'running',
       created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+      job_definition_id: 'def-1',
+      job_definition_version: 1,
       error: null,
+      progress: '45',
+      cascade_job_id: null,
     },
-    'job-2': {
-      progress: '100',
+    {
+      execution_id: 'exec-2',
+      attempt_count: 1,
       status: 'completed',
       created_at: '2026-01-01T01:00:00Z',
+      updated_at: '2026-01-01T01:00:00Z',
+      job_definition_id: 'def-2',
+      job_definition_version: 1,
       error: null,
-    },
-    'job-3': {
       progress: '100',
+      cascade_job_id: null,
+    },
+    {
+      execution_id: 'exec-3',
+      attempt_count: 1,
       status: 'completed',
       created_at: '2026-01-01T02:00:00Z',
+      updated_at: '2026-01-01T02:00:00Z',
+      job_definition_id: 'def-3',
+      job_definition_version: 1,
       error: null,
+      progress: '100',
+      cascade_job_id: null,
     },
-    'job-4': {
-      progress: '60',
+    {
+      execution_id: 'exec-4',
+      attempt_count: 1,
       status: 'errored',
       created_at: '2026-01-01T03:00:00Z',
+      updated_at: '2026-01-01T03:00:00Z',
+      job_definition_id: 'def-4',
+      job_definition_version: 1,
       error: 'OOM',
+      progress: '60',
+      cascade_job_id: null,
     },
-    'job-5': {
-      progress: '0',
+    {
+      execution_id: 'exec-5',
+      attempt_count: 1,
       status: 'submitted',
       created_at: '2026-01-01T04:00:00Z',
+      updated_at: '2026-01-01T04:00:00Z',
+      job_definition_id: 'def-5',
+      job_definition_version: 1,
       error: null,
+      progress: '0',
+      cascade_job_id: null,
     },
-  },
+  ],
   total: 5,
   page: 1,
   page_size: 1000,
   total_pages: 1,
-  error: null,
 }
 
 describe('JobStatusDetailsPopover', () => {

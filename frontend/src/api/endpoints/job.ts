@@ -13,12 +13,12 @@
  */
 
 import type {
-  ExecutionSpecification,
-  JobProgressResponse,
-  JobProgressResponses,
+  JobExecuteRequest,
+  JobExecuteResponse,
+  JobExecutionDetail,
+  JobExecutionList,
   JobStatus,
   ProductToOutputId,
-  SubmitJobResponse,
 } from '@/api/types/job.types'
 import { ApiClientError, apiClient } from '@/api/client'
 import { API_ENDPOINTS } from '@/api/endpoints'
@@ -26,37 +26,21 @@ import { getBackendBaseUrl } from '@/utils/env'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
 
 export async function executeJob(
-  spec: ExecutionSpecification,
-): Promise<SubmitJobResponse> {
-  return apiClient.post(API_ENDPOINTS.job.execute, spec)
+  request: JobExecuteRequest,
+): Promise<JobExecuteResponse> {
+  return apiClient.post(API_ENDPOINTS.job.execute, request)
 }
 
 export async function getJobsStatus(
   page: number = 1,
   pageSize: number = 10,
   status?: JobStatus,
-): Promise<JobProgressResponses> {
+): Promise<JobExecutionList> {
   const params: Record<string, string | number> = { page, page_size: pageSize }
   if (status) {
     params.status = status
   }
   return apiClient.get(API_ENDPOINTS.job.status, { params })
-}
-
-export async function getJobStatus(
-  jobId: string,
-): Promise<JobProgressResponse> {
-  return apiClient.get(API_ENDPOINTS.job.statusById(jobId))
-}
-
-export async function getJobOutputs(
-  jobId: string,
-): Promise<Array<ProductToOutputId>> {
-  return apiClient.get(API_ENDPOINTS.job.outputs(jobId))
-}
-
-export async function getJobAvailable(jobId: string): Promise<Array<string>> {
-  return apiClient.get(API_ENDPOINTS.job.available(jobId))
 }
 
 function buildFullUrl(path: string, params?: Record<string, string>): string {
@@ -83,11 +67,29 @@ function buildHeaders(): HeadersInit {
   return headers
 }
 
+export async function getJobStatus(
+  executionId: string,
+): Promise<JobExecutionDetail> {
+  return apiClient.get(API_ENDPOINTS.job.statusById(executionId))
+}
+
+export async function getJobOutputs(
+  executionId: string,
+): Promise<Array<ProductToOutputId>> {
+  return apiClient.get(API_ENDPOINTS.job.outputs(executionId))
+}
+
+export async function getJobAvailable(
+  executionId: string,
+): Promise<Array<string>> {
+  return apiClient.get(API_ENDPOINTS.job.available(executionId))
+}
+
 export async function getJobResult(
-  jobId: string,
+  executionId: string,
   datasetId: string,
 ): Promise<{ blob: Blob; contentType: string }> {
-  const url = buildFullUrl(API_ENDPOINTS.job.results(jobId), {
+  const url = buildFullUrl(API_ENDPOINTS.job.results(executionId), {
     dataset_id: datasetId,
   })
 
@@ -109,8 +111,8 @@ export async function getJobResult(
   return { blob, contentType }
 }
 
-export async function downloadJobLogs(jobId: string): Promise<Blob> {
-  const url = buildFullUrl(API_ENDPOINTS.job.logs(jobId))
+export async function downloadJobLogs(executionId: string): Promise<Blob> {
+  const url = buildFullUrl(API_ENDPOINTS.job.logs(executionId))
 
   const response = await fetch(url, {
     credentials: 'include',
@@ -127,18 +129,14 @@ export async function downloadJobLogs(jobId: string): Promise<Blob> {
   return response.blob()
 }
 
-export async function restartJob(jobId: string): Promise<SubmitJobResponse> {
-  return apiClient.post(API_ENDPOINTS.job.restart(jobId))
+export async function restartJob(
+  executionId: string,
+): Promise<JobExecuteResponse> {
+  return apiClient.post(API_ENDPOINTS.job.restart(executionId))
 }
 
-export async function deleteJob(
-  jobId: string,
-): Promise<{ deleted_count: number }> {
-  return apiClient.delete(API_ENDPOINTS.job.delete(jobId))
-}
-
-export async function getJobSpecification(
-  jobId: string,
-): Promise<ExecutionSpecification> {
-  return apiClient.get(API_ENDPOINTS.job.specification(jobId))
+export async function deleteJob(executionId: string): Promise<void> {
+  return apiClient.delete(
+    `${API_ENDPOINTS.job.delete}?execution_id=${executionId}`,
+  )
 }

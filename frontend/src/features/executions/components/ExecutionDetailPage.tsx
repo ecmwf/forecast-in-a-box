@@ -53,7 +53,6 @@ export function ExecutionDetailPage() {
   const deleteMutation = useDeleteJob()
 
   const metadata = useJobMetadataStore((s) => s.getJob(jobId))
-  const addJob = useJobMetadataStore((s) => s.addJob)
   const removeJob = useJobMetadataStore((s) => s.removeJob)
 
   const layoutMode = useUiStore((state) => state.layoutMode)
@@ -61,15 +60,8 @@ export function ExecutionDetailPage() {
 
   const handleRestart = () => {
     restartMutation.mutate(jobId, {
-      onSuccess: (response) => {
+      onSuccess: () => {
         toast.success(t('actions.restartJob'))
-        if (metadata) {
-          addJob(response.id, {
-            ...metadata,
-            submittedAt: new Date().toISOString(),
-          })
-        }
-        navigate({ to: '/executions/$jobId', params: { jobId: response.id } })
       },
       onError: (error) => {
         log.error('Failed to restart job', { jobId, error })
@@ -157,7 +149,7 @@ export function ExecutionDetailPage() {
         name={jobName}
         description={metadata?.description}
         status={jobData.status}
-        progress={jobData.progress}
+        progress={jobData.progress ?? '0'}
         createdAt={jobData.created_at}
         error={jobData.error}
         onRestart={handleRestart}

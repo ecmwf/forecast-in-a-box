@@ -15,23 +15,39 @@ import {
   mockSavedFables,
 } from '../data/fable.data'
 import { consumeCatalogueUnavailable } from './plugins.handlers'
-import type { FableBuilderV1 } from '@/api/types/fable.types'
+import type {
+  FableBuilderV1,
+  FableUpsertRequest,
+} from '@/api/types/fable.types'
 import { getFactory } from '@/api/types/fable.types'
 import { API_ENDPOINTS } from '@/api/endpoints'
 
 interface SavedFableEntry {
   fable: FableBuilderV1
   name: string
+  display_name: string
+  display_description: string
   tags: Array<string>
   user_id: string
   created_at: string
   updated_at: string
 }
 
-const savedFablesState: Record<string, SavedFableEntry | undefined> = {
-  ...mockSavedFables,
-}
+const savedFablesState: Record<string, SavedFableEntry | undefined> =
+  Object.fromEntries(
+    Object.entries(mockSavedFables).map(([id, entry]) => [
+      id,
+      {
+        ...entry,
+        display_name: entry.name,
+        display_description: '',
+      },
+    ]),
+  )
 let fableIdCounter = 100
+const fableVersions: Record<string, number> = Object.fromEntries(
+  Object.keys(mockSavedFables).map((id) => [id, 1]),
+)
 
 export const fableHandlers = [
   http.get(API_ENDPOINTS.fable.catalogue, async () => {
@@ -66,12 +82,12 @@ export const fableHandlers = [
     return HttpResponse.json(expansion)
   }),
 
-  http.put(API_ENDPOINTS.fable.compile, async ({ request }) => {
-    await delay(600)
+  http.post(API_ENDPOINTS.fable.upsert, async ({ request }) => {
+    await delay(500)
 
-    let fable: FableBuilderV1
+    let body: FableUpsertRequest
     try {
-      fable = (await request.json()) as FableBuilderV1
+      body = (await request.json()) as FableUpsertRequest
     } catch {
       return HttpResponse.json(
         { message: 'Invalid request body' },
@@ -79,33 +95,62 @@ export const fableHandlers = [
       )
     }
 
-    const expansion = calculateExpansion(fable)
-    const hasErrors =
-      expansion.global_errors.length > 0 ||
-      Object.values(expansion.block_errors).some((errors) => errors.length > 0)
+    const { builder, display_name, display_description, tags, parent_id } = body
 
-    if (hasErrors) {
-      return HttpResponse.json(
-        {
-          message: 'Fable validation failed',
-          errors: expansion,
-        },
-        { status: 422 },
-      )
+    for (const instance of Object.values(builder.blocks)) {
+      const factory = getFactory(mockCatalogue, instance.factory_id)
+      if (!factory) {
+        const pluginDisplay = `${instance.factory_id.plugin.store}/${instance.factory_id.plugin.local}`
+        return HttpResponse.json(
+          {
+            message: `Block factory '${pluginDisplay}:${instance.factory_id.factory}' not found`,
+          },
+          { status: 404 },
+        )
+      }
     }
 
-    return HttpResponse.json({
-      job: {
-        job_type: 'raw_cascade_job',
-        job_instance: { tasks: {}, edges: [] },
-      },
-      environment: {
-        hosts: null,
-        workers_per_host: null,
-        environment_variables: {},
-      },
-      shared: false,
-    })
+    const now = new Date().toISOString()
+
+    if (parent_id) {
+      const existing = savedFablesState[parent_id]
+      if (!existing) {
+        return HttpResponse.json(
+          { message: 'Fable not found' },
+          { status: 404 },
+        )
+      }
+
+      const newVersion = (fableVersions[parent_id] ?? 1) + 1
+      fableVersions[parent_id] = newVersion
+
+      savedFablesState[parent_id] = {
+        ...existing,
+        fable: builder,
+        display_name,
+        display_description,
+        tags: tags.length > 0 ? tags : existing.tags,
+        updated_at: now,
+      }
+
+      return HttpResponse.json({ id: parent_id, version: newVersion })
+    }
+
+    const newId = `fable-${String(fableIdCounter++).padStart(3, '0')}`
+    fableVersions[newId] = 1
+
+    savedFablesState[newId] = {
+      fable: builder,
+      name: display_name,
+      display_name,
+      display_description,
+      tags,
+      user_id: 'mock-user-123',
+      created_at: now,
+      updated_at: now,
+    }
+
+    return HttpResponse.json({ id: newId, version: 1 })
   }),
 
   http.get(API_ENDPOINTS.fable.retrieve, async ({ request }) => {
@@ -126,21 +171,24 @@ export const fableHandlers = [
       return HttpResponse.json({ message: 'Fable not found' }, { status: 404 })
     }
 
-    return HttpResponse.json(saved.fable)
+    return HttpResponse.json({
+      id: fableId,
+      version: fableVersions[fableId] ?? 1,
+      builder: saved.fable,
+      display_name: saved.display_name,
+      display_description: saved.display_description,
+      tags: saved.tags,
+      created_at: saved.created_at,
+      updated_at: saved.updated_at,
+    })
   }),
 
-  http.post(API_ENDPOINTS.fable.upsert, async ({ request }) => {
-    await delay(500)
+  http.put(API_ENDPOINTS.fable.compile, async ({ request }) => {
+    await delay(600)
 
-    const url = new URL(request.url)
-    const existingId = url.searchParams.get('fable_builder_id')
-    const tagsParam = url.searchParams.get('tags')
-    const tags = tagsParam ? tagsParam.split(',') : []
-
-    let fable: FableBuilderV1
+    let body: { id: string; version?: number }
     try {
-      const body = (await request.json()) as { builder: FableBuilderV1 }
-      fable = body.builder
+      body = (await request.json()) as { id: string; version?: number }
     } catch {
       return HttpResponse.json(
         { message: 'Invalid request body' },
@@ -148,51 +196,34 @@ export const fableHandlers = [
       )
     }
 
-    for (const instance of Object.values(fable.blocks)) {
-      const factory = getFactory(mockCatalogue, instance.factory_id)
-      if (!factory) {
-        const pluginDisplay = `${instance.factory_id.plugin.store}/${instance.factory_id.plugin.local}`
-        return HttpResponse.json(
-          {
-            message: `Block factory '${pluginDisplay}:${instance.factory_id.factory}' not found`,
-          },
-          { status: 404 },
-        )
-      }
+    const saved = savedFablesState[body.id]
+    if (!saved) {
+      return HttpResponse.json({ message: 'Fable not found' }, { status: 404 })
     }
 
-    const now = new Date().toISOString()
+    const expansion = calculateExpansion(saved.fable)
+    const hasErrors =
+      expansion.global_errors.length > 0 ||
+      Object.values(expansion.block_errors).some((errors) => errors.length > 0)
 
-    if (existingId) {
-      const existing = savedFablesState[existingId]
-      if (!existing) {
-        return HttpResponse.json(
-          { message: 'Fable not found' },
-          { status: 404 },
-        )
-      }
-
-      savedFablesState[existingId] = {
-        ...existing,
-        fable,
-        tags: tags.length > 0 ? tags : existing.tags,
-        updated_at: now,
-      }
-
-      return HttpResponse.json(existingId)
+    if (hasErrors) {
+      return HttpResponse.json(
+        { message: 'Fable validation failed', errors: expansion },
+        { status: 422 },
+      )
     }
 
-    const newId = `fable-${String(fableIdCounter++).padStart(3, '0')}`
-
-    savedFablesState[newId] = {
-      fable,
-      name: 'Untitled Configuration',
-      tags,
-      user_id: 'mock-user-123',
-      created_at: now,
-      updated_at: now,
-    }
-
-    return HttpResponse.json(newId)
+    return HttpResponse.json({
+      job: {
+        job_type: 'raw_cascade_job',
+        job_instance: { tasks: {}, edges: [] },
+      },
+      environment: {
+        hosts: null,
+        workers_per_host: null,
+        environment_variables: {},
+      },
+      shared: false,
+    })
   }),
 ]

@@ -63,6 +63,41 @@ export interface SubmitJobResponse {
   id: string
 }
 
+/** POST /job/execute request */
+export interface JobExecuteRequest {
+  job_definition_id: string
+  job_definition_version?: number
+}
+
+/** POST /job/execute response */
+export interface JobExecuteResponse {
+  execution_id: string
+  attempt_count: number
+}
+
+/** Single execution detail from GET /job/status */
+export interface JobExecutionDetail {
+  execution_id: string
+  attempt_count: number
+  status: JobStatus
+  created_at: string
+  updated_at: string
+  job_definition_id: string
+  job_definition_version: number
+  error: string | null
+  progress: string | null
+  cascade_job_id: string | null
+}
+
+/** GET /job/status response */
+export interface JobExecutionList {
+  executions: Array<JobExecutionDetail>
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
 export interface EnvironmentSpecification {
   hosts: number | null
   workers_per_host: number | null

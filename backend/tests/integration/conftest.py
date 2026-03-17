@@ -10,6 +10,7 @@ from typing import Any, Generator
 
 import httpx
 import pytest
+from pydantic import SecretStr
 
 import forecastbox.config
 from forecastbox.config import ArtifactStoreConfig, FIABConfig
@@ -62,7 +63,7 @@ class FakeArtifactRegistry(SimpleHTTPRequestHandler):
             chunk = b"x" * chunk_size
             chunk_header = hex(len(chunk))[2:].encode("ascii")
             for _ in range(chunks):
-                time.sleep(0.3)
+                time.sleep(0.1)
                 self.wfile.write(chunk_header + b"\r\n")
                 self.wfile.write(chunk + b"\r\n")
                 self.wfile.flush()
@@ -98,12 +99,15 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         td = tempfile.TemporaryDirectory()
         td_data = tempfile.TemporaryDirectory()
         os.environ["FIAB_ROOT"] = td.name
+        # NOTE we set test data dir because of a hack in api.fable.compile -- can be removed after that is solved
+        os.environ["IS_TEST_DATA_DIR"] = os.path.join(os.path.dirname(__file__), "data")
         (pathlib.Path(td.name) / "pylock.toml.timestamp").write_text("1761908420:d0.0.1")
         # we need to monkeypath this, because of eager import this was already initialised
         # to user's personal config file
         forecastbox.config.fiab_home = pathlib.Path(td.name)
 
         config = FIABConfig()
+        config.auth.jwt_secret = SecretStr("x" * 32)
         config.api.uvicorn_port = 30645
         config.cascade.cascade_url = "tcp://localhost:30644"
         config.db.sqlite_userdb_path = f"{td.name}/user.db"

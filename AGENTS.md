@@ -9,11 +9,25 @@
 * there is pre-commit configured. Ideally do `uv run prek` before every commit
 
 # GitHub and Pull Requests
-* when asked to fetch PR review comments, use the GitHub API directly instead of `gh pr view`:
+* when asked to fetch PR review comments, use the GitHub GraphQL API to fetch only **unresolved** threads:
   ```bash
-  gh api repos/ecmwf/forecast-in-a-box/pulls/PR_NUMBER/comments | jq -r '.[] | "File: \(.path)\nLine: \(.line // .original_line)\nComment: \(.body)\n---"'
+  gh api graphql -f query='
+  {
+    repository(owner: "ecmwf", name: "forecast-in-a-box") {
+      pullRequest(number: PR_NUMBER) {
+        reviewThreads(first: 50) {
+          nodes {
+            isResolved
+            comments(first: 1) {
+              nodes { path line originalLine body }
+            }
+          }
+        }
+      }
+    }
+  }' | jq -r '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | "File: \(.comments.nodes[0].path)\nLine: \(.comments.nodes[0].line // .comments.nodes[0].originalLine)\nComment: \(.comments.nodes[0].body)\n---"'
   ```
-  This provides the actual inline review comments which `gh pr view` doesn't show properly.
+  This provides the actual inline review comments which `gh pr view` doesn't show properly, and filters out resolved threads.
 
 # Python-Related
 * utilize `just` for command running -- `just val` in backend is the "typechecking and testing". Always run this after you make any changes to python code
@@ -32,6 +46,7 @@
 * when adding new fields to config.py, make sure they contain defaults -- we need to be backwards compatible wrt users configs
 * when adding new fields to database schemata, make sure you explicitly handle migrations -- we need to be backwards compatible wrt users sqlite instances
 * use comments sparingly, for non-obvious code only. Add docstrings to functions called from other modules only. When adding docstring, use compact style -- dont separate out Args and Returns, describe everything in one or two paragraphs.
+* all imports belong to top level of the file, dont import inside function definitions unless necessiated by runtime. Dont alias imports unless there is a name collision
 
 # Frontend
 * if you would develop frontend features, consult the `frontend/AGENTS.md`.

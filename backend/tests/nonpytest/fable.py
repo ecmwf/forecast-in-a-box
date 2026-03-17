@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import httpx
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
-from forecastbox.api.types.fable import FableBuilderV1
+from forecastbox.api.types.fable import FableBuilder
 from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
 from forecastbox.config import FIABConfig
 from forecastbox.standalone.entrypoint import launch_all
@@ -84,7 +84,7 @@ if __name__ == "__main__":
                 blocks[f"ensemble{statistic.capitalize()}"] = block
                 blocks[f"sink{statistic.capitalize()}"] = sink
 
-            builder = FableBuilderV1(blocks=blocks)
+            builder = FableBuilder(blocks=blocks)
             response = client.request(url="/fable/compile", method="put", json=builder.model_dump()).json()
 
             spec = ExecutionSpecification(**response)

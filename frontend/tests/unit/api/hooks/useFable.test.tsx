@@ -189,10 +189,21 @@ describe('useFable', () => {
     worker.resetHandlers()
   })
 
-  it('fetches fable by ID', async () => {
+  it('fetches fable by ID and returns the builder', async () => {
+    const mockRetrieveResponse = {
+      id: 'test-fable-id',
+      version: 1,
+      builder: mockFable,
+      display_name: 'Test Config',
+      display_description: '',
+      tags: [],
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    }
+
     worker.use(
       http.get(API_ENDPOINTS.fable.retrieve, () => {
-        return HttpResponse.json(mockFable)
+        return HttpResponse.json(mockRetrieveResponse)
       }),
     )
 
@@ -222,7 +233,7 @@ describe('useFable', () => {
     worker.use(
       http.get(API_ENDPOINTS.fable.retrieve, () => {
         fetchCalled = true
-        return HttpResponse.json(mockFable)
+        return HttpResponse.json({})
       }),
     )
 
@@ -384,6 +395,100 @@ describe('useFableValidation', () => {
   })
 })
 
+describe('useUpsertFable', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    worker.resetHandlers()
+  })
+
+  it('creates new fable and returns { id, version }', async () => {
+    worker.use(
+      http.post(API_ENDPOINTS.fable.upsert, () => {
+        return HttpResponse.json({ id: 'new-fable-id', version: 1 })
+      }),
+    )
+
+    let mutationResult: ReturnType<typeof useUpsertFable> | null = null
+
+    function TestComponent() {
+      const result = useUpsertFable()
+      mutationResult = result
+      return (
+        <div>
+          <button
+            data-testid="upsert"
+            onClick={() =>
+              result.mutate({
+                fable: mockFable,
+                display_name: 'My Config',
+                display_description: '',
+              })
+            }
+          >
+            Upsert
+          </button>
+          <div data-testid="status">{result.status}</div>
+        </div>
+      )
+    }
+
+    const screen = await renderWithQueryClient(<TestComponent />)
+
+    await screen.getByTestId('upsert').click()
+
+    await expect
+      .element(screen.getByTestId('status'))
+      .toHaveTextContent('success')
+    expect(mutationResult!.data!.id).toBe('new-fable-id')
+    expect(mutationResult!.data!.version).toBe(1)
+  })
+
+  it('updates existing fable by sending parent_id in body', async () => {
+    let capturedBody: unknown = null
+
+    worker.use(
+      http.post(API_ENDPOINTS.fable.upsert, async ({ request }) => {
+        capturedBody = await request.json()
+        return HttpResponse.json({ id: 'existing-id', version: 2 })
+      }),
+    )
+
+    function TestComponent() {
+      const result = useUpsertFable()
+      return (
+        <div>
+          <button
+            data-testid="upsert"
+            onClick={() =>
+              result.mutate({
+                fable: mockFable,
+                fableId: 'existing-id',
+                display_name: 'Updated Config',
+                display_description: '',
+              })
+            }
+          >
+            Upsert
+          </button>
+          <div data-testid="status">{result.status}</div>
+        </div>
+      )
+    }
+
+    const screen = await renderWithQueryClient(<TestComponent />)
+
+    await screen.getByTestId('upsert').click()
+
+    await expect
+      .element(screen.getByTestId('status'))
+      .toHaveTextContent('success')
+    expect(capturedBody).toMatchObject({ parent_id: 'existing-id' })
+  })
+})
+
 describe('useCompileFable', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -393,7 +498,7 @@ describe('useCompileFable', () => {
     worker.resetHandlers()
   })
 
-  it('compiles fable successfully', async () => {
+  it('compiles fable by reference', async () => {
     const mockCompiled = {
       job: {
         job_type: 'raw_cascade_job',
@@ -422,7 +527,7 @@ describe('useCompileFable', () => {
         <div>
           <button
             data-testid="compile"
-            onClick={() => result.mutate(mockFable)}
+            onClick={() => result.mutate({ id: 'fable-123' })}
           >
             Compile
           </button>
@@ -439,88 +544,6 @@ describe('useCompileFable', () => {
       .element(screen.getByTestId('status'))
       .toHaveTextContent('success')
     expect(mutationResult!.data).toEqual(mockCompiled)
-  })
-})
-
-describe('useUpsertFable', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  afterEach(() => {
-    worker.resetHandlers()
-  })
-
-  it('creates new fable', async () => {
-    worker.use(
-      http.post(API_ENDPOINTS.fable.upsert, () => {
-        return HttpResponse.json('new-fable-id')
-      }),
-    )
-
-    let mutationResult: ReturnType<typeof useUpsertFable> | null = null
-
-    function TestComponent() {
-      const result = useUpsertFable()
-      mutationResult = result
-      return (
-        <div>
-          <button
-            data-testid="upsert"
-            onClick={() => result.mutate({ fable: mockFable })}
-          >
-            Upsert
-          </button>
-          <div data-testid="status">{result.status}</div>
-        </div>
-      )
-    }
-
-    const screen = await renderWithQueryClient(<TestComponent />)
-
-    await screen.getByTestId('upsert').click()
-
-    await expect
-      .element(screen.getByTestId('status'))
-      .toHaveTextContent('success')
-    expect(mutationResult!.data).toBe('new-fable-id')
-  })
-
-  it('updates existing fable', async () => {
-    let capturedUrl: string | null = null
-
-    worker.use(
-      http.post(API_ENDPOINTS.fable.upsert, ({ request }) => {
-        capturedUrl = request.url
-        return HttpResponse.json('updated-fable-id')
-      }),
-    )
-
-    function TestComponent() {
-      const result = useUpsertFable()
-      return (
-        <div>
-          <button
-            data-testid="upsert"
-            onClick={() =>
-              result.mutate({ fable: mockFable, fableId: 'existing-id' })
-            }
-          >
-            Upsert
-          </button>
-          <div data-testid="status">{result.status}</div>
-        </div>
-      )
-    }
-
-    const screen = await renderWithQueryClient(<TestComponent />)
-
-    await screen.getByTestId('upsert').click()
-
-    await expect
-      .element(screen.getByTestId('status'))
-      .toHaveTextContent('success')
-    expect(capturedUrl).toContain('fable_builder_id=existing-id')
   })
 })
 

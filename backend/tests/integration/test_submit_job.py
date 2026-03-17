@@ -17,6 +17,14 @@ from .utils import ensure_completed
 
 
 def test_submit_job(backend_client_with_auth):
+    return
+    # TODO this test is disabled because the endpoints are being removed. However,
+    # some coverage of this test has not yet been migrated, because we cannot
+    # properly submit raw jobs or mock them at the moment. Once that is available,
+    # revisit this test. Thus, do not delete this file or its content, despite being
+    # unreachable!
+    # In brief, we need to test job delete, request making from job, gateway restarts,
+    # job output consumption, job logs fetching, sleeper jobs.
     env = EnvironmentSpecification(hosts=1, workers_per_host=2)
 
     headers = {"Content-Type": "application/json"}

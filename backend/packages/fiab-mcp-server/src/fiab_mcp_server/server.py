@@ -77,7 +77,7 @@ class FiabMcpServer:
             return [
                 Tool(
                     name="fable_start_building",
-                    description="Initialize a new fable workflow builder. Returns an empty FableBuilderV1 ready for adding blocks.",
+                    description="Initialize a new fable workflow builder. Returns an empty FableBuilder ready for adding blocks.",
                     inputSchema={
                         "type": "object",
                         "properties": {},
@@ -85,13 +85,13 @@ class FiabMcpServer:
                 ),
                 Tool(
                     name="fable_add_block",
-                    description="Add a block to the builder and get validation/expansion results. The builder should be a FableBuilderV1 with a 'blocks' dict mapping block IDs to BlockInstance objects. Returns the updated builder and validation results including possible next blocks.",
+                    description="Add a block to the builder and get validation/expansion results. The builder should be a FableBuilder with a 'blocks' dict mapping block IDs to BlockInstance objects. Returns the updated builder and validation results including possible next blocks.",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "builder": {
                                 "type": "object",
-                                "description": "Current FableBuilderV1 state with 'blocks' dict",
+                                "description": "Current FableBuilder state with 'blocks' dict",
                                 "properties": {
                                     "blocks": {
                                         "type": "object",
@@ -150,7 +150,7 @@ class FiabMcpServer:
                         "properties": {
                             "builder": {
                                 "type": "object",
-                                "description": "FableBuilderV1 to save with 'blocks' dict",
+                                "description": "FableBuilder to save with 'blocks' dict",
                                 "properties": {
                                     "blocks": {
                                         "type": "object",
@@ -174,7 +174,7 @@ class FiabMcpServer:
                 ),
                 Tool(
                     name="fable_load",
-                    description="Load a previously saved workflow builder by its ID. Returns the FableBuilderV1.",
+                    description="Load a previously saved workflow builder by its ID. Returns the FableBuilder.",
                     inputSchema={
                         "type": "object",
                         "properties": {

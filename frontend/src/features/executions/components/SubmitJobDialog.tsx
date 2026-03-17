@@ -117,7 +117,10 @@ export function SubmitJobDialog({
       })
 
       onOpenChange(false)
-      navigate({ to: '/executions/$jobId', params: { jobId: response.id } })
+      navigate({
+        to: '/executions/$jobId',
+        params: { jobId: response.execution_id },
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     }

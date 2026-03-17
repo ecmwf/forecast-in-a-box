@@ -16,9 +16,11 @@ from typing import Any, cast
 import orjson
 from cascade.low.func import Either
 
+import forecastbox.api.fable as api_fable
+import forecastbox.db.jobs as db_jobs
 from forecastbox.api.scheduling.dt_utils import calculate_next_run
-from forecastbox.api.types.jobs import ExecutionSpecification
-from forecastbox.db.schedule import get_schedules, max_attempt_cnt, run2date, run2schedule
+from forecastbox.api.types.fable import FableBuilder
+from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification
 
 
 def deep_union(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
@@ -56,61 +58,144 @@ class RunnableSchedule:
     schedule_id: str
 
 
-async def schedule2runnable(schedule_id: str, exec_time: dt.datetime) -> Either[RunnableSchedule, str]:  # type: ignore[invalid-argument] # NOTE type checker issue
-    """Converts a ScheduleDefinition into a RunnableSchedule by evaluating dynamic expressions and merging."""
-    schedules = list(await get_schedules(schedule_id=schedule_id))
-    if not schedules:
-        return Either.error("not found")
-    schedule_def = schedules[0]
+@dataclass(frozen=True, eq=True, slots=True)
+class RunnableExperiment:
+    """Carries a compiled spec and all metadata needed to submit and track a scheduled run."""
+
+    exec_spec: ExecutionSpecification
+    created_by: str | None
+    next_run_at: dt.datetime | None
+    scheduled_at: dt.datetime
+    experiment_id: str
+    job_definition_id: str
+    job_definition_version: int
+    max_acceptable_delay_hours: int
+    compiler_runtime_context: dict[str, Any]
+
+
+async def experiment2runnable(experiment_id: str, exec_time: dt.datetime) -> Either[RunnableExperiment, str]:  # type: ignore[invalid-argument]
+    """Convert an ExperimentDefinition into a RunnableExperiment for the given execution time.
+
+    Loads the linked JobDefinition, applies any dynamic expressions from
+    experiment_definition onto the blocks, compiles to an ExecutionSpecification,
+    and computes the next cron tick.
+    """
+    exp = await db_jobs.get_experiment_definition(experiment_id)
+    if exp is None:
+        return Either.error(f"ExperimentDefinition {experiment_id!r} not found")
+
+    exp_def = cast(dict, exp.experiment_definition) or {}
+    cron_expr = str(exp_def.get("cron_expr", ""))
+    dynamic_expr = cast(dict, exp_def.get("dynamic_expr", {}))
+    max_acceptable_delay_hours = int(exp_def.get("max_acceptable_delay_hours", 24))
+
+    job_def_id = str(exp.job_definition_id)  # ty:ignore[invalid-argument-type]
+    job_def_version = cast(int, exp.job_definition_version)
+    job_def = await db_jobs.get_job_definition(job_def_id, job_def_version)
+    if job_def is None:
+        return Either.error(f"JobDefinition {job_def_id!r} v{job_def_version} not found")
 
     try:
-        dynamic_expr = orjson.loads(schedule_def.dynamic_expr.encode("ascii"))
-        exec_spec = orjson.loads(schedule_def.exec_spec.encode("ascii"))
+        blocks = cast(dict, job_def.blocks) or {}
+        builder = FableBuilder(
+            blocks=blocks,
+            environment=EnvironmentSpecification.model_validate(job_def.environment_spec) if job_def.environment_spec else None,
+        )
+        compiled = api_fable.compile(builder)
 
-        dynamic_evaluated = eval_dynamic_expression(dynamic_expr, exec_time)
-        merged_spec = deep_union(exec_spec, dynamic_evaluated)
-        next_run_at = calculate_next_run(exec_time, cast(str, schedule_def.cron_expr))
-        rv = RunnableSchedule(
-            exec_spec=ExecutionSpecification(**merged_spec),
-            created_by=schedule_def.created_by,
+        if dynamic_expr:
+            dynamic_evaluated = eval_dynamic_expression(dynamic_expr, exec_time)
+            merged = deep_union(compiled.model_dump(), dynamic_evaluated)
+            exec_spec = ExecutionSpecification.model_validate(merged)
+        else:
+            exec_spec = compiled
+
+        next_run_at = calculate_next_run(exec_time, cron_expr) if cron_expr else None
+
+        rv = RunnableExperiment(
+            exec_spec=exec_spec,
+            created_by=cast(str | None, exp.created_by),
             next_run_at=next_run_at,
             scheduled_at=exec_time,
-            attempt_cnt=0,
-            max_acceptable_delay_hours=cast(int, schedule_def.max_acceptable_delay_hours),
-            schedule_id=schedule_def.schedule_id,
+            experiment_id=experiment_id,
+            job_definition_id=job_def_id,
+            job_definition_version=job_def_version,
+            max_acceptable_delay_hours=max_acceptable_delay_hours,
+            compiler_runtime_context={"trigger": "cron", "scheduled_at": exec_time.isoformat()},
         )
         return Either.ok(rv)
     except Exception as e:
         return Either.error(repr(e))
 
 
-async def run2runnable(schedule_run_id: str) -> Either[RunnableSchedule, str]:  # type: ignore[invalid-argument] # NOTE type checker issue
-    """Converts a ScheduleRun into a RunnableSchedule, with all the original parameters. Intended for re-runs"""
-    schedule_def = await run2schedule(schedule_run_id)
-    if schedule_def is None:
-        return Either.error(f"schedule corresponding to run {schedule_run_id} not found")
+async def rerun2runnable(execution_id: str) -> Either[RunnableExperiment, str]:  # type: ignore[invalid-argument]
+    """Build a RunnableExperiment for a re-run of an existing scheduled JobExecution.
 
-    attempt_cnt = await max_attempt_cnt(cast(str, schedule_def.schedule_id)) + 1
+    Retrieves the original execution's runtime context to preserve the scheduled_at
+    date. The trigger is set to 'rerun' in compiler_runtime_context.
+    """
+    execution = await db_jobs.get_job_execution(execution_id)
+    if execution is None:
+        return Either.error(f"JobExecution {execution_id!r} not found")
 
-    scheduled_at = await run2date(schedule_run_id)
-    if scheduled_at is None:
-        return Either.error(f"schedule run {schedule_run_id} not found")
+    experiment_id = cast(str | None, execution.experiment_id)
+    if experiment_id is None:
+        return Either.error(f"JobExecution {execution_id!r} is not linked to an experiment")
+
+    runtime_ctx = cast(dict, execution.compiler_runtime_context) or {}
+    original_scheduled_at_str = runtime_ctx.get("scheduled_at")
+    if original_scheduled_at_str:
+        try:
+            scheduled_at = dt.datetime.fromisoformat(original_scheduled_at_str)
+        except ValueError:
+            scheduled_at = dt.datetime.now()
+    else:
+        scheduled_at = dt.datetime.now()
+
+    exp = await db_jobs.get_experiment_definition(experiment_id)
+    if exp is None:
+        return Either.error(f"ExperimentDefinition {experiment_id!r} not found")
+
+    exp_def = cast(dict, exp.experiment_definition) or {}
+    dynamic_expr = cast(dict, exp_def.get("dynamic_expr", {}))
+    max_acceptable_delay_hours = int(exp_def.get("max_acceptable_delay_hours", 24))
+
+    job_def_id = str(execution.job_definition_id)  # ty:ignore[invalid-argument-type]
+    job_def_version = cast(int, execution.job_definition_version)
+    job_def = await db_jobs.get_job_definition(job_def_id, job_def_version)
+    if job_def is None:
+        return Either.error(f"JobDefinition {job_def_id!r} v{job_def_version} not found")
 
     try:
-        dynamic_expr = orjson.loads(schedule_def.dynamic_expr.encode("ascii"))
-        exec_spec = orjson.loads(schedule_def.exec_spec.encode("ascii"))
+        blocks = cast(dict, job_def.blocks) or {}
+        builder = FableBuilder(
+            blocks=blocks,
+            environment=EnvironmentSpecification.model_validate(job_def.environment_spec) if job_def.environment_spec else None,
+        )
+        compiled = api_fable.compile(builder)
 
-        dynamic_evaluated = eval_dynamic_expression(dynamic_expr, scheduled_at)
-        merged_spec = deep_union(exec_spec, dynamic_evaluated)
-        rv = RunnableSchedule(
-            exec_spec=ExecutionSpecification(**merged_spec),
-            created_by=cast(str | None, schedule_def.created_by),
+        if dynamic_expr:
+            dynamic_evaluated = eval_dynamic_expression(dynamic_expr, scheduled_at)
+            merged = deep_union(compiled.model_dump(), dynamic_evaluated)
+            exec_spec = ExecutionSpecification.model_validate(merged)
+        else:
+            exec_spec = compiled
+
+        rv = RunnableExperiment(
+            exec_spec=exec_spec,
+            created_by=cast(str | None, execution.created_by),
             next_run_at=None,
             scheduled_at=scheduled_at,
-            attempt_cnt=attempt_cnt,
-            max_acceptable_delay_hours=cast(int, schedule_def.max_acceptable_delay_hours),
-            schedule_id=cast(str, schedule_def.schedule_id),
+            experiment_id=experiment_id,
+            job_definition_id=job_def_id,
+            job_definition_version=job_def_version,
+            max_acceptable_delay_hours=max_acceptable_delay_hours,
+            compiler_runtime_context={
+                "trigger": "rerun",
+                "scheduled_at": scheduled_at.isoformat(),
+                "original_execution_id": execution_id,
+            },
         )
         return Either.ok(rv)
     except Exception as e:
-        return Either.error(f"Failed to build a job because of {repr(e)}")
+        return Either.error(repr(e))

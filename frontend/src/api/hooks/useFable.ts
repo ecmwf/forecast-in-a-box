@@ -13,6 +13,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type {
   BlockFactoryCatalogue,
   FableBuilderV1,
+  FableCompileRequest,
+  FableUpsertResponse,
   FableValidationExpansion,
   PluginBlockFactoryId,
 } from '@/api/types/fable.types'
@@ -61,7 +63,10 @@ export function useBlockCatalogue(language?: string) {
 export function useFable(fableId: string | null | undefined) {
   return useQuery<FableBuilderV1>({
     queryKey: fableKeys.detail(fableId ?? ''),
-    queryFn: () => retrieveFable(fableId!),
+    queryFn: async () => {
+      const response = await retrieveFable(fableId!)
+      return response.builder
+    },
     enabled: !!fableId,
     staleTime: 30 * 1000, // 30 seconds
   })
@@ -95,7 +100,7 @@ export function useFableValidation(
 }
 
 export function useCompileFable() {
-  return useMutation<ExecutionSpecification, Error, FableBuilderV1>({
+  return useMutation<ExecutionSpecification, Error, FableCompileRequest>({
     mutationFn: compileFable,
   })
 }
@@ -104,22 +109,31 @@ export function useUpsertFable() {
   const queryClient = useQueryClient()
 
   return useMutation<
-    string,
+    FableUpsertResponse,
     Error,
     {
       fable: FableBuilderV1
       fableId?: string
+      display_name: string
+      display_description: string
       tags?: Array<string>
     }
   >({
-    mutationFn: ({ fable, fableId, tags }) => upsertFable(fable, fableId, tags),
-    onSuccess: (newId, variables) => {
+    mutationFn: ({ fable, fableId, display_name, display_description, tags }) =>
+      upsertFable({
+        builder: fable,
+        display_name,
+        display_description,
+        tags: tags ?? [],
+        parent_id: fableId,
+      }),
+    onSuccess: (result, variables) => {
       if (variables.fableId) {
         queryClient.invalidateQueries({
           queryKey: fableKeys.detail(variables.fableId),
         })
       }
-      queryClient.invalidateQueries({ queryKey: fableKeys.detail(newId) })
+      queryClient.invalidateQueries({ queryKey: fableKeys.detail(result.id) })
     },
   })
 }
