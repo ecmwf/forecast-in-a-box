@@ -241,9 +241,7 @@ export function getExecution(
   return executionsState[executionId]
 }
 
-export function addExecution(
-  request: JobExecuteRequest,
-): JobExecuteResponse {
+export function addExecution(request: JobExecuteRequest): JobExecuteResponse {
   const execution_id = `exec-mock-${String(executionIdCounter++).padStart(3, '0')}`
   const timestamp = new Date().toISOString()
   executionsState[execution_id] = {

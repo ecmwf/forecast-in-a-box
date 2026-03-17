@@ -156,9 +156,7 @@ export const FableRetrieveResponseSchema = z.object({
   updated_at: z.string(),
 })
 
-export type FableRetrieveResponse = z.infer<
-  typeof FableRetrieveResponseSchema
->
+export type FableRetrieveResponse = z.infer<typeof FableRetrieveResponseSchema>
 
 export interface FableCompileRequest {
   id: string
