@@ -419,8 +419,15 @@ describe('compileFableV2', () => {
       http.put(API_ENDPOINTS.fable.compileV2, async ({ request }) => {
         capturedBody = await request.json()
         return HttpResponse.json({
-          job: { job_type: 'raw_cascade_job', job_instance: { tasks: {}, edges: [] } },
-          environment: { hosts: null, workers_per_host: null, environment_variables: {} },
+          job: {
+            job_type: 'raw_cascade_job',
+            job_instance: { tasks: {}, edges: [] },
+          },
+          environment: {
+            hosts: null,
+            workers_per_host: null,
+            environment_variables: {},
+          },
           shared: false,
         })
       }),

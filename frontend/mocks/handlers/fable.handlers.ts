@@ -15,7 +15,10 @@ import {
   mockSavedFables,
 } from '../data/fable.data'
 import { consumeCatalogueUnavailable } from './plugins.handlers'
-import type { FableBuilderV1, FableUpsertV2Request } from '@/api/types/fable.types'
+import type {
+  FableBuilderV1,
+  FableUpsertV2Request,
+} from '@/api/types/fable.types'
 import { getFactory } from '@/api/types/fable.types'
 import { API_ENDPOINTS } from '@/api/endpoints'
 
@@ -30,16 +33,17 @@ interface SavedFableEntry {
   updated_at: string
 }
 
-const savedFablesState: Record<string, SavedFableEntry | undefined> = Object.fromEntries(
-  Object.entries(mockSavedFables).map(([id, entry]) => [
-    id,
-    {
-      ...entry,
-      display_name: entry.name,
-      display_description: '',
-    },
-  ]),
-)
+const savedFablesState: Record<string, SavedFableEntry | undefined> =
+  Object.fromEntries(
+    Object.entries(mockSavedFables).map(([id, entry]) => [
+      id,
+      {
+        ...entry,
+        display_name: entry.name,
+        display_description: '',
+      },
+    ]),
+  )
 let fableIdCounter = 100
 const fableVersions: Record<string, number> = Object.fromEntries(
   Object.keys(mockSavedFables).map((id) => [id, 1]),
