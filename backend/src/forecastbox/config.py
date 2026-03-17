@@ -235,10 +235,14 @@ class BackendAPISettings(BaseModel):
 
 
 class CascadeSettings(BaseModel):
+    default_hosts: int = 1
+    """Default number of hosts for Cascade if unspecified in a job."""
     max_hosts: int = 1
-    """Number of hosts for Cascade."""
+    """Max number of hosts for Cascade."""
+    default_workers_per_host: int = 2
+    """Default number of workers per hosts for Cascade if unspecified in a job."""
     max_workers_per_host: int = 8
-    """Number of workers per host for Cascade."""
+    """Max number of workers per host for Cascade."""
     cascade_url: str = "tcp://localhost:8067"
     """Base URL for the Cascade API."""
     log_collection_max_size: int = 1000

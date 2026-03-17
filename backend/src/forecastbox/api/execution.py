@@ -105,8 +105,8 @@ def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobRespons
 
     environment = spec.environment
 
-    hosts = min(config.cascade.max_hosts, environment.hosts or config.cascade.max_hosts)
-    workers_per_host = min(config.cascade.max_workers_per_host, environment.workers_per_host or config.cascade.max_workers_per_host)
+    hosts = min(config.cascade.max_hosts, environment.hosts or config.cascade.default_hosts)
+    workers_per_host = min(config.cascade.max_workers_per_host, environment.workers_per_host or config.cascade.default_workers_per_host)
 
     env_vars = {"TMPDIR": config.cascade.venv_temp_dir}
 
