@@ -23,7 +23,7 @@ import threading
 from typing import cast
 
 import forecastbox.db.jobs2 as db_jobs2
-from forecastbox.api.execution import execute, execute_experiment_run
+from forecastbox.api.execution import execute_experiment_run, execute_v1
 from forecastbox.api.scheduling.dt_utils import calculate_next_run
 from forecastbox.api.scheduling.job_utils import experiment2runnable, schedule2runnable
 from forecastbox.config import config
@@ -63,7 +63,7 @@ class SchedulerThread(threading.Thread):
         self.liveness_signal.set()
         return self.liveness_timestamp
 
-    async def _try_schedule(self) -> int:
+    async def _try_schedule_v1(self) -> int:
         now = self.mark_alive()
         logger.debug(f"Scheduler inquiry at {now}")
 
@@ -90,7 +90,7 @@ class SchedulerThread(threading.Thread):
                         schedule_id_str, scheduled_at_dt, job_id=None, trigger="cron_skipped", attempt_cnt=get_spec_result.t.attempt_cnt
                     )
                 else:
-                    exec_result = await execute(get_spec_result.t.exec_spec, get_spec_result.t.created_by)
+                    exec_result = await execute_v1(get_spec_result.t.exec_spec, get_spec_result.t.created_by)
                     if exec_result.t is not None:
                         logger.debug(f"Job {exec_result.t.id} submitted for schedule {schedule_id_str}")
                         await insert_schedule_run(
@@ -110,7 +110,7 @@ class SchedulerThread(threading.Thread):
                     logger.warning(f"No next run for {schedule_id_str}, not scheduling")
                     # logging as warning because its not expected rn, but presumably we'll supported bounded-ocurrence schedules eventually
 
-        await self._try_schedule_v2(now)
+        await self._try_schedule(now)
 
         next_schedulable_at_v1 = await next_schedulable()
         next_schedulable_at_v2 = await db_jobs2.next_schedulable_experiment()
@@ -127,7 +127,7 @@ class SchedulerThread(threading.Thread):
 
         return sleep_duration
 
-    async def _try_schedule_v2(self, now: dt.datetime) -> None:
+    async def _try_schedule(self, now: dt.datetime) -> None:
         """Check and submit due v2 (ExperimentDefinition) scheduled runs."""
         schedulable = await db_jobs2.get_schedulable_experiments(now)
 
@@ -172,7 +172,7 @@ class SchedulerThread(threading.Thread):
     async def _run(self):
         while not self.stop_event.is_set():
             with scheduler_lock:
-                sleep_duration = await self._try_schedule()
+                sleep_duration = await self._try_schedule_v1()
 
             if sleep_duration > 0:
                 with self.sleep_condition:

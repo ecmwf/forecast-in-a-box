@@ -62,7 +62,7 @@ def expand_fable(fable: FableBuilder) -> FableValidationExpansion:
 
 
 @router.post("/upsert_v2")
-async def upsert_fable_builder_v2(
+async def upsert_fable_builder(
     payload: FableSaveV2Request,
     fable_id: Optional[str] = None,
     user: UserRead | None = Depends(current_active_user),
@@ -97,7 +97,7 @@ async def upsert_fable_builder_v2(
 
 
 @router.get("/retrieve_v2")
-async def retrieve_fable_builder_v2(
+async def retrieve_fable_builder(
     fable_id: str,
     version: Optional[int] = None,
 ) -> FableRetrieveV2Response:
@@ -125,7 +125,7 @@ async def retrieve_fable_builder_v2(
 
 
 @router.put("/compile_v2")
-async def compile_fable_v2(request: FableCompileV2Request) -> ExecutionSpecification:
+async def compile_fable(request: FableCompileV2Request) -> ExecutionSpecification:
     """Load a saved builder from the v2 store by reference and compile it to an ExecutionSpecification.
 
     If `version` is omitted the latest non-deleted version is used. The returned

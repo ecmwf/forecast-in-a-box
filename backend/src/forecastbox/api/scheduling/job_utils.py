@@ -189,7 +189,7 @@ async def experiment2runnable(experiment_id: str, exec_time: dt.datetime) -> Eit
         return Either.error(repr(e))
 
 
-async def rerun2runnable_v2(execution_id: str) -> Either[RunnableExperiment, str]:  # type: ignore[invalid-argument]
+async def rerun2runnable(execution_id: str) -> Either[RunnableExperiment, str]:  # type: ignore[invalid-argument]
     """Build a RunnableExperiment for a re-run of an existing v2 scheduled JobExecution.
 
     Retrieves the original execution's runtime context to preserve the scheduled_at

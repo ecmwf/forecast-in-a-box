@@ -7,14 +7,14 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Unit tests for experiment2runnable and rerun2runnable_v2 conversion helpers."""
+"""Unit tests for experiment2runnable and rerun2runnable conversion helpers."""
 
 import datetime as dt
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from forecastbox.api.scheduling.job_utils import RunnableExperiment, experiment2runnable, rerun2runnable_v2
+from forecastbox.api.scheduling.job_utils import RunnableExperiment, experiment2runnable, rerun2runnable
 from forecastbox.api.types.jobs import ExecutionSpecification
 
 
@@ -151,10 +151,10 @@ async def test_experiment2runnable_dynamic_expr_applied(mock_compile, mock_get_j
 
 @pytest.mark.asyncio
 @patch("forecastbox.api.scheduling.job_utils.db_jobs2.get_job_execution", new_callable=AsyncMock)
-async def test_rerun2runnable_v2_execution_not_found(mock_get_exec):
+async def test_rerun2runnable_execution_not_found(mock_get_exec):
     mock_get_exec.return_value = None
 
-    result = await rerun2runnable_v2("exec-99")
+    result = await rerun2runnable("exec-99")
 
     assert result.t is None
     assert result.e is not None
@@ -163,12 +163,12 @@ async def test_rerun2runnable_v2_execution_not_found(mock_get_exec):
 
 @pytest.mark.asyncio
 @patch("forecastbox.api.scheduling.job_utils.db_jobs2.get_job_execution", new_callable=AsyncMock)
-async def test_rerun2runnable_v2_no_experiment_link(mock_get_exec):
+async def test_rerun2runnable_no_experiment_link(mock_get_exec):
     execution = MagicMock()
     execution.experiment_id = None
     mock_get_exec.return_value = execution
 
-    result = await rerun2runnable_v2("exec-1")
+    result = await rerun2runnable("exec-1")
 
     assert result.t is None
     assert result.e is not None
@@ -180,7 +180,7 @@ async def test_rerun2runnable_v2_no_experiment_link(mock_get_exec):
 @patch("forecastbox.api.scheduling.job_utils.db_jobs2.get_experiment_definition", new_callable=AsyncMock)
 @patch("forecastbox.api.scheduling.job_utils.db_jobs2.get_job_definition", new_callable=AsyncMock)
 @patch("forecastbox.api.scheduling.job_utils.api_fable.compile")
-async def test_rerun2runnable_v2_success(mock_compile, mock_get_jd, mock_get_exp, mock_get_exec):
+async def test_rerun2runnable_success(mock_compile, mock_get_jd, mock_get_exp, mock_get_exec):
     original_time = dt.datetime(2026, 1, 1, 6, 0)
     execution = MagicMock()
     execution.experiment_id = "exp-1"
@@ -199,7 +199,7 @@ async def test_rerun2runnable_v2_success(mock_compile, mock_get_jd, mock_get_exp
     exec_spec = _make_exec_spec()
     mock_compile.return_value = exec_spec
 
-    result = await rerun2runnable_v2("exec-1")
+    result = await rerun2runnable("exec-1")
 
     assert result.e is None
     assert result.t is not None

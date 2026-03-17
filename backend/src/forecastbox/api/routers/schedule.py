@@ -111,7 +111,7 @@ def _experiment_to_v2_response(exp: ExperimentDefinition) -> ScheduleDefinitionV
 
 
 @router.get("/list_v2")
-async def list_schedules_v2(
+async def list_schedules(
     user: UserRead = Depends(current_active_user),
     page: int = 1,
     page_size: int = 10,
@@ -132,7 +132,7 @@ async def list_schedules_v2(
 
 
 @router.put("/create_v2")
-async def create_schedule_v2(
+async def create_schedule(
     schedule_spec: ScheduleSpecificationV2, user: UserRead | None = Depends(current_active_user)
 ) -> CreateScheduleV2Response:
     try:
@@ -173,7 +173,7 @@ async def create_schedule_v2(
 
 
 @router.get("/get_v2")
-async def get_schedule_v2(experiment_id: str, user: UserRead = Depends(current_active_user)) -> ScheduleDefinitionV2Response:
+async def get_schedule(experiment_id: str, user: UserRead = Depends(current_active_user)) -> ScheduleDefinitionV2Response:
     exp_def = await db_jobs2.get_experiment_definition(experiment_id)
     if exp_def is None or exp_def.experiment_type != "cron_schedule":
         raise HTTPException(status_code=404, detail=f"Schedule {experiment_id} not found")
@@ -181,7 +181,7 @@ async def get_schedule_v2(experiment_id: str, user: UserRead = Depends(current_a
 
 
 @router.post("/update_v2")
-async def update_schedule_v2(
+async def update_schedule(
     experiment_id: str, update: ScheduleUpdateV2, user: UserRead = Depends(current_active_user)
 ) -> ScheduleDefinitionV2Response:
     with scheduler_lock:  # NOTE this may block the async pool a bit!
@@ -241,7 +241,7 @@ async def update_schedule_v2(
 
 
 @router.get("/next_run_v2")
-async def get_next_run_v2(experiment_id: str, user: UserRead = Depends(current_active_user)) -> str:
+async def get_next_run(experiment_id: str, user: UserRead = Depends(current_active_user)) -> str:
     exp_def = await db_jobs2.get_experiment_definition(experiment_id)
     if exp_def is None or exp_def.experiment_type != "cron_schedule":
         raise HTTPException(status_code=404, detail=f"Schedule {experiment_id} not found")
@@ -252,7 +252,7 @@ async def get_next_run_v2(experiment_id: str, user: UserRead = Depends(current_a
 
 
 @router.get("/runs_v2")
-async def get_schedule_runs_v2(
+async def get_schedule_runs(
     experiment_id: str,
     user: UserRead = Depends(current_active_user),
     page: int = 1,

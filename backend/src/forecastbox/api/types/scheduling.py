@@ -56,26 +56,3 @@ class ScheduleSpecification(BaseModel):
     """Cron expression for time scheduling"""
     max_acceptable_delay_hours: PositiveInt
     """Maximum acceptable delay in hours for a scheduled run. If the scheduler is down for longer than this, the run will be skipped."""
-
-
-class ScheduleUpdate(BaseModel):
-    exec_spec: ExecutionSpecification | None = None
-    dynamic_expr: dict[str, str] | None = None
-    enabled: bool | None = None
-    cron_expr: str | None = None
-    max_acceptable_delay_hours: PositiveInt | None = None
-
-
-def schedule2db(schedule_obj: ScheduleSpecification | ScheduleUpdate) -> dict[str, Any]:
-    data = {}
-    if schedule_obj.exec_spec is not None:
-        data["exec_spec"] = schedule_obj.exec_spec.model_dump_json()
-    if schedule_obj.dynamic_expr is not None:
-        data["dynamic_expr"] = orjson.dumps(schedule_obj.dynamic_expr).decode("ascii")
-    if schedule_obj.cron_expr is not None:
-        data["cron_expr"] = schedule_obj.cron_expr
-    if hasattr(schedule_obj, "enabled") and schedule_obj.enabled is not None:
-        data["enabled"] = schedule_obj.enabled
-    if hasattr(schedule_obj, "max_acceptable_delay_hours") and schedule_obj.max_acceptable_delay_hours is not None:
-        data["max_acceptable_delay_hours"] = schedule_obj.max_acceptable_delay_hours
-    return data

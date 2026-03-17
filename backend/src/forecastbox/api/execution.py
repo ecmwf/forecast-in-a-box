@@ -134,7 +134,7 @@ class SubmitJobResponse(BaseModel):
     """Id of the submitted job."""
 
 
-async def execute(spec: ExecutionSpecification, user_id: str | None) -> Either[SubmitJobResponse, str]:  # type: ignore[invalid-argument] # NOTE type checker issue
+async def execute_v1(spec: ExecutionSpecification, user_id: str | None) -> Either[SubmitJobResponse, str]:  # type: ignore[invalid-argument] # NOTE type checker issue
     try:
         loop = asyncio.get_running_loop()
         response, product_to_id_mappings = await loop.run_in_executor(None, _execute_cascade, spec)  # CPU-bound
@@ -156,7 +156,7 @@ async def execute(spec: ExecutionSpecification, user_id: str | None) -> Either[S
 
 
 async def execute2response(spec: ExecutionSpecification, user: UserRead | None) -> SubmitJobResponse:
-    result = await execute(spec, str(user.id) if user is not None else None)
+    result = await execute_v1(spec, str(user.id) if user is not None else None)
     if result.t is None:
         raise HTTPException(status_code=500, detail=f"Failed to execute because of {result.e}")
     else:
@@ -168,7 +168,7 @@ async def get_job_definition_for_execution(definition_id: str, definition_versio
     return await db_jobs2.get_job_definition(definition_id, definition_version)
 
 
-async def get_job_execution_specification_v2(execution_id: str, attempt_count: int | None) -> JobSpecification | None:
+async def get_job_execution_specification(execution_id: str, attempt_count: int | None) -> JobSpecification | None:
     """Return the JobSpecification for the given execution attempt (latest if attempt_count is None)."""
     execution = await db_jobs2.get_job_execution(execution_id, attempt_count)
     if execution is None:
@@ -187,7 +187,7 @@ async def get_job_execution_specification_v2(execution_id: str, attempt_count: i
     )
 
 
-async def restart_job_execution_v2(execution_id: str, user_id: str | None) -> Either[JobExecuteV2Response, str]:  # type: ignore[invalid-argument]
+async def restart_job_execution(execution_id: str, user_id: str | None) -> Either[JobExecuteV2Response, str]:  # type: ignore[invalid-argument]
     """Create a new attempt under an existing execution_id, re-running its linked JobDefinition."""
     existing = await db_jobs2.get_job_execution(execution_id)
     if existing is None:
@@ -199,8 +199,8 @@ async def restart_job_execution_v2(execution_id: str, user_id: str | None) -> Ei
     if definition is None:
         return Either.error(f"JobDefinition {definition_id!r} v{definition_version} not found")
 
-    # Reuse execute_v2 with the existing execution_id so the new attempt is appended under it
-    result = await execute_v2(definition, user_id, execution_id=execution_id)
+    # Reuse execute with the existing execution_id so the new attempt is appended under it
+    result = await execute(definition, user_id, execution_id=execution_id)
     return result
 
 
@@ -220,7 +220,7 @@ def execution_to_detail(execution: JobExecution) -> JobExecutionDetail:
     )
 
 
-async def poll_and_update_execution_v2(execution_id: str, attempt_count: int | None) -> JobExecutionDetail | None:
+async def poll_and_update_execution(execution_id: str, attempt_count: int | None) -> JobExecutionDetail | None:
     """Fetch a JobExecution, poll cascade if active, update db, and return current detail.
 
     Returns None if the execution is not found.
@@ -278,7 +278,7 @@ async def poll_and_update_execution_v2(execution_id: str, attempt_count: int | N
     return _build()
 
 
-async def execute_v2(definition: JobDefinition, user_id: str | None, execution_id: str | None = None) -> Either[JobExecuteV2Response, str]:  # type: ignore[invalid-argument]
+async def execute(definition: JobDefinition, user_id: str | None, execution_id: str | None = None) -> Either[JobExecuteV2Response, str]:  # type: ignore[invalid-argument]
     """v2 execute path: always creates a JobExecution linked to the given JobDefinition.
 
     Compiles the definition's blocks via the fable compiler, submits the resulting

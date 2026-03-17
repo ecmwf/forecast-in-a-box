@@ -26,12 +26,12 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 import forecastbox.db.jobs2 as db_jobs2
 from forecastbox.api.execution import (
     ProductToOutputId,
-    execute_v2,
+    execute,
     execution_to_detail,
     get_job_definition_for_execution,
-    get_job_execution_specification_v2,
-    poll_and_update_execution_v2,
-    restart_job_execution_v2,
+    get_job_execution_specification,
+    poll_and_update_execution,
+    restart_job_execution,
 )
 from forecastbox.api.routers.gateway import Globals
 from forecastbox.api.types.jobs import (
@@ -132,7 +132,7 @@ async def execute_v2_api(request: JobExecuteV2Request, user: UserRead | None = D
     if definition is None:
         raise HTTPException(status_code=404, detail=f"JobDefinition {request.job_definition_id!r} not found")
     user_id = str(user.id) if user is not None else None
-    result = await execute_v2(definition, user_id)
+    result = await execute(definition, user_id)
     if result.t is None:
         raise HTTPException(status_code=500, detail=f"Failed to execute because of {result.e}")
     return result.t
@@ -144,7 +144,7 @@ async def execute_v2_api(request: JobExecuteV2Request, user: UserRead | None = D
 
 
 @router.get("/status_v2")
-async def get_status_v2(
+async def get_status(
     user: UserRead = Depends(current_active_user),
     page: int = 1,
     page_size: int = 10,
@@ -166,20 +166,20 @@ async def get_status_v2(
 
 
 @router.get("/{execution_id}/status_v2")
-async def get_status_of_execution_v2(
+async def get_status_of_execution(
     execution_id: str,
     attempt_count: int | None = None,
     user: UserRead = Depends(current_active_user),
 ) -> JobExecutionDetail:
     """Get status for a specific v2 execution; defaults to the latest attempt."""
-    detail = await poll_and_update_execution_v2(execution_id, attempt_count)
+    detail = await poll_and_update_execution(execution_id, attempt_count)
     if detail is None:
         raise HTTPException(status_code=404, detail=f"JobExecution {execution_id!r} not found.")
     return detail
 
 
 @router.get("/{execution_id}/outputs_v2")
-async def get_outputs_of_execution_v2(
+async def get_outputs_of_execution(
     execution_id: str,
     attempt_count: int | None = None,
     user: UserRead = Depends(current_active_user),
@@ -195,26 +195,26 @@ async def get_outputs_of_execution_v2(
 
 
 @router.get("/{execution_id}/specification_v2")
-async def get_specification_of_execution_v2(
+async def get_specification_of_execution(
     execution_id: str,
     attempt_count: int | None = None,
     user: UserRead = Depends(current_active_user),
 ) -> JobSpecification:
     """Get the linked JobDefinition specification for a v2 execution attempt."""
-    spec = await get_job_execution_specification_v2(execution_id, attempt_count)
+    spec = await get_job_execution_specification(execution_id, attempt_count)
     if spec is None:
         raise HTTPException(status_code=404, detail=f"JobExecution {execution_id!r} or its definition not found.")
     return spec
 
 
 @router.post("/{execution_id}/restart_v2")
-async def restart_execution_v2(
+async def restart_execution(
     execution_id: str,
     user: UserRead | None = Depends(current_active_user),
 ) -> JobExecuteV2Response:
     """Create a new attempt of an existing v2 execution under the same logical id."""
     user_id = str(user.id) if user is not None else None
-    result = await restart_job_execution_v2(execution_id, user_id)
+    result = await restart_job_execution(execution_id, user_id)
     if result.t is None:
         raise HTTPException(status_code=500, detail=f"Failed to restart: {result.e}")
     return result.t
@@ -232,7 +232,7 @@ async def _id2cascExecution(execution_id: str, attempt_count: int | None = None)
 
 
 @router.get("/{execution_id}/available_v2")
-async def get_job_availability_v2(
+async def get_job_availability(
     execution_id: str, attempt_count: int | None = None, user: UserRead = Depends(current_active_user)
 ) -> list[TaskId]:
     """Check which results are available for a given v2 execution."""
@@ -246,7 +246,7 @@ async def get_job_availability_v2(
 
 
 @router.get("/{execution_id}/results_v2")
-async def get_result_v2(
+async def get_result(
     execution_id: str,
     attempt_count: int | None = None,
     dataset_id: TaskId = Depends(validate_dataset_id),
@@ -273,7 +273,7 @@ async def get_result_v2(
 
 
 @router.get("/{job_id}/logs_v2")
-async def get_logs_v2(execution_id: str, attempt_count: int | None = None, user: UserRead = Depends(current_active_user)) -> Response:
+async def get_logs(execution_id: str, attempt_count: int | None = None, user: UserRead = Depends(current_active_user)) -> Response:
     db_entity, cascade_job_id = await _id2cascExecution(execution_id, attempt_count)
     return await _get_logs(cascade_job_id, orjson.dumps(db_entity))
 
