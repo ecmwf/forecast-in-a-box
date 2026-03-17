@@ -20,7 +20,7 @@ from forecastbox.api.scheduling.scheduler_thread import (
     prod_scheduler,
     scheduler_lock,
 )
-from forecastbox.api.types.scheduling import ScheduleSpecificationV2, ScheduleUpdateV2
+from forecastbox.api.types.scheduling import ScheduleSpecification, ScheduleUpdate
 from forecastbox.auth.users import current_active_user
 from forecastbox.schemas.jobs2 import ExperimentDefinition
 from forecastbox.schemas.user import UserRead
@@ -133,7 +133,7 @@ async def list_schedules(
 
 @router.put("/create")
 async def create_schedule(
-    schedule_spec: ScheduleSpecificationV2, user: UserRead | None = Depends(current_active_user)
+    schedule_spec: ScheduleSpecification, user: UserRead | None = Depends(current_active_user)
 ) -> CreateScheduleV2Response:
     try:
         parse_crontab(schedule_spec.cron_expr)
@@ -182,7 +182,7 @@ async def get_schedule(experiment_id: str, user: UserRead = Depends(current_acti
 
 @router.post("/update")
 async def update_schedule(
-    experiment_id: str, update: ScheduleUpdateV2, user: UserRead = Depends(current_active_user)
+    experiment_id: str, update: ScheduleUpdate, user: UserRead = Depends(current_active_user)
 ) -> ScheduleDefinitionV2Response:
     with scheduler_lock:  # NOTE this may block the async pool a bit!
         current = await db_jobs2.get_experiment_definition(experiment_id)

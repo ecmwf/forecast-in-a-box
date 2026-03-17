@@ -14,11 +14,9 @@ from typing import Any
 import orjson
 from pydantic import BaseModel, PositiveInt
 
-from forecastbox.api.types.jobs import ExecutionSpecification
 
-
-class ScheduleSpecificationV2(BaseModel):
-    """Create request for a v2 cron schedule backed by a persisted JobDefinition."""
+class ScheduleSpecification(BaseModel):
+    """Create request for a cron schedule backed by a persisted JobDefinition."""
 
     job_definition_id: str
     """ID of an existing JobDefinition to execute on each tick."""
@@ -35,24 +33,10 @@ class ScheduleSpecificationV2(BaseModel):
     tags: list[str] | None = None
 
 
-class ScheduleUpdateV2(BaseModel):
-    """Update request for a v2 cron schedule. All fields are optional."""
+class ScheduleUpdate(BaseModel):
+    """Update request for a cron schedule. All fields are optional."""
 
     cron_expr: str | None = None
     enabled: bool | None = None
     dynamic_expr: dict[str, str] | None = None
     max_acceptable_delay_hours: PositiveInt | None = None
-
-
-class ScheduleSpecification(BaseModel):
-    exec_spec: ExecutionSpecification
-    """The static part of the job, ie, what remains constant across executions"""
-    dynamic_expr: dict[str, str]
-    """Evaluated at each invocation, with keys pointing to paths in the job_spec,
-    and values being dynamic expressions to be injected. Supported expressions:
-    - `$schedule_datetime` -- like '20241012T00'
-    """  # TODO support smth like argo expression language here
-    cron_expr: str
-    """Cron expression for time scheduling"""
-    max_acceptable_delay_hours: PositiveInt
-    """Maximum acceptable delay in hours for a scheduled run. If the scheduler is down for longer than this, the run will be skipped."""

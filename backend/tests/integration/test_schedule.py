@@ -16,7 +16,7 @@ import datetime as dt
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
 from forecastbox.api.types.fable import FableBuilder, FableSaveV2Request
-from forecastbox.api.types.scheduling import ScheduleSpecificationV2, ScheduleUpdateV2
+from forecastbox.api.types.scheduling import ScheduleSpecification, ScheduleUpdate
 
 # *** helpers **
 
@@ -38,7 +38,7 @@ def _save_fable(client) -> tuple[str, int]:
 
 def _create_schedule_v2(client, job_def_id: str, job_def_version: int, cron_expr: str = "0 0 * * *") -> str:
     """Create a v2 cron schedule and return experiment_id."""
-    spec = ScheduleSpecificationV2(
+    spec = ScheduleSpecification(
         job_definition_id=job_def_id,
         job_definition_version=job_def_version,
         cron_expr=cron_expr,
@@ -64,7 +64,7 @@ def test_schedule_v2_crud(backend_client_with_auth):
     assert response.status_code == 404
 
     # create
-    spec = ScheduleSpecificationV2(
+    spec = ScheduleSpecification(
         job_definition_id=job_def_id,
         job_definition_version=job_def_version,
         cron_expr="0 0 * * *",
@@ -88,7 +88,7 @@ def test_schedule_v2_crud(backend_client_with_auth):
 
     # update cron and enabled
     updated_cron = "0 1 * * *"
-    update = ScheduleUpdateV2(cron_expr=updated_cron, enabled=False)
+    update = ScheduleUpdate(cron_expr=updated_cron, enabled=False)
     response = backend_client_with_auth.post(
         "/schedule/update", params={"experiment_id": experiment_id}, headers=headers, json=update.model_dump(exclude_unset=True)
     )
@@ -115,12 +115,12 @@ def test_schedule_v2_list(backend_client_with_auth):
     assert response.is_success, response.text
     baseline_total = response.json()["total"]
 
-    spec1 = ScheduleSpecificationV2(
+    spec1 = ScheduleSpecification(
         job_definition_id=job_def_id,
         job_definition_version=job_def_version,
         cron_expr="0 0 * * *",
     )
-    spec2 = ScheduleSpecificationV2(
+    spec2 = ScheduleSpecification(
         job_definition_id=job_def_id,
         job_definition_version=job_def_version,
         cron_expr="0 6 * * *",
@@ -162,7 +162,7 @@ def test_schedule_v2_next_run(backend_client_with_auth):
     headers = {"Content-Type": "application/json"}
     job_def_id, job_def_version = _save_fable(backend_client_with_auth)
 
-    spec = ScheduleSpecificationV2(
+    spec = ScheduleSpecification(
         job_definition_id=job_def_id,
         job_definition_version=job_def_version,
         cron_expr="0 0 * * *",
@@ -178,7 +178,7 @@ def test_schedule_v2_next_run(backend_client_with_auth):
     assert "00:00:00" in initial_next_run
 
     # update cron to 2 AM
-    update = ScheduleUpdateV2(cron_expr="0 2 * * *")
+    update = ScheduleUpdate(cron_expr="0 2 * * *")
     response = backend_client_with_auth.post(
         "/schedule/update", params={"experiment_id": experiment_id}, headers=headers, json=update.model_dump(exclude_unset=True)
     )
@@ -191,7 +191,7 @@ def test_schedule_v2_next_run(backend_client_with_auth):
     assert "02:00:00" in updated_next_run
 
     # disable: next run should be cleared
-    disable_update = ScheduleUpdateV2(enabled=False)
+    disable_update = ScheduleUpdate(enabled=False)
     response = backend_client_with_auth.post(
         "/schedule/update", params={"experiment_id": experiment_id}, headers=headers, json=disable_update.model_dump(exclude_unset=True)
     )
@@ -207,7 +207,7 @@ def test_schedule_v2_create_invalid_cron(backend_client_with_auth):
     headers = {"Content-Type": "application/json"}
     job_def_id, job_def_version = _save_fable(backend_client_with_auth)
 
-    spec = ScheduleSpecificationV2(
+    spec = ScheduleSpecification(
         job_definition_id=job_def_id,
         job_definition_version=job_def_version,
         cron_expr="not a cron",
@@ -219,7 +219,7 @@ def test_schedule_v2_create_invalid_cron(backend_client_with_auth):
 def test_schedule_v2_create_unknown_job_definition(backend_client_with_auth):
     """create_v2 referencing a non-existent JobDefinition returns 404."""
     headers = {"Content-Type": "application/json"}
-    spec = ScheduleSpecificationV2(
+    spec = ScheduleSpecification(
         job_definition_id="does-not-exist",
         cron_expr="0 0 * * *",
     )
