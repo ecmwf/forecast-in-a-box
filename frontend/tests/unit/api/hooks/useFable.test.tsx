@@ -22,7 +22,6 @@ import {
   fableKeys,
   useBlockCatalogue,
   useBlockFactory,
-  useCompileFable,
   useCompileFableV2,
   useExpandFable,
   useFable,
@@ -393,64 +392,6 @@ describe('useFableValidation', () => {
 
     await expect.element(screen.getByTestId('status')).toHaveTextContent('idle')
     expect(fetchCalled).toBe(false)
-  })
-})
-
-describe('useCompileFable', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  afterEach(() => {
-    worker.resetHandlers()
-  })
-
-  it('compiles fable successfully', async () => {
-    const mockCompiled = {
-      job: {
-        job_type: 'raw_cascade_job',
-        job_instance: { tasks: {}, edges: [] },
-      },
-      environment: {
-        hosts: null,
-        workers_per_host: null,
-        environment_variables: {},
-      },
-      shared: false,
-    }
-
-    worker.use(
-      http.put(API_ENDPOINTS.fable.compile, () => {
-        return HttpResponse.json(mockCompiled)
-      }),
-    )
-
-    let mutationResult: ReturnType<typeof useCompileFable> | null = null
-
-    function TestComponent() {
-      const result = useCompileFable()
-      mutationResult = result
-      return (
-        <div>
-          <button
-            data-testid="compile"
-            onClick={() => result.mutate(mockFable)}
-          >
-            Compile
-          </button>
-          <div data-testid="status">{result.status}</div>
-        </div>
-      )
-    }
-
-    const screen = await renderWithQueryClient(<TestComponent />)
-
-    await screen.getByTestId('compile').click()
-
-    await expect
-      .element(screen.getByTestId('status'))
-      .toHaveTextContent('success')
-    expect(mutationResult!.data).toEqual(mockCompiled)
   })
 })
 

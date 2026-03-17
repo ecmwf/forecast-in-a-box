@@ -27,9 +27,6 @@ export { fetchConfigFromAPI, initializeConfig, refreshConfig } from './config'
 export {
   getCatalogue,
   expandFable,
-  compileFable,
-  retrieveFable,
-  upsertFable,
 } from './fable'
 
 // Status endpoints

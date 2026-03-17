@@ -61,12 +61,6 @@ export const API_ENDPOINTS = {
     catalogue: `${API_PREFIX}/fable/catalogue`,
     /** PUT - Expand a fable configuration */
     expand: `${API_PREFIX}/fable/expand`,
-    /** PUT - Compile a fable configuration (v1, inline builder body) */
-    compile: `${API_PREFIX}/fable/compile`,
-    /** GET - Retrieve a saved fable (v1, returns builder only) */
-    retrieve: `${API_PREFIX}/fable/retrieve`,
-    /** POST - Create or update a fable (v1) */
-    upsert: `${API_PREFIX}/fable/upsert`,
     /** GET - Retrieve a saved fable with metadata (v2) */
     retrieveV2: `${API_PREFIX}/fable/retrieve_v2`,
     /** POST - Create or update a fable with metadata (v2, returns { id, version }) */
@@ -145,27 +139,6 @@ export const API_ENDPOINTS = {
    * Job monitoring and execution endpoints
    */
   job: {
-    /** GET - Get paginated status of all jobs */
-    status: `${API_PREFIX}/job/status`,
-    /** GET - Get status of a single job */
-    statusById: (jobId: string) => `${API_PREFIX}/job/${jobId}/status`,
-    /** GET - Get job outputs (product-to-task mapping) */
-    outputs: (jobId: string) => `${API_PREFIX}/job/${jobId}/outputs`,
-    /** GET - Get job result data by task ID */
-    results: (jobId: string) => `${API_PREFIX}/job/${jobId}/results`,
-    /** GET - Get list of available output task IDs */
-    available: (jobId: string) => `${API_PREFIX}/job/${jobId}/available`,
-    /** GET - Download job logs as ZIP */
-    logs: (jobId: string) => `${API_PREFIX}/job/${jobId}/logs`,
-    /** GET - Get original job specification */
-    specification: (jobId: string) =>
-      `${API_PREFIX}/job/${jobId}/specification`,
-    /** POST - Restart a job */
-    restart: (jobId: string) => `${API_PREFIX}/job/${jobId}/restart`,
-    /** DELETE - Delete a job */
-    delete: (jobId: string) => `${API_PREFIX}/job/${jobId}`,
-    /** POST - Submit a job for execution */
-    execute: `${API_PREFIX}/job/execute`,
     /** POST - Submit a job for execution (v2, by definition id) */
     executeV2: `${API_PREFIX}/job/execute_v2`,
     /** GET - Get paginated status of all executions (v2) */
@@ -248,22 +221,6 @@ export const API_PATTERNS = {
     modifyEnabled: `${API_PREFIX}/plugin/modifyEnabled`,
   },
   job: {
-    /** Pattern: /api/v1/job/:jobId/status */
-    statusById: `${API_PREFIX}/job/:jobId/status`,
-    /** Pattern: /api/v1/job/:jobId/outputs */
-    outputs: `${API_PREFIX}/job/:jobId/outputs`,
-    /** Pattern: /api/v1/job/:jobId/results */
-    results: `${API_PREFIX}/job/:jobId/results`,
-    /** Pattern: /api/v1/job/:jobId/available */
-    available: `${API_PREFIX}/job/:jobId/available`,
-    /** Pattern: /api/v1/job/:jobId/logs */
-    logs: `${API_PREFIX}/job/:jobId/logs`,
-    /** Pattern: /api/v1/job/:jobId/specification */
-    specification: `${API_PREFIX}/job/:jobId/specification`,
-    /** Pattern: /api/v1/job/:jobId/restart */
-    restart: `${API_PREFIX}/job/:jobId/restart`,
-    /** Pattern: /api/v1/job/:jobId (DELETE) */
-    delete: `${API_PREFIX}/job/:jobId`,
     /** Pattern: /api/v1/job/:executionId/status_v2 */
     statusV2ById: `${API_PREFIX}/job/:executionId/status_v2`,
     /** Pattern: /api/v1/job/:executionId/outputs_v2 */

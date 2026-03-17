@@ -20,7 +20,6 @@ import type {
 } from '@/api/types/fable.types'
 import type { ExecutionSpecification } from '@/api/types/job.types'
 import {
-  compileFable,
   compileFableV2,
   expandFable,
   getCatalogue,
@@ -97,12 +96,6 @@ export function useFableValidation(
     staleTime: 10 * 1000, // 10 seconds
     refetchOnWindowFocus: false,
     retry: false, // Don't retry on validation errors
-  })
-}
-
-export function useCompileFable() {
-  return useMutation<ExecutionSpecification, Error, FableBuilderV1>({
-    mutationFn: compileFable,
   })
 }
 

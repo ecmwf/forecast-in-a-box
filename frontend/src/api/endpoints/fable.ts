@@ -28,7 +28,6 @@ import { apiClient } from '@/api/client'
 import { API_ENDPOINTS } from '@/api/endpoints'
 import {
   BlockFactoryCatalogueSchema,
-  FableBuilderV1Schema,
   FableRetrieveV2ResponseSchema,
   FableUpsertV2ResponseSchema,
   FableValidationExpansionSchema,
@@ -67,53 +66,6 @@ export async function expandFable(
   return apiClient.put(API_ENDPOINTS.fable.expand, fable, {
     schema: FableValidationExpansionSchema,
   })
-}
-
-/**
- * Compile a fable configuration
- */
-export async function compileFable(
-  fable: FableBuilderV1,
-): Promise<ExecutionSpecification> {
-  return apiClient.put(API_ENDPOINTS.fable.compile, fable)
-}
-
-/**
- * Retrieve a saved fable by ID
- */
-export async function retrieveFable(fableId: string): Promise<FableBuilderV1> {
-  return apiClient.get(API_ENDPOINTS.fable.retrieve, {
-    params: { fable_builder_id: fableId },
-    schema: FableBuilderV1Schema,
-  })
-}
-
-/**
- * Create or update a fable configuration
- */
-export async function upsertFable(
-  fable: FableBuilderV1,
-  fableId?: string,
-  tags: Array<string> = [],
-): Promise<string> {
-  const params: Record<string, string> = {}
-
-  if (fableId) {
-    params.fable_builder_id = fableId
-  }
-
-  if (tags.length > 0) {
-    params.tags = tags.join(',')
-  }
-
-  // Backend expects body wrapped in 'builder' key due to FastAPI parameter naming
-  return apiClient.post(
-    API_ENDPOINTS.fable.upsert,
-    { builder: fable },
-    {
-      params,
-    },
-  )
 }
 
 /**

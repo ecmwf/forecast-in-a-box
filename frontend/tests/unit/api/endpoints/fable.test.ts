@@ -13,13 +13,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { worker } from '@tests/../mocks/browser'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
 import {
-  compileFable,
   compileFableV2,
   expandFable,
   getCatalogue,
-  retrieveFable,
   retrieveFableV2,
-  upsertFable,
   upsertFableV2,
 } from '@/api/endpoints/fable'
 import { API_ENDPOINTS } from '@/api/endpoints'
@@ -146,131 +143,6 @@ describe('expandFable', () => {
 
     await expandFable(mockFable)
     expect(capturedBody).toEqual(mockFable)
-  })
-})
-
-describe('compileFable', () => {
-  afterEach(() => {
-    worker.resetHandlers()
-  })
-
-  it('compiles fable configuration', async () => {
-    const mockCompiled = {
-      job: {
-        job_type: 'raw_cascade_job',
-        job_instance: { tasks: {}, edges: [] },
-      },
-      environment: {
-        hosts: null,
-        workers_per_host: null,
-        environment_variables: {},
-      },
-      shared: false,
-    }
-
-    worker.use(
-      http.put(API_ENDPOINTS.fable.compile, () => {
-        return HttpResponse.json(mockCompiled)
-      }),
-    )
-
-    const result = await compileFable(mockFable)
-    expect(result).toEqual(mockCompiled)
-  })
-})
-
-describe('retrieveFable', () => {
-  afterEach(() => {
-    worker.resetHandlers()
-  })
-
-  it('retrieves fable by ID', async () => {
-    worker.use(
-      http.get(API_ENDPOINTS.fable.retrieve, () => {
-        return HttpResponse.json(mockFable)
-      }),
-    )
-
-    const result = await retrieveFable('fable-123')
-    expect(result.blocks).toBeDefined()
-    expect(Object.keys(result.blocks)).toHaveLength(1)
-  })
-
-  it('sends fable_builder_id as query parameter', async () => {
-    let capturedUrl: string | null = null
-
-    worker.use(
-      http.get(API_ENDPOINTS.fable.retrieve, ({ request }) => {
-        capturedUrl = request.url
-        return HttpResponse.json(mockFable)
-      }),
-    )
-
-    await retrieveFable('fable-456')
-    expect(capturedUrl).toContain('fable_builder_id=fable-456')
-  })
-})
-
-describe('upsertFable', () => {
-  afterEach(() => {
-    worker.resetHandlers()
-  })
-
-  it('creates new fable without ID', async () => {
-    let capturedBody: unknown = null
-
-    worker.use(
-      http.post(API_ENDPOINTS.fable.upsert, async ({ request }) => {
-        capturedBody = await request.json()
-        return HttpResponse.json('new-fable-id')
-      }),
-    )
-
-    const result = await upsertFable(mockFable)
-    expect(result).toBe('new-fable-id')
-    expect(capturedBody).toEqual({ builder: mockFable })
-  })
-
-  it('updates existing fable with ID', async () => {
-    let capturedUrl: string | null = null
-
-    worker.use(
-      http.post(API_ENDPOINTS.fable.upsert, ({ request }) => {
-        capturedUrl = request.url
-        return HttpResponse.json('updated-fable-id')
-      }),
-    )
-
-    await upsertFable(mockFable, 'existing-id')
-    expect(capturedUrl).toContain('fable_builder_id=existing-id')
-  })
-
-  it('includes tags when provided', async () => {
-    let capturedUrl: string | null = null
-
-    worker.use(
-      http.post(API_ENDPOINTS.fable.upsert, ({ request }) => {
-        capturedUrl = request.url
-        return HttpResponse.json('tagged-fable-id')
-      }),
-    )
-
-    await upsertFable(mockFable, undefined, ['tag1', 'tag2'])
-    expect(capturedUrl).toContain('tags=tag1%2Ctag2')
-  })
-
-  it('does not include tags when empty array', async () => {
-    let capturedUrl: string | null = null
-
-    worker.use(
-      http.post(API_ENDPOINTS.fable.upsert, ({ request }) => {
-        capturedUrl = request.url
-        return HttpResponse.json('fable-id')
-      }),
-    )
-
-    await upsertFable(mockFable, undefined, [])
-    expect(capturedUrl).not.toContain('tags=')
   })
 })
 
