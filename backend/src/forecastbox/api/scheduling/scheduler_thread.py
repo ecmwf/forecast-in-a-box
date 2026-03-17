@@ -65,7 +65,7 @@ class SchedulerThread(threading.Thread):
         for exp_next, _exp_def in schedulable:
             experiment_id = cast(str, exp_next.experiment_id)
             scheduled_at = cast(dt.datetime, exp_next.scheduled_at)
-            logger.debug(f"[v2] Processing scheduled experiment {experiment_id} at {scheduled_at}")
+            logger.debug(f"Processing scheduled experiment {experiment_id} at {scheduled_at}")
 
             get_spec_result = await experiment2runnable(experiment_id, scheduled_at)
 
@@ -73,7 +73,7 @@ class SchedulerThread(threading.Thread):
                 runnable = get_spec_result.t
                 if (now - scheduled_at).total_seconds() / 3600 > runnable.max_acceptable_delay_hours:
                     logger.warning(
-                        f"[v2] Skipping experiment {experiment_id} at {scheduled_at}: "
+                        f"Skipping experiment {experiment_id} at {scheduled_at}: "
                         f"older than max_acceptable_delay_hours ({runnable.max_acceptable_delay_hours} hours)."
                     )
                 else:
@@ -86,18 +86,18 @@ class SchedulerThread(threading.Thread):
                         compiler_runtime_context=runnable.compiler_runtime_context,
                     )
                     if exec_result.t is not None:
-                        logger.debug(f"[v2] Execution {exec_result.t.execution_id} submitted for experiment {experiment_id}")
+                        logger.debug(f"Execution {exec_result.t.execution_id} submitted for experiment {experiment_id}")
                     else:
-                        logger.error(f"[v2] Failed to submit experiment {experiment_id}: {exec_result.e}")
+                        logger.error(f"Failed to submit experiment {experiment_id}: {exec_result.e}")
 
                 await db_jobs.delete_experiment_next(experiment_id)
                 if runnable.next_run_at:
                     await db_jobs.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=runnable.next_run_at)
-                    logger.debug(f"[v2] Next run for {experiment_id}: {runnable.next_run_at}")
+                    logger.debug(f"Next run for {experiment_id}: {runnable.next_run_at}")
                 else:
-                    logger.warning(f"[v2] No next run computed for {experiment_id}")
+                    logger.warning(f"No next run computed for {experiment_id}")
             else:
-                logger.error(f"[v2] Could not create runnable for experiment {experiment_id}: {get_spec_result.e}")
+                logger.error(f"Could not create runnable for experiment {experiment_id}: {get_spec_result.e}")
                 await db_jobs.delete_experiment_next(experiment_id)
 
         next_schedulable_at = await db_jobs.next_schedulable_experiment()

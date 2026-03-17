@@ -60,7 +60,7 @@ class RunnableSchedule:
 
 @dataclass(frozen=True, eq=True, slots=True)
 class RunnableExperiment:
-    """Carries a compiled spec and all metadata needed to submit and track a v2 scheduled run."""
+    """Carries a compiled spec and all metadata needed to submit and track a scheduled run."""
 
     exec_spec: ExecutionSpecification
     created_by: str | None
@@ -129,7 +129,7 @@ async def experiment2runnable(experiment_id: str, exec_time: dt.datetime) -> Eit
 
 
 async def rerun2runnable(execution_id: str) -> Either[RunnableExperiment, str]:  # type: ignore[invalid-argument]
-    """Build a RunnableExperiment for a re-run of an existing v2 scheduled JobExecution.
+    """Build a RunnableExperiment for a re-run of an existing scheduled JobExecution.
 
     Retrieves the original execution's runtime context to preserve the scheduled_at
     date. The trigger is set to 'rerun' in compiler_runtime_context.

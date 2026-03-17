@@ -34,7 +34,7 @@ class FableValidationExpansion(BaseModel):
 
 
 class FableSaveRequest(BaseModel):
-    """Payload for saving a fable builder via the v2 persistence path."""
+    """Payload for saving a fable builder."""
 
     builder: FableBuilder
     display_name: str | None = None
@@ -44,14 +44,14 @@ class FableSaveRequest(BaseModel):
 
 
 class FableSaveResponse(BaseModel):
-    """Returned by upsert_v2; contains the stable id and the new version number."""
+    """Returned by upsert; contains the stable id and the new version number."""
 
     id: str
     version: int
 
 
 class FableRetrieveResponse(BaseModel):
-    """Full payload returned by retrieve_v2."""
+    """Full payload returned by retrieve."""
 
     id: str
     version: int
@@ -63,7 +63,7 @@ class FableRetrieveResponse(BaseModel):
 
 
 class FableCompileRequest(BaseModel):
-    """Reference to a saved JobDefinition for compile_v2."""
+    """Reference to a saved JobDefinition for compile."""
 
     id: str
     version: int | None = None

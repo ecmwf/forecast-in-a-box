@@ -110,8 +110,8 @@ async def _get_logs(cascade_job_id: str, db_entity_ser: bytes) -> Response:
 
 
 @router.post("/execute")
-async def execute_v2_api(request: JobExecuteRequest, user: UserRead | None = Depends(current_active_user)) -> JobExecuteResponse:
-    """Execute a job via the v2 persistence path.
+async def execute_api(request: JobExecuteRequest, user: UserRead | None = Depends(current_active_user)) -> JobExecuteResponse:
+    """Execute a job
 
     Loads the referenced JobDefinition from the jobs store, compiles it, and
     submits it to cascade, always creating a linked JobExecution row.
@@ -139,7 +139,7 @@ async def execute_v2_api(request: JobExecuteRequest, user: UserRead | None = Dep
 
 
 # ---------------------------------------------------------------------------
-# v2 read endpoints
+# read endpoints
 # ---------------------------------------------------------------------------
 
 
@@ -149,7 +149,7 @@ async def get_status(
     page: int = 1,
     page_size: int = 10,
 ) -> JobExecutionList:
-    """List the latest attempt of every v2 job execution, with pagination."""
+    """List the latest attempt of every job execution, with pagination."""
     if page < 1 or page_size < 1:
         raise HTTPException(status_code=400, detail="Page and page_size must be greater than 0.")
 
@@ -171,7 +171,7 @@ async def get_status_of_execution(
     attempt_count: int | None = None,
     user: UserRead = Depends(current_active_user),
 ) -> JobExecutionDetail:
-    """Get status for a specific v2 execution; defaults to the latest attempt."""
+    """Get status for a specific execution; defaults to the latest attempt."""
     detail = await poll_and_update_execution(execution_id, attempt_count)
     if detail is None:
         raise HTTPException(status_code=404, detail=f"JobExecution {execution_id!r} not found.")
@@ -184,7 +184,7 @@ async def get_outputs_of_execution(
     attempt_count: int | None = None,
     user: UserRead = Depends(current_active_user),
 ) -> list[ProductToOutputId]:
-    """Get outputs for a specific v2 execution; defaults to the latest attempt."""
+    """Get outputs for a specific execution; defaults to the latest attempt."""
     execution = await db_jobs.get_job_execution(execution_id, attempt_count)
     if execution is None:
         raise HTTPException(status_code=404, detail=f"JobExecution {execution_id!r} not found.")
@@ -200,7 +200,7 @@ async def get_specification_of_execution(
     attempt_count: int | None = None,
     user: UserRead = Depends(current_active_user),
 ) -> JobSpecification:
-    """Get the linked JobDefinition specification for a v2 execution attempt."""
+    """Get the linked JobDefinition specification for a execution attempt."""
     spec = await get_job_execution_specification(execution_id, attempt_count)
     if spec is None:
         raise HTTPException(status_code=404, detail=f"JobExecution {execution_id!r} or its definition not found.")
@@ -212,7 +212,7 @@ async def restart_execution(
     execution_id: str,
     user: UserRead | None = Depends(current_active_user),
 ) -> JobExecuteResponse:
-    """Create a new attempt of an existing v2 execution under the same logical id."""
+    """Create a new attempt of an existing execution under the same logical id."""
     user_id = str(user.id) if user is not None else None
     result = await restart_job_execution(execution_id, user_id)
     if result.t is None:
@@ -235,7 +235,7 @@ async def _id2cascExecution(execution_id: str, attempt_count: int | None = None)
 async def get_job_availability(
     execution_id: str, attempt_count: int | None = None, user: UserRead = Depends(current_active_user)
 ) -> list[TaskId]:
-    """Check which results are available for a given v2 execution."""
+    """Check which results are available for a given execution."""
     _, cascade_job_id = await _id2cascExecution(execution_id, attempt_count)
     response = client.request_response(api.JobProgressRequest(job_ids=[cascade_job_id]), f"{config.cascade.cascade_url}")
     response = cast(api.JobProgressResponse, response)

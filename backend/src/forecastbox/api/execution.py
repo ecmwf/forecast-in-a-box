@@ -249,7 +249,7 @@ async def poll_and_update_execution(execution_id: str, attempt_count: int | None
 
 
 async def execute(definition: JobDefinition, user_id: str | None, execution_id: str | None = None) -> Either[JobExecuteResponse, str]:  # type: ignore[invalid-argument]
-    """v2 execute path: always creates a JobExecution linked to the given JobDefinition.
+    """Always creates a JobExecution linked to the given JobDefinition.
 
     Compiles the definition's blocks via the fable compiler, submits the resulting
     spec to cascade, and persists a JobExecution row. When `execution_id` is supplied,
@@ -307,7 +307,7 @@ async def execute_experiment_run(
 
     Uses a spec already compiled by the caller (with dynamic expressions applied).
     Stores experiment_id and compiler_runtime_context on the created JobExecution so
-    runs_v2 can read trigger type and original scheduled_at.
+    runs can read trigger type and original scheduled_at.
     When execution_id is supplied, the new attempt is appended under that id (rerun semantics).
     """
     new_execution_id, attempt_count = await db_jobs.upsert_job_execution(

@@ -35,7 +35,7 @@ class ExecutionSpecification(BaseModel):
 
 
 class JobExecuteRequest(BaseModel):
-    """Request body for POST /job/execute_v2.
+    """Request body for POST /job/execute.
 
     References an existing saved JobDefinition by id and optional version.
     """
@@ -47,16 +47,16 @@ class JobExecuteRequest(BaseModel):
 
 
 class JobExecuteResponse(BaseModel):
-    """Response from POST /job/execute_v2."""
+    """Response from POST /job/execute."""
 
     execution_id: str
-    """Logical v2 execution id (JobExecution.id)."""
+    """Logical execution id (JobExecution.id)."""
     attempt_count: int
     """Attempt number; always 1 on a fresh execution."""
 
 
 class JobExecutionDetail(BaseModel):
-    """Detail of a single v2 job execution attempt."""
+    """Detail of a single job execution attempt."""
 
     execution_id: str
     attempt_count: int
@@ -71,7 +71,7 @@ class JobExecutionDetail(BaseModel):
 
 
 class JobExecutionList(BaseModel):
-    """List of latest-attempt v2 job execution details with pagination metadata."""
+    """List of latest-attempt job execution details with pagination metadata."""
 
     executions: list[JobExecutionDetail]
     total: int
@@ -85,7 +85,7 @@ class JobExecutionList(BaseModel):
 
 
 class JobSpecification(BaseModel):
-    """Specification payload linked to a v2 job execution attempt."""
+    """Specification payload linked to a job execution attempt."""
 
     definition_id: str
     definition_version: int

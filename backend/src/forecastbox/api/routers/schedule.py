@@ -258,7 +258,7 @@ async def get_schedule_runs(
     page: int = 1,
     page_size: int = 10,
 ) -> ScheduleRunsResponse:
-    """Return paginated JobExecution rows linked to a v2 cron schedule experiment.
+    """Return paginated JobExecution rows linked to a cron schedule experiment.
 
     Each run includes a trigger field ('cron' or 'rerun') sourced from
     compiler_runtime_context so callers can distinguish normal scheduled runs

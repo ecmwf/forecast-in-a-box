@@ -67,7 +67,7 @@ async def upsert_fable_builder(
     fable_id: Optional[str] = None,
     user: UserRead | None = Depends(current_active_user),
 ) -> FableSaveResponse:
-    """Save a FableBuilder as a JobDefinition (v2 persistence path).
+    """Save a FableBuilder as a JobDefinition.
 
     If `fable_id` is omitted a new definition is created (version 1). If
     `fable_id` is supplied the existing definition gains a new version; a 404
@@ -101,7 +101,7 @@ async def retrieve_fable_builder(
     fable_id: str,
     version: Optional[int] = None,
 ) -> FableRetrieveResponse:
-    """Retrieve a saved FableBuilder by id (and optionally version) from the v2 store.
+    """Retrieve a saved FableBuilder by id (and optionally version) from the store.
 
     If `version` is omitted the latest non-deleted version is returned.
     """
@@ -126,7 +126,7 @@ async def retrieve_fable_builder(
 
 @router.put("/compile")
 async def compile_fable(request: FableCompileRequest) -> ExecutionSpecification:
-    """Load a saved builder from the v2 store by reference and compile it to an ExecutionSpecification.
+    """Load a saved builder from the store by reference and compile it to an ExecutionSpecification.
 
     If `version` is omitted the latest non-deleted version is used. The returned
     ExecutionSpecification has the same shape as the one from /compile.
