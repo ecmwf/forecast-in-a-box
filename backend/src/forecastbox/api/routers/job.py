@@ -646,3 +646,16 @@ async def restart_execution_v2(
     if result.t is None:
         raise HTTPException(status_code=500, detail=f"Failed to restart: {result.e}")
     return result.t
+
+
+@router.get("/{job_id}/available_2")
+async def get_job_availability_v2(
+    execution_id: str, attempt_count: int | None = None, user: UserRead = Depends(current_active_user)
+) -> list[TaskId]:
+    """Check which results are available for a given job_id."""
+    raise NotImplementedError
+    """ TODO
+        1. retrieve the JobExecution entity based on execution_id
+        2. assuming the cascade_job_id is not None, make a cascade api request like in `get_job_availability`, otherwise raise
+        3. extend the tests/integration/test_fable.py, namely the function test_fable_v2_execute, with invocation of this endpoint
+    """
