@@ -183,8 +183,7 @@ export const API_ENDPOINTS = {
     resultsV2: (executionId: string) =>
       `${API_PREFIX}/job/${executionId}/results_v2`,
     /** GET - Download job logs as ZIP (v2) */
-    logsV2: (executionId: string) =>
-      `${API_PREFIX}/job/${executionId}/logs_v2`,
+    logsV2: (executionId: string) => `${API_PREFIX}/job/${executionId}/logs_v2`,
     /** POST - Restart an execution (v2, returns same execution_id with bumped attempt_count) */
     restartV2: (executionId: string) =>
       `${API_PREFIX}/job/${executionId}/restart_v2`,
