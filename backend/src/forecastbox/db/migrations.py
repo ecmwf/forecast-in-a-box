@@ -1,5 +1,7 @@
 """Alembic looked too heavy handed to me."""
 
+# NOTE this file is left in place only as an example how to add migrations -- all these listed are currently invalid
+
 import logging
 
 from sqlalchemy import MetaData, create_engine, text
@@ -28,6 +30,7 @@ def _delete_models(metadata, connection):
 
 
 def migrate():
+    return  # NOTE those migrations are invalid for now
     url = f"sqlite:///{config.db.sqlite_jobdb_path}"
     engine = create_engine(url)
     metadata = MetaData()

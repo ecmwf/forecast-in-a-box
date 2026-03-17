@@ -21,7 +21,6 @@ import forecastbox.db.jobs2 as db_jobs2
 from forecastbox.api.scheduling.dt_utils import calculate_next_run
 from forecastbox.api.types.fable import FableBuilder
 from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification
-from forecastbox.db.schedule import get_schedules, max_attempt_cnt, run2date, run2schedule
 
 
 def deep_union(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
@@ -57,66 +56,6 @@ class RunnableSchedule:
     attempt_cnt: int
     max_acceptable_delay_hours: int
     schedule_id: str
-
-
-async def schedule2runnable(schedule_id: str, exec_time: dt.datetime) -> Either[RunnableSchedule, str]:  # type: ignore[invalid-argument] # NOTE type checker issue
-    """Converts a ScheduleDefinition into a RunnableSchedule by evaluating dynamic expressions and merging."""
-    schedules = list(await get_schedules(schedule_id=schedule_id))
-    if not schedules:
-        return Either.error("not found")
-    schedule_def = schedules[0]
-
-    try:
-        dynamic_expr = orjson.loads(schedule_def.dynamic_expr.encode("ascii"))
-        exec_spec = orjson.loads(schedule_def.exec_spec.encode("ascii"))
-
-        dynamic_evaluated = eval_dynamic_expression(dynamic_expr, exec_time)
-        merged_spec = deep_union(exec_spec, dynamic_evaluated)
-        next_run_at = calculate_next_run(exec_time, cast(str, schedule_def.cron_expr))
-        rv = RunnableSchedule(
-            exec_spec=ExecutionSpecification(**merged_spec),
-            created_by=schedule_def.created_by,
-            next_run_at=next_run_at,
-            scheduled_at=exec_time,
-            attempt_cnt=0,
-            max_acceptable_delay_hours=cast(int, schedule_def.max_acceptable_delay_hours),
-            schedule_id=schedule_def.schedule_id,
-        )
-        return Either.ok(rv)
-    except Exception as e:
-        return Either.error(repr(e))
-
-
-async def run2runnable(schedule_run_id: str) -> Either[RunnableSchedule, str]:  # type: ignore[invalid-argument] # NOTE type checker issue
-    """Converts a ScheduleRun into a RunnableSchedule, with all the original parameters. Intended for re-runs"""
-    schedule_def = await run2schedule(schedule_run_id)
-    if schedule_def is None:
-        return Either.error(f"schedule corresponding to run {schedule_run_id} not found")
-
-    attempt_cnt = await max_attempt_cnt(cast(str, schedule_def.schedule_id)) + 1
-
-    scheduled_at = await run2date(schedule_run_id)
-    if scheduled_at is None:
-        return Either.error(f"schedule run {schedule_run_id} not found")
-
-    try:
-        dynamic_expr = orjson.loads(schedule_def.dynamic_expr.encode("ascii"))
-        exec_spec = orjson.loads(schedule_def.exec_spec.encode("ascii"))
-
-        dynamic_evaluated = eval_dynamic_expression(dynamic_expr, scheduled_at)
-        merged_spec = deep_union(exec_spec, dynamic_evaluated)
-        rv = RunnableSchedule(
-            exec_spec=ExecutionSpecification(**merged_spec),
-            created_by=cast(str | None, schedule_def.created_by),
-            next_run_at=None,
-            scheduled_at=scheduled_at,
-            attempt_cnt=attempt_cnt,
-            max_acceptable_delay_hours=cast(int, schedule_def.max_acceptable_delay_hours),
-            schedule_id=cast(str, schedule_def.schedule_id),
-        )
-        return Either.ok(rv)
-    except Exception as e:
-        return Either.error(f"Failed to build a job because of {repr(e)}")
 
 
 @dataclass(frozen=True, eq=True, slots=True)

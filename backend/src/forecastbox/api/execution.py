@@ -39,7 +39,6 @@ from forecastbox.api.types.jobs import (
 )
 from forecastbox.api.utils import get_model_path
 from forecastbox.config import config
-from forecastbox.db.job import insert_one
 from forecastbox.models import get_model
 from forecastbox.products.registry import get_product
 from forecastbox.schemas.jobs2 import JobDefinition, JobExecution
@@ -132,35 +131,6 @@ class SubmitJobResponse(BaseModel):
 
     id: str
     """Id of the submitted job."""
-
-
-async def execute_v1(spec: ExecutionSpecification, user_id: str | None) -> Either[SubmitJobResponse, str]:  # type: ignore[invalid-argument] # NOTE type checker issue
-    try:
-        loop = asyncio.get_running_loop()
-        response, product_to_id_mappings = await loop.run_in_executor(None, _execute_cascade, spec)  # CPU-bound
-        if not response.job_id:
-            # TODO this best comes from the db... we still have a cascade conflict problem,
-            # we best redesign cascade api to allow for uuid acceptance
-            response.job_id = str(uuid.uuid4())
-
-        await insert_one(
-            response.job_id,
-            response.error,
-            user_id,
-            spec.model_dump_json(),
-            json.dumps([x.model_dump() for x in product_to_id_mappings]),
-        )
-        return Either.ok(SubmitJobResponse(id=response.job_id))
-    except Exception as e:
-        return Either.error(repr(e))
-
-
-async def execute2response(spec: ExecutionSpecification, user: UserRead | None) -> SubmitJobResponse:
-    result = await execute_v1(spec, str(user.id) if user is not None else None)
-    if result.t is None:
-        raise HTTPException(status_code=500, detail=f"Failed to execute because of {result.e}")
-    else:
-        return result.t
 
 
 async def get_job_definition_for_execution(definition_id: str, definition_version: int | None) -> JobDefinition | None:

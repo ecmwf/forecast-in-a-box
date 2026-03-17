@@ -39,7 +39,7 @@ from forecastbox.schemas.jobs2 import (
     JobExecutionStatus,
 )
 
-async_url = f"sqlite+aiosqlite:///{config.db.sqlite_jobs2db_path}"
+async_url = f"sqlite+aiosqlite:///{config.db.sqlite_jobdb_path}"
 async_engine = create_async_engine(async_url, pool_pre_ping=True)
 async_session_maker = async_sessionmaker(async_engine, expire_on_commit=False)
 

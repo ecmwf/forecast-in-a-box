@@ -15,6 +15,5 @@ def test_dbs_created(backend_client):
     import forecastbox.config
 
     fiab_root = forecastbox.config.fiab_home
-    assert (pathlib.Path(fiab_root) / "jobs2.db").exists(), "jobs2.db was not created on startup"
     assert (pathlib.Path(fiab_root) / "user.db").exists(), "user.db was not created on startup"
     assert (pathlib.Path(fiab_root) / "job.db").exists(), "job.db was not created on startup"
