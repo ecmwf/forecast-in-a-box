@@ -15,7 +15,10 @@ import {
   mockSavedFables,
 } from '../data/fable.data'
 import { consumeCatalogueUnavailable } from './plugins.handlers'
-import type { FableBuilderV1, FableUpsertV2Request } from '@/api/types/fable.types'
+import type {
+  FableBuilderV1,
+  FableUpsertV2Request,
+} from '@/api/types/fable.types'
 import { getFactory } from '@/api/types/fable.types'
 import { API_ENDPOINTS } from '@/api/endpoints'
 
