@@ -48,7 +48,7 @@ This file tracks implementation progress for the frontend migration from v1 to v
 - Notes: `useSubmitFable` now calls `upsertFableV2` then `executeJobV2` (keying metadata by `execution_id`); `useJobsStatus` and `useJobStatusCounts` now consume `status_v2` (`executions[]` array); `JobListPage` normalises the array into a map before rendering; v1 handlers kept for detail-page tests; environment spec field in submit dialog retained in UI but not forwarded (not supported by execute_v2).
 
 ### 13-jobDetailAndArtifacts.md
-- Status: `pending`
+- Status: `done`
 - Owner:
 - Depends on:
   - `12-jobSubmissionAndList.md`
@@ -65,7 +65,7 @@ This file tracks implementation progress for the frontend migration from v1 to v
   - `cd frontend && npm run test:e2e -- executions.spec.ts`
 - Known blocker:
   - Backend currently has no v2 routes for result download, log download, or delete.
-- Notes:
+- Notes: All detail-page routes fully migrated to v2: `useJobStatus` → `status_v2`, `useJobOutputs` → `outputs_v2`, `useJobAvailable` → `available_v2`, `getJobResultV2`/`downloadJobLogsV2` for artifact download, `restartJobV2` (stays on same route, invalidates status), `deleteJobV2` (query-param DELETE); v2 mock handlers added for all; restart no longer navigates to a new id.
 
 ### 14-scheduleEndpoints.md
 - Status: `pending`

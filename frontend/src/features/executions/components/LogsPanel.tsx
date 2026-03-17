@@ -21,7 +21,7 @@ import type { LogLine } from '@/api/hooks/useGateway'
 import type { JobStatus } from '@/api/types/job.types'
 import { useGatewayLogs } from '@/api/hooks/useGateway'
 import { isTerminalStatus } from '@/api/types/job.types'
-import { downloadJobLogs } from '@/api/endpoints/job'
+import { downloadJobLogsV2 } from '@/api/endpoints/job'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
@@ -100,7 +100,7 @@ export function LogsPanel({ jobId, status }: LogsPanelProps) {
 
   const handleDownloadLogs = useCallback(async () => {
     try {
-      const blob = await downloadJobLogs(jobId)
+      const blob = await downloadJobLogsV2(jobId)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url

@@ -16,22 +16,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
 import type {
   EnvironmentSpecification,
+  JobExecuteV2Response,
+  JobExecutionDetail,
   JobExecutionListV2,
-  JobProgressResponse,
   JobStatus,
   ProductToOutputId,
-  SubmitJobResponse,
 } from '@/api/types/job.types'
 import type { JobMetadata } from '@/features/executions/stores/useJobMetadataStore'
 import { isTerminalStatus } from '@/api/types/job.types'
 import {
-  deleteJob,
+  deleteJobV2,
   executeJobV2,
-  getJobAvailable,
-  getJobOutputs,
-  getJobStatus,
+  getJobAvailableV2,
+  getJobOutputsV2,
+  getJobStatusV2,
   getJobsStatusV2,
-  restartJob,
+  restartJobV2,
 } from '@/api/endpoints/job'
 import { upsertFableV2 } from '@/api/endpoints/fable'
 import { useJobMetadataStore } from '@/features/executions/stores/useJobMetadataStore'
@@ -46,9 +46,9 @@ export const jobKeys = {
 }
 
 export function useJobStatus(jobId: string | undefined) {
-  return useQuery<JobProgressResponse>({
+  return useQuery<JobExecutionDetail>({
     queryKey: jobKeys.status(jobId ?? ''),
-    queryFn: () => getJobStatus(jobId!),
+    queryFn: () => getJobStatusV2(jobId!),
     enabled: !!jobId,
     refetchInterval: (query) => {
       const status = query.state.data?.status
@@ -76,7 +76,7 @@ export function useJobsStatus(
 export function useJobOutputs(jobId: string | undefined) {
   return useQuery<Array<ProductToOutputId>>({
     queryKey: jobKeys.outputs(jobId ?? ''),
-    queryFn: () => getJobOutputs(jobId!),
+    queryFn: () => getJobOutputsV2(jobId!),
     enabled: !!jobId,
     staleTime: 30 * 1000,
   })
@@ -88,7 +88,7 @@ export function useJobAvailable(
 ) {
   return useQuery<Array<string>>({
     queryKey: jobKeys.available(jobId ?? ''),
-    queryFn: () => getJobAvailable(jobId!),
+    queryFn: () => getJobAvailableV2(jobId!),
     enabled: !!jobId,
     refetchInterval: () => {
       if (!jobStatus) return 5000
@@ -102,10 +102,10 @@ export function useJobAvailable(
 export function useRestartJob() {
   const queryClient = useQueryClient()
 
-  return useMutation<SubmitJobResponse, Error, string>({
-    mutationFn: restartJob,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: jobKeys.all })
+  return useMutation<JobExecuteV2Response, Error, string>({
+    mutationFn: restartJobV2,
+    onSuccess: (_data, executionId) => {
+      queryClient.invalidateQueries({ queryKey: jobKeys.status(executionId) })
     },
   })
 }
@@ -113,8 +113,8 @@ export function useRestartJob() {
 export function useDeleteJob() {
   const queryClient = useQueryClient()
 
-  return useMutation<{ deleted_count: number }, Error, string>({
-    mutationFn: deleteJob,
+  return useMutation<void, Error, string>({
+    mutationFn: deleteJobV2,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: jobKeys.all })
     },

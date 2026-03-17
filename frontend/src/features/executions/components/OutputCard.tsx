@@ -18,7 +18,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Binary, Download, FileDown, Globe, Map, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { LucideIcon } from 'lucide-react'
-import { getJobResult } from '@/api/endpoints/job'
+import { getJobResultV2 } from '@/api/endpoints/job'
 import { Button } from '@/components/ui/button'
 import { P } from '@/components/base/typography'
 import { createLogger } from '@/lib/logger'
@@ -88,7 +88,7 @@ export function OutputCard({
     let revoked = false
     setIsLoading(true)
 
-    getJobResult(jobId, taskId)
+    getJobResultV2(jobId, taskId)
       .then(({ blob }) => {
         if (revoked) return
         const url = URL.createObjectURL(blob)
@@ -113,7 +113,7 @@ export function OutputCard({
 
   const handleDownload = useCallback(async () => {
     try {
-      const { blob } = await getJobResult(jobId, taskId)
+      const { blob } = await getJobResultV2(jobId, taskId)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url

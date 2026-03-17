@@ -173,6 +173,23 @@ export const API_ENDPOINTS = {
     /** GET - Get status of a single execution (v2) */
     statusV2ById: (executionId: string) =>
       `${API_PREFIX}/job/${executionId}/status_v2`,
+    /** GET - Get job outputs (product-to-task mapping) (v2) */
+    outputsV2: (executionId: string) =>
+      `${API_PREFIX}/job/${executionId}/outputs_v2`,
+    /** GET - Get list of available output task IDs (v2) */
+    availableV2: (executionId: string) =>
+      `${API_PREFIX}/job/${executionId}/available_v2`,
+    /** GET - Get job result data by task ID (v2) */
+    resultsV2: (executionId: string) =>
+      `${API_PREFIX}/job/${executionId}/results_v2`,
+    /** GET - Download job logs as ZIP (v2) */
+    logsV2: (executionId: string) =>
+      `${API_PREFIX}/job/${executionId}/logs_v2`,
+    /** POST - Restart an execution (v2, returns same execution_id with bumped attempt_count) */
+    restartV2: (executionId: string) =>
+      `${API_PREFIX}/job/${executionId}/restart_v2`,
+    /** DELETE - Delete an execution (v2, execution_id as query param) */
+    deleteV2: `${API_PREFIX}/job/delete_v2`,
   },
 
   /**
@@ -250,6 +267,18 @@ export const API_PATTERNS = {
     delete: `${API_PREFIX}/job/:jobId`,
     /** Pattern: /api/v1/job/:executionId/status_v2 */
     statusV2ById: `${API_PREFIX}/job/:executionId/status_v2`,
+    /** Pattern: /api/v1/job/:executionId/outputs_v2 */
+    outputsV2: `${API_PREFIX}/job/:executionId/outputs_v2`,
+    /** Pattern: /api/v1/job/:executionId/available_v2 */
+    availableV2: `${API_PREFIX}/job/:executionId/available_v2`,
+    /** Pattern: /api/v1/job/:executionId/results_v2 */
+    resultsV2: `${API_PREFIX}/job/:executionId/results_v2`,
+    /** Pattern: /api/v1/job/:executionId/logs_v2 */
+    logsV2: `${API_PREFIX}/job/:executionId/logs_v2`,
+    /** Pattern: /api/v1/job/:executionId/restart_v2 */
+    restartV2: `${API_PREFIX}/job/:executionId/restart_v2`,
+    /** Pattern: /api/v1/job/delete_v2 (execution_id as query param) */
+    deleteV2: `${API_PREFIX}/job/delete_v2`,
   },
   sources: {
     /** Pattern: /api/v1/sources/:sourceId */

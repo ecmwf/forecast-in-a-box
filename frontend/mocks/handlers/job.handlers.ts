@@ -17,11 +17,13 @@ import {
   addExecution,
   addJob,
   createMockPngBlob,
+  deleteExecution,
   deleteJob,
   getAllExecutions,
   getAllJobs,
   getExecution,
   getJob,
+  restartExecution,
 } from '../data/job.data'
 import type {
   ExecutionSpecification,
@@ -273,5 +275,141 @@ export const jobHandlers = [
     }
 
     return HttpResponse.json({ deleted_count: 1 })
+  }),
+
+  // ─── v2 artifact handlers ────────────────────────────────────────────────
+
+  http.post(API_PATTERNS.job.restartV2, async ({ params }) => {
+    await delay(400)
+
+    const executionId = params.executionId as string
+    const result = restartExecution(executionId)
+
+    if (!result) {
+      return HttpResponse.json(
+        { detail: 'Execution not found' },
+        { status: 404 },
+      )
+    }
+
+    return HttpResponse.json(result)
+  }),
+
+  http.get(API_PATTERNS.job.outputsV2, async ({ params }) => {
+    await delay(200)
+
+    const executionId = params.executionId as string
+    const exec = getExecution(executionId)
+
+    if (!exec) {
+      return HttpResponse.json(
+        { detail: 'Execution not found' },
+        { status: 404 },
+      )
+    }
+
+    // Fall back to the v1 job outputs for shared mock IDs
+    const job = getJob(executionId)
+    return HttpResponse.json(job?.outputs ?? [])
+  }),
+
+  http.get(API_PATTERNS.job.availableV2, async ({ params }) => {
+    await delay(150)
+
+    const executionId = params.executionId as string
+    const exec = getExecution(executionId)
+
+    if (!exec) {
+      return HttpResponse.json(
+        { detail: 'Execution not found' },
+        { status: 404 },
+      )
+    }
+
+    // Fall back to the v1 job available list for shared mock IDs
+    const job = getJob(executionId)
+    return HttpResponse.json(job?.available ?? [])
+  }),
+
+  http.get(API_PATTERNS.job.resultsV2, async ({ params, request }) => {
+    await delay(300)
+
+    const executionId = params.executionId as string
+    const exec = getExecution(executionId)
+
+    if (!exec) {
+      return HttpResponse.json(
+        { detail: 'Execution not found' },
+        { status: 404 },
+      )
+    }
+
+    const url = new URL(request.url)
+    const datasetId = url.searchParams.get('dataset_id')
+
+    if (!datasetId) {
+      return HttpResponse.json(
+        { detail: 'Missing dataset_id parameter' },
+        { status: 400 },
+      )
+    }
+
+    const blob = createMockPngBlob()
+    return new HttpResponse(blob, {
+      headers: {
+        'Content-Type': 'image/png',
+        'Content-Length': String(blob.size),
+      },
+    })
+  }),
+
+  http.get(API_PATTERNS.job.logsV2, async ({ params }) => {
+    await delay(200)
+
+    const executionId = params.executionId as string
+    const exec = getExecution(executionId)
+
+    if (!exec) {
+      return HttpResponse.json(
+        { detail: 'Execution not found' },
+        { status: 404 },
+      )
+    }
+
+    const zipBytes = new Uint8Array([
+      0x50, 0x4b, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    ])
+    return new HttpResponse(zipBytes, {
+      headers: {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="${executionId}-logs.zip"`,
+      },
+    })
+  }),
+
+  http.delete(API_PATTERNS.job.deleteV2, async ({ request }) => {
+    await delay(200)
+
+    const url = new URL(request.url)
+    const executionId = url.searchParams.get('execution_id')
+
+    if (!executionId) {
+      return HttpResponse.json(
+        { detail: 'Missing execution_id parameter' },
+        { status: 400 },
+      )
+    }
+
+    const deleted = deleteExecution(executionId)
+
+    if (!deleted) {
+      return HttpResponse.json(
+        { detail: 'Execution not found' },
+        { status: 404 },
+      )
+    }
+
+    return new HttpResponse(null, { status: 200 })
   }),
 ]

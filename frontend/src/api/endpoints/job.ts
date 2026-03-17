@@ -16,6 +16,7 @@ import type {
   ExecutionSpecification,
   JobExecuteV2Request,
   JobExecuteV2Response,
+  JobExecutionDetail,
   JobExecutionListV2,
   JobProgressResponse,
   JobProgressResponses,
@@ -162,4 +163,78 @@ export async function getJobSpecification(
   jobId: string,
 ): Promise<ExecutionSpecification> {
   return apiClient.get(API_ENDPOINTS.job.specification(jobId))
+}
+
+export async function getJobStatusV2(
+  executionId: string,
+): Promise<JobExecutionDetail> {
+  return apiClient.get(API_ENDPOINTS.job.statusV2ById(executionId))
+}
+
+export async function getJobOutputsV2(
+  executionId: string,
+): Promise<Array<ProductToOutputId>> {
+  return apiClient.get(API_ENDPOINTS.job.outputsV2(executionId))
+}
+
+export async function getJobAvailableV2(
+  executionId: string,
+): Promise<Array<string>> {
+  return apiClient.get(API_ENDPOINTS.job.availableV2(executionId))
+}
+
+export async function getJobResultV2(
+  executionId: string,
+  datasetId: string,
+): Promise<{ blob: Blob; contentType: string }> {
+  const url = buildFullUrl(API_ENDPOINTS.job.resultsV2(executionId), {
+    dataset_id: datasetId,
+  })
+
+  const response = await fetch(url, {
+    credentials: 'include',
+    headers: buildHeaders(),
+  })
+
+  if (!response.ok) {
+    throw new ApiClientError(
+      `Failed to fetch result: ${response.statusText}`,
+      response.status,
+    )
+  }
+
+  const blob = await response.blob()
+  const contentType =
+    response.headers.get('content-type') ?? 'application/octet-stream'
+  return { blob, contentType }
+}
+
+export async function downloadJobLogsV2(executionId: string): Promise<Blob> {
+  const url = buildFullUrl(API_ENDPOINTS.job.logsV2(executionId))
+
+  const response = await fetch(url, {
+    credentials: 'include',
+    headers: buildHeaders(),
+  })
+
+  if (!response.ok) {
+    throw new ApiClientError(
+      `Failed to download logs: ${response.statusText}`,
+      response.status,
+    )
+  }
+
+  return response.blob()
+}
+
+export async function restartJobV2(
+  executionId: string,
+): Promise<JobExecuteV2Response> {
+  return apiClient.post(API_ENDPOINTS.job.restartV2(executionId))
+}
+
+export async function deleteJobV2(executionId: string): Promise<void> {
+  return apiClient.delete(
+    `${API_ENDPOINTS.job.deleteV2}?execution_id=${executionId}`,
+  )
 }

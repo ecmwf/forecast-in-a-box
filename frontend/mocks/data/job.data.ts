@@ -269,6 +269,28 @@ export function deleteJob(jobId: string): boolean {
   return true
 }
 
+export function restartExecution(
+  executionId: string,
+): { execution_id: string; attempt_count: number } | undefined {
+  if (!(executionId in executionsState)) return undefined
+  const exec = executionsState[executionId]
+  const attempt_count = exec.attempt_count + 1
+  executionsState[executionId] = {
+    ...exec,
+    attempt_count,
+    status: 'submitted',
+    progress: '0',
+    updated_at: new Date().toISOString(),
+  }
+  return { execution_id: executionId, attempt_count }
+}
+
+export function deleteExecution(executionId: string): boolean {
+  if (!(executionId in executionsState)) return false
+  delete executionsState[executionId]
+  return true
+}
+
 export function createMockPngBlob(): Blob {
   const pngBytes = new Uint8Array([
     0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
