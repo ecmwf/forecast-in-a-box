@@ -110,7 +110,7 @@ def _experiment_to_v2_response(exp: ExperimentDefinition) -> ScheduleDefinitionV
     )
 
 
-@router.get("/list_v2")
+@router.get("/list")
 async def list_schedules(
     user: UserRead = Depends(current_active_user),
     page: int = 1,
@@ -131,7 +131,7 @@ async def list_schedules(
     return ListSchedulesV2Response(schedules=schedules, total=total, page=page, page_size=page_size, total_pages=total_pages)
 
 
-@router.put("/create_v2")
+@router.put("/create")
 async def create_schedule(
     schedule_spec: ScheduleSpecificationV2, user: UserRead | None = Depends(current_active_user)
 ) -> CreateScheduleV2Response:
@@ -172,7 +172,7 @@ async def create_schedule(
     return CreateScheduleV2Response(experiment_id=experiment_id)
 
 
-@router.get("/get_v2")
+@router.get("/get")
 async def get_schedule(experiment_id: str, user: UserRead = Depends(current_active_user)) -> ScheduleDefinitionV2Response:
     exp_def = await db_jobs2.get_experiment_definition(experiment_id)
     if exp_def is None or exp_def.experiment_type != "cron_schedule":
@@ -180,7 +180,7 @@ async def get_schedule(experiment_id: str, user: UserRead = Depends(current_acti
     return _experiment_to_v2_response(exp_def)
 
 
-@router.post("/update_v2")
+@router.post("/update")
 async def update_schedule(
     experiment_id: str, update: ScheduleUpdateV2, user: UserRead = Depends(current_active_user)
 ) -> ScheduleDefinitionV2Response:
@@ -240,7 +240,7 @@ async def update_schedule(
     return _experiment_to_v2_response(updated)
 
 
-@router.get("/next_run_v2")
+@router.get("/next_run")
 async def get_next_run(experiment_id: str, user: UserRead = Depends(current_active_user)) -> str:
     exp_def = await db_jobs2.get_experiment_definition(experiment_id)
     if exp_def is None or exp_def.experiment_type != "cron_schedule":
@@ -251,7 +251,7 @@ async def get_next_run(experiment_id: str, user: UserRead = Depends(current_acti
     return str(next_entry.scheduled_at)
 
 
-@router.get("/runs_v2")
+@router.get("/runs")
 async def get_schedule_runs(
     experiment_id: str,
     user: UserRead = Depends(current_active_user),

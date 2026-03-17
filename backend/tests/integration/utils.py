@@ -66,7 +66,7 @@ def ensure_completed(backend_client, job_id, sleep=0.5, attempts=20):
 def ensure_completed_v2(backend_client, job_id, sleep=0.5, attempts=20):
     i = attempts
     while i > 0:
-        response = backend_client.get(f"/job/{job_id}/status_v2", timeout=10)
+        response = backend_client.get(f"/job/{job_id}/status", timeout=10)
         assert response.is_success, response.text
         detail = JobExecutionDetail(**response.json())
         if detail.status == "failed":

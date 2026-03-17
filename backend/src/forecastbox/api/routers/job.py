@@ -109,7 +109,7 @@ async def _get_logs(cascade_job_id: str, db_entity_ser: bytes) -> Response:
         )
 
 
-@router.post("/execute_v2")
+@router.post("/execute")
 async def execute_v2_api(request: JobExecuteV2Request, user: UserRead | None = Depends(current_active_user)) -> JobExecuteV2Response:
     """Execute a job via the v2 persistence path.
 
@@ -143,7 +143,7 @@ async def execute_v2_api(request: JobExecuteV2Request, user: UserRead | None = D
 # ---------------------------------------------------------------------------
 
 
-@router.get("/status_v2")
+@router.get("/status")
 async def get_status(
     user: UserRead = Depends(current_active_user),
     page: int = 1,
@@ -165,7 +165,7 @@ async def get_status(
     return JobExecutionList(executions=details, total=total, page=page, page_size=page_size, total_pages=total_pages)
 
 
-@router.get("/{execution_id}/status_v2")
+@router.get("/{execution_id}/status")
 async def get_status_of_execution(
     execution_id: str,
     attempt_count: int | None = None,
@@ -178,7 +178,7 @@ async def get_status_of_execution(
     return detail
 
 
-@router.get("/{execution_id}/outputs_v2")
+@router.get("/{execution_id}/outputs")
 async def get_outputs_of_execution(
     execution_id: str,
     attempt_count: int | None = None,
@@ -194,7 +194,7 @@ async def get_outputs_of_execution(
     return [ProductToOutputId(**item) for item in cast(list[dict], raw_outputs)]
 
 
-@router.get("/{execution_id}/specification_v2")
+@router.get("/{execution_id}/specification")
 async def get_specification_of_execution(
     execution_id: str,
     attempt_count: int | None = None,
@@ -207,7 +207,7 @@ async def get_specification_of_execution(
     return spec
 
 
-@router.post("/{execution_id}/restart_v2")
+@router.post("/{execution_id}/restart")
 async def restart_execution(
     execution_id: str,
     user: UserRead | None = Depends(current_active_user),
@@ -231,7 +231,7 @@ async def _id2cascExecution(execution_id: str, attempt_count: int | None = None)
     return execution, cascade_job_id
 
 
-@router.get("/{execution_id}/available_v2")
+@router.get("/{execution_id}/available")
 async def get_job_availability(
     execution_id: str, attempt_count: int | None = None, user: UserRead = Depends(current_active_user)
 ) -> list[TaskId]:
@@ -245,7 +245,7 @@ async def get_job_availability(
     return [x.task for x in response.datasets[cascade_job_id]]
 
 
-@router.get("/{execution_id}/results_v2")
+@router.get("/{execution_id}/results")
 async def get_result(
     execution_id: str,
     attempt_count: int | None = None,
@@ -272,13 +272,13 @@ async def get_result(
     return Response(bytez, media_type=media_type)
 
 
-@router.get("/{job_id}/logs_v2")
+@router.get("/{job_id}/logs")
 async def get_logs(execution_id: str, attempt_count: int | None = None, user: UserRead = Depends(current_active_user)) -> Response:
     db_entity, cascade_job_id = await _id2cascExecution(execution_id, attempt_count)
     return await _get_logs(cascade_job_id, orjson.dumps(db_entity))
 
 
-@router.delete("/delete_v2")
+@router.delete("/delete")
 async def delete_job(execution_id: str, attempt_count: int | None = None, user: UserRead = Depends(current_active_user)) -> None:
     """Delete a job from the database and cascade."""
     _, cascade_job_id = await _id2cascExecution(execution_id, attempt_count)

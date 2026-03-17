@@ -28,7 +28,7 @@ import { STORAGE_KEYS } from '@/lib/storage-keys'
 export async function executeJobV2(
   request: JobExecuteV2Request,
 ): Promise<JobExecuteV2Response> {
-  return apiClient.post(API_ENDPOINTS.job.executeV2, request)
+  return apiClient.post(API_ENDPOINTS.job.execute, request)
 }
 
 export async function getJobsStatusV2(
@@ -40,7 +40,7 @@ export async function getJobsStatusV2(
   if (status) {
     params.status = status
   }
-  return apiClient.get(API_ENDPOINTS.job.statusV2, { params })
+  return apiClient.get(API_ENDPOINTS.job.status, { params })
 }
 
 function buildFullUrl(path: string, params?: Record<string, string>): string {
@@ -70,26 +70,26 @@ function buildHeaders(): HeadersInit {
 export async function getJobStatusV2(
   executionId: string,
 ): Promise<JobExecutionDetail> {
-  return apiClient.get(API_ENDPOINTS.job.statusV2ById(executionId))
+  return apiClient.get(API_ENDPOINTS.job.statusById(executionId))
 }
 
 export async function getJobOutputsV2(
   executionId: string,
 ): Promise<Array<ProductToOutputId>> {
-  return apiClient.get(API_ENDPOINTS.job.outputsV2(executionId))
+  return apiClient.get(API_ENDPOINTS.job.outputs(executionId))
 }
 
 export async function getJobAvailableV2(
   executionId: string,
 ): Promise<Array<string>> {
-  return apiClient.get(API_ENDPOINTS.job.availableV2(executionId))
+  return apiClient.get(API_ENDPOINTS.job.available(executionId))
 }
 
 export async function getJobResultV2(
   executionId: string,
   datasetId: string,
 ): Promise<{ blob: Blob; contentType: string }> {
-  const url = buildFullUrl(API_ENDPOINTS.job.resultsV2(executionId), {
+  const url = buildFullUrl(API_ENDPOINTS.job.results(executionId), {
     dataset_id: datasetId,
   })
 
@@ -112,7 +112,7 @@ export async function getJobResultV2(
 }
 
 export async function downloadJobLogsV2(executionId: string): Promise<Blob> {
-  const url = buildFullUrl(API_ENDPOINTS.job.logsV2(executionId))
+  const url = buildFullUrl(API_ENDPOINTS.job.logs(executionId))
 
   const response = await fetch(url, {
     credentials: 'include',
@@ -132,11 +132,11 @@ export async function downloadJobLogsV2(executionId: string): Promise<Blob> {
 export async function restartJobV2(
   executionId: string,
 ): Promise<JobExecuteV2Response> {
-  return apiClient.post(API_ENDPOINTS.job.restartV2(executionId))
+  return apiClient.post(API_ENDPOINTS.job.restart(executionId))
 }
 
 export async function deleteJobV2(executionId: string): Promise<void> {
   return apiClient.delete(
-    `${API_ENDPOINTS.job.deleteV2}?execution_id=${executionId}`,
+    `${API_ENDPOINTS.job.delete}?execution_id=${executionId}`,
   )
 }

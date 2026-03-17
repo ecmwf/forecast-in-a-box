@@ -28,7 +28,7 @@ import { API_ENDPOINTS, API_PATTERNS } from '@/api/endpoints'
 export const jobHandlers = [
   // ─── v2 handlers ────────────────────────────────────────────────────────
 
-  http.post(API_ENDPOINTS.job.executeV2, async ({ request }) => {
+  http.post(API_ENDPOINTS.job.execute, async ({ request }) => {
     await delay(400)
 
     let body: JobExecuteV2Request
@@ -45,7 +45,7 @@ export const jobHandlers = [
     return HttpResponse.json(result)
   }),
 
-  http.get(API_ENDPOINTS.job.statusV2, async ({ request }) => {
+  http.get(API_ENDPOINTS.job.status, async ({ request }) => {
     await delay(200)
 
     const url = new URL(request.url)
@@ -72,7 +72,7 @@ export const jobHandlers = [
     })
   }),
 
-  http.get(API_PATTERNS.job.statusV2ById, async ({ params }) => {
+  http.get(API_PATTERNS.job.statusById, async ({ params }) => {
     await delay(150)
 
     const executionId = params.executionId as string
@@ -90,7 +90,7 @@ export const jobHandlers = [
 
   // ─── v2 artifact handlers ────────────────────────────────────────────────
 
-  http.post(API_PATTERNS.job.restartV2, async ({ params }) => {
+  http.post(API_PATTERNS.job.restart, async ({ params }) => {
     await delay(400)
 
     const executionId = params.executionId as string
@@ -106,7 +106,7 @@ export const jobHandlers = [
     return HttpResponse.json(result)
   }),
 
-  http.get(API_PATTERNS.job.outputsV2, async ({ params }) => {
+  http.get(API_PATTERNS.job.outputs, async ({ params }) => {
     await delay(200)
 
     const executionId = params.executionId as string
@@ -124,7 +124,7 @@ export const jobHandlers = [
     return HttpResponse.json(job?.outputs ?? [])
   }),
 
-  http.get(API_PATTERNS.job.availableV2, async ({ params }) => {
+  http.get(API_PATTERNS.job.available, async ({ params }) => {
     await delay(150)
 
     const executionId = params.executionId as string
@@ -142,7 +142,7 @@ export const jobHandlers = [
     return HttpResponse.json(job?.available ?? [])
   }),
 
-  http.get(API_PATTERNS.job.resultsV2, async ({ params, request }) => {
+  http.get(API_PATTERNS.job.results, async ({ params, request }) => {
     await delay(300)
 
     const executionId = params.executionId as string
@@ -174,7 +174,7 @@ export const jobHandlers = [
     })
   }),
 
-  http.get(API_PATTERNS.job.logsV2, async ({ params }) => {
+  http.get(API_PATTERNS.job.logs, async ({ params }) => {
     await delay(200)
 
     const executionId = params.executionId as string
@@ -199,7 +199,7 @@ export const jobHandlers = [
     })
   }),
 
-  http.delete(API_PATTERNS.job.deleteV2, async ({ request }) => {
+  http.delete(API_PATTERNS.job.delete, async ({ request }) => {
     await delay(200)
 
     const url = new URL(request.url)

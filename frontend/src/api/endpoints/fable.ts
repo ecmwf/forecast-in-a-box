@@ -81,7 +81,7 @@ export async function retrieveFableV2(
   if (version !== undefined) {
     params.version = version
   }
-  return apiClient.get(API_ENDPOINTS.fable.retrieveV2, {
+  return apiClient.get(API_ENDPOINTS.fable.retrieve, {
     params,
     schema: FableRetrieveV2ResponseSchema,
   })
@@ -93,7 +93,7 @@ export async function retrieveFableV2(
 export async function upsertFableV2(
   request: FableUpsertV2Request,
 ): Promise<FableUpsertV2Response> {
-  return apiClient.post(API_ENDPOINTS.fable.upsertV2, request, {
+  return apiClient.post(API_ENDPOINTS.fable.upsert, request, {
     schema: FableUpsertV2ResponseSchema,
   })
 }
@@ -104,5 +104,5 @@ export async function upsertFableV2(
 export async function compileFableV2(
   request: FableCompileV2Request,
 ): Promise<ExecutionSpecification> {
-  return apiClient.put(API_ENDPOINTS.fable.compileV2, request)
+  return apiClient.put(API_ENDPOINTS.fable.compile, request)
 }

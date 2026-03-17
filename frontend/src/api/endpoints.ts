@@ -61,12 +61,12 @@ export const API_ENDPOINTS = {
     catalogue: `${API_PREFIX}/fable/catalogue`,
     /** PUT - Expand a fable configuration */
     expand: `${API_PREFIX}/fable/expand`,
-    /** GET - Retrieve a saved fable with metadata (v2) */
-    retrieveV2: `${API_PREFIX}/fable/retrieve_v2`,
-    /** POST - Create or update a fable with metadata (v2, returns { id, version }) */
-    upsertV2: `${API_PREFIX}/fable/upsert_v2`,
-    /** PUT - Compile a fable by persisted reference (v2) */
-    compileV2: `${API_PREFIX}/fable/compile_v2`,
+    /** GET - Retrieve a saved fable with metadata */
+    retrieve: `${API_PREFIX}/fable/retrieve`,
+    /** POST - Create or update a fable with metadata (returns { id, version }) */
+    upsert: `${API_PREFIX}/fable/upsert`,
+    /** PUT - Compile a fable by persisted reference */
+    compile: `${API_PREFIX}/fable/compile`,
   },
 
   /**
@@ -139,29 +139,29 @@ export const API_ENDPOINTS = {
    * Job monitoring and execution endpoints
    */
   job: {
-    /** POST - Submit a job for execution (v2, by definition id) */
-    executeV2: `${API_PREFIX}/job/execute_v2`,
-    /** GET - Get paginated status of all executions (v2) */
-    statusV2: `${API_PREFIX}/job/status_v2`,
-    /** GET - Get status of a single execution (v2) */
-    statusV2ById: (executionId: string) =>
-      `${API_PREFIX}/job/${executionId}/status_v2`,
-    /** GET - Get job outputs (product-to-task mapping) (v2) */
-    outputsV2: (executionId: string) =>
-      `${API_PREFIX}/job/${executionId}/outputs_v2`,
-    /** GET - Get list of available output task IDs (v2) */
-    availableV2: (executionId: string) =>
-      `${API_PREFIX}/job/${executionId}/available_v2`,
-    /** GET - Get job result data by task ID (v2) */
-    resultsV2: (executionId: string) =>
-      `${API_PREFIX}/job/${executionId}/results_v2`,
-    /** GET - Download job logs as ZIP (v2) */
-    logsV2: (executionId: string) => `${API_PREFIX}/job/${executionId}/logs_v2`,
-    /** POST - Restart an execution (v2, returns same execution_id with bumped attempt_count) */
-    restartV2: (executionId: string) =>
-      `${API_PREFIX}/job/${executionId}/restart_v2`,
-    /** DELETE - Delete an execution (v2, execution_id as query param) */
-    deleteV2: `${API_PREFIX}/job/delete_v2`,
+    /** POST - Submit a job for execution (by definition id) */
+    execute: `${API_PREFIX}/job/execute`,
+    /** GET - Get paginated status of all executions */
+    status: `${API_PREFIX}/job/status`,
+    /** GET - Get status of a single execution */
+    statusById: (executionId: string) =>
+      `${API_PREFIX}/job/${executionId}/status`,
+    /** GET - Get job outputs (product-to-task mapping) */
+    outputs: (executionId: string) =>
+      `${API_PREFIX}/job/${executionId}/outputs`,
+    /** GET - Get list of available output task IDs */
+    available: (executionId: string) =>
+      `${API_PREFIX}/job/${executionId}/available`,
+    /** GET - Get job result data by task ID */
+    results: (executionId: string) =>
+      `${API_PREFIX}/job/${executionId}/results`,
+    /** GET - Download job logs as ZIP */
+    logs: (executionId: string) => `${API_PREFIX}/job/${executionId}/logs`,
+    /** POST - Restart an execution (returns same execution_id with bumped attempt_count) */
+    restart: (executionId: string) =>
+      `${API_PREFIX}/job/${executionId}/restart`,
+    /** DELETE - Delete an execution (execution_id as query param) */
+    delete: `${API_PREFIX}/job/delete`,
   },
 
   /**
@@ -221,20 +221,20 @@ export const API_PATTERNS = {
     modifyEnabled: `${API_PREFIX}/plugin/modifyEnabled`,
   },
   job: {
-    /** Pattern: /api/v1/job/:executionId/status_v2 */
-    statusV2ById: `${API_PREFIX}/job/:executionId/status_v2`,
-    /** Pattern: /api/v1/job/:executionId/outputs_v2 */
-    outputsV2: `${API_PREFIX}/job/:executionId/outputs_v2`,
-    /** Pattern: /api/v1/job/:executionId/available_v2 */
-    availableV2: `${API_PREFIX}/job/:executionId/available_v2`,
-    /** Pattern: /api/v1/job/:executionId/results_v2 */
-    resultsV2: `${API_PREFIX}/job/:executionId/results_v2`,
-    /** Pattern: /api/v1/job/:executionId/logs_v2 */
-    logsV2: `${API_PREFIX}/job/:executionId/logs_v2`,
-    /** Pattern: /api/v1/job/:executionId/restart_v2 */
-    restartV2: `${API_PREFIX}/job/:executionId/restart_v2`,
-    /** Pattern: /api/v1/job/delete_v2 (execution_id as query param) */
-    deleteV2: `${API_PREFIX}/job/delete_v2`,
+    /** Pattern: /api/v1/job/:executionId/status */
+    statusById: `${API_PREFIX}/job/:executionId/status`,
+    /** Pattern: /api/v1/job/:executionId/outputs */
+    outputs: `${API_PREFIX}/job/:executionId/outputs`,
+    /** Pattern: /api/v1/job/:executionId/available */
+    available: `${API_PREFIX}/job/:executionId/available`,
+    /** Pattern: /api/v1/job/:executionId/results */
+    results: `${API_PREFIX}/job/:executionId/results`,
+    /** Pattern: /api/v1/job/:executionId/logs */
+    logs: `${API_PREFIX}/job/:executionId/logs`,
+    /** Pattern: /api/v1/job/:executionId/restart */
+    restart: `${API_PREFIX}/job/:executionId/restart`,
+    /** Pattern: /api/v1/job/delete (execution_id as query param) */
+    delete: `${API_PREFIX}/job/delete`,
   },
   sources: {
     /** Pattern: /api/v1/sources/:sourceId */
