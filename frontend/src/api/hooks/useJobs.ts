@@ -18,22 +18,22 @@ import type {
   EnvironmentSpecification,
   JobExecuteV2Response,
   JobExecutionDetail,
-  JobExecutionListV2,
+  JobExecutionList,
   JobStatus,
   ProductToOutputId,
 } from '@/api/types/job.types'
 import type { JobMetadata } from '@/features/executions/stores/useJobMetadataStore'
 import { isTerminalStatus } from '@/api/types/job.types'
 import {
-  deleteJobV2,
-  executeJobV2,
-  getJobAvailableV2,
-  getJobOutputsV2,
-  getJobStatusV2,
-  getJobsStatusV2,
-  restartJobV2,
+  deleteJob,
+  executeJob,
+  getJobAvailable,
+  getJobOutputs,
+  getJobStatus,
+  getJobsStatus,
+  restartJob,
 } from '@/api/endpoints/job'
-import { upsertFableV2 } from '@/api/endpoints/fable'
+import { upsertFable } from '@/api/endpoints/fable'
 import { useJobMetadataStore } from '@/features/executions/stores/useJobMetadataStore'
 
 export const jobKeys = {
@@ -48,7 +48,7 @@ export const jobKeys = {
 export function useJobStatus(jobId: string | undefined) {
   return useQuery<JobExecutionDetail>({
     queryKey: jobKeys.status(jobId ?? ''),
-    queryFn: () => getJobStatusV2(jobId!),
+    queryFn: () => getJobStatus(jobId!),
     enabled: !!jobId,
     refetchInterval: (query) => {
       const status = query.state.data?.status
@@ -65,9 +65,9 @@ export function useJobsStatus(
   pageSize: number = 10,
   status?: JobStatus,
 ) {
-  return useQuery<JobExecutionListV2>({
+  return useQuery<JobExecutionList>({
     queryKey: jobKeys.list(page, pageSize, status),
-    queryFn: () => getJobsStatusV2(page, pageSize, status),
+    queryFn: () => getJobsStatus(page, pageSize, status),
     refetchInterval: 10000,
     refetchOnWindowFocus: false,
   })
@@ -76,7 +76,7 @@ export function useJobsStatus(
 export function useJobOutputs(jobId: string | undefined) {
   return useQuery<Array<ProductToOutputId>>({
     queryKey: jobKeys.outputs(jobId ?? ''),
-    queryFn: () => getJobOutputsV2(jobId!),
+    queryFn: () => getJobOutputs(jobId!),
     enabled: !!jobId,
     staleTime: 30 * 1000,
   })
@@ -88,7 +88,7 @@ export function useJobAvailable(
 ) {
   return useQuery<Array<string>>({
     queryKey: jobKeys.available(jobId ?? ''),
-    queryFn: () => getJobAvailableV2(jobId!),
+    queryFn: () => getJobAvailable(jobId!),
     enabled: !!jobId,
     refetchInterval: () => {
       if (!jobStatus) return 5000
@@ -103,7 +103,7 @@ export function useRestartJob() {
   const queryClient = useQueryClient()
 
   return useMutation<JobExecuteV2Response, Error, string>({
-    mutationFn: restartJobV2,
+    mutationFn: restartJob,
     onSuccess: (_data, executionId) => {
       queryClient.invalidateQueries({ queryKey: jobKeys.status(executionId) })
     },
@@ -114,7 +114,7 @@ export function useDeleteJob() {
   const queryClient = useQueryClient()
 
   return useMutation<void, Error, string>({
-    mutationFn: deleteJobV2,
+    mutationFn: deleteJob,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: jobKeys.all })
     },
@@ -137,7 +137,7 @@ export function useSubmitFable() {
   return useMutation<{ execution_id: string }, Error, SubmitFableParams>({
     mutationFn: async ({ fable, name, description, tags, fableId }) => {
       // Save or update the fable definition first to get a persisted id/version
-      const { id, version } = await upsertFableV2({
+      const { id, version } = await upsertFable({
         builder: fable,
         display_name: name,
         display_description: description,
@@ -146,7 +146,7 @@ export function useSubmitFable() {
       })
 
       // Execute the persisted definition by reference
-      return executeJobV2({
+      return executeJob({
         job_definition_id: id,
         job_definition_version: version,
       })

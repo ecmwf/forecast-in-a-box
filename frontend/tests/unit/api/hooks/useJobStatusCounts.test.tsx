@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { worker } from '@tests/../mocks/browser'
 import type { ReactNode } from 'react'
-import type { JobExecutionListV2 } from '@/api/types/job.types'
+import type { JobExecutionList } from '@/api/types/job.types'
 import { useJobStatusCounts } from '@/api/hooks/useJobStatusCounts'
 import { API_ENDPOINTS } from '@/api/endpoints'
 
@@ -22,7 +22,7 @@ vi.mock('@/utils/env', () => ({
   getBackendBaseUrl: vi.fn(() => ''),
 }))
 
-const mockJobsResponse: JobExecutionListV2 = {
+const mockJobsResponse: JobExecutionList = {
   executions: [
     {
       execution_id: 'exec-1',
@@ -110,7 +110,7 @@ describe('useJobStatusCounts', () => {
 
   it('computes counts correctly from API response', async () => {
     worker.use(
-      http.get(API_ENDPOINTS.job.statusV2, () => {
+      http.get(API_ENDPOINTS.job.status, () => {
         return HttpResponse.json(mockJobsResponse)
       }),
     )
@@ -144,7 +144,7 @@ describe('useJobStatusCounts', () => {
 
   it('returns correct runningCount', async () => {
     worker.use(
-      http.get(API_ENDPOINTS.job.statusV2, () => {
+      http.get(API_ENDPOINTS.job.status, () => {
         return HttpResponse.json(mockJobsResponse)
       }),
     )
@@ -173,7 +173,7 @@ describe('useJobStatusCounts', () => {
 
   it('returns zero counts while loading', async () => {
     worker.use(
-      http.get(API_ENDPOINTS.job.statusV2, async () => {
+      http.get(API_ENDPOINTS.job.status, async () => {
         await new Promise((resolve) => setTimeout(resolve, 5000))
         return HttpResponse.json(mockJobsResponse)
       }),

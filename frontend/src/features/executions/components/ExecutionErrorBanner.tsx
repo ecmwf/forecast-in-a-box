@@ -19,7 +19,7 @@ import { useTranslation } from 'react-i18next'
 import { P } from '@/components/base/typography'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { downloadJobLogsV2 } from '@/api/endpoints/job'
+import { downloadJobLogs } from '@/api/endpoints/job'
 import { createLogger } from '@/lib/logger'
 import { showToast } from '@/lib/toast'
 
@@ -44,7 +44,7 @@ export function ExecutionErrorBanner({
 
   const handleDownloadLogs = async () => {
     try {
-      const blob = await downloadJobLogsV2(jobId)
+      const blob = await downloadJobLogs(jobId)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url

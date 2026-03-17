@@ -82,7 +82,7 @@ export const fableHandlers = [
     return HttpResponse.json(expansion)
   }),
 
-  http.post(API_ENDPOINTS.fable.upsertV2, async ({ request }) => {
+  http.post(API_ENDPOINTS.fable.upsert, async ({ request }) => {
     await delay(500)
 
     let body: FableUpsertV2Request
@@ -153,7 +153,7 @@ export const fableHandlers = [
     return HttpResponse.json({ id: newId, version: 1 })
   }),
 
-  http.get(API_ENDPOINTS.fable.retrieveV2, async ({ request }) => {
+  http.get(API_ENDPOINTS.fable.retrieve, async ({ request }) => {
     await delay(300)
 
     const url = new URL(request.url)
@@ -183,7 +183,7 @@ export const fableHandlers = [
     })
   }),
 
-  http.put(API_ENDPOINTS.fable.compileV2, async ({ request }) => {
+  http.put(API_ENDPOINTS.fable.compile, async ({ request }) => {
     await delay(600)
 
     let body: { id: string; version?: number }

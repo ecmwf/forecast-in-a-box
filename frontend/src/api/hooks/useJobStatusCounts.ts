@@ -14,13 +14,13 @@
 
 import { useQuery } from '@tanstack/react-query'
 import type { JobStatus } from '@/api/types/job.types'
-import { getJobsStatusV2 } from '@/api/endpoints/job'
+import { getJobsStatus } from '@/api/endpoints/job'
 import { jobKeys } from '@/api/hooks/useJobs'
 
 export function useJobStatusCounts() {
   const query = useQuery({
     queryKey: [...jobKeys.all, 'counts'] as const,
-    queryFn: () => getJobsStatusV2(1, 1000),
+    queryFn: () => getJobsStatus(1, 1000),
     refetchInterval: 10000,
     refetchOnWindowFocus: false,
   })

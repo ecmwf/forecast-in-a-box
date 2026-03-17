@@ -63,19 +63,19 @@ export interface SubmitJobResponse {
   id: string
 }
 
-/** POST /job/execute_v2 request */
+/** POST /job/execute request */
 export interface JobExecuteV2Request {
   job_definition_id: string
   job_definition_version?: number
 }
 
-/** POST /job/execute_v2 response */
+/** POST /job/execute response */
 export interface JobExecuteV2Response {
   execution_id: string
   attempt_count: number
 }
 
-/** Single execution detail from GET /job/status_v2 */
+/** Single execution detail from GET /job/status */
 export interface JobExecutionDetail {
   execution_id: string
   attempt_count: number
@@ -89,8 +89,8 @@ export interface JobExecutionDetail {
   cascade_job_id: string | null
 }
 
-/** GET /job/status_v2 response */
-export interface JobExecutionListV2 {
+/** GET /job/status response */
+export interface JobExecutionList {
   executions: Array<JobExecutionDetail>
   total: number
   page: number

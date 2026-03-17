@@ -16,7 +16,7 @@ import type {
   JobExecuteV2Request,
   JobExecuteV2Response,
   JobExecutionDetail,
-  JobExecutionListV2,
+  JobExecutionList,
   JobStatus,
   ProductToOutputId,
 } from '@/api/types/job.types'
@@ -25,17 +25,17 @@ import { API_ENDPOINTS } from '@/api/endpoints'
 import { getBackendBaseUrl } from '@/utils/env'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
 
-export async function executeJobV2(
+export async function executeJob(
   request: JobExecuteV2Request,
 ): Promise<JobExecuteV2Response> {
   return apiClient.post(API_ENDPOINTS.job.execute, request)
 }
 
-export async function getJobsStatusV2(
+export async function getJobsStatus(
   page: number = 1,
   pageSize: number = 10,
   status?: JobStatus,
-): Promise<JobExecutionListV2> {
+): Promise<JobExecutionList> {
   const params: Record<string, string | number> = { page, page_size: pageSize }
   if (status) {
     params.status = status
@@ -67,25 +67,25 @@ function buildHeaders(): HeadersInit {
   return headers
 }
 
-export async function getJobStatusV2(
+export async function getJobStatus(
   executionId: string,
 ): Promise<JobExecutionDetail> {
   return apiClient.get(API_ENDPOINTS.job.statusById(executionId))
 }
 
-export async function getJobOutputsV2(
+export async function getJobOutputs(
   executionId: string,
 ): Promise<Array<ProductToOutputId>> {
   return apiClient.get(API_ENDPOINTS.job.outputs(executionId))
 }
 
-export async function getJobAvailableV2(
+export async function getJobAvailable(
   executionId: string,
 ): Promise<Array<string>> {
   return apiClient.get(API_ENDPOINTS.job.available(executionId))
 }
 
-export async function getJobResultV2(
+export async function getJobResult(
   executionId: string,
   datasetId: string,
 ): Promise<{ blob: Blob; contentType: string }> {
@@ -111,7 +111,7 @@ export async function getJobResultV2(
   return { blob, contentType }
 }
 
-export async function downloadJobLogsV2(executionId: string): Promise<Blob> {
+export async function downloadJobLogs(executionId: string): Promise<Blob> {
   const url = buildFullUrl(API_ENDPOINTS.job.logs(executionId))
 
   const response = await fetch(url, {
@@ -129,13 +129,13 @@ export async function downloadJobLogsV2(executionId: string): Promise<Blob> {
   return response.blob()
 }
 
-export async function restartJobV2(
+export async function restartJob(
   executionId: string,
 ): Promise<JobExecuteV2Response> {
   return apiClient.post(API_ENDPOINTS.job.restart(executionId))
 }
 
-export async function deleteJobV2(executionId: string): Promise<void> {
+export async function deleteJob(executionId: string): Promise<void> {
   return apiClient.delete(
     `${API_ENDPOINTS.job.delete}?execution_id=${executionId}`,
   )

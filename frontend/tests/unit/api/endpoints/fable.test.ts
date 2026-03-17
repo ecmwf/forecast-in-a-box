@@ -13,11 +13,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { worker } from '@tests/../mocks/browser'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
 import {
-  compileFableV2,
+  compileFable,
   expandFable,
   getCatalogue,
-  retrieveFableV2,
-  upsertFableV2,
+  retrieveFable,
+  upsertFable,
 } from '@/api/endpoints/fable'
 import { API_ENDPOINTS } from '@/api/endpoints'
 
@@ -146,7 +146,7 @@ describe('expandFable', () => {
   })
 })
 
-describe('retrieveFableV2', () => {
+describe('retrieveFable', () => {
   afterEach(() => {
     worker.resetHandlers()
   })
@@ -164,12 +164,12 @@ describe('retrieveFableV2', () => {
     }
 
     worker.use(
-      http.get(API_ENDPOINTS.fable.retrieveV2, () => {
+      http.get(API_ENDPOINTS.fable.retrieve, () => {
         return HttpResponse.json(mockResponse)
       }),
     )
 
-    const result = await retrieveFableV2('fable-123')
+    const result = await retrieveFable('fable-123')
     expect(result.id).toBe('fable-123')
     expect(result.version).toBe(1)
     expect(result.builder.blocks).toBeDefined()
@@ -180,7 +180,7 @@ describe('retrieveFableV2', () => {
     let capturedUrl: string | null = null
 
     worker.use(
-      http.get(API_ENDPOINTS.fable.retrieveV2, ({ request }) => {
+      http.get(API_ENDPOINTS.fable.retrieve, ({ request }) => {
         capturedUrl = request.url
         return HttpResponse.json({
           id: 'fable-456',
@@ -195,12 +195,12 @@ describe('retrieveFableV2', () => {
       }),
     )
 
-    await retrieveFableV2('fable-456')
+    await retrieveFable('fable-456')
     expect(capturedUrl).toContain('fable_builder_id=fable-456')
   })
 })
 
-describe('upsertFableV2', () => {
+describe('upsertFable', () => {
   afterEach(() => {
     worker.resetHandlers()
   })
@@ -209,13 +209,13 @@ describe('upsertFableV2', () => {
     let capturedBody: unknown = null
 
     worker.use(
-      http.post(API_ENDPOINTS.fable.upsertV2, async ({ request }) => {
+      http.post(API_ENDPOINTS.fable.upsert, async ({ request }) => {
         capturedBody = await request.json()
         return HttpResponse.json({ id: 'new-fable-id', version: 1 })
       }),
     )
 
-    const result = await upsertFableV2({
+    const result = await upsertFable({
       builder: mockFable,
       display_name: 'My Config',
       display_description: 'Some notes',
@@ -234,13 +234,13 @@ describe('upsertFableV2', () => {
     let capturedBody: unknown = null
 
     worker.use(
-      http.post(API_ENDPOINTS.fable.upsertV2, async ({ request }) => {
+      http.post(API_ENDPOINTS.fable.upsert, async ({ request }) => {
         capturedBody = await request.json()
         return HttpResponse.json({ id: 'existing-id', version: 2 })
       }),
     )
 
-    await upsertFableV2({
+    await upsertFable({
       builder: mockFable,
       display_name: 'Updated Config',
       display_description: '',
@@ -251,7 +251,7 @@ describe('upsertFableV2', () => {
   })
 })
 
-describe('compileFableV2', () => {
+describe('compileFable', () => {
   afterEach(() => {
     worker.resetHandlers()
   })
@@ -273,13 +273,13 @@ describe('compileFableV2', () => {
     let capturedBody: unknown = null
 
     worker.use(
-      http.put(API_ENDPOINTS.fable.compileV2, async ({ request }) => {
+      http.put(API_ENDPOINTS.fable.compile, async ({ request }) => {
         capturedBody = await request.json()
         return HttpResponse.json(mockCompiled)
       }),
     )
 
-    const result = await compileFableV2({ id: 'fable-123' })
+    const result = await compileFable({ id: 'fable-123' })
     expect(result).toEqual(mockCompiled)
     expect(capturedBody).toEqual({ id: 'fable-123' })
   })
@@ -288,7 +288,7 @@ describe('compileFableV2', () => {
     let capturedBody: unknown = null
 
     worker.use(
-      http.put(API_ENDPOINTS.fable.compileV2, async ({ request }) => {
+      http.put(API_ENDPOINTS.fable.compile, async ({ request }) => {
         capturedBody = await request.json()
         return HttpResponse.json({
           job: {
@@ -305,7 +305,7 @@ describe('compileFableV2', () => {
       }),
     )
 
-    await compileFableV2({ id: 'fable-123', version: 2 })
+    await compileFable({ id: 'fable-123', version: 2 })
     expect(capturedBody).toEqual({ id: 'fable-123', version: 2 })
   })
 })

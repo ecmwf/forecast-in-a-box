@@ -20,11 +20,11 @@ import type {
 } from '@/api/types/fable.types'
 import type { ExecutionSpecification } from '@/api/types/job.types'
 import {
-  compileFableV2,
+  compileFable,
   expandFable,
   getCatalogue,
-  retrieveFableV2,
-  upsertFableV2,
+  retrieveFable,
+  upsertFable,
 } from '@/api/endpoints/fable'
 import { getFactory } from '@/api/types/fable.types'
 import { ApiClientError } from '@/api/client'
@@ -64,7 +64,7 @@ export function useFable(fableId: string | null | undefined) {
   return useQuery<FableBuilderV1>({
     queryKey: fableKeys.detail(fableId ?? ''),
     queryFn: async () => {
-      const response = await retrieveFableV2(fableId!)
+      const response = await retrieveFable(fableId!)
       return response.builder
     },
     enabled: !!fableId,
@@ -99,9 +99,9 @@ export function useFableValidation(
   })
 }
 
-export function useCompileFableV2() {
+export function useCompileFable() {
   return useMutation<ExecutionSpecification, Error, FableCompileV2Request>({
-    mutationFn: compileFableV2,
+    mutationFn: compileFable,
   })
 }
 
@@ -120,7 +120,7 @@ export function useUpsertFable() {
     }
   >({
     mutationFn: ({ fable, fableId, display_name, display_description, tags }) =>
-      upsertFableV2({
+      upsertFable({
         builder: fable,
         display_name,
         display_description,

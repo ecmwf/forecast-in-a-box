@@ -71,7 +71,7 @@ export async function expandFable(
 /**
  * Retrieve a saved fable by ID, returning builder and metadata (v2)
  */
-export async function retrieveFableV2(
+export async function retrieveFable(
   fableId: string,
   version?: number,
 ): Promise<FableRetrieveV2Response> {
@@ -90,7 +90,7 @@ export async function retrieveFableV2(
 /**
  * Create or update a fable with full metadata, returning { id, version } (v2)
  */
-export async function upsertFableV2(
+export async function upsertFable(
   request: FableUpsertV2Request,
 ): Promise<FableUpsertV2Response> {
   return apiClient.post(API_ENDPOINTS.fable.upsert, request, {
@@ -101,7 +101,7 @@ export async function upsertFableV2(
 /**
  * Compile a fable by persisted definition reference (v2)
  */
-export async function compileFableV2(
+export async function compileFable(
   request: FableCompileV2Request,
 ): Promise<ExecutionSpecification> {
   return apiClient.put(API_ENDPOINTS.fable.compile, request)

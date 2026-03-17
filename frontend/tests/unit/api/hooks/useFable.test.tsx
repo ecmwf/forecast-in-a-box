@@ -22,7 +22,7 @@ import {
   fableKeys,
   useBlockCatalogue,
   useBlockFactory,
-  useCompileFableV2,
+  useCompileFable,
   useExpandFable,
   useFable,
   useFableValidation,
@@ -202,7 +202,7 @@ describe('useFable', () => {
     }
 
     worker.use(
-      http.get(API_ENDPOINTS.fable.retrieveV2, () => {
+      http.get(API_ENDPOINTS.fable.retrieve, () => {
         return HttpResponse.json(mockRetrieveV2Response)
       }),
     )
@@ -231,7 +231,7 @@ describe('useFable', () => {
     let fetchCalled = false
 
     worker.use(
-      http.get(API_ENDPOINTS.fable.retrieveV2, () => {
+      http.get(API_ENDPOINTS.fable.retrieve, () => {
         fetchCalled = true
         return HttpResponse.json({})
       }),
@@ -406,7 +406,7 @@ describe('useUpsertFable', () => {
 
   it('creates new fable and returns { id, version }', async () => {
     worker.use(
-      http.post(API_ENDPOINTS.fable.upsertV2, () => {
+      http.post(API_ENDPOINTS.fable.upsert, () => {
         return HttpResponse.json({ id: 'new-fable-id', version: 1 })
       }),
     )
@@ -450,7 +450,7 @@ describe('useUpsertFable', () => {
     let capturedBody: unknown = null
 
     worker.use(
-      http.post(API_ENDPOINTS.fable.upsertV2, async ({ request }) => {
+      http.post(API_ENDPOINTS.fable.upsert, async ({ request }) => {
         capturedBody = await request.json()
         return HttpResponse.json({ id: 'existing-id', version: 2 })
       }),
@@ -489,7 +489,7 @@ describe('useUpsertFable', () => {
   })
 })
 
-describe('useCompileFableV2', () => {
+describe('useCompileFable', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -513,15 +513,15 @@ describe('useCompileFableV2', () => {
     }
 
     worker.use(
-      http.put(API_ENDPOINTS.fable.compileV2, () => {
+      http.put(API_ENDPOINTS.fable.compile, () => {
         return HttpResponse.json(mockCompiled)
       }),
     )
 
-    let mutationResult: ReturnType<typeof useCompileFableV2> | null = null
+    let mutationResult: ReturnType<typeof useCompileFable> | null = null
 
     function TestComponent() {
-      const result = useCompileFableV2()
+      const result = useCompileFable()
       mutationResult = result
       return (
         <div>

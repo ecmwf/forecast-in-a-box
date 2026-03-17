@@ -12,7 +12,7 @@ import { HttpResponse, http } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { worker } from '@tests/../mocks/browser'
 import { renderWithProviders } from '@tests/utils/render'
-import type { JobExecutionListV2 } from '@/api/types/job.types'
+import type { JobExecutionList } from '@/api/types/job.types'
 import { JobStatusDetailsPopover } from '@/features/dashboard/components/JobStatusDetailsPopover'
 import { API_ENDPOINTS } from '@/api/endpoints'
 
@@ -20,7 +20,7 @@ vi.mock('@/utils/env', () => ({
   getBackendBaseUrl: vi.fn(() => ''),
 }))
 
-const mockJobsResponse: JobExecutionListV2 = {
+const mockJobsResponse: JobExecutionList = {
   executions: [
     {
       execution_id: 'exec-1',
@@ -93,7 +93,7 @@ describe('JobStatusDetailsPopover', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     worker.use(
-      http.get(API_ENDPOINTS.job.statusV2, () => {
+      http.get(API_ENDPOINTS.job.status, () => {
         return HttpResponse.json(mockJobsResponse)
       }),
     )
