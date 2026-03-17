@@ -14,6 +14,9 @@
 
 import type {
   ExecutionSpecification,
+  JobExecuteV2Request,
+  JobExecuteV2Response,
+  JobExecutionListV2,
   JobProgressResponse,
   JobProgressResponses,
   JobStatus,
@@ -31,6 +34,12 @@ export async function executeJob(
   return apiClient.post(API_ENDPOINTS.job.execute, spec)
 }
 
+export async function executeJobV2(
+  request: JobExecuteV2Request,
+): Promise<JobExecuteV2Response> {
+  return apiClient.post(API_ENDPOINTS.job.executeV2, request)
+}
+
 export async function getJobsStatus(
   page: number = 1,
   pageSize: number = 10,
@@ -41,6 +50,18 @@ export async function getJobsStatus(
     params.status = status
   }
   return apiClient.get(API_ENDPOINTS.job.status, { params })
+}
+
+export async function getJobsStatusV2(
+  page: number = 1,
+  pageSize: number = 10,
+  status?: JobStatus,
+): Promise<JobExecutionListV2> {
+  const params: Record<string, string | number> = { page, page_size: pageSize }
+  if (status) {
+    params.status = status
+  }
+  return apiClient.get(API_ENDPOINTS.job.statusV2, { params })
 }
 
 export async function getJobStatus(

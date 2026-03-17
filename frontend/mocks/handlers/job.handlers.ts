@@ -14,16 +14,21 @@
 
 import { HttpResponse, delay, http } from 'msw'
 import {
+  addExecution,
   addJob,
   createMockPngBlob,
   deleteJob,
+  getAllExecutions,
   getAllJobs,
+  getExecution,
   getJob,
 } from '../data/job.data'
-import type { ExecutionSpecification, JobStatus } from '@/api/types/job.types'
+import type { ExecutionSpecification, JobExecuteV2Request, JobStatus } from '@/api/types/job.types'
 import { API_ENDPOINTS, API_PATTERNS } from '@/api/endpoints'
 
 export const jobHandlers = [
+  // ─── v1 handlers (kept for backward compatibility) ─────────────────────
+
   http.post(API_ENDPOINTS.job.execute, async ({ request }) => {
     await delay(400)
 
@@ -72,6 +77,65 @@ export const jobHandlers = [
       total_pages: totalPages,
       error: null,
     })
+  }),
+
+  // ─── v2 handlers ────────────────────────────────────────────────────────
+
+  http.post(API_ENDPOINTS.job.executeV2, async ({ request }) => {
+    await delay(400)
+
+    let body: JobExecuteV2Request
+    try {
+      body = (await request.json()) as JobExecuteV2Request
+    } catch {
+      return HttpResponse.json(
+        { message: 'Invalid request body' },
+        { status: 400 },
+      )
+    }
+
+    const result = addExecution(body)
+    return HttpResponse.json(result)
+  }),
+
+  http.get(API_ENDPOINTS.job.statusV2, async ({ request }) => {
+    await delay(200)
+
+    const url = new URL(request.url)
+    const page = parseInt(url.searchParams.get('page') ?? '1', 10)
+    const pageSize = parseInt(url.searchParams.get('page_size') ?? '10', 10)
+    const statusFilter = url.searchParams.get('status') as JobStatus | null
+
+    let executions = getAllExecutions()
+    if (statusFilter) {
+      executions = executions.filter((e) => e.status === statusFilter)
+    }
+
+    const total = executions.length
+    const totalPages = Math.max(1, Math.ceil(total / pageSize))
+    const start = (page - 1) * pageSize
+    const pageExecutions = executions.slice(start, start + pageSize)
+
+    return HttpResponse.json({
+      executions: pageExecutions,
+      total,
+      page,
+      page_size: pageSize,
+      total_pages: totalPages,
+    })
+  }),
+
+  http.get(API_PATTERNS.job.statusV2ById, async ({ params }) => {
+    await delay(150)
+
+    const executionId = params.executionId as string
+    const exec = getExecution(executionId)
+
+    if (!exec) {
+      return HttpResponse.json({ detail: 'Execution not found' }, { status: 404 })
+    }
+
+    return HttpResponse.json(exec)
   }),
 
   http.get(API_PATTERNS.job.statusById, async ({ params }) => {

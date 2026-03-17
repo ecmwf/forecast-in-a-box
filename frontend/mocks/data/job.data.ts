@@ -14,6 +14,9 @@
 
 import type {
   ExecutionSpecification,
+  JobExecuteV2Request,
+  JobExecuteV2Response,
+  JobExecutionDetail,
   JobProgressResponse,
   ProductToOutputId,
 } from '@/api/types/job.types'
@@ -118,10 +121,73 @@ let jobIdCounter = 100
 
 let jobsState: Record<string, MockJob> = {}
 
+// ─── V2 execution mock state ───────────────────────────────────────────────
+
+let executionIdCounter = 200
+
+let executionsState: Record<string, JobExecutionDetail> = {}
+
+const seedExecutionsV2: Array<JobExecutionDetail> = [
+  {
+    execution_id: 'job-completed-001',
+    attempt_count: 1,
+    status: 'completed',
+    created_at: threeDaysAgo,
+    updated_at: threeDaysAgo,
+    job_definition_id: 'def-001',
+    job_definition_version: 1,
+    error: null,
+    progress: '100',
+    cascade_job_id: 'cascade-001',
+  },
+  {
+    execution_id: 'job-running-002',
+    attempt_count: 1,
+    status: 'running',
+    created_at: oneHourAgo,
+    updated_at: oneHourAgo,
+    job_definition_id: 'def-002',
+    job_definition_version: 1,
+    error: null,
+    progress: '45',
+    cascade_job_id: 'cascade-002',
+  },
+  {
+    execution_id: 'job-errored-003',
+    attempt_count: 1,
+    status: 'errored',
+    created_at: twoHoursAgo,
+    updated_at: twoHoursAgo,
+    job_definition_id: 'def-003',
+    job_definition_version: 1,
+    error: 'Worker process exited with code 137 (OOM killed)',
+    progress: '62',
+    cascade_job_id: 'cascade-003',
+  },
+  {
+    execution_id: 'job-submitted-004',
+    attempt_count: 1,
+    status: 'submitted',
+    created_at: now.toISOString(),
+    updated_at: now.toISOString(),
+    job_definition_id: 'def-004',
+    job_definition_version: 1,
+    error: null,
+    progress: '0',
+    cascade_job_id: null,
+  },
+]
+
 export function resetJobsState(): void {
   jobsState = {}
   for (const job of seedJobs) {
     jobsState[job.id] = JSON.parse(JSON.stringify(job)) as MockJob
+  }
+  executionsState = {}
+  for (const exec of seedExecutionsV2) {
+    executionsState[exec.execution_id] = JSON.parse(
+      JSON.stringify(exec),
+    ) as JobExecutionDetail
   }
 }
 
@@ -159,6 +225,36 @@ export function addJob(spec: ExecutionSpecification): MockJob {
   }
   jobsState[id] = job
   return job
+}
+
+// ─── V2 execution accessors ────────────────────────────────────────────────
+
+export function getAllExecutions(): Array<JobExecutionDetail> {
+  return Object.values(executionsState).sort((a, b) => {
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  })
+}
+
+export function getExecution(executionId: string): JobExecutionDetail | undefined {
+  return executionsState[executionId]
+}
+
+export function addExecution(request: JobExecuteV2Request): JobExecuteV2Response {
+  const execution_id = `exec-mock-${String(executionIdCounter++).padStart(3, '0')}`
+  const timestamp = new Date().toISOString()
+  executionsState[execution_id] = {
+    execution_id,
+    attempt_count: 1,
+    status: 'submitted',
+    created_at: timestamp,
+    updated_at: timestamp,
+    job_definition_id: request.job_definition_id,
+    job_definition_version: request.job_definition_version ?? 1,
+    error: null,
+    progress: '0',
+    cascade_job_id: null,
+  }
+  return { execution_id, attempt_count: 1 }
 }
 
 export function deleteJob(jobId: string): boolean {

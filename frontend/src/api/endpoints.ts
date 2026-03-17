@@ -166,6 +166,13 @@ export const API_ENDPOINTS = {
     delete: (jobId: string) => `${API_PREFIX}/job/${jobId}`,
     /** POST - Submit a job for execution */
     execute: `${API_PREFIX}/job/execute`,
+    /** POST - Submit a job for execution (v2, by definition id) */
+    executeV2: `${API_PREFIX}/job/execute_v2`,
+    /** GET - Get paginated status of all executions (v2) */
+    statusV2: `${API_PREFIX}/job/status_v2`,
+    /** GET - Get status of a single execution (v2) */
+    statusV2ById: (executionId: string) =>
+      `${API_PREFIX}/job/${executionId}/status_v2`,
   },
 
   /**
@@ -241,6 +248,8 @@ export const API_PATTERNS = {
     restart: `${API_PREFIX}/job/:jobId/restart`,
     /** Pattern: /api/v1/job/:jobId (DELETE) */
     delete: `${API_PREFIX}/job/:jobId`,
+    /** Pattern: /api/v1/job/:executionId/status_v2 */
+    statusV2ById: `${API_PREFIX}/job/:executionId/status_v2`,
   },
   sources: {
     /** Pattern: /api/v1/sources/:sourceId */

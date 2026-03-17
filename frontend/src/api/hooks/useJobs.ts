@@ -16,8 +16,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
 import type {
   EnvironmentSpecification,
+  JobExecutionListV2,
   JobProgressResponse,
-  JobProgressResponses,
   JobStatus,
   ProductToOutputId,
   SubmitJobResponse,
@@ -26,14 +26,14 @@ import type { JobMetadata } from '@/features/executions/stores/useJobMetadataSto
 import { isTerminalStatus } from '@/api/types/job.types'
 import {
   deleteJob,
-  executeJob,
+  executeJobV2,
   getJobAvailable,
   getJobOutputs,
   getJobStatus,
-  getJobsStatus,
+  getJobsStatusV2,
   restartJob,
 } from '@/api/endpoints/job'
-import { compileFable } from '@/api/endpoints/fable'
+import { upsertFableV2 } from '@/api/endpoints/fable'
 import { useJobMetadataStore } from '@/features/executions/stores/useJobMetadataStore'
 
 export const jobKeys = {
@@ -65,9 +65,9 @@ export function useJobsStatus(
   pageSize: number = 10,
   status?: JobStatus,
 ) {
-  return useQuery<JobProgressResponses>({
+  return useQuery<JobExecutionListV2>({
     queryKey: jobKeys.list(page, pageSize, status),
-    queryFn: () => getJobsStatus(page, pageSize, status),
+    queryFn: () => getJobsStatusV2(page, pageSize, status),
     refetchInterval: 10000,
     refetchOnWindowFocus: false,
   })
@@ -134,19 +134,19 @@ interface SubmitFableParams {
 export function useSubmitFable() {
   const addJob = useJobMetadataStore((s) => s.addJob)
 
-  return useMutation<SubmitJobResponse, Error, SubmitFableParams>({
-    mutationFn: async ({ fable, environment }) => {
-      const spec = await compileFable(fable)
+  return useMutation<{ execution_id: string }, Error, SubmitFableParams>({
+    mutationFn: async ({ fable, name, description, tags, fableId }) => {
+      // Save or update the fable definition first to get a persisted id/version
+      const { id, version } = await upsertFableV2({
+        builder: fable,
+        display_name: name,
+        display_description: description,
+        tags,
+        parent_id: fableId ?? undefined,
+      })
 
-      // Merge user-provided environment settings into backend-provided spec
-      if (environment) {
-        spec.environment = {
-          ...spec.environment,
-          ...environment,
-        }
-      }
-
-      return executeJob(spec)
+      // Execute the persisted definition by reference
+      return executeJobV2({ job_definition_id: id, job_definition_version: version })
     },
     onSuccess: (response, params) => {
       const metadata: JobMetadata = {
@@ -158,7 +158,8 @@ export function useSubmitFable() {
         fableSnapshot: params.fable,
         submittedAt: new Date().toISOString(),
       }
-      addJob(response.id, metadata)
+      // Key metadata by execution_id (v2 logical execution identifier)
+      addJob(response.execution_id, metadata)
     },
   })
 }

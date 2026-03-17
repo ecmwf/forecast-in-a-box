@@ -98,10 +98,14 @@ export function JobListPage() {
     )
   }
 
-  const progresses = data?.progresses ?? {}
-  let jobIds = Object.keys(progresses).sort((a, b) => {
-    const aTime = progresses[a].created_at ?? ''
-    const bTime = progresses[b].created_at ?? ''
+  const progresses = data?.executions ?? []
+  const progressMap: Record<string, (typeof progresses)[number]> = {}
+  for (const exec of progresses) {
+    progressMap[exec.execution_id] = exec
+  }
+  let jobIds = Object.keys(progressMap).sort((a, b) => {
+    const aTime = progressMap[a].created_at ?? ''
+    const bTime = progressMap[b].created_at ?? ''
     return bTime.localeCompare(aTime)
   })
   const totalPages = data?.total_pages ?? 1
@@ -174,14 +178,23 @@ export function JobListPage() {
 
         <div className="divide-y divide-border">
           {jobIds.length > 0 ? (
-            jobIds.map((jobId) => (
-              <JobListItem
-                key={jobId}
-                jobId={jobId}
-                status={progresses[jobId]}
-                metadata={jobs[jobId]}
-              />
-            ))
+            jobIds.map((jobId) => {
+              const exec = progressMap[jobId]
+              const status = {
+                progress: exec.progress ?? '0',
+                status: exec.status,
+                created_at: exec.created_at,
+                error: exec.error,
+              }
+              return (
+                <JobListItem
+                  key={jobId}
+                  jobId={jobId}
+                  status={status}
+                  metadata={jobs[jobId]}
+                />
+              )
+            })
           ) : (
             <div className="p-12 text-center text-muted-foreground">
               {t('empty.description')}

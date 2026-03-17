@@ -12,6 +12,7 @@
  * Job Metadata Store
  *
  * Client-side persisted store for job metadata (name, description, tags, fable snapshot).
+ * Keys in the `jobs` map are v2 execution_ids (logical identifiers returned by execute_v2).
  */
 
 import { create } from 'zustand'

@@ -26,7 +26,7 @@ This file tracks implementation progress for the frontend migration from v1 to v
 - Notes: v2 wrappers (`retrieveFableV2`, `upsertFableV2`, `compileFableV2`) added to `endpoints/fable.ts`; `useFable` now calls `retrieveV2` internally (still returns `FableBuilderV1`); `useUpsertFable` now requires `display_name`/`display_description` and returns `{ id, version }`; `SaveConfigPopover` passes title and comments to the backend; `useCompileFableV2` hook added for compile-by-reference use in next stage.
 
 ### 12-jobSubmissionAndList.md
-- Status: `pending`
+- Status: `done`
 - Owner:
 - Depends on:
   - `11-fableEndpoints.md`
@@ -45,7 +45,7 @@ This file tracks implementation progress for the frontend migration from v1 to v
   - `cd frontend && npm run test:unit -- tests/unit/api/hooks/useJobStatusCounts.test.tsx`
   - `cd frontend && npm run test:integration -- tests/integration/features/dashboard/job-status-popover.test.tsx`
   - `cd frontend && npm run test:integration -- tests/integration/features/executions/job-list.test.tsx`
-- Notes:
+- Notes: `useSubmitFable` now calls `upsertFableV2` then `executeJobV2` (keying metadata by `execution_id`); `useJobsStatus` and `useJobStatusCounts` now consume `status_v2` (`executions[]` array); `JobListPage` normalises the array into a map before rendering; v1 handlers kept for detail-page tests; environment spec field in submit dialog retained in UI but not forwarded (not supported by execute_v2).
 
 ### 13-jobDetailAndArtifacts.md
 - Status: `pending`
