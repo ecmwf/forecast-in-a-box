@@ -648,14 +648,23 @@ async def restart_execution_v2(
     return result.t
 
 
-@router.get("/{job_id}/available_2")
+@router.get("/{execution_id}/available_2")
 async def get_job_availability_v2(
     execution_id: str, attempt_count: int | None = None, user: UserRead = Depends(current_active_user)
 ) -> list[TaskId]:
-    """Check which results are available for a given job_id."""
-    raise NotImplementedError
-    """ TODO
-        1. retrieve the JobExecution entity based on execution_id
-        2. assuming the cascade_job_id is not None, make a cascade api request like in `get_job_availability`, otherwise raise
-        3. extend the tests/integration/test_fable.py, namely the function test_fable_v2_execute, with invocation of this endpoint
-    """
+    """Check which results are available for a given v2 execution."""
+    execution = await db_jobs2.get_job_execution(execution_id, attempt_count)
+    if execution is None:
+        raise HTTPException(status_code=404, detail=f"JobExecution {execution_id!r} not found.")
+
+    cascade_job_id = cast(str | None, execution.cascade_job_id)
+    if cascade_job_id is None:
+        raise HTTPException(status_code=409, detail=f"JobExecution {execution_id!r} has not been submitted to cascade yet.")
+
+    response = client.request_response(api.JobProgressRequest(job_ids=[cascade_job_id]), f"{config.cascade.cascade_url}")
+    response = cast(api.JobProgressResponse, response)
+
+    if cascade_job_id not in response.datasets:
+        raise HTTPException(status_code=404, detail=f"Job {cascade_job_id} not found in gateway.")
+
+    return [x.task for x in response.datasets[cascade_job_id]]
