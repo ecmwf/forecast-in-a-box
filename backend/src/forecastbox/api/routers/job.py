@@ -35,8 +35,8 @@ from forecastbox.api.execution import (
 )
 from forecastbox.api.routers.gateway import Globals
 from forecastbox.api.types.jobs import (
-    JobExecuteV2Request,
-    JobExecuteV2Response,
+    JobExecuteRequest,
+    JobExecuteResponse,
     JobExecutionDetail,
     JobExecutionList,
     JobSpecification,
@@ -110,7 +110,7 @@ async def _get_logs(cascade_job_id: str, db_entity_ser: bytes) -> Response:
 
 
 @router.post("/execute")
-async def execute_v2_api(request: JobExecuteV2Request, user: UserRead | None = Depends(current_active_user)) -> JobExecuteV2Response:
+async def execute_v2_api(request: JobExecuteRequest, user: UserRead | None = Depends(current_active_user)) -> JobExecuteResponse:
     """Execute a job via the v2 persistence path.
 
     Loads the referenced JobDefinition from the jobs2 store, compiles it, and
@@ -118,14 +118,14 @@ async def execute_v2_api(request: JobExecuteV2Request, user: UserRead | None = D
 
     Parameters
     ----------
-    request : JobExecuteV2Request
+    request : JobExecuteRequest
         job_definition_id (+ optional version) referencing a saved JobDefinition.
     user : UserRead, optional
         The current active user.
 
     Returns
     -------
-    JobExecuteV2Response
+    JobExecuteResponse
         Contains the logical execution_id and attempt_count.
     """
     definition = await get_job_definition_for_execution(request.job_definition_id, request.job_definition_version)
@@ -211,7 +211,7 @@ async def get_specification_of_execution(
 async def restart_execution(
     execution_id: str,
     user: UserRead | None = Depends(current_active_user),
-) -> JobExecuteV2Response:
+) -> JobExecuteResponse:
     """Create a new attempt of an existing v2 execution under the same logical id."""
     user_id = str(user.id) if user is not None else None
     result = await restart_job_execution(execution_id, user_id)

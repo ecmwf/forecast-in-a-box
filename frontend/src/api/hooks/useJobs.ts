@@ -16,7 +16,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
 import type {
   EnvironmentSpecification,
-  JobExecuteV2Response,
+  JobExecuteResponse,
   JobExecutionDetail,
   JobExecutionList,
   JobStatus,
@@ -102,7 +102,7 @@ export function useJobAvailable(
 export function useRestartJob() {
   const queryClient = useQueryClient()
 
-  return useMutation<JobExecuteV2Response, Error, string>({
+  return useMutation<JobExecuteResponse, Error, string>({
     mutationFn: restartJob,
     onSuccess: (_data, executionId) => {
       queryClient.invalidateQueries({ queryKey: jobKeys.status(executionId) })

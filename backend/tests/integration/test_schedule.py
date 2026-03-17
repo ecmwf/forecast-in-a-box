@@ -15,7 +15,7 @@ import datetime as dt
 
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
-from forecastbox.api.types.fable import FableBuilder, FableSaveV2Request
+from forecastbox.api.types.fable import FableBuilder, FableSaveRequest
 from forecastbox.api.types.scheduling import ScheduleSpecification, ScheduleUpdate
 
 # *** helpers **
@@ -30,7 +30,7 @@ def _save_fable(client) -> tuple[str, int]:
         input_ids={},
     )
     builder = FableBuilder(blocks={"source1": source})
-    resp = client.post("/fable/upsert", json=FableSaveV2Request(builder=builder, display_name="sched-v2 test").model_dump())
+    resp = client.post("/fable/upsert", json=FableSaveRequest(builder=builder, display_name="sched-v2 test").model_dump())
     assert resp.is_success, resp.text
     data = resp.json()
     return data["id"], data["version"]

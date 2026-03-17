@@ -32,7 +32,7 @@ from forecastbox.api.types.fable import FableBuilder
 from forecastbox.api.types.jobs import (
     EnvironmentSpecification,
     ExecutionSpecification,
-    JobExecuteV2Response,
+    JobExecuteResponse,
     JobExecutionDetail,
     JobSpecification,
     RawCascadeJob,
@@ -157,7 +157,7 @@ async def get_job_execution_specification(execution_id: str, attempt_count: int 
     )
 
 
-async def restart_job_execution(execution_id: str, user_id: str | None) -> Either[JobExecuteV2Response, str]:  # type: ignore[invalid-argument]
+async def restart_job_execution(execution_id: str, user_id: str | None) -> Either[JobExecuteResponse, str]:  # type: ignore[invalid-argument]
     """Create a new attempt under an existing execution_id, re-running its linked JobDefinition."""
     existing = await db_jobs2.get_job_execution(execution_id)
     if existing is None:
@@ -248,7 +248,7 @@ async def poll_and_update_execution(execution_id: str, attempt_count: int | None
     return _build()
 
 
-async def execute(definition: JobDefinition, user_id: str | None, execution_id: str | None = None) -> Either[JobExecuteV2Response, str]:  # type: ignore[invalid-argument]
+async def execute(definition: JobDefinition, user_id: str | None, execution_id: str | None = None) -> Either[JobExecuteResponse, str]:  # type: ignore[invalid-argument]
     """v2 execute path: always creates a JobExecution linked to the given JobDefinition.
 
     Compiles the definition's blocks via the fable compiler, submits the resulting
@@ -288,7 +288,7 @@ async def execute(definition: JobDefinition, user_id: str | None, execution_id: 
             update_kwargs["outputs"] = [x.model_dump() for x in product_to_id_mappings]
         await db_jobs2.update_job_execution_runtime(new_execution_id, attempt_count, **update_kwargs)
 
-        return Either.ok(JobExecuteV2Response(execution_id=new_execution_id, attempt_count=attempt_count))
+        return Either.ok(JobExecuteResponse(execution_id=new_execution_id, attempt_count=attempt_count))
     except Exception as e:
         await db_jobs2.update_job_execution_runtime(new_execution_id, attempt_count, status="failed", error=repr(e)[:255])
         return Either.error(repr(e))
@@ -302,7 +302,7 @@ async def execute_experiment_run(
     job_definition_version: int,
     compiler_runtime_context: dict,
     execution_id: str | None = None,
-) -> Either[JobExecuteV2Response, str]:  # type: ignore[invalid-argument]
+) -> Either[JobExecuteResponse, str]:  # type: ignore[invalid-argument]
     """Submit a pre-compiled scheduled experiment run, creating a JobExecution linked to the experiment.
 
     Uses a spec already compiled by the caller (with dynamic expressions applied).
@@ -333,7 +333,7 @@ async def execute_experiment_run(
             update_kwargs["outputs"] = [x.model_dump() for x in product_to_id_mappings]
         await db_jobs2.update_job_execution_runtime(new_execution_id, attempt_count, **update_kwargs)
 
-        return Either.ok(JobExecuteV2Response(execution_id=new_execution_id, attempt_count=attempt_count))
+        return Either.ok(JobExecuteResponse(execution_id=new_execution_id, attempt_count=attempt_count))
     except Exception as e:
         await db_jobs2.update_job_execution_runtime(new_execution_id, attempt_count, status="failed", error=repr(e)[:255])
         return Either.error(repr(e))

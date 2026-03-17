@@ -13,8 +13,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type {
   BlockFactoryCatalogue,
   FableBuilderV1,
-  FableCompileV2Request,
-  FableUpsertV2Response,
+  FableCompileRequest,
+  FableUpsertResponse,
   FableValidationExpansion,
   PluginBlockFactoryId,
 } from '@/api/types/fable.types'
@@ -100,7 +100,7 @@ export function useFableValidation(
 }
 
 export function useCompileFable() {
-  return useMutation<ExecutionSpecification, Error, FableCompileV2Request>({
+  return useMutation<ExecutionSpecification, Error, FableCompileRequest>({
     mutationFn: compileFable,
   })
 }
@@ -109,7 +109,7 @@ export function useUpsertFable() {
   const queryClient = useQueryClient()
 
   return useMutation<
-    FableUpsertV2Response,
+    FableUpsertResponse,
     Error,
     {
       fable: FableBuilderV1

@@ -13,8 +13,8 @@
  */
 
 import type {
-  JobExecuteV2Request,
-  JobExecuteV2Response,
+  JobExecuteRequest,
+  JobExecuteResponse,
   JobExecutionDetail,
   JobExecutionList,
   JobStatus,
@@ -26,8 +26,8 @@ import { getBackendBaseUrl } from '@/utils/env'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
 
 export async function executeJob(
-  request: JobExecuteV2Request,
-): Promise<JobExecuteV2Response> {
+  request: JobExecuteRequest,
+): Promise<JobExecuteResponse> {
   return apiClient.post(API_ENDPOINTS.job.execute, request)
 }
 
@@ -131,7 +131,7 @@ export async function downloadJobLogs(executionId: string): Promise<Blob> {
 
 export async function restartJob(
   executionId: string,
-): Promise<JobExecuteV2Response> {
+): Promise<JobExecuteResponse> {
   return apiClient.post(API_ENDPOINTS.job.restart(executionId))
 }
 

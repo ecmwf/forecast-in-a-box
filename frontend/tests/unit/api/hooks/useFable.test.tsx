@@ -190,7 +190,7 @@ describe('useFable', () => {
   })
 
   it('fetches fable by ID and returns the builder', async () => {
-    const mockRetrieveV2Response = {
+    const mockRetrieveResponse = {
       id: 'test-fable-id',
       version: 1,
       builder: mockFable,
@@ -203,7 +203,7 @@ describe('useFable', () => {
 
     worker.use(
       http.get(API_ENDPOINTS.fable.retrieve, () => {
-        return HttpResponse.json(mockRetrieveV2Response)
+        return HttpResponse.json(mockRetrieveResponse)
       }),
     )
 

@@ -28,8 +28,8 @@ test_submit_job.py
 
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
-from forecastbox.api.types.fable import FableBuilder, FableSaveV2Request
-from forecastbox.api.types.jobs import EnvironmentSpecification, JobExecuteV2Response
+from forecastbox.api.types.fable import FableBuilder, FableSaveRequest
+from forecastbox.api.types.jobs import EnvironmentSpecification, JobExecuteResponse
 
 from .utils import ensure_completed_v2
 
@@ -79,7 +79,7 @@ def _make_builder_full(tmpdir: str) -> FableBuilder:
 def test_fable_v2_save_and_retrieve(backend_client_with_auth):
     builder = _make_builder_source_only()
     builder.environment = EnvironmentSpecification(hosts=2, workers_per_host=4)
-    payload = FableSaveV2Request(
+    payload = FableSaveRequest(
         builder=builder,
         display_name="Test Fable",
         display_description="A fable saved via the v2 API",
@@ -106,7 +106,7 @@ def test_fable_v2_save_and_retrieve(backend_client_with_auth):
     assert retrieved["builder"]["environment"]["workers_per_host"] == 4
 
     # Saving again with the same id creates a new version
-    payload2 = FableSaveV2Request(builder=_make_builder_source_only(), display_name="Test Fable v2")
+    payload2 = FableSaveRequest(builder=_make_builder_source_only(), display_name="Test Fable v2")
     response = backend_client_with_auth.post("/fable/upsert", params={"fable_id": saved["id"]}, json=payload2.model_dump())
     assert response.is_success, response.text
     saved2 = response.json()
@@ -136,7 +136,7 @@ def test_fable_v2_retrieve_nonexistent(backend_client_with_auth):
 def test_fable_v2_upsert_nonexistent_id(backend_client_with_auth):
     """Attempting to add a version to a non-existent id returns 404."""
     builder = _make_builder_source_only()
-    payload = FableSaveV2Request(builder=builder)
+    payload = FableSaveRequest(builder=builder)
     response = backend_client_with_auth.post("/fable/upsert", params={"fable_id": "no-such-id"}, json=payload.model_dump())
     assert response.status_code == 404
 
@@ -144,7 +144,7 @@ def test_fable_v2_upsert_nonexistent_id(backend_client_with_auth):
 def test_fable_v2_compile_latest_version(tmpdir, backend_client_with_auth):
     """A builder saved via upsert_v2 can be compiled by reference (no version = latest)."""
     builder = _make_builder_full(str(tmpdir))
-    payload = FableSaveV2Request(builder=builder, display_name="Compile Test")
+    payload = FableSaveRequest(builder=builder, display_name="Compile Test")
     save_resp = backend_client_with_auth.post("/fable/upsert", json=payload.model_dump())
     assert save_resp.is_success, save_resp.text
     fable_id = save_resp.json()["id"]
@@ -160,14 +160,14 @@ def test_fable_v2_compile_latest_version(tmpdir, backend_client_with_auth):
 def test_fable_v2_compile_specific_version(tmpdir, backend_client_with_auth):
     """Omitting version resolves to latest; specifying version compiles that exact version."""
     builder_v1 = _make_builder_full(str(tmpdir.mkdir("v1")))
-    payload_v1 = FableSaveV2Request(builder=builder_v1, display_name="Version Test v1")
+    payload_v1 = FableSaveRequest(builder=builder_v1, display_name="Version Test v1")
     save_resp = backend_client_with_auth.post("/fable/upsert", json=payload_v1.model_dump())
     assert save_resp.is_success, save_resp.text
     fable_id = save_resp.json()["id"]
 
     # Save a second version with a different builder (source-only, no sink)
     source_only = _make_builder_source_only()
-    payload_v2 = FableSaveV2Request(builder=source_only, display_name="Version Test v2")
+    payload_v2 = FableSaveRequest(builder=source_only, display_name="Version Test v2")
     save_resp2 = backend_client_with_auth.post("/fable/upsert", params={"fable_id": fable_id}, json=payload_v2.model_dump())
     assert save_resp2.is_success, save_resp2.text
     assert save_resp2.json()["version"] == 2
@@ -241,7 +241,7 @@ def test_fable_expand(tmpdir, backend_client_with_auth):
     assert len(response.json()["possible_expansions"]["sinkMean"]) == 0
     assert len(response.json()["block_errors"]) == 0
 
-    save_req = FableSaveV2Request(builder=builder)
+    save_req = FableSaveRequest(builder=builder)
     save_resp = backend_client_with_auth.post("/fable/upsert", json=save_req.model_dump())
     assert save_resp.is_success, save_resp.text
     fable_id = save_resp.json()["id"]
@@ -251,13 +251,13 @@ def test_fable_expand(tmpdir, backend_client_with_auth):
 
 def test_fable_v2_basic_execute(tmpdir, backend_client_with_auth):
     builder = _make_builder_full(tmpdir)
-    save_req = FableSaveV2Request(builder=builder)
+    save_req = FableSaveRequest(builder=builder)
     save_resp = backend_client_with_auth.post("/fable/upsert", json=save_req.model_dump())
     assert save_resp.is_success, save_resp.text
     fable_id = save_resp.json()["id"]
     exec_response = backend_client_with_auth.post("/job/execute", json={"job_definition_id": fable_id})
     assert exec_response.is_success, exec_response.text
-    response = JobExecuteV2Response(**exec_response.json())
+    response = JobExecuteResponse(**exec_response.json())
     execution_id = response.execution_id
     assert response.attempt_count == 1
     ensure_completed_v2(backend_client_with_auth, execution_id, sleep=1, attempts=120)

@@ -33,7 +33,7 @@ class FableValidationExpansion(BaseModel):
     possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]]
 
 
-class FableSaveV2Request(BaseModel):
+class FableSaveRequest(BaseModel):
     """Payload for saving a fable builder via the v2 persistence path."""
 
     builder: FableBuilder
@@ -43,14 +43,14 @@ class FableSaveV2Request(BaseModel):
     parent_id: str | None = None
 
 
-class FableSaveV2Response(BaseModel):
+class FableSaveResponse(BaseModel):
     """Returned by upsert_v2; contains the stable id and the new version number."""
 
     id: str
     version: int
 
 
-class FableRetrieveV2Response(BaseModel):
+class FableRetrieveResponse(BaseModel):
     """Full payload returned by retrieve_v2."""
 
     id: str
@@ -62,7 +62,7 @@ class FableRetrieveV2Response(BaseModel):
     parent_id: str | None = None
 
 
-class FableCompileV2Request(BaseModel):
+class FableCompileRequest(BaseModel):
     """Reference to a saved JobDefinition for compile_v2."""
 
     id: str

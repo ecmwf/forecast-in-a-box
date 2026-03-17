@@ -17,10 +17,10 @@
 import type {
   BlockFactoryCatalogue,
   FableBuilderV1,
-  FableCompileV2Request,
-  FableRetrieveV2Response,
-  FableUpsertV2Request,
-  FableUpsertV2Response,
+  FableCompileRequest,
+  FableRetrieveResponse,
+  FableUpsertRequest,
+  FableUpsertResponse,
   FableValidationExpansion,
 } from '@/api/types/fable.types'
 import type { ExecutionSpecification } from '@/api/types/job.types'
@@ -28,8 +28,8 @@ import { apiClient } from '@/api/client'
 import { API_ENDPOINTS } from '@/api/endpoints'
 import {
   BlockFactoryCatalogueSchema,
-  FableRetrieveV2ResponseSchema,
-  FableUpsertV2ResponseSchema,
+  FableRetrieveResponseSchema,
+  FableUpsertResponseSchema,
   FableValidationExpansionSchema,
   normalizeCatalogueKeys,
 } from '@/api/types/fable.types'
@@ -74,7 +74,7 @@ export async function expandFable(
 export async function retrieveFable(
   fableId: string,
   version?: number,
-): Promise<FableRetrieveV2Response> {
+): Promise<FableRetrieveResponse> {
   const params: Record<string, string | number> = {
     fable_builder_id: fableId,
   }
@@ -83,7 +83,7 @@ export async function retrieveFable(
   }
   return apiClient.get(API_ENDPOINTS.fable.retrieve, {
     params,
-    schema: FableRetrieveV2ResponseSchema,
+    schema: FableRetrieveResponseSchema,
   })
 }
 
@@ -91,10 +91,10 @@ export async function retrieveFable(
  * Create or update a fable with full metadata, returning { id, version } (v2)
  */
 export async function upsertFable(
-  request: FableUpsertV2Request,
-): Promise<FableUpsertV2Response> {
+  request: FableUpsertRequest,
+): Promise<FableUpsertResponse> {
   return apiClient.post(API_ENDPOINTS.fable.upsert, request, {
-    schema: FableUpsertV2ResponseSchema,
+    schema: FableUpsertResponseSchema,
   })
 }
 
@@ -102,7 +102,7 @@ export async function upsertFable(
  * Compile a fable by persisted definition reference (v2)
  */
 export async function compileFable(
-  request: FableCompileV2Request,
+  request: FableCompileRequest,
 ): Promise<ExecutionSpecification> {
   return apiClient.put(API_ENDPOINTS.fable.compile, request)
 }

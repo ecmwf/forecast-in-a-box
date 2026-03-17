@@ -34,7 +34,7 @@ class ExecutionSpecification(BaseModel):
     shared: bool = Field(default=False)
 
 
-class JobExecuteV2Request(BaseModel):
+class JobExecuteRequest(BaseModel):
     """Request body for POST /job/execute_v2.
 
     References an existing saved JobDefinition by id and optional version.
@@ -46,7 +46,7 @@ class JobExecuteV2Request(BaseModel):
     """Specific version to use; omit to use the latest version."""
 
 
-class JobExecuteV2Response(BaseModel):
+class JobExecuteResponse(BaseModel):
     """Response from POST /job/execute_v2."""
 
     execution_id: str

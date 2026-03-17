@@ -22,7 +22,7 @@ import {
   getJob,
   restartExecution,
 } from '../data/job.data'
-import type { JobExecuteV2Request, JobStatus } from '@/api/types/job.types'
+import type { JobExecuteRequest, JobStatus } from '@/api/types/job.types'
 import { API_ENDPOINTS, API_PATTERNS } from '@/api/endpoints'
 
 export const jobHandlers = [
@@ -31,9 +31,9 @@ export const jobHandlers = [
   http.post(API_ENDPOINTS.job.execute, async ({ request }) => {
     await delay(400)
 
-    let body: JobExecuteV2Request
+    let body: JobExecuteRequest
     try {
-      body = (await request.json()) as JobExecuteV2Request
+      body = (await request.json()) as JobExecuteRequest
     } catch {
       return HttpResponse.json(
         { message: 'Invalid request body' },

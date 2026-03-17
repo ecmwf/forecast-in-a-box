@@ -22,10 +22,10 @@ import forecastbox.db.jobs2 as db_jobs2
 from forecastbox.api.plugin.manager import PluginCompositeId, catalogue_view, plugins_ready
 from forecastbox.api.types.fable import (
     FableBuilder,
-    FableCompileV2Request,
-    FableRetrieveV2Response,
-    FableSaveV2Request,
-    FableSaveV2Response,
+    FableCompileRequest,
+    FableRetrieveResponse,
+    FableSaveRequest,
+    FableSaveResponse,
     FableValidationExpansion,
 )
 from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification
@@ -63,10 +63,10 @@ def expand_fable(fable: FableBuilder) -> FableValidationExpansion:
 
 @router.post("/upsert")
 async def upsert_fable_builder(
-    payload: FableSaveV2Request,
+    payload: FableSaveRequest,
     fable_id: Optional[str] = None,
     user: UserRead | None = Depends(current_active_user),
-) -> FableSaveV2Response:
+) -> FableSaveResponse:
     """Save a FableBuilder as a JobDefinition (v2 persistence path).
 
     If `fable_id` is omitted a new definition is created (version 1). If
@@ -93,14 +93,14 @@ async def upsert_fable_builder(
         )
     except KeyError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    return FableSaveV2Response(id=definition_id, version=version)
+    return FableSaveResponse(id=definition_id, version=version)
 
 
 @router.get("/retrieve")
 async def retrieve_fable_builder(
     fable_id: str,
     version: Optional[int] = None,
-) -> FableRetrieveV2Response:
+) -> FableRetrieveResponse:
     """Retrieve a saved FableBuilder by id (and optionally version) from the v2 store.
 
     If `version` is omitted the latest non-deleted version is returned.
@@ -113,7 +113,7 @@ async def retrieve_fable_builder(
     builder = FableBuilder(blocks=definition.blocks)  # ty:ignore[invalid-argument-type]
     if definition.environment_spec is not None:
         builder.environment = EnvironmentSpecification.model_validate(definition.environment_spec)
-    return FableRetrieveV2Response(
+    return FableRetrieveResponse(
         id=definition.id,  # ty:ignore[invalid-argument-type]
         version=definition.version,  # ty:ignore[invalid-argument-type]
         builder=builder,
@@ -125,7 +125,7 @@ async def retrieve_fable_builder(
 
 
 @router.put("/compile")
-async def compile_fable(request: FableCompileV2Request) -> ExecutionSpecification:
+async def compile_fable(request: FableCompileRequest) -> ExecutionSpecification:
     """Load a saved builder from the v2 store by reference and compile it to an ExecutionSpecification.
 
     If `version` is omitted the latest non-deleted version is used. The returned

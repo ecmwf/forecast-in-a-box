@@ -17,7 +17,7 @@ import {
 import { consumeCatalogueUnavailable } from './plugins.handlers'
 import type {
   FableBuilderV1,
-  FableUpsertV2Request,
+  FableUpsertRequest,
 } from '@/api/types/fable.types'
 import { getFactory } from '@/api/types/fable.types'
 import { API_ENDPOINTS } from '@/api/endpoints'
@@ -85,9 +85,9 @@ export const fableHandlers = [
   http.post(API_ENDPOINTS.fable.upsert, async ({ request }) => {
     await delay(500)
 
-    let body: FableUpsertV2Request
+    let body: FableUpsertRequest
     try {
-      body = (await request.json()) as FableUpsertV2Request
+      body = (await request.json()) as FableUpsertRequest
     } catch {
       return HttpResponse.json(
         { message: 'Invalid request body' },

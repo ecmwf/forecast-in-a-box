@@ -39,12 +39,12 @@ router = APIRouter(
 
 
 @dataclass(frozen=True, eq=True, slots=True)
-class CreateScheduleV2Response:
+class CreateScheduleResponse:
     experiment_id: str
 
 
 @dataclass(frozen=True, eq=True, slots=True)
-class ScheduleDefinitionV2Response:
+class ScheduleDefinitionResponse:
     experiment_id: str
     experiment_version: int
     job_definition_id: str
@@ -61,8 +61,8 @@ class ScheduleDefinitionV2Response:
 
 
 @dataclass(frozen=True, eq=True, slots=True)
-class ListSchedulesV2Response:
-    schedules: list[ScheduleDefinitionV2Response]
+class ListSchedulesResponse:
+    schedules: list[ScheduleDefinitionResponse]
     total: int
     page: int
     page_size: int
@@ -71,7 +71,7 @@ class ListSchedulesV2Response:
 
 
 @dataclass(frozen=True, eq=True, slots=True)
-class ScheduleRunV2Response:
+class ScheduleRunResponse:
     execution_id: str
     attempt_count: int
     status: str
@@ -82,8 +82,8 @@ class ScheduleRunV2Response:
 
 
 @dataclass(frozen=True, eq=True, slots=True)
-class ScheduleRunsV2Response:
-    runs: list[ScheduleRunV2Response]
+class ScheduleRunsResponse:
+    runs: list[ScheduleRunResponse]
     total: int
     page: int
     page_size: int
@@ -91,9 +91,9 @@ class ScheduleRunsV2Response:
     error: str | None = None
 
 
-def _experiment_to_v2_response(exp: ExperimentDefinition) -> ScheduleDefinitionV2Response:
+def _experiment_to_response(exp: ExperimentDefinition) -> ScheduleDefinitionResponse:
     exp_def = cast(dict, exp.experiment_definition) or {}
-    return ScheduleDefinitionV2Response(
+    return ScheduleDefinitionResponse(
         experiment_id=str(exp.id),  # ty:ignore[invalid-argument-type]
         experiment_version=cast(int, exp.version),
         job_definition_id=str(exp.job_definition_id),  # ty:ignore[invalid-argument-type]
@@ -115,7 +115,7 @@ async def list_schedules(
     user: UserRead = Depends(current_active_user),
     page: int = 1,
     page_size: int = 10,
-) -> ListSchedulesV2Response:
+) -> ListSchedulesResponse:
     if page < 1 or page_size < 1:
         raise HTTPException(status_code=400, detail="Page and page_size must be greater than 0.")
 
@@ -127,14 +127,14 @@ async def list_schedules(
         raise HTTPException(status_code=404, detail="Page number out of range.")
 
     experiments = list(await db_jobs2.list_experiment_definitions(experiment_type="cron_schedule", offset=start, limit=page_size))
-    schedules = [_experiment_to_v2_response(exp) for exp in experiments]
-    return ListSchedulesV2Response(schedules=schedules, total=total, page=page, page_size=page_size, total_pages=total_pages)
+    schedules = [_experiment_to_response(exp) for exp in experiments]
+    return ListSchedulesResponse(schedules=schedules, total=total, page=page, page_size=page_size, total_pages=total_pages)
 
 
 @router.put("/create")
 async def create_schedule(
     schedule_spec: ScheduleSpecification, user: UserRead | None = Depends(current_active_user)
-) -> CreateScheduleV2Response:
+) -> CreateScheduleResponse:
     try:
         parse_crontab(schedule_spec.cron_expr)
     except ValueError as e:
@@ -169,21 +169,21 @@ async def create_schedule(
     logger.debug(f"V2 schedule {experiment_id}: next run at {next_run_at}")
     prod_scheduler()
 
-    return CreateScheduleV2Response(experiment_id=experiment_id)
+    return CreateScheduleResponse(experiment_id=experiment_id)
 
 
 @router.get("/get")
-async def get_schedule(experiment_id: str, user: UserRead = Depends(current_active_user)) -> ScheduleDefinitionV2Response:
+async def get_schedule(experiment_id: str, user: UserRead = Depends(current_active_user)) -> ScheduleDefinitionResponse:
     exp_def = await db_jobs2.get_experiment_definition(experiment_id)
     if exp_def is None or exp_def.experiment_type != "cron_schedule":
         raise HTTPException(status_code=404, detail=f"Schedule {experiment_id} not found")
-    return _experiment_to_v2_response(exp_def)
+    return _experiment_to_response(exp_def)
 
 
 @router.post("/update")
 async def update_schedule(
     experiment_id: str, update: ScheduleUpdate, user: UserRead = Depends(current_active_user)
-) -> ScheduleDefinitionV2Response:
+) -> ScheduleDefinitionResponse:
     with scheduler_lock:  # NOTE this may block the async pool a bit!
         current = await db_jobs2.get_experiment_definition(experiment_id)
         if current is None or current.experiment_type != "cron_schedule":
@@ -237,7 +237,7 @@ async def update_schedule(
 
     updated = await db_jobs2.get_experiment_definition(experiment_id)
     assert updated is not None
-    return _experiment_to_v2_response(updated)
+    return _experiment_to_response(updated)
 
 
 @router.get("/next_run")
@@ -257,7 +257,7 @@ async def get_schedule_runs(
     user: UserRead = Depends(current_active_user),
     page: int = 1,
     page_size: int = 10,
-) -> ScheduleRunsV2Response:
+) -> ScheduleRunsResponse:
     """Return paginated JobExecution rows linked to a v2 cron schedule experiment.
 
     Each run includes a trigger field ('cron' or 'rerun') sourced from
@@ -281,7 +281,7 @@ async def get_schedule_runs(
     executions = list(await db_jobs2.list_job_executions_by_experiment(experiment_id, offset=start, limit=page_size))
 
     runs = [
-        ScheduleRunV2Response(
+        ScheduleRunResponse(
             execution_id=str(ex.id),  # ty:ignore[invalid-argument-type]
             attempt_count=cast(int, ex.attempt_count),
             status=cast(str, ex.status),
@@ -292,4 +292,4 @@ async def get_schedule_runs(
         )
         for ex in executions
     ]
-    return ScheduleRunsV2Response(runs=runs, total=total, page=page, page_size=page_size, total_pages=total_pages)
+    return ScheduleRunsResponse(runs=runs, total=total, page=page, page_size=page_size, total_pages=total_pages)

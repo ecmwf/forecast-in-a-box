@@ -130,14 +130,14 @@ export type UpsertFableResponse = z.infer<typeof UpsertFableResponseSchema>
 
 // --- v2 types ---
 
-export const FableUpsertV2ResponseSchema = z.object({
+export const FableUpsertResponseSchema = z.object({
   id: z.string(),
   version: z.number(),
 })
 
-export type FableUpsertV2Response = z.infer<typeof FableUpsertV2ResponseSchema>
+export type FableUpsertResponse = z.infer<typeof FableUpsertResponseSchema>
 
-export interface FableUpsertV2Request {
+export interface FableUpsertRequest {
   builder: FableBuilderV1
   display_name: string
   display_description: string
@@ -145,7 +145,7 @@ export interface FableUpsertV2Request {
   parent_id?: string
 }
 
-export const FableRetrieveV2ResponseSchema = z.object({
+export const FableRetrieveResponseSchema = z.object({
   id: z.string(),
   version: z.number(),
   builder: FableBuilderV1Schema,
@@ -156,11 +156,11 @@ export const FableRetrieveV2ResponseSchema = z.object({
   updated_at: z.string(),
 })
 
-export type FableRetrieveV2Response = z.infer<
-  typeof FableRetrieveV2ResponseSchema
+export type FableRetrieveResponse = z.infer<
+  typeof FableRetrieveResponseSchema
 >
 
-export interface FableCompileV2Request {
+export interface FableCompileRequest {
   id: string
   version?: number
 }

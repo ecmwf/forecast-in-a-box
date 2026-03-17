@@ -64,13 +64,13 @@ export interface SubmitJobResponse {
 }
 
 /** POST /job/execute request */
-export interface JobExecuteV2Request {
+export interface JobExecuteRequest {
   job_definition_id: string
   job_definition_version?: number
 }
 
 /** POST /job/execute response */
-export interface JobExecuteV2Response {
+export interface JobExecuteResponse {
   execution_id: string
   attempt_count: number
 }

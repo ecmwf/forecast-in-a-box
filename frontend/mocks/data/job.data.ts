@@ -14,8 +14,8 @@
 
 import type {
   ExecutionSpecification,
-  JobExecuteV2Request,
-  JobExecuteV2Response,
+  JobExecuteRequest,
+  JobExecuteResponse,
   JobExecutionDetail,
   JobProgressResponse,
   ProductToOutputId,
@@ -242,8 +242,8 @@ export function getExecution(
 }
 
 export function addExecution(
-  request: JobExecuteV2Request,
-): JobExecuteV2Response {
+  request: JobExecuteRequest,
+): JobExecuteResponse {
   const execution_id = `exec-mock-${String(executionIdCounter++).padStart(3, '0')}`
   const timestamp = new Date().toISOString()
   executionsState[execution_id] = {
