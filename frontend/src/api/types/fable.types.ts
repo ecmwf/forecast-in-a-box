@@ -128,6 +128,43 @@ export const UpsertFableResponseSchema = z.object({
 
 export type UpsertFableResponse = z.infer<typeof UpsertFableResponseSchema>
 
+// --- v2 types ---
+
+export const FableUpsertV2ResponseSchema = z.object({
+  id: z.string(),
+  version: z.number(),
+})
+
+export type FableUpsertV2Response = z.infer<typeof FableUpsertV2ResponseSchema>
+
+export interface FableUpsertV2Request {
+  builder: FableBuilderV1
+  display_name: string
+  display_description: string
+  tags: Array<string>
+  parent_id?: string
+}
+
+export const FableRetrieveV2ResponseSchema = z.object({
+  id: z.string(),
+  version: z.number(),
+  builder: FableBuilderV1Schema,
+  display_name: z.string(),
+  display_description: z.string(),
+  tags: z.array(z.string()),
+  created_at: z.string(),
+  updated_at: z.string(),
+})
+
+export type FableRetrieveV2Response = z.infer<
+  typeof FableRetrieveV2ResponseSchema
+>
+
+export interface FableCompileV2Request {
+  id: string
+  version?: number
+}
+
 export interface BlockWithFactory {
   instanceId: BlockInstanceId
   instance: BlockInstance

@@ -152,15 +152,18 @@ export function SaveConfigPopover({
   async function handleSave(asCopy: boolean = false) {
     try {
       const idToPass = asCopy ? undefined : (effectiveFableId ?? undefined)
-      const newId = await upsertFable.mutateAsync({
+      const displayTitle = title.trim() || generateDefaultTitle()
+      const result = await upsertFable.mutateAsync({
         fable,
         fableId: idToPass,
+        display_name: displayTitle,
+        display_description: comments.trim(),
+        tags: [],
       })
-      const displayTitle = title.trim() || generateDefaultTitle()
 
       setMetadataStore({
         ...metadataStore,
-        [newId]: {
+        [result.id]: {
           title: displayTitle,
           comments: comments.trim(),
           summary,
@@ -168,7 +171,7 @@ export function SaveConfigPopover({
         },
       })
 
-      markSaved(newId, displayTitle)
+      markSaved(result.id, displayTitle)
       handleOpenChange(false)
       showToast.success(
         asCopy ? 'Configuration saved as new' : 'Configuration saved',

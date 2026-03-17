@@ -13,16 +13,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type {
   BlockFactoryCatalogue,
   FableBuilderV1,
+  FableCompileV2Request,
+  FableUpsertV2Response,
   FableValidationExpansion,
   PluginBlockFactoryId,
 } from '@/api/types/fable.types'
 import type { ExecutionSpecification } from '@/api/types/job.types'
 import {
   compileFable,
+  compileFableV2,
   expandFable,
   getCatalogue,
-  retrieveFable,
-  upsertFable,
+  retrieveFableV2,
+  upsertFableV2,
 } from '@/api/endpoints/fable'
 import { getFactory } from '@/api/types/fable.types'
 import { ApiClientError } from '@/api/client'
@@ -61,7 +64,10 @@ export function useBlockCatalogue(language?: string) {
 export function useFable(fableId: string | null | undefined) {
   return useQuery<FableBuilderV1>({
     queryKey: fableKeys.detail(fableId ?? ''),
-    queryFn: () => retrieveFable(fableId!),
+    queryFn: async () => {
+      const response = await retrieveFableV2(fableId!)
+      return response.builder
+    },
     enabled: !!fableId,
     staleTime: 30 * 1000, // 30 seconds
   })
@@ -100,26 +106,41 @@ export function useCompileFable() {
   })
 }
 
+export function useCompileFableV2() {
+  return useMutation<ExecutionSpecification, Error, FableCompileV2Request>({
+    mutationFn: compileFableV2,
+  })
+}
+
 export function useUpsertFable() {
   const queryClient = useQueryClient()
 
   return useMutation<
-    string,
+    FableUpsertV2Response,
     Error,
     {
       fable: FableBuilderV1
       fableId?: string
+      display_name: string
+      display_description: string
       tags?: Array<string>
     }
   >({
-    mutationFn: ({ fable, fableId, tags }) => upsertFable(fable, fableId, tags),
-    onSuccess: (newId, variables) => {
+    mutationFn: ({ fable, fableId, display_name, display_description, tags }) =>
+      upsertFableV2({
+        builder: fable,
+        display_name,
+        display_description,
+        tags: tags ?? [],
+        parent_id: fableId,
+      }),
+    onSuccess: (result, variables) => {
       if (variables.fableId) {
         queryClient.invalidateQueries({
           queryKey: fableKeys.detail(variables.fableId),
         })
       }
-      queryClient.invalidateQueries({ queryKey: fableKeys.detail(newId) })
+      queryClient.invalidateQueries({ queryKey: fableKeys.detail(result.id) })
     },
   })
 }

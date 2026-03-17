@@ -61,12 +61,18 @@ export const API_ENDPOINTS = {
     catalogue: `${API_PREFIX}/fable/catalogue`,
     /** PUT - Expand a fable configuration */
     expand: `${API_PREFIX}/fable/expand`,
-    /** PUT - Compile a fable configuration */
+    /** PUT - Compile a fable configuration (v1, inline builder body) */
     compile: `${API_PREFIX}/fable/compile`,
-    /** GET - Retrieve a saved fable */
+    /** GET - Retrieve a saved fable (v1, returns builder only) */
     retrieve: `${API_PREFIX}/fable/retrieve`,
-    /** POST - Create or update a fable */
+    /** POST - Create or update a fable (v1) */
     upsert: `${API_PREFIX}/fable/upsert`,
+    /** GET - Retrieve a saved fable with metadata (v2) */
+    retrieveV2: `${API_PREFIX}/fable/retrieve_v2`,
+    /** POST - Create or update a fable with metadata (v2, returns { id, version }) */
+    upsertV2: `${API_PREFIX}/fable/upsert_v2`,
+    /** PUT - Compile a fable by persisted reference (v2) */
+    compileV2: `${API_PREFIX}/fable/compile_v2`,
   },
 
   /**

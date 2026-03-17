@@ -17,6 +17,10 @@
 import type {
   BlockFactoryCatalogue,
   FableBuilderV1,
+  FableCompileV2Request,
+  FableRetrieveV2Response,
+  FableUpsertV2Request,
+  FableUpsertV2Response,
   FableValidationExpansion,
 } from '@/api/types/fable.types'
 import type { ExecutionSpecification } from '@/api/types/job.types'
@@ -25,6 +29,8 @@ import { API_ENDPOINTS } from '@/api/endpoints'
 import {
   BlockFactoryCatalogueSchema,
   FableBuilderV1Schema,
+  FableRetrieveV2ResponseSchema,
+  FableUpsertV2ResponseSchema,
   FableValidationExpansionSchema,
   normalizeCatalogueKeys,
 } from '@/api/types/fable.types'
@@ -108,4 +114,43 @@ export async function upsertFable(
       params,
     },
   )
+}
+
+/**
+ * Retrieve a saved fable by ID, returning builder and metadata (v2)
+ */
+export async function retrieveFableV2(
+  fableId: string,
+  version?: number,
+): Promise<FableRetrieveV2Response> {
+  const params: Record<string, string | number> = {
+    fable_builder_id: fableId,
+  }
+  if (version !== undefined) {
+    params.version = version
+  }
+  return apiClient.get(API_ENDPOINTS.fable.retrieveV2, {
+    params,
+    schema: FableRetrieveV2ResponseSchema,
+  })
+}
+
+/**
+ * Create or update a fable with full metadata, returning { id, version } (v2)
+ */
+export async function upsertFableV2(
+  request: FableUpsertV2Request,
+): Promise<FableUpsertV2Response> {
+  return apiClient.post(API_ENDPOINTS.fable.upsertV2, request, {
+    schema: FableUpsertV2ResponseSchema,
+  })
+}
+
+/**
+ * Compile a fable by persisted definition reference (v2)
+ */
+export async function compileFableV2(
+  request: FableCompileV2Request,
+): Promise<ExecutionSpecification> {
+  return apiClient.put(API_ENDPOINTS.fable.compileV2, request)
 }

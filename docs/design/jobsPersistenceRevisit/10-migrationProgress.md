@@ -11,7 +11,7 @@ This file tracks implementation progress for the frontend migration from v1 to v
 ## Stages
 
 ### 11-fableEndpoints.md
-- Status: `pending`
+- Status: `done`
 - Owner:
 - Main files:
   - `frontend/src/api/endpoints.ts`
@@ -23,7 +23,7 @@ This file tracks implementation progress for the frontend migration from v1 to v
   - `cd frontend && npm run test:unit -- tests/unit/api/endpoints/fable.test.ts`
   - `cd frontend && npm run test:unit -- tests/unit/api/hooks/useFable.test.tsx`
   - `cd frontend && npm run test:integration -- tests/integration/features/fable-builder/save-and-load.test.tsx`
-- Notes:
+- Notes: v2 wrappers (`retrieveFableV2`, `upsertFableV2`, `compileFableV2`) added to `endpoints/fable.ts`; `useFable` now calls `retrieveV2` internally (still returns `FableBuilderV1`); `useUpsertFable` now requires `display_name`/`display_description` and returns `{ id, version }`; `SaveConfigPopover` passes title and comments to the backend; `useCompileFableV2` hook added for compile-by-reference use in next stage.
 
 ### 12-jobSubmissionAndList.md
 - Status: `pending`
