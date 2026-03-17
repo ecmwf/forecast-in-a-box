@@ -22,10 +22,7 @@ import {
   getJob,
   restartExecution,
 } from '../data/job.data'
-import type {
-  JobExecuteV2Request,
-  JobStatus,
-} from '@/api/types/job.types'
+import type { JobExecuteV2Request, JobStatus } from '@/api/types/job.types'
 import { API_ENDPOINTS, API_PATTERNS } from '@/api/endpoints'
 
 export const jobHandlers = [

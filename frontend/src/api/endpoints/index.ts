@@ -24,10 +24,7 @@ export { checkSession, getAuthorizationUrl, logout } from './auth'
 export { fetchConfigFromAPI, initializeConfig, refreshConfig } from './config'
 
 // Fable endpoints
-export {
-  getCatalogue,
-  expandFable,
-} from './fable'
+export { getCatalogue, expandFable } from './fable'
 
 // Status endpoints
 export { fetchStatus } from './status'
