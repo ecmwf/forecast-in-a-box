@@ -17,7 +17,7 @@ import orjson
 from cascade.low.func import Either
 
 import forecastbox.api.fable as api_fable
-import forecastbox.db.jobs2 as db_jobs2
+import forecastbox.db.jobs as db_jobs
 from forecastbox.api.scheduling.dt_utils import calculate_next_run
 from forecastbox.api.types.fable import FableBuilder
 from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification
@@ -80,7 +80,7 @@ async def experiment2runnable(experiment_id: str, exec_time: dt.datetime) -> Eit
     experiment_definition onto the blocks, compiles to an ExecutionSpecification,
     and computes the next cron tick.
     """
-    exp = await db_jobs2.get_experiment_definition(experiment_id)
+    exp = await db_jobs.get_experiment_definition(experiment_id)
     if exp is None:
         return Either.error(f"ExperimentDefinition {experiment_id!r} not found")
 
@@ -91,7 +91,7 @@ async def experiment2runnable(experiment_id: str, exec_time: dt.datetime) -> Eit
 
     job_def_id = str(exp.job_definition_id)  # ty:ignore[invalid-argument-type]
     job_def_version = cast(int, exp.job_definition_version)
-    job_def = await db_jobs2.get_job_definition(job_def_id, job_def_version)
+    job_def = await db_jobs.get_job_definition(job_def_id, job_def_version)
     if job_def is None:
         return Either.error(f"JobDefinition {job_def_id!r} v{job_def_version} not found")
 
@@ -134,7 +134,7 @@ async def rerun2runnable(execution_id: str) -> Either[RunnableExperiment, str]: 
     Retrieves the original execution's runtime context to preserve the scheduled_at
     date. The trigger is set to 'rerun' in compiler_runtime_context.
     """
-    execution = await db_jobs2.get_job_execution(execution_id)
+    execution = await db_jobs.get_job_execution(execution_id)
     if execution is None:
         return Either.error(f"JobExecution {execution_id!r} not found")
 
@@ -152,7 +152,7 @@ async def rerun2runnable(execution_id: str) -> Either[RunnableExperiment, str]: 
     else:
         scheduled_at = dt.datetime.now()
 
-    exp = await db_jobs2.get_experiment_definition(experiment_id)
+    exp = await db_jobs.get_experiment_definition(experiment_id)
     if exp is None:
         return Either.error(f"ExperimentDefinition {experiment_id!r} not found")
 
@@ -162,7 +162,7 @@ async def rerun2runnable(execution_id: str) -> Either[RunnableExperiment, str]: 
 
     job_def_id = str(execution.job_definition_id)  # ty:ignore[invalid-argument-type]
     job_def_version = cast(int, execution.job_definition_version)
-    job_def = await db_jobs2.get_job_definition(job_def_id, job_def_version)
+    job_def = await db_jobs.get_job_definition(job_def_id, job_def_version)
     if job_def is None:
         return Either.error(f"JobDefinition {job_def_id!r} v{job_def_version} not found")
 

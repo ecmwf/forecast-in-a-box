@@ -23,7 +23,7 @@ import orjson
 from cascade.low.core import DatasetId, TaskId
 from fastapi import APIRouter, Depends, HTTPException, Response
 
-import forecastbox.db.jobs2 as db_jobs2
+import forecastbox.db.jobs as db_jobs
 from forecastbox.api.execution import (
     ProductToOutputId,
     execute,
@@ -113,7 +113,7 @@ async def _get_logs(cascade_job_id: str, db_entity_ser: bytes) -> Response:
 async def execute_v2_api(request: JobExecuteRequest, user: UserRead | None = Depends(current_active_user)) -> JobExecuteResponse:
     """Execute a job via the v2 persistence path.
 
-    Loads the referenced JobDefinition from the jobs2 store, compiles it, and
+    Loads the referenced JobDefinition from the jobs store, compiles it, and
     submits it to cascade, always creating a linked JobExecution row.
 
     Parameters
@@ -153,14 +153,14 @@ async def get_status(
     if page < 1 or page_size < 1:
         raise HTTPException(status_code=400, detail="Page and page_size must be greater than 0.")
 
-    total = await db_jobs2.count_job_executions()
+    total = await db_jobs.count_job_executions()
     start = (page - 1) * page_size
     total_pages = (total + page_size - 1) // page_size if total > 0 else 0
 
     if start >= total and total > 0:
         raise HTTPException(status_code=404, detail="Page number out of range.")
 
-    executions = list(await db_jobs2.list_job_executions(offset=start, limit=page_size))
+    executions = list(await db_jobs.list_job_executions(offset=start, limit=page_size))
     details = [execution_to_detail(e) for e in executions]
     return JobExecutionList(executions=details, total=total, page=page, page_size=page_size, total_pages=total_pages)
 
@@ -185,7 +185,7 @@ async def get_outputs_of_execution(
     user: UserRead = Depends(current_active_user),
 ) -> list[ProductToOutputId]:
     """Get outputs for a specific v2 execution; defaults to the latest attempt."""
-    execution = await db_jobs2.get_job_execution(execution_id, attempt_count)
+    execution = await db_jobs.get_job_execution(execution_id, attempt_count)
     if execution is None:
         raise HTTPException(status_code=404, detail=f"JobExecution {execution_id!r} not found.")
     raw_outputs = execution.outputs
@@ -220,8 +220,8 @@ async def restart_execution(
     return result.t
 
 
-async def _id2cascExecution(execution_id: str, attempt_count: int | None = None) -> tuple[db_jobs2.JobExecution, str]:
-    execution = await db_jobs2.get_job_execution(execution_id, attempt_count)
+async def _id2cascExecution(execution_id: str, attempt_count: int | None = None) -> tuple[db_jobs.JobExecution, str]:
+    execution = await db_jobs.get_job_execution(execution_id, attempt_count)
     if execution is None:
         raise HTTPException(status_code=404, detail=f"JobExecution {execution_id!r} not found.")
 
@@ -288,4 +288,4 @@ async def delete_job(execution_id: str, attempt_count: int | None = None, user: 
         raise HTTPException(500, f"Job deletion failed: {e}")
     finally:
         # TODO consider the attempt count here, return the deleted count
-        await db_jobs2.soft_delete_job_execution(execution_id)
+        await db_jobs.soft_delete_job_execution(execution_id)

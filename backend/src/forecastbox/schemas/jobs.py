@@ -7,7 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""ORM models for the jobs2 database.
+"""ORM models for the jobs database.
 
 Tables are versioned/immutable (JobDefinition, ExperimentDefinition) or
 append-only with a mutable runtime state (JobExecution).  Soft-delete is

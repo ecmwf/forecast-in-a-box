@@ -6,7 +6,6 @@ import pytest
 
 from forecastbox.api.scheduling.job_utils import deep_union, eval_dynamic_expression
 from forecastbox.api.types.jobs import ExecutionSpecification
-from forecastbox.schemas.schedule import ScheduleDefinition
 
 
 def test_deep_union_empty_dicts():

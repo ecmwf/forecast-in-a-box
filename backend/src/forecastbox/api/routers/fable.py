@@ -18,7 +18,7 @@ from fastapi.exceptions import HTTPException
 from fiab_core.fable import BlockFactoryCatalogue
 
 import forecastbox.api.fable as api_fable
-import forecastbox.db.jobs2 as db_jobs2
+import forecastbox.db.jobs as db_jobs
 from forecastbox.api.plugin.manager import PluginCompositeId, catalogue_view, plugins_ready
 from forecastbox.api.types.fable import (
     FableBuilder,
@@ -80,7 +80,7 @@ async def upsert_fable_builder(
     source: str = "user_defined" if payload.display_name is not None else "oneoff_execution"
     env = payload.builder.environment
     try:
-        definition_id, version = await db_jobs2.upsert_job_definition(
+        definition_id, version = await db_jobs.upsert_job_definition(
             id=fable_id,
             source=source,
             created_by=created_by,
@@ -105,7 +105,7 @@ async def retrieve_fable_builder(
 
     If `version` is omitted the latest non-deleted version is returned.
     """
-    definition = await db_jobs2.get_job_definition(fable_id, version)
+    definition = await db_jobs.get_job_definition(fable_id, version)
     if definition is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fable definition not found")
     if definition.blocks is None:
@@ -131,7 +131,7 @@ async def compile_fable(request: FableCompileRequest) -> ExecutionSpecification:
     If `version` is omitted the latest non-deleted version is used. The returned
     ExecutionSpecification has the same shape as the one from /compile.
     """
-    definition = await db_jobs2.get_job_definition(request.id, request.version)
+    definition = await db_jobs.get_job_definition(request.id, request.version)
     if definition is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fable definition not found")
     if definition.blocks is None:

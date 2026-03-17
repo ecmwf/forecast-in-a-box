@@ -26,7 +26,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 
 import forecastbox.api.fable as api_fable
-import forecastbox.db.jobs2 as db_jobs2
+import forecastbox.db.jobs as db_jobs
 from forecastbox.api.artifacts.manager import ArtifactManager, submit_artifact_download
 from forecastbox.api.types.fable import FableBuilder
 from forecastbox.api.types.jobs import (
@@ -41,7 +41,7 @@ from forecastbox.api.utils import get_model_path
 from forecastbox.config import config
 from forecastbox.models import get_model
 from forecastbox.products.registry import get_product
-from forecastbox.schemas.jobs2 import JobDefinition, JobExecution
+from forecastbox.schemas.jobs import JobDefinition, JobExecution
 from forecastbox.schemas.user import UserRead
 
 logger = logging.getLogger(__name__)
@@ -134,16 +134,16 @@ class SubmitJobResponse(BaseModel):
 
 
 async def get_job_definition_for_execution(definition_id: str, definition_version: int | None) -> JobDefinition | None:
-    """Retrieve a JobDefinition from the jobs2 store by id and optional version."""
-    return await db_jobs2.get_job_definition(definition_id, definition_version)
+    """Retrieve a JobDefinition from the jobs store by id and optional version."""
+    return await db_jobs.get_job_definition(definition_id, definition_version)
 
 
 async def get_job_execution_specification(execution_id: str, attempt_count: int | None) -> JobSpecification | None:
     """Return the JobSpecification for the given execution attempt (latest if attempt_count is None)."""
-    execution = await db_jobs2.get_job_execution(execution_id, attempt_count)
+    execution = await db_jobs.get_job_execution(execution_id, attempt_count)
     if execution is None:
         return None
-    definition = await db_jobs2.get_job_definition(
+    definition = await db_jobs.get_job_definition(
         str(execution.job_definition_id),  # ty:ignore[invalid-argument-type]
         cast(int, execution.job_definition_version),
     )
@@ -159,13 +159,13 @@ async def get_job_execution_specification(execution_id: str, attempt_count: int 
 
 async def restart_job_execution(execution_id: str, user_id: str | None) -> Either[JobExecuteResponse, str]:  # type: ignore[invalid-argument]
     """Create a new attempt under an existing execution_id, re-running its linked JobDefinition."""
-    existing = await db_jobs2.get_job_execution(execution_id)
+    existing = await db_jobs.get_job_execution(execution_id)
     if existing is None:
         return Either.error(f"JobExecution {execution_id!r} not found")
 
     definition_id = str(existing.job_definition_id)  # ty:ignore[invalid-argument-type]
     definition_version = cast(int, existing.job_definition_version)
-    definition = await db_jobs2.get_job_definition(definition_id, definition_version)
+    definition = await db_jobs.get_job_definition(definition_id, definition_version)
     if definition is None:
         return Either.error(f"JobDefinition {definition_id!r} v{definition_version} not found")
 
@@ -195,7 +195,7 @@ async def poll_and_update_execution(execution_id: str, attempt_count: int | None
 
     Returns None if the execution is not found.
     """
-    execution = await db_jobs2.get_job_execution(execution_id, attempt_count)
+    execution = await db_jobs.get_job_execution(execution_id, attempt_count)
     if execution is None:
         return None
 
@@ -233,16 +233,16 @@ async def poll_and_update_execution(execution_id: str, attempt_count: int | None
 
         jobprogress = response.progresses.get(cascade_job_id)
         if jobprogress is None:
-            await db_jobs2.update_job_execution_runtime(execution_id, actual_attempt, status="failed", error="evicted from gateway")
+            await db_jobs.update_job_execution_runtime(execution_id, actual_attempt, status="failed", error="evicted from gateway")
             return _build(status_override="failed", error_override="evicted from gateway")
         elif jobprogress.failure:
-            await db_jobs2.update_job_execution_runtime(execution_id, actual_attempt, status="failed", error=jobprogress.failure)
+            await db_jobs.update_job_execution_runtime(execution_id, actual_attempt, status="failed", error=jobprogress.failure)
             return _build(status_override="failed", error_override=jobprogress.failure)
         elif jobprogress.completed or jobprogress.pct == "100.00":
-            await db_jobs2.update_job_execution_runtime(execution_id, actual_attempt, status="completed", progress="100.00")
+            await db_jobs.update_job_execution_runtime(execution_id, actual_attempt, status="completed", progress="100.00")
             return _build(status_override="completed", progress_override="100.00")
         else:
-            await db_jobs2.update_job_execution_runtime(execution_id, actual_attempt, status="running", progress=jobprogress.pct)
+            await db_jobs.update_job_execution_runtime(execution_id, actual_attempt, status="running", progress=jobprogress.pct)
             return _build(status_override="running", progress_override=jobprogress.pct)
 
     return _build()
@@ -267,7 +267,7 @@ async def execute(definition: JobDefinition, user_id: str | None, execution_id: 
     definition_id = str(definition.id)  # ty:ignore[invalid-argument-type]
     definition_version = cast(int, definition.version)
 
-    new_execution_id, attempt_count = await db_jobs2.upsert_job_execution(
+    new_execution_id, attempt_count = await db_jobs.upsert_job_execution(
         id=execution_id,
         job_definition_id=definition_id,
         job_definition_version=definition_version,
@@ -286,11 +286,11 @@ async def execute(definition: JobDefinition, user_id: str | None, execution_id: 
             update_kwargs["error"] = response.error[:255]
         else:
             update_kwargs["outputs"] = [x.model_dump() for x in product_to_id_mappings]
-        await db_jobs2.update_job_execution_runtime(new_execution_id, attempt_count, **update_kwargs)
+        await db_jobs.update_job_execution_runtime(new_execution_id, attempt_count, **update_kwargs)
 
         return Either.ok(JobExecuteResponse(execution_id=new_execution_id, attempt_count=attempt_count))
     except Exception as e:
-        await db_jobs2.update_job_execution_runtime(new_execution_id, attempt_count, status="failed", error=repr(e)[:255])
+        await db_jobs.update_job_execution_runtime(new_execution_id, attempt_count, status="failed", error=repr(e)[:255])
         return Either.error(repr(e))
 
 
@@ -310,7 +310,7 @@ async def execute_experiment_run(
     runs_v2 can read trigger type and original scheduled_at.
     When execution_id is supplied, the new attempt is appended under that id (rerun semantics).
     """
-    new_execution_id, attempt_count = await db_jobs2.upsert_job_execution(
+    new_execution_id, attempt_count = await db_jobs.upsert_job_execution(
         id=execution_id,
         job_definition_id=job_definition_id,
         job_definition_version=job_definition_version,
@@ -331,9 +331,9 @@ async def execute_experiment_run(
             update_kwargs["error"] = response.error[:255]
         else:
             update_kwargs["outputs"] = [x.model_dump() for x in product_to_id_mappings]
-        await db_jobs2.update_job_execution_runtime(new_execution_id, attempt_count, **update_kwargs)
+        await db_jobs.update_job_execution_runtime(new_execution_id, attempt_count, **update_kwargs)
 
         return Either.ok(JobExecuteResponse(execution_id=new_execution_id, attempt_count=attempt_count))
     except Exception as e:
-        await db_jobs2.update_job_execution_runtime(new_execution_id, attempt_count, status="failed", error=repr(e)[:255])
+        await db_jobs.update_job_execution_runtime(new_execution_id, attempt_count, status="failed", error=repr(e)[:255])
         return Either.error(repr(e))

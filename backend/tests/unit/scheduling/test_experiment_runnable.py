@@ -62,8 +62,8 @@ def _make_exec_spec() -> ExecutionSpecification:
 
 
 @pytest.mark.asyncio
-@patch("forecastbox.api.scheduling.job_utils.db_jobs2.get_experiment_definition", new_callable=AsyncMock)
-@patch("forecastbox.api.scheduling.job_utils.db_jobs2.get_job_definition", new_callable=AsyncMock)
+@patch("forecastbox.api.scheduling.job_utils.db_jobs.get_experiment_definition", new_callable=AsyncMock)
+@patch("forecastbox.api.scheduling.job_utils.db_jobs.get_job_definition", new_callable=AsyncMock)
 @patch("forecastbox.api.scheduling.job_utils.api_fable.compile")
 async def test_experiment2runnable_success(mock_compile, mock_get_jd, mock_get_exp):
     exec_time = dt.datetime(2026, 1, 1, 0, 0)
@@ -94,7 +94,7 @@ async def test_experiment2runnable_success(mock_compile, mock_get_jd, mock_get_e
 
 
 @pytest.mark.asyncio
-@patch("forecastbox.api.scheduling.job_utils.db_jobs2.get_experiment_definition", new_callable=AsyncMock)
+@patch("forecastbox.api.scheduling.job_utils.db_jobs.get_experiment_definition", new_callable=AsyncMock)
 async def test_experiment2runnable_not_found(mock_get_exp):
     mock_get_exp.return_value = None
 
@@ -106,8 +106,8 @@ async def test_experiment2runnable_not_found(mock_get_exp):
 
 
 @pytest.mark.asyncio
-@patch("forecastbox.api.scheduling.job_utils.db_jobs2.get_experiment_definition", new_callable=AsyncMock)
-@patch("forecastbox.api.scheduling.job_utils.db_jobs2.get_job_definition", new_callable=AsyncMock)
+@patch("forecastbox.api.scheduling.job_utils.db_jobs.get_experiment_definition", new_callable=AsyncMock)
+@patch("forecastbox.api.scheduling.job_utils.db_jobs.get_job_definition", new_callable=AsyncMock)
 async def test_experiment2runnable_job_def_missing(mock_get_jd, mock_get_exp):
     mock_get_exp.return_value = _make_experiment()
     mock_get_jd.return_value = None
@@ -120,8 +120,8 @@ async def test_experiment2runnable_job_def_missing(mock_get_jd, mock_get_exp):
 
 
 @pytest.mark.asyncio
-@patch("forecastbox.api.scheduling.job_utils.db_jobs2.get_experiment_definition", new_callable=AsyncMock)
-@patch("forecastbox.api.scheduling.job_utils.db_jobs2.get_job_definition", new_callable=AsyncMock)
+@patch("forecastbox.api.scheduling.job_utils.db_jobs.get_experiment_definition", new_callable=AsyncMock)
+@patch("forecastbox.api.scheduling.job_utils.db_jobs.get_job_definition", new_callable=AsyncMock)
 @patch("forecastbox.api.scheduling.job_utils.api_fable.compile")
 async def test_experiment2runnable_dynamic_expr_applied(mock_compile, mock_get_jd, mock_get_exp):
     exec_time = dt.datetime(2026, 3, 15, 12, 0)
@@ -150,7 +150,7 @@ async def test_experiment2runnable_dynamic_expr_applied(mock_compile, mock_get_j
 
 
 @pytest.mark.asyncio
-@patch("forecastbox.api.scheduling.job_utils.db_jobs2.get_job_execution", new_callable=AsyncMock)
+@patch("forecastbox.api.scheduling.job_utils.db_jobs.get_job_execution", new_callable=AsyncMock)
 async def test_rerun2runnable_execution_not_found(mock_get_exec):
     mock_get_exec.return_value = None
 
@@ -162,7 +162,7 @@ async def test_rerun2runnable_execution_not_found(mock_get_exec):
 
 
 @pytest.mark.asyncio
-@patch("forecastbox.api.scheduling.job_utils.db_jobs2.get_job_execution", new_callable=AsyncMock)
+@patch("forecastbox.api.scheduling.job_utils.db_jobs.get_job_execution", new_callable=AsyncMock)
 async def test_rerun2runnable_no_experiment_link(mock_get_exec):
     execution = MagicMock()
     execution.experiment_id = None
@@ -176,9 +176,9 @@ async def test_rerun2runnable_no_experiment_link(mock_get_exec):
 
 
 @pytest.mark.asyncio
-@patch("forecastbox.api.scheduling.job_utils.db_jobs2.get_job_execution", new_callable=AsyncMock)
-@patch("forecastbox.api.scheduling.job_utils.db_jobs2.get_experiment_definition", new_callable=AsyncMock)
-@patch("forecastbox.api.scheduling.job_utils.db_jobs2.get_job_definition", new_callable=AsyncMock)
+@patch("forecastbox.api.scheduling.job_utils.db_jobs.get_job_execution", new_callable=AsyncMock)
+@patch("forecastbox.api.scheduling.job_utils.db_jobs.get_experiment_definition", new_callable=AsyncMock)
+@patch("forecastbox.api.scheduling.job_utils.db_jobs.get_job_definition", new_callable=AsyncMock)
 @patch("forecastbox.api.scheduling.job_utils.api_fable.compile")
 async def test_rerun2runnable_success(mock_compile, mock_get_jd, mock_get_exp, mock_get_exec):
     original_time = dt.datetime(2026, 1, 1, 6, 0)

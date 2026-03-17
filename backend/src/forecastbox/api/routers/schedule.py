@@ -14,7 +14,7 @@ from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException
 
-import forecastbox.db.jobs2 as db_jobs2
+import forecastbox.db.jobs as db_jobs
 from forecastbox.api.scheduling.dt_utils import calculate_next_run, parse_crontab
 from forecastbox.api.scheduling.scheduler_thread import (
     prod_scheduler,
@@ -22,7 +22,7 @@ from forecastbox.api.scheduling.scheduler_thread import (
 )
 from forecastbox.api.types.scheduling import ScheduleSpecification, ScheduleUpdate
 from forecastbox.auth.users import current_active_user
-from forecastbox.schemas.jobs2 import ExperimentDefinition
+from forecastbox.schemas.jobs import ExperimentDefinition
 from forecastbox.schemas.user import UserRead
 
 logger = logging.getLogger(__name__)
@@ -119,14 +119,14 @@ async def list_schedules(
     if page < 1 or page_size < 1:
         raise HTTPException(status_code=400, detail="Page and page_size must be greater than 0.")
 
-    total = await db_jobs2.count_experiment_definitions(experiment_type="cron_schedule")
+    total = await db_jobs.count_experiment_definitions(experiment_type="cron_schedule")
     start = (page - 1) * page_size
     total_pages = (total + page_size - 1) // page_size if total > 0 else 0
 
     if start >= total and total > 0:
         raise HTTPException(status_code=404, detail="Page number out of range.")
 
-    experiments = list(await db_jobs2.list_experiment_definitions(experiment_type="cron_schedule", offset=start, limit=page_size))
+    experiments = list(await db_jobs.list_experiment_definitions(experiment_type="cron_schedule", offset=start, limit=page_size))
     schedules = [_experiment_to_response(exp) for exp in experiments]
     return ListSchedulesResponse(schedules=schedules, total=total, page=page, page_size=page_size, total_pages=total_pages)
 
@@ -140,7 +140,7 @@ async def create_schedule(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid crontab: {schedule_spec.cron_expr} => {e}")
 
-    job_def = await db_jobs2.get_job_definition(schedule_spec.job_definition_id, schedule_spec.job_definition_version)
+    job_def = await db_jobs.get_job_definition(schedule_spec.job_definition_id, schedule_spec.job_definition_version)
     if job_def is None:
         raise HTTPException(status_code=404, detail=f"JobDefinition {schedule_spec.job_definition_id!r} not found")
 
@@ -153,7 +153,7 @@ async def create_schedule(
         "max_acceptable_delay_hours": schedule_spec.max_acceptable_delay_hours,
         "enabled": True,
     }
-    experiment_id, _ = await db_jobs2.upsert_experiment_definition(
+    experiment_id, _ = await db_jobs.upsert_experiment_definition(
         job_definition_id=job_def_id,
         job_definition_version=job_def_version,
         experiment_type="cron_schedule",
@@ -165,7 +165,7 @@ async def create_schedule(
     )
 
     next_run_at = calculate_next_run(dt.datetime.now(), schedule_spec.cron_expr)
-    await db_jobs2.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=next_run_at)
+    await db_jobs.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=next_run_at)
     logger.debug(f"V2 schedule {experiment_id}: next run at {next_run_at}")
     prod_scheduler()
 
@@ -174,7 +174,7 @@ async def create_schedule(
 
 @router.get("/get")
 async def get_schedule(experiment_id: str, user: UserRead = Depends(current_active_user)) -> ScheduleDefinitionResponse:
-    exp_def = await db_jobs2.get_experiment_definition(experiment_id)
+    exp_def = await db_jobs.get_experiment_definition(experiment_id)
     if exp_def is None or exp_def.experiment_type != "cron_schedule":
         raise HTTPException(status_code=404, detail=f"Schedule {experiment_id} not found")
     return _experiment_to_response(exp_def)
@@ -185,7 +185,7 @@ async def update_schedule(
     experiment_id: str, update: ScheduleUpdate, user: UserRead = Depends(current_active_user)
 ) -> ScheduleDefinitionResponse:
     with scheduler_lock:  # NOTE this may block the async pool a bit!
-        current = await db_jobs2.get_experiment_definition(experiment_id)
+        current = await db_jobs.get_experiment_definition(experiment_id)
         if current is None or current.experiment_type != "cron_schedule":
             raise HTTPException(status_code=404, detail=f"Schedule {experiment_id} not found")
 
@@ -213,7 +213,7 @@ async def update_schedule(
             "enabled": new_enabled,
         }
 
-        await db_jobs2.upsert_experiment_definition(
+        await db_jobs.upsert_experiment_definition(
             id=experiment_id,
             job_definition_id=str(current.job_definition_id),  # ty:ignore[invalid-argument-type]
             job_definition_version=cast(int, current.job_definition_version),
@@ -228,24 +228,24 @@ async def update_schedule(
         if update.cron_expr is not None or update.enabled is not None:
             if new_enabled:
                 next_run_at = calculate_next_run(dt.datetime.now(), new_cron_expr)
-                await db_jobs2.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=next_run_at)
+                await db_jobs.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=next_run_at)
                 logger.debug(f"V2 schedule {experiment_id}: regenerated next run at {next_run_at}")
             else:
-                await db_jobs2.delete_experiment_next(experiment_id)
+                await db_jobs.delete_experiment_next(experiment_id)
                 logger.debug(f"V2 schedule {experiment_id}: disabled, next run cleared")
         prod_scheduler()
 
-    updated = await db_jobs2.get_experiment_definition(experiment_id)
+    updated = await db_jobs.get_experiment_definition(experiment_id)
     assert updated is not None
     return _experiment_to_response(updated)
 
 
 @router.get("/next_run")
 async def get_next_run(experiment_id: str, user: UserRead = Depends(current_active_user)) -> str:
-    exp_def = await db_jobs2.get_experiment_definition(experiment_id)
+    exp_def = await db_jobs.get_experiment_definition(experiment_id)
     if exp_def is None or exp_def.experiment_type != "cron_schedule":
         raise HTTPException(status_code=404, detail=f"Schedule {experiment_id} not found")
-    next_entry = await db_jobs2.get_experiment_next(experiment_id)
+    next_entry = await db_jobs.get_experiment_next(experiment_id)
     if next_entry is None:
         return "not scheduled currently"
     return str(next_entry.scheduled_at)
@@ -267,18 +267,18 @@ async def get_schedule_runs(
     if page < 1 or page_size < 1:
         raise HTTPException(status_code=400, detail="Page and page_size must be greater than 0.")
 
-    exp_def = await db_jobs2.get_experiment_definition(experiment_id)
+    exp_def = await db_jobs.get_experiment_definition(experiment_id)
     if exp_def is None or exp_def.experiment_type != "cron_schedule":
         raise HTTPException(status_code=404, detail=f"Schedule {experiment_id} not found")
 
-    total = await db_jobs2.count_job_executions_by_experiment(experiment_id)
+    total = await db_jobs.count_job_executions_by_experiment(experiment_id)
     start = (page - 1) * page_size
     total_pages = (total + page_size - 1) // page_size if total > 0 else 0
 
     if start >= total and total > 0:
         raise HTTPException(status_code=404, detail="Page number out of range.")
 
-    executions = list(await db_jobs2.list_job_executions_by_experiment(experiment_id, offset=start, limit=page_size))
+    executions = list(await db_jobs.list_job_executions_by_experiment(experiment_id, offset=start, limit=page_size))
 
     runs = [
         ScheduleRunResponse(

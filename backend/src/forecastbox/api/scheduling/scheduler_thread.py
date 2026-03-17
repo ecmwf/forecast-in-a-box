@@ -22,7 +22,7 @@ import logging
 import threading
 from typing import cast
 
-import forecastbox.db.jobs2 as db_jobs2
+import forecastbox.db.jobs as db_jobs
 from forecastbox.api.execution import execute_experiment_run
 from forecastbox.api.scheduling.dt_utils import calculate_next_run
 from forecastbox.api.scheduling.job_utils import experiment2runnable
@@ -60,7 +60,7 @@ class SchedulerThread(threading.Thread):
         now = self.mark_alive()
         logger.debug(f"Scheduler inquiry at {now}")
 
-        schedulable = await db_jobs2.get_schedulable_experiments(now)
+        schedulable = await db_jobs.get_schedulable_experiments(now)
 
         for exp_next, _exp_def in schedulable:
             experiment_id = cast(str, exp_next.experiment_id)
@@ -90,17 +90,17 @@ class SchedulerThread(threading.Thread):
                     else:
                         logger.error(f"[v2] Failed to submit experiment {experiment_id}: {exec_result.e}")
 
-                await db_jobs2.delete_experiment_next(experiment_id)
+                await db_jobs.delete_experiment_next(experiment_id)
                 if runnable.next_run_at:
-                    await db_jobs2.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=runnable.next_run_at)
+                    await db_jobs.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=runnable.next_run_at)
                     logger.debug(f"[v2] Next run for {experiment_id}: {runnable.next_run_at}")
                 else:
                     logger.warning(f"[v2] No next run computed for {experiment_id}")
             else:
                 logger.error(f"[v2] Could not create runnable for experiment {experiment_id}: {get_spec_result.e}")
-                await db_jobs2.delete_experiment_next(experiment_id)
+                await db_jobs.delete_experiment_next(experiment_id)
 
-        next_schedulable_at = await db_jobs2.next_schedulable_experiment()
+        next_schedulable_at = await db_jobs.next_schedulable_experiment()
 
         sleep_duration = sleep_duration_min
         if next_schedulable_at:

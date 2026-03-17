@@ -7,7 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""DB helpers for the jobs2 database.
+"""DB helpers for the jobs database.
 
 Provides insert / get / list / update-runtime / soft-delete operations for
 each table.  "Latest version" and "latest attempt" semantics are resolved
@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from forecastbox.config import config
 from forecastbox.db.core import addAndCommit, dbRetry, executeAndCommit, querySingle
-from forecastbox.schemas.jobs2 import (
+from forecastbox.schemas.jobs import (
     Base,
     ExperimentDefinition,
     ExperimentNext,
@@ -45,7 +45,7 @@ async_session_maker = async_sessionmaker(async_engine, expire_on_commit=False)
 
 
 async def create_db_and_tables() -> None:
-    """Create the jobs2 database and all its tables on startup."""
+    """Create the jobs database and all its tables on startup."""
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
