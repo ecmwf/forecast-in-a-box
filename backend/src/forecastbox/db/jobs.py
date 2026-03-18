@@ -383,7 +383,7 @@ async def update_job_execution_runtime(id: str, attempt_count: int, **kwargs: ob
 
 
 async def list_job_executions(offset: int = 0, limit: int | None = None) -> Iterable[JobExecution]:
-    """Return the latest non-deleted attempt of every JobExecution, with optional paging."""
+    """Return the latest non-deleted attempt of every JobExecution, with optional paging. Orders by creation time, descending."""
 
     async def function(i: int) -> list[JobExecution]:
         async with async_session_maker() as session:
@@ -399,6 +399,7 @@ async def list_job_executions(offset: int = 0, limit: int | None = None) -> Iter
                     subq,
                     (JobExecution.id == subq.c.id) & (JobExecution.attempt_count == subq.c.max_attempt),
                 )
+                .order_by(JobExecution.created_at.desc())
                 .offset(offset)
             )
             if limit is not None:

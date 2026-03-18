@@ -149,7 +149,7 @@ async def get_status(
     page: int = 1,
     page_size: int = 10,
 ) -> JobExecutionList:
-    """List the latest attempt of every job execution, with pagination."""
+    """List the latest attempt of every job execution, with pagination. Orders by creation time, descending."""
     if page < 1 or page_size < 1:
         raise HTTPException(status_code=400, detail="Page and page_size must be greater than 0.")
 
@@ -272,7 +272,7 @@ async def get_result(
     return Response(bytez, media_type=media_type)
 
 
-@router.get("/{job_id}/logs")
+@router.get("/{execution_id}/logs")
 async def get_logs(execution_id: str, attempt_count: int | None = None, user: UserRead = Depends(current_active_user)) -> Response:
     db_entity, cascade_job_id = await _id2cascExecution(execution_id, attempt_count)
     return await _get_logs(cascade_job_id, orjson.dumps(db_entity))
