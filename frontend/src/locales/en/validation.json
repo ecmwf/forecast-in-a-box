@@ -1,0 +1,24 @@
+{
+  "required": "{{field}} is required",
+  "email": "Please enter a valid email address",
+  "password": {
+    "minLength": "Password must be at least {{min}} characters",
+    "maxLength": "Password must be at most {{max}} characters",
+    "mustMatch": "Passwords must match"
+  },
+  "number": {
+    "min": "Value must be at least {{min}}",
+    "max": "Value must be at most {{max}}",
+    "integer": "Value must be an integer",
+    "positive": "Value must be positive"
+  },
+  "string": {
+    "minLength": "Must be at least {{min}} characters",
+    "maxLength": "Must be at most {{max}} characters"
+  },
+  "date": {
+    "invalid": "Invalid date",
+    "minDate": "Date must be after {{min}}",
+    "maxDate": "Date must be before {{max}}"
+  }
+}

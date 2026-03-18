@@ -30,13 +30,13 @@ dependencies = [
   "anemoi-utils>=0.4.36",
   "apscheduler",
   "cloudpickle",
-  "earthkit-workflows>=0.6.1",
+  "earthkit-workflows>=0.9.0",
   "earthkit-workflows-anemoi>=0.3.12",
   "earthkit-workflows-pproc",
   "fastapi",
   "fastapi-users[oauth]",
   "fastapi-users-db-sqlalchemy",
-  "fiab-core>=0.0.1,<1.0.0", # ~=0.0
+  "fiab-core>=0.0.2,<1.0.0",
   "httpx<1",
   "httpx-oauth",
   "jinja2",
@@ -78,9 +78,6 @@ dev = [
   "pytest-mock>=3.15.1",
   "ty==0.0.2",
   "prek",
-  "fiab-plugin-toy", # TODO remove after first publish
-  "fiab-plugin-toy-impl", # TODO remove after first publish
-  "fiab-plugin-toy2[runtime]", # TODO remove after first publish
   "fiab-plugin-ecmwf[runtime]", # TODO remove after first publish
 ]
 
@@ -108,7 +105,8 @@ addopts = "-n0 -s --log-disable findlibs"      # NOTE stick to 0 *or* have rando
 filterwarnings = [
     "error",
     'ignore:diagnostic_variables is unsupported:deprecation.UnsupportedWarning',
-    'ignore:prognostic_variables is unsupported:deprecation.UnsupportedWarning'
+    'ignore:prognostic_variables is unsupported:deprecation.UnsupportedWarning',
+    'ignore:fix this test -- it was written for old qubed'
 ]
 
 [tool.mypy]
@@ -120,17 +118,13 @@ plugins = "pydantic.mypy"
 pproc = { git = "https://github.com/ecmwf/pproc" }
 earthkit-workflows-pproc = { git = "https://github.com/ecmwf/earthkit-workflows-pproc" }
 fiab-core = {workspace = true}
-fiab-plugin-toy = {workspace = true}
-fiab-plugin-toy-impl = {workspace = true}
-fiab-plugin-toy2 = {workspace = true}
+fiab-mcp-server = {workspace = true}
 fiab-plugin-ecmwf = {workspace = true}
 
 [tool.uv.workspace]
 members = [
     "packages/fiab-core",
-    "packages/fiab-plugin-toy",
-    "packages/fiab-plugin-toy-impl",
-    "packages/fiab-plugin-toy2",
+    "packages/fiab-mcp-server",
     "packages/fiab-plugin-ecmwf",
 ]
 

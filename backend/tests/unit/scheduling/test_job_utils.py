@@ -4,9 +4,8 @@ from unittest.mock import patch
 import orjson
 import pytest
 
-from forecastbox.api.scheduling.job_utils import deep_union, eval_dynamic_expression, schedule2runnable
-from forecastbox.api.types import ExecutionSpecification
-from forecastbox.schemas.schedule import ScheduleDefinition
+from forecastbox.api.scheduling.job_utils import deep_union, eval_dynamic_expression
+from forecastbox.api.types.jobs import ExecutionSpecification
 
 
 def test_deep_union_empty_dicts():
@@ -98,53 +97,3 @@ def test_eval_dynamic_expression_partial_match():
     execution_time = datetime(2025, 10, 20, 10, 30)
     expected = {"key1": "prefix_$execution_time_suffix", "key2": "$execution_time_only"}
     assert eval_dynamic_expression(data, execution_time) == expected
-
-
-@pytest.mark.asyncio
-@patch("forecastbox.api.scheduling.job_utils.get_schedules")
-async def test_schedule2runnable_found(mock_get_schedules):
-    schedule_id = "test_schedule_id"
-    exec_time = datetime(2025, 10, 20, 10, 30)
-
-    mock_schedule_def = ScheduleDefinition(
-        schedule_id=schedule_id,
-        cron_expr="* * * * *",
-        created_at=datetime.now(),
-        updated_at=datetime.now(),
-        exec_spec=orjson.dumps(
-            {
-                "job": {
-                    "job_type": "forecast_products",
-                    "model": {"model": "test_model", "date": "2025-10-20", "lead_time": 24, "ensemble_members": 1},
-                    "products": [{"product": "test_product", "specification": {}}],
-                },
-                "environment": {"hosts": 1, "workers_per_host": 1},
-            }
-        ).decode("ascii"),
-        dynamic_expr=orjson.dumps({"job": {"model": {"date": "$execution_time"}}}).decode("ascii"),
-        enabled=True,
-        created_by="test_user",
-    )
-    mock_get_schedules.return_value = [mock_schedule_def]
-
-    result = await schedule2runnable(schedule_id, exec_time)
-
-    assert result.e is None
-    assert result.t is not None
-    assert isinstance(result.t.exec_spec, ExecutionSpecification)
-    assert result.t.created_by == "test_user"
-    assert result.t.exec_spec.job.model.date == "20251020T10"  # Check dynamic replacement
-    assert result.t.exec_spec.environment.hosts == 1
-
-
-@pytest.mark.asyncio
-@patch("forecastbox.api.scheduling.job_utils.get_schedules")
-async def test_schedule2runnable_not_found(mock_get_schedules):
-    schedule_id = "non_existent_id"
-    exec_time = datetime(2025, 10, 20, 10, 30)
-
-    mock_get_schedules.return_value = []
-
-    result = await schedule2runnable(schedule_id, exec_time)
-
-    assert result.t is None and result.e is not None

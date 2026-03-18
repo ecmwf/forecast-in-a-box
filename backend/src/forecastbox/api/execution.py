@@ -10,118 +10,104 @@
 import asyncio
 import json
 import logging
+import time
 import uuid
-from typing import Any, Sequence
+from typing import Any, Sequence, cast
 
 import cascade.gateway.api as api
 import cascade.gateway.client as client
 from cascade.low import views as cascade_views
 from cascade.low.core import JobInstance, JobInstanceRich
 from cascade.low.func import Either, assert_never
-from cascade.low.into import graph2job
 from earthkit.workflows import Cascade, fluent
+from earthkit.workflows.compilers import graph2job
 from earthkit.workflows.graph import Graph, deduplicate_nodes
 from fastapi import HTTPException
 from pydantic import BaseModel
 
-from forecastbox.api.types import EnvironmentSpecification, ExecutionSpecification, ForecastProducts, RawCascadeJob
+import forecastbox.api.fable as api_fable
+import forecastbox.db.jobs as db_jobs
+from forecastbox.api.artifacts.manager import ArtifactManager, submit_artifact_download
+from forecastbox.api.types.fable import FableBuilder
+from forecastbox.api.types.jobs import (
+    EnvironmentSpecification,
+    ExecutionSpecification,
+    JobExecuteResponse,
+    JobExecutionDetail,
+    JobSpecification,
+    RawCascadeJob,
+)
 from forecastbox.api.utils import get_model_path
 from forecastbox.config import config
-from forecastbox.db.job import insert_one
 from forecastbox.models import get_model
 from forecastbox.products.registry import get_product
+from forecastbox.schemas.jobs import JobDefinition, JobExecution
 from forecastbox.schemas.user import UserRead
 
 logger = logging.getLogger(__name__)
 
 
-def _get_model(spec: ForecastProducts):
-    model_spec = dict(
-        lead_time=spec.model.lead_time,
-        date=spec.model.date,
-        ensemble_members=spec.model.ensemble_members,
-    )
-
-    return get_model(checkpoint=get_model_path(spec.model.model)).specify(**model_spec)  # type: ignore
-
-
+# TODO replace with just output_ids, or something more fitting, since product_ are deprecated
 class ProductToOutputId(BaseModel):
     product_name: str
     product_spec: dict[str, Any]
     output_ids: Sequence[str]
 
 
-def forecast_products_to_cascade(
-    spec: ForecastProducts, environment: EnvironmentSpecification
-) -> tuple[Cascade, dict, list[ProductToOutputId]]:
-    model = _get_model(spec)
-
-    # Create the model action graph
-    model_action = model.graph()
-
-    # Iterate over each product in the specification
-    complete_graph = Graph([])
-
-    product_to_id_mappings = []
-
-    for product in spec.products:
-        product_spec = product.specification.copy()
-        try:
-            product_graph = get_product(*product.product.split("/", 1)).execute(product_spec, model, model_action)
-        except Exception as e:
-            raise Exception(f"Error in product {product}:\n{e}")
-
-        if isinstance(product_graph, fluent.Action):
-            product_graph = product_graph.graph()
-
-        output_ids = [x.name for x in product_graph.sinks]
-        product_to_id_mappings.append(ProductToOutputId(product_name=product.product, product_spec=product_spec, output_ids=output_ids))
-
-        complete_graph += product_graph
-
-    if len(spec.products) == 0:
-        complete_graph += model_action.graph()
-        product_to_id_mappings.append(
-            ProductToOutputId(product_name="All Model Outputs", product_spec={}, output_ids=[x.name for x in model_action.graph().sinks])
-        )
-
-    env_vars = model.control.environment_variables
-    env_vars.update(environment.environment_variables)
-
-    return Cascade(deduplicate_nodes(complete_graph)), env_vars, product_to_id_mappings
-
-
-def execution_specification_to_cascade(spec: ExecutionSpecification) -> tuple[JobInstance, dict, list[ProductToOutputId] | None]:
-    if isinstance(spec.job, ForecastProducts):
-        cascade_graph, environment_variables, product_to_id_mappings = forecast_products_to_cascade(spec.job, spec.environment)
-        return graph2job(cascade_graph._graph), environment_variables, product_to_id_mappings
-    elif isinstance(spec.job, RawCascadeJob):
-        return spec.job.job_instance, {}, None
-    assert_never(spec.job)
-
-
 def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobResponse, list[ProductToOutputId]]:
-    """Converts spec to JobInstance and submits to cascade api, returning response + list of sinks"""
-    try:
-        job, job_envvars, product_to_id_mappings = execution_specification_to_cascade(spec)
-    except Exception as e:
-        return api.SubmitJobResponse(job_id=None, error=repr(e)), []
+    """Converts spec to JobInstance and submits to cascade api, returning response"""
 
+    # Handle runtime artifacts download before job execution
+    runtime_artifacts = spec.environment.runtime_artifacts
+    if runtime_artifacts:
+        # Check which artifacts are not locally available (without locking)
+        missing_artifacts = [art for art in runtime_artifacts if art not in ArtifactManager.locally_available]
+
+        # TODO if any are missing update the db status
+
+        # Submit downloads for missing artifacts
+        download_ids = []
+        for artifact_id in missing_artifacts:
+            result = submit_artifact_download(artifact_id)
+            if result.e:
+                error_msg = f"Failed to submit download for {artifact_id}: {result.e}"
+                logger.error(error_msg)
+                return api.SubmitJobResponse(job_id=None, error=error_msg), []
+            download_ids.append(artifact_id)
+
+        # TODO replace this with Future await
+        # Poll for download completion
+        if download_ids:
+            max_wait_seconds = 3600  # 1 hour timeout
+            start_time = time.time()
+
+            while True:
+                # Check for remaining downloads using set difference
+                remaining = set(download_ids) - ArtifactManager.locally_available
+
+                if not remaining:
+                    logger.info(f"All runtime artifacts downloaded: {download_ids}")
+                    break
+
+                if time.time() - start_time > max_wait_seconds:
+                    error_msg = f"Timeout waiting for runtime artifacts to download"
+                    logger.error(error_msg)
+                    return api.SubmitJobResponse(job_id=None, error=error_msg), []
+
+                time.sleep(1)
+
+    job = spec.job.job_instance
     sinks = cascade_views.sinks(job)
     sinks = [s for s in sinks if not s.task.startswith("run_as_earthkit")]
-
-    if not product_to_id_mappings:
-        product_to_id_mappings = [ProductToOutputId(product_name="All Outputs", product_spec={}, output_ids=[x.task for x in sinks])]
-
     job.ext_outputs = sinks
+    product_to_id_mappings = [ProductToOutputId(product_name="All Outputs", product_spec={}, output_ids=[x.task for x in sinks])]
 
     environment = spec.environment
 
-    hosts = min(config.cascade.max_hosts, environment.hosts or config.cascade.max_hosts)
-    workers_per_host = min(config.cascade.max_workers_per_host, environment.workers_per_host or config.cascade.max_workers_per_host)
+    hosts = min(config.cascade.max_hosts, environment.hosts or config.cascade.default_hosts)
+    workers_per_host = min(config.cascade.max_workers_per_host, environment.workers_per_host or config.cascade.default_workers_per_host)
 
     env_vars = {"TMPDIR": config.cascade.venv_temp_dir}
-    env_vars.update({k: str(v) for k, v in job_envvars.items()})
 
     r = api.SubmitJobRequest(
         job=api.JobSpec(
@@ -147,30 +133,207 @@ class SubmitJobResponse(BaseModel):
     """Id of the submitted job."""
 
 
-async def execute(spec: ExecutionSpecification, user_id: str | None) -> Either[SubmitJobResponse, str]:  # type: ignore[invalid-argument] # NOTE type checker issue
+async def get_job_definition_for_execution(definition_id: str, definition_version: int | None) -> JobDefinition | None:
+    """Retrieve a JobDefinition from the jobs store by id and optional version."""
+    return await db_jobs.get_job_definition(definition_id, definition_version)
+
+
+async def get_job_execution_specification(execution_id: str, attempt_count: int | None) -> JobSpecification | None:
+    """Return the JobSpecification for the given execution attempt (latest if attempt_count is None)."""
+    execution = await db_jobs.get_job_execution(execution_id, attempt_count)
+    if execution is None:
+        return None
+    definition = await db_jobs.get_job_definition(
+        str(execution.job_definition_id),  # ty:ignore[invalid-argument-type]
+        cast(int, execution.job_definition_version),
+    )
+    if definition is None:
+        return None
+    return JobSpecification(
+        definition_id=str(definition.id),  # ty:ignore[invalid-argument-type]
+        definition_version=cast(int, definition.version),
+        blocks=cast(dict | None, definition.blocks),
+        environment_spec=cast(dict | None, definition.environment_spec),
+    )
+
+
+async def restart_job_execution(execution_id: str, user_id: str | None) -> Either[JobExecuteResponse, str]:  # type: ignore[invalid-argument]
+    """Create a new attempt under an existing execution_id, re-running its linked JobDefinition."""
+    existing = await db_jobs.get_job_execution(execution_id)
+    if existing is None:
+        return Either.error(f"JobExecution {execution_id!r} not found")
+
+    definition_id = str(existing.job_definition_id)  # ty:ignore[invalid-argument-type]
+    definition_version = cast(int, existing.job_definition_version)
+    definition = await db_jobs.get_job_definition(definition_id, definition_version)
+    if definition is None:
+        return Either.error(f"JobDefinition {definition_id!r} v{definition_version} not found")
+
+    # Reuse execute with the existing execution_id so the new attempt is appended under it
+    result = await execute(definition, user_id, execution_id=execution_id)
+    return result
+
+
+def execution_to_detail(execution: JobExecution) -> JobExecutionDetail:
+    """Convert a JobExecution ORM row to a JobExecutionDetail response model."""
+    return JobExecutionDetail(
+        execution_id=str(execution.id),  # ty:ignore[invalid-argument-type]
+        attempt_count=cast(int, execution.attempt_count),
+        status=cast(str, execution.status),
+        created_at=str(execution.created_at),
+        updated_at=str(execution.updated_at),
+        job_definition_id=str(execution.job_definition_id),  # ty:ignore[invalid-argument-type]
+        job_definition_version=cast(int, execution.job_definition_version),
+        error=cast(str | None, execution.error),
+        progress=cast(str | None, execution.progress),
+        cascade_job_id=cast(str | None, execution.cascade_job_id),
+    )
+
+
+async def poll_and_update_execution(execution_id: str, attempt_count: int | None) -> JobExecutionDetail | None:
+    """Fetch a JobExecution, poll cascade if active, update db, and return current detail.
+
+    Returns None if the execution is not found.
+    """
+    execution = await db_jobs.get_job_execution(execution_id, attempt_count)
+    if execution is None:
+        return None
+
+    actual_attempt = cast(int, execution.attempt_count)
+    cascade_job_id = cast(str | None, execution.cascade_job_id)
+    status = cast(str, execution.status)
+
+    def _build(
+        status_override: str | None = None, error_override: str | None = None, progress_override: str | None = None
+    ) -> JobExecutionDetail:
+        return JobExecutionDetail(
+            execution_id=str(execution.id),  # ty:ignore[invalid-argument-type]
+            attempt_count=actual_attempt,
+            status=status_override or status,
+            created_at=str(execution.created_at),
+            updated_at=str(execution.updated_at),
+            job_definition_id=str(execution.job_definition_id),  # ty:ignore[invalid-argument-type]
+            job_definition_version=cast(int, execution.job_definition_version),
+            error=error_override if error_override is not None else cast(str | None, execution.error),
+            progress=progress_override if progress_override is not None else cast(str | None, execution.progress),
+            cascade_job_id=cascade_job_id,
+        )
+
+    if status in ("submitted", "preparing", "running") and cascade_job_id:
+        try:
+            response = client.request_response(api.JobProgressRequest(job_ids=[cascade_job_id]), f"{config.cascade.cascade_url}")
+            response = cast(api.JobProgressResponse, response)
+        except TimeoutError:
+            return _build(status_override="unknown", error_override="failed to communicate with gateway")
+        except Exception as e:
+            return _build(status_override="unknown", error_override=f"internal cascade failure: {repr(e)}")
+
+        if response.error:
+            return _build(status_override="unknown", error_override=response.error)
+
+        jobprogress = response.progresses.get(cascade_job_id)
+        if jobprogress is None:
+            await db_jobs.update_job_execution_runtime(execution_id, actual_attempt, status="failed", error="evicted from gateway")
+            return _build(status_override="failed", error_override="evicted from gateway")
+        elif jobprogress.failure:
+            await db_jobs.update_job_execution_runtime(execution_id, actual_attempt, status="failed", error=jobprogress.failure)
+            return _build(status_override="failed", error_override=jobprogress.failure)
+        elif jobprogress.completed or jobprogress.pct == "100.00":
+            await db_jobs.update_job_execution_runtime(execution_id, actual_attempt, status="completed", progress="100.00")
+            return _build(status_override="completed", progress_override="100.00")
+        else:
+            await db_jobs.update_job_execution_runtime(execution_id, actual_attempt, status="running", progress=jobprogress.pct)
+            return _build(status_override="running", progress_override=jobprogress.pct)
+
+    return _build()
+
+
+async def execute(definition: JobDefinition, user_id: str | None, execution_id: str | None = None) -> Either[JobExecuteResponse, str]:  # type: ignore[invalid-argument]
+    """Always creates a JobExecution linked to the given JobDefinition.
+
+    Compiles the definition's blocks via the fable compiler, submits the resulting
+    spec to cascade, and persists a JobExecution row. When `execution_id` is supplied,
+    the new attempt is appended under that existing id (restart semantics); otherwise a
+    fresh id is generated.
+    """
+    if not definition.blocks:
+        return Either.error(f"JobDefinition {definition.id!r} has no compilable blocks")
+
+    builder = FableBuilder(
+        blocks=definition.blocks,  # ty:ignore[invalid-argument-type]
+        environment=EnvironmentSpecification.model_validate(definition.environment_spec) if definition.environment_spec else None,
+    )
+    spec = api_fable.compile(builder)
+    definition_id = str(definition.id)  # ty:ignore[invalid-argument-type]
+    definition_version = cast(int, definition.version)
+
+    new_execution_id, attempt_count = await db_jobs.upsert_job_execution(
+        id=execution_id,
+        job_definition_id=definition_id,
+        job_definition_version=definition_version,
+        created_by=user_id,
+        status="submitted",
+    )
+
     try:
         loop = asyncio.get_running_loop()
-        response, product_to_id_mappings = await loop.run_in_executor(None, _execute_cascade, spec)  # CPU-bound
-        if not response.job_id:
-            # TODO this best comes from the db... we still have a cascade conflict problem,
-            # we best redesign cascade api to allow for uuid acceptance
-            response.job_id = str(uuid.uuid4())
+        response, product_to_id_mappings = await loop.run_in_executor(None, _execute_cascade, spec)
+        cascade_job_id = response.job_id or str(uuid.uuid4())
 
-        await insert_one(
-            response.job_id,
-            response.error,
-            user_id,
-            spec.model_dump_json(),
-            json.dumps([x.model_dump() for x in product_to_id_mappings]),
-        )
-        return Either.ok(SubmitJobResponse(id=response.job_id))
+        update_kwargs: dict[str, object] = {"cascade_job_id": cascade_job_id}
+        if response.error:
+            update_kwargs["status"] = "failed"
+            update_kwargs["error"] = response.error[:255]
+        else:
+            update_kwargs["outputs"] = [x.model_dump() for x in product_to_id_mappings]
+        await db_jobs.update_job_execution_runtime(new_execution_id, attempt_count, **update_kwargs)
+
+        return Either.ok(JobExecuteResponse(execution_id=new_execution_id, attempt_count=attempt_count))
     except Exception as e:
+        await db_jobs.update_job_execution_runtime(new_execution_id, attempt_count, status="failed", error=repr(e)[:255])
         return Either.error(repr(e))
 
 
-async def execute2response(spec: ExecutionSpecification, user: UserRead | None) -> SubmitJobResponse:
-    result = await execute(spec, str(user.id) if user is not None else None)
-    if result.t is None:
-        raise HTTPException(status_code=500, detail=f"Failed to execute because of {result.e}")
-    else:
-        return result.t
+async def execute_experiment_run(
+    exec_spec: ExecutionSpecification,
+    user_id: str | None,
+    experiment_id: str,
+    job_definition_id: str,
+    job_definition_version: int,
+    compiler_runtime_context: dict,
+    execution_id: str | None = None,
+) -> Either[JobExecuteResponse, str]:  # type: ignore[invalid-argument]
+    """Submit a pre-compiled scheduled experiment run, creating a JobExecution linked to the experiment.
+
+    Uses a spec already compiled by the caller (with dynamic expressions applied).
+    Stores experiment_id and compiler_runtime_context on the created JobExecution so
+    runs can read trigger type and original scheduled_at.
+    When execution_id is supplied, the new attempt is appended under that id (rerun semantics).
+    """
+    new_execution_id, attempt_count = await db_jobs.upsert_job_execution(
+        id=execution_id,
+        job_definition_id=job_definition_id,
+        job_definition_version=job_definition_version,
+        created_by=user_id,
+        status="submitted",
+        experiment_id=experiment_id,
+        compiler_runtime_context=compiler_runtime_context,
+    )
+
+    try:
+        loop = asyncio.get_running_loop()
+        response, product_to_id_mappings = await loop.run_in_executor(None, _execute_cascade, exec_spec)
+        cascade_job_id = response.job_id or str(uuid.uuid4())
+
+        update_kwargs: dict[str, object] = {"cascade_job_id": cascade_job_id}
+        if response.error:
+            update_kwargs["status"] = "failed"
+            update_kwargs["error"] = response.error[:255]
+        else:
+            update_kwargs["outputs"] = [x.model_dump() for x in product_to_id_mappings]
+        await db_jobs.update_job_execution_runtime(new_execution_id, attempt_count, **update_kwargs)
+
+        return Either.ok(JobExecuteResponse(execution_id=new_execution_id, attempt_count=attempt_count))
+    except Exception as e:
+        await db_jobs.update_job_execution_runtime(new_execution_id, attempt_count, status="failed", error=repr(e)[:255])
+        return Either.error(repr(e))

@@ -1,0 +1,90 @@
+{
+  "title": "Sources Management",
+  "subtitle": "Manage data sources for your Fables - AI models and datasets.",
+  "stats": {
+    "total": "Total Sources",
+    "ready": "Ready",
+    "downloading": "Downloading",
+    "byPlugin": "By Plugin"
+  },
+  "filters": {
+    "all": "All Sources",
+    "models": "AI Models",
+    "datasets": "Datasets",
+    "ready": "Ready",
+    "available": "Available",
+    "searchPlaceholder": "Search sources...",
+    "type": "Type",
+    "status": "Status",
+    "plugin": "Plugin"
+  },
+  "sourceTypes": {
+    "model": "AI Model",
+    "dataset": "Dataset"
+  },
+  "status": {
+    "ready": "Ready",
+    "available": "Available",
+    "downloading": "Downloading",
+    "configuring": "Configuring",
+    "error": "Error",
+    "disabled": "Disabled"
+  },
+  "actions": {
+    "download": "Download",
+    "configure": "Configure",
+    "enable": "Enable",
+    "disable": "Disable",
+    "remove": "Remove",
+    "viewDetails": "View Details",
+    "retry": "Retry"
+  },
+  "card": {
+    "providedBy": "Provided by {{plugin}}",
+    "registry": "Registry: {{registry}}",
+    "size": "Size: {{size}}",
+    "downloadProgress": "{{progress}}% downloaded"
+  },
+  "emptyState": {
+    "title": "No sources found",
+    "description": "Install plugins with source capabilities to add data sources.",
+    "noResults": "No sources match your filters. Try adjusting your search criteria."
+  },
+  "table": {
+    "source": "Source",
+    "type": "Type",
+    "plugin": "Plugin",
+    "status": "Status",
+    "actions": "Actions",
+    "showing": "Showing {{count}} sources"
+  },
+  "details": {
+    "title": "Source Details",
+    "version": "Version",
+    "author": "Author",
+    "description": "Description",
+    "configuration": "Configuration",
+    "registry": "Registry",
+    "size": "Size"
+  },
+  "registry": {
+    "title": "Source Registries",
+    "add": "Add Registry",
+    "connect": "Connect",
+    "remove": "Remove",
+    "sync": "Sync",
+    "syncing": "Syncing...",
+    "visitSite": "Visit Site",
+    "default": "Default",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "sourcesCount": "{{count}} sources",
+    "sourcesCount_one": "{{count}} source",
+    "lastSynced": "Synced {{date}} at {{time}}",
+    "neverSynced": "Never synced",
+    "namePlaceholder": "Registry name (optional)",
+    "urlPlaceholder": "https://registry.example.com",
+    "stores": "Stores",
+    "description": "Registries are lightweight adapters that connect to data stores like HuggingFace, S3, or local storage."
+  }
+}

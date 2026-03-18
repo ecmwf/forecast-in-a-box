@@ -7,7 +7,7 @@ on:
       - 'main'
     paths:
       - 'backend/**'
-      - 'frontend-v2/**'
+      - 'frontend/**'
     tags-ignore:
       - '**'
 
@@ -15,15 +15,49 @@ on:
   pull_request:
     paths:
       - 'backend/**'
-      - 'frontend-v2/**'
+      - 'frontend/**'
+      - '.github/workflows/ci.yml'
 
   # Trigger the workflow manually
   workflow_dispatch: ~
 
 # TODO unify with a single matrix over platforms
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      backend: ${{ steps.filter.outputs.backend || steps.all-true.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend || steps.all-true.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        # Skip path filtering for workflow_dispatch and push events - run all jobs
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/ci.yml'
+      # For workflow_dispatch and push events, set all outputs to true
+      - name: Set outputs for non-PR events
+        if: github.event_name != 'pull_request'
+        id: all-true
+        run: |
+          echo "backend=true" >> "$GITHUB_OUTPUT"
+          echo "frontend=true" >> "$GITHUB_OUTPUT"
+
   macos:
     name: macos
+    needs: changes
+    # NOTE: Run when backend changes OR workflow_dispatch, AND only for origin2origin or fork2origin scenarios (not fork2fork)
+    if: needs.changes.outputs.backend == 'true' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.base.repo.full_name == 'ecmwf/forecast-in-a-box')
     strategy:
       fail-fast: true
       matrix:
@@ -31,18 +65,18 @@ jobs:
         python_version: ["3.11", "3.12", "3.13"]
     runs-on: [self-hosted, macOS, "${{ matrix.arch_type }}"]
     # NOTE we want to trigger this only in origin2origin or fork2origin scenarios, not in fork2fork scenarios
-    if: github.event.pull_request.base.repo.full_name == 'ecmwf/forecast-in-a-box'
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: extractions/setup-just@v3
-      - uses: astral-sh/setup-uv@v7
+      # NOTE if setup uv used, make sure to configure uv cache correctly, to not fill home. But should be already installed and configured
+      # - uses: astral-sh/setup-uv@v7
       - uses: actions/setup-node@v6 # NOTE does not actually work on macos !!!
       - run: |
           set -euo pipefail
           pushd backend
           export UV_FROZEN=1
-          uv sync --extra plots --python "${{ matrix.python_version }}"
+          uv sync --extra plots --python "${{ matrix.python_version }}" --all-packages
           uv run prek --all-files
           mkdir /tmp/tmpFiabHome
           mkdir src/forecastbox/static && touch src/forecastbox/static/index.html # TODO replace with proper static file build
@@ -55,6 +89,9 @@ jobs:
           just val
   ubuntu:
     name: ubuntu
+    needs: changes
+    # NOTE: Run when backend changes; triggers for both fork- and origin- targeting PRs (using github runners)
+    if: needs.changes.outputs.backend == 'true'
     strategy:
       fail-fast: true
       matrix:
@@ -71,7 +108,7 @@ jobs:
           set -euo pipefail
           pushd backend
           export UV_FROZEN=1
-          uv sync --extra plots --python "${{ matrix.python_version }}"
+          uv sync --extra plots --python "${{ matrix.python_version }}" --all-packages
           uv run prek --all-files
           mkdir /tmp/tmpFiabHome
           mkdir src/forecastbox/static && touch src/forecastbox/static/index.html # TODO replace with proper static file build
@@ -82,3 +119,37 @@ jobs:
           popd
 
           just val
+
+  frontend:
+    name: frontend
+    needs: changes
+    # NOTE: Run when frontend changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/.node-version
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Check formatting and linting
+        run: npm run check
+
+      - name: Run unit and integration tests. No e2e tests as they take too long and could be added later to a full test suite.
+        run: npm run test:run
+
+      - name: Check if build succeeds
+        run: npm run build

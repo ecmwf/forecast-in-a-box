@@ -1,28 +1,49 @@
-import js from '@eslint/js'
-import globals from 'globals'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
-import tseslint from 'typescript-eslint'
+/*
+ * (C) Copyright 2026- ECMWF and individual contributors.
+ *
+ * This software is licensed under the terms of the Apache Licence Version 2.0
+ * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+ * In applying this licence, ECMWF does not waive the privileges and immunities
+ * granted to it by virtue of its status as an intergovernmental organisation nor
+ * does it submit to any jurisdiction.
+ */
 
-export default tseslint.config(
-  { ignores: ['dist'] },
+//  @ts-check
+import pluginQuery from '@tanstack/eslint-plugin-query'
+import { tanstackConfig } from '@tanstack/eslint-config'
+import licenseHeader from 'eslint-plugin-license-header'
+
+export default [
+  { ignores: ['dist', '*.config.js', 'public'] },
+  ...pluginQuery.configs['flat/recommended'],
+  ...tanstackConfig,
   {
-    extends: [js.configs.recommended, ...tseslint.configs.recommended],
-    files: ['**/*.{ts,tsx}'],
-    languageOptions: {
-      ecmaVersion: 2020,
-      globals: globals.browser,
+    rules: {
+      'no-restricted-imports': ['error', { patterns: ['@radix-ui/*'] }],
     },
+  },
+  {
+    files: ['!src/components/ui/**'],
     plugins: {
-      'react-hooks': reactHooks,
-      'react-refresh': reactRefresh,
+      'license-header': licenseHeader,
     },
     rules: {
-      ...reactHooks.configs.recommended.rules,
-      'react-refresh/only-export-components': [
-        'warn',
-        { allowConstantExport: true },
+      'license-header/header': [
+        'error',
+        [
+          '/*',
+          ' * (C) Copyright ' +
+            new Date().getFullYear() +
+            '- ECMWF and individual contributors.',
+          ' *',
+          ' * This software is licensed under the terms of the Apache Licence Version 2.0',
+          ' * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.',
+          ' * In applying this licence, ECMWF does not waive the privileges and immunities',
+          ' * granted to it by virtue of its status as an intergovernmental organisation nor',
+          ' * does it submit to any jurisdiction.',
+          ' */',
+        ],
       ],
     },
   },
-)
+]

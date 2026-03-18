@@ -11,31 +11,39 @@
 
 import asyncio
 import io
-import json
 import logging
 import os
 import pathlib
 import zipfile
-from dataclasses import dataclass
-from typing import Literal, cast
+from typing import cast
 
 import cascade.gateway.api as api
 import cascade.gateway.client as client
 import orjson
-from cascade.controller.report import JobId
 from cascade.low.core import DatasetId, TaskId
-from fastapi import APIRouter, Body, Depends, HTTPException, Response, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, HTTPException, Response
 
-from forecastbox.api.execution import ProductToOutputId, SubmitJobResponse, execute2response
+import forecastbox.db.jobs as db_jobs
+from forecastbox.api.execution import (
+    ProductToOutputId,
+    execute,
+    execution_to_detail,
+    get_job_definition_for_execution,
+    get_job_execution_specification,
+    poll_and_update_execution,
+    restart_job_execution,
+)
 from forecastbox.api.routers.gateway import Globals
-from forecastbox.api.types import ExecutionSpecification, VisualisationOptions
+from forecastbox.api.types.jobs import (
+    JobExecuteRequest,
+    JobExecuteResponse,
+    JobExecutionDetail,
+    JobExecutionList,
+    JobSpecification,
+)
 from forecastbox.api.utils import encode_result
-from forecastbox.api.visualisation import visualise
 from forecastbox.auth.users import current_active_user
 from forecastbox.config import config
-from forecastbox.db.job import delete_all, delete_one, get_all, get_count, get_one, update_one
-from forecastbox.schemas.job import JobRecord
 from forecastbox.schemas.user import UserRead
 
 logger = logging.getLogger(__name__)
@@ -46,352 +54,26 @@ router = APIRouter(
 )
 
 
-STATUS = Literal["submitted", "running", "completed", "errored", "invalid", "timeout", "unknown"]
-
-
-@dataclass
-class JobProgressResponse:
-    """Job Progress Response."""
-
-    progress: str
-    """Progress of the job as a percentage."""
-    status: STATUS
-    """Status of the job."""
-    created_at: str | None = None
-    """Creation timestamp of the job."""
-    error: str | None = None
-    """Error message if the job encountered an error, otherwise None."""
-
-
-def build_response(
-    record: JobRecord, progress: str | None = None, error: str | None = None, status: STATUS | None = None
-) -> JobProgressResponse:
-    created_at = str(record.created_at)
-    progress = progress or cast(str, record.progress) or "0.00"
-    error = error or cast(str, record.error)
-    status = status or cast(STATUS, record.status)
-    return JobProgressResponse(progress=progress, created_at=created_at, status=status, error=error)
-
-
-@dataclass
-class JobProgressResponses:
-    """Job Progress Responses.
-
-    Contains progress information for multiple jobs with pagination metadata.
-    """
-
-    progresses: dict[JobId, JobProgressResponse]
-    """A dictionary mapping job IDs to their progress responses."""
-    total: int
-    """Total number of jobs in the database matching the filtering status."""
-    page: int
-    """Current page number."""
-    page_size: int
-    """Number of items per page."""
-    total_pages: int
-    """Total number of pages."""
-    error: str | None = None
-    """An error message if there was an issue retrieving job progress, otherwise None."""
-
-
-def validate_job_id(job_id: JobId) -> JobId | None:
-    """Validate the job ID."""
-    # NOTE we could query the db here, but since next step is a conditional db retrieval anyway, this extra query makes low sense
-    return job_id
-
-
 def validate_dataset_id(dataset_id: str) -> str:
     """Validate the dataset ID."""
     return dataset_id
 
 
-async def update_and_get_progress(job_id: JobId) -> JobProgressResponse:
-    """Updates the job db with the newest cascade gateway response, returns the updated result"""
-    job = await get_one(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
-
-    if job.status in ("running", "submitted"):
-        try:
-            response = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}")
-            response = cast(api.JobProgressResponse, response)
-        except TimeoutError:
-            # NOTE we dont update db because the job may still be running
-            return build_response(job, status="timeout", error="failed to communicate with gateway")
-        except Exception as e:
-            logger.debug(f"inquiry for {job_id=} failed with {repr(e)}")
-            # TODO this is either network or internal (eg serde) problem. Ideally fine-grain network into TimeoutError branch
-            result = {"status": "unknown", "error": f"internal cascade failure: {repr(e)}"}
-            await update_one(job_id, **result)
-            return build_response(job, **result)  # type: ignore[invalid-argument-type] # literal not recognized
-        if response.error:
-            # NOTE we dont update db because the job may still be running
-            return build_response(job, status="unknown", error=response.error)
-
-        jobprogress = response.progresses.get(job_id)
-        if jobprogress is None:
-            result = {"status": "invalid", "error": "evicted from gateway"}
-            await update_one(job_id, **result)
-            return build_response(job, **result)  # type: ignore[invalid-argument-type] # literal not recognized
-        elif jobprogress.failure:
-            result = {"status": "errored", "error": jobprogress.failure}
-            await update_one(job_id, **result)
-            return build_response(job, **result)  # type: ignore[invalid-argument-type] # literal not recognized
-        elif jobprogress.completed or jobprogress.pct == "100.00":
-            result = {"status": "completed", "progress": "100.00"}
-            await update_one(job_id, **result)
-            return build_response(job, **result)  # type: ignore[invalid-argument-type] # literal not recognized
-        else:
-            result = {"status": "running", "progress": jobprogress.pct}
-            await update_one(job_id, **result)
-            return build_response(job, **result)  # type: ignore[invalid-argument-type] # literal not recognized
-
-    else:
-        return build_response(job)
-
-
-@router.get("/status")
-async def get_status(
-    user: UserRead = Depends(current_active_user), page: int = 1, page_size: int = 10, status: STATUS | None = None
-) -> JobProgressResponses:
-    """Get progress of all tasks recorded in the database with pagination and filtering.
-
-    Parameters
-    ----------
-    user : UserRead
-        The current active user.
-    page : int
-        Page number (1-indexed).
-    page_size : int
-        Number of items per page.
-    status : STATUS | None
-        Filter by job status (submitted, running, completed, errored, invalid, timeout, unknown).
-
-    Returns
-    -------
-    JobProgressResponses
-        Paginated job progress responses with metadata.
-    """
-
-    if page < 1 or page_size < 1:
-        raise HTTPException(status_code=400, detail="Page and page_size must be greater than 0.")
-
-    total_jobs = await get_count(status)
-    start = (page - 1) * page_size
-    total_pages = (total_jobs + page_size - 1) // page_size if total_jobs > 0 else 0
-
-    if start >= total_jobs and total_jobs > 0:
-        raise HTTPException(status_code=404, detail="Page number out of range.")
-
-    job_records = list(await get_all(status, start, page_size))
-
-    progresses = {
-        str(job.job_id): (await update_and_get_progress(job.job_id) if job.status in ["running", "submitted"] else build_response(job))
-        for job in job_records
-    }
-
-    return JobProgressResponses(
-        progresses=progresses, total=total_jobs, page=page, page_size=page_size, total_pages=total_pages, error=None
-    )
-
-
-@router.get("/{job_id}/status")
-async def get_status_of_job(job_id: JobId = Depends(validate_job_id), user: UserRead = Depends(current_active_user)) -> JobProgressResponse:
-    """Get progress of a particular job."""
-    return await update_and_get_progress(job_id)
-
-
-@router.get("/{job_id}/outputs")
-async def get_outputs_of_job(job_id: JobId = Depends(validate_job_id), user=Depends(current_active_user)) -> list[ProductToOutputId]:
-    """Get outputs of a job."""
-    job = await get_one(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
-
-    product_to_id_mappings = json.loads(str(job.outputs))
-    if len(product_to_id_mappings) == 0:
-        raise HTTPException(status_code=204, detail=f"Job {job_id} had no outputs recorded.")
-    return [ProductToOutputId(**item) for item in product_to_id_mappings]
-
-
-@router.post("/{job_id}/visualise")
-async def visualise_job(
-    job_id: JobId = Depends(validate_job_id), options: VisualisationOptions = Body(None), user: UserRead = Depends(current_active_user)
-) -> HTMLResponse:
-    """Visualise a job's execution graph.
-
-    Retrieves the job's graph specification from the database, converts it to a cascade graph,
-    and generates an HTML visualisation of the graph.
-    """
-    job = await get_one(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
-    if not options:
-        options = VisualisationOptions()
-    spec = job.graph_specification
-    if spec is None:
-        raise HTTPException(status_code=404, detail=f"Job {job_id} had no specification.")
-    spec = cast(str, spec)
-    spec = ExecutionSpecification(**json.loads(spec))
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, visualise, spec, options)  # CPU bound
-
-
-@router.get("/{job_id}/specification")
-async def get_job_specification(
-    job_id: JobId = Depends(validate_job_id), user: UserRead = Depends(current_active_user)
-) -> ExecutionSpecification:
-    """Get specification in the database of a job."""
-    job = await get_one(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
-    if job.graph_specification is None:
-        raise HTTPException(status_code=404, detail=f"Job {job_id} had no specification.")
-    spec = job.graph_specification
-    if not spec:
-        raise HTTPException(status_code=404, detail=f"Job {job_id} had no specification.")
-    spec = cast(str, spec)
-    return ExecutionSpecification(**json.loads(spec))
-
-
-@router.post("/{job_id}/restart")
-async def restart_job(job_id: JobId = Depends(validate_job_id), user: UserRead | None = Depends(current_active_user)) -> SubmitJobResponse:
-    """Restart a job by executing its specification."""
-    job = await get_one(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail=f"Job {job_id} not found in the database.")
-    spec = job.graph_specification
-    if not spec:
-        raise HTTPException(status_code=404, detail=f"Job {job_id} had no specification.")
-    spec = cast(str, spec)
-    spec = ExecutionSpecification(**json.loads(spec))
-    return await execute2response(spec, user)
-
-
-@router.post("/upload")
-async def upload_job(file: UploadFile, user: UserRead | None = Depends(current_active_user)) -> SubmitJobResponse:
-    """Upload a job specification file and execute it."""
-    if not file:
-        raise HTTPException(status_code=400, detail="No file provided for upload.")
-
-    # Validate file type
-    if file.content_type not in ["application/json", "text/plain"]:
-        raise HTTPException(status_code=400, detail=f"Invalid file type: {file.content_type}. Only JSON files are accepted.")
-
-    # Validate file size (max 10MB)
-    max_size = 10 * 1024 * 1024
-    content = await file.read()
-    if len(content) > max_size:
-        raise HTTPException(status_code=413, detail=f"File too large. Maximum size is {max_size} bytes.")
-
+async def _get_logs(cascade_job_id: str, db_entity_ser: bytes) -> Response:
     try:
-        spec = ExecutionSpecification(**json.loads(content))
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid JSON format: {str(e)}")
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid specification format: {str(e)}")
-
-    return await execute2response(spec, user)
-
-
-@dataclass
-class DatasetAvailabilityResponse:
-    """Dataset Availability Response."""
-
-    available: bool
-    """Indicates whether the dataset is available for download."""
-
-
-@router.get("/{job_id}/available")
-async def get_job_availability(job_id: JobId = Depends(validate_job_id), user: UserRead = Depends(current_active_user)) -> list[TaskId]:
-    """Check which results are available for a given job_id.
-
-    Parameters
-    ----------
-    job_id : str
-        Job ID of the task
-    user: UserRead | None
-        The current active user, if any.
-
-    Returns
-    -------
-    list[TaskId]
-        List of TaskIds that have an available output within this job.
-    """
-    response = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}")
-    response = cast(api.JobProgressResponse, response)
-
-    if job_id not in response.datasets:
-        raise HTTPException(status_code=404, detail=f"Job {job_id} not found in gateway.")
-
-    return [x.task for x in response.datasets[job_id]]
-
-
-@router.get("/{job_id}/{dataset_id}/available")
-async def get_result_availability(
-    job_id: JobId = Depends(validate_job_id),
-    dataset_id: TaskId = Depends(validate_dataset_id),
-    user: UserRead = Depends(current_active_user),
-) -> DatasetAvailabilityResponse:
-    """Check if the result is available for a given job_id and dataset_id.
-    *DEPRECATED* use `get_job_availability` -- this one may malfunction for long or slashy or proxyed dataset_ids
-
-    This is used to check if the result is available for download.
-
-    Parameters
-    ----------
-    job_id : str
-        Job ID of the task
-    dataset_id : str
-        Dataset Id of the task
-        NOTE -- the param is TaskId, and we check if any of the actual DatasetIds corresponds to that task
-    user: UserRead | None
-        The current active user, if any.
-
-    Returns
-    -------
-    DatasetAvailabilityResponse
-        {'available': Availability of the result}
-    """
-
-    try:
-        response = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}")
-        response = cast(api.JobProgressResponse, response)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Job retrieval failed: {repr(e)}")
-
-    if job_id not in response.datasets:
-        raise HTTPException(status_code=404, detail=f"Job {job_id} not found in gateway.")
-
-    return DatasetAvailabilityResponse(dataset_id in [x.task for x in response.datasets[job_id]])
-
-
-@router.get("/{job_id}/logs")
-async def get_logs(job_id: JobId = Depends(validate_job_id), user: UserRead = Depends(current_active_user)) -> Response:
-    """Returns a zip file with logs and other data for the purpose of troubleshooting"""
-
-    logger.debug(f"getting logs for {job_id}")
-    try:
-        db_entity_raw = await get_one(job_id)
-        db_entity = {c.name: getattr(db_entity_raw, c.name) for c in db_entity_raw.__table__.columns}
-    except Exception as e:
-        db_entity = {"error": repr(e)}
-    logger.debug(f"{db_entity=} for {job_id}")
-
-    try:
-        request = api.JobProgressRequest(job_ids=[job_id])
+        request = api.JobProgressRequest(job_ids=[cascade_job_id])
         gw_state = client.request_response(request, f"{config.cascade.cascade_url}").model_dump()
     except TimeoutError:
         gw_state = {"progresses": {}, "datasets": {}, "error": "TimeoutError"}
     except Exception as e:
         gw_state = {"progresses": {}, "datasets": {}, "error": repr(e)}
-    logger.debug(f"{gw_state=} for {job_id}")
+    logger.debug(f"{gw_state=} for {cascade_job_id}")
 
     def _build_zip() -> tuple[bytes, str]:
         try:
             buffer = io.BytesIO()
             with zipfile.ZipFile(buffer, "a", zipfile.ZIP_DEFLATED) as zf:
-                zf.writestr("db_entity.json", orjson.dumps(db_entity))
+                zf.writestr("db_entity.json", db_entity_ser)
                 zf.writestr("gw_state.json", orjson.dumps(gw_state))
                 if not Globals.logs_directory:
                     zf.writestr("logs_directory.error.txt", "logs directory missing")
@@ -400,7 +82,7 @@ async def get_logs(job_id: JobId = Depends(validate_job_id), user: UserRead = De
                     f = ""
                     try:
                         for f in os.listdir(p):
-                            jPref = f"job.{job_id}"
+                            jPref = f"job_{cascade_job_id}"
                             if f.startswith("gateway") or f.startswith(jPref):
                                 zf.write(f"{p / f}", arcname=f)
                     except Exception as e:
@@ -427,36 +109,153 @@ async def get_logs(job_id: JobId = Depends(validate_job_id), user: UserRead = De
         )
 
 
-@router.get("/{job_id}/results")
-async def get_result(
-    job_id: JobId = Depends(validate_job_id),
-    dataset_id: TaskId = Depends(validate_dataset_id),
-    user: UserRead = Depends(current_active_user),
-) -> Response:
-    """Get the result of a job.
+@router.post("/execute")
+async def execute_api(request: JobExecuteRequest, user: UserRead | None = Depends(current_active_user)) -> JobExecuteResponse:
+    """Execute a job
+
+    Loads the referenced JobDefinition from the jobs store, compiles it, and
+    submits it to cascade, always creating a linked JobExecution row.
 
     Parameters
     ----------
-    job_id : JobId
-        Job ID of the task, expected to be the id in the database, not the cascade job id.
-    dataset_id : TaskId
-        Dataset Id of the task, these can be found from /{job_id}/outputs.
-        NOTE -- the param is TaskId, the actual DatasetId is formed by appending "0"
-    user: UserRead | None
-        The current active user, if any.
+    request : JobExecuteRequest
+        job_definition_id (+ optional version) referencing a saved JobDefinition.
+    user : UserRead, optional
+        The current active user.
 
     Returns
     -------
-    Response
-        Response containing the result of the job, encoded as bytes.
-
-    Raises
-    ------
-    HTTPException
-        If the result retrieval fails or if the job or dataset ID is not found in the database.
+    JobExecuteResponse
+        Contains the logical execution_id and attempt_count.
     """
+    definition = await get_job_definition_for_execution(request.job_definition_id, request.job_definition_version)
+    if definition is None:
+        raise HTTPException(status_code=404, detail=f"JobDefinition {request.job_definition_id!r} not found")
+    user_id = str(user.id) if user is not None else None
+    result = await execute(definition, user_id)
+    if result.t is None:
+        raise HTTPException(status_code=500, detail=f"Failed to execute because of {result.e}")
+    return result.t
+
+
+# ---------------------------------------------------------------------------
+# read endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/status")
+async def get_status(
+    user: UserRead = Depends(current_active_user),
+    page: int = 1,
+    page_size: int = 10,
+) -> JobExecutionList:
+    """List the latest attempt of every job execution, with pagination. Orders by creation time, descending."""
+    if page < 1 or page_size < 1:
+        raise HTTPException(status_code=400, detail="Page and page_size must be greater than 0.")
+
+    total = await db_jobs.count_job_executions()
+    start = (page - 1) * page_size
+    total_pages = (total + page_size - 1) // page_size if total > 0 else 0
+
+    if start >= total and total > 0:
+        raise HTTPException(status_code=404, detail="Page number out of range.")
+
+    executions = list(await db_jobs.list_job_executions(offset=start, limit=page_size))
+    details = [execution_to_detail(e) for e in executions]
+    return JobExecutionList(executions=details, total=total, page=page, page_size=page_size, total_pages=total_pages)
+
+
+@router.get("/{execution_id}/status")
+async def get_status_of_execution(
+    execution_id: str,
+    attempt_count: int | None = None,
+    user: UserRead = Depends(current_active_user),
+) -> JobExecutionDetail:
+    """Get status for a specific execution; defaults to the latest attempt."""
+    detail = await poll_and_update_execution(execution_id, attempt_count)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"JobExecution {execution_id!r} not found.")
+    return detail
+
+
+@router.get("/{execution_id}/outputs")
+async def get_outputs_of_execution(
+    execution_id: str,
+    attempt_count: int | None = None,
+    user: UserRead = Depends(current_active_user),
+) -> list[ProductToOutputId]:
+    """Get outputs for a specific execution; defaults to the latest attempt."""
+    execution = await db_jobs.get_job_execution(execution_id, attempt_count)
+    if execution is None:
+        raise HTTPException(status_code=404, detail=f"JobExecution {execution_id!r} not found.")
+    raw_outputs = execution.outputs
+    if not raw_outputs:
+        raise HTTPException(status_code=204, detail=f"JobExecution {execution_id!r} has no outputs recorded.")
+    return [ProductToOutputId(**item) for item in cast(list[dict], raw_outputs)]
+
+
+@router.get("/{execution_id}/specification")
+async def get_specification_of_execution(
+    execution_id: str,
+    attempt_count: int | None = None,
+    user: UserRead = Depends(current_active_user),
+) -> JobSpecification:
+    """Get the linked JobDefinition specification for a execution attempt."""
+    spec = await get_job_execution_specification(execution_id, attempt_count)
+    if spec is None:
+        raise HTTPException(status_code=404, detail=f"JobExecution {execution_id!r} or its definition not found.")
+    return spec
+
+
+@router.post("/{execution_id}/restart")
+async def restart_execution(
+    execution_id: str,
+    user: UserRead | None = Depends(current_active_user),
+) -> JobExecuteResponse:
+    """Create a new attempt of an existing execution under the same logical id."""
+    user_id = str(user.id) if user is not None else None
+    result = await restart_job_execution(execution_id, user_id)
+    if result.t is None:
+        raise HTTPException(status_code=500, detail=f"Failed to restart: {result.e}")
+    return result.t
+
+
+async def _id2cascExecution(execution_id: str, attempt_count: int | None = None) -> tuple[db_jobs.JobExecution, str]:
+    execution = await db_jobs.get_job_execution(execution_id, attempt_count)
+    if execution is None:
+        raise HTTPException(status_code=404, detail=f"JobExecution {execution_id!r} not found.")
+
+    cascade_job_id = cast(str | None, execution.cascade_job_id)
+    if cascade_job_id is None:
+        raise HTTPException(status_code=409, detail=f"JobExecution {execution_id!r} has not been submitted to cascade yet.")
+    return execution, cascade_job_id
+
+
+@router.get("/{execution_id}/available")
+async def get_job_availability(
+    execution_id: str, attempt_count: int | None = None, user: UserRead = Depends(current_active_user)
+) -> list[TaskId]:
+    """Check which results are available for a given execution."""
+    _, cascade_job_id = await _id2cascExecution(execution_id, attempt_count)
+    response = client.request_response(api.JobProgressRequest(job_ids=[cascade_job_id]), f"{config.cascade.cascade_url}")
+    response = cast(api.JobProgressResponse, response)
+    if cascade_job_id not in response.datasets:
+        raise HTTPException(status_code=404, detail=f"Job {cascade_job_id} not found in gateway.")
+
+    return [x.task for x in response.datasets[cascade_job_id]]
+
+
+@router.get("/{execution_id}/results")
+async def get_result(
+    execution_id: str,
+    attempt_count: int | None = None,
+    dataset_id: TaskId = Depends(validate_dataset_id),
+    user: UserRead = Depends(current_active_user),
+) -> Response:
+    """Get the result of a job. Returns response containing the result of the job, encoded as bytes."""
+    _, cascade_job_id = await _id2cascExecution(execution_id, attempt_count)
     response = client.request_response(
-        api.ResultRetrievalRequest(job_id=job_id, dataset_id=DatasetId(task=dataset_id, output="0")),
+        api.ResultRetrievalRequest(job_id=cascade_job_id, dataset_id=DatasetId(task=dataset_id, output="0")),
         f"{config.cascade.cascade_url}",
     )
     response = cast(api.ResultRetrievalResponse, response)
@@ -473,52 +272,20 @@ async def get_result(
     return Response(bytez, media_type=media_type)
 
 
-@router.get("/{job_id}/results/{dataset_id}")
-async def get_result_old(
-    job_id: JobId = Depends(validate_job_id),
-    dataset_id: TaskId = Depends(validate_dataset_id),
-    user: UserRead = Depends(current_active_user),
-) -> Response:
-    """Get the result of a job.
-    **Deprecated**: dataset_id may contain slashes, be too long, thwarted by proxy... Use `get_results` instead
-    """
-
-    return await get_result(job_id, dataset_id, user)
+@router.get("/{execution_id}/logs")
+async def get_logs(execution_id: str, attempt_count: int | None = None, user: UserRead = Depends(current_active_user)) -> Response:
+    db_entity, cascade_job_id = await _id2cascExecution(execution_id, attempt_count)
+    return await _get_logs(cascade_job_id, orjson.dumps(db_entity))
 
 
-@dataclass
-class JobDeletionResponse:
-    """Job Deletion Response."""
-
-    deleted_count: int
-    """Number of jobs deleted from the database."""
-
-
-@router.post("/flush")
-async def flush_job(user: UserRead = Depends(current_active_user)) -> JobDeletionResponse:
-    """Flush all job from the database and cascade.
-
-    Returns number of deleted jobs.
-    """
+@router.delete("/delete")
+async def delete_job(execution_id: str, attempt_count: int | None = None, user: UserRead = Depends(current_active_user)) -> None:
+    """Delete a job from the database and cascade."""
+    _, cascade_job_id = await _id2cascExecution(execution_id, attempt_count)
     try:
-        client.request_response(api.ResultDeletionRequest(datasets={}), f"{config.cascade.cascade_url}")  # type: ignore
+        client.request_response(api.ResultDeletionRequest(datasets={cascade_job_id: []}), f"{config.cascade.cascade_url}")  # type: ignore
     except Exception as e:
         raise HTTPException(500, f"Job deletion failed: {e}")
     finally:
-        deleted_count = await delete_all()
-    return JobDeletionResponse(deleted_count=deleted_count)
-
-
-@router.delete("/{job_id}")
-async def delete_job(job_id: JobId = Depends(validate_job_id), user: UserRead = Depends(current_active_user)) -> JobDeletionResponse:
-    """Delete a job from the database and cascade.
-
-    Returns number of deleted jobs.
-    """
-    try:
-        client.request_response(api.ResultDeletionRequest(datasets={job_id: []}), f"{config.cascade.cascade_url}")  # type: ignore
-    except Exception as e:
-        raise HTTPException(500, f"Job deletion failed: {e}")
-    finally:
-        deleted_count = await delete_one(job_id)
-    return JobDeletionResponse(deleted_count=deleted_count)
+        # TODO consider the attempt count here, return the deleted count
+        await db_jobs.soft_delete_job_execution(execution_id)

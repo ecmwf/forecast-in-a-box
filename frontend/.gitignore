@@ -1,0 +1,19 @@
+node_modules
+.DS_Store
+dist
+dist-ssr
+*.local
+count.txt
+.env
+.nitro
+.tanstack
+.wrangler
+.env*
+
+# Test artifacts
+playwright-report/
+.playwright-mcp/
+test-results/
+coverage/
+**/__screenshots__/
+

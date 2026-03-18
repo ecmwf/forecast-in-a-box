@@ -19,7 +19,8 @@ repos:
     exclude: |
       (?x)(
         .*uv.lock|
-        .*pylock.toml
+        .*pylock.toml|
+        ^frontend-v2/public/.*\.(png|jpeg|jpg)$
       )
   - id: check-merge-conflict # Check for files that contain merge conflict
 - repo: https://github.com/astral-sh/ruff-pre-commit

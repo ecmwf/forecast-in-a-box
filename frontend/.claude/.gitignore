@@ -1,0 +1,5 @@
+# Local settings (personal overrides)
+settings.local.json
+
+# Task-specific context
+tasks/

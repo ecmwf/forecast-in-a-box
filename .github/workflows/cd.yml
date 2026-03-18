@@ -102,7 +102,7 @@ jobs:
 
           # commit & tag
           git add install/pylock.toml
-          git commit -m "Release $TAG"
+          git commit -m "Release $TAG" --allow-empty
           git push
           git tag $TAG
           git push origin $TAG

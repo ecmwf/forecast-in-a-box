@@ -1,0 +1,24 @@
+{
+  "hero": {
+    "title": "Forecast-in-a-Box",
+    "subtitle": "Portable machine learning-based weather forecasting",
+    "description": "A complete weather forecasting system developed as part of the Destination Earth initiative for ECMWF",
+    "getStarted": "Get Started",
+    "learnMore": "Learn More"
+  },
+  "features": {
+    "title": "Features",
+    "configure": {
+      "title": "Configure",
+      "description": "Set up AI weather forecasts with model selection, parameters, and geographic regions"
+    },
+    "monitor": {
+      "title": "Monitor",
+      "description": "Track forecast execution in real-time with progress updates and live logs"
+    },
+    "visualize": {
+      "title": "Visualize",
+      "description": "View and download forecast results including images, plots, and data files"
+    }
+  }
+}

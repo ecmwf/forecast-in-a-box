@@ -11,13 +11,14 @@ from typing import cast
 
 import numpy as np
 from cascade.low.func import Either
-from earthkit.workflows.fluent import Payload, from_source
+from earthkit.workflows.fluent import Action, Payload, from_source
 from fiab_core.fable import (
+    ActionLookup,
     BlockConfigurationOption,
     BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
-    DataPartitionLookup,
+    XarrayOutput,
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import Product, Sink, Source
@@ -82,10 +83,10 @@ class EkdSource(Source):
 
     def compile(
         self,
-        partitions: DataPartitionLookup,
+        inputs: ActionLookup,
         block_id: BlockInstanceId,
         block: BlockInstance,
-    ) -> Either[DataPartitionLookup, Error]:  # type:ignore[invalid-argument] # semigroup
+    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         action = (
             from_source(
                 np.asarray(
@@ -120,8 +121,7 @@ class EkdSource(Source):
                 backend_kwargs={"method": "isel"},
             )
         )
-        partitions[block_id] = action
-        return Either.ok(partitions)
+        return Either.ok(action)
 
 
 class EnsembleStatistics(Product):
@@ -149,22 +149,19 @@ class EnsembleStatistics(Product):
 
     def compile(
         self,
-        partitions: DataPartitionLookup,
+        inputs: ActionLookup,
         block_id: BlockInstanceId,
         block: BlockInstance,
-    ) -> Either[DataPartitionLookup, Error]:  # type:ignore[invalid-argument] # semigroup
+    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
-        input_task_action = partitions[input_task]
+        input_task_action = inputs[input_task]
         stat = block.configuration_values["statistic"]
         param = input_task_action.select({PARAM_DIM: block.configuration_values["variable"]})
         if stat == "mean":
             action = param.mean(dim=ENSEMBLE_DIM)
         elif stat == "std":
             action = param.std(dim=ENSEMBLE_DIM)
-        else:
-            return Either.error(f"Unsupported statistic {stat}")
-        partitions[block_id] = action
-        return Either.ok(partitions)
+        return Either.ok(action)
 
     def intersect(self, input: BlockInstanceOutput) -> bool:
         return ENSEMBLE_DIM in input and "param" in input
@@ -193,12 +190,12 @@ class TemporalStatistics(Product):
 
     def compile(
         self,
-        partitions: DataPartitionLookup,
+        inputs: ActionLookup,
         block_id: BlockInstanceId,
         block: BlockInstance,
-    ) -> Either[DataPartitionLookup, Error]:  # type:ignore[invalid-argument] # semigroup
+    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
-        input_task_action = partitions[input_task]
+        input_task_action = inputs[input_task]
         stat = block.configuration_values["statistic"]
         param = input_task_action.select({PARAM_DIM: block.configuration_values[PARAM_DIM]})
         if stat == "mean":
@@ -209,10 +206,7 @@ class TemporalStatistics(Product):
             action = param.min(dim=STEP_DIM)
         elif stat == "max":
             action = param.max(dim=STEP_DIM)
-        else:
-            return Either.error(f"Unsupported statistic {stat}")
-        partitions[block_id] = action
-        return Either.ok(partitions)
+        return Either.ok(action)
 
     def intersect(self, input: BlockInstanceOutput) -> bool:
         return STEP_DIM in input and "param" in input
@@ -235,16 +229,15 @@ class ZarrSink(Sink):
 
     def compile(
         self,
-        partitions: DataPartitionLookup,
+        inputs: ActionLookup,
         block_id: BlockInstanceId,
         block: BlockInstance,
-    ) -> Either[DataPartitionLookup, Error]:  # type:ignore[invalid-argument] # semigroup
+    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
-        action = partitions[input_task].map(
+        action = inputs[input_task].map(
             Payload("fiab_plugin_ecmwf.runtime.sinks.write_zarr", kwargs={"path": block.configuration_values["path"]})
         )
-        partitions[block_id] = action
-        return Either.ok(partitions)
+        return Either.ok(action)
 
     def intersect(self, input: BlockInstanceOutput) -> bool:
         return "param" in input and len(input.axes()["param"]) > 0

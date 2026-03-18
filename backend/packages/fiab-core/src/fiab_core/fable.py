@@ -359,5 +359,4 @@ class BlockInstanceOutput(BaseModel):
         return all(contains(k, v) for k, v in dict_cast_to_list.items())
 
 
-# NOTE placeholder, this will be replaced with Fluent
-DataPartitionLookup = dict[BlockInstanceId, Action]
+ActionLookup = dict[BlockInstanceId, Action]

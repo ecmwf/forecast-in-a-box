@@ -12,12 +12,14 @@ Fundamental APIs of Forecast As BLock Expression (Fable)
 """
 
 import logging
+import os
 from collections import defaultdict
 from itertools import groupby
 from typing import Iterator, cast
 
-from cascade.low.into import graph2job
+from earthkit.workflows.compilers import graph2job
 from earthkit.workflows.graph import Graph, deduplicate_nodes
+from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import (
     BlockConfigurationOption,
     BlockFactory,
@@ -29,16 +31,16 @@ from fiab_core.fable import (
 )
 
 from forecastbox.api.plugin.manager import PluginManager
-from forecastbox.api.types import RawCascadeJob
 from forecastbox.api.types.fable import (
-    FableBuilderV1,
+    FableBuilder,
     FableValidationExpansion,
 )
+from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
 
 logger = logging.getLogger(__name__)
 
 
-def topological_order(fable: FableBuilderV1) -> Iterator[BlockInstanceId]:
+def topological_order(fable: FableBuilder) -> Iterator[BlockInstanceId]:
     remaining = {}
     children = defaultdict(list)
     queue = []
@@ -59,7 +61,7 @@ def topological_order(fable: FableBuilderV1) -> Iterator[BlockInstanceId]:
                 queue.append(child)
 
 
-def validate_expand(fable: FableBuilderV1) -> FableValidationExpansion:
+def validate_expand(fable: FableBuilder) -> FableValidationExpansion:
     # TODO this will be repeatedly called -- we probably need to cache a lot here
 
     plugins = PluginManager.plugins  # TODO we are avoiding a lock here! See the TODO at api/plugin.py
@@ -117,26 +119,62 @@ def validate_expand(fable: FableBuilderV1) -> FableValidationExpansion:
     )
 
 
-def compile(fable: FableBuilderV1) -> RawCascadeJob:
+def _get_artifacts_list(graph: Graph) -> list[CompositeArtifactId]:
+    # TODO move into earthkit.workflows.fluent somehow
+    payloads = (node.payload for node in graph.nodes())
+    artifactLists = (
+        payload.metadata.get("artifacts", []) for payload in payloads if hasattr(payload, "metadata") and isinstance(payload.metadata, dict)
+    )
+    artifacts = set(
+        artifact
+        for artifactList in artifactLists
+        if isinstance(artifactList, list)
+        for artifact in artifactList
+        if isinstance(artifact, CompositeArtifactId)
+    )
+    return list(artifacts)
+
+
+def compile(fable: FableBuilder) -> ExecutionSpecification:
     graph = Graph([])
-    plugins = PluginManager.plugins  # TODO we are avoiding a lock here! See the TODO at api/plugin.py
-    data_partition_lookup = {}
+    plugins = PluginManager.plugins
+    action_lookup = {}
 
     for blockId in topological_order(fable):
         blockInstance = fable.blocks[blockId]
         plugin = plugins.get(blockInstance.factory_id.plugin, None)
         if not plugin:
             raise ValueError(f"plugin for {blockId=} not found")
-        result = plugin.compiler(data_partition_lookup, blockId, blockInstance)
+        result = plugin.compiler(action_lookup, blockId, blockInstance)
         if result.t is None:
+            # NOTE we fail eagerly, but we could proceed with non-descedant actions and collect/emit all
             raise ValueError(f"compile failed at {blockId=} with {result.e}")
-        data_partition_lookup = result.t
+        action_lookup[blockId] = result.t
         block_factory = plugin.catalogue.factories[blockInstance.factory_id.factory]
         if block_factory.kind == "sink":
-            graph += data_partition_lookup[blockId].graph()
+            graph += action_lookup[blockId].graph()
 
-    result = graph2job(deduplicate_nodes(graph))
-    return RawCascadeJob(job_type="raw_cascade_job", job_instance=result)
+    graph = deduplicate_nodes(graph)
+    job_instance = graph2job(graph)
+    if data_dir := os.environ.get("IS_TEST_DATA_DIR", ""):
+        # TODO solve this properly
+        for task in job_instance.tasks.values():
+            if task.definition.entrypoint == "fiab_plugin_ecmwf.runtime.source.earthkit_source":
+                request = task.static_input_kw["request"]
+                # Check request matches data inside test file
+                assert request["number"] == list(range(1, 6, 1))
+                assert request["step"] == list(range(0, 61, 6))
+                task.static_input_ps["0"] = "file"
+                task.static_input_kw["path"] = os.path.join(data_dir, "fable_test.grib")
+    job = RawCascadeJob(job_type="raw_cascade_job", job_instance=job_instance)
+
+    graph_artifacts = _get_artifacts_list(graph)
+    if fable.environment is not None:
+        merged_artifacts = list(set(fable.environment.runtime_artifacts).union(set(graph_artifacts)))
+        environment = fable.environment.model_copy(update={"runtime_artifacts": merged_artifacts})
+    else:
+        environment = EnvironmentSpecification(runtime_artifacts=graph_artifacts)
+    return ExecutionSpecification(job=job, environment=environment)
 
 
 """

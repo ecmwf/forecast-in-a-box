@@ -26,15 +26,10 @@ from .export import OUTPUT_TYPES, export_fieldlist_as
 PPROC_AVAILABLE = True
 LOG = logging.getLogger(__name__)
 
-try:
-    from earthkit.workflows.plugins.pproc.fluent import Action as ppAction
-    from earthkit.workflows.plugins.pproc.templates import derive_template
-except (OSError, ImportError) as e:
-    PPROC_AVAILABLE = False
-    LOG.warning("PPROC is not available. %s", e)
-
 
 def from_request(request: dict, pproc_schema: str, action_kwargs: dict[str, Any] | None = None, **sources: fluent.Action) -> fluent.Action:
+    from earthkit.workflows.plugins.pproc.templates import derive_template
+
     inputs = []
     for source in sources.values():
         inputs.append({k: list(source.nodes.coords[k].values) for k in source.nodes.coords.keys()})
@@ -55,7 +50,10 @@ class PProcProduct(Product):
         pass
 
     def validate_intersection(self, model: SpecifiedModel) -> bool:
-        if not PPROC_AVAILABLE:
+        try:
+            import earthkit.workflows.plugins.pproc
+        except (OSError, ImportError) as e:
+            LOG.warning("PPROC is not available. %s", e)
             return False
         return super().validate_intersection(model)
 
@@ -147,6 +145,8 @@ class PProcProduct(Product):
         Graph
             PPROC graph
         """
+        from earthkit.workflows.plugins.pproc.fluent import Action as ppAction
+
         total_graph = Graph([])
         if not isinstance(request, list):
             request = [request]

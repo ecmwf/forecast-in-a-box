@@ -1,224 +1,288 @@
-from datetime import datetime as dt
+# (C) Copyright 2024- ECMWF.
+#
+# This software is licensed under the terms of the Apache Licence Version 2.0
+# which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# In applying this licence, ECMWF does not waive the privileges and immunities
+# granted to it by virtue of its status as an intergovernmental organisation
+# nor does it submit to any jurisdiction.
 
-from cascade.low.builders import JobBuilder, TaskBuilder
+"""Integration tests for
+- v2 schedule persistence (ExperimentDefinition / ExperimentNext)
+- v2 schedule runs read model (GET /schedule/runs)."""
 
-from forecastbox.api.types import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob, ScheduleSpecification, ScheduleUpdate
+import datetime as dt
+
+from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
+
+from forecastbox.api.types.fable import FableBuilder, FableSaveRequest
+from forecastbox.api.types.scheduling import ScheduleSpecification, ScheduleUpdate
+
+# *** helpers **
 
 
-def test_schedule_crud(backend_client_with_auth):
-    # miss
-    response = backend_client_with_auth.get("/schedule/notToBeFound")
+def _save_fable(client) -> tuple[str, int]:
+    """Save a minimal FableBuilder and return (job_definition_id, version)."""
+    plugin_id = PluginCompositeId(store="ecmwf", local="ecmwf-base")
+    source = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=plugin_id, factory="ekdSource"),
+        configuration_values={"source": "ecmwf-open-data", "date": "2026-01-01", "expver": "0001"},
+        input_ids={},
+    )
+    builder = FableBuilder(blocks={"source1": source})
+    resp = client.post("/fable/upsert", json=FableSaveRequest(builder=builder, display_name="sched-v2 test").model_dump())
+    assert resp.is_success, resp.text
+    data = resp.json()
+    return data["id"], data["version"]
+
+
+def _create_schedule_v2(client, job_def_id: str, job_def_version: int, cron_expr: str = "0 0 * * *") -> str:
+    """Create a v2 cron schedule and return experiment_id."""
+    spec = ScheduleSpecification(
+        job_definition_id=job_def_id,
+        job_definition_version=job_def_version,
+        cron_expr=cron_expr,
+        dynamic_expr={},
+        max_acceptable_delay_hours=24,
+        display_name="Runs v2 Test Schedule",
+    )
+    resp = client.put("/schedule/create", headers={"Content-Type": "application/json"}, json=spec.model_dump())
+    assert resp.is_success, resp.text
+    return resp.json()["experiment_id"]
+
+
+# *** schedule crud endpoints ***
+
+
+def test_schedule_v2_crud(backend_client_with_auth):
+    """Create, get, update, and verify persistence of a v2 schedule."""
+    headers = {"Content-Type": "application/json"}
+    job_def_id, job_def_version = _save_fable(backend_client_with_auth)
+
+    # miss on unknown experiment_id
+    response = backend_client_with_auth.get("/schedule/get", params={"experiment_id": "notToBeFound"})
     assert response.status_code == 404
 
-    job_instance = JobBuilder().with_node("n1", TaskBuilder.from_callable(eval).with_values("1+2")).build().get_or_raise()
-    env = EnvironmentSpecification(hosts=1, workers_per_host=2)
-    exec_spec = ExecutionSpecification(
-        job=RawCascadeJob(
-            job_type="raw_cascade_job",
-            job_instance=job_instance,
-        ),
-        environment=env,
-    )
-    sched_spec = ScheduleSpecification(
-        exec_spec=exec_spec,
-        dynamic_expr={},
-        cron_expr="0 0 * * *",
-        max_acceptable_delay_hours=24,
-    )
-
     # create
-    headers = {"Content-Type": "application/json"}
-    response = backend_client_with_auth.put("/schedule/create", headers=headers, json=sched_spec.model_dump())
-    assert response.is_success
-    sched_id = response.json()["schedule_id"]
+    spec = ScheduleSpecification(
+        job_definition_id=job_def_id,
+        job_definition_version=job_def_version,
+        cron_expr="0 0 * * *",
+        dynamic_expr={},
+        max_acceptable_delay_hours=24,
+        display_name="Test v2 Schedule",
+    )
+    response = backend_client_with_auth.put("/schedule/create", headers=headers, json=spec.model_dump())
+    assert response.is_success, response.text
+    experiment_id = response.json()["experiment_id"]
+    assert experiment_id
 
     # get
-    response = backend_client_with_auth.get(f"/schedule/{sched_id}")
-    assert response.is_success
+    response = backend_client_with_auth.get("/schedule/get", params={"experiment_id": experiment_id})
+    assert response.is_success, response.text
+    data = response.json()
+    assert data["experiment_id"] == experiment_id
+    assert data["cron_expr"] == "0 0 * * *"
+    assert data["enabled"] is True
+    assert data["job_definition_id"] == job_def_id
 
-    # update
-    updated_cron_expr = "0 1 * * *"
-    schedule_update = ScheduleUpdate(cron_expr=updated_cron_expr, enabled=False)
-    response = backend_client_with_auth.post(f"/schedule/{sched_id}", headers=headers, json=schedule_update.model_dump(exclude_unset=True))
-    assert response.is_success
-    updated_schedule = response.json()
-    assert updated_schedule["cron_expr"] == updated_cron_expr
-    assert updated_schedule["enabled"] is False
-    response = backend_client_with_auth.get(f"/schedule/{sched_id}")
-    assert response.is_success
-    retrieved_schedule = response.json()
-    assert retrieved_schedule["cron_expr"] == updated_cron_expr
-    assert retrieved_schedule["enabled"] is False
-
-
-def test_get_multiple_schedules(backend_client_with_auth):
-    headers = {"Content-Type": "application/json"}
-
-    job_instance = JobBuilder().with_node("n1", TaskBuilder.from_callable(eval).with_values("1+2")).build().get_or_raise()
-    env = EnvironmentSpecification(hosts=1, workers_per_host=2)
-    exec_spec = ExecutionSpecification(
-        job=RawCascadeJob(
-            job_type="raw_cascade_job",
-            job_instance=job_instance,
-        ),
-        environment=env,
-    )
-
-    # create
-    sched_spec_1 = ScheduleSpecification(exec_spec=exec_spec, dynamic_expr={}, cron_expr="0 0 * * *", max_acceptable_delay_hours=24)
-    response = backend_client_with_auth.put("/schedule/create", headers=headers, json=sched_spec_1.model_dump())
-    assert response.is_success
-    sched_id_1 = response.json()["schedule_id"]
-    sched_spec_2 = ScheduleSpecification(exec_spec=exec_spec, dynamic_expr={}, cron_expr="0 0 * * *", max_acceptable_delay_hours=24)
-    response = backend_client_with_auth.put("/schedule/create", headers=headers, json=sched_spec_2.model_dump())
-    assert response.is_success
-    sched_id_2 = response.json()["schedule_id"]
-    sched_spec_3 = ScheduleSpecification(exec_spec=exec_spec, dynamic_expr={}, cron_expr="0 0 * * *", max_acceptable_delay_hours=24)
-    response = backend_client_with_auth.put("/schedule/create", headers=headers, json=sched_spec_3.model_dump())
-    assert response.is_success
-    sched_id_3 = response.json()["schedule_id"]
-
-    # update: disable
-    schedule_update_2 = ScheduleUpdate(enabled=False)
+    # update cron and enabled
+    updated_cron = "0 1 * * *"
+    update = ScheduleUpdate(cron_expr=updated_cron, enabled=False)
     response = backend_client_with_auth.post(
-        f"/schedule/{sched_id_2}", headers=headers, json=schedule_update_2.model_dump(exclude_unset=True)
+        "/schedule/update", params={"experiment_id": experiment_id}, headers=headers, json=update.model_dump(exclude_unset=True)
     )
-    assert response.is_success
+    assert response.is_success, response.text
+    updated = response.json()
+    assert updated["cron_expr"] == updated_cron
+    assert updated["enabled"] is False
 
-    creation_time = dt.now()  # we do it a bit later, to ensure db in sync
-
-    # filter: enabled
-    response = backend_client_with_auth.get("/schedule/?enabled=true")
-    assert response.is_success
-    enabled_schedules_response = response.json()
-    enabled_schedules = enabled_schedules_response["schedules"]
-    assert enabled_schedules_response["total"] >= 2
-    assert enabled_schedules_response["page"] == 1
-    assert enabled_schedules_response["page_size"] == 10
-    assert sched_id_1 in enabled_schedules
-    assert sched_id_3 in enabled_schedules
-    assert sched_id_2 not in enabled_schedules
-
-    response = backend_client_with_auth.get("/schedule/?enabled=false")
-    assert response.is_success
-    disabled_schedules_response = response.json()
-    disabled_schedules = disabled_schedules_response["schedules"]
-    assert disabled_schedules_response["total"] >= 1
-    assert disabled_schedules_response["page"] == 1
-    assert disabled_schedules_response["page_size"] == 10
-    assert sched_id_2 in disabled_schedules
-    assert sched_id_1 not in disabled_schedules
-    assert sched_id_3 not in disabled_schedules
-
-    # filter: created at
-    sched_spec_4 = ScheduleSpecification(exec_spec=exec_spec, dynamic_expr={}, cron_expr="0 0 * * *", max_acceptable_delay_hours=24)
-    response = backend_client_with_auth.put("/schedule/create", headers=headers, json=sched_spec_4.model_dump())
-    assert response.is_success
-    sched_id_4 = response.json()["schedule_id"]
-
-    response = backend_client_with_auth.get(f"/schedule/?created_at_end={creation_time.isoformat()}")
-    assert response.is_success
-    nonrecent_schedules_response = response.json()
-    nonrecent_schedules = nonrecent_schedules_response["schedules"]
-    assert nonrecent_schedules_response["total"] >= 3
-    assert nonrecent_schedules_response["page"] == 1
-    assert nonrecent_schedules_response["page_size"] == 10
-    assert sched_id_1 in nonrecent_schedules
-    assert sched_id_2 in nonrecent_schedules
-    assert sched_id_3 in nonrecent_schedules
-    assert sched_id_4 not in nonrecent_schedules
-
-    # pagination
-    response = backend_client_with_auth.get("/schedule/")
-    assert response.is_success
-    all_schedules_response = response.json()
-    total_schedules = all_schedules_response["total"]
-    assert total_schedules >= 4
-
-    # page 1, page_size 2
-    response = backend_client_with_auth.get("/schedule/?page=1&page_size=2")
-    assert response.is_success
-    paginated_response = response.json()
-    assert len(paginated_response["schedules"]) == 2
-    assert paginated_response["total"] == total_schedules
-    assert paginated_response["page"] == 1
-    assert paginated_response["page_size"] == 2
-    assert paginated_response["total_pages"] == (total_schedules + 1) // 2
-
-    # page 2, page_size 2
-    response = backend_client_with_auth.get("/schedule/?page=2&page_size=2")
-    assert response.is_success
-    paginated_response = response.json()
-    assert len(paginated_response["schedules"]) == 2
-    assert paginated_response["total"] == total_schedules
-    assert paginated_response["page"] == 2
-    assert paginated_response["page_size"] == 2
-    assert paginated_response["total_pages"] == (total_schedules + 1) // 2
-
-    # page too high
-    response = backend_client_with_auth.get(f"/schedule/?page={paginated_response['total_pages'] + 1}&page_size=2")
-    assert response.status_code == 404
-
-    # invalid size
-    response = backend_client_with_auth.get("/schedule/?page=1&page_size=0")
-    assert response.status_code == 400
-
-    # page too low
-    response = backend_client_with_auth.get("/schedule/?page=0&page_size=1")
-    assert response.status_code == 400
+    # confirm updated values are persisted
+    response = backend_client_with_auth.get("/schedule/get", params={"experiment_id": experiment_id})
+    assert response.is_success, response.text
+    persisted = response.json()
+    assert persisted["cron_expr"] == updated_cron
+    assert persisted["enabled"] is False
 
 
-def test_get_next_schedule_run_endpoint(backend_client_with_auth):
+def test_schedule_v2_list(backend_client_with_auth):
+    """Creating v2 schedules makes them appear in the list_v2 endpoint with pagination."""
     headers = {"Content-Type": "application/json"}
+    job_def_id, job_def_version = _save_fable(backend_client_with_auth)
 
-    job_instance = JobBuilder().with_node("n1", TaskBuilder.from_callable(eval).with_values("1+2")).build().get_or_raise()
-    env = EnvironmentSpecification(hosts=1, workers_per_host=2)
-    exec_spec = ExecutionSpecification(
-        job=RawCascadeJob(
-            job_type="raw_cascade_job",
-            job_instance=job_instance,
-        ),
-        environment=env,
-    )
-    sched_spec = ScheduleSpecification(
-        exec_spec=exec_spec,
-        dynamic_expr={},
+    # baseline count
+    response = backend_client_with_auth.get("/schedule/list")
+    assert response.is_success, response.text
+    baseline_total = response.json()["total"]
+
+    spec1 = ScheduleSpecification(
+        job_definition_id=job_def_id,
+        job_definition_version=job_def_version,
         cron_expr="0 0 * * *",
-        max_acceptable_delay_hours=24,
     )
+    spec2 = ScheduleSpecification(
+        job_definition_id=job_def_id,
+        job_definition_version=job_def_version,
+        cron_expr="0 6 * * *",
+    )
+    r1 = backend_client_with_auth.put("/schedule/create", headers=headers, json=spec1.model_dump())
+    assert r1.is_success, r1.text
+    exp_id_1 = r1.json()["experiment_id"]
+    r2 = backend_client_with_auth.put("/schedule/create", headers=headers, json=spec2.model_dump())
+    assert r2.is_success, r2.text
+    exp_id_2 = r2.json()["experiment_id"]
 
-    response = backend_client_with_auth.put("/schedule/create", headers=headers, json=sched_spec.model_dump())
-    assert response.is_success
-    schedule_id = response.json()["schedule_id"]
+    response = backend_client_with_auth.get("/schedule/list")
+    assert response.is_success, response.text
+    list_data = response.json()
+    assert list_data["total"] == baseline_total + 2
+    assert list_data["page"] == 1
+    assert list_data["page_size"] == 10
+    experiment_ids = [s["experiment_id"] for s in list_data["schedules"]]
+    assert exp_id_1 in experiment_ids
+    assert exp_id_2 in experiment_ids
 
-    # without changes
-    response = backend_client_with_auth.get(f"/schedule/{schedule_id}/next_run")
-    assert response.is_success
+    # pagination: page_size=1
+    response = backend_client_with_auth.get("/schedule/list", params={"page": 1, "page_size": 1})
+    assert response.is_success, response.text
+    paged = response.json()
+    assert len(paged["schedules"]) == 1
+    assert paged["total"] == baseline_total + 2
+    assert paged["total_pages"] == baseline_total + 2
+
+    # invalid params
+    response = backend_client_with_auth.get("/schedule/list", params={"page": 0, "page_size": 1})
+    assert response.status_code == 400
+    response = backend_client_with_auth.get("/schedule/list", params={"page": 1, "page_size": 0})
+    assert response.status_code == 400
+
+
+def test_schedule_v2_next_run(backend_client_with_auth):
+    """Next-run endpoint reflects cron changes and disabled state."""
+    headers = {"Content-Type": "application/json"}
+    job_def_id, job_def_version = _save_fable(backend_client_with_auth)
+
+    spec = ScheduleSpecification(
+        job_definition_id=job_def_id,
+        job_definition_version=job_def_version,
+        cron_expr="0 0 * * *",
+    )
+    response = backend_client_with_auth.put("/schedule/create", headers=headers, json=spec.model_dump())
+    assert response.is_success, response.text
+    experiment_id = response.json()["experiment_id"]
+
+    # initial next run at midnight
+    response = backend_client_with_auth.get("/schedule/next_run", params={"experiment_id": experiment_id})
+    assert response.is_success, response.text
     initial_next_run = response.json()
     assert "00:00:00" in initial_next_run
 
-    # regenerate by changing cron expr
-    updated_cron_expr = "0 2 * * *"  # Change to 2 AM
-    schedule_update = ScheduleUpdate(cron_expr=updated_cron_expr)
+    # update cron to 2 AM
+    update = ScheduleUpdate(cron_expr="0 2 * * *")
     response = backend_client_with_auth.post(
-        f"/schedule/{schedule_id}", headers=headers, json=schedule_update.model_dump(exclude_unset=True)
+        "/schedule/update", params={"experiment_id": experiment_id}, headers=headers, json=update.model_dump(exclude_unset=True)
     )
-    assert response.is_success
+    assert response.is_success, response.text
 
-    response = backend_client_with_auth.get(f"/schedule/{schedule_id}/next_run")
-    assert response.is_success
+    response = backend_client_with_auth.get("/schedule/next_run", params={"experiment_id": experiment_id})
+    assert response.is_success, response.text
     updated_next_run = response.json()
     assert updated_next_run != initial_next_run
     assert "02:00:00" in updated_next_run
 
-    # regenerate by disabling
-    schedule_update_disable = ScheduleUpdate(enabled=False)
+    # disable: next run should be cleared
+    disable_update = ScheduleUpdate(enabled=False)
     response = backend_client_with_auth.post(
-        f"/schedule/{schedule_id}", headers=headers, json=schedule_update_disable.model_dump(exclude_unset=True)
+        "/schedule/update", params={"experiment_id": experiment_id}, headers=headers, json=disable_update.model_dump(exclude_unset=True)
     )
-    assert response.is_success
+    assert response.is_success, response.text
 
-    response = backend_client_with_auth.get(f"/schedule/{schedule_id}/next_run")
-    assert response.is_success
-    disabled_next_run = response.json()
-    assert disabled_next_run == "not scheduled currently"
+    response = backend_client_with_auth.get("/schedule/next_run", params={"experiment_id": experiment_id})
+    assert response.is_success, response.text
+    assert response.json() == "not scheduled currently"
+
+
+def test_schedule_v2_create_invalid_cron(backend_client_with_auth):
+    """create_v2 with an invalid cron expression returns 400."""
+    headers = {"Content-Type": "application/json"}
+    job_def_id, job_def_version = _save_fable(backend_client_with_auth)
+
+    spec = ScheduleSpecification(
+        job_definition_id=job_def_id,
+        job_definition_version=job_def_version,
+        cron_expr="not a cron",
+    )
+    response = backend_client_with_auth.put("/schedule/create", headers=headers, json=spec.model_dump())
+    assert response.status_code == 400
+
+
+def test_schedule_v2_create_unknown_job_definition(backend_client_with_auth):
+    """create_v2 referencing a non-existent JobDefinition returns 404."""
+    headers = {"Content-Type": "application/json"}
+    spec = ScheduleSpecification(
+        job_definition_id="does-not-exist",
+        cron_expr="0 0 * * *",
+    )
+    response = backend_client_with_auth.put("/schedule/create", headers=headers, json=spec.model_dump())
+    assert response.status_code == 404
+
+
+# *** runs endpoints ***
+
+
+def test_schedule_v2_runs_empty(backend_client_with_auth):
+    """A newly created v2 schedule with no executions returns an empty runs list."""
+    job_def_id, job_def_version = _save_fable(backend_client_with_auth)
+    experiment_id = _create_schedule_v2(backend_client_with_auth, job_def_id, job_def_version)
+
+    response = backend_client_with_auth.get("/schedule/runs", params={"experiment_id": experiment_id})
+    assert response.is_success, response.text
+    data = response.json()
+    assert data["total"] == 0
+    assert data["runs"] == []
+    assert data["page"] == 1
+    assert data["page_size"] == 10
+    assert data["total_pages"] == 0
+
+
+def test_schedule_v2_runs_not_found(backend_client_with_auth):
+    """runs_v2 returns 404 for an unknown experiment_id."""
+    response = backend_client_with_auth.get("/schedule/runs", params={"experiment_id": "does-not-exist"})
+    assert response.status_code == 404
+
+
+def test_schedule_v2_runs_invalid_pagination(backend_client_with_auth):
+    """runs_v2 returns 400 for invalid page or page_size values."""
+    job_def_id, job_def_version = _save_fable(backend_client_with_auth)
+    experiment_id = _create_schedule_v2(backend_client_with_auth, job_def_id, job_def_version)
+
+    response = backend_client_with_auth.get("/schedule/runs", params={"experiment_id": experiment_id, "page": 0, "page_size": 10})
+    assert response.status_code == 400
+
+    response = backend_client_with_auth.get("/schedule/runs", params={"experiment_id": experiment_id, "page": 1, "page_size": 0})
+    assert response.status_code == 400
+
+
+def test_schedule_v2_runs_page_beyond_empty(backend_client_with_auth):
+    """Page 2 of an empty schedule returns an empty list (not 404), since total is 0."""
+    job_def_id, job_def_version = _save_fable(backend_client_with_auth)
+    experiment_id = _create_schedule_v2(backend_client_with_auth, job_def_id, job_def_version)
+
+    response = backend_client_with_auth.get("/schedule/runs", params={"experiment_id": experiment_id, "page": 2, "page_size": 10})
+    assert response.is_success, response.text
+    data = response.json()
+    assert data["total"] == 0
+    assert data["runs"] == []
+
+
+def test_schedule_v2_runs_independent_per_experiment(backend_client_with_auth):
+    """Two different experiments have independent runs_v2 results."""
+    job_def_id, job_def_version = _save_fable(backend_client_with_auth)
+    exp_id_1 = _create_schedule_v2(backend_client_with_auth, job_def_id, job_def_version, cron_expr="0 0 * * *")
+    exp_id_2 = _create_schedule_v2(backend_client_with_auth, job_def_id, job_def_version, cron_expr="0 6 * * *")
+
+    r1 = backend_client_with_auth.get("/schedule/runs", params={"experiment_id": exp_id_1})
+    r2 = backend_client_with_auth.get("/schedule/runs", params={"experiment_id": exp_id_2})
+    assert r1.is_success and r2.is_success
+    assert r1.json()["total"] == 0
+    assert r2.json()["total"] == 0

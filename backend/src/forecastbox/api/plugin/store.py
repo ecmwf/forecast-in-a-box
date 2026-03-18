@@ -17,12 +17,14 @@ import httpx
 import orjson
 from cascade.low.func import assert_never
 from pydantic import BaseModel
+from pyrsistent import pmap
+from pyrsistent.typing import PMap
 from typing_extensions import Self
 
-from forecastbox.api.ecpyutil import timed_acquire
 from forecastbox.api.plugin.manager import submit_update_single
 from forecastbox.api.types.fable import PluginCompositeId, PluginId
 from forecastbox.config import PluginSettings, PluginStoreConfig, PluginStoreId, PluginStoresConfig, config, config_edit_lock
+from forecastbox.ecpyutil import timed_acquire
 
 logger = logging.getLogger(__name__)
 
@@ -87,38 +89,34 @@ class PluginStore(BaseModel):
 
 
 class StoresManager:
-    stores: dict[PluginStoreId, PluginStore] = {}
+    stores: PMap[PluginStoreId, PluginStore] = pmap()
     stores_lock: threading.Lock = threading.Lock()
     stores_updater: threading.Thread | None = None
 
 
 def initialize_stores(plugin_stores_config: PluginStoresConfig) -> None:
     # assumed to be submitted from a thread
+    with httpx.Client() as client:
+        # a thread pool / async could work here but we dont expect many stores here
+        stores = {key: PluginStore.fetch(client, value) for key, value in plugin_stores_config.items()}
+        for store in stores.values():
+            store.populate(client)
     with timed_acquire(StoresManager.stores_lock, 600) as result:
-        # NOTE we lock for long because two concurrent updates make no sense
         if not result:
             raise ValueError("failed to acquire lock")
-        with httpx.Client() as client:
-            # a thread pool / async could work here but we dont expect many stores here
-            stores = {key: PluginStore.fetch(client, value) for key, value in plugin_stores_config.items()}
-            for store in stores.values():
-                store.populate(client)
-        StoresManager.stores = stores
+        StoresManager.stores = pmap(stores)
 
 
 def get_plugins_detail() -> dict[PluginCompositeId, tuple[PluginStoreEntry, PluginRemoteInfo]]:
-    with timed_acquire(StoresManager.stores_lock, 5) as result:
-        # NOTE we lock to prevent collection-changed-during-iteration error
-        if not result:
-            raise ValueError("failed to acquire lock")
-        return {
-            PluginCompositeId(store=storeId, local=pluginId): (
-                store.plugins[pluginId],
-                store.remote[pluginId],
-            )
-            for storeId, store in StoresManager.stores.items()
-            for pluginId in store.plugins.keys()
-        }
+    # No lock needed for reads with pyrsistent immutable structures
+    return {
+        PluginCompositeId(store=storeId, local=pluginId): (
+            store.plugins[pluginId],
+            store.remote[pluginId],
+        )
+        for storeId, store in StoresManager.stores.items()
+        for pluginId in store.plugins.keys()
+    }
 
 
 def submit_initialize_stores():
@@ -131,11 +129,9 @@ def submit_initialize_stores():
 
 
 def submit_install_plugin(plugin_composite_key: PluginCompositeId) -> None:
-    with timed_acquire(StoresManager.stores_lock, 10) as result:
-        if not result:
-            raise ValueError("failed to acquire lock")
-        if not StoresManager.stores:
-            raise ValueError("stores not initialized")
+    # No lock needed for reads with pyrsistent immutable structures
+    if not StoresManager.stores:
+        raise ValueError("stores not initialized")
     storeId, pluginId = plugin_composite_key.store, plugin_composite_key.local
     store = StoresManager.stores.get(storeId, None)
     if store is None:

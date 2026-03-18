@@ -10,60 +10,77 @@ from typing import Any, Generator
 
 import httpx
 import pytest
+from pydantic import SecretStr
 
 import forecastbox.config
-from forecastbox.config import FIABConfig
+from forecastbox.config import ArtifactStoreConfig, FIABConfig
 from forecastbox.standalone.entrypoint import launch_all
 
 from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
 
-fake_model_name = "themodel"
-fake_repository_port = 12000
+fake_artifact_registry_port = 12001
+fake_artifact_store_id = "test_store"
+fake_artifact_checkpoint_id = "test_checkpoint"
 
 
-class FakeModelRepository(SimpleHTTPRequestHandler):
+class FakeArtifactRegistry(SimpleHTTPRequestHandler):
     def do_GET(self):
-        if self.path.startswith(f"/{fake_model_name}"):
+        if self.path == "/artifacts.json":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+
+            def make_artifact(i):
+                checkpoint_id = f"{fake_artifact_checkpoint_id}{i}"
+                return {
+                    "url": f"http://localhost:{fake_artifact_registry_port}/{checkpoint_id}",
+                    "display_name": f"Test Model Checkpoint {i}",
+                    "display_author": "Test Author",
+                    "display_description": f"A test model checkpoint {i} for integration tests",
+                    "comment": "",
+                    "disk_size_bytes": 1024,
+                    "pip_package_constraints": ["torch>=2.0.0"],
+                    "supported_platforms": ["linux", "macos"],
+                    "output_characteristics": ["test_output"],
+                    "input_characteristics": ["test_input"],
+                }
+
+            catalog = {
+                "display_name": "Test Artifact Store",
+                "artifacts": {f"{fake_artifact_checkpoint_id}{i}": make_artifact(i) for i in range(4)},
+            }
+            import json
+
+            self.wfile.write(json.dumps(catalog).encode("utf-8"))
+        elif self.path.startswith(f"/{fake_artifact_checkpoint_id}"):
             self.send_response(200)
             self.send_header("Content-Type", "application/octet-stream")
             self.send_header("Transfer-Encoding", "chunked")
             chunk_size = 256
-            chunks = 8
+            chunks = 4
             self.send_header("Content-Length", str(chunk_size * chunks))
             self.end_headers()
             chunk = b"x" * chunk_size
-            chunk_header = hex(len(chunk))[2:].encode("ascii")  # Get hex size of chunk, remove '0x'
+            chunk_header = hex(len(chunk))[2:].encode("ascii")
             for _ in range(chunks):
-                time.sleep(0.3)
+                time.sleep(0.1)
                 self.wfile.write(chunk_header + b"\r\n")
                 self.wfile.write(chunk + b"\r\n")
                 self.wfile.flush()
             self.wfile.write(b"0\r\n\r\n")
             self.wfile.flush()
-
-            print(f"sending done for {self.path}")
-        elif self.path == "/MANIFEST":
-            self.send_response(200)
-            self.send_header("Content-Type", "text/plain")
-            self.end_headers()
-            manifest_content = f"{fake_model_name}"
-            self.wfile.write(manifest_content.encode("utf-8"))
+            print(f"artifact download done for {self.path}")
         else:
             self.send_error(404, f"Not Found: {self.path}")
 
 
-def run_repository(shutdown_event: Any):  # TODO typing -- is `Event` but thats not correct
-    server_address = ("", fake_repository_port)
+def run_artifact_registry(shutdown_event: Any):
+    server_address = ("", fake_artifact_registry_port)
 
-    # We need to allow reuse address on the socket, because kernel helpfully keeps it in zombie
-    # for like a minute or two. Reuse is generally dangerous because we may get packets from
-    # a queue, but in this get-only repository its a legit thing
     class WhyExposeFieldsInConstructorWhenYouCanSubclass(socketserver.ThreadingTCPServer):
         allow_reuse_address = True
 
-    with WhyExposeFieldsInConstructorWhenYouCanSubclass(server_address, FakeModelRepository) as httpd:
-        # NOTE dont serve forever, doesnt free the port up correctly
-        # httpd.serve_forever()
+    with WhyExposeFieldsInConstructorWhenYouCanSubclass(server_address, FakeArtifactRegistry) as httpd:
         httpd.timeout = 1
         while not shutdown_event.is_set():
             httpd.handle_request()
@@ -73,49 +90,65 @@ def run_repository(shutdown_event: Any):  # TODO typing -- is `Event` but thats 
 @pytest.fixture(scope="session")
 def backend_client() -> Generator[httpx.Client, None, None]:
     td = None
+    td_data = None
     handles = None
-    shutdown_event = None
-    p = None
+    shutdown_event_artifacts = None
+    p_artifacts = None
     client = None
     try:
         td = tempfile.TemporaryDirectory()
+        td_data = tempfile.TemporaryDirectory()
         os.environ["FIAB_ROOT"] = td.name
+        # NOTE we set test data dir because of a hack in api.fable.compile -- can be removed after that is solved
+        os.environ["IS_TEST_DATA_DIR"] = os.path.join(os.path.dirname(__file__), "data")
         (pathlib.Path(td.name) / "pylock.toml.timestamp").write_text("1761908420:d0.0.1")
         # we need to monkeypath this, because of eager import this was already initialised
         # to user's personal config file
         forecastbox.config.fiab_home = pathlib.Path(td.name)
+
         config = FIABConfig()
+        config.auth.jwt_secret = SecretStr("x" * 32)
         config.api.uvicorn_port = 30645
         config.cascade.cascade_url = "tcp://localhost:30644"
         config.db.sqlite_userdb_path = f"{td.name}/user.db"
         config.db.sqlite_jobdb_path = f"{td.name}/job.db"
-        config.api.data_path = str(pathlib.Path(__file__).parent / "data")
-        config.api.model_repository = f"http://localhost:{fake_repository_port}"
+        config.api.data_path = td_data.name
+        config.product.artifact_stores = {
+            fake_artifact_store_id: ArtifactStoreConfig(
+                url=f"http://localhost:{fake_artifact_registry_port}/artifacts.json",
+                method="file",
+            )
+        }
         config.general.launch_browser = False
         config.auth.domain_allowlist_registry = ["somewhere.org"]
         config.auth.passthrough = False
+
+        # Start fake artifact registry before launching the app
+        shutdown_event_artifacts = Event()
+        p_artifacts = Process(target=run_artifact_registry, args=(shutdown_event_artifacts,))
+        p_artifacts.start()
+
         handles = launch_all(config)
-        shutdown_event = Event()
-        p = Process(target=run_repository, args=(shutdown_event,))
-        p.start()
         client = httpx.Client(base_url=config.api.local_url() + "/api/v1", follow_redirects=True)
         yield client
     finally:
         if client is not None:
             client.close()
-        if shutdown_event is not None:
-            shutdown_event.set()
-        if p is not None:
-            p.join(timeout=3)
-            if p.is_alive():
-                p.terminate()
-            p.join(timeout=3)
-            if p.is_alive():
-                p.kill()
+        if shutdown_event_artifacts is not None:
+            shutdown_event_artifacts.set()
+        if p_artifacts is not None:
+            p_artifacts.join(timeout=3)
+            if p_artifacts.is_alive():
+                p_artifacts.terminate()
+            p_artifacts.join(timeout=3)
+            if p_artifacts.is_alive():
+                p_artifacts.kill()
         if handles is not None:
             handles.shutdown()
         if td is not None:
             td.cleanup()
+        if td_data is not None:
+            td_data.cleanup()
 
 
 @pytest.fixture(scope="session")

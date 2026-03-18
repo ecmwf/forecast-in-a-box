@@ -16,6 +16,7 @@ from typing import Annotated, Literal
 
 import toml
 from cascade.low.func import pydantic_recursive_collect
+from fiab_core.artifacts import ArtifactStoreId
 from fiab_core.fable import PluginCompositeId, PluginId, PluginStoreId
 from pydantic import BaseModel, BeforeValidator, Field, PlainSerializer, SecretStr, model_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict, TomlConfigSettingsSource
@@ -41,7 +42,7 @@ class DatabaseSettings(BaseModel):
     sqlite_userdb_path: str = str(fiab_home / "user.db")
     """Location of the sqlite file for user auth+info"""
     sqlite_jobdb_path: str = str(fiab_home / "job.db")
-    """Location of the sqlite file for job progress tracking"""
+    """Location of the sqlite file for the jobs persistence layer: experiments, schedules, executions"""
 
     def validate_runtime(self) -> list[str]:
         errors = []
@@ -153,6 +154,24 @@ def _default_plugin_stores() -> PluginStoresConfig:
     }
 
 
+class ArtifactStoreConfig(BaseModel):
+    url: str
+    method: Literal["file"]
+
+
+ArtifactStoresConfig = dict[ArtifactStoreId, ArtifactStoreConfig]
+
+
+def _default_artifact_stores() -> ArtifactStoresConfig:
+    return {
+        "ecmwf": ArtifactStoreConfig(
+            # TODO fix pre merge
+            url="https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/d092af0130a1bc4b09d25d9f1785b94fe1e54b18/install/artifacts.json",
+            method="file",
+        ),
+    }
+
+
 class ProductSettings(BaseModel):
     pproc_schema_dir: str | None = None
     """Path to the directory containing the PPROC schema files."""
@@ -171,8 +190,9 @@ class ProductSettings(BaseModel):
     default_input_source: str = "opendata"
     """Default input source for models, if not specified otherwise"""
 
-    plugins: PluginsSettings = Field(default_factory=dict)
+    plugins: PluginsSettings = Field(default_factory=_default_plugins)
     plugin_stores: PluginStoresConfig = Field(default_factory=_default_plugin_stores)
+    artifact_stores: ArtifactStoresConfig = Field(default_factory=_default_artifact_stores)
 
     def validate_runtime(self) -> list[str]:
         if self.pproc_schema_dir and not os.path.isdir(self.pproc_schema_dir):
@@ -211,10 +231,14 @@ class BackendAPISettings(BaseModel):
 
 
 class CascadeSettings(BaseModel):
+    default_hosts: int = 1
+    """Default number of hosts for Cascade if unspecified in a job."""
     max_hosts: int = 1
-    """Number of hosts for Cascade."""
+    """Max number of hosts for Cascade."""
+    default_workers_per_host: int = 2
+    """Default number of workers per hosts for Cascade if unspecified in a job."""
     max_workers_per_host: int = 8
-    """Number of workers per host for Cascade."""
+    """Max number of workers per host for Cascade."""
     cascade_url: str = "tcp://localhost:8067"
     """Base URL for the Cascade API."""
     log_collection_max_size: int = 1000

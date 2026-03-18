@@ -2,7 +2,6 @@
 .venv
 *.swp
 
-frontend/**/lib
 data_dir
 *.ckpt
 dist
@@ -67,3 +66,6 @@ venv
 backend/MANIFEST.in
 
 *.grib
+
+# development tools
+actionlint

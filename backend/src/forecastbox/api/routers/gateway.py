@@ -8,7 +8,6 @@
 # nor does it submit to any jurisdiction.
 
 import asyncio
-import datetime as dt
 import logging
 import os
 import select
@@ -31,7 +30,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class GatewayProcess:
-    log_path: str | None
     process: BaseProcess
 
     def cleanup(self) -> None:
@@ -87,16 +85,14 @@ async def start_gateway() -> str:
             Globals.gateway.cleanup()
             Globals.gateway = None
 
-    now = dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    log_path = None if os.getenv("FIAB_LOGSTDOUT", "nay") == "yea" else f"{Globals.logs_directory.name}/gateway.{now}.txt"
-    logs_directory = None if os.getenv("FIAB_LOGSTDOUT", "nay") == "yea" else Globals.logs_directory.name
+    logs_directory = None if os.getenv("FIAB_LOGSTDOUT", "nay") == "yea" else Globals.logs_directory.name + os.sep
     max_concurrent_jobs = config.cascade.max_concurrent_jobs
     # TODO for some reason changes to os.environ were *not* visible by the child process! Investigate and re-enable:
     # export_recursive(config.model_dump(), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"])
-    process = cascade_platform.get_mp_ctx("gateway").Process(target=launch_cascade, args=(log_path, logs_directory, max_concurrent_jobs))  # type: ignore[unresolved-attribute] # context
+    process = cascade_platform.get_mp_ctx("gateway").Process(target=launch_cascade, args=(logs_directory, max_concurrent_jobs))  # type: ignore[unresolved-attribute] # context
     process.start()
-    Globals.gateway = GatewayProcess(log_path=log_path, process=process)
-    logger.debug(f"spawned new gateway process with pid {process.pid} and logs at {log_path}")
+    Globals.gateway = GatewayProcess(process=process)
+    logger.debug(f"spawned new gateway process with pid {process.pid}")
     return "started"
 
 
@@ -109,31 +105,6 @@ async def get_status() -> str:
         return f"exited with {Globals.gateway.process.exitcode}"
     else:
         return StatusMessage.gateway_running
-
-
-@router.get("/logs")
-async def stream_logs(request: Request) -> EventSourceResponse:
-    """Stream logs from the Cascade Gateway process."""
-
-    if Globals.gateway is None:
-        raise HTTPException(400, "Gateway not running")
-
-    if Globals.gateway.log_path is None:
-        raise HTTPException(400, "Gateway started with logs into stdout")
-
-    async def event_generator():
-        # NOTE consider rewriting to aiofile, eg https://github.com/kuralabs/logserver/blob/master/server/server.py
-
-        pipe = subprocess.Popen(["tail", "-F", Globals.gateway.log_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)  # type: ignore[no-matching-overload] # Popen
-        poller = select.poll()
-        poller.register(pipe.stdout)  # type: ignore[invalid-argument-type] # pipe
-
-        while Globals.gateway.process.is_alive() and not (await request.is_disconnected()):
-            while poller.poll(5):
-                yield pipe.stdout.readline()
-            await asyncio.sleep(1)
-
-    return EventSourceResponse(event_generator())
 
 
 @router.post("/kill")

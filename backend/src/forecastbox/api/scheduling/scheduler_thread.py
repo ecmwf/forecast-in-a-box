@@ -22,18 +22,12 @@ import logging
 import threading
 from typing import cast
 
-from forecastbox.api.execution import execute
+import forecastbox.db.jobs as db_jobs
+from forecastbox.api.execution import execute_experiment_run
 from forecastbox.api.scheduling.dt_utils import calculate_next_run
-from forecastbox.api.scheduling.job_utils import schedule2runnable
+from forecastbox.api.scheduling.job_utils import experiment2runnable
 from forecastbox.config import config
-from forecastbox.db.schedule import (
-    delete_schedule_next_run,
-    get_schedulable,
-    insert_next_run,
-    insert_schedule_run,
-    mark_run_executed,
-    next_schedulable,
-)
+from forecastbox.ecpyutil import timed_acquire
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +35,9 @@ logger = logging.getLogger(__name__)
 # potentially involving the ScheduleNext table etc, as well as scheduler instance itself
 # to guarantee the singleton nature
 scheduler_lock = threading.Lock()
+timeout_acquire_request = 1  # aggressive timeout, we dont want to block async worker for long
+timeout_acquire_lifecycle = 5  # moderate timeout during scheduler startup/shutdown
+timeout_acquire_background = 60  # leisure timeout for the scheduler background thread
 
 # NOTE this does not really affect how often scheduler checks for new jobs --
 # if anything is scheduled for earlier, we sleep for shorter time in advance,
@@ -63,53 +60,59 @@ class SchedulerThread(threading.Thread):
         return self.liveness_timestamp
 
     async def _try_schedule(self) -> int:
+        """Check and submit due ExperimentDefinition scheduled runs."""
         now = self.mark_alive()
         logger.debug(f"Scheduler inquiry at {now}")
 
-        schedulable_runs = await get_schedulable(now)
+        schedulable = await db_jobs.get_schedulable_experiments(now)
 
-        for run in schedulable_runs:
-            schedule_id_str: str = cast(str, run.schedule_id)
-            scheduled_at_dt: dt.datetime = cast(dt.datetime, run.scheduled_at)
-            schedule_next_id_str: str = cast(str, run.schedule_next_id)
-            logger.debug(f"Processing scheduled run {schedule_next_id_str} for schedule {schedule_id_str} at {scheduled_at_dt}")
+        for exp_next, exp_def in schedulable:
+            experiment_id = cast(str, exp_next.experiment_id)
+            scheduled_at = cast(dt.datetime, exp_next.scheduled_at)
+            logger.debug(f"Processing scheduled experiment {experiment_id} at {scheduled_at}")
 
-            get_spec_result = await schedule2runnable(schedule_id_str, scheduled_at_dt)
+            get_spec_result = await experiment2runnable(experiment_id, scheduled_at)
+            try:
+                is_valid = (not exp_def.is_deleted) and (cast(dict, exp_def.experiment_definition)["enabled"])
+            except (TypeError, KeyError) as e:
+                logger.error(f"unexpected parsing failure for {experiment_id=}: {repr(e)} on {exp_def.experiment_definition}")
+                is_valid = False
 
             if get_spec_result.t is not None:
-                if (
-                    get_spec_result.t.max_acceptable_delay_hours is not None
-                    and (now - scheduled_at_dt).total_seconds() / 3600 > get_spec_result.t.max_acceptable_delay_hours
-                ):
+                runnable = get_spec_result.t
+                if (now - scheduled_at).total_seconds() / 3600 > runnable.max_acceptable_delay_hours:
                     logger.warning(
-                        f"Skipping scheduled run {schedule_next_id_str} for schedule {schedule_id_str} at {scheduled_at_dt} "
-                        f"because it is older than max_acceptable_delay_hours ({get_spec_result.t.max_acceptable_delay_hours} hours)."
+                        f"Skipping experiment {experiment_id} at {scheduled_at}: "
+                        f"older than max_acceptable_delay_hours ({runnable.max_acceptable_delay_hours} hours)."
                     )
-                    await insert_schedule_run(
-                        schedule_id_str, scheduled_at_dt, job_id=None, trigger="cron_skipped", attempt_cnt=get_spec_result.t.attempt_cnt
-                    )
+                elif not is_valid:
+                    # NOTE this should not happen -- we have locks etc preventing this
+                    logger.error("Skipping {experiment_id} at {scheduled_at}: it is not valid!")
                 else:
-                    exec_result = await execute(get_spec_result.t.exec_spec, get_spec_result.t.created_by)
+                    exec_result = await execute_experiment_run(
+                        exec_spec=runnable.exec_spec,
+                        user_id=runnable.created_by,
+                        experiment_id=experiment_id,
+                        job_definition_id=runnable.job_definition_id,
+                        job_definition_version=runnable.job_definition_version,
+                        compiler_runtime_context=runnable.compiler_runtime_context,
+                    )
                     if exec_result.t is not None:
-                        logger.debug(f"Job {exec_result.t.id} submitted for schedule {schedule_id_str}")
-                        await insert_schedule_run(
-                            schedule_id_str, scheduled_at_dt, exec_result.t.id, attempt_cnt=get_spec_result.t.attempt_cnt
-                        )
+                        logger.debug(f"Execution {exec_result.t.execution_id} submitted for experiment {experiment_id}")
                     else:
-                        logger.error(f"Failed to submit job for schedule {schedule_id_str} because of {exec_result.e}")
-            else:
-                logger.error(f"Could not create schedule spec for schedule {schedule_id_str}")
+                        logger.error(f"Failed to submit experiment {experiment_id}: {exec_result.e}")
 
-            await mark_run_executed(schedule_next_id_str)
-            if get_spec_result.t is not None:
-                if get_spec_result.t.next_run_at:
-                    logger.debug(f"Next run for {schedule_id_str} will be at {get_spec_result.t.next_run_at}")
-                    await insert_next_run(schedule_id_str, get_spec_result.t.next_run_at)
+                await db_jobs.delete_experiment_next(experiment_id)
+                if runnable.next_run_at and is_valid:
+                    await db_jobs.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=runnable.next_run_at)
+                    logger.debug(f"Next run for {experiment_id}: {runnable.next_run_at}")
                 else:
-                    logger.warning(f"No next run for {schedule_id_str}, not scheduling")
-                    # logging as warning because its not expected rn, but presumably we'll supported bounded-ocurrence schedules eventually
+                    logger.warning(f"No next run computed for {experiment_id}")
+            else:
+                logger.error(f"Could not create runnable for experiment {experiment_id}: {get_spec_result.e}")
+                await db_jobs.delete_experiment_next(experiment_id)
 
-        next_schedulable_at = await next_schedulable()
+        next_schedulable_at = await db_jobs.next_schedulable_experiment()
 
         sleep_duration = sleep_duration_min
         if next_schedulable_at:
@@ -123,7 +126,10 @@ class SchedulerThread(threading.Thread):
 
     async def _run(self):
         while not self.stop_event.is_set():
-            with scheduler_lock:
+            with timed_acquire(scheduler_lock, timeout_acquire_background) as acquired:
+                if not acquired:
+                    logger.warning("Scheduler could not acquire scheduler_lock within timeout, skipping iteration.")
+                    continue
                 sleep_duration = await self._try_schedule()
 
             if sleep_duration > 0:
@@ -154,7 +160,9 @@ class Globals:
 
 
 def start_scheduler():
-    with scheduler_lock:
+    with timed_acquire(scheduler_lock, timeout_acquire_lifecycle) as acquired:
+        if not acquired:
+            raise ValueError("Could not acquire scheduler_lock within timeout during start")
         if Globals.scheduler is not None:
             raise ValueError("double start")
         Globals.scheduler = SchedulerThread()
@@ -162,7 +170,9 @@ def start_scheduler():
 
 
 def stop_scheduler():
-    with scheduler_lock:
+    with timed_acquire(scheduler_lock, timeout_acquire_lifecycle) as acquired:
+        if not acquired:
+            raise ValueError("Could not acquire scheduler_lock within timeout during stop")
         if Globals.scheduler is None:
             raise ValueError("unexpected stop")
         Globals.scheduler.stop()
@@ -199,15 +209,3 @@ def status_scheduler():
         logger.warning(f"scheduler reported down due to failing liveness check: {now} >> {Globals.scheduler.liveness_timestamp}")
         return "down"
     return "up"
-
-
-# NOTE this is not a class method of scheduler because its called from a different thread
-async def regenerate_schedule_next(schedule_id: str, cron_expr: str, enabled: bool) -> None:
-    await delete_schedule_next_run(schedule_id)
-
-    if enabled:
-        next_run_at = calculate_next_run(dt.datetime.now(), cron_expr)
-        await insert_next_run(schedule_id, next_run_at)
-        logger.debug(f"Regenerated next run for {schedule_id} at {next_run_at}")
-    else:
-        logger.debug(f"Schedule {schedule_id} is disabled, no next run inserted.")
