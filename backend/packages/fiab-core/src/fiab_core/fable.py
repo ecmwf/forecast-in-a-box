@@ -67,8 +67,9 @@ class PluginCompositeId(BaseModel):
         store, local = v.split(":", 1)
         return cls(store=store, local=local)
 
-    def to_str(self: Self) -> str:
-        return f"{self.store}:{self.local}"
+    @staticmethod
+    def to_str(k: Self) -> str:
+        return f"{k.store}:{k.local}"
 
 
 class PluginBlockFactoryId(BaseModel):
