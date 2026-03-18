@@ -110,6 +110,8 @@ async def experiment2runnable(experiment_id: str, exec_time: dt.datetime) -> Eit
         else:
             exec_spec = compiled
 
+        # TODO we should eagerly evaluate now and max_delay_hours, ie, dont generate
+        # invalid execution times here
         next_run_at = calculate_next_run(exec_time, cron_expr) if cron_expr else None
 
         rv = RunnableExperiment(

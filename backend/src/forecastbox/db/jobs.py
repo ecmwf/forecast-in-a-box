@@ -15,6 +15,8 @@ deterministically by ordering on the version / attempt_count column and
 taking the maximum.
 
 Soft-deleted rows are excluded from all normal read operations.
+We maintain that setting a delete sets it on all versions of a given entity,
+leading to simpler query semantics, ie, no need to select "last non-deleted".
 """
 
 import datetime as dt
@@ -294,10 +296,26 @@ async def count_experiment_definitions(experiment_type: str | None = None) -> in
     return await dbRetry(function)
 
 
-async def soft_delete_experiment_definition(id: str) -> None:
-    """Mark all versions of an ExperimentDefinition as deleted."""
-    stmt = update(ExperimentDefinition).where(ExperimentDefinition.id == id).values(is_deleted=True)
-    await executeAndCommit(stmt, async_session_maker)
+async def soft_delete_experiment_definition(experiment_id: str) -> bool:
+    """Mark all versions of an ExperimentDefinition as deleted. Return true if any was marked"""
+
+    async def function(i: int) -> bool:
+        async with async_session_maker() as session:
+            subquery = (
+                select(ExperimentDefinition.id)
+                .where(ExperimentDefinition.is_deleted.is_(False), ExperimentDefinition.id == experiment_id)
+                .subquery()
+            )
+            query = select(func.count()).select_from(subquery)
+            result = await session.execute(query)
+            if not result.scalar():
+                return False
+            stmt = update(ExperimentDefinition).where(ExperimentDefinition.id == experiment_id).values(is_deleted=True)
+            await session.execute(stmt)
+            await session.commit()
+            return True
+
+    return await dbRetry(function)
 
 
 # ---------------------------------------------------------------------------
@@ -383,7 +401,7 @@ async def update_job_execution_runtime(id: str, attempt_count: int, **kwargs: ob
 
 
 async def list_job_executions(offset: int = 0, limit: int | None = None) -> Iterable[JobExecution]:
-    """Return the latest non-deleted attempt of every JobExecution, with optional paging."""
+    """Return the latest non-deleted attempt of every JobExecution, with optional paging. Orders by creation time, descending."""
 
     async def function(i: int) -> list[JobExecution]:
         async with async_session_maker() as session:
@@ -399,6 +417,7 @@ async def list_job_executions(offset: int = 0, limit: int | None = None) -> Iter
                     subq,
                     (JobExecution.id == subq.c.id) & (JobExecution.attempt_count == subq.c.max_attempt),
                 )
+                .order_by(JobExecution.created_at.desc())
                 .offset(offset)
             )
             if limit is not None:
@@ -504,7 +523,8 @@ async def get_schedulable_experiments(now: dt.datetime) -> list[tuple[Experiment
 
     Joins ExperimentNext with the latest non-deleted ExperimentDefinition of type
     'cron_schedule'. Disabled schedules have their ExperimentNext row deleted at
-    update time, so no explicit enabled check is needed here.
+    update time, so should not appear here -- but if they would, we handle at the
+    scheduler thread by logging error and deleting their ExperimentNext
     """
 
     async def function(i: int) -> list[tuple[ExperimentNext, ExperimentDefinition]]:

@@ -47,6 +47,7 @@
 * when adding new fields to database schemata, make sure you explicitly handle migrations -- we need to be backwards compatible wrt users sqlite instances
 * use comments sparingly, for non-obvious code only. Add docstrings to functions called from other modules only. When adding docstring, use compact style -- dont separate out Args and Returns, describe everything in one or two paragraphs.
 * all imports belong to top level of the file, dont import inside function definitions unless necessiated by runtime. Dont alias imports unless there is a name collision
+* never use python keywords and builtins as variable names -- for example, don't use `id` variable, prefer `id_<something>` or `id_`
 
 # Frontend
 * if you would develop frontend features, consult the `frontend/AGENTS.md`.

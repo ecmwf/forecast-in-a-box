@@ -19,9 +19,13 @@ from forecastbox.api.scheduling.dt_utils import calculate_next_run, parse_cronta
 from forecastbox.api.scheduling.scheduler_thread import (
     prod_scheduler,
     scheduler_lock,
+    start_scheduler,
+    stop_scheduler,
+    timeout_acquire_request,
 )
 from forecastbox.api.types.scheduling import ScheduleSpecification, ScheduleUpdate
 from forecastbox.auth.users import current_active_user
+from forecastbox.ecpyutil import timed_acquire
 from forecastbox.schemas.jobs import ExperimentDefinition
 from forecastbox.schemas.user import UserRead
 
@@ -184,7 +188,9 @@ async def get_schedule(experiment_id: str, user: UserRead = Depends(current_acti
 async def update_schedule(
     experiment_id: str, update: ScheduleUpdate, user: UserRead = Depends(current_active_user)
 ) -> ScheduleDefinitionResponse:
-    with scheduler_lock:  # NOTE this may block the async pool a bit!
+    with timed_acquire(scheduler_lock, timeout_acquire_request) as acquired:
+        if not acquired:
+            raise HTTPException(status_code=503, detail="Scheduler is busy, please retry.")
         current = await db_jobs.get_experiment_definition(experiment_id)
         if current is None or current.experiment_type != "cron_schedule":
             raise HTTPException(status_code=404, detail=f"Schedule {experiment_id} not found")
@@ -206,6 +212,7 @@ async def update_schedule(
             else int(current_def.get("max_acceptable_delay_hours", 24))
         )
 
+        # TODO this should be typed, not arbitrary dict
         new_experiment_definition = {
             "cron_expr": new_cron_expr,
             "dynamic_expr": new_dynamic_expr,
@@ -238,6 +245,18 @@ async def update_schedule(
     updated = await db_jobs.get_experiment_definition(experiment_id)
     assert updated is not None
     return _experiment_to_response(updated)
+
+
+@router.post("/delete")
+async def delete_schedule(experiment_id: str, user: UserRead = Depends(current_active_user)) -> None:
+    with timed_acquire(scheduler_lock, timeout_acquire_request) as acquired:
+        if not acquired:
+            raise HTTPException(status_code=503, detail="Scheduler is busy, please retry.")
+        was_deleted = await db_jobs.soft_delete_experiment_definition(experiment_id)
+        await db_jobs.delete_experiment_next(experiment_id)  # we delete regardless
+    if not was_deleted:
+        raise HTTPException(status_code=404, detail=f"Schedule {experiment_id} not found in the database.")
+    prod_scheduler()
 
 
 @router.get("/next_run")
@@ -293,3 +312,9 @@ async def get_schedule_runs(
         for ex in executions
     ]
     return ScheduleRunsResponse(runs=runs, total=total, page=page, page_size=page_size, total_pages=total_pages)
+
+
+@router.post("/restart")
+async def restart_scheduler() -> None:
+    stop_scheduler()
+    start_scheduler()
