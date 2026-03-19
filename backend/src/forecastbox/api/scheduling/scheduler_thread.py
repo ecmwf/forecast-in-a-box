@@ -93,6 +93,7 @@ class SchedulerThread(threading.Thread):
                         exec_spec=runnable.exec_spec,
                         user_id=runnable.created_by,
                         experiment_id=experiment_id,
+                        experiment_version=cast(int, exp_def.version),
                         job_definition_id=runnable.job_definition_id,
                         job_definition_version=runnable.job_definition_version,
                         compiler_runtime_context=runnable.compiler_runtime_context,

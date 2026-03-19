@@ -54,7 +54,7 @@ async def test_jobs_job_definition_insert_and_get(mem_session_maker, monkeypatch
 
     result = await jobs_db.get_job_definition(job_id)
     assert result is not None
-    assert result.id == job_id
+    assert result.job_definition_id == job_id
     assert result.version == 1
     assert result.source == "user_defined"
     assert result.display_name == "My job"
@@ -66,8 +66,8 @@ async def test_jobs_job_definition_latest_version(mem_session_maker, monkeypatch
     monkeypatch.setattr(jobs_db, "async_session_maker", mem_session_maker)
 
     job_id, v1 = await jobs_db.upsert_job_definition(source="user_defined", created_by="user1")
-    _, v2 = await jobs_db.upsert_job_definition(id=job_id, source="user_defined", created_by="user1")
-    _, v3 = await jobs_db.upsert_job_definition(id=job_id, source="user_defined", created_by="user1")
+    _, v2 = await jobs_db.upsert_job_definition(definition_id=job_id, source="user_defined", created_by="user1")
+    _, v3 = await jobs_db.upsert_job_definition(definition_id=job_id, source="user_defined", created_by="user1")
 
     assert v1 == 1
     assert v2 == 2
@@ -97,7 +97,7 @@ async def test_jobs_job_definition_soft_delete(mem_session_maker, monkeypatch):
 
     # List excludes deleted rows
     definitions = list(await jobs_db.list_job_definitions())
-    assert all(d.id != job_id for d in definitions)
+    assert all(d.job_definition_id != job_id for d in definitions)
 
 
 @pytest.mark.asyncio
@@ -105,19 +105,19 @@ async def test_jobs_list_job_definitions_latest_only(mem_session_maker, monkeypa
     monkeypatch.setattr(jobs_db, "async_session_maker", mem_session_maker)
 
     job_id, _ = await jobs_db.upsert_job_definition(source="user_defined", created_by="user1")
-    await jobs_db.upsert_job_definition(id=job_id, source="user_defined", created_by="user1")
-    await jobs_db.upsert_job_definition(id=job_id, source="user_defined", created_by="user1")
+    await jobs_db.upsert_job_definition(definition_id=job_id, source="user_defined", created_by="user1")
+    await jobs_db.upsert_job_definition(definition_id=job_id, source="user_defined", created_by="user1")
 
     # A second independent definition
     other_id, _ = await jobs_db.upsert_job_definition(source="oneoff_execution", created_by="user2")
 
     definitions = list(await jobs_db.list_job_definitions())
-    ids = [d.id for d in definitions]
+    ids = [d.job_definition_id for d in definitions]
     assert job_id in ids
     assert other_id in ids
 
     # Only the latest version for job_id is returned
-    matching = [d for d in definitions if d.id == job_id]
+    matching = [d for d in definitions if d.job_definition_id == job_id]
     assert len(matching) == 1
     assert matching[0].version == 3
 
@@ -143,7 +143,7 @@ async def test_jobs_experiment_definition_versioning(mem_session_maker, monkeypa
     assert v1 == 1
 
     _, v2 = await jobs_db.upsert_experiment_definition(
-        id=exp_id,
+        experiment_definition_id=exp_id,
         job_definition_id=job_id,
         job_definition_version=job_v,
         experiment_type="cron_schedule",
@@ -174,7 +174,7 @@ async def test_jobs_experiment_definition_soft_delete(mem_session_maker, monkeyp
 
     assert await jobs_db.get_experiment_definition(exp_id) is None
     experiments = list(await jobs_db.list_experiment_definitions())
-    assert all(e.id != exp_id for e in experiments)
+    assert all(e.experiment_definition_id != exp_id for e in experiments)
 
 
 # ---------------------------------------------------------------------------
@@ -197,7 +197,7 @@ async def test_jobs_job_execution_latest_attempt(mem_session_maker, monkeypatch)
     assert a1 == 1
 
     _, a2 = await jobs_db.upsert_job_execution(
-        id=exec_id,
+        job_execution_id=exec_id,
         job_definition_id=job_id,
         job_definition_version=job_v,
         created_by="user1",
@@ -255,7 +255,7 @@ async def test_jobs_job_execution_soft_delete(mem_session_maker, monkeypatch):
 
     assert await jobs_db.get_job_execution(exec_id) is None
     executions = list(await jobs_db.list_job_executions())
-    assert all(e.id != exec_id for e in executions)
+    assert all(e.job_execution_id != exec_id for e in executions)
 
 
 @pytest.mark.asyncio
@@ -268,7 +268,7 @@ async def test_jobs_list_job_executions_latest_only(mem_session_maker, monkeypat
     )
 
     executions = list(await jobs_db.list_job_executions())
-    matching = [e for e in executions if e.id == exec_id]
+    matching = [e for e in executions if e.job_execution_id == exec_id]
     assert len(matching) == 1
     assert matching[0].attempt_count == 1
 
@@ -293,7 +293,7 @@ async def test_jobs_global_defaults(mem_session_maker, monkeypatch):
 
     defaults = await jobs_db.get_global_defaults()
     assert defaults is not None
-    assert defaults.id == defaults_id
+    assert defaults.global_defaults_id == defaults_id
     assert defaults.option_specs == {"outputType": "zarr"}
     assert defaults.value_specs == {"modelCheckpoint": "aifs-1.0"}
 
@@ -331,7 +331,7 @@ async def test_jobs_experiment_next_upsert(mem_session_maker, monkeypatch):
     assert result2.scheduled_at == t2
 
     # Only one row per experiment_id
-    assert result2.id == result.id
+    assert result2.experiment_next_id == result.experiment_next_id
 
 
 # ---------------------------------------------------------------------------
@@ -344,7 +344,7 @@ async def test_jobs_upsert_job_definition_unknown_id_raises(mem_session_maker, m
     monkeypatch.setattr(jobs_db, "async_session_maker", mem_session_maker)
 
     with pytest.raises(KeyError, match="No JobDefinition"):
-        await jobs_db.upsert_job_definition(id="nonexistent-id", source="user_defined", created_by="user1")
+        await jobs_db.upsert_job_definition(definition_id="nonexistent-id", source="user_defined", created_by="user1")
 
 
 @pytest.mark.asyncio
@@ -355,7 +355,7 @@ async def test_jobs_upsert_experiment_definition_unknown_id_raises(mem_session_m
 
     with pytest.raises(KeyError, match="No ExperimentDefinition"):
         await jobs_db.upsert_experiment_definition(
-            id="nonexistent-id",
+            experiment_definition_id="nonexistent-id",
             job_definition_id=job_id,
             job_definition_version=job_v,
             experiment_type="cron_schedule",
@@ -371,7 +371,7 @@ async def test_jobs_upsert_job_execution_unknown_id_raises(mem_session_maker, mo
 
     with pytest.raises(KeyError, match="No JobExecution"):
         await jobs_db.upsert_job_execution(
-            id="nonexistent-id",
+            job_execution_id="nonexistent-id",
             job_definition_id=job_id,
             job_definition_version=job_v,
             created_by="user1",
