@@ -129,8 +129,8 @@ def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobRespons
 class SubmitJobResponse(BaseModel):
     """Submit Job Response."""
 
-    id: str
-    """Id of the submitted job."""
+    execution_id: str
+    """Id of the submitted job execution."""
 
 
 async def get_job_definition_for_execution(definition_id: str, definition_version: int | None) -> JobDefinition | None:
@@ -150,7 +150,7 @@ async def get_job_execution_specification(execution_id: str, attempt_count: int 
     if definition is None:
         return None
     return JobSpecification(
-        definition_id=str(definition.id),  # ty:ignore[invalid-argument-type]
+        definition_id=str(definition.job_definition_id),  # ty:ignore[invalid-argument-type]
         definition_version=cast(int, definition.version),
         blocks=cast(dict | None, definition.blocks),
         environment_spec=cast(dict | None, definition.environment_spec),
@@ -177,7 +177,7 @@ async def restart_job_execution(execution_id: str, user_id: str | None) -> Eithe
 def execution_to_detail(execution: JobExecution) -> JobExecutionDetail:
     """Convert a JobExecution ORM row to a JobExecutionDetail response model."""
     return JobExecutionDetail(
-        execution_id=str(execution.id),  # ty:ignore[invalid-argument-type]
+        execution_id=str(execution.job_execution_id),  # ty:ignore[invalid-argument-type]
         attempt_count=cast(int, execution.attempt_count),
         status=cast(str, execution.status),
         created_at=str(execution.created_at),
@@ -207,7 +207,7 @@ async def poll_and_update_execution(execution_id: str, attempt_count: int | None
         status_override: str | None = None, error_override: str | None = None, progress_override: str | None = None
     ) -> JobExecutionDetail:
         return JobExecutionDetail(
-            execution_id=str(execution.id),  # ty:ignore[invalid-argument-type]
+            execution_id=str(execution.job_execution_id),  # ty:ignore[invalid-argument-type]
             attempt_count=actual_attempt,
             status=status_override or status,
             created_at=str(execution.created_at),
@@ -257,18 +257,18 @@ async def execute(definition: JobDefinition, user_id: str | None, execution_id: 
     fresh id is generated.
     """
     if not definition.blocks:
-        return Either.error(f"JobDefinition {definition.id!r} has no compilable blocks")
+        return Either.error(f"JobDefinition {definition.job_definition_id!r} has no compilable blocks")
 
     builder = FableBuilder(
         blocks=definition.blocks,  # ty:ignore[invalid-argument-type]
         environment=EnvironmentSpecification.model_validate(definition.environment_spec) if definition.environment_spec else None,
     )
     spec = api_fable.compile(builder)
-    definition_id = str(definition.id)  # ty:ignore[invalid-argument-type]
+    definition_id = str(definition.job_definition_id)  # ty:ignore[invalid-argument-type]
     definition_version = cast(int, definition.version)
 
     new_execution_id, attempt_count = await db_jobs.upsert_job_execution(
-        id=execution_id,
+        job_execution_id=execution_id,
         job_definition_id=definition_id,
         job_definition_version=definition_version,
         created_by=user_id,
@@ -311,7 +311,7 @@ async def execute_experiment_run(
     When execution_id is supplied, the new attempt is appended under that id (rerun semantics).
     """
     new_execution_id, attempt_count = await db_jobs.upsert_job_execution(
-        id=execution_id,
+        job_execution_id=execution_id,
         job_definition_id=job_definition_id,
         job_definition_version=job_definition_version,
         created_by=user_id,

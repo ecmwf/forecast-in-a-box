@@ -33,14 +33,14 @@ class JobDefinition(Base):
     """Captures everything needed to execute a job.
 
     Immutable once written; a new version is appended for each save.
-    The composite primary key is (id, version).  `source` distinguishes
+    The composite primary key is (job_definition_id, version).  `source` distinguishes
     plugin templates, user-defined definitions, and one-off executions.
     `parent_id` tracks lineage without pinning a version.
     """
 
     __tablename__ = "job_definition"
 
-    id = Column(String(255), primary_key=True, nullable=False)
+    job_definition_id = Column(String(255), primary_key=True, nullable=False)
     version = Column(Integer, primary_key=True, nullable=False)
     created_by = Column(String(255), nullable=True)
     created_at = Column(DateTime, nullable=False)
@@ -66,14 +66,14 @@ class JobDefinition(Base):
 class ExperimentDefinition(Base):
     """Captures that a JobDefinition should execute multiple times.
 
-    Immutable; composite primary key is (id, version).
+    Immutable; composite primary key is (experiment_definition_id, version).
     `experiment_type` is one of: cron_schedule | batch_execution | external_trigger.
     `experiment_definition` is a JSON blob whose schema depends on the type.
     """
 
     __tablename__ = "experiment_definition"
 
-    id = Column(String(255), primary_key=True, nullable=False)
+    experiment_definition_id = Column(String(255), primary_key=True, nullable=False)
     version = Column(Integer, primary_key=True, nullable=False)
     created_by = Column(String(255), nullable=True)
     created_at = Column(DateTime, nullable=False)
@@ -94,7 +94,7 @@ class ExperimentDefinition(Base):
     __table_args__ = (
         ForeignKeyConstraint(
             ["job_definition_id", "job_definition_version"],
-            ["job_definition.id", "job_definition.version"],
+            ["job_definition.job_definition_id", "job_definition.version"],
         ),
     )
 
@@ -103,7 +103,7 @@ class JobExecution(Base):
     """A single computation that has happened or is happening.
 
     Mutable (status, outputs, error, cascade identifiers are written at runtime).
-    Composite primary key is (id, attempt_count); re-runs share the same `id`.
+    Composite primary key is (job_execution_id, attempt_count); re-runs share the same `job_execution_id`.
     The optional `experiment_id` links this execution to an experiment.
     `compiler_runtime_context` carries per-execution dynamic values (e.g.
     cron tick time, batch element) that were used to resolve the spec.
@@ -111,7 +111,7 @@ class JobExecution(Base):
 
     __tablename__ = "job_execution"
 
-    id = Column(String(255), primary_key=True, nullable=False)
+    job_execution_id = Column(String(255), primary_key=True, nullable=False)
     attempt_count = Column(Integer, primary_key=True, nullable=False)
     created_by = Column(String(255), nullable=True)
     created_at = Column(DateTime, nullable=False)
@@ -138,7 +138,7 @@ class JobExecution(Base):
     __table_args__ = (
         ForeignKeyConstraint(
             ["job_definition_id", "job_definition_version"],
-            ["job_definition.id", "job_definition.version"],
+            ["job_definition.job_definition_id", "job_definition.version"],
         ),
     )
 
@@ -148,7 +148,7 @@ class GlobalDefaults(Base):
 
     __tablename__ = "global_defaults"
 
-    id = Column(String(255), primary_key=True, nullable=False)
+    global_defaults_id = Column(String(255), primary_key=True, nullable=False)
     created_by = Column(String(255), nullable=True)
     created_at = Column(DateTime, nullable=False)
 
@@ -165,7 +165,7 @@ class ExperimentNext(Base):
 
     __tablename__ = "experiment_next"
 
-    id = Column(String(255), primary_key=True, nullable=False)
+    experiment_next_id = Column(String(255), primary_key=True, nullable=False)
     experiment_id = Column(String(255), nullable=False, unique=True)
     scheduled_at = Column(DateTime, nullable=False)
     updated_at = Column(DateTime, nullable=False)

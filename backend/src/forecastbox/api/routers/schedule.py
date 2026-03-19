@@ -98,7 +98,7 @@ class ScheduleRunsResponse:
 def _experiment_to_response(exp: ExperimentDefinition) -> ScheduleDefinitionResponse:
     exp_def = cast(dict, exp.experiment_definition) or {}
     return ScheduleDefinitionResponse(
-        experiment_id=str(exp.id),  # ty:ignore[invalid-argument-type]
+        experiment_id=str(exp.experiment_definition_id),  # ty:ignore[invalid-argument-type]
         experiment_version=cast(int, exp.version),
         job_definition_id=str(exp.job_definition_id),  # ty:ignore[invalid-argument-type]
         job_definition_version=cast(int, exp.job_definition_version),
@@ -148,7 +148,7 @@ async def create_schedule(
     if job_def is None:
         raise HTTPException(status_code=404, detail=f"JobDefinition {schedule_spec.job_definition_id!r} not found")
 
-    job_def_id = str(job_def.id)  # ty:ignore[invalid-argument-type]
+    job_def_id = str(job_def.job_definition_id)  # ty:ignore[invalid-argument-type]
     job_def_version = cast(int, job_def.version)
 
     experiment_definition = {
@@ -221,7 +221,7 @@ async def update_schedule(
         }
 
         await db_jobs.upsert_experiment_definition(
-            id=experiment_id,
+            experiment_definition_id=experiment_id,
             job_definition_id=str(current.job_definition_id),  # ty:ignore[invalid-argument-type]
             job_definition_version=cast(int, current.job_definition_version),
             experiment_type="cron_schedule",
@@ -301,7 +301,7 @@ async def get_schedule_runs(
 
     runs = [
         ScheduleRunResponse(
-            execution_id=str(ex.id),  # ty:ignore[invalid-argument-type]
+            execution_id=str(ex.job_execution_id),  # ty:ignore[invalid-argument-type]
             attempt_count=cast(int, ex.attempt_count),
             status=cast(str, ex.status),
             created_at=str(ex.created_at),

@@ -81,7 +81,7 @@ async def upsert_fable_builder(
     env = payload.builder.environment
     try:
         definition_id, version = await db_jobs.upsert_job_definition(
-            id=fable_id,
+            definition_id=fable_id,
             source=source,
             created_by=created_by,
             blocks=payload.builder.model_dump(mode="json")["blocks"],
@@ -114,7 +114,7 @@ async def retrieve_fable_builder(
     if definition.environment_spec is not None:
         builder.environment = EnvironmentSpecification.model_validate(definition.environment_spec)
     return FableRetrieveResponse(
-        id=definition.id,  # ty:ignore[invalid-argument-type]
+        id=definition.job_definition_id,  # ty:ignore[invalid-argument-type]
         version=definition.version,  # ty:ignore[invalid-argument-type]
         builder=builder,
         display_name=definition.display_name,  # ty:ignore[invalid-argument-type]
