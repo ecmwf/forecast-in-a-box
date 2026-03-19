@@ -129,7 +129,7 @@ class EnsembleStatistics(Product):
     title: str = "Ensemble Statistics"
     description: str = "Computes ensemble mean or standard deviation"
     configuration_options: dict[str, BlockConfigurationOption] = {
-        PARAM_DIM: BlockConfigurationOption(title="Variable", description="Variable name like '2t'", value_type="str"),
+        PARAM_DIM: BlockConfigurationOption(title="Parameter", description="Parameter name like '2t'", value_type="str"),
         "statistic": BlockConfigurationOption(
             title="Statistic",
             description="Statistic to compute over the ensemble",
@@ -157,7 +157,7 @@ class EnsembleStatistics(Product):
         input_task = block.input_ids["dataset"]
         input_task_action = inputs[input_task]
         stat = block.configuration_values["statistic"]
-        param = input_task_action.select({PARAM_DIM: block.configuration_values["variable"]})
+        param = input_task_action.select({PARAM_DIM: block.configuration_values[PARAM_DIM]})
         if stat == "mean":
             action = param.mean(dim=ENSEMBLE_DIM)
         elif stat == "std":

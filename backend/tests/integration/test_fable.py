@@ -53,12 +53,12 @@ def _make_builder_full(tmpdir: str) -> FableBuilder:
     )
     temporal_mean = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=plugin_id, factory="temporalStatistics"),
-        configuration_values={"variable": "2t", "statistic": "mean"},
+        configuration_values={"param": "2t", "statistic": "mean"},
         input_ids={"dataset": "source1"},
     )
     ensemble_mean = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=plugin_id, factory="ensembleStatistics"),
-        configuration_values={"variable": "2t", "statistic": "mean"},
+        configuration_values={"param": "2t", "statistic": "mean"},
         input_ids={"dataset": "temporalMean"},
     )
     sink = BlockInstance(
@@ -215,7 +215,7 @@ def test_fable_expand(tmpdir, backend_client_with_auth):
 
     temporalMean = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=pluginId, factory="temporalStatistics"),
-        configuration_values={"variable": "2t", "statistic": "mean"},
+        configuration_values={"param": "2t", "statistic": "mean"},
         input_ids={"dataset": "source1"},
     )
     blocks["temporalMean"] = temporalMean
@@ -225,7 +225,7 @@ def test_fable_expand(tmpdir, backend_client_with_auth):
 
     block = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=pluginId, factory="ensembleStatistics"),
-        configuration_values={"variable": "2t", "statistic": "mean"},
+        configuration_values={"param": "2t", "statistic": "mean"},
         input_ids={"dataset": "temporalMean"},
     )
     sink = BlockInstance(
