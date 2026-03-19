@@ -51,7 +51,7 @@ const mockJobsResponse: JobExecutionList = {
     {
       execution_id: 'exec-3',
       attempt_count: 1,
-      status: 'errored',
+      status: 'failed',
       created_at: '2026-01-01T02:00:00Z',
       updated_at: '2026-01-01T02:00:00Z',
       job_definition_id: 'def-3',
@@ -135,11 +135,9 @@ describe('useJobStatusCounts', () => {
 
     expect(capturedData!.counts.running).toBe(1)
     expect(capturedData!.counts.completed).toBe(1)
-    expect(capturedData!.counts.errored).toBe(1)
+    expect(capturedData!.counts.failed).toBe(1)
     expect(capturedData!.counts.submitted).toBe(1)
-    expect(capturedData!.counts.invalid).toBe(0)
-    expect(capturedData!.counts.timeout).toBe(0)
-    expect(capturedData!.counts.unknown).toBe(0)
+    expect(capturedData!.counts.preparing).toBe(0)
   })
 
   it('returns correct runningCount', async () => {

@@ -21,7 +21,7 @@ export type FilterType =
   | 'all'
   | 'running'
   | 'completed'
-  | 'error'
+  | 'failed'
   | 'bookmarked'
 
 interface ForecastJournalFiltersProps {
@@ -39,7 +39,7 @@ export function ForecastJournalFilters({
     { key: 'all', label: t('journal.filters.all') },
     { key: 'running', label: t('journal.filters.running') },
     { key: 'completed', label: t('journal.filters.completed') },
-    { key: 'error', label: t('journal.filters.error') },
+    { key: 'failed', label: t('journal.filters.failed') },
     { key: 'bookmarked', label: t('journal.filters.bookmarked') },
   ]
 

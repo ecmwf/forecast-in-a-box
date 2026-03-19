@@ -1,0 +1,64 @@
+{
+  "title": "ML Models",
+  "subtitle": "Browse and manage machine learning model artifacts. Download models to make them available for forecasting.",
+  "actions": {
+    "refresh": "Refresh",
+    "download": "Download",
+    "downloading": "Downloading...",
+    "cancelDownload": "Cancel",
+    "delete": "Delete",
+    "viewDetails": "View Details",
+    "backToArtifacts": "Back to Models"
+  },
+  "filters": {
+    "searchPlaceholder": "Search models by name or author..."
+  },
+  "status": {
+    "downloaded": "Downloaded",
+    "notDownloaded": "Not Downloaded",
+    "downloading": "Downloading {{progress}}%"
+  },
+  "downloadedSection": {
+    "title": "Downloaded Models",
+    "total": "{{count}} models"
+  },
+  "availableSection": {
+    "title": "Available Models",
+    "total": "{{count}} models",
+    "searchPlaceholder": "Search available models...",
+    "description": "These models are available for download. Once downloaded, they can be used for forecasting."
+  },
+  "table": {
+    "model": "Model",
+    "size": "Size",
+    "status": "Status",
+    "actions": "Actions"
+  },
+  "pagination": {
+    "showing": "Showing {{start}}-{{end}} of {{total}}"
+  },
+  "detail": {
+    "description": "Description",
+    "platforms": "Supported Platforms",
+    "diskSize": "Disk Size",
+    "author": "Author",
+    "url": "URL",
+    "pipConstraints": "Pip Package Constraints",
+    "outputCharacteristics": "Output Characteristics",
+    "inputCharacteristics": "Input Characteristics",
+    "noConstraints": "No package constraints",
+    "noCharacteristics": "No characteristics available"
+  },
+  "emptyState": {
+    "title": "No models found",
+    "description": "Try adjusting your search or filter criteria.",
+    "noModels": "No models available",
+    "noModelsDescription": "No ML models are currently available in the artifact store."
+  },
+  "confirmDelete": {
+    "title": "Delete Model",
+    "description": "Are you sure you want to delete {{name}}? This will remove the downloaded model files.",
+    "confirm": "Delete",
+    "cancel": "Cancel"
+  }
+}

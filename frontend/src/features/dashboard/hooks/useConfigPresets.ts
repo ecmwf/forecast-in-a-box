@@ -54,20 +54,7 @@ export function useConfigPresets() {
     })
   }
 
-  function renamePreset(fableId: string, title: string, comments?: string) {
-    const existing = metadataStore[fableId] as FableSaveMetadata | undefined
-    if (!existing) return
-    setMetadataStore({
-      ...metadataStore,
-      [fableId]: {
-        ...existing,
-        title,
-        ...(comments !== undefined ? { comments } : {}),
-      },
-    })
-  }
-
   const hasPresets = presets.length > 0
 
-  return { presets, deletePreset, toggleFavourite, renamePreset, hasPresets }
+  return { presets, deletePreset, toggleFavourite, hasPresets }
 }

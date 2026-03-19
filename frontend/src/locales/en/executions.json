@@ -15,12 +15,10 @@
   },
   "status": {
     "submitted": "Submitted",
+    "preparing": "Preparing",
     "running": "Running",
     "completed": "Completed",
-    "errored": "Errored",
-    "invalid": "Invalid",
-    "timeout": "Timeout",
-    "unknown": "Unknown"
+    "failed": "Failed"
   },
   "tabs": {
     "outputs": "Outputs",
@@ -44,10 +42,13 @@
     "title": "Submit Forecast Job",
     "name": "Name",
     "namePlaceholder": "Enter a name for this job",
+    "namePlaceholderOptional": "Name this run to find it later (optional)",
     "description": "Description",
     "descriptionPlaceholder": "Optional notes about this execution",
+    "descriptionPlaceholderOptional": "Add notes about this run (optional)",
     "tags": "Tags",
     "tagsPlaceholder": "Add a tag",
+    "tagsPlaceholderOptional": "Tag this run for easy filtering (optional)",
     "advancedTitle": "Advanced: Execution Environment",
     "hosts": "Hosts",
     "hostsPlaceholder": "Default (auto)",
@@ -59,7 +60,20 @@
     "addVariable": "Add variable",
     "cancel": "Cancel",
     "submit": "Submit Job",
-    "submitting": "Submitting..."
+    "submitting": "Submitting...",
+    "modeRunNow": "Run Once",
+    "modeSchedule": "Run on Schedule",
+    "createSchedule": "Create Schedule",
+    "creatingSchedule": "Creating...",
+    "cronExpression": "Schedule Frequency",
+    "maxDelay": "Max Acceptable Delay (hours)",
+    "maxDelayHelp": "If the scheduler is delayed longer than this, the run will be skipped.",
+    "dynamicFields": "Dynamic Fields",
+    "dynamicFieldToggleLabel": "Use scheduled run time",
+    "dynamicFieldPreview": "At each run, this value will be set to the scheduled run time (e.g., 20260313T06)",
+    "dynamicFieldsFallbackHelp": "No configuration values could be matched in the compiled specification. Dynamic fields are not available for this configuration.",
+    "scheduleCreated": "Schedule created successfully",
+    "compilingSpec": "Compiling specification..."
   },
   "outputs": {
     "generated": "Generated",
@@ -96,7 +110,7 @@
     "submitted": "Submitted",
     "running": "Running",
     "completed": "Completed",
-    "errored": "Errored",
+    "failed": "Failed",
     "searchPlaceholder": "Search executions..."
   },
   "list": {

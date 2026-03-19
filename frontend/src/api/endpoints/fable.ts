@@ -69,14 +69,14 @@ export async function expandFable(
 }
 
 /**
- * Retrieve a saved fable by ID, returning builder and metadata (v2)
+ * Retrieve a saved fable by ID, returning builder and metadata
  */
 export async function retrieveFable(
   fableId: string,
   version?: number,
 ): Promise<FableRetrieveResponse> {
   const params: Record<string, string | number> = {
-    fable_builder_id: fableId,
+    fable_id: fableId,
   }
   if (version !== undefined) {
     params.version = version
@@ -88,7 +88,7 @@ export async function retrieveFable(
 }
 
 /**
- * Create or update a fable with full metadata, returning { id, version } (v2)
+ * Create or update a fable with full metadata, returning { id, version }
  */
 export async function upsertFable(
   request: FableUpsertRequest,
@@ -99,7 +99,7 @@ export async function upsertFable(
 }
 
 /**
- * Compile a fable by persisted definition reference (v2)
+ * Compile a fable by persisted definition reference
  */
 export async function compileFable(
   request: FableCompileRequest,

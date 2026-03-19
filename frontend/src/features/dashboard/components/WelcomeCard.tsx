@@ -28,6 +28,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Link } from '@tanstack/react-router'
 import { StatCard } from './StatCard'
 import { QuickActionButton } from './QuickActionButton'
 import { JobStatusDetailsPopover } from './JobStatusDetailsPopover'
@@ -35,6 +36,7 @@ import type { ReactNode } from 'react'
 import type { TrafficLightStatus } from '@/types/status.types'
 import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
 import { mockDashboardStats } from '@/features/dashboard/data/mockData'
+import { useArtifacts } from '@/api/hooks/useArtifacts'
 import { useStatus } from '@/api/hooks/useStatus'
 import { useJobStatusCounts } from '@/api/hooks/useJobStatusCounts'
 import { StatusDetailsPopover } from '@/components/common/StatusDetailsPopover'
@@ -75,9 +77,13 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
   const { runningCount, isLoading: isJobCountLoading } = useJobStatusCounts()
   const { authType } = useAuth()
 
+  const { artifacts } = useArtifacts()
+
   const isAnonymous = authType === 'anonymous'
   const displayName = getUserDisplayName(user?.email)
   const stats = mockDashboardStats
+  const downloadedModels = artifacts.filter((a) => a.isAvailable).length
+  const totalModels = artifacts.length
 
   // Get status label and subtext based on traffic light status
   function getStatusText(): { label: string; subtext: string } {
@@ -164,19 +170,22 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
           </JobStatusDetailsPopover>
 
           {/* Available Models */}
-          <StatCard
-            label={t('welcome.stats.availableModels')}
-            icon={<Box className="h-4 w-4" />}
-            value={
-              <span className="text-lg font-semibold">
-                {stats.availableModels}{' '}
-                <span className="text-sm font-normal text-muted-foreground">
-                  {t('welcome.stats.of', { total: stats.totalModels })}
+          <Link to="/admin/artifacts" className="block">
+            <StatCard
+              label={t('welcome.stats.availableModels')}
+              icon={<Box className="h-4 w-4" />}
+              value={
+                <span className="text-lg font-semibold">
+                  {downloadedModels}{' '}
+                  <span className="text-sm font-normal text-muted-foreground">
+                    {t('welcome.stats.of', { total: totalModels })}
+                  </span>
                 </span>
-              </span>
-            }
-            subtext={t('welcome.stats.downloadedModels')}
-          />
+              }
+              subtext={t('welcome.stats.downloadedModels')}
+              className="cursor-pointer transition-colors hover:bg-muted/80"
+            />
+          </Link>
 
           {/* Total Forecasts */}
           <StatCard
@@ -217,6 +226,7 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
         <QuickActionButton
           icon={<Clock className="h-4 w-4" />}
           label={t('welcome.actions.scheduledForecasts')}
+          to="/schedules"
         />
       </div>
     </Card>

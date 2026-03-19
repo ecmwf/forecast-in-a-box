@@ -26,8 +26,6 @@ import type { JobExecuteRequest, JobStatus } from '@/api/types/job.types'
 import { API_ENDPOINTS, API_PATTERNS } from '@/api/endpoints'
 
 export const jobHandlers = [
-  // ─── v2 handlers ────────────────────────────────────────────────────────
-
   http.post(API_ENDPOINTS.job.execute, async ({ request }) => {
     await delay(400)
 
@@ -87,8 +85,6 @@ export const jobHandlers = [
 
     return HttpResponse.json(exec)
   }),
-
-  // ─── v2 artifact handlers ────────────────────────────────────────────────
 
   http.post(API_PATTERNS.job.restart, async ({ params }) => {
     await delay(400)

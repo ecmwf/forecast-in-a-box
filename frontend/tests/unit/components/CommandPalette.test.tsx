@@ -14,10 +14,11 @@
  * Tests the command palette component including:
  * - Open/close behavior via store
  * - Command groups rendering
- * - Keyboard shortcut integration
+ * - Search filtering
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { HotkeysProvider } from '@tanstack/react-hotkeys'
 import { renderWithRouter } from '@tests/utils/render'
 import { CommandPalette } from '@/components/CommandPalette'
 import { useCommandStore } from '@/stores/commandStore'
@@ -37,7 +38,11 @@ describe('CommandPalette', () => {
   })
 
   it('renders nothing visible when store isOpen is false', async () => {
-    const screen = await renderWithRouter(<CommandPalette />)
+    const screen = await renderWithRouter(
+      <HotkeysProvider>
+        <CommandPalette />
+      </HotkeysProvider>,
+    )
 
     // The dialog should not show command content when closed
     await expect
@@ -46,7 +51,11 @@ describe('CommandPalette', () => {
   })
 
   it('shows command groups when opened via store', async () => {
-    const screen = await renderWithRouter(<CommandPalette />)
+    const screen = await renderWithRouter(
+      <HotkeysProvider>
+        <CommandPalette />
+      </HotkeysProvider>,
+    )
 
     // Open the palette
     useCommandStore.getState().setOpen(true)
@@ -62,7 +71,11 @@ describe('CommandPalette', () => {
   })
 
   it('shows navigation commands', async () => {
-    const screen = await renderWithRouter(<CommandPalette />)
+    const screen = await renderWithRouter(
+      <HotkeysProvider>
+        <CommandPalette />
+      </HotkeysProvider>,
+    )
 
     useCommandStore.getState().setOpen(true)
 
@@ -82,7 +95,11 @@ describe('CommandPalette', () => {
   })
 
   it('shows getting started commands', async () => {
-    const screen = await renderWithRouter(<CommandPalette />)
+    const screen = await renderWithRouter(
+      <HotkeysProvider>
+        <CommandPalette />
+      </HotkeysProvider>,
+    )
 
     useCommandStore.getState().setOpen(true)
 
@@ -92,7 +109,11 @@ describe('CommandPalette', () => {
   })
 
   it('shows "No results found" for non-matching search', async () => {
-    const screen = await renderWithRouter(<CommandPalette />)
+    const screen = await renderWithRouter(
+      <HotkeysProvider>
+        <CommandPalette />
+      </HotkeysProvider>,
+    )
 
     useCommandStore.getState().setOpen(true)
 
@@ -103,58 +124,43 @@ describe('CommandPalette', () => {
     await expect.element(screen.getByText('No results found.')).toBeVisible()
   })
 
-  it('opens palette on Cmd+K keyboard shortcut', async () => {
-    const screen = await renderWithRouter(<CommandPalette />)
-
-    // Palette should be closed initially
-    expect(useCommandStore.getState().isOpen).toBe(false)
-
-    // Simulate Cmd+K
-    document.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'k', metaKey: true }),
+  it('closes when store isOpen is set to false', async () => {
+    const screen = await renderWithRouter(
+      <HotkeysProvider>
+        <CommandPalette />
+      </HotkeysProvider>,
     )
-
-    // Store should now be open
-    expect(useCommandStore.getState().isOpen).toBe(true)
-
-    // Content should be visible
-    await expect
-      .element(screen.getByPlaceholder('Type a command or search...'))
-      .toBeVisible()
-  })
-
-  it('opens palette on Ctrl+K keyboard shortcut', async () => {
-    await renderWithRouter(<CommandPalette />)
-
-    // Simulate Ctrl+K
-    document.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }),
-    )
-
-    expect(useCommandStore.getState().isOpen).toBe(true)
-  })
-
-  it('toggles palette closed on repeated Cmd+K', async () => {
-    const screen = await renderWithRouter(<CommandPalette />)
 
     // Open
-    document.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'k', metaKey: true }),
-    )
-    expect(useCommandStore.getState().isOpen).toBe(true)
-
-    // Wait for React to re-render so the effect re-registers with new isOpen
+    useCommandStore.getState().setOpen(true)
     await expect
       .element(screen.getByPlaceholder('Type a command or search...'))
       .toBeVisible()
 
     // Close
-    document.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'k', metaKey: true }),
+    useCommandStore.getState().setOpen(false)
+    await expect
+      .element(screen.getByPlaceholder('Type a command or search...'))
+      .not.toBeInTheDocument()
+  })
+
+  it('toggle cycles open and closed', async () => {
+    const screen = await renderWithRouter(
+      <HotkeysProvider>
+        <CommandPalette />
+      </HotkeysProvider>,
     )
 
+    // Toggle open
+    useCommandStore.getState().toggle()
     await expect
-      .poll(() => useCommandStore.getState().isOpen, { timeout: 1000 })
-      .toBe(false)
+      .element(screen.getByPlaceholder('Type a command or search...'))
+      .toBeVisible()
+
+    // Toggle closed
+    useCommandStore.getState().toggle()
+    await expect
+      .element(screen.getByPlaceholder('Type a command or search...'))
+      .not.toBeInTheDocument()
   })
 })

@@ -75,6 +75,7 @@ export function FableBuilderHeader({
   const setMode = useFableBuilderStore((s) => s.setMode)
   const setStep = useFableBuilderStore((s) => s.setStep)
   const setFable = useFableBuilderStore((s) => s.setFable)
+  const setSubmitDialogOpen = useFableBuilderStore((s) => s.setSubmitDialogOpen)
 
   const blockCount = Object.keys(fable.blocks).length
   const isValid = validationState?.isValid ?? false
@@ -407,7 +408,12 @@ export function FableBuilderHeader({
                   <span className="hidden sm:inline">Back to Edit</span>
                 </Button>
 
-                <Button size="sm" disabled={!isValid} className="gap-2">
+                <Button
+                  size="sm"
+                  disabled={!isValid}
+                  onClick={() => setSubmitDialogOpen(true)}
+                  className="gap-2"
+                >
                   <Check className="h-4 w-4" />
                   <span className="hidden sm:inline">Submit Job</span>
                 </Button>

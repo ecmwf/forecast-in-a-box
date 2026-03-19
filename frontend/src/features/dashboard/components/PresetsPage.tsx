@@ -24,8 +24,16 @@ import { Link } from '@tanstack/react-router'
 import { formatDistanceToNow } from 'date-fns'
 import { useConfigPresets } from '../hooks/useConfigPresets'
 import type { PresetEntry } from '../hooks/useConfigPresets'
-import type { FableBlockSummary } from '@/features/fable-builder/components/SaveConfigPopover'
-import { BLOCK_KIND_METADATA, BLOCK_KIND_ORDER } from '@/api/types/fable.types'
+import {
+  useBlockCatalogue,
+  useFableRetrieve,
+  useUpsertFable,
+} from '@/api/hooks/useFable'
+import {
+  BLOCK_KIND_METADATA,
+  BLOCK_KIND_ORDER,
+  getBlocksByKind,
+} from '@/api/types/fable.types'
 import { PageHeader } from '@/components/common'
 import { H2, P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
@@ -48,52 +56,40 @@ import {
 import { useUiStore } from '@/stores/uiStore'
 import { cn } from '@/lib/utils'
 
-function BlockSummaryTags({ summary }: { summary: FableBlockSummary }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {BLOCK_KIND_ORDER.filter(
-        (kind) => summary[kind as keyof FableBlockSummary] > 0,
-      ).map((kind) => {
-        const meta = BLOCK_KIND_METADATA[kind]
-        const count = summary[kind as keyof FableBlockSummary]
-        return (
-          <span
-            key={kind}
-            className="rounded bg-muted px-2 py-1 text-sm text-muted-foreground"
-          >
-            {count} {meta.label.toLowerCase()}
-            {count !== 1 ? 's' : ''}
-          </span>
-        )
-      })}
-    </div>
-  )
-}
-
 function RenamePopover({
-  preset,
-  onRename,
+  fableId,
+  currentTitle,
+  currentComments,
 }: {
-  preset: PresetEntry
-  onRename: (fableId: string, title: string, comments: string) => void
+  fableId: string
+  currentTitle: string
+  currentComments: string
 }) {
   const { t } = useTranslation('dashboard')
   const [open, setOpen] = useState(false)
-  const [title, setTitle] = useState(preset.title)
-  const [comments, setComments] = useState(preset.comments)
+  const [title, setTitle] = useState(currentTitle)
+  const [comments, setComments] = useState(currentComments)
+  const upsertFable = useUpsertFable()
+  const { data: fableData } = useFableRetrieve(fableId)
 
   function handleOpen(nextOpen: boolean) {
     if (nextOpen) {
-      setTitle(preset.title)
-      setComments(preset.comments)
+      setTitle(currentTitle)
+      setComments(currentComments)
     }
     setOpen(nextOpen)
   }
 
   function handleSave() {
     const trimmed = title.trim()
-    if (!trimmed) return
-    onRename(preset.fableId, trimmed, comments.trim())
+    if (!trimmed || !fableData) return
+    upsertFable.mutate({
+      fable: fableData.builder,
+      fableId,
+      display_name: trimmed,
+      display_description: comments.trim(),
+      tags: fableData.tags,
+    })
     setOpen(false)
   }
 
@@ -118,9 +114,9 @@ function RenamePopover({
         </PopoverHeader>
 
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor={`rename-title-${preset.fableId}`}>Title</Label>
+          <Label htmlFor={`rename-title-${fableId}`}>Title</Label>
           <Input
-            id={`rename-title-${preset.fableId}`}
+            id={`rename-title-${fableId}`}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => {
@@ -130,9 +126,9 @@ function RenamePopover({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor={`rename-comments-${preset.fableId}`}>Comments</Label>
+          <Label htmlFor={`rename-comments-${fableId}`}>Comments</Label>
           <textarea
-            id={`rename-comments-${preset.fableId}`}
+            id={`rename-comments-${fableId}`}
             rows={2}
             value={comments}
             onChange={(e) => setComments(e.target.value)}
@@ -153,6 +149,145 @@ function RenamePopover({
   )
 }
 
+function PresetRow({
+  preset,
+  onDelete,
+  onToggleFavourite,
+}: {
+  preset: PresetEntry
+  onDelete: (fableId: string) => void
+  onToggleFavourite: (fableId: string) => void
+}) {
+  const { t } = useTranslation('dashboard')
+  const { data: fableData } = useFableRetrieve(preset.fableId)
+  const { data: catalogue } = useBlockCatalogue()
+
+  const title = fableData?.display_name || preset.fableId.slice(0, 8)
+  const comments = fableData?.display_description || ''
+  const tags = fableData?.tags ?? []
+
+  return (
+    <div className="p-6 transition-colors hover:bg-muted/50">
+      <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+        {/* Content */}
+        <div className="grow">
+          <div className="mb-1 flex items-center gap-2">
+            <P className="truncate font-medium">{title}</P>
+            <RenamePopover
+              fableId={preset.fableId}
+              currentTitle={title}
+              currentComments={comments}
+            />
+          </div>
+          {comments && (
+            <P className="mb-2 line-clamp-1 text-sm text-muted-foreground">
+              {comments}
+            </P>
+          )}
+          <div className="flex flex-wrap items-center gap-3">
+            {fableData?.builder && catalogue && (
+              <div className="flex flex-wrap gap-1.5">
+                {BLOCK_KIND_ORDER.filter(
+                  (kind) =>
+                    getBlocksByKind(fableData.builder, catalogue, kind).length >
+                    0,
+                ).map((kind) => {
+                  const meta = BLOCK_KIND_METADATA[kind]
+                  const count = getBlocksByKind(
+                    fableData.builder,
+                    catalogue,
+                    kind,
+                  ).length
+                  return (
+                    <span
+                      key={kind}
+                      className="rounded bg-muted px-2 py-1 text-sm text-muted-foreground"
+                    >
+                      {count} {meta.label.toLowerCase()}
+                      {count !== 1 ? 's' : ''}
+                    </span>
+                  )
+                })}
+              </div>
+            )}
+            {tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-xs text-primary"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+            <P className="text-sm text-muted-foreground">
+              {formatDistanceToNow(new Date(preset.savedAt), {
+                addSuffix: true,
+              })}
+            </P>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="mt-2 flex w-full items-center justify-between gap-6 sm:mt-0 sm:w-auto sm:justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-sm"
+            render={
+              <Link to="/configure" search={{ fableId: preset.fableId }} />
+            }
+            nativeButton={false}
+          >
+            {t('presets.load')}
+          </Button>
+
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <button
+              onClick={() => onToggleFavourite(preset.fableId)}
+              className={cn(
+                'transition-colors hover:text-yellow-500',
+                preset.isFavourite && 'text-yellow-500',
+              )}
+              aria-label={t('presets.bookmark')}
+            >
+              <Star
+                className={cn(
+                  'h-5 w-5',
+                  preset.isFavourite && 'fill-yellow-500',
+                )}
+              />
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <button
+                    className="transition-colors hover:text-primary"
+                    aria-label="More options"
+                  />
+                }
+              >
+                <MoreVertical className="h-5 w-5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => onDelete(preset.fableId)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {t('presets.delete')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const PAGE_SIZE = 10
 
 type PresetFilter = 'all' | 'bookmarked'
@@ -163,8 +298,7 @@ export function PresetsPage() {
   const dashboardVariant = useUiStore((state) => state.dashboardVariant)
   const panelShadow = useUiStore((state) => state.panelShadow)
 
-  const { presets, deletePreset, toggleFavourite, renamePreset } =
-    useConfigPresets()
+  const { presets, deletePreset, toggleFavourite } = useConfigPresets()
   const [searchQuery, setSearchQuery] = useState('')
   const [filter, setFilter] = useState<PresetFilter>('all')
   const [page, setPage] = useState(1)
@@ -178,11 +312,7 @@ export function PresetsPage() {
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
-      result = result.filter(
-        (p) =>
-          p.title.toLowerCase().includes(query) ||
-          p.comments.toLowerCase().includes(query),
-      )
+      result = result.filter((p) => p.fableId.toLowerCase().includes(query))
     }
 
     return result
@@ -261,90 +391,12 @@ export function PresetsPage() {
         <div className="divide-y divide-border">
           {paginatedPresets.length > 0 ? (
             paginatedPresets.map((preset) => (
-              <div
+              <PresetRow
                 key={preset.fableId}
-                className="p-6 transition-colors hover:bg-muted/50"
-              >
-                <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-                  {/* Content */}
-                  <div className="grow">
-                    <div className="mb-1 flex items-center gap-2">
-                      <P className="truncate font-medium">{preset.title}</P>
-                      <RenamePopover preset={preset} onRename={renamePreset} />
-                    </div>
-                    {preset.comments && (
-                      <P className="mb-2 line-clamp-1 text-sm text-muted-foreground">
-                        {preset.comments}
-                      </P>
-                    )}
-                    <div className="flex flex-wrap items-center gap-3">
-                      <BlockSummaryTags summary={preset.summary} />
-                      <P className="text-sm text-muted-foreground">
-                        {formatDistanceToNow(new Date(preset.savedAt), {
-                          addSuffix: true,
-                        })}
-                      </P>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="mt-2 flex w-full items-center justify-between gap-6 sm:mt-0 sm:w-auto sm:justify-end">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-sm"
-                      render={
-                        <Link
-                          to="/configure"
-                          search={{ fableId: preset.fableId }}
-                        />
-                      }
-                      nativeButton={false}
-                    >
-                      {t('presets.load')}
-                    </Button>
-
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <button
-                        onClick={() => toggleFavourite(preset.fableId)}
-                        className={cn(
-                          'transition-colors hover:text-yellow-500',
-                          preset.isFavourite && 'text-yellow-500',
-                        )}
-                        aria-label={t('presets.bookmark')}
-                      >
-                        <Star
-                          className={cn(
-                            'h-5 w-5',
-                            preset.isFavourite && 'fill-yellow-500',
-                          )}
-                        />
-                      </button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger
-                          render={
-                            <button
-                              className="transition-colors hover:text-primary"
-                              aria-label="More options"
-                            />
-                          }
-                        >
-                          <MoreVertical className="h-5 w-5" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => deletePreset(preset.fableId)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            {t('presets.delete')}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                preset={preset}
+                onDelete={deletePreset}
+                onToggleFavourite={toggleFavourite}
+              />
             ))
           ) : (
             <div className="flex flex-col items-center gap-2 p-12 text-center text-muted-foreground">

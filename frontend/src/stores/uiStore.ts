@@ -50,8 +50,8 @@ interface UiState {
   setPluginsViewMode: (mode: AdminViewMode) => void
   modelsViewMode: AdminViewMode
   setModelsViewMode: (mode: AdminViewMode) => void
-  sourcesViewMode: AdminViewMode
-  setSourcesViewMode: (mode: AdminViewMode) => void
+  artifactsViewMode: AdminViewMode
+  setArtifactsViewMode: (mode: AdminViewMode) => void
 
   // Reset store
   reset: () => void
@@ -66,7 +66,7 @@ const initialState = {
   panelShadow: 'none' as PanelShadow,
   pluginsViewMode: 'table' as AdminViewMode,
   modelsViewMode: 'table' as AdminViewMode,
-  sourcesViewMode: 'card' as AdminViewMode,
+  artifactsViewMode: 'card' as AdminViewMode,
 }
 
 export const useUiStore = create<UiState>()(
@@ -109,7 +109,7 @@ export const useUiStore = create<UiState>()(
         // Admin view mode management
         setPluginsViewMode: (pluginsViewMode) => set({ pluginsViewMode }),
         setModelsViewMode: (modelsViewMode) => set({ modelsViewMode }),
-        setSourcesViewMode: (sourcesViewMode) => set({ sourcesViewMode }),
+        setArtifactsViewMode: (artifactsViewMode) => set({ artifactsViewMode }),
 
         // Reset to initial state
         reset: () => set(initialState),
@@ -142,9 +142,10 @@ export const useUiStore = create<UiState>()(
             state.modelsViewMode = 'table'
           }
 
-          // Migration from v2 to v3: Add sources view mode
+          // Migration from v2 to v3: Add artifacts view mode (was sources)
           if (version < 3) {
-            state.sourcesViewMode = 'table'
+            state.artifactsViewMode = 'card'
+            delete state.sourcesViewMode
           }
 
           // Migration from v3 to v4: Remove sidebar state
@@ -159,7 +160,7 @@ export const useUiStore = create<UiState>()(
             panelShadow: PanelShadow
             pluginsViewMode: AdminViewMode
             modelsViewMode: AdminViewMode
-            sourcesViewMode: AdminViewMode
+            artifactsViewMode: AdminViewMode
           }
         },
         partialize: (state) => ({
@@ -169,7 +170,7 @@ export const useUiStore = create<UiState>()(
           panelShadow: state.panelShadow,
           pluginsViewMode: state.pluginsViewMode,
           modelsViewMode: state.modelsViewMode,
-          sourcesViewMode: state.sourcesViewMode,
+          artifactsViewMode: state.artifactsViewMode,
         }),
       },
     ),

@@ -17,13 +17,17 @@ import type {
   JobExecuteRequest,
   JobExecuteResponse,
   JobExecutionDetail,
-  JobProgressResponse,
   ProductToOutputId,
 } from '@/api/types/job.types'
 
 export interface MockJob {
   id: string
-  status: JobProgressResponse
+  status: {
+    progress: string
+    status: string
+    created_at: string | null
+    error: string | null
+  }
   specification: ExecutionSpecification
   outputs: Array<ProductToOutputId>
   available: Array<string>
@@ -95,7 +99,7 @@ const seedJobs: Array<MockJob> = [
     id: 'job-errored-003',
     status: {
       progress: '62',
-      status: 'errored',
+      status: 'failed',
       created_at: twoHoursAgo,
       error: 'Worker process exited with code 137 (OOM killed)',
     },
@@ -121,7 +125,7 @@ let jobIdCounter = 100
 
 let jobsState: Record<string, MockJob> = {}
 
-// ─── V2 execution mock state ───────────────────────────────────────────────
+// ─── Execution mock state ─────────────────────────────────────────────────
 
 let executionIdCounter = 200
 
@@ -155,7 +159,7 @@ const seedExecutionsV2: Array<JobExecutionDetail> = [
   {
     execution_id: 'job-errored-003',
     attempt_count: 1,
-    status: 'errored',
+    status: 'failed',
     created_at: twoHoursAgo,
     updated_at: twoHoursAgo,
     job_definition_id: 'def-003',
@@ -227,7 +231,7 @@ export function addJob(spec: ExecutionSpecification): MockJob {
   return job
 }
 
-// ─── V2 execution accessors ────────────────────────────────────────────────
+// ─── Execution accessors ──────────────────────────────────────────────────
 
 export function getAllExecutions(): Array<JobExecutionDetail> {
   return Object.values(executionsState).sort((a, b) => {
