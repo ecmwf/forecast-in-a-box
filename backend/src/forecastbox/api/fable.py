@@ -99,7 +99,7 @@ def validate_expand(fable: FableBuilder) -> FableValidationExpansion:
         inputs = {input_id: outputs[source_id] for input_id, source_id in blockInstance.input_ids.items()}
         output_or_error = plugin.validator(blockInstance, inputs)
         if output_or_error.t is None:
-            block_errors[blockId] += cast(str, output_or_error.e)
+            block_errors[blockId] += [cast(str, output_or_error.e)]
             continue
         outputs[blockId] = output_or_error.t
 
