@@ -18,10 +18,11 @@ from fiab_core.fable import (
     BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
-    XarrayOutput,
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import Product, Sink, Source
+
+from .metadata import QubedInstanceOutput
 
 IFS_REQUEST = {
     "class": "od",
@@ -71,8 +72,8 @@ class EkdSource(Source):
     }
     inputs: list[str] = []
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        output = BlockInstanceOutput(
+    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[QubedInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        output = QubedInstanceOutput(
             dataqube={
                 PARAM_DIM: cast(list[str], IFS_REQUEST[PARAM_DIM]),
                 ENSEMBLE_DIM: cast(list[int], IFS_REQUEST[ENSEMBLE_DIM]),
@@ -137,8 +138,8 @@ class EnsembleStatistics(Product):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_dataset = inputs["dataset"]
+    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[QubedInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_dataset = cast(QubedInstanceOutput, inputs["dataset"])
 
         param = block.configuration_values[PARAM_DIM]
         if {PARAM_DIM: param} not in input_dataset:
@@ -164,7 +165,8 @@ class EnsembleStatistics(Product):
         return Either.ok(action)
 
     def intersect(self, input: BlockInstanceOutput) -> bool:
-        return ENSEMBLE_DIM in input and "param" in input
+        input_qube = cast(QubedInstanceOutput, input)
+        return ENSEMBLE_DIM in input_qube and "param" in input_qube
 
 
 class TemporalStatistics(Product):
@@ -180,8 +182,8 @@ class TemporalStatistics(Product):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_dataset = inputs["dataset"]
+    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[QubedInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_dataset = cast(QubedInstanceOutput, inputs["dataset"])
         param = block.configuration_values[PARAM_DIM]
         if {"param": param} not in input_dataset:
             return Either.error(f"param {param} is not in the input variables: {input_dataset.axes().get('param', [])}")
@@ -209,7 +211,8 @@ class TemporalStatistics(Product):
         return Either.ok(action)
 
     def intersect(self, input: BlockInstanceOutput) -> bool:
-        return STEP_DIM in input and "param" in input
+        input_qube = cast(QubedInstanceOutput, input)
+        return STEP_DIM in input_qube and "param" in input_qube
 
 
 class ZarrSink(Sink):
@@ -224,8 +227,8 @@ class ZarrSink(Sink):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        return Either.ok(BlockInstanceOutput())
+    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[QubedInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        return Either.ok(QubedInstanceOutput())
 
     def compile(
         self,
@@ -240,4 +243,5 @@ class ZarrSink(Sink):
         return Either.ok(action)
 
     def intersect(self, input: BlockInstanceOutput) -> bool:
-        return "param" in input and len(input.axes()["param"]) > 0
+        input_qube = cast(QubedInstanceOutput, input)
+        return "param" in input_qube and len(input_qube.axes()["param"]) > 0

@@ -9,7 +9,7 @@
 
 
 import pytest
-from fiab_core.fable import BlockInstance, BlockInstanceOutput, PluginBlockFactoryId, PluginCompositeId
+from fiab_core.fable import BlockInstance, BlockInstanceOutput, PluginBlockFactoryId, PluginCompositeId, XarrayOutput
 
 from fiab_plugin_ecmwf.blocks import EkdSource, EnsembleStatistics, TemporalStatistics, ZarrSink
 
@@ -25,7 +25,7 @@ def dummy_blockinstance() -> BlockInstance:
 
 @pytest.fixture
 def dummy_blockinstance_output() -> BlockInstanceOutput:
-    return BlockInstanceOutput()
+    return XarrayOutput(variables=[], coords=[])
 
 
 @pytest.fixture

@@ -1,25 +1,25 @@
 """
-Tests for BlockInstanceOutput
+Tests for QubedInstanceOutput
 
-BlockInstanceOutput represents the output produced by a BlockInstance, consisting of dataqube and metadata.
+QubedInstanceOutput represents the output produced by a BlockInstance, consisting of dataqube and metadata.
 """
 
 import pytest
 from qubed import Qube
 
-from fiab_core.fable import BlockInstanceOutput
+from fiab_plugin_ecmwf.metadata import QubedInstanceOutput
 
 
 @pytest.fixture
 def empty_output():
-    """Create an empty BlockInstanceOutput"""
-    return BlockInstanceOutput()
+    """Create an empty QubedInstanceOutput"""
+    return QubedInstanceOutput()
 
 
 @pytest.fixture
 def simple_output():
-    """Create a simple BlockInstanceOutput with param and time dimensions"""
-    return BlockInstanceOutput(
+    """Create a simple QubedInstanceOutput with param and time dimensions"""
+    return QubedInstanceOutput(
         dataqube=Qube.from_datacube(
             {
                 "param": ["2t", "tp"],
@@ -31,8 +31,8 @@ def simple_output():
 
 @pytest.fixture
 def complex_output():
-    """Create a complex BlockInstanceOutput with param, time, and level dimensions"""
-    return BlockInstanceOutput(
+    """Create a complex QubedInstanceOutput with param, time, and level dimensions"""
+    return QubedInstanceOutput(
         dataqube=Qube.from_datacube(
             {
                 "param": ["t", "q"],
@@ -43,8 +43,8 @@ def complex_output():
     )
 
 
-class TestBlockInstanceOutputCreation:
-    """Tests for creating BlockInstanceOutput instances"""
+class TestQubedInstanceOutputCreation:
+    """Tests for creating QubedInstanceOutput instances"""
 
     @pytest.mark.parametrize(
         "fixture_name,expected_dimensions",
@@ -55,13 +55,13 @@ class TestBlockInstanceOutputCreation:
         ],
     )
     def test_creation_with_dimensions(self, fixture_name, expected_dimensions, request):
-        """Test creating BlockInstanceOutput with various dimensions"""
+        """Test creating QubedInstanceOutput with various dimensions"""
         output = request.getfixturevalue(fixture_name)
         assert output.dimensions() == expected_dimensions
         assert output.metadata.datatype == ""
 
 
-class TestBlockInstanceOutputExpand:
+class TestQubedInstanceOutputExpand:
     """Tests for the expand() method"""
 
     def test_expand_from_empty(self, empty_output):
@@ -142,7 +142,7 @@ class TestBlockInstanceOutputExpand:
         assert expanded.dimensions() >= output.dimensions()
 
 
-class TestBlockInstanceOutputCollapse:
+class TestQubedInstanceOutputCollapse:
     """Tests for the collapse() method"""
 
     @pytest.mark.parametrize(
@@ -235,7 +235,7 @@ class TestBlockInstanceOutputCollapse:
             collapsed.collapse(first_dim)
 
 
-class TestBlockInstanceOutputContains:
+class TestQubedInstanceOutputContains:
     """Tests for the __contains__ method"""
 
     @pytest.mark.parametrize(
@@ -278,7 +278,7 @@ class TestBlockInstanceOutputContains:
 
     def test_contains_subset_after_expand_collapse(self):
         """Test checking if a subset exists after expand and collapse"""
-        output = BlockInstanceOutput(
+        output = QubedInstanceOutput(
             dataqube=Qube.from_datacube(
                 {
                     "param": ["t", "q"],
@@ -314,7 +314,7 @@ class TestBlockInstanceOutputContains:
             assert subset in output
 
 
-class TestBlockInstanceOutputAxes:
+class TestQubedInstanceOutputAxes:
     """Tests for the axes() method"""
 
     @pytest.mark.parametrize(
@@ -357,7 +357,7 @@ class TestBlockInstanceOutputAxes:
         assert len(axes) == len(output.dimensions()) - 1
 
 
-class TestBlockInstanceOutputDimensions:
+class TestQubedInstanceOutputDimensions:
     """Tests for the dimensions() method"""
 
     @pytest.mark.parametrize(
@@ -377,7 +377,7 @@ class TestBlockInstanceOutputDimensions:
         assert collapsed.dimensions() == expected_dims
 
 
-class TestBlockInstanceOutputMetadata:
+class TestQubedInstanceOutputMetadata:
     """Tests for metadata operations"""
 
     @pytest.mark.parametrize(
@@ -433,7 +433,7 @@ class TestBlockInstanceOutputMetadata:
         assert output.metadata.datatype == ""
 
 
-class TestBlockInstanceOutputIntegration:
+class TestQubedInstanceOutputIntegration:
     """Integration tests combining multiple operations"""
 
     def test_full_workflow_from_empty(self, empty_output):
@@ -518,7 +518,7 @@ class TestBlockInstanceOutputIntegration:
             elif op_type == "update":
                 output = output.update(**op_arg)
 
-        assert isinstance(output, BlockInstanceOutput)
+        assert isinstance(output, QubedInstanceOutput)
 
     @pytest.mark.parametrize(
         "fixture_name,value_types",
