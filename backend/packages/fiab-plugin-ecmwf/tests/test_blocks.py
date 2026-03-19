@@ -11,7 +11,7 @@
 from typing import cast
 
 import pytest
-from fiab_core.fable import BlockInstance, BlockInstanceOutput, PluginBlockFactoryId, PluginCompositeId, XarrayOutput
+from fiab_core.fable import BlockInstance, BlockInstanceOutput, PluginBlockFactoryId, PluginCompositeId
 
 from fiab_plugin_ecmwf.blocks import EkdSource, EnsembleStatistics, TemporalStatistics, ZarrSink
 from fiab_plugin_ecmwf.metadata import QubedInstanceOutput
@@ -189,7 +189,10 @@ class TestZarrSink:
         block = ZarrSink()
 
         assert block.intersect(input=ekdsource_output)
-        output: BlockInstanceOutput = block.validate(block=zarr_sink_configuration, inputs={"dataset": ekdsource_output}).get_or_raise()
+        output: BlockInstanceOutput = block.validate(
+            block=zarr_sink_configuration,
+            inputs={"dataset": ekdsource_output},
+        ).get_or_raise()
         assert output.is_empty()
 
     def test_from_ensemble_statistics(
@@ -206,7 +209,10 @@ class TestZarrSink:
         block = ZarrSink()
 
         assert block.intersect(input=ensemble_output)
-        output: BlockInstanceOutput = block.validate(block=zarr_sink_configuration, inputs={"dataset": ensemble_output}).get_or_raise()
+        output: BlockInstanceOutput = block.validate(
+            block=zarr_sink_configuration,
+            inputs={"dataset": ensemble_output},
+        ).get_or_raise()
         assert output.is_empty()
 
     def test_from_temporal_statistics(
@@ -223,5 +229,8 @@ class TestZarrSink:
         block = ZarrSink()
 
         assert block.intersect(input=temporal_output)
-        output: BlockInstanceOutput = block.validate(block=zarr_sink_configuration, inputs={"dataset": temporal_output}).get_or_raise()
+        output: BlockInstanceOutput = block.validate(
+            block=zarr_sink_configuration,
+            inputs={"dataset": temporal_output},
+        ).get_or_raise()
         assert output.is_empty()

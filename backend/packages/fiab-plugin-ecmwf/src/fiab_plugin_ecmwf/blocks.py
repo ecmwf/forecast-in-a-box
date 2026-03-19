@@ -139,7 +139,12 @@ class EnsembleStatistics(Product):
     inputs: list[str] = ["dataset"]
 
     def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[QubedInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_dataset = cast(QubedInstanceOutput, inputs["dataset"])
+        raw_input_dataset = inputs.get("dataset")
+        if not isinstance(raw_input_dataset, QubedInstanceOutput):
+            actual_type = type(raw_input_dataset).__name__ if raw_input_dataset is not None else "None"
+            return Either.error(f"Unsupported input type for 'dataset': expected QubedInstanceOutput, got {actual_type}")
+
+        input_dataset = cast(QubedInstanceOutput, raw_input_dataset)
 
         param = block.configuration_values[PARAM_DIM]
         if {PARAM_DIM: param} not in input_dataset:
@@ -165,6 +170,8 @@ class EnsembleStatistics(Product):
         return Either.ok(action)
 
     def intersect(self, input: BlockInstanceOutput) -> bool:
+        if not isinstance(input, QubedInstanceOutput):
+            return False
         input_qube = cast(QubedInstanceOutput, input)
         return ENSEMBLE_DIM in input_qube and "param" in input_qube
 
@@ -183,10 +190,16 @@ class TemporalStatistics(Product):
     inputs: list[str] = ["dataset"]
 
     def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[QubedInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_dataset = cast(QubedInstanceOutput, inputs["dataset"])
+        dataset_output = inputs["dataset"]
+        if not isinstance(dataset_output, QubedInstanceOutput):
+            return Either.error("TemporalStatistics expects 'dataset' input of type QubedInstanceOutput")
+
+        input_dataset = dataset_output
         param = block.configuration_values[PARAM_DIM]
         if {"param": param} not in input_dataset:
-            return Either.error(f"param {param} is not in the input variables: {input_dataset.axes().get('param', [])}")
+            return Either.error(
+                f"param {param} is not in the input variables: {input_dataset.axes().get('param', [])}"
+            )
         output = input_dataset.collapse(["param", STEP_DIM]).expand({"param": [param]})
         return Either.ok(output)
 
@@ -211,6 +224,8 @@ class TemporalStatistics(Product):
         return Either.ok(action)
 
     def intersect(self, input: BlockInstanceOutput) -> bool:
+        if not isinstance(input, QubedInstanceOutput):
+            return False
         input_qube = cast(QubedInstanceOutput, input)
         return STEP_DIM in input_qube and "param" in input_qube
 

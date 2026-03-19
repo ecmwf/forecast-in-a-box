@@ -9,7 +9,7 @@
 
 
 import functools
-from typing import Any, Literal, Sequence, cast
+from typing import Any, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from qubed import Qube
@@ -92,12 +92,12 @@ class QubedInstanceOutput(BaseModel):
         """
         return len(self.axes()) == 0
 
-    def axes(self) -> dict[str, set[str]]:
+    def axes(self) -> dict[str, set[Any]]:
         """Return the axes of the dataqube.
 
         Returns
         -------
-        dict[str, set[str]]
+        dict[str, set[Any]]
             A dictionary where keys are dimension names and values are sets of axis values.
 
         Usage
