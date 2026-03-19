@@ -135,7 +135,7 @@ class TestEnsembleStatistics:
 
         assert not block.intersect(input=modified_output)
         result = block.validate(block=ensemble_statistics_configuration, inputs={"dataset": modified_output})
-        with pytest.raises(ValueError, match="param 2t is not in the input variables"):
+        with pytest.raises(ValueError, match="param 2t is not in the input parameters"):
             assert result.get_or_raise()
 
 
@@ -180,7 +180,7 @@ class TestTemporalStatistics:
 
         assert not block.intersect(input=modified_output)
         result = block.validate(block=temporal_statistics_configuration, inputs={"dataset": modified_output})
-        with pytest.raises(ValueError, match="param 2t is not in the input variables"):
+        with pytest.raises(ValueError, match="param 2t is not in the input parameters"):
             assert result.get_or_raise()
 
 

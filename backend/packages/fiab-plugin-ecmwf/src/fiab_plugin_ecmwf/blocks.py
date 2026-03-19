@@ -148,9 +148,9 @@ class EnsembleStatistics(Product):
 
         param = block.configuration_values[PARAM_DIM]
         if {PARAM_DIM: param} not in input_dataset:
-            return Either.error(f"param {param} is not in the input variables: {input_dataset.axes().get('param', [])}")
+            return Either.error(f"param {param} is not in the input parameters: {input_dataset.axes().get(PARAM_DIM, [])}")
 
-        output = input_dataset.collapse(["param", ENSEMBLE_DIM]).expand({"param": [param]})
+        output = input_dataset.collapse([PARAM_DIM, ENSEMBLE_DIM]).expand({PARAM_DIM: [param]})
         return Either.ok(output)
 
     def compile(
@@ -172,7 +172,7 @@ class EnsembleStatistics(Product):
     def intersect(self, input: BlockInstanceOutput) -> bool:
         if not isinstance(input, QubedInstanceOutput):
             return False
-        return ENSEMBLE_DIM in input and "param" in input
+        return ENSEMBLE_DIM in input and PARAM_DIM in input
 
 
 class TemporalStatistics(Product):
@@ -195,9 +195,9 @@ class TemporalStatistics(Product):
 
         input_dataset = dataset_output
         param = block.configuration_values[PARAM_DIM]
-        if {"param": param} not in input_dataset:
-            return Either.error(f"param {param} is not in the input variables: {input_dataset.axes().get('param', [])}")
-        output = input_dataset.collapse(["param", STEP_DIM]).expand({"param": [param]})
+        if {PARAM_DIM: param} not in input_dataset:
+            return Either.error(f"param {param} is not in the input parameters: {input_dataset.axes().get(PARAM_DIM, [])}")
+        output = input_dataset.collapse([PARAM_DIM, STEP_DIM]).expand({PARAM_DIM: [param]})
         return Either.ok(output)
 
     def compile(
@@ -223,7 +223,7 @@ class TemporalStatistics(Product):
     def intersect(self, input: BlockInstanceOutput) -> bool:
         if not isinstance(input, QubedInstanceOutput):
             return False
-        return STEP_DIM in input and "param" in input
+        return STEP_DIM in input and PARAM_DIM in input
 
 
 class ZarrSink(Sink):
@@ -256,4 +256,4 @@ class ZarrSink(Sink):
     def intersect(self, input: BlockInstanceOutput) -> bool:
         if not isinstance(input, QubedInstanceOutput):
             return False
-        return "param" in input and len(input.axes()["param"]) > 0
+        return PARAM_DIM in input and len(input.axes()[PARAM_DIM]) > 0
