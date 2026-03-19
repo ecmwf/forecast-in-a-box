@@ -20,7 +20,7 @@ from forecastbox.api.types.jobs import ExecutionSpecification
 
 def _make_experiment(experiment_id: str = "exp-1", job_def_id: str = "jd-1", job_def_version: int = 1) -> MagicMock:
     exp = MagicMock()
-    exp.id = experiment_id
+    exp.experiment_definition_id = experiment_id
     exp.version = 1
     exp.created_by = "test@example.com"
     exp.job_definition_id = job_def_id
@@ -36,7 +36,7 @@ def _make_experiment(experiment_id: str = "exp-1", job_def_id: str = "jd-1", job
 
 def _make_job_definition(job_def_id: str = "jd-1", version: int = 1) -> MagicMock:
     jd = MagicMock()
-    jd.id = job_def_id
+    jd.job_definition_id = job_def_id
     jd.version = version
     jd.blocks = {
         "source1": {
