@@ -298,6 +298,7 @@ async def execute_experiment_run(
     exec_spec: ExecutionSpecification,
     user_id: str | None,
     experiment_id: str,
+    experiment_version: int,
     job_definition_id: str,
     job_definition_version: int,
     compiler_runtime_context: dict,
@@ -306,7 +307,7 @@ async def execute_experiment_run(
     """Submit a pre-compiled scheduled experiment run, creating a JobExecution linked to the experiment.
 
     Uses a spec already compiled by the caller (with dynamic expressions applied).
-    Stores experiment_id and compiler_runtime_context on the created JobExecution so
+    Stores experiment_id, experiment_version and compiler_runtime_context on the created JobExecution so
     runs can read trigger type and original scheduled_at.
     When execution_id is supplied, the new attempt is appended under that id (rerun semantics).
     """
@@ -317,6 +318,7 @@ async def execute_experiment_run(
         created_by=user_id,
         status="submitted",
         experiment_id=experiment_id,
+        experiment_version=experiment_version,
         compiler_runtime_context=compiler_runtime_context,
     )
 
