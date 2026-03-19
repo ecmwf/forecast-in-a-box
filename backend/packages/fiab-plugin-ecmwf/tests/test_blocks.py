@@ -8,10 +8,13 @@
 # nor does it submit to any jurisdiction.
 
 
+from typing import cast
+
 import pytest
 from fiab_core.fable import BlockInstance, BlockInstanceOutput, PluginBlockFactoryId, PluginCompositeId, XarrayOutput
 
 from fiab_plugin_ecmwf.blocks import EkdSource, EnsembleStatistics, TemporalStatistics, ZarrSink
+from fiab_plugin_ecmwf.metadata import QubedInstanceOutput
 
 
 @pytest.fixture
@@ -25,7 +28,7 @@ def dummy_blockinstance() -> BlockInstance:
 
 @pytest.fixture
 def dummy_blockinstance_output() -> BlockInstanceOutput:
-    return XarrayOutput(variables=[], coords=[])
+    return QubedInstanceOutput()
 
 
 @pytest.fixture
@@ -127,6 +130,7 @@ class TestEnsembleStatistics:
     def test_missing_param(self, ensemble_statistics_configuration: BlockInstance, ekdsource_output: BlockInstanceOutput):
         block = EnsembleStatistics()
 
+        ekdsource_output = cast(QubedInstanceOutput, ekdsource_output)
         modified_output = ekdsource_output.collapse("param")
 
         assert not block.intersect(input=modified_output)
@@ -171,6 +175,7 @@ class TestTemporalStatistics:
     def test_missing_param(self, temporal_statistics_configuration: BlockInstance, ekdsource_output: BlockInstanceOutput):
         block = TemporalStatistics()
 
+        ekdsource_output = cast(QubedInstanceOutput, ekdsource_output)
         modified_output = ekdsource_output.collapse("param")
 
         assert not block.intersect(input=modified_output)

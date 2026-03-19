@@ -1608,13 +1608,10 @@ source = { editable = "packages/fiab-core" }
 dependencies = [
     { name = "earthkit-workflows" },
     { name = "pydantic" },
-    { name = "qubed" },
 ]
 
 [package.dev-dependencies]
 dev = [
-    { name = "pytest" },
-    { name = "pytest-xdist" },
     { name = "ty" },
 ]
 
@@ -1622,15 +1619,10 @@ dev = [
 requires-dist = [
     { name = "earthkit-workflows" },
     { name = "pydantic" },
-    { name = "qubed", specifier = ">=0.3.0" },
 ]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=8.4.2" },
-    { name = "pytest-xdist", specifier = ">=3.8.0" },
-    { name = "ty", specifier = "==0.0.2" },
-]
+dev = [{ name = "ty", specifier = "==0.0.2" }]
 
 [[package]]
 name = "fiab-mcp-server"
