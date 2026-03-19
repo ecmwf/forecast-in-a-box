@@ -258,5 +258,7 @@ class ZarrSink(Sink):
         return Either.ok(action)
 
     def intersect(self, input: BlockInstanceOutput) -> bool:
+		if not isinstance(input, QubedInstanceOutput):
+			return False
         input_qube = cast(QubedInstanceOutput, input)
         return "param" in input_qube and len(input_qube.axes()["param"]) > 0
