@@ -172,8 +172,7 @@ class EnsembleStatistics(Product):
     def intersect(self, input: BlockInstanceOutput) -> bool:
         if not isinstance(input, QubedInstanceOutput):
             return False
-        input_qube = cast(QubedInstanceOutput, input)
-        return ENSEMBLE_DIM in input_qube and "param" in input_qube
+        return ENSEMBLE_DIM in input and "param" in input
 
 
 class TemporalStatistics(Product):
@@ -197,9 +196,7 @@ class TemporalStatistics(Product):
         input_dataset = dataset_output
         param = block.configuration_values[PARAM_DIM]
         if {"param": param} not in input_dataset:
-            return Either.error(
-                f"param {param} is not in the input variables: {input_dataset.axes().get('param', [])}"
-            )
+            return Either.error(f"param {param} is not in the input variables: {input_dataset.axes().get('param', [])}")
         output = input_dataset.collapse(["param", STEP_DIM]).expand({"param": [param]})
         return Either.ok(output)
 
@@ -226,8 +223,7 @@ class TemporalStatistics(Product):
     def intersect(self, input: BlockInstanceOutput) -> bool:
         if not isinstance(input, QubedInstanceOutput):
             return False
-        input_qube = cast(QubedInstanceOutput, input)
-        return STEP_DIM in input_qube and "param" in input_qube
+        return STEP_DIM in input and "param" in input
 
 
 class ZarrSink(Sink):
@@ -258,7 +254,6 @@ class ZarrSink(Sink):
         return Either.ok(action)
 
     def intersect(self, input: BlockInstanceOutput) -> bool:
-		if not isinstance(input, QubedInstanceOutput):
-			return False
-        input_qube = cast(QubedInstanceOutput, input)
-        return "param" in input_qube and len(input_qube.axes()["param"]) > 0
+        if not isinstance(input, QubedInstanceOutput):
+            return False
+        return "param" in input and len(input.axes()["param"]) > 0
