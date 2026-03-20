@@ -161,7 +161,7 @@ async def create_schedule(
         job_definition_id=job_def_id,
         job_definition_version=job_def_version,
         experiment_type="cron_schedule",
-        created_by=user.email if user is not None else None,  # ty:ignore[unresolved-attribute]
+        created_by=user.email if user is not None else None,
         experiment_definition=experiment_definition,
         display_name=schedule_spec.display_name,
         display_description=schedule_spec.display_description,

@@ -16,6 +16,8 @@ from datetime import datetime, timedelta
 
 def current_scheduling_time() -> datetime:
     """Return the current time used for scheduling decisions."""
+    # NOTE used by scheduler for scheduling decision, exposed to the users via endpoint
+    # *Not* used for internal liveness measurement etc
     return datetime.now()
 
 

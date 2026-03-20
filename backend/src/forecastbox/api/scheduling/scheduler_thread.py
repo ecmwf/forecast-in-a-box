@@ -55,7 +55,7 @@ class SchedulerThread(threading.Thread):
         self.liveness_signal = threading.Event()
 
     def mark_alive(self) -> dt.datetime:
-        self.liveness_timestamp = current_scheduling_time()
+        self.liveness_timestamp = dt.datetime.now()
         self.liveness_signal.set()
         return self.liveness_timestamp
 
@@ -202,7 +202,7 @@ def status_scheduler():
         logger.warning("scheduler reported down due to thread not being alive")
         return "down"
     Globals.scheduler.liveness_signal.wait(0)  # we do this just for ensuring a multithread sync
-    now = dt.datetime.now()  # liveness wall-clock check, not a scheduling decision
+    now = dt.datetime.now()
     if (
         Globals.scheduler.liveness_timestamp is None
         or (now - Globals.scheduler.liveness_timestamp) > dt.timedelta(minutes=sleep_duration_min) * 2
