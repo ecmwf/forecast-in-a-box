@@ -24,7 +24,7 @@ from typing import cast
 
 import forecastbox.db.jobs as db_jobs
 from forecastbox.api.execution import execute_experiment_run
-from forecastbox.api.scheduling.dt_utils import calculate_next_run
+from forecastbox.api.scheduling.dt_utils import calculate_next_run, current_scheduling_time
 from forecastbox.api.scheduling.job_utils import experiment2runnable
 from forecastbox.config import config
 from forecastbox.ecpyutil import timed_acquire
@@ -117,7 +117,7 @@ class SchedulerThread(threading.Thread):
 
         sleep_duration = sleep_duration_min
         if next_schedulable_at:
-            time_to_next_schedulable_at = int((next_schedulable_at - dt.datetime.now()).total_seconds())
+            time_to_next_schedulable_at = int((next_schedulable_at - current_scheduling_time()).total_seconds())
             if time_to_next_schedulable_at > 0:
                 sleep_duration = min(time_to_next_schedulable_at, sleep_duration_min)
             else:

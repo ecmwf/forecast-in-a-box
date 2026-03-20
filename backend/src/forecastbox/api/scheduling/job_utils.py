@@ -18,7 +18,7 @@ from cascade.low.func import Either
 
 import forecastbox.api.fable as api_fable
 import forecastbox.db.jobs as db_jobs
-from forecastbox.api.scheduling.dt_utils import calculate_next_run
+from forecastbox.api.scheduling.dt_utils import calculate_next_run, current_scheduling_time
 from forecastbox.api.types.fable import FableBuilder
 from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification
 
@@ -150,9 +150,9 @@ async def rerun2runnable(execution_id: str) -> Either[RunnableExperiment, str]: 
         try:
             scheduled_at = dt.datetime.fromisoformat(original_scheduled_at_str)
         except ValueError:
-            scheduled_at = dt.datetime.now()
+            scheduled_at = current_scheduling_time()
     else:
-        scheduled_at = dt.datetime.now()
+        scheduled_at = current_scheduling_time()
 
     exp = await db_jobs.get_experiment_definition(experiment_id)
     if exp is None:
