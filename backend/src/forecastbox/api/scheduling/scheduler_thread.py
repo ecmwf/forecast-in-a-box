@@ -24,7 +24,7 @@ from typing import cast
 
 import forecastbox.db.jobs as db_jobs
 from forecastbox.api.execution import execute_experiment_run
-from forecastbox.api.scheduling.dt_utils import calculate_next_run
+from forecastbox.api.scheduling.dt_utils import calculate_next_run, current_scheduling_time
 from forecastbox.api.scheduling.job_utils import experiment2runnable
 from forecastbox.config import config
 from forecastbox.ecpyutil import timed_acquire
@@ -55,7 +55,7 @@ class SchedulerThread(threading.Thread):
         self.liveness_signal = threading.Event()
 
     def mark_alive(self) -> dt.datetime:
-        self.liveness_timestamp = dt.datetime.now()
+        self.liveness_timestamp = current_scheduling_time()
         self.liveness_signal.set()
         return self.liveness_timestamp
 
@@ -117,7 +117,7 @@ class SchedulerThread(threading.Thread):
 
         sleep_duration = sleep_duration_min
         if next_schedulable_at:
-            time_to_next_schedulable_at = int((next_schedulable_at - dt.datetime.now()).total_seconds())
+            time_to_next_schedulable_at = int((next_schedulable_at - current_scheduling_time()).total_seconds())
             if time_to_next_schedulable_at > 0:
                 sleep_duration = min(time_to_next_schedulable_at, sleep_duration_min)
             else:
@@ -202,7 +202,7 @@ def status_scheduler():
         logger.warning("scheduler reported down due to thread not being alive")
         return "down"
     Globals.scheduler.liveness_signal.wait(0)  # we do this just for ensuring a multithread sync
-    now = dt.datetime.now()
+    now = dt.datetime.now()  # liveness wall-clock check, not a scheduling decision
     if (
         Globals.scheduler.liveness_timestamp is None
         or (now - Globals.scheduler.liveness_timestamp) > dt.timedelta(minutes=sleep_duration_min) * 2
