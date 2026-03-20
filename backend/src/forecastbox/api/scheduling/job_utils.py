@@ -35,17 +35,6 @@ def eval_dynamic_expression(data: dict[str, Any], execution_time: dt.datetime) -
 
 
 @dataclass(frozen=True, eq=True, slots=True)
-class RunnableSchedule:
-    exec_spec: Any
-    created_by: str | None
-    next_run_at: dt.datetime | None
-    scheduled_at: dt.datetime
-    attempt_cnt: int
-    max_acceptable_delay_hours: int
-    schedule_id: str
-
-
-@dataclass(frozen=True, eq=True, slots=True)
 class RunnableExperiment:
     """Carries the JobDefinition and all metadata needed to submit and track a scheduled run."""
 
