@@ -306,6 +306,10 @@ def test_fable_v2_basic_execute(tmpdir, backend_client_with_auth):
     assert isinstance(available_tasks, list)
     assert len(available_tasks) > 0
 
+    logs_resp = backend_client_with_auth.get(f"/job/{execution_id}/logs")
+    assert logs_resp.is_success, logs_resp.text
+    assert "zip" in logs_resp.headers["content-type"]
+
 
 def test_submit_job_v2_execute_missing_definition_id(backend_client_with_auth):
     """Omitting job_definition_id (required field) returns 422."""
