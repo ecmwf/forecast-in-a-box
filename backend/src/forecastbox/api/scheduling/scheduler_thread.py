@@ -89,24 +89,17 @@ class SchedulerThread(threading.Thread):
                     # NOTE this should not happen -- we have locks etc preventing this
                     logger.error("Skipping {experiment_id} at {scheduled_at}: it is not valid!")
                 else:
-                    definition = await db_jobs.get_job_definition(runnable.job_definition_id, runnable.job_definition_version)
-                    if definition is None:
-                        logger.error(
-                            f"JobDefinition {runnable.job_definition_id!r} v{runnable.job_definition_version} not found for experiment {experiment_id}"
-                        )
+                    exec_result = await execute(
+                        runnable.definition,
+                        runnable.created_by,
+                        experiment_id=experiment_id,
+                        experiment_version=cast(int, exp_def.version),
+                        compiler_runtime_context=runnable.compiler_runtime_context,
+                    )
+                    if exec_result.t is not None:
+                        logger.debug(f"Execution {exec_result.t.execution_id} submitted for experiment {experiment_id}")
                     else:
-                        exec_result = await execute(
-                            definition,
-                            runnable.created_by,
-                            experiment_id=experiment_id,
-                            experiment_version=cast(int, exp_def.version),
-                            compiler_runtime_context=runnable.compiler_runtime_context,
-                            exec_spec=runnable.exec_spec,
-                        )
-                        if exec_result.t is not None:
-                            logger.debug(f"Execution {exec_result.t.execution_id} submitted for experiment {experiment_id}")
-                        else:
-                            logger.error(f"Failed to submit experiment {experiment_id}: {exec_result.e}")
+                        logger.error(f"Failed to submit experiment {experiment_id}: {exec_result.e}")
 
                 await db_jobs.delete_experiment_next(experiment_id)
                 if runnable.next_run_at and is_valid:

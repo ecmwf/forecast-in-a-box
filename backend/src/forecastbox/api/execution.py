@@ -47,6 +47,17 @@ from forecastbox.schemas.user import UserRead
 logger = logging.getLogger(__name__)
 
 
+def deep_union(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
+    """Recursively merges two dictionaries. In case of conflicts, values from dict2 are preferred. Copies the first."""
+    merged = dict1.copy()
+    for key, value in dict2.items():
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key] = deep_union(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
 # TODO replace with just output_ids, or something more fitting, since product_ are deprecated
 class ProductToOutputId(BaseModel):
     product_name: str
@@ -260,28 +271,33 @@ async def execute(
     experiment_id: str | None = None,
     experiment_version: int | None = None,
     compiler_runtime_context: dict | None = None,
-    exec_spec: ExecutionSpecification | None = None,
 ) -> Either[JobExecuteResponse, str]:  # type: ignore[invalid-argument]
     """Always creates a JobExecution linked to the given JobDefinition.
 
-    Compiles the definition's blocks via the fable compiler (unless a pre-compiled `exec_spec`
-    is supplied, in which case compilation is skipped), submits the resulting spec to cascade,
-    and persists a JobExecution row. When `execution_id` is supplied, the new attempt is
-    appended under that existing id (restart semantics); otherwise a fresh id is generated.
-    Experiment metadata (`experiment_id`, `experiment_version`, `compiler_runtime_context`) is
-    stored on the row when provided — used by scheduled runs and preserved on restart.
+    Compiles the definition's blocks via the fable compiler, applies
+    compiler_runtime_context (if given) via deep_union to override compiled values
+    (used by scheduled runs to inject dynamic expressions), submits the resulting
+    spec to cascade, and persists a JobExecution row. When `execution_id` is
+    supplied, the new attempt is appended under that existing id (restart semantics);
+    otherwise a fresh id is generated. Experiment metadata is stored on the row when
+    provided and is preserved on restart.
     """
+    if not definition.blocks:
+        return Either.error(f"JobDefinition {definition.job_definition_id!r} has no compilable blocks")
+
     definition_id = str(definition.job_definition_id)  # ty:ignore[invalid-argument-type]
     definition_version = cast(int, definition.version)
 
-    if exec_spec is None:
-        if not definition.blocks:
-            return Either.error(f"JobDefinition {definition.job_definition_id!r} has no compilable blocks")
-        builder = FableBuilder(
-            blocks=definition.blocks,  # ty:ignore[invalid-argument-type]
-            environment=EnvironmentSpecification.model_validate(definition.environment_spec) if definition.environment_spec else None,
-        )
-        exec_spec = api_fable.compile(builder)
+    builder = FableBuilder(
+        blocks=definition.blocks,  # ty:ignore[invalid-argument-type]
+        environment=EnvironmentSpecification.model_validate(definition.environment_spec) if definition.environment_spec else None,
+    )
+    compiled = api_fable.compile(builder)
+
+    if compiler_runtime_context:
+        exec_spec = ExecutionSpecification.model_validate(deep_union(compiled.model_dump(), compiler_runtime_context))
+    else:
+        exec_spec = compiled
 
     new_execution_id, attempt_count = await db_jobs.upsert_job_execution(
         job_execution_id=execution_id,
