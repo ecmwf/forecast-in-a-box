@@ -26,7 +26,7 @@ def _make_experiment(experiment_id: str = "exp-1", job_def_id: str = "jd-1", job
     exp.job_definition_version = job_def_version
     exp.experiment_definition = {
         "cron_expr": "0 0 * * *",
-        "dynamic_expr": {},
+        "dynamic_expr": {"environment": {"environment_variables": {"date": "$execution_time"}}},
         "max_acceptable_delay_hours": 24,
         "enabled": True,
     }
@@ -72,7 +72,7 @@ async def test_experiment2runnable_success(mock_get_jd, mock_get_exp):
     assert runnable.max_acceptable_delay_hours == 24
     assert runnable.scheduled_at == exec_time
     assert runnable.next_run_at is not None  # cron_expr computes a next run
-    assert runnable.compiler_runtime_context == {}  # no dynamic_expr
+    assert runnable.compiler_runtime_context == {"environment": {"environment_variables": {"date": "20260101T00"}}}
     assert runnable.definition is jd
 
 
