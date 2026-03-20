@@ -19,7 +19,6 @@ import { ArrowLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { toast } from 'sonner'
-import { EditJobMetadataDialog } from './EditJobMetadataDialog'
 import { ExecutionCanvas } from './ExecutionCanvas'
 import { ExecutionErrorBanner } from './ExecutionErrorBanner'
 import { ExecutionStatusHeader } from './ExecutionStatusHeader'
@@ -27,13 +26,11 @@ import { LogsPanel } from './LogsPanel'
 import { OutputsPanel } from './OutputsPanel'
 import { SpecificationPanel } from './SpecificationPanel'
 import { ApiClientError } from '@/api/client'
-import { useBlockCatalogue } from '@/api/hooks/useFable'
+import { useBlockCatalogue, useFableRetrieve } from '@/api/hooks/useFable'
 import { useDeleteJob, useJobStatus, useRestartJob } from '@/api/hooks/useJobs'
 import { LoadingSpinner } from '@/components/common'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useJobMetadataStore } from '@/features/executions/stores/useJobMetadataStore'
-import { encodeFableToURL } from '@/features/fable-builder/utils/url-state'
 import { useUiStore } from '@/stores/uiStore'
 import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
@@ -46,14 +43,13 @@ export function ExecutionDetailPage() {
   const { jobId } = useParams({ from: '/_authenticated/executions/$jobId' })
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('outputs')
-  const [editOpen, setEditOpen] = useState(false)
 
   const statusQuery = useJobStatus(jobId)
   const restartMutation = useRestartJob()
   const deleteMutation = useDeleteJob()
 
-  const metadata = useJobMetadataStore((s) => s.getJob(jobId))
-  const removeJob = useJobMetadataStore((s) => s.removeJob)
+  const jobData = statusQuery.data
+  const { data: fableData } = useFableRetrieve(jobData?.job_definition_id)
 
   const layoutMode = useUiStore((state) => state.layoutMode)
   const { data: catalogue } = useBlockCatalogue()
@@ -74,7 +70,6 @@ export function ExecutionDetailPage() {
     deleteMutation.mutate(jobId, {
       onSuccess: () => {
         toast.success(t('actions.deleteJob'))
-        removeJob(jobId)
         navigate({ to: '/executions' })
       },
       onError: (error) => {
@@ -85,11 +80,10 @@ export function ExecutionDetailPage() {
   }
 
   const handleEditConfig = () => {
-    if (!metadata?.fableSnapshot) return
-    const encoded = encodeFableToURL(metadata.fableSnapshot)
+    if (!jobData?.job_definition_id) return
     navigate({
       to: '/configure',
-      search: { state: encoded },
+      search: { fableId: jobData.job_definition_id },
     })
   }
 
@@ -121,11 +115,10 @@ export function ExecutionDetailPage() {
     )
   }
 
-  const jobData = statusQuery.data
   if (!jobData) return null
 
-  const jobName = metadata?.name ?? t('detail.untitledJob')
-  const canEditConfig = !!metadata?.fableSnapshot
+  const jobName = fableData?.display_name ?? t('detail.untitledJob')
+  const canEditConfig = !!jobData.job_definition_id
 
   return (
     <div
@@ -147,28 +140,18 @@ export function ExecutionDetailPage() {
       <ExecutionStatusHeader
         jobId={jobId}
         name={jobName}
-        description={metadata?.description}
+        description={fableData?.display_description ?? undefined}
         status={jobData.status}
         progress={jobData.progress ?? '0'}
         createdAt={jobData.created_at}
         error={jobData.error}
         onRestart={handleRestart}
         onDelete={handleDelete}
-        onEdit={metadata ? () => setEditOpen(true) : undefined}
         isRestartPending={restartMutation.isPending}
         isDeletePending={deleteMutation.isPending}
       />
 
-      {metadata && (
-        <EditJobMetadataDialog
-          open={editOpen}
-          onOpenChange={setEditOpen}
-          jobId={jobId}
-          metadata={metadata}
-        />
-      )}
-
-      {jobData.status === 'errored' && jobData.error && (
+      {jobData.status === 'failed' && jobData.error && (
         <ExecutionErrorBanner
           error={jobData.error}
           jobId={jobId}
@@ -178,9 +161,9 @@ export function ExecutionDetailPage() {
         />
       )}
 
-      {metadata?.fableSnapshot && catalogue ? (
+      {fableData?.builder && catalogue ? (
         <ExecutionCanvas
-          fable={metadata.fableSnapshot}
+          fable={fableData.builder}
           catalogue={catalogue}
           status={jobData.status}
         />
@@ -210,7 +193,7 @@ export function ExecutionDetailPage() {
           <LogsPanel jobId={jobId} status={jobData.status} />
         </TabsContent>
         <TabsContent value="specification">
-          <SpecificationPanel fableSnapshot={metadata?.fableSnapshot} />
+          <SpecificationPanel fableSnapshot={fableData?.builder} />
         </TabsContent>
       </Tabs>
     </div>

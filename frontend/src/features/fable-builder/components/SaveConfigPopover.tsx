@@ -9,7 +9,7 @@
  */
 
 import { useState } from 'react'
-import { Loader2, Save } from 'lucide-react'
+import { Loader2, Save, X } from 'lucide-react'
 import type {
   BlockFactoryCatalogue,
   FableBuilderV1,
@@ -19,7 +19,7 @@ import {
   BLOCK_KIND_ORDER,
   getBlocksByKind,
 } from '@/api/types/fable.types'
-import { useUpsertFable } from '@/api/hooks/useFable'
+import { useFableRetrieve, useUpsertFable } from '@/api/hooks/useFable'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
@@ -44,9 +44,6 @@ export interface FableBlockSummary {
 }
 
 export interface FableSaveMetadata {
-  title: string
-  comments: string
-  summary: FableBlockSummary
   savedAt: string
   isFavourite?: boolean
 }
@@ -131,16 +128,56 @@ export function SaveConfigPopover({
 
   const effectiveFableId = fableId ?? storeFableId
   const isUpdate = !!effectiveFableId
+  const { data: fableData } = useFableRetrieve(effectiveFableId)
 
   const [title, setTitle] = useState(generateDefaultTitle)
   const [comments, setComments] = useState('')
+  const [tags, setTags] = useState<Array<string>>([])
+  const [tagInput, setTagInput] = useState('')
 
   const summary = computeBlockSummary(fable, catalogue)
 
+  function addTag(value: string) {
+    const trimmed = value.trim()
+    if (trimmed && !tags.includes(trimmed)) {
+      setTags([...tags, trimmed])
+    }
+  }
+
+  function handleTagChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value
+    if (value.includes(',')) {
+      const parts = value.split(',')
+      for (const part of parts.slice(0, -1)) {
+        addTag(part)
+      }
+      setTagInput(parts[parts.length - 1])
+    } else {
+      setTagInput(value)
+    }
+  }
+
+  function handleTagKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      addTag(tagInput)
+      setTagInput('')
+    }
+    if (e.key === 'Backspace' && !tagInput && tags.length > 0) {
+      setTags(tags.slice(0, -1))
+    }
+  }
+
+  function handleRemoveTag(tag: string) {
+    setTags(tags.filter((existing) => existing !== tag))
+  }
+
   function handleOpenChange(nextOpen: boolean) {
     if (nextOpen) {
-      setTitle(generateDefaultTitle())
-      setComments('')
+      setTitle(fableData?.display_name || generateDefaultTitle())
+      setComments(fableData?.display_description || '')
+      setTags(fableData?.tags ? [...fableData.tags] : [])
+      setTagInput('')
     }
     if (isControlled) {
       onOpenChange?.(nextOpen)
@@ -153,23 +190,33 @@ export function SaveConfigPopover({
     try {
       const idToPass = asCopy ? undefined : (effectiveFableId ?? undefined)
       const displayTitle = title.trim() || generateDefaultTitle()
+      // Include any pending text in the input as a final tag
+      const finalTags = [...tags]
+      const pendingTag = tagInput.trim()
+      if (pendingTag && !finalTags.includes(pendingTag)) {
+        finalTags.push(pendingTag)
+      }
       const result = await upsertFable.mutateAsync({
         fable,
         fableId: idToPass,
         display_name: displayTitle,
         display_description: comments.trim(),
-        tags: [],
+        tags: finalTags,
       })
 
-      setMetadataStore({
-        ...metadataStore,
-        [result.id]: {
-          title: displayTitle,
-          comments: comments.trim(),
-          summary,
-          savedAt: new Date().toISOString(),
-        },
-      })
+      const updatedStore = { ...metadataStore }
+      // If the backend returned a new ID (versioning), remove the old entry
+      const oldEntry = idToPass
+        ? (metadataStore[idToPass] as FableSaveMetadata | undefined)
+        : undefined
+      if (idToPass && result.id !== idToPass) {
+        delete updatedStore[idToPass]
+      }
+      updatedStore[result.id] = {
+        savedAt: new Date().toISOString(),
+        isFavourite: oldEntry?.isFavourite,
+      }
+      setMetadataStore(updatedStore)
 
       markSaved(result.id, displayTitle)
       handleOpenChange(false)
@@ -239,6 +286,37 @@ export function SaveConfigPopover({
             onChange={(e) => setComments(e.target.value)}
             className="w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
           />
+        </div>
+
+        {/* Tags input */}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="save-config-tags">Tags</Label>
+          <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border border-input bg-transparent px-3 py-1.5 shadow-xs transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 dark:bg-input/30">
+            {tags.map((tag) => (
+              <Badge
+                key={tag}
+                variant="secondary"
+                className="shrink-0 gap-1 py-0.5"
+              >
+                {tag}
+                <button
+                  type="button"
+                  onClick={() => handleRemoveTag(tag)}
+                  className="ml-0.5 rounded-full hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+            <input
+              id="save-config-tags"
+              placeholder={tags.length === 0 ? 'e.g. production, europe' : ''}
+              value={tagInput}
+              onChange={handleTagChange}
+              onKeyDown={handleTagKeyDown}
+              className="min-w-[80px] flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+          </div>
         </div>
 
         {/* Actions */}

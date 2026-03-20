@@ -22,7 +22,6 @@ import type {
   JobStatus,
   ProductToOutputId,
 } from '@/api/types/job.types'
-import type { JobMetadata } from '@/features/executions/stores/useJobMetadataStore'
 import { isTerminalStatus } from '@/api/types/job.types'
 import {
   deleteJob,
@@ -34,7 +33,6 @@ import {
   restartJob,
 } from '@/api/endpoints/job'
 import { upsertFable } from '@/api/endpoints/fable'
-import { useJobMetadataStore } from '@/features/executions/stores/useJobMetadataStore'
 
 export const jobKeys = {
   all: ['jobs'] as const,
@@ -123,17 +121,14 @@ export function useDeleteJob() {
 
 interface SubmitFableParams {
   fable: FableBuilderV1
-  name: string
-  description: string
+  name: string | null
+  description: string | null
   tags: Array<string>
   fableId: string | null
-  fableName: string
   environment?: EnvironmentSpecification
 }
 
 export function useSubmitFable() {
-  const addJob = useJobMetadataStore((s) => s.addJob)
-
   return useMutation<{ execution_id: string }, Error, SubmitFableParams>({
     mutationFn: async ({ fable, name, description, tags, fableId }) => {
       // Save or update the fable definition first to get a persisted id/version
@@ -150,19 +145,6 @@ export function useSubmitFable() {
         job_definition_id: id,
         job_definition_version: version,
       })
-    },
-    onSuccess: (response, params) => {
-      const metadata: JobMetadata = {
-        name: params.name,
-        description: params.description,
-        tags: params.tags,
-        fableId: params.fableId,
-        fableName: params.fableName,
-        fableSnapshot: params.fable,
-        submittedAt: new Date().toISOString(),
-      }
-      // Key metadata by execution_id (v2 logical execution identifier)
-      addJob(response.execution_id, metadata)
     },
   })
 }

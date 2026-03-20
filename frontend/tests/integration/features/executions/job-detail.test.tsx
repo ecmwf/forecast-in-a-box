@@ -13,7 +13,6 @@
  *
  * Tests the execution detail page with MSW-mocked API:
  * - Renders job status header with name, status badge, progress bar
- * - Shows description when available
  * - Tab switching between outputs, logs, specification
  * - Error state for nonexistent jobs
  */
@@ -33,7 +32,6 @@ import {
 import { resetJobsState } from '@tests/../mocks/data/job.data'
 import type { AuthContextValue } from '@/features/auth/AuthContext'
 import { AuthContext } from '@/features/auth/AuthContext'
-import { useJobMetadataStore } from '@/features/executions/stores/useJobMetadataStore'
 import { ExecutionDetailPage } from '@/features/executions/components/ExecutionDetailPage'
 import i18n from '@/lib/i18n'
 
@@ -98,7 +96,6 @@ function renderDetailPage(jobId: string) {
 describe('ExecutionDetailPage Integration', () => {
   beforeEach(() => {
     resetJobsState()
-    useJobMetadataStore.setState({ jobs: {} })
   })
 
   describe('rendering', () => {
@@ -126,41 +123,9 @@ describe('ExecutionDetailPage Integration', () => {
         .toBeVisible()
     })
 
-    it('renders Untitled Job when no metadata', async () => {
+    it('renders Untitled Job when fable lookup fails', async () => {
       const screen = await renderDetailPage('job-completed-001')
       await expect.element(screen.getByText('Untitled Job')).toBeVisible()
-    })
-
-    it('renders job name from metadata', async () => {
-      useJobMetadataStore.getState().addJob('job-completed-001', {
-        name: 'My Forecast',
-        description: '',
-        tags: [],
-        fableId: null,
-        fableName: 'test',
-        fableSnapshot: { blocks: {} },
-        submittedAt: '2026-01-15T10:00:00Z',
-      })
-
-      const screen = await renderDetailPage('job-completed-001')
-      await expect.element(screen.getByText('My Forecast')).toBeVisible()
-    })
-
-    it('renders description when available', async () => {
-      useJobMetadataStore.getState().addJob('job-completed-001', {
-        name: 'Test',
-        description: 'Detailed forecast description',
-        tags: [],
-        fableId: null,
-        fableName: 'test',
-        fableSnapshot: { blocks: {} },
-        submittedAt: '2026-01-15T10:00:00Z',
-      })
-
-      const screen = await renderDetailPage('job-completed-001')
-      await expect
-        .element(screen.getByText('Detailed forecast description'))
-        .toBeVisible()
     })
   })
 
@@ -211,7 +176,7 @@ describe('ExecutionDetailPage Integration', () => {
     it('shows error banner for errored job', async () => {
       const screen = await renderDetailPage('job-errored-003')
       await expect
-        .element(screen.getByText('Errored', { exact: true }))
+        .element(screen.getByText('Failed', { exact: true }))
         .toBeVisible()
     })
   })

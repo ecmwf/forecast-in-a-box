@@ -286,9 +286,9 @@ export function AuthenticatedHeader() {
                       <Blocks className="mr-2 h-4 w-4" />
                       Plugins
                     </DropdownMenuItem>
-                    <DropdownMenuItem render={<Link to="/admin/sources" />}>
+                    <DropdownMenuItem render={<Link to="/admin/artifacts" />}>
                       <Cloud className="mr-2 h-4 w-4" />
-                      Sources
+                      Artifacts
                     </DropdownMenuItem>
                   </DropdownMenuGroup>
                 </>

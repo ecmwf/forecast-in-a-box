@@ -8,6 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
+import { HotkeysProvider } from '@tanstack/react-hotkeys'
 import { Outlet, createRootRoute } from '@tanstack/react-router'
 import { Suspense, lazy, useEffect } from 'react'
 import {
@@ -53,7 +54,7 @@ export const Route = createRootRoute({
     }, [config, debugMode, backendBaseUrl, environment])
 
     return (
-      <>
+      <HotkeysProvider>
         {/* Header and Footer are rendered by individual layouts */}
         <Outlet />
         {/* Global command palette (⌘K / Ctrl+K) */}
@@ -73,7 +74,7 @@ export const Route = createRootRoute({
         {/*    ]}*/}
         {/*  />*/}
         {/* )}*/}
-      </>
+      </HotkeysProvider>
     )
   },
 })

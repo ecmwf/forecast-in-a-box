@@ -8,8 +8,14 @@
  * does it submit to any jurisdiction.
  */
 
-import { useMemo, useState } from 'react'
-import { AlertCircle, CheckCircle2, Loader2, Play } from 'lucide-react'
+import { useMemo } from 'react'
+import {
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle2,
+  Loader2,
+  Play,
+} from 'lucide-react'
 import { ConfigSummaryCard } from './ConfigSummaryCard'
 import type { BlockFactoryCatalogue, BlockKind } from '@/api/types/fable.types'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
@@ -23,7 +29,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   BLOCK_KIND_METADATA,
@@ -44,8 +49,12 @@ export function ReviewStep({ catalogue }: ReviewStepProps) {
   const validationState = useFableBuilderStore((state) => state.validationState)
   const isValidating = useFableBuilderStore((state) => state.isValidating)
   const setStep = useFableBuilderStore((state) => state.setStep)
-
-  const [submitDialogOpen, setSubmitDialogOpen] = useState(false)
+  const submitDialogOpen = useFableBuilderStore(
+    (state) => state.submitDialogOpen,
+  )
+  const setSubmitDialogOpen = useFableBuilderStore(
+    (state) => state.setSubmitDialogOpen,
+  )
 
   const blocksByKind = useMemo(() => {
     const groups: Record<
@@ -152,10 +161,35 @@ export function ReviewStep({ catalogue }: ReviewStepProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle>Configuration Summary</CardTitle>
-            <CardDescription>
-              {blockCount} {blockCount === 1 ? 'block' : 'blocks'} configured
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Configuration Summary</CardTitle>
+                <CardDescription>
+                  {blockCount} {blockCount === 1 ? 'block' : 'blocks'}{' '}
+                  configured
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleBackToEdit}
+                  className="gap-2"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Edit
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSubmit}
+                  disabled={!canSubmit}
+                  className="gap-2"
+                >
+                  <Play className="h-4 w-4" />
+                  Submit Job
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-6">
             {BLOCK_KIND_ORDER.map((kind) => {
@@ -174,7 +208,9 @@ export function ReviewStep({ catalogue }: ReviewStepProps) {
                       />
                     </div>
                     <span className="font-medium">{metadata.label}s</span>
-                    <Badge variant="secondary">{blocks.length}</Badge>
+                    <span className="rounded border border-border bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground">
+                      {blocks.length}
+                    </span>
                   </div>
                   <div className="ml-8 space-y-2">
                     {blocks.map(({ id }) => (
@@ -190,20 +226,6 @@ export function ReviewStep({ catalogue }: ReviewStepProps) {
             })}
           </CardContent>
         </Card>
-
-        <div className="flex items-center justify-between border-t pt-4">
-          <Button variant="outline" onClick={handleBackToEdit}>
-            Back to Edit
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            className="gap-2"
-          >
-            <Play className="h-4 w-4" />
-            Submit Job
-          </Button>
-        </div>
 
         <SubmitJobDialog
           open={submitDialogOpen}

@@ -1,0 +1,63 @@
+{
+  "page": {
+    "title": "Scheduled Forecasts",
+    "description": "Manage your scheduled forecast jobs"
+  },
+  "detail": {
+    "backLink": "Schedules",
+    "untitledSchedule": "Untitled Schedule",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "createdBy": "Created by",
+    "createdAt": "Created",
+    "updatedAt": "Last updated",
+    "nextRun": "Next run",
+    "maxDelay": "Max delay",
+    "maxDelayValue": "{{hours}} hours",
+    "cronExpression": "Schedule",
+    "dynamicExpressions": "Dynamic expressions",
+    "noDynamicExpressions": "None configured",
+    "runsTitle": "Schedule Runs",
+    "noRuns": "No runs yet",
+    "scheduledAt": "Scheduled at",
+    "trigger": "Trigger",
+    "status": "Status",
+    "jobId": "Job ID",
+    "attempts": "Attempts",
+    "rerun": "Re-run",
+    "configuration": "Configuration"
+  },
+  "filter": {
+    "all": "All",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "searchPlaceholder": "Search schedules..."
+  },
+  "actions": {
+    "enable": "Enable",
+    "disable": "Disable",
+    "viewRuns": "View Runs",
+    "rerun": "Re-run",
+    "rerunSuccess": "Run re-triggered successfully",
+    "enableSuccess": "Schedule enabled",
+    "disableSuccess": "Schedule disabled"
+  },
+  "empty": {
+    "title": "No scheduled forecasts",
+    "description": "You haven't created any scheduled forecasts yet. Create one from the forecast builder."
+  },
+  "list": {
+    "loading": "Loading schedules..."
+  },
+  "pagination": {
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page {{current}} of {{total}}"
+  },
+  "trigger": {
+    "cron": "Cron",
+    "rerun": "Re-run",
+    "cron_skipped": "Skipped",
+    "event": "Event"
+  }
+}

@@ -22,8 +22,9 @@ import type errorsEN from '@/locales/en/errors.json'
 import type validationEN from '@/locales/en/validation.json'
 import type dashboardEN from '@/locales/en/dashboard.json'
 import type pluginsEN from '@/locales/en/plugins.json'
-import type sourcesEN from '@/locales/en/sources.json'
+import type artifactsEN from '@/locales/en/artifacts.json'
 import type executionsEN from '@/locales/en/executions.json'
+import type schedulesEN from '@/locales/en/schedules.json'
 
 declare module 'i18next' {
   interface CustomTypeOptions {
@@ -37,8 +38,9 @@ declare module 'i18next' {
       validation: typeof validationEN
       dashboard: typeof dashboardEN
       plugins: typeof pluginsEN
-      sources: typeof sourcesEN
+      artifacts: typeof artifactsEN
       executions: typeof executionsEN
+      schedules: typeof schedulesEN
     }
   }
 }

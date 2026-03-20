@@ -18,27 +18,25 @@ import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { JobListItem } from './JobListItem'
-import type { JobStatus } from '@/api/types/job.types'
 import { useJobsStatus } from '@/api/hooks/useJobs'
 import { LoadingSpinner, PageHeader } from '@/components/common'
 import { H2, P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { useJobMetadataStore } from '@/features/executions/stores/useJobMetadataStore'
 import { useUiStore } from '@/stores/uiStore'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 10
 
-type StatusFilter = 'all' | 'submitted' | 'running' | 'completed' | 'errored'
+type StatusFilter = 'all' | 'submitted' | 'running' | 'completed' | 'failed'
 
 const STATUS_FILTERS: Array<StatusFilter> = [
   'all',
   'submitted',
   'running',
   'completed',
-  'errored',
+  'failed',
 ]
 
 export function JobListPage() {
@@ -50,15 +48,7 @@ export function JobListPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [searchQuery, setSearchQuery] = useState('')
 
-  const queryStatus =
-    statusFilter === 'all' ? undefined : (statusFilter as JobStatus)
-  const { data, isLoading, isError, error } = useJobsStatus(
-    page,
-    PAGE_SIZE,
-    queryStatus,
-  )
-
-  const jobs = useJobMetadataStore((s) => s.jobs)
+  const { data, isLoading, isError, error } = useJobsStatus(page, PAGE_SIZE)
 
   if (isLoading) {
     return (
@@ -110,16 +100,18 @@ export function JobListPage() {
   })
   const totalPages = data?.total_pages ?? 1
 
-  // Client-side search filter on name, jobId, and tags
+  // Client-side status filter
+  if (statusFilter !== 'all') {
+    jobIds = jobIds.filter(
+      (jobId) => progressMap[jobId].status === statusFilter,
+    )
+  }
+
+  // Client-side search filter on jobId
   if (searchQuery) {
     const query = searchQuery.toLowerCase()
     jobIds = jobIds.filter((jobId) => {
-      const meta = jobs[jobId] as (typeof jobs)[string] | undefined
-      return (
-        jobId.toLowerCase().includes(query) ||
-        meta?.name.toLowerCase().includes(query) ||
-        meta?.tags.some((tag) => tag.toLowerCase().includes(query))
-      )
+      return jobId.toLowerCase().includes(query)
     })
   }
 
@@ -178,23 +170,14 @@ export function JobListPage() {
 
         <div className="divide-y divide-border">
           {jobIds.length > 0 ? (
-            jobIds.map((jobId) => {
-              const exec = progressMap[jobId]
-              const status = {
-                progress: exec.progress ?? '0',
-                status: exec.status,
-                created_at: exec.created_at,
-                error: exec.error,
-              }
-              return (
-                <JobListItem
-                  key={jobId}
-                  jobId={jobId}
-                  status={status}
-                  metadata={jobs[jobId]}
-                />
-              )
-            })
+            jobIds.map((jobId) => (
+              <JobListItem
+                key={jobId}
+                jobId={jobId}
+                status={progressMap[jobId]}
+                fableId={progressMap[jobId].job_definition_id}
+              />
+            ))
           ) : (
             <div className="p-12 text-center text-muted-foreground">
               {t('empty.description')}

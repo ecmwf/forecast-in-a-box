@@ -94,6 +94,49 @@ function useElapsedTime(createdAt: string | null, isTerminal: boolean) {
   return elapsed
 }
 
+function RestartDialog({
+  onRestart,
+  isRestartPending,
+}: {
+  onRestart: () => void
+  isRestartPending: boolean
+}) {
+  const { t } = useTranslation('executions')
+  const [open, setOpen] = useState(false)
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger
+        render={
+          <Button variant="outline" size="sm" disabled={isRestartPending}>
+            <RotateCcw className="mr-1.5 h-4 w-4" />
+            {t('actions.restart')}
+          </Button>
+        }
+      />
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t('actions.restartJob')}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {t('actions.confirmRestart')}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{t('submit.cancel')}</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              onRestart()
+              setOpen(false)
+            }}
+          >
+            {t('actions.restart')}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
 export function ExecutionStatusHeader({
   jobId,
   name,
@@ -151,30 +194,12 @@ export function ExecutionStatusHeader({
             </span>
           )}
 
-          <AlertDialog>
-            <AlertDialogTrigger
-              render={
-                <Button variant="outline" size="sm" disabled={isRestartPending}>
-                  <RotateCcw className="mr-1.5 h-4 w-4" />
-                  {t('actions.restart')}
-                </Button>
-              }
+          {(status === 'completed' || status === 'failed') && (
+            <RestartDialog
+              onRestart={onRestart}
+              isRestartPending={isRestartPending}
             />
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>{t('actions.restartJob')}</AlertDialogTitle>
-                <AlertDialogDescription>
-                  {t('actions.confirmRestart')}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>{t('submit.cancel')}</AlertDialogCancel>
-                <AlertDialogAction onClick={onRestart}>
-                  {t('actions.restart')}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          )}
 
           <AlertDialog>
             <DropdownMenu>

@@ -49,23 +49,14 @@ function setMockPresets(presets: FableMetadataStore) {
 
 const basePresets: FableMetadataStore = {
   'fable-001': {
-    title: 'Oldest',
-    comments: '',
-    summary: { source: 1, transform: 0, product: 1, sink: 1 },
     savedAt: '2026-01-01T10:00:00Z',
     isFavourite: false,
   },
   'fable-002': {
-    title: 'Middle',
-    comments: 'Some notes',
-    summary: { source: 1, transform: 0, product: 0, sink: 1 },
     savedAt: '2026-01-10T10:00:00Z',
     isFavourite: false,
   },
   'fable-003': {
-    title: 'Newest',
-    comments: '',
-    summary: { source: 2, transform: 0, product: 1, sink: 0 },
     savedAt: '2026-02-01T10:00:00Z',
     isFavourite: false,
   },
@@ -100,9 +91,9 @@ describe('useConfigPresets', () => {
 
       const { result } = renderHook(() => useConfigPresets())
 
-      expect(result.current.presets[0].title).toBe('Newest')
-      expect(result.current.presets[1].title).toBe('Middle')
-      expect(result.current.presets[2].title).toBe('Oldest')
+      expect(result.current.presets[0].fableId).toBe('fable-003')
+      expect(result.current.presets[1].fableId).toBe('fable-002')
+      expect(result.current.presets[2].fableId).toBe('fable-001')
     })
 
     it('sorts favourites before non-favourites', () => {
@@ -113,12 +104,12 @@ describe('useConfigPresets', () => {
 
       const { result } = renderHook(() => useConfigPresets())
 
-      // fable-001 (Oldest) is favourite, so it comes first
-      expect(result.current.presets[0].title).toBe('Oldest')
+      // fable-001 (oldest) is favourite, so it comes first
+      expect(result.current.presets[0].fableId).toBe('fable-001')
       expect(result.current.presets[0].isFavourite).toBe(true)
       // Then newest non-favourites
-      expect(result.current.presets[1].title).toBe('Newest')
-      expect(result.current.presets[2].title).toBe('Middle')
+      expect(result.current.presets[1].fableId).toBe('fable-003')
+      expect(result.current.presets[2].fableId).toBe('fable-002')
     })
 
     it('sorts multiple favourites by date descending', () => {
@@ -131,10 +122,10 @@ describe('useConfigPresets', () => {
       const { result } = renderHook(() => useConfigPresets())
 
       // Both favourites first, newest favourite first
-      expect(result.current.presets[0].title).toBe('Newest')
-      expect(result.current.presets[1].title).toBe('Oldest')
+      expect(result.current.presets[0].fableId).toBe('fable-003')
+      expect(result.current.presets[1].fableId).toBe('fable-001')
       // Then non-favourite
-      expect(result.current.presets[2].title).toBe('Middle')
+      expect(result.current.presets[2].fableId).toBe('fable-002')
     })
   })
 
@@ -285,7 +276,7 @@ describe('useConfigPresets', () => {
       }
     })
 
-    it('includes all metadata fields', () => {
+    it('includes savedAt and isFavourite fields', () => {
       setMockPresets(basePresets)
 
       const { result } = renderHook(() => useConfigPresets())
@@ -294,15 +285,8 @@ describe('useConfigPresets', () => {
         (p) => p.fableId === 'fable-002',
       )
       expect(preset).toBeDefined()
-      expect(preset?.title).toBe('Middle')
-      expect(preset?.comments).toBe('Some notes')
-      expect(preset?.summary).toEqual({
-        source: 1,
-        transform: 0,
-        product: 0,
-        sink: 1,
-      })
       expect(preset?.savedAt).toBe('2026-01-10T10:00:00Z')
+      expect(preset?.isFavourite).toBe(false)
     })
   })
 })

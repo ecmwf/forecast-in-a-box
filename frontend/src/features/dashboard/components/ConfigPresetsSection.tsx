@@ -14,9 +14,14 @@ import { Link } from '@tanstack/react-router'
 import { formatDistanceToNow } from 'date-fns'
 import { useConfigPresets } from '../hooks/useConfigPresets'
 import type { PresetEntry } from '../hooks/useConfigPresets'
-import type { FableBlockSummary } from '@/features/fable-builder/components/SaveConfigPopover'
 import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
-import { BLOCK_KIND_METADATA, BLOCK_KIND_ORDER } from '@/api/types/fable.types'
+import { useBlockCatalogue, useFableRetrieve } from '@/api/hooks/useFable'
+import {
+  BLOCK_KIND_METADATA,
+  BLOCK_KIND_ORDER,
+  getBlocksByKind,
+} from '@/api/types/fable.types'
+import { Badge } from '@/components/ui/badge'
 import { H2, H3, P } from '@/components/base/typography'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
@@ -26,29 +31,14 @@ interface ConfigPresetsSectionProps {
   shadow?: PanelShadow
 }
 
-function BlockSummaryTags({ summary }: { summary: FableBlockSummary }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {BLOCK_KIND_ORDER.filter(
-        (kind) => summary[kind as keyof FableBlockSummary] > 0,
-      ).map((kind) => {
-        const meta = BLOCK_KIND_METADATA[kind]
-        const count = summary[kind as keyof FableBlockSummary]
-        return (
-          <span
-            key={kind}
-            className="rounded bg-muted px-2 py-1 text-sm text-muted-foreground"
-          >
-            {count} {meta.label.toLowerCase()}
-            {count !== 1 ? 's' : ''}
-          </span>
-        )
-      })}
-    </div>
-  )
-}
-
 function PresetCard({ preset }: { preset: PresetEntry }) {
+  const { data: fableData } = useFableRetrieve(preset.fableId)
+  const { data: catalogue } = useBlockCatalogue()
+  const tags = fableData?.tags ?? []
+
+  const title = fableData?.display_name || preset.fableId.slice(0, 8)
+  const comments = fableData?.display_description || ''
+
   return (
     <Link
       to="/configure"
@@ -60,20 +50,55 @@ function PresetCard({ preset }: { preset: PresetEntry }) {
       )}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
-        <H3 className="truncate text-base font-bold">{preset.title}</H3>
+        <H3 className="truncate text-base font-bold">{title}</H3>
         {preset.isFavourite && (
           <Star className="h-4 w-4 shrink-0 fill-amber-500 text-amber-500" />
         )}
       </div>
 
-      {preset.comments && (
+      {comments && (
         <P className="mb-3 line-clamp-2 leading-relaxed text-muted-foreground">
-          {preset.comments}
+          {comments}
         </P>
       )}
 
       <div className="mt-auto space-y-3">
-        <BlockSummaryTags summary={preset.summary} />
+        {fableData?.builder && catalogue && (
+          <div className="flex flex-wrap gap-1.5">
+            {BLOCK_KIND_ORDER.filter(
+              (kind) =>
+                getBlocksByKind(fableData.builder, catalogue, kind).length > 0,
+            ).map((kind) => {
+              const meta = BLOCK_KIND_METADATA[kind]
+              const count = getBlocksByKind(
+                fableData.builder,
+                catalogue,
+                kind,
+              ).length
+              return (
+                <Badge key={kind} variant="outline" className="gap-1.5 text-xs">
+                  <span
+                    className={`inline-block h-2 w-2 rounded-full ${meta.topBarColor}`}
+                  />
+                  {count} {meta.label.toLowerCase()}
+                  {count !== 1 ? 's' : ''}
+                </Badge>
+              )
+            })}
+          </div>
+        )}
+        {tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {tags.map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-xs text-primary"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
         <P className="text-sm text-muted-foreground">
           {formatDistanceToNow(new Date(preset.savedAt), { addSuffix: true })}
         </P>

@@ -63,6 +63,7 @@ interface FableBuilderState {
   lastValidatedAt: number | null
   isDirty: boolean
   lastSavedAt: number | null
+  submitDialogOpen: boolean
 
   setFable: (fable: FableBuilderV1, id?: string | null) => void
   setFableName: (name: string) => void
@@ -112,6 +113,7 @@ interface FableBuilderState {
   setNodesLocked: (locked: boolean) => void
   setValidationState: (state: FableValidationState | null) => void
   setIsValidating: (validating: boolean) => void
+  setSubmitDialogOpen: (open: boolean) => void
   markSaved: (id: string, name?: string) => void
   markDirty: () => void
   reset: () => void
@@ -139,6 +141,7 @@ const initialState = {
   lastValidatedAt: null,
   isDirty: false,
   lastSavedAt: null,
+  submitDialogOpen: false,
 }
 
 export const useFableBuilderStore = create<FableBuilderState>()(
@@ -497,6 +500,7 @@ export const useFableBuilderStore = create<FableBuilderState>()(
             lastValidatedAt: state ? Date.now() : null,
           }),
         setIsValidating: (validating) => set({ isValidating: validating }),
+        setSubmitDialogOpen: (open) => set({ submitDialogOpen: open }),
 
         markSaved: (id, name) =>
           set({

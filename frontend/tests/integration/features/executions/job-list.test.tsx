@@ -13,10 +13,9 @@
  *
  * Tests the executions list page with MSW-mocked API responses:
  * - Renders page header and filter controls
- * - Renders job list items with correct status, metadata, and links
+ * - Renders job list items with correct status and links
  * - Status filtering works correctly
- * - Search filters by name, jobId, and tags
- * - Three-dots menu appears for jobs with metadata
+ * - Search filters by jobId
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -24,7 +23,6 @@ import { renderWithRouter } from '@tests/utils/render'
 import { resetJobsState } from '@tests/../mocks/data/job.data'
 import type { AuthContextValue } from '@/features/auth/AuthContext'
 import { AuthContext } from '@/features/auth/AuthContext'
-import { useJobMetadataStore } from '@/features/executions/stores/useJobMetadataStore'
 import { JobListPage } from '@/features/executions/components/JobListPage'
 
 vi.mock('@/hooks/useMedia', () => ({
@@ -56,7 +54,6 @@ function renderJobList() {
 describe('JobListPage Integration', () => {
   beforeEach(() => {
     resetJobsState()
-    useJobMetadataStore.setState({ jobs: {} })
   })
 
   describe('rendering', () => {
@@ -86,7 +83,7 @@ describe('JobListPage Integration', () => {
         .element(screen.getByRole('button', { name: 'Completed' }))
         .toBeVisible()
       await expect
-        .element(screen.getByRole('button', { name: 'Errored' }))
+        .element(screen.getByRole('button', { name: 'Failed' }))
         .toBeVisible()
     })
 
@@ -107,61 +104,13 @@ describe('JobListPage Integration', () => {
       // Use regex to match just the status text at the beginning
       await expect.element(screen.getByText(/^Completed ·/)).toBeVisible()
       await expect.element(screen.getByText(/^Running ·/)).toBeVisible()
-      await expect.element(screen.getByText(/^Errored ·/)).toBeVisible()
+      await expect.element(screen.getByText(/^Failed ·/)).toBeVisible()
       await expect.element(screen.getByText(/^Submitted ·/)).toBeVisible()
     })
   })
 
   describe('metadata display', () => {
-    it('renders job name from metadata when available', async () => {
-      useJobMetadataStore.getState().addJob('job-completed-001', {
-        name: 'My Forecast Run',
-        description: 'A test run',
-        tags: ['production'],
-        fableId: null,
-        fableName: 'test',
-        fableSnapshot: { blocks: {} },
-        submittedAt: '2026-01-15T10:00:00Z',
-      })
-
-      const screen = await renderJobList()
-      await expect.element(screen.getByText('My Forecast Run')).toBeVisible()
-    })
-
-    it('renders description when available', async () => {
-      useJobMetadataStore.getState().addJob('job-completed-001', {
-        name: 'Test',
-        description: 'This is my forecast description',
-        tags: [],
-        fableId: null,
-        fableName: 'test',
-        fableSnapshot: { blocks: {} },
-        submittedAt: '2026-01-15T10:00:00Z',
-      })
-
-      const screen = await renderJobList()
-      await expect
-        .element(screen.getByText('This is my forecast description'))
-        .toBeVisible()
-    })
-
-    it('renders tags when available', async () => {
-      useJobMetadataStore.getState().addJob('job-completed-001', {
-        name: 'Tagged Job',
-        description: '',
-        tags: ['production', 'europe'],
-        fableId: null,
-        fableName: 'test',
-        fableSnapshot: { blocks: {} },
-        submittedAt: '2026-01-15T10:00:00Z',
-      })
-
-      const screen = await renderJobList()
-      await expect.element(screen.getByText('production')).toBeVisible()
-      await expect.element(screen.getByText('europe')).toBeVisible()
-    })
-
-    it('shows Untitled Job when no metadata exists', async () => {
+    it('shows Untitled Job when fable lookup returns no data', async () => {
       const screen = await renderJobList()
       const untitled = screen.getByText('Untitled Job')
       await expect.element(untitled.first()).toBeVisible()
@@ -208,44 +157,6 @@ describe('JobListPage Integration', () => {
 
       await expect.element(screen.getByText('#job-complete...')).toBeVisible()
       expect(screen.getByText('#job-running-...').query()).toBeNull()
-    })
-
-    it('filters jobs by name from metadata', async () => {
-      useJobMetadataStore.getState().addJob('job-completed-001', {
-        name: 'Europe Weather',
-        description: '',
-        tags: [],
-        fableId: null,
-        fableName: 'test',
-        fableSnapshot: { blocks: {} },
-        submittedAt: '2026-01-15T10:00:00Z',
-      })
-
-      const screen = await renderJobList()
-
-      const searchInput = screen.getByPlaceholder('Search executions...')
-      await searchInput.fill('Europe')
-
-      await expect.element(screen.getByText('Europe Weather')).toBeVisible()
-    })
-
-    it('filters jobs by tag from metadata', async () => {
-      useJobMetadataStore.getState().addJob('job-completed-001', {
-        name: 'Tagged Job',
-        description: '',
-        tags: ['my-unique-tag'],
-        fableId: null,
-        fableName: 'test',
-        fableSnapshot: { blocks: {} },
-        submittedAt: '2026-01-15T10:00:00Z',
-      })
-
-      const screen = await renderJobList()
-
-      const searchInput = screen.getByPlaceholder('Search executions...')
-      await searchInput.fill('my-unique-tag')
-
-      await expect.element(screen.getByText('Tagged Job')).toBeVisible()
     })
   })
 

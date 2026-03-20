@@ -15,7 +15,8 @@
  * Provides quick access to Getting Started presets and navigation.
  */
 
-import { useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
+import { useHotkey } from '@tanstack/react-hotkeys'
 import { useNavigate } from '@tanstack/react-router'
 import type { Command } from '@/commands'
 import { groupCommandsByCategory, navigationCommands } from '@/commands'
@@ -42,17 +43,11 @@ export function CommandPalette() {
   )
 
   // Listen for ⌘K / Ctrl+K keyboard shortcut
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault()
-        setOpen(!isOpen)
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, setOpen])
+  // Mod+K covers ⌘K on Mac and Ctrl+K on Windows/Linux.
+  // Control+K ensures Ctrl+K also works on Mac for consistency.
+  const toggle = () => setOpen(!isOpen)
+  useHotkey('Mod+K', toggle)
+  useHotkey('Control+K', toggle)
 
   const handleSelect = (command: Command) => {
     setOpen(false)

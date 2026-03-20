@@ -83,7 +83,7 @@ describe('ForecastJournal Integration', () => {
         .element(screen.getByRole('button', { name: 'Completed' }))
         .toBeVisible()
       await expect
-        .element(screen.getByRole('button', { name: 'Error' }))
+        .element(screen.getByRole('button', { name: 'Failed' }))
         .toBeVisible()
       await expect
         .element(screen.getByRole('button', { name: 'Bookmarked' }))
@@ -273,7 +273,7 @@ describe('ForecastJournal Integration', () => {
         </AuthContext.Provider>,
       )
 
-      await screen.getByRole('button', { name: 'Error' }).click()
+      await screen.getByRole('button', { name: 'Failed' }).click()
 
       // Error job should be visible
       await expect
@@ -311,7 +311,7 @@ describe('ForecastJournal Integration', () => {
       )
 
       // First filter to error
-      await screen.getByRole('button', { name: 'Error' }).click()
+      await screen.getByRole('button', { name: 'Failed' }).click()
       await expect
         .element(screen.getByText('Global Forecast - 240h'))
         .toBeVisible()

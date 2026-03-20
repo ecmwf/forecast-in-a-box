@@ -27,12 +27,10 @@ export function useJobStatusCounts() {
 
   const counts: Record<JobStatus, number> = {
     submitted: 0,
+    preparing: 0,
     running: 0,
     completed: 0,
-    errored: 0,
-    invalid: 0,
-    timeout: 0,
-    unknown: 0,
+    failed: 0,
   }
 
   let total = 0

@@ -25,7 +25,7 @@ export interface ForumTopic {
   postedAt: string
 }
 
-export type ForecastStatus = 'running' | 'completed' | 'error'
+export type ForecastStatus = 'running' | 'completed' | 'failed'
 
 export interface ForecastJob {
   id: string
@@ -126,7 +126,7 @@ export const mockForecastJobs: Array<ForecastJob> = [
     model: 'AIFS Global',
     startedAt: '2025-10-01 11:00',
     productCount: 8,
-    status: 'error',
+    status: 'failed',
     tags: ['high-priority', 'emergency'],
     isBookmarked: false,
   },

@@ -14,6 +14,7 @@ import type {
   BlockFactoryCatalogue,
   FableBuilderV1,
   FableCompileRequest,
+  FableRetrieveResponse,
   FableUpsertResponse,
   FableValidationExpansion,
   PluginBlockFactoryId,
@@ -69,6 +70,15 @@ export function useFable(fableId: string | null | undefined) {
     },
     enabled: !!fableId,
     staleTime: 30 * 1000, // 30 seconds
+  })
+}
+
+export function useFableRetrieve(fableId: string | null | undefined) {
+  return useQuery<FableRetrieveResponse>({
+    queryKey: [...fableKeys.detail(fableId ?? ''), 'full'],
+    queryFn: () => retrieveFable(fableId!),
+    enabled: !!fableId,
+    staleTime: Infinity,
   })
 }
 

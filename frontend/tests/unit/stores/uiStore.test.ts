@@ -88,7 +88,7 @@ describe('uiStore', () => {
     it('has correct default view modes', () => {
       expect(useUiStore.getState().pluginsViewMode).toBe('table')
       expect(useUiStore.getState().modelsViewMode).toBe('table')
-      expect(useUiStore.getState().sourcesViewMode).toBe('card')
+      expect(useUiStore.getState().artifactsViewMode).toBe('card')
     })
 
     it('sets plugins view mode', () => {
@@ -104,9 +104,9 @@ describe('uiStore', () => {
       expect(useUiStore.getState().modelsViewMode).toBe('table')
     })
 
-    it('sets sources view mode', () => {
-      useUiStore.getState().setSourcesViewMode('table')
-      expect(useUiStore.getState().sourcesViewMode).toBe('table')
+    it('sets artifacts view mode', () => {
+      useUiStore.getState().setArtifactsViewMode('table')
+      expect(useUiStore.getState().artifactsViewMode).toBe('table')
     })
   })
 

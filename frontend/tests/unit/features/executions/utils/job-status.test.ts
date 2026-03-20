@@ -17,17 +17,19 @@ import {
 
 const ALL_STATUSES: Array<JobStatus> = [
   'submitted',
+  'preparing',
   'running',
   'completed',
-  'errored',
-  'invalid',
-  'timeout',
-  'unknown',
+  'failed',
 ]
 
 describe('getStatusBadgeClasses', () => {
   it('returns blue classes for submitted', () => {
     expect(getStatusBadgeClasses('submitted')).toContain('bg-blue-100')
+  })
+
+  it('returns blue classes for preparing', () => {
+    expect(getStatusBadgeClasses('preparing')).toContain('bg-blue-100')
   })
 
   it('returns amber classes for running', () => {
@@ -38,20 +40,8 @@ describe('getStatusBadgeClasses', () => {
     expect(getStatusBadgeClasses('completed')).toContain('bg-green-100')
   })
 
-  it('returns red classes for errored', () => {
-    expect(getStatusBadgeClasses('errored')).toContain('bg-red-100')
-  })
-
-  it('returns red classes for invalid', () => {
-    expect(getStatusBadgeClasses('invalid')).toContain('bg-red-100')
-  })
-
-  it('returns orange classes for timeout', () => {
-    expect(getStatusBadgeClasses('timeout')).toContain('bg-orange-100')
-  })
-
-  it('returns gray classes for unknown', () => {
-    expect(getStatusBadgeClasses('unknown')).toContain('bg-gray-100')
+  it('returns red classes for failed', () => {
+    expect(getStatusBadgeClasses('failed')).toContain('bg-red-100')
   })
 
   it('returns a non-empty string for every status', () => {
@@ -74,8 +64,8 @@ describe('getStatusBarColor', () => {
     expect(getStatusBarColor('completed')).toBe('bg-green-500')
   })
 
-  it('returns red bar for errored', () => {
-    expect(getStatusBarColor('errored')).toBe('bg-red-500')
+  it('returns red bar for failed', () => {
+    expect(getStatusBarColor('failed')).toBe('bg-red-500')
   })
 
   it('returns a non-empty string for every status', () => {
