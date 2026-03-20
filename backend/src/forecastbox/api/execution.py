@@ -169,9 +169,14 @@ async def restart_job_execution(execution_id: str, user_id: str | None) -> Eithe
     if definition is None:
         return Either.error(f"JobDefinition {definition_id!r} v{definition_version} not found")
 
-    # Reuse execute with the existing execution_id so the new attempt is appended under it
-    result = await execute(definition, user_id, execution_id=execution_id)
-    return result
+    return await execute(
+        definition,
+        user_id,
+        execution_id=execution_id,
+        experiment_id=cast(str | None, existing.experiment_id),
+        experiment_version=cast(int | None, existing.experiment_version),
+        compiler_runtime_context=cast(dict | None, existing.compiler_runtime_context),
+    )
 
 
 def execution_to_detail(execution: JobExecution) -> JobExecutionDetail:
@@ -248,73 +253,40 @@ async def poll_and_update_execution(execution_id: str, attempt_count: int | None
     return _build()
 
 
-async def execute(definition: JobDefinition, user_id: str | None, execution_id: str | None = None) -> Either[JobExecuteResponse, str]:  # type: ignore[invalid-argument]
+async def execute(
+    definition: JobDefinition,
+    user_id: str | None,
+    execution_id: str | None = None,
+    experiment_id: str | None = None,
+    experiment_version: int | None = None,
+    compiler_runtime_context: dict | None = None,
+    exec_spec: ExecutionSpecification | None = None,
+) -> Either[JobExecuteResponse, str]:  # type: ignore[invalid-argument]
     """Always creates a JobExecution linked to the given JobDefinition.
 
-    Compiles the definition's blocks via the fable compiler, submits the resulting
-    spec to cascade, and persists a JobExecution row. When `execution_id` is supplied,
-    the new attempt is appended under that existing id (restart semantics); otherwise a
-    fresh id is generated.
+    Compiles the definition's blocks via the fable compiler (unless a pre-compiled `exec_spec`
+    is supplied, in which case compilation is skipped), submits the resulting spec to cascade,
+    and persists a JobExecution row. When `execution_id` is supplied, the new attempt is
+    appended under that existing id (restart semantics); otherwise a fresh id is generated.
+    Experiment metadata (`experiment_id`, `experiment_version`, `compiler_runtime_context`) is
+    stored on the row when provided — used by scheduled runs and preserved on restart.
     """
-    if not definition.blocks:
-        return Either.error(f"JobDefinition {definition.job_definition_id!r} has no compilable blocks")
-
-    builder = FableBuilder(
-        blocks=definition.blocks,  # ty:ignore[invalid-argument-type]
-        environment=EnvironmentSpecification.model_validate(definition.environment_spec) if definition.environment_spec else None,
-    )
-    spec = api_fable.compile(builder)
     definition_id = str(definition.job_definition_id)  # ty:ignore[invalid-argument-type]
     definition_version = cast(int, definition.version)
+
+    if exec_spec is None:
+        if not definition.blocks:
+            return Either.error(f"JobDefinition {definition.job_definition_id!r} has no compilable blocks")
+        builder = FableBuilder(
+            blocks=definition.blocks,  # ty:ignore[invalid-argument-type]
+            environment=EnvironmentSpecification.model_validate(definition.environment_spec) if definition.environment_spec else None,
+        )
+        exec_spec = api_fable.compile(builder)
 
     new_execution_id, attempt_count = await db_jobs.upsert_job_execution(
         job_execution_id=execution_id,
         job_definition_id=definition_id,
         job_definition_version=definition_version,
-        created_by=user_id,
-        status="submitted",
-    )
-
-    try:
-        loop = asyncio.get_running_loop()
-        response, product_to_id_mappings = await loop.run_in_executor(None, _execute_cascade, spec)
-        cascade_job_id = response.job_id or str(uuid.uuid4())
-
-        update_kwargs: dict[str, object] = {"cascade_job_id": cascade_job_id}
-        if response.error:
-            update_kwargs["status"] = "failed"
-            update_kwargs["error"] = response.error[:255]
-        else:
-            update_kwargs["outputs"] = [x.model_dump() for x in product_to_id_mappings]
-        await db_jobs.update_job_execution_runtime(new_execution_id, attempt_count, **update_kwargs)
-
-        return Either.ok(JobExecuteResponse(execution_id=new_execution_id, attempt_count=attempt_count))
-    except Exception as e:
-        await db_jobs.update_job_execution_runtime(new_execution_id, attempt_count, status="failed", error=repr(e)[:255])
-        return Either.error(repr(e))
-
-
-async def execute_experiment_run(
-    exec_spec: ExecutionSpecification,
-    user_id: str | None,
-    experiment_id: str,
-    experiment_version: int,
-    job_definition_id: str,
-    job_definition_version: int,
-    compiler_runtime_context: dict,
-    execution_id: str | None = None,
-) -> Either[JobExecuteResponse, str]:  # type: ignore[invalid-argument]
-    """Submit a pre-compiled scheduled experiment run, creating a JobExecution linked to the experiment.
-
-    Uses a spec already compiled by the caller (with dynamic expressions applied).
-    Stores experiment_id, experiment_version and compiler_runtime_context on the created JobExecution so
-    runs can read trigger type and original scheduled_at.
-    When execution_id is supplied, the new attempt is appended under that id (rerun semantics).
-    """
-    new_execution_id, attempt_count = await db_jobs.upsert_job_execution(
-        job_execution_id=execution_id,
-        job_definition_id=job_definition_id,
-        job_definition_version=job_definition_version,
         created_by=user_id,
         status="submitted",
         experiment_id=experiment_id,
