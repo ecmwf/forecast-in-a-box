@@ -16,8 +16,8 @@ from typing import Any, cast
 from cascade.low.func import Either
 
 import forecastbox.db.jobs as db_jobs
-from forecastbox.api.execution import deep_union  # re-exported; tests import from here
 from forecastbox.api.scheduling.dt_utils import calculate_next_run
+from forecastbox.ecpyutil import deep_union
 from forecastbox.schemas.jobs import JobDefinition
 
 

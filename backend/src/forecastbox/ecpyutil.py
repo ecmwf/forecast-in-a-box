@@ -12,7 +12,7 @@
 import dataclasses
 import threading
 from contextlib import contextmanager
-from typing import Iterator, TypeVar
+from typing import Any, Iterator, TypeVar
 
 _T = TypeVar("_T")
 
@@ -40,3 +40,14 @@ def frozendc(cls: type[_T]) -> type[_T]:
     We also tried a pyi stub, but `ty` isn't ready.
     """
     return dataclasses.dataclass(frozen=True, eq=True, slots=True)(cls)  # type: ignore[return-value]
+
+
+def deep_union(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
+    """Recursively merges two dictionaries. In case of conflicts, values from dict2 are preferred. Copies the first."""
+    merged = dict1.copy()
+    for key, value in dict2.items():
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key] = deep_union(merged[key], value)
+        else:
+            merged[key] = value
+    return merged

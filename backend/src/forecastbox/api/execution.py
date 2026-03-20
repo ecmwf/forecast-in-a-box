@@ -39,23 +39,13 @@ from forecastbox.api.types.jobs import (
 )
 from forecastbox.api.utils import get_model_path
 from forecastbox.config import config
+from forecastbox.ecpyutil import deep_union
 from forecastbox.models import get_model
 from forecastbox.products.registry import get_product
 from forecastbox.schemas.jobs import JobDefinition, JobExecution
 from forecastbox.schemas.user import UserRead
 
 logger = logging.getLogger(__name__)
-
-
-def deep_union(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
-    """Recursively merges two dictionaries. In case of conflicts, values from dict2 are preferred. Copies the first."""
-    merged = dict1.copy()
-    for key, value in dict2.items():
-        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
-            merged[key] = deep_union(merged[key], value)
-        else:
-            merged[key] = value
-    return merged
 
 
 # TODO replace with just output_ids, or something more fitting, since product_ are deprecated
