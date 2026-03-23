@@ -4,16 +4,20 @@ See project's [readme](https://github.com/ecmwf/forecast-in-a-box/blob/main/READ
 
 ## Setup
 There are two options:
-1. create manually a `venv` and install this as an editable package into it,
+1. use `uv` to create a virtual environment and install this as an editable
+   package into it,
 2. use the [`fiab.sh`](../scripts/fiab.sh) script.
 
 The first gives you more control, the second brings more automation -- but both choices are ultimately fine and lead to the same result.
 
-For the first option, active your venv of choice, and then:
+For the first option, do the following:
 ```
 mkdir -p ~/.fiab
-uv pip install --prerelease=allow --upgrade -e .[test] # the --prerelease will eventually disapper, check whether pyproject contains any `dev` pins
-pytest backend # just to ensure all is good
+cd backend
+uv sync --prerelease allow --upgrade  # TODO: --prerelease will eventually disapper
+mkdir src/forecastbox/static && touch src/forecastbox/static/index.html  # TODO: replace
+. .venv/bin/activate
+pytest tests/  # just to ensure all is good
 ```
 
 For the second option, check the `fiab.sh` first -- it is configurable via envvars which are listed at the script's start.
