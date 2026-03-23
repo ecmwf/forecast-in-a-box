@@ -163,7 +163,9 @@ def status() -> StatusResponse:
     import requests
 
     try:
-        response = requests.get(f"{config.api.model_repository}/MANIFEST", timeout=1)
+        # TODO this is not good: we dont want a timeout=5 for the status endpoint, the status should return under a sec
+        # we probably need to evaluate this async, returing cached value, possibly `unknown` in case refresh in progres
+        response = requests.get(f"{config.api.model_repository}/MANIFEST", timeout=5)
         if response.status_code == 200:
             status["ecmwf"] = "up"
         else:
