@@ -81,8 +81,7 @@ class ScheduleRunResponse:
     status: str
     created_at: str
     updated_at: str
-    trigger: str
-    scheduled_at: str | None
+    experiment_context: str | None
 
 
 @dataclass(frozen=True, eq=True, slots=True)
@@ -277,12 +276,7 @@ async def get_schedule_runs(
     page: int = 1,
     page_size: int = 10,
 ) -> ScheduleRunsResponse:
-    """Return paginated JobExecution rows linked to a cron schedule experiment.
-
-    Each run includes a trigger field ('cron' or 'rerun') sourced from
-    compiler_runtime_context so callers can distinguish normal scheduled runs
-    from manual reruns.
-    """
+    """Return paginated JobExecution rows linked to a cron schedule experiment."""
     if page < 1 or page_size < 1:
         raise HTTPException(status_code=400, detail="Page and page_size must be greater than 0.")
 
@@ -306,8 +300,7 @@ async def get_schedule_runs(
             status=cast(str, ex.status),
             created_at=str(ex.created_at),
             updated_at=str(ex.updated_at),
-            trigger=cast(dict, ex.compiler_runtime_context or {}).get("trigger", "cron"),
-            scheduled_at=cast(dict, ex.compiler_runtime_context or {}).get("scheduled_at"),
+            experiment_context=cast(str | None, ex.experiment_context),
         )
         for ex in executions
     ]

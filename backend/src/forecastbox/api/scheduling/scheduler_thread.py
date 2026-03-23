@@ -23,7 +23,7 @@ import threading
 from typing import cast
 
 import forecastbox.db.jobs as db_jobs
-from forecastbox.api.execution import execute_experiment_run
+from forecastbox.api.execution import execute
 from forecastbox.api.scheduling.dt_utils import calculate_next_run, current_scheduling_time
 from forecastbox.api.scheduling.job_utils import experiment2runnable
 from forecastbox.config import config
@@ -89,14 +89,13 @@ class SchedulerThread(threading.Thread):
                     # NOTE this should not happen -- we have locks etc preventing this
                     logger.error("Skipping {experiment_id} at {scheduled_at}: it is not valid!")
                 else:
-                    exec_result = await execute_experiment_run(
-                        exec_spec=runnable.exec_spec,
-                        user_id=runnable.created_by,
+                    exec_result = await execute(
+                        runnable.definition,
+                        runnable.created_by,
                         experiment_id=experiment_id,
                         experiment_version=cast(int, exp_def.version),
-                        job_definition_id=runnable.job_definition_id,
-                        job_definition_version=runnable.job_definition_version,
                         compiler_runtime_context=runnable.compiler_runtime_context,
+                        experiment_context=f"scheduled_at={runnable.scheduled_at.isoformat()}",
                     )
                     if exec_result.t is not None:
                         logger.debug(f"Execution {exec_result.t.execution_id} submitted for experiment {experiment_id}")
