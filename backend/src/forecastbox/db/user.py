@@ -9,11 +9,9 @@ from forecastbox.config import config
 from forecastbox.schemas.user import Base, OAuthAccount, UserTable
 
 async_url = f"sqlite+aiosqlite:///{config.db.sqlite_userdb_path}"
-sync_url = f"sqlite:///{config.db.sqlite_userdb_path}"
 
 async_engine = create_async_engine(async_url)
 async_session_maker = async_sessionmaker(async_engine, expire_on_commit=False)
-sync_engine = create_engine(sync_url)
 
 
 async def create_db_and_tables():
