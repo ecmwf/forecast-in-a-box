@@ -22,7 +22,7 @@ from sqlalchemy.orm import DeclarativeBase
 
 JobDefinitionSource = Literal["plugin_template", "user_defined", "oneoff_execution"]
 ExperimentType = Literal["cron_schedule", "batch_execution", "external_trigger"]
-JobExecutionStatus = Literal["submitted", "preparing", "running", "completed", "failed"]
+JobExecutionStatus = Literal["submitted", "preparing", "running", "completed", "errored", "invalid", "timeout", "unknown"]
 
 
 class Base(DeclarativeBase):

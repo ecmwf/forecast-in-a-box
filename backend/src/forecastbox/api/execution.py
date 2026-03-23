@@ -240,11 +240,11 @@ async def poll_and_update_execution(execution_id: str, attempt_count: int | None
 
         jobprogress = response.progresses.get(cascade_job_id)
         if jobprogress is None:
-            await db_jobs.update_job_execution_runtime(execution_id, actual_attempt, status="failed", error="evicted from gateway")
-            return _build(status_override="failed", error_override="evicted from gateway")
+            await db_jobs.update_job_execution_runtime(execution_id, actual_attempt, status="errored", error="evicted from gateway")
+            return _build(status_override="errored", error_override="evicted from gateway")
         elif jobprogress.failure:
-            await db_jobs.update_job_execution_runtime(execution_id, actual_attempt, status="failed", error=jobprogress.failure)
-            return _build(status_override="failed", error_override=jobprogress.failure)
+            await db_jobs.update_job_execution_runtime(execution_id, actual_attempt, status="errored", error=jobprogress.failure)
+            return _build(status_override="errored", error_override=jobprogress.failure)
         elif jobprogress.completed or jobprogress.pct == "100.00":
             await db_jobs.update_job_execution_runtime(execution_id, actual_attempt, status="completed", progress="100.00")
             return _build(status_override="completed", progress_override="100.00")
