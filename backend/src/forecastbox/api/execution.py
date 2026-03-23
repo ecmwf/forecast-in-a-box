@@ -177,6 +177,7 @@ async def restart_job_execution(execution_id: str, user_id: str | None) -> Eithe
         experiment_id=cast(str | None, existing.experiment_id),
         experiment_version=cast(int | None, existing.experiment_version),
         compiler_runtime_context=cast(dict | None, existing.compiler_runtime_context),
+        experiment_context=cast(str | None, existing.experiment_context),
     )
 
 
@@ -261,6 +262,7 @@ async def execute(
     experiment_id: str | None = None,
     experiment_version: int | None = None,
     compiler_runtime_context: dict | None = None,
+    experiment_context: str | None = None,
 ) -> Either[JobExecuteResponse, str]:  # type: ignore[invalid-argument]
     """Always creates a JobExecution linked to the given JobDefinition.
 
@@ -298,6 +300,7 @@ async def execute(
         experiment_id=experiment_id,
         experiment_version=experiment_version,
         compiler_runtime_context=compiler_runtime_context,
+        experiment_context=experiment_context,
     )
 
     try:

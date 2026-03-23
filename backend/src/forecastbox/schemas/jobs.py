@@ -123,6 +123,7 @@ class JobExecution(Base):
     experiment_id = Column(String(255), nullable=True)
     experiment_version = Column(Integer, nullable=True)
     compiler_runtime_context = Column(JSON, nullable=True)
+    experiment_context = Column(String(255), nullable=True)
 
     # TODO later -- make sure entity validates this
     status = Column(String(50), nullable=False)

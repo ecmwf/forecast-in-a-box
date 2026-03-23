@@ -95,6 +95,7 @@ class SchedulerThread(threading.Thread):
                         experiment_id=experiment_id,
                         experiment_version=cast(int, exp_def.version),
                         compiler_runtime_context=runnable.compiler_runtime_context,
+                        experiment_context=f"scheduled_at={runnable.scheduled_at.isoformat()}",
                     )
                     if exec_result.t is not None:
                         logger.debug(f"Execution {exec_result.t.execution_id} submitted for experiment {experiment_id}")
