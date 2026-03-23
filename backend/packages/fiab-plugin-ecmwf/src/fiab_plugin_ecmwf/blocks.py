@@ -139,12 +139,10 @@ class EnsembleStatistics(Product):
     inputs: list[str] = ["dataset"]
 
     def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[QubedInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        raw_input_dataset = inputs.get("dataset")
-        if not isinstance(raw_input_dataset, QubedInstanceOutput):
-            actual_type = type(raw_input_dataset).__name__ if raw_input_dataset is not None else "None"
+        input_dataset = inputs.get("dataset")
+        if not isinstance(input_dataset, QubedInstanceOutput):
+            actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
             return Either.error(f"Unsupported input type for 'dataset': expected QubedInstanceOutput, got {actual_type}")
-
-        input_dataset = cast(QubedInstanceOutput, raw_input_dataset)
 
         param = block.configuration_values[PARAM_DIM]
         if {PARAM_DIM: param} not in input_dataset:

@@ -230,7 +230,7 @@ class QubedInstanceOutput(BaseModel):
         metadata.update(kwargs)
         return self.__class__(dataqube=self.dataqube, metadata=OutputMetadata(**metadata))
 
-    def __contains__(self, item: Qube | str | dict) -> bool:  # pyright: ignore[reportRedeclaration]
+    def __contains__(self, item: Qube | str | dict) -> bool:  # type: ignore[reportRedeclaration]
         """Check if the QubedInstanceOutput contains the specified dimension(s) or axes.
 
         If a string is provided, it checks if that dimension exists.
