@@ -100,6 +100,10 @@ class XarrayOutput(BaseModel):  # NOTE eventually Qubed
     coords: list[str]
 
 
-BlockInstanceOutput = XarrayOutput  # NOTE eventually a Union
+class RawOutput(BaseModel):
+    type_fqn: str  # most likely you want Any here
+
+
+BlockInstanceOutput = XarrayOutput | RawOutput
 
 ActionLookup = dict[BlockInstanceId, Action]
