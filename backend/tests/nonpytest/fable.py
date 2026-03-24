@@ -17,7 +17,7 @@ def ensure_completed(backend_client, job_id, sleep=0.5, attempts=20):
         response = backend_client.get("/job/status", timeout=10)
         assert response.is_success
         status = response.json()["progresses"][job_id]["status"]
-        if status == "failed":
+        if status == "errored":
             raise RuntimeError(f"Job {job_id} failed: {response.json()['progresses'][job_id]['error']}")
         # TODO parse response with corresponding class, define a method `not_failed` instead
         assert status in {"submitted", "running", "completed"}

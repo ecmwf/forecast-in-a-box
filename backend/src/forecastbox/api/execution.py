@@ -310,7 +310,7 @@ async def execute(
 
         update_kwargs: dict[str, object] = {"cascade_job_id": cascade_job_id}
         if response.error:
-            update_kwargs["status"] = "failed"
+            update_kwargs["status"] = "errored"
             update_kwargs["error"] = response.error[:255]
         else:
             update_kwargs["outputs"] = [x.model_dump() for x in product_to_id_mappings]
@@ -318,5 +318,5 @@ async def execute(
 
         return Either.ok(JobExecuteResponse(execution_id=new_execution_id, attempt_count=attempt_count))
     except Exception as e:
-        await db_jobs.update_job_execution_runtime(new_execution_id, attempt_count, status="failed", error=repr(e)[:255])
+        await db_jobs.update_job_execution_runtime(new_execution_id, attempt_count, status="errored", error=repr(e)[:255])
         return Either.error(repr(e))
