@@ -11,8 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from fiab_core.artifacts import CheckpointLookup, CompositeArtifactId, MlModelCheckpoint
-from fiab_core.providers import ArtifactsProvider
+from fiab_core.artifacts import ArtifactsProvider, CheckpointLookup, CompositeArtifactId, MlModelCheckpoint
 
 
 def _reset_provider() -> None:

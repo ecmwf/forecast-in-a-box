@@ -11,8 +11,9 @@
 Declarations related to Artifacts such as ML Model Checkpoints.
 """
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -56,3 +57,39 @@ class MlModelCheckpoint(BaseModel):
 
 
 CheckpointLookup = Mapping[CompositeArtifactId, MlModelCheckpoint]
+
+
+class ArtifactsProvider:
+    """Singleton provider giving plugins access to artifact management functions.
+
+    The host application registers implementations via `register_*` class methods
+    during startup.  Plugins call the plain class methods to invoke them.
+    Raises RuntimeError if a method is called before its implementation is registered.
+    """
+
+    _get_checkpoint_lookup: Callable[[], CheckpointLookup] | None = None
+    _get_artifact_local_path: Callable[[CompositeArtifactId], Path] | None = None
+
+    @classmethod
+    def register_get_checkpoint_lookup(cls, fn: Callable[[], CheckpointLookup]) -> None:
+        """Register the get_checkpoint_lookup implementation."""
+        cls._get_checkpoint_lookup = fn
+
+    @classmethod
+    def get_checkpoint_lookup(cls) -> CheckpointLookup:
+        """Return a mapping of all known CompositeArtifactId to MlModelCheckpoint."""
+        if cls._get_checkpoint_lookup is None:
+            raise RuntimeError("ArtifactsProvider.get_checkpoint_lookup has not been registered")
+        return cls._get_checkpoint_lookup()
+
+    @classmethod
+    def register_get_artifact_local_path(cls, fn: Callable[[CompositeArtifactId], Path]) -> None:
+        """Register the get_artifact_local_path implementation (without data_dir — it is bound at registration time)."""
+        cls._get_artifact_local_path = fn
+
+    @classmethod
+    def get_artifact_local_path(cls, composite_id: CompositeArtifactId) -> Path:
+        """Return the local filesystem path for the given artifact."""
+        if cls._get_artifact_local_path is None:
+            raise RuntimeError("ArtifactsProvider.get_artifact_local_path has not been registered")
+        return cls._get_artifact_local_path(composite_id)

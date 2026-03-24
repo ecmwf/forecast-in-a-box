@@ -23,7 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fiab_core.providers import ArtifactsProvider
+from fiab_core.artifacts import ArtifactsProvider
 from starlette.exceptions import HTTPException
 
 import forecastbox.db
