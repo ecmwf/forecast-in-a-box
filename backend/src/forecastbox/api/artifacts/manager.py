@@ -21,7 +21,7 @@ We use pyrsistent immutable structures for safe lock-free reads.
 import logging
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 
 from cascade.low.func import Either
@@ -79,14 +79,14 @@ def _refresh_catalog_task() -> None:
             ArtifactManager.refresh_error = repr(e)
 
 
-def submit_refresh_catalog() -> None:
-    """Submit catalog refresh task to background executor."""
+def submit_refresh_catalog() -> Future[None]:  # ty: ignore[invalid-return-type]
+    """Submit catalog refresh task to background executor. Returns a Future that resolves when the refresh completes."""
     with timed_acquire(ArtifactManager.lock, timeout_acquire_request) as result:
         if not result:
             logger.error("failed to submit refresh_catalog")
             ArtifactManager.refresh_error = "failed to submit refresh_catalog"
         ArtifactManager._ensure_pool()
-        ArtifactManager.executor.submit(_refresh_catalog_task)
+        return ArtifactManager.executor.submit(_refresh_catalog_task)  # ty: ignore[call-non-callable]
 
 
 def _download_artifact_task(composite_id: CompositeArtifactId) -> None:

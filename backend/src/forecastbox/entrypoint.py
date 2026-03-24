@@ -59,8 +59,8 @@ async def lifespan(app: FastAPI):
     ArtifactsProvider.register_get_artifact_local_path(
         lambda composite_id: get_artifact_local_path(composite_id, Path(config.api.data_path))
     )
-    submit_load_plugins()
-    submit_refresh_catalog()
+    catalog_ready = submit_refresh_catalog()
+    submit_load_plugins(start_after=catalog_ready)
     yield
     if config.api.allow_scheduler:
         stop_scheduler()

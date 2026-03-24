@@ -10,7 +10,10 @@
 # TODO move to ecpyutil once that is published
 
 import dataclasses
+import logging
 import threading
+from collections.abc import Callable, Sequence
+from concurrent.futures import Future
 from contextlib import contextmanager
 from typing import Any, Iterator, TypeVar
 
@@ -51,3 +54,23 @@ def deep_union(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
         else:
             merged[key] = value
     return merged
+
+
+_logger = logging.getLogger(__name__)
+
+
+def delayed_thread(future: Future[Any], fn: Callable[..., Any], args: Sequence[Any] = ()) -> threading.Thread:
+    """Return a thread that waits for `future` to complete, then calls `fn(*args)`.
+
+    If the future raised an exception, a warning is logged and `fn` is called anyway
+    so that the caller's own error handling can run.
+    """
+
+    def _target() -> None:
+        try:
+            future.result()
+        except Exception as e:
+            _logger.warning(f"delayed_thread: future completed with error {repr(e)}, proceeding")
+        fn(*args)
+
+    return threading.Thread(target=_target)

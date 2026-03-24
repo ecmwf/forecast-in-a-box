@@ -33,6 +33,7 @@ import pathlib
 import subprocess
 import threading
 import time
+from concurrent.futures import Future
 from types import ModuleType
 from typing import Iterator, Literal
 
@@ -45,7 +46,7 @@ from pyrsistent.typing import PMap
 
 from forecastbox.api.types.fable import PluginCompositeId
 from forecastbox.config import PluginSettings, PluginsSettings, config, config_edit_lock
-from forecastbox.ecpyutil import timed_acquire
+from forecastbox.ecpyutil import delayed_thread, timed_acquire
 
 logger = logging.getLogger(__name__)
 
@@ -213,7 +214,7 @@ def unload_single(pluginId: PluginCompositeId) -> None:
             PluginManager.versions = PluginManager.versions.remove(pluginId)
 
 
-def submit_load_plugins():
+def submit_load_plugins(start_after: Future[None] | None = None) -> None:
     with timed_acquire(PluginManager.lock, 0.2) as result:
         if not result:
             logger.error("failed to submit load_plugins")
@@ -222,7 +223,12 @@ def submit_load_plugins():
         elif PluginManager.updater is not None:
             raise TypeError("attempted to submit load_plugins but updater is already in progress")
         else:
-            PluginManager.updater = threading.Thread(target=load_plugins, args=(config.product.plugins,))
+            args = (config.product.plugins,)
+            if start_after is not None:
+                thread = delayed_thread(start_after, load_plugins, args)
+            else:
+                thread = threading.Thread(target=load_plugins, args=args)
+            PluginManager.updater = thread
             PluginManager.updater.start()
 
 
