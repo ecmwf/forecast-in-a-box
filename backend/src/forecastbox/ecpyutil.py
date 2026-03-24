@@ -19,6 +19,8 @@ from typing import Any, Iterator, TypeVar
 
 _T = TypeVar("_T")
 
+logger = logging.getLogger(__name__)
+
 
 @contextmanager
 def timed_acquire(lock: threading.Lock, timeout: float) -> Iterator[bool]:
@@ -56,9 +58,6 @@ def deep_union(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
     return merged
 
 
-_logger = logging.getLogger(__name__)
-
-
 def delayed_thread(future: Future[Any], fn: Callable[..., Any], args: Sequence[Any] = ()) -> threading.Thread:
     """Return a thread that waits for `future` to complete, then calls `fn(*args)`.
 
@@ -70,7 +69,7 @@ def delayed_thread(future: Future[Any], fn: Callable[..., Any], args: Sequence[A
         try:
             future.result()
         except Exception as e:
-            _logger.warning(f"delayed_thread: future completed with error {repr(e)}, proceeding")
+            logger.warning(f"delayed_thread: future completed with error {repr(e)}, proceeding")
         fn(*args)
 
     return threading.Thread(target=_target)

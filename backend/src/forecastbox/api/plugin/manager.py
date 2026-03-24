@@ -214,7 +214,7 @@ def unload_single(pluginId: PluginCompositeId) -> None:
             PluginManager.versions = PluginManager.versions.remove(pluginId)
 
 
-def submit_load_plugins(start_after: Future[None] | None = None) -> None:
+def submit_load_plugins(start_after: Future[None]) -> None:
     with timed_acquire(PluginManager.lock, 0.2) as result:
         if not result:
             logger.error("failed to submit load_plugins")
@@ -223,12 +223,7 @@ def submit_load_plugins(start_after: Future[None] | None = None) -> None:
         elif PluginManager.updater is not None:
             raise TypeError("attempted to submit load_plugins but updater is already in progress")
         else:
-            args = (config.product.plugins,)
-            if start_after is not None:
-                thread = delayed_thread(start_after, load_plugins, args)
-            else:
-                thread = threading.Thread(target=load_plugins, args=args)
-            PluginManager.updater = thread
+            PluginManager.updater = delayed_thread(start_after, load_plugins, (config.product.plugins,))
             PluginManager.updater.start()
 
 
