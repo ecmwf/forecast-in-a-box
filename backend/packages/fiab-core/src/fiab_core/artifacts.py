@@ -31,6 +31,18 @@ class CompositeArtifactId:
     ml_model_checkpoint_id: MlModelCheckpointId
 
 
+@dataclass(frozen=True, eq=True, slots=True)
+class MlModelOverview:
+    """Overview information for listing ML models"""
+
+    composite_id: CompositeArtifactId
+    display_name: str
+    display_author: str
+    disk_size_bytes: int
+    supported_platforms: list[Platform]
+    is_available: bool
+
+
 class MlModelCheckpoint(BaseModel):
     url: str = Field(
         description="Location such as anemoi catalogue or hugging face registry url. Represents the source url, not an url of a local copy"

@@ -14,20 +14,8 @@ Base definitions pertaining to artifacts such as ml model checkpoints
 from dataclasses import dataclass
 from pathlib import Path
 
-from fiab_core.artifacts import CompositeArtifactId, MlModelCheckpoint, MlModelCheckpointId, Platform
+from fiab_core.artifacts import CompositeArtifactId, MlModelCheckpoint, MlModelCheckpointId, MlModelOverview, Platform
 from pyrsistent.typing import PMap
-
-
-@dataclass(frozen=True, eq=True, slots=True)
-class MlModelOverview:
-    """Overview information for listing ML models"""
-
-    composite_id: CompositeArtifactId
-    display_name: str
-    display_author: str
-    disk_size_bytes: int
-    supported_platforms: list[Platform]
-    is_available: bool
 
 
 @dataclass(frozen=True, eq=True, slots=True)

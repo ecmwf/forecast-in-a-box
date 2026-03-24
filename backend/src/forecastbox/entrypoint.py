@@ -23,10 +23,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fiab_core.providers import ArtifactsProvider
 from starlette.exceptions import HTTPException
 
 import forecastbox.db
-from forecastbox.api.artifacts.manager import join_artifact_manager, submit_refresh_catalog
+from forecastbox.api.artifacts.base import get_artifact_local_path
+from forecastbox.api.artifacts.manager import join_artifact_manager, list_models, submit_refresh_catalog
 from forecastbox.api.plugin.manager import PluginsStatus, join_updater_thread, submit_load_plugins
 from forecastbox.api.plugin.manager import status_brief as status_plugins
 from forecastbox.api.plugin.store import join_stores_thread, submit_initialize_stores
@@ -52,8 +54,12 @@ async def lifespan(app: FastAPI):
         start_scheduler()
     release_time, release_version = get_local_release()
     app.version = f"{release_version}@{release_time}"
-    submit_load_plugins()
     submit_initialize_stores()
+    ArtifactsProvider.register_list_models(list_models)
+    ArtifactsProvider.register_get_artifact_local_path(
+        lambda composite_id: get_artifact_local_path(composite_id, Path(config.api.data_path))
+    )
+    submit_load_plugins()
     submit_refresh_catalog()
     yield
     if config.api.allow_scheduler:
