@@ -28,7 +28,7 @@ from starlette.exceptions import HTTPException
 
 import forecastbox.db
 from forecastbox.api.artifacts.base import get_artifact_local_path
-from forecastbox.api.artifacts.manager import join_artifact_manager, list_models, submit_refresh_catalog
+from forecastbox.api.artifacts.manager import ArtifactManager, join_artifact_manager, submit_refresh_catalog
 from forecastbox.api.plugin.manager import PluginsStatus, join_updater_thread, submit_load_plugins
 from forecastbox.api.plugin.manager import status_brief as status_plugins
 from forecastbox.api.plugin.store import join_stores_thread, submit_initialize_stores
@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI):
     release_time, release_version = get_local_release()
     app.version = f"{release_version}@{release_time}"
     submit_initialize_stores()
-    ArtifactsProvider.register_list_models(list_models)
+    ArtifactsProvider.register_get_checkpoint_lookup(lambda: ArtifactManager.catalog)
     ArtifactsProvider.register_get_artifact_local_path(
         lambda composite_id: get_artifact_local_path(composite_id, Path(config.api.data_path))
     )

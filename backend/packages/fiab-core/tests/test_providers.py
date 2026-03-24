@@ -11,12 +11,12 @@ from pathlib import Path
 
 import pytest
 
-from fiab_core.artifacts import CompositeArtifactId, MlModelOverview
+from fiab_core.artifacts import CheckpointLookup, CompositeArtifactId, MlModelCheckpoint
 from fiab_core.providers import ArtifactsProvider
 
 
 def _reset_provider() -> None:
-    ArtifactsProvider._list_models = None
+    ArtifactsProvider._get_checkpoint_lookup = None
     ArtifactsProvider._get_artifact_local_path = None
 
 
@@ -27,9 +27,9 @@ def clean_provider():
     _reset_provider()
 
 
-def test_list_models_raises_before_registration():
-    with pytest.raises(RuntimeError, match="list_models"):
-        ArtifactsProvider.list_models()
+def test_get_checkpoint_lookup_raises_before_registration():
+    with pytest.raises(RuntimeError, match="get_checkpoint_lookup"):
+        ArtifactsProvider.get_checkpoint_lookup()
 
 
 def test_get_artifact_local_path_raises_before_registration():
@@ -38,19 +38,44 @@ def test_get_artifact_local_path_raises_before_registration():
         ArtifactsProvider.get_artifact_local_path(composite_id)
 
 
-def test_list_models_returns_registered_result():
-    expected: list[MlModelOverview] = [
-        MlModelOverview(
-            composite_id=CompositeArtifactId(artifact_store_id="s", ml_model_checkpoint_id="c"),
-            display_name="My Model",
-            display_author="Author",
-            disk_size_bytes=1024,
-            supported_platforms=["linux"],
-            is_available=True,
-        )
-    ]
-    ArtifactsProvider.register_list_models(lambda: expected)
-    assert ArtifactsProvider.list_models() == expected
+def test_get_checkpoint_lookup_returns_registered_result():
+    checkpoint = MlModelCheckpoint(
+        url="http://example.com/model.ckpt",
+        display_name="My Model",
+        display_author="Author",
+        display_description="A model",
+        disk_size_bytes=1024,
+        pip_package_constraints=[],
+        supported_platforms=["linux"],
+        output_characteristics=[],
+        input_characteristics=[],
+    )
+    composite_id = CompositeArtifactId(artifact_store_id="s", ml_model_checkpoint_id="c")
+    catalog: CheckpointLookup = {composite_id: checkpoint}
+    ArtifactsProvider.register_get_checkpoint_lookup(lambda: catalog)
+    result = ArtifactsProvider.get_checkpoint_lookup()
+    assert result[composite_id] == checkpoint
+
+
+def test_get_checkpoint_lookup_returns_current_value_of_mutable_source():
+    """Verifies that registering a lambda (not an instance) means callers see mutations."""
+    catalog: dict[CompositeArtifactId, MlModelCheckpoint] = {}
+    ArtifactsProvider.register_get_checkpoint_lookup(lambda: catalog)
+    assert len(ArtifactsProvider.get_checkpoint_lookup()) == 0
+
+    checkpoint = MlModelCheckpoint(
+        url="http://example.com/model.ckpt",
+        display_name="M",
+        display_author="A",
+        display_description="D",
+        disk_size_bytes=0,
+        pip_package_constraints=[],
+        supported_platforms=[],
+        output_characteristics=[],
+        input_characteristics=[],
+    )
+    catalog[CompositeArtifactId(artifact_store_id="s", ml_model_checkpoint_id="c")] = checkpoint
+    assert len(ArtifactsProvider.get_checkpoint_lookup()) == 1
 
 
 def test_get_artifact_local_path_returns_registered_result():
@@ -58,23 +83,4 @@ def test_get_artifact_local_path_returns_registered_result():
     ArtifactsProvider.register_get_artifact_local_path(lambda cid: base / cid.artifact_store_id / cid.ml_model_checkpoint_id)
 
     composite_id = CompositeArtifactId(artifact_store_id="store", ml_model_checkpoint_id="ckpt")
-    result = ArtifactsProvider.get_artifact_local_path(composite_id)
-    assert result == Path("/data/store/ckpt")
-
-
-def test_registration_can_be_replaced():
-    ArtifactsProvider.register_list_models(lambda: [])
-    assert ArtifactsProvider.list_models() == []
-
-    sentinel: list[MlModelOverview] = [
-        MlModelOverview(
-            composite_id=CompositeArtifactId(artifact_store_id="a", ml_model_checkpoint_id="b"),
-            display_name="X",
-            display_author="Y",
-            disk_size_bytes=0,
-            supported_platforms=[],
-            is_available=False,
-        )
-    ]
-    ArtifactsProvider.register_list_models(lambda: sentinel)
-    assert ArtifactsProvider.list_models() == sentinel
+    assert ArtifactsProvider.get_artifact_local_path(composite_id) == Path("/data/store/ckpt")

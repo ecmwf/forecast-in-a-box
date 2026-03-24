@@ -11,6 +11,7 @@
 Declarations related to Artifacts such as ML Model Checkpoints.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
@@ -29,18 +30,6 @@ class CompositeArtifactId:
 
     artifact_store_id: ArtifactStoreId
     ml_model_checkpoint_id: MlModelCheckpointId
-
-
-@dataclass(frozen=True, eq=True, slots=True)
-class MlModelOverview:
-    """Overview information for listing ML models"""
-
-    composite_id: CompositeArtifactId
-    display_name: str
-    display_author: str
-    disk_size_bytes: int
-    supported_platforms: list[Platform]
-    is_available: bool
 
 
 class MlModelCheckpoint(BaseModel):
@@ -64,3 +53,6 @@ class MlModelCheckpoint(BaseModel):
         description="List of config keys that this model exposes"
     )  # Question: do we want key-values, or just keys and the plugins define values?
     # Question: how would we capture memory requirements? May be tricky since technically its a function of config and backend
+
+
+CheckpointLookup = Mapping[CompositeArtifactId, MlModelCheckpoint]

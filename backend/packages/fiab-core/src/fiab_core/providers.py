@@ -18,7 +18,7 @@ implementations once at startup, before any plugin code is loaded.
 from collections.abc import Callable
 from pathlib import Path
 
-from fiab_core.artifacts import CompositeArtifactId, MlModelOverview
+from fiab_core.artifacts import CheckpointLookup, CompositeArtifactId
 
 
 class ArtifactsProvider:
@@ -29,20 +29,20 @@ class ArtifactsProvider:
     Raises RuntimeError if a method is called before its implementation is registered.
     """
 
-    _list_models: Callable[[], list[MlModelOverview]] | None = None
+    _get_checkpoint_lookup: Callable[[], CheckpointLookup] | None = None
     _get_artifact_local_path: Callable[[CompositeArtifactId], Path] | None = None
 
     @classmethod
-    def register_list_models(cls, fn: Callable[[], list[MlModelOverview]]) -> None:
-        """Register the list_models implementation."""
-        cls._list_models = fn
+    def register_get_checkpoint_lookup(cls, fn: Callable[[], CheckpointLookup]) -> None:
+        """Register the get_checkpoint_lookup implementation."""
+        cls._get_checkpoint_lookup = fn
 
     @classmethod
-    def list_models(cls) -> list[MlModelOverview]:
-        """List all available ML models."""
-        if cls._list_models is None:
-            raise RuntimeError("ArtifactsProvider.list_models has not been registered")
-        return cls._list_models()
+    def get_checkpoint_lookup(cls) -> CheckpointLookup:
+        """Return a mapping of all known CompositeArtifactId to MlModelCheckpoint."""
+        if cls._get_checkpoint_lookup is None:
+            raise RuntimeError("ArtifactsProvider.get_checkpoint_lookup has not been registered")
+        return cls._get_checkpoint_lookup()
 
     @classmethod
     def register_get_artifact_local_path(cls, fn: Callable[[CompositeArtifactId], Path]) -> None:
