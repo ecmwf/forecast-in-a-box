@@ -9,6 +9,7 @@
 
 """Related to scheduling endpoints"""
 
+from datetime import datetime
 from typing import Any
 
 import orjson
@@ -28,6 +29,8 @@ class ScheduleSpecification(BaseModel):
     """Evaluated at each invocation; keys are paths in the job spec, values are dynamic expressions."""
     max_acceptable_delay_hours: PositiveInt = 24
     """Maximum acceptable delay in hours. Runs missed beyond this window are skipped."""
+    first_run_override: datetime | None = None
+    """If provided and not older than max_acceptable_delay_hours, used as the first scheduled run time instead of the next cron tick."""
     display_name: str | None = None
     display_description: str | None = None
     tags: list[str] | None = None
@@ -40,3 +43,5 @@ class ScheduleUpdate(BaseModel):
     enabled: bool | None = None
     dynamic_expr: dict[str, str] | None = None
     max_acceptable_delay_hours: PositiveInt | None = None
+    first_run_override: datetime | None = None
+    """If provided and not older than max_acceptable_delay_hours, used as the next scheduled run time instead of the next cron tick."""
