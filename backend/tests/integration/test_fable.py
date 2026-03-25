@@ -39,7 +39,7 @@ def _make_builder_source_only() -> FableBuilder:
         configuration_values={},
         input_ids={},
     )
-    return FableBuilder(blocks={"source": source_42})
+    return FableBuilder(blocks={"source_42": source_42})
 
 
 def _make_builder_full(tmpdir: str) -> FableBuilder:
@@ -98,7 +98,7 @@ def test_fable_v2_save_and_retrieve(backend_client_with_auth):
     assert retrieved["version"] == 1
     assert retrieved["display_name"] == "Test Fable"
     assert retrieved["tags"] == ["test", "integration"]
-    assert retrieved["builder"]["blocks"]["source_42"]["factory_id"]["factory"] == "soucre_42"
+    assert retrieved["builder"]["blocks"]["source_42"]["factory_id"]["factory"] == "source_42"
     assert retrieved["builder"]["environment"]["hosts"] == 2
     assert retrieved["builder"]["environment"]["workers_per_host"] == 4
 

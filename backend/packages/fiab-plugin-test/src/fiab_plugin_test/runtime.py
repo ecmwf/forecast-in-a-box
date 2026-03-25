@@ -13,7 +13,11 @@ def product_join(a: int, b: int) -> int:
     return a + b
 
 
-def sink_file(data, fname: str) -> None:
+def sink_file(data, fname: str) -> str:
     import pathlib
 
     pathlib.Path(fname).write_text(str(data))
+
+    # TODO sadly important, otherwise cascade won't detect completion at the moment. Investigate
+    # why the default output injector doesnt seem to work
+    return "ok"
