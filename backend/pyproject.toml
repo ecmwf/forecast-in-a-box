@@ -127,6 +127,7 @@ members = [
     "packages/fiab-core",
     "packages/fiab-mcp-server",
     "packages/fiab-plugin-ecmwf",
+    "packages/fiab-plugin-test",
 ]
 
 [tool.ty.rules]

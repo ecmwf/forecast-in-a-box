@@ -91,9 +91,9 @@ def _try_updatedate(pluginSettings: PluginSettings) -> str:
 
 
 def _try_install(pip_source: str) -> None:
-    install_command = lambda name: ["uv", "pip", "install", "--upgrade", name]
+    install_command = ["uv", "pip", "install", "--upgrade"] + (pip_source.split(" ", 1) if pip_source.startswith("-e") else [pip_source])
     try:
-        result = subprocess.run(install_command(pip_source), check=False, capture_output=True)
+        result = subprocess.run(install_command, check=False, capture_output=True)
     except FileNotFoundError as ex:
         logger.error(f"installing {pip_source} failure: {repr(ex)}")
     if result.returncode != 0:

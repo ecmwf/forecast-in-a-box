@@ -21,6 +21,7 @@ members = [
     "fiab-core",
     "fiab-mcp-server",
     "fiab-plugin-ecmwf",
+    "fiab-plugin-test",
     "forecast-in-a-box",
 ]
 
@@ -1677,6 +1678,25 @@ requires-dist = [
     { name = "qubed", specifier = ">=0.3.1" },
 ]
 provides-extras = ["runtime"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "ty", specifier = "==0.0.2" }]
+
+[[package]]
+name = "fiab-plugin-test"
+version = "0.1.0"
+source = { editable = "packages/fiab-plugin-test" }
+dependencies = [
+    { name = "fiab-core" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "ty" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "fiab-core", editable = "packages/fiab-core" }]
 
 [package.metadata.requires-dev]
 dev = [{ name = "ty", specifier = "==0.0.2" }]

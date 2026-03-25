@@ -144,7 +144,8 @@ def compile(fable: FableBuilder) -> ExecutionSpecification:
         blockInstance = fable.blocks[blockId]
         plugin = plugins.get(blockInstance.factory_id.plugin, None)
         if not plugin:
-            raise ValueError(f"plugin for {blockId=} not found")
+            logger.debug(f"plugin for {blockId=} not found: {blockInstance.factory_id.plugin}. Available plugins: {plugins.keys()}")
+            raise ValueError(f"plugin for {blockId=} not found: {blockInstance.factory_id.plugin}")
         result = plugin.compiler(action_lookup, blockId, blockInstance)
         if result.t is None:
             # NOTE we fail eagerly, but we could proceed with non-descedant actions and collect/emit all
@@ -156,16 +157,6 @@ def compile(fable: FableBuilder) -> ExecutionSpecification:
 
     graph = deduplicate_nodes(graph)
     job_instance = graph2job(graph)
-    if data_dir := os.environ.get("IS_TEST_DATA_DIR", ""):
-        # TODO solve this properly
-        for task in job_instance.tasks.values():
-            if task.definition.entrypoint == "fiab_plugin_ecmwf.runtime.source.earthkit_source":
-                request = task.static_input_kw["request"]
-                # Check request matches data inside test file
-                assert request["number"] == list(range(1, 6, 1))
-                assert request["step"] == list(range(0, 61, 6))
-                task.static_input_ps["0"] = "file"
-                task.static_input_kw["path"] = os.path.join(data_dir, "fable_test.grib")
     job = RawCascadeJob(job_type="raw_cascade_job", job_instance=job_instance)
 
     graph_artifacts = _get_artifacts_list(graph)

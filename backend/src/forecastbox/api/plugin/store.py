@@ -24,25 +24,24 @@ from typing_extensions import Self
 from forecastbox.api.plugin.manager import submit_update_single
 from forecastbox.api.types.fable import PluginCompositeId, PluginId
 from forecastbox.config import PluginSettings, PluginStoreConfig, PluginStoreId, PluginStoresConfig, config, config_edit_lock
-from forecastbox.ecpyutil import timed_acquire
+from forecastbox.ecpyutil import fetch_content, timed_acquire
 
 logger = logging.getLogger(__name__)
 
 
 class PluginStoreEntry(BaseModel):
-    """Name of the package if assuming PyPI, or a local path, git repo, ... Anything that pip accepts"""
-
     pip_source: str
-    """A string such that `importlib.import_module(module_name)` gives a module that has a `plugin` attribute of type fiab_core.plugin.Plugin`"""
+    """Name of the package if assuming PyPI, or a local path, git repo, ... Anything that pip accepts"""
     module_name: str
-    """What the frontend should display in the plugins table"""
+    """A string such that `importlib.import_module(module_name)` gives a module that has a `plugin` attribute of type fiab_core.plugin.Plugin`"""
     display_title: str
-    """What the frontend should display in this plugin's details"""
+    """What the frontend should display in the plugins table"""
     display_description: str
-    """What the frontend should display as the plugin's author"""
+    """What the frontend should display in this plugin's details"""
     display_author: str
-    """Any comment or clarification to developers or maintainers. Not propagated to the frontend"""
+    """What the frontend should display as the plugin's author"""
     comment: str = ""
+    """Any comment or clarification to developers or maintainers. Not propagated to the frontend"""
 
 
 class PluginRemoteInfo(BaseModel):
@@ -60,7 +59,7 @@ def get_latest_version(package_name: str, client: httpx.Client) -> str:
         except Exception:
             logger.exception(f"getting version of {package_name=} => failure {response=}")
     else:
-        logger.exception(f"getting version of {package_name=} => failure {response=}")
+        logger.warning(f"getting version of {package_name=} => failure {response=}")
     return "unknown"
 
 
@@ -71,13 +70,27 @@ class PluginStore(BaseModel):
 
     @classmethod
     def fetch(cls, client: httpx.Client, plugin_store_config: PluginStoreConfig) -> Self:
+        url = plugin_store_config.url
         match plugin_store_config.method:
             case "file":
-                response = client.get(plugin_store_config.url)
-                response.raise_for_status()
-                raw = response.content
+                raw = fetch_content(url, client)
                 as_json = orjson.loads(raw)
                 return cls(**as_json)
+            case "localSingle":
+                fname = url.rsplit("/", 1)[1]
+                return cls(
+                    display_name=f"local:{fname}",
+                    plugins={
+                        "single": PluginStoreEntry(
+                            pip_source=url,
+                            module_name=fname.replace("-", "_"),
+                            display_title=fname,
+                            display_description="",
+                            display_author="local",
+                            comment="",
+                        )
+                    },
+                )
             case s:
                 assert_never(s)
 

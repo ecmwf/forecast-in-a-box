@@ -15,7 +15,10 @@ import threading
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any, Iterator, TypeVar
+
+import httpx  # dont move to ecpyutil? Used for file fetching. Or a Protocol?
 
 _T = TypeVar("_T")
 
@@ -73,3 +76,21 @@ def delayed_thread(future: Future[Any], fn: Callable[..., Any], args: Sequence[A
         fn(*args)
 
     return threading.Thread(target=_target)
+
+
+def fetch_content(url: str, client: httpx.Client) -> bytes:
+    """
+    Fetches content from a URL. Supports http/https via httpx.Client and local file system via file:// protocol.
+    """
+    if url.startswith("http://") or url.startswith("https://"):
+        response = client.get(url)
+        response.raise_for_status()
+        return response.content
+
+    elif url.startswith("file://"):
+        # Remove the file:// prefix and convert to a Path object
+        file_path = Path(url.replace("file://", ""))
+        return file_path.read_bytes()
+
+    else:
+        raise ValueError("Unsupported protocol. Use http://, https://, or file://")
