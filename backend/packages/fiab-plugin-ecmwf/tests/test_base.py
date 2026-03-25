@@ -7,7 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from fiab_plugin_ecmwf.blocks import *
+from fiab_plugin_ecmwf.blocks import *  # noqa: F403
 
 
 def test_ok():

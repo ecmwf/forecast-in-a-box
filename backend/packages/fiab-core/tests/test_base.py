@@ -7,8 +7,8 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from fiab_core.fable import *
-from fiab_core.plugin import *
+from fiab_core.fable import *  # noqa: F403
+from fiab_core.plugin import *  # noqa: F403
 
 
 def test_ok():
