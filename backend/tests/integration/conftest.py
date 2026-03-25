@@ -113,6 +113,7 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         config.db.sqlite_userdb_path = f"{td.name}/user.db"
         config.db.sqlite_jobdb_path = f"{td.name}/job.db"
         config.api.data_path = td_data.name
+        config.api.allow_scheduler = True
         config.product.artifact_stores = {
             fake_artifact_store_id: ArtifactStoreConfig(
                 url=f"http://localhost:{fake_artifact_registry_port}/artifacts.json",
