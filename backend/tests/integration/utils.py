@@ -63,6 +63,21 @@ def ensure_completed(backend_client, job_id, sleep=0.5, attempts=20):
     assert i > 0, f"Failed to finish job {job_id}"
 
 
+def ensure_schedule_run_v2(backend_client, experiment_id: str, sleep: float = 1.0, attempts: int = 30) -> str:
+    """Wait for at least one run to appear for the given schedule; return the execution_id.
+
+    Polls GET /schedule/runs until total > 0, up to attempts * sleep seconds.
+    """
+    for _ in range(attempts):
+        response = backend_client.get("/schedule/runs", params={"experiment_id": experiment_id}, timeout=10)
+        assert response.is_success, response.text
+        data = response.json()
+        if data["total"] > 0:
+            return data["runs"][0]["execution_id"]
+        time.sleep(sleep)
+    raise AssertionError(f"No run appeared for schedule {experiment_id} within {attempts} attempts")
+
+
 def ensure_completed_v2(backend_client, job_id, sleep=0.5, attempts=20):
     i = attempts
     while i > 0:

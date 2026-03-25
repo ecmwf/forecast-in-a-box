@@ -22,6 +22,7 @@ NOTE: there is not enough coverage in terms of job variety -- see the test_submi
 
 import io
 import os
+import pathlib
 import zipfile
 
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
@@ -264,6 +265,10 @@ def test_fable_v2_basic_execute(tmpdir, backend_client_with_auth):
     assert response.attempt_count == 1
     ensure_completed_v2(backend_client_with_auth, execution_id, sleep=1, attempts=120)
 
+    output = pathlib.Path(tmpdir) / "output"
+    assert output.read_text() == "85"  # the output of 42 + 1 + 42, thats what the job is configured to do
+    output.unlink()
+
     list_resp = backend_client_with_auth.get("/job/status")
     assert list_resp.is_success, list_resp.text
     data = list_resp.json()
@@ -301,6 +306,7 @@ def test_fable_v2_basic_execute(tmpdir, backend_client_with_auth):
     assert status_1_resp.json()["attempt_count"] == 1
 
     ensure_completed_v2(backend_client_with_auth, execution_id, sleep=1, attempts=120)
+    assert output.read_text() == "85"  # the output of 42 + 1 + 42, thats what the job is configured to do
 
     avail_resp = backend_client_with_auth.get(f"/job/{execution_id}/available")
     assert avail_resp.is_success, avail_resp.text

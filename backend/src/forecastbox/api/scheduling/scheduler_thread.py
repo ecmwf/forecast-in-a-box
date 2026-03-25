@@ -8,19 +8,16 @@
 # nor does it submit to any jurisdiction.
 
 """The main loop of the scheduler -- checks the ScheduledRun table, submits jobs.
-Runs in its own thread with its own async loop (which makes low sense, but it uses
-many async methods shared with the backend)
+Runs in its own thread, submitting async work to the main event loop via
+asyncio.run_coroutine_threadsafe to avoid cross-loop issues with asyncio primitives
+(e.g. the asyncio.Lock in db/core.py).
 """
-
-# NOTE this asyncio here is really odd. Either consider running in main task loop,
-# (but can we reliably and neatly wake/stop/status-check/restart then?), or have
-# non-async methods as well
 
 import asyncio
 import datetime as dt
 import logging
 import threading
-from typing import cast
+from typing import Any, cast
 
 import forecastbox.db.jobs as db_jobs
 from forecastbox.api.execution import execute
@@ -35,7 +32,7 @@ logger = logging.getLogger(__name__)
 # potentially involving the ScheduleNext table etc, as well as scheduler instance itself
 # to guarantee the singleton nature
 scheduler_lock = threading.Lock()
-timeout_acquire_request = 1  # aggressive timeout, we dont want to block async worker for long
+timeout_acquire_request = 3  # aggressive timeout, we dont want to block async worker for long
 timeout_acquire_lifecycle = 5  # moderate timeout during scheduler startup/shutdown
 timeout_acquire_background = 60  # leisure timeout for the scheduler background thread
 
@@ -47,31 +44,36 @@ sleep_duration_min: int = 15 * 60
 
 
 class SchedulerThread(threading.Thread):
-    def __init__(self):
+    def __init__(self, loop: asyncio.AbstractEventLoop):
         super().__init__()
+        self._loop = loop
         self.stop_event = threading.Event()
         self.sleep_condition = threading.Condition()
         self.liveness_timestamp: dt.datetime | None = None
         self.liveness_signal = threading.Event()
+
+    def _run_async(self, coro: Any) -> Any:
+        """Submit a coroutine to the main event loop and block until it completes."""
+        return asyncio.run_coroutine_threadsafe(coro, self._loop).result()
 
     def mark_alive(self) -> dt.datetime:
         self.liveness_timestamp = dt.datetime.now()
         self.liveness_signal.set()
         return self.liveness_timestamp
 
-    async def _try_schedule(self) -> int:
+    def _try_schedule(self) -> int:
         """Check and submit due ExperimentDefinition scheduled runs."""
         now = self.mark_alive()
         logger.debug(f"Scheduler inquiry at {now}")
 
-        schedulable = await db_jobs.get_schedulable_experiments(now)
+        schedulable = self._run_async(db_jobs.get_schedulable_experiments(now))
 
         for exp_next, exp_def in schedulable:
             experiment_id = cast(str, exp_next.experiment_id)
             scheduled_at = cast(dt.datetime, exp_next.scheduled_at)
             logger.debug(f"Processing scheduled experiment {experiment_id} at {scheduled_at}")
 
-            get_spec_result = await experiment2runnable(experiment_id, scheduled_at)
+            get_spec_result = self._run_async(experiment2runnable(experiment_id, scheduled_at))
             try:
                 is_valid = (not exp_def.is_deleted) and (cast(dict, exp_def.experiment_definition)["enabled"])
             except (TypeError, KeyError) as e:
@@ -89,30 +91,32 @@ class SchedulerThread(threading.Thread):
                     # NOTE this should not happen -- we have locks etc preventing this
                     logger.error("Skipping {experiment_id} at {scheduled_at}: it is not valid!")
                 else:
-                    exec_result = await execute(
-                        runnable.definition,
-                        runnable.created_by,
-                        experiment_id=experiment_id,
-                        experiment_version=cast(int, exp_def.version),
-                        compiler_runtime_context=runnable.compiler_runtime_context,
-                        experiment_context=f"scheduled_at={runnable.scheduled_at.isoformat()}",
+                    exec_result = self._run_async(
+                        execute(
+                            runnable.definition,
+                            runnable.created_by,
+                            experiment_id=experiment_id,
+                            experiment_version=cast(int, exp_def.version),
+                            compiler_runtime_context=runnable.compiler_runtime_context,
+                            experiment_context=f"scheduled_at={runnable.scheduled_at.isoformat()}",
+                        )
                     )
                     if exec_result.t is not None:
                         logger.debug(f"Execution {exec_result.t.execution_id} submitted for experiment {experiment_id}")
                     else:
                         logger.error(f"Failed to submit experiment {experiment_id}: {exec_result.e}")
 
-                await db_jobs.delete_experiment_next(experiment_id)
+                self._run_async(db_jobs.delete_experiment_next(experiment_id))
                 if runnable.next_run_at and is_valid:
-                    await db_jobs.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=runnable.next_run_at)
+                    self._run_async(db_jobs.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=runnable.next_run_at))
                     logger.debug(f"Next run for {experiment_id}: {runnable.next_run_at}")
                 else:
                     logger.warning(f"No next run computed for {experiment_id}")
             else:
                 logger.error(f"Could not create runnable for experiment {experiment_id}: {get_spec_result.e}")
-                await db_jobs.delete_experiment_next(experiment_id)
+                self._run_async(db_jobs.delete_experiment_next(experiment_id))
 
-        next_schedulable_at = await db_jobs.next_schedulable_experiment()
+        next_schedulable_at = self._run_async(db_jobs.next_schedulable_experiment())
 
         sleep_duration = sleep_duration_min
         if next_schedulable_at:
@@ -124,23 +128,19 @@ class SchedulerThread(threading.Thread):
 
         return sleep_duration
 
-    async def _run(self):
+    def run(self) -> None:
+        logger.info("Scheduler thread started.")
         while not self.stop_event.is_set():
             with timed_acquire(scheduler_lock, timeout_acquire_background) as acquired:
                 if not acquired:
                     logger.warning("Scheduler could not acquire scheduler_lock within timeout, skipping iteration.")
                     continue
-                sleep_duration = await self._try_schedule()
+                sleep_duration = self._try_schedule()
 
             if sleep_duration > 0:
                 with self.sleep_condition:
                     logger.debug(f"Scheduler sleeping for {sleep_duration} seconds.")
-                    # NOTE this probably blocks the asyncio loop, but we dont really care
                     self.sleep_condition.wait(sleep_duration)
-
-    def run(self):
-        logger.info("Scheduler thread started.")
-        asyncio.run(self._run())
 
     def stop(self):
         self.stop_event.set()
@@ -160,12 +160,13 @@ class Globals:
 
 
 def start_scheduler():
+    loop = asyncio.get_running_loop()
     with timed_acquire(scheduler_lock, timeout_acquire_lifecycle) as acquired:
         if not acquired:
             raise ValueError("Could not acquire scheduler_lock within timeout during start")
         if Globals.scheduler is not None:
             raise ValueError("double start")
-        Globals.scheduler = SchedulerThread()
+        Globals.scheduler = SchedulerThread(loop)
         Globals.scheduler.start()
 
 
