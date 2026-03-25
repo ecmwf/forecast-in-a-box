@@ -22,3 +22,10 @@ dev = [
 [build-system]
 requires = ["uv_build>=0.10.6,<0.11.0"]
 build-backend = "uv_build"
+
+
+[tool.ruff]
+line-length = 140
+
+lint.ignore = [ "E731" ]
+lint.select = [ "I" ]
