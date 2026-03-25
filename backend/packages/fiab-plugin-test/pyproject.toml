@@ -1,0 +1,31 @@
+[project]
+name = "fiab-plugin-test"
+version = "0.1.0"
+description = "Weather Forecast in a Box, test plugin"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = [ "LICENSE" ]
+authors = [
+  { name = "European Centre for Medium-Range Weather Forecasts (ECMWF)", email = "software.support@ecmwf.int" },
+]
+requires-python = ">=3.11"
+dependencies = [
+    "fiab-core>=0.0.1,<1.0.0", # ~=0.0
+]
+
+[dependency-groups]
+dev = [
+  "ty==0.0.2",
+]
+
+
+[build-system]
+requires = ["uv_build>=0.10.6,<0.11.0"]
+build-backend = "uv_build"
+
+
+[tool.ruff]
+line-length = 140
+
+lint.ignore = [ "E731" ]
+lint.select = [ "I" ]
