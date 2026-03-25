@@ -17,13 +17,7 @@ suspicious. The remaining ones test edge cases and funcionality which is
 possibly subject of changes, and their failure may be a legitimate behavioral
 change (such as change of return error code).
 
-The tests currently rely on a data file and a mocked ecmwf plugin (where
-the mocking is actually hacked inside the non-test code). We would rather
-test the ecmwf plugin only in the nonpytest scenario, and here utilize
-some sort of test plugin or a proper mock.
-
-Therefore there is not enough coverage in terms of job variety -- see the
-test_submit_job.py
+NOTE: there is not enough coverage in terms of job variety -- see the test_submit_job.py
 """
 
 import io
@@ -35,47 +29,46 @@ from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginComposite
 from forecastbox.api.types.fable import FableBuilder, FableSaveRequest
 from forecastbox.api.types.jobs import EnvironmentSpecification, JobExecuteResponse
 
+from .conftest import testPluginId
 from .utils import ensure_completed_v2
 
 
 def _make_builder_source_only() -> FableBuilder:
-    plugin_id = PluginCompositeId(store="ecmwf", local="ecmwf-base")
-    source = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=plugin_id, factory="ekdSource"),
-        configuration_values={"source": "ecmwf-open-data", "date": "2026-01-01", "expver": "0001"},
+    source_42 = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="source_42"),
+        configuration_values={},
         input_ids={},
     )
-    return FableBuilder(blocks={"source1": source})
+    return FableBuilder(blocks={"source": source_42})
 
 
 def _make_builder_full(tmpdir: str) -> FableBuilder:
-    plugin_id = PluginCompositeId(store="ecmwf", local="ecmwf-base")
-    source = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=plugin_id, factory="ekdSource"),
-        configuration_values={"source": "ecmwf-open-data", "date": "2026-02-18", "expver": "0001"},
+    source_42 = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="source_42"),
+        configuration_values={},
         input_ids={},
     )
-    temporal_mean = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=plugin_id, factory="temporalStatistics"),
-        configuration_values={"variable": "2t", "statistic": "mean"},
-        input_ids={"dataset": "source1"},
+    transform_increment = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="transform_increment"),
+        configuration_values={"amount": "1"},
+        input_ids={"a": "source_42"},
     )
-    ensemble_mean = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=plugin_id, factory="ensembleStatistics"),
-        configuration_values={"variable": "2t", "statistic": "mean"},
-        input_ids={"dataset": "temporalMean"},
+    product_join = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="product_join"),
+        configuration_values={},
+        input_ids={"a": "transform_increment", "b": "source_42"},
     )
-    sink = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=plugin_id, factory="zarrSink"),
-        configuration_values={"path": f"{tmpdir}/output.zarr"},
-        input_ids={"dataset": "ensembleMean"},
+    sink_file = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
+        configuration_values={"fname": f"{tmpdir}/output"},
+        input_ids={"data": "product_join"},
     )
     return FableBuilder(
         blocks={
-            "source1": source,
-            "temporalMean": temporal_mean,
-            "ensembleMean": ensemble_mean,
-            "sinkMean": sink,
+            "source_42": source_42,
+            "transform_increment": transform_increment,
+            "product_join": product_join,
+            "sink_file": sink_file,
         }
     )
 
@@ -105,7 +98,7 @@ def test_fable_v2_save_and_retrieve(backend_client_with_auth):
     assert retrieved["version"] == 1
     assert retrieved["display_name"] == "Test Fable"
     assert retrieved["tags"] == ["test", "integration"]
-    assert retrieved["builder"]["blocks"]["source1"]["factory_id"]["factory"] == "ekdSource"
+    assert retrieved["builder"]["blocks"]["source_42"]["factory_id"]["factory"] == "soucre_42"
     assert retrieved["builder"]["environment"]["hosts"] == 2
     assert retrieved["builder"]["environment"]["workers_per_host"] == 4
 
@@ -199,50 +192,55 @@ def test_fable_expand(tmpdir, backend_client_with_auth):
 
     builder = FableBuilder(blocks={})
     response = backend_client_with_auth.request(url="/fable/expand", method="put", json=builder.model_dump())
-    assert len(response.json()["possible_sources"]) == 1
-    assert len(response.json()["possible_expansions"]) == 0
+    assert response.json()["possible_sources"] == [{"plugin": {"store": "localTest", "local": "single"}, "factory": "source_42"}]
+    assert response.json()["possible_expansions"] == {}
 
-    pluginId = PluginCompositeId(store="ecmwf", local="ecmwf-base")
-    source = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=pluginId, factory="ekdSource"),
-        configuration_values={
-            "source": "ecmwf-open-data",
-            "date": "2026-02-18",
-            "expver": "0001",
-        },
+    source_42 = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="source_42"),
+        configuration_values={},
         input_ids={},
     )
-    blocks = {"source1": source}
+    blocks = {"source_42": source_42}
     builder = FableBuilder(blocks=blocks)
     response = backend_client_with_auth.request(url="/fable/expand", method="put", json=builder.model_dump())
-    assert len(response.json()["possible_expansions"]["source1"]) > 0
+    assert response.json()["possible_expansions"] == {
+        "source_42": [
+            {"plugin": {"store": "localTest", "local": "single"}, "factory": "transform_increment"},
+            {"plugin": {"store": "localTest", "local": "single"}, "factory": "product_join"},
+            {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_file"},
+        ]
+    }
 
-    temporalMean = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=pluginId, factory="temporalStatistics"),
-        configuration_values={"variable": "2t", "statistic": "mean"},
-        input_ids={"dataset": "source1"},
+    transform_increment = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="transform_increment"),
+        configuration_values={"amount": "2"},
+        input_ids={"a": "source_42"},
     )
-    blocks["temporalMean"] = temporalMean
+    blocks["transform_increment"] = transform_increment
     builder = FableBuilder(blocks=blocks)
     response = backend_client_with_auth.request(url="/fable/expand", method="put", json=builder.model_dump())
-    assert len(response.json()["possible_expansions"]["temporalMean"]) > 0
+    assert response.json()["possible_expansions"]["transform_increment"] == [
+        {"plugin": {"store": "localTest", "local": "single"}, "factory": "transform_increment"},
+        {"plugin": {"store": "localTest", "local": "single"}, "factory": "product_join"},
+        {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_file"},
+    ]
 
-    block = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=pluginId, factory="ensembleStatistics"),
-        configuration_values={"variable": "2t", "statistic": "mean"},
-        input_ids={"dataset": "temporalMean"},
+    product_join = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="product_join"),
+        configuration_values={},
+        input_ids={"a": "transform_increment", "b": "source_42"},
     )
-    sink = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=pluginId, factory="zarrSink"),
-        configuration_values={"path": f"{tmpdir}/output.zarr"},
-        input_ids={"dataset": f"ensembleMean"},
+    sink_file = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
+        configuration_values={"fname": f"{tmpdir}/output"},
+        input_ids={"data": "product_join"},
     )
-    blocks[f"ensembleMean"] = block
-    blocks[f"sinkMean"] = sink
+    blocks["product_join"] = product_join
+    blocks["sink_file"] = sink_file
 
     builder = FableBuilder(blocks=blocks)
     response = backend_client_with_auth.request(url="/fable/expand", method="put", json=builder.model_dump())
-    assert len(response.json()["possible_expansions"]["sinkMean"]) == 0
+    assert len(response.json()["possible_expansions"]["sink_file"]) == 0
     assert len(response.json()["block_errors"]) == 0
 
     save_req = FableSaveRequest(builder=builder)

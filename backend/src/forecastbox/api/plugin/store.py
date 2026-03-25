@@ -59,7 +59,7 @@ def get_latest_version(package_name: str, client: httpx.Client) -> str:
         except Exception:
             logger.exception(f"getting version of {package_name=} => failure {response=}")
     else:
-        logger.exception(f"getting version of {package_name=} => failure {response=}")
+        logger.warning(f"getting version of {package_name=} => failure {response=}")
     return "unknown"
 
 

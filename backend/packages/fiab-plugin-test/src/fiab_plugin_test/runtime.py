@@ -3,3 +3,17 @@
 
 def source_42() -> int:
     return 42
+
+
+def transform_increment(a: int, amount: int) -> int:
+    return a + amount
+
+
+def product_join(a: int, b: int) -> int:
+    return a + b
+
+
+def sink_file(data, fname: str) -> None:
+    import pathlib
+
+    pathlib.Path(fname).write_text(str(data))

@@ -261,7 +261,7 @@ class CascadeSettings(BaseModel):
 
 
 class FIABConfig(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", env_prefix="fiab__")
+    model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", env_prefix="fiab__", case_sensitive=True)
 
     general: GeneralSettings = Field(default_factory=GeneralSettings)
     product: ProductSettings = Field(default_factory=ProductSettings, description="Product specific settings")

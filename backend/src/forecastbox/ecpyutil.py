@@ -61,7 +61,6 @@ def deep_union(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
     return merged
 
 
-
 def delayed_thread(future: Future[Any], fn: Callable[..., Any], args: Sequence[Any] = ()) -> threading.Thread:
     """Return a thread that waits for `future` to complete, then calls `fn(*args)`.
 

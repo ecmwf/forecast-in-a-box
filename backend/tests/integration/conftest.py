@@ -13,7 +13,8 @@ import pytest
 from pydantic import SecretStr
 
 import forecastbox.config
-from forecastbox.config import ArtifactStoreConfig, FIABConfig
+from forecastbox.api.types.fable import PluginCompositeId, PluginId
+from forecastbox.config import ArtifactStoreConfig, FIABConfig, PluginCompositeIdReadable, PluginSettings, PluginStoreConfig
 from forecastbox.standalone.entrypoint import launch_all
 
 from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
@@ -21,6 +22,7 @@ from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_to
 fake_artifact_registry_port = 12001
 fake_artifact_store_id = "test_store"
 fake_artifact_checkpoint_id = "test_checkpoint"
+testPluginId = PluginCompositeIdReadable.from_str("localTest:single")
 
 
 class FakeArtifactRegistry(SimpleHTTPRequestHandler):
@@ -99,8 +101,6 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         td = tempfile.TemporaryDirectory()
         td_data = tempfile.TemporaryDirectory()
         os.environ["FIAB_ROOT"] = td.name
-        # NOTE we set test data dir because of a hack in api.fable.compile -- can be removed after that is solved
-        os.environ["IS_TEST_DATA_DIR"] = os.path.join(os.path.dirname(__file__), "data")
         (pathlib.Path(td.name) / "pylock.toml.timestamp").write_text("1761908420:d0.0.1")
         # we need to monkeypath this, because of eager import this was already initialised
         # to user's personal config file
@@ -119,6 +119,19 @@ def backend_client() -> Generator[httpx.Client, None, None]:
                 method="file",
             )
         }
+        config.product.plugin_stores = {
+            "localTest": PluginStoreConfig(
+                url="file://../../packages/fiab-plugin-test",
+                method="localSingle",
+            ),
+        }
+        config.product.plugins = {
+            testPluginId: PluginSettings(
+                pip_source="-e file://../../packages/fiab-plugin-test",
+                module_name="fiab_plugin_test",
+            ),
+        }
+
         config.general.launch_browser = False
         config.auth.domain_allowlist_registry = ["somewhere.org"]
         config.auth.passthrough = False

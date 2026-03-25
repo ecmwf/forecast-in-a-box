@@ -104,6 +104,10 @@ class RawOutput(BaseModel):
     type_fqn: str  # most likely you want Any here
 
 
-BlockInstanceOutput = XarrayOutput | RawOutput
+class NoOutput(BaseModel):
+    pass
+
+
+BlockInstanceOutput = XarrayOutput | RawOutput | NoOutput
 
 ActionLookup = dict[BlockInstanceId, Action]
