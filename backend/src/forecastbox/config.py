@@ -130,7 +130,10 @@ PluginsSettings = dict[PluginCompositeIdReadable, PluginSettings]
 
 class PluginStoreConfig(BaseModel):
     url: str
-    method: Literal["file"]
+    method: Literal["file", "localSingle"]
+    """In case of file, the `url` points  to a json parseable as api.plugin.store.PluginStore
+    In case of localSingle, the `url` points to a pip-installable location, eg, a folder with pyproject
+    In either case the url supports http:// and file:// protocols"""
 
 
 PluginStoresConfig = dict[PluginStoreId, PluginStoreConfig]
