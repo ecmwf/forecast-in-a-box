@@ -44,3 +44,4 @@ tag_regex = '^[vd](?P<version>\d+(?:\.\d+){0,2}[^\+]*)(?:\+.*)?$'
 line-length = 140
 
 lint.ignore = [ "E731" ]
+lint.select = [ "I" ]

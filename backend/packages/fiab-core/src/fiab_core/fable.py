@@ -60,7 +60,7 @@ class PluginCompositeId(BaseModel):
 
     @classmethod
     def from_str(cls, v) -> "PluginCompositeId":
-        if not ":" in v:
+        if ":" not in v:
             raise ValueError("must be of the form store:local")
         store, local = v.split(":", 1)
         return cls(store=store, local=local)
