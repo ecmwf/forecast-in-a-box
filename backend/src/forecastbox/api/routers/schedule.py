@@ -95,12 +95,19 @@ class ScheduleRunsResponse:
 
 
 def _resolve_next_run(first_run_override: dt.datetime | None, max_delay_hours: int, cron_expr: str) -> dt.datetime:
-    """Return first_run_override if valid (within max_delay_hours of now), else calculate next cron tick."""
+    """Return first_run_override if provided and within max_delay_hours of now, else calculate next cron tick.
+
+    Raises HTTPException 400 if first_run_override is provided but older than max_delay_hours.
+    """
     now = current_scheduling_time()
     if first_run_override is not None:
         age_hours = (now - first_run_override).total_seconds() / 3600
-        if age_hours <= max_delay_hours:
-            return first_run_override
+        if age_hours > max_delay_hours:
+            raise HTTPException(
+                status_code=400,
+                detail=f"first_run_override is {age_hours:.2f}h old, which exceeds max_acceptable_delay_hours={max_delay_hours}.",
+            )
+        return first_run_override
     return calculate_next_run(now, cron_expr)
 
 

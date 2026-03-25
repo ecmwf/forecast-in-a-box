@@ -30,7 +30,9 @@ class ScheduleSpecification(BaseModel):
     max_acceptable_delay_hours: PositiveInt = 24
     """Maximum acceptable delay in hours. Runs missed beyond this window are skipped."""
     first_run_override: datetime | None = None
-    """If provided and not older than max_acceptable_delay_hours, used as the first scheduled run time instead of the next cron tick."""
+    """If provided, used as the first scheduled run time instead of the next cron tick.
+    Must not be older than max_acceptable_delay_hours relative to the current scheduling time;
+    if it is, the request will be rejected with a 400 error."""
     display_name: str | None = None
     display_description: str | None = None
     tags: list[str] | None = None
@@ -44,4 +46,6 @@ class ScheduleUpdate(BaseModel):
     dynamic_expr: dict[str, str] | None = None
     max_acceptable_delay_hours: PositiveInt | None = None
     first_run_override: datetime | None = None
-    """If provided and not older than max_acceptable_delay_hours, used as the next scheduled run time instead of the next cron tick."""
+    """If provided, used as the next scheduled run time instead of the next cron tick.
+    Must not be older than max_acceptable_delay_hours relative to the current scheduling time;
+    if it is, the request will be rejected with a 400 error."""
