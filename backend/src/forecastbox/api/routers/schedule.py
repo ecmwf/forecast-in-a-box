@@ -15,7 +15,7 @@ from typing import cast
 from fastapi import APIRouter, Depends, HTTPException
 
 import forecastbox.db.jobs as db_jobs
-from forecastbox.api.scheduling.dt_utils import calculate_next_run, parse_crontab
+from forecastbox.api.scheduling.dt_utils import calculate_next_run, current_scheduling_time, parse_crontab
 from forecastbox.api.scheduling.scheduler_thread import (
     prod_scheduler,
     scheduler_lock,
@@ -81,8 +81,7 @@ class ScheduleRunResponse:
     status: str
     created_at: str
     updated_at: str
-    trigger: str
-    scheduled_at: str | None
+    experiment_context: str | None
 
 
 @dataclass(frozen=True, eq=True, slots=True)
@@ -161,14 +160,14 @@ async def create_schedule(
         job_definition_id=job_def_id,
         job_definition_version=job_def_version,
         experiment_type="cron_schedule",
-        created_by=user.email if user is not None else None,  # ty:ignore[unresolved-attribute]
+        created_by=user.email if user is not None else None,
         experiment_definition=experiment_definition,
         display_name=schedule_spec.display_name,
         display_description=schedule_spec.display_description,
         tags=schedule_spec.tags,
     )
 
-    next_run_at = calculate_next_run(dt.datetime.now(), schedule_spec.cron_expr)
+    next_run_at = calculate_next_run(current_scheduling_time(), schedule_spec.cron_expr)
     await db_jobs.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=next_run_at)
     logger.debug(f"V2 schedule {experiment_id}: next run at {next_run_at}")
     prod_scheduler()
@@ -186,7 +185,7 @@ async def get_schedule(experiment_id: str, user: UserRead = Depends(current_acti
 
 @router.post("/update")
 async def update_schedule(
-    experiment_id: str, update: ScheduleUpdate, user: UserRead = Depends(current_active_user)
+    experiment_id: str, update: ScheduleUpdate, user: UserRead | None = Depends(current_active_user)
 ) -> ScheduleDefinitionResponse:
     with timed_acquire(scheduler_lock, timeout_acquire_request) as acquired:
         if not acquired:
@@ -225,7 +224,7 @@ async def update_schedule(
             job_definition_id=str(current.job_definition_id),  # ty:ignore[invalid-argument-type]
             job_definition_version=cast(int, current.job_definition_version),
             experiment_type="cron_schedule",
-            created_by=user.email,  # ty:ignore[unresolved-attribute]
+            created_by=user.email if user else None,  # ty:ignore[unresolved-attribute]
             experiment_definition=new_experiment_definition,
             display_name=cast(str | None, current.display_name),
             display_description=cast(str | None, current.display_description),
@@ -234,7 +233,7 @@ async def update_schedule(
 
         if update.cron_expr is not None or update.enabled is not None:
             if new_enabled:
-                next_run_at = calculate_next_run(dt.datetime.now(), new_cron_expr)
+                next_run_at = calculate_next_run(current_scheduling_time(), new_cron_expr)
                 await db_jobs.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=next_run_at)
                 logger.debug(f"V2 schedule {experiment_id}: regenerated next run at {next_run_at}")
             else:
@@ -277,12 +276,7 @@ async def get_schedule_runs(
     page: int = 1,
     page_size: int = 10,
 ) -> ScheduleRunsResponse:
-    """Return paginated JobExecution rows linked to a cron schedule experiment.
-
-    Each run includes a trigger field ('cron' or 'rerun') sourced from
-    compiler_runtime_context so callers can distinguish normal scheduled runs
-    from manual reruns.
-    """
+    """Return paginated JobExecution rows linked to a cron schedule experiment."""
     if page < 1 or page_size < 1:
         raise HTTPException(status_code=400, detail="Page and page_size must be greater than 0.")
 
@@ -306,12 +300,17 @@ async def get_schedule_runs(
             status=cast(str, ex.status),
             created_at=str(ex.created_at),
             updated_at=str(ex.updated_at),
-            trigger=cast(dict, ex.compiler_runtime_context or {}).get("trigger", "cron"),
-            scheduled_at=cast(dict, ex.compiler_runtime_context or {}).get("scheduled_at"),
+            experiment_context=cast(str | None, ex.experiment_context),
         )
         for ex in executions
     ]
     return ScheduleRunsResponse(runs=runs, total=total, page=page, page_size=page_size, total_pages=total_pages)
+
+
+@router.get("/current_time")
+async def get_current_scheduling_time(user: UserRead = Depends(current_active_user)) -> str:
+    """Return the current time used for scheduling decisions."""
+    return current_scheduling_time().isoformat()
 
 
 @router.post("/restart")

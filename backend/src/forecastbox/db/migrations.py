@@ -29,12 +29,17 @@ def _delete_models(metadata, connection):
             connection.execute(text(f"drop table {table}"))
 
 
-def migrate():
-    return  # NOTE those migrations are invalid for now
+def _add_experiment_context(metadata: MetaData, connection) -> None:  # type: ignore[no-untyped-def]
+    if "job_execution" in metadata.tables and "experiment_context" not in metadata.tables["job_execution"].c:
+        logger.debug("adding column to job_execution: experiment_context")
+        connection.execute(text("ALTER TABLE job_execution ADD COLUMN experiment_context VARCHAR(255)"))
+        connection.commit()
+
+
+def migrate() -> None:
     url = f"sqlite:///{config.db.sqlite_jobdb_path}"
     engine = create_engine(url)
     metadata = MetaData()
     metadata.reflect(bind=engine)
     with engine.connect() as connection:
-        _migrate_jobs(metadata, connection)
-        _delete_models(metadata, connection)
+        _add_experiment_context(metadata, connection)

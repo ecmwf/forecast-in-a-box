@@ -61,7 +61,7 @@ const mockJobsResponse: JobExecutionList = {
     {
       execution_id: 'exec-4',
       attempt_count: 1,
-      status: 'errored',
+      status: 'failed',
       created_at: '2026-01-01T03:00:00Z',
       updated_at: '2026-01-01T03:00:00Z',
       job_definition_id: 'def-4',
@@ -126,7 +126,7 @@ describe('JobStatusDetailsPopover', () => {
     await expect.element(screen.getByText('Running')).toBeVisible()
     await expect.element(screen.getByText('Submitted')).toBeVisible()
     await expect.element(screen.getByText('Completed')).toBeVisible()
-    await expect.element(screen.getByText('Errored')).toBeVisible()
+    await expect.element(screen.getByText('Failed')).toBeVisible()
   })
 
   it('shows correct counts for each status', async () => {

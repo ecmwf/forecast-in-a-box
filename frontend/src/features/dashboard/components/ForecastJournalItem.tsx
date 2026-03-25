@@ -39,7 +39,7 @@ function StatusIcon({ status }: { status: ForecastJob['status'] }) {
       return (
         <CheckCircle2 className="h-5 w-5 fill-emerald-500 text-emerald-500" />
       )
-    case 'error':
+    case 'failed':
       return <AlertCircle className="h-5 w-5 fill-red-500 text-red-500" />
   }
 }
@@ -110,7 +110,7 @@ export function ForecastJournalItem({ job }: ForecastJournalItemProps) {
             >
               {t('journal.item.viewResults')}
             </Link>
-          ) : job.status === 'error' ? (
+          ) : job.status === 'failed' ? (
             <Link
               to="/executions/$jobId"
               params={{ jobId: job.id }}

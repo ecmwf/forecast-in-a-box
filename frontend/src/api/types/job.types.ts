@@ -14,41 +14,18 @@
 
 export type JobStatus =
   | 'submitted'
+  | 'preparing'
   | 'running'
   | 'completed'
-  | 'errored'
-  | 'invalid'
-  | 'timeout'
-  | 'unknown'
+  | 'failed'
 
 export const TERMINAL_STATUSES: ReadonlySet<JobStatus> = new Set([
   'completed',
-  'errored',
-  'invalid',
-  'timeout',
-  'unknown',
+  'failed',
 ])
 
 export function isTerminalStatus(status: JobStatus): boolean {
   return TERMINAL_STATUSES.has(status)
-}
-
-/** GET /job/{job_id}/status */
-export interface JobProgressResponse {
-  progress: string
-  status: JobStatus
-  created_at: string | null
-  error: string | null
-}
-
-/** GET /job/status */
-export interface JobProgressResponses {
-  progresses: Record<string, JobProgressResponse>
-  total: number
-  page: number
-  page_size: number
-  total_pages: number
-  error: string | null
 }
 
 /** GET /job/{job_id}/outputs */
@@ -56,11 +33,6 @@ export interface ProductToOutputId {
   product_name: string
   product_spec: Record<string, unknown>
   output_ids: Array<string>
-}
-
-/** POST /job/execute */
-export interface SubmitJobResponse {
-  id: string
 }
 
 /** POST /job/execute request */
@@ -148,10 +120,8 @@ export const JOB_STATUS_META: Record<
   { label: string; color: string }
 > = {
   submitted: { label: 'Submitted', color: 'blue' },
+  preparing: { label: 'Preparing', color: 'blue' },
   running: { label: 'Running', color: 'amber' },
   completed: { label: 'Completed', color: 'green' },
-  errored: { label: 'Errored', color: 'red' },
-  invalid: { label: 'Invalid', color: 'red' },
-  timeout: { label: 'Timeout', color: 'orange' },
-  unknown: { label: 'Unknown', color: 'gray' },
+  failed: { label: 'Failed', color: 'red' },
 } as const

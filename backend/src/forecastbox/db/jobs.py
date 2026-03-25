@@ -339,6 +339,7 @@ async def upsert_job_execution(
     experiment_id: str | None = None,
     experiment_version: int | None = None,
     compiler_runtime_context: dict | None = None,
+    experiment_context: str | None = None,
 ) -> tuple[str, int]:
     """Insert a new attempt of a JobExecution and return (id, attempt_count).
 
@@ -372,6 +373,7 @@ async def upsert_job_execution(
                     experiment_id=experiment_id,
                     experiment_version=experiment_version,
                     compiler_runtime_context=compiler_runtime_context,
+                    experiment_context=experiment_context,
                     status=status,
                     is_deleted=False,
                 )

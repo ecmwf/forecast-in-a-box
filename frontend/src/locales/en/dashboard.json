@@ -92,7 +92,7 @@
       "all": "All",
       "running": "Running",
       "completed": "Completed",
-      "error": "Error",
+      "failed": "Failed",
       "bookmarked": "Bookmarked"
     },
     "item": {

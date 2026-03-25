@@ -20,7 +20,7 @@ import { fableHandlers } from './fable.handlers'
 import { gatewayHandlers } from './gateway.handlers'
 import { jobHandlers } from './job.handlers'
 import { pluginsHandlers } from './plugins.handlers'
-import { sourcesHandlers } from './sources.handlers'
+import { artifactsHandlers } from './artifacts.handlers'
 import { statusHandlers } from './status.handlers'
 import { usersHandlers } from './users.handlers'
 
@@ -31,7 +31,7 @@ export const handlers = [
   ...gatewayHandlers,
   ...jobHandlers,
   ...pluginsHandlers,
-  ...sourcesHandlers,
+  ...artifactsHandlers,
   ...statusHandlers,
   ...usersHandlers,
 ]

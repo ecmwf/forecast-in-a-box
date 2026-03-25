@@ -59,8 +59,8 @@ describe('i18n', () => {
       expect(i18n.options.ns).toContain('plugins')
     })
 
-    it('has sources namespace', () => {
-      expect(i18n.options.ns).toContain('sources')
+    it('has artifacts namespace', () => {
+      expect(i18n.options.ns).toContain('artifacts')
     })
 
     it('has common as default namespace', () => {

@@ -52,7 +52,7 @@ export function useShowConfig() {
 interface ExecutionCanvasProps {
   fable: FableBuilderV1
   catalogue: BlockFactoryCatalogue
-  status: JobStatus
+  status?: JobStatus
 }
 
 const nodeTypes: Record<string, typeof ExecutionNode> = {
@@ -101,7 +101,7 @@ function ExecutionCanvasInner({
           'relative h-[300px] overflow-hidden rounded-lg border',
           status === 'running' &&
             'border-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.3)]',
-          status === 'errored' &&
+          status === 'failed' &&
             'border-red-400 shadow-[0_0_12px_rgba(239,68,68,0.3)]',
           status === 'completed' && 'border-green-400',
         )}

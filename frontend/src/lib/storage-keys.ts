@@ -55,6 +55,14 @@ export const STORAGE_KEYS = {
   },
 
   /**
+   * Artifact-related storage keys (direct localStorage)
+   */
+  artifacts: {
+    /** Composite IDs of downloads in progress, so polling can resume after refresh */
+    pendingDownloads: 'fiab.artifacts.pending-downloads',
+  },
+
+  /**
    * Zustand store persistence keys
    */
   stores: {
@@ -64,8 +72,6 @@ export const STORAGE_KEYS = {
     config: 'fiab.store.config',
     /** Fable builder UI preferences */
     fableBuilder: 'fiab.store.fable-builder',
-    /** Client-side job metadata (name, description, tags, fable snapshot) */
-    jobMetadata: 'fiab.store.job-metadata',
   },
 } as const
 
@@ -89,7 +95,6 @@ export const STORE_VERSIONS = {
   ui: 4, // v4: Removed sidebar state
   config: 1,
   fableBuilder: 2, // v2: Removed configDisplayMode, added isMiniMapOpen
-  jobMetadata: 1,
 } as const
 
 /**

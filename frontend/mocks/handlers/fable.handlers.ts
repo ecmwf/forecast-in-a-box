@@ -25,8 +25,8 @@ import { API_ENDPOINTS } from '@/api/endpoints'
 interface SavedFableEntry {
   fable: FableBuilderV1
   name: string
-  display_name: string
-  display_description: string
+  display_name: string | null
+  display_description: string | null
   tags: Array<string>
   user_id: string
   created_at: string
@@ -141,7 +141,7 @@ export const fableHandlers = [
 
     savedFablesState[newId] = {
       fable: builder,
-      name: display_name,
+      name: display_name ?? '',
       display_name,
       display_description,
       tags,
@@ -157,11 +157,11 @@ export const fableHandlers = [
     await delay(300)
 
     const url = new URL(request.url)
-    const fableId = url.searchParams.get('fable_builder_id')
+    const fableId = url.searchParams.get('fable_id')
 
     if (!fableId) {
       return HttpResponse.json(
-        { message: 'Missing fable_builder_id parameter' },
+        { message: 'Missing fable_id parameter' },
         { status: 400 },
       )
     }

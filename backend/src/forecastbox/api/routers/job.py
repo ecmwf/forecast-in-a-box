@@ -275,7 +275,8 @@ async def get_result(
 @router.get("/{execution_id}/logs")
 async def get_logs(execution_id: str, attempt_count: int | None = None, user: UserRead = Depends(current_active_user)) -> Response:
     db_entity, cascade_job_id = await _id2cascExecution(execution_id, attempt_count)
-    return await _get_logs(cascade_job_id, orjson.dumps(db_entity))
+    entity_dict = {col.name: getattr(db_entity, col.name) for col in db_entity.__table__.columns}
+    return await _get_logs(cascade_job_id, orjson.dumps(entity_dict))
 
 
 @router.delete("/delete")

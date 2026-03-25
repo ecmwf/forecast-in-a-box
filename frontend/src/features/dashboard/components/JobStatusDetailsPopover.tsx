@@ -48,9 +48,10 @@ const statusDotColors: Record<string, string> = {
 /** Statuses always shown regardless of count */
 const PRIMARY_STATUSES: ReadonlyArray<JobStatus> = [
   'running',
+  'preparing',
   'submitted',
   'completed',
-  'errored',
+  'failed',
 ]
 
 interface StatusRowProps {

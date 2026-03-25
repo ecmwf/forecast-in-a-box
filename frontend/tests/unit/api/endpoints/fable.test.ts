@@ -176,7 +176,7 @@ describe('retrieveFable', () => {
     expect(result.display_name).toBe('My Config')
   })
 
-  it('sends fable_builder_id as query parameter', async () => {
+  it('sends fable_id as query parameter', async () => {
     let capturedUrl: string | null = null
 
     worker.use(
@@ -196,7 +196,7 @@ describe('retrieveFable', () => {
     )
 
     await retrieveFable('fable-456')
-    expect(capturedUrl).toContain('fable_builder_id=fable-456')
+    expect(capturedUrl).toContain('fable_id=fable-456')
   })
 })
 

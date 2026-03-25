@@ -26,6 +26,10 @@ Therefore there is not enough coverage in terms of job variety -- see the
 test_submit_job.py
 """
 
+import io
+import os
+import zipfile
+
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
 from forecastbox.api.types.fable import FableBuilder, FableSaveRequest
@@ -305,6 +309,14 @@ def test_fable_v2_basic_execute(tmpdir, backend_client_with_auth):
     available_tasks = avail_resp.json()
     assert isinstance(available_tasks, list)
     assert len(available_tasks) > 0
+
+    logs_resp = backend_client_with_auth.get(f"/job/{execution_id}/logs")
+    assert logs_resp.is_success, logs_resp.text
+    assert "zip" in logs_resp.headers["content-type"]
+    with zipfile.ZipFile(io.BytesIO(logs_resp.content), "r") as zf:
+        # NOTE dbEntity, gwState, gateway, controller, host0, host0.dsr, host0.shm, host0.w1, host0.w2
+        expected_log_count = 9
+        assert len(zf.namelist()) == expected_log_count or os.getenv("FIAB_LOGSTDOUT", "nay") == "yea"
 
 
 def test_submit_job_v2_execute_missing_definition_id(backend_client_with_auth):

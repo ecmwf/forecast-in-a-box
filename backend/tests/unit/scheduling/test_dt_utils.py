@@ -3,7 +3,7 @@ from datetime import datetime
 
 import pytest
 
-from forecastbox.api.scheduling.dt_utils import calculate_next_run, parse_crontab
+from forecastbox.api.scheduling.dt_utils import calculate_next_run, current_scheduling_time, parse_crontab
 
 
 def test_parse_crontab_valid(subtests):
@@ -112,3 +112,11 @@ def test_next_run_endofyear():
     cron_tab = "0 0 * * *"
     expected = datetime(2026, 1, 1, 0, 0, 0)
     assert calculate_next_run(after, cron_tab) == expected
+
+
+def test_current_scheduling_time():
+    before = datetime.now()
+    result = current_scheduling_time()
+    after = datetime.now()
+    assert isinstance(result, datetime)
+    assert before <= result <= after

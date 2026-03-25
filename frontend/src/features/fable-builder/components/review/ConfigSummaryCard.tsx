@@ -19,7 +19,6 @@ import {
 } from '@/features/fable-builder/stores/fableBuilderStore'
 import { P } from '@/components/base/typography'
 import { getFactory } from '@/api/types/fable.types'
-import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
 interface ConfigSummaryCardProps {
@@ -66,10 +65,10 @@ export function ConfigSummaryCard({
       <div className="mb-2 flex items-center justify-between">
         <span className="font-medium">{factory.title}</span>
         {hasErrors && (
-          <Badge variant="destructive" className="gap-1 text-sm">
+          <span className="inline-flex items-center gap-1 rounded border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-sm font-medium text-destructive">
             <AlertCircle className="h-3 w-3" />
             {errors.length}
-          </Badge>
+          </span>
         )}
       </div>
 
@@ -110,9 +109,9 @@ export function ConfigSummaryCard({
               className="flex items-center justify-between text-sm"
             >
               <span className="text-muted-foreground">{inputName}:</span>
-              <Badge variant="outline" className="text-sm">
+              <span className="rounded border border-border bg-card px-2 py-0.5 text-sm text-muted-foreground">
                 {sourceTitle}
-              </Badge>
+              </span>
             </div>
           ))}
         </div>

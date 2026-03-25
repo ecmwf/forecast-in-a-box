@@ -23,10 +23,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fiab_core.artifacts import ArtifactsProvider
 from starlette.exceptions import HTTPException
 
 import forecastbox.db
-from forecastbox.api.artifacts.manager import join_artifact_manager, submit_refresh_catalog
+from forecastbox.api.artifacts.base import get_artifact_local_path
+from forecastbox.api.artifacts.manager import ArtifactManager, join_artifact_manager, submit_refresh_catalog
 from forecastbox.api.plugin.manager import PluginsStatus, join_updater_thread, submit_load_plugins
 from forecastbox.api.plugin.manager import status_brief as status_plugins
 from forecastbox.api.plugin.store import join_stores_thread, submit_initialize_stores
@@ -52,9 +54,13 @@ async def lifespan(app: FastAPI):
         start_scheduler()
     release_time, release_version = get_local_release()
     app.version = f"{release_version}@{release_time}"
-    submit_load_plugins()
     submit_initialize_stores()
-    submit_refresh_catalog()
+    ArtifactsProvider.register_get_checkpoint_lookup(lambda: ArtifactManager.catalog)
+    ArtifactsProvider.register_get_artifact_local_path(
+        lambda composite_id: get_artifact_local_path(composite_id, Path(config.api.data_path))
+    )
+    catalog_ready = submit_refresh_catalog()
+    submit_load_plugins(start_after=catalog_ready)
     yield
     if config.api.allow_scheduler:
         stop_scheduler()
@@ -163,7 +169,9 @@ def status() -> StatusResponse:
     import requests
 
     try:
-        response = requests.get(f"{config.api.model_repository}/MANIFEST", timeout=1)
+        # TODO this is not good: we dont want a timeout=5 for the status endpoint, the status should return under a sec
+        # we probably need to evaluate this async, returing cached value, possibly `unknown` in case refresh in progres
+        response = requests.get(f"{config.api.model_repository}/MANIFEST", timeout=5)
         if response.status_code == 200:
             status["ecmwf"] = "up"
         else:

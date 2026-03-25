@@ -23,7 +23,6 @@ import { FableFormCanvas } from './form-mode'
 import { ReviewStep as ReviewStepComponent } from './review'
 import type { PresetId } from '@/features/fable-builder/presets'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
-import type { FableMetadataStore } from '@/features/fable-builder/components/SaveConfigPopover'
 import { useURLStateSync } from '@/features/fable-builder/hooks/useURLStateSync'
 import { getPreset } from '@/features/fable-builder/presets'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
@@ -33,6 +32,7 @@ import { toValidationState } from '@/api/types/fable.types'
 import {
   useBlockCatalogue,
   useFable,
+  useFableRetrieve,
   useFableValidation,
 } from '@/api/hooks/useFable'
 import { H2, P } from '@/components/base/typography'
@@ -41,7 +41,6 @@ import { Button } from '@/components/ui/button'
 import { useAuth } from '@/features/auth/AuthContext'
 import { useUser } from '@/hooks/useUser'
 import { ApiClientError } from '@/api/client'
-import { STORAGE_KEYS } from '@/lib/storage-keys'
 
 /**
  * Extract a user-friendly error message from a validation error
@@ -113,6 +112,7 @@ export function FableBuilderPage({
     isLoading: fableLoading,
     error: fableError,
   } = useFable(fableId ?? null)
+  const { data: fableRetrieveData } = useFableRetrieve(fableId ?? null)
 
   const {
     data: validationResult,
@@ -127,21 +127,11 @@ export function FableBuilderPage({
 
     if (fableId && existingFable) {
       setFable(existingFable, fableId)
-      // Restore saved title from metadata store without marking dirty
-      try {
-        const raw = localStorage.getItem(STORAGE_KEYS.fable.metadata)
-        if (raw) {
-          const metadata = JSON.parse(raw) as FableMetadataStore
-          const entry = metadata[fableId] as
-            | FableMetadataStore[string]
-            | undefined
-          const savedTitle = entry?.title
-          if (savedTitle) {
-            useFableBuilderStore.setState({ fableName: savedTitle })
-          }
-        }
-      } catch {
-        // Ignore parse errors — title stays as default
+      // Restore saved title from backend metadata without marking dirty
+      if (fableRetrieveData?.display_name) {
+        useFableBuilderStore.setState({
+          fableName: fableRetrieveData.display_name,
+        })
       }
       initializedRef.current = true
     } else if (!fableId && !encodedState) {
@@ -161,7 +151,7 @@ export function FableBuilderPage({
       // URL state sync will handle this case
       initializedRef.current = true
     }
-  }, [fableId, existingFable, preset, encodedState])
+  }, [fableId, existingFable, fableRetrieveData, preset, encodedState])
 
   useEffect(() => {
     setIsValidating(isValidating || isRevalidating)

@@ -11,46 +11,34 @@
 /**
  * JobListItem Component
  *
- * A single job row in the executions list.
+ * A single job row in the executions list, styled consistently with PresetRow.
  */
 
-import { useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
-import {
-  AlertCircle,
-  CheckCircle2,
-  HelpCircle,
-  Hourglass,
-  Loader2,
-  MoreVertical,
-  Pencil,
-  Timer,
-} from 'lucide-react'
+import { AlertCircle, CheckCircle2, Hourglass, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
-import type { JobProgressResponse, JobStatus } from '@/api/types/job.types'
-import type { JobMetadata } from '@/features/executions/stores/useJobMetadataStore'
-import { EditJobMetadataDialog } from '@/features/executions/components/EditJobMetadataDialog'
-import { getStatusBarColor } from '@/features/executions/utils/job-status'
-import { Button } from '@/components/ui/button'
+import type { JobExecutionDetail, JobStatus } from '@/api/types/job.types'
+import { useBlockCatalogue, useFableRetrieve } from '@/api/hooks/useFable'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+  BLOCK_KIND_METADATA,
+  BLOCK_KIND_ORDER,
+  getBlocksByKind,
+} from '@/api/types/fable.types'
+import { getStatusBarColor } from '@/features/executions/utils/job-status'
 import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
 
 interface JobListItemProps {
   jobId: string
-  status: JobProgressResponse
-  metadata: JobMetadata | undefined
+  status: JobExecutionDetail
+  fableId: string
 }
 
 function StatusIcon({ status }: { status: JobStatus }) {
   switch (status) {
     case 'submitted':
+    case 'preparing':
       return <Hourglass className="h-5 w-5 text-blue-500" />
     case 'running':
       return <Loader2 className="h-5 w-5 animate-spin text-amber-500" />
@@ -58,20 +46,16 @@ function StatusIcon({ status }: { status: JobStatus }) {
       return (
         <CheckCircle2 className="h-5 w-5 fill-emerald-500 text-emerald-500" />
       )
-    case 'errored':
-    case 'invalid':
+    case 'failed':
       return <AlertCircle className="h-5 w-5 fill-red-500 text-red-500" />
-    case 'timeout':
-      return <Timer className="h-5 w-5 text-orange-500" />
-    default:
-      return <HelpCircle className="h-5 w-5 text-gray-500" />
   }
 }
 
-export function JobListItem({ jobId, status, metadata }: JobListItemProps) {
+export function JobListItem({ jobId, status, fableId }: JobListItemProps) {
   const { t } = useTranslation('executions')
-  const [editOpen, setEditOpen] = useState(false)
-  const progress = parseFloat(status.progress) || 0
+  const { data: fableData } = useFableRetrieve(fableId)
+  const { data: catalogue } = useBlockCatalogue()
+  const progress = parseFloat(status.progress ?? '0') || 0
   const isRunning = status.status === 'running'
 
   const createdAt = status.created_at
@@ -79,48 +63,78 @@ export function JobListItem({ jobId, status, metadata }: JobListItemProps) {
     : null
 
   const truncatedId = jobId.length > 12 ? `${jobId.slice(0, 12)}...` : jobId
+  const displayName = fableData?.display_name || t('detail.untitledJob')
+  const tags = fableData?.tags ?? []
 
   return (
     <div className="p-6 transition-colors hover:bg-muted/50">
       <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-        <div className="mt-1 shrink-0 sm:mt-0">
-          <StatusIcon status={status.status} />
-        </div>
-
+        {/* Content */}
         <div className="grow">
           <div className="mb-1 flex items-center gap-2">
+            <StatusIcon status={status.status} />
             <Link
               to="/executions/$jobId"
               params={{ jobId }}
-              className="text-sm font-medium hover:underline"
+              className="truncate font-medium hover:underline"
             >
-              {metadata?.name || t('detail.untitledJob')}
+              {displayName}
             </Link>
           </div>
-          {metadata?.description && (
-            <P className="mb-1 line-clamp-1 text-muted-foreground">
-              {metadata.description}
+          {fableData?.display_description && (
+            <P className="mb-2 line-clamp-1 text-sm text-muted-foreground">
+              {fableData.display_description}
             </P>
           )}
-          <div className="mb-2 text-sm text-muted-foreground">
-            {t(`status.${status.status}`)}
-            {createdAt && <> · {createdAt}</>}
-          </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             <span className="rounded border border-border bg-muted px-2 py-0.5 font-mono text-sm text-muted-foreground">
               #{truncatedId}
             </span>
-            {metadata?.tags.map((tag) => (
-              <span
-                key={tag}
-                className="rounded border border-border bg-card px-2 py-0.5 text-sm text-muted-foreground"
-              >
-                {tag}
-              </span>
-            ))}
+            {fableData?.builder && catalogue && (
+              <div className="flex flex-wrap gap-1.5">
+                {BLOCK_KIND_ORDER.filter(
+                  (kind) =>
+                    getBlocksByKind(fableData.builder, catalogue, kind).length >
+                    0,
+                ).map((kind) => {
+                  const meta = BLOCK_KIND_METADATA[kind]
+                  const count = getBlocksByKind(
+                    fableData.builder,
+                    catalogue,
+                    kind,
+                  ).length
+                  return (
+                    <span
+                      key={kind}
+                      className="rounded bg-muted px-2 py-1 text-sm text-muted-foreground"
+                    >
+                      {count} {meta.label.toLowerCase()}
+                      {count !== 1 ? 's' : ''}
+                    </span>
+                  )
+                })}
+              </div>
+            )}
+            {tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-xs text-primary"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+            <P className="text-sm text-muted-foreground">
+              {t(`status.${status.status}`)}
+              {createdAt && <> · {createdAt}</>}
+            </P>
           </div>
         </div>
 
+        {/* Actions */}
         <div className="mt-2 flex w-full items-center justify-between gap-6 sm:mt-0 sm:w-auto sm:justify-end">
           {isRunning ? (
             <div className="flex w-32 items-center gap-3">
@@ -145,7 +159,7 @@ export function JobListItem({ jobId, status, metadata }: JobListItemProps) {
             >
               {t('outputs.view')}
             </Link>
-          ) : status.status === 'errored' || status.status === 'invalid' ? (
+          ) : status.status === 'failed' ? (
             <Link
               to="/executions/$jobId"
               params={{ jobId }}
@@ -162,35 +176,8 @@ export function JobListItem({ jobId, status, metadata }: JobListItemProps) {
               {t('outputs.inspect')}
             </Link>
           )}
-
-          {metadata && (
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button variant="ghost" size="icon" className="h-8 w-8" />
-                }
-              >
-                <MoreVertical className="h-4 w-4" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setEditOpen(true)}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  {t('actions.edit')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
         </div>
       </div>
-
-      {metadata && (
-        <EditJobMetadataDialog
-          open={editOpen}
-          onOpenChange={setEditOpen}
-          jobId={jobId}
-          metadata={metadata}
-        />
-      )}
     </div>
   )
 }
