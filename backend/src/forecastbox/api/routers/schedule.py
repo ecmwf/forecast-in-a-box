@@ -94,6 +94,23 @@ class ScheduleRunsResponse:
     error: str | None = None
 
 
+def _resolve_next_run(first_run_override: dt.datetime | None, max_delay_hours: int, cron_expr: str) -> dt.datetime:
+    """Return first_run_override if provided and within max_delay_hours of now, else calculate next cron tick.
+
+    Raises HTTPException 400 if first_run_override is provided but older than max_delay_hours.
+    """
+    now = current_scheduling_time()
+    if first_run_override is not None:
+        age_hours = (now - first_run_override).total_seconds() / 3600
+        if age_hours > max_delay_hours:
+            raise HTTPException(
+                status_code=400,
+                detail=f"first_run_override is {age_hours:.2f}h old, which exceeds max_acceptable_delay_hours={max_delay_hours}.",
+            )
+        return first_run_override
+    return calculate_next_run(now, cron_expr)
+
+
 def _experiment_to_response(exp: ExperimentDefinition) -> ScheduleDefinitionResponse:
     exp_def = cast(dict, exp.experiment_definition) or {}
     return ScheduleDefinitionResponse(
@@ -167,7 +184,7 @@ async def create_schedule(
         tags=schedule_spec.tags,
     )
 
-    next_run_at = calculate_next_run(current_scheduling_time(), schedule_spec.cron_expr)
+    next_run_at = _resolve_next_run(schedule_spec.first_run_override, schedule_spec.max_acceptable_delay_hours, schedule_spec.cron_expr)
     await db_jobs.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=next_run_at)
     logger.debug(f"V2 schedule {experiment_id}: next run at {next_run_at}")
     prod_scheduler()
@@ -231,9 +248,9 @@ async def update_schedule(
             tags=cast(list[str] | None, current.tags),
         )
 
-        if update.cron_expr is not None or update.enabled is not None:
+        if update.cron_expr is not None or update.enabled is not None or update.first_run_override is not None:
             if new_enabled:
-                next_run_at = calculate_next_run(current_scheduling_time(), new_cron_expr)
+                next_run_at = _resolve_next_run(update.first_run_override, new_max_delay, new_cron_expr)
                 await db_jobs.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=next_run_at)
                 logger.debug(f"V2 schedule {experiment_id}: regenerated next run at {next_run_at}")
             else:

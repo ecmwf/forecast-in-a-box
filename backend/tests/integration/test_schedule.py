@@ -12,11 +12,16 @@
 - v2 schedule runs read model (GET /schedule/runs)."""
 
 import datetime as dt
+import pathlib
+import time
 
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
 from forecastbox.api.types.fable import FableBuilder, FableSaveRequest
 from forecastbox.api.types.scheduling import ScheduleSpecification, ScheduleUpdate
+
+from .conftest import testPluginId
+from .utils import ensure_completed_v2, ensure_schedule_run_v2
 
 # *** helpers **
 
@@ -31,6 +36,42 @@ def _save_fable(client) -> tuple[str, int]:
     )
     builder = FableBuilder(blocks={"source1": source})
     resp = client.post("/fable/upsert", json=FableSaveRequest(builder=builder, display_name="sched-v2 test").model_dump())
+    assert resp.is_success, resp.text
+    data = resp.json()
+    return data["id"], data["version"]
+
+
+def _save_full_fable(client, output_path: str) -> tuple[str, int]:
+    """Save a full FableBuilder (with sink) and return (job_definition_id, version)."""
+    source_42 = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="source_42"),
+        configuration_values={},
+        input_ids={},
+    )
+    transform_increment = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="transform_increment"),
+        configuration_values={"amount": "1"},
+        input_ids={"a": "source_42"},
+    )
+    product_join = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="product_join"),
+        configuration_values={},
+        input_ids={"a": "transform_increment", "b": "source_42"},
+    )
+    sink_file = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
+        configuration_values={"fname": output_path},
+        input_ids={"data": "product_join"},
+    )
+    builder = FableBuilder(
+        blocks={
+            "source_42": source_42,
+            "transform_increment": transform_increment,
+            "product_join": product_join,
+            "sink_file": sink_file,
+        }
+    )
+    resp = client.post("/fable/upsert", json=FableSaveRequest(builder=builder).model_dump())
     assert resp.is_success, resp.text
     data = resp.json()
     return data["id"], data["version"]
@@ -286,3 +327,30 @@ def test_schedule_v2_runs_independent_per_experiment(backend_client_with_auth):
     assert r1.is_success and r2.is_success
     assert r1.json()["total"] == 0
     assert r2.json()["total"] == 0
+
+
+def test_schedule_v2_execute(tmpdir, backend_client_with_auth):
+    """Create a schedule with first_run_override in the past; verify the scheduler executes it and produces the correct output."""
+    output_path = str(pathlib.Path(str(tmpdir)) / "output")
+    job_def_id, job_def_version = _save_full_fable(backend_client_with_auth, output_path)
+
+    first_run_override = dt.datetime.now() - dt.timedelta(minutes=5)
+    spec = ScheduleSpecification(
+        job_definition_id=job_def_id,
+        job_definition_version=job_def_version,
+        cron_expr="0 0 * * *",
+        max_acceptable_delay_hours=1,
+        first_run_override=first_run_override,
+    )
+    create_resp = backend_client_with_auth.put(
+        "/schedule/create",
+        headers={"Content-Type": "application/json"},
+        json=spec.model_dump(mode="json"),
+    )
+    assert create_resp.is_success, create_resp.text
+    experiment_id = create_resp.json()["experiment_id"]
+
+    execution_id = ensure_schedule_run_v2(backend_client_with_auth, experiment_id, sleep=1, attempts=30)
+    ensure_completed_v2(backend_client_with_auth, execution_id, sleep=1, attempts=120)
+
+    assert pathlib.Path(output_path).read_text() == "85"  # 42 + 1 + 42
