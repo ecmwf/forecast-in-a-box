@@ -73,4 +73,4 @@ def previous_cleanup():
             # NOTE likely some earlier kill brought this one down too
             pass
         except Exception as e:
-            logger.error(f"failed to stop {p.pid()} with {repr(e)}, continuing despite that")
+            logger.error(f"failed to stop {p.pid} with {repr(e)}, continuing despite that")
