@@ -12,6 +12,7 @@
  * Job & Execution API Endpoints
  */
 
+import { z } from 'zod'
 import type {
   JobExecuteRequest,
   JobExecuteResponse,
@@ -19,6 +20,12 @@ import type {
   JobExecutionList,
   JobStatus,
   ProductToOutputId,
+} from '@/api/types/job.types'
+import {
+  JobExecuteResponseSchema,
+  JobExecutionDetailSchema,
+  JobExecutionListSchema,
+  ProductToOutputIdSchema,
 } from '@/api/types/job.types'
 import { ApiClientError, apiClient } from '@/api/client'
 import { API_ENDPOINTS } from '@/api/endpoints'
@@ -28,7 +35,9 @@ import { STORAGE_KEYS } from '@/lib/storage-keys'
 export async function executeJob(
   request: JobExecuteRequest,
 ): Promise<JobExecuteResponse> {
-  return apiClient.post(API_ENDPOINTS.job.execute, request)
+  return apiClient.post(API_ENDPOINTS.job.execute, request, {
+    schema: JobExecuteResponseSchema,
+  })
 }
 
 export async function getJobsStatus(
@@ -40,7 +49,10 @@ export async function getJobsStatus(
   if (status) {
     params.status = status
   }
-  return apiClient.get(API_ENDPOINTS.job.status, { params })
+  return apiClient.get(API_ENDPOINTS.job.status, {
+    params,
+    schema: JobExecutionListSchema,
+  })
 }
 
 function buildFullUrl(path: string, params?: Record<string, string>): string {
@@ -70,19 +82,25 @@ function buildHeaders(): HeadersInit {
 export async function getJobStatus(
   executionId: string,
 ): Promise<JobExecutionDetail> {
-  return apiClient.get(API_ENDPOINTS.job.statusById(executionId))
+  return apiClient.get(API_ENDPOINTS.job.statusById(executionId), {
+    schema: JobExecutionDetailSchema,
+  })
 }
 
 export async function getJobOutputs(
   executionId: string,
 ): Promise<Array<ProductToOutputId>> {
-  return apiClient.get(API_ENDPOINTS.job.outputs(executionId))
+  return apiClient.get(API_ENDPOINTS.job.outputs(executionId), {
+    schema: z.array(ProductToOutputIdSchema),
+  })
 }
 
 export async function getJobAvailable(
   executionId: string,
 ): Promise<Array<string>> {
-  return apiClient.get(API_ENDPOINTS.job.available(executionId))
+  return apiClient.get(API_ENDPOINTS.job.available(executionId), {
+    schema: z.array(z.string()),
+  })
 }
 
 export async function getJobResult(
@@ -132,11 +150,13 @@ export async function downloadJobLogs(executionId: string): Promise<Blob> {
 export async function restartJob(
   executionId: string,
 ): Promise<JobExecuteResponse> {
-  return apiClient.post(API_ENDPOINTS.job.restart(executionId))
+  return apiClient.post(API_ENDPOINTS.job.restart(executionId), undefined, {
+    schema: JobExecuteResponseSchema,
+  })
 }
 
 export async function deleteJob(executionId: string): Promise<void> {
-  return apiClient.delete(
-    `${API_ENDPOINTS.job.delete}?execution_id=${executionId}`,
-  )
+  return apiClient.delete(API_ENDPOINTS.job.delete, {
+    params: { execution_id: executionId },
+  })
 }

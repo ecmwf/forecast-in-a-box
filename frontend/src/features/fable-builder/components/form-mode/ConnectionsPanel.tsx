@@ -17,8 +17,9 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { AlertTriangle, ChevronRight } from 'lucide-react'
-import { AddBlockNode, MiniPipelineNode } from './mini-graph'
-import type { ControlDirection } from './mini-graph'
+import { AddBlockNode } from './mini-graph/AddBlockNode'
+import { MiniPipelineNode } from './mini-graph/MiniPipelineNode'
+import type { ControlDirection } from './mini-graph/NodeControls'
 import type { Edge, Node, NodeTypes } from '@xyflow/react'
 import type {
   BlockFactoryCatalogue,

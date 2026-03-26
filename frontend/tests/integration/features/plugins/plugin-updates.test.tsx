@@ -27,7 +27,10 @@ import { useMemo, useState } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithRouter } from '@tests/utils/render'
 import type { PluginCompositeId, PluginInfo } from '@/api/types/plugins.types'
-import type { CapabilityFilter, StatusFilter } from '@/features/plugins'
+import type {
+  CapabilityFilter,
+  StatusFilter,
+} from '@/features/plugins/components/PluginsFilters'
 import {
   useDisablePlugin,
   useEnablePlugin,
@@ -38,13 +41,11 @@ import {
   useUpdatePlugin,
 } from '@/api/hooks/usePlugins'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
-import {
-  PluginsFilters,
-  PluginsList,
-  PluginsPageHeader,
-  UninstalledPluginsSection,
-  UpdatesAvailableSection,
-} from '@/features/plugins'
+import { PluginsFilters } from '@/features/plugins/components/PluginsFilters'
+import { PluginsList } from '@/features/plugins/components/PluginsList'
+import { PluginsPageHeader } from '@/features/plugins/components/PluginsPageHeader'
+import { UninstalledPluginsSection } from '@/features/plugins/components/UninstalledPluginsSection'
+import { UpdatesAvailableSection } from '@/features/plugins/components/UpdatesAvailableSection'
 
 // Mock useMedia to simulate desktop layout
 vi.mock('@/hooks/useMedia', () => ({

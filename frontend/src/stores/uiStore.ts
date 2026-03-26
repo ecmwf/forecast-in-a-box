@@ -66,7 +66,7 @@ const initialState = {
   panelShadow: 'none' as PanelShadow,
   pluginsViewMode: 'table' as AdminViewMode,
   modelsViewMode: 'table' as AdminViewMode,
-  artifactsViewMode: 'card' as AdminViewMode,
+  artifactsViewMode: 'table' as AdminViewMode,
 }
 
 export const useUiStore = create<UiState>()(
@@ -151,6 +151,11 @@ export const useUiStore = create<UiState>()(
           // Migration from v3 to v4: Remove sidebar state
           if (version < 4) {
             delete state.isSidebarOpen
+          }
+
+          // Migration from v4 to v5: Default artifacts view to table
+          if (version < 5) {
+            state.artifactsViewMode = 'table'
           }
 
           return state as {

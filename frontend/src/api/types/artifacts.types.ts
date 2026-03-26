@@ -57,7 +57,7 @@ export const MlModelOverviewSchema = z.object({
   composite_id: CompositeArtifactIdSchema,
   display_name: z.string(),
   display_author: z.string(),
-  disk_size_bytes: z.number().nullable(),
+  disk_size_bytes: z.number(),
   supported_platforms: z.array(z.string()),
   is_available: z.boolean(),
 })
@@ -69,16 +69,10 @@ export type MlModelOverview = z.infer<typeof MlModelOverviewSchema>
  */
 export const MlModelDetailSchema = MlModelOverviewSchema.extend({
   display_description: z.string(),
-  url: z.string().nullable(),
+  url: z.string(),
   pip_package_constraints: z.array(z.string()),
-  output_characteristics: z.union([
-    z.array(z.string()),
-    z.record(z.string(), z.unknown()),
-  ]),
-  input_characteristics: z.union([
-    z.array(z.string()),
-    z.record(z.string(), z.unknown()),
-  ]),
+  output_characteristics: z.array(z.string()),
+  input_characteristics: z.array(z.string()),
 })
 
 export type MlModelDetail = z.infer<typeof MlModelDetailSchema>
@@ -108,8 +102,8 @@ export type ArtifactActionResponse = z.infer<
 /**
  * Format bytes to human-readable string
  */
-export function formatBytes(bytes: number | null): string {
-  if (bytes === null || bytes === 0) return '-'
+export function formatBytes(bytes: number): string {
+  if (bytes === 0) return '-'
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
   const i = Math.floor(Math.log(bytes) / Math.log(1024))
   const value = bytes / Math.pow(1024, i)
@@ -125,7 +119,7 @@ export interface ArtifactInfo {
   displayName: string
   author: string
   diskSize: string
-  diskSizeBytes: number | null
+  diskSizeBytes: number
   platforms: Array<string>
   isAvailable: boolean
 }

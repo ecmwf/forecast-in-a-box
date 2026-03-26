@@ -76,7 +76,7 @@ export function ConfigSummaryCard({
         <div className="mb-2 rounded bg-destructive/10 p-2 text-sm text-destructive">
           <ul className="list-disc space-y-0.5 pl-4">
             {errors.map((error, index) => (
-              <li key={index}>{error}</li>
+              <li key={`${error}-${index}`}>{error}</li>
             ))}
           </ul>
         </div>

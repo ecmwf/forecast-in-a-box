@@ -25,7 +25,7 @@ import {
   Wrench,
 } from 'lucide-react'
 import type { NavigateFn } from '@tanstack/react-router'
-import type { Command } from './index'
+import type { Command } from './registry'
 
 /**
  * Create navigation commands with the router navigate function

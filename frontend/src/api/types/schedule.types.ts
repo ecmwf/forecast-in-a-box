@@ -9,85 +9,105 @@
  */
 
 /**
- * Schedule Types
+ * Schedule Types & Schemas
  *
- * TypeScript types matching the backend schedule API (Pydantic models).
+ * TypeScript types matching the backend schedule API.
  */
 
-import type { JobStatus } from '@/api/types/job.types'
+import { z } from 'zod'
+import { JobStatusSchema } from '@/api/types/job.types'
 
-/** PUT /schedule/create - request body */
+// ---------------------------------------------------------------------------
+// Schemas — must match backend dataclasses in routers/schedule.py
+// ---------------------------------------------------------------------------
+
+/** schedule.py: ScheduleDefinitionResponse */
+export const ScheduleDefinitionResponseSchema = z.object({
+  experiment_id: z.string(),
+  experiment_version: z.number(),
+  job_definition_id: z.string(),
+  job_definition_version: z.number(),
+  cron_expr: z.string(),
+  dynamic_expr: z.record(z.string(), z.string()),
+  max_acceptable_delay_hours: z.number(),
+  enabled: z.boolean(),
+  created_at: z.string(),
+  created_by: z.string().nullable(),
+  display_name: z.string().nullable(),
+  display_description: z.string().nullable(),
+  tags: z.array(z.string()).nullable(),
+})
+
+/** schedule.py: ListSchedulesResponse */
+export const ScheduleListResponseSchema = z.object({
+  schedules: z.array(ScheduleDefinitionResponseSchema),
+  total: z.number(),
+  page: z.number(),
+  page_size: z.number(),
+  total_pages: z.number(),
+  error: z.string().nullable(),
+})
+
+/** schedule.py: CreateScheduleResponse */
+export const CreateScheduleResponseSchema = z.object({
+  experiment_id: z.string(),
+})
+
+/** schedule.py: ScheduleRunResponse; status narrowed from str to known values) */
+export const ScheduleRunResponseSchema = z.object({
+  execution_id: z.string(),
+  attempt_count: z.number(),
+  status: JobStatusSchema,
+  created_at: z.string(),
+  updated_at: z.string(),
+  experiment_context: z.string().nullable(),
+})
+
+/** schedule.py: ScheduleRunsResponse */
+export const ScheduleRunsResponseSchema = z.object({
+  runs: z.array(ScheduleRunResponseSchema),
+  total: z.number(),
+  page: z.number(),
+  page_size: z.number(),
+  total_pages: z.number(),
+  error: z.string().nullable(),
+})
+
+// ---------------------------------------------------------------------------
+// Types (derived from schemas)
+// ---------------------------------------------------------------------------
+
+export type ScheduleDefinitionResponse = z.infer<
+  typeof ScheduleDefinitionResponseSchema
+>
+export type ScheduleListResponse = z.infer<typeof ScheduleListResponseSchema>
+export type CreateScheduleResponse = z.infer<
+  typeof CreateScheduleResponseSchema
+>
+export type ScheduleRunResponse = z.infer<typeof ScheduleRunResponseSchema>
+export type ScheduleRunsResponse = z.infer<typeof ScheduleRunsResponseSchema>
+
+/** PUT /schedule/create - request body (not validated — outbound only) */
 export interface ScheduleSpecification {
   job_definition_id: string
   job_definition_version?: number
   cron_expr: string
   dynamic_expr: Record<string, unknown>
   max_acceptable_delay_hours: number
+  first_run_override?: string
   display_name?: string
   display_description?: string
   tags?: Array<string>
 }
 
-/** POST /schedule/update - request body (all fields optional) */
+/** POST /schedule/update - request body (not validated — outbound only) */
 export interface ScheduleUpdate {
   enabled?: boolean
   cron_expr?: string
   dynamic_expr?: Record<string, unknown>
   max_acceptable_delay_hours?: number
+  first_run_override?: string
   display_name?: string
   display_description?: string
   tags?: Array<string>
-}
-
-/** GET /schedule/get - response */
-export interface ScheduleDefinitionResponse {
-  experiment_id: string
-  experiment_version: number
-  job_definition_id: string
-  job_definition_version: number
-  cron_expr: string | null
-  dynamic_expr: Record<string, unknown>
-  max_acceptable_delay_hours: number
-  enabled: boolean
-  created_at: string
-  created_by: string | null
-  display_name: string | null
-  display_description: string | null
-  tags: Array<string> | null
-}
-
-/** GET /schedule/list - paginated response */
-export interface ScheduleListResponse {
-  schedules: Array<ScheduleDefinitionResponse>
-  total: number
-  page: number
-  page_size: number
-  total_pages: number
-}
-
-/** PUT /schedule/create - response */
-export interface CreateScheduleResponse {
-  experiment_id: string
-}
-
-export type ScheduleRunTrigger = 'cron' | 'rerun' | 'cron_skipped' | 'event'
-
-/** GET /schedule/runs - individual run */
-export interface ScheduleRunResponse {
-  execution_id: string
-  attempt_count: number
-  experiment_id: string
-  status: JobStatus | null
-  trigger: ScheduleRunTrigger
-  scheduled_at: string
-  created_at: string
-}
-
-/** GET /schedule/runs - paginated response */
-export interface ScheduleRunsResponse {
-  runs: Array<ScheduleRunResponse>
-  total: number
-  page: number
-  page_size: number
-  total_pages: number
 }

@@ -9,7 +9,7 @@
  */
 
 import { createFileRoute } from '@tanstack/react-router'
-import { FableBuilderPage } from '@/features/fable-builder'
+import { FableBuilderPage } from '@/features/fable-builder/components/FableBuilderPage'
 
 export const Route = createFileRoute('/_authenticated/configure/$fableId')({
   component: ConfigureEditPage,

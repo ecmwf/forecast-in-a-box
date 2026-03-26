@@ -105,13 +105,12 @@ export class ErrorBoundary extends Component<
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {this.state.error && (
-                <div className="rounded-lg bg-muted p-3">
-                  <P className="font-mono text-muted-foreground">
-                    {this.state.error.message}
-                  </P>
-                </div>
-              )}
+              <div className="rounded-lg bg-muted p-3">
+                <P className="font-mono text-muted-foreground">
+                  An unexpected error occurred. If the problem persists, please
+                  contact support.
+                </P>
+              </div>
               <div className="flex gap-2">
                 <Button onClick={this.handleReset} variant="outline">
                   Try Again

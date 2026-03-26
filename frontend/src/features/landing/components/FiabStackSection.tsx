@@ -42,13 +42,13 @@ export function FiabStackSection() {
                   variant="secondary"
                   size="sm"
                   className="ml-1.5 gap-1 pr-1.5"
+                  nativeButton={false}
                   render={
                     <RouterLink to="/about">
                       <span>Learn More</span>
                       <ChevronRight className="size-2" />
                     </RouterLink>
                   }
-                  nativeButton={false}
                 />
               </P>
             </div>

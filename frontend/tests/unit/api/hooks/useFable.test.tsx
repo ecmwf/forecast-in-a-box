@@ -508,6 +508,7 @@ describe('useCompileFable', () => {
         hosts: null,
         workers_per_host: null,
         environment_variables: {},
+        runtime_artifacts: [],
       },
       shared: false,
     }

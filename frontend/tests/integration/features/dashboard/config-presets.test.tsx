@@ -21,7 +21,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithRouter } from '@tests/utils/render'
 import type { FableMetadataStore } from '@/features/fable-builder/components/SaveConfigPopover'
-import { ConfigPresetsSection } from '@/features/dashboard'
+import { ConfigPresetsSection } from '@/features/dashboard/components/ConfigPresetsSection'
 import { PresetsPage } from '@/features/dashboard/components/PresetsPage'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
 

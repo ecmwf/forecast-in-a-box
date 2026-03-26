@@ -50,10 +50,10 @@ export function Footer() {
         )}
       >
         <div className="flex flex-wrap justify-center gap-6 text-sm">
-          {links.map((link, index) =>
+          {links.map((link) =>
             isExternalUrl(link.href) ? (
               <a
-                key={index}
+                key={link.title}
                 href={link.href}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -63,7 +63,7 @@ export function Footer() {
               </a>
             ) : (
               <Link
-                key={index}
+                key={link.title}
                 to={link.href}
                 className="block text-foreground/70 duration-150 hover:text-foreground"
               >

@@ -12,6 +12,8 @@
  * Cron Expression Utilities
  *
  * Pure utility functions for converting between cron expressions and human-readable formats.
+ * All time inputs/outputs face the user in their local timezone.
+ * Cron expressions are stored in server time.
  */
 
 export type CronFrequency = 'hourly' | 'daily' | 'weekly' | 'custom'
@@ -34,10 +36,44 @@ export interface CronPreset {
 }
 
 /**
- * Convert a cron expression to a human-readable string.
- * Handles common patterns; falls back to raw expression for complex ones.
+ * Convert server hour:minute to the client's local equivalent using the offset.
+ * offsetMs = (server time parsed as local) - (actual epoch), so:
+ * local = server-parsed - offset
  */
-export function cronToHumanReadable(cronExpr: string): string {
+export function serverHourMinuteToLocal(
+  hour: number,
+  minute: number,
+  offsetMs: number,
+): { hour: number; minute: number } {
+  const ref = new Date()
+  ref.setHours(hour, minute, 0, 0)
+  const local = new Date(ref.getTime() - offsetMs)
+  return { hour: local.getHours(), minute: local.getMinutes() }
+}
+
+/**
+ * Convert local hour:minute back to server time using the offset.
+ * Inverse of serverHourMinuteToLocal.
+ */
+export function localHourMinuteToServer(
+  hour: number,
+  minute: number,
+  offsetMs: number,
+): { hour: number; minute: number } {
+  const ref = new Date()
+  ref.setHours(hour, minute, 0, 0)
+  const server = new Date(ref.getTime() + offsetMs)
+  return { hour: server.getHours(), minute: server.getMinutes() }
+}
+
+/**
+ * Convert a cron expression to a human-readable string in local time.
+ * Falls back to raw expression for complex patterns.
+ */
+export function cronToHumanReadable(
+  cronExpr: string,
+  offsetMs?: number | null,
+): string {
   const parsed = parseCronForUI(cronExpr)
   if (!parsed) return cronExpr
 
@@ -46,10 +82,28 @@ export function cronToHumanReadable(cronExpr: string): string {
       return parsed.minute === 0
         ? 'Every hour'
         : `Every hour at minute ${String(parsed.minute).padStart(2, '0')}`
-    case 'daily':
-      return `Every day at ${formatTime(parsed.hour, parsed.minute)} UTC`
-    case 'weekly':
-      return `Every ${DAY_NAMES[parsed.dayOfWeek]} at ${formatTime(parsed.hour, parsed.minute)} UTC`
+    case 'daily': {
+      if (offsetMs != null) {
+        const local = serverHourMinuteToLocal(
+          parsed.hour,
+          parsed.minute,
+          offsetMs,
+        )
+        return `Every day at ${formatTime(local.hour, local.minute)} ${getLocalTimezone()}`
+      }
+      return `Every day at ${formatTime(parsed.hour, parsed.minute)} (server time)`
+    }
+    case 'weekly': {
+      if (offsetMs != null) {
+        const local = serverHourMinuteToLocal(
+          parsed.hour,
+          parsed.minute,
+          offsetMs,
+        )
+        return `Every ${DAY_NAMES[parsed.dayOfWeek]} at ${formatTime(local.hour, local.minute)} ${getLocalTimezone()}`
+      }
+      return `Every ${DAY_NAMES[parsed.dayOfWeek]} at ${formatTime(parsed.hour, parsed.minute)} (server time)`
+    }
     default:
       return cronExpr
   }
@@ -57,6 +111,7 @@ export function cronToHumanReadable(cronExpr: string): string {
 
 /**
  * Convert a frequency preset to a cron expression string.
+ * hour and minute are in SERVER time.
  */
 export function frequencyToCron(
   frequency: CronFrequency,
@@ -77,7 +132,7 @@ export function frequencyToCron(
 }
 
 /**
- * Parse a cron expression back into UI-friendly preset values.
+ * Parse a cron expression back into UI-friendly preset values (in server time).
  * Returns null if the expression doesn't match a known pattern.
  */
 export function parseCronForUI(cronExpr: string): CronPreset | null {
@@ -114,4 +169,35 @@ export function parseCronForUI(cronExpr: string): CronPreset | null {
 
 function formatTime(hour: number, minute: number): string {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+}
+
+/**
+ * Format a Date as a locale string with the UTC-offset timezone label.
+ * e.g. "26/03/2026, 14:20 UTC+7" instead of browser's "GMT+7"
+ */
+export function formatLocalDateTime(
+  date: Date,
+  opts?: { includeSeconds?: boolean },
+): string {
+  const formatted = date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    ...(opts?.includeSeconds ? { second: '2-digit' } : {}),
+  })
+  return `${formatted} ${getLocalTimezone()}`
+}
+
+/** Get the short timezone name for the client in UTC offset format (e.g. "UTC+7", "UTC-5") */
+export function getLocalTimezone(): string {
+  const offsetMin = new Date().getTimezoneOffset()
+  if (offsetMin === 0) return 'UTC'
+  const sign = offsetMin < 0 ? '+' : '-'
+  const absHours = Math.floor(Math.abs(offsetMin) / 60)
+  const absMinutes = Math.abs(offsetMin) % 60
+  return absMinutes === 0
+    ? `UTC${sign}${absHours}`
+    : `UTC${sign}${absHours}:${String(absMinutes).padStart(2, '0')}`
 }

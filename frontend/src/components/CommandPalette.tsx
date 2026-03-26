@@ -18,8 +18,9 @@
 import { useMemo } from 'react'
 import { useHotkey } from '@tanstack/react-hotkeys'
 import { useNavigate } from '@tanstack/react-router'
-import type { Command } from '@/commands'
-import { groupCommandsByCategory, navigationCommands } from '@/commands'
+import type { Command } from '@/commands/registry'
+import { groupCommandsByCategory } from '@/commands/registry'
+import { navigationCommands } from '@/commands/navigationCommands'
 import {
   CommandDialog,
   CommandEmpty,

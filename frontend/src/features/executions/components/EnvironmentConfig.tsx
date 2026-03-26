@@ -117,8 +117,8 @@ export function EnvironmentConfig({
 
           <div className="flex flex-col gap-2">
             <Label>{t('submit.envVariables')}</Label>
-            {envEntries.map(([key, value], index) => (
-              <div key={index} className="flex items-center gap-2">
+            {envEntries.map(([key, value]) => (
+              <div key={key} className="flex items-center gap-2">
                 <Input
                   placeholder={t('submit.envKeyPlaceholder')}
                   value={key}

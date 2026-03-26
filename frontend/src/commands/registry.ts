@@ -75,6 +75,3 @@ export function groupCommandsByCategory(
       commands: grouped.get(category)!,
     }))
 }
-
-// Re-export navigation commands
-export { navigationCommands } from './navigationCommands.tsx'

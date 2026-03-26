@@ -20,7 +20,7 @@ import { useTranslation } from 'react-i18next'
 import { CapabilityBadges } from './CapabilityBadges'
 import { PluginIcon } from './PluginIcon'
 import type { PluginCompositeId, PluginInfo } from '@/api/types/plugins.types'
-import { PluginStatusBadge } from '@/features/plugins'
+import { PluginStatusBadge } from '@/features/plugins/components/PluginStatusBadge'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,

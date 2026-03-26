@@ -139,6 +139,16 @@ export function FableBuilderHeader({
     const file = event.target.files?.[0]
     if (!file) return
 
+    // Prevent client-side DoS from oversized files (1 MB limit)
+    const MAX_CONFIG_SIZE = 1 * 1024 * 1024
+    if (file.size > MAX_CONFIG_SIZE) {
+      showToast.error(
+        'File too large',
+        'Configuration files must be smaller than 1 MB.',
+      )
+      return
+    }
+
     const reader = new FileReader()
     reader.onload = (e) => {
       try {

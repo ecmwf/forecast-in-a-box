@@ -28,7 +28,7 @@ import { SpecificationPanel } from './SpecificationPanel'
 import { ApiClientError } from '@/api/client'
 import { useBlockCatalogue, useFableRetrieve } from '@/api/hooks/useFable'
 import { useDeleteJob, useJobStatus, useRestartJob } from '@/api/hooks/useJobs'
-import { LoadingSpinner } from '@/components/common'
+import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useUiStore } from '@/stores/uiStore'
@@ -107,7 +107,11 @@ export function ExecutionDetailPage() {
             ? t('errors.jobNotFoundDescription')
             : statusQuery.error.message}
         </P>
-        <Button variant="outline" render={<Link to="/executions" />}>
+        <Button
+          variant="outline"
+          nativeButton={false}
+          render={<Link to="/executions" />}
+        >
           <ArrowLeft className="mr-1.5 h-4 w-4" />
           {t('errors.backToExecutions')}
         </Button>
@@ -131,6 +135,7 @@ export function ExecutionDetailPage() {
         variant="outline"
         size="sm"
         className="gap-1.5"
+        nativeButton={false}
         render={<Link to="/executions" />}
       >
         <ArrowLeft className="h-4 w-4" />

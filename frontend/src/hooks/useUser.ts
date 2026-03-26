@@ -45,8 +45,8 @@ export function useUser() {
   return useQuery({
     queryKey: ['user', 'me', authType],
     queryFn: getCurrentUser,
-    // Only fetch if authenticated
-    enabled: isAuthenticated,
+    // Only fetch if using real authentication (not anonymous)
+    enabled: isAuthenticated && authType === 'authenticated',
     retry: (failureCount, error) => {
       // Don't retry 401/403 errors
       if (error instanceof Error && error.message.includes('401')) return false

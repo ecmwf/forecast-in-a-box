@@ -22,7 +22,7 @@ import {
   useDownloadModel,
 } from '@/api/hooks/useArtifacts'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
-import { ArtifactDetailPage } from '@/features/artifacts'
+import { ArtifactDetailPage } from '@/features/artifacts/components/ArtifactDetailPage'
 
 export const Route = createFileRoute(
   '/_authenticated/admin/artifacts/$artifactId',

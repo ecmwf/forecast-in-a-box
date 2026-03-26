@@ -19,7 +19,7 @@ import { useBlockCatalogue } from '@/api/hooks/useFable'
 import { usePlugins } from '@/api/hooks/usePlugins'
 import { decodePluginId, toPluginDisplayId } from '@/api/types/plugins.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
-import { PluginDetailPage } from '@/features/plugins'
+import { PluginDetailPage } from '@/features/plugins/components/PluginDetailPage'
 
 export const Route = createFileRoute('/_authenticated/admin/plugins/$pluginId')(
   {
