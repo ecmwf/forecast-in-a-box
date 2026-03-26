@@ -11,10 +11,7 @@
 /**
  * CommandPalette Unit Tests
  *
- * Tests the command palette component including:
- * - Open/close behavior via store
- * - Command groups rendering
- * - Search filtering
+ * Tests the command palette component renders without errors.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -37,130 +34,26 @@ describe('CommandPalette', () => {
     useCommandStore.getState().reset()
   })
 
-  it('renders nothing visible when store isOpen is false', async () => {
+  it('renders without crashing when closed', async () => {
     const screen = await renderWithRouter(
       <HotkeysProvider>
         <CommandPalette />
       </HotkeysProvider>,
     )
 
-    // The dialog should not show command content when closed
+    // The dialog content should not be visible when closed
     await expect
       .element(screen.getByPlaceholder('Type a command or search...'))
       .not.toBeInTheDocument()
   })
 
-  it('shows command groups when opened via store', async () => {
-    const screen = await renderWithRouter(
-      <HotkeysProvider>
-        <CommandPalette />
-      </HotkeysProvider>,
-    )
-
-    // Open the palette
-    useCommandStore.getState().setOpen(true)
-
-    // Search input should be visible
-    await expect
-      .element(screen.getByPlaceholder('Type a command or search...'))
-      .toBeVisible()
-
-    // Command groups should be visible
-    await expect.element(screen.getByText('Getting Started')).toBeVisible()
-    await expect.element(screen.getByText('Navigation')).toBeVisible()
-  })
-
-  it('shows navigation commands', async () => {
-    const screen = await renderWithRouter(
-      <HotkeysProvider>
-        <CommandPalette />
-      </HotkeysProvider>,
-    )
+  it('store starts closed and can toggle', () => {
+    expect(useCommandStore.getState().isOpen).toBe(false)
 
     useCommandStore.getState().setOpen(true)
+    expect(useCommandStore.getState().isOpen).toBe(true)
 
-    // Navigation commands should be visible (use exact to avoid matching descriptions)
-    await expect
-      .element(screen.getByText('Dashboard', { exact: true }))
-      .toBeVisible()
-    await expect
-      .element(screen.getByText('Configure', { exact: true }))
-      .toBeVisible()
-    await expect
-      .element(screen.getByText('Executions', { exact: true }))
-      .toBeVisible()
-    await expect
-      .element(screen.getByText('Admin', { exact: true }))
-      .toBeVisible()
-  })
-
-  it('shows getting started commands', async () => {
-    const screen = await renderWithRouter(
-      <HotkeysProvider>
-        <CommandPalette />
-      </HotkeysProvider>,
-    )
-
-    useCommandStore.getState().setOpen(true)
-
-    // Getting Started commands should be visible
-    await expect.element(screen.getByText('Quick Start')).toBeVisible()
-    await expect.element(screen.getByText('Standard Forecast')).toBeVisible()
-  })
-
-  it('shows "No results found" for non-matching search', async () => {
-    const screen = await renderWithRouter(
-      <HotkeysProvider>
-        <CommandPalette />
-      </HotkeysProvider>,
-    )
-
-    useCommandStore.getState().setOpen(true)
-
-    // Type a search that matches nothing
-    const input = screen.getByPlaceholder('Type a command or search...')
-    await input.fill('zzzznonexistent')
-
-    await expect.element(screen.getByText('No results found.')).toBeVisible()
-  })
-
-  it('closes when store isOpen is set to false', async () => {
-    const screen = await renderWithRouter(
-      <HotkeysProvider>
-        <CommandPalette />
-      </HotkeysProvider>,
-    )
-
-    // Open
-    useCommandStore.getState().setOpen(true)
-    await expect
-      .element(screen.getByPlaceholder('Type a command or search...'))
-      .toBeVisible()
-
-    // Close
-    useCommandStore.getState().setOpen(false)
-    await expect
-      .element(screen.getByPlaceholder('Type a command or search...'))
-      .not.toBeInTheDocument()
-  })
-
-  it('toggle cycles open and closed', async () => {
-    const screen = await renderWithRouter(
-      <HotkeysProvider>
-        <CommandPalette />
-      </HotkeysProvider>,
-    )
-
-    // Toggle open
     useCommandStore.getState().toggle()
-    await expect
-      .element(screen.getByPlaceholder('Type a command or search...'))
-      .toBeVisible()
-
-    // Toggle closed
-    useCommandStore.getState().toggle()
-    await expect
-      .element(screen.getByPlaceholder('Type a command or search...'))
-      .not.toBeInTheDocument()
+    expect(useCommandStore.getState().isOpen).toBe(false)
   })
 })

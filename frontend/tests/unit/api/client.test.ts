@@ -76,7 +76,10 @@ describe('apiClient', () => {
     })
 
     it('includes X-Anonymous-ID header when present in localStorage', async () => {
-      localStorage.setItem(STORAGE_KEYS.auth.anonymousId, 'anon-123')
+      localStorage.setItem(
+        STORAGE_KEYS.auth.anonymousId,
+        '550e8400-e29b-41d4-a716-446655440000',
+      )
 
       let capturedHeaders: Headers | null = null
       worker.use(
@@ -88,7 +91,9 @@ describe('apiClient', () => {
 
       await apiClient.get('/api/v1/test')
 
-      expect(capturedHeaders!.get('X-Anonymous-ID')).toBe('anon-123')
+      expect(capturedHeaders!.get('X-Anonymous-ID')).toBe(
+        '550e8400-e29b-41d4-a716-446655440000',
+      )
     })
 
     it('does not include X-Anonymous-ID header when not in localStorage', async () => {

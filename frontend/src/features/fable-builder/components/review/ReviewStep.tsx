@@ -136,7 +136,7 @@ export function ReviewStep({ catalogue }: ReviewStepProps) {
               {validationSummary.globalErrors.length > 0 && (
                 <ul className="list-disc space-y-1 pl-4">
                   {validationSummary.globalErrors.map((error, index) => (
-                    <li key={index}>{error}</li>
+                    <li key={`${error}-${index}`}>{error}</li>
                   ))}
                 </ul>
               )}

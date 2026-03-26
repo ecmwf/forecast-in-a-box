@@ -15,13 +15,17 @@
  */
 
 import { formatDistanceToNow } from 'date-fns'
-import { Clock, MoreVertical, Pause, Play } from 'lucide-react'
+import { Clock, Eye, MoreVertical, Pause, Play } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import type { ScheduleDefinitionResponse } from '@/api/types/schedule.types'
-import { useUpdateSchedule } from '@/api/hooks/useSchedules'
+import { useServerTime, useUpdateSchedule } from '@/api/hooks/useSchedules'
 import { cronToHumanReadable } from '@/features/schedules/utils/cron'
+import {
+  STATUS_BADGE_VARIANTS,
+  StatusBadge,
+} from '@/components/common/StatusBadge'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -43,9 +47,12 @@ export function ScheduleListItem({
 }: ScheduleListItemProps) {
   const { t } = useTranslation('schedules')
   const updateSchedule = useUpdateSchedule()
+  const { offsetMs, serverTimeToLocal } = useServerTime()
 
   const createdAt = schedule.created_at
-    ? formatDistanceToNow(new Date(schedule.created_at), { addSuffix: true })
+    ? formatDistanceToNow(serverTimeToLocal(schedule.created_at), {
+        addSuffix: true,
+      })
     : null
 
   const truncatedId =
@@ -56,7 +63,7 @@ export function ScheduleListItem({
     `${t('detail.untitledSchedule')} ${scheduleId.slice(0, 8)}`
 
   const cronDescription = schedule.cron_expr
-    ? cronToHumanReadable(schedule.cron_expr)
+    ? cronToHumanReadable(schedule.cron_expr, offsetMs)
     : null
 
   async function handleToggleEnabled() {
@@ -75,13 +82,18 @@ export function ScheduleListItem({
   }
 
   return (
-    <div className="p-6 transition-colors hover:bg-muted/50">
+    <div
+      className={cn(
+        'p-6 transition-colors hover:bg-muted/50',
+        !schedule.enabled && 'opacity-60',
+      )}
+    >
       <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
         <div className="mt-1 shrink-0 sm:mt-0">
           <Clock
             className={cn(
               'h-5 w-5',
-              schedule.enabled ? 'text-emerald-500' : 'text-gray-400',
+              schedule.enabled ? 'text-emerald-500' : 'text-muted-foreground',
             )}
           />
         </div>
@@ -91,20 +103,26 @@ export function ScheduleListItem({
             <Link
               to="/schedules/$scheduleId"
               params={{ scheduleId }}
-              className="text-sm font-medium hover:underline"
+              className={cn(
+                'text-sm font-medium hover:underline',
+                !schedule.enabled && 'text-muted-foreground',
+              )}
             >
               {displayName}
             </Link>
-            <span
-              className={cn(
-                'rounded-full px-2 py-0.5 text-sm',
+            <StatusBadge
+              variant={
                 schedule.enabled
-                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                  : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-              )}
-            >
-              {schedule.enabled ? t('detail.enabled') : t('detail.disabled')}
-            </span>
+                  ? {
+                      label: t('detail.enabled'),
+                      ...STATUS_BADGE_VARIANTS.active,
+                    }
+                  : {
+                      label: t('detail.disabled'),
+                      ...STATUS_BADGE_VARIANTS.disabled,
+                    }
+              }
+            />
           </div>
           {schedule.display_description && (
             <P className="mb-1 line-clamp-1 text-muted-foreground">
@@ -131,13 +149,18 @@ export function ScheduleListItem({
         </div>
 
         <div className="mt-2 flex w-full items-center justify-between gap-6 sm:mt-0 sm:w-auto sm:justify-end">
-          <Link
-            to="/schedules/$scheduleId"
-            params={{ scheduleId }}
-            className="text-sm font-semibold text-muted-foreground hover:underline"
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            nativeButton={false}
+            render={
+              <Link to="/schedules/$scheduleId" params={{ scheduleId }} />
+            }
           >
-            {t('actions.viewRuns')}
-          </Link>
+            <Eye className="h-4 w-4" />
+            {t('actions.viewDetails')}
+          </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger

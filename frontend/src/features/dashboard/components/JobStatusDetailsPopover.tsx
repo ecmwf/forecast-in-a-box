@@ -14,8 +14,9 @@
  * Shows job status breakdown in a popover (mirrors StatusDetailsPopover pattern)
  */
 
-import { Clock, RefreshCw } from 'lucide-react'
+import { ArrowRight, Clock, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import type { JobStatus } from '@/api/types/job.types'
 import { JOB_STATUS_META } from '@/api/types/job.types'
@@ -145,7 +146,7 @@ export function JobStatusDetailsPopover({
               ))}
         </div>
 
-        <div className="border-t pt-2">
+        <div className="space-y-2 border-t pt-2">
           <div className="flex items-center justify-between px-2">
             <span className="text-sm font-medium">
               {t('welcome.stats.totalJobs')}
@@ -154,6 +155,13 @@ export function JobStatusDetailsPopover({
               {isLoading ? '...' : total}
             </span>
           </div>
+          <Link
+            to="/executions"
+            className="flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-muted/80"
+          >
+            {t('welcome.actions.manageExecutions')}
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
         </div>
       </PopoverContent>
     </Popover>

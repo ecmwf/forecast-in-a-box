@@ -81,8 +81,8 @@ export function CommunityNewsCard({ variant, shadow }: CommunityNewsCardProps) {
             {t('community.latestTopics')}
           </H3>
           <div className="flex-1 space-y-4">
-            {mockForumTopics.map((topic, index) => (
-              <div key={index}>
+            {mockForumTopics.map((topic) => (
+              <div key={topic.title}>
                 <H4 className="text-sm leading-snug font-medium">
                   {topic.title}
                 </H4>

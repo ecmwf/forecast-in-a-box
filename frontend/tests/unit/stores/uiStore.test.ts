@@ -88,7 +88,7 @@ describe('uiStore', () => {
     it('has correct default view modes', () => {
       expect(useUiStore.getState().pluginsViewMode).toBe('table')
       expect(useUiStore.getState().modelsViewMode).toBe('table')
-      expect(useUiStore.getState().artifactsViewMode).toBe('card')
+      expect(useUiStore.getState().artifactsViewMode).toBe('table')
     })
 
     it('sets plugins view mode', () => {

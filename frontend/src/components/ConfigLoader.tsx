@@ -40,8 +40,10 @@ interface ConfigLoaderProps {
 }
 
 export function ConfigLoader({ children }: ConfigLoaderProps) {
-  const { isLoaded, isLoading, error, loadConfig } = useConfigStore()
-
+  const isLoaded = useConfigStore((s) => s.isLoaded)
+  const isLoading = useConfigStore((s) => s.isLoading)
+  const error = useConfigStore((s) => s.error)
+  const loadConfig = useConfigStore((s) => s.loadConfig)
   const isConfigReady = useConfigStore(selectIsConfigReady)
 
   // Initialize config on mount

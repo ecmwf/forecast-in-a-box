@@ -146,8 +146,11 @@ export function OutputCard({
       <div className="w-full space-y-2 rounded-lg border bg-card p-3">
         {thumbnailUrl ? (
           <div
+            role="button"
+            tabIndex={0}
             className="aspect-video cursor-pointer overflow-hidden rounded bg-muted"
             onClick={handleView}
+            onKeyDown={(e) => e.key === 'Enter' && handleView()}
           >
             <img
               src={thumbnailUrl}
@@ -184,10 +187,14 @@ export function OutputCard({
 
       {lightboxOpen && thumbnailUrl && (
         <div
+          role="button"
+          tabIndex={0}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
           onClick={() => setLightboxOpen(false)}
+          onKeyDown={(e) => e.key === 'Enter' && setLightboxOpen(false)}
         >
           <div
+            role="presentation"
             className="relative max-h-[90vh] max-w-[90vw]"
             onClick={(e) => e.stopPropagation()}
           >

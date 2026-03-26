@@ -118,7 +118,10 @@ export function SpecificationPanel({ fableSnapshot }: SpecificationPanelProps) {
         <pre className="font-mono text-sm leading-relaxed">
           <code>
             {highlighted.map((segment, i) => (
-              <span key={i} className={segment.className}>
+              <span
+                key={`${segment.className}-${i}`}
+                className={segment.className}
+              >
                 {segment.text}
               </span>
             ))}

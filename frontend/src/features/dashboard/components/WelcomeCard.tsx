@@ -74,7 +74,24 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
   const { data: user } = useUser()
   const { t } = useTranslation('dashboard')
   const { trafficLightStatus } = useStatus()
-  const { runningCount, isLoading: isJobCountLoading } = useJobStatusCounts()
+  const { counts, isLoading: isJobCountLoading } = useJobStatusCounts()
+
+  // Show the most advanced active state: running > preparing > submitted
+  const activeStatus =
+    counts.running > 0
+      ? {
+          label: t('welcome.stats.currently.running'),
+          count: counts.running,
+        }
+      : counts.preparing > 0
+        ? {
+            label: t('welcome.stats.currently.preparing'),
+            count: counts.preparing,
+          }
+        : {
+            label: t('welcome.stats.currently.submitted'),
+            count: counts.submitted,
+          }
   const { authType } = useAuth()
 
   const { artifacts } = useArtifacts()
@@ -145,10 +162,10 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
             />
           </StatusDetailsPopover>
 
-          {/* Currently Running */}
+          {/* Currently Active */}
           <JobStatusDetailsPopover align="start">
             <StatCard
-              label={t('welcome.stats.currentlyRunning')}
+              label={activeStatus.label}
               icon={<Clock className="h-4 w-4" />}
               value={
                 <>
@@ -156,10 +173,10 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   ) : (
                     <span className="text-lg font-semibold">
-                      {runningCount}
+                      {activeStatus.count}
                     </span>
                   )}
-                  {runningCount > 0 && (
+                  {activeStatus.count > 0 && (
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />
                   )}
                 </>

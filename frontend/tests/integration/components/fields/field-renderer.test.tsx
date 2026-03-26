@@ -16,7 +16,7 @@
  */
 
 import { useState } from 'react'
-import { userEvent } from '@vitest/browser/context'
+import { userEvent } from 'vitest/browser'
 import { describe, expect, it } from 'vitest'
 import { renderWithProviders } from '@tests/utils/render'
 import {

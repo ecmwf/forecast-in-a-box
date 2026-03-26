@@ -16,7 +16,6 @@ import {
   ReactFlow,
   ReactFlowProvider,
   addEdge,
-  getNodesBounds,
   useEdgesState,
   useNodesState,
   useReactFlow,
@@ -73,7 +72,7 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   const connectBlocks = useFableBuilderStore((state) => state.connectBlocks)
   const selectBlock = useFableBuilderStore((state) => state.selectBlock)
 
-  const { fitView, setViewport } = useReactFlow()
+  const { fitView, setViewport, getNodesBounds } = useReactFlow()
 
   const [nodes, setNodes, onNodesChangeInternal] = useNodesState<FableNode>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])

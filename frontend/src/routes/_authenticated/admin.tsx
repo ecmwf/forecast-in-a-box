@@ -11,13 +11,42 @@
 /**
  * Admin Layout Route
  *
- * Wraps all admin routes with a shared layout.
+ * Wraps all admin routes with a shared layout and authorization check.
  * In anonymous/pass-through mode, all users are treated as admins.
+ * In authenticated mode, only superusers can access admin routes.
  */
 
-import { Outlet, createFileRoute } from '@tanstack/react-router'
+import { Outlet, createFileRoute, redirect } from '@tanstack/react-router'
+import { useConfigStore } from '@/stores/configStore'
+import { getCurrentUser } from '@/api/endpoints/users'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('AdminRoute')
 
 export const Route = createFileRoute('/_authenticated/admin')({
+  beforeLoad: async () => {
+    const config = useConfigStore.getState().config
+    const authType = config?.authType || 'anonymous'
+
+    // In anonymous mode, all users have admin access (by design)
+    if (authType === 'anonymous') {
+      return
+    }
+
+    // In authenticated mode, verify superuser status
+    let user
+    try {
+      user = await getCurrentUser()
+    } catch (error) {
+      log.error('Failed to verify admin access:', error)
+      throw redirect({ to: '/dashboard' })
+    }
+
+    if (!user.is_superuser) {
+      log.warn('Non-superuser attempted to access admin route')
+      throw redirect({ to: '/dashboard' })
+    }
+  },
   component: AdminLayout,
 })
 

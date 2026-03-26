@@ -74,13 +74,19 @@ describe('ErrorBoundary', () => {
         .toBeVisible()
     })
 
-    it('displays error message', async () => {
+    it('displays generic error message instead of raw error details', async () => {
       const screen = await render(
         <ErrorBoundary>
           <ThrowingComponent shouldThrow={true} />
         </ErrorBoundary>,
       )
-      await expect.element(screen.getByText('Test error message')).toBeVisible()
+      await expect
+        .element(
+          screen.getByText(
+            'An unexpected error occurred. If the problem persists, please contact support.',
+          ),
+        )
+        .toBeVisible()
     })
 
     it('shows Try Again button', async () => {

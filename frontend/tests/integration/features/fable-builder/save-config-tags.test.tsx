@@ -17,7 +17,7 @@
  * - Tags render as pills with X buttons
  */
 
-import { userEvent } from '@vitest/browser/context'
+import { userEvent } from 'vitest/browser'
 import { describe, expect, it, vi } from 'vitest'
 import { renderWithRouter } from '@tests/utils/render'
 import { SaveConfigPopover } from '@/features/fable-builder/components/SaveConfigPopover'

@@ -11,7 +11,7 @@
 import { HttpResponse, http } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { worker } from '@tests/../mocks/browser'
-import { renderWithProviders } from '@tests/utils/render'
+import { renderWithRouter } from '@tests/utils/render'
 import type { JobExecutionList } from '@/api/types/job.types'
 import { JobStatusDetailsPopover } from '@/features/dashboard/components/JobStatusDetailsPopover'
 import { API_ENDPOINTS } from '@/api/endpoints'
@@ -104,7 +104,7 @@ describe('JobStatusDetailsPopover', () => {
   })
 
   it('shows running count in the trigger card', async () => {
-    const screen = await renderWithProviders(
+    const screen = await renderWithRouter(
       <JobStatusDetailsPopover>
         <div data-testid="trigger">Trigger</div>
       </JobStatusDetailsPopover>,
@@ -114,7 +114,7 @@ describe('JobStatusDetailsPopover', () => {
   })
 
   it('opens popover with status rows when clicked', async () => {
-    const screen = await renderWithProviders(
+    const screen = await renderWithRouter(
       <JobStatusDetailsPopover>
         <div data-testid="trigger">Trigger</div>
       </JobStatusDetailsPopover>,
@@ -130,7 +130,7 @@ describe('JobStatusDetailsPopover', () => {
   })
 
   it('shows correct counts for each status', async () => {
-    const screen = await renderWithProviders(
+    const screen = await renderWithRouter(
       <JobStatusDetailsPopover>
         <div data-testid="trigger">Trigger</div>
       </JobStatusDetailsPopover>,
@@ -146,7 +146,7 @@ describe('JobStatusDetailsPopover', () => {
   })
 
   it('shows refresh button', async () => {
-    const screen = await renderWithProviders(
+    const screen = await renderWithRouter(
       <JobStatusDetailsPopover>
         <div data-testid="trigger">Trigger</div>
       </JobStatusDetailsPopover>,

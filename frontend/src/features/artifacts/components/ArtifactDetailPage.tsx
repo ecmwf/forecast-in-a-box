@@ -67,6 +67,7 @@ export function ArtifactDetailPage({
         variant="outline"
         size="sm"
         className="gap-1.5"
+        nativeButton={false}
         render={<Link to="/admin/artifacts" />}
       >
         <ArrowLeft className="h-4 w-4" />
@@ -83,12 +84,10 @@ export function ArtifactDetailPage({
               isAvailable={detail.is_available}
               downloadProgress={isDownloading ? downloadProgress : undefined}
             />
-            {detail.disk_size_bytes !== null && (
-              <span className="inline-flex items-center gap-1.5 rounded bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground">
-                <HardDrive className="h-3.5 w-3.5" />
-                {formatBytes(detail.disk_size_bytes)}
-              </span>
-            )}
+            <span className="inline-flex items-center gap-1.5 rounded bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground">
+              <HardDrive className="h-3.5 w-3.5" />
+              {formatBytes(detail.disk_size_bytes)}
+            </span>
             {detail.supported_platforms.map((platform) => (
               <span
                 key={platform}
@@ -104,6 +103,7 @@ export function ArtifactDetailPage({
             <Button
               variant="outline"
               size="sm"
+              nativeButton={false}
               render={
                 <a
                   href={detail.url}

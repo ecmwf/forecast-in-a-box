@@ -12,6 +12,7 @@
  * Schedule API Hooks
  */
 
+import { useCallback } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
 import type {
@@ -25,6 +26,7 @@ import {
   createSchedule,
   deleteSchedule,
   getSchedule,
+  getScheduleCurrentTime,
   getScheduleNextRun,
   getScheduleRuns,
   getSchedules,
@@ -54,6 +56,7 @@ export const scheduleKeys = {
     ] as const,
   nextRun: (experimentId: string) =>
     [...scheduleKeys.all, 'nextRun', experimentId] as const,
+  serverTime: [...['schedules'], 'serverTime'] as const,
 }
 
 export function useSchedules(
@@ -65,7 +68,6 @@ export function useSchedules(
     queryKey: scheduleKeys.list(page, pageSize, enabled),
     queryFn: () => getSchedules(page, pageSize, enabled),
     refetchInterval: 30000,
-    refetchOnWindowFocus: false,
   })
 }
 
@@ -74,7 +76,6 @@ export function useSchedule(experimentId: string | undefined) {
     queryKey: scheduleKeys.detail(experimentId ?? ''),
     queryFn: () => getSchedule(experimentId!),
     enabled: !!experimentId,
-    refetchOnWindowFocus: false,
   })
 }
 
@@ -89,7 +90,6 @@ export function useScheduleRuns(
     queryFn: () => getScheduleRuns(experimentId!, page, pageSize, status),
     enabled: !!experimentId,
     refetchInterval: 30000,
-    refetchOnWindowFocus: false,
   })
 }
 
@@ -99,7 +99,6 @@ export function useScheduleNextRun(experimentId: string | undefined) {
     queryFn: () => getScheduleNextRun(experimentId!),
     enabled: !!experimentId,
     refetchInterval: 60000,
-    refetchOnWindowFocus: false,
   })
 }
 
@@ -128,6 +127,75 @@ export function useDeleteSchedule() {
       queryClient.invalidateQueries({ queryKey: scheduleKeys.all })
     },
   })
+}
+
+/**
+ * Fetches the scheduler's current time and computes the offset from the client clock.
+ *
+ * The offset lets us translate naive datetime strings returned by the server
+ * (which are in the server's local timezone) into correct client-local Dates.
+ *
+ * Formula: correctEpoch = new Date(serverTimeStr).getTime() - offsetMs
+ */
+/**
+ * Parse a naive datetime string from the backend.
+ *
+ * The backend's current_scheduling_time() uses datetime.now() which returns
+ * a naive datetime in the server's local timezone (no timezone suffix).
+ * We parse it consistently with new Date() — the offset calculation and
+ * conversion both use the same parsing, so any timezone difference cancels out.
+ */
+function parseServerTime(dateStr: string): number {
+  return new Date(dateStr.trim()).getTime()
+}
+
+export function useServerTime() {
+  const { data: offsetMs } = useQuery<number>({
+    queryKey: scheduleKeys.serverTime,
+    queryFn: async () => {
+      const serverTimeStr = await getScheduleCurrentTime()
+      const serverParsed = parseServerTime(serverTimeStr)
+      const clientNow = Date.now()
+      const rawOffset = serverParsed - clientNow
+      // Round to nearest minute — cron has minute precision, and network
+      // latency introduces sub-minute jitter that corrupts exact cron times
+      return Math.round(rawOffset / 60_000) * 60_000
+    },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  })
+
+  const serverTimeToLocal = useCallback(
+    (serverTimeStr: string, { roundMinute = false } = {}): Date => {
+      const parsed = parseServerTime(serverTimeStr)
+      let epoch = offsetMs == null ? parsed : parsed - offsetMs
+      if (roundMinute) {
+        epoch = Math.round(epoch / 60_000) * 60_000
+      }
+      return new Date(epoch)
+    },
+    [offsetMs],
+  )
+
+  const serverHourMinuteToLocal = useCallback(
+    (hour: number, minute: number): { hour: number; minute: number } => {
+      if (offsetMs == null) return { hour, minute }
+      // Build a reference date with the given server hour/minute
+      const ref = new Date()
+      ref.setHours(hour, minute, 0, 0)
+      // ref is now interpreted as client-local; adjust by offset to get true local time
+      const local = new Date(ref.getTime() - offsetMs)
+      return { hour: local.getHours(), minute: local.getMinutes() }
+    },
+    [offsetMs],
+  )
+
+  return {
+    offsetMs: offsetMs ?? null,
+    isLoaded: offsetMs != null,
+    serverTimeToLocal,
+    serverHourMinuteToLocal,
+  }
 }
 
 interface CreateScheduleParams {

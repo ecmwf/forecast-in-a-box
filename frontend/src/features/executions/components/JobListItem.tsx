@@ -15,10 +15,10 @@
  */
 
 import { formatDistanceToNow } from 'date-fns'
-import { AlertCircle, CheckCircle2, Hourglass, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
-import type { JobExecutionDetail, JobStatus } from '@/api/types/job.types'
+import type { JobExecutionDetail } from '@/api/types/job.types'
+import { JobStatusIcon } from '@/features/executions/components/JobStatusIcon'
 import { useBlockCatalogue, useFableRetrieve } from '@/api/hooks/useFable'
 import {
   BLOCK_KIND_METADATA,
@@ -33,22 +33,6 @@ interface JobListItemProps {
   jobId: string
   status: JobExecutionDetail
   fableId: string
-}
-
-function StatusIcon({ status }: { status: JobStatus }) {
-  switch (status) {
-    case 'submitted':
-    case 'preparing':
-      return <Hourglass className="h-5 w-5 text-blue-500" />
-    case 'running':
-      return <Loader2 className="h-5 w-5 animate-spin text-amber-500" />
-    case 'completed':
-      return (
-        <CheckCircle2 className="h-5 w-5 fill-emerald-500 text-emerald-500" />
-      )
-    case 'failed':
-      return <AlertCircle className="h-5 w-5 fill-red-500 text-red-500" />
-  }
 }
 
 export function JobListItem({ jobId, status, fableId }: JobListItemProps) {
@@ -72,7 +56,7 @@ export function JobListItem({ jobId, status, fableId }: JobListItemProps) {
         {/* Content */}
         <div className="grow">
           <div className="mb-1 flex items-center gap-2">
-            <StatusIcon status={status.status} />
+            <JobStatusIcon status={status.status} />
             <Link
               to="/executions/$jobId"
               params={{ jobId }}

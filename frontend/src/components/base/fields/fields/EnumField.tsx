@@ -37,7 +37,7 @@ export function EnumField({
 }: EnumFieldProps) {
   return (
     <Select
-      value={value || undefined}
+      value={value || null}
       onValueChange={(newValue) => onChange(newValue ?? '')}
       disabled={disabled}
     >

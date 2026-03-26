@@ -23,11 +23,9 @@ import { HttpResponse, http } from 'msw'
 import { renderWithRouter } from '@tests/utils/render'
 import { worker } from '@tests/test-extend'
 import type { AuthContextValue } from '@/features/auth/AuthContext'
-import {
-  CommunityNewsCard,
-  GettingStartedSection,
-  WelcomeCard,
-} from '@/features/dashboard'
+import { CommunityNewsCard } from '@/features/dashboard/components/CommunityNewsCard'
+import { GettingStartedSection } from '@/features/dashboard/components/GettingStartedSection'
+import { WelcomeCard } from '@/features/dashboard/components/WelcomeCard'
 import { AuthContext } from '@/features/auth/AuthContext'
 import { API_ENDPOINTS } from '@/api/endpoints'
 

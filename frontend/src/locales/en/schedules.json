@@ -17,8 +17,8 @@
     "cronExpression": "Schedule",
     "dynamicExpressions": "Dynamic expressions",
     "noDynamicExpressions": "None configured",
-    "runsTitle": "Schedule Runs",
-    "noRuns": "No runs yet",
+    "runsTitle": "Execution Journal",
+    "noRuns": "No executions yet",
     "scheduledAt": "Scheduled at",
     "trigger": "Trigger",
     "status": "Status",
@@ -37,10 +37,13 @@
     "enable": "Enable",
     "disable": "Disable",
     "viewRuns": "View Runs",
+    "viewDetails": "View Details",
     "rerun": "Re-run",
     "rerunSuccess": "Run re-triggered successfully",
     "enableSuccess": "Schedule enabled",
-    "disableSuccess": "Schedule disabled"
+    "disableSuccess": "Schedule disabled",
+    "editSchedule": "Edit Schedule",
+    "scheduleUpdated": "Schedule updated successfully"
   },
   "empty": {
     "title": "No scheduled forecasts",

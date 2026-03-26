@@ -62,7 +62,8 @@
     "available": "Available",
     "errored": "Errored",
     "updateAvailable": "Update Available",
-    "incompatible": "Incompatible"
+    "incompatible": "Incompatible",
+    "error": "Plugin System Error"
   },
   "updatesSection": {
     "title": "Updates Available",

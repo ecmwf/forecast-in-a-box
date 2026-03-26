@@ -23,7 +23,7 @@ import type { AuthContextValue } from '@/features/auth/AuthContext'
 import { IntroGlobeSection } from '@/features/landing/components/IntroGlobeSection'
 import { FiabStackSection } from '@/features/landing/components/FiabStackSection'
 import { Collaboration } from '@/features/landing/components/Collaboration'
-import { PublicLayout } from '@/components/layout'
+import { PublicLayout } from '@/components/layout/PublicLayout'
 import { AuthContext } from '@/features/auth/AuthContext'
 
 // Mock useMedia to simulate desktop layout

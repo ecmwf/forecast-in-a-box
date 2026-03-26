@@ -14,8 +14,12 @@ import type { CronFrequency } from '@/features/schedules/utils/cron'
 import {
   cronToHumanReadable,
   frequencyToCron,
+  getLocalTimezone,
+  localHourMinuteToServer,
   parseCronForUI,
+  serverHourMinuteToLocal,
 } from '@/features/schedules/utils/cron'
+import { useServerTime } from '@/api/hooks/useSchedules'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { P } from '@/components/base/typography'
@@ -48,42 +52,56 @@ export function CronExpressionInput({
   onChange,
 }: CronExpressionInputProps) {
   const { t } = useTranslation('executions')
+  const { offsetMs } = useServerTime()
   const parsed = parseCronForUI(value)
 
   const [frequency, setFrequency] = useState<CronFrequency>(
     parsed?.frequency ?? 'custom',
   )
-  const [hour, setHour] = useState(parsed?.hour ?? 6)
-  const [minute, setMinute] = useState(parsed?.minute ?? 0)
   const [dayOfWeek, setDayOfWeek] = useState(parsed?.dayOfWeek ?? 1)
   const [showRaw, setShowRaw] = useState(false)
 
+  // Derive displayed hour/minute from the cron expression (server time) + offset
+  // This recomputes whenever the cron value or offset changes — no stale state
+  const serverHour = parsed?.hour ?? 6
+  const serverMinute = parsed?.minute ?? 0
+  const localTime =
+    offsetMs != null
+      ? serverHourMinuteToLocal(serverHour, serverMinute, offsetMs)
+      : { hour: serverHour, minute: serverMinute }
+
+  /** Convert local hour/minute to server time and emit the cron expression */
+  function emitCron(
+    freq: CronFrequency,
+    lHour: number,
+    lMinute: number,
+    day: number,
+  ) {
+    if (freq === 'custom') return
+    if (offsetMs != null && freq !== 'hourly') {
+      const server = localHourMinuteToServer(lHour, lMinute, offsetMs)
+      onChange(frequencyToCron(freq, server.hour, server.minute, day))
+    } else {
+      onChange(frequencyToCron(freq, lHour, lMinute, day))
+    }
+  }
+
   function handleFrequencyChange(newFrequency: CronFrequency) {
     setFrequency(newFrequency)
-    if (newFrequency !== 'custom') {
-      onChange(frequencyToCron(newFrequency, hour, minute, dayOfWeek))
-    }
+    emitCron(newFrequency, localTime.hour, localTime.minute, dayOfWeek)
   }
 
   function handleHourChange(newHour: number) {
-    setHour(newHour)
-    if (frequency !== 'custom') {
-      onChange(frequencyToCron(frequency, newHour, minute, dayOfWeek))
-    }
+    emitCron(frequency, newHour, localTime.minute, dayOfWeek)
   }
 
   function handleMinuteChange(newMinute: number) {
-    setMinute(newMinute)
-    if (frequency !== 'custom') {
-      onChange(frequencyToCron(frequency, hour, newMinute, dayOfWeek))
-    }
+    emitCron(frequency, localTime.hour, newMinute, dayOfWeek)
   }
 
   function handleDayChange(newDay: number) {
     setDayOfWeek(newDay)
-    if (frequency !== 'custom') {
-      onChange(frequencyToCron(frequency, hour, minute, newDay))
-    }
+    emitCron(frequency, localTime.hour, localTime.minute, newDay)
   }
 
   return (
@@ -109,7 +127,7 @@ export function CronExpressionInput({
         ))}
       </div>
 
-      {/* Time/day inputs */}
+      {/* Time/day inputs — displayed in local time */}
       {frequency !== 'custom' && (
         <div className="flex items-center gap-3">
           {frequency === 'weekly' && (
@@ -132,7 +150,7 @@ export function CronExpressionInput({
                 type="number"
                 min={0}
                 max={23}
-                value={hour}
+                value={localTime.hour}
                 onChange={(e) => handleHourChange(Number(e.target.value))}
                 className="w-20"
               />
@@ -141,11 +159,13 @@ export function CronExpressionInput({
                 type="number"
                 min={0}
                 max={59}
-                value={minute}
+                value={localTime.minute}
                 onChange={(e) => handleMinuteChange(Number(e.target.value))}
                 className="w-20"
               />
-              <span className="text-sm text-muted-foreground">UTC</span>
+              <span className="text-sm text-muted-foreground">
+                {getLocalTimezone()}
+              </span>
             </>
           )}
           {frequency === 'hourly' && (
@@ -155,7 +175,7 @@ export function CronExpressionInput({
                 type="number"
                 min={0}
                 max={59}
-                value={minute}
+                value={localTime.minute}
                 onChange={(e) => handleMinuteChange(Number(e.target.value))}
                 className="w-20"
               />
@@ -164,7 +184,7 @@ export function CronExpressionInput({
         </div>
       )}
 
-      {/* Raw cron toggle */}
+      {/* Raw cron toggle (server time) */}
       <div>
         <button
           type="button"
@@ -188,7 +208,7 @@ export function CronExpressionInput({
 
       {/* Human-readable preview */}
       <P className="text-sm text-muted-foreground">
-        {cronToHumanReadable(value)}
+        {cronToHumanReadable(value, offsetMs)}
       </P>
     </div>
   )

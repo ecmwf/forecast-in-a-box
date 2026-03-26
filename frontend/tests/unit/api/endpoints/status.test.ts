@@ -31,6 +31,7 @@ describe('fetchStatus', () => {
       cascade: 'up',
       ecmwf: 'up',
       scheduler: 'up',
+      plugins: 'ok',
     }
 
     worker.use(

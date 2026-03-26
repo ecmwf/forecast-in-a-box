@@ -22,6 +22,34 @@ import { z } from 'zod'
 export type ComponentStatus = 'up' | 'down' | 'off'
 
 /**
+ * Normalize plugin status from its own vocabulary to the standard component vocabulary.
+ *
+ * Backend plugin status values:
+ * - "ok"           → "up"   (healthy, idle)
+ * - "running"      → "up"   (busy but operational)
+ * - "failure: ..." → "down" (error occurred)
+ * - "retrieving"   → "up"   (lock contention, transient)
+ */
+export function normalizePluginStatus(raw: string): ComponentStatus {
+  if (raw === 'ok' || raw === 'running' || raw === 'retrieving') return 'up'
+  if (raw.startsWith('failure')) return 'down'
+  return 'down'
+}
+
+/**
+ * Check if a raw plugin status string indicates an error.
+ * Returns the error message or null.
+ */
+export function getPluginStatusError(raw: string): string | null {
+  if (raw.startsWith('failure')) {
+    // Strip "failure: " or "failure getting status" prefix for display
+    const msg = raw.replace(/^failure:?\s*/, '').trim()
+    return msg || 'Unknown plugin error'
+  }
+  return null
+}
+
+/**
  * Traffic light status for overall system health
  * - unknown: Status not yet determined (initial loading state)
  * - green: All active components are up
@@ -45,6 +73,7 @@ export const statusResponseSchema = z.object({
   cascade: statusValueSchema,
   ecmwf: statusValueSchema,
   scheduler: statusValueSchema,
+  plugins: statusValueSchema,
   version: z.string(),
 })
 
@@ -72,6 +101,7 @@ export const STATUS_COMPONENTS = [
   'cascade',
   'ecmwf',
   'scheduler',
+  'plugins',
 ] as const
 export type StatusComponent = (typeof STATUS_COMPONENTS)[number]
 
@@ -90,8 +120,11 @@ export function computeTrafficLightStatus(
   }
 
   // Get statuses for all components (excluding version)
-  const componentStatuses = STATUS_COMPONENTS.map(
-    (component) => status[component] as ComponentStatus,
+  // Plugins use a different vocabulary — normalize before comparison
+  const componentStatuses = STATUS_COMPONENTS.map((component) =>
+    component === 'plugins'
+      ? normalizePluginStatus(status[component])
+      : (status[component] as ComponentStatus),
   )
 
   // Filter out components that are 'off' - they don't count
@@ -148,7 +181,10 @@ export function getComponentStatusDetails(
   }
 
   return STATUS_COMPONENTS.map((component) => {
-    const componentStatus = status[component] as ComponentStatus
+    const componentStatus =
+      component === 'plugins'
+        ? normalizePluginStatus(status[component])
+        : (status[component] as ComponentStatus)
     return {
       component,
       status: componentStatus,

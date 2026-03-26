@@ -120,7 +120,7 @@ export function ValidationStatus({
       <AlertDescription>
         <ul className="mt-2 list-disc space-y-1 pl-4">
           {errorSummary.globalErrors.map((error, index) => (
-            <li key={index} className="text-sm">
+            <li key={`${error}-${index}`} className="text-sm">
               {error}
             </li>
           ))}

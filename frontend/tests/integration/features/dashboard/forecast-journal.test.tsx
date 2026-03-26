@@ -24,7 +24,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { renderWithRouter } from '@tests/utils/render'
 import type { AuthContextValue } from '@/features/auth/AuthContext'
 import { AuthContext } from '@/features/auth/AuthContext'
-import { ForecastJournal } from '@/features/dashboard'
+import { ForecastJournal } from '@/features/dashboard/components/ForecastJournal'
 
 // Mock useMedia to simulate desktop layout
 vi.mock('@/hooks/useMedia', () => ({

@@ -53,7 +53,11 @@ export function AuthenticatedAuthProvider({
     async function initializeAuth() {
       setIsLoading(true)
 
-      // Check if user explicitly logged out
+      // Check if user explicitly logged out.
+      // Note: This flag is a UX convenience to prevent auto-login after logout.
+      // The actual security boundary is the server-side session invalidation
+      // performed by the logout() call in signOut(). If this flag is tampered
+      // with, the user may be re-authenticated, but no privilege escalation occurs.
       const userLoggedOut =
         localStorage.getItem(STORAGE_KEYS.auth.logoutFlag) === 'true'
 
@@ -91,7 +95,7 @@ export function AuthenticatedAuthProvider({
       log.info('Logout flag cleared, user is logging in')
 
       const authUrl = await getAuthorizationUrl(loginEndpoint)
-      log.info('Redirecting to login:', authUrl)
+      log.info('Redirecting to login:', new URL(authUrl).origin)
       window.location.href = authUrl
     } catch (error) {
       log.error('Sign in failed:', error)
