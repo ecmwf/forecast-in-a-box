@@ -57,7 +57,7 @@ class QubedInstanceOutput(BaseModel):
 
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
-    dataqube: Qube | dict[str, Any] = Field(default_factory=Qube.empty)
+    dataqube: Qube = Field(default_factory=Qube.empty)
     metadata: OutputMetadata = Field(default_factory=OutputMetadata)
 
     @field_validator("dataqube", mode="before")
@@ -112,7 +112,6 @@ class QubedInstanceOutput(BaseModel):
         >>> axes['time']
         {0, 1, 2}
         """
-        assert isinstance(self.dataqube, Qube)
         return self.dataqube.axes()
 
     def dimensions(self) -> set[str]:
@@ -159,8 +158,6 @@ class QubedInstanceOutput(BaseModel):
         >>> expanded.axes()
         {'ensemble': {'ens1', 'ens2'}, 'param': {'2t', 'tp'}, 'time': {0, 1, 2}}
         """
-        assert isinstance(self.dataqube, Qube)
-
         qube = functools.reduce(
             lambda q, kv: Qube.make_root([Qube.make_node(kv[0], list(kv[1]), q.children)]), dimension.items(), self.dataqube
         )
@@ -193,12 +190,11 @@ class QubedInstanceOutput(BaseModel):
         >>> 'level' in collapsed
         False
         """
-        assert isinstance(self.dataqube, Qube)
         axes = [axis] if isinstance(axis, str) else axis
         if not all(ax in self.dimensions() for ax in axes):
             raise ValueError(f"Dimension '{', '.join(set(axes) - self.dimensions())}' not in dataqube dimensions {self.dimensions()}")
 
-        reduced_qube = self.dataqube.remove_by_key(axis)
+        reduced_qube = self.dataqube.remove_by_key(axes)
         return self.__class__(dataqube=reduced_qube, metadata=self.metadata)
 
     def update(self, **kwargs) -> Self:
@@ -230,7 +226,7 @@ class QubedInstanceOutput(BaseModel):
         metadata.update(kwargs)
         return self.__class__(dataqube=self.dataqube, metadata=OutputMetadata(**metadata))
 
-    def __contains__(self, item: Qube | str | dict) -> bool:  # type: ignore[reportRedeclaration]
+    def __contains__(self, item: Qube | str | dict) -> bool:
         """Check if the QubedInstanceOutput contains the specified dimension(s) or axes.
 
         If a string is provided, it checks if that dimension exists.
@@ -257,17 +253,14 @@ class QubedInstanceOutput(BaseModel):
         >>> {'param': ['2t'], 'time': [0, 3], } in output
         False
         """
-        assert isinstance(self.dataqube, Qube), "dataqube must be a Qube instance to use __contains__"
-
         if isinstance(item, str):
             return item in self.dimensions()
-        elif isinstance(item, Qube):
-            item: dict = item.axes()
 
-        dict_cast_to_list = {k: list(v) if isinstance(v, (set, tuple, list)) else [v] for k, v in item.items()}
-        result = self.dataqube  # .select(dict_cast_to_list) # Remove select as it depends on order of axis
+        lookup: dict = item.axes() if isinstance(item, Qube) else item
+        dict_cast_to_list = {k: list(v) if isinstance(v, (set, tuple, list)) else [v] for k, v in lookup.items()}
+        current_axes = self.dataqube.axes()
 
         def contains(key, values):
-            return key in result.axes() and all(v in result.axes()[key] for v in values)
+            return key in current_axes and all(v in current_axes[key] for v in values)
 
         return all(contains(k, v) for k, v in dict_cast_to_list.items())

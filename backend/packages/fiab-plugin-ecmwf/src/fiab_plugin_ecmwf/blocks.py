@@ -107,7 +107,7 @@ class EkdSource(Source):
                         for param in IFS_REQUEST[PARAM_DIM]
                     ]
                 ),
-                coords={PARAM_DIM: IFS_REQUEST[x] for x in [PARAM_DIM]},
+                coords={PARAM_DIM: IFS_REQUEST[PARAM_DIM]},
             )
             .expand(
                 (ENSEMBLE_DIM, cast(list[int], IFS_REQUEST["number"])),
@@ -187,11 +187,11 @@ class TemporalStatistics(Product):
     inputs: list[str] = ["dataset"]
 
     def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[QubedInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        dataset_output = inputs["dataset"]
-        if not isinstance(dataset_output, QubedInstanceOutput):
-            return Either.error("TemporalStatistics expects 'dataset' input of type QubedInstanceOutput")
+        input_dataset = inputs.get("dataset")
+        if not isinstance(input_dataset, QubedInstanceOutput):
+            actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
+            return Either.error(f"Unsupported input type for 'dataset': expected QubedInstanceOutput, got {actual_type}")
 
-        input_dataset = dataset_output
         param = block.configuration_values[PARAM_DIM]
         if {PARAM_DIM: param} not in input_dataset:
             return Either.error(f"param {param} is not in the input parameters: {input_dataset.axes().get(PARAM_DIM, [])}")

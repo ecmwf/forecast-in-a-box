@@ -18,7 +18,7 @@ dynamic = [ "version" ]
 
 dependencies = [
     "fiab-core>=0.0.1,<1.0.0", # ~=0.0
-    "earthkit-workflows",
+    "earthkit-workflows>=0.9.0",
     "qubed>=0.3.1",
 ]
 
