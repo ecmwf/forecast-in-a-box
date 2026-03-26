@@ -96,7 +96,8 @@ class BlockInstance(BaseModel):
 
 
 class BlockInstanceOutput(Protocol):
-    pass
+    def is_empty(self) -> bool: ...
+    def dimensions(self) -> set[str]: ...
 
 
 class XarrayOutput(BaseModel):
@@ -108,13 +109,29 @@ class XarrayOutput(BaseModel):
     variables: list[str]
     coords: list[str]
 
+    def is_empty(self) -> bool:
+        return len(self.variables) == 0
+
+    def dimensions(self) -> set[str]:
+        return set(self.coords)
+
 
 class RawOutput(BaseModel):
     type_fqn: str  # most likely you want Any here
 
+    def is_empty(self) -> bool:
+        return False
+
+    def dimensions(self) -> set[str]:
+        return set()
+
 
 class NoOutput(BaseModel):
-    pass
+    def is_empty(self) -> bool:
+        return True
+
+    def dimensions(self) -> set[str]:
+        return set()
 
 
 ActionLookup = dict[BlockInstanceId, Action]

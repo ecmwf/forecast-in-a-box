@@ -57,7 +57,7 @@ class QubedInstanceOutput(BaseModel):
 
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
-    dataqube: Qube = Field(default_factory=Qube.empty)
+    dataqube: Qube | dict[str, Any] = Field(default_factory=Qube.empty)
     metadata: OutputMetadata = Field(default_factory=OutputMetadata)
 
     @field_validator("dataqube", mode="before")
