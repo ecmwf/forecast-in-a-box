@@ -9,7 +9,7 @@
 
 
 import functools
-from typing import Any, Sequence
+from typing import Any, Iterable
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from qubed import Qube
@@ -134,12 +134,12 @@ class QubedInstanceOutput(BaseModel):
         """
         return set(self.axes().keys())
 
-    def expand(self, dimension: dict[str, Sequence]) -> Self:
+    def expand(self, dimension: dict[str, Iterable]) -> Self:
         """Return a new QubedInstanceOutput with the dataqube expanded by adding the specified dimension(s).
 
         Parameters
         ----------
-        dimension : dict[str, Sequence]
+        dimension : dict[str, Iterable]
             A dictionary where keys are dimension names and values are sequences of values for those dimensions.
 
         Returns
