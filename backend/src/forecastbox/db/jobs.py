@@ -27,7 +27,6 @@ from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from forecastbox.config import config
 from forecastbox.db.core import addAndCommit, dbRetry, executeAndCommit, querySingle
 from forecastbox.schemas.jobs import (
     Base,
@@ -39,6 +38,7 @@ from forecastbox.schemas.jobs import (
     JobExecution,
     JobExecutionStatus,
 )
+from forecastbox.utility.config import config
 
 async_url = f"sqlite+aiosqlite:///{config.db.sqlite_jobdb_path}"
 async_engine = create_async_engine(async_url, pool_pre_ping=True)

@@ -42,9 +42,9 @@ from forecastbox.api.types.jobs import (
     JobSpecification,
 )
 from forecastbox.api.utils import encode_result
-from forecastbox.auth.users import current_active_user
-from forecastbox.config import config
+from forecastbox.entrypoint.auth.users import current_active_user
 from forecastbox.schemas.user import UserRead
+from forecastbox.utility.config import config
 
 logger = logging.getLogger(__name__)
 

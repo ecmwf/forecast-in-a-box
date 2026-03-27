@@ -23,8 +23,8 @@ import forecastbox.db.jobs as db_jobs
 from forecastbox.api.execution import execute
 from forecastbox.api.scheduling.dt_utils import calculate_next_run, current_scheduling_time
 from forecastbox.api.scheduling.job_utils import experiment2runnable
-from forecastbox.config import config
 from forecastbox.ecpyutil import timed_acquire
+from forecastbox.utility.config import config
 
 logger = logging.getLogger(__name__)
 

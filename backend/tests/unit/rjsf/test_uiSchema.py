@@ -1,4 +1,4 @@
-from forecastbox.rjsf.uiSchema import UIBooleanField, UIField, UIIntegerField, UIObjectField, UIStringField
+from forecastbox.utility.rsjf.uiSchema import UIBooleanField, UIField, UIIntegerField, UIObjectField, UIStringField
 
 
 def test_uifield_export_with_prefix():

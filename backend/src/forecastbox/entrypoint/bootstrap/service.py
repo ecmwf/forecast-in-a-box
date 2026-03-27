@@ -5,11 +5,11 @@ from multiprocessing import Process, freeze_support, get_context
 
 import psutil
 
-from forecastbox.config import FIABConfig, fiab_home, validate_runtime
-from forecastbox.standalone.checks import check_backend_ready
-from forecastbox.standalone.config import export_recursive, setup_process
-from forecastbox.standalone.launchers import launch_backend
-from forecastbox.standalone.procs import ChildProcessGroup, previous_cleanup
+from forecastbox.entrypoint.bootstrap.checks import check_backend_ready
+from forecastbox.entrypoint.bootstrap.config import export_recursive, setup_process
+from forecastbox.entrypoint.bootstrap.launchers import launch_backend
+from forecastbox.entrypoint.bootstrap.procs import ChildProcessGroup, previous_cleanup
+from forecastbox.utility.config import FIABConfig, fiab_home, validate_runtime
 
 logger = logging.getLogger(__name__ if __name__ != "__main__" else __package__)
 

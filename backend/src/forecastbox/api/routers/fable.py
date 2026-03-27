@@ -29,7 +29,7 @@ from forecastbox.api.types.fable import (
     FableValidationExpansion,
 )
 from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification
-from forecastbox.auth.users import current_active_user
+from forecastbox.entrypoint.auth.users import current_active_user
 from forecastbox.schemas.user import UserRead
 
 router = APIRouter(

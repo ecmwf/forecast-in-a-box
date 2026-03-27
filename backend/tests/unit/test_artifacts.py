@@ -27,7 +27,7 @@ from forecastbox.api.artifacts.io import (
     get_artifacts_catalog,
     list_local_storage,
 )
-from forecastbox.config import ArtifactStoreConfig, ArtifactStoresConfig
+from forecastbox.utility.config import ArtifactStoreConfig, ArtifactStoresConfig
 
 
 @pytest.fixture

@@ -20,13 +20,13 @@ from multiprocessing import Process, get_context
 
 from fiab_core.fable import PluginCompositeId
 
-import forecastbox.standalone.service
+import forecastbox.entrypoint.bootstrap.service
 from forecastbox.api.updates import should_install_default_plugin
-from forecastbox.config import FIABConfig, validate_runtime
-from forecastbox.standalone.checks import check_backend_ready, install_default_plugins
-from forecastbox.standalone.config import export_recursive, setup_process
-from forecastbox.standalone.launchers import launch_backend
-from forecastbox.standalone.procs import ChildProcessGroup, previous_cleanup
+from forecastbox.entrypoint.bootstrap.checks import check_backend_ready, install_default_plugins
+from forecastbox.entrypoint.bootstrap.config import export_recursive, setup_process
+from forecastbox.entrypoint.bootstrap.launchers import launch_backend
+from forecastbox.entrypoint.bootstrap.procs import ChildProcessGroup, previous_cleanup
+from forecastbox.utility.config import FIABConfig, validate_runtime
 
 logger = logging.getLogger(__name__ if __name__ != "__main__" else __package__)
 
@@ -49,7 +49,7 @@ def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
         handle = ChildProcessGroup([backend])
         spawn_gateway = True
     else:
-        if not forecastbox.standalone.service.is_running():
+        if not forecastbox.entrypoint.bootstrap.service.is_running():
             raise ValueError("configured to use service, but is not running!")
         handle = ChildProcessGroup([])
         spawn_gateway = False

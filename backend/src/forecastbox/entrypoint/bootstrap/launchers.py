@@ -8,8 +8,8 @@
 # nor does it submit to any jurisdiction.
 
 """Launcher methods for backend and cascade -- utilized by
-- standalone.entrypoint for launch_backend,
-- standalone.service for launch_backend,
+- entrypoint.bootstrap.entrypoint for launch_backend,
+- entrypoint.bootstrap.service for launch_backend,
 - api.routers.gateway for spawning cascade itself (regardless how backend was launched).
 """
 
@@ -18,8 +18,8 @@ import logging
 
 import uvicorn
 
-from forecastbox.config import FIABConfig
-from forecastbox.standalone.config import setup_process
+from forecastbox.entrypoint.bootstrap.config import setup_process
+from forecastbox.utility.config import FIABConfig
 
 logger = logging.getLogger(__name__)
 

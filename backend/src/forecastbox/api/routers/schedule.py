@@ -24,8 +24,8 @@ from forecastbox.api.scheduling.scheduler_thread import (
     timeout_acquire_request,
 )
 from forecastbox.api.types.scheduling import ScheduleSpecification, ScheduleUpdate
-from forecastbox.auth.users import current_active_user
 from forecastbox.ecpyutil import timed_acquire
+from forecastbox.entrypoint.auth.users import current_active_user
 from forecastbox.schemas.jobs import ExperimentDefinition
 from forecastbox.schemas.user import UserRead
 

@@ -7,8 +7,8 @@ from collections.abc import Callable
 import httpx
 from cascade.low.func import assert_never
 
-from forecastbox.config import FIABConfig, StatusMessage, _default_plugins
-from forecastbox.standalone.procs import ChildProcessGroup
+from forecastbox.entrypoint.bootstrap.procs import ChildProcessGroup
+from forecastbox.utility.config import FIABConfig, StatusMessage, _default_plugins
 
 logger = logging.getLogger(__name__)
 

@@ -8,8 +8,8 @@ from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginComposite
 
 from forecastbox.api.types.fable import FableBuilder
 from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
-from forecastbox.config import FIABConfig
-from forecastbox.standalone.entrypoint import launch_all
+from forecastbox.entrypoint.bootstrap.entrypoint import launch_all
+from forecastbox.utility.config import FIABConfig
 
 
 def ensure_completed(backend_client, job_id, sleep=0.5, attempts=20):
