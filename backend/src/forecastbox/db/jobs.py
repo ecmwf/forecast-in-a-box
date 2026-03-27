@@ -17,6 +17,11 @@ taking the maximum.
 Soft-deleted rows are excluded from all normal read operations.
 We maintain that setting a delete sets it on all versions of a given entity,
 leading to simpler query semantics, ie, no need to select "last non-deleted".
+
+Note: ``JobDefinition`` persistence has moved to
+``forecastbox.domain.job_definition.db``.  ``get_job_definition`` is kept here as
+a thin proxy so existing call-sites (execution, scheduling) continue to work
+without changes.
 """
 
 import datetime as dt
@@ -52,105 +57,19 @@ async def create_db_and_tables() -> None:
 
 
 # ---------------------------------------------------------------------------
-# JobDefinition
+# JobDefinition — thin proxy; canonical implementation in domain.job_definition.db
 # ---------------------------------------------------------------------------
 
 
-async def upsert_job_definition(
-    *,
-    definition_id: str | None = None,
-    source: JobDefinitionSource,
-    created_by: str | None,
-    blocks: dict | None = None,
-    environment_spec: dict | None = None,
-    display_name: str | None = None,
-    display_description: str | None = None,
-    tags: list[str] | None = None,
-    parent_id: str | None = None,
-) -> tuple[str, int]:
-    """Insert a new version of a JobDefinition and return (id, version).
-
-    If `id` is omitted a fresh UUID is generated (version 1).
-    If `id` is supplied the next version number is derived from the database;
-    a KeyError is raised if that id does not exist yet.
-    """
-    id_provided = definition_id is not None
-    definition_id = definition_id or str(uuid.uuid4())
-    ref_time = dt.datetime.now()
-
-    async def function(i: int) -> int:
-        async with async_session_maker() as session:
-            result = await session.execute(select(func.max(JobDefinition.version)).where(JobDefinition.job_definition_id == definition_id))
-            max_version: int | None = result.scalar()
-            if id_provided and max_version is None:
-                raise KeyError(f"No JobDefinition with id={definition_id!r} exists; cannot add a new version.")
-            new_version = (max_version or 0) + 1
-            session.add(
-                JobDefinition(
-                    job_definition_id=definition_id,
-                    version=new_version,
-                    created_by=created_by,
-                    created_at=ref_time,
-                    source=source,
-                    parent_id=parent_id,
-                    display_name=display_name,
-                    display_description=display_description,
-                    tags=tags,
-                    blocks=blocks,
-                    environment_spec=environment_spec,
-                    is_deleted=False,
-                )
-            )
-            await session.commit()
-            return new_version
-
-    new_version = await dbRetry(function)
-    return definition_id, new_version
-
-
 async def get_job_definition(definition_id: str, version: int | None = None) -> JobDefinition | None:
-    """Return a specific or the latest non-deleted version of a JobDefinition."""
-    if version is not None:
-        query = select(JobDefinition).where(
-            JobDefinition.job_definition_id == definition_id,
-            JobDefinition.version == version,
-            JobDefinition.is_deleted.is_(False),
-        )
-    else:
-        query = (
-            select(JobDefinition)
-            .where(JobDefinition.job_definition_id == definition_id, JobDefinition.is_deleted.is_(False))
-            .order_by(JobDefinition.version.desc())
-            .limit(1)
-        )
-    return await querySingle(query, async_session_maker)
+    """Return a specific or the latest non-deleted version of a JobDefinition.
 
+    Delegates to ``forecastbox.domain.job_definition.db.get_job_definition``; kept
+    here so execution and scheduling code need not be updated in this step.
+    """
+    from forecastbox.domain.job_definition import db as job_definition_db
 
-async def list_job_definitions() -> Iterable[JobDefinition]:
-    """Return the latest non-deleted version of every JobDefinition."""
-
-    async def function(i: int) -> list[JobDefinition]:
-        async with async_session_maker() as session:
-            subq = (
-                select(JobDefinition.job_definition_id, func.max(JobDefinition.version).label("max_version"))
-                .where(JobDefinition.is_deleted.is_(False))
-                .group_by(JobDefinition.job_definition_id)
-                .subquery()
-            )
-            query = select(JobDefinition).join(
-                subq,
-                (JobDefinition.job_definition_id == subq.c.job_definition_id) & (JobDefinition.version == subq.c.max_version),
-            )
-            result = await session.execute(query)
-            return [r[0] for r in result.all()]
-
-    return await dbRetry(function)
-
-
-async def soft_delete_job_definition(definition_id: str) -> None:
-    """Mark all versions of a JobDefinition as deleted."""
-    stmt = update(JobDefinition).where(JobDefinition.job_definition_id == definition_id).values(is_deleted=True)
-    await executeAndCommit(stmt, async_session_maker)
+    return await job_definition_db.get_job_definition(definition_id, version)
 
 
 # ---------------------------------------------------------------------------

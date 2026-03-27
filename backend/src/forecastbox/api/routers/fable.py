@@ -17,8 +17,7 @@ from fastapi import APIRouter, Depends, status
 from fastapi.exceptions import HTTPException
 from fiab_core.fable import BlockFactoryCatalogue
 
-import forecastbox.api.fable as api_fable
-import forecastbox.db.jobs as db_jobs
+import forecastbox.domain.job_definition.service as job_definition_service
 from forecastbox.api.plugin.manager import PluginCompositeId, catalogue_view, plugins_ready
 from forecastbox.api.types.fable import (
     FableBuilder,
@@ -28,7 +27,9 @@ from forecastbox.api.types.fable import (
     FableSaveResponse,
     FableValidationExpansion,
 )
-from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification
+from forecastbox.api.types.jobs import ExecutionSpecification
+from forecastbox.domain.job_definition.db import actor_from_user
+from forecastbox.domain.job_definition.exceptions import JobDefinitionAccessDenied, JobDefinitionNotFound
 from forecastbox.entrypoint.auth.users import current_active_user
 from forecastbox.schemas.user import UserRead
 
@@ -58,7 +59,7 @@ def expand_fable(fable: FableBuilder) -> FableValidationExpansion:
     """Given a partially constructed fable, return whether there are any validation errors,
     and what are further completion/expansion options. Note that presence of validation
     errors does not affect return code, ie its still 200 OK"""
-    return api_fable.validate_expand(fable)
+    return job_definition_service.validate_expand(fable)
 
 
 @router.post("/upsert")
@@ -69,31 +70,20 @@ async def upsert_fable_builder(
 ) -> FableSaveResponse:
     """Save a FableBuilder as a JobDefinition.
 
-    If `fable_id` is omitted a new definition is created (version 1). If
-    `fable_id` is supplied the existing definition gains a new version; a 404
+    If `fable_id` is omitted a new job definition is created (version 1). If
+    `fable_id` is supplied the existing job definition gains a new version; a 404
     is returned if that id does not exist.
 
     `source` is derived from `display_name`: `user_defined` when a name is
     provided, `oneoff_execution` otherwise.
     """
-    created_by = str(user.id) if user is not None else None
-    source: str = "user_defined" if payload.display_name is not None else "oneoff_execution"
-    env = payload.builder.environment
+    actor = actor_from_user(user)
     try:
-        definition_id, version = await db_jobs.upsert_job_definition(
-            definition_id=fable_id,
-            source=source,
-            created_by=created_by,
-            blocks=payload.builder.model_dump(mode="json")["blocks"],
-            environment_spec=env.model_dump(mode="json") if env is not None else None,
-            display_name=payload.display_name,
-            display_description=payload.display_description,
-            tags=payload.tags if payload.tags else None,
-            parent_id=payload.parent_id,
-        )
-    except KeyError as e:
+        return await job_definition_service.save_builder(actor=actor, payload=payload, fable_id=fable_id)
+    except JobDefinitionNotFound as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    return FableSaveResponse(id=definition_id, version=version)
+    except JobDefinitionAccessDenied as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 
 @router.get("/retrieve")
@@ -105,23 +95,10 @@ async def retrieve_fable_builder(
 
     If `version` is omitted the latest non-deleted version is returned.
     """
-    definition = await db_jobs.get_job_definition(fable_id, version)
-    if definition is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fable definition not found")
-    if definition.blocks is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fable definition has no builder spec")
-    builder = FableBuilder(blocks=definition.blocks)  # ty:ignore[invalid-argument-type]
-    if definition.environment_spec is not None:
-        builder.environment = EnvironmentSpecification.model_validate(definition.environment_spec)
-    return FableRetrieveResponse(
-        id=definition.job_definition_id,  # ty:ignore[invalid-argument-type]
-        version=definition.version,  # ty:ignore[invalid-argument-type]
-        builder=builder,
-        display_name=definition.display_name,  # ty:ignore[invalid-argument-type]
-        display_description=definition.display_description,  # ty:ignore[invalid-argument-type]
-        tags=definition.tags or [],  # ty:ignore[invalid-argument-type]
-        parent_id=definition.parent_id,  # ty:ignore[invalid-argument-type]
-    )
+    try:
+        return await job_definition_service.load_builder(fable_id, version)
+    except JobDefinitionNotFound as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
 @router.put("/compile")
@@ -131,15 +108,9 @@ async def compile_fable(request: FableCompileRequest) -> ExecutionSpecification:
     If `version` is omitted the latest non-deleted version is used. The returned
     ExecutionSpecification has the same shape as the one from /compile.
     """
-    definition = await db_jobs.get_job_definition(request.id, request.version)
-    if definition is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fable definition not found")
-    if definition.blocks is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fable definition has no builder spec")
-    builder = FableBuilder(blocks=definition.blocks)  # ty:ignore[invalid-argument-type]
-    if definition.environment_spec is not None:
-        builder.environment = EnvironmentSpecification.model_validate(definition.environment_spec)
     try:
-        return api_fable.compile(builder)
+        return await job_definition_service.compile_definition(request.id, request.version)
+    except JobDefinitionNotFound as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
