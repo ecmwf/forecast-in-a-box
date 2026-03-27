@@ -171,11 +171,27 @@ export function FableBuilderPage({
   }
 
   if (fableId && fableError) {
+    const isNotFound =
+      fableError instanceof ApiClientError && fableError.status === 404
     return (
       <div className="flex min-h-100 flex-col items-center justify-center gap-4">
-        <P className="text-destructive">
-          Failed to load configuration: {fableError.message}
+        <P className="text-lg font-medium">
+          {isNotFound
+            ? 'The requested configuration was not found.'
+            : 'Failed to load configuration. Please try again later.'}
         </P>
+        <P className="text-muted-foreground">
+          {isNotFound
+            ? 'It may have been deleted or the link is no longer valid.'
+            : fableError.message}
+        </P>
+        <Button
+          variant="outline"
+          nativeButton={false}
+          render={<Link to="/dashboard" />}
+        >
+          Back to Dashboard
+        </Button>
       </div>
     )
   }
