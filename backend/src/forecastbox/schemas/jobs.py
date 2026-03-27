@@ -145,19 +145,6 @@ class JobExecution(Base):
     )
 
 
-class GlobalDefaults(Base):
-    """Stores installation-wide default option and value specs."""
-
-    __tablename__ = "global_defaults"
-
-    global_defaults_id = Column(String(255), primary_key=True, nullable=False)
-    created_by = Column(String(255), nullable=True)
-    created_at = Column(DateTime, nullable=False)
-
-    option_specs = Column(JSON, nullable=True)
-    value_specs = Column(JSON, nullable=True)
-
-
 class ExperimentNext(Base):
     """Mutable table tracking the next scheduled run time for an experiment.
 

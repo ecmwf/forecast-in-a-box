@@ -1,6 +1,0 @@
-id: snow-water-equivalent
-
-criteria:
-- {paramId: 228141, shortName: sd}
-- {name: Snow depth water equivalent}
-- {shortName: sd}

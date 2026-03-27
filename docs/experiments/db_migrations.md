@@ -1,7 +1,14 @@
-"""Alembic looked too heavy handed to me."""
+# Alembic
+looked too heavy handed to me, and more "server-oriented" whereas we deal with end-station deployed software
 
-# NOTE this file is left in place only as an example how to add migrations -- all these listed are currently invalid
+# Manual
+Each schema change would be manually extracted as respective sql statement, and put in place.
 
+Ideally, it would execute changes based on versions (and version persistence would follow these updates transactionally),
+so that we don't need to determine the state of db across versions.
+
+Example:
+```
 import logging
 
 from sqlalchemy import MetaData, create_engine, text
@@ -43,3 +50,6 @@ def migrate() -> None:
     metadata.reflect(bind=engine)
     with engine.connect() as connection:
         _add_experiment_context(metadata, connection)
+```
+
+and then call `migrate()` in the startup.

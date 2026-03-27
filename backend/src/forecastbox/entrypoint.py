@@ -34,7 +34,6 @@ from forecastbox.api.plugin.manager import status_brief as status_plugins
 from forecastbox.api.plugin.store import join_stores_thread, submit_initialize_stores
 from forecastbox.api.scheduling.scheduler_thread import start_scheduler, status_scheduler, stop_scheduler
 from forecastbox.api.updates import get_local_release
-from forecastbox.db.migrations import migrate
 
 from .api.routers import admin, artifacts, auth, fable, gateway, job, plugin, schedule
 from .config import config
@@ -49,7 +48,6 @@ async def lifespan(app: FastAPI):
         module = importlib.import_module(f"forecastbox.db.{module_info.name}")
         if hasattr(module, "create_db_and_tables"):
             await module.create_db_and_tables()  # type: ignore[call-non-callable] # NOTE no module protocol
-    migrate()
     if config.api.allow_scheduler:
         start_scheduler()
     release_time, release_version = get_local_release()
