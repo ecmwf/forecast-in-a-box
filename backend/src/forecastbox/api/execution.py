@@ -40,8 +40,6 @@ from forecastbox.api.types.jobs import (
 from forecastbox.api.utils import get_model_path
 from forecastbox.config import config
 from forecastbox.ecpyutil import deep_union
-from forecastbox.models import get_model
-from forecastbox.products.registry import get_product
 from forecastbox.schemas.jobs import JobDefinition, JobExecution
 from forecastbox.schemas.user import UserRead
 
