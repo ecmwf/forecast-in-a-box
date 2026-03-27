@@ -1,4 +1,6 @@
 import time
+from collections.abc import Callable
+from typing import Any
 
 from forecastbox.api.types.jobs import JobExecutionDetail
 
@@ -94,3 +96,18 @@ def ensure_completed_v2(backend_client, job_id, sleep=0.5, attempts=20):
         i -= 1
 
     assert i > 0, f"Failed to finish job {job_id}"
+
+
+def scheduling_endpoint_with_retries(fn: Callable[[], Any], *, attempts: int = 4, sleep: float = 0.5) -> Any:
+    """Call fn() and retry on 503 Scheduler is busy, up to attempts times with sleep in between.
+
+    fn should be a zero-argument callable that performs an HTTP request and returns the response.
+    Returns the last response regardless of status; callers should assert success as usual.
+    """
+    response = fn()
+    for _ in range(attempts - 1):
+        if response.status_code != 503:
+            break
+        time.sleep(sleep)
+        response = fn()
+    return response
