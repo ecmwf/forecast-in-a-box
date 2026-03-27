@@ -274,31 +274,6 @@ async def test_jobs_list_job_executions_latest_only(mem_session_maker, monkeypat
 
 
 # ---------------------------------------------------------------------------
-# GlobalDefaults
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_jobs_global_defaults(mem_session_maker, monkeypatch):
-    monkeypatch.setattr(jobs_db, "async_session_maker", mem_session_maker)
-
-    # No defaults yet
-    assert await jobs_db.get_global_defaults() is None
-
-    defaults_id = await jobs_db.insert_global_defaults(
-        created_by="admin",
-        option_specs={"outputType": "zarr"},
-        value_specs={"modelCheckpoint": "aifs-1.0"},
-    )
-
-    defaults = await jobs_db.get_global_defaults()
-    assert defaults is not None
-    assert defaults.global_defaults_id == defaults_id
-    assert defaults.option_specs == {"outputType": "zarr"}
-    assert defaults.value_specs == {"modelCheckpoint": "aifs-1.0"}
-
-
-# ---------------------------------------------------------------------------
 # ExperimentNext
 # ---------------------------------------------------------------------------
 

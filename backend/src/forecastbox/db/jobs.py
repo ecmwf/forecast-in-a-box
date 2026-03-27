@@ -34,7 +34,6 @@ from forecastbox.schemas.jobs import (
     ExperimentDefinition,
     ExperimentNext,
     ExperimentType,
-    GlobalDefaults,
     JobDefinition,
     JobDefinitionSource,
     JobExecution,
@@ -459,38 +458,6 @@ async def soft_delete_job_execution(execution_id: str) -> None:
     """Mark all attempts of a JobExecution as deleted."""
     stmt = update(JobExecution).where(JobExecution.job_execution_id == execution_id).values(is_deleted=True)
     await executeAndCommit(stmt, async_session_maker)
-
-
-# ---------------------------------------------------------------------------
-# GlobalDefaults
-# ---------------------------------------------------------------------------
-
-
-async def insert_global_defaults(
-    *,
-    global_defaults_id: str | None = None,
-    created_by: str | None,
-    option_specs: dict | None = None,
-    value_specs: dict | None = None,
-) -> str:
-    """Insert a GlobalDefaults row and return its id."""
-    defaults_id = global_defaults_id or str(uuid.uuid4())
-    ref_time = dt.datetime.now()
-    entity = GlobalDefaults(
-        global_defaults_id=defaults_id,
-        created_by=created_by,
-        created_at=ref_time,
-        option_specs=option_specs,
-        value_specs=value_specs,
-    )
-    await addAndCommit(entity, async_session_maker)
-    return defaults_id
-
-
-async def get_global_defaults() -> GlobalDefaults | None:
-    """Return the first GlobalDefaults row, if any."""
-    query = select(GlobalDefaults).limit(1)
-    return await querySingle(query, async_session_maker)
 
 
 # ---------------------------------------------------------------------------
