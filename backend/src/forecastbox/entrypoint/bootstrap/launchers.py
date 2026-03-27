@@ -8,8 +8,8 @@
 # nor does it submit to any jurisdiction.
 
 """Launcher methods for backend and cascade -- utilized by
-- standalone.entrypoint for launch_backend,
-- standalone.service for launch_backend,
+- entrypoint.main for launch_backend,
+- entrypoint.bootstrap.service for launch_backend,
 - api.routers.gateway for spawning cascade itself (regardless how backend was launched).
 """
 
@@ -18,8 +18,8 @@ import logging
 
 import uvicorn
 
-from forecastbox.config import FIABConfig
-from forecastbox.standalone.config import setup_process
+from forecastbox.entrypoint.bootstrap.config import setup_process
+from forecastbox.utility.config import FIABConfig
 
 logger = logging.getLogger(__name__)
 
@@ -44,13 +44,13 @@ async def _uvicorn_run(app_name: str, host: str, port: int) -> None:
 def launch_backend():
     config = FIABConfig()
     # TODO something imported by this module reconfigures the logging -- find and remove!
-    import forecastbox.entrypoint
+    import forecastbox.entrypoint.app
 
     setup_process()
-    logger.debug(f"logging initialized post-{forecastbox.entrypoint.__name__} import")
+    logger.debug(f"logging initialized post-{forecastbox.entrypoint.app.__name__} import")
     port = config.api.uvicorn_port
     host = config.api.uvicorn_host
-    task = _uvicorn_run("forecastbox.entrypoint:app", host, port)
+    task = _uvicorn_run("forecastbox.entrypoint.app:app", host, port)
     try:
         asyncio.run(task)
     except KeyboardInterrupt:

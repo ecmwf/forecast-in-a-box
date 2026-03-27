@@ -25,7 +25,7 @@ from forecastbox.api.plugin.manager import PluginsStatus, modify_enabled, status
 from forecastbox.api.plugin.store import PluginRemoteInfo, PluginStoreEntry, get_plugins_detail, submit_install_plugin
 from forecastbox.api.routers.admin import get_admin_user
 from forecastbox.api.types.fable import PluginCompositeId
-from forecastbox.config import config
+from forecastbox.utility.config import config
 
 router = APIRouter(
     tags=["fable"],

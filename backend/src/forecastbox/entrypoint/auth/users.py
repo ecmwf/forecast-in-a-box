@@ -18,9 +18,9 @@ from fastapi_users.db import SQLAlchemyUserDatabase
 from fastapi_users.exceptions import InvalidPasswordException
 from sqlalchemy import func, select, update
 
-from forecastbox.config import config
 from forecastbox.db.user import async_session_maker, get_user_db
 from forecastbox.schemas.user import UserCreate, UserRead, UserTable
+from forecastbox.utility.config import config
 
 SECRET = config.auth.jwt_secret.get_secret_value()
 COOKIE_NAME = "forecastbox_auth"

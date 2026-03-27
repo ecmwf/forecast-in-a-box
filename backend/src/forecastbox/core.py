@@ -9,7 +9,7 @@
 
 from abc import ABC, abstractmethod
 
-from forecastbox.rjsf import FieldWithUI
+from forecastbox.utility.rsjf import FieldWithUI
 
 
 class FormFieldProvider(ABC):

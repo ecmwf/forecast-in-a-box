@@ -1,6 +1,6 @@
-from forecastbox.rjsf.forms import FieldWithUI, FormDefinition
-from forecastbox.rjsf.jsonSchema import IntegerSchema, StringSchema
-from forecastbox.rjsf.uiSchema import UIStringField
+from forecastbox.utility.rsjf.forms import FieldWithUI, FormDefinition
+from forecastbox.utility.rsjf.jsonSchema import IntegerSchema, StringSchema
+from forecastbox.utility.rsjf.uiSchema import UIStringField
 
 
 def test_export_jsonschema_and_uischema():

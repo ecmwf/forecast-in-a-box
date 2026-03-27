@@ -20,11 +20,11 @@ from pydantic import UUID4, BaseModel
 from sqlalchemy import delete, select, update
 
 from forecastbox.api.updates import Release, get_local_release, get_most_recent_release, get_pylock, mark_release, save_pylock
-from forecastbox.auth.users import current_active_user
-from forecastbox.config import BackendAPISettings, CascadeSettings, ProductSettings, config
 from forecastbox.db.user import async_session_maker
-from forecastbox.rjsf import ExportedSchemas, FormDefinition, from_pydantic
+from forecastbox.entrypoint.auth.users import current_active_user
 from forecastbox.schemas.user import UserRead, UserTable, UserUpdate
+from forecastbox.utility.config import BackendAPISettings, CascadeSettings, ProductSettings, config
+from forecastbox.utility.rsjf import ExportedSchemas, FormDefinition, from_pydantic
 
 logger = logging.getLogger(__name__)
 

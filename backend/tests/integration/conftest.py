@@ -12,10 +12,10 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
-import forecastbox.config
+import forecastbox.utility.config
 from forecastbox.api.types.fable import PluginCompositeId, PluginId
-from forecastbox.config import ArtifactStoreConfig, FIABConfig, PluginCompositeIdReadable, PluginSettings, PluginStoreConfig
-from forecastbox.standalone.entrypoint import launch_all
+from forecastbox.entrypoint.main import launch_all
+from forecastbox.utility.config import ArtifactStoreConfig, FIABConfig, PluginCompositeIdReadable, PluginSettings, PluginStoreConfig
 
 from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
 
@@ -104,7 +104,7 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         (pathlib.Path(td.name) / "pylock.toml.timestamp").write_text("1761908420:d0.0.1")
         # we need to monkeypath this, because of eager import this was already initialised
         # to user's personal config file
-        forecastbox.config.fiab_home = pathlib.Path(td.name)
+        forecastbox.utility.config.fiab_home = pathlib.Path(td.name)
 
         config = FIABConfig()
         config.auth.jwt_secret = SecretStr("x" * 32)

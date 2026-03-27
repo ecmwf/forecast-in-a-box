@@ -14,8 +14,8 @@ import pytest
 from pydantic import BaseModel, Field
 from pydantic.fields import FieldInfo
 
-from forecastbox.rjsf.forms import FieldWithUI
-from forecastbox.rjsf.from_pydantic import (
+from forecastbox.utility.rsjf.forms import FieldWithUI
+from forecastbox.utility.rsjf.from_pydantic import (
     PRIMATIVES,
     _from_boolean_primative,
     _from_date_primative,
@@ -28,8 +28,8 @@ from forecastbox.rjsf.from_pydantic import (
     _update_with_extra_json,
     from_pydantic,
 )
-from forecastbox.rjsf.jsonSchema import BooleanSchema, IntegerSchema, ObjectSchema, StringSchema
-from forecastbox.rjsf.uiSchema import UIAdditionalProperties, UIField, UIIntegerField, UIObjectField, UIStringField
+from forecastbox.utility.rsjf.jsonSchema import BooleanSchema, IntegerSchema, ObjectSchema, StringSchema
+from forecastbox.utility.rsjf.uiSchema import UIAdditionalProperties, UIField, UIIntegerField, UIObjectField, UIStringField
 
 
 class TestHelperFunctions:

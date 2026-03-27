@@ -32,11 +32,10 @@ from forecastbox.api.artifacts.manager import ArtifactManager, join_artifact_man
 from forecastbox.api.plugin.manager import PluginsStatus, join_updater_thread, submit_load_plugins
 from forecastbox.api.plugin.manager import status_brief as status_plugins
 from forecastbox.api.plugin.store import join_stores_thread, submit_initialize_stores
+from forecastbox.api.routers import admin, artifacts, auth, fable, gateway, job, plugin, schedule
 from forecastbox.api.scheduling.scheduler_thread import start_scheduler, status_scheduler, stop_scheduler
 from forecastbox.api.updates import get_local_release
-
-from .api.routers import admin, artifacts, auth, fable, gateway, job, plugin, schedule
-from .config import config
+from forecastbox.utility.config import config
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +137,7 @@ class StatusResponse:
 @app.get("/api/v1/status", tags=["status"])
 def status() -> StatusResponse:
     """Status endpoint"""
-    from forecastbox.config import config
+    from forecastbox.utility.config import config
 
     status = {"api": "up", "cascade": "up", "ecmwf": "up", "scheduler": "up", "version": app.version}
 
@@ -188,7 +187,7 @@ async def share_image(request: Request, job_id: str, dataset_id: str):
     return templates.TemplateResponse("share.html", {"request": request, "image_url": image_url, "image_name": f"{job_id}_{dataset_id}"})
 
 
-frontend = os.path.join(os.path.dirname(__file__), "static")
+frontend = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 
 
 class SPAStaticFiles(StaticFiles):

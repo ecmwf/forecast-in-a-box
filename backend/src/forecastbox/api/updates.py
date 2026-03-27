@@ -11,7 +11,7 @@ from pathlib import Path
 
 import httpx
 
-from forecastbox.config import fiab_home
+from forecastbox.utility.config import fiab_home
 
 logger = logging.getLogger(__name__)
 
