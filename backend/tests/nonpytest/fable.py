@@ -8,7 +8,7 @@ from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginComposite
 
 from forecastbox.api.types.fable import FableBuilder
 from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
-from forecastbox.entrypoint.bootstrap.entrypoint import launch_all
+from forecastbox.entrypoint.main import launch_all
 from forecastbox.utility.config import FIABConfig
 
 

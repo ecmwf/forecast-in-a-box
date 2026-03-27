@@ -14,7 +14,7 @@ from pydantic import SecretStr
 
 import forecastbox.utility.config
 from forecastbox.api.types.fable import PluginCompositeId, PluginId
-from forecastbox.entrypoint.bootstrap.entrypoint import launch_all
+from forecastbox.entrypoint.main import launch_all
 from forecastbox.utility.config import ArtifactStoreConfig, FIABConfig, PluginCompositeIdReadable, PluginSettings, PluginStoreConfig
 
 from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token

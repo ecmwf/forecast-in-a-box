@@ -103,7 +103,7 @@ class AuthSettings(BaseModel):
 class GeneralSettings(BaseModel):
     launch_browser: bool = True
     """Whether a browser window should be opened after start. Used only when
-    entrypoint.bootstrap.entrypoint.launch_all module is used"""
+    entrypoint.main.launch_all module is used"""
 
 
 PluginRefreshStrategy = Literal["automatic", "manual"]
@@ -214,7 +214,7 @@ class BackendAPISettings(BaseModel):
     uvicorn_port: int = 8000
     """Listening port of the whole server."""
     allow_service: bool = False
-    """Whether we assume that a system-level service has been registered. Affects entrypoint.bootstrap.entrypoint behaviour"""
+    """Whether we assume that a system-level service has been registered. Affects entrypoint.main behaviour"""
     allow_scheduler: bool = False
     """Whether scheduler thread should be started. Best combine with allow_service=True"""
 

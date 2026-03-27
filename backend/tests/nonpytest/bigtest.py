@@ -12,7 +12,7 @@ import time
 
 import httpx
 
-from forecastbox.entrypoint.bootstrap.entrypoint import launch_all
+from forecastbox.entrypoint.main import launch_all
 from forecastbox.utility.config import FIABConfig, config
 
 logger = logging.getLogger("forecastbox.bigtest")
