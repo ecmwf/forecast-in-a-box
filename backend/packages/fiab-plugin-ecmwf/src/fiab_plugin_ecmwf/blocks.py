@@ -153,6 +153,8 @@ class EnsembleStatistics(Product):
             action = param.mean(dim=ENSEMBLE_DIM)
         elif stat == "std":
             action = param.std(dim=ENSEMBLE_DIM)
+        else:
+            return Either.error(f"unknown {stat=}")
         return Either.ok(action)
 
     def intersect(self, input: BlockInstanceOutput) -> bool:
