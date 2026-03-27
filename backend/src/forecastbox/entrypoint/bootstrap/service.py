@@ -33,6 +33,8 @@ def is_running() -> bool:
 
 
 if __name__ == "__main__":
+    # TODO we probably want to unify this with the forecastbox.entrypoint.main
+    # dont forget to update the scripts/fiab.sh in that case!
     config = FIABConfig()
     validate_runtime(config)
 

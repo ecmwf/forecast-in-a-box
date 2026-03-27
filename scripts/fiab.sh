@@ -288,7 +288,7 @@ case "$COMMAND" in
         ;;
     "service")
         ensureEnvironment
-        python -m forecastbox.standalone.service
+        python -m forecastbox.entrypoint.bootstrap.service
         ;;
     "full-reinstall")
         uv cache prune
@@ -300,7 +300,7 @@ case "$COMMAND" in
         ;;
     "run")
         ensureEnvironment
-        python -m forecastbox.standalone.entrypoint
+        python -m forecastbox.entrypoint.main
         ;;
     *)
         >&2 echo "unknown command $COMMAND"

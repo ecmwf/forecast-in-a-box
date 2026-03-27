@@ -65,6 +65,7 @@ def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
 
 
 if __name__ == "__main__":
+    # NOTE this is referenced from scripts/fiab.sh -- if you refactor this module, pay attention to it
     config = FIABConfig()
     validate_runtime(config)
     handles = launch_all(config)
