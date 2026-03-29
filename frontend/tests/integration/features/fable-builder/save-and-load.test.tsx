@@ -214,13 +214,9 @@ describe('Fable Builder Save & Load', () => {
       await expect.element(expverInput).toHaveValue('0001')
     })
 
-    it('handles retrieve error by keeping builder empty', async () => {
-      const screen = await renderWithRouter(<FableBuilderPage />)
-
-      // Wait for catalogue to load
-      await expect.element(screen.getByText('Block Palette')).toBeVisible()
-
-      // Override retrieve handler to return 404
+    it('handles retrieve error by showing error message', async () => {
+      // Override retrieve handler to return 404 BEFORE rendering
+      // so the component sees the error on its initial fetch
       worker.use(
         http.get(API_ENDPOINTS.fable.retrieve, () => {
           return HttpResponse.json(
@@ -230,15 +226,23 @@ describe('Fable Builder Save & Load', () => {
         }),
       )
 
-      // The builder should remain empty (no blocks loaded)
+      // Render with a fableId to trigger the retrieve flow
+      const screen = await renderWithRouter(
+        <FableBuilderPage fableId="fable-nonexistent" />,
+      )
+
+      // When retrieve returns 404, the component shows a not-found message
+      await expect
+        .element(screen.getByText('The requested configuration was not found.'))
+        .toBeVisible()
+
+      // Should show a link back to the dashboard
+      await expect.element(screen.getByText('Back to Dashboard')).toBeVisible()
+
+      // Store should not have been populated
       const state = useFableBuilderStore.getState()
       expect(Object.keys(state.fable.blocks)).toHaveLength(0)
       expect(state.fableId).toBeNull()
-
-      // Should still show the empty hint
-      await expect
-        .element(screen.getByText('Click a source to get started'))
-        .toBeVisible()
     })
   })
 

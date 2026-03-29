@@ -12,7 +12,11 @@
       "someIssues": "Some services unavailable",
       "systemDown": "System Down",
       "notOperational": "Not operational",
-      "currentlyRunning": "Currently Running",
+      "currently": {
+        "running": "Currently Running",
+        "preparing": "Currently Preparing",
+        "submitted": "Currently Submitted"
+      },
       "activeForecasts": "Active forecasts",
       "availableModels": "Available Models",
       "of": "of {{total}}",

@@ -9,15 +9,90 @@
  */
 
 /**
- * Job & Execution Types
+ * Job & Execution Types & Schemas
  */
 
-export type JobStatus =
-  | 'submitted'
-  | 'preparing'
-  | 'running'
-  | 'completed'
-  | 'failed'
+import { z } from 'zod'
+
+// ---------------------------------------------------------------------------
+// Schemas — must match backend Pydantic models in types/jobs.py & execution.py
+// ---------------------------------------------------------------------------
+
+export const JobStatusSchema = z.enum([
+  'submitted',
+  'preparing',
+  'running',
+  'completed',
+  'failed',
+])
+
+/** execution.py: ProductToOutputId */
+export const ProductToOutputIdSchema = z.object({
+  product_name: z.string(),
+  product_spec: z.record(z.string(), z.unknown()),
+  output_ids: z.array(z.string()),
+})
+
+/** types/jobs.py: JobExecuteResponse */
+export const JobExecuteResponseSchema = z.object({
+  execution_id: z.string(),
+  attempt_count: z.number(),
+})
+
+/** types/jobs.py: JobExecutionDetail (status narrowed from str to known values) */
+export const JobExecutionDetailSchema = z.object({
+  execution_id: z.string(),
+  attempt_count: z.number(),
+  status: JobStatusSchema,
+  created_at: z.string(),
+  updated_at: z.string(),
+  job_definition_id: z.string(),
+  job_definition_version: z.number(),
+  error: z.string().nullable(),
+  progress: z.string().nullable(),
+  cascade_job_id: z.string().nullable(),
+})
+
+/** types/jobs.py: JobExecutionList */
+export const JobExecutionListSchema = z.object({
+  executions: z.array(JobExecutionDetailSchema),
+  total: z.number(),
+  page: z.number(),
+  page_size: z.number(),
+  total_pages: z.number(),
+})
+
+/** types/jobs.py: EnvironmentSpecification */
+const CompositeArtifactIdSchema = z.object({
+  artifact_store_id: z.string(),
+  ml_model_checkpoint_id: z.string(),
+})
+
+const EnvironmentSpecificationSchema = z.object({
+  hosts: z.number().nullable(),
+  workers_per_host: z.number().nullable(),
+  environment_variables: z.record(z.string(), z.string()),
+  runtime_artifacts: z.array(CompositeArtifactIdSchema).default([]),
+})
+
+/** types/jobs.py: RawCascadeJob */
+const RawCascadeJobSchema = z.object({
+  job_type: z.literal('raw_cascade_job'),
+  job_instance: z.unknown(),
+})
+
+/** types/jobs.py: ExecutionSpecification */
+export const ExecutionSpecificationSchema = z.object({
+  job: RawCascadeJobSchema,
+  environment: EnvironmentSpecificationSchema,
+  shared: z.boolean(),
+})
+
+// ---------------------------------------------------------------------------
+// Types (derived from schemas)
+// ---------------------------------------------------------------------------
+
+export type JobStatus = z.infer<typeof JobStatusSchema>
 
 export const TERMINAL_STATUSES: ReadonlySet<JobStatus> = new Set([
   'completed',
@@ -28,83 +103,21 @@ export function isTerminalStatus(status: JobStatus): boolean {
   return TERMINAL_STATUSES.has(status)
 }
 
-/** GET /job/{job_id}/outputs */
-export interface ProductToOutputId {
-  product_name: string
-  product_spec: Record<string, unknown>
-  output_ids: Array<string>
-}
+export type ProductToOutputId = z.infer<typeof ProductToOutputIdSchema>
+export type JobExecuteResponse = z.infer<typeof JobExecuteResponseSchema>
+export type JobExecutionDetail = z.infer<typeof JobExecutionDetailSchema>
+export type JobExecutionList = z.infer<typeof JobExecutionListSchema>
+export type EnvironmentSpecification = z.infer<
+  typeof EnvironmentSpecificationSchema
+>
+export type ExecutionSpecification = z.infer<
+  typeof ExecutionSpecificationSchema
+>
 
-/** POST /job/execute request */
+/** POST /job/execute request (not validated — outbound only) */
 export interface JobExecuteRequest {
   job_definition_id: string
   job_definition_version?: number
-}
-
-/** POST /job/execute response */
-export interface JobExecuteResponse {
-  execution_id: string
-  attempt_count: number
-}
-
-/** Single execution detail from GET /job/status */
-export interface JobExecutionDetail {
-  execution_id: string
-  attempt_count: number
-  status: JobStatus
-  created_at: string
-  updated_at: string
-  job_definition_id: string
-  job_definition_version: number
-  error: string | null
-  progress: string | null
-  cascade_job_id: string | null
-}
-
-/** GET /job/status response */
-export interface JobExecutionList {
-  executions: Array<JobExecutionDetail>
-  total: number
-  page: number
-  page_size: number
-  total_pages: number
-}
-
-export interface EnvironmentSpecification {
-  hosts: number | null
-  workers_per_host: number | null
-  environment_variables: Record<string, string>
-}
-
-export interface ModelSpecification {
-  model: string
-  date: string
-  lead_time: number
-  ensemble_members: number
-}
-
-export interface ProductSpecification {
-  product: string
-  specification: Record<string, unknown>
-}
-
-export interface ForecastProducts {
-  job_type: 'forecast_products'
-  model: ModelSpecification
-  products: Array<ProductSpecification>
-}
-
-export interface RawCascadeJob {
-  job_type: 'raw_cascade_job'
-  job_instance: unknown
-}
-
-export type JobSpecification = ForecastProducts | RawCascadeJob
-
-export interface ExecutionSpecification {
-  job: JobSpecification
-  environment: EnvironmentSpecification
-  shared: boolean
 }
 
 export function createDefaultEnvironment(): EnvironmentSpecification {
@@ -112,6 +125,7 @@ export function createDefaultEnvironment(): EnvironmentSpecification {
     hosts: null,
     workers_per_host: null,
     environment_variables: {},
+    runtime_artifacts: [],
   }
 }
 

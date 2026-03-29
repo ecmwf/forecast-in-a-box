@@ -5,8 +5,8 @@ from fastapi_users.db import SQLAlchemyUserDatabase
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from forecastbox.config import config
 from forecastbox.schemas.user import Base, OAuthAccount, UserTable
+from forecastbox.utility.config import config
 
 async_url = f"sqlite+aiosqlite:///{config.db.sqlite_userdb_path}"
 sync_url = f"sqlite:///{config.db.sqlite_userdb_path}"

@@ -21,6 +21,7 @@ import { gatewayHandlers } from './gateway.handlers'
 import { jobHandlers } from './job.handlers'
 import { pluginsHandlers } from './plugins.handlers'
 import { artifactsHandlers } from './artifacts.handlers'
+import { scheduleHandlers } from './schedule.handlers'
 import { statusHandlers } from './status.handlers'
 import { usersHandlers } from './users.handlers'
 
@@ -32,6 +33,7 @@ export const handlers = [
   ...jobHandlers,
   ...pluginsHandlers,
   ...artifactsHandlers,
+  ...scheduleHandlers,
   ...statusHandlers,
   ...usersHandlers,
 ]

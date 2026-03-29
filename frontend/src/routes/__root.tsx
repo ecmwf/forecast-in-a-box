@@ -28,53 +28,42 @@ const CommandPalette = lazy(() =>
 
 const log = createLogger('Root')
 
+function RootComponent() {
+  const config = useConfig()
+  const debugMode = useDebugMode()
+  const backendBaseUrl = useBackendBaseUrl()
+  const environment = useEnvironment()
+
+  // Sync language between configStore, globalStore, and i18next
+  useLanguageSync()
+
+  // Log configuration in debug mode
+  useEffect(() => {
+    if (debugMode && config) {
+      log.debug('Application Configuration', {
+        backendBaseUrl,
+        environment,
+        debugMode,
+        language: config.language_iso639_1,
+        authType: config.authType,
+        loginEndpoint: config.loginEndpoint,
+        config,
+      })
+    }
+  }, [config, debugMode, backendBaseUrl, environment])
+
+  return (
+    <HotkeysProvider>
+      {/* Header and Footer are rendered by individual layouts */}
+      <Outlet />
+      {/* Global command palette (⌘K / Ctrl+K) */}
+      <Suspense fallback={null}>
+        <CommandPalette />
+      </Suspense>
+    </HotkeysProvider>
+  )
+}
+
 export const Route = createRootRoute({
-  component: () => {
-    const config = useConfig()
-    const debugMode = useDebugMode()
-    const backendBaseUrl = useBackendBaseUrl()
-    const environment = useEnvironment()
-
-    // Sync language between configStore, globalStore, and i18next
-    useLanguageSync()
-
-    // Log configuration in debug mode
-    useEffect(() => {
-      if (debugMode && config) {
-        log.debug('Application Configuration', {
-          backendBaseUrl,
-          environment,
-          debugMode,
-          language: config.language_iso639_1,
-          authType: config.authType,
-          loginEndpoint: config.loginEndpoint,
-          config,
-        })
-      }
-    }, [config, debugMode, backendBaseUrl, environment])
-
-    return (
-      <HotkeysProvider>
-        {/* Header and Footer are rendered by individual layouts */}
-        <Outlet />
-        {/* Global command palette (⌘K / Ctrl+K) */}
-        <Suspense fallback={null}>
-          <CommandPalette />
-        </Suspense>
-        {/* {debugMode && (*/}
-        {/*  <TanStackDevtools*/}
-        {/*    config={{*/}
-        {/*      position: 'bottom-right',*/}
-        {/*    }}*/}
-        {/*    plugins={[*/}
-        {/*      {*/}
-        {/*        name: 'Tanstack Router',*/}
-        {/*        render: <TanStackRouterDevtoolsPanel />,*/}
-        {/*      },*/}
-        {/*    ]}*/}
-        {/*  />*/}
-        {/* )}*/}
-      </HotkeysProvider>
-    )
-  },
+  component: RootComponent,
 })

@@ -28,12 +28,10 @@ import {
 } from '@/api/hooks/useArtifacts'
 import { H3 } from '@/components/base/typography'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
-import {
-  ArtifactsFilters,
-  ArtifactsList,
-  ArtifactsPageHeader,
-  AvailableModelsSection,
-} from '@/features/artifacts'
+import { ArtifactsFilters } from '@/features/artifacts/components/ArtifactsFilters'
+import { ArtifactsList } from '@/features/artifacts/components/ArtifactsList'
+import { ArtifactsPageHeader } from '@/features/artifacts/components/ArtifactsPageHeader'
+import { AvailableModelsSection } from '@/features/artifacts/components/AvailableModelsSection'
 import { cn } from '@/lib/utils'
 import { useUiStore } from '@/stores/uiStore'
 

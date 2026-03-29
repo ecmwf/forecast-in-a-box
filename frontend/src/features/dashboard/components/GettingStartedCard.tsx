@@ -50,7 +50,10 @@ export function GettingStartedCard({
 }: GettingStartedCardProps) {
   const card = (
     <div
+      role="button"
+      tabIndex={disabled ? -1 : 0}
       onClick={disabled ? undefined : onClick}
+      onKeyDown={(e) => !disabled && e.key === 'Enter' && onClick?.()}
       className={cn(
         'relative flex h-full flex-col rounded-lg border p-5 transition-colors',
         'bg-card',
@@ -83,9 +86,9 @@ export function GettingStartedCard({
       </P>
 
       <div className="mt-auto flex flex-wrap gap-2">
-        {tags.map((tag, index) => (
+        {tags.map((tag) => (
           <span
-            key={index}
+            key={tag}
             className={cn(
               'rounded px-2 py-1 text-sm text-muted-foreground',
               isRecommended

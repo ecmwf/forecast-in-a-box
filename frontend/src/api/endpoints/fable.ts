@@ -24,6 +24,7 @@ import type {
   FableValidationExpansion,
 } from '@/api/types/fable.types'
 import type { ExecutionSpecification } from '@/api/types/job.types'
+import { ExecutionSpecificationSchema } from '@/api/types/job.types'
 import { apiClient } from '@/api/client'
 import { API_ENDPOINTS } from '@/api/endpoints'
 import {
@@ -104,5 +105,7 @@ export async function upsertFable(
 export async function compileFable(
   request: FableCompileRequest,
 ): Promise<ExecutionSpecification> {
-  return apiClient.put(API_ENDPOINTS.fable.compile, request)
+  return apiClient.put(API_ENDPOINTS.fable.compile, request, {
+    schema: ExecutionSpecificationSchema,
+  })
 }

@@ -15,7 +15,6 @@
  * - Plugin header (name, author, version, status badge)
  * - Block factory cards with source-only button behavior
  * - Tooltip on disabled non-source buttons
- * - Use All Blocks button
  * - Back to Plugins button
  */
 
@@ -23,7 +22,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { mockCatalogue } from '@tests/../mocks/data/fable.data'
 import { renderWithRouter } from '@tests/utils/render'
 import type { PluginInfo } from '@/api/types/plugins.types'
-import { PluginDetailPage } from '@/features/plugins'
+import { PluginDetailPage } from '@/features/plugins/components/PluginDetailPage'
 
 // Mock useMedia to simulate desktop layout
 vi.mock('@/hooks/useMedia', () => ({
@@ -194,18 +193,6 @@ describe('Plugin Detail Page', () => {
     })
   })
 
-  describe('Use All Blocks Button', () => {
-    it('renders Use All Blocks button with correct count', async () => {
-      const screen = await renderWithRouter(
-        <PluginDetailPage plugin={mockPlugin} catalogue={mockCatalogue} />,
-      )
-
-      await expect
-        .element(screen.getByRole('button', { name: /Use All Blocks \(4\)/i }))
-        .toBeVisible()
-    })
-  })
-
   describe('Back to Plugins Button', () => {
     it('renders Back to Plugins button', async () => {
       const screen = await renderWithRouter(
@@ -213,7 +200,7 @@ describe('Plugin Detail Page', () => {
       )
 
       await expect
-        .element(screen.getByRole('link', { name: /Back to Plugins/i }))
+        .element(screen.getByRole('button', { name: /Back to Plugins/i }))
         .toBeVisible()
     })
   })

@@ -45,15 +45,13 @@ const mockModels: Array<MlModelDetail> = [
       'ECMWF Artificial Intelligence Forecasting System (AIFS) single model for medium-range weather prediction.',
     url: 'https://www.ecmwf.int/en/forecasts/documentation-and-support',
     pip_package_constraints: ['torch>=2.0.0', 'numpy>=1.24.0'],
-    output_characteristics: {
-      variables: ['temperature', 'wind_speed', 'pressure'],
-      resolution: '0.25 degrees',
-      lead_time: '10 days',
-    },
-    input_characteristics: {
-      variables: ['temperature', 'wind_speed', 'pressure', 'humidity'],
-      resolution: '0.25 degrees',
-    },
+    output_characteristics: ['temperature', 'wind_speed', 'pressure'],
+    input_characteristics: [
+      'temperature',
+      'wind_speed',
+      'pressure',
+      'humidity',
+    ],
   },
   {
     composite_id: {
@@ -67,65 +65,49 @@ const mockModels: Array<MlModelDetail> = [
     is_available: false,
     display_description:
       'ECMWF AIFS ensemble model for probabilistic weather forecasting with multiple ensemble members.',
-    url: null,
+    url: 'https://www.ecmwf.int/en/forecasts/documentation-and-support',
     pip_package_constraints: ['torch>=2.0.0', 'numpy>=1.24.0'],
-    output_characteristics: {
-      variables: ['temperature', 'wind_speed', 'pressure'],
-      resolution: '0.25 degrees',
-      ensemble_members: 50,
-    },
-    input_characteristics: {
-      variables: ['temperature', 'wind_speed', 'pressure', 'humidity'],
-      resolution: '0.25 degrees',
-    },
+    output_characteristics: ['temperature', 'wind_speed', 'pressure'],
+    input_characteristics: [
+      'temperature',
+      'wind_speed',
+      'pressure',
+      'humidity',
+    ],
   },
   {
     composite_id: {
-      artifact_store_id: 'community',
-      ml_model_checkpoint_id: 'pangu-weather-v1.0',
+      artifact_store_id: 'ecmwf',
+      ml_model_checkpoint_id: 'aifs-crps-v0.1.0',
     },
-    display_name: 'Pangu-Weather',
-    display_author: 'Huawei Cloud',
+    display_name: 'AIFS CRPS',
+    display_author: 'ECMWF',
     disk_size_bytes: 1_073_741_824,
-    supported_platforms: ['cpu', 'cuda', 'rocm'],
+    supported_platforms: ['cpu', 'cuda'],
     is_available: true,
     display_description:
-      'Pangu-Weather model for global weather forecasting using 3D Earth-specific transformer architecture.',
-    url: 'https://github.com/198808xc/Pangu-Weather',
-    pip_package_constraints: ['onnxruntime>=1.14.0'],
-    output_characteristics: {
-      variables: ['geopotential', 'temperature', 'humidity', 'wind'],
-      resolution: '0.25 degrees',
-      lead_time: '7 days',
-    },
-    input_characteristics: {
-      variables: ['geopotential', 'temperature', 'humidity', 'wind'],
-      resolution: '0.25 degrees',
-    },
+      'ECMWF AIFS model trained with Continuous Ranked Probability Score for calibrated probabilistic forecasts.',
+    url: 'https://www.ecmwf.int/en/forecasts/documentation-and-support',
+    pip_package_constraints: ['torch>=2.0.0', 'numpy>=1.24.0'],
+    output_characteristics: ['geopotential', 'temperature', 'humidity', 'wind'],
+    input_characteristics: ['geopotential', 'temperature', 'humidity', 'wind'],
   },
   {
     composite_id: {
-      artifact_store_id: 'community',
-      ml_model_checkpoint_id: 'graphcast-v0.1',
+      artifact_store_id: 'ecmwf',
+      ml_model_checkpoint_id: 'aifs-ens-v0.3.0',
     },
-    display_name: 'GraphCast',
-    display_author: 'Google DeepMind',
+    display_name: 'AIFS ENS',
+    display_author: 'ECMWF',
     disk_size_bytes: 3_221_225_472,
     supported_platforms: ['cuda'],
     is_available: false,
     display_description:
-      'GraphCast: Learning skillful medium-range global weather forecasting using graph neural networks.',
-    url: 'https://github.com/google-deepmind/graphcast',
-    pip_package_constraints: ['jax>=0.4.0', 'jraph>=0.0.6'],
-    output_characteristics: {
-      variables: ['temperature', 'wind', 'pressure', 'humidity'],
-      resolution: '0.25 degrees',
-      lead_time: '10 days',
-    },
-    input_characteristics: {
-      variables: ['temperature', 'wind', 'pressure', 'humidity'],
-      resolution: '0.25 degrees',
-    },
+      'ECMWF AIFS large ensemble model for operational probabilistic weather forecasting at scale.',
+    url: 'https://www.ecmwf.int/en/forecasts/documentation-and-support',
+    pip_package_constraints: ['torch>=2.0.0', 'numpy>=1.24.0'],
+    output_characteristics: ['temperature', 'wind', 'pressure', 'humidity'],
+    input_characteristics: ['temperature', 'wind', 'pressure', 'humidity'],
   },
 ]
 

@@ -10,7 +10,7 @@
 
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { FableBuilderPage } from '@/features/fable-builder'
+import { FableBuilderPage } from '@/features/fable-builder/components/FableBuilderPage'
 
 const searchSchema = z.object({
   preset: z

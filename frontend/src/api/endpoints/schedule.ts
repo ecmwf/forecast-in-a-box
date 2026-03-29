@@ -12,6 +12,7 @@
  * Schedule API Endpoints
  */
 
+import { z } from 'zod'
 import type {
   CreateScheduleResponse,
   ScheduleDefinitionResponse,
@@ -19,6 +20,12 @@ import type {
   ScheduleRunsResponse,
   ScheduleSpecification,
   ScheduleUpdate,
+} from '@/api/types/schedule.types'
+import {
+  CreateScheduleResponseSchema,
+  ScheduleDefinitionResponseSchema,
+  ScheduleListResponseSchema,
+  ScheduleRunsResponseSchema,
 } from '@/api/types/schedule.types'
 import { apiClient } from '@/api/client'
 import { API_ENDPOINTS } from '@/api/endpoints'
@@ -32,7 +39,10 @@ export async function getSchedules(
   if (enabled !== undefined) {
     params.enabled = String(enabled)
   }
-  return apiClient.get(API_ENDPOINTS.schedule.list, { params })
+  return apiClient.get(API_ENDPOINTS.schedule.list, {
+    params,
+    schema: ScheduleListResponseSchema,
+  })
 }
 
 export async function getSchedule(
@@ -40,25 +50,29 @@ export async function getSchedule(
 ): Promise<ScheduleDefinitionResponse> {
   return apiClient.get(API_ENDPOINTS.schedule.get, {
     params: { experiment_id: experimentId },
+    schema: ScheduleDefinitionResponseSchema,
   })
 }
 
 export async function createSchedule(
   spec: ScheduleSpecification,
 ): Promise<CreateScheduleResponse> {
-  return apiClient.put(API_ENDPOINTS.schedule.create, spec)
+  return apiClient.put(API_ENDPOINTS.schedule.create, spec, {
+    schema: CreateScheduleResponseSchema,
+  })
 }
 
 export async function updateSchedule(
   experimentId: string,
   update: ScheduleUpdate,
-): Promise<unknown> {
+): Promise<ScheduleDefinitionResponse> {
   return apiClient.post(API_ENDPOINTS.schedule.update, update, {
     params: { experiment_id: experimentId },
+    schema: ScheduleDefinitionResponseSchema,
   })
 }
 
-export async function deleteSchedule(experimentId: string): Promise<unknown> {
+export async function deleteSchedule(experimentId: string): Promise<void> {
   return apiClient.post(API_ENDPOINTS.schedule.delete, null, {
     params: { experiment_id: experimentId },
   })
@@ -78,7 +92,10 @@ export async function getScheduleRuns(
   if (status) {
     params.status = status
   }
-  return apiClient.get(API_ENDPOINTS.schedule.runs, { params })
+  return apiClient.get(API_ENDPOINTS.schedule.runs, {
+    params,
+    schema: ScheduleRunsResponseSchema,
+  })
 }
 
 export async function getScheduleNextRun(
@@ -86,5 +103,12 @@ export async function getScheduleNextRun(
 ): Promise<string> {
   return apiClient.get(API_ENDPOINTS.schedule.nextRun, {
     params: { experiment_id: experimentId },
+    schema: z.string(),
+  })
+}
+
+export async function getScheduleCurrentTime(): Promise<string> {
+  return apiClient.get(API_ENDPOINTS.schedule.currentTime, {
+    schema: z.string(),
   })
 }

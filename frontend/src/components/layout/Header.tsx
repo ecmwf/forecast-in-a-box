@@ -89,8 +89,8 @@ export const Header = () => {
               <div className="mr-6 ml-auto border-r border-foreground/10 pr-6">
                 <div className="lg:pr-4">
                   <ul className="space-y-6 text-base lg:flex lg:gap-8 lg:space-y-0 lg:text-sm">
-                    {menuItems.map((item, index) => (
-                      <li key={index}>
+                    {menuItems.map((item) => (
+                      <li key={item.to}>
                         <Link
                           to={item.to}
                           className="block text-muted-foreground duration-150 hover:text-accent-foreground"
@@ -104,15 +104,12 @@ export const Header = () => {
               </div>
             )}
             {!isLarge && isMobileMenuOpen && (
-              <nav
-                role="navigation"
-                className="w-full [--color-muted:--alpha(var(--color-foreground)/5%)]"
-              >
-                {mobileLinks.map((link, index) => {
+              <nav className="w-full [--color-muted:--alpha(var(--color-foreground)/5%)]">
+                {mobileLinks.map((link) => {
                   if (link.name && link.to) {
                     return (
                       <Link
-                        key={index}
+                        key={link.to}
                         to={link.to}
                         onClick={() => setIsMobileMenuOpen(false)}
                         className="group relative block py-4 text-lg"

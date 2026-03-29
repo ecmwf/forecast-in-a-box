@@ -66,14 +66,16 @@
     "createSchedule": "Create Schedule",
     "creatingSchedule": "Creating...",
     "cronExpression": "Schedule Frequency",
-    "maxDelay": "Max Acceptable Delay (hours)",
-    "maxDelayHelp": "If the scheduler is delayed longer than this, the run will be skipped.",
+    "maxDelay": "Skip if delayed by (hours)",
+    "maxDelayHelp": "If a scheduled run is delayed longer than this, it will be skipped instead of running late.",
     "dynamicFields": "Dynamic Fields",
     "dynamicFieldToggleLabel": "Use scheduled run time",
     "dynamicFieldPreview": "At each run, this value will be set to the scheduled run time (e.g., 20260313T06)",
     "dynamicFieldsFallbackHelp": "No configuration values could be matched in the compiled specification. Dynamic fields are not available for this configuration.",
     "scheduleCreated": "Schedule created successfully",
-    "compilingSpec": "Compiling specification..."
+    "compilingSpec": "Compiling specification...",
+    "serverTime": "(server time)",
+    "localEquivalent": "→ {{time}}"
   },
   "outputs": {
     "generated": "Generated",

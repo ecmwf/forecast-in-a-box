@@ -22,6 +22,9 @@ import type { ApiError, RequestConfig } from '@/types/api.types'
 import { getBackendBaseUrl } from '@/utils/env'
 import { parseOrThrow } from '@/utils/zod'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('ApiClient')
 
 /**
  * Custom error class for API errors
@@ -84,7 +87,12 @@ async function request<T>(
 
   // Add X-Anonymous-ID header if anonymous ID exists in localStorage
   const anonymousId = localStorage.getItem(STORAGE_KEYS.auth.anonymousId)
-  if (anonymousId) {
+  if (
+    anonymousId &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      anonymousId,
+    )
+  ) {
     requestHeaders['X-Anonymous-ID'] = anonymousId
   }
 
@@ -129,6 +137,13 @@ async function request<T>(
     }
 
     const data = await response.json()
+
+    // Warn in development when response validation is skipped
+    if (!schema && import.meta.env.DEV) {
+      log.warn(
+        `No schema for ${method} ${path} — response is not validated at runtime`,
+      )
+    }
 
     // Validate with Zod schema if provided
     if (schema) {

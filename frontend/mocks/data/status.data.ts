@@ -23,6 +23,7 @@ export const mockStatusAllUp: StatusResponse = {
   cascade: 'up',
   ecmwf: 'up',
   scheduler: 'off',
+  plugins: 'ok',
   version: '0.0.1@2025-11-10 17:06:53',
 }
 
@@ -34,6 +35,7 @@ export const mockStatusPartialOutage: StatusResponse = {
   cascade: 'down',
   ecmwf: 'up',
   scheduler: 'off',
+  plugins: 'ok',
   version: '0.0.1@2025-11-10 17:06:53',
 }
 
@@ -45,6 +47,7 @@ export const mockStatusAllDown: StatusResponse = {
   cascade: 'down',
   ecmwf: 'down',
   scheduler: 'off',
+  plugins: 'down',
   version: '0.0.1@2025-11-10 17:06:53',
 }
 

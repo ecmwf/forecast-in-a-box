@@ -179,7 +179,7 @@ describe('useUser', () => {
     it('includes authType in query key', async () => {
       mockUseAuth.mockReturnValue({
         isAuthenticated: true,
-        authType: 'anonymous',
+        authType: 'authenticated',
       })
       mockGetCurrentUser.mockResolvedValue({ id: '1' })
 
@@ -193,6 +193,20 @@ describe('useUser', () => {
 
       // Query key should include authType to differentiate cached results
       expect(mockGetCurrentUser).toHaveBeenCalled()
+    })
+
+    it('does not fetch for anonymous auth', () => {
+      mockUseAuth.mockReturnValue({
+        isAuthenticated: true,
+        authType: 'anonymous',
+      })
+
+      const { result } = renderHook(() => useUser(), {
+        wrapper: createWrapper(),
+      })
+
+      expect(result.current.fetchStatus).toBe('idle')
+      expect(mockGetCurrentUser).not.toHaveBeenCalled()
     })
   })
 })

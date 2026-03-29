@@ -20,7 +20,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { renderWithRouter } from '@tests/utils/render'
 import type { AuthContextValue } from '@/features/auth/AuthContext'
-import { PublicLayout } from '@/components/layout'
+import { PublicLayout } from '@/components/layout/PublicLayout'
 import { Footer } from '@/components/layout/Footer'
 import { Header } from '@/components/layout/Header'
 import { AuthContext } from '@/features/auth/AuthContext'

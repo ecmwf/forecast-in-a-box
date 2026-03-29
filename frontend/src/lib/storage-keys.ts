@@ -92,7 +92,7 @@ export const STORAGE_KEYS = {
  * ```
  */
 export const STORE_VERSIONS = {
-  ui: 4, // v4: Removed sidebar state
+  ui: 5, // v5: Default artifacts view to table
   config: 1,
   fableBuilder: 2, // v2: Removed configDisplayMode, added isMiniMapOpen
 } as const

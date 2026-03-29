@@ -70,6 +70,12 @@ export function useFable(fableId: string | null | undefined) {
     },
     enabled: !!fableId,
     staleTime: 30 * 1000, // 30 seconds
+    // Don't retry 4xx errors (e.g. 404 not found) — only retry server errors
+    retry: (failureCount, error) => {
+      if (error instanceof ApiClientError && error.status && error.status < 500)
+        return false
+      return failureCount < 2
+    },
   })
 }
 
@@ -79,6 +85,12 @@ export function useFableRetrieve(fableId: string | null | undefined) {
     queryFn: () => retrieveFable(fableId!),
     enabled: !!fableId,
     staleTime: Infinity,
+    // Don't retry 4xx errors (e.g. 404 not found) — only retry server errors
+    retry: (failureCount, error) => {
+      if (error instanceof ApiClientError && error.status && error.status < 500)
+        return false
+      return failureCount < 2
+    },
   })
 }
 

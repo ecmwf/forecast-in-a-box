@@ -21,7 +21,7 @@ from forecastbox.api.types.fable import FableBuilder, FableSaveRequest
 from forecastbox.api.types.scheduling import ScheduleSpecification, ScheduleUpdate
 
 from .conftest import testPluginId
-from .utils import ensure_completed_v2, ensure_schedule_run_v2
+from .utils import ensure_completed_v2, ensure_schedule_run_v2, scheduling_endpoint_with_retries
 
 # *** helpers **
 
@@ -130,8 +130,10 @@ def test_schedule_v2_crud(backend_client_with_auth):
     # update cron and enabled
     updated_cron = "0 1 * * *"
     update = ScheduleUpdate(cron_expr=updated_cron, enabled=False)
-    response = backend_client_with_auth.post(
-        "/schedule/update", params={"experiment_id": experiment_id}, headers=headers, json=update.model_dump(exclude_unset=True)
+    response = scheduling_endpoint_with_retries(
+        lambda: backend_client_with_auth.post(
+            "/schedule/update", params={"experiment_id": experiment_id}, headers=headers, json=update.model_dump(exclude_unset=True)
+        )
     )
     assert response.is_success, response.text
     updated = response.json()
@@ -220,8 +222,10 @@ def test_schedule_v2_next_run(backend_client_with_auth):
 
     # update cron to 2 AM
     update = ScheduleUpdate(cron_expr="0 2 * * *")
-    response = backend_client_with_auth.post(
-        "/schedule/update", params={"experiment_id": experiment_id}, headers=headers, json=update.model_dump(exclude_unset=True)
+    response = scheduling_endpoint_with_retries(
+        lambda: backend_client_with_auth.post(
+            "/schedule/update", params={"experiment_id": experiment_id}, headers=headers, json=update.model_dump(exclude_unset=True)
+        )
     )
     assert response.is_success, response.text
 
@@ -233,8 +237,10 @@ def test_schedule_v2_next_run(backend_client_with_auth):
 
     # disable: next run should be cleared
     disable_update = ScheduleUpdate(enabled=False)
-    response = backend_client_with_auth.post(
-        "/schedule/update", params={"experiment_id": experiment_id}, headers=headers, json=disable_update.model_dump(exclude_unset=True)
+    response = scheduling_endpoint_with_retries(
+        lambda: backend_client_with_auth.post(
+            "/schedule/update", params={"experiment_id": experiment_id}, headers=headers, json=disable_update.model_dump(exclude_unset=True)
+        )
     )
     assert response.is_success, response.text
 

@@ -10,7 +10,7 @@
 
 import { createFileRoute } from '@tanstack/react-router'
 import { Dag } from '@/features/landing/components/Dag.tsx'
-import { PublicLayout } from '@/components/layout'
+import { PublicLayout } from '@/components/layout/PublicLayout'
 
 export const Route = createFileRoute('/about')({
   component: About,

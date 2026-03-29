@@ -74,6 +74,7 @@ function NodeControlButton({
 
   return (
     <div
+      role="presentation"
       onClick={stopPropagation}
       onPointerDown={stopPropagation}
       onMouseDown={stopPropagation}

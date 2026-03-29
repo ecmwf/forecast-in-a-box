@@ -31,7 +31,7 @@ import {
 } from '@/features/fable-builder/stores/fableBuilderStore'
 import { P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
-import { FieldRenderer } from '@/components/base/fields'
+import { FieldRenderer } from '@/components/base/fields/FieldRenderer'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import {
   ContextMenu,
@@ -91,6 +91,7 @@ export function BlockInstanceCard({
 }: BlockInstanceCardProps) {
   const [isExpanded, setIsExpanded] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   const fable = useFableBuilderStore((state) => state.fable)
   const updateBlockConfig = useFableBuilderStore(
@@ -134,8 +135,6 @@ export function BlockInstanceCard({
   const IconComponent = getBlockKindIcon(factory.kind)
   const hasErrors = blockValidation?.hasErrors ?? false
   const errors = blockValidation?.errors ?? []
-
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   return (
     <ContextMenu>
@@ -242,7 +241,7 @@ export function BlockInstanceCard({
                   <P className="mb-1 font-medium">Configuration Issues</P>
                   <ul className="list-disc space-y-0.5 pl-4 text-sm">
                     {errors.map((error, index) => (
-                      <li key={index}>{error}</li>
+                      <li key={`${error}-${index}`}>{error}</li>
                     ))}
                   </ul>
                 </div>
@@ -275,7 +274,7 @@ export function BlockInstanceCard({
                             {inputName}
                           </Label>
                           <Select
-                            value={connectedTo || undefined}
+                            value={connectedTo || null}
                             onValueChange={(value) => {
                               if (value) {
                                 connectBlocks(instanceId, inputName, value)

@@ -33,7 +33,7 @@ import {
 import type { AuthContextValue } from '@/features/auth/AuthContext'
 import { AuthContext } from '@/features/auth/AuthContext'
 import { API_ENDPOINTS } from '@/api/endpoints'
-import { WelcomeCard } from '@/features/dashboard'
+import { WelcomeCard } from '@/features/dashboard/components/WelcomeCard'
 import { Footer } from '@/components/layout/Footer'
 import { StatusDetailsPopover } from '@/components/common/StatusDetailsPopover'
 import { useStatusStore } from '@/features/status/stores/statusStore'
@@ -209,6 +209,7 @@ describe('System Status', () => {
       await expect.element(screen.getByText('Cascade')).toBeVisible()
       await expect.element(screen.getByText('ECMWF Data')).toBeVisible()
       await expect.element(screen.getByText('Scheduler')).toBeVisible()
+      await expect.element(screen.getByText('Plugins')).toBeVisible()
     })
 
     it('shows Online status for healthy components', async () => {
@@ -223,11 +224,12 @@ describe('System Status', () => {
       const trigger = screen.getByText('Open Status')
       await trigger.click()
 
-      // mockStatusAllUp has api: up, cascade: up, ecmwf: up => "Online" for each
+      // mockStatusAllUp has api: up, cascade: up, ecmwf: up, plugins: ok => "Online" for each
       // scheduler is "off" => "Disabled"
       const onlineElements = screen.getByText('Online')
       await expect.element(onlineElements.first()).toBeVisible()
       await expect.element(screen.getByText('Disabled')).toBeVisible()
+      await expect.element(screen.getByText('Plugins')).toBeVisible()
     })
 
     it('shows Offline status for down components with partial outage', async () => {

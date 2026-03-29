@@ -48,6 +48,7 @@ function getComponentLabel(component: StatusComponent): string {
     cascade: 'Cascade',
     ecmwf: 'ECMWF Data',
     scheduler: 'Scheduler',
+    plugins: 'Plugins',
   }
   return labels[component]
 }

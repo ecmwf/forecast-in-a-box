@@ -12,12 +12,15 @@
  * Gateway API Endpoints
  */
 
+import { z } from 'zod'
 import { apiClient } from '@/api/client'
 import { API_ENDPOINTS } from '@/api/endpoints'
 import { getBackendBaseUrl } from '@/utils/env'
 
 export async function getGatewayStatus(): Promise<string> {
-  return apiClient.get(API_ENDPOINTS.gateway.status)
+  return apiClient.get(API_ENDPOINTS.gateway.status, {
+    schema: z.string(),
+  })
 }
 
 export function getGatewayLogsUrl(): string {

@@ -234,7 +234,10 @@ export function SaveConfigPopover({
   return (
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
       {isControlled ? (
-        <PopoverTrigger render={<span className="hidden" />} />
+        <PopoverTrigger
+          nativeButton={false}
+          render={<span className="hidden" />}
+        />
       ) : (
         <PopoverTrigger
           render={

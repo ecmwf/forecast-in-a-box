@@ -30,8 +30,8 @@ from pyrsistent.typing import PMap, PSet
 
 from forecastbox.api.artifacts.base import ArtifactCatalog, CompositeArtifactId, MlModelCheckpoint, MlModelDetail, MlModelOverview
 from forecastbox.api.artifacts.io import delete_artifact, download_artifact, get_artifacts_catalog, list_local_storage
-from forecastbox.config import config
 from forecastbox.ecpyutil import timed_acquire
+from forecastbox.utility.config import config
 
 logger = logging.getLogger(__name__)
 

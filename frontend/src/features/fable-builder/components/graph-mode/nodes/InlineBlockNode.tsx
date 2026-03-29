@@ -38,7 +38,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { FieldRenderer } from '@/components/base/fields'
+import { FieldRenderer } from '@/components/base/fields/FieldRenderer'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import {
@@ -123,7 +123,10 @@ export const InlineBlockNode = memo(function InlineBlockNode({
   return (
     <div
       ref={containerRef}
+      role="button"
+      tabIndex={0}
       onClick={() => selectBlock(id)}
+      onKeyDown={(e) => e.key === 'Enter' && selectBlock(id)}
       className={cn(
         'relative w-[380px] rounded-2xl border bg-card shadow-sm',
         'cursor-pointer transition-all duration-300 hover:shadow-lg',
@@ -144,7 +147,7 @@ export const InlineBlockNode = memo(function InlineBlockNode({
               <P className="font-medium text-destructive">Validation Errors</P>
               <ul className="list-disc space-y-0.5 pl-4 text-sm">
                 {errors.map((error, index) => (
-                  <li key={index}>{error}</li>
+                  <li key={`${error}-${index}`}>{error}</li>
                 ))}
               </ul>
             </div>
@@ -221,6 +224,7 @@ export const InlineBlockNode = memo(function InlineBlockNode({
                 <div
                   key={inputName}
                   className="nodrag space-y-1"
+                  role="presentation"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <Label
@@ -230,7 +234,7 @@ export const InlineBlockNode = memo(function InlineBlockNode({
                     {inputName}
                   </Label>
                   <Select
-                    value={currentSourceId || undefined}
+                    value={currentSourceId || null}
                     onValueChange={(value) =>
                       handleInputChange(inputName, value ?? '')
                     }

@@ -244,6 +244,7 @@ export function PluginCard({
               <Button
                 variant="outline"
                 className="flex-1"
+                nativeButton={false}
                 render={
                   <a href={pypiUrl} target="_blank" rel="noopener noreferrer" />
                 }

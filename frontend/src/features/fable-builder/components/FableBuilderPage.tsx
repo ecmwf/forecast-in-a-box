@@ -12,19 +12,17 @@ import React, { useEffect, useRef } from 'react'
 import { Link } from '@tanstack/react-router'
 import { AlertCircle, Package } from 'lucide-react'
 import { FableBuilderHeader } from './FableBuilderHeader'
-import {
-  BlockPalette,
-  ConfigPanel,
-  MobileLayout,
-  ThreeColumnLayout,
-} from './layout'
-import { FableGraphCanvas } from './graph-mode'
-import { FableFormCanvas } from './form-mode'
-import { ReviewStep as ReviewStepComponent } from './review'
-import type { PresetId } from '@/features/fable-builder/presets'
+import { BlockPalette } from './layout/BlockPalette'
+import { ConfigPanel } from './layout/ConfigPanel'
+import { MobileLayout } from './layout/MobileLayout'
+import { ThreeColumnLayout } from './layout/ThreeColumnLayout'
+import { FableGraphCanvas } from './graph-mode/FableGraphCanvas'
+import { FableFormCanvas } from './form-mode/FableFormCanvas'
+import { ReviewStep as ReviewStepComponent } from './review/ReviewStep'
+import type { PresetId } from '@/features/fable-builder/presets/presets'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import { useURLStateSync } from '@/features/fable-builder/hooks/useURLStateSync'
-import { getPreset } from '@/features/fable-builder/presets'
+import { getPreset } from '@/features/fable-builder/presets/presets'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { useMedia } from '@/hooks/useMedia'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -153,14 +151,14 @@ export function FableBuilderPage({
     }
   }, [fableId, existingFable, fableRetrieveData, preset, encodedState])
 
+  // Sync React Query validation state → Zustand store for sibling components
   useEffect(() => {
     setIsValidating(isValidating || isRevalidating)
   }, [isValidating, isRevalidating, setIsValidating])
 
   useEffect(() => {
     if (validationResult) {
-      const state = toValidationState(validationResult)
-      setValidationState(state)
+      setValidationState(toValidationState(validationResult))
     }
   }, [validationResult, setValidationState])
 
@@ -173,11 +171,27 @@ export function FableBuilderPage({
   }
 
   if (fableId && fableError) {
+    const isNotFound =
+      fableError instanceof ApiClientError && fableError.status === 404
     return (
       <div className="flex min-h-100 flex-col items-center justify-center gap-4">
-        <P className="text-destructive">
-          Failed to load configuration: {fableError.message}
+        <P className="text-lg font-medium">
+          {isNotFound
+            ? 'The requested configuration was not found.'
+            : 'Failed to load configuration. Please try again later.'}
         </P>
+        <P className="text-muted-foreground">
+          {isNotFound
+            ? 'It may have been deleted or the link is no longer valid.'
+            : fableError.message}
+        </P>
+        <Button
+          variant="outline"
+          nativeButton={false}
+          render={<Link to="/dashboard" />}
+        >
+          Back to Dashboard
+        </Button>
       </div>
     )
   }
@@ -246,6 +260,7 @@ function EditStep({
             <Button
               variant="outline"
               className="mt-4"
+              nativeButton={false}
               render={<Link to="/admin/plugins" />}
             >
               Manage Plugins

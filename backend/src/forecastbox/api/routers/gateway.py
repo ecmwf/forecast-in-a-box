@@ -22,8 +22,8 @@ import cascade.gateway.client
 from fastapi import APIRouter, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
 
-from forecastbox.config import StatusMessage, config
-from forecastbox.standalone.launchers import launch_cascade
+from forecastbox.entrypoint.bootstrap.launchers import launch_cascade
+from forecastbox.utility.config import StatusMessage, config
 
 logger = logging.getLogger(__name__)
 

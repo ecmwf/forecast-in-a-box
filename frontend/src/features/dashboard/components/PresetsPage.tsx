@@ -34,7 +34,7 @@ import {
   BLOCK_KIND_ORDER,
   getBlocksByKind,
 } from '@/api/types/fable.types'
-import { PageHeader } from '@/components/common'
+import { PageHeader } from '@/components/common/PageHeader'
 import { H2, P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'

@@ -15,14 +15,11 @@
  * replacing the previous PluginDetailsSheet sidebar.
  */
 
-import { ArrowLeft, Layers, Search } from 'lucide-react'
+import { ArrowLeft, Search } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import {
-  createSingleBlockFable,
-  generatePluginPipeline,
-} from '../utils/pipeline-generator'
+import { createSingleBlockFable } from '../utils/pipeline-generator'
 import { BlockFactoryCard } from './BlockFactoryCard'
 import { CapabilityBadges } from './CapabilityBadges'
 import { PluginIcon } from './PluginIcon'
@@ -122,22 +119,6 @@ export function PluginDetailPage({ plugin, catalogue }: PluginDetailPageProps) {
     })
   }
 
-  const handleUseAllBlocks = () => {
-    if (!catalogue) return
-
-    const { fable } = generatePluginPipeline({
-      pluginId: pluginDisplayId,
-      catalogue,
-    })
-
-    const encoded = encodeFableToURL(fable)
-
-    navigate({
-      to: '/configure',
-      search: { state: encoded },
-    })
-  }
-
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
       {/* Back button */}
@@ -145,6 +126,7 @@ export function PluginDetailPage({ plugin, catalogue }: PluginDetailPageProps) {
         variant="outline"
         size="sm"
         className="gap-1.5"
+        nativeButton={false}
         render={<Link to="/admin/plugins" />}
       >
         <ArrowLeft className="h-4 w-4" />
@@ -174,28 +156,13 @@ export function PluginDetailPage({ plugin, catalogue }: PluginDetailPageProps) {
         <P className="text-muted-foreground">{plugin.description}</P>
       )}
 
-      {/* Capabilities + Use All Blocks */}
-      {(plugin.capabilities.length > 0 ||
-        (pluginCatalogue && blockCount > 1)) && (
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          {plugin.capabilities.length > 0 && (
-            <CapabilityBadges
-              capabilities={plugin.capabilities}
-              selectedCapabilities={selectedCapabilities}
-              onToggle={handleCapabilityToggle}
-            />
-          )}
-          {pluginCatalogue && blockCount > 1 && (
-            <Button
-              className="gap-2"
-              variant="outline"
-              onClick={handleUseAllBlocks}
-            >
-              <Layers className="h-4 w-4" />
-              {t('detail.useAllBlocks', { count: blockCount })}
-            </Button>
-          )}
-        </div>
+      {/* Capabilities */}
+      {plugin.capabilities.length > 0 && (
+        <CapabilityBadges
+          capabilities={plugin.capabilities}
+          selectedCapabilities={selectedCapabilities}
+          onToggle={handleCapabilityToggle}
+        />
       )}
 
       <Separator />

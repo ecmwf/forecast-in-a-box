@@ -20,7 +20,7 @@ import {
 import { H2, P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { FieldRenderer } from '@/components/base/fields'
+import { FieldRenderer } from '@/components/base/fields/FieldRenderer'
 import { Separator } from '@/components/ui/separator'
 import {
   Select,
@@ -263,7 +263,7 @@ function InputConnectionField({
         {inputName}
       </Label>
       <Select
-        value={currentSourceId || undefined}
+        value={currentSourceId || null}
         onValueChange={(value) => onInputChange(inputName, value ?? '')}
       >
         <SelectTrigger id={`input-${inputName}`} className="h-9 w-full">

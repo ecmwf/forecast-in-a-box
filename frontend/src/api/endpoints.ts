@@ -188,6 +188,8 @@ export const API_ENDPOINTS = {
     runs: `${API_PREFIX}/schedule/runs`,
     /** POST - Restart the scheduler thread */
     restart: `${API_PREFIX}/schedule/restart`,
+    /** GET - Get the scheduler's current time */
+    currentTime: `${API_PREFIX}/schedule/current_time`,
   },
 } as const
 

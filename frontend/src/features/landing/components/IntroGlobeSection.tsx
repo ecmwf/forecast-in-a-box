@@ -11,7 +11,7 @@
 import { Suspense, lazy } from 'react'
 import { Button } from '@/components/ui/button'
 import { H1, Typography } from '@/components/base/typography'
-import { useAuth } from '@/features/auth'
+import { useAuth } from '@/features/auth/AuthContext'
 
 // Lazy load the globe to ensure Three.js initializes properly in production builds
 const RotatingGlobe = lazy(

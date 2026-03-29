@@ -12,6 +12,7 @@ count.txt
 
 # Test artifacts
 playwright-report/
+.vitest-attachments
 .playwright-mcp/
 test-results/
 coverage/

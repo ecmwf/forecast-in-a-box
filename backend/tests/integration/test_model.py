@@ -2,8 +2,6 @@ import time
 
 import httpx
 
-from forecastbox.models.metadata import ControlMetadata
-
 from .conftest import fake_artifact_checkpoint_id, fake_artifact_registry_port, fake_artifact_store_id
 from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
 

@@ -31,7 +31,7 @@ import {
 import {
   getDefaultValueForType,
   parseValueType,
-} from '@/components/base/fields'
+} from '@/components/base/fields/value-type-parser'
 
 export interface PipelineGeneratorOptions {
   pluginId: string
