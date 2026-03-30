@@ -123,4 +123,10 @@ def get_product_list(category: str) -> list[str]:
 
 def get_product(category: str, product: str) -> Product:
     """Get a product."""
+    if category not in PRODUCTS:
+        raise KeyError(f"Category '{category}' not found. Available categories: {list(PRODUCTS.keys())}")
+    if product not in PRODUCTS[category]:
+        raise KeyError(
+            f"Product '{product}' not found in category '{category}'. Available products: {list(PRODUCTS[category].products.keys())}"
+        )
     return PRODUCTS[category][product]()
