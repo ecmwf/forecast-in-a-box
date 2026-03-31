@@ -169,7 +169,7 @@ class EnsembleStatistics(Product):
             return Either.error(f"Unsupported statistic '{stat}'")
         return Either.ok(action)
 
-    def intersect(self, input: BlockInstanceOutput) -> bool:
+    def intersect(self, input: BlockInstanceOutput) -> bool:  # type: ignore[override]
         if not isinstance(input, QubedInstanceOutput):
             return False
         dims = input.dimensions()
@@ -221,7 +221,7 @@ class TemporalStatistics(Product):
             action = param.max(dim=STEP_DIM)
         return Either.ok(action)
 
-    def intersect(self, input: BlockInstanceOutput) -> bool:
+    def intersect(self, input: BlockInstanceOutput) -> bool:  # type: ignore[override]
         if not isinstance(input, QubedInstanceOutput):
             return False
         dims = input.dimensions()
@@ -255,5 +255,5 @@ class ZarrSink(Sink):
         )
         return Either.ok(action)
 
-    def intersect(self, input: BlockInstanceOutput) -> bool:
-        return not input.is_empty()
+    def intersect(self, input: BlockInstanceOutput) -> bool:  # type: ignore[override]
+        return not input.is_empty()  # type: ignore[union-attr]

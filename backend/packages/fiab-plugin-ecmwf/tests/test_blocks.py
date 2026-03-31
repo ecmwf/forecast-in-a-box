@@ -11,10 +11,10 @@
 from typing import cast
 
 import pytest
-from fiab_core.fable import BlockInstance, BlockInstanceOutput, PluginBlockFactoryId, PluginCompositeId
+from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
 from fiab_plugin_ecmwf.blocks import EkdSource, EnsembleStatistics, TemporalStatistics, ZarrSink
-from fiab_plugin_ecmwf.metadata import QubedInstanceOutput
+from fiab_plugin_ecmwf.metadata import PluginNoOutput, QubedInstanceOutput
 
 
 @pytest.fixture
@@ -27,7 +27,7 @@ def dummy_blockinstance() -> BlockInstance:
 
 
 @pytest.fixture
-def dummy_blockinstance_output() -> BlockInstanceOutput:
+def dummy_blockinstance_output() -> QubedInstanceOutput:
     return QubedInstanceOutput()
 
 
@@ -45,8 +45,8 @@ def ekdsource_configuration() -> BlockInstance:
 
 
 @pytest.fixture
-def ekdsource_output(dummy_blockinstance: BlockInstance) -> BlockInstanceOutput:
-    return EkdSource().validate(block=dummy_blockinstance, inputs={}).get_or_raise()
+def ekdsource_output(dummy_blockinstance: BlockInstance) -> QubedInstanceOutput:
+    return EkdSource().validate(block=dummy_blockinstance, inputs={}).get_or_raise()  # type: ignore[return-value]
 
 
 @pytest.fixture
@@ -85,22 +85,23 @@ def zarr_sink_configuration() -> BlockInstance:
 
 
 class TestEkdSource:
-    def test_creation(self, dummy_blockinstance: BlockInstance, dummy_blockinstance_output: BlockInstanceOutput):
+    def test_creation(self, dummy_blockinstance: BlockInstance, dummy_blockinstance_output: QubedInstanceOutput):
         block = EkdSource()
 
-        assert not block.intersect(input=dummy_blockinstance_output)
-        output: BlockInstanceOutput = block.validate(block=dummy_blockinstance, inputs={}).get_or_raise()
+        assert not block.intersect(input=dummy_blockinstance_output)  # type: ignore[arg-type]
+        output: QubedInstanceOutput | PluginNoOutput = block.validate(block=dummy_blockinstance, inputs={}).get_or_raise()  # type: ignore[assignment]
         assert output.dataqube is not None
         assert "param" in output
 
 
 class TestEnsembleStatistics:
-    def test_from_ekdsource(self, ensemble_statistics_configuration: BlockInstance, ekdsource_output: BlockInstanceOutput):
+    def test_from_ekdsource(self, ensemble_statistics_configuration: BlockInstance, ekdsource_output: QubedInstanceOutput):
         block = EnsembleStatistics()
 
-        assert block.intersect(input=ekdsource_output)
-        output: BlockInstanceOutput = block.validate(
-            block=ensemble_statistics_configuration, inputs={"dataset": ekdsource_output}
+        assert block.intersect(input=ekdsource_output)  # type: ignore[arg-type]
+        output: QubedInstanceOutput | PluginNoOutput = block.validate(  # type: ignore[assignment]
+            block=ensemble_statistics_configuration,
+            inputs={"dataset": ekdsource_output},  # type: ignore[dict-item]
         ).get_or_raise()
         assert output.dataqube is not None
         assert "param" in output
@@ -110,42 +111,44 @@ class TestEnsembleStatistics:
         self,
         ensemble_statistics_configuration: BlockInstance,
         temporal_statistics_configuration: BlockInstance,
-        ekdsource_output: BlockInstanceOutput,
+        ekdsource_output: QubedInstanceOutput,
     ):
         temporal_block = TemporalStatistics()
-        temporal_output: BlockInstanceOutput = temporal_block.validate(
-            block=temporal_statistics_configuration, inputs={"dataset": ekdsource_output}
+        temporal_output: QubedInstanceOutput | PluginNoOutput = temporal_block.validate(  # type: ignore[assignment]
+            block=temporal_statistics_configuration,
+            inputs={"dataset": ekdsource_output},  # type: ignore[dict-item]
         ).get_or_raise()
 
         block = EnsembleStatistics()
 
-        assert block.intersect(input=temporal_output)
-        output: BlockInstanceOutput = block.validate(
-            block=ensemble_statistics_configuration, inputs={"dataset": temporal_output}
+        assert block.intersect(input=temporal_output)  # type: ignore[arg-type]
+        output: QubedInstanceOutput | PluginNoOutput = block.validate(  # type: ignore[assignment]
+            block=ensemble_statistics_configuration,
+            inputs={"dataset": temporal_output},  # type: ignore[dict-item]
         ).get_or_raise()
         assert output.dataqube is not None
         assert "param" in output
         assert output.axes()["param"] == {"2t"}
 
-    def test_missing_param(self, ensemble_statistics_configuration: BlockInstance, ekdsource_output: BlockInstanceOutput):
+    def test_missing_param(self, ensemble_statistics_configuration: BlockInstance, ekdsource_output: QubedInstanceOutput):
         block = EnsembleStatistics()
 
-        ekdsource_output = cast(QubedInstanceOutput, ekdsource_output)
         modified_output = ekdsource_output.collapse("param")
 
-        assert not block.intersect(input=modified_output)
-        result = block.validate(block=ensemble_statistics_configuration, inputs={"dataset": modified_output})
+        assert not block.intersect(input=modified_output)  # type: ignore[arg-type]
+        result = block.validate(block=ensemble_statistics_configuration, inputs={"dataset": modified_output})  # type: ignore[dict-item]
         with pytest.raises(ValueError, match="param 2t is not in the input parameters"):
             assert result.get_or_raise()
 
 
 class TestTemporalStatistics:
-    def test_from_ekdsource(self, temporal_statistics_configuration: BlockInstance, ekdsource_output: BlockInstanceOutput):
+    def test_from_ekdsource(self, temporal_statistics_configuration: BlockInstance, ekdsource_output: QubedInstanceOutput):
         block = TemporalStatistics()
 
-        assert block.intersect(input=ekdsource_output)
-        output: BlockInstanceOutput = block.validate(
-            block=temporal_statistics_configuration, inputs={"dataset": ekdsource_output}
+        assert block.intersect(input=ekdsource_output)  # type: ignore[arg-type]
+        output: QubedInstanceOutput | PluginNoOutput = block.validate(  # type: ignore[assignment]
+            block=temporal_statistics_configuration,
+            inputs={"dataset": ekdsource_output},  # type: ignore[dict-item]
         ).get_or_raise()
         assert output.dataqube is not None
         assert "param" in output
@@ -155,43 +158,44 @@ class TestTemporalStatistics:
         self,
         temporal_statistics_configuration: BlockInstance,
         ensemble_statistics_configuration: BlockInstance,
-        ekdsource_output: BlockInstanceOutput,
+        ekdsource_output: QubedInstanceOutput,
     ):
         ensemble_block = EnsembleStatistics()
-        ensemble_output: BlockInstanceOutput = ensemble_block.validate(
-            block=ensemble_statistics_configuration, inputs={"dataset": ekdsource_output}
+        ensemble_output: QubedInstanceOutput | PluginNoOutput = ensemble_block.validate(  # type: ignore[assignment]
+            block=ensemble_statistics_configuration,
+            inputs={"dataset": ekdsource_output},  # type: ignore[dict-item]
         ).get_or_raise()
 
         block = TemporalStatistics()
 
-        assert block.intersect(input=ensemble_output)
-        output: BlockInstanceOutput = block.validate(
-            block=temporal_statistics_configuration, inputs={"dataset": ensemble_output}
+        assert block.intersect(input=ensemble_output)  # type: ignore[arg-type]
+        output: QubedInstanceOutput | PluginNoOutput = block.validate(  # type: ignore[assignment]
+            block=temporal_statistics_configuration,
+            inputs={"dataset": ensemble_output},  # type: ignore[dict-item]
         ).get_or_raise()
         assert output.dataqube is not None
         assert "param" in output
         assert output.axes()["param"] == {"2t"}
 
-    def test_missing_param(self, temporal_statistics_configuration: BlockInstance, ekdsource_output: BlockInstanceOutput):
+    def test_missing_param(self, temporal_statistics_configuration: BlockInstance, ekdsource_output: QubedInstanceOutput):
         block = TemporalStatistics()
 
-        ekdsource_output = cast(QubedInstanceOutput, ekdsource_output)
         modified_output = ekdsource_output.collapse("param")
 
-        assert not block.intersect(input=modified_output)
-        result = block.validate(block=temporal_statistics_configuration, inputs={"dataset": modified_output})
+        assert not block.intersect(input=modified_output)  # type: ignore[arg-type]
+        result = block.validate(block=temporal_statistics_configuration, inputs={"dataset": modified_output})  # type: ignore[dict-item]
         with pytest.raises(ValueError, match="param 2t is not in the input parameters"):
             assert result.get_or_raise()
 
 
 class TestZarrSink:
-    def test_from_ekdsource(self, zarr_sink_configuration: BlockInstance, ekdsource_output: BlockInstanceOutput):
+    def test_from_ekdsource(self, zarr_sink_configuration: BlockInstance, ekdsource_output: QubedInstanceOutput):
         block = ZarrSink()
 
-        assert block.intersect(input=ekdsource_output)
-        output: BlockInstanceOutput = block.validate(
+        assert block.intersect(input=ekdsource_output)  # type: ignore[arg-type]
+        output: QubedInstanceOutput | PluginNoOutput = block.validate(  # type: ignore[assignment]
             block=zarr_sink_configuration,
-            inputs={"dataset": ekdsource_output},
+            inputs={"dataset": ekdsource_output},  # type: ignore[dict-item]
         ).get_or_raise()
         assert output.is_empty()
 
@@ -199,19 +203,20 @@ class TestZarrSink:
         self,
         zarr_sink_configuration: BlockInstance,
         ensemble_statistics_configuration: BlockInstance,
-        ekdsource_output: BlockInstanceOutput,
+        ekdsource_output: QubedInstanceOutput,
     ):
         ensemble_block = EnsembleStatistics()
-        ensemble_output: BlockInstanceOutput = ensemble_block.validate(
-            block=ensemble_statistics_configuration, inputs={"dataset": ekdsource_output}
+        ensemble_output: QubedInstanceOutput | PluginNoOutput = ensemble_block.validate(  # type: ignore[assignment]
+            block=ensemble_statistics_configuration,
+            inputs={"dataset": ekdsource_output},  # type: ignore[dict-item]
         ).get_or_raise()
 
         block = ZarrSink()
 
-        assert block.intersect(input=ensemble_output)
-        output: BlockInstanceOutput = block.validate(
+        assert block.intersect(input=ensemble_output)  # type: ignore[arg-type]
+        output: QubedInstanceOutput | PluginNoOutput = block.validate(  # type: ignore[assignment]
             block=zarr_sink_configuration,
-            inputs={"dataset": ensemble_output},
+            inputs={"dataset": ensemble_output},  # type: ignore[dict-item]
         ).get_or_raise()
         assert output.is_empty()
 
@@ -219,18 +224,19 @@ class TestZarrSink:
         self,
         zarr_sink_configuration: BlockInstance,
         temporal_statistics_configuration: BlockInstance,
-        ekdsource_output: BlockInstanceOutput,
+        ekdsource_output: QubedInstanceOutput,
     ):
         temporal_block = TemporalStatistics()
-        temporal_output: BlockInstanceOutput = temporal_block.validate(
-            block=temporal_statistics_configuration, inputs={"dataset": ekdsource_output}
+        temporal_output: QubedInstanceOutput | PluginNoOutput = temporal_block.validate(  # type: ignore[assignment]
+            block=temporal_statistics_configuration,
+            inputs={"dataset": ekdsource_output},  # type: ignore[dict-item]
         ).get_or_raise()
 
         block = ZarrSink()
 
-        assert block.intersect(input=temporal_output)
-        output: BlockInstanceOutput = block.validate(
+        assert block.intersect(input=temporal_output)  # type: ignore[arg-type]
+        output: QubedInstanceOutput | PluginNoOutput = block.validate(  # type: ignore[assignment]
             block=zarr_sink_configuration,
-            inputs={"dataset": temporal_output},
+            inputs={"dataset": temporal_output},  # type: ignore[dict-item]
         ).get_or_raise()
         assert output.is_empty()
