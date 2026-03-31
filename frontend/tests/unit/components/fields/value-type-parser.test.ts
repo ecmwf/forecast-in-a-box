@@ -72,10 +72,10 @@ describe('parseValueType', () => {
       })
     })
 
-    it('returns unknown for unsupported list item type "list[int]"', () => {
+    it('parses list with int item type "list[int]"', () => {
       expect(parseValueType('list[int]')).toEqual({
-        type: 'unknown',
-        raw: 'list[int]',
+        type: 'list',
+        itemType: 'int',
       })
     })
   })
