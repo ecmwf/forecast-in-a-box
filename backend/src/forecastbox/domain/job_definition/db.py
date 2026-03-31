@@ -7,7 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Persistence layer for JobDefinition, with actor-scoped authorization.
+"""Persistence layer for JobDefinition, with auth-scoped authorization.
 
 Uses the same session maker as ``forecastbox.db.jobs`` so that all tables
 share a single SQLite connection pool and in-process tests can monkeypatch
@@ -17,7 +17,6 @@ a single ``async_session_maker`` attribute to inject an in-memory database.
 import datetime as dt
 import uuid
 from collections.abc import Iterable
-from dataclasses import dataclass
 
 from sqlalchemy import func, or_, select, update
 
@@ -25,27 +24,12 @@ import forecastbox.db.jobs as _jobs_module
 from forecastbox.db.core import dbRetry, executeAndCommit, querySingle
 from forecastbox.domain.job_definition.exceptions import JobDefinitionAccessDenied, JobDefinitionNotFound
 from forecastbox.schemas.jobs import JobDefinition, JobDefinitionSource
-from forecastbox.schemas.user import UserRead
-
-
-@dataclass(frozen=True, eq=True, slots=True)
-class ActorContext:
-    """Normalised identity passed to mutating job-definition-layer operations."""
-
-    user_id: str | None
-    is_admin: bool
-
-
-def actor_from_user(user: UserRead | None) -> ActorContext:
-    """Build an ActorContext from an optional authenticated user."""
-    if user is None:
-        return ActorContext(user_id=None, is_admin=False)
-    return ActorContext(user_id=str(user.id), is_admin=user.is_superuser)
+from forecastbox.utility.auth import AuthContext
 
 
 async def upsert_job_definition(
     *,
-    actor: ActorContext,
+    actor: AuthContext,
     definition_id: str | None = None,
     source: JobDefinitionSource,
     created_by: str | None,
@@ -141,7 +125,7 @@ async def get_job_definition(definition_id: str, version: int | None = None) -> 
     return await querySingle(query, _jobs_module.async_session_maker)
 
 
-async def list_job_definitions(*, actor: ActorContext) -> Iterable[JobDefinition]:
+async def list_job_definitions(*, actor: AuthContext) -> Iterable[JobDefinition]:
     """Return the latest non-deleted version of every JobDefinition visible to the actor.
 
     Admins see all definitions.  Non-admins see only their own definitions and
@@ -180,7 +164,7 @@ async def list_job_definitions(*, actor: ActorContext) -> Iterable[JobDefinition
     return await dbRetry(function)
 
 
-async def soft_delete_job_definition(definition_id: str, *, actor: ActorContext) -> None:
+async def soft_delete_job_definition(definition_id: str, *, actor: AuthContext) -> None:
     """Mark all versions of a JobDefinition as deleted.
 
     Raises ``JobDefinitionNotFound`` if the definition does not exist,

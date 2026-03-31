@@ -28,10 +28,10 @@ from forecastbox.api.types.fable import (
     FableValidationExpansion,
 )
 from forecastbox.api.types.jobs import ExecutionSpecification
-from forecastbox.domain.job_definition.db import actor_from_user
 from forecastbox.domain.job_definition.exceptions import JobDefinitionAccessDenied, JobDefinitionNotFound
 from forecastbox.entrypoint.auth.users import current_active_user
 from forecastbox.schemas.user import UserRead
+from forecastbox.utility.auth import user2auth
 
 router = APIRouter(
     tags=["fable"],
@@ -77,7 +77,7 @@ async def upsert_fable_builder(
     `source` is derived from `display_name`: `user_defined` when a name is
     provided, `oneoff_execution` otherwise.
     """
-    actor = actor_from_user(user)
+    actor = user2auth(user)
     try:
         return await job_definition_service.save_builder(actor=actor, payload=payload, fable_id=fable_id)
     except JobDefinitionNotFound as e:

@@ -27,9 +27,9 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 import forecastbox.db.jobs as jobs_db
 import forecastbox.domain.job_definition.db as job_definition_db
-from forecastbox.domain.job_definition.db import ActorContext
 from forecastbox.domain.job_definition.exceptions import JobDefinitionAccessDenied, JobDefinitionNotFound
 from forecastbox.schemas.jobs import Base
+from forecastbox.utility.auth import AuthContext
 
 
 @pytest_asyncio.fixture
@@ -52,10 +52,10 @@ async def mem_session_maker_both(mem_session_maker, monkeypatch):
     yield mem_session_maker
 
 
-_admin = ActorContext(user_id="admin", is_admin=True)
-_user1 = ActorContext(user_id="user1", is_admin=False)
-_user2 = ActorContext(user_id="user2", is_admin=False)
-_anon = ActorContext(user_id=None, is_admin=False)
+_admin = AuthContext(user_id="admin", is_admin=True)
+_user1 = AuthContext(user_id="user1", is_admin=False)
+_user2 = AuthContext(user_id="user2", is_admin=False)
+_anon = AuthContext(user_id=None, is_admin=False)
 
 
 # ---------------------------------------------------------------------------

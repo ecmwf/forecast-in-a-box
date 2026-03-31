@@ -47,8 +47,9 @@ from forecastbox.api.types.fable import (
     FableValidationExpansion,
 )
 from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
-from forecastbox.domain.job_definition.db import ActorContext, upsert_job_definition
+from forecastbox.domain.job_definition.db import upsert_job_definition
 from forecastbox.domain.job_definition.exceptions import JobDefinitionNotFound
+from forecastbox.utility.auth import AuthContext
 
 logger = logging.getLogger(__name__)
 
@@ -195,7 +196,7 @@ def compile_builder(fable: FableBuilder) -> ExecutionSpecification:
 
 async def save_builder(
     *,
-    actor: ActorContext,
+    actor: AuthContext,
     payload: FableSaveRequest,
     fable_id: str | None = None,
 ) -> FableSaveResponse:
