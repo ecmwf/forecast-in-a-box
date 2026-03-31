@@ -10,6 +10,7 @@
 import importlib.metadata
 import re
 from pathlib import Path
+from typing import cast
 
 from anemoi.inference.metadata import Metadata as InferenceMetadata
 from anemoi.inference.metadata import MetadataFactory as InferenceMetadataFactory
@@ -41,7 +42,7 @@ def get_local_path(composite_id: CompositeArtifactId) -> Path:
 
 def get_metadata(composite_id: CompositeArtifactId) -> InferenceMetadata:
     checkpoint = AVAILABLE_CHECKPOINTS[composite_id]
-    return InferenceMetadataFactory(checkpoint.metadata)
+    return cast(InferenceMetadata, InferenceMetadataFactory(checkpoint.metadata))
 
 
 INPUT_SOURCE_EXTRAS: dict[str, str] = {
