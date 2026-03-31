@@ -25,6 +25,7 @@ from forecastbox.domain.experiment.scheduling.dt_utils import current_scheduling
 from forecastbox.entrypoint.auth.users import get_auth_context
 from forecastbox.schemas.jobs import ExperimentDefinition
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.pagination import PaginationSpec
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +123,9 @@ async def list_schedules(
     page_size: int = 10,
 ) -> ListSchedulesResponse:
     try:
-        experiments, total, total_pages = await experiment_service.list_schedules(auth_context, page, page_size)
+        experiments, total, total_pages = await experiment_service.list_schedules(
+            auth_context, PaginationSpec(page=page, page_size=page_size)
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     schedules = [_experiment_to_response(exp) for exp in experiments]
@@ -218,7 +221,9 @@ async def get_schedule_runs(
 ) -> ScheduleRunsResponse:
     """Return paginated JobExecution rows linked to a cron schedule experiment."""
     try:
-        executions, total, total_pages = await experiment_service.get_schedule_runs(auth_context, experiment_id, page, page_size)
+        executions, total, total_pages = await experiment_service.get_schedule_runs(
+            auth_context, experiment_id, PaginationSpec(page=page, page_size=page_size)
+        )
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:

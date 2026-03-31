@@ -15,7 +15,7 @@ import logging
 import os
 import pathlib
 import zipfile
-from typing import cast
+from typing import Annotated, cast
 
 import cascade.gateway.api as cascade_api
 import cascade.gateway.client as cascade_client
@@ -34,6 +34,7 @@ from forecastbox.domain.job_execution.service import ProductToOutputId
 from forecastbox.entrypoint.auth.users import get_auth_context
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
+from forecastbox.utility.pagination import PaginationSpec
 
 logger = logging.getLogger(__name__)
 
@@ -199,24 +200,25 @@ async def create_job_execution(
 
 @router.get("/list")
 async def list_job_executions(
+    pagination: Annotated[PaginationSpec, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
-    page: int = 1,
-    page_size: int = 10,
 ) -> JobExecutionListResponse:
     """List the latest attempt of every execution visible to the caller, with pagination.
 
     Admins see all executions; regular users see only their own.
     """
-    if page < 1 or page_size < 1:
+    if pagination.page < 1 or pagination.page_size < 1:
         raise HTTPException(status_code=400, detail="page and page_size must be greater than 0.")
     total = await job_execution_db.count_job_executions(auth_context=auth_context)
-    start = (page - 1) * page_size
-    total_pages = (total + page_size - 1) // page_size if total > 0 else 0
+    start = (pagination.page - 1) * pagination.page_size
+    total_pages = (total + pagination.page_size - 1) // pagination.page_size if total > 0 else 0
     if start >= total and total > 0:
         raise HTTPException(status_code=404, detail="Page number out of range.")
-    executions = list(await job_execution_db.list_job_executions(auth_context=auth_context, offset=start, limit=page_size))
+    executions = list(await job_execution_db.list_job_executions(auth_context=auth_context, offset=start, limit=pagination.page_size))
     details = [_to_job_execution_detail(job_execution_service.execution_to_detail(e)) for e in executions]
-    return JobExecutionListResponse(executions=details, total=total, page=page, page_size=page_size, total_pages=total_pages)
+    return JobExecutionListResponse(
+        executions=details, total=total, page=pagination.page, page_size=pagination.page_size, total_pages=total_pages
+    )
 
 
 @router.get("/get")

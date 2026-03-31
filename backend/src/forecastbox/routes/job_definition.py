@@ -9,7 +9,7 @@
 
 """Canonical job-definition entity routes — /job_definition/*"""
 
-from typing import cast
+from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends
 from fastapi.exceptions import HTTPException
@@ -21,6 +21,7 @@ from forecastbox.api.types.fable import FableBuilder, FableSaveRequest
 from forecastbox.domain.job_definition.exceptions import JobDefinitionAccessDenied, JobDefinitionNotFound
 from forecastbox.entrypoint.auth.users import get_auth_context
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.pagination import PaginationSpec
 
 router = APIRouter(
     tags=["definition"],
@@ -69,6 +70,8 @@ class JobDefinitionListItem(BaseModel):
 class JobDefinitionListResponse(BaseModel):
     definitions: list[JobDefinitionListItem]
     total: int
+    page: int
+    page_size: int
 
 
 class JobDefinitionUpdateRequest(BaseModel):
@@ -142,10 +145,16 @@ async def get_job_definition(
 
 @router.get("/list")
 async def list_job_definitions(
+    pagination: Annotated[PaginationSpec, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> JobDefinitionListResponse:
     """List the latest non-deleted version of every job definition visible to the caller."""
+    if pagination.page < 1 or pagination.page_size < 1:
+        raise HTTPException(status_code=400, detail="page and page_size must be greater than 0.")
     definitions = list(await job_definition_db.list_job_definitions(auth_context=auth_context))
+    total = len(definitions)
+    start = (pagination.page - 1) * pagination.page_size
+    page_defs = definitions[start : start + pagination.page_size]
     items = [
         JobDefinitionListItem(
             job_definition_id=cast(str, defn.job_definition_id),
@@ -156,9 +165,9 @@ async def list_job_definitions(
             source=cast(str | None, defn.source),
             created_by=cast(str | None, defn.created_by),
         )
-        for defn in definitions
+        for defn in page_defs
     ]
-    return JobDefinitionListResponse(definitions=items, total=len(items))
+    return JobDefinitionListResponse(definitions=items, total=total, page=pagination.page, page_size=pagination.page_size)
 
 
 @router.post("/update")

@@ -14,7 +14,7 @@ Covers cron-schedule experiments and their operational controls.
 
 import datetime as dt
 import logging
-from typing import cast
+from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends
 from fastapi.exceptions import HTTPException
@@ -27,6 +27,7 @@ from forecastbox.domain.experiment.scheduling.dt_utils import current_scheduling
 from forecastbox.entrypoint.auth.users import get_auth_context
 from forecastbox.schemas.jobs import ExperimentDefinition
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.pagination import PaginationSpec
 
 logger = logging.getLogger(__name__)
 
@@ -178,17 +179,18 @@ async def get_experiment(
 
 @router.get("/list")
 async def list_experiments(
+    pagination: Annotated[PaginationSpec, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
-    page: int = 1,
-    page_size: int = 10,
 ) -> ExperimentListResponse:
     """List experiments visible to the caller, with pagination."""
     try:
-        experiments, total, total_pages = await experiment_service.list_schedules(auth_context, page, page_size)
+        experiments, total, total_pages = await experiment_service.list_schedules(auth_context, pagination)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     items = [_experiment_to_detail(exp) for exp in experiments]
-    return ExperimentListResponse(experiments=items, total=total, page=page, page_size=page_size, total_pages=total_pages)
+    return ExperimentListResponse(
+        experiments=items, total=total, page=pagination.page, page_size=pagination.page_size, total_pages=total_pages
+    )
 
 
 @router.post("/update")
@@ -243,13 +245,12 @@ async def delete_experiment(
 @router.get("/runs/list")
 async def list_experiment_runs(
     experiment_id: str,
+    pagination: Annotated[PaginationSpec, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
-    page: int = 1,
-    page_size: int = 10,
 ) -> ExperimentRunsResponse:
     """Return paginated execution rows linked to a cron-schedule experiment."""
     try:
-        executions, total, total_pages = await experiment_service.get_schedule_runs(auth_context, experiment_id, page, page_size)
+        executions, total, total_pages = await experiment_service.get_schedule_runs(auth_context, experiment_id, pagination)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -265,7 +266,7 @@ async def list_experiment_runs(
         )
         for ex in executions
     ]
-    return ExperimentRunsResponse(runs=runs, total=total, page=page, page_size=page_size, total_pages=total_pages)
+    return ExperimentRunsResponse(runs=runs, total=total, page=pagination.page, page_size=pagination.page_size, total_pages=total_pages)
 
 
 @router.get("/runs/next")
