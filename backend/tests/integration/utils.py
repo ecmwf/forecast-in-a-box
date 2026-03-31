@@ -2,8 +2,6 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from forecastbox.api.types.jobs import JobExecutionDetail
-
 
 def extract_auth_token_from_response(response) -> None | str:
     """Extracts the authentication token from the response cookies.
@@ -68,10 +66,10 @@ def ensure_completed(backend_client, job_id, sleep=0.5, attempts=20):
 def ensure_schedule_run_v2(backend_client, experiment_id: str, sleep: float = 1.0, attempts: int = 30) -> str:
     """Wait for at least one run to appear for the given schedule; return the execution_id.
 
-    Polls GET /schedule/runs until total > 0, up to attempts * sleep seconds.
+    Polls GET /experiment/runs/list until total > 0, up to attempts * sleep seconds.
     """
     for _ in range(attempts):
-        response = backend_client.get("/schedule/runs", params={"experiment_id": experiment_id}, timeout=10)
+        response = backend_client.get("/experiment/runs/list", params={"experiment_id": experiment_id}, timeout=10)
         assert response.is_success, response.text
         data = response.json()
         if data["total"] > 0:
@@ -83,14 +81,13 @@ def ensure_schedule_run_v2(backend_client, experiment_id: str, sleep: float = 1.
 def ensure_completed_v2(backend_client, job_id, sleep=0.5, attempts=20):
     i = attempts
     while i > 0:
-        response = backend_client.get(f"/job/{job_id}/status", timeout=10)
+        response = backend_client.get("/execution/get", params={"execution_id": job_id}, timeout=10)
         assert response.is_success, response.text
-        detail = JobExecutionDetail(**response.json())
-        if detail.status == "failed":
-            raise RuntimeError(f"Job {job_id} failed: {detail}")
-        # TODO define a method `not_failed` instead
-        assert detail.status in {"submitted", "running", "completed"}, detail.status
-        if detail.status == "completed":
+        data = response.json()
+        if data["status"] == "failed":
+            raise RuntimeError(f"Job {job_id} failed: {data}")
+        assert data["status"] in {"submitted", "running", "completed"}, data["status"]
+        if data["status"] == "completed":
             break
         time.sleep(sleep)
         i -= 1

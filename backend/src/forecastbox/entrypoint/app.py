@@ -32,9 +32,10 @@ from forecastbox.api.artifacts.manager import ArtifactManager, join_artifact_man
 from forecastbox.api.plugin.manager import PluginsStatus, join_updater_thread, submit_load_plugins
 from forecastbox.api.plugin.manager import status_brief as status_plugins
 from forecastbox.api.plugin.store import join_stores_thread, submit_initialize_stores
-from forecastbox.api.routers import admin, artifacts, auth, fable, gateway, job, plugin, schedule
+from forecastbox.api.routers import admin, artifacts, auth, gateway, plugin
 from forecastbox.api.scheduling.scheduler_thread import start_scheduler, status_scheduler, stop_scheduler
 from forecastbox.api.updates import get_local_release
+from forecastbox.routes import definition, definition_building, execution, experiment
 from forecastbox.utility.config import config
 
 logger = logging.getLogger(__name__)
@@ -79,14 +80,15 @@ templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 
 # TODO replace with iter modules, this is awkward
-app.include_router(job.router, prefix="/api/v1/job")
 app.include_router(admin.router, prefix="/api/v1/admin")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(gateway.router, prefix="/api/v1/gateway")
-app.include_router(schedule.router, prefix="/api/v1/schedule")
-app.include_router(fable.router, prefix="/api/v1/fable")
 app.include_router(plugin.router, prefix="/api/v1/plugin")
 app.include_router(artifacts.router, prefix="/api/v1/artifacts")
+app.include_router(definition.router, prefix="/api/v1/definition")
+app.include_router(definition_building.router, prefix="/api/v1/definition/building")
+app.include_router(execution.router, prefix="/api/v1/execution")
+app.include_router(experiment.router, prefix="/api/v1/experiment")
 
 app.add_middleware(
     CORSMiddleware,  # type: ignore[invalid-argument-type]
