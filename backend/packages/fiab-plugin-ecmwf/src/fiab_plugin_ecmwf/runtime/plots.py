@@ -50,7 +50,7 @@ def _plot_fields(subplot, fields: ekd.FieldList, **kwargs) -> None:
     Wind fields (u/v components) are plotted with ``quiver``; all others use ``quickplot``.
     """
     plot_categories: dict[str, dict] = defaultdict(lambda: defaultdict(list))
-    for index, field in enumerate(fields):
+    for index, field in enumerate(fields):  # type: ignore[reportArgumentType]
         if field.metadata().get("shortName", None) in WIND_SHORTNAMES:
             plot_categories["quiver"][field.metadata().get("levtype", None)].append(field)
             continue

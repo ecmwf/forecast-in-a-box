@@ -56,8 +56,12 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-def _get_item_list(raw: str, item_type: type[T], *, allow_empty: bool = True) -> Either[list[T], Error]:  # type:ignore[invalid-argument] # semigroup
-    split = raw.split(",")
+def _get_item_list(raw: str | list, item_type: type[T], *, allow_empty: bool = True) -> Either[list[T], Error]:  # type:ignore[invalid-argument] # semigroup
+    if isinstance(raw, list):
+        split = raw
+    else:
+        split = raw.split(",")
+
     if not raw:
         return Either.ok([]) if allow_empty else Either.error(f"Empty list of {item_type.__name__}")
     try:
