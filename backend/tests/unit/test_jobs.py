@@ -158,8 +158,9 @@ async def test_jobs_list_job_definitions_ownership_filter(mem_session_maker_both
     assert id_u2 not in u1_defs
 
     anon_defs = {d.job_definition_id for d in await job_definition_db.list_job_definitions(auth_context=_anon)}
+    assert id_u1 in anon_defs
+    assert id_u2 in anon_defs
     assert id_tmpl in anon_defs
-    assert id_u1 not in anon_defs
 
     admin_defs = {d.job_definition_id for d in await job_definition_db.list_job_definitions(auth_context=_admin)}
     assert {id_u1, id_u2, id_tmpl}.issubset(admin_defs)
@@ -271,16 +272,20 @@ async def test_jobs_experiment_definition_soft_delete(mem_session_maker_both):
 
 
 @pytest.mark.asyncio
-async def test_experiment_create_anon_raises(mem_session_maker_both):
+async def test_experiment_create_anon_allowed(mem_session_maker_both):
+    """Passthrough (user_id=None) callers may create experiments; created_by is stored as None."""
     job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
-    with pytest.raises(ExperimentAccessDenied):
-        await experiment_db.upsert_experiment_definition(
-            auth_context=_anon,
-            job_definition_id=job_id,
-            job_definition_version=job_v,
-            experiment_type="cron_schedule",
-            created_by=None,
-        )
+    exp_id, v1 = await experiment_db.upsert_experiment_definition(
+        auth_context=_anon,
+        job_definition_id=job_id,
+        job_definition_version=job_v,
+        experiment_type="cron_schedule",
+        created_by=None,
+    )
+    assert v1 == 1
+    result = await experiment_db.get_experiment_definition(exp_id)
+    assert result is not None
+    assert result.created_by is None
 
 
 @pytest.mark.asyncio
@@ -366,7 +371,95 @@ async def test_experiment_list_filters_by_actor(mem_session_maker_both):
     assert len(user1_exps) == 1 and user1_exps[0].created_by == "user1"
     assert len(user2_exps) == 1 and user2_exps[0].created_by == "user2"
     assert len(admin_exps) == 2
-    assert len(anon_exps) == 0
+    assert len(anon_exps) == 2
+
+
+# ---------------------------------------------------------------------------
+# Passthrough / anonymous regime (user_id=None) — treated as admin
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_anon_list_job_definitions_sees_all(mem_session_maker_both):
+    """Passthrough caller sees all job definitions, not only plugin templates."""
+    id_u1, _ = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+    id_u2, _ = await job_definition_db.upsert_job_definition(auth_context=_user2, source="user_defined", created_by="user2")
+    id_tmpl, _ = await job_definition_db.upsert_job_definition(auth_context=_admin, source="plugin_template", created_by="admin")
+
+    anon_defs = {d.job_definition_id for d in await job_definition_db.list_job_definitions(auth_context=_anon)}
+    assert {id_u1, id_u2, id_tmpl}.issubset(anon_defs)
+
+
+@pytest.mark.asyncio
+async def test_anon_update_job_definition_bypasses_ownership(mem_session_maker_both):
+    """Passthrough caller may update a job definition owned by another user."""
+    job_id, _ = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+    _, v2 = await job_definition_db.upsert_job_definition(
+        auth_context=_anon,
+        definition_id=job_id,
+        source="user_defined",
+        created_by=None,
+    )
+    assert v2 == 2
+
+
+@pytest.mark.asyncio
+async def test_anon_list_experiments_sees_all(mem_session_maker_both):
+    """Passthrough caller sees all experiments, not an empty result."""
+    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+    await experiment_db.upsert_experiment_definition(
+        auth_context=_user1,
+        job_definition_id=job_id,
+        job_definition_version=job_v,
+        experiment_type="cron_schedule",
+        created_by="user1",
+    )
+    await experiment_db.upsert_experiment_definition(
+        auth_context=_user2,
+        job_definition_id=job_id,
+        job_definition_version=job_v,
+        experiment_type="cron_schedule",
+        created_by="user2",
+    )
+    anon_exps = list(await experiment_db.list_experiment_definitions(auth_context=_anon))
+    assert len(anon_exps) == 2
+
+
+@pytest.mark.asyncio
+async def test_anon_update_experiment_bypasses_ownership(mem_session_maker_both):
+    """Passthrough caller may update an experiment owned by another user."""
+    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+    exp_id, _ = await experiment_db.upsert_experiment_definition(
+        auth_context=_user1,
+        job_definition_id=job_id,
+        job_definition_version=job_v,
+        experiment_type="cron_schedule",
+        created_by="user1",
+    )
+    _, v2 = await experiment_db.upsert_experiment_definition(
+        auth_context=_anon,
+        experiment_definition_id=exp_id,
+        job_definition_id=job_id,
+        job_definition_version=job_v,
+        experiment_type="cron_schedule",
+        created_by=None,
+    )
+    assert v2 == 2
+
+
+@pytest.mark.asyncio
+async def test_anon_delete_experiment_bypasses_ownership(mem_session_maker_both):
+    """Passthrough caller may delete an experiment owned by another user."""
+    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+    exp_id, _ = await experiment_db.upsert_experiment_definition(
+        auth_context=_user1,
+        job_definition_id=job_id,
+        job_definition_version=job_v,
+        experiment_type="cron_schedule",
+        created_by="user1",
+    )
+    await experiment_db.soft_delete_experiment_definition(exp_id, auth_context=_anon)
+    assert await experiment_db.get_experiment_definition(exp_id) is None
 
 
 # ---------------------------------------------------------------------------

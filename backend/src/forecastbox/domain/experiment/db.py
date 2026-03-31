@@ -44,17 +44,14 @@ async def upsert_experiment_definition(
     """Insert a new version of an ExperimentDefinition and return ``(id, version)``.
 
     If ``experiment_definition_id`` is omitted a fresh UUID is generated (version 1).
-    Requires an authenticated actor (``actor.user_id`` must not be ``None``) for
-    creates.  For updates, additionally checks that the actor is the owner or admin,
-    raising ``ExperimentAccessDenied`` otherwise.  Raises ``ExperimentNotFound`` if
-    an ``experiment_definition_id`` is given but does not exist.
+    For updates, checks that the caller is the owner or has admin access (via
+    ``auth_context.allowed()``), raising ``ExperimentAccessDenied`` otherwise.
+    Raises ``ExperimentNotFound`` if an ``experiment_definition_id`` is given but
+    does not exist.  ``created_by`` may be ``None`` in passthrough deployments.
     """
     id_provided = experiment_definition_id is not None
     experiment_id = experiment_definition_id or str(uuid.uuid4())
     ref_time = dt.datetime.now()
-
-    if not id_provided and auth_context.user_id is None:
-        raise ExperimentAccessDenied("Unauthenticated callers may not create experiment definitions.")
 
     async def function(i: int) -> int:
         async with _jobs_module.async_session_maker() as session:
@@ -140,13 +137,11 @@ async def list_experiment_definitions(
     offset: int = 0,
     limit: int | None = None,
 ) -> Iterable[ExperimentDefinition]:
-    """Return the latest non-deleted version of every ExperimentDefinition visible to the actor.
+    """Return the latest non-deleted version of every ExperimentDefinition visible to the caller.
 
-    Admins see all.  Authenticated users see only their own definitions.
-    Unauthenticated callers receive an empty result.
+    Admins and passthrough callers (``auth_context.has_admin()``) see all definitions.
+    Authenticated non-admin users see only their own definitions.
     """
-    if not auth_context.is_admin and auth_context.user_id is None:
-        return []
 
     async def function(i: int) -> list[ExperimentDefinition]:
         async with _jobs_module.async_session_maker() as session:
@@ -166,7 +161,7 @@ async def list_experiment_definitions(
             )
             if experiment_type is not None:
                 query = query.where(ExperimentDefinition.experiment_type == experiment_type)
-            if not auth_context.is_admin:
+            if not auth_context.has_admin():
                 query = query.where(ExperimentDefinition.created_by == auth_context.user_id)
             query = query.offset(offset)
             if limit is not None:
@@ -182,9 +177,11 @@ async def count_experiment_definitions(
     auth_context: AuthContext,
     experiment_type: str | None = None,
 ) -> int:
-    """Return the number of distinct non-deleted ExperimentDefinition ids visible to the actor."""
-    if not auth_context.is_admin and auth_context.user_id is None:
-        return 0
+    """Return the number of distinct non-deleted ExperimentDefinition ids visible to the caller.
+
+    Admins and passthrough callers (``auth_context.has_admin()``) count all definitions.
+    Authenticated non-admin users count only their own.
+    """
 
     async def function(i: int) -> int:
         async with _jobs_module.async_session_maker() as session:
@@ -204,7 +201,7 @@ async def count_experiment_definitions(
             )
             if experiment_type is not None:
                 inner = inner.where(ExperimentDefinition.experiment_type == experiment_type)
-            if not auth_context.is_admin:
+            if not auth_context.has_admin():
                 inner = inner.where(ExperimentDefinition.created_by == auth_context.user_id)
             query = select(func.count()).select_from(inner.subquery())
             result = await session.execute(query)

@@ -129,11 +129,10 @@ async def get_job_definition(definition_id: str, version: int | None = None) -> 
 
 
 async def list_job_definitions(*, auth_context: AuthContext) -> Iterable[JobDefinition]:
-    """Return the latest non-deleted version of every JobDefinition visible to the actor.
+    """Return the latest non-deleted version of every JobDefinition visible to the caller.
 
-    Admins see all definitions.  Non-admins see only their own definitions and
-    plugin templates.  Unauthenticated callers (``actor.user_id`` is ``None``)
-    see only plugin templates.
+    Admins and passthrough callers (``auth_context.has_admin()``) see all definitions.
+    Authenticated non-admin users see only their own definitions and plugin templates.
     """
 
     async def function(i: int) -> list[JobDefinition]:
@@ -151,16 +150,13 @@ async def list_job_definitions(*, auth_context: AuthContext) -> Iterable[JobDefi
                 subq,
                 (JobDefinition.job_definition_id == subq.c.job_definition_id) & (JobDefinition.version == subq.c.max_version),
             )
-            if not auth_context.is_admin:
-                if auth_context.user_id is not None:
-                    query = query.where(
-                        or_(
-                            JobDefinition.source == "plugin_template",
-                            JobDefinition.created_by == auth_context.user_id,
-                        )
+            if not auth_context.has_admin():
+                query = query.where(
+                    or_(
+                        JobDefinition.source == "plugin_template",
+                        JobDefinition.created_by == auth_context.user_id,
                     )
-                else:
-                    query = query.where(JobDefinition.source == "plugin_template")
+                )
             result = await session.execute(query)
             return [r[0] for r in result.all()]
 
