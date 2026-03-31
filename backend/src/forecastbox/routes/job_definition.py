@@ -165,11 +165,9 @@ async def list_job_definitions(
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> JobDefinitionListResponse:
     """List the latest non-deleted version of every job definition visible to the caller."""
-    if pagination.page < 1 or pagination.page_size < 1:
-        raise HTTPException(status_code=400, detail="page and page_size must be greater than 0.")
     definitions = list(await job_definition_db.list_job_definitions(auth_context=auth_context))
     total = len(definitions)
-    start = (pagination.page - 1) * pagination.page_size
+    start = pagination.start()
     page_defs = definitions[start : start + pagination.page_size]
     items = [
         JobDefinitionListItem(

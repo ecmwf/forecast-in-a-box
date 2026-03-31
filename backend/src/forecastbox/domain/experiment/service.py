@@ -134,14 +134,10 @@ async def list_schedules(
 ) -> tuple[list[ExperimentDefinition], int, int]:
     """Return (schedules, total, total_pages) for cron-schedule experiments visible to the actor.
 
-    Raises ValueError if page or page_size are less than 1, or if page is out of range.
+    Raises ValueError if page is out of range.
     """
-    if pagination.page < 1 or pagination.page_size < 1:
-        raise ValueError("Page and page_size must be greater than 0.")
-
     total = await experiment_db.count_experiment_definitions(auth_context=auth_context, experiment_type="cron_schedule")
-    start = (pagination.page - 1) * pagination.page_size
-    total_pages = (total + pagination.page_size - 1) // pagination.page_size if total > 0 else 0
+    start = pagination.start()
 
     if start >= total and total > 0:
         raise ValueError("Page number out of range.")
@@ -151,7 +147,7 @@ async def list_schedules(
             auth_context=auth_context, experiment_type="cron_schedule", offset=start, limit=pagination.page_size
         )
     )
-    return experiments, total, total_pages
+    return experiments, total, pagination.total_pages(total)
 
 
 async def update_schedule(
@@ -264,21 +260,17 @@ async def get_schedule_runs(
     """Return (executions, total, total_pages) for runs linked to a cron schedule experiment.
 
     Raises ExperimentNotFound if the schedule does not exist.
-    Raises ValueError if page or page_size are invalid.
+    Raises ValueError if page is out of range.
     """
-    if pagination.page < 1 or pagination.page_size < 1:
-        raise ValueError("Page and page_size must be greater than 0.")
-
     exp_def = await experiment_db.get_experiment_definition(experiment_id)
     if exp_def is None or exp_def.experiment_type != "cron_schedule":
         raise ExperimentNotFound(f"Schedule {experiment_id} not found")
 
     total = await db_jobs.count_job_executions_by_experiment(experiment_id)
-    start = (pagination.page - 1) * pagination.page_size
-    total_pages = (total + pagination.page_size - 1) // pagination.page_size if total > 0 else 0
+    start = pagination.start()
 
     if start >= total and total > 0:
         raise ValueError("Page number out of range.")
 
     executions = await db_jobs.list_job_executions_by_experiment(experiment_id, offset=start, limit=pagination.page_size)
-    return executions, total, total_pages
+    return executions, total, pagination.total_pages(total)

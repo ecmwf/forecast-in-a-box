@@ -224,11 +224,9 @@ async def list_job_executions(
 
     Admins see all executions; regular users see only their own.
     """
-    if pagination.page < 1 or pagination.page_size < 1:
-        raise HTTPException(status_code=400, detail="page and page_size must be greater than 0.")
     total = await job_execution_db.count_job_executions(auth_context=auth_context)
-    start = (pagination.page - 1) * pagination.page_size
-    total_pages = (total + pagination.page_size - 1) // pagination.page_size if total > 0 else 0
+    start = pagination.start()
+    total_pages = pagination.total_pages(total)
     if start >= total and total > 0:
         raise HTTPException(status_code=404, detail="Page number out of range.")
     executions = list(await job_execution_db.list_job_executions(auth_context=auth_context, offset=start, limit=pagination.page_size))

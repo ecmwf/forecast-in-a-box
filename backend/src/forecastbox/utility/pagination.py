@@ -9,16 +9,26 @@
 
 """Shared pagination contract used across routes and service layers."""
 
-from dataclasses import dataclass, field
+from pydantic import BaseModel, ConfigDict, Field
 
 
-@dataclass(frozen=True, eq=True, slots=True)
-class PaginationSpec:
+class PaginationSpec(BaseModel):
     """Query-parameter group for paginated list endpoints.
 
     Use with ``Depends()`` in FastAPI route signatures to accept ``page`` and
     ``page_size`` as individual query parameters while keeping handlers clean.
+    FastAPI converts validation errors (e.g. page < 1) into 422 responses.
     """
 
-    page: int = field(default=1)
-    page_size: int = field(default=10)
+    model_config = ConfigDict(frozen=True)
+
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=10, ge=1)
+
+    def start(self) -> int:
+        """Return the zero-based row offset for this page."""
+        return (self.page - 1) * self.page_size
+
+    def total_pages(self, total_rows: int) -> int:
+        """Return the total number of pages given the full result count."""
+        return (total_rows + self.page_size - 1) // self.page_size if total_rows > 0 else 0

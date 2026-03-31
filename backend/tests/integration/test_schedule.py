@@ -193,11 +193,11 @@ def test_schedule_v2_list(backend_client_with_auth):
     assert paged["total"] == baseline_total + 2
     assert paged["total_pages"] == baseline_total + 2
 
-    # invalid params
+    # invalid params — now 422 (Pydantic validation) instead of 400
     response = backend_client_with_auth.get("/experiment/list", params={"page": 0, "page_size": 1})
-    assert response.status_code == 400
+    assert response.status_code == 422
     response = backend_client_with_auth.get("/experiment/list", params={"page": 1, "page_size": 0})
-    assert response.status_code == 400
+    assert response.status_code == 422
 
 
 def test_schedule_v2_next_run(backend_client_with_auth):
@@ -307,15 +307,15 @@ def test_schedule_v2_runs_not_found(backend_client_with_auth):
 
 
 def test_schedule_v2_runs_invalid_pagination(backend_client_with_auth):
-    """runs_v2 returns 400 for invalid page or page_size values."""
+    """runs_v2 returns 422 for invalid page or page_size values."""
     job_def_id, job_def_version = _save_fable(backend_client_with_auth)
     experiment_id = _create_schedule_v2(backend_client_with_auth, job_def_id, job_def_version)
 
     response = backend_client_with_auth.get("/experiment/runs/list", params={"experiment_id": experiment_id, "page": 0, "page_size": 10})
-    assert response.status_code == 400
+    assert response.status_code == 422
 
     response = backend_client_with_auth.get("/experiment/runs/list", params={"experiment_id": experiment_id, "page": 1, "page_size": 0})
-    assert response.status_code == 400
+    assert response.status_code == 422
 
 
 def test_schedule_v2_runs_page_beyond_empty(backend_client_with_auth):
