@@ -17,14 +17,11 @@
 import type {
   BlockFactoryCatalogue,
   FableBuilderV1,
-  FableCompileRequest,
   FableRetrieveResponse,
   FableUpsertRequest,
   FableUpsertResponse,
   FableValidationExpansion,
 } from '@/api/types/fable.types'
-import type { ExecutionSpecification } from '@/api/types/job.types'
-import { ExecutionSpecificationSchema } from '@/api/types/job.types'
 import { apiClient } from '@/api/client'
 import { API_ENDPOINTS } from '@/api/endpoints'
 import {
@@ -77,35 +74,24 @@ export async function retrieveFable(
   version?: number,
 ): Promise<FableRetrieveResponse> {
   const params: Record<string, string | number> = {
-    fable_id: fableId,
+    job_definition_id: fableId,
   }
   if (version !== undefined) {
     params.version = version
   }
-  return apiClient.get(API_ENDPOINTS.fable.retrieve, {
+  return apiClient.get(API_ENDPOINTS.fable.get, {
     params,
     schema: FableRetrieveResponseSchema,
   })
 }
 
 /**
- * Create or update a fable with full metadata, returning { id, version }
+ * Create a fable with full metadata, returning { job_definition_id, version }
  */
 export async function upsertFable(
   request: FableUpsertRequest,
 ): Promise<FableUpsertResponse> {
-  return apiClient.post(API_ENDPOINTS.fable.upsert, request, {
+  return apiClient.post(API_ENDPOINTS.fable.create, request, {
     schema: FableUpsertResponseSchema,
-  })
-}
-
-/**
- * Compile a fable by persisted definition reference
- */
-export async function compileFable(
-  request: FableCompileRequest,
-): Promise<ExecutionSpecification> {
-  return apiClient.put(API_ENDPOINTS.fable.compile, request, {
-    schema: ExecutionSpecificationSchema,
   })
 }

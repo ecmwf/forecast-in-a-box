@@ -150,6 +150,7 @@ export function ScheduleDetailPage() {
     try {
       await updateSchedule.mutateAsync({
         experimentId: scheduleId,
+        version: schedule!.experiment_version,
         update: { enabled: newEnabled },
       })
       toast.success(
@@ -169,6 +170,7 @@ export function ScheduleDetailPage() {
     try {
       await updateSchedule.mutateAsync({
         experimentId: scheduleId,
+        version: schedule!.experiment_version,
         update: { cron_expr: editCronExpr },
       })
       toast.success(t('schedules:actions.scheduleUpdated'))

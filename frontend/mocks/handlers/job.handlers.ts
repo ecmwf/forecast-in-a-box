@@ -23,10 +23,10 @@ import {
   restartExecution,
 } from '../data/job.data'
 import type { JobExecuteRequest, JobStatus } from '@/api/types/job.types'
-import { API_ENDPOINTS, API_PATTERNS } from '@/api/endpoints'
+import { API_ENDPOINTS } from '@/api/endpoints'
 
 export const jobHandlers = [
-  http.post(API_ENDPOINTS.job.execute, async ({ request }) => {
+  http.post(API_ENDPOINTS.job.create, async ({ request }) => {
     await delay(400)
 
     let body: JobExecuteRequest
@@ -43,7 +43,7 @@ export const jobHandlers = [
     return HttpResponse.json(result)
   }),
 
-  http.get(API_ENDPOINTS.job.status, async ({ request }) => {
+  http.get(API_ENDPOINTS.job.list, async ({ request }) => {
     await delay(200)
 
     const url = new URL(request.url)
@@ -70,10 +70,19 @@ export const jobHandlers = [
     })
   }),
 
-  http.get(API_PATTERNS.job.statusById, async ({ params }) => {
+  http.get(API_ENDPOINTS.job.get, async ({ request }) => {
     await delay(150)
 
-    const executionId = params.executionId as string
+    const url = new URL(request.url)
+    const executionId = url.searchParams.get('execution_id')
+
+    if (!executionId) {
+      return HttpResponse.json(
+        { detail: 'Missing execution_id parameter' },
+        { status: 400 },
+      )
+    }
+
     const exec = getExecution(executionId)
 
     if (!exec) {
@@ -86,10 +95,14 @@ export const jobHandlers = [
     return HttpResponse.json(exec)
   }),
 
-  http.post(API_PATTERNS.job.restart, async ({ params }) => {
+  http.post(API_ENDPOINTS.job.restart, async ({ request }) => {
     await delay(400)
 
-    const executionId = params.executionId as string
+    const body = (await request.json()) as {
+      execution_id: string
+      attempt_count: number
+    }
+    const executionId = body.execution_id
     const result = restartExecution(executionId)
 
     if (!result) {
@@ -102,28 +115,19 @@ export const jobHandlers = [
     return HttpResponse.json(result)
   }),
 
-  http.get(API_PATTERNS.job.outputs, async ({ params }) => {
-    await delay(200)
-
-    const executionId = params.executionId as string
-    const exec = getExecution(executionId)
-
-    if (!exec) {
-      return HttpResponse.json(
-        { detail: 'Execution not found' },
-        { status: 404 },
-      )
-    }
-
-    // Fall back to the v1 job outputs for shared mock IDs
-    const job = getJob(executionId)
-    return HttpResponse.json(job?.outputs ?? [])
-  }),
-
-  http.get(API_PATTERNS.job.available, async ({ params }) => {
+  http.get(API_ENDPOINTS.job.outputAvailability, async ({ request }) => {
     await delay(150)
 
-    const executionId = params.executionId as string
+    const url = new URL(request.url)
+    const executionId = url.searchParams.get('execution_id')
+
+    if (!executionId) {
+      return HttpResponse.json(
+        { detail: 'Missing execution_id parameter' },
+        { status: 400 },
+      )
+    }
+
     const exec = getExecution(executionId)
 
     if (!exec) {
@@ -133,15 +137,24 @@ export const jobHandlers = [
       )
     }
 
-    // Fall back to the v1 job available list for shared mock IDs
     const job = getJob(executionId)
     return HttpResponse.json(job?.available ?? [])
   }),
 
-  http.get(API_PATTERNS.job.results, async ({ params, request }) => {
+  http.get(API_ENDPOINTS.job.outputContent, async ({ request }) => {
     await delay(300)
 
-    const executionId = params.executionId as string
+    const url = new URL(request.url)
+    const executionId = url.searchParams.get('execution_id')
+    const datasetId = url.searchParams.get('dataset_id')
+
+    if (!executionId) {
+      return HttpResponse.json(
+        { detail: 'Missing execution_id parameter' },
+        { status: 400 },
+      )
+    }
+
     const exec = getExecution(executionId)
 
     if (!exec) {
@@ -150,9 +163,6 @@ export const jobHandlers = [
         { status: 404 },
       )
     }
-
-    const url = new URL(request.url)
-    const datasetId = url.searchParams.get('dataset_id')
 
     if (!datasetId) {
       return HttpResponse.json(
@@ -170,10 +180,19 @@ export const jobHandlers = [
     })
   }),
 
-  http.get(API_PATTERNS.job.logs, async ({ params }) => {
+  http.get(API_ENDPOINTS.job.logs, async ({ request }) => {
     await delay(200)
 
-    const executionId = params.executionId as string
+    const url = new URL(request.url)
+    const executionId = url.searchParams.get('execution_id')
+
+    if (!executionId) {
+      return HttpResponse.json(
+        { detail: 'Missing execution_id parameter' },
+        { status: 400 },
+      )
+    }
+
     const exec = getExecution(executionId)
 
     if (!exec) {
@@ -195,11 +214,14 @@ export const jobHandlers = [
     })
   }),
 
-  http.delete(API_PATTERNS.job.delete, async ({ request }) => {
+  http.post(API_ENDPOINTS.job.delete, async ({ request }) => {
     await delay(200)
 
-    const url = new URL(request.url)
-    const executionId = url.searchParams.get('execution_id')
+    const body = (await request.json()) as {
+      execution_id: string
+      attempt_count: number
+    }
+    const executionId = body.execution_id
 
     if (!executionId) {
       return HttpResponse.json(

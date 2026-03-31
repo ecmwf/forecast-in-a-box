@@ -93,7 +93,7 @@ describe('JobStatusDetailsPopover', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     worker.use(
-      http.get(API_ENDPOINTS.job.status, () => {
+      http.get(API_ENDPOINTS.job.list, () => {
         return HttpResponse.json(mockJobsResponse)
       }),
     )

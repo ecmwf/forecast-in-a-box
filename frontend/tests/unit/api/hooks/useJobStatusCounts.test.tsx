@@ -110,7 +110,7 @@ describe('useJobStatusCounts', () => {
 
   it('computes counts correctly from API response', async () => {
     worker.use(
-      http.get(API_ENDPOINTS.job.status, () => {
+      http.get(API_ENDPOINTS.job.list, () => {
         return HttpResponse.json(mockJobsResponse)
       }),
     )
@@ -142,7 +142,7 @@ describe('useJobStatusCounts', () => {
 
   it('returns correct runningCount', async () => {
     worker.use(
-      http.get(API_ENDPOINTS.job.status, () => {
+      http.get(API_ENDPOINTS.job.list, () => {
         return HttpResponse.json(mockJobsResponse)
       }),
     )
@@ -171,7 +171,7 @@ describe('useJobStatusCounts', () => {
 
   it('returns zero counts while loading', async () => {
     worker.use(
-      http.get(API_ENDPOINTS.job.status, async () => {
+      http.get(API_ENDPOINTS.job.list, async () => {
         await new Promise((resolve) => setTimeout(resolve, 5000))
         return HttpResponse.json(mockJobsResponse)
       }),

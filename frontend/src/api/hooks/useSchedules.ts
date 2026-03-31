@@ -108,10 +108,10 @@ export function useUpdateSchedule() {
   return useMutation<
     unknown,
     Error,
-    { experimentId: string; update: ScheduleUpdate }
+    { experimentId: string; version: number; update: ScheduleUpdate }
   >({
-    mutationFn: ({ experimentId, update }) =>
-      updateSchedule(experimentId, update),
+    mutationFn: ({ experimentId, version, update }) =>
+      updateSchedule(experimentId, version, update),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: scheduleKeys.all })
     },
@@ -121,12 +121,15 @@ export function useUpdateSchedule() {
 export function useDeleteSchedule() {
   const queryClient = useQueryClient()
 
-  return useMutation<unknown, Error, string>({
-    mutationFn: deleteSchedule,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: scheduleKeys.all })
+  return useMutation<unknown, Error, { experimentId: string; version: number }>(
+    {
+      mutationFn: ({ experimentId, version }) =>
+        deleteSchedule(experimentId, version),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: scheduleKeys.all })
+      },
     },
-  })
+  )
 }
 
 /**
@@ -224,7 +227,7 @@ export function useCreateSchedule() {
       dynamicExpr,
     }) => {
       // Upsert the fable to get a persisted id/version
-      const { id, version } = await upsertFable({
+      const { job_definition_id, version } = await upsertFable({
         builder: fable,
         display_name: name,
         display_description: description,
@@ -233,7 +236,7 @@ export function useCreateSchedule() {
       })
 
       return createSchedule({
-        job_definition_id: id,
+        job_definition_id,
         job_definition_version: version,
         cron_expr: cronExpr,
         dynamic_expr: dynamicExpr,

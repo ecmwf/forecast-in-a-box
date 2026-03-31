@@ -55,28 +55,34 @@ export function ExecutionDetailPage() {
   const { data: catalogue } = useBlockCatalogue()
 
   const handleRestart = () => {
-    restartMutation.mutate(jobId, {
-      onSuccess: () => {
-        toast.success(t('actions.restartJob'))
+    restartMutation.mutate(
+      { executionId: jobId, attemptCount: jobData!.attempt_count },
+      {
+        onSuccess: () => {
+          toast.success(t('actions.restartJob'))
+        },
+        onError: (error) => {
+          log.error('Failed to restart job', { jobId, error })
+          toast.error(error.message)
+        },
       },
-      onError: (error) => {
-        log.error('Failed to restart job', { jobId, error })
-        toast.error(error.message)
-      },
-    })
+    )
   }
 
   const handleDelete = () => {
-    deleteMutation.mutate(jobId, {
-      onSuccess: () => {
-        toast.success(t('actions.deleteJob'))
-        navigate({ to: '/executions' })
+    deleteMutation.mutate(
+      { executionId: jobId, attemptCount: jobData!.attempt_count },
+      {
+        onSuccess: () => {
+          toast.success(t('actions.deleteJob'))
+          navigate({ to: '/executions' })
+        },
+        onError: (error) => {
+          log.error('Failed to delete job', { jobId, error })
+          toast.error(error.message)
+        },
       },
-      onError: (error) => {
-        log.error('Failed to delete job', { jobId, error })
-        toast.error(error.message)
-      },
-    })
+    )
   }
 
   const handleEditConfig = () => {

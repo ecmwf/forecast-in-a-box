@@ -87,7 +87,7 @@ export type CreateScheduleResponse = z.infer<
 export type ScheduleRunResponse = z.infer<typeof ScheduleRunResponseSchema>
 export type ScheduleRunsResponse = z.infer<typeof ScheduleRunsResponseSchema>
 
-/** PUT /schedule/create - request body (not validated — outbound only) */
+/** PUT /experiment/create - request body (not validated — outbound only) */
 export interface ScheduleSpecification {
   job_definition_id: string
   job_definition_version?: number
@@ -100,7 +100,7 @@ export interface ScheduleSpecification {
   tags?: Array<string>
 }
 
-/** POST /schedule/update - request body (not validated — outbound only) */
+/** POST /experiment/update - request body (not validated — outbound only) */
 export interface ScheduleUpdate {
   enabled?: boolean
   cron_expr?: string

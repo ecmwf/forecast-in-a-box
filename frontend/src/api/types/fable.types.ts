@@ -123,7 +123,7 @@ export const SavedFableSchema = z.object({
 export type SavedFable = z.infer<typeof SavedFableSchema>
 
 export const FableUpsertResponseSchema = z.object({
-  id: z.string(),
+  job_definition_id: z.string(),
   version: z.number(),
 })
 
@@ -138,7 +138,7 @@ export interface FableUpsertRequest {
 }
 
 export const FableRetrieveResponseSchema = z.object({
-  id: z.string(),
+  job_definition_id: z.string(),
   version: z.number(),
   builder: FableBuilderV1Schema,
   display_name: z.string().nullable(),
@@ -150,11 +150,6 @@ export const FableRetrieveResponseSchema = z.object({
 })
 
 export type FableRetrieveResponse = z.infer<typeof FableRetrieveResponseSchema>
-
-export interface FableCompileRequest {
-  id: string
-  version?: number
-}
 
 export interface BlockWithFactory {
   instanceId: BlockInstanceId

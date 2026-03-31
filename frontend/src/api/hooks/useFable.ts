@@ -13,15 +13,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type {
   BlockFactoryCatalogue,
   FableBuilderV1,
-  FableCompileRequest,
   FableRetrieveResponse,
   FableUpsertResponse,
   FableValidationExpansion,
   PluginBlockFactoryId,
 } from '@/api/types/fable.types'
-import type { ExecutionSpecification } from '@/api/types/job.types'
 import {
-  compileFable,
   expandFable,
   getCatalogue,
   retrieveFable,
@@ -121,12 +118,6 @@ export function useFableValidation(
   })
 }
 
-export function useCompileFable() {
-  return useMutation<ExecutionSpecification, Error, FableCompileRequest>({
-    mutationFn: compileFable,
-  })
-}
-
 export function useUpsertFable() {
   const queryClient = useQueryClient()
 
@@ -155,7 +146,9 @@ export function useUpsertFable() {
           queryKey: fableKeys.detail(variables.fableId),
         })
       }
-      queryClient.invalidateQueries({ queryKey: fableKeys.detail(result.id) })
+      queryClient.invalidateQueries({
+        queryKey: fableKeys.detail(result.job_definition_id),
+      })
     },
   })
 }

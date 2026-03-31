@@ -114,7 +114,7 @@ export type ExecutionSpecification = z.infer<
   typeof ExecutionSpecificationSchema
 >
 
-/** POST /job/execute request (not validated — outbound only) */
+/** POST /job_execution/create request (not validated — outbound only) */
 export interface JobExecuteRequest {
   job_definition_id: string
   job_definition_version?: number

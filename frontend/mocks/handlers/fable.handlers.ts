@@ -82,7 +82,7 @@ export const fableHandlers = [
     return HttpResponse.json(expansion)
   }),
 
-  http.post(API_ENDPOINTS.fable.upsert, async ({ request }) => {
+  http.post(API_ENDPOINTS.fable.create, async ({ request }) => {
     await delay(500)
 
     let body: FableUpsertRequest
@@ -133,7 +133,10 @@ export const fableHandlers = [
         updated_at: now,
       }
 
-      return HttpResponse.json({ id: parent_id, version: newVersion })
+      return HttpResponse.json({
+        job_definition_id: parent_id,
+        version: newVersion,
+      })
     }
 
     const newId = `fable-${String(fableIdCounter++).padStart(3, '0')}`
@@ -150,18 +153,18 @@ export const fableHandlers = [
       updated_at: now,
     }
 
-    return HttpResponse.json({ id: newId, version: 1 })
+    return HttpResponse.json({ job_definition_id: newId, version: 1 })
   }),
 
-  http.get(API_ENDPOINTS.fable.retrieve, async ({ request }) => {
+  http.get(API_ENDPOINTS.fable.get, async ({ request }) => {
     await delay(300)
 
     const url = new URL(request.url)
-    const fableId = url.searchParams.get('fable_id')
+    const fableId = url.searchParams.get('job_definition_id')
 
     if (!fableId) {
       return HttpResponse.json(
-        { message: 'Missing fable_id parameter' },
+        { message: 'Missing job_definition_id parameter' },
         { status: 400 },
       )
     }
@@ -172,7 +175,7 @@ export const fableHandlers = [
     }
 
     return HttpResponse.json({
-      id: fableId,
+      job_definition_id: fableId,
       version: fableVersions[fableId] ?? 1,
       builder: saved.fable,
       display_name: saved.display_name,
@@ -180,50 +183,6 @@ export const fableHandlers = [
       tags: saved.tags,
       created_at: saved.created_at,
       updated_at: saved.updated_at,
-    })
-  }),
-
-  http.put(API_ENDPOINTS.fable.compile, async ({ request }) => {
-    await delay(600)
-
-    let body: { id: string; version?: number }
-    try {
-      body = (await request.json()) as { id: string; version?: number }
-    } catch {
-      return HttpResponse.json(
-        { message: 'Invalid request body' },
-        { status: 400 },
-      )
-    }
-
-    const saved = savedFablesState[body.id]
-    if (!saved) {
-      return HttpResponse.json({ message: 'Fable not found' }, { status: 404 })
-    }
-
-    const expansion = calculateExpansion(saved.fable)
-    const hasErrors =
-      expansion.global_errors.length > 0 ||
-      Object.values(expansion.block_errors).some((errors) => errors.length > 0)
-
-    if (hasErrors) {
-      return HttpResponse.json(
-        { message: 'Fable validation failed', errors: expansion },
-        { status: 422 },
-      )
-    }
-
-    return HttpResponse.json({
-      job: {
-        job_type: 'raw_cascade_job',
-        job_instance: { tasks: {}, edges: [] },
-      },
-      environment: {
-        hosts: null,
-        workers_per_host: null,
-        environment_variables: {},
-      },
-      shared: false,
     })
   }),
 ]

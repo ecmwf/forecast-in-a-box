@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-import { useCallback, useRef, useState } from 'react'
+import { useState } from 'react'
 import { AlertCircle, Calendar, Loader2, Play, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from '@tanstack/react-router'
@@ -22,9 +22,7 @@ import { createDefaultEnvironment } from '@/api/types/job.types'
 import { useFableRetrieve } from '@/api/hooks/useFable'
 import { useSubmitFable } from '@/api/hooks/useJobs'
 import { useCreateSchedule } from '@/api/hooks/useSchedules'
-import { compileFable, upsertFable } from '@/api/endpoints/fable'
 import { CronExpressionInput } from '@/features/schedules/components/CronExpressionInput'
-import { DynamicFieldsSelector } from '@/features/schedules/components/DynamicFieldsSelector'
 import { EnvironmentConfig } from '@/features/executions/components/EnvironmentConfig'
 import {
   AlertDialog,
@@ -36,11 +34,6 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
@@ -122,32 +115,6 @@ function SubmitJobForm({
   const [cronExpr, setCronExpr] = useState('0 6 * * *')
   const [maxDelayHours, setMaxDelayHours] = useState(2)
   const [dynamicExpr, setDynamicExpr] = useState<Record<string, unknown>>({})
-  const [compiledSpec, setCompiledSpec] = useState<object | null>(null)
-  const [isCompiling, setIsCompiling] = useState(false)
-  const compileRequestedRef = useRef(false)
-
-  // Compile the spec for DynamicFieldsSelector preview
-  const triggerCompile = useCallback(async () => {
-    if (compiledSpec || compileRequestedRef.current) return
-    compileRequestedRef.current = true
-    setIsCompiling(true)
-
-    try {
-      const { id, version } = await upsertFable({
-        builder: fable,
-        display_name: fableName,
-        display_description: '',
-        tags: [],
-        parent_id: fableId ?? undefined,
-      })
-      const spec = await compileFable({ id, version })
-      setCompiledSpec(spec)
-    } catch (err) {
-      log.error('Failed to compile spec for dynamic fields', { error: err })
-    } finally {
-      setIsCompiling(false)
-    }
-  }, [compiledSpec, fable, fableId, fableName])
 
   function addTag(value: string) {
     const trimmed = value.trim()
@@ -283,7 +250,6 @@ function SubmitJobForm({
             type="button"
             onClick={() => {
               setMode('schedule')
-              triggerCompile()
             }}
             className={cn(
               'flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
@@ -391,31 +357,6 @@ function SubmitJobForm({
                 {t('submit.maxDelayHelp')}
               </p>
             </div>
-
-            {isCompiling && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t('submit.compilingSpec')}
-              </div>
-            )}
-
-            {compiledSpec && (
-              <Collapsible defaultOpen={false}>
-                <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted">
-                  {t('submit.dynamicFields')}
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="mt-2">
-                    <DynamicFieldsSelector
-                      compiledExecSpec={compiledSpec}
-                      fable={fable}
-                      value={dynamicExpr}
-                      onChange={setDynamicExpr}
-                    />
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            )}
           </>
         )}
 
