@@ -12,6 +12,7 @@
 from dataclasses import dataclass
 
 from forecastbox.schemas.user import UserRead
+from forecastbox.utility.config import config
 
 
 @dataclass(frozen=True, eq=True, slots=True)
@@ -37,7 +38,7 @@ class AuthContext:
         True for explicit admins (``is_admin=True``) and for the passthrough
         regime (``user_id=None``, auth disabled).
         """
-        return self.is_admin or self.user_id is None
+        return self.is_admin or (self.user_id is None and config.auth.passthrough)
 
     def allowed(self, resource_owner: str | None) -> bool:
         """Return True if the caller may mutate a resource owned by resource_owner.

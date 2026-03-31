@@ -211,7 +211,7 @@ async def save_builder(
     definition_id, version = await upsert_job_definition(
         auth_context=auth_context,
         definition_id=fable_id,
-        source=source,  # ty:ignore[arg-type]
+        source=source,
         created_by=auth_context.user_id,
         blocks=payload.builder.model_dump(mode="json")["blocks"],
         environment_spec=env.model_dump(mode="json") if env is not None else None,
