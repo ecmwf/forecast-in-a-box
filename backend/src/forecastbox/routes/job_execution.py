@@ -10,7 +10,6 @@
 """Canonical job-execution entity routes — /job_execution/*"""
 
 PREFIX = "/api/v1/job_execution"
-PREFIX = "/api/v1/job_execution"
 import asyncio
 import io
 import logging

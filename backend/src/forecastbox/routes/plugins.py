@@ -10,7 +10,6 @@
 """Canonical plugin management routes — /plugin/*"""
 
 PREFIX = "/api/v1/plugin"
-PREFIX = "/api/v1/plugin"
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status

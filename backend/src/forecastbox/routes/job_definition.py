@@ -10,7 +10,6 @@
 """Canonical job-definition entity routes — /job_definition/*"""
 
 PREFIX = "/api/v1/job_definition"
-PREFIX = "/api/v1/job_definition"
 from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends

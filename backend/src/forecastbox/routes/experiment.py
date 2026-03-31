@@ -13,7 +13,6 @@ Covers cron-schedule experiments and their operational controls.
 """
 
 PREFIX = "/api/v1/experiment"
-PREFIX = "/api/v1/experiment"
 import datetime as dt
 import logging
 from typing import Annotated, cast
