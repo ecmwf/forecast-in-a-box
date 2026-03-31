@@ -126,14 +126,14 @@ def test_schedule_v2_crud(backend_client_with_auth):
     assert data["cron_expr"] == "0 0 * * *"
     assert data["enabled"] is True
     assert data["job_definition_id"] == job_def_id
+    experiment_version = data["experiment_version"]
 
     # update cron and enabled
     updated_cron = "0 1 * * *"
     update = ScheduleUpdate(cron_expr=updated_cron, enabled=False)
+    update_body = {"experiment_id": experiment_id, "version": experiment_version, **update.model_dump(exclude_unset=True)}
     response = scheduling_endpoint_with_retries(
-        lambda: backend_client_with_auth.post(
-            "/experiment/update", params={"experiment_id": experiment_id}, headers=headers, json=update.model_dump(exclude_unset=True)
-        )
+        lambda: backend_client_with_auth.post("/experiment/update", headers=headers, json=update_body)
     )
     assert response.is_success, response.text
     updated = response.json()
@@ -220,14 +220,19 @@ def test_schedule_v2_next_run(backend_client_with_auth):
     initial_next_run = response.json()
     assert "00:00:00" in initial_next_run
 
+    # fetch current version before first update
+    get_resp = backend_client_with_auth.get("/experiment/get", params={"experiment_id": experiment_id})
+    assert get_resp.is_success, get_resp.text
+    experiment_version = get_resp.json()["experiment_version"]
+
     # update cron to 2 AM
     update = ScheduleUpdate(cron_expr="0 2 * * *")
+    update_body = {"experiment_id": experiment_id, "version": experiment_version, **update.model_dump(exclude_unset=True)}
     response = scheduling_endpoint_with_retries(
-        lambda: backend_client_with_auth.post(
-            "/experiment/update", params={"experiment_id": experiment_id}, headers=headers, json=update.model_dump(exclude_unset=True)
-        )
+        lambda: backend_client_with_auth.post("/experiment/update", headers=headers, json=update_body)
     )
     assert response.is_success, response.text
+    experiment_version = response.json()["experiment_version"]
 
     response = backend_client_with_auth.get("/experiment/runs/next", params={"experiment_id": experiment_id})
     assert response.is_success, response.text
@@ -237,12 +242,12 @@ def test_schedule_v2_next_run(backend_client_with_auth):
 
     # disable: next run should be cleared
     disable_update = ScheduleUpdate(enabled=False)
+    disable_body = {"experiment_id": experiment_id, "version": experiment_version, **disable_update.model_dump(exclude_unset=True)}
     response = scheduling_endpoint_with_retries(
         lambda: backend_client_with_auth.post(
             "/experiment/update",
-            params={"experiment_id": experiment_id},
             headers=headers,
-            json=disable_update.model_dump(exclude_unset=True),
+            json=disable_body,
         )
     )
     assert response.is_success, response.text

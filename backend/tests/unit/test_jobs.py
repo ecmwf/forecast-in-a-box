@@ -119,7 +119,7 @@ async def test_jobs_job_definition_latest_version(mem_session_maker_both):
 async def test_jobs_job_definition_soft_delete(mem_session_maker_both):
     job_id, _ = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
 
-    await job_definition_db.soft_delete_job_definition(job_id, auth_context=_user1)
+    await job_definition_db.soft_delete_job_definition(job_id, expected_version=1, auth_context=_user1)
 
     assert await job_definition_db.get_job_definition(job_id) is None
 
@@ -208,13 +208,13 @@ async def test_jobs_soft_delete_wrong_owner_raises(mem_session_maker_both):
     job_id, _ = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
 
     with pytest.raises(JobDefinitionAccessDenied):
-        await job_definition_db.soft_delete_job_definition(job_id, auth_context=_user2)
+        await job_definition_db.soft_delete_job_definition(job_id, expected_version=1, auth_context=_user2)
 
 
 @pytest.mark.asyncio
 async def test_jobs_soft_delete_not_found_raises(mem_session_maker_both):
     with pytest.raises(JobDefinitionNotFound):
-        await job_definition_db.soft_delete_job_definition("no-such-id", auth_context=_admin)
+        await job_definition_db.soft_delete_job_definition("no-such-id", expected_version=1, auth_context=_admin)
 
 
 # ---------------------------------------------------------------------------

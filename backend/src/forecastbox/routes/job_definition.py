@@ -18,13 +18,17 @@ from pydantic import BaseModel
 import forecastbox.domain.job_definition.db as job_definition_db
 import forecastbox.domain.job_definition.service as job_definition_service
 from forecastbox.api.types.fable import FableBuilder, FableSaveRequest
-from forecastbox.domain.job_definition.exceptions import JobDefinitionAccessDenied, JobDefinitionNotFound
+from forecastbox.domain.job_definition.exceptions import (
+    JobDefinitionAccessDenied,
+    JobDefinitionNotFound,
+    JobDefinitionVersionConflict,
+)
 from forecastbox.entrypoint.auth.users import get_auth_context
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
 
 router = APIRouter(
-    tags=["definition"],
+    tags=["job_definition"],
     responses={404: {"description": "Not found"}},
 )
 
@@ -32,6 +36,17 @@ router = APIRouter(
 # ---------------------------------------------------------------------------
 # Route-local contracts
 # ---------------------------------------------------------------------------
+
+
+class JobDefinitionId(BaseModel):
+    """Identifies a job definition, optionally pinning a specific version.
+
+    Used as a Depends()-based query-param group on GET endpoints, and as a
+    request body on PUT endpoints that target a specific definition.
+    """
+
+    job_definition_id: str
+    version: int | None = None
 
 
 class JobDefinitionCreateRequest(BaseModel):
@@ -76,6 +91,7 @@ class JobDefinitionListResponse(BaseModel):
 
 class JobDefinitionUpdateRequest(BaseModel):
     job_definition_id: str
+    version: int
     builder: FableBuilder
     display_name: str | None = None
     display_description: str | None = None
@@ -90,6 +106,7 @@ class JobDefinitionUpdateResponse(BaseModel):
 
 class JobDefinitionDeleteRequest(BaseModel):
     job_definition_id: str
+    version: int
 
 
 # ---------------------------------------------------------------------------
@@ -121,15 +138,14 @@ async def create_job_definition(
 
 @router.get("/get")
 async def get_job_definition(
-    job_definition_id: str,
-    version: int | None = None,
+    spec: Annotated[JobDefinitionId, Depends()],
 ) -> JobDefinitionGetResponse:
     """Retrieve a saved job definition by id and optional version.
 
     Returns the latest non-deleted version when version is omitted.
     """
     try:
-        retrieved = await job_definition_service.load_builder(job_definition_id, version)
+        retrieved = await job_definition_service.load_builder(spec.job_definition_id, spec.version)
     except JobDefinitionNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     return JobDefinitionGetResponse(
@@ -177,7 +193,8 @@ async def update_job_definition(
 ) -> JobDefinitionUpdateResponse:
     """Add a new version to an existing job definition.
 
-    The id must reference an existing definition. Returns the new version number.
+    ``version`` must match the current latest version; returns 409 if it does not.
+    Returns the new version number on success.
     """
     payload = FableSaveRequest(
         builder=request.builder,
@@ -187,7 +204,14 @@ async def update_job_definition(
         parent_id=request.parent_id,
     )
     try:
-        result = await job_definition_service.save_builder(auth_context=auth_context, payload=payload, fable_id=request.job_definition_id)
+        result = await job_definition_service.save_builder(
+            auth_context=auth_context,
+            payload=payload,
+            fable_id=request.job_definition_id,
+            expected_version=request.version,
+        )
+    except JobDefinitionVersionConflict as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except JobDefinitionNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     except JobDefinitionAccessDenied as e:
@@ -200,9 +224,18 @@ async def delete_job_definition(
     request: JobDefinitionDeleteRequest,
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> None:
-    """Soft-delete all versions of a job definition."""
+    """Soft-delete all versions of a job definition.
+
+    ``version`` must match the current latest version; returns 409 if it does not.
+    """
     try:
-        await job_definition_db.soft_delete_job_definition(request.job_definition_id, auth_context=auth_context)
+        await job_definition_db.soft_delete_job_definition(
+            request.job_definition_id,
+            expected_version=request.version,
+            auth_context=auth_context,
+        )
+    except JobDefinitionVersionConflict as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except JobDefinitionNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     except JobDefinitionAccessDenied as e:

@@ -18,5 +18,9 @@ class ExperimentAccessDenied(Exception):
     """Raised when the actor does not have permission to perform the operation."""
 
 
+class ExperimentVersionConflict(Exception):
+    """Raised when the provided version does not match the current version in the database."""
+
+
 class SchedulerBusy(Exception):
     """Raised when the scheduler lock cannot be acquired within the timeout."""

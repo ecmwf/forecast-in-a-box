@@ -12,28 +12,18 @@
 from fastapi import APIRouter, status
 from fastapi.exceptions import HTTPException
 from fiab_core.fable import BlockFactoryCatalogue
-from pydantic import BaseModel
 
 import forecastbox.domain.job_definition.service as job_definition_service
 from forecastbox.api.plugin.manager import PluginCompositeId, catalogue_view, plugins_ready
 from forecastbox.api.types.fable import FableBuilder, FableValidationExpansion
 from forecastbox.api.types.jobs import ExecutionSpecification
 from forecastbox.domain.job_definition.exceptions import JobDefinitionNotFound
+from forecastbox.routes.job_definition import JobDefinitionId
 
 router = APIRouter(
     tags=["definition-building"],
     responses={404: {"description": "Not found"}},
 )
-
-
-# ---------------------------------------------------------------------------
-# Route-local contracts
-# ---------------------------------------------------------------------------
-
-
-class JobDefinitionBuildingCompileRequest(BaseModel):
-    job_definition_id: str
-    version: int | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -63,7 +53,7 @@ def expand_job_definition(fable: FableBuilder) -> FableValidationExpansion:
 
 
 @router.put("/compile")
-async def compile_job_definition(request: JobDefinitionBuildingCompileRequest) -> ExecutionSpecification:
+async def compile_job_definition(request: JobDefinitionId) -> ExecutionSpecification:
     """Load a saved definition by id and compile it to an ExecutionSpecification.
 
     Uses the latest non-deleted version when version is omitted.

@@ -23,7 +23,7 @@ from sqlalchemy import func, or_, select, update
 
 import forecastbox.db.jobs as _jobs_module
 from forecastbox.db.core import dbRetry, executeAndCommit, querySingle
-from forecastbox.domain.job_definition.exceptions import JobDefinitionAccessDenied, JobDefinitionNotFound
+from forecastbox.domain.job_definition.exceptions import JobDefinitionAccessDenied, JobDefinitionNotFound, JobDefinitionVersionConflict
 from forecastbox.schemas.jobs import JobDefinition, JobDefinitionSource
 from forecastbox.utility.auth import AuthContext
 
@@ -40,13 +40,16 @@ async def upsert_job_definition(
     display_description: str | None = None,
     tags: list[str] | None = None,
     parent_id: str | None = None,
+    expected_version: int | None = None,
 ) -> tuple[str, int]:
     """Insert a new version of a JobDefinition and return ``(id, version)``.
 
     If ``definition_id`` is omitted a fresh UUID is generated (version 1).
     If ``definition_id`` is supplied the next version is derived from the DB;
-    raises ``JobDefinitionNotFound`` if it does not exist yet, and
-    ``JobDefinitionAccessDenied`` if the actor is not the owner or an admin.
+    raises ``JobDefinitionNotFound`` if it does not exist yet,
+    ``JobDefinitionAccessDenied`` if the actor is not the owner or an admin, and
+    ``JobDefinitionVersionConflict`` if ``expected_version`` is provided and does not
+    match the current maximum version.
     """
     id_provided = definition_id is not None
     definition_id = definition_id or str(uuid.uuid4())
@@ -60,6 +63,11 @@ async def upsert_job_definition(
             if id_provided:
                 if max_version is None:
                     raise JobDefinitionNotFound(f"No JobDefinition with id={definition_id!r} exists; cannot add a new version.")
+                if expected_version is not None and max_version != expected_version:
+                    raise JobDefinitionVersionConflict(
+                        f"Version conflict for JobDefinition {definition_id!r}: "
+                        f"expected version {expected_version}, current is {max_version}."
+                    )
                 # Ownership check on the latest (non-deleted) version.
                 owner_query = (
                     select(JobDefinition.created_by)
@@ -163,15 +171,21 @@ async def list_job_definitions(*, auth_context: AuthContext) -> Iterable[JobDefi
     return await dbRetry(function)
 
 
-async def soft_delete_job_definition(definition_id: str, *, auth_context: AuthContext) -> None:
+async def soft_delete_job_definition(definition_id: str, *, expected_version: int, auth_context: AuthContext) -> None:
     """Mark all versions of a JobDefinition as deleted.
 
     Raises ``JobDefinitionNotFound`` if the definition does not exist,
-    and ``JobDefinitionAccessDenied`` if the actor is not the owner or an admin.
+    ``JobDefinitionAccessDenied`` if the actor is not the owner or an admin, and
+    ``JobDefinitionVersionConflict`` if ``expected_version`` does not match the
+    current latest version.
     """
     existing = await get_job_definition(definition_id)
     if existing is None:
         raise JobDefinitionNotFound(f"No JobDefinition with id={definition_id!r}.")
+    if cast(int, existing.version) != expected_version:
+        raise JobDefinitionVersionConflict(
+            f"Version conflict for JobDefinition {definition_id!r}: expected version {expected_version}, current is {existing.version}."
+        )
     if not auth_context.allowed(cast(str | None, existing.created_by)):
         raise JobDefinitionAccessDenied(f"User {auth_context.user_id!r} is not allowed to delete JobDefinition {definition_id!r}.")
     stmt = update(JobDefinition).where(JobDefinition.job_definition_id == definition_id).values(is_deleted=True)

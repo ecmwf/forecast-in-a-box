@@ -199,11 +199,14 @@ async def save_builder(
     auth_context: AuthContext,
     payload: FableSaveRequest,
     fable_id: str | None = None,
+    expected_version: int | None = None,
 ) -> FableSaveResponse:
     """Persist a FableBuilder as a JobDefinition and return the stable id and version.
 
     ``source`` is derived from ``display_name``: ``user_defined`` when a name is
     provided, ``oneoff_execution`` otherwise.
+    When ``expected_version`` is provided it must match the current max version;
+    raises ``JobDefinitionVersionConflict`` if it does not.
     Raises ``JobDefinitionNotFound`` or ``JobDefinitionAccessDenied`` from the db layer.
     """
     source: str = "user_defined" if payload.display_name is not None else "oneoff_execution"
@@ -219,6 +222,7 @@ async def save_builder(
         display_description=payload.display_description,
         tags=payload.tags if payload.tags else None,
         parent_id=payload.parent_id,
+        expected_version=expected_version,
     )
     return FableSaveResponse(id=definition_id, version=version)
 

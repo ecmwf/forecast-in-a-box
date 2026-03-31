@@ -22,7 +22,7 @@ from pydantic import BaseModel, PositiveInt
 
 import forecastbox.domain.experiment.service as experiment_service
 from forecastbox.api.scheduling.scheduler_thread import start_scheduler, stop_scheduler
-from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound, SchedulerBusy
+from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound, ExperimentVersionConflict, SchedulerBusy
 from forecastbox.domain.experiment.scheduling.dt_utils import current_scheduling_time
 from forecastbox.entrypoint.auth.users import get_auth_context
 from forecastbox.schemas.jobs import ExperimentDefinition
@@ -40,6 +40,17 @@ router = APIRouter(
 # ---------------------------------------------------------------------------
 # Route-local contracts
 # ---------------------------------------------------------------------------
+
+
+class ExperimentId(BaseModel):
+    """Identifies an experiment, optionally pinning a specific version.
+
+    Used as a Depends()-based query-param group on GET endpoints, and as a
+    request body field on endpoints that address a specific experiment version.
+    """
+
+    experiment_id: str
+    version: int | None = None
 
 
 class ExperimentCreateRequest(BaseModel):
@@ -83,11 +94,22 @@ class ExperimentListResponse(BaseModel):
 
 
 class ExperimentUpdateRequest(BaseModel):
+    """Update a cron-schedule experiment. ``version`` must match the current version."""
+
+    experiment_id: str
+    version: int
     cron_expr: str | None = None
     enabled: bool | None = None
     dynamic_expr: dict[str, str] | None = None
     max_acceptable_delay_hours: PositiveInt | None = None
     first_run_override: dt.datetime | None = None
+
+
+class ExperimentDeleteRequest(BaseModel):
+    """Soft-delete an experiment. ``version`` must match the current version."""
+
+    experiment_id: str
+    version: int
 
 
 class ExperimentRunDetail(BaseModel):
@@ -166,12 +188,12 @@ async def create_experiment(
 
 @router.get("/get")
 async def get_experiment(
-    experiment_id: str,
+    spec: Annotated[ExperimentId, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> ExperimentDetail:
     """Retrieve a single experiment by id."""
     try:
-        exp = await experiment_service.get_schedule(auth_context, experiment_id)
+        exp = await experiment_service.get_schedule(auth_context, spec.experiment_id)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     return _experiment_to_detail(exp)
@@ -195,15 +217,29 @@ async def list_experiments(
 
 @router.post("/update")
 async def update_experiment(
-    experiment_id: str,
     update: ExperimentUpdateRequest,
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> ExperimentDetail:
-    """Update a cron-schedule experiment. All fields are optional."""
+    """Update a cron-schedule experiment. All schedule fields are optional.
+
+    ``version`` must match the current experiment version; returns 409 if it does not.
+    """
+    try:
+        current = await experiment_service.get_schedule(auth_context, update.experiment_id)
+    except ExperimentNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    if cast(int, current.version) != update.version:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Version conflict for experiment {update.experiment_id!r}: "
+                f"expected version {update.version}, current is {current.version}."
+            ),
+        )
     try:
         updated = await experiment_service.update_schedule(
             auth_context=auth_context,
-            experiment_id=experiment_id,
+            experiment_id=update.experiment_id,
             cron_expr=update.cron_expr,
             enabled=update.enabled,
             dynamic_expr=update.dynamic_expr,
@@ -218,17 +254,34 @@ async def update_experiment(
         raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except ExperimentVersionConflict as e:
+        raise HTTPException(status_code=409, detail=str(e))
     return _experiment_to_detail(updated)
 
 
 @router.post("/delete")
 async def delete_experiment(
-    experiment_id: str,
+    request: ExperimentDeleteRequest,
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> None:
-    """Soft-delete an experiment and clear its next scheduled run."""
+    """Soft-delete an experiment and clear its next scheduled run.
+
+    ``version`` must match the current experiment version; returns 409 if it does not.
+    """
     try:
-        await experiment_service.delete_schedule(auth_context, experiment_id)
+        current = await experiment_service.get_schedule(auth_context, request.experiment_id)
+    except ExperimentNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    if cast(int, current.version) != request.version:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Version conflict for experiment {request.experiment_id!r}: "
+                f"expected version {request.version}, current is {current.version}."
+            ),
+        )
+    try:
+        await experiment_service.delete_schedule(auth_context, request.experiment_id)
     except SchedulerBusy as e:
         raise HTTPException(status_code=503, detail=str(e))
     except ExperimentNotFound as e:
@@ -244,13 +297,13 @@ async def delete_experiment(
 
 @router.get("/runs/list")
 async def list_experiment_runs(
-    experiment_id: str,
+    spec: Annotated[ExperimentId, Depends()],
     pagination: Annotated[PaginationSpec, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> ExperimentRunsResponse:
     """Return paginated execution rows linked to a cron-schedule experiment."""
     try:
-        executions, total, total_pages = await experiment_service.get_schedule_runs(auth_context, experiment_id, pagination)
+        executions, total, total_pages = await experiment_service.get_schedule_runs(auth_context, spec.experiment_id, pagination)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -271,12 +324,12 @@ async def list_experiment_runs(
 
 @router.get("/runs/next")
 async def get_next_experiment_run(
-    experiment_id: str,
+    spec: Annotated[ExperimentId, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> str:
     """Return the next scheduled run time, or 'not scheduled currently'."""
     try:
-        return await experiment_service.get_next_run(auth_context, experiment_id)
+        return await experiment_service.get_next_run(auth_context, spec.experiment_id)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
 

@@ -107,7 +107,8 @@ def test_fable_v2_save_and_retrieve(backend_client_with_auth):
     # Saving again with the same id creates a new version
     payload2 = FableSaveRequest(builder=_make_builder_source_only(), display_name="Test Fable v2")
     response = backend_client_with_auth.post(
-        "/job_definition/update", json={**payload2.model_dump(), "job_definition_id": saved["job_definition_id"]}
+        "/job_definition/update",
+        json={**payload2.model_dump(), "job_definition_id": saved["job_definition_id"], "version": saved["version"]},
     )
     assert response.is_success, response.text
     saved2 = response.json()
@@ -138,7 +139,9 @@ def test_fable_v2_upsert_nonexistent_id(backend_client_with_auth):
     """Attempting to add a version to a non-existent id returns 404."""
     builder = _make_builder_source_only()
     payload = FableSaveRequest(builder=builder)
-    response = backend_client_with_auth.post("/job_definition/update", json={**payload.model_dump(), "job_definition_id": "no-such-id"})
+    response = backend_client_with_auth.post(
+        "/job_definition/update", json={**payload.model_dump(), "job_definition_id": "no-such-id", "version": 1}
+    )
     assert response.status_code == 404
 
 
@@ -169,7 +172,9 @@ def test_fable_v2_compile_specific_version(tmpdir, backend_client_with_auth):
     # Save a second version with a different builder (source-only, no sink)
     source_only = _make_builder_source_only()
     payload_v2 = FableSaveRequest(builder=source_only, display_name="Version Test v2")
-    save_resp2 = backend_client_with_auth.post("/job_definition/update", json={**payload_v2.model_dump(), "job_definition_id": fable_id})
+    save_resp2 = backend_client_with_auth.post(
+        "/job_definition/update", json={**payload_v2.model_dump(), "job_definition_id": fable_id, "version": save_resp.json()["version"]}
+    )
     assert save_resp2.is_success, save_resp2.text
     assert save_resp2.json()["version"] == 2
 
@@ -292,7 +297,7 @@ def test_fable_v2_basic_execute(tmpdir, backend_client_with_auth):
     assert "blocks" in data
     assert data["blocks"] is not None
 
-    restart_resp = backend_client_with_auth.post("/job_execution/restart", json={"execution_id": execution_id})
+    restart_resp = backend_client_with_auth.post("/job_execution/restart", json={"execution_id": execution_id, "attempt_count": 1})
     assert restart_resp.is_success, restart_resp.text
     data = restart_resp.json()
     assert data["execution_id"] == execution_id
@@ -353,5 +358,5 @@ def test_submit_job_v2_read_specification_not_found(backend_client_with_auth):
 
 def test_submit_job_v2_restart_not_found(backend_client_with_auth):
     """POST /execution/restart with unknown execution_id returns 404."""
-    resp = backend_client_with_auth.post("/job_execution/restart", json={"execution_id": "nonexistent-exec-id"})
+    resp = backend_client_with_auth.post("/job_execution/restart", json={"execution_id": "nonexistent-exec-id", "attempt_count": 1})
     assert resp.status_code == 404

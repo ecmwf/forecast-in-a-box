@@ -20,3 +20,7 @@ class JobDefinitionNotFound(Exception):
 
 class JobDefinitionAccessDenied(Exception):
     """Raised when the actor lacks permission to mutate a JobDefinition."""
+
+
+class JobDefinitionVersionConflict(Exception):
+    """Raised when the provided version does not match the current version in the database."""
