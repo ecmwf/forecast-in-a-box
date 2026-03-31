@@ -22,17 +22,22 @@ Note: ``JobDefinition`` persistence has moved to
 ``forecastbox.domain.job_definition.db``.  ``get_job_definition`` is kept here as
 a thin proxy so existing call-sites (execution, scheduling) continue to work
 without changes.
+
+Note: ``ExperimentDefinition`` and ``ExperimentNext`` persistence has moved to
+``forecastbox.domain.experiment.db`` and
+``forecastbox.domain.experiment.scheduling.db`` respectively.  The functions
+below are thin proxies using a system-level (admin) actor so that callers not
+yet updated continue to work.
 """
 
 import datetime as dt
 import uuid
 from collections.abc import Iterable
 
-from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from forecastbox.db.core import addAndCommit, dbRetry, executeAndCommit, querySingle
+from forecastbox.db.core import dbRetry, executeAndCommit, querySingle
 from forecastbox.schemas.jobs import (
     Base,
     ExperimentDefinition,
@@ -73,7 +78,7 @@ async def get_job_definition(definition_id: str, version: int | None = None) -> 
 
 
 # ---------------------------------------------------------------------------
-# ExperimentDefinition
+# ExperimentDefinition — thin proxies; canonical implementation in domain.experiment.db
 # ---------------------------------------------------------------------------
 
 
@@ -89,157 +94,71 @@ async def upsert_experiment_definition(
     display_description: str | None = None,
     tags: list[str] | None = None,
 ) -> tuple[str, int]:
-    """Insert a new version of an ExperimentDefinition and return (id, version).
+    """Thin proxy; canonical implementation in ``forecastbox.domain.experiment.db``."""
+    from forecastbox.domain.experiment import db as _exp_db
+    from forecastbox.utility.auth import AuthContext
 
-    If `id` is omitted a fresh UUID is generated (version 1).
-    If `id` is supplied the next version number is derived from the database;
-    a KeyError is raised if that id does not exist yet.
-    """
-    id_provided = experiment_definition_id is not None
-    experiment_id = experiment_definition_id or str(uuid.uuid4())
-    ref_time = dt.datetime.now()
-
-    async def function(i: int) -> int:
-        async with async_session_maker() as session:
-            result = await session.execute(
-                select(func.max(ExperimentDefinition.version)).where(ExperimentDefinition.experiment_definition_id == experiment_id)
-            )
-            max_version: int | None = result.scalar()
-            if id_provided and max_version is None:
-                raise KeyError(f"No ExperimentDefinition with id={experiment_id!r} exists; cannot add a new version.")
-            new_version = (max_version or 0) + 1
-            session.add(
-                ExperimentDefinition(
-                    experiment_definition_id=experiment_id,
-                    version=new_version,
-                    created_by=created_by,
-                    created_at=ref_time,
-                    display_name=display_name,
-                    display_description=display_description,
-                    tags=tags,
-                    job_definition_id=job_definition_id,
-                    job_definition_version=job_definition_version,
-                    experiment_type=experiment_type,
-                    experiment_definition=experiment_definition,
-                    is_deleted=False,
-                )
-            )
-            await session.commit()
-            return new_version
-
-    new_version = await dbRetry(function)
-    return experiment_id, new_version
+    return await _exp_db.upsert_experiment_definition(
+        actor=AuthContext(user_id=None, is_admin=True),
+        experiment_definition_id=experiment_definition_id,
+        job_definition_id=job_definition_id,
+        job_definition_version=job_definition_version,
+        experiment_type=experiment_type,
+        created_by=created_by,
+        experiment_definition=experiment_definition,
+        display_name=display_name,
+        display_description=display_description,
+        tags=tags,
+    )
 
 
 async def get_experiment_definition(experiment_definition_id: str, version: int | None = None) -> ExperimentDefinition | None:
-    """Return a specific or the latest non-deleted version of an ExperimentDefinition."""
-    if version is not None:
-        query = select(ExperimentDefinition).where(
-            ExperimentDefinition.experiment_definition_id == experiment_definition_id,
-            ExperimentDefinition.version == version,
-            ExperimentDefinition.is_deleted.is_(False),
-        )
-    else:
-        query = (
-            select(ExperimentDefinition)
-            .where(ExperimentDefinition.experiment_definition_id == experiment_definition_id, ExperimentDefinition.is_deleted.is_(False))
-            .order_by(ExperimentDefinition.version.desc())
-            .limit(1)
-        )
-    return await querySingle(query, async_session_maker)
+    """Thin proxy; canonical implementation in ``forecastbox.domain.experiment.db``."""
+    from forecastbox.domain.experiment import db as _exp_db
+
+    return await _exp_db.get_experiment_definition(experiment_definition_id, version)
 
 
 async def list_experiment_definitions(
     experiment_type: str | None = None, offset: int = 0, limit: int | None = None
 ) -> Iterable[ExperimentDefinition]:
-    """Return the latest non-deleted version of every ExperimentDefinition, with optional type filter and paging."""
+    """Thin proxy; canonical implementation in ``forecastbox.domain.experiment.db``."""
+    from forecastbox.domain.experiment import db as _exp_db
+    from forecastbox.utility.auth import AuthContext
 
-    async def function(i: int) -> list[ExperimentDefinition]:
-        async with async_session_maker() as session:
-            subq = (
-                select(
-                    ExperimentDefinition.experiment_definition_id,
-                    func.max(ExperimentDefinition.version).label("max_version"),
-                )
-                .where(ExperimentDefinition.is_deleted.is_(False))
-                .group_by(ExperimentDefinition.experiment_definition_id)
-                .subquery()
-            )
-            query = select(ExperimentDefinition).join(
-                subq,
-                (ExperimentDefinition.experiment_definition_id == subq.c.experiment_definition_id)
-                & (ExperimentDefinition.version == subq.c.max_version),
-            )
-            if experiment_type is not None:
-                query = query.where(ExperimentDefinition.experiment_type == experiment_type)
-            query = query.offset(offset)
-            if limit is not None:
-                query = query.limit(limit)
-            result = await session.execute(query)
-            return [r[0] for r in result.all()]
-
-    return await dbRetry(function)
+    return await _exp_db.list_experiment_definitions(
+        actor=AuthContext(user_id=None, is_admin=True),
+        experiment_type=experiment_type,
+        offset=offset,
+        limit=limit,
+    )
 
 
 async def count_experiment_definitions(experiment_type: str | None = None) -> int:
-    """Return the number of distinct non-deleted ExperimentDefinition ids, with optional type filter."""
+    """Thin proxy; canonical implementation in ``forecastbox.domain.experiment.db``."""
+    from forecastbox.domain.experiment import db as _exp_db
+    from forecastbox.utility.auth import AuthContext
 
-    async def function(i: int) -> int:
-        async with async_session_maker() as session:
-            subq = (
-                select(ExperimentDefinition.experiment_definition_id)
-                .where(ExperimentDefinition.is_deleted.is_(False))
-                .group_by(ExperimentDefinition.experiment_definition_id)
-                .subquery()
-            )
-            query = select(func.count()).select_from(subq)
-            if experiment_type is not None:
-                # Re-filter on latest version rows
-                subq2 = (
-                    select(ExperimentDefinition.experiment_definition_id, func.max(ExperimentDefinition.version).label("max_version"))
-                    .where(ExperimentDefinition.is_deleted.is_(False))
-                    .group_by(ExperimentDefinition.experiment_definition_id)
-                    .subquery()
-                )
-                inner = (
-                    select(ExperimentDefinition.experiment_definition_id)
-                    .join(
-                        subq2,
-                        (ExperimentDefinition.experiment_definition_id == subq2.c.experiment_definition_id)
-                        & (ExperimentDefinition.version == subq2.c.max_version),
-                    )
-                    .where(ExperimentDefinition.experiment_type == experiment_type)
-                    .subquery()
-                )
-                query = select(func.count()).select_from(inner)
-            result = await session.execute(query)
-            return result.scalar() or 0
-
-    return await dbRetry(function)
+    return await _exp_db.count_experiment_definitions(
+        actor=AuthContext(user_id=None, is_admin=True),
+        experiment_type=experiment_type,
+    )
 
 
 async def soft_delete_experiment_definition(experiment_id: str) -> bool:
-    """Mark all versions of an ExperimentDefinition as deleted. Return true if any was marked"""
+    """Thin proxy; canonical implementation in ``forecastbox.domain.experiment.db``.
 
-    async def function(i: int) -> bool:
-        async with async_session_maker() as session:
-            subquery = (
-                select(ExperimentDefinition.experiment_definition_id)
-                .where(ExperimentDefinition.is_deleted.is_(False), ExperimentDefinition.experiment_definition_id == experiment_id)
-                .subquery()
-            )
-            query = select(func.count()).select_from(subquery)
-            result = await session.execute(query)
-            if not result.scalar():
-                return False
-            stmt = (
-                update(ExperimentDefinition).where(ExperimentDefinition.experiment_definition_id == experiment_id).values(is_deleted=True)
-            )
-            await session.execute(stmt)
-            await session.commit()
-            return True
+    Returns True if deleted, False if not found (preserving the original boolean interface).
+    """
+    from forecastbox.domain.experiment import db as _exp_db
+    from forecastbox.domain.experiment.exceptions import ExperimentNotFound
+    from forecastbox.utility.auth import AuthContext
 
-    return await dbRetry(function)
+    try:
+        await _exp_db.soft_delete_experiment_definition(experiment_id, actor=AuthContext(user_id=None, is_admin=True))
+        return True
+    except ExperimentNotFound:
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -380,90 +299,43 @@ async def soft_delete_job_execution(execution_id: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# ExperimentNext
+# ExperimentNext — thin proxies; canonical implementation in domain.experiment.scheduling.db
 # ---------------------------------------------------------------------------
 
 
 async def upsert_experiment_next(*, experiment_id: str, scheduled_at: dt.datetime) -> None:
-    """Insert or update the next scheduled run time for an experiment."""
-    ref_time = dt.datetime.now()
-    existing = await querySingle(
-        select(ExperimentNext).where(ExperimentNext.experiment_id == experiment_id),
-        async_session_maker,
-    )
-    if existing:
-        stmt = (
-            update(ExperimentNext)
-            .where(ExperimentNext.experiment_id == experiment_id)
-            .values(scheduled_at=scheduled_at, updated_at=ref_time)
-        )
-        await executeAndCommit(stmt, async_session_maker)
-    else:
-        entity = ExperimentNext(
-            experiment_next_id=str(uuid.uuid4()),
-            experiment_id=experiment_id,
-            scheduled_at=scheduled_at,
-            updated_at=ref_time,
-        )
-        await addAndCommit(entity, async_session_maker)
+    """Thin proxy; canonical implementation in ``forecastbox.domain.experiment.scheduling.db``."""
+    from forecastbox.domain.experiment.scheduling import db as _sched_db
+
+    await _sched_db.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=scheduled_at)
 
 
 async def get_experiment_next(experiment_id: str) -> ExperimentNext | None:
-    """Return the next scheduled run entry for an experiment."""
-    query = select(ExperimentNext).where(ExperimentNext.experiment_id == experiment_id)
-    return await querySingle(query, async_session_maker)
+    """Thin proxy; canonical implementation in ``forecastbox.domain.experiment.scheduling.db``."""
+    from forecastbox.domain.experiment.scheduling import db as _sched_db
+
+    return await _sched_db.get_experiment_next(experiment_id)
 
 
 async def delete_experiment_next(experiment_id: str) -> None:
-    """Remove the next scheduled run entry for an experiment, clearing the pending tick."""
-    stmt = sa_delete(ExperimentNext).where(ExperimentNext.experiment_id == experiment_id)
-    await executeAndCommit(stmt, async_session_maker)
+    """Thin proxy; canonical implementation in ``forecastbox.domain.experiment.scheduling.db``."""
+    from forecastbox.domain.experiment.scheduling import db as _sched_db
+
+    await _sched_db.delete_experiment_next(experiment_id)
 
 
 async def get_schedulable_experiments(now: dt.datetime) -> list[tuple[ExperimentNext, ExperimentDefinition]]:
-    """Return (ExperimentNext, ExperimentDefinition) pairs due for execution.
+    """Thin proxy; canonical implementation in ``forecastbox.domain.experiment.scheduling.db``."""
+    from forecastbox.domain.experiment.scheduling import db as _sched_db
 
-    Joins ExperimentNext with the latest non-deleted ExperimentDefinition of type
-    'cron_schedule'. Disabled schedules have their ExperimentNext row deleted at
-    update time, so should not appear here -- but if they would, we handle at the
-    scheduler thread by logging error and deleting their ExperimentNext
-    """
-
-    async def function(i: int) -> list[tuple[ExperimentNext, ExperimentDefinition]]:
-        async with async_session_maker() as session:
-            subq = (
-                select(ExperimentDefinition.experiment_definition_id, func.max(ExperimentDefinition.version).label("max_version"))
-                .where(ExperimentDefinition.is_deleted.is_(False))
-                .group_by(ExperimentDefinition.experiment_definition_id)
-                .subquery()
-            )
-            query = (
-                select(ExperimentNext, ExperimentDefinition)
-                .where(ExperimentNext.scheduled_at <= now)
-                .join(subq, ExperimentNext.experiment_id == subq.c.experiment_definition_id)
-                .join(
-                    ExperimentDefinition,
-                    (ExperimentDefinition.experiment_definition_id == subq.c.experiment_definition_id)
-                    & (ExperimentDefinition.version == subq.c.max_version),
-                )
-                .where(ExperimentDefinition.experiment_type == "cron_schedule")
-            )
-            result = await session.execute(query)
-            return [(row[0], row[1]) for row in result.all()]
-
-    return await dbRetry(function)
+    return await _sched_db.get_schedulable_experiments(now)
 
 
 async def next_schedulable_experiment() -> dt.datetime | None:
-    """Return the earliest scheduled_at across all ExperimentNext rows."""
+    """Thin proxy; canonical implementation in ``forecastbox.domain.experiment.scheduling.db``."""
+    from forecastbox.domain.experiment.scheduling import db as _sched_db
 
-    async def function(i: int) -> dt.datetime | None:
-        async with async_session_maker() as session:
-            query = select(func.min(ExperimentNext.scheduled_at))
-            result = await session.execute(query)
-            return result.scalar_one_or_none()
-
-    return await dbRetry(function)
+    return await _sched_db.next_schedulable_experiment()
 
 
 async def list_job_executions_by_experiment(experiment_id: str, offset: int = 0, limit: int | None = None) -> Iterable[JobExecution]:

@@ -21,6 +21,10 @@ class AuthContext:
     user_id: str | None
     is_admin: bool
 
+    def has_admin(self) -> bool:
+        """Return True if the caller has admin privileges or is unauthenticated (anonymous regime)."""
+        return self.is_admin or self.user_id is None
+
 
 def user2auth(user: UserRead | None) -> AuthContext:
     """Build an AuthContext from an optional authenticated user."""

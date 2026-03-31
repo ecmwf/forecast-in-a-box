@@ -11,12 +11,12 @@
 
 All tests use an in-memory SQLite engine so no filesystem state is required.
 ``forecastbox.db.jobs.async_session_maker`` is monkeypatched to the in-memory
-maker for ExperimentDefinition / JobExecution / ExperimentNext tests.
+maker for JobExecution tests.
 
-JobDefinition tests additionally patch
-``forecastbox.domain.definition.db._jobs_module.async_session_maker``; both
-patches are applied together via the ``mem_session_maker_both`` fixture so that
-FK constraints between tables still work.
+JobDefinition, ExperimentDefinition, and ExperimentNext tests patch the
+corresponding domain-module ``_jobs_module.async_session_maker`` references so
+that all tables share a single connection pool and FK constraints work in-memory.
+The ``mem_session_maker_all`` fixture applies all patches at once.
 """
 
 import datetime as dt
@@ -26,7 +26,10 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 import forecastbox.db.jobs as jobs_db
+import forecastbox.domain.experiment.db as experiment_db
+import forecastbox.domain.experiment.scheduling.db as scheduling_db
 import forecastbox.domain.job_definition.db as job_definition_db
+from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound
 from forecastbox.domain.job_definition.exceptions import JobDefinitionAccessDenied, JobDefinitionNotFound
 from forecastbox.schemas.jobs import Base
 from forecastbox.utility.auth import AuthContext
@@ -44,12 +47,16 @@ async def mem_session_maker():
 
 @pytest_asyncio.fixture
 async def mem_session_maker_both(mem_session_maker, monkeypatch):
-    """Patch both jobs_db and job_definition_db to the same in-memory session maker."""
+    """Patch jobs_db, job_definition_db, experiment_db, and scheduling_db to the same in-memory session maker."""
     monkeypatch.setattr(jobs_db, "async_session_maker", mem_session_maker)
-    # job_definition_db accesses _jobs_module.async_session_maker; patch via the
-    # module reference that job_definition_db holds.
     monkeypatch.setattr(job_definition_db._jobs_module, "async_session_maker", mem_session_maker)
+    monkeypatch.setattr(experiment_db._jobs_module, "async_session_maker", mem_session_maker)
+    monkeypatch.setattr(scheduling_db._jobs_module, "async_session_maker", mem_session_maker)
     yield mem_session_maker
+
+
+# alias for clarity in newer tests
+mem_session_maker_all = mem_session_maker_both
 
 
 _admin = AuthContext(user_id="admin", is_admin=True)
@@ -213,7 +220,8 @@ async def test_jobs_soft_delete_not_found_raises(mem_session_maker_both):
 async def test_jobs_experiment_definition_versioning(mem_session_maker_both):
     job_id, job_v = await job_definition_db.upsert_job_definition(actor=_user1, source="user_defined", created_by="user1")
 
-    exp_id, v1 = await jobs_db.upsert_experiment_definition(
+    exp_id, v1 = await experiment_db.upsert_experiment_definition(
+        actor=_user1,
         job_definition_id=job_id,
         job_definition_version=job_v,
         experiment_type="cron_schedule",
@@ -222,7 +230,8 @@ async def test_jobs_experiment_definition_versioning(mem_session_maker_both):
     )
     assert v1 == 1
 
-    _, v2 = await jobs_db.upsert_experiment_definition(
+    _, v2 = await experiment_db.upsert_experiment_definition(
+        actor=_user1,
         experiment_definition_id=exp_id,
         job_definition_id=job_id,
         job_definition_version=job_v,
@@ -232,7 +241,7 @@ async def test_jobs_experiment_definition_versioning(mem_session_maker_both):
     )
     assert v2 == 2
 
-    latest = await jobs_db.get_experiment_definition(exp_id)
+    latest = await experiment_db.get_experiment_definition(exp_id)
     assert latest is not None
     assert latest.version == 2
     assert latest.experiment_definition == {"cron": "30 * * * *"}
@@ -241,18 +250,118 @@ async def test_jobs_experiment_definition_versioning(mem_session_maker_both):
 @pytest.mark.asyncio
 async def test_jobs_experiment_definition_soft_delete(mem_session_maker_both):
     job_id, job_v = await job_definition_db.upsert_job_definition(actor=_user1, source="user_defined", created_by="user1")
-    exp_id, _ = await jobs_db.upsert_experiment_definition(
+    exp_id, _ = await experiment_db.upsert_experiment_definition(
+        actor=_user1,
         job_definition_id=job_id,
         job_definition_version=job_v,
         experiment_type="cron_schedule",
         created_by="user1",
     )
 
-    await jobs_db.soft_delete_experiment_definition(exp_id)
+    await experiment_db.soft_delete_experiment_definition(exp_id, actor=_user1)
 
-    assert await jobs_db.get_experiment_definition(exp_id) is None
-    experiments = list(await jobs_db.list_experiment_definitions())
+    assert await experiment_db.get_experiment_definition(exp_id) is None
+    experiments = list(await experiment_db.list_experiment_definitions(actor=_admin))
     assert all(e.experiment_definition_id != exp_id for e in experiments)
+
+
+@pytest.mark.asyncio
+async def test_experiment_create_anon_raises(mem_session_maker_both):
+    job_id, job_v = await job_definition_db.upsert_job_definition(actor=_user1, source="user_defined", created_by="user1")
+    with pytest.raises(ExperimentAccessDenied):
+        await experiment_db.upsert_experiment_definition(
+            actor=_anon,
+            job_definition_id=job_id,
+            job_definition_version=job_v,
+            experiment_type="cron_schedule",
+            created_by=None,
+        )
+
+
+@pytest.mark.asyncio
+async def test_experiment_update_non_owner_raises(mem_session_maker_both):
+    job_id, job_v = await job_definition_db.upsert_job_definition(actor=_user1, source="user_defined", created_by="user1")
+    exp_id, _ = await experiment_db.upsert_experiment_definition(
+        actor=_user1,
+        job_definition_id=job_id,
+        job_definition_version=job_v,
+        experiment_type="cron_schedule",
+        created_by="user1",
+    )
+    with pytest.raises(ExperimentAccessDenied):
+        await experiment_db.upsert_experiment_definition(
+            actor=_user2,
+            experiment_definition_id=exp_id,
+            job_definition_id=job_id,
+            job_definition_version=job_v,
+            experiment_type="cron_schedule",
+            created_by="user2",
+        )
+
+
+@pytest.mark.asyncio
+async def test_experiment_update_admin_bypasses_ownership(mem_session_maker_both):
+    job_id, job_v = await job_definition_db.upsert_job_definition(actor=_user1, source="user_defined", created_by="user1")
+    exp_id, _ = await experiment_db.upsert_experiment_definition(
+        actor=_user1,
+        job_definition_id=job_id,
+        job_definition_version=job_v,
+        experiment_type="cron_schedule",
+        created_by="user1",
+    )
+    _, v2 = await experiment_db.upsert_experiment_definition(
+        actor=_admin,
+        experiment_definition_id=exp_id,
+        job_definition_id=job_id,
+        job_definition_version=job_v,
+        experiment_type="cron_schedule",
+        created_by="user1",
+    )
+    assert v2 == 2
+
+
+@pytest.mark.asyncio
+async def test_experiment_delete_non_owner_raises(mem_session_maker_both):
+    job_id, job_v = await job_definition_db.upsert_job_definition(actor=_user1, source="user_defined", created_by="user1")
+    exp_id, _ = await experiment_db.upsert_experiment_definition(
+        actor=_user1,
+        job_definition_id=job_id,
+        job_definition_version=job_v,
+        experiment_type="cron_schedule",
+        created_by="user1",
+    )
+    with pytest.raises(ExperimentAccessDenied):
+        await experiment_db.soft_delete_experiment_definition(exp_id, actor=_user2)
+
+
+@pytest.mark.asyncio
+async def test_experiment_list_filters_by_actor(mem_session_maker_both):
+    job_id, job_v = await job_definition_db.upsert_job_definition(actor=_user1, source="user_defined", created_by="user1")
+
+    await experiment_db.upsert_experiment_definition(
+        actor=_user1,
+        job_definition_id=job_id,
+        job_definition_version=job_v,
+        experiment_type="cron_schedule",
+        created_by="user1",
+    )
+    await experiment_db.upsert_experiment_definition(
+        actor=_user2,
+        job_definition_id=job_id,
+        job_definition_version=job_v,
+        experiment_type="cron_schedule",
+        created_by="user2",
+    )
+
+    user1_exps = list(await experiment_db.list_experiment_definitions(actor=_user1))
+    user2_exps = list(await experiment_db.list_experiment_definitions(actor=_user2))
+    admin_exps = list(await experiment_db.list_experiment_definitions(actor=_admin))
+    anon_exps = list(await experiment_db.list_experiment_definitions(actor=_anon))
+
+    assert len(user1_exps) == 1 and user1_exps[0].created_by == "user1"
+    assert len(user2_exps) == 1 and user2_exps[0].created_by == "user2"
+    assert len(admin_exps) == 2
+    assert len(anon_exps) == 0
 
 
 # ---------------------------------------------------------------------------
@@ -351,7 +460,8 @@ async def test_jobs_list_job_executions_latest_only(mem_session_maker_both):
 @pytest.mark.asyncio
 async def test_jobs_experiment_next_upsert(mem_session_maker_both):
     job_id, job_v = await job_definition_db.upsert_job_definition(actor=_user1, source="user_defined", created_by="user1")
-    exp_id, _ = await jobs_db.upsert_experiment_definition(
+    exp_id, _ = await experiment_db.upsert_experiment_definition(
+        actor=_user1,
         job_definition_id=job_id,
         job_definition_version=job_v,
         experiment_type="cron_schedule",
@@ -359,17 +469,17 @@ async def test_jobs_experiment_next_upsert(mem_session_maker_both):
     )
 
     t1 = dt.datetime(2026, 1, 1, 12, 0)
-    await jobs_db.upsert_experiment_next(experiment_id=exp_id, scheduled_at=t1)
+    await scheduling_db.upsert_experiment_next(experiment_id=exp_id, scheduled_at=t1)
 
-    result = await jobs_db.get_experiment_next(exp_id)
+    result = await scheduling_db.get_experiment_next(exp_id)
     assert result is not None
     assert result.scheduled_at == t1
 
     # Upsert again should update the scheduled_at
     t2 = dt.datetime(2026, 1, 2, 12, 0)
-    await jobs_db.upsert_experiment_next(experiment_id=exp_id, scheduled_at=t2)
+    await scheduling_db.upsert_experiment_next(experiment_id=exp_id, scheduled_at=t2)
 
-    result2 = await jobs_db.get_experiment_next(exp_id)
+    result2 = await scheduling_db.get_experiment_next(exp_id)
     assert result2 is not None
     assert result2.scheduled_at == t2
 
@@ -387,8 +497,9 @@ async def test_jobs_experiment_next_upsert(mem_session_maker_both):
 async def test_jobs_upsert_experiment_definition_unknown_id_raises(mem_session_maker_both):
     job_id, job_v = await job_definition_db.upsert_job_definition(actor=_user1, source="user_defined", created_by="user1")
 
-    with pytest.raises(KeyError, match="No ExperimentDefinition"):
-        await jobs_db.upsert_experiment_definition(
+    with pytest.raises(ExperimentNotFound):
+        await experiment_db.upsert_experiment_definition(
+            actor=_user1,
             experiment_definition_id="nonexistent-id",
             job_definition_id=job_id,
             job_definition_version=job_v,

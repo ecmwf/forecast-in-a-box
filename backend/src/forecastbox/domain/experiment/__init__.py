@@ -6,16 +6,3 @@
 # In applying this licence, ECMWF does not waive the privileges and immunities
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
-
-"""Datetime-related utilities for scheduling.
-
-Canonical implementation has moved to ``forecastbox.domain.experiment.scheduling.dt_utils``.
-This module re-exports everything for backward compatibility.
-"""
-
-from forecastbox.domain.experiment.scheduling.dt_utils import (  # noqa: F401
-    Crontab,
-    calculate_next_run,
-    current_scheduling_time,
-    parse_crontab,
-)
