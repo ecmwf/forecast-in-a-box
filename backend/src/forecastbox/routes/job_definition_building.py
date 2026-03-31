@@ -7,7 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Canonical definition-building routes — /definition/building/*"""
+"""Canonical job-definition building routes — /job_definition/building/*"""
 
 from fastapi import APIRouter, status
 from fastapi.exceptions import HTTPException
@@ -31,7 +31,7 @@ router = APIRouter(
 # ---------------------------------------------------------------------------
 
 
-class BuildingCompileRequest(BaseModel):
+class JobDefinitionBuildingCompileRequest(BaseModel):
     id: str
     version: int | None = None
 
@@ -53,7 +53,7 @@ def get_catalogue() -> dict[PluginCompositeId, BlockFactoryCatalogue]:
 
 
 @router.put("/expand")
-def expand_definition(fable: FableBuilder) -> FableValidationExpansion:
+def expand_job_definition(fable: FableBuilder) -> FableValidationExpansion:
     """Validate a partially-constructed FableBuilder and return completion options.
 
     Returns 200 regardless of whether validation errors are present; callers must
@@ -63,7 +63,7 @@ def expand_definition(fable: FableBuilder) -> FableValidationExpansion:
 
 
 @router.put("/compile")
-async def compile_definition(request: BuildingCompileRequest) -> ExecutionSpecification:
+async def compile_job_definition(request: JobDefinitionBuildingCompileRequest) -> ExecutionSpecification:
     """Load a saved definition by id and compile it to an ExecutionSpecification.
 
     Uses the latest non-deleted version when version is omitted.

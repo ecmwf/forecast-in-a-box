@@ -7,7 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Canonical definition entity routes — /definition/*"""
+"""Canonical job-definition entity routes — /job_definition/*"""
 
 from typing import cast
 
@@ -33,7 +33,7 @@ router = APIRouter(
 # ---------------------------------------------------------------------------
 
 
-class DefinitionCreateRequest(BaseModel):
+class JobDefinitionCreateRequest(BaseModel):
     builder: FableBuilder
     display_name: str | None = None
     display_description: str | None = None
@@ -41,12 +41,12 @@ class DefinitionCreateRequest(BaseModel):
     parent_id: str | None = None
 
 
-class DefinitionCreateResponse(BaseModel):
+class JobDefinitionCreateResponse(BaseModel):
     id: str
     version: int
 
 
-class DefinitionGetResponse(BaseModel):
+class JobDefinitionGetResponse(BaseModel):
     id: str
     version: int
     builder: FableBuilder
@@ -56,7 +56,7 @@ class DefinitionGetResponse(BaseModel):
     parent_id: str | None = None
 
 
-class DefinitionListItem(BaseModel):
+class JobDefinitionListItem(BaseModel):
     id: str
     version: int
     display_name: str | None = None
@@ -66,12 +66,12 @@ class DefinitionListItem(BaseModel):
     created_by: str | None = None
 
 
-class DefinitionListResponse(BaseModel):
-    definitions: list[DefinitionListItem]
+class JobDefinitionListResponse(BaseModel):
+    definitions: list[JobDefinitionListItem]
     total: int
 
 
-class DefinitionUpdateRequest(BaseModel):
+class JobDefinitionUpdateRequest(BaseModel):
     id: str
     builder: FableBuilder
     display_name: str | None = None
@@ -80,12 +80,12 @@ class DefinitionUpdateRequest(BaseModel):
     parent_id: str | None = None
 
 
-class DefinitionUpdateResponse(BaseModel):
+class JobDefinitionUpdateResponse(BaseModel):
     id: str
     version: int
 
 
-class DefinitionDeleteRequest(BaseModel):
+class JobDefinitionDeleteRequest(BaseModel):
     id: str
 
 
@@ -95,10 +95,10 @@ class DefinitionDeleteRequest(BaseModel):
 
 
 @router.post("/create")
-async def create_definition(
-    request: DefinitionCreateRequest,
+async def create_job_definition(
+    request: JobDefinitionCreateRequest,
     auth_context: AuthContext = Depends(get_auth_context),
-) -> DefinitionCreateResponse:
+) -> JobDefinitionCreateResponse:
     """Create a new job definition from a FableBuilder."""
     payload = FableSaveRequest(
         builder=request.builder,
@@ -113,14 +113,14 @@ async def create_definition(
         raise HTTPException(status_code=404, detail=str(e))
     except JobDefinitionAccessDenied as e:
         raise HTTPException(status_code=403, detail=str(e))
-    return DefinitionCreateResponse(id=result.id, version=result.version)
+    return JobDefinitionCreateResponse(id=result.id, version=result.version)
 
 
 @router.get("/get")
-async def get_definition(
+async def get_job_definition(
     id: str,
     version: int | None = None,
-) -> DefinitionGetResponse:
+) -> JobDefinitionGetResponse:
     """Retrieve a saved job definition by id and optional version.
 
     Returns the latest non-deleted version when version is omitted.
@@ -129,7 +129,7 @@ async def get_definition(
         retrieved = await job_definition_service.load_builder(id, version)
     except JobDefinitionNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return DefinitionGetResponse(
+    return JobDefinitionGetResponse(
         id=retrieved.id,
         version=retrieved.version,
         builder=retrieved.builder,
@@ -141,13 +141,13 @@ async def get_definition(
 
 
 @router.get("/list")
-async def list_definitions(
+async def list_job_definitions(
     auth_context: AuthContext = Depends(get_auth_context),
-) -> DefinitionListResponse:
+) -> JobDefinitionListResponse:
     """List the latest non-deleted version of every job definition visible to the caller."""
     definitions = list(await job_definition_db.list_job_definitions(auth_context=auth_context))
     items = [
-        DefinitionListItem(
+        JobDefinitionListItem(
             id=cast(str, defn.job_definition_id),
             version=cast(int, defn.version),
             display_name=cast(str | None, defn.display_name),
@@ -158,14 +158,14 @@ async def list_definitions(
         )
         for defn in definitions
     ]
-    return DefinitionListResponse(definitions=items, total=len(items))
+    return JobDefinitionListResponse(definitions=items, total=len(items))
 
 
 @router.post("/update")
-async def update_definition(
-    request: DefinitionUpdateRequest,
+async def update_job_definition(
+    request: JobDefinitionUpdateRequest,
     auth_context: AuthContext = Depends(get_auth_context),
-) -> DefinitionUpdateResponse:
+) -> JobDefinitionUpdateResponse:
     """Add a new version to an existing job definition.
 
     The id must reference an existing definition. Returns the new version number.
@@ -183,12 +183,12 @@ async def update_definition(
         raise HTTPException(status_code=404, detail=str(e))
     except JobDefinitionAccessDenied as e:
         raise HTTPException(status_code=403, detail=str(e))
-    return DefinitionUpdateResponse(id=result.id, version=result.version)
+    return JobDefinitionUpdateResponse(id=result.id, version=result.version)
 
 
 @router.post("/delete")
-async def delete_definition(
-    request: DefinitionDeleteRequest,
+async def delete_job_definition(
+    request: JobDefinitionDeleteRequest,
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> None:
     """Soft-delete all versions of a job definition."""

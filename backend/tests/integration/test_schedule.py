@@ -35,7 +35,7 @@ def _save_fable(client) -> tuple[str, int]:
         input_ids={},
     )
     builder = FableBuilder(blocks={"source1": source})
-    resp = client.post("/definition/create", json=FableSaveRequest(builder=builder, display_name="sched-v2 test").model_dump())
+    resp = client.post("/job_definition/create", json=FableSaveRequest(builder=builder, display_name="sched-v2 test").model_dump())
     assert resp.is_success, resp.text
     data = resp.json()
     return data["id"], data["version"]
@@ -71,7 +71,7 @@ def _save_full_fable(client, output_path: str) -> tuple[str, int]:
             "sink_file": sink_file,
         }
     )
-    resp = client.post("/definition/create", json=FableSaveRequest(builder=builder).model_dump())
+    resp = client.post("/job_definition/create", json=FableSaveRequest(builder=builder).model_dump())
     assert resp.is_success, resp.text
     data = resp.json()
     return data["id"], data["version"]

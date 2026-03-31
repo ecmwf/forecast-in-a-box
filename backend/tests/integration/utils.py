@@ -81,7 +81,7 @@ def ensure_schedule_run_v2(backend_client, experiment_id: str, sleep: float = 1.
 def ensure_completed_v2(backend_client, job_id, sleep=0.5, attempts=20):
     i = attempts
     while i > 0:
-        response = backend_client.get("/execution/get", params={"execution_id": job_id}, timeout=10)
+        response = backend_client.get("/job_execution/get", params={"execution_id": job_id}, timeout=10)
         assert response.is_success, response.text
         data = response.json()
         if data["status"] == "failed":
