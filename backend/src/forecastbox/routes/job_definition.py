@@ -42,12 +42,12 @@ class JobDefinitionCreateRequest(BaseModel):
 
 
 class JobDefinitionCreateResponse(BaseModel):
-    id: str
+    job_definition_id: str
     version: int
 
 
 class JobDefinitionGetResponse(BaseModel):
-    id: str
+    job_definition_id: str
     version: int
     builder: FableBuilder
     display_name: str | None = None
@@ -57,7 +57,7 @@ class JobDefinitionGetResponse(BaseModel):
 
 
 class JobDefinitionListItem(BaseModel):
-    id: str
+    job_definition_id: str
     version: int
     display_name: str | None = None
     display_description: str | None = None
@@ -72,7 +72,7 @@ class JobDefinitionListResponse(BaseModel):
 
 
 class JobDefinitionUpdateRequest(BaseModel):
-    id: str
+    job_definition_id: str
     builder: FableBuilder
     display_name: str | None = None
     display_description: str | None = None
@@ -81,12 +81,12 @@ class JobDefinitionUpdateRequest(BaseModel):
 
 
 class JobDefinitionUpdateResponse(BaseModel):
-    id: str
+    job_definition_id: str
     version: int
 
 
 class JobDefinitionDeleteRequest(BaseModel):
-    id: str
+    job_definition_id: str
 
 
 # ---------------------------------------------------------------------------
@@ -113,12 +113,12 @@ async def create_job_definition(
         raise HTTPException(status_code=404, detail=str(e))
     except JobDefinitionAccessDenied as e:
         raise HTTPException(status_code=403, detail=str(e))
-    return JobDefinitionCreateResponse(id=result.id, version=result.version)
+    return JobDefinitionCreateResponse(job_definition_id=result.id, version=result.version)
 
 
 @router.get("/get")
 async def get_job_definition(
-    id: str,
+    job_definition_id: str,
     version: int | None = None,
 ) -> JobDefinitionGetResponse:
     """Retrieve a saved job definition by id and optional version.
@@ -126,11 +126,11 @@ async def get_job_definition(
     Returns the latest non-deleted version when version is omitted.
     """
     try:
-        retrieved = await job_definition_service.load_builder(id, version)
+        retrieved = await job_definition_service.load_builder(job_definition_id, version)
     except JobDefinitionNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     return JobDefinitionGetResponse(
-        id=retrieved.id,
+        job_definition_id=retrieved.id,
         version=retrieved.version,
         builder=retrieved.builder,
         display_name=retrieved.display_name,
@@ -148,7 +148,7 @@ async def list_job_definitions(
     definitions = list(await job_definition_db.list_job_definitions(auth_context=auth_context))
     items = [
         JobDefinitionListItem(
-            id=cast(str, defn.job_definition_id),
+            job_definition_id=cast(str, defn.job_definition_id),
             version=cast(int, defn.version),
             display_name=cast(str | None, defn.display_name),
             display_description=cast(str | None, defn.display_description),
@@ -178,12 +178,12 @@ async def update_job_definition(
         parent_id=request.parent_id,
     )
     try:
-        result = await job_definition_service.save_builder(auth_context=auth_context, payload=payload, fable_id=request.id)
+        result = await job_definition_service.save_builder(auth_context=auth_context, payload=payload, fable_id=request.job_definition_id)
     except JobDefinitionNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     except JobDefinitionAccessDenied as e:
         raise HTTPException(status_code=403, detail=str(e))
-    return JobDefinitionUpdateResponse(id=result.id, version=result.version)
+    return JobDefinitionUpdateResponse(job_definition_id=result.id, version=result.version)
 
 
 @router.post("/delete")
@@ -193,7 +193,7 @@ async def delete_job_definition(
 ) -> None:
     """Soft-delete all versions of a job definition."""
     try:
-        await job_definition_db.soft_delete_job_definition(request.id, auth_context=auth_context)
+        await job_definition_db.soft_delete_job_definition(request.job_definition_id, auth_context=auth_context)
     except JobDefinitionNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     except JobDefinitionAccessDenied as e:

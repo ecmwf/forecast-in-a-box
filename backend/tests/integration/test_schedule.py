@@ -38,7 +38,7 @@ def _save_fable(client) -> tuple[str, int]:
     resp = client.post("/job_definition/create", json=FableSaveRequest(builder=builder, display_name="sched-v2 test").model_dump())
     assert resp.is_success, resp.text
     data = resp.json()
-    return data["id"], data["version"]
+    return data["job_definition_id"], data["version"]
 
 
 def _save_full_fable(client, output_path: str) -> tuple[str, int]:
@@ -74,7 +74,7 @@ def _save_full_fable(client, output_path: str) -> tuple[str, int]:
     resp = client.post("/job_definition/create", json=FableSaveRequest(builder=builder).model_dump())
     assert resp.is_success, resp.text
     data = resp.json()
-    return data["id"], data["version"]
+    return data["job_definition_id"], data["version"]
 
 
 def _create_schedule_v2(client, job_def_id: str, job_def_version: int, cron_expr: str = "0 0 * * *") -> str:

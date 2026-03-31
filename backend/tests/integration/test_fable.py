@@ -89,14 +89,14 @@ def test_fable_v2_save_and_retrieve(backend_client_with_auth):
     response = backend_client_with_auth.post("/job_definition/create", json=payload.model_dump())
     assert response.is_success, response.text
     saved = response.json()
-    assert "id" in saved
+    assert "job_definition_id" in saved
     assert saved["version"] == 1
 
     # Retrieve by id (latest version)
-    response = backend_client_with_auth.get("/job_definition/get", params={"id": saved["id"]})
+    response = backend_client_with_auth.get("/job_definition/get", params={"job_definition_id": saved["job_definition_id"]})
     assert response.is_success, response.text
     retrieved = response.json()
-    assert retrieved["id"] == saved["id"]
+    assert retrieved["job_definition_id"] == saved["job_definition_id"]
     assert retrieved["version"] == 1
     assert retrieved["display_name"] == "Test Fable"
     assert retrieved["tags"] == ["test", "integration"]
@@ -106,14 +106,16 @@ def test_fable_v2_save_and_retrieve(backend_client_with_auth):
 
     # Saving again with the same id creates a new version
     payload2 = FableSaveRequest(builder=_make_builder_source_only(), display_name="Test Fable v2")
-    response = backend_client_with_auth.post("/job_definition/update", json={**payload2.model_dump(), "id": saved["id"]})
+    response = backend_client_with_auth.post(
+        "/job_definition/update", json={**payload2.model_dump(), "job_definition_id": saved["job_definition_id"]}
+    )
     assert response.is_success, response.text
     saved2 = response.json()
-    assert saved2["id"] == saved["id"]
+    assert saved2["job_definition_id"] == saved["job_definition_id"]
     assert saved2["version"] == 2
 
     # Retrieve latest returns version 2
-    response = backend_client_with_auth.get("/job_definition/get", params={"id": saved["id"]})
+    response = backend_client_with_auth.get("/job_definition/get", params={"job_definition_id": saved["job_definition_id"]})
     assert response.is_success, response.text
     latest = response.json()
     assert latest["version"] == 2
@@ -121,14 +123,14 @@ def test_fable_v2_save_and_retrieve(backend_client_with_auth):
     assert latest["builder"]["environment"] is None
 
     # Retrieve specific version 1 still works
-    response = backend_client_with_auth.get("/job_definition/get", params={"id": saved["id"], "version": 1})
+    response = backend_client_with_auth.get("/job_definition/get", params={"job_definition_id": saved["job_definition_id"], "version": 1})
     assert response.is_success, response.text
     assert response.json()["version"] == 1
     assert response.json()["display_name"] == "Test Fable"
 
 
 def test_fable_v2_retrieve_nonexistent(backend_client_with_auth):
-    response = backend_client_with_auth.get("/job_definition/get", params={"id": "does-not-exist"})
+    response = backend_client_with_auth.get("/job_definition/get", params={"job_definition_id": "does-not-exist"})
     assert response.status_code == 404
 
 
@@ -136,7 +138,7 @@ def test_fable_v2_upsert_nonexistent_id(backend_client_with_auth):
     """Attempting to add a version to a non-existent id returns 404."""
     builder = _make_builder_source_only()
     payload = FableSaveRequest(builder=builder)
-    response = backend_client_with_auth.post("/job_definition/update", json={**payload.model_dump(), "id": "no-such-id"})
+    response = backend_client_with_auth.post("/job_definition/update", json={**payload.model_dump(), "job_definition_id": "no-such-id"})
     assert response.status_code == 404
 
 
@@ -146,9 +148,9 @@ def test_fable_v2_compile_latest_version(tmpdir, backend_client_with_auth):
     payload = FableSaveRequest(builder=builder, display_name="Compile Test")
     save_resp = backend_client_with_auth.post("/job_definition/create", json=payload.model_dump())
     assert save_resp.is_success, save_resp.text
-    fable_id = save_resp.json()["id"]
+    fable_id = save_resp.json()["job_definition_id"]
 
-    compile_resp = backend_client_with_auth.put("/job_definition/building/compile", json={"id": fable_id})
+    compile_resp = backend_client_with_auth.put("/job_definition/building/compile", json={"job_definition_id": fable_id})
     assert compile_resp.is_success, compile_resp.text
     spec = compile_resp.json()
     assert "job" in spec
@@ -162,29 +164,29 @@ def test_fable_v2_compile_specific_version(tmpdir, backend_client_with_auth):
     payload_v1 = FableSaveRequest(builder=builder_v1, display_name="Version Test v1")
     save_resp = backend_client_with_auth.post("/job_definition/create", json=payload_v1.model_dump())
     assert save_resp.is_success, save_resp.text
-    fable_id = save_resp.json()["id"]
+    fable_id = save_resp.json()["job_definition_id"]
 
     # Save a second version with a different builder (source-only, no sink)
     source_only = _make_builder_source_only()
     payload_v2 = FableSaveRequest(builder=source_only, display_name="Version Test v2")
-    save_resp2 = backend_client_with_auth.post("/job_definition/update", json={**payload_v2.model_dump(), "id": fable_id})
+    save_resp2 = backend_client_with_auth.post("/job_definition/update", json={**payload_v2.model_dump(), "job_definition_id": fable_id})
     assert save_resp2.is_success, save_resp2.text
     assert save_resp2.json()["version"] == 2
 
     # Compile v1 explicitly — should produce tasks (has a sink)
-    resp_v1 = backend_client_with_auth.put("/job_definition/building/compile", json={"id": fable_id, "version": 1})
+    resp_v1 = backend_client_with_auth.put("/job_definition/building/compile", json={"job_definition_id": fable_id, "version": 1})
     assert resp_v1.is_success, resp_v1.text
     assert len(resp_v1.json()["job"]["job_instance"]["tasks"]) > 0
 
     # Compile latest (v2, source-only, no sink) — produces empty tasks
-    resp_latest = backend_client_with_auth.put("/job_definition/building/compile", json={"id": fable_id})
+    resp_latest = backend_client_with_auth.put("/job_definition/building/compile", json={"job_definition_id": fable_id})
     assert resp_latest.is_success, resp_latest.text
     assert len(resp_latest.json()["job"]["job_instance"]["tasks"]) == 0
 
 
 def test_fable_v2_compile_nonexistent(backend_client_with_auth):
     """Compiling an unknown fable id returns 404."""
-    resp = backend_client_with_auth.put("/job_definition/building/compile", json={"id": "does-not-exist"})
+    resp = backend_client_with_auth.put("/job_definition/building/compile", json={"job_definition_id": "does-not-exist"})
     assert resp.status_code == 404
 
 
@@ -248,8 +250,8 @@ def test_fable_expand(tmpdir, backend_client_with_auth):
     save_req = FableSaveRequest(builder=builder)
     save_resp = backend_client_with_auth.post("/job_definition/create", json=save_req.model_dump())
     assert save_resp.is_success, save_resp.text
-    fable_id = save_resp.json()["id"]
-    compile_resp = backend_client_with_auth.put("/job_definition/building/compile", json={"id": fable_id})
+    fable_id = save_resp.json()["job_definition_id"]
+    compile_resp = backend_client_with_auth.put("/job_definition/building/compile", json={"job_definition_id": fable_id})
     assert compile_resp.is_success, compile_resp.text
 
 
@@ -258,8 +260,8 @@ def test_fable_v2_basic_execute(tmpdir, backend_client_with_auth):
     save_req = FableSaveRequest(builder=builder)
     save_resp = backend_client_with_auth.post("/job_definition/create", json=save_req.model_dump())
     assert save_resp.is_success, save_resp.text
-    fable_id = save_resp.json()["id"]
-    exec_response = backend_client_with_auth.post("/job_execution/create", json={"definition_id": fable_id})
+    fable_id = save_resp.json()["job_definition_id"]
+    exec_response = backend_client_with_auth.post("/job_execution/create", json={"job_definition_id": fable_id})
     assert exec_response.is_success, exec_response.text
     response = JobExecutionCreateResponse(**exec_response.json())
     execution_id = response.execution_id
@@ -332,7 +334,7 @@ def test_submit_job_v2_execute_missing_definition_id(backend_client_with_auth):
 
 def test_submit_job_v2_execute_unknown_definition(backend_client_with_auth):
     """Referencing a non-existent JobDefinition returns 404."""
-    payload = {"definition_id": "does-not-exist"}
+    payload = {"job_definition_id": "does-not-exist"}
     response = backend_client_with_auth.post("/job_execution/create", json=payload)
     assert response.status_code == 404
 

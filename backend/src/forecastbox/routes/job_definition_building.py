@@ -32,7 +32,7 @@ router = APIRouter(
 
 
 class JobDefinitionBuildingCompileRequest(BaseModel):
-    id: str
+    job_definition_id: str
     version: int | None = None
 
 
@@ -69,7 +69,7 @@ async def compile_job_definition(request: JobDefinitionBuildingCompileRequest) -
     Uses the latest non-deleted version when version is omitted.
     """
     try:
-        return await job_definition_service.compile_definition(request.id, request.version)
+        return await job_definition_service.compile_definition(request.job_definition_id, request.version)
     except JobDefinitionNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:

@@ -49,8 +49,8 @@ router = APIRouter(
 
 
 class JobExecutionCreateRequest(BaseModel):
-    definition_id: str
-    definition_version: int | None = None
+    job_definition_id: str
+    job_definition_version: int | None = None
 
 
 class JobExecutionCreateResponse(BaseModel):
@@ -64,8 +64,8 @@ class JobExecutionDetail(BaseModel):
     status: str
     created_at: str
     updated_at: str
-    definition_id: str
-    definition_version: int
+    job_definition_id: str
+    job_definition_version: int
     error: str | None = None
     progress: str | None = None
     cascade_job_id: str | None = None
@@ -105,8 +105,8 @@ def _to_job_execution_detail(domain_detail) -> JobExecutionDetail:
         status=domain_detail.status,
         created_at=domain_detail.created_at,
         updated_at=domain_detail.updated_at,
-        definition_id=domain_detail.job_definition_id,
-        definition_version=domain_detail.job_definition_version,
+        job_definition_id=domain_detail.job_definition_id,
+        job_definition_version=domain_detail.job_definition_version,
         error=domain_detail.error,
         progress=domain_detail.progress,
         cascade_job_id=domain_detail.cascade_job_id,
@@ -188,9 +188,9 @@ async def create_job_execution(
     Loads the referenced definition, compiles it, submits it to cascade, and
     creates a linked execution row.
     """
-    definition = await job_execution_service.get_job_definition_for_execution(request.definition_id, request.definition_version)
+    definition = await job_execution_service.get_job_definition_for_execution(request.job_definition_id, request.job_definition_version)
     if definition is None:
-        raise HTTPException(status_code=404, detail=f"Definition {request.definition_id!r} not found.")
+        raise HTTPException(status_code=404, detail=f"JobDefinition {request.job_definition_id!r} not found.")
     result = await job_execution_service.execute(definition, auth_context)
     if result.t is None:
         raise HTTPException(status_code=500, detail=f"Failed to execute: {result.e}")
