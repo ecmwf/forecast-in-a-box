@@ -40,7 +40,6 @@ import forecastbox.domain.job_definition.db as _job_definition_db
 from forecastbox.api.plugin.manager import PluginManager
 from forecastbox.api.types.fable import (
     FableBuilder,
-    FableCompileRequest,
     FableRetrieveResponse,
     FableSaveRequest,
     FableSaveResponse,
