@@ -61,7 +61,7 @@ def resolve_next_run(
 
 
 async def create_schedule(
-    actor: AuthContext,
+    auth_context: AuthContext,
     job_definition_id: str,
     job_definition_version: int | None,
     cron_expr: str,
@@ -96,11 +96,11 @@ async def create_schedule(
         "enabled": True,
     }
     experiment_id, _ = await experiment_db.upsert_experiment_definition(
-        actor=actor,
+        auth_context=auth_context,
         job_definition_id=job_def_id,
         job_definition_version=job_def_version,
         experiment_type="cron_schedule",
-        created_by=actor.user_id,
+        created_by=auth_context.user_id,
         experiment_definition=experiment_definition_payload,
         display_name=display_name,
         display_description=display_description,
@@ -115,7 +115,7 @@ async def create_schedule(
     return experiment_id
 
 
-async def get_schedule(actor: AuthContext, experiment_id: str) -> ExperimentDefinition:
+async def get_schedule(auth_context: AuthContext, experiment_id: str) -> ExperimentDefinition:
     """Return the experiment definition for a cron schedule.
 
     Raises ExperimentNotFound if not found or not a cron schedule.
@@ -128,7 +128,7 @@ async def get_schedule(actor: AuthContext, experiment_id: str) -> ExperimentDefi
 
 
 async def list_schedules(
-    actor: AuthContext,
+    auth_context: AuthContext,
     page: int,
     page_size: int,
 ) -> tuple[list[ExperimentDefinition], int, int]:
@@ -139,7 +139,7 @@ async def list_schedules(
     if page < 1 or page_size < 1:
         raise ValueError("Page and page_size must be greater than 0.")
 
-    total = await experiment_db.count_experiment_definitions(actor=actor, experiment_type="cron_schedule")
+    total = await experiment_db.count_experiment_definitions(auth_context=auth_context, experiment_type="cron_schedule")
     start = (page - 1) * page_size
     total_pages = (total + page_size - 1) // page_size if total > 0 else 0
 
@@ -147,13 +147,15 @@ async def list_schedules(
         raise ValueError("Page number out of range.")
 
     experiments = list(
-        await experiment_db.list_experiment_definitions(actor=actor, experiment_type="cron_schedule", offset=start, limit=page_size)
+        await experiment_db.list_experiment_definitions(
+            auth_context=auth_context, experiment_type="cron_schedule", offset=start, limit=page_size
+        )
     )
     return experiments, total, total_pages
 
 
 async def update_schedule(
-    actor: AuthContext,
+    auth_context: AuthContext,
     experiment_id: str,
     cron_expr: str | None,
     enabled: bool | None,
@@ -199,7 +201,7 @@ async def update_schedule(
         }
 
         await experiment_db.upsert_experiment_definition(
-            actor=actor,
+            auth_context=auth_context,
             experiment_definition_id=experiment_id,
             job_definition_id=str(current.job_definition_id),  # ty:ignore[invalid-argument-type]
             job_definition_version=cast(int, current.job_definition_version),
@@ -226,7 +228,7 @@ async def update_schedule(
     return updated
 
 
-async def delete_schedule(actor: AuthContext, experiment_id: str) -> None:
+async def delete_schedule(auth_context: AuthContext, experiment_id: str) -> None:
     """Soft-delete a cron schedule experiment and clear its next run.
 
     Acquires scheduler_lock for the duration.  Raises SchedulerBusy if lock
@@ -235,12 +237,12 @@ async def delete_schedule(actor: AuthContext, experiment_id: str) -> None:
     with timed_acquire(scheduler_lock, timeout_acquire_request) as acquired:
         if not acquired:
             raise SchedulerBusy("Scheduler is busy, please retry.")
-        await experiment_db.soft_delete_experiment_definition(experiment_id, actor=actor)
+        await experiment_db.soft_delete_experiment_definition(experiment_id, auth_context=auth_context)
         await scheduling_db.delete_experiment_next(experiment_id)
     prod_scheduler()
 
 
-async def get_next_run(actor: AuthContext, experiment_id: str) -> str:
+async def get_next_run(auth_context: AuthContext, experiment_id: str) -> str:
     """Return the next scheduled run time for a cron schedule, or a 'not scheduled' message.
 
     Raises ExperimentNotFound if the schedule does not exist.
@@ -255,7 +257,7 @@ async def get_next_run(actor: AuthContext, experiment_id: str) -> str:
 
 
 async def get_schedule_runs(
-    actor: AuthContext,
+    auth_context: AuthContext,
     experiment_id: str,
     page: int,
     page_size: int,

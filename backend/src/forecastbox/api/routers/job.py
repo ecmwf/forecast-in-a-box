@@ -36,9 +36,8 @@ from forecastbox.api.types.jobs import (
 from forecastbox.api.utils import encode_result
 from forecastbox.domain.job_execution.exceptions import JobExecutionAccessDenied, JobExecutionNotFound
 from forecastbox.domain.job_execution.service import ProductToOutputId
-from forecastbox.entrypoint.auth.users import current_active_user
-from forecastbox.schemas.user import UserRead
-from forecastbox.utility.auth import AuthContext, user2auth
+from forecastbox.entrypoint.auth.users import get_auth_context
+from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
 
 logger = logging.getLogger(__name__)
@@ -107,14 +106,14 @@ async def _get_logs(cascade_job_id: str, db_entity_ser: bytes) -> Response:
 async def _resolve_execution_with_cascade(
     execution_id: str,
     attempt_count: int | None,
-    actor: AuthContext,
+    auth_context: AuthContext,
 ) -> tuple[job_execution_db.JobExecution, str]:
     """Fetch a JobExecution and validate it has a cascade_job_id.
 
     Raises HTTP 404 if not found or access denied, HTTP 409 if not yet submitted.
     """
     try:
-        execution = await job_execution_db.get_job_execution(execution_id, attempt_count, actor=actor)
+        execution = await job_execution_db.get_job_execution(execution_id, attempt_count, auth_context=auth_context)
     except JobExecutionNotFound:
         raise HTTPException(status_code=404, detail=f"JobExecution {execution_id!r} not found.")
     except JobExecutionAccessDenied:
@@ -127,7 +126,7 @@ async def _resolve_execution_with_cascade(
 
 
 @router.post("/execute")
-async def execute_api(request: JobExecuteRequest, user: UserRead | None = Depends(current_active_user)) -> JobExecuteResponse:
+async def execute_api(request: JobExecuteRequest, auth_context: AuthContext = Depends(get_auth_context)) -> JobExecuteResponse:
     """Execute a job
 
     Loads the referenced JobDefinition from the jobs store, compiles it, and
@@ -148,7 +147,7 @@ async def execute_api(request: JobExecuteRequest, user: UserRead | None = Depend
     definition = await job_execution_service.get_job_definition_for_execution(request.job_definition_id, request.job_definition_version)
     if definition is None:
         raise HTTPException(status_code=404, detail=f"JobDefinition {request.job_definition_id!r} not found")
-    result = await job_execution_service.execute(definition, user2auth(user))
+    result = await job_execution_service.execute(definition, auth_context)
     if result.t is None:
         raise HTTPException(status_code=500, detail=f"Failed to execute because of {result.e}")
     return result.t
@@ -161,7 +160,7 @@ async def execute_api(request: JobExecuteRequest, user: UserRead | None = Depend
 
 @router.get("/status")
 async def get_status(
-    user: UserRead = Depends(current_active_user),
+    auth_context: AuthContext = Depends(get_auth_context),
     page: int = 1,
     page_size: int = 10,
 ) -> JobExecutionList:
@@ -173,15 +172,14 @@ async def get_status(
     if page < 1 or page_size < 1:
         raise HTTPException(status_code=400, detail="Page and page_size must be greater than 0.")
 
-    actor = user2auth(user)
-    total = await job_execution_db.count_job_executions(actor=actor)
+    total = await job_execution_db.count_job_executions(auth_context=auth_context)
     start = (page - 1) * page_size
     total_pages = (total + page_size - 1) // page_size if total > 0 else 0
 
     if start >= total and total > 0:
         raise HTTPException(status_code=404, detail="Page number out of range.")
 
-    executions = list(await job_execution_db.list_job_executions(actor=actor, offset=start, limit=page_size))
+    executions = list(await job_execution_db.list_job_executions(auth_context=auth_context, offset=start, limit=page_size))
     details = [job_execution_service.execution_to_detail(e) for e in executions]
     return JobExecutionList(executions=details, total=total, page=page, page_size=page_size, total_pages=total_pages)
 
@@ -190,11 +188,11 @@ async def get_status(
 async def get_status_of_execution(
     execution_id: str,
     attempt_count: int | None = None,
-    user: UserRead = Depends(current_active_user),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> JobExecutionDetail:
     """Get status for a specific execution; defaults to the latest attempt."""
     try:
-        return await job_execution_service.poll_and_update_execution(execution_id, attempt_count, user2auth(user))
+        return await job_execution_service.poll_and_update_execution(execution_id, attempt_count, auth_context)
     except JobExecutionNotFound:
         raise HTTPException(status_code=404, detail=f"JobExecution {execution_id!r} not found.")
     except JobExecutionAccessDenied:
@@ -205,11 +203,11 @@ async def get_status_of_execution(
 async def get_outputs_of_execution(
     execution_id: str,
     attempt_count: int | None = None,
-    user: UserRead = Depends(current_active_user),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> list[ProductToOutputId]:
     """Get outputs for a specific execution; defaults to the latest attempt."""
     try:
-        execution = await job_execution_db.get_job_execution(execution_id, attempt_count, actor=user2auth(user))
+        execution = await job_execution_db.get_job_execution(execution_id, attempt_count, auth_context=auth_context)
     except JobExecutionNotFound:
         raise HTTPException(status_code=404, detail=f"JobExecution {execution_id!r} not found.")
     except JobExecutionAccessDenied:
@@ -225,11 +223,11 @@ async def get_outputs_of_execution(
 async def get_specification_of_execution(
     execution_id: str,
     attempt_count: int | None = None,
-    user: UserRead = Depends(current_active_user),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> JobSpecification:
     """Get the linked JobDefinition specification for a execution attempt."""
     try:
-        return await job_execution_service.get_job_execution_specification(execution_id, attempt_count, user2auth(user))
+        return await job_execution_service.get_job_execution_specification(execution_id, attempt_count, auth_context)
     except JobExecutionNotFound:
         raise HTTPException(status_code=404, detail=f"JobExecution {execution_id!r} or its definition not found.")
     except JobExecutionAccessDenied:
@@ -239,11 +237,11 @@ async def get_specification_of_execution(
 @router.post("/{execution_id}/restart")
 async def restart_execution(
     execution_id: str,
-    user: UserRead | None = Depends(current_active_user),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> JobExecuteResponse:
     """Create a new attempt of an existing execution under the same logical id."""
     try:
-        result = await job_execution_service.restart_job_execution(execution_id, user2auth(user))
+        result = await job_execution_service.restart_job_execution(execution_id, auth_context)
     except JobExecutionNotFound:
         raise HTTPException(status_code=404, detail=f"JobExecution {execution_id!r} not found.")
     except JobExecutionAccessDenied:
@@ -255,10 +253,10 @@ async def restart_execution(
 
 @router.get("/{execution_id}/available")
 async def get_job_availability(
-    execution_id: str, attempt_count: int | None = None, user: UserRead = Depends(current_active_user)
+    execution_id: str, attempt_count: int | None = None, auth_context: AuthContext = Depends(get_auth_context)
 ) -> list[TaskId]:
     """Check which results are available for a given execution."""
-    _, cascade_job_id = await _resolve_execution_with_cascade(execution_id, attempt_count, user2auth(user))
+    _, cascade_job_id = await _resolve_execution_with_cascade(execution_id, attempt_count, auth_context)
     response = client.request_response(api.JobProgressRequest(job_ids=[cascade_job_id]), f"{config.cascade.cascade_url}")
     response = cast(api.JobProgressResponse, response)
     if cascade_job_id not in response.datasets:
@@ -272,10 +270,10 @@ async def get_result(
     execution_id: str,
     attempt_count: int | None = None,
     dataset_id: TaskId = Depends(validate_dataset_id),
-    user: UserRead = Depends(current_active_user),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> Response:
     """Get the result of a job. Returns response containing the result of the job, encoded as bytes."""
-    _, cascade_job_id = await _resolve_execution_with_cascade(execution_id, attempt_count, user2auth(user))
+    _, cascade_job_id = await _resolve_execution_with_cascade(execution_id, attempt_count, auth_context)
     response = client.request_response(
         api.ResultRetrievalRequest(job_id=cascade_job_id, dataset_id=DatasetId(task=dataset_id, output="0")),
         f"{config.cascade.cascade_url}",
@@ -295,22 +293,22 @@ async def get_result(
 
 
 @router.get("/{execution_id}/logs")
-async def get_logs(execution_id: str, attempt_count: int | None = None, user: UserRead = Depends(current_active_user)) -> Response:
-    db_entity, cascade_job_id = await _resolve_execution_with_cascade(execution_id, attempt_count, user2auth(user))
+async def get_logs(execution_id: str, attempt_count: int | None = None, auth_context: AuthContext = Depends(get_auth_context)) -> Response:
+    db_entity, cascade_job_id = await _resolve_execution_with_cascade(execution_id, attempt_count, auth_context)
     entity_dict = {col.name: getattr(db_entity, col.name) for col in db_entity.__table__.columns}
     return await _get_logs(cascade_job_id, orjson.dumps(entity_dict))
 
 
 @router.delete("/delete")
-async def delete_job(execution_id: str, attempt_count: int | None = None, user: UserRead = Depends(current_active_user)) -> None:
+async def delete_job(execution_id: str, attempt_count: int | None = None, auth_context: AuthContext = Depends(get_auth_context)) -> None:
     """Delete a job from the database and cascade."""
-    _, cascade_job_id = await _resolve_execution_with_cascade(execution_id, attempt_count, user2auth(user))
+    _, cascade_job_id = await _resolve_execution_with_cascade(execution_id, attempt_count, auth_context)
     try:
         client.request_response(api.ResultDeletionRequest(datasets={cascade_job_id: []}), f"{config.cascade.cascade_url}")  # type: ignore
     except Exception as e:
         raise HTTPException(500, f"Job deletion failed: {e}")
     finally:
         try:
-            await job_execution_db.soft_delete_job_execution(execution_id, actor=user2auth(user))
+            await job_execution_db.soft_delete_job_execution(execution_id, auth_context=auth_context)
         except (JobExecutionNotFound, JobExecutionAccessDenied):
             pass  # best-effort; cascade deletion already attempted

@@ -23,6 +23,8 @@ def _call_succ(response: CallResult, url: str) -> bool:
             raise ValueError(f"failure on {url}: {response}")
     elif isinstance(response, httpx.ConnectError):
         return False
+    elif isinstance(response, httpx.ReadTimeout):
+        return False
     elif isinstance(response, httpx.HTTPError):
         raise ValueError(f"failure on {url}: {repr(response)}")
     else:

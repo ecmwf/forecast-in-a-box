@@ -91,7 +91,7 @@ async def get_job_execution(
     execution_id: str,
     attempt_count: int | None = None,
     *,
-    actor: AuthContext,
+    auth_context: AuthContext,
 ) -> JobExecution:
     """Return a specific or the latest non-deleted attempt of a JobExecution.
 
@@ -115,8 +115,8 @@ async def get_job_execution(
     row = await querySingle(query, _jobs_module.async_session_maker)
     if row is None:
         raise JobExecutionNotFound(f"JobExecution {execution_id!r} not found.")
-    if not actor.has_admin() and actor.user_id != row.created_by:
-        raise JobExecutionAccessDenied(f"User {actor.user_id!r} does not have access to JobExecution {execution_id!r}.")
+    if not auth_context.has_admin() and auth_context.user_id != row.created_by:
+        raise JobExecutionAccessDenied(f"User {auth_context.user_id!r} does not have access to JobExecution {execution_id!r}.")
     return row
 
 
@@ -134,7 +134,7 @@ async def update_job_execution_runtime(execution_id: str, attempt_count: int, **
     await executeAndCommit(stmt, _jobs_module.async_session_maker)
 
 
-async def list_job_executions(*, actor: AuthContext, offset: int = 0, limit: int | None = None) -> Iterable[JobExecution]:
+async def list_job_executions(*, auth_context: AuthContext, offset: int = 0, limit: int | None = None) -> Iterable[JobExecution]:
     """Return the latest non-deleted attempt of every JobExecution, with optional paging.
 
     Admins and anonymous actors see all executions.  Authenticated non-admins see only
@@ -158,8 +158,8 @@ async def list_job_executions(*, actor: AuthContext, offset: int = 0, limit: int
                 .order_by(JobExecution.created_at.desc())
                 .offset(offset)
             )
-            if not actor.has_admin():
-                query = query.where(JobExecution.created_by == actor.user_id)
+            if not auth_context.has_admin():
+                query = query.where(JobExecution.created_by == auth_context.user_id)
             if limit is not None:
                 query = query.limit(limit)
             result = await session.execute(query)
@@ -168,28 +168,28 @@ async def list_job_executions(*, actor: AuthContext, offset: int = 0, limit: int
     return await dbRetry(function)
 
 
-async def count_job_executions(*, actor: AuthContext) -> int:
+async def count_job_executions(*, auth_context: AuthContext) -> int:
     """Return the total number of distinct non-deleted JobExecution ids visible to the actor."""
 
     async def function(i: int) -> int:
         async with _jobs_module.async_session_maker() as session:
             query = select(func.count(func.distinct(JobExecution.job_execution_id))).where(JobExecution.is_deleted.is_(False))
-            if not actor.has_admin():
-                query = query.where(JobExecution.created_by == actor.user_id)
+            if not auth_context.has_admin():
+                query = query.where(JobExecution.created_by == auth_context.user_id)
             result = await session.execute(query)
             return result.scalar() or 0
 
     return await dbRetry(function)
 
 
-async def soft_delete_job_execution(execution_id: str, *, actor: AuthContext) -> None:
+async def soft_delete_job_execution(execution_id: str, *, auth_context: AuthContext) -> None:
     """Mark all attempts of a JobExecution as deleted.
 
     Raises ``JobExecutionNotFound`` if the execution does not exist.
     Raises ``JobExecutionAccessDenied`` if the actor is an authenticated non-admin
     who does not own the execution.
     """
-    existing = await get_job_execution(execution_id, actor=actor)
+    existing = await get_job_execution(execution_id, auth_context=auth_context)
     # get_job_execution raises if not found or access denied; ownership is already checked.
     del existing  # only needed for the auth check above
     stmt = update(JobExecution).where(JobExecution.job_execution_id == execution_id).values(is_deleted=True)
@@ -199,7 +199,7 @@ async def soft_delete_job_execution(execution_id: str, *, actor: AuthContext) ->
 async def list_job_executions_by_experiment(
     experiment_id: str,
     *,
-    actor: AuthContext,
+    auth_context: AuthContext,
     offset: int = 0,
     limit: int | None = None,
 ) -> Iterable[JobExecution]:
@@ -226,8 +226,8 @@ async def list_job_executions_by_experiment(
                 .order_by(JobExecution.created_at.desc())
                 .offset(offset)
             )
-            if not actor.has_admin():
-                query = query.where(JobExecution.created_by == actor.user_id)
+            if not auth_context.has_admin():
+                query = query.where(JobExecution.created_by == auth_context.user_id)
             if limit is not None:
                 query = query.limit(limit)
             result = await session.execute(query)
@@ -236,7 +236,7 @@ async def list_job_executions_by_experiment(
     return await dbRetry(function)
 
 
-async def count_job_executions_by_experiment(experiment_id: str, *, actor: AuthContext) -> int:
+async def count_job_executions_by_experiment(experiment_id: str, *, auth_context: AuthContext) -> int:
     """Return the total number of distinct non-deleted JobExecution ids linked to an experiment and visible to the actor."""
 
     async def function(i: int) -> int:
@@ -245,8 +245,8 @@ async def count_job_executions_by_experiment(experiment_id: str, *, actor: AuthC
                 JobExecution.experiment_id == experiment_id,
                 JobExecution.is_deleted.is_(False),
             )
-            if not actor.has_admin():
-                query = query.where(JobExecution.created_by == actor.user_id)
+            if not auth_context.has_admin():
+                query = query.where(JobExecution.created_by == auth_context.user_id)
             result = await session.execute(query)
             return result.scalar() or 0
 

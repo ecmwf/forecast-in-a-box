@@ -101,7 +101,7 @@ async def upsert_experiment_definition(
     from forecastbox.utility.auth import AuthContext
 
     return await _exp_db.upsert_experiment_definition(
-        actor=AuthContext(user_id=None, is_admin=True),
+        auth_context=AuthContext(user_id=None, is_admin=True),
         experiment_definition_id=experiment_definition_id,
         job_definition_id=job_definition_id,
         job_definition_version=job_definition_version,
@@ -129,7 +129,7 @@ async def list_experiment_definitions(
     from forecastbox.utility.auth import AuthContext
 
     return await _exp_db.list_experiment_definitions(
-        actor=AuthContext(user_id=None, is_admin=True),
+        auth_context=AuthContext(user_id=None, is_admin=True),
         experiment_type=experiment_type,
         offset=offset,
         limit=limit,
@@ -142,7 +142,7 @@ async def count_experiment_definitions(experiment_type: str | None = None) -> in
     from forecastbox.utility.auth import AuthContext
 
     return await _exp_db.count_experiment_definitions(
-        actor=AuthContext(user_id=None, is_admin=True),
+        auth_context=AuthContext(user_id=None, is_admin=True),
         experiment_type=experiment_type,
     )
 
@@ -157,7 +157,7 @@ async def soft_delete_experiment_definition(experiment_id: str) -> bool:
     from forecastbox.utility.auth import AuthContext
 
     try:
-        await _exp_db.soft_delete_experiment_definition(experiment_id, actor=AuthContext(user_id=None, is_admin=True))
+        await _exp_db.soft_delete_experiment_definition(experiment_id, auth_context=AuthContext(user_id=None, is_admin=True))
         return True
     except ExperimentNotFound:
         return False
@@ -206,7 +206,7 @@ async def get_job_execution(execution_id: str, attempt_count: int | None = None)
     from forecastbox.utility.auth import AuthContext
 
     try:
-        return await _exec_db.get_job_execution(execution_id, attempt_count, actor=AuthContext(user_id=None, is_admin=True))
+        return await _exec_db.get_job_execution(execution_id, attempt_count, auth_context=AuthContext(user_id=None, is_admin=True))
     except JobExecutionNotFound:
         return None
 
@@ -226,7 +226,7 @@ async def list_job_executions(offset: int = 0, limit: int | None = None) -> Iter
     from forecastbox.domain.job_execution import db as _exec_db
     from forecastbox.utility.auth import AuthContext
 
-    return await _exec_db.list_job_executions(actor=AuthContext(user_id=None, is_admin=True), offset=offset, limit=limit)
+    return await _exec_db.list_job_executions(auth_context=AuthContext(user_id=None, is_admin=True), offset=offset, limit=limit)
 
 
 async def count_job_executions() -> int:
@@ -237,7 +237,7 @@ async def count_job_executions() -> int:
     from forecastbox.domain.job_execution import db as _exec_db
     from forecastbox.utility.auth import AuthContext
 
-    return await _exec_db.count_job_executions(actor=AuthContext(user_id=None, is_admin=True))
+    return await _exec_db.count_job_executions(auth_context=AuthContext(user_id=None, is_admin=True))
 
 
 async def soft_delete_job_execution(execution_id: str) -> None:
@@ -250,7 +250,7 @@ async def soft_delete_job_execution(execution_id: str) -> None:
     from forecastbox.utility.auth import AuthContext
 
     try:
-        await _exec_db.soft_delete_job_execution(execution_id, actor=AuthContext(user_id=None, is_admin=True))
+        await _exec_db.soft_delete_job_execution(execution_id, auth_context=AuthContext(user_id=None, is_admin=True))
     except JobExecutionNotFound:
         pass  # preserve original silent-no-op behaviour
 
@@ -304,7 +304,7 @@ async def list_job_executions_by_experiment(experiment_id: str, offset: int = 0,
     from forecastbox.utility.auth import AuthContext
 
     return await _exec_db.list_job_executions_by_experiment(
-        experiment_id, actor=AuthContext(user_id=None, is_admin=True), offset=offset, limit=limit
+        experiment_id, auth_context=AuthContext(user_id=None, is_admin=True), offset=offset, limit=limit
     )
 
 
@@ -316,4 +316,4 @@ async def count_job_executions_by_experiment(experiment_id: str) -> int:
     from forecastbox.domain.job_execution import db as _exec_db
     from forecastbox.utility.auth import AuthContext
 
-    return await _exec_db.count_job_executions_by_experiment(experiment_id, actor=AuthContext(user_id=None, is_admin=True))
+    return await _exec_db.count_job_executions_by_experiment(experiment_id, auth_context=AuthContext(user_id=None, is_admin=True))
