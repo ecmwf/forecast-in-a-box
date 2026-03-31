@@ -7,27 +7,25 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-import datetime as dt
 import logging
 from dataclasses import dataclass
 from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException
 
-import forecastbox.db.jobs as db_jobs
-from forecastbox.api.scheduling.dt_utils import calculate_next_run, current_scheduling_time, parse_crontab
-from forecastbox.api.scheduling.scheduler_thread import (
-    prod_scheduler,
-    scheduler_lock,
-    start_scheduler,
-    stop_scheduler,
-    timeout_acquire_request,
-)
+import forecastbox.domain.experiment.service as experiment_service
+from forecastbox.api.scheduling.scheduler_thread import start_scheduler, stop_scheduler
 from forecastbox.api.types.scheduling import ScheduleSpecification, ScheduleUpdate
-from forecastbox.ecpyutil import timed_acquire
+from forecastbox.domain.experiment.exceptions import (
+    ExperimentAccessDenied,
+    ExperimentNotFound,
+    SchedulerBusy,
+)
+from forecastbox.domain.experiment.scheduling.dt_utils import current_scheduling_time
 from forecastbox.entrypoint.auth.users import current_active_user
 from forecastbox.schemas.jobs import ExperimentDefinition
 from forecastbox.schemas.user import UserRead
+from forecastbox.utility.auth import user2auth
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +36,7 @@ router = APIRouter(
 
 
 # ---------------------------------------------------------------------------
-# V2 response types (defined here so endpoint functions below can reference them)
+# Response types
 # ---------------------------------------------------------------------------
 
 
@@ -94,23 +92,6 @@ class ScheduleRunsResponse:
     error: str | None = None
 
 
-def _resolve_next_run(first_run_override: dt.datetime | None, max_delay_hours: int, cron_expr: str) -> dt.datetime:
-    """Return first_run_override if provided and within max_delay_hours of now, else calculate next cron tick.
-
-    Raises HTTPException 400 if first_run_override is provided but older than max_delay_hours.
-    """
-    now = current_scheduling_time()
-    if first_run_override is not None:
-        age_hours = (now - first_run_override).total_seconds() / 3600
-        if age_hours > max_delay_hours:
-            raise HTTPException(
-                status_code=400,
-                detail=f"first_run_override is {age_hours:.2f}h old, which exceeds max_acceptable_delay_hours={max_delay_hours}.",
-            )
-        return first_run_override
-    return calculate_next_run(now, cron_expr)
-
-
 def _experiment_to_response(exp: ExperimentDefinition) -> ScheduleDefinitionResponse:
     exp_def = cast(dict, exp.experiment_definition) or {}
     return ScheduleDefinitionResponse(
@@ -130,160 +111,107 @@ def _experiment_to_response(exp: ExperimentDefinition) -> ScheduleDefinitionResp
     )
 
 
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
+
+
 @router.get("/list")
 async def list_schedules(
     user: UserRead = Depends(current_active_user),
     page: int = 1,
     page_size: int = 10,
 ) -> ListSchedulesResponse:
-    if page < 1 or page_size < 1:
-        raise HTTPException(status_code=400, detail="Page and page_size must be greater than 0.")
-
-    total = await db_jobs.count_experiment_definitions(experiment_type="cron_schedule")
-    start = (page - 1) * page_size
-    total_pages = (total + page_size - 1) // page_size if total > 0 else 0
-
-    if start >= total and total > 0:
-        raise HTTPException(status_code=404, detail="Page number out of range.")
-
-    experiments = list(await db_jobs.list_experiment_definitions(experiment_type="cron_schedule", offset=start, limit=page_size))
+    actor = user2auth(user)
+    try:
+        experiments, total, total_pages = await experiment_service.list_schedules(actor, page, page_size)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     schedules = [_experiment_to_response(exp) for exp in experiments]
     return ListSchedulesResponse(schedules=schedules, total=total, page=page, page_size=page_size, total_pages=total_pages)
 
 
 @router.put("/create")
-async def create_schedule(
-    schedule_spec: ScheduleSpecification, user: UserRead | None = Depends(current_active_user)
-) -> CreateScheduleResponse:
+async def create_schedule(schedule_spec: ScheduleSpecification, user: UserRead = Depends(current_active_user)) -> CreateScheduleResponse:
+    actor = user2auth(user)
     try:
-        parse_crontab(schedule_spec.cron_expr)
+        experiment_id = await experiment_service.create_schedule(
+            actor=actor,
+            job_definition_id=schedule_spec.job_definition_id,
+            job_definition_version=schedule_spec.job_definition_version,
+            cron_expr=schedule_spec.cron_expr,
+            dynamic_expr=schedule_spec.dynamic_expr,
+            max_acceptable_delay_hours=schedule_spec.max_acceptable_delay_hours,
+            first_run_override=schedule_spec.first_run_override,
+            display_name=schedule_spec.display_name,
+            display_description=schedule_spec.display_description,
+            tags=schedule_spec.tags,
+        )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid crontab: {schedule_spec.cron_expr} => {e}")
-
-    job_def = await db_jobs.get_job_definition(schedule_spec.job_definition_id, schedule_spec.job_definition_version)
-    if job_def is None:
-        raise HTTPException(status_code=404, detail=f"JobDefinition {schedule_spec.job_definition_id!r} not found")
-
-    job_def_id = str(job_def.job_definition_id)  # ty:ignore[invalid-argument-type]
-    job_def_version = cast(int, job_def.version)
-
-    experiment_definition = {
-        "cron_expr": schedule_spec.cron_expr,
-        "dynamic_expr": schedule_spec.dynamic_expr,
-        "max_acceptable_delay_hours": schedule_spec.max_acceptable_delay_hours,
-        "enabled": True,
-    }
-    experiment_id, _ = await db_jobs.upsert_experiment_definition(
-        job_definition_id=job_def_id,
-        job_definition_version=job_def_version,
-        experiment_type="cron_schedule",
-        created_by=user.email if user is not None else None,
-        experiment_definition=experiment_definition,
-        display_name=schedule_spec.display_name,
-        display_description=schedule_spec.display_description,
-        tags=schedule_spec.tags,
-    )
-
-    next_run_at = _resolve_next_run(schedule_spec.first_run_override, schedule_spec.max_acceptable_delay_hours, schedule_spec.cron_expr)
-    await db_jobs.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=next_run_at)
-    logger.debug(f"V2 schedule {experiment_id}: next run at {next_run_at}")
-    prod_scheduler()
-
+        raise HTTPException(status_code=400, detail=str(e))
+    except ExperimentNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ExperimentAccessDenied as e:
+        raise HTTPException(status_code=403, detail=str(e))
     return CreateScheduleResponse(experiment_id=experiment_id)
 
 
 @router.get("/get")
 async def get_schedule(experiment_id: str, user: UserRead = Depends(current_active_user)) -> ScheduleDefinitionResponse:
-    exp_def = await db_jobs.get_experiment_definition(experiment_id)
-    if exp_def is None or exp_def.experiment_type != "cron_schedule":
-        raise HTTPException(status_code=404, detail=f"Schedule {experiment_id} not found")
+    actor = user2auth(user)
+    try:
+        exp_def = await experiment_service.get_schedule(actor, experiment_id)
+    except ExperimentNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return _experiment_to_response(exp_def)
 
 
 @router.post("/update")
 async def update_schedule(
-    experiment_id: str, update: ScheduleUpdate, user: UserRead | None = Depends(current_active_user)
+    experiment_id: str, update: ScheduleUpdate, user: UserRead = Depends(current_active_user)
 ) -> ScheduleDefinitionResponse:
-    with timed_acquire(scheduler_lock, timeout_acquire_request) as acquired:
-        if not acquired:
-            raise HTTPException(status_code=503, detail="Scheduler is busy, please retry.")
-        current = await db_jobs.get_experiment_definition(experiment_id)
-        if current is None or current.experiment_type != "cron_schedule":
-            raise HTTPException(status_code=404, detail=f"Schedule {experiment_id} not found")
-
-        current_def = cast(dict, current.experiment_definition) or {}
-
-        new_cron_expr = update.cron_expr if update.cron_expr is not None else str(current_def.get("cron_expr", ""))
-        if update.cron_expr is not None:
-            try:
-                parse_crontab(update.cron_expr)
-            except ValueError as e:
-                raise HTTPException(status_code=400, detail=f"Invalid crontab: {update.cron_expr} => {e}")
-
-        new_enabled = update.enabled if update.enabled is not None else bool(current_def.get("enabled", True))
-        new_dynamic_expr = update.dynamic_expr if update.dynamic_expr is not None else cast(dict, current_def.get("dynamic_expr", {}))
-        new_max_delay = (
-            update.max_acceptable_delay_hours
-            if update.max_acceptable_delay_hours is not None
-            else int(current_def.get("max_acceptable_delay_hours", 24))
+    actor = user2auth(user)
+    try:
+        updated = await experiment_service.update_schedule(
+            actor=actor,
+            experiment_id=experiment_id,
+            cron_expr=update.cron_expr,
+            enabled=update.enabled,
+            dynamic_expr=update.dynamic_expr,
+            max_acceptable_delay_hours=update.max_acceptable_delay_hours,
+            first_run_override=update.first_run_override,
         )
-
-        # TODO this should be typed, not arbitrary dict
-        new_experiment_definition = {
-            "cron_expr": new_cron_expr,
-            "dynamic_expr": new_dynamic_expr,
-            "max_acceptable_delay_hours": new_max_delay,
-            "enabled": new_enabled,
-        }
-
-        await db_jobs.upsert_experiment_definition(
-            experiment_definition_id=experiment_id,
-            job_definition_id=str(current.job_definition_id),  # ty:ignore[invalid-argument-type]
-            job_definition_version=cast(int, current.job_definition_version),
-            experiment_type="cron_schedule",
-            created_by=user.email if user else None,  # ty:ignore[unresolved-attribute]
-            experiment_definition=new_experiment_definition,
-            display_name=cast(str | None, current.display_name),
-            display_description=cast(str | None, current.display_description),
-            tags=cast(list[str] | None, current.tags),
-        )
-
-        if update.cron_expr is not None or update.enabled is not None or update.first_run_override is not None:
-            if new_enabled:
-                next_run_at = _resolve_next_run(update.first_run_override, new_max_delay, new_cron_expr)
-                await db_jobs.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=next_run_at)
-                logger.debug(f"V2 schedule {experiment_id}: regenerated next run at {next_run_at}")
-            else:
-                await db_jobs.delete_experiment_next(experiment_id)
-                logger.debug(f"V2 schedule {experiment_id}: disabled, next run cleared")
-        prod_scheduler()
-
-    updated = await db_jobs.get_experiment_definition(experiment_id)
-    assert updated is not None
+    except SchedulerBusy as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except ExperimentNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ExperimentAccessDenied as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return _experiment_to_response(updated)
 
 
 @router.post("/delete")
 async def delete_schedule(experiment_id: str, user: UserRead = Depends(current_active_user)) -> None:
-    with timed_acquire(scheduler_lock, timeout_acquire_request) as acquired:
-        if not acquired:
-            raise HTTPException(status_code=503, detail="Scheduler is busy, please retry.")
-        was_deleted = await db_jobs.soft_delete_experiment_definition(experiment_id)
-        await db_jobs.delete_experiment_next(experiment_id)  # we delete regardless
-    if not was_deleted:
-        raise HTTPException(status_code=404, detail=f"Schedule {experiment_id} not found in the database.")
-    prod_scheduler()
+    actor = user2auth(user)
+    try:
+        await experiment_service.delete_schedule(actor, experiment_id)
+    except SchedulerBusy as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except ExperimentNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ExperimentAccessDenied as e:
+        raise HTTPException(status_code=403, detail=str(e))
 
 
 @router.get("/next_run")
 async def get_next_run(experiment_id: str, user: UserRead = Depends(current_active_user)) -> str:
-    exp_def = await db_jobs.get_experiment_definition(experiment_id)
-    if exp_def is None or exp_def.experiment_type != "cron_schedule":
-        raise HTTPException(status_code=404, detail=f"Schedule {experiment_id} not found")
-    next_entry = await db_jobs.get_experiment_next(experiment_id)
-    if next_entry is None:
-        return "not scheduled currently"
-    return str(next_entry.scheduled_at)
+    actor = user2auth(user)
+    try:
+        return await experiment_service.get_next_run(actor, experiment_id)
+    except ExperimentNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.get("/runs")
@@ -294,21 +222,13 @@ async def get_schedule_runs(
     page_size: int = 10,
 ) -> ScheduleRunsResponse:
     """Return paginated JobExecution rows linked to a cron schedule experiment."""
-    if page < 1 or page_size < 1:
-        raise HTTPException(status_code=400, detail="Page and page_size must be greater than 0.")
-
-    exp_def = await db_jobs.get_experiment_definition(experiment_id)
-    if exp_def is None or exp_def.experiment_type != "cron_schedule":
-        raise HTTPException(status_code=404, detail=f"Schedule {experiment_id} not found")
-
-    total = await db_jobs.count_job_executions_by_experiment(experiment_id)
-    start = (page - 1) * page_size
-    total_pages = (total + page_size - 1) // page_size if total > 0 else 0
-
-    if start >= total and total > 0:
-        raise HTTPException(status_code=404, detail="Page number out of range.")
-
-    executions = list(await db_jobs.list_job_executions_by_experiment(experiment_id, offset=start, limit=page_size))
+    actor = user2auth(user)
+    try:
+        executions, total, total_pages = await experiment_service.get_schedule_runs(actor, experiment_id, page, page_size)
+    except ExperimentNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     runs = [
         ScheduleRunResponse(
@@ -331,6 +251,10 @@ async def get_current_scheduling_time(user: UserRead = Depends(current_active_us
 
 
 @router.post("/restart")
-async def restart_scheduler() -> None:
+async def restart_scheduler(user: UserRead = Depends(current_active_user)) -> None:
+    """Restart the scheduler thread. Requires authentication."""
+    actor = user2auth(user)
+    if not actor.is_admin:
+        raise HTTPException(status_code=403, detail="Only admins may restart the scheduler.")
     stop_scheduler()
     start_scheduler()

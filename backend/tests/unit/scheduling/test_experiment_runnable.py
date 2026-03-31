@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from forecastbox.api.scheduling.job_utils import RunnableExperiment, experiment2runnable
+from forecastbox.domain.experiment.scheduling.job_utils import RunnableExperiment, experiment2runnable
 
 
 def _make_experiment(experiment_id: str = "exp-1", job_def_id: str = "jd-1", job_def_version: int = 1) -> MagicMock:
@@ -49,8 +49,8 @@ def _make_job_definition(job_def_id: str = "jd-1", version: int = 1) -> MagicMoc
 
 
 @pytest.mark.asyncio
-@patch("forecastbox.api.scheduling.job_utils.db_jobs.get_experiment_definition", new_callable=AsyncMock)
-@patch("forecastbox.api.scheduling.job_utils.db_jobs.get_job_definition", new_callable=AsyncMock)
+@patch("forecastbox.domain.experiment.scheduling.job_utils.experiment_db.get_experiment_definition", new_callable=AsyncMock)
+@patch("forecastbox.domain.experiment.scheduling.job_utils.job_definition_db.get_job_definition", new_callable=AsyncMock)
 async def test_experiment2runnable_success(mock_get_jd, mock_get_exp):
     exec_time = dt.datetime(2026, 1, 1, 0, 0)
     exp = _make_experiment()
@@ -77,7 +77,7 @@ async def test_experiment2runnable_success(mock_get_jd, mock_get_exp):
 
 
 @pytest.mark.asyncio
-@patch("forecastbox.api.scheduling.job_utils.db_jobs.get_experiment_definition", new_callable=AsyncMock)
+@patch("forecastbox.domain.experiment.scheduling.job_utils.experiment_db.get_experiment_definition", new_callable=AsyncMock)
 async def test_experiment2runnable_not_found(mock_get_exp):
     mock_get_exp.return_value = None
 
@@ -89,8 +89,8 @@ async def test_experiment2runnable_not_found(mock_get_exp):
 
 
 @pytest.mark.asyncio
-@patch("forecastbox.api.scheduling.job_utils.db_jobs.get_experiment_definition", new_callable=AsyncMock)
-@patch("forecastbox.api.scheduling.job_utils.db_jobs.get_job_definition", new_callable=AsyncMock)
+@patch("forecastbox.domain.experiment.scheduling.job_utils.experiment_db.get_experiment_definition", new_callable=AsyncMock)
+@patch("forecastbox.domain.experiment.scheduling.job_utils.job_definition_db.get_job_definition", new_callable=AsyncMock)
 async def test_experiment2runnable_job_def_missing(mock_get_jd, mock_get_exp):
     mock_get_exp.return_value = _make_experiment()
     mock_get_jd.return_value = None
@@ -103,8 +103,8 @@ async def test_experiment2runnable_job_def_missing(mock_get_jd, mock_get_exp):
 
 
 @pytest.mark.asyncio
-@patch("forecastbox.api.scheduling.job_utils.db_jobs.get_experiment_definition", new_callable=AsyncMock)
-@patch("forecastbox.api.scheduling.job_utils.db_jobs.get_job_definition", new_callable=AsyncMock)
+@patch("forecastbox.domain.experiment.scheduling.job_utils.experiment_db.get_experiment_definition", new_callable=AsyncMock)
+@patch("forecastbox.domain.experiment.scheduling.job_utils.job_definition_db.get_job_definition", new_callable=AsyncMock)
 async def test_experiment2runnable_dynamic_expr_applied(mock_get_jd, mock_get_exp):
     exec_time = dt.datetime(2026, 3, 15, 12, 0)
     exp = _make_experiment()
