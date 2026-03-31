@@ -37,9 +37,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
-import { createLogger } from '@/lib/logger'
-
-const log = createLogger('SubmitJobDialog')
 
 type SubmitMode = 'run' | 'schedule'
 
@@ -55,7 +52,6 @@ export function SubmitJobDialog({
   open,
   onOpenChange,
   fable,
-  fableName,
   fableId,
 }: SubmitJobDialogProps) {
   const { data: fableData } = useFableRetrieve(fableId)
@@ -67,7 +63,6 @@ export function SubmitJobDialog({
           <SubmitJobForm
             onOpenChange={onOpenChange}
             fable={fable}
-            fableName={fableName}
             fableId={fableId}
             fableData={fableData}
           />
@@ -80,7 +75,6 @@ export function SubmitJobDialog({
 interface SubmitJobFormProps {
   onOpenChange: (open: boolean) => void
   fable: FableBuilderV1
-  fableName: string
   fableId: string | null
   fableData: FableRetrieveResponse | undefined
 }
@@ -88,7 +82,6 @@ interface SubmitJobFormProps {
 function SubmitJobForm({
   onOpenChange,
   fable,
-  fableName,
   fableId,
   fableData,
 }: SubmitJobFormProps) {
@@ -114,7 +107,7 @@ function SubmitJobForm({
   // Schedule-specific state
   const [cronExpr, setCronExpr] = useState('0 6 * * *')
   const [maxDelayHours, setMaxDelayHours] = useState(2)
-  const [dynamicExpr, setDynamicExpr] = useState<Record<string, unknown>>({})
+  const [dynamicExpr] = useState<Record<string, unknown>>({})
 
   function addTag(value: string) {
     const trimmed = value.trim()
