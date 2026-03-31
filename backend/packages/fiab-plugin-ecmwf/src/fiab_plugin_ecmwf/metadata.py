@@ -226,6 +226,14 @@ class QubedInstanceOutput(BaseModel):
         metadata.update(kwargs)
         return self.__class__(dataqube=self.dataqube, metadata=OutputMetadata(**metadata))
 
+    @property
+    def variables(self) -> list[str]:
+        """Compatibility shim for fiab-core's PluginBuilder.expand() which checks len(block.variables).
+
+        Returns the list of dimension names so that a non-empty qube is treated as having variables.
+        """
+        return list(self.dimensions())
+
     def __contains__(self, item: Qube | str | dict) -> bool:
         """Check if the QubedInstanceOutput contains the specified dimension(s) or axes.
 
@@ -264,3 +272,17 @@ class QubedInstanceOutput(BaseModel):
             return key in current_axes and all(v in current_axes[key] for v in values)
 
         return all(contains(k, v) for k, v in dict_cast_to_list.items())
+
+
+class PluginNoOutput(BaseModel):
+    """A no-output sentinel local to this plugin, compatible with core's expand() guard."""
+
+    @property
+    def variables(self) -> list[str]:
+        return []
+
+    def is_empty(self) -> bool:
+        return True
+
+    def dimensions(self) -> set[str]:
+        return set()

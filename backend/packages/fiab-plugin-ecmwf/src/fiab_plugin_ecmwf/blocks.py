@@ -18,12 +18,11 @@ from fiab_core.fable import (
     BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
-    NoOutput,
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import Product, Sink, Source
 
-from .metadata import QubedInstanceOutput
+from .metadata import PluginNoOutput, QubedInstanceOutput
 
 IFS_REQUEST = {
     "class": "od",
@@ -242,7 +241,7 @@ class ZarrSink(Sink):
     inputs: list[str] = ["dataset"]
 
     def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[QubedInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        return Either.ok(NoOutput())
+        return Either.ok(PluginNoOutput())
 
     def compile(
         self,
