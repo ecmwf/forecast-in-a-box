@@ -9,6 +9,8 @@
 
 """Canonical admin routes — /admin/* and /users/*"""
 
+PREFIX = "/api/v1/admin"
+PREFIX = "/api/v1/admin"
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone

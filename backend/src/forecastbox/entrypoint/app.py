@@ -25,14 +25,15 @@ from fastapi.templating import Jinja2Templates
 from fiab_core.artifacts import ArtifactsProvider
 from starlette.exceptions import HTTPException
 
-import forecastbox.db
+import forecastbox.routes
+import forecastbox.schemata
 from forecastbox.api.artifacts.base import get_artifact_local_path
 from forecastbox.api.artifacts.manager import ArtifactManager, join_artifact_manager, submit_refresh_catalog
-from forecastbox.api.plugin.manager import PluginsStatus, join_updater_thread, submit_load_plugins
+from forecastbox.api.plugin.manager import join_updater_thread, submit_load_plugins
 from forecastbox.api.plugin.store import join_stores_thread, submit_initialize_stores
 from forecastbox.api.scheduling.scheduler_thread import start_scheduler, stop_scheduler
 from forecastbox.api.updates import get_local_release
-from forecastbox.routes import admin, artifacts, auth, experiment, gateway, job_definition, job_execution, plugins, status
+from forecastbox.routes.gateway import shutdown_processes
 from forecastbox.utility.config import config
 
 logger = logging.getLogger(__name__)
@@ -41,8 +42,8 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.debug(f"Starting FIAB with config: {config}")
-    for module_info in pkgutil.iter_modules(forecastbox.db.__path__):
-        module = importlib.import_module(f"forecastbox.db.{module_info.name}")
+    for module_info in pkgutil.iter_modules(forecastbox.schemata.__path__):
+        module = importlib.import_module(f"forecastbox.schemata.{module_info.name}")
         if hasattr(module, "create_db_and_tables"):
             await module.create_db_and_tables()  # type: ignore[call-non-callable] # NOTE no module protocol
     if config.api.allow_scheduler:
@@ -59,7 +60,7 @@ async def lifespan(app: FastAPI):
     yield
     if config.api.allow_scheduler:
         stop_scheduler()
-    await gateway.shutdown_processes()
+    await shutdown_processes()
     join_updater_thread(timeout_sec=10)
     join_stores_thread(timeout_sec=10)
     join_artifact_manager(timeout_sec=10)
@@ -76,16 +77,12 @@ app = FastAPI(
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 
-# TODO replace with iter modules, this is awkward
-app.include_router(admin.router, prefix="/api/v1/admin")
-app.include_router(auth.router, prefix="/api/v1")
-app.include_router(gateway.router, prefix="/api/v1/gateway")
-app.include_router(plugins.router, prefix="/api/v1/plugin")
-app.include_router(artifacts.router, prefix="/api/v1/artifacts")
-app.include_router(status.router, prefix="/api/v1/status")
-app.include_router(job_definition.router, prefix="/api/v1/job_definition")
-app.include_router(job_execution.router, prefix="/api/v1/job_execution")
-app.include_router(experiment.router, prefix="/api/v1/experiment")
+# Auto-discover and register all route modules under forecastbox.routes.
+# Each module must expose a module-level `router` (APIRouter) and a `PREFIX` string.
+for _module_info in pkgutil.iter_modules(forecastbox.routes.__path__):
+    _module = importlib.import_module(f"forecastbox.routes.{_module_info.name}")
+    if hasattr(_module, "router") and hasattr(_module, "PREFIX"):
+        app.include_router(_module.router, prefix=_module.PREFIX)
 
 app.add_middleware(
     CORSMiddleware,  # type: ignore[invalid-argument-type]

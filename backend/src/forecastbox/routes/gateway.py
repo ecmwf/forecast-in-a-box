@@ -9,6 +9,8 @@
 
 """Canonical gateway lifecycle routes — /gateway/*"""
 
+PREFIX = "/api/v1/gateway"
+PREFIX = "/api/v1/gateway"
 import asyncio
 import logging
 import os

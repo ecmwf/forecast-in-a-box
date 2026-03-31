@@ -9,6 +9,8 @@
 
 """Canonical artifacts routes — /artifacts/*"""
 
+PREFIX = "/api/v1/artifacts"
+PREFIX = "/api/v1/artifacts"
 from fastapi import APIRouter, Depends, HTTPException
 
 from forecastbox.api.artifacts.base import CompositeArtifactId, MlModelDetail, MlModelOverview

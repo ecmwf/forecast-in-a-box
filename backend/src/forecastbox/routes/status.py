@@ -9,6 +9,8 @@
 
 """Canonical status route — /status"""
 
+PREFIX = "/api/v1/status"
+PREFIX = "/api/v1/status"
 import logging
 from dataclasses import dataclass
 

@@ -9,6 +9,8 @@
 
 """Canonical auth routes — /auth/* and /users/*"""
 
+PREFIX = "/api/v1"
+PREFIX = "/api/v1"
 from fastapi import APIRouter
 
 from forecastbox.entrypoint.auth.oidc import oauth_client
