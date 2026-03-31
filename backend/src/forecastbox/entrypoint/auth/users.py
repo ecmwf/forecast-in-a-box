@@ -20,6 +20,7 @@ from sqlalchemy import func, select, update
 
 from forecastbox.db.user import async_session_maker, get_user_db
 from forecastbox.schemas.user import UserCreate, UserRead, UserTable
+from forecastbox.utility.auth import AuthContext, user2auth
 from forecastbox.utility.config import config
 
 SECRET = config.auth.jwt_secret.get_secret_value()
@@ -108,3 +109,7 @@ auth_backend = AuthenticationBackend(
 fastapi_users = FastAPIUsers[UserTable, pydantic.UUID4](get_user_manager, [auth_backend])
 
 current_active_user = fastapi_users.current_user(active=True, optional=config.auth.passthrough)
+
+
+async def get_auth_context(user: UserRead | None = Depends(current_active_user)) -> AuthContext:
+    return user2auth(user)

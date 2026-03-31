@@ -17,6 +17,7 @@ a single ``async_session_maker`` attribute to inject an in-memory database.
 import datetime as dt
 import uuid
 from collections.abc import Iterable
+from typing import cast
 
 from sqlalchemy import func, or_, select, update
 
@@ -29,7 +30,7 @@ from forecastbox.utility.auth import AuthContext
 
 async def upsert_job_definition(
     *,
-    actor: AuthContext,
+    auth_context: AuthContext,
     definition_id: str | None = None,
     source: JobDefinitionSource,
     created_by: str | None,
@@ -73,8 +74,10 @@ async def upsert_job_definition(
                 row = owner_result.first()
                 if row is not None:
                     owner: str | None = row[0]
-                    if not actor.is_admin and actor.user_id != owner:
-                        raise JobDefinitionAccessDenied(f"User {actor.user_id!r} is not allowed to modify JobDefinition {definition_id!r}.")
+                    if not auth_context.allowed(owner):
+                        raise JobDefinitionAccessDenied(
+                            f"User {auth_context.user_id!r} is not allowed to modify JobDefinition {definition_id!r}."
+                        )
 
             new_version = (max_version or 0) + 1
             session.add(
@@ -125,7 +128,7 @@ async def get_job_definition(definition_id: str, version: int | None = None) -> 
     return await querySingle(query, _jobs_module.async_session_maker)
 
 
-async def list_job_definitions(*, actor: AuthContext) -> Iterable[JobDefinition]:
+async def list_job_definitions(*, auth_context: AuthContext) -> Iterable[JobDefinition]:
     """Return the latest non-deleted version of every JobDefinition visible to the actor.
 
     Admins see all definitions.  Non-admins see only their own definitions and
@@ -148,12 +151,12 @@ async def list_job_definitions(*, actor: AuthContext) -> Iterable[JobDefinition]
                 subq,
                 (JobDefinition.job_definition_id == subq.c.job_definition_id) & (JobDefinition.version == subq.c.max_version),
             )
-            if not actor.is_admin:
-                if actor.user_id is not None:
+            if not auth_context.is_admin:
+                if auth_context.user_id is not None:
                     query = query.where(
                         or_(
                             JobDefinition.source == "plugin_template",
-                            JobDefinition.created_by == actor.user_id,
+                            JobDefinition.created_by == auth_context.user_id,
                         )
                     )
                 else:
@@ -164,7 +167,7 @@ async def list_job_definitions(*, actor: AuthContext) -> Iterable[JobDefinition]
     return await dbRetry(function)
 
 
-async def soft_delete_job_definition(definition_id: str, *, actor: AuthContext) -> None:
+async def soft_delete_job_definition(definition_id: str, *, auth_context: AuthContext) -> None:
     """Mark all versions of a JobDefinition as deleted.
 
     Raises ``JobDefinitionNotFound`` if the definition does not exist,
@@ -173,7 +176,7 @@ async def soft_delete_job_definition(definition_id: str, *, actor: AuthContext) 
     existing = await get_job_definition(definition_id)
     if existing is None:
         raise JobDefinitionNotFound(f"No JobDefinition with id={definition_id!r}.")
-    if not actor.is_admin and actor.user_id != existing.created_by:
-        raise JobDefinitionAccessDenied(f"User {actor.user_id!r} is not allowed to delete JobDefinition {definition_id!r}.")
+    if not auth_context.allowed(cast(str | None, existing.created_by)):
+        raise JobDefinitionAccessDenied(f"User {auth_context.user_id!r} is not allowed to delete JobDefinition {definition_id!r}.")
     stmt = update(JobDefinition).where(JobDefinition.job_definition_id == definition_id).values(is_deleted=True)
     await executeAndCommit(stmt, _jobs_module.async_session_maker)

@@ -196,7 +196,7 @@ def compile_builder(fable: FableBuilder) -> ExecutionSpecification:
 
 async def save_builder(
     *,
-    actor: AuthContext,
+    auth_context: AuthContext,
     payload: FableSaveRequest,
     fable_id: str | None = None,
 ) -> FableSaveResponse:
@@ -209,10 +209,10 @@ async def save_builder(
     source: str = "user_defined" if payload.display_name is not None else "oneoff_execution"
     env = payload.builder.environment
     definition_id, version = await upsert_job_definition(
-        actor=actor,
+        auth_context=auth_context,
         definition_id=fable_id,
         source=source,  # ty:ignore[arg-type]
-        created_by=actor.user_id,
+        created_by=auth_context.user_id,
         blocks=payload.builder.model_dump(mode="json")["blocks"],
         environment_spec=env.model_dump(mode="json") if env is not None else None,
         display_name=payload.display_name,

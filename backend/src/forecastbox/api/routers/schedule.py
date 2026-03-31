@@ -22,10 +22,9 @@ from forecastbox.domain.experiment.exceptions import (
     SchedulerBusy,
 )
 from forecastbox.domain.experiment.scheduling.dt_utils import current_scheduling_time
-from forecastbox.entrypoint.auth.users import current_active_user
+from forecastbox.entrypoint.auth.users import get_auth_context
 from forecastbox.schemas.jobs import ExperimentDefinition
-from forecastbox.schemas.user import UserRead
-from forecastbox.utility.auth import user2auth
+from forecastbox.utility.auth import AuthContext
 
 logger = logging.getLogger(__name__)
 
@@ -118,13 +117,12 @@ def _experiment_to_response(exp: ExperimentDefinition) -> ScheduleDefinitionResp
 
 @router.get("/list")
 async def list_schedules(
-    user: UserRead | None = Depends(current_active_user),
+    auth_context: AuthContext = Depends(get_auth_context),
     page: int = 1,
     page_size: int = 10,
 ) -> ListSchedulesResponse:
-    actor = user2auth(user)
     try:
-        experiments, total, total_pages = await experiment_service.list_schedules(actor, page, page_size)
+        experiments, total, total_pages = await experiment_service.list_schedules(auth_context, page, page_size)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     schedules = [_experiment_to_response(exp) for exp in experiments]
@@ -133,12 +131,11 @@ async def list_schedules(
 
 @router.put("/create")
 async def create_schedule(
-    schedule_spec: ScheduleSpecification, user: UserRead | None = Depends(current_active_user)
+    schedule_spec: ScheduleSpecification, auth_context: AuthContext = Depends(get_auth_context)
 ) -> CreateScheduleResponse:
-    actor = user2auth(user)
     try:
         experiment_id = await experiment_service.create_schedule(
-            actor=actor,
+            auth_context=auth_context,
             job_definition_id=schedule_spec.job_definition_id,
             job_definition_version=schedule_spec.job_definition_version,
             cron_expr=schedule_spec.cron_expr,
@@ -159,10 +156,9 @@ async def create_schedule(
 
 
 @router.get("/get")
-async def get_schedule(experiment_id: str, user: UserRead | None = Depends(current_active_user)) -> ScheduleDefinitionResponse:
-    actor = user2auth(user)
+async def get_schedule(experiment_id: str, auth_context: AuthContext = Depends(get_auth_context)) -> ScheduleDefinitionResponse:
     try:
-        exp_def = await experiment_service.get_schedule(actor, experiment_id)
+        exp_def = await experiment_service.get_schedule(auth_context, experiment_id)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     return _experiment_to_response(exp_def)
@@ -170,12 +166,11 @@ async def get_schedule(experiment_id: str, user: UserRead | None = Depends(curre
 
 @router.post("/update")
 async def update_schedule(
-    experiment_id: str, update: ScheduleUpdate, user: UserRead | None = Depends(current_active_user)
+    experiment_id: str, update: ScheduleUpdate, auth_context: AuthContext = Depends(get_auth_context)
 ) -> ScheduleDefinitionResponse:
-    actor = user2auth(user)
     try:
         updated = await experiment_service.update_schedule(
-            actor=actor,
+            auth_context=auth_context,
             experiment_id=experiment_id,
             cron_expr=update.cron_expr,
             enabled=update.enabled,
@@ -195,10 +190,9 @@ async def update_schedule(
 
 
 @router.post("/delete")
-async def delete_schedule(experiment_id: str, user: UserRead | None = Depends(current_active_user)) -> None:
-    actor = user2auth(user)
+async def delete_schedule(experiment_id: str, auth_context: AuthContext = Depends(get_auth_context)) -> None:
     try:
-        await experiment_service.delete_schedule(actor, experiment_id)
+        await experiment_service.delete_schedule(auth_context, experiment_id)
     except SchedulerBusy as e:
         raise HTTPException(status_code=503, detail=str(e))
     except ExperimentNotFound as e:
@@ -208,10 +202,9 @@ async def delete_schedule(experiment_id: str, user: UserRead | None = Depends(cu
 
 
 @router.get("/next_run")
-async def get_next_run(experiment_id: str, user: UserRead | None = Depends(current_active_user)) -> str:
-    actor = user2auth(user)
+async def get_next_run(experiment_id: str, auth_context: AuthContext = Depends(get_auth_context)) -> str:
     try:
-        return await experiment_service.get_next_run(actor, experiment_id)
+        return await experiment_service.get_next_run(auth_context, experiment_id)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -219,14 +212,13 @@ async def get_next_run(experiment_id: str, user: UserRead | None = Depends(curre
 @router.get("/runs")
 async def get_schedule_runs(
     experiment_id: str,
-    user: UserRead | None = Depends(current_active_user),
+    auth_context: AuthContext = Depends(get_auth_context),
     page: int = 1,
     page_size: int = 10,
 ) -> ScheduleRunsResponse:
     """Return paginated JobExecution rows linked to a cron schedule experiment."""
-    actor = user2auth(user)
     try:
-        executions, total, total_pages = await experiment_service.get_schedule_runs(actor, experiment_id, page, page_size)
+        executions, total, total_pages = await experiment_service.get_schedule_runs(auth_context, experiment_id, page, page_size)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -247,16 +239,15 @@ async def get_schedule_runs(
 
 
 @router.get("/current_time")
-async def get_current_scheduling_time(user: UserRead | None = Depends(current_active_user)) -> str:
+async def get_current_scheduling_time() -> str:
     """Return the current time used for scheduling decisions."""
     return current_scheduling_time().isoformat()
 
 
 @router.post("/restart")
-async def restart_scheduler(user: UserRead | None = Depends(current_active_user)) -> None:
+async def restart_scheduler(auth_context: AuthContext = Depends(get_auth_context)) -> None:
     """Restart the scheduler thread. Requires authentication."""
-    actor = user2auth(user)
-    if not actor.has_admin():
+    if not auth_context.has_admin():
         raise HTTPException(status_code=403, detail="Only admins may restart the scheduler.")
     stop_scheduler()
     start_scheduler()

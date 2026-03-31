@@ -17,6 +17,7 @@ a single ``async_session_maker`` attribute to inject an in-memory database.
 import datetime as dt
 import uuid
 from collections.abc import Iterable
+from typing import cast
 
 from sqlalchemy import func, select, update
 
@@ -29,7 +30,7 @@ from forecastbox.utility.auth import AuthContext
 
 async def upsert_experiment_definition(
     *,
-    actor: AuthContext,
+    auth_context: AuthContext,
     experiment_definition_id: str | None = None,
     job_definition_id: str,
     job_definition_version: int,
@@ -52,7 +53,7 @@ async def upsert_experiment_definition(
     experiment_id = experiment_definition_id or str(uuid.uuid4())
     ref_time = dt.datetime.now()
 
-    if not id_provided and actor.user_id is None:
+    if not id_provided and auth_context.user_id is None:
         raise ExperimentAccessDenied("Unauthenticated callers may not create experiment definitions.")
 
     async def function(i: int) -> int:
@@ -78,9 +79,9 @@ async def upsert_experiment_definition(
                 row = owner_result.first()
                 if row is not None:
                     owner: str | None = row[0]
-                    if not actor.is_admin and actor.user_id != owner:
+                    if not auth_context.allowed(owner):
                         raise ExperimentAccessDenied(
-                            f"User {actor.user_id!r} is not allowed to modify ExperimentDefinition {experiment_id!r}."
+                            f"User {auth_context.user_id!r} is not allowed to modify ExperimentDefinition {experiment_id!r}."
                         )
 
             new_version = (max_version or 0) + 1
@@ -134,7 +135,7 @@ async def get_experiment_definition(experiment_definition_id: str, version: int 
 
 async def list_experiment_definitions(
     *,
-    actor: AuthContext,
+    auth_context: AuthContext,
     experiment_type: str | None = None,
     offset: int = 0,
     limit: int | None = None,
@@ -144,7 +145,7 @@ async def list_experiment_definitions(
     Admins see all.  Authenticated users see only their own definitions.
     Unauthenticated callers receive an empty result.
     """
-    if not actor.is_admin and actor.user_id is None:
+    if not auth_context.is_admin and auth_context.user_id is None:
         return []
 
     async def function(i: int) -> list[ExperimentDefinition]:
@@ -165,8 +166,8 @@ async def list_experiment_definitions(
             )
             if experiment_type is not None:
                 query = query.where(ExperimentDefinition.experiment_type == experiment_type)
-            if not actor.is_admin:
-                query = query.where(ExperimentDefinition.created_by == actor.user_id)
+            if not auth_context.is_admin:
+                query = query.where(ExperimentDefinition.created_by == auth_context.user_id)
             query = query.offset(offset)
             if limit is not None:
                 query = query.limit(limit)
@@ -178,11 +179,11 @@ async def list_experiment_definitions(
 
 async def count_experiment_definitions(
     *,
-    actor: AuthContext,
+    auth_context: AuthContext,
     experiment_type: str | None = None,
 ) -> int:
     """Return the number of distinct non-deleted ExperimentDefinition ids visible to the actor."""
-    if not actor.is_admin and actor.user_id is None:
+    if not auth_context.is_admin and auth_context.user_id is None:
         return 0
 
     async def function(i: int) -> int:
@@ -203,8 +204,8 @@ async def count_experiment_definitions(
             )
             if experiment_type is not None:
                 inner = inner.where(ExperimentDefinition.experiment_type == experiment_type)
-            if not actor.is_admin:
-                inner = inner.where(ExperimentDefinition.created_by == actor.user_id)
+            if not auth_context.is_admin:
+                inner = inner.where(ExperimentDefinition.created_by == auth_context.user_id)
             query = select(func.count()).select_from(inner.subquery())
             result = await session.execute(query)
             return result.scalar() or 0
@@ -212,7 +213,7 @@ async def count_experiment_definitions(
     return await dbRetry(function)
 
 
-async def soft_delete_experiment_definition(experiment_id: str, *, actor: AuthContext) -> None:
+async def soft_delete_experiment_definition(experiment_id: str, *, auth_context: AuthContext) -> None:
     """Mark all versions of an ExperimentDefinition as deleted.
 
     Raises ``ExperimentNotFound`` if the definition does not exist, and
@@ -221,7 +222,7 @@ async def soft_delete_experiment_definition(experiment_id: str, *, actor: AuthCo
     existing = await get_experiment_definition(experiment_id)
     if existing is None:
         raise ExperimentNotFound(f"No ExperimentDefinition with id={experiment_id!r}.")
-    if not actor.is_admin and actor.user_id != existing.created_by:
-        raise ExperimentAccessDenied(f"User {actor.user_id!r} is not allowed to delete ExperimentDefinition {experiment_id!r}.")
+    if not auth_context.allowed(cast(str | None, existing.created_by)):
+        raise ExperimentAccessDenied(f"User {auth_context.user_id!r} is not allowed to delete ExperimentDefinition {experiment_id!r}.")
     stmt = update(ExperimentDefinition).where(ExperimentDefinition.experiment_definition_id == experiment_id).values(is_deleted=True)
     await executeAndCommit(stmt, _jobs_module.async_session_maker)

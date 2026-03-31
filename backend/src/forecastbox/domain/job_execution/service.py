@@ -135,7 +135,7 @@ async def get_job_definition_for_execution(definition_id: str, definition_versio
 
 async def execute(
     definition: JobDefinition,
-    actor: AuthContext,
+    auth_context: AuthContext,
     execution_id: str | None = None,
     experiment_id: str | None = None,
     experiment_version: int | None = None,
@@ -173,7 +173,7 @@ async def execute(
         job_execution_id=execution_id,
         job_definition_id=definition_id,
         job_definition_version=definition_version,
-        created_by=actor.user_id,
+        created_by=auth_context.user_id,
         status="submitted",
         experiment_id=experiment_id,
         experiment_version=experiment_version,
@@ -200,13 +200,13 @@ async def execute(
         return Either.error(repr(e))
 
 
-async def restart_job_execution(execution_id: str, actor: AuthContext) -> Either[JobExecuteResponse, str]:  # type: ignore[invalid-argument]
+async def restart_job_execution(execution_id: str, auth_context: AuthContext) -> Either[JobExecuteResponse, str]:  # type: ignore[invalid-argument]
     """Create a new attempt under an existing execution_id, re-running its linked JobDefinition.
 
     Raises ``JobExecutionNotFound`` if the execution does not exist.
     Raises ``JobExecutionAccessDenied`` if the actor does not own the execution.
     """
-    existing = await job_execution_db.get_job_execution(execution_id, actor=actor)
+    existing = await job_execution_db.get_job_execution(execution_id, auth_context=auth_context)
     # get_job_execution raises JobExecutionNotFound / JobExecutionAccessDenied on failure.
 
     definition_id = str(existing.job_definition_id)  # ty:ignore[invalid-argument-type]
@@ -217,7 +217,7 @@ async def restart_job_execution(execution_id: str, actor: AuthContext) -> Either
 
     return await execute(
         definition,
-        actor,
+        auth_context,
         execution_id=execution_id,
         experiment_id=cast(str | None, existing.experiment_id),
         experiment_version=cast(int | None, existing.experiment_version),
@@ -245,14 +245,14 @@ def execution_to_detail(execution: JobExecution) -> JobExecutionDetail:
 async def poll_and_update_execution(
     execution_id: str,
     attempt_count: int | None,
-    actor: AuthContext,
+    auth_context: AuthContext,
 ) -> JobExecutionDetail:
     """Fetch a JobExecution, poll cascade if active, update db, and return current detail.
 
     Raises ``JobExecutionNotFound`` if the execution is not found.
     Raises ``JobExecutionAccessDenied`` if the actor does not own it.
     """
-    execution = await job_execution_db.get_job_execution(execution_id, attempt_count, actor=actor)
+    execution = await job_execution_db.get_job_execution(execution_id, attempt_count, auth_context=auth_context)
 
     actual_attempt = cast(int, execution.attempt_count)
     cascade_job_id = cast(str | None, execution.cascade_job_id)
@@ -306,14 +306,14 @@ async def poll_and_update_execution(
 async def get_job_execution_specification(
     execution_id: str,
     attempt_count: int | None,
-    actor: AuthContext,
+    auth_context: AuthContext,
 ) -> JobSpecification:
     """Return the JobSpecification for the given execution attempt (latest if attempt_count is None).
 
     Raises ``JobExecutionNotFound`` if the execution is not found.
     Raises ``JobExecutionAccessDenied`` if the actor does not own it.
     """
-    execution = await job_execution_db.get_job_execution(execution_id, attempt_count, actor=actor)
+    execution = await job_execution_db.get_job_execution(execution_id, attempt_count, auth_context=auth_context)
     definition = await job_definition_db.get_job_definition(
         str(execution.job_definition_id),  # ty:ignore[invalid-argument-type]
         cast(int, execution.job_definition_version),

@@ -29,9 +29,8 @@ from forecastbox.api.types.fable import (
 )
 from forecastbox.api.types.jobs import ExecutionSpecification
 from forecastbox.domain.job_definition.exceptions import JobDefinitionAccessDenied, JobDefinitionNotFound
-from forecastbox.entrypoint.auth.users import current_active_user
-from forecastbox.schemas.user import UserRead
-from forecastbox.utility.auth import user2auth
+from forecastbox.entrypoint.auth.users import get_auth_context
+from forecastbox.utility.auth import AuthContext
 
 router = APIRouter(
     tags=["fable"],
@@ -66,7 +65,7 @@ def expand_fable(fable: FableBuilder) -> FableValidationExpansion:
 async def upsert_fable_builder(
     payload: FableSaveRequest,
     fable_id: Optional[str] = None,
-    user: UserRead | None = Depends(current_active_user),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> FableSaveResponse:
     """Save a FableBuilder as a JobDefinition.
 
@@ -77,9 +76,8 @@ async def upsert_fable_builder(
     `source` is derived from `display_name`: `user_defined` when a name is
     provided, `oneoff_execution` otherwise.
     """
-    actor = user2auth(user)
     try:
-        return await job_definition_service.save_builder(actor=actor, payload=payload, fable_id=fable_id)
+        return await job_definition_service.save_builder(auth_context=auth_context, payload=payload, fable_id=fable_id)
     except JobDefinitionNotFound as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except JobDefinitionAccessDenied as e:

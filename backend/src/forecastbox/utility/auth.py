@@ -25,6 +25,13 @@ class AuthContext:
         """Return True if the caller has admin privileges or is unauthenticated (anonymous regime)."""
         return self.is_admin or self.user_id is None
 
+    def allowed(self, resource_owner: str | None) -> bool:
+        """Return True if the caller may access or mutate a resource owned by resource_owner.
+
+        Grants access to admins and to callers whose user_id matches the owner.
+        """
+        return self.is_admin or self.user_id == resource_owner
+
 
 def user2auth(user: UserRead | None) -> AuthContext:
     """Build an AuthContext from an optional authenticated user."""
