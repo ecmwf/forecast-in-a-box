@@ -39,7 +39,6 @@ from earthkit.workflows.compilers import graph2job
 from earthkit.workflows.graph import Graph, deduplicate_nodes
 from pydantic import BaseModel
 
-import forecastbox.api.fable as api_fable
 import forecastbox.domain.job_definition.db as job_definition_db
 import forecastbox.domain.job_execution.db as job_execution_db
 from forecastbox.api.artifacts.manager import ArtifactManager, submit_artifact_download
@@ -52,6 +51,7 @@ from forecastbox.api.types.jobs import (
     JobSpecification,
     RawCascadeJob,
 )
+from forecastbox.domain.job_definition.service import compile_builder
 from forecastbox.domain.job_execution.exceptions import JobExecutionNotFound
 from forecastbox.ecpyutil import deep_union
 from forecastbox.schemas.jobs import JobDefinition, JobExecution
@@ -162,7 +162,7 @@ async def execute(
         blocks=definition.blocks,  # ty:ignore[invalid-argument-type]
         environment=EnvironmentSpecification.model_validate(definition.environment_spec) if definition.environment_spec else None,
     )
-    compiled = api_fable.compile(builder)
+    compiled = compile_builder(builder)
 
     if compiler_runtime_context:
         exec_spec = ExecutionSpecification.model_validate(deep_union(compiled.model_dump(), compiler_runtime_context))
