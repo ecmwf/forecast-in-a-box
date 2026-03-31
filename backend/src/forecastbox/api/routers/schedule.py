@@ -118,7 +118,7 @@ def _experiment_to_response(exp: ExperimentDefinition) -> ScheduleDefinitionResp
 
 @router.get("/list")
 async def list_schedules(
-    user: UserRead = Depends(current_active_user),
+    user: UserRead | None = Depends(current_active_user),
     page: int = 1,
     page_size: int = 10,
 ) -> ListSchedulesResponse:
@@ -132,7 +132,9 @@ async def list_schedules(
 
 
 @router.put("/create")
-async def create_schedule(schedule_spec: ScheduleSpecification, user: UserRead = Depends(current_active_user)) -> CreateScheduleResponse:
+async def create_schedule(
+    schedule_spec: ScheduleSpecification, user: UserRead | None = Depends(current_active_user)
+) -> CreateScheduleResponse:
     actor = user2auth(user)
     try:
         experiment_id = await experiment_service.create_schedule(
@@ -157,7 +159,7 @@ async def create_schedule(schedule_spec: ScheduleSpecification, user: UserRead =
 
 
 @router.get("/get")
-async def get_schedule(experiment_id: str, user: UserRead = Depends(current_active_user)) -> ScheduleDefinitionResponse:
+async def get_schedule(experiment_id: str, user: UserRead | None = Depends(current_active_user)) -> ScheduleDefinitionResponse:
     actor = user2auth(user)
     try:
         exp_def = await experiment_service.get_schedule(actor, experiment_id)
@@ -168,7 +170,7 @@ async def get_schedule(experiment_id: str, user: UserRead = Depends(current_acti
 
 @router.post("/update")
 async def update_schedule(
-    experiment_id: str, update: ScheduleUpdate, user: UserRead = Depends(current_active_user)
+    experiment_id: str, update: ScheduleUpdate, user: UserRead | None = Depends(current_active_user)
 ) -> ScheduleDefinitionResponse:
     actor = user2auth(user)
     try:
@@ -193,7 +195,7 @@ async def update_schedule(
 
 
 @router.post("/delete")
-async def delete_schedule(experiment_id: str, user: UserRead = Depends(current_active_user)) -> None:
+async def delete_schedule(experiment_id: str, user: UserRead | None = Depends(current_active_user)) -> None:
     actor = user2auth(user)
     try:
         await experiment_service.delete_schedule(actor, experiment_id)
@@ -206,7 +208,7 @@ async def delete_schedule(experiment_id: str, user: UserRead = Depends(current_a
 
 
 @router.get("/next_run")
-async def get_next_run(experiment_id: str, user: UserRead = Depends(current_active_user)) -> str:
+async def get_next_run(experiment_id: str, user: UserRead | None = Depends(current_active_user)) -> str:
     actor = user2auth(user)
     try:
         return await experiment_service.get_next_run(actor, experiment_id)
@@ -217,7 +219,7 @@ async def get_next_run(experiment_id: str, user: UserRead = Depends(current_acti
 @router.get("/runs")
 async def get_schedule_runs(
     experiment_id: str,
-    user: UserRead = Depends(current_active_user),
+    user: UserRead | None = Depends(current_active_user),
     page: int = 1,
     page_size: int = 10,
 ) -> ScheduleRunsResponse:
@@ -245,16 +247,16 @@ async def get_schedule_runs(
 
 
 @router.get("/current_time")
-async def get_current_scheduling_time(user: UserRead = Depends(current_active_user)) -> str:
+async def get_current_scheduling_time(user: UserRead | None = Depends(current_active_user)) -> str:
     """Return the current time used for scheduling decisions."""
     return current_scheduling_time().isoformat()
 
 
 @router.post("/restart")
-async def restart_scheduler(user: UserRead = Depends(current_active_user)) -> None:
+async def restart_scheduler(user: UserRead | None = Depends(current_active_user)) -> None:
     """Restart the scheduler thread. Requires authentication."""
     actor = user2auth(user)
-    if not actor.is_admin:
+    if not actor.has_admin():
         raise HTTPException(status_code=403, detail="Only admins may restart the scheduler.")
     stop_scheduler()
     start_scheduler()
