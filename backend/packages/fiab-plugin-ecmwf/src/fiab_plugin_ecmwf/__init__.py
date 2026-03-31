@@ -10,13 +10,20 @@
 from fiab_core.tools.blocks import BlockBuilder
 from fiab_core.tools.plugins import PluginBuilder
 
-from fiab_plugin_ecmwf.blocks import EkdSource, EnsembleStatistics, TemporalStatistics, ZarrSink
+from fiab_plugin_ecmwf.blocks import (
+    EkdSource,
+    EnsembleStatistics,
+    MapPlotSink,
+    TemporalStatistics,
+    ZarrSink,
+)
 
 blocks: dict[str, BlockBuilder] = {
     "ekdSource": EkdSource(),
     "ensembleStatistics": EnsembleStatistics(),
     "temporalStatistics": TemporalStatistics(),
     "zarrSink": ZarrSink(),
+    "mapPlotSink": MapPlotSink(),
 }
 
 plugin = PluginBuilder(block_builders=blocks).as_plugin()

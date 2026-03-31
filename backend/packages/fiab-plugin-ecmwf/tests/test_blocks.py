@@ -13,7 +13,13 @@ from typing import cast
 import pytest
 from fiab_core.fable import BlockInstance, BlockInstanceOutput, PluginBlockFactoryId, PluginCompositeId
 
-from fiab_plugin_ecmwf.blocks import EkdSource, EnsembleStatistics, TemporalStatistics, ZarrSink
+from fiab_plugin_ecmwf.blocks import (
+    EkdSource,
+    EnsembleStatistics,
+    MapPlotSink,
+    TemporalStatistics,
+    ZarrSink,
+)
 from fiab_plugin_ecmwf.metadata import QubedInstanceOutput
 
 
@@ -80,6 +86,21 @@ def zarr_sink_configuration() -> BlockInstance:
         input_ids={"dataset": "source_output"},
         configuration_values={
             "path": "/path/to/output.zarr",
+        },
+    )
+
+
+@pytest.fixture
+def map_plot_sink_configuration() -> BlockInstance:
+    return BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="MapPlotSink"),  # type: ignore
+        input_ids={"dataset": "source_output"},
+        configuration_values={
+            "param": "2t",
+            "domain": "global",
+            "format": "png",
+            "groupby": "valid_datetime",
+            "style_schema": "inbuilt://fiab",
         },
     )
 
@@ -233,4 +254,89 @@ class TestZarrSink:
             block=zarr_sink_configuration,
             inputs={"dataset": temporal_output},
         ).get_or_raise()
+        assert output.is_empty()
+
+
+class TestMapPlotSink:
+    def test_intersect_from_ekdsource(self, ekdsource_output: BlockInstanceOutput):
+        block = MapPlotSink()
+        assert block.intersect(input=ekdsource_output)
+
+    def test_intersect_rejects_empty(self, dummy_blockinstance_output: BlockInstanceOutput):
+        block = MapPlotSink()
+        assert not block.intersect(input=dummy_blockinstance_output)
+
+    def test_intersect_rejects_no_param(self, ekdsource_output: BlockInstanceOutput):
+        block = MapPlotSink()
+        collapsed = cast(QubedInstanceOutput, ekdsource_output).collapse("param")
+        assert not block.intersect(input=collapsed)
+
+    def test_validate_from_ekdsource(self, map_plot_sink_configuration: BlockInstance, ekdsource_output: BlockInstanceOutput):
+        block = MapPlotSink()
+        output = block.validate(block=map_plot_sink_configuration, inputs={"dataset": ekdsource_output}).get_or_raise()
+        assert output.is_empty()
+
+    def test_validate_multi_param(self, ekdsource_output: BlockInstanceOutput):
+        block = MapPlotSink()
+        config = BlockInstance(
+            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="MapPlotSink"),
+            input_ids={"dataset": "source_output"},
+            configuration_values={
+                "param": '["2t", "msl"]',
+                "domain": "global",
+                "format": "png",
+                "groupby": "none",
+                "style_schema": "inbuilt://fiab",
+            },
+        )
+        output = block.validate(block=config, inputs={"dataset": ekdsource_output}).get_or_raise()
+        assert output.is_empty()
+
+    def test_validate_missing_param(self, ekdsource_output: BlockInstanceOutput):
+        block = MapPlotSink()
+        config = BlockInstance(
+            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="MapPlotSink"),
+            input_ids={"dataset": "source_output"},
+            configuration_values={
+                "param": "nonexistent",
+                "domain": "global",
+                "format": "png",
+                "groupby": "none",
+                "style_schema": "inbuilt://fiab",
+            },
+        )
+        result = block.validate(block=config, inputs={"dataset": ekdsource_output})
+        with pytest.raises(ValueError, match="params \\['nonexistent'\\] are not in the input parameters"):
+            result.get_or_raise()
+
+    def test_validate_partial_missing_params(self, ekdsource_output: BlockInstanceOutput):
+        block = MapPlotSink()
+        config = BlockInstance(
+            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="MapPlotSink"),
+            input_ids={"dataset": "source_output"},
+            configuration_values={
+                "param": '["2t", "nonexistent"]',
+                "domain": "global",
+                "format": "png",
+                "groupby": "none",
+                "style_schema": "inbuilt://fiab",
+            },
+        )
+        result = block.validate(block=config, inputs={"dataset": ekdsource_output})
+        with pytest.raises(ValueError, match="params \\['nonexistent'\\] are not in the input parameters"):
+            result.get_or_raise()
+
+    def test_validate_from_ensemble_statistics(
+        self,
+        map_plot_sink_configuration: BlockInstance,
+        ensemble_statistics_configuration: BlockInstance,
+        ekdsource_output: BlockInstanceOutput,
+    ):
+        ensemble_output = (
+            EnsembleStatistics().validate(block=ensemble_statistics_configuration, inputs={"dataset": ekdsource_output}).get_or_raise()
+        )
+
+        block = MapPlotSink()
+        assert block.intersect(input=ensemble_output)
+        output = block.validate(block=map_plot_sink_configuration, inputs={"dataset": ensemble_output}).get_or_raise()
         assert output.is_empty()
