@@ -32,6 +32,17 @@ class CompositeArtifactId:
     artifact_store_id: ArtifactStoreId
     ml_model_checkpoint_id: MlModelCheckpointId
 
+    @classmethod
+    def from_str(cls, v) -> "CompositeArtifactId":
+        if not ":" in v:
+            raise ValueError(f"must be of the form artifact_store_id:ml_model_checkpoint_id, got {v}")
+        artifact_store_id, ml_model_checkpoint_id = v.split(":", 1)
+        return cls(artifact_store_id=artifact_store_id, ml_model_checkpoint_id=ml_model_checkpoint_id)
+
+    @staticmethod
+    def to_str(k: "CompositeArtifactId") -> str:
+        return f"{k.artifact_store_id}:{k.ml_model_checkpoint_id}"
+
 
 class MlModelCheckpoint(BaseModel):
     url: str = Field(
@@ -54,6 +65,7 @@ class MlModelCheckpoint(BaseModel):
         description="List of config keys that this model exposes"
     )  # Question: do we want key-values, or just keys and the plugins define values?
     # Question: how would we capture memory requirements? May be tricky since technically its a function of config and backend
+    metadata: dict = Field(default_factory=dict, description="Additional metadata from the checkpoint, for anemoi this is the raw dump")
 
 
 CheckpointLookup = Mapping[CompositeArtifactId, MlModelCheckpoint]

@@ -13,6 +13,7 @@ Downloading and managing artifacts such as ml model checkpoints
 All the methods here are blocking -- see manager for nonblocking invocations
 """
 
+import json
 import logging
 import shutil
 import tempfile
@@ -36,9 +37,12 @@ def get_artifacts_catalog(artifact_stores_config: ArtifactStoresConfig) -> Artif
 
     for store_id, store_config in artifact_stores_config.items():
         if store_config.method == "file":
-            response = httpx.get(store_config.url, follow_redirects=True)
-            response.raise_for_status()
-            store_data = response.json()
+            if Path(store_config.url).exists():
+                store_data = json.load(Path(store_config.url).open())
+            else:
+                response = httpx.get(store_config.url, follow_redirects=True)
+                response.raise_for_status()
+                store_data = response.json()
 
             artifacts = store_data.get("artifacts", {})
             for checkpoint_id, checkpoint_data in artifacts.items():
