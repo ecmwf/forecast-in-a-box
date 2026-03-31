@@ -10,13 +10,11 @@
 """Unit tests for the jobs schema and CRUD helpers.
 
 All tests use an in-memory SQLite engine so no filesystem state is required.
-``forecastbox.db.jobs.async_session_maker`` is monkeypatched to the in-memory
-maker for JobExecution tests.
 
-JobDefinition, ExperimentDefinition, and ExperimentNext tests patch the
-corresponding domain-module ``_jobs_module.async_session_maker`` references so
-that all tables share a single connection pool and FK constraints work in-memory.
-The ``mem_session_maker_all`` fixture applies all patches at once.
+JobDefinition, ExperimentDefinition, ExperimentNext, and JobExecution tests
+patch the corresponding domain-module ``_jobs_module.async_session_maker``
+references so that all tables share a single connection pool and FK constraints
+work in-memory.  The ``mem_session_maker_all`` fixture applies all patches at once.
 """
 
 import datetime as dt
@@ -29,8 +27,10 @@ import forecastbox.db.jobs as jobs_db
 import forecastbox.domain.experiment.db as experiment_db
 import forecastbox.domain.experiment.scheduling.db as scheduling_db
 import forecastbox.domain.job_definition.db as job_definition_db
+import forecastbox.domain.job_execution.db as job_execution_db
 from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound
 from forecastbox.domain.job_definition.exceptions import JobDefinitionAccessDenied, JobDefinitionNotFound
+from forecastbox.domain.job_execution.exceptions import JobExecutionAccessDenied, JobExecutionNotFound
 from forecastbox.schemas.jobs import Base
 from forecastbox.utility.auth import AuthContext
 
@@ -47,11 +47,12 @@ async def mem_session_maker():
 
 @pytest_asyncio.fixture
 async def mem_session_maker_both(mem_session_maker, monkeypatch):
-    """Patch jobs_db, job_definition_db, experiment_db, and scheduling_db to the same in-memory session maker."""
+    """Patch jobs_db, job_definition_db, experiment_db, scheduling_db, and job_execution_db to the same in-memory session maker."""
     monkeypatch.setattr(jobs_db, "async_session_maker", mem_session_maker)
     monkeypatch.setattr(job_definition_db._jobs_module, "async_session_maker", mem_session_maker)
     monkeypatch.setattr(experiment_db._jobs_module, "async_session_maker", mem_session_maker)
     monkeypatch.setattr(scheduling_db._jobs_module, "async_session_maker", mem_session_maker)
+    monkeypatch.setattr(job_execution_db._jobs_module, "async_session_maker", mem_session_maker)
     yield mem_session_maker
 
 
@@ -520,3 +521,115 @@ async def test_jobs_upsert_job_execution_unknown_id_raises(mem_session_maker_bot
             created_by="user1",
             status="submitted",
         )
+
+
+# ---------------------------------------------------------------------------
+# JobExecution — auth / ownership tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_job_execution_get_own(mem_session_maker_both):
+    """Owner can retrieve their own execution."""
+    job_id, job_v = await job_definition_db.upsert_job_definition(actor=_user1, source="user_defined", created_by="user1")
+    exec_id, _ = await job_execution_db.upsert_job_execution(
+        job_definition_id=job_id, job_definition_version=job_v, created_by="user1", status="submitted"
+    )
+    result = await job_execution_db.get_job_execution(exec_id, actor=_user1)
+    assert result is not None
+    assert result.job_execution_id == exec_id
+
+
+@pytest.mark.asyncio
+async def test_job_execution_get_other_user_denied(mem_session_maker_both):
+    """Non-owner cannot access another user's execution."""
+    job_id, job_v = await job_definition_db.upsert_job_definition(actor=_user1, source="user_defined", created_by="user1")
+    exec_id, _ = await job_execution_db.upsert_job_execution(
+        job_definition_id=job_id, job_definition_version=job_v, created_by="user1", status="submitted"
+    )
+    with pytest.raises(JobExecutionAccessDenied):
+        await job_execution_db.get_job_execution(exec_id, actor=_user2)
+
+
+@pytest.mark.asyncio
+async def test_job_execution_get_admin_sees_all(mem_session_maker_both):
+    """Admin can access any execution."""
+    job_id, job_v = await job_definition_db.upsert_job_definition(actor=_user1, source="user_defined", created_by="user1")
+    exec_id, _ = await job_execution_db.upsert_job_execution(
+        job_definition_id=job_id, job_definition_version=job_v, created_by="user1", status="submitted"
+    )
+    result = await job_execution_db.get_job_execution(exec_id, actor=_admin)
+    assert result is not None
+
+
+@pytest.mark.asyncio
+async def test_job_execution_get_anon_sees_all(mem_session_maker_both):
+    """Anonymous actor (unauthenticated regime) can access all executions."""
+    job_id, job_v = await job_definition_db.upsert_job_definition(actor=_user1, source="user_defined", created_by="user1")
+    exec_id, _ = await job_execution_db.upsert_job_execution(
+        job_definition_id=job_id, job_definition_version=job_v, created_by="user1", status="submitted"
+    )
+    result = await job_execution_db.get_job_execution(exec_id, actor=_anon)
+    assert result is not None
+
+
+@pytest.mark.asyncio
+async def test_job_execution_get_not_found(mem_session_maker_both):
+    """get_job_execution raises JobExecutionNotFound for missing id."""
+    with pytest.raises(JobExecutionNotFound):
+        await job_execution_db.get_job_execution("nonexistent-id", actor=_admin)
+
+
+@pytest.mark.asyncio
+async def test_job_execution_list_filters_by_owner(mem_session_maker_both):
+    """Non-admin users see only their own executions in list."""
+    job_id, job_v = await job_definition_db.upsert_job_definition(actor=_user1, source="user_defined", created_by="user1")
+    exec_u1, _ = await job_execution_db.upsert_job_execution(
+        job_definition_id=job_id, job_definition_version=job_v, created_by="user1", status="submitted"
+    )
+    exec_u2, _ = await job_execution_db.upsert_job_execution(
+        job_definition_id=job_id, job_definition_version=job_v, created_by="user2", status="submitted"
+    )
+
+    u1_execs = {e.job_execution_id for e in await job_execution_db.list_job_executions(actor=_user1)}
+    assert exec_u1 in u1_execs
+    assert exec_u2 not in u1_execs
+
+    admin_execs = {e.job_execution_id for e in await job_execution_db.list_job_executions(actor=_admin)}
+    assert exec_u1 in admin_execs
+    assert exec_u2 in admin_execs
+
+
+@pytest.mark.asyncio
+async def test_job_execution_delete_own(mem_session_maker_both):
+    """Owner can delete their own execution."""
+    job_id, job_v = await job_definition_db.upsert_job_definition(actor=_user1, source="user_defined", created_by="user1")
+    exec_id, _ = await job_execution_db.upsert_job_execution(
+        job_definition_id=job_id, job_definition_version=job_v, created_by="user1", status="submitted"
+    )
+    await job_execution_db.soft_delete_job_execution(exec_id, actor=_user1)
+    with pytest.raises(JobExecutionNotFound):
+        await job_execution_db.get_job_execution(exec_id, actor=_admin)
+
+
+@pytest.mark.asyncio
+async def test_job_execution_delete_other_user_denied(mem_session_maker_both):
+    """Non-owner cannot delete another user's execution."""
+    job_id, job_v = await job_definition_db.upsert_job_definition(actor=_user1, source="user_defined", created_by="user1")
+    exec_id, _ = await job_execution_db.upsert_job_execution(
+        job_definition_id=job_id, job_definition_version=job_v, created_by="user1", status="submitted"
+    )
+    with pytest.raises(JobExecutionAccessDenied):
+        await job_execution_db.soft_delete_job_execution(exec_id, actor=_user2)
+
+
+@pytest.mark.asyncio
+async def test_job_execution_delete_admin_can_delete_any(mem_session_maker_both):
+    """Admin can delete any execution."""
+    job_id, job_v = await job_definition_db.upsert_job_definition(actor=_user1, source="user_defined", created_by="user1")
+    exec_id, _ = await job_execution_db.upsert_job_execution(
+        job_definition_id=job_id, job_definition_version=job_v, created_by="user1", status="submitted"
+    )
+    await job_execution_db.soft_delete_job_execution(exec_id, actor=_admin)
+    with pytest.raises(JobExecutionNotFound):
+        await job_execution_db.get_job_execution(exec_id, actor=_admin)

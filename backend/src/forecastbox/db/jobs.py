@@ -28,16 +28,18 @@ Note: ``ExperimentDefinition`` and ``ExperimentNext`` persistence has moved to
 ``forecastbox.domain.experiment.scheduling.db`` respectively.  The functions
 below are thin proxies using a system-level (admin) actor so that callers not
 yet updated continue to work.
+
+Note: ``JobExecution`` persistence has moved to
+``forecastbox.domain.job_execution.db``.  The functions below are thin proxies
+using a system-level (admin) actor so that callers not yet updated continue to
+work.
 """
 
 import datetime as dt
-import uuid
 from collections.abc import Iterable
 
-from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from forecastbox.db.core import dbRetry, executeAndCommit, querySingle
 from forecastbox.schemas.jobs import (
     Base,
     ExperimentDefinition,
@@ -162,7 +164,7 @@ async def soft_delete_experiment_definition(experiment_id: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# JobExecution
+# JobExecution — thin proxies; canonical implementation in domain.job_execution.db
 # ---------------------------------------------------------------------------
 
 
@@ -178,124 +180,79 @@ async def upsert_job_execution(
     compiler_runtime_context: dict | None = None,
     experiment_context: str | None = None,
 ) -> tuple[str, int]:
-    """Insert a new attempt of a JobExecution and return (id, attempt_count).
+    """Thin proxy; canonical implementation in ``forecastbox.domain.job_execution.db``."""
+    from forecastbox.domain.job_execution import db as _exec_db
 
-    If `id` is omitted a fresh UUID is generated (attempt 1).
-    If `id` is supplied the next attempt number is derived from the database,
-    enabling re-run tracking under the same execution identity;
-    a KeyError is raised if that id does not exist yet.
-    """
-    id_provided = job_execution_id is not None
-    execution_id = job_execution_id or str(uuid.uuid4())
-    ref_time = dt.datetime.now()
-
-    async def function(i: int) -> int:
-        async with async_session_maker() as session:
-            result = await session.execute(
-                select(func.max(JobExecution.attempt_count)).where(JobExecution.job_execution_id == execution_id)
-            )
-            max_attempt: int | None = result.scalar()
-            if id_provided and max_attempt is None:
-                raise KeyError(f"No JobExecution with id={execution_id!r} exists; cannot add a new attempt.")
-            new_attempt = (max_attempt or 0) + 1
-            session.add(
-                JobExecution(
-                    job_execution_id=execution_id,
-                    attempt_count=new_attempt,
-                    created_by=created_by,
-                    created_at=ref_time,
-                    updated_at=ref_time,
-                    job_definition_id=job_definition_id,
-                    job_definition_version=job_definition_version,
-                    experiment_id=experiment_id,
-                    experiment_version=experiment_version,
-                    compiler_runtime_context=compiler_runtime_context,
-                    experiment_context=experiment_context,
-                    status=status,
-                    is_deleted=False,
-                )
-            )
-            await session.commit()
-            return new_attempt
-
-    new_attempt = await dbRetry(function)
-    return execution_id, new_attempt
+    return await _exec_db.upsert_job_execution(
+        job_execution_id=job_execution_id,
+        job_definition_id=job_definition_id,
+        job_definition_version=job_definition_version,
+        created_by=created_by,
+        status=status,
+        experiment_id=experiment_id,
+        experiment_version=experiment_version,
+        compiler_runtime_context=compiler_runtime_context,
+        experiment_context=experiment_context,
+    )
 
 
 async def get_job_execution(execution_id: str, attempt_count: int | None = None) -> JobExecution | None:
-    """Return a specific or the latest non-deleted attempt of a JobExecution."""
-    if attempt_count is not None:
-        query = select(JobExecution).where(
-            JobExecution.job_execution_id == execution_id,
-            JobExecution.attempt_count == attempt_count,
-            JobExecution.is_deleted.is_(False),
-        )
-    else:
-        query = (
-            select(JobExecution)
-            .where(JobExecution.job_execution_id == execution_id, JobExecution.is_deleted.is_(False))
-            .order_by(JobExecution.attempt_count.desc())
-            .limit(1)
-        )
-    return await querySingle(query, async_session_maker)
+    """Thin proxy; canonical implementation in ``forecastbox.domain.job_execution.db``.
+
+    Returns None if not found (preserving the original interface). Uses a system-level actor.
+    """
+    from forecastbox.domain.job_execution import db as _exec_db
+    from forecastbox.domain.job_execution.exceptions import JobExecutionNotFound
+    from forecastbox.utility.auth import AuthContext
+
+    try:
+        return await _exec_db.get_job_execution(execution_id, attempt_count, actor=AuthContext(user_id=None, is_admin=True))
+    except JobExecutionNotFound:
+        return None
 
 
 async def update_job_execution_runtime(execution_id: str, attempt_count: int, **kwargs: object) -> None:
-    """Update mutable runtime fields on a specific JobExecution attempt."""
-    ref_time = dt.datetime.now()
-    stmt = (
-        update(JobExecution)
-        .where(JobExecution.job_execution_id == execution_id, JobExecution.attempt_count == attempt_count)
-        .values(updated_at=ref_time, **kwargs)
-    )
-    await executeAndCommit(stmt, async_session_maker)
+    """Thin proxy; canonical implementation in ``forecastbox.domain.job_execution.db``."""
+    from forecastbox.domain.job_execution import db as _exec_db
+
+    await _exec_db.update_job_execution_runtime(execution_id, attempt_count, **kwargs)
 
 
 async def list_job_executions(offset: int = 0, limit: int | None = None) -> Iterable[JobExecution]:
-    """Return the latest non-deleted attempt of every JobExecution, with optional paging. Orders by creation time, descending."""
+    """Thin proxy; canonical implementation in ``forecastbox.domain.job_execution.db``.
 
-    async def function(i: int) -> list[JobExecution]:
-        async with async_session_maker() as session:
-            subq = (
-                select(JobExecution.job_execution_id, func.max(JobExecution.attempt_count).label("max_attempt"))
-                .where(JobExecution.is_deleted.is_(False))
-                .group_by(JobExecution.job_execution_id)
-                .subquery()
-            )
-            query = (
-                select(JobExecution)
-                .join(
-                    subq,
-                    (JobExecution.job_execution_id == subq.c.job_execution_id) & (JobExecution.attempt_count == subq.c.max_attempt),
-                )
-                .order_by(JobExecution.created_at.desc())
-                .offset(offset)
-            )
-            if limit is not None:
-                query = query.limit(limit)
-            result = await session.execute(query)
-            return [r[0] for r in result.all()]
+    Uses a system-level (admin) actor so that all executions are returned.
+    """
+    from forecastbox.domain.job_execution import db as _exec_db
+    from forecastbox.utility.auth import AuthContext
 
-    return await dbRetry(function)
+    return await _exec_db.list_job_executions(actor=AuthContext(user_id=None, is_admin=True), offset=offset, limit=limit)
 
 
 async def count_job_executions() -> int:
-    """Return the total number of distinct (non-deleted) JobExecution ids."""
+    """Thin proxy; canonical implementation in ``forecastbox.domain.job_execution.db``.
 
-    async def function(i: int) -> int:
-        async with async_session_maker() as session:
-            result = await session.execute(
-                select(func.count(func.distinct(JobExecution.job_execution_id))).where(JobExecution.is_deleted.is_(False))
-            )
-            return result.scalar() or 0
+    Uses a system-level (admin) actor so that all executions are counted.
+    """
+    from forecastbox.domain.job_execution import db as _exec_db
+    from forecastbox.utility.auth import AuthContext
 
-    return await dbRetry(function)
+    return await _exec_db.count_job_executions(actor=AuthContext(user_id=None, is_admin=True))
 
 
 async def soft_delete_job_execution(execution_id: str) -> None:
-    """Mark all attempts of a JobExecution as deleted."""
-    stmt = update(JobExecution).where(JobExecution.job_execution_id == execution_id).values(is_deleted=True)
-    await executeAndCommit(stmt, async_session_maker)
+    """Thin proxy; canonical implementation in ``forecastbox.domain.job_execution.db``.
+
+    Uses a system-level (admin) actor so that any execution can be deleted.
+    """
+    from forecastbox.domain.job_execution import db as _exec_db
+    from forecastbox.domain.job_execution.exceptions import JobExecutionNotFound
+    from forecastbox.utility.auth import AuthContext
+
+    try:
+        await _exec_db.soft_delete_job_execution(execution_id, actor=AuthContext(user_id=None, is_admin=True))
+    except JobExecutionNotFound:
+        pass  # preserve original silent-no-op behaviour
 
 
 # ---------------------------------------------------------------------------
@@ -339,44 +296,24 @@ async def next_schedulable_experiment() -> dt.datetime | None:
 
 
 async def list_job_executions_by_experiment(experiment_id: str, offset: int = 0, limit: int | None = None) -> Iterable[JobExecution]:
-    """Return the latest attempt of each JobExecution linked to an experiment, ordered by created_at descending."""
+    """Thin proxy; canonical implementation in ``forecastbox.domain.job_execution.db``.
 
-    async def function(i: int) -> list[JobExecution]:
-        async with async_session_maker() as session:
-            subq = (
-                select(JobExecution.job_execution_id, func.max(JobExecution.attempt_count).label("max_attempt"))
-                .where(JobExecution.experiment_id == experiment_id, JobExecution.is_deleted.is_(False))
-                .group_by(JobExecution.job_execution_id)
-                .subquery()
-            )
-            query = (
-                select(JobExecution)
-                .join(
-                    subq,
-                    (JobExecution.job_execution_id == subq.c.job_execution_id) & (JobExecution.attempt_count == subq.c.max_attempt),
-                )
-                .order_by(JobExecution.created_at.desc())
-                .offset(offset)
-            )
-            if limit is not None:
-                query = query.limit(limit)
-            result = await session.execute(query)
-            return [r[0] for r in result.all()]
+    Uses a system-level (admin) actor so that all executions are returned.
+    """
+    from forecastbox.domain.job_execution import db as _exec_db
+    from forecastbox.utility.auth import AuthContext
 
-    return await dbRetry(function)
+    return await _exec_db.list_job_executions_by_experiment(
+        experiment_id, actor=AuthContext(user_id=None, is_admin=True), offset=offset, limit=limit
+    )
 
 
 async def count_job_executions_by_experiment(experiment_id: str) -> int:
-    """Return the total number of distinct non-deleted JobExecution ids linked to an experiment."""
+    """Thin proxy; canonical implementation in ``forecastbox.domain.job_execution.db``.
 
-    async def function(i: int) -> int:
-        async with async_session_maker() as session:
-            result = await session.execute(
-                select(func.count(func.distinct(JobExecution.job_execution_id))).where(
-                    JobExecution.experiment_id == experiment_id,
-                    JobExecution.is_deleted.is_(False),
-                )
-            )
-            return result.scalar() or 0
+    Uses a system-level (admin) actor so that all executions are counted.
+    """
+    from forecastbox.domain.job_execution import db as _exec_db
+    from forecastbox.utility.auth import AuthContext
 
-    return await dbRetry(function)
+    return await _exec_db.count_job_executions_by_experiment(experiment_id, actor=AuthContext(user_id=None, is_admin=True))

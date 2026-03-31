@@ -349,6 +349,6 @@ def test_submit_job_v2_read_specification_not_found(backend_client_with_auth):
 
 
 def test_submit_job_v2_restart_not_found(backend_client_with_auth):
-    """POST /job/{execution_id}/restart with unknown id returns 500 (execution not found)."""
+    """POST /job/{execution_id}/restart with unknown id returns 404 (execution not found)."""
     resp = backend_client_with_auth.post("/job/nonexistent-exec-id/restart")
-    assert resp.status_code == 500
+    assert resp.status_code == 404
