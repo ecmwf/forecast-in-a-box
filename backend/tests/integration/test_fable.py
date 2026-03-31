@@ -145,62 +145,12 @@ def test_fable_v2_upsert_nonexistent_id(backend_client_with_auth):
     assert response.status_code == 404
 
 
-def test_fable_v2_compile_latest_version(tmpdir, backend_client_with_auth):
-    """A builder saved via upsert_v2 can be compiled by reference (no version = latest)."""
-    builder = _make_builder_full(str(tmpdir))
-    payload = FableSaveRequest(builder=builder, display_name="Compile Test")
-    save_resp = backend_client_with_auth.post("/job_definition/create", json=payload.model_dump())
-    assert save_resp.is_success, save_resp.text
-    fable_id = save_resp.json()["job_definition_id"]
-
-    compile_resp = backend_client_with_auth.put("/job_definition/building/compile", json={"job_definition_id": fable_id})
-    assert compile_resp.is_success, compile_resp.text
-    spec = compile_resp.json()
-    assert "job" in spec
-    assert "environment" in spec
-    assert len(spec["job"]["job_instance"]["tasks"]) > 0
-
-
-def test_fable_v2_compile_specific_version(tmpdir, backend_client_with_auth):
-    """Omitting version resolves to latest; specifying version compiles that exact version."""
-    builder_v1 = _make_builder_full(str(tmpdir.mkdir("v1")))
-    payload_v1 = FableSaveRequest(builder=builder_v1, display_name="Version Test v1")
-    save_resp = backend_client_with_auth.post("/job_definition/create", json=payload_v1.model_dump())
-    assert save_resp.is_success, save_resp.text
-    fable_id = save_resp.json()["job_definition_id"]
-
-    # Save a second version with a different builder (source-only, no sink)
-    source_only = _make_builder_source_only()
-    payload_v2 = FableSaveRequest(builder=source_only, display_name="Version Test v2")
-    save_resp2 = backend_client_with_auth.post(
-        "/job_definition/update", json={**payload_v2.model_dump(), "job_definition_id": fable_id, "version": save_resp.json()["version"]}
-    )
-    assert save_resp2.is_success, save_resp2.text
-    assert save_resp2.json()["version"] == 2
-
-    # Compile v1 explicitly — should produce tasks (has a sink)
-    resp_v1 = backend_client_with_auth.put("/job_definition/building/compile", json={"job_definition_id": fable_id, "version": 1})
-    assert resp_v1.is_success, resp_v1.text
-    assert len(resp_v1.json()["job"]["job_instance"]["tasks"]) > 0
-
-    # Compile latest (v2, source-only, no sink) — produces empty tasks
-    resp_latest = backend_client_with_auth.put("/job_definition/building/compile", json={"job_definition_id": fable_id})
-    assert resp_latest.is_success, resp_latest.text
-    assert len(resp_latest.json()["job"]["job_instance"]["tasks"]) == 0
-
-
-def test_fable_v2_compile_nonexistent(backend_client_with_auth):
-    """Compiling an unknown fable id returns 404."""
-    resp = backend_client_with_auth.put("/job_definition/building/compile", json={"job_definition_id": "does-not-exist"})
-    assert resp.status_code == 404
-
-
 def test_fable_expand(tmpdir, backend_client_with_auth):
-    response = backend_client_with_auth.get("/job_definition/building/catalogue").raise_for_status()
+    response = backend_client_with_auth.get("/job_definition/catalogue").raise_for_status()
     assert len(response.json()) > 0
 
     builder = FableBuilder(blocks={})
-    response = backend_client_with_auth.request(url="/job_definition/building/expand", method="put", json=builder.model_dump())
+    response = backend_client_with_auth.request(url="/job_definition/expand", method="put", json=builder.model_dump())
     assert response.json()["possible_sources"] == [{"plugin": {"store": "localTest", "local": "single"}, "factory": "source_42"}]
     assert response.json()["possible_expansions"] == {}
 
@@ -211,7 +161,7 @@ def test_fable_expand(tmpdir, backend_client_with_auth):
     )
     blocks = {"source_42": source_42}
     builder = FableBuilder(blocks=blocks)
-    response = backend_client_with_auth.request(url="/job_definition/building/expand", method="put", json=builder.model_dump())
+    response = backend_client_with_auth.request(url="/job_definition/expand", method="put", json=builder.model_dump())
     assert response.json()["possible_expansions"] == {
         "source_42": [
             {"plugin": {"store": "localTest", "local": "single"}, "factory": "transform_increment"},
@@ -227,7 +177,7 @@ def test_fable_expand(tmpdir, backend_client_with_auth):
     )
     blocks["transform_increment"] = transform_increment
     builder = FableBuilder(blocks=blocks)
-    response = backend_client_with_auth.request(url="/job_definition/building/expand", method="put", json=builder.model_dump())
+    response = backend_client_with_auth.request(url="/job_definition/expand", method="put", json=builder.model_dump())
     assert response.json()["possible_expansions"]["transform_increment"] == [
         {"plugin": {"store": "localTest", "local": "single"}, "factory": "transform_increment"},
         {"plugin": {"store": "localTest", "local": "single"}, "factory": "product_join"},
@@ -248,16 +198,9 @@ def test_fable_expand(tmpdir, backend_client_with_auth):
     blocks["sink_file"] = sink_file
 
     builder = FableBuilder(blocks=blocks)
-    response = backend_client_with_auth.request(url="/job_definition/building/expand", method="put", json=builder.model_dump())
+    response = backend_client_with_auth.request(url="/job_definition/expand", method="put", json=builder.model_dump())
     assert len(response.json()["possible_expansions"]["sink_file"]) == 0
     assert len(response.json()["block_errors"]) == 0
-
-    save_req = FableSaveRequest(builder=builder)
-    save_resp = backend_client_with_auth.post("/job_definition/create", json=save_req.model_dump())
-    assert save_resp.is_success, save_resp.text
-    fable_id = save_resp.json()["job_definition_id"]
-    compile_resp = backend_client_with_auth.put("/job_definition/building/compile", json={"job_definition_id": fable_id})
-    assert compile_resp.is_success, compile_resp.text
 
 
 def test_fable_v2_basic_execute(tmpdir, backend_client_with_auth):

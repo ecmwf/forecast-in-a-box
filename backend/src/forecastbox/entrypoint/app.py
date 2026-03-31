@@ -35,7 +35,7 @@ from forecastbox.api.plugin.store import join_stores_thread, submit_initialize_s
 from forecastbox.api.routers import admin, artifacts, auth, gateway, plugin
 from forecastbox.api.scheduling.scheduler_thread import start_scheduler, status_scheduler, stop_scheduler
 from forecastbox.api.updates import get_local_release
-from forecastbox.routes import experiment, job_definition, job_definition_building, job_execution
+from forecastbox.routes import experiment, job_definition, job_execution
 from forecastbox.utility.config import config
 
 logger = logging.getLogger(__name__)
@@ -86,7 +86,6 @@ app.include_router(gateway.router, prefix="/api/v1/gateway")
 app.include_router(plugin.router, prefix="/api/v1/plugin")
 app.include_router(artifacts.router, prefix="/api/v1/artifacts")
 app.include_router(job_definition.router, prefix="/api/v1/job_definition")
-app.include_router(job_definition_building.router, prefix="/api/v1/job_definition/building")
 app.include_router(job_execution.router, prefix="/api/v1/job_execution")
 app.include_router(experiment.router, prefix="/api/v1/experiment")
 

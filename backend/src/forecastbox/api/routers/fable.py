@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, status
 from fastapi.exceptions import HTTPException
 from fiab_core.fable import BlockFactoryCatalogue
 
+import forecastbox.domain.job_definition.db as _job_definition_db
 import forecastbox.domain.job_definition.service as job_definition_service
 from forecastbox.api.plugin.manager import PluginCompositeId, catalogue_view, plugins_ready
 from forecastbox.api.types.fable import (
@@ -29,6 +30,7 @@ from forecastbox.api.types.fable import (
 )
 from forecastbox.api.types.jobs import ExecutionSpecification
 from forecastbox.domain.job_definition.exceptions import JobDefinitionAccessDenied, JobDefinitionNotFound
+from forecastbox.domain.job_definition.service import compile_builder
 from forecastbox.entrypoint.auth.users import get_auth_context
 from forecastbox.utility.auth import AuthContext
 
@@ -107,7 +109,17 @@ async def compile_fable(request: FableCompileRequest) -> ExecutionSpecification:
     ExecutionSpecification has the same shape as the one from /compile.
     """
     try:
-        return await job_definition_service.compile_definition(request.id, request.version)
+        job_def = await _job_definition_db.get_job_definition(request.id, request.version)
+        if job_def is None:
+            raise JobDefinitionNotFound(f"Fable job definition {request.id!r} not found.")
+        if job_def.blocks is None:
+            raise JobDefinitionNotFound(f"Fable job definition {request.id!r} has no builder spec.")
+        builder = FableBuilder(blocks=job_def.blocks)  # ty:ignore[invalid-argument-type]
+        if job_def.environment_spec is not None:
+            from forecastbox.api.types.fable import EnvironmentSpecification
+
+            builder.environment = EnvironmentSpecification.model_validate(job_def.environment_spec)
+        return compile_builder(builder)
     except JobDefinitionNotFound as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ValueError as e:

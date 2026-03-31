@@ -249,20 +249,3 @@ async def load_builder(fable_id: str, version: int | None = None) -> FableRetrie
         tags=job_definition.tags or [],  # ty:ignore[invalid-argument-type]
         parent_id=job_definition.parent_id,  # ty:ignore[invalid-argument-type]
     )
-
-
-async def compile_definition(fable_id: str, version: int | None = None) -> ExecutionSpecification:
-    """Load a stored job definition and compile it to an ExecutionSpecification.
-
-    Raises ``JobDefinitionNotFound`` if the id does not exist or has no builder spec.
-    Raises ``ValueError`` if compilation fails.
-    """
-    job_definition = await _job_definition_db.get_job_definition(fable_id, version)
-    if job_definition is None:
-        raise JobDefinitionNotFound(f"Fable job definition {fable_id!r} not found.")
-    if job_definition.blocks is None:
-        raise JobDefinitionNotFound(f"Fable job definition {fable_id!r} has no builder spec.")
-    builder = FableBuilder(blocks=job_definition.blocks)  # ty:ignore[invalid-argument-type]
-    if job_definition.environment_spec is not None:
-        builder.environment = EnvironmentSpecification.model_validate(job_definition.environment_spec)
-    return compile_builder(builder)

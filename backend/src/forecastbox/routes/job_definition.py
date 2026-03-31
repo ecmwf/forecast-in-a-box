@@ -12,12 +12,15 @@
 from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends
+from fastapi import status as http_status
 from fastapi.exceptions import HTTPException
+from fiab_core.fable import BlockFactoryCatalogue
 from pydantic import BaseModel
 
 import forecastbox.domain.job_definition.db as job_definition_db
 import forecastbox.domain.job_definition.service as job_definition_service
-from forecastbox.api.types.fable import FableBuilder, FableSaveRequest
+from forecastbox.api.plugin.manager import PluginCompositeId, catalogue_view, plugins_ready
+from forecastbox.api.types.fable import FableBuilder, FableSaveRequest, FableValidationExpansion
 from forecastbox.domain.job_definition.exceptions import (
     JobDefinitionAccessDenied,
     JobDefinitionNotFound,
@@ -238,3 +241,29 @@ async def delete_job_definition(
         raise HTTPException(status_code=404, detail=str(e))
     except JobDefinitionAccessDenied as e:
         raise HTTPException(status_code=403, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Building helpers
+# ---------------------------------------------------------------------------
+
+
+@router.get("/catalogue")
+def get_catalogue() -> dict[PluginCompositeId, BlockFactoryCatalogue]:
+    """All blocks this backend is capable of evaluating within a definition."""
+    if not plugins_ready():
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail="Plugins not ready")
+    catalogue = catalogue_view()
+    if isinstance(catalogue, bool):
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail="Plugins not ready")
+    return catalogue
+
+
+@router.put("/expand")
+def expand_job_definition(fable: FableBuilder) -> FableValidationExpansion:
+    """Validate a partially-constructed FableBuilder and return completion options.
+
+    Returns 200 regardless of whether validation errors are present; callers must
+    inspect the returned error fields.
+    """
+    return job_definition_service.validate_expand(fable)
