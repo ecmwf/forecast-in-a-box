@@ -25,7 +25,6 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 
 import forecastbox.domain.job_execution.db as job_execution_db
 import forecastbox.domain.job_execution.service as job_execution_service
-from forecastbox.api.routers.gateway import Globals
 from forecastbox.api.types.jobs import (
     JobExecuteRequest,
     JobExecuteResponse,
@@ -37,6 +36,7 @@ from forecastbox.api.utils import encode_result
 from forecastbox.domain.job_execution.exceptions import JobExecutionAccessDenied, JobExecutionNotFound
 from forecastbox.domain.job_execution.service import ProductToOutputId
 from forecastbox.entrypoint.auth.users import get_auth_context
+from forecastbox.routes.gateway import Globals
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
 

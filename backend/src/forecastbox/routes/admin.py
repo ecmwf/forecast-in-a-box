@@ -7,7 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Admin API Router."""
+"""Canonical admin routes — /admin/* and /users/*"""
 
 import logging
 from dataclasses import dataclass

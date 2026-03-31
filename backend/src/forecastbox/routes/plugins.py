@@ -7,13 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""User-facing API for plugins, that is, standalone python modules providing
-definitions of fable blocks like products or sources.
-
-In particular
- - retrieve status information about plugins
- - invoke manual plugin update
-"""
+"""Canonical plugin management routes — /plugin/*"""
 
 from typing import Literal
 
@@ -23,8 +17,8 @@ from pydantic import BaseModel
 
 from forecastbox.api.plugin.manager import PluginsStatus, modify_enabled, status_full, submit_update_single, uninstall_plugin
 from forecastbox.api.plugin.store import PluginRemoteInfo, PluginStoreEntry, get_plugins_detail, submit_install_plugin
-from forecastbox.api.routers.admin import get_admin_user
 from forecastbox.api.types.fable import PluginCompositeId
+from forecastbox.routes.admin import get_admin_user
 from forecastbox.utility.config import config
 
 router = APIRouter(
