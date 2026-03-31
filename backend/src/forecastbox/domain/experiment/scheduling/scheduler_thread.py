@@ -20,10 +20,11 @@ import threading
 from typing import Any, cast
 
 import forecastbox.domain.experiment.scheduling.db as scheduling_db
-from forecastbox.api.execution import execute
 from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run, current_scheduling_time
 from forecastbox.domain.experiment.scheduling.job_utils import experiment2runnable
+from forecastbox.domain.job_execution.service import execute
 from forecastbox.ecpyutil import timed_acquire
+from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
 
 logger = logging.getLogger(__name__)
@@ -94,7 +95,7 @@ class SchedulerThread(threading.Thread):
                     exec_result = self._run_async(
                         execute(
                             runnable.definition,
-                            runnable.created_by,
+                            AuthContext(user_id=runnable.created_by, is_admin=False),
                             experiment_id=experiment_id,
                             experiment_version=cast(int, exp_def.version),
                             compiler_runtime_context=runnable.compiler_runtime_context,
