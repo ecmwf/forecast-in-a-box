@@ -22,9 +22,24 @@ from forecastbox.domain.blueprint.service import BlueprintSaveCommand as Bluepri
 from forecastbox.routes.experiment import ExperimentCreateRequest, ExperimentUpdateRequest
 
 from .conftest import testPluginId
-from .utils import ensure_completed_v2, ensure_schedule_run_v2, scheduling_endpoint_with_retries
+from .utils import ensure_schedule_run_v2, retry_until, scheduling_endpoint_with_retries
 
 # *** helpers **
+
+
+def ensure_completed_v2(backend_client, job_id, sleep=0.5, attempts=20):
+    def do_action():
+        response = backend_client.get("/run/get", params={"run_id": job_id}, timeout=10)
+        assert response.is_success, response.text
+        return response.json()
+
+    def verify_ok(data) -> bool | None:
+        if data["status"] == "failed":
+            raise RuntimeError(f"Job {job_id} failed: {data}")
+        assert data["status"] in {"submitted", "running", "completed"}, data["status"]
+        return True if data["status"] == "completed" else None
+
+    retry_until(do_action, verify_ok, attempts=attempts, sleep=sleep, error_msg=f"Failed to finish job {job_id}")
 
 
 def _save_blueprint(client) -> tuple[str, int]:
