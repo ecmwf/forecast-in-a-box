@@ -178,10 +178,9 @@ async def list_blueprints(
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> BlueprintListResponse:
     """List the latest non-deleted version of every blueprint visible to the caller."""
-    blueprints = list(await blueprint_db.list_blueprints(auth_context=auth_context))
-    total = len(blueprints)
+    total = await blueprint_db.count_blueprints(auth_context=auth_context)
     start = pagination.start()
-    page_defs = blueprints[start : start + pagination.page_size]
+    page_defs = list(await blueprint_db.list_blueprints(auth_context=auth_context, offset=start, limit=pagination.page_size))
     items = [
         BlueprintListItem(
             blueprint_id=cast(str, defn.blueprint_id),
