@@ -79,6 +79,7 @@ dev = [
   "ty==0.0.2",
   "prek",
   "fiab-plugin-ecmwf[runtime]", # TODO remove after first publish
+  "ruff>=0.15.8",
 ]
 
 [tool.setuptools_scm]

@@ -24,7 +24,9 @@ import io
 import os
 import pathlib
 import zipfile
+from typing import Any
 
+import httpx
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
@@ -35,13 +37,13 @@ from .conftest import testPluginId
 from .utils import retry_until
 
 
-def ensure_completed_v2(backend_client, job_id, sleep=0.5, attempts=20):
-    def do_action():
+def ensure_completed_v2(backend_client: httpx.Client, job_id: str, sleep: float = 0.5, attempts: int = 20) -> None:
+    def do_action() -> Any:
         response = backend_client.get("/run/get", params={"run_id": job_id}, timeout=10)
         assert response.is_success, response.text
         return response.json()
 
-    def verify_ok(data) -> bool | None:
+    def verify_ok(data: Any) -> bool | None:
         if data["status"] == "failed":
             raise RuntimeError(f"Job {job_id} failed: {data}")
         assert data["status"] in {"submitted", "running", "completed"}, data["status"]
@@ -90,7 +92,7 @@ def _make_builder_full(tmpdir: str) -> BlueprintBuilder:
     )
 
 
-def test_blueprint_save_and_retrieve(backend_client_with_auth):
+def test_blueprint_save_and_retrieve(backend_client_with_auth: httpx.Client) -> None:
     builder = _make_builder_source_only()
     builder.environment = EnvironmentSpecification(hosts=2, workers_per_host=4)
     payload = BlueprintSaveCommand(
@@ -145,12 +147,12 @@ def test_blueprint_save_and_retrieve(backend_client_with_auth):
     assert response.json()["display_name"] == "Test Blueprint"
 
 
-def test_blueprint_retrieve_nonexistent(backend_client_with_auth):
+def test_blueprint_retrieve_nonexistent(backend_client_with_auth: httpx.Client) -> None:
     response = backend_client_with_auth.get("/blueprint/get", params={"blueprint_id": "does-not-exist"})
     assert response.status_code == 404
 
 
-def test_blueprint_upsert_nonexistent_id(backend_client_with_auth):
+def test_blueprint_upsert_nonexistent_id(backend_client_with_auth: httpx.Client) -> None:
     """Attempting to add a version to a non-existent id returns 404."""
     builder = _make_builder_source_only()
     payload = BlueprintSaveCommand(builder=builder)
@@ -158,7 +160,7 @@ def test_blueprint_upsert_nonexistent_id(backend_client_with_auth):
     assert response.status_code == 404
 
 
-def test_blueprint_expand(tmpdir, backend_client_with_auth):
+def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
     response = backend_client_with_auth.get("/blueprint/catalogue").raise_for_status()
     assert len(response.json()) > 0
 
@@ -216,7 +218,7 @@ def test_blueprint_expand(tmpdir, backend_client_with_auth):
     assert len(response.json()["block_errors"]) == 0
 
 
-def test_blueprint_basic_execute(tmpdir, backend_client_with_auth):
+def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
     builder = _make_builder_full(tmpdir)
     save_req = BlueprintSaveCommand(builder=builder)
     save_resp = backend_client_with_auth.post("/blueprint/create", json=save_req.model_dump())
@@ -279,26 +281,26 @@ def test_blueprint_basic_execute(tmpdir, backend_client_with_auth):
         assert len(zf.namelist()) == expected_log_count or os.getenv("FIAB_LOGSTDOUT", "nay") == "yea"
 
 
-def test_submit_job_v2_execute_missing_blueprint_id(backend_client_with_auth):
+def test_submit_job_v2_execute_missing_blueprint_id(backend_client_with_auth: httpx.Client) -> None:
     """Omitting blueprint_id (required field) returns 422."""
     response = backend_client_with_auth.post("/run/create", json={})
     assert response.status_code == 422
 
 
-def test_submit_job_v2_execute_unknown_definition(backend_client_with_auth):
+def test_submit_job_v2_execute_unknown_definition(backend_client_with_auth: httpx.Client) -> None:
     """Referencing a non-existent Blueprint returns 404."""
     payload = {"blueprint_id": "does-not-exist"}
     response = backend_client_with_auth.post("/run/create", json=payload)
     assert response.status_code == 404
 
 
-def test_submit_job_v2_read_status_not_found(backend_client_with_auth):
+def test_submit_job_v2_read_status_not_found(backend_client_with_auth: httpx.Client) -> None:
     """GET /execution/get with unknown run_id returns 404."""
     resp = backend_client_with_auth.get("/run/get", params={"run_id": "nonexistent-exec-id"})
     assert resp.status_code == 404
 
 
-def test_submit_job_v2_restart_not_found(backend_client_with_auth):
+def test_submit_job_v2_restart_not_found(backend_client_with_auth: httpx.Client) -> None:
     """POST /execution/restart with unknown run_id returns 404."""
     resp = backend_client_with_auth.post("/run/restart", json={"run_id": "nonexistent-exec-id", "attempt_count": 1})
     assert resp.status_code == 404

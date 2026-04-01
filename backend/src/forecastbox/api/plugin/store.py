@@ -132,7 +132,7 @@ def get_plugins_detail() -> dict[PluginCompositeId, tuple[PluginStoreEntry, Plug
     }
 
 
-def submit_initialize_stores():
+def submit_initialize_stores() -> None:
     with timed_acquire(StoresManager.stores_lock, 10) as result:
         if not result:
             logger.error("failed to initialize stores")

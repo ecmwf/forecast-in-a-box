@@ -15,6 +15,7 @@ for liveness and open the browser window here, with the rest logic happening in 
 import logging
 import signal
 import sys
+import types
 import webbrowser
 from multiprocessing import Process, get_context
 
@@ -40,8 +41,8 @@ def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
         previous_cleanup()
         export_recursive(
             config.model_dump(exclude_defaults=True),
-            config.model_config["env_nested_delimiter"],
-            config.model_config["env_prefix"],
+            config.model_config["env_nested_delimiter"],  # ty:ignore[invalid-argument-type]
+            config.model_config["env_prefix"],  # ty:ignore[invalid-argument-type]
         )
         # TODO migrate to cascade_platform -- but we *need* forkserver for linux. Mind service.py here as well
         backend = get_context("forkserver").Process(target=launch_backend)
@@ -70,7 +71,7 @@ if __name__ == "__main__":
     validate_runtime(config)
     handles = launch_all(config)
 
-    def sigterm_handler(_signo, _stack_frame):
+    def sigterm_handler(_signo: int, _stack_frame: types.FrameType | None) -> None:
         handles.shutdown()
         sys.exit(0)
 

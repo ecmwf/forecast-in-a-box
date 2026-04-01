@@ -2,6 +2,8 @@ import time
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
 
+import httpx
+
 T = TypeVar("T")
 
 
@@ -29,7 +31,7 @@ def retry_until(
     raise AssertionError(error_msg)
 
 
-def extract_auth_token_from_response(response) -> None | str:
+def extract_auth_token_from_response(response: httpx.Response) -> None | str:
     """Extracts the authentication token from the response cookies.
 
     Will look for the `forecastbox_auth` cookie in the response,
@@ -55,7 +57,7 @@ def extract_auth_token_from_response(response) -> None | str:
     return None
 
 
-def prepare_cookie_with_auth_token(token) -> dict:
+def prepare_cookie_with_auth_token(token: str) -> dict:
     """Prepares a cookie with the authentication token.
 
     Parameters
@@ -71,13 +73,13 @@ def prepare_cookie_with_auth_token(token) -> dict:
     return {"name": "forecastbox_auth", "value": token}
 
 
-def ensure_completed(backend_client, job_id, sleep=0.5, attempts=20):
-    def do_action():
+def ensure_completed(backend_client: httpx.Client, job_id: str, sleep: float = 0.5, attempts: int = 20) -> None:
+    def do_action() -> Any:
         response = backend_client.get("/job/status", timeout=10)
         assert response.is_success
         return response.json()["progresses"][job_id]
 
-    def verify_ok(progress) -> bool | None:
+    def verify_ok(progress: Any) -> bool | None:
         if progress["status"] == "failed":
             raise RuntimeError(f"Job {job_id} failed: {progress['error']}")
         # TODO parse response with corresponding class, define a method `not_failed` instead
@@ -87,18 +89,18 @@ def ensure_completed(backend_client, job_id, sleep=0.5, attempts=20):
     retry_until(do_action, verify_ok, attempts=attempts, sleep=sleep, error_msg=f"Failed to finish job {job_id}")
 
 
-def ensure_schedule_run_v2(backend_client, experiment_id: str, sleep: float = 1.0, attempts: int = 30) -> str:
+def ensure_schedule_run_v2(backend_client: httpx.Client, experiment_id: str, sleep: float = 1.0, attempts: int = 30) -> str:
     """Wait for at least one run to appear for the given schedule; return the run_id.
 
     Polls GET /experiment/runs/list until total > 0, up to attempts * sleep seconds.
     """
 
-    def do_action():
+    def do_action() -> Any:
         response = backend_client.get("/experiment/runs/list", params={"experiment_id": experiment_id}, timeout=10)
         assert response.is_success, response.text
         return response.json()
 
-    def verify_ok(data) -> str | None:
+    def verify_ok(data: Any) -> str | None:
         return data["runs"][0]["run_id"] if data["total"] > 0 else None
 
     return cast(

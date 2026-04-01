@@ -45,7 +45,7 @@ sleep_duration_min: int = 15 * 60
 
 
 class SchedulerThread(threading.Thread):
-    def __init__(self, loop: asyncio.AbstractEventLoop):
+    def __init__(self, loop: asyncio.AbstractEventLoop) -> None:
         super().__init__()
         self._loop = loop
         self.stop_event = threading.Event()
@@ -143,14 +143,14 @@ class SchedulerThread(threading.Thread):
                     logger.debug(f"Scheduler sleeping for {sleep_duration} seconds.")
                     self.sleep_condition.wait(sleep_duration)
 
-    def stop(self):
+    def stop(self) -> None:
         self.stop_event.set()
         with self.sleep_condition:
             logger.debug("Waking possibly sleeping scheduler.")
             self.sleep_condition.notify()
         logger.info("Scheduler thread stopped.")
 
-    def prod(self):
+    def prod(self) -> None:
         with self.sleep_condition:
             logger.debug("Prodding possibly sleeping scheduler.")
             self.sleep_condition.notify()
@@ -160,7 +160,7 @@ class Globals:
     scheduler: SchedulerThread | None = None
 
 
-def start_scheduler():
+def start_scheduler() -> None:
     loop = asyncio.get_running_loop()
     with timed_acquire(scheduler_lock, timeout_acquire_lifecycle) as acquired:
         if not acquired:
@@ -171,7 +171,7 @@ def start_scheduler():
         Globals.scheduler.start()
 
 
-def stop_scheduler():
+def stop_scheduler() -> None:
     with timed_acquire(scheduler_lock, timeout_acquire_lifecycle) as acquired:
         if not acquired:
             raise ValueError("Could not acquire scheduler_lock within timeout during stop")
@@ -186,14 +186,14 @@ def stop_scheduler():
         Globals.scheduler = None
 
 
-def prod_scheduler():
+def prod_scheduler() -> None:
     if Globals.scheduler is None:
         logger.warning("scheduler is None! No prodding")
     else:
         Globals.scheduler.prod()
 
 
-def status_scheduler():
+def status_scheduler() -> str:
     if not config.api.allow_scheduler:
         return "off"
     if Globals.scheduler is None:

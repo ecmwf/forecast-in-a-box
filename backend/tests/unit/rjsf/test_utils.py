@@ -4,14 +4,14 @@ from forecastbox.utility.rsjf.jsonSchema import ArraySchema, EnumMixin, StringSc
 from forecastbox.utility.rsjf.uiSchema import UIField, UIObjectField
 
 
-def test_update_enum_within_field_string():
+def test_update_enum_within_field_string() -> None:
     field = FieldWithUI(jsonschema=StringSchema(type="string", title="Color"), uischema=None)
     updated = utils.update_enum_within_field(field, ["red", "green"])
     assert isinstance(updated.jsonschema, EnumMixin)
     assert updated.jsonschema.enum == ["red", "green"]
 
 
-def test_update_enum_within_field_array():
+def test_update_enum_within_field_array() -> None:
     arr = ArraySchema(type="array", title="Arr", items=StringSchema(type="string", title="Item"))
     field = FieldWithUI(jsonschema=arr, uischema=None)
     updated = utils.update_enum_within_field(field, ["a", "b"])
@@ -20,7 +20,7 @@ def test_update_enum_within_field_array():
     assert updated.jsonschema.items.enum == ["a", "b"]
 
 
-def test_collapse_enums_if_possible_string():
+def test_collapse_enums_if_possible_string() -> None:
     field = FieldWithUI(jsonschema=StringSchema(type="string", title="X", enum=["only"]), uischema=None)  # type: ignore
     collapsed = utils.collapse_enums_if_possible(field)
     assert collapsed.jsonschema.default == "only"
@@ -28,7 +28,7 @@ def test_collapse_enums_if_possible_string():
     assert collapsed.uischema.disabled is True
 
 
-def test_collapse_enums_if_possible_array():
+def test_collapse_enums_if_possible_array() -> None:
     arr = ArraySchema(type="array", title="Arr", items=StringSchema(type="string", title="Item", enum=["one"]))  # type: ignore
     field = FieldWithUI(jsonschema=arr, uischema=None)
     collapsed = utils.collapse_enums_if_possible(field)
@@ -38,7 +38,7 @@ def test_collapse_enums_if_possible_array():
     assert hasattr(collapsed.uischema, "anyOf")
 
 
-def test_collapse_enums_if_possible_noop():
+def test_collapse_enums_if_possible_noop() -> None:
     # Should not collapse if more than one enum value
     field = FieldWithUI(jsonschema=StringSchema(type="string", title="X", enum=["a", "b"]), uischema=None)  # type: ignore
     result = utils.collapse_enums_if_possible(field)

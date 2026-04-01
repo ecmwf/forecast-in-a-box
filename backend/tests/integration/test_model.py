@@ -1,10 +1,12 @@
+from typing import Any
+
 import httpx
 
 from .conftest import fake_artifact_checkpoint_id, fake_artifact_registry_port, fake_artifact_store_id
 from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token, retry_until
 
 
-def test_download_model(backend_client):
+def test_download_model(backend_client: httpx.Client) -> None:
     """Downloads bunch of artifacts in parallel, tests they successfully appear"""
 
     # TODO shame! This test *assumes* that test_admin_flows has already been executed,
@@ -54,10 +56,10 @@ def test_download_model(backend_client):
         assert result["status"] in ["download submitted", "download in progress"], f"Unexpected status: {result}"
 
     # Wait until all 4 are available
-    def do_action():
+    def do_action() -> Any:
         return backend_client.get("/artifacts/list_models").raise_for_status().json()
 
-    def verify_ok(models) -> bool | None:
+    def verify_ok(models: Any) -> bool | None:
         available = {
             m["composite_id"]["ml_model_checkpoint_id"]
             for m in models

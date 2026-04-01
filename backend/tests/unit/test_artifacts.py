@@ -9,7 +9,9 @@
 
 import json
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -62,13 +64,13 @@ def sample_artifact_stores_config() -> ArtifactStoresConfig:
 
 
 @pytest.fixture
-def tmpdir_path():
+def tmpdir_path() -> Generator[Path, None, None]:
     """Create a temporary directory for testing"""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield Path(tmpdir)
 
 
-def test_composite_artifact_id():
+def test_composite_artifact_id() -> None:
     """Test CompositeArtifactId creation and hashing"""
     id1 = CompositeArtifactId(artifact_store_id="store1", ml_model_checkpoint_id="model1")
     id2 = CompositeArtifactId(artifact_store_id="store1", ml_model_checkpoint_id="model1")
@@ -84,7 +86,7 @@ def test_composite_artifact_id():
     assert test_dict[id2] == "value1"
 
 
-def test_get_artifacts_catalog(sample_artifact_stores_config, sample_checkpoint):
+def test_get_artifacts_catalog(sample_artifact_stores_config: Any, sample_checkpoint: Any) -> None:
     """Test getting artifacts catalog from multiple stores"""
     store1_data = {
         "display_name": "Store 1",
@@ -123,7 +125,7 @@ def test_get_artifacts_catalog(sample_artifact_stores_config, sample_checkpoint)
             assert checkpoint.display_name == "Test Model"
 
 
-def test_get_artifacts_catalog_with_error(sample_artifact_stores_config):
+def test_get_artifacts_catalog_with_error(sample_artifact_stores_config: Any) -> None:
     """Test get_artifacts_catalog raises when there's a network error"""
     with patch("httpx.get") as mock_get:
         mock_get.side_effect = httpx.HTTPError("Network error")
@@ -131,7 +133,7 @@ def test_get_artifacts_catalog_with_error(sample_artifact_stores_config):
             get_artifacts_catalog(sample_artifact_stores_config)
 
 
-def test_get_artifacts_catalog_unsupported_method():
+def test_get_artifacts_catalog_unsupported_method() -> None:
     """Test get_artifacts_catalog with unsupported store method raises"""
     from typing import Literal, cast
 
@@ -148,7 +150,7 @@ def test_get_artifacts_catalog_unsupported_method():
         get_artifacts_catalog(config)
 
 
-def test_list_local_storage_empty(tmpdir_path, sample_checkpoint):
+def test_list_local_storage_empty(tmpdir_path: Path, sample_checkpoint: Any) -> None:
     """Test list_local_storage with no artifacts"""
     catalog: ArtifactCatalog = pmap(
         {
@@ -160,7 +162,7 @@ def test_list_local_storage_empty(tmpdir_path, sample_checkpoint):
     assert result == []
 
 
-def test_list_local_storage_nonexistent_dir(tmpdir_path, sample_checkpoint):
+def test_list_local_storage_nonexistent_dir(tmpdir_path: Path, sample_checkpoint: Any) -> None:
     """Test list_local_storage with nonexistent artifacts directory"""
     catalog: ArtifactCatalog = pmap(
         {
@@ -173,7 +175,7 @@ def test_list_local_storage_nonexistent_dir(tmpdir_path, sample_checkpoint):
     assert result == []
 
 
-def test_list_local_storage_with_artifacts(tmpdir_path, sample_checkpoint):
+def test_list_local_storage_with_artifacts(tmpdir_path: Path, sample_checkpoint: Any) -> None:
     """Test list_local_storage with existing artifacts as files"""
     catalog: ArtifactCatalog = pmap(
         {
@@ -202,7 +204,7 @@ def test_list_local_storage_with_artifacts(tmpdir_path, sample_checkpoint):
     assert CompositeArtifactId("store2", "model3.ckpt") in result
 
 
-def test_list_local_storage_with_unknown_store(tmpdir_path, sample_checkpoint):
+def test_list_local_storage_with_unknown_store(tmpdir_path: Path, sample_checkpoint: Any) -> None:
     """Test list_local_storage with unknown store directory"""
     catalog: ArtifactCatalog = pmap(
         {
@@ -226,7 +228,7 @@ def test_list_local_storage_with_unknown_store(tmpdir_path, sample_checkpoint):
     assert CompositeArtifactId("store1", "model1.ckpt") in result
 
 
-def test_list_local_storage_with_unknown_checkpoint(tmpdir_path, sample_checkpoint):
+def test_list_local_storage_with_unknown_checkpoint(tmpdir_path: Path, sample_checkpoint: Any) -> None:
     """Test list_local_storage with unknown checkpoint in known store"""
     catalog: ArtifactCatalog = pmap(
         {
@@ -248,7 +250,7 @@ def test_list_local_storage_with_unknown_checkpoint(tmpdir_path, sample_checkpoi
     assert CompositeArtifactId("store1", "model1.ckpt") in result
 
 
-def test_get_artifact_local_path(tmpdir_path):
+def test_get_artifact_local_path(tmpdir_path: Path) -> None:
     """Test get_artifact_local_path returns correct path"""
     composite_id = CompositeArtifactId("store1", "model1.ckpt")
     path = get_artifact_local_path(composite_id, tmpdir_path)
@@ -257,7 +259,7 @@ def test_get_artifact_local_path(tmpdir_path):
     assert path == expected
 
 
-def test_get_artifact_local_path_with_string_dir(tmpdir_path):
+def test_get_artifact_local_path_with_string_dir(tmpdir_path: Path) -> None:
     """Test get_artifact_local_path with Path directory path"""
     composite_id = CompositeArtifactId("store1", "model1.ckpt")
     path = get_artifact_local_path(composite_id, tmpdir_path)
@@ -266,7 +268,7 @@ def test_get_artifact_local_path_with_string_dir(tmpdir_path):
     assert path == expected
 
 
-def test_get_artifact_local_path_invalid_characters():
+def test_get_artifact_local_path_invalid_characters() -> None:
     """Test get_artifact_local_path raises on invalid path characters"""
     tmpdir = Path("/tmp")
     invalid_ids = [
@@ -283,7 +285,7 @@ def test_get_artifact_local_path_invalid_characters():
             get_artifact_local_path(invalid_id, tmpdir)
 
 
-def test_download_artifact_success(tmpdir_path, sample_checkpoint):
+def test_download_artifact_success(tmpdir_path: Path, sample_checkpoint: Any) -> None:
     """Test successful artifact download"""
     composite_id = CompositeArtifactId("store1", "model1.ckpt")
 
@@ -309,7 +311,7 @@ def test_download_artifact_success(tmpdir_path, sample_checkpoint):
         assert artifact_path.read_bytes() == mock_content
 
 
-def test_download_artifact_creates_directory(tmpdir_path, sample_checkpoint):
+def test_download_artifact_creates_directory(tmpdir_path: Path, sample_checkpoint: Any) -> None:
     """Test download_artifact creates necessary parent directory"""
     composite_id = CompositeArtifactId("store1", "model1.ckpt")
 
@@ -334,7 +336,7 @@ def test_download_artifact_creates_directory(tmpdir_path, sample_checkpoint):
         assert artifact_path.parent.is_dir()
 
 
-def test_download_artifact_http_error(tmpdir_path, sample_checkpoint):
+def test_download_artifact_http_error(tmpdir_path: Path, sample_checkpoint: Any) -> None:
     """Test download_artifact handles HTTP errors"""
     composite_id = CompositeArtifactId("store1", "model1.ckpt")
 
@@ -351,7 +353,7 @@ def test_download_artifact_http_error(tmpdir_path, sample_checkpoint):
             download_artifact(composite_id, sample_checkpoint, tmpdir_path)
 
 
-def test_download_artifact_chunked_download(tmpdir_path, sample_checkpoint):
+def test_download_artifact_chunked_download(tmpdir_path: Path, sample_checkpoint: Any) -> None:
     """Test download_artifact handles chunked downloads"""
     composite_id = CompositeArtifactId("store1", "model1.ckpt")
 

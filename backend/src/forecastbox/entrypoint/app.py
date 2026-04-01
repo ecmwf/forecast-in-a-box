@@ -14,12 +14,14 @@ import logging
 import os
 import pkgutil
 import time
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fiab_core.artifacts import ArtifactsProvider
@@ -40,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.debug(f"Starting FIAB with config: {config}")
     for module_info in pkgutil.iter_modules(forecastbox.schemata.__path__):
         module = importlib.import_module(f"forecastbox.schemata.{module_info.name}")
@@ -100,7 +102,7 @@ app.add_middleware(
 
 
 @app.middleware("http")
-async def add_process_time_header(request: Request, call_next):
+async def add_process_time_header(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
     start_time = time.time()
     response = await call_next(request)
     logger.debug(f"Request took {time.time() - start_time:0.2f} sec")
@@ -108,7 +110,7 @@ async def add_process_time_header(request: Request, call_next):
 
 
 @app.middleware("http")
-async def circumvent_auth(request: Request, call_next):
+async def circumvent_auth(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
     # TODO this is a hotfix, we'd instead like to fix properly in api/routers/auth.py
     if request.url.path == "/api/v1/users/me" and config.auth.passthrough:
         from starlette.responses import JSONResponse
@@ -119,7 +121,7 @@ async def circumvent_auth(request: Request, call_next):
 
 
 @app.get("/api/v1/share/{job_id}/{dataset_id}", response_class=HTMLResponse, tags=["share"], summary="Share Image")
-async def share_image(request: Request, job_id: str, dataset_id: str):
+async def share_image(request: Request, job_id: str, dataset_id: str) -> HTMLResponse:
     """Endpoint to share an image from a job and dataset ID."""
     base_url = str(request.base_url).rstrip("/")
     image_url = f"{base_url}/api/v1/job/{job_id}/{dataset_id}"
@@ -132,7 +134,7 @@ frontend = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 class SPAStaticFiles(StaticFiles):
     """Custom StaticFiles class to handle SPA routing."""
 
-    async def get_response(self, path: str, scope):
+    async def get_response(self, path: str, scope: Any) -> Response:
         try:
             return await super().get_response(path, scope)
         except HTTPException as ex:

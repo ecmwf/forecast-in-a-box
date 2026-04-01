@@ -35,7 +35,7 @@ from forecastbox.utility.rsjf.uiSchema import UIAdditionalProperties, UIField, U
 class TestHelperFunctions:
     """Test helper functions used in from_pydantic module."""
 
-    def test_update_with_extra_json_with_rjsf_data(self):
+    def test_update_with_extra_json_with_rjsf_data(self) -> None:
         field = FieldInfo(json_schema_extra={"rjsf": {"title": "Custom Title", "widget": "textarea"}})
         schema = StringSchema(type="string")
         ui = UIStringField()
@@ -45,7 +45,7 @@ class TestHelperFunctions:
         assert updated_schema.title == "Custom Title"
         assert updated_ui.widget == "textarea"
 
-    def test_update_with_extra_json_without_rjsf_data(self):
+    def test_update_with_extra_json_without_rjsf_data(self) -> None:
         field = FieldInfo()
         schema = StringSchema(type="string")
         ui = UIStringField()
@@ -55,7 +55,7 @@ class TestHelperFunctions:
         assert updated_schema is schema
         assert updated_ui is ui
 
-    def test_update_with_extra_json_invalid_key(self):
+    def test_update_with_extra_json_invalid_key(self) -> None:
         field = FieldInfo(json_schema_extra={"rjsf": {"invalid_key": "value"}})
         schema = StringSchema(type="string")
         ui = UIStringField()
@@ -63,7 +63,7 @@ class TestHelperFunctions:
         with pytest.raises(ValueError, match="Unknown rjsf extra key: invalid_key"):
             _update_with_extra_json(field, schema, ui)
 
-    def test_update_with_extra_json_invalid_rjsf_type(self):
+    def test_update_with_extra_json_invalid_rjsf_type(self) -> None:
         field = FieldInfo(json_schema_extra={"rjsf": "not_a_dict"})
         schema = StringSchema(type="string")
         ui = UIStringField()
@@ -71,7 +71,7 @@ class TestHelperFunctions:
         with pytest.raises(AssertionError, match="rjsf extra must be a dict"):
             _update_with_extra_json(field, schema, ui)
 
-    def test_set_base_field_info_with_default(self):
+    def test_set_base_field_info_with_default(self) -> None:
         field = FieldInfo(default="test_default", title="Test Title", description="Test Description")
         schema = StringSchema(type="string")
         ui = UIStringField()
@@ -83,8 +83,8 @@ class TestHelperFunctions:
         assert updated_schema.description == "Test Description"
         assert updated_ui.description == "Test Description"
 
-    def test_set_base_field_info_with_default_factory(self):
-        def factory():
+    def test_set_base_field_info_with_default_factory(self) -> None:
+        def factory() -> str:
             return "factory_value"
 
         field = FieldInfo(default_factory=factory)
@@ -99,7 +99,7 @@ class TestHelperFunctions:
 class TestPrimitiveConversions:
     """Test primitive type conversions."""
 
-    def test_from_string_primitive(self):
+    def test_from_string_primitive(self) -> None:
         field = FieldInfo(title="String Field", description="A string field")
         result = _from_string_primative(field)
 
@@ -110,7 +110,7 @@ class TestPrimitiveConversions:
         assert isinstance(result.uischema, UIStringField)
         assert result.uischema.description == "A string field"
 
-    def test_from_date_primitive(self):
+    def test_from_date_primitive(self) -> None:
         field = FieldInfo(title="Date Field")
         result = _from_date_primative(field)
 
@@ -121,7 +121,7 @@ class TestPrimitiveConversions:
         assert isinstance(result.uischema, UIStringField)
         assert result.uischema.widget == "date"
 
-    def test_from_literal_primitive_strings(self):
+    def test_from_literal_primitive_strings(self) -> None:
         field = FieldInfo(annotation=Literal["option1", "option2", "option3"])
         result = _from_literal_primative(field)
 
@@ -131,13 +131,13 @@ class TestPrimitiveConversions:
         assert isinstance(result.uischema, UIStringField)
         assert result.uischema.widget == "select"
 
-    def test_from_literal_primitive_invalid_type(self):
+    def test_from_literal_primitive_invalid_type(self) -> None:
         field = FieldInfo(annotation=Literal[1, 2, 3])
 
         with pytest.raises(TypeError, match="Only Literal\\[str, ...\\] is supported"):
             _from_literal_primative(field)
 
-    def test_from_literal_primitive_single_value(self):
+    def test_from_literal_primitive_single_value(self) -> None:
         field = FieldInfo(annotation=Literal["only_one"])
         result = _from_literal_primative(field)
 
@@ -147,7 +147,7 @@ class TestPrimitiveConversions:
         assert isinstance(result.uischema, UIStringField)
         assert result.uischema.widget == "select"
 
-    def test_from_integer_primitive(self):
+    def test_from_integer_primitive(self) -> None:
         field = FieldInfo(title="Integer Field", default=42)
         result = _from_integer_primative(field)
 
@@ -157,7 +157,7 @@ class TestPrimitiveConversions:
         assert result.jsonschema.default == 42
         assert isinstance(result.uischema, UIIntegerField)
 
-    def test_from_boolean_primitive(self):
+    def test_from_boolean_primitive(self) -> None:
         field = FieldInfo(title="Boolean Field", default=True)
         result = _from_boolean_primative(field)
 
@@ -168,7 +168,7 @@ class TestPrimitiveConversions:
         assert isinstance(result.uischema, UIField)
         assert result.uischema.widget == "checkbox"
 
-    def test_from_dict_primitive_string_values(self):
+    def test_from_dict_primitive_string_values(self) -> None:
         field = FieldInfo(annotation=Dict[str, str])
         result = _from_dict_primative(field)
 
@@ -180,7 +180,7 @@ class TestPrimitiveConversions:
         assert isinstance(result.uischema, UIAdditionalProperties)
         assert isinstance(result.uischema.additionalProperties, UIStringField)
 
-    def test_from_dict_primitive_int_values(self):
+    def test_from_dict_primitive_int_values(self) -> None:
         field = FieldInfo(annotation=Dict[str, int])
         result = _from_dict_primative(field)
 
@@ -190,7 +190,7 @@ class TestPrimitiveConversions:
         assert isinstance(result.uischema, UIAdditionalProperties)
         assert isinstance(result.uischema.additionalProperties, UIIntegerField)
 
-    def test_from_dict_primitive_bool_values(self):
+    def test_from_dict_primitive_bool_values(self) -> None:
         field = FieldInfo(annotation=Dict[str, bool])
         result = _from_dict_primative(field)
 
@@ -201,7 +201,7 @@ class TestPrimitiveConversions:
         assert isinstance(result.uischema.additionalProperties, UIField)
         assert result.uischema.additionalProperties.widget == "checkbox"
 
-    def test_from_dict_primitive_basemodel_values(self):
+    def test_from_dict_primitive_basemodel_values(self) -> None:
         """Test dict with BaseModel values - new functionality."""
 
         class NestedModel(BaseModel):
@@ -238,7 +238,7 @@ class TestPrimitiveConversions:
         assert result.uischema.additionalProperties.anyOf is not None
         assert len(result.uischema.additionalProperties.anyOf) == 3
 
-    def test_from_dict_primitive_nested_basemodel_values(self):
+    def test_from_dict_primitive_nested_basemodel_values(self) -> None:
         """Test dict with nested BaseModel values."""
 
         class Address(BaseModel):
@@ -269,13 +269,13 @@ class TestPrimitiveConversions:
         assert additional_props.required is not None
         assert set(additional_props.required) == {"name", "address"}
 
-    def test_from_dict_primitive_unsupported_value_type(self):
+    def test_from_dict_primitive_unsupported_value_type(self) -> None:
         field = FieldInfo(annotation=Dict[str, float])
 
         with pytest.raises(ValueError, match="Unsupported dict value type: <class 'float'>"):
             _from_dict_primative(field)
 
-    def test_from_list_primitive_string_items(self):
+    def test_from_list_primitive_string_items(self) -> None:
         field = FieldInfo(annotation=List[str])
         result = _from_list_primative(field)
 
@@ -287,7 +287,7 @@ class TestPrimitiveConversions:
         assert len(result.uischema.anyOf) == 1  # type: ignore
         assert isinstance(result.uischema.anyOf[0], UIStringField)  # type: ignore
 
-    def test_from_list_primitive_int_items(self):
+    def test_from_list_primitive_int_items(self) -> None:
         field = FieldInfo(annotation=List[int])
         result = _from_list_primative(field)
 
@@ -296,7 +296,7 @@ class TestPrimitiveConversions:
         assert result.jsonschema.items.type == "integer"
         assert isinstance(result.uischema.anyOf[0], UIIntegerField)  # type: ignore
 
-    def test_from_list_primitive_bool_items(self):
+    def test_from_list_primitive_bool_items(self) -> None:
         field = FieldInfo(annotation=List[bool])
         result = _from_list_primative(field)
 
@@ -306,7 +306,7 @@ class TestPrimitiveConversions:
         assert isinstance(result.uischema.anyOf[0], UIField)  # type: ignore
         assert result.uischema.anyOf[0].widget == "checkbox"  # type: ignore
 
-    def test_from_list_primitive_unsupported_item_type(self):
+    def test_from_list_primitive_unsupported_item_type(self) -> None:
         field = FieldInfo(annotation=List[float])
 
         with pytest.raises(ValueError, match="Unsupported list item type: <class 'float'>"):
@@ -316,7 +316,7 @@ class TestPrimitiveConversions:
 class TestFromPydantic:
     """Test the main from_pydantic function."""
 
-    def test_simple_model_with_basic_types(self):
+    def test_simple_model_with_basic_types(self) -> None:
         class SimpleModel(BaseModel):
             name: str
             age: int
@@ -345,7 +345,7 @@ class TestFromPydantic:
         assert fields["birth_date"].jsonschema.format == "date"
         assert fields["birth_date"].uischema.widget == "date"
 
-    def test_model_with_defaults(self):
+    def test_model_with_defaults(self) -> None:
         class ModelWithDefaults(BaseModel):
             name: str = "Default Name"
             age: int = Field(default=25, title="Person Age")
@@ -361,7 +361,7 @@ class TestFromPydantic:
         assert fields["age"].jsonschema.title == "Person Age"
         assert fields["is_active"].jsonschema.default is True
 
-    def test_model_with_optional_fields(self):
+    def test_model_with_optional_fields(self) -> None:
         class OptionalModel(BaseModel):
             name: str
             nickname: Optional[str] = None
@@ -376,7 +376,7 @@ class TestFromPydantic:
         assert fields["nickname"].jsonschema.type == ["string", "null"]
         assert fields["age"].jsonschema.type == ["integer", "null"]
 
-    def test_model_with_literal_field(self):
+    def test_model_with_literal_field(self) -> None:
         class LiteralModel(BaseModel):
             status: Literal["active", "inactive", "pending"]
             name: str
@@ -390,7 +390,7 @@ class TestFromPydantic:
         assert fields["status"].jsonschema.enum == ["active", "inactive", "pending"]
         assert fields["status"].uischema.widget == "select"
 
-    def test_model_with_multiple_literal_fields(self):
+    def test_model_with_multiple_literal_fields(self) -> None:
         class MultiLiteralModel(BaseModel):
             priority: Literal["low", "medium", "high"]
             category: Literal["bug", "feature", "enhancement"]
@@ -413,7 +413,7 @@ class TestFromPydantic:
         assert fields["single_option"].jsonschema.enum == ["only_choice"]
         assert fields["single_option"].uischema.widget == "select"
 
-    def test_model_with_dict_and_list_fields(self):
+    def test_model_with_dict_and_list_fields(self) -> None:
         class ComplexModel(BaseModel):
             metadata: Dict[str, str]
             tags: List[str]
@@ -439,7 +439,7 @@ class TestFromPydantic:
         # Check list with bool items
         assert isinstance(fields["flags"].jsonschema.items, BooleanSchema)
 
-    def test_model_with_dict_basemodel_values(self):
+    def test_model_with_dict_basemodel_values(self) -> None:
         """Test model with Dict[str, BaseModel] field - new functionality."""
 
         class Config(BaseModel):
@@ -473,7 +473,7 @@ class TestFromPydantic:
         assert isinstance(config_field.uischema, UIAdditionalProperties)
         assert isinstance(config_field.uischema.additionalProperties, UIObjectField)
 
-    def test_model_with_complex_dict_nesting(self):
+    def test_model_with_complex_dict_nesting(self) -> None:
         """Test complex nesting with Dict[str, BaseModel] containing other BaseModels."""
 
         class DatabaseConfig(BaseModel):
@@ -514,7 +514,7 @@ class TestFromPydantic:
         assert database_prop.properties["ssl_enabled"].default is False
         assert database_prop.required == ["host"]
 
-    def test_nested_model(self):
+    def test_nested_model(self) -> None:
         class Address(BaseModel):
             street: str
             city: str
@@ -540,7 +540,7 @@ class TestFromPydantic:
         assert isinstance(fields["address"].uischema, UIObjectField)
         assert len(fields["address"].uischema.anyOf) == 3  # type: ignore
 
-    def test_model_with_excluded_field(self):
+    def test_model_with_excluded_field(self) -> None:
         class ModelWithExcluded(BaseModel):
             name: str
             secret: str = Field(exclude=True)
@@ -552,7 +552,7 @@ class TestFromPydantic:
         assert "secret" not in fields
         assert set(required) == {"name", "age"}
 
-    def test_model_with_field_aliases(self):
+    def test_model_with_field_aliases(self) -> None:
         class AliasModel(BaseModel):
             full_name: str = Field(alias="fullName", title="Full Name")
             user_id: int = Field(serialization_alias="userId")
@@ -564,7 +564,7 @@ class TestFromPydantic:
         assert "userId" in fields  # Uses serialization_alias as field name
         assert set(required) == {"fullName", "userId"}
 
-    def test_model_with_rjsf_extra(self):
+    def test_model_with_rjsf_extra(self) -> None:
         class RJSFModel(BaseModel):
             description: str = Field(json_schema_extra={"rjsf": {"widget": "textarea", "placeholder": "Enter description here"}})
             priority: int = Field(json_schema_extra={"rjsf": {"minimum": 1, "maximum": 10}})
@@ -577,7 +577,7 @@ class TestFromPydantic:
         assert fields["priority"].jsonschema.minimum == 1
         assert fields["priority"].jsonschema.maximum == 10
 
-    def test_empty_model(self):
+    def test_empty_model(self) -> None:
         class EmptyModel(BaseModel):
             pass
 
@@ -586,7 +586,7 @@ class TestFromPydantic:
         assert len(fields) == 0
         assert len(required) == 0
 
-    def test_model_with_no_annotation_field(self):
+    def test_model_with_no_annotation_field(self) -> None:
         # This tests the fallback to string when no annotation is provided
         class NoAnnotationModel(BaseModel):
             name: str
@@ -600,7 +600,7 @@ class TestFromPydantic:
         assert "mystery_field" in fields
         assert fields["mystery_field"].jsonschema.type == "string"
 
-    def test_unsupported_field_type_fallback(self):
+    def test_unsupported_field_type_fallback(self) -> None:
         # This would test the final fallback in the else clause
         # but since the actual line 225 has a syntax error, we'll test what should happen
         class UnsupportedModel(BaseModel):
@@ -617,11 +617,11 @@ class TestFromPydantic:
 class TestPrimativesMapping:
     """Test the PRIMATIVES mapping."""
 
-    def test_primatives_mapping_completeness(self):
+    def test_primatives_mapping_completeness(self) -> None:
         expected_types = {str, int, bool, date, dict, list, object}
         assert set(PRIMATIVES.keys()) == expected_types
 
-    def test_primatives_mapping_functions(self):
+    def test_primatives_mapping_functions(self) -> None:
         assert PRIMATIVES[str] == _from_string_primative
         assert PRIMATIVES[int] == _from_integer_primative
         assert PRIMATIVES[bool] == _from_boolean_primative
@@ -634,7 +634,7 @@ class TestPrimativesMapping:
 class TestEdgeCases:
     """Test edge cases and error conditions."""
 
-    def test_model_with_union_type_first_arg_used(self):
+    def test_model_with_union_type_first_arg_used(self) -> None:
         class UnionModel(BaseModel):
             value: Union[str, int]  # Should use str (first type)
 
@@ -642,7 +642,7 @@ class TestEdgeCases:
 
         assert fields["value"].jsonschema.type == "string"
 
-    def test_dict_basemodel_with_rjsf_extra(self):
+    def test_dict_basemodel_with_rjsf_extra(self) -> None:
         """Test Dict[str, BaseModel] with RJSF extra configuration."""
 
         class ConfigItem(BaseModel):
@@ -669,7 +669,7 @@ class TestEdgeCases:
         assert priority_prop.minimum == 1
         assert priority_prop.maximum == 5
 
-    def test_dict_basemodel_empty_model(self):
+    def test_dict_basemodel_empty_model(self) -> None:
         """Test Dict[str, BaseModel] where BaseModel is empty."""
 
         class EmptyModel(BaseModel):
@@ -686,7 +686,7 @@ class TestEdgeCases:
         assert additional_props.properties == {}
         assert additional_props.required is None or additional_props.required == []
 
-    def test_dict_basemodel_with_optional_fields(self):
+    def test_dict_basemodel_with_optional_fields(self) -> None:
         """Test Dict[str, BaseModel] where BaseModel has optional fields."""
 
         class OptionalModel(BaseModel):
@@ -714,7 +714,7 @@ class TestEdgeCases:
         default_prop = additional_props.properties["default_field"]
         assert default_prop.default == 42
 
-    def test_dict_basemodel_issubclass_error_handling(self):
+    def test_dict_basemodel_issubclass_error_handling(self) -> None:
         """Test error handling when issubclass check fails."""
         # This tests the robustness of the issubclass check
         field = FieldInfo(annotation=Dict[str, str])  # This should not trigger BaseModel path
@@ -723,7 +723,7 @@ class TestEdgeCases:
         # Should use string handling, not BaseModel
         assert isinstance(result.jsonschema.additionalProperties, StringSchema)
 
-    def test_deeply_nested_model(self):
+    def test_deeply_nested_model(self) -> None:
         class Level3(BaseModel):
             value: str
 
@@ -746,7 +746,7 @@ class TestEdgeCases:
 class TestDictBaseModelIntegration:
     """Integration tests for the new Dict[str, BaseModel] functionality."""
 
-    def test_comprehensive_basemodel_dict_scenario(self):
+    def test_comprehensive_basemodel_dict_scenario(self) -> None:
         """Comprehensive test covering multiple aspects of Dict[str, BaseModel]."""
 
         class Validation(BaseModel):
@@ -805,7 +805,7 @@ class TestDictBaseModelIntegration:
         assert metadata_prop.type == "object"
         assert isinstance(metadata_prop.additionalProperties, StringSchema)
 
-    def test_circular_reference_prevention(self):
+    def test_circular_reference_prevention(self) -> None:
         """Test that circular references are handled gracefully."""
 
         class Node(BaseModel):
@@ -827,7 +827,7 @@ class TestDictBaseModelIntegration:
         assert "name" in additional_props.properties
         assert "value" in additional_props.properties
 
-    def test_mixed_dict_types_in_model(self):
+    def test_mixed_dict_types_in_model(self) -> None:
         """Test a model with various dictionary types."""
 
         class ComplexItem(BaseModel):

@@ -9,7 +9,7 @@ import pydantic
 from cascade.executor.config import logging_config, logging_config_filehandler
 
 
-def setup_process(log_path: str | None = None):
+def setup_process(log_path: str | None = None) -> None:
     """Invoke at the start of each new process. Configures logging etc"""
     if log_path is not None:
         logging.config.dictConfig(logging_config_filehandler(log_path))
@@ -17,7 +17,7 @@ def setup_process(log_path: str | None = None):
         logging.config.dictConfig(logging_config)
 
 
-def export_recursive(dikt, delimiter, prefix):
+def export_recursive(dikt: dict, delimiter: str, prefix: str) -> None:
     for k, v in dikt.items():
         if isinstance(v, dict):
             export_recursive(v, delimiter, f"{prefix}{k}{delimiter}")

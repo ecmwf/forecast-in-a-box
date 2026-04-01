@@ -37,7 +37,7 @@ async def dbRetry(func: Callable[[int], Awaitable[T]]) -> T:
     raise ValueError  # NOTE in case of retries misconfig, we dont want implicit None
 
 
-async def executeAndCommit(stmt, session_maker) -> None:
+async def executeAndCommit(stmt: Any, session_maker: Any) -> None:
     async def func(i: int) -> None:
         async with session_maker() as session:
             await session.execute(stmt)
@@ -46,7 +46,7 @@ async def executeAndCommit(stmt, session_maker) -> None:
     await dbRetry(func)
 
 
-async def addAndCommit(entity, session_maker) -> None:
+async def addAndCommit(entity: Any, session_maker: Any) -> None:
     async def func(i: int) -> None:
         async with session_maker() as session:
             session.add(entity)
@@ -55,7 +55,7 @@ async def addAndCommit(entity, session_maker) -> None:
     await dbRetry(func)
 
 
-async def querySingle(query, session_maker) -> Any:
+async def querySingle(query: Any, session_maker: Any) -> Any:
     async def func(i: int) -> Any:
         async with session_maker() as session:
             result = await session.execute(query)
@@ -66,7 +66,7 @@ async def querySingle(query, session_maker) -> Any:
     return await dbRetry(func)
 
 
-async def queryCount(query, session) -> int:
+async def queryCount(query: Any, session: Any) -> int:
     # TODO scalar_one
     result = (await session.execute(query)).scalar()
     if result is None or not isinstance(result, int):

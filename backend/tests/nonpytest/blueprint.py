@@ -12,7 +12,7 @@ from forecastbox.entrypoint.main import launch_all
 from forecastbox.utility.config import FIABConfig
 
 
-def ensure_completed(backend_client, job_id, sleep=0.5, attempts=20):
+def ensure_completed(backend_client: httpx.Client, job_id: str, sleep: float = 0.5, attempts: int = 20) -> None:
     while attempts > 0:
         response = backend_client.get("/job/status", timeout=10)
         assert response.is_success
