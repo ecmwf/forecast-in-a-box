@@ -62,7 +62,7 @@ export const jobHandlers = [
     const pageExecutions = executions.slice(start, start + pageSize)
 
     return HttpResponse.json({
-      executions: pageExecutions,
+      runs: pageExecutions,
       total,
       page,
       page_size: pageSize,
@@ -74,11 +74,11 @@ export const jobHandlers = [
     await delay(150)
 
     const url = new URL(request.url)
-    const executionId = url.searchParams.get('execution_id')
+    const executionId = url.searchParams.get('run_id')
 
     if (!executionId) {
       return HttpResponse.json(
-        { detail: 'Missing execution_id parameter' },
+        { detail: 'Missing run_id parameter' },
         { status: 400 },
       )
     }
@@ -99,10 +99,10 @@ export const jobHandlers = [
     await delay(400)
 
     const body = (await request.json()) as {
-      execution_id: string
+      run_id: string
       attempt_count: number
     }
-    const executionId = body.execution_id
+    const executionId = body.run_id
     const result = restartExecution(executionId)
 
     if (!result) {
@@ -119,11 +119,11 @@ export const jobHandlers = [
     await delay(150)
 
     const url = new URL(request.url)
-    const executionId = url.searchParams.get('execution_id')
+    const executionId = url.searchParams.get('run_id')
 
     if (!executionId) {
       return HttpResponse.json(
-        { detail: 'Missing execution_id parameter' },
+        { detail: 'Missing run_id parameter' },
         { status: 400 },
       )
     }
@@ -145,12 +145,12 @@ export const jobHandlers = [
     await delay(300)
 
     const url = new URL(request.url)
-    const executionId = url.searchParams.get('execution_id')
+    const executionId = url.searchParams.get('run_id')
     const datasetId = url.searchParams.get('dataset_id')
 
     if (!executionId) {
       return HttpResponse.json(
-        { detail: 'Missing execution_id parameter' },
+        { detail: 'Missing run_id parameter' },
         { status: 400 },
       )
     }
@@ -184,11 +184,11 @@ export const jobHandlers = [
     await delay(200)
 
     const url = new URL(request.url)
-    const executionId = url.searchParams.get('execution_id')
+    const executionId = url.searchParams.get('run_id')
 
     if (!executionId) {
       return HttpResponse.json(
-        { detail: 'Missing execution_id parameter' },
+        { detail: 'Missing run_id parameter' },
         { status: 400 },
       )
     }
@@ -218,14 +218,14 @@ export const jobHandlers = [
     await delay(200)
 
     const body = (await request.json()) as {
-      execution_id: string
+      run_id: string
       attempt_count: number
     }
-    const executionId = body.execution_id
+    const executionId = body.run_id
 
     if (!executionId) {
       return HttpResponse.json(
-        { detail: 'Missing execution_id parameter' },
+        { detail: 'Missing run_id parameter' },
         { status: 400 },
       )
     }

@@ -58,19 +58,19 @@ export const API_ENDPOINTS = {
    */
   fable: {
     /** GET - Get block catalogue */
-    catalogue: `${API_PREFIX}/job_definition/catalogue`,
+    catalogue: `${API_PREFIX}/blueprint/catalogue`,
     /** PUT - Expand a fable configuration */
-    expand: `${API_PREFIX}/job_definition/expand`,
+    expand: `${API_PREFIX}/blueprint/expand`,
     /** GET - Retrieve a saved fable with metadata */
-    get: `${API_PREFIX}/job_definition/get`,
-    /** POST - Create a fable with metadata (returns { job_definition_id, version }) */
-    create: `${API_PREFIX}/job_definition/create`,
+    get: `${API_PREFIX}/blueprint/get`,
+    /** POST - Create a fable with metadata (returns { blueprint_id, version }) */
+    create: `${API_PREFIX}/blueprint/create`,
     /** POST - Update a fable with metadata */
-    update: `${API_PREFIX}/job_definition/update`,
+    update: `${API_PREFIX}/blueprint/update`,
     /** GET - List all fable definitions */
-    list: `${API_PREFIX}/job_definition/list`,
+    list: `${API_PREFIX}/blueprint/list`,
     /** POST - Delete a fable definition */
-    delete: `${API_PREFIX}/job_definition/delete`,
+    delete: `${API_PREFIX}/blueprint/delete`,
   },
 
   /**
@@ -137,22 +137,22 @@ export const API_ENDPOINTS = {
    * Job monitoring and execution endpoints
    */
   job: {
-    /** POST - Submit a job for execution (by definition id) */
-    create: `${API_PREFIX}/job_execution/create`,
+    /** POST - Submit a job for execution (by blueprint id) */
+    create: `${API_PREFIX}/run/create`,
     /** GET - Get paginated status of all executions */
-    list: `${API_PREFIX}/job_execution/list`,
-    /** GET - Get status of a single execution (query: execution_id) */
-    get: `${API_PREFIX}/job_execution/get`,
-    /** POST - Restart an execution (body: { execution_id, attempt_count }) */
-    restart: `${API_PREFIX}/job_execution/restart`,
-    /** GET - Get list of available output task IDs (query: execution_id) */
-    outputAvailability: `${API_PREFIX}/job_execution/outputAvailability`,
-    /** GET - Get job result data by task ID (query: execution_id, dataset_id) */
-    outputContent: `${API_PREFIX}/job_execution/outputContent`,
-    /** GET - Download job logs as ZIP (query: execution_id) */
-    logs: `${API_PREFIX}/job_execution/logs`,
-    /** POST - Delete an execution (body: { execution_id, attempt_count }) */
-    delete: `${API_PREFIX}/job_execution/delete`,
+    list: `${API_PREFIX}/run/list`,
+    /** GET - Get status of a single execution (query: run_id) */
+    get: `${API_PREFIX}/run/get`,
+    /** POST - Restart an execution (body: { run_id, attempt_count }) */
+    restart: `${API_PREFIX}/run/restart`,
+    /** GET - Get list of available output task IDs (query: run_id) */
+    outputAvailability: `${API_PREFIX}/run/outputAvailability`,
+    /** GET - Get job result data by task ID (query: run_id, dataset_id) */
+    outputContent: `${API_PREFIX}/run/outputContent`,
+    /** GET - Download job logs as ZIP (query: run_id) */
+    logs: `${API_PREFIX}/run/logs`,
+    /** POST - Delete an execution (body: { run_id, attempt_count }) */
+    delete: `${API_PREFIX}/run/delete`,
   },
 
   /**

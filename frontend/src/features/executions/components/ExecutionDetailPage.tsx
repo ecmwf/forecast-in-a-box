@@ -49,7 +49,7 @@ export function ExecutionDetailPage() {
   const deleteMutation = useDeleteJob()
 
   const jobData = statusQuery.data
-  const { data: fableData } = useFableRetrieve(jobData?.job_definition_id)
+  const { data: fableData } = useFableRetrieve(jobData?.blueprint_id)
 
   const layoutMode = useUiStore((state) => state.layoutMode)
   const { data: catalogue } = useBlockCatalogue()
@@ -86,10 +86,10 @@ export function ExecutionDetailPage() {
   }
 
   const handleEditConfig = () => {
-    if (!jobData?.job_definition_id) return
+    if (!jobData?.blueprint_id) return
     navigate({
       to: '/configure',
-      search: { fableId: jobData.job_definition_id },
+      search: { fableId: jobData.blueprint_id },
     })
   }
 
@@ -128,7 +128,7 @@ export function ExecutionDetailPage() {
   if (!jobData) return null
 
   const jobName = fableData?.display_name ?? t('detail.untitledJob')
-  const canEditConfig = !!jobData.job_definition_id
+  const canEditConfig = !!jobData.blueprint_id
 
   return (
     <div

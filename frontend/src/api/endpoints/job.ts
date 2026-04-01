@@ -81,7 +81,7 @@ export async function getJobStatus(
   executionId: string,
 ): Promise<JobExecutionDetail> {
   return apiClient.get(API_ENDPOINTS.job.get, {
-    params: { execution_id: executionId },
+    params: { run_id: executionId },
     schema: JobExecutionDetailSchema,
   })
 }
@@ -90,7 +90,7 @@ export async function getJobAvailable(
   executionId: string,
 ): Promise<Array<string>> {
   return apiClient.get(API_ENDPOINTS.job.outputAvailability, {
-    params: { execution_id: executionId },
+    params: { run_id: executionId },
     schema: z.array(z.string()),
   })
 }
@@ -100,7 +100,7 @@ export async function getJobResult(
   datasetId: string,
 ): Promise<{ blob: Blob; contentType: string }> {
   const url = buildFullUrl(API_ENDPOINTS.job.outputContent, {
-    execution_id: executionId,
+    run_id: executionId,
     dataset_id: datasetId,
   })
 
@@ -124,7 +124,7 @@ export async function getJobResult(
 
 export async function downloadJobLogs(executionId: string): Promise<Blob> {
   const url = buildFullUrl(API_ENDPOINTS.job.logs, {
-    execution_id: executionId,
+    run_id: executionId,
   })
 
   const response = await fetch(url, {
@@ -148,7 +148,7 @@ export async function restartJob(
 ): Promise<JobExecuteResponse> {
   return apiClient.post(
     API_ENDPOINTS.job.restart,
-    { execution_id: executionId, attempt_count: attemptCount },
+    { run_id: executionId, attempt_count: attemptCount },
     {
       schema: JobExecuteResponseSchema,
     },
@@ -160,7 +160,7 @@ export async function deleteJob(
   attemptCount: number,
 ): Promise<void> {
   return apiClient.post(API_ENDPOINTS.job.delete, {
-    execution_id: executionId,
+    run_id: executionId,
     attempt_count: attemptCount,
   })
 }

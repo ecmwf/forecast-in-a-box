@@ -127,9 +127,9 @@ interface SubmitFableParams {
 }
 
 export function useSubmitFable() {
-  return useMutation<{ execution_id: string }, Error, SubmitFableParams>({
+  return useMutation<{ run_id: string }, Error, SubmitFableParams>({
     mutationFn: async ({ fable, name, description, tags, fableId }) => {
-      const { job_definition_id, version } = await upsertFable({
+      const { blueprint_id, version } = await upsertFable({
         builder: fable,
         display_name: name,
         display_description: description,
@@ -138,8 +138,8 @@ export function useSubmitFable() {
       })
 
       return executeJob({
-        job_definition_id,
-        job_definition_version: version,
+        blueprint_id,
+        blueprint_version: version,
       })
     },
   })

@@ -62,8 +62,8 @@ export const scheduleHandlers = [
     return HttpResponse.json({
       experiment_id: 'mock-schedule-1',
       experiment_version: 1,
-      job_definition_id: 'mock-job-def',
-      job_definition_version: 1,
+      blueprint_id: 'mock-blueprint',
+      blueprint_version: 1,
       cron_expr: '0 6 * * *',
       dynamic_expr: {},
       max_acceptable_delay_hours: 24,

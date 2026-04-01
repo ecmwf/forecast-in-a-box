@@ -134,7 +134,7 @@ export const fableHandlers = [
       }
 
       return HttpResponse.json({
-        job_definition_id: parent_id,
+        blueprint_id: parent_id,
         version: newVersion,
       })
     }
@@ -153,18 +153,18 @@ export const fableHandlers = [
       updated_at: now,
     }
 
-    return HttpResponse.json({ job_definition_id: newId, version: 1 })
+    return HttpResponse.json({ blueprint_id: newId, version: 1 })
   }),
 
   http.get(API_ENDPOINTS.fable.get, async ({ request }) => {
     await delay(300)
 
     const url = new URL(request.url)
-    const fableId = url.searchParams.get('job_definition_id')
+    const fableId = url.searchParams.get('blueprint_id')
 
     if (!fableId) {
       return HttpResponse.json(
-        { message: 'Missing job_definition_id parameter' },
+        { message: 'Missing blueprint_id parameter' },
         { status: 400 },
       )
     }
@@ -175,7 +175,7 @@ export const fableHandlers = [
     }
 
     return HttpResponse.json({
-      job_definition_id: fableId,
+      blueprint_id: fableId,
       version: fableVersions[fableId] ?? 1,
       builder: saved.fable,
       display_name: saved.display_name,

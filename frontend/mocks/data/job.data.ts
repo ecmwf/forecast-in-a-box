@@ -134,49 +134,49 @@ let executionsState: Record<string, JobExecutionDetail> = {}
 
 const seedExecutionsV2: Array<JobExecutionDetail> = [
   {
-    execution_id: 'job-completed-001',
+    run_id: 'job-completed-001',
     attempt_count: 1,
     status: 'completed',
     created_at: threeDaysAgo,
     updated_at: threeDaysAgo,
-    job_definition_id: 'def-001',
-    job_definition_version: 1,
+    blueprint_id: 'def-001',
+    blueprint_version: 1,
     error: null,
     progress: '100',
     cascade_job_id: 'cascade-001',
   },
   {
-    execution_id: 'job-running-002',
+    run_id: 'job-running-002',
     attempt_count: 1,
     status: 'running',
     created_at: oneHourAgo,
     updated_at: oneHourAgo,
-    job_definition_id: 'def-002',
-    job_definition_version: 1,
+    blueprint_id: 'def-002',
+    blueprint_version: 1,
     error: null,
     progress: '45',
     cascade_job_id: 'cascade-002',
   },
   {
-    execution_id: 'job-errored-003',
+    run_id: 'job-errored-003',
     attempt_count: 1,
     status: 'failed',
     created_at: twoHoursAgo,
     updated_at: twoHoursAgo,
-    job_definition_id: 'def-003',
-    job_definition_version: 1,
+    blueprint_id: 'def-003',
+    blueprint_version: 1,
     error: 'Worker process exited with code 137 (OOM killed)',
     progress: '62',
     cascade_job_id: 'cascade-003',
   },
   {
-    execution_id: 'job-submitted-004',
+    run_id: 'job-submitted-004',
     attempt_count: 1,
     status: 'submitted',
     created_at: now.toISOString(),
     updated_at: now.toISOString(),
-    job_definition_id: 'def-004',
-    job_definition_version: 1,
+    blueprint_id: 'def-004',
+    blueprint_version: 1,
     error: null,
     progress: '0',
     cascade_job_id: null,
@@ -190,7 +190,7 @@ export function resetJobsState(): void {
   }
   executionsState = {}
   for (const exec of seedExecutionsV2) {
-    executionsState[exec.execution_id] = JSON.parse(
+    executionsState[exec.run_id] = JSON.parse(
       JSON.stringify(exec),
     ) as JobExecutionDetail
   }
@@ -247,21 +247,21 @@ export function getExecution(
 }
 
 export function addExecution(request: JobExecuteRequest): JobExecuteResponse {
-  const execution_id = `exec-mock-${String(executionIdCounter++).padStart(3, '0')}`
+  const run_id = `exec-mock-${String(executionIdCounter++).padStart(3, '0')}`
   const timestamp = new Date().toISOString()
-  executionsState[execution_id] = {
-    execution_id,
+  executionsState[run_id] = {
+    run_id,
     attempt_count: 1,
     status: 'submitted',
     created_at: timestamp,
     updated_at: timestamp,
-    job_definition_id: request.job_definition_id,
-    job_definition_version: request.job_definition_version ?? 1,
+    blueprint_id: request.blueprint_id,
+    blueprint_version: request.blueprint_version ?? 1,
     error: null,
     progress: '0',
     cascade_job_id: null,
   }
-  return { execution_id, attempt_count: 1 }
+  return { run_id, attempt_count: 1 }
 }
 
 export function deleteJob(jobId: string): boolean {
@@ -274,7 +274,7 @@ export function deleteJob(jobId: string): boolean {
 
 export function restartExecution(
   executionId: string,
-): { execution_id: string; attempt_count: number } | undefined {
+): { run_id: string; attempt_count: number } | undefined {
   if (!(executionId in executionsState)) return undefined
   const exec = executionsState[executionId]
   const attempt_count = exec.attempt_count + 1
@@ -285,7 +285,7 @@ export function restartExecution(
     progress: '0',
     updated_at: new Date().toISOString(),
   }
-  return { execution_id: executionId, attempt_count }
+  return { run_id: executionId, attempt_count }
 }
 
 export function deleteExecution(executionId: string): boolean {

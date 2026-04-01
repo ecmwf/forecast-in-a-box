@@ -123,7 +123,7 @@ export const SavedFableSchema = z.object({
 export type SavedFable = z.infer<typeof SavedFableSchema>
 
 export const FableUpsertResponseSchema = z.object({
-  job_definition_id: z.string(),
+  blueprint_id: z.string(),
   version: z.number(),
 })
 
@@ -138,7 +138,7 @@ export interface FableUpsertRequest {
 }
 
 export const FableRetrieveResponseSchema = z.object({
-  job_definition_id: z.string(),
+  blueprint_id: z.string(),
   version: z.number(),
   builder: FableBuilderV1Schema,
   display_name: z.string().nullable(),

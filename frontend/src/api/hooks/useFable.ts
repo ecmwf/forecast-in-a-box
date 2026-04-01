@@ -147,7 +147,7 @@ export function useUpsertFable() {
         })
       }
       queryClient.invalidateQueries({
-        queryKey: fableKeys.detail(result.job_definition_id),
+        queryKey: fableKeys.detail(result.blueprint_id),
       })
     },
   })

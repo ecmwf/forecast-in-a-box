@@ -227,7 +227,7 @@ export function useCreateSchedule() {
       dynamicExpr,
     }) => {
       // Upsert the fable to get a persisted id/version
-      const { job_definition_id, version } = await upsertFable({
+      const { blueprint_id, version } = await upsertFable({
         builder: fable,
         display_name: name,
         display_description: description,
@@ -236,8 +236,8 @@ export function useCreateSchedule() {
       })
 
       return createSchedule({
-        job_definition_id,
-        job_definition_version: version,
+        blueprint_id,
+        blueprint_version: version,
         cron_expr: cronExpr,
         dynamic_expr: dynamicExpr,
         max_acceptable_delay_hours: maxAcceptableDelayHours,

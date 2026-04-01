@@ -209,16 +209,16 @@ export function SaveConfigPopover({
       const oldEntry = idToPass
         ? (metadataStore[idToPass] as FableSaveMetadata | undefined)
         : undefined
-      if (idToPass && result.job_definition_id !== idToPass) {
+      if (idToPass && result.blueprint_id !== idToPass) {
         delete updatedStore[idToPass]
       }
-      updatedStore[result.job_definition_id] = {
+      updatedStore[result.blueprint_id] = {
         savedAt: new Date().toISOString(),
         isFavourite: oldEntry?.isFavourite,
       }
       setMetadataStore(updatedStore)
 
-      markSaved(result.job_definition_id, displayTitle)
+      markSaved(result.blueprint_id, displayTitle)
       handleOpenChange(false)
       showToast.success(
         asCopy ? 'Configuration saved as new' : 'Configuration saved',

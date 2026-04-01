@@ -74,7 +74,7 @@ export async function retrieveFable(
   version?: number,
 ): Promise<FableRetrieveResponse> {
   const params: Record<string, string | number> = {
-    job_definition_id: fableId,
+    blueprint_id: fableId,
   }
   if (version !== undefined) {
     params.version = version
@@ -86,7 +86,7 @@ export async function retrieveFable(
 }
 
 /**
- * Create a fable with full metadata, returning { job_definition_id, version }
+ * Create a fable with full metadata, returning { blueprint_id, version }
  */
 export async function upsertFable(
   request: FableUpsertRequest,

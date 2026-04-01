@@ -190,7 +190,7 @@ describe('useFable', () => {
 
   it('fetches fable by ID and returns the builder', async () => {
     const mockRetrieveResponse = {
-      job_definition_id: 'test-fable-id',
+      blueprint_id: 'test-fable-id',
       version: 1,
       builder: mockFable,
       display_name: 'Test Config',
@@ -403,11 +403,11 @@ describe('useUpsertFable', () => {
     worker.resetHandlers()
   })
 
-  it('creates new fable and returns { job_definition_id, version }', async () => {
+  it('creates new fable and returns { blueprint_id, version }', async () => {
     worker.use(
       http.post(API_ENDPOINTS.fable.create, () => {
         return HttpResponse.json({
-          job_definition_id: 'new-fable-id',
+          blueprint_id: 'new-fable-id',
           version: 1,
         })
       }),
@@ -444,7 +444,7 @@ describe('useUpsertFable', () => {
     await expect
       .element(screen.getByTestId('status'))
       .toHaveTextContent('success')
-    expect(mutationResult!.data!.job_definition_id).toBe('new-fable-id')
+    expect(mutationResult!.data!.blueprint_id).toBe('new-fable-id')
     expect(mutationResult!.data!.version).toBe(1)
   })
 
@@ -455,7 +455,7 @@ describe('useUpsertFable', () => {
       http.post(API_ENDPOINTS.fable.create, async ({ request }) => {
         capturedBody = await request.json()
         return HttpResponse.json({
-          job_definition_id: 'existing-id',
+          blueprint_id: 'existing-id',
           version: 2,
         })
       }),

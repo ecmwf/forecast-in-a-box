@@ -152,7 +152,7 @@ describe('retrieveFable', () => {
 
   it('retrieves fable by ID with full metadata', async () => {
     const mockResponse = {
-      job_definition_id: 'fable-123',
+      blueprint_id: 'fable-123',
       version: 1,
       builder: mockFable,
       display_name: 'My Config',
@@ -169,20 +169,20 @@ describe('retrieveFable', () => {
     )
 
     const result = await retrieveFable('fable-123')
-    expect(result.job_definition_id).toBe('fable-123')
+    expect(result.blueprint_id).toBe('fable-123')
     expect(result.version).toBe(1)
     expect(result.builder.blocks).toBeDefined()
     expect(result.display_name).toBe('My Config')
   })
 
-  it('sends job_definition_id as query parameter', async () => {
+  it('sends blueprint_id as query parameter', async () => {
     let capturedUrl: string | null = null
 
     worker.use(
       http.get(API_ENDPOINTS.fable.get, ({ request }) => {
         capturedUrl = request.url
         return HttpResponse.json({
-          job_definition_id: 'fable-456',
+          blueprint_id: 'fable-456',
           version: 1,
           builder: mockFable,
           display_name: 'Test',
@@ -195,7 +195,7 @@ describe('retrieveFable', () => {
     )
 
     await retrieveFable('fable-456')
-    expect(capturedUrl).toContain('job_definition_id=fable-456')
+    expect(capturedUrl).toContain('blueprint_id=fable-456')
   })
 })
 
@@ -204,14 +204,14 @@ describe('upsertFable', () => {
     worker.resetHandlers()
   })
 
-  it('creates new fable and returns { job_definition_id, version }', async () => {
+  it('creates new fable and returns { blueprint_id, version }', async () => {
     let capturedBody: unknown = null
 
     worker.use(
       http.post(API_ENDPOINTS.fable.create, async ({ request }) => {
         capturedBody = await request.json()
         return HttpResponse.json({
-          job_definition_id: 'new-fable-id',
+          blueprint_id: 'new-fable-id',
           version: 1,
         })
       }),
@@ -223,7 +223,7 @@ describe('upsertFable', () => {
       display_description: 'Some notes',
       tags: [],
     })
-    expect(result.job_definition_id).toBe('new-fable-id')
+    expect(result.blueprint_id).toBe('new-fable-id')
     expect(result.version).toBe(1)
     expect(capturedBody).toMatchObject({
       builder: mockFable,
@@ -239,7 +239,7 @@ describe('upsertFable', () => {
       http.post(API_ENDPOINTS.fable.create, async ({ request }) => {
         capturedBody = await request.json()
         return HttpResponse.json({
-          job_definition_id: 'existing-id',
+          blueprint_id: 'existing-id',
           version: 2,
         })
       }),

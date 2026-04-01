@@ -175,7 +175,7 @@ function SubmitJobForm({
       onOpenChange(false)
       navigate({
         to: '/executions/$jobId',
-        params: { jobId: response.execution_id },
+        params: { jobId: response.run_id },
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
