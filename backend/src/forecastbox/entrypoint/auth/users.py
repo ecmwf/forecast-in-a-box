@@ -18,8 +18,7 @@ from fastapi_users.db import SQLAlchemyUserDatabase
 from fastapi_users.exceptions import InvalidPasswordException
 from sqlalchemy import func, select, update
 
-from forecastbox.db.user import async_session_maker, get_user_db
-from forecastbox.schemas.user import UserCreate, UserRead, UserTable
+from forecastbox.schemata.user import UserCreate, UserRead, UserTable, async_session_maker, get_user_db
 from forecastbox.utility.auth import AuthContext, user2auth
 from forecastbox.utility.config import config
 

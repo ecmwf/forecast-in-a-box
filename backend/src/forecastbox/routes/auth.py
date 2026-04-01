@@ -14,7 +14,7 @@ from fastapi import APIRouter
 
 from forecastbox.entrypoint.auth.oidc import oauth_client
 from forecastbox.entrypoint.auth.users import auth_backend, fastapi_users
-from forecastbox.schemas.user import UserCreate, UserRead, UserUpdate
+from forecastbox.schemata.user import UserCreate, UserRead, UserUpdate
 from forecastbox.utility.config import config
 
 router = APIRouter()

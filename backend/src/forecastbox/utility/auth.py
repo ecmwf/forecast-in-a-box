@@ -11,7 +11,7 @@
 
 from dataclasses import dataclass
 
-from forecastbox.schemas.user import UserRead
+from forecastbox.schemata.user import UserRead
 from forecastbox.utility.config import config
 
 

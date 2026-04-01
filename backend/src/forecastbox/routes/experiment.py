@@ -26,7 +26,7 @@ from forecastbox.api.scheduling.scheduler_thread import start_scheduler, stop_sc
 from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound, ExperimentVersionConflict, SchedulerBusy
 from forecastbox.domain.experiment.scheduling.dt_utils import current_scheduling_time
 from forecastbox.entrypoint.auth.users import get_auth_context
-from forecastbox.schemas.jobs import ExperimentDefinition
+from forecastbox.schemata.jobs import ExperimentDefinition
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
 

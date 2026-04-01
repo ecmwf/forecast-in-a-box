@@ -23,7 +23,6 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-import forecastbox.db.jobs as jobs_db
 import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.experiment.db as experiment_db
 import forecastbox.domain.experiment.scheduling.db as scheduling_db
@@ -31,7 +30,7 @@ import forecastbox.domain.run.db as run_db
 from forecastbox.domain.blueprint.exceptions import BlueprintAccessDenied, BlueprintNotFound
 from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound
 from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
-from forecastbox.schemas.jobs import Base
+from forecastbox.schemata.jobs import Base
 from forecastbox.utility.auth import AuthContext
 
 
@@ -47,8 +46,7 @@ async def mem_session_maker():
 
 @pytest_asyncio.fixture
 async def mem_session_maker_both(mem_session_maker, monkeypatch):
-    """Patch jobs_db, blueprint_db, experiment_db, scheduling_db, and run_db to the same in-memory session maker."""
-    monkeypatch.setattr(jobs_db, "async_session_maker", mem_session_maker)
+    """Patch blueprint_db, experiment_db, scheduling_db, and run_db to the same in-memory session maker."""
     monkeypatch.setattr(blueprint_db._jobs_module, "async_session_maker", mem_session_maker)
     monkeypatch.setattr(experiment_db._jobs_module, "async_session_maker", mem_session_maker)
     monkeypatch.setattr(scheduling_db._jobs_module, "async_session_maker", mem_session_maker)
@@ -465,7 +463,7 @@ async def test_anon_delete_experiment_bypasses_ownership(mem_session_maker_both)
 async def test_jobs_run_latest_attempt(mem_session_maker_both):
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
 
-    exec_id, a1 = await jobs_db.upsert_run(
+    exec_id, a1 = await run_db.upsert_run(
         blueprint_id=job_id,
         blueprint_version=job_v,
         created_by="user1",
@@ -473,7 +471,7 @@ async def test_jobs_run_latest_attempt(mem_session_maker_both):
     )
     assert a1 == 1
 
-    _, a2 = await jobs_db.upsert_run(
+    _, a2 = await run_db.upsert_run(
         run_id=exec_id,
         blueprint_id=job_id,
         blueprint_version=job_v,
@@ -483,12 +481,12 @@ async def test_jobs_run_latest_attempt(mem_session_maker_both):
     assert a2 == 2
 
     # Latest attempt returned by default
-    latest = await jobs_db.get_run(exec_id)
+    latest = await run_db.get_run(exec_id, auth_context=_admin)
     assert latest is not None
     assert latest.attempt_count == 2
 
     # Explicit attempt lookup works
-    first = await jobs_db.get_run(exec_id, attempt_count=1)
+    first = await run_db.get_run(exec_id, attempt_count=1, auth_context=_admin)
     assert first is not None
     assert first.attempt_count == 1
 
@@ -496,16 +494,16 @@ async def test_jobs_run_latest_attempt(mem_session_maker_both):
 @pytest.mark.asyncio
 async def test_jobs_update_run_runtime(mem_session_maker_both):
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, attempt = await jobs_db.upsert_run(
+    exec_id, attempt = await run_db.upsert_run(
         blueprint_id=job_id,
         blueprint_version=job_v,
         created_by="user1",
         status="submitted",
     )
 
-    await jobs_db.update_run_runtime(exec_id, attempt, status="success", cascade_job_id="job-abc", outputs={"url": "s3://bucket/out"})
+    await run_db.update_run_runtime(exec_id, attempt, status="success", cascade_job_id="job-abc", outputs={"url": "s3://bucket/out"})
 
-    execution = await jobs_db.get_run(exec_id, attempt_count=attempt)
+    execution = await run_db.get_run(exec_id, attempt_count=attempt, auth_context=_admin)
     assert execution is not None
     assert execution.status == "success"
     assert execution.cascade_job_id == "job-abc"
@@ -515,26 +513,27 @@ async def test_jobs_update_run_runtime(mem_session_maker_both):
 @pytest.mark.asyncio
 async def test_jobs_run_soft_delete(mem_session_maker_both):
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, _ = await jobs_db.upsert_run(
+    exec_id, _ = await run_db.upsert_run(
         blueprint_id=job_id,
         blueprint_version=job_v,
         created_by="user1",
         status="submitted",
     )
 
-    await jobs_db.soft_delete_run(exec_id)
+    await run_db.soft_delete_run(exec_id, auth_context=_admin)
 
-    assert await jobs_db.get_run(exec_id) is None
-    executions = list(await jobs_db.list_runs())
+    with pytest.raises(RunNotFound):
+        await run_db.get_run(exec_id, auth_context=_admin)
+    executions = list(await run_db.list_runs(auth_context=_admin))
     assert all(e.run_id != exec_id for e in executions)
 
 
 @pytest.mark.asyncio
 async def test_jobs_list_runs_latest_only(mem_session_maker_both):
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, _ = await jobs_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
+    exec_id, _ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
 
-    executions = list(await jobs_db.list_runs())
+    executions = list(await run_db.list_runs(auth_context=_admin))
     matching = [e for e in executions if e.run_id == exec_id]
     assert len(matching) == 1
     assert matching[0].attempt_count == 1
@@ -601,7 +600,7 @@ async def test_jobs_upsert_run_unknown_id_raises(mem_session_maker_both):
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
 
     with pytest.raises(KeyError, match="No Run"):
-        await jobs_db.upsert_run(
+        await run_db.upsert_run(
             run_id="nonexistent-id",
             blueprint_id=job_id,
             blueprint_version=job_v,

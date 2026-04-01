@@ -9,7 +9,7 @@
 
 """Persistence layer for ExperimentDefinition, with auth-scoped authorization.
 
-Uses the same session maker as ``forecastbox.db.jobs`` so that all tables
+Uses the same session maker as ``forecastbox.schemata.jobs`` so that all tables
 share a single SQLite connection pool and in-process tests can monkeypatch
 a single ``async_session_maker`` attribute to inject an in-memory database.
 """
@@ -21,11 +21,11 @@ from typing import cast
 
 from sqlalchemy import func, select, update
 
-import forecastbox.db.jobs as _jobs_module
-from forecastbox.db.core import dbRetry, executeAndCommit, querySingle
+import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound
-from forecastbox.schemas.jobs import ExperimentDefinition, ExperimentType
+from forecastbox.schemata.jobs import ExperimentDefinition, ExperimentType
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.db import dbRetry, executeAndCommit, querySingle
 
 
 async def upsert_experiment_definition(

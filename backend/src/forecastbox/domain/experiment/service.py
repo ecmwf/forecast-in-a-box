@@ -25,9 +25,10 @@ import logging
 from collections.abc import Iterable
 from typing import cast
 
-import forecastbox.db.jobs as db_jobs
+import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.experiment.db as experiment_db
 import forecastbox.domain.experiment.scheduling.db as scheduling_db
+import forecastbox.domain.run.db as run_db
 from forecastbox.domain.experiment.exceptions import ExperimentNotFound, SchedulerBusy
 from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run, current_scheduling_time, parse_crontab
 from forecastbox.domain.experiment.scheduling.scheduler_thread import (
@@ -36,7 +37,7 @@ from forecastbox.domain.experiment.scheduling.scheduler_thread import (
     timeout_acquire_request,
 )
 from forecastbox.ecpyutil import timed_acquire
-from forecastbox.schemas.jobs import ExperimentDefinition, Run
+from forecastbox.schemata.jobs import ExperimentDefinition, Run
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
 
@@ -83,7 +84,7 @@ async def create_schedule(
     except ValueError as e:
         raise ValueError(f"Invalid crontab: {cron_expr} => {e}") from e
 
-    job_def = await db_jobs.get_blueprint(blueprint_id, blueprint_version)
+    job_def = await blueprint_db.get_blueprint(blueprint_id, blueprint_version)
     if job_def is None:
         raise ExperimentNotFound(f"Blueprint {blueprint_id!r} not found")
 
@@ -266,11 +267,13 @@ async def get_schedule_runs(
     if exp_def is None or exp_def.experiment_type != "cron_schedule":
         raise ExperimentNotFound(f"Schedule {experiment_id} not found")
 
-    total = await db_jobs.count_runs_by_experiment(experiment_id)
+    total = await run_db.count_runs_by_experiment(experiment_id, auth_context=AuthContext(user_id=None, is_admin=True))
     start = pagination.start()
 
     if start >= total and total > 0:
         raise ValueError("Page number out of range.")
 
-    executions = await db_jobs.list_runs_by_experiment(experiment_id, offset=start, limit=pagination.page_size)
+    executions = await run_db.list_runs_by_experiment(
+        experiment_id, auth_context=AuthContext(user_id=None, is_admin=True), offset=start, limit=pagination.page_size
+    )
     return executions, total, pagination.total_pages(total)
