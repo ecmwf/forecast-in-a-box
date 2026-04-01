@@ -19,13 +19,11 @@ import type {
   JobExecutionDetail,
   JobExecutionList,
   JobStatus,
-  ProductToOutputId,
 } from '@/api/types/job.types'
 import {
   JobExecuteResponseSchema,
   JobExecutionDetailSchema,
   JobExecutionListSchema,
-  ProductToOutputIdSchema,
 } from '@/api/types/job.types'
 import { ApiClientError, apiClient } from '@/api/client'
 import { API_ENDPOINTS } from '@/api/endpoints'
@@ -35,7 +33,7 @@ import { STORAGE_KEYS } from '@/lib/storage-keys'
 export async function executeJob(
   request: JobExecuteRequest,
 ): Promise<JobExecuteResponse> {
-  return apiClient.post(API_ENDPOINTS.job.execute, request, {
+  return apiClient.post(API_ENDPOINTS.job.create, request, {
     schema: JobExecuteResponseSchema,
   })
 }
@@ -49,7 +47,7 @@ export async function getJobsStatus(
   if (status) {
     params.status = status
   }
-  return apiClient.get(API_ENDPOINTS.job.status, {
+  return apiClient.get(API_ENDPOINTS.job.list, {
     params,
     schema: JobExecutionListSchema,
   })
@@ -82,23 +80,17 @@ function buildHeaders(): HeadersInit {
 export async function getJobStatus(
   executionId: string,
 ): Promise<JobExecutionDetail> {
-  return apiClient.get(API_ENDPOINTS.job.statusById(executionId), {
+  return apiClient.get(API_ENDPOINTS.job.get, {
+    params: { run_id: executionId },
     schema: JobExecutionDetailSchema,
-  })
-}
-
-export async function getJobOutputs(
-  executionId: string,
-): Promise<Array<ProductToOutputId>> {
-  return apiClient.get(API_ENDPOINTS.job.outputs(executionId), {
-    schema: z.array(ProductToOutputIdSchema),
   })
 }
 
 export async function getJobAvailable(
   executionId: string,
 ): Promise<Array<string>> {
-  return apiClient.get(API_ENDPOINTS.job.available(executionId), {
+  return apiClient.get(API_ENDPOINTS.job.outputAvailability, {
+    params: { run_id: executionId },
     schema: z.array(z.string()),
   })
 }
@@ -107,7 +99,8 @@ export async function getJobResult(
   executionId: string,
   datasetId: string,
 ): Promise<{ blob: Blob; contentType: string }> {
-  const url = buildFullUrl(API_ENDPOINTS.job.results(executionId), {
+  const url = buildFullUrl(API_ENDPOINTS.job.outputContent, {
+    run_id: executionId,
     dataset_id: datasetId,
   })
 
@@ -130,7 +123,9 @@ export async function getJobResult(
 }
 
 export async function downloadJobLogs(executionId: string): Promise<Blob> {
-  const url = buildFullUrl(API_ENDPOINTS.job.logs(executionId))
+  const url = buildFullUrl(API_ENDPOINTS.job.logs, {
+    run_id: executionId,
+  })
 
   const response = await fetch(url, {
     credentials: 'include',
@@ -149,14 +144,23 @@ export async function downloadJobLogs(executionId: string): Promise<Blob> {
 
 export async function restartJob(
   executionId: string,
+  attemptCount: number,
 ): Promise<JobExecuteResponse> {
-  return apiClient.post(API_ENDPOINTS.job.restart(executionId), undefined, {
-    schema: JobExecuteResponseSchema,
-  })
+  return apiClient.post(
+    API_ENDPOINTS.job.restart,
+    { run_id: executionId, attempt_count: attemptCount },
+    {
+      schema: JobExecuteResponseSchema,
+    },
+  )
 }
 
-export async function deleteJob(executionId: string): Promise<void> {
-  return apiClient.delete(API_ENDPOINTS.job.delete, {
-    params: { execution_id: executionId },
+export async function deleteJob(
+  executionId: string,
+  attemptCount: number,
+): Promise<void> {
+  return apiClient.post(API_ENDPOINTS.job.delete, {
+    run_id: executionId,
+    attempt_count: attemptCount,
   })
 }

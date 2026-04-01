@@ -35,19 +35,19 @@ export const ProductToOutputIdSchema = z.object({
 
 /** types/jobs.py: JobExecuteResponse */
 export const JobExecuteResponseSchema = z.object({
-  execution_id: z.string(),
+  run_id: z.string(),
   attempt_count: z.number(),
 })
 
 /** types/jobs.py: JobExecutionDetail (status narrowed from str to known values) */
 export const JobExecutionDetailSchema = z.object({
-  execution_id: z.string(),
+  run_id: z.string(),
   attempt_count: z.number(),
   status: JobStatusSchema,
   created_at: z.string(),
   updated_at: z.string(),
-  job_definition_id: z.string(),
-  job_definition_version: z.number(),
+  blueprint_id: z.string(),
+  blueprint_version: z.number(),
   error: z.string().nullable(),
   progress: z.string().nullable(),
   cascade_job_id: z.string().nullable(),
@@ -55,7 +55,7 @@ export const JobExecutionDetailSchema = z.object({
 
 /** types/jobs.py: JobExecutionList */
 export const JobExecutionListSchema = z.object({
-  executions: z.array(JobExecutionDetailSchema),
+  runs: z.array(JobExecutionDetailSchema),
   total: z.number(),
   page: z.number(),
   page_size: z.number(),
@@ -114,10 +114,10 @@ export type ExecutionSpecification = z.infer<
   typeof ExecutionSpecificationSchema
 >
 
-/** POST /job/execute request (not validated — outbound only) */
+/** POST /run/create request (not validated — outbound only) */
 export interface JobExecuteRequest {
-  job_definition_id: string
-  job_definition_version?: number
+  blueprint_id: string
+  blueprint_version?: number
 }
 
 export function createDefaultEnvironment(): EnvironmentSpecification {

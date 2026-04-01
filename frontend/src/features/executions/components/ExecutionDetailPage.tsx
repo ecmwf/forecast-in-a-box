@@ -49,41 +49,47 @@ export function ExecutionDetailPage() {
   const deleteMutation = useDeleteJob()
 
   const jobData = statusQuery.data
-  const { data: fableData } = useFableRetrieve(jobData?.job_definition_id)
+  const { data: fableData } = useFableRetrieve(jobData?.blueprint_id)
 
   const layoutMode = useUiStore((state) => state.layoutMode)
   const { data: catalogue } = useBlockCatalogue()
 
   const handleRestart = () => {
-    restartMutation.mutate(jobId, {
-      onSuccess: () => {
-        toast.success(t('actions.restartJob'))
+    restartMutation.mutate(
+      { executionId: jobId, attemptCount: jobData!.attempt_count },
+      {
+        onSuccess: () => {
+          toast.success(t('actions.restartJob'))
+        },
+        onError: (error) => {
+          log.error('Failed to restart job', { jobId, error })
+          toast.error(error.message)
+        },
       },
-      onError: (error) => {
-        log.error('Failed to restart job', { jobId, error })
-        toast.error(error.message)
-      },
-    })
+    )
   }
 
   const handleDelete = () => {
-    deleteMutation.mutate(jobId, {
-      onSuccess: () => {
-        toast.success(t('actions.deleteJob'))
-        navigate({ to: '/executions' })
+    deleteMutation.mutate(
+      { executionId: jobId, attemptCount: jobData!.attempt_count },
+      {
+        onSuccess: () => {
+          toast.success(t('actions.deleteJob'))
+          navigate({ to: '/executions' })
+        },
+        onError: (error) => {
+          log.error('Failed to delete job', { jobId, error })
+          toast.error(error.message)
+        },
       },
-      onError: (error) => {
-        log.error('Failed to delete job', { jobId, error })
-        toast.error(error.message)
-      },
-    })
+    )
   }
 
   const handleEditConfig = () => {
-    if (!jobData?.job_definition_id) return
+    if (!jobData?.blueprint_id) return
     navigate({
       to: '/configure',
-      search: { fableId: jobData.job_definition_id },
+      search: { fableId: jobData.blueprint_id },
     })
   }
 
@@ -122,7 +128,7 @@ export function ExecutionDetailPage() {
   if (!jobData) return null
 
   const jobName = fableData?.display_name ?? t('detail.untitledJob')
-  const canEditConfig = !!jobData.job_definition_id
+  const canEditConfig = !!jobData.blueprint_id
 
   return (
     <div

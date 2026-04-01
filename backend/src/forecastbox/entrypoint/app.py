@@ -15,7 +15,6 @@ import os
 import pkgutil
 import time
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -26,15 +25,15 @@ from fastapi.templating import Jinja2Templates
 from fiab_core.artifacts import ArtifactsProvider
 from starlette.exceptions import HTTPException
 
-import forecastbox.db
+import forecastbox.routes
+import forecastbox.schemata
 from forecastbox.api.artifacts.base import get_artifact_local_path
 from forecastbox.api.artifacts.manager import ArtifactManager, join_artifact_manager, submit_refresh_catalog
-from forecastbox.api.plugin.manager import PluginsStatus, join_updater_thread, submit_load_plugins
-from forecastbox.api.plugin.manager import status_brief as status_plugins
+from forecastbox.api.plugin.manager import join_updater_thread, submit_load_plugins
 from forecastbox.api.plugin.store import join_stores_thread, submit_initialize_stores
-from forecastbox.api.routers import admin, artifacts, auth, fable, gateway, job, plugin, schedule
-from forecastbox.api.scheduling.scheduler_thread import start_scheduler, status_scheduler, stop_scheduler
+from forecastbox.api.scheduling.scheduler_thread import start_scheduler, stop_scheduler
 from forecastbox.api.updates import get_local_release
+from forecastbox.routes.gateway import shutdown_processes
 from forecastbox.utility.config import config
 
 logger = logging.getLogger(__name__)
@@ -43,8 +42,8 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.debug(f"Starting FIAB with config: {config}")
-    for module_info in pkgutil.iter_modules(forecastbox.db.__path__):
-        module = importlib.import_module(f"forecastbox.db.{module_info.name}")
+    for module_info in pkgutil.iter_modules(forecastbox.schemata.__path__):
+        module = importlib.import_module(f"forecastbox.schemata.{module_info.name}")
         if hasattr(module, "create_db_and_tables"):
             await module.create_db_and_tables()  # type: ignore[call-non-callable] # NOTE no module protocol
     if config.api.allow_scheduler:
@@ -61,7 +60,7 @@ async def lifespan(app: FastAPI):
     yield
     if config.api.allow_scheduler:
         stop_scheduler()
-    await gateway.shutdown_processes()
+    await shutdown_processes()
     join_updater_thread(timeout_sec=10)
     join_stores_thread(timeout_sec=10)
     join_artifact_manager(timeout_sec=10)
@@ -78,15 +77,12 @@ app = FastAPI(
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 
-# TODO replace with iter modules, this is awkward
-app.include_router(job.router, prefix="/api/v1/job")
-app.include_router(admin.router, prefix="/api/v1/admin")
-app.include_router(auth.router, prefix="/api/v1")
-app.include_router(gateway.router, prefix="/api/v1/gateway")
-app.include_router(schedule.router, prefix="/api/v1/schedule")
-app.include_router(fable.router, prefix="/api/v1/fable")
-app.include_router(plugin.router, prefix="/api/v1/plugin")
-app.include_router(artifacts.router, prefix="/api/v1/artifacts")
+# Auto-discover and register all route modules under forecastbox.routes.
+# Each module must expose a module-level `router` (APIRouter) and a `PREFIX` string.
+for _module_info in pkgutil.iter_modules(forecastbox.routes.__path__):
+    _module = importlib.import_module(f"forecastbox.routes.{_module_info.name}")
+    if hasattr(_module, "router") and hasattr(_module, "PREFIX"):
+        app.include_router(_module.router, prefix=_module.PREFIX)
 
 app.add_middleware(
     CORSMiddleware,  # type: ignore[invalid-argument-type]
@@ -120,63 +116,6 @@ async def circumvent_auth(request: Request, call_next):
         return JSONResponse({"is_superuser": True})
     else:
         return await call_next(request)
-
-
-@dataclass(frozen=True, eq=True, slots=True)
-class StatusResponse:
-    """Status response model"""
-
-    api: str
-    cascade: str
-    ecmwf: str
-    scheduler: str
-    version: str
-    plugins: str
-
-
-@app.get("/api/v1/status", tags=["status"])
-def status() -> StatusResponse:
-    """Status endpoint"""
-    from forecastbox.utility.config import config
-
-    status = {"api": "up", "cascade": "up", "ecmwf": "up", "scheduler": "up", "version": app.version}
-
-    from cascade.gateway import api, client
-
-    try:
-        client.request_response(api.JobProgressRequest(job_ids=[]), config.cascade.cascade_url, timeout_ms=1000)
-        status["cascade"] = "up"
-    except Exception as e:
-        logger.warning(f"Error connecting to Cascade: {repr(e)}")
-        status["cascade"] = "down"
-
-    try:
-        status["scheduler"] = status_scheduler()
-    except Exception as e:
-        logger.warning(f"Error discerning scheduler status: {repr(e)}")
-        status["scheduler"] = "down"
-
-    try:
-        status["plugins"] = status_plugins()
-    except Exception as e:
-        logger.warning(f"Error discerning plugins status: {repr(e)}")
-        status["plugins"] = f"failure getting status"
-
-    # Check connection to model_repository
-    import requests
-
-    try:
-        # TODO this is not good: we dont want a timeout=5 for the status endpoint, the status should return under a sec
-        # we probably need to evaluate this async, returing cached value, possibly `unknown` in case refresh in progres
-        response = requests.get(f"{config.api.model_repository}/MANIFEST", timeout=5)
-        if response.status_code == 200:
-            status["ecmwf"] = "up"
-        else:
-            status["ecmwf"] = "down"
-    except Exception:
-        status["ecmwf"] = "down"
-
-    return StatusResponse(**status)
 
 
 @app.get("/api/v1/share/{job_id}/{dataset_id}", response_class=HTMLResponse, tags=["share"], summary="Share Image")

@@ -11,7 +11,7 @@
 
 All tests use an in-memory SQLite engine so no filesystem state is required.
 
-JobDefinition, ExperimentDefinition, ExperimentNext, and JobExecution tests
+Blueprint, ExperimentDefinition, ExperimentNext, and Run tests
 patch the corresponding domain-module ``_jobs_module.async_session_maker``
 references so that all tables share a single connection pool and FK constraints
 work in-memory.  The ``mem_session_maker_all`` fixture applies all patches at once.
@@ -24,13 +24,13 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 import forecastbox.db.jobs as jobs_db
+import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.experiment.db as experiment_db
 import forecastbox.domain.experiment.scheduling.db as scheduling_db
-import forecastbox.domain.job_definition.db as job_definition_db
-import forecastbox.domain.job_execution.db as job_execution_db
+import forecastbox.domain.run.db as run_db
+from forecastbox.domain.blueprint.exceptions import BlueprintAccessDenied, BlueprintNotFound
 from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound
-from forecastbox.domain.job_definition.exceptions import JobDefinitionAccessDenied, JobDefinitionNotFound
-from forecastbox.domain.job_execution.exceptions import JobExecutionAccessDenied, JobExecutionNotFound
+from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
 from forecastbox.schemas.jobs import Base
 from forecastbox.utility.auth import AuthContext
 
@@ -47,12 +47,12 @@ async def mem_session_maker():
 
 @pytest_asyncio.fixture
 async def mem_session_maker_both(mem_session_maker, monkeypatch):
-    """Patch jobs_db, job_definition_db, experiment_db, scheduling_db, and job_execution_db to the same in-memory session maker."""
+    """Patch jobs_db, blueprint_db, experiment_db, scheduling_db, and run_db to the same in-memory session maker."""
     monkeypatch.setattr(jobs_db, "async_session_maker", mem_session_maker)
-    monkeypatch.setattr(job_definition_db._jobs_module, "async_session_maker", mem_session_maker)
+    monkeypatch.setattr(blueprint_db._jobs_module, "async_session_maker", mem_session_maker)
     monkeypatch.setattr(experiment_db._jobs_module, "async_session_maker", mem_session_maker)
     monkeypatch.setattr(scheduling_db._jobs_module, "async_session_maker", mem_session_maker)
-    monkeypatch.setattr(job_execution_db._jobs_module, "async_session_maker", mem_session_maker)
+    monkeypatch.setattr(run_db._jobs_module, "async_session_maker", mem_session_maker)
     yield mem_session_maker
 
 
@@ -67,13 +67,13 @@ _anon = AuthContext(user_id=None, is_admin=False)
 
 
 # ---------------------------------------------------------------------------
-# JobDefinition
+# Blueprint
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_jobs_job_definition_insert_and_get(mem_session_maker_both):
-    job_id, v1 = await job_definition_db.upsert_job_definition(
+async def test_jobs_blueprint_insert_and_get(mem_session_maker_both):
+    job_id, v1 = await blueprint_db.upsert_blueprint(
         auth_context=_user1,
         source="user_defined",
         created_by="user1",
@@ -83,9 +83,9 @@ async def test_jobs_job_definition_insert_and_get(mem_session_maker_both):
     )
     assert v1 == 1
 
-    result = await job_definition_db.get_job_definition(job_id)
+    result = await blueprint_db.get_blueprint(job_id)
     assert result is not None
-    assert result.job_definition_id == job_id
+    assert result.blueprint_id == job_id
     assert result.version == 1
     assert result.source == "user_defined"
     assert result.display_name == "My job"
@@ -93,109 +93,103 @@ async def test_jobs_job_definition_insert_and_get(mem_session_maker_both):
 
 
 @pytest.mark.asyncio
-async def test_jobs_job_definition_latest_version(mem_session_maker_both):
-    job_id, v1 = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
-    _, v2 = await job_definition_db.upsert_job_definition(
-        auth_context=_user1, definition_id=job_id, source="user_defined", created_by="user1"
-    )
-    _, v3 = await job_definition_db.upsert_job_definition(
-        auth_context=_user1, definition_id=job_id, source="user_defined", created_by="user1"
-    )
+async def test_jobs_blueprint_latest_version(mem_session_maker_both):
+    job_id, v1 = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
+    _, v2 = await blueprint_db.upsert_blueprint(auth_context=_user1, blueprint_id=job_id, source="user_defined", created_by="user1")
+    _, v3 = await blueprint_db.upsert_blueprint(auth_context=_user1, blueprint_id=job_id, source="user_defined", created_by="user1")
 
     assert v1 == 1
     assert v2 == 2
     assert v3 == 3
 
-    latest = await job_definition_db.get_job_definition(job_id)
+    latest = await blueprint_db.get_blueprint(job_id)
     assert latest is not None
     assert latest.version == 3
 
-    specific = await job_definition_db.get_job_definition(job_id, version=1)
+    specific = await blueprint_db.get_blueprint(job_id, version=1)
     assert specific is not None
     assert specific.version == 1
 
 
 @pytest.mark.asyncio
-async def test_jobs_job_definition_soft_delete(mem_session_maker_both):
-    job_id, _ = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+async def test_jobs_blueprint_soft_delete(mem_session_maker_both):
+    job_id, _ = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
 
-    await job_definition_db.soft_delete_job_definition(job_id, auth_context=_user1)
+    await blueprint_db.soft_delete_blueprint(job_id, expected_version=1, auth_context=_user1)
 
-    assert await job_definition_db.get_job_definition(job_id) is None
+    assert await blueprint_db.get_blueprint(job_id) is None
 
-    definitions = list(await job_definition_db.list_job_definitions(auth_context=_admin))
-    assert all(d.job_definition_id != job_id for d in definitions)
+    definitions = list(await blueprint_db.list_blueprints(auth_context=_admin))
+    assert all(d.blueprint_id != job_id for d in definitions)
 
 
 @pytest.mark.asyncio
-async def test_jobs_list_job_definitions_latest_only(mem_session_maker_both):
-    job_id, _ = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
-    await job_definition_db.upsert_job_definition(auth_context=_user1, definition_id=job_id, source="user_defined", created_by="user1")
-    await job_definition_db.upsert_job_definition(auth_context=_user1, definition_id=job_id, source="user_defined", created_by="user1")
+async def test_jobs_list_blueprints_latest_only(mem_session_maker_both):
+    job_id, _ = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
+    await blueprint_db.upsert_blueprint(auth_context=_user1, blueprint_id=job_id, source="user_defined", created_by="user1")
+    await blueprint_db.upsert_blueprint(auth_context=_user1, blueprint_id=job_id, source="user_defined", created_by="user1")
 
-    other_id, _ = await job_definition_db.upsert_job_definition(auth_context=_user2, source="oneoff_execution", created_by="user2")
+    other_id, _ = await blueprint_db.upsert_blueprint(auth_context=_user2, source="oneoff_execution", created_by="user2")
 
-    definitions = list(await job_definition_db.list_job_definitions(auth_context=_admin))
-    ids = [d.job_definition_id for d in definitions]
+    definitions = list(await blueprint_db.list_blueprints(auth_context=_admin))
+    ids = [d.blueprint_id for d in definitions]
     assert job_id in ids
     assert other_id in ids
 
-    matching = [d for d in definitions if d.job_definition_id == job_id]
+    matching = [d for d in definitions if d.blueprint_id == job_id]
     assert len(matching) == 1
     assert matching[0].version == 3
 
 
 @pytest.mark.asyncio
-async def test_jobs_list_job_definitions_ownership_filter(mem_session_maker_both):
+async def test_jobs_list_blueprints_ownership_filter(mem_session_maker_both):
     """Non-admin users see only their own definitions and plugin templates."""
-    id_u1, _ = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
-    id_u2, _ = await job_definition_db.upsert_job_definition(auth_context=_user2, source="user_defined", created_by="user2")
-    id_tmpl, _ = await job_definition_db.upsert_job_definition(auth_context=_admin, source="plugin_template", created_by="admin")
+    id_u1, _ = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
+    id_u2, _ = await blueprint_db.upsert_blueprint(auth_context=_user2, source="user_defined", created_by="user2")
+    id_tmpl, _ = await blueprint_db.upsert_blueprint(auth_context=_admin, source="plugin_template", created_by="admin")
 
-    u1_defs = {d.job_definition_id for d in await job_definition_db.list_job_definitions(auth_context=_user1)}
+    u1_defs = {d.blueprint_id for d in await blueprint_db.list_blueprints(auth_context=_user1)}
     assert id_u1 in u1_defs
     assert id_tmpl in u1_defs
     assert id_u2 not in u1_defs
 
-    anon_defs = {d.job_definition_id for d in await job_definition_db.list_job_definitions(auth_context=_anon)}
+    anon_defs = {d.blueprint_id for d in await blueprint_db.list_blueprints(auth_context=_anon)}
     assert id_u1 in anon_defs
     assert id_u2 in anon_defs
     assert id_tmpl in anon_defs
 
-    admin_defs = {d.job_definition_id for d in await job_definition_db.list_job_definitions(auth_context=_admin)}
+    admin_defs = {d.blueprint_id for d in await blueprint_db.list_blueprints(auth_context=_admin)}
     assert {id_u1, id_u2, id_tmpl}.issubset(admin_defs)
 
 
 @pytest.mark.asyncio
-async def test_jobs_upsert_job_definition_unknown_id_raises(mem_session_maker_both):
-    with pytest.raises(JobDefinitionNotFound):
-        await job_definition_db.upsert_job_definition(
-            auth_context=_user1, definition_id="nonexistent-id", source="user_defined", created_by="user1"
-        )
+async def test_jobs_upsert_blueprint_unknown_id_raises(mem_session_maker_both):
+    with pytest.raises(BlueprintNotFound):
+        await blueprint_db.upsert_blueprint(auth_context=_user1, blueprint_id="nonexistent-id", source="user_defined", created_by="user1")
 
 
 @pytest.mark.asyncio
-async def test_jobs_upsert_job_definition_wrong_owner_raises(mem_session_maker_both):
-    """Non-owner cannot update a definition they don't own."""
-    job_id, _ = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+async def test_jobs_upsert_blueprint_wrong_owner_raises(mem_session_maker_both):
+    """Non-owner cannot update a blueprint they don't own."""
+    job_id, _ = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
 
-    with pytest.raises(JobDefinitionAccessDenied):
-        await job_definition_db.upsert_job_definition(
+    with pytest.raises(BlueprintAccessDenied):
+        await blueprint_db.upsert_blueprint(
             auth_context=_user2,
-            definition_id=job_id,
+            blueprint_id=job_id,
             source="user_defined",
             created_by="user2",
         )
 
 
 @pytest.mark.asyncio
-async def test_jobs_upsert_job_definition_admin_can_update_any(mem_session_maker_both):
-    """Admin can update a definition owned by another user."""
-    job_id, _ = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+async def test_jobs_upsert_blueprint_admin_can_update_any(mem_session_maker_both):
+    """Admin can update a blueprint owned by another user."""
+    job_id, _ = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
 
-    _, v2 = await job_definition_db.upsert_job_definition(
+    _, v2 = await blueprint_db.upsert_blueprint(
         auth_context=_admin,
-        definition_id=job_id,
+        blueprint_id=job_id,
         source="user_defined",
         created_by="admin",
     )
@@ -204,17 +198,17 @@ async def test_jobs_upsert_job_definition_admin_can_update_any(mem_session_maker
 
 @pytest.mark.asyncio
 async def test_jobs_soft_delete_wrong_owner_raises(mem_session_maker_both):
-    """Non-owner cannot delete a definition they don't own."""
-    job_id, _ = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+    """Non-owner cannot delete a blueprint they don't own."""
+    job_id, _ = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
 
-    with pytest.raises(JobDefinitionAccessDenied):
-        await job_definition_db.soft_delete_job_definition(job_id, auth_context=_user2)
+    with pytest.raises(BlueprintAccessDenied):
+        await blueprint_db.soft_delete_blueprint(job_id, expected_version=1, auth_context=_user2)
 
 
 @pytest.mark.asyncio
 async def test_jobs_soft_delete_not_found_raises(mem_session_maker_both):
-    with pytest.raises(JobDefinitionNotFound):
-        await job_definition_db.soft_delete_job_definition("no-such-id", auth_context=_admin)
+    with pytest.raises(BlueprintNotFound):
+        await blueprint_db.soft_delete_blueprint("no-such-id", expected_version=1, auth_context=_admin)
 
 
 # ---------------------------------------------------------------------------
@@ -224,12 +218,12 @@ async def test_jobs_soft_delete_not_found_raises(mem_session_maker_both):
 
 @pytest.mark.asyncio
 async def test_jobs_experiment_definition_versioning(mem_session_maker_both):
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
 
     exp_id, v1 = await experiment_db.upsert_experiment_definition(
         auth_context=_user1,
-        job_definition_id=job_id,
-        job_definition_version=job_v,
+        blueprint_id=job_id,
+        blueprint_version=job_v,
         experiment_type="cron_schedule",
         created_by="user1",
         experiment_definition={"cron": "0 * * * *"},
@@ -239,8 +233,8 @@ async def test_jobs_experiment_definition_versioning(mem_session_maker_both):
     _, v2 = await experiment_db.upsert_experiment_definition(
         auth_context=_user1,
         experiment_definition_id=exp_id,
-        job_definition_id=job_id,
-        job_definition_version=job_v,
+        blueprint_id=job_id,
+        blueprint_version=job_v,
         experiment_type="cron_schedule",
         created_by="user1",
         experiment_definition={"cron": "30 * * * *"},
@@ -255,11 +249,11 @@ async def test_jobs_experiment_definition_versioning(mem_session_maker_both):
 
 @pytest.mark.asyncio
 async def test_jobs_experiment_definition_soft_delete(mem_session_maker_both):
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
     exp_id, _ = await experiment_db.upsert_experiment_definition(
         auth_context=_user1,
-        job_definition_id=job_id,
-        job_definition_version=job_v,
+        blueprint_id=job_id,
+        blueprint_version=job_v,
         experiment_type="cron_schedule",
         created_by="user1",
     )
@@ -274,11 +268,11 @@ async def test_jobs_experiment_definition_soft_delete(mem_session_maker_both):
 @pytest.mark.asyncio
 async def test_experiment_create_anon_allowed(mem_session_maker_both):
     """Passthrough (user_id=None) callers may create experiments; created_by is stored as None."""
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
     exp_id, v1 = await experiment_db.upsert_experiment_definition(
         auth_context=_anon,
-        job_definition_id=job_id,
-        job_definition_version=job_v,
+        blueprint_id=job_id,
+        blueprint_version=job_v,
         experiment_type="cron_schedule",
         created_by=None,
     )
@@ -290,11 +284,11 @@ async def test_experiment_create_anon_allowed(mem_session_maker_both):
 
 @pytest.mark.asyncio
 async def test_experiment_update_non_owner_raises(mem_session_maker_both):
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
     exp_id, _ = await experiment_db.upsert_experiment_definition(
         auth_context=_user1,
-        job_definition_id=job_id,
-        job_definition_version=job_v,
+        blueprint_id=job_id,
+        blueprint_version=job_v,
         experiment_type="cron_schedule",
         created_by="user1",
     )
@@ -302,8 +296,8 @@ async def test_experiment_update_non_owner_raises(mem_session_maker_both):
         await experiment_db.upsert_experiment_definition(
             auth_context=_user2,
             experiment_definition_id=exp_id,
-            job_definition_id=job_id,
-            job_definition_version=job_v,
+            blueprint_id=job_id,
+            blueprint_version=job_v,
             experiment_type="cron_schedule",
             created_by="user2",
         )
@@ -311,19 +305,19 @@ async def test_experiment_update_non_owner_raises(mem_session_maker_both):
 
 @pytest.mark.asyncio
 async def test_experiment_update_admin_bypasses_ownership(mem_session_maker_both):
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
     exp_id, _ = await experiment_db.upsert_experiment_definition(
         auth_context=_user1,
-        job_definition_id=job_id,
-        job_definition_version=job_v,
+        blueprint_id=job_id,
+        blueprint_version=job_v,
         experiment_type="cron_schedule",
         created_by="user1",
     )
     _, v2 = await experiment_db.upsert_experiment_definition(
         auth_context=_admin,
         experiment_definition_id=exp_id,
-        job_definition_id=job_id,
-        job_definition_version=job_v,
+        blueprint_id=job_id,
+        blueprint_version=job_v,
         experiment_type="cron_schedule",
         created_by="user1",
     )
@@ -332,11 +326,11 @@ async def test_experiment_update_admin_bypasses_ownership(mem_session_maker_both
 
 @pytest.mark.asyncio
 async def test_experiment_delete_non_owner_raises(mem_session_maker_both):
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
     exp_id, _ = await experiment_db.upsert_experiment_definition(
         auth_context=_user1,
-        job_definition_id=job_id,
-        job_definition_version=job_v,
+        blueprint_id=job_id,
+        blueprint_version=job_v,
         experiment_type="cron_schedule",
         created_by="user1",
     )
@@ -346,19 +340,19 @@ async def test_experiment_delete_non_owner_raises(mem_session_maker_both):
 
 @pytest.mark.asyncio
 async def test_experiment_list_filters_by_actor(mem_session_maker_both):
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
 
     await experiment_db.upsert_experiment_definition(
         auth_context=_user1,
-        job_definition_id=job_id,
-        job_definition_version=job_v,
+        blueprint_id=job_id,
+        blueprint_version=job_v,
         experiment_type="cron_schedule",
         created_by="user1",
     )
     await experiment_db.upsert_experiment_definition(
         auth_context=_user2,
-        job_definition_id=job_id,
-        job_definition_version=job_v,
+        blueprint_id=job_id,
+        blueprint_version=job_v,
         experiment_type="cron_schedule",
         created_by="user2",
     )
@@ -380,23 +374,23 @@ async def test_experiment_list_filters_by_actor(mem_session_maker_both):
 
 
 @pytest.mark.asyncio
-async def test_anon_list_job_definitions_sees_all(mem_session_maker_both):
-    """Passthrough caller sees all job definitions, not only plugin templates."""
-    id_u1, _ = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
-    id_u2, _ = await job_definition_db.upsert_job_definition(auth_context=_user2, source="user_defined", created_by="user2")
-    id_tmpl, _ = await job_definition_db.upsert_job_definition(auth_context=_admin, source="plugin_template", created_by="admin")
+async def test_anon_list_blueprints_sees_all(mem_session_maker_both):
+    """Passthrough caller sees all blueprints, not only plugin templates."""
+    id_u1, _ = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
+    id_u2, _ = await blueprint_db.upsert_blueprint(auth_context=_user2, source="user_defined", created_by="user2")
+    id_tmpl, _ = await blueprint_db.upsert_blueprint(auth_context=_admin, source="plugin_template", created_by="admin")
 
-    anon_defs = {d.job_definition_id for d in await job_definition_db.list_job_definitions(auth_context=_anon)}
+    anon_defs = {d.blueprint_id for d in await blueprint_db.list_blueprints(auth_context=_anon)}
     assert {id_u1, id_u2, id_tmpl}.issubset(anon_defs)
 
 
 @pytest.mark.asyncio
-async def test_anon_update_job_definition_bypasses_ownership(mem_session_maker_both):
-    """Passthrough caller may update a job definition owned by another user."""
-    job_id, _ = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
-    _, v2 = await job_definition_db.upsert_job_definition(
+async def test_anon_update_blueprint_bypasses_ownership(mem_session_maker_both):
+    """Passthrough caller may update a blueprint owned by another user."""
+    job_id, _ = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
+    _, v2 = await blueprint_db.upsert_blueprint(
         auth_context=_anon,
-        definition_id=job_id,
+        blueprint_id=job_id,
         source="user_defined",
         created_by=None,
     )
@@ -406,18 +400,18 @@ async def test_anon_update_job_definition_bypasses_ownership(mem_session_maker_b
 @pytest.mark.asyncio
 async def test_anon_list_experiments_sees_all(mem_session_maker_both):
     """Passthrough caller sees all experiments, not an empty result."""
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
     await experiment_db.upsert_experiment_definition(
         auth_context=_user1,
-        job_definition_id=job_id,
-        job_definition_version=job_v,
+        blueprint_id=job_id,
+        blueprint_version=job_v,
         experiment_type="cron_schedule",
         created_by="user1",
     )
     await experiment_db.upsert_experiment_definition(
         auth_context=_user2,
-        job_definition_id=job_id,
-        job_definition_version=job_v,
+        blueprint_id=job_id,
+        blueprint_version=job_v,
         experiment_type="cron_schedule",
         created_by="user2",
     )
@@ -428,19 +422,19 @@ async def test_anon_list_experiments_sees_all(mem_session_maker_both):
 @pytest.mark.asyncio
 async def test_anon_update_experiment_bypasses_ownership(mem_session_maker_both):
     """Passthrough caller may update an experiment owned by another user."""
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
     exp_id, _ = await experiment_db.upsert_experiment_definition(
         auth_context=_user1,
-        job_definition_id=job_id,
-        job_definition_version=job_v,
+        blueprint_id=job_id,
+        blueprint_version=job_v,
         experiment_type="cron_schedule",
         created_by="user1",
     )
     _, v2 = await experiment_db.upsert_experiment_definition(
         auth_context=_anon,
         experiment_definition_id=exp_id,
-        job_definition_id=job_id,
-        job_definition_version=job_v,
+        blueprint_id=job_id,
+        blueprint_version=job_v,
         experiment_type="cron_schedule",
         created_by=None,
     )
@@ -450,11 +444,11 @@ async def test_anon_update_experiment_bypasses_ownership(mem_session_maker_both)
 @pytest.mark.asyncio
 async def test_anon_delete_experiment_bypasses_ownership(mem_session_maker_both):
     """Passthrough caller may delete an experiment owned by another user."""
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
     exp_id, _ = await experiment_db.upsert_experiment_definition(
         auth_context=_user1,
-        job_definition_id=job_id,
-        job_definition_version=job_v,
+        blueprint_id=job_id,
+        blueprint_version=job_v,
         experiment_type="cron_schedule",
         created_by="user1",
     )
@@ -463,57 +457,55 @@ async def test_anon_delete_experiment_bypasses_ownership(mem_session_maker_both)
 
 
 # ---------------------------------------------------------------------------
-# JobExecution
+# Run
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_jobs_job_execution_latest_attempt(mem_session_maker_both):
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+async def test_jobs_run_latest_attempt(mem_session_maker_both):
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
 
-    exec_id, a1 = await jobs_db.upsert_job_execution(
-        job_definition_id=job_id,
-        job_definition_version=job_v,
+    exec_id, a1 = await jobs_db.upsert_run(
+        blueprint_id=job_id,
+        blueprint_version=job_v,
         created_by="user1",
         status="submitted",
     )
     assert a1 == 1
 
-    _, a2 = await jobs_db.upsert_job_execution(
-        job_execution_id=exec_id,
-        job_definition_id=job_id,
-        job_definition_version=job_v,
+    _, a2 = await jobs_db.upsert_run(
+        run_id=exec_id,
+        blueprint_id=job_id,
+        blueprint_version=job_v,
         created_by="user1",
         status="submitted",
     )
     assert a2 == 2
 
     # Latest attempt returned by default
-    latest = await jobs_db.get_job_execution(exec_id)
+    latest = await jobs_db.get_run(exec_id)
     assert latest is not None
     assert latest.attempt_count == 2
 
     # Explicit attempt lookup works
-    first = await jobs_db.get_job_execution(exec_id, attempt_count=1)
+    first = await jobs_db.get_run(exec_id, attempt_count=1)
     assert first is not None
     assert first.attempt_count == 1
 
 
 @pytest.mark.asyncio
-async def test_jobs_update_job_execution_runtime(mem_session_maker_both):
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, attempt = await jobs_db.upsert_job_execution(
-        job_definition_id=job_id,
-        job_definition_version=job_v,
+async def test_jobs_update_run_runtime(mem_session_maker_both):
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
+    exec_id, attempt = await jobs_db.upsert_run(
+        blueprint_id=job_id,
+        blueprint_version=job_v,
         created_by="user1",
         status="submitted",
     )
 
-    await jobs_db.update_job_execution_runtime(
-        exec_id, attempt, status="success", cascade_job_id="job-abc", outputs={"url": "s3://bucket/out"}
-    )
+    await jobs_db.update_run_runtime(exec_id, attempt, status="success", cascade_job_id="job-abc", outputs={"url": "s3://bucket/out"})
 
-    execution = await jobs_db.get_job_execution(exec_id, attempt_count=attempt)
+    execution = await jobs_db.get_run(exec_id, attempt_count=attempt)
     assert execution is not None
     assert execution.status == "success"
     assert execution.cascade_job_id == "job-abc"
@@ -521,31 +513,29 @@ async def test_jobs_update_job_execution_runtime(mem_session_maker_both):
 
 
 @pytest.mark.asyncio
-async def test_jobs_job_execution_soft_delete(mem_session_maker_both):
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, _ = await jobs_db.upsert_job_execution(
-        job_definition_id=job_id,
-        job_definition_version=job_v,
+async def test_jobs_run_soft_delete(mem_session_maker_both):
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
+    exec_id, _ = await jobs_db.upsert_run(
+        blueprint_id=job_id,
+        blueprint_version=job_v,
         created_by="user1",
         status="submitted",
     )
 
-    await jobs_db.soft_delete_job_execution(exec_id)
+    await jobs_db.soft_delete_run(exec_id)
 
-    assert await jobs_db.get_job_execution(exec_id) is None
-    executions = list(await jobs_db.list_job_executions())
-    assert all(e.job_execution_id != exec_id for e in executions)
+    assert await jobs_db.get_run(exec_id) is None
+    executions = list(await jobs_db.list_runs())
+    assert all(e.run_id != exec_id for e in executions)
 
 
 @pytest.mark.asyncio
-async def test_jobs_list_job_executions_latest_only(mem_session_maker_both):
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, _ = await jobs_db.upsert_job_execution(
-        job_definition_id=job_id, job_definition_version=job_v, created_by="user1", status="submitted"
-    )
+async def test_jobs_list_runs_latest_only(mem_session_maker_both):
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
+    exec_id, _ = await jobs_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
 
-    executions = list(await jobs_db.list_job_executions())
-    matching = [e for e in executions if e.job_execution_id == exec_id]
+    executions = list(await jobs_db.list_runs())
+    matching = [e for e in executions if e.run_id == exec_id]
     assert len(matching) == 1
     assert matching[0].attempt_count == 1
 
@@ -557,11 +547,11 @@ async def test_jobs_list_job_executions_latest_only(mem_session_maker_both):
 
 @pytest.mark.asyncio
 async def test_jobs_experiment_next_upsert(mem_session_maker_both):
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
     exp_id, _ = await experiment_db.upsert_experiment_definition(
         auth_context=_user1,
-        job_definition_id=job_id,
-        job_definition_version=job_v,
+        blueprint_id=job_id,
+        blueprint_version=job_v,
         experiment_type="cron_schedule",
         created_by="user1",
     )
@@ -586,147 +576,129 @@ async def test_jobs_experiment_next_upsert(mem_session_maker_both):
 
 
 # ---------------------------------------------------------------------------
-# id-provided guard (ExperimentDefinition and JobExecution only;
-# JobDefinition guard is covered in the auth tests above)
+# id-provided guard (ExperimentDefinition and Run only;
+# Blueprint guard is covered in the auth tests above)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_jobs_upsert_experiment_definition_unknown_id_raises(mem_session_maker_both):
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
 
     with pytest.raises(ExperimentNotFound):
         await experiment_db.upsert_experiment_definition(
             auth_context=_user1,
             experiment_definition_id="nonexistent-id",
-            job_definition_id=job_id,
-            job_definition_version=job_v,
+            blueprint_id=job_id,
+            blueprint_version=job_v,
             experiment_type="cron_schedule",
             created_by="user1",
         )
 
 
 @pytest.mark.asyncio
-async def test_jobs_upsert_job_execution_unknown_id_raises(mem_session_maker_both):
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
+async def test_jobs_upsert_run_unknown_id_raises(mem_session_maker_both):
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
 
-    with pytest.raises(KeyError, match="No JobExecution"):
-        await jobs_db.upsert_job_execution(
-            job_execution_id="nonexistent-id",
-            job_definition_id=job_id,
-            job_definition_version=job_v,
+    with pytest.raises(KeyError, match="No Run"):
+        await jobs_db.upsert_run(
+            run_id="nonexistent-id",
+            blueprint_id=job_id,
+            blueprint_version=job_v,
             created_by="user1",
             status="submitted",
         )
 
 
 # ---------------------------------------------------------------------------
-# JobExecution — auth / ownership tests
+# Run — auth / ownership tests
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_job_execution_get_own(mem_session_maker_both):
+async def test_run_get_own(mem_session_maker_both):
     """Owner can retrieve their own execution."""
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, _ = await job_execution_db.upsert_job_execution(
-        job_definition_id=job_id, job_definition_version=job_v, created_by="user1", status="submitted"
-    )
-    result = await job_execution_db.get_job_execution(exec_id, auth_context=_user1)
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
+    exec_id, _ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
+    result = await run_db.get_run(exec_id, auth_context=_user1)
     assert result is not None
-    assert result.job_execution_id == exec_id
+    assert result.run_id == exec_id
 
 
 @pytest.mark.asyncio
-async def test_job_execution_get_other_user_denied(mem_session_maker_both):
+async def test_run_get_other_user_denied(mem_session_maker_both):
     """Non-owner cannot access another user's execution."""
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, _ = await job_execution_db.upsert_job_execution(
-        job_definition_id=job_id, job_definition_version=job_v, created_by="user1", status="submitted"
-    )
-    with pytest.raises(JobExecutionAccessDenied):
-        await job_execution_db.get_job_execution(exec_id, auth_context=_user2)
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
+    exec_id, _ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
+    with pytest.raises(RunAccessDenied):
+        await run_db.get_run(exec_id, auth_context=_user2)
 
 
 @pytest.mark.asyncio
-async def test_job_execution_get_admin_sees_all(mem_session_maker_both):
+async def test_run_get_admin_sees_all(mem_session_maker_both):
     """Admin can access any execution."""
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, _ = await job_execution_db.upsert_job_execution(
-        job_definition_id=job_id, job_definition_version=job_v, created_by="user1", status="submitted"
-    )
-    result = await job_execution_db.get_job_execution(exec_id, auth_context=_admin)
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
+    exec_id, _ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
+    result = await run_db.get_run(exec_id, auth_context=_admin)
     assert result is not None
 
 
 @pytest.mark.asyncio
-async def test_job_execution_get_anon_sees_all(mem_session_maker_both):
+async def test_run_get_anon_sees_all(mem_session_maker_both):
     """Anonymous actor (unauthenticated regime) can access all executions."""
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, _ = await job_execution_db.upsert_job_execution(
-        job_definition_id=job_id, job_definition_version=job_v, created_by="user1", status="submitted"
-    )
-    result = await job_execution_db.get_job_execution(exec_id, auth_context=_anon)
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
+    exec_id, _ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
+    result = await run_db.get_run(exec_id, auth_context=_anon)
     assert result is not None
 
 
 @pytest.mark.asyncio
-async def test_job_execution_get_not_found(mem_session_maker_both):
-    """get_job_execution raises JobExecutionNotFound for missing id."""
-    with pytest.raises(JobExecutionNotFound):
-        await job_execution_db.get_job_execution("nonexistent-id", auth_context=_admin)
+async def test_run_get_not_found(mem_session_maker_both):
+    """get_run raises RunNotFound for missing id."""
+    with pytest.raises(RunNotFound):
+        await run_db.get_run("nonexistent-id", auth_context=_admin)
 
 
 @pytest.mark.asyncio
-async def test_job_execution_list_filters_by_owner(mem_session_maker_both):
+async def test_run_list_filters_by_owner(mem_session_maker_both):
     """Non-admin users see only their own executions in list."""
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_u1, _ = await job_execution_db.upsert_job_execution(
-        job_definition_id=job_id, job_definition_version=job_v, created_by="user1", status="submitted"
-    )
-    exec_u2, _ = await job_execution_db.upsert_job_execution(
-        job_definition_id=job_id, job_definition_version=job_v, created_by="user2", status="submitted"
-    )
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
+    exec_u1, _ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
+    exec_u2, _ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user2", status="submitted")
 
-    u1_execs = {e.job_execution_id for e in await job_execution_db.list_job_executions(auth_context=_user1)}
+    u1_execs = {e.run_id for e in await run_db.list_runs(auth_context=_user1)}
     assert exec_u1 in u1_execs
     assert exec_u2 not in u1_execs
 
-    admin_execs = {e.job_execution_id for e in await job_execution_db.list_job_executions(auth_context=_admin)}
+    admin_execs = {e.run_id for e in await run_db.list_runs(auth_context=_admin)}
     assert exec_u1 in admin_execs
     assert exec_u2 in admin_execs
 
 
 @pytest.mark.asyncio
-async def test_job_execution_delete_own(mem_session_maker_both):
+async def test_run_delete_own(mem_session_maker_both):
     """Owner can delete their own execution."""
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, _ = await job_execution_db.upsert_job_execution(
-        job_definition_id=job_id, job_definition_version=job_v, created_by="user1", status="submitted"
-    )
-    await job_execution_db.soft_delete_job_execution(exec_id, auth_context=_user1)
-    with pytest.raises(JobExecutionNotFound):
-        await job_execution_db.get_job_execution(exec_id, auth_context=_admin)
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
+    exec_id, _ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
+    await run_db.soft_delete_run(exec_id, auth_context=_user1)
+    with pytest.raises(RunNotFound):
+        await run_db.get_run(exec_id, auth_context=_admin)
 
 
 @pytest.mark.asyncio
-async def test_job_execution_delete_other_user_denied(mem_session_maker_both):
+async def test_run_delete_other_user_denied(mem_session_maker_both):
     """Non-owner cannot delete another user's execution."""
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, _ = await job_execution_db.upsert_job_execution(
-        job_definition_id=job_id, job_definition_version=job_v, created_by="user1", status="submitted"
-    )
-    with pytest.raises(JobExecutionAccessDenied):
-        await job_execution_db.soft_delete_job_execution(exec_id, auth_context=_user2)
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
+    exec_id, _ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
+    with pytest.raises(RunAccessDenied):
+        await run_db.soft_delete_run(exec_id, auth_context=_user2)
 
 
 @pytest.mark.asyncio
-async def test_job_execution_delete_admin_can_delete_any(mem_session_maker_both):
+async def test_run_delete_admin_can_delete_any(mem_session_maker_both):
     """Admin can delete any execution."""
-    job_id, job_v = await job_definition_db.upsert_job_definition(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, _ = await job_execution_db.upsert_job_execution(
-        job_definition_id=job_id, job_definition_version=job_v, created_by="user1", status="submitted"
-    )
-    await job_execution_db.soft_delete_job_execution(exec_id, auth_context=_admin)
-    with pytest.raises(JobExecutionNotFound):
-        await job_execution_db.get_job_execution(exec_id, auth_context=_admin)
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
+    exec_id, _ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
+    await run_db.soft_delete_run(exec_id, auth_context=_admin)
+    with pytest.raises(RunNotFound):
+        await run_db.get_run(exec_id, auth_context=_admin)

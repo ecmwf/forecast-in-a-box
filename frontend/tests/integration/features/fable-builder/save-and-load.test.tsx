@@ -154,7 +154,7 @@ describe('Fable Builder Save & Load', () => {
 
       // Override upsert handler to return an error
       worker.use(
-        http.post(API_ENDPOINTS.fable.upsert, () => {
+        http.post(API_ENDPOINTS.fable.create, () => {
           return HttpResponse.json(
             { message: 'Internal server error' },
             { status: 500 },
@@ -218,7 +218,7 @@ describe('Fable Builder Save & Load', () => {
       // Override retrieve handler to return 404 BEFORE rendering
       // so the component sees the error on its initial fetch
       worker.use(
-        http.get(API_ENDPOINTS.fable.retrieve, () => {
+        http.get(API_ENDPOINTS.fable.get, () => {
           return HttpResponse.json(
             { message: 'Fable not found' },
             { status: 404 },

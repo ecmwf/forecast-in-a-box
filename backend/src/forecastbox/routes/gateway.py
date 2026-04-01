@@ -7,6 +7,9 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+"""Canonical gateway lifecycle routes — /gateway/*"""
+
+PREFIX = "/api/v1/gateway"
 import asyncio
 import logging
 import os

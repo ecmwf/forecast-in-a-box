@@ -7,8 +7,9 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Admin API Router."""
+"""Canonical admin routes — /admin/* and /users/*"""
 
+PREFIX = "/api/v1/admin"
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -53,7 +54,7 @@ class ExposedSettings(BaseModel):
     cascade: CascadeSettings = config.cascade
 
     def to_rjsf(self) -> FormDefinition:
-        """Convert settings to RJSF form definition"""
+        """Convert settings to RJSF form blueprint"""
         fields, required = from_pydantic(self)
         return FormDefinition(
             title="Settings",

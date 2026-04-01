@@ -6,8 +6,8 @@ from datetime import datetime, timedelta
 import httpx
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
-from forecastbox.api.types.fable import FableBuilder
-from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
+from forecastbox.domain.blueprint.cascade import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
+from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.entrypoint.main import launch_all
 from forecastbox.utility.config import FIABConfig
 
@@ -50,7 +50,7 @@ if __name__ == "__main__":
             handles = launch_all(config, attempts=50)
             client = httpx.Client(base_url=config.api.local_url() + "/api/v1", follow_redirects=True)
 
-            response = client.get("/fable/catalogue").raise_for_status()
+            response = client.get("/blueprint/catalogue").raise_for_status()
             assert len(response.json()) > 0
 
             pluginId = PluginCompositeId(store="ecmwf", local="ecmwf-base")
@@ -84,8 +84,8 @@ if __name__ == "__main__":
                 blocks[f"ensemble{statistic.capitalize()}"] = block
                 blocks[f"sink{statistic.capitalize()}"] = sink
 
-            builder = FableBuilder(blocks=blocks)
-            response = client.request(url="/fable/compile", method="put", json=builder.model_dump()).json()
+            builder = BlueprintBuilder(blocks=blocks)
+            response = client.request(url="/blueprint/compile", method="put", json=builder.model_dump()).json()
 
             spec = ExecutionSpecification(**response)
             spec.environment.hosts = 1

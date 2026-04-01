@@ -7,17 +7,17 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Service layer for the job definition domain.
+"""Service layer for the blueprint domain.
 
 Owns:
-- pure builder validation / expansion logic (formerly in ``api.fable``),
-- pure builder compilation logic (formerly in ``api.fable``),
-- saving a FableBuilder as a JobDefinition,
-- loading a JobDefinition back into FableBuilder form,
-- compiling a stored job definition to an ExecutionSpecification.
+- pure builder validation / expansion logic (formerly in ``api.blueprint``),
+- pure builder compilation logic (formerly in ``api.blueprint``),
+- saving a BlueprintBuilder as a Blueprint,
+- loading a Blueprint back into BlueprintBuilder form,
+- compiling a stored blueprint to an ExecutionSpecification.
 
 No HTTP exceptions are raised here; callers are responsible for mapping
-``JobDefinitionNotFound`` and ``JobDefinitionAccessDenied`` to HTTP responses.
+``BlueprintNotFound`` and ``BlueprintAccessDenied`` to HTTP responses.
 """
 
 import logging
@@ -35,35 +35,72 @@ from fiab_core.fable import (
     BlockKind,
     PluginBlockFactoryId,
 )
+from pydantic import BaseModel
 
-import forecastbox.domain.job_definition.db as _job_definition_db
+import forecastbox.domain.blueprint.db as _blueprint_db
 from forecastbox.api.plugin.manager import PluginManager
-from forecastbox.api.types.fable import (
-    FableBuilder,
-    FableCompileRequest,
-    FableRetrieveResponse,
-    FableSaveRequest,
-    FableSaveResponse,
-    FableValidationExpansion,
-)
-from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
-from forecastbox.domain.job_definition.db import upsert_job_definition
-from forecastbox.domain.job_definition.exceptions import JobDefinitionNotFound
+from forecastbox.domain.blueprint.cascade import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
+from forecastbox.domain.blueprint.db import upsert_blueprint
+from forecastbox.domain.blueprint.exceptions import BlueprintNotFound
 from forecastbox.utility.auth import AuthContext
 
 logger = logging.getLogger(__name__)
 
 
+class BlueprintBuilder(BaseModel):
+    # NOTE warning -- this class is used by the web api. Be careful about changes here
+    blocks: dict[BlockInstanceId, BlockInstance]
+    environment: EnvironmentSpecification | None = None
+
+
+class BlueprintSaveResult(BaseModel):
+    """Returned by save_builder; contains the stable id and the new version number."""
+
+    blueprint_id: str
+    blueprint_version: int
+
+
+class BlueprintRetrieveResult(BaseModel):
+    """Full payload returned by load_builder."""
+
+    blueprint_id: str
+    blueprint_version: int
+    builder: BlueprintBuilder
+    display_name: str | None = None
+    display_description: str | None = None
+    tags: list[str] = []
+    parent_id: str | None = None
+
+
+class BlueprintValidationExpansion(BaseModel):
+    """Structured validation result and completion options for a BlueprintBuilder."""
+
+    global_errors: list[str]
+    block_errors: dict[BlockInstanceId, list[str]]
+    possible_sources: list[PluginBlockFactoryId]
+    possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]]
+
+
+class BlueprintSaveCommand(BaseModel):
+    """Command payload for saving a blueprint builder."""
+
+    builder: BlueprintBuilder
+    display_name: str | None = None
+    display_description: str | None = None
+    tags: list[str] = []
+    parent_id: str | None = None
+
+
 # ---------------------------------------------------------------------------
-# Pure builder logic (formerly in api.fable)
+# Pure builder logic (formerly in api.blueprint)
 # ---------------------------------------------------------------------------
 
 
-def _topological_order(fable: FableBuilder) -> Iterator[BlockInstanceId]:
+def _topological_order(blueprint: BlueprintBuilder) -> Iterator[BlockInstanceId]:
     remaining = {}
     children: dict[BlockInstanceId, list[BlockInstanceId]] = defaultdict(list)
     queue: list[BlockInstanceId] = []
-    for blockId, blockInstance in fable.blocks.items():
+    for blockId, blockInstance in blueprint.blocks.items():
         l = len(blockInstance.input_ids)
         if l == 0:
             queue.append(blockId)
@@ -80,8 +117,8 @@ def _topological_order(fable: FableBuilder) -> Iterator[BlockInstanceId]:
                 queue.append(child)
 
 
-def validate_expand(fable: FableBuilder) -> FableValidationExpansion:
-    """Validate and expand a partially-constructed FableBuilder.
+def validate_expand(blueprint: BlueprintBuilder) -> BlueprintValidationExpansion:
+    """Validate and expand a partially-constructed BlueprintBuilder.
 
     Returns structured validation errors and possible completion options.
     The presence of errors does not affect the return (callers decide how to
@@ -97,8 +134,8 @@ def validate_expand(fable: FableBuilder) -> FableValidationExpansion:
     possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]] = {}
     block_errors: dict[BlockInstanceId, list[str]] = defaultdict(list)
     outputs = {}
-    for blockId in _topological_order(fable):
-        blockInstance = fable.blocks[blockId]
+    for blockId in _topological_order(blueprint):
+        blockInstance = blueprint.blocks[blockId]
         plugin = plugins.get(blockInstance.factory_id.plugin, None)
         if not plugin:
             block_errors[blockId] += ["Plugin not found"]
@@ -130,7 +167,7 @@ def validate_expand(fable: FableBuilder) -> FableValidationExpansion:
 
     global_errors: list[str] = []
 
-    return FableValidationExpansion(
+    return BlueprintValidationExpansion(
         possible_sources=possible_sources,
         possible_expansions=possible_expansions,
         block_errors=block_errors,
@@ -153,8 +190,8 @@ def _get_artifacts_list(graph: Graph) -> list[CompositeArtifactId]:
     return list(artifacts)
 
 
-def compile_builder(fable: FableBuilder) -> ExecutionSpecification:
-    """Compile a FableBuilder into an ExecutionSpecification.
+def compile_builder(blueprint: BlueprintBuilder) -> ExecutionSpecification:
+    """Compile a BlueprintBuilder into an ExecutionSpecification.
 
     Raises ``ValueError`` if any block cannot be compiled.
     """
@@ -162,8 +199,8 @@ def compile_builder(fable: FableBuilder) -> ExecutionSpecification:
     plugins = PluginManager.plugins
     action_lookup = {}
 
-    for blockId in _topological_order(fable):
-        blockInstance = fable.blocks[blockId]
+    for blockId in _topological_order(blueprint):
+        blockInstance = blueprint.blocks[blockId]
         plugin = plugins.get(blockInstance.factory_id.plugin, None)
         if not plugin:
             logger.debug(f"plugin for {blockId=} not found: {blockInstance.factory_id.plugin}. Available plugins: {plugins.keys()}")
@@ -181,36 +218,39 @@ def compile_builder(fable: FableBuilder) -> ExecutionSpecification:
     job = RawCascadeJob(job_type="raw_cascade_job", job_instance=job_instance)
 
     graph_artifacts = _get_artifacts_list(graph)
-    if fable.environment is not None:
-        merged_artifacts = list(set(fable.environment.runtime_artifacts).union(set(graph_artifacts)))
-        environment = fable.environment.model_copy(update={"runtime_artifacts": merged_artifacts})
+    if blueprint.environment is not None:
+        merged_artifacts = list(set(blueprint.environment.runtime_artifacts).union(set(graph_artifacts)))
+        environment = blueprint.environment.model_copy(update={"runtime_artifacts": merged_artifacts})
     else:
         environment = EnvironmentSpecification(runtime_artifacts=graph_artifacts)
     return ExecutionSpecification(job=job, environment=environment)
 
 
 # ---------------------------------------------------------------------------
-# Definition-aware service operations
+# Blueprint-aware service operations
 # ---------------------------------------------------------------------------
 
 
 async def save_builder(
     *,
     auth_context: AuthContext,
-    payload: FableSaveRequest,
-    fable_id: str | None = None,
-) -> FableSaveResponse:
-    """Persist a FableBuilder as a JobDefinition and return the stable id and version.
+    payload: BlueprintSaveCommand,
+    blueprint_id: str | None = None,
+    expected_version: int | None = None,
+) -> BlueprintSaveResult:
+    """Persist a BlueprintBuilder as a Blueprint and return the stable id and version.
 
     ``source`` is derived from ``display_name``: ``user_defined`` when a name is
     provided, ``oneoff_execution`` otherwise.
-    Raises ``JobDefinitionNotFound`` or ``JobDefinitionAccessDenied`` from the db layer.
+    When ``expected_version`` is provided it must match the current max version;
+    raises ``BlueprintVersionConflict`` if it does not.
+    Raises ``BlueprintNotFound`` or ``BlueprintAccessDenied`` from the db layer.
     """
     source: str = "user_defined" if payload.display_name is not None else "oneoff_execution"
     env = payload.builder.environment
-    definition_id, version = await upsert_job_definition(
+    blueprint_id, version = await upsert_blueprint(
         auth_context=auth_context,
-        definition_id=fable_id,
+        blueprint_id=blueprint_id,
         source=source,
         created_by=auth_context.user_id,
         blocks=payload.builder.model_dump(mode="json")["blocks"],
@@ -219,46 +259,30 @@ async def save_builder(
         display_description=payload.display_description,
         tags=payload.tags if payload.tags else None,
         parent_id=payload.parent_id,
+        expected_version=expected_version,
     )
-    return FableSaveResponse(id=definition_id, version=version)
+    return BlueprintSaveResult(blueprint_id=blueprint_id, blueprint_version=version)
 
 
-async def load_builder(fable_id: str, version: int | None = None) -> FableRetrieveResponse:
-    """Load a JobDefinition and return it as a FableRetrieveResponse.
+async def load_builder(blueprint_id: str, version: int | None = None) -> BlueprintRetrieveResult:
+    """Load a Blueprint and return it as a BlueprintRetrieveResult.
 
-    Raises ``JobDefinitionNotFound`` if the id does not exist or has no builder spec.
+    Raises ``BlueprintNotFound`` if the id does not exist or has no builder spec.
     """
-    job_definition = await _job_definition_db.get_job_definition(fable_id, version)
-    if job_definition is None:
-        raise JobDefinitionNotFound(f"Fable job definition {fable_id!r} not found.")
-    if job_definition.blocks is None:
-        raise JobDefinitionNotFound(f"Fable job definition {fable_id!r} has no builder spec.")
-    builder = FableBuilder(blocks=job_definition.blocks)  # ty:ignore[invalid-argument-type]
-    if job_definition.environment_spec is not None:
-        builder.environment = EnvironmentSpecification.model_validate(job_definition.environment_spec)
-    return FableRetrieveResponse(
-        id=job_definition.job_definition_id,  # ty:ignore[invalid-argument-type]
-        version=job_definition.version,  # ty:ignore[invalid-argument-type]
+    blueprint = await _blueprint_db.get_blueprint(blueprint_id, version)
+    if blueprint is None:
+        raise BlueprintNotFound(f"Blueprint {blueprint_id!r} not found.")
+    if blueprint.blocks is None:
+        raise BlueprintNotFound(f"Blueprint {blueprint_id!r} has no builder spec.")
+    builder = BlueprintBuilder(blocks=blueprint.blocks)  # ty:ignore[invalid-argument-type]
+    if blueprint.environment_spec is not None:
+        builder.environment = EnvironmentSpecification.model_validate(blueprint.environment_spec)
+    return BlueprintRetrieveResult(
+        blueprint_id=str(blueprint.blueprint_id),  # ty:ignore[invalid-argument-type]
+        blueprint_version=cast(int, blueprint.version),
         builder=builder,
-        display_name=job_definition.display_name,  # ty:ignore[invalid-argument-type]
-        display_description=job_definition.display_description,  # ty:ignore[invalid-argument-type]
-        tags=job_definition.tags or [],  # ty:ignore[invalid-argument-type]
-        parent_id=job_definition.parent_id,  # ty:ignore[invalid-argument-type]
+        display_name=blueprint.display_name,  # ty:ignore[invalid-argument-type]
+        display_description=blueprint.display_description,  # ty:ignore[invalid-argument-type]
+        tags=blueprint.tags or [],  # ty:ignore[invalid-argument-type]
+        parent_id=blueprint.parent_id,  # ty:ignore[invalid-argument-type]
     )
-
-
-async def compile_definition(fable_id: str, version: int | None = None) -> ExecutionSpecification:
-    """Load a stored job definition and compile it to an ExecutionSpecification.
-
-    Raises ``JobDefinitionNotFound`` if the id does not exist or has no builder spec.
-    Raises ``ValueError`` if compilation fails.
-    """
-    job_definition = await _job_definition_db.get_job_definition(fable_id, version)
-    if job_definition is None:
-        raise JobDefinitionNotFound(f"Fable job definition {fable_id!r} not found.")
-    if job_definition.blocks is None:
-        raise JobDefinitionNotFound(f"Fable job definition {fable_id!r} has no builder spec.")
-    builder = FableBuilder(blocks=job_definition.blocks)  # ty:ignore[invalid-argument-type]
-    if job_definition.environment_spec is not None:
-        builder.environment = EnvironmentSpecification.model_validate(job_definition.environment_spec)
-    return compile_builder(builder)

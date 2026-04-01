@@ -11,11 +11,15 @@
 
 
 class ExperimentNotFound(Exception):
-    """Raised when an experiment definition does not exist or has been deleted."""
+    """Raised when an experiment blueprint does not exist or has been deleted."""
 
 
 class ExperimentAccessDenied(Exception):
     """Raised when the actor does not have permission to perform the operation."""
+
+
+class ExperimentVersionConflict(Exception):
+    """Raised when the provided version does not match the current version in the database."""
 
 
 class SchedulerBusy(Exception):

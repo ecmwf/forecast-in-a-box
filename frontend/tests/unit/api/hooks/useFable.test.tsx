@@ -22,7 +22,6 @@ import {
   fableKeys,
   useBlockCatalogue,
   useBlockFactory,
-  useCompileFable,
   useExpandFable,
   useFable,
   useFableValidation,
@@ -191,7 +190,7 @@ describe('useFable', () => {
 
   it('fetches fable by ID and returns the builder', async () => {
     const mockRetrieveResponse = {
-      id: 'test-fable-id',
+      blueprint_id: 'test-fable-id',
       version: 1,
       builder: mockFable,
       display_name: 'Test Config',
@@ -202,7 +201,7 @@ describe('useFable', () => {
     }
 
     worker.use(
-      http.get(API_ENDPOINTS.fable.retrieve, () => {
+      http.get(API_ENDPOINTS.fable.get, () => {
         return HttpResponse.json(mockRetrieveResponse)
       }),
     )
@@ -231,7 +230,7 @@ describe('useFable', () => {
     let fetchCalled = false
 
     worker.use(
-      http.get(API_ENDPOINTS.fable.retrieve, () => {
+      http.get(API_ENDPOINTS.fable.get, () => {
         fetchCalled = true
         return HttpResponse.json({})
       }),
@@ -404,10 +403,13 @@ describe('useUpsertFable', () => {
     worker.resetHandlers()
   })
 
-  it('creates new fable and returns { id, version }', async () => {
+  it('creates new fable and returns { blueprint_id, version }', async () => {
     worker.use(
-      http.post(API_ENDPOINTS.fable.upsert, () => {
-        return HttpResponse.json({ id: 'new-fable-id', version: 1 })
+      http.post(API_ENDPOINTS.fable.create, () => {
+        return HttpResponse.json({
+          blueprint_id: 'new-fable-id',
+          version: 1,
+        })
       }),
     )
 
@@ -442,7 +444,7 @@ describe('useUpsertFable', () => {
     await expect
       .element(screen.getByTestId('status'))
       .toHaveTextContent('success')
-    expect(mutationResult!.data!.id).toBe('new-fable-id')
+    expect(mutationResult!.data!.blueprint_id).toBe('new-fable-id')
     expect(mutationResult!.data!.version).toBe(1)
   })
 
@@ -450,9 +452,12 @@ describe('useUpsertFable', () => {
     let capturedBody: unknown = null
 
     worker.use(
-      http.post(API_ENDPOINTS.fable.upsert, async ({ request }) => {
+      http.post(API_ENDPOINTS.fable.create, async ({ request }) => {
         capturedBody = await request.json()
-        return HttpResponse.json({ id: 'existing-id', version: 2 })
+        return HttpResponse.json({
+          blueprint_id: 'existing-id',
+          version: 2,
+        })
       }),
     )
 
@@ -486,65 +491,6 @@ describe('useUpsertFable', () => {
       .element(screen.getByTestId('status'))
       .toHaveTextContent('success')
     expect(capturedBody).toMatchObject({ parent_id: 'existing-id' })
-  })
-})
-
-describe('useCompileFable', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  afterEach(() => {
-    worker.resetHandlers()
-  })
-
-  it('compiles fable by reference', async () => {
-    const mockCompiled = {
-      job: {
-        job_type: 'raw_cascade_job',
-        job_instance: { tasks: {}, edges: [] },
-      },
-      environment: {
-        hosts: null,
-        workers_per_host: null,
-        environment_variables: {},
-        runtime_artifacts: [],
-      },
-      shared: false,
-    }
-
-    worker.use(
-      http.put(API_ENDPOINTS.fable.compile, () => {
-        return HttpResponse.json(mockCompiled)
-      }),
-    )
-
-    let mutationResult: ReturnType<typeof useCompileFable> | null = null
-
-    function TestComponent() {
-      const result = useCompileFable()
-      mutationResult = result
-      return (
-        <div>
-          <button
-            data-testid="compile"
-            onClick={() => result.mutate({ id: 'fable-123' })}
-          >
-            Compile
-          </button>
-          <div data-testid="status">{result.status}</div>
-        </div>
-      )
-    }
-
-    const screen = await renderWithQueryClient(<TestComponent />)
-
-    await screen.getByTestId('compile').click()
-
-    await expect
-      .element(screen.getByTestId('status'))
-      .toHaveTextContent('success')
-    expect(mutationResult!.data).toEqual(mockCompiled)
   })
 })
 

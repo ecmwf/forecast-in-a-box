@@ -7,13 +7,14 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""User-facing API for artifacts management."""
+"""Canonical artifacts routes — /artifacts/*"""
 
+PREFIX = "/api/v1/artifacts"
 from fastapi import APIRouter, Depends, HTTPException
 
 from forecastbox.api.artifacts.base import CompositeArtifactId, MlModelDetail, MlModelOverview
 from forecastbox.api.artifacts.manager import delete_model, get_model_details, list_models, submit_artifact_download
-from forecastbox.api.routers.admin import get_admin_user
+from forecastbox.routes.admin import get_admin_user
 
 router = APIRouter(
     tags=["artifacts"],

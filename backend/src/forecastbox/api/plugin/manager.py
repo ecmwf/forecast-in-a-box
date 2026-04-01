@@ -38,13 +38,12 @@ from types import ModuleType
 from typing import Iterator, Literal
 
 from cascade.low.func import assert_never
-from fiab_core.fable import BlockFactoryCatalogue
+from fiab_core.fable import BlockFactoryCatalogue, PluginCompositeId
 from fiab_core.plugin import Plugin
 from pydantic import BaseModel
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
-from forecastbox.api.types.fable import PluginCompositeId
 from forecastbox.ecpyutil import delayed_thread, timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginsSettings, config, config_edit_lock
 

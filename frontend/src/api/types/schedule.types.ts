@@ -25,8 +25,8 @@ import { JobStatusSchema } from '@/api/types/job.types'
 export const ScheduleDefinitionResponseSchema = z.object({
   experiment_id: z.string(),
   experiment_version: z.number(),
-  job_definition_id: z.string(),
-  job_definition_version: z.number(),
+  blueprint_id: z.string(),
+  blueprint_version: z.number(),
   cron_expr: z.string(),
   dynamic_expr: z.record(z.string(), z.string()),
   max_acceptable_delay_hours: z.number(),
@@ -55,7 +55,7 @@ export const CreateScheduleResponseSchema = z.object({
 
 /** schedule.py: ScheduleRunResponse; status narrowed from str to known values) */
 export const ScheduleRunResponseSchema = z.object({
-  execution_id: z.string(),
+  run_id: z.string(),
   attempt_count: z.number(),
   status: JobStatusSchema,
   created_at: z.string(),
@@ -87,10 +87,10 @@ export type CreateScheduleResponse = z.infer<
 export type ScheduleRunResponse = z.infer<typeof ScheduleRunResponseSchema>
 export type ScheduleRunsResponse = z.infer<typeof ScheduleRunsResponseSchema>
 
-/** PUT /schedule/create - request body (not validated — outbound only) */
+/** PUT /experiment/create - request body (not validated — outbound only) */
 export interface ScheduleSpecification {
-  job_definition_id: string
-  job_definition_version?: number
+  blueprint_id: string
+  blueprint_version?: number
   cron_expr: string
   dynamic_expr: Record<string, unknown>
   max_acceptable_delay_hours: number
@@ -100,7 +100,7 @@ export interface ScheduleSpecification {
   tags?: Array<string>
 }
 
-/** POST /schedule/update - request body (not validated — outbound only) */
+/** POST /experiment/update - request body (not validated — outbound only) */
 export interface ScheduleUpdate {
   enabled?: boolean
   cron_expr?: string

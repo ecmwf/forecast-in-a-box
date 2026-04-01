@@ -106,7 +106,7 @@ export function ScheduleDetailPage() {
   const { data: runsData } = useScheduleRuns(scheduleId, runsPage, PAGE_SIZE)
   const updateSchedule = useUpdateSchedule()
   const { data: catalogue } = useBlockCatalogue()
-  const { data: fableBuilder } = useFable(schedule?.job_definition_id)
+  const { data: fableBuilder } = useFable(schedule?.blueprint_id)
   const { offsetMs, serverTimeToLocal } = useServerTime()
 
   if (isLoading) {
@@ -150,6 +150,7 @@ export function ScheduleDetailPage() {
     try {
       await updateSchedule.mutateAsync({
         experimentId: scheduleId,
+        version: schedule!.experiment_version,
         update: { enabled: newEnabled },
       })
       toast.success(
@@ -169,6 +170,7 @@ export function ScheduleDetailPage() {
     try {
       await updateSchedule.mutateAsync({
         experimentId: scheduleId,
+        version: schedule!.experiment_version,
         update: { cron_expr: editCronExpr },
       })
       toast.success(t('schedules:actions.scheduleUpdated'))
@@ -191,12 +193,12 @@ export function ScheduleDetailPage() {
     sortedRuns = sortedRuns.filter((run) => run.status === runStatusFilter)
   }
 
-  // Client-side search filter on execution_id
+  // Client-side search filter on run_id
   if (runSearchQuery) {
     const query = runSearchQuery.toLowerCase()
     sortedRuns = sortedRuns.filter(
       (run) =>
-        run.execution_id.toLowerCase().includes(query) ||
+        run.run_id.toLowerCase().includes(query) ||
         deriveTrigger(run.attempt_count).includes(query),
     )
   }
@@ -363,7 +365,7 @@ export function ScheduleDetailPage() {
           {sortedRuns.length > 0 ? (
             sortedRuns.map((run) => (
               <div
-                key={run.execution_id}
+                key={run.run_id}
                 className="p-6 transition-colors hover:bg-muted/50"
               >
                 <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
@@ -401,35 +403,35 @@ export function ScheduleDetailPage() {
                           {t('detail.attempts')}: {run.attempt_count}
                         </span>
                       )}
-                      {run.execution_id && (
+                      {run.run_id && (
                         <span className="rounded border border-border bg-muted px-2 py-0.5 font-mono text-sm text-muted-foreground">
-                          #{run.execution_id.slice(0, 12)}
+                          #{run.run_id.slice(0, 12)}
                         </span>
                       )}
                     </div>
                   </div>
 
                   <div className="mt-2 flex w-full items-center justify-end gap-6 sm:mt-0 sm:w-auto">
-                    {run.execution_id && run.status === 'completed' ? (
+                    {run.run_id && run.status === 'completed' ? (
                       <Link
                         to="/executions/$jobId"
-                        params={{ jobId: run.execution_id }}
+                        params={{ jobId: run.run_id }}
                         className="text-sm font-semibold text-emerald-600 hover:underline dark:text-emerald-400"
                       >
                         {t('executions:outputs.view')}
                       </Link>
-                    ) : run.execution_id && run.status === 'failed' ? (
+                    ) : run.run_id && run.status === 'failed' ? (
                       <Link
                         to="/executions/$jobId"
-                        params={{ jobId: run.execution_id }}
+                        params={{ jobId: run.run_id }}
                         className="text-sm font-semibold text-red-600 hover:underline dark:text-red-400"
                       >
                         {t('executions:errors.executionFailed')}
                       </Link>
-                    ) : run.execution_id ? (
+                    ) : run.run_id ? (
                       <Link
                         to="/executions/$jobId"
-                        params={{ jobId: run.execution_id }}
+                        params={{ jobId: run.run_id }}
                         className="text-sm font-semibold text-muted-foreground hover:underline"
                       >
                         {t('executions:outputs.inspect')}

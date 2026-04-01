@@ -7,16 +7,16 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Domain exceptions for the job definition layer.
+"""Domain exceptions for the job execution layer.
 
-Raised by domain.job_definition.db and domain.job_definition.service; translated to
+Raised by domain.run.db and domain.run.service; translated to
 HTTP responses at the router boundary.
 """
 
 
-class JobDefinitionNotFound(Exception):
-    """Raised when a requested JobDefinition does not exist (or has been soft-deleted)."""
+class RunNotFound(Exception):
+    """Raised when a requested Run does not exist (or has been soft-deleted)."""
 
 
-class JobDefinitionAccessDenied(Exception):
-    """Raised when the actor lacks permission to mutate a JobDefinition."""
+class RunAccessDenied(Exception):
+    """Raised when the actor lacks permission to read or mutate a Run."""

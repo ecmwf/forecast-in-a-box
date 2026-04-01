@@ -7,4 +7,10 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""FastAPI routers."""
+"""Schemata entry-point for the user database.
+
+Exposes ``create_db_and_tables`` so the entrypoint can discover and run it
+via automatic schemata iteration without knowing the underlying db module.
+"""
+
+from forecastbox.db.user import create_db_and_tables as create_db_and_tables

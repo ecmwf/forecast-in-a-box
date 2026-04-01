@@ -7,6 +7,9 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+"""Canonical auth routes — /auth/* and /users/*"""
+
+PREFIX = "/api/v1"
 from fastapi import APIRouter
 
 from forecastbox.entrypoint.auth.oidc import oauth_client

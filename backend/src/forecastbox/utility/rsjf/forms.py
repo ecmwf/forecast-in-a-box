@@ -25,7 +25,7 @@ class ExportedJsonSchema(TypedDict):
     type: str
     required: list[str]
     properties: dict[str, dict]
-    """The JSON Schema definition for the form."""
+    """The JSON Schema blueprint for the form."""
 
 
 class ExportedSchemas(TypedDict):
@@ -39,9 +39,9 @@ class FieldWithUI(BaseModel):
     """Combines a JSON Schema field with an optional UI Schema for RJSF."""
 
     jsonschema: FieldSchema
-    """The JSON Schema definition for the field."""
+    """The JSON Schema blueprint for the field."""
     uischema: UISchema | None = None
-    """The UI Schema definition for the field (controls rendering and widgets)."""
+    """The UI Schema blueprint for the field (controls rendering and widgets)."""
 
 
 class FormDefinition(BaseModel):
@@ -58,7 +58,7 @@ class FormDefinition(BaseModel):
     formData: dict[str, Any] = Field(default_factory=dict)
 
     def export_jsonschema(self) -> ExportedJsonSchema:
-        """Exports the form definition as a JSON Schema object.
+        """Exports the form blueprint as a JSON Schema object.
         This includes the title, type, required fields, and properties for each field.
         """
         return {
@@ -69,7 +69,7 @@ class FormDefinition(BaseModel):
         }
 
     def export_uischema(self) -> dict[str, Any]:
-        """Exports the form definition as a UI Schema object.
+        """Exports the form blueprint as a UI Schema object.
         This includes the UI options for each field that has a UI Schema defined.
         """
         uischema = {key: field.uischema.export_with_prefix() for key, field in self.fields.items() if field.uischema}

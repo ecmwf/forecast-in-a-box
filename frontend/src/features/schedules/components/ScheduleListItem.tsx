@@ -71,6 +71,7 @@ export function ScheduleListItem({
     try {
       await updateSchedule.mutateAsync({
         experimentId: scheduleId,
+        version: schedule.experiment_version,
         update: { enabled: newEnabled },
       })
       toast.success(

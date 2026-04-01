@@ -89,10 +89,10 @@ export function JobListPage() {
     )
   }
 
-  const progresses = data?.executions ?? []
+  const progresses = data?.runs ?? []
   const progressMap: Record<string, (typeof progresses)[number]> = {}
   for (const exec of progresses) {
-    progressMap[exec.execution_id] = exec
+    progressMap[exec.run_id] = exec
   }
   let jobIds = Object.keys(progressMap).sort((a, b) => {
     const aTime = progressMap[a].created_at
@@ -176,7 +176,7 @@ export function JobListPage() {
                 key={jobId}
                 jobId={jobId}
                 status={progressMap[jobId]}
-                fableId={progressMap[jobId].job_definition_id}
+                fableId={progressMap[jobId].blueprint_id}
               />
             ))
           ) : (
