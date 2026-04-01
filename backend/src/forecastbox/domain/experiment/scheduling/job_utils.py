@@ -19,7 +19,7 @@ import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.experiment.db as experiment_db
 from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run
 from forecastbox.ecpyutil import deep_union
-from forecastbox.schemas.jobs import Blueprint
+from forecastbox.schemata.jobs import Blueprint
 
 
 def eval_dynamic_expression(data: dict[str, Any], execution_time: dt.datetime) -> dict[str, Any]:

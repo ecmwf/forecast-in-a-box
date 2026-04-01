@@ -46,7 +46,7 @@ from forecastbox.domain.blueprint.cascade import EnvironmentSpecification, Execu
 from forecastbox.domain.blueprint.service import BlueprintBuilder, compile_builder
 from forecastbox.domain.run.exceptions import RunNotFound
 from forecastbox.ecpyutil import deep_union
-from forecastbox.schemas.jobs import Blueprint, Run
+from forecastbox.schemata.jobs import Blueprint, Run
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
 

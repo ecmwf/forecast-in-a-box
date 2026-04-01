@@ -9,7 +9,7 @@
 
 """Persistence for ExperimentNext and scheduler-support helpers.
 
-Uses the same session maker as ``forecastbox.db.jobs`` so all tables share a
+Uses the same session maker as ``forecastbox.schemata.jobs`` so all tables share a
 single connection pool and in-process tests can monkeypatch a single attribute.
 """
 
@@ -19,9 +19,9 @@ import uuid
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select, update
 
-import forecastbox.db.jobs as _jobs_module
-from forecastbox.db.core import addAndCommit, dbRetry, executeAndCommit, querySingle
-from forecastbox.schemas.jobs import ExperimentDefinition, ExperimentNext
+import forecastbox.schemata.jobs as _jobs_module
+from forecastbox.schemata.jobs import ExperimentDefinition, ExperimentNext
+from forecastbox.utility.db import addAndCommit, dbRetry, executeAndCommit, querySingle
 
 
 async def upsert_experiment_next(*, experiment_id: str, scheduled_at: dt.datetime) -> None:

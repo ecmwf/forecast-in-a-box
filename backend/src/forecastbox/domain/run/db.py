@@ -9,7 +9,7 @@
 
 """Persistence layer for Run, with auth-scoped authorization.
 
-Uses the same session maker as ``forecastbox.db.jobs`` so that all tables
+Uses the same session maker as ``forecastbox.schemata.jobs`` so that all tables
 share a single SQLite connection pool and in-process tests can monkeypatch
 a single ``async_session_maker`` attribute to inject an in-memory database.
 
@@ -24,11 +24,11 @@ from collections.abc import Iterable
 
 from sqlalchemy import func, select, update
 
-import forecastbox.db.jobs as _jobs_module
-from forecastbox.db.core import dbRetry, executeAndCommit, querySingle
+import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
-from forecastbox.schemas.jobs import Run, RunStatus
+from forecastbox.schemata.jobs import Run, RunStatus
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.db import dbRetry, executeAndCommit, querySingle
 
 
 async def upsert_run(
