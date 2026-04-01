@@ -51,7 +51,7 @@ def _make_blueprint(job_def_id: str = "jd-1", version: int = 1) -> MagicMock:
 @pytest.mark.asyncio
 @patch("forecastbox.domain.experiment.scheduling.job_utils.experiment_db.get_experiment_definition", new_callable=AsyncMock)
 @patch("forecastbox.domain.experiment.scheduling.job_utils.blueprint_db.get_blueprint", new_callable=AsyncMock)
-async def test_experiment2runnable_success(mock_get_jd, mock_get_exp):
+async def test_experiment2runnable_success(mock_get_jd: AsyncMock, mock_get_exp: AsyncMock) -> None:
     exec_time = dt.datetime(2026, 1, 1, 0, 0)
     exp = _make_experiment()
     jd = _make_blueprint()
@@ -78,7 +78,7 @@ async def test_experiment2runnable_success(mock_get_jd, mock_get_exp):
 
 @pytest.mark.asyncio
 @patch("forecastbox.domain.experiment.scheduling.job_utils.experiment_db.get_experiment_definition", new_callable=AsyncMock)
-async def test_experiment2runnable_not_found(mock_get_exp):
+async def test_experiment2runnable_not_found(mock_get_exp: AsyncMock) -> None:
     mock_get_exp.return_value = None
 
     result = await experiment2runnable("does-not-exist", dt.datetime.now())
@@ -91,7 +91,7 @@ async def test_experiment2runnable_not_found(mock_get_exp):
 @pytest.mark.asyncio
 @patch("forecastbox.domain.experiment.scheduling.job_utils.experiment_db.get_experiment_definition", new_callable=AsyncMock)
 @patch("forecastbox.domain.experiment.scheduling.job_utils.blueprint_db.get_blueprint", new_callable=AsyncMock)
-async def test_experiment2runnable_job_def_missing(mock_get_jd, mock_get_exp):
+async def test_experiment2runnable_job_def_missing(mock_get_jd: AsyncMock, mock_get_exp: AsyncMock) -> None:
     mock_get_exp.return_value = _make_experiment()
     mock_get_jd.return_value = None
 
@@ -105,7 +105,7 @@ async def test_experiment2runnable_job_def_missing(mock_get_jd, mock_get_exp):
 @pytest.mark.asyncio
 @patch("forecastbox.domain.experiment.scheduling.job_utils.experiment_db.get_experiment_definition", new_callable=AsyncMock)
 @patch("forecastbox.domain.experiment.scheduling.job_utils.blueprint_db.get_blueprint", new_callable=AsyncMock)
-async def test_experiment2runnable_dynamic_expr_applied(mock_get_jd, mock_get_exp):
+async def test_experiment2runnable_dynamic_expr_applied(mock_get_jd: AsyncMock, mock_get_exp: AsyncMock) -> None:
     exec_time = dt.datetime(2026, 3, 15, 12, 0)
     exp = _make_experiment()
     exp.experiment_definition = {

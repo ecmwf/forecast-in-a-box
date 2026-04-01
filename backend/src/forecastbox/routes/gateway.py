@@ -57,7 +57,7 @@ class Globals:
     gateway: GatewayProcess | None = None
 
 
-async def shutdown_processes():
+async def shutdown_processes() -> None:
     """Terminate all running processes on shutdown."""
     logger.debug("initiating graceful gateway shutdown")
     if Globals.gateway is not None:

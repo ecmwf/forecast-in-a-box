@@ -26,13 +26,13 @@ testPluginId = PluginCompositeIdReadable.from_str("localTest:single")
 
 
 class FakeArtifactRegistry(SimpleHTTPRequestHandler):
-    def do_GET(self):
+    def do_GET(self) -> None:
         if self.path == "/artifacts.json":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
 
-            def make_artifact(i):
+            def make_artifact(i: int) -> dict:
                 checkpoint_id = f"{fake_artifact_checkpoint_id}{i}"
                 return {
                     "url": f"http://localhost:{fake_artifact_registry_port}/{checkpoint_id}",
@@ -76,7 +76,7 @@ class FakeArtifactRegistry(SimpleHTTPRequestHandler):
             self.send_error(404, f"Not Found: {self.path}")
 
 
-def run_artifact_registry(shutdown_event: Any):
+def run_artifact_registry(shutdown_event: Any) -> None:
     server_address = ("", fake_artifact_registry_port)
 
     class WhyExposeFieldsInConstructorWhenYouCanSubclass(socketserver.ThreadingTCPServer):
@@ -166,7 +166,7 @@ def backend_client() -> Generator[httpx.Client, None, None]:
 
 
 @pytest.fixture(scope="session")
-def backend_client_with_auth(backend_client):
+def backend_client_with_auth(backend_client: httpx.Client) -> Generator[httpx.Client, None, None]:
     headers = {"Content-Type": "application/json"}
     data = {"email": "authenticated_user@somewhere.org", "password": "something"}
     response = backend_client.post("/auth/register", headers=headers, json=data)

@@ -10,33 +10,33 @@
 from forecastbox.ecpyutil import deep_union
 
 
-def test_deep_union_empty_dicts():
+def test_deep_union_empty_dicts() -> None:
     assert deep_union({}, {}) == {}
 
 
-def test_deep_union_dict1_empty():
+def test_deep_union_dict1_empty() -> None:
     assert deep_union({}, {"a": 1, "b": {"c": 2}}) == {"a": 1, "b": {"c": 2}}
 
 
-def test_deep_union_dict2_empty():
+def test_deep_union_dict2_empty() -> None:
     assert deep_union({"a": 1, "b": {"c": 2}}, {}) == {"a": 1, "b": {"c": 2}}
 
 
-def test_deep_union_no_conflicts():
+def test_deep_union_no_conflicts() -> None:
     assert deep_union({"a": 1, "b": {"c": 2}}, {"d": 3, "e": 4}) == {"a": 1, "b": {"c": 2}, "d": 3, "e": 4}
 
 
-def test_deep_union_with_conflicts_prefer_dict2():
+def test_deep_union_with_conflicts_prefer_dict2() -> None:
     assert deep_union({"a": 1, "b": {"c": 2}, "k3": 0}, {"b": {"d": 3}, "k3": 4}) == {"a": 1, "b": {"c": 2, "d": 3}, "k3": 4}
 
 
-def test_deep_union_nested_dicts_with_conflicts():
+def test_deep_union_nested_dicts_with_conflicts() -> None:
     assert deep_union({"k1": {"k2": 3}, "k3": 0}, {"k1": {"k4": 5}, "k3": 4}) == {"k1": {"k2": 3, "k4": 5}, "k3": 4}
 
 
-def test_deep_union_non_dict_overwrite():
+def test_deep_union_non_dict_overwrite() -> None:
     assert deep_union({"a": 1, "b": {"c": 2}}, {"b": 3}) == {"a": 1, "b": 3}
 
 
-def test_deep_union_dict_overwrite_non_dict():
+def test_deep_union_dict_overwrite_non_dict() -> None:
     assert deep_union({"a": 1, "b": 2}, {"b": {"c": 3}}) == {"a": 1, "b": {"c": 3}}

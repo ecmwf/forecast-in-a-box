@@ -41,7 +41,7 @@ async def _uvicorn_run(app_name: str, host: str, port: int) -> None:
     await server.serve()
 
 
-def launch_backend():
+def launch_backend() -> None:
     config = FIABConfig()
     # TODO something imported by this module reconfigures the logging -- find and remove!
     import forecastbox.entrypoint.app
@@ -57,7 +57,7 @@ def launch_backend():
         pass  # no need to spew stacktrace to log
 
 
-def launch_cascade(log_base: str | None, max_concurrent_jobs: int | None):
+def launch_cascade(log_base: str | None, max_concurrent_jobs: int | None) -> None:
     config = FIABConfig()
     from cascade.deployment.logging import LoggingConfig
     from cascade.gateway.server import main_enp

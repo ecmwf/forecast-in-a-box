@@ -14,7 +14,9 @@
 import datetime as dt
 import pathlib
 import time
+from typing import Any
 
+import httpx
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
 from forecastbox.domain.blueprint.service import BlueprintBuilder
@@ -27,13 +29,13 @@ from .utils import ensure_schedule_run_v2, retry_until, scheduling_endpoint_with
 # *** helpers **
 
 
-def ensure_completed_v2(backend_client, job_id, sleep=0.5, attempts=20):
-    def do_action():
+def ensure_completed_v2(backend_client: httpx.Client, job_id: str, sleep: float = 0.5, attempts: int = 20) -> None:
+    def do_action() -> Any:
         response = backend_client.get("/run/get", params={"run_id": job_id}, timeout=10)
         assert response.is_success, response.text
         return response.json()
 
-    def verify_ok(data) -> bool | None:
+    def verify_ok(data: Any) -> bool | None:
         if data["status"] == "failed":
             raise RuntimeError(f"Job {job_id} failed: {data}")
         assert data["status"] in {"submitted", "running", "completed"}, data["status"]
@@ -42,7 +44,7 @@ def ensure_completed_v2(backend_client, job_id, sleep=0.5, attempts=20):
     retry_until(do_action, verify_ok, attempts=attempts, sleep=sleep, error_msg=f"Failed to finish job {job_id}")
 
 
-def _save_blueprint(client) -> tuple[str, int]:
+def _save_blueprint(client: httpx.Client) -> tuple[str, int]:
     """Save a minimal BlueprintBuilder and return (blueprint_id, version)."""
     plugin_id = PluginCompositeId(store="ecmwf", local="ecmwf-base")
     source = BlockInstance(
@@ -57,7 +59,7 @@ def _save_blueprint(client) -> tuple[str, int]:
     return data["blueprint_id"], data["version"]
 
 
-def _save_full_blueprint(client, output_path: str) -> tuple[str, int]:
+def _save_full_blueprint(client: httpx.Client, output_path: str) -> tuple[str, int]:
     """Save a full BlueprintBuilder (with sink) and return (blueprint_id, version)."""
     source_42 = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="source_42"),
@@ -93,7 +95,7 @@ def _save_full_blueprint(client, output_path: str) -> tuple[str, int]:
     return data["blueprint_id"], data["version"]
 
 
-def _create_schedule_v2(client, job_def_id: str, job_def_version: int, cron_expr: str = "0 0 * * *") -> str:
+def _create_schedule_v2(client: httpx.Client, job_def_id: str, job_def_version: int, cron_expr: str = "0 0 * * *") -> str:
     """Create a v2 cron schedule and return experiment_id."""
     spec = ExperimentCreateRequest(
         blueprint_id=job_def_id,
@@ -111,7 +113,7 @@ def _create_schedule_v2(client, job_def_id: str, job_def_version: int, cron_expr
 # *** schedule crud endpoints ***
 
 
-def test_schedule_v2_crud(backend_client_with_auth):
+def test_schedule_v2_crud(backend_client_with_auth: httpx.Client) -> None:
     """Create, get, update, and verify persistence of a v2 schedule."""
     headers = {"Content-Type": "application/json"}
     job_def_id, job_def_version = _save_blueprint(backend_client_with_auth)
@@ -165,7 +167,7 @@ def test_schedule_v2_crud(backend_client_with_auth):
     assert persisted["enabled"] is False
 
 
-def test_schedule_v2_list(backend_client_with_auth):
+def test_schedule_v2_list(backend_client_with_auth: httpx.Client) -> None:
     """Creating v2 schedules makes them appear in the list_v2 endpoint with pagination."""
     headers = {"Content-Type": "application/json"}
     job_def_id, job_def_version = _save_blueprint(backend_client_with_auth)
@@ -217,7 +219,7 @@ def test_schedule_v2_list(backend_client_with_auth):
     assert response.status_code == 422
 
 
-def test_schedule_v2_next_run(backend_client_with_auth):
+def test_schedule_v2_next_run(backend_client_with_auth: httpx.Client) -> None:
     """Next-run endpoint reflects cron changes and disabled state."""
     headers = {"Content-Type": "application/json"}
     job_def_id, job_def_version = _save_blueprint(backend_client_with_auth)
@@ -276,7 +278,7 @@ def test_schedule_v2_next_run(backend_client_with_auth):
     assert response.json() == "not scheduled currently"
 
 
-def test_schedule_v2_create_invalid_cron(backend_client_with_auth):
+def test_schedule_v2_create_invalid_cron(backend_client_with_auth: httpx.Client) -> None:
     """create_v2 with an invalid cron expression returns 400."""
     headers = {"Content-Type": "application/json"}
     job_def_id, job_def_version = _save_blueprint(backend_client_with_auth)
@@ -290,7 +292,7 @@ def test_schedule_v2_create_invalid_cron(backend_client_with_auth):
     assert response.status_code == 400
 
 
-def test_schedule_v2_create_unknown_blueprint(backend_client_with_auth):
+def test_schedule_v2_create_unknown_blueprint(backend_client_with_auth: httpx.Client) -> None:
     """create_v2 referencing a non-existent Blueprint returns 404."""
     headers = {"Content-Type": "application/json"}
     spec = ExperimentCreateRequest(
@@ -304,7 +306,7 @@ def test_schedule_v2_create_unknown_blueprint(backend_client_with_auth):
 # *** runs endpoints ***
 
 
-def test_schedule_v2_runs_empty(backend_client_with_auth):
+def test_schedule_v2_runs_empty(backend_client_with_auth: httpx.Client) -> None:
     """A newly created v2 schedule with no executions returns an empty runs list."""
     job_def_id, job_def_version = _save_blueprint(backend_client_with_auth)
     experiment_id = _create_schedule_v2(backend_client_with_auth, job_def_id, job_def_version)
@@ -319,13 +321,13 @@ def test_schedule_v2_runs_empty(backend_client_with_auth):
     assert data["total_pages"] == 0
 
 
-def test_schedule_v2_runs_not_found(backend_client_with_auth):
+def test_schedule_v2_runs_not_found(backend_client_with_auth: httpx.Client) -> None:
     """runs_v2 returns 404 for an unknown experiment_id."""
     response = backend_client_with_auth.get("/experiment/runs/list", params={"experiment_id": "does-not-exist"})
     assert response.status_code == 404
 
 
-def test_schedule_v2_runs_invalid_pagination(backend_client_with_auth):
+def test_schedule_v2_runs_invalid_pagination(backend_client_with_auth: httpx.Client) -> None:
     """runs_v2 returns 422 for invalid page or page_size values."""
     job_def_id, job_def_version = _save_blueprint(backend_client_with_auth)
     experiment_id = _create_schedule_v2(backend_client_with_auth, job_def_id, job_def_version)
@@ -337,7 +339,7 @@ def test_schedule_v2_runs_invalid_pagination(backend_client_with_auth):
     assert response.status_code == 422
 
 
-def test_schedule_v2_runs_page_beyond_empty(backend_client_with_auth):
+def test_schedule_v2_runs_page_beyond_empty(backend_client_with_auth: httpx.Client) -> None:
     """Page 2 of an empty schedule returns an empty list (not 404), since total is 0."""
     job_def_id, job_def_version = _save_blueprint(backend_client_with_auth)
     experiment_id = _create_schedule_v2(backend_client_with_auth, job_def_id, job_def_version)
@@ -349,7 +351,7 @@ def test_schedule_v2_runs_page_beyond_empty(backend_client_with_auth):
     assert data["runs"] == []
 
 
-def test_schedule_v2_runs_independent_per_experiment(backend_client_with_auth):
+def test_schedule_v2_runs_independent_per_experiment(backend_client_with_auth: httpx.Client) -> None:
     """Two different experiments have independent runs_v2 results."""
     job_def_id, job_def_version = _save_blueprint(backend_client_with_auth)
     exp_id_1 = _create_schedule_v2(backend_client_with_auth, job_def_id, job_def_version, cron_expr="0 0 * * *")
@@ -362,7 +364,7 @@ def test_schedule_v2_runs_independent_per_experiment(backend_client_with_auth):
     assert r2.json()["total"] == 0
 
 
-def test_schedule_v2_execute(tmpdir, backend_client_with_auth):
+def test_schedule_v2_execute(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
     """Create a schedule with first_run_override in the past; verify the scheduler executes it and produces the correct output."""
     output_path = str(pathlib.Path(str(tmpdir)) / "output")
     job_def_id, job_def_version = _save_full_blueprint(backend_client_with_auth, output_path)

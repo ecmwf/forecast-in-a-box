@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from forecastbox.api.artifacts.base import CompositeArtifactId, MlModelDetail, MlModelOverview
 from forecastbox.api.artifacts.manager import delete_model, get_model_details, list_models, submit_artifact_download
 from forecastbox.routes.admin import get_admin_user
+from forecastbox.schemata.user import UserRead
 
 router = APIRouter(
     tags=["artifacts"],
@@ -44,7 +45,7 @@ def get_model_details_endpoint(composite_id: CompositeArtifactId) -> MlModelDeta
 
 
 @router.post("/download_model")
-def download_model_endpoint(composite_id: CompositeArtifactId, admin=Depends(get_admin_user)) -> dict[str, str | int]:
+def download_model_endpoint(composite_id: CompositeArtifactId, admin: UserRead | None = Depends(get_admin_user)) -> dict[str, str | int]:
     """Submit a download request for a specific ML model or get status of ongoing download."""
     result = submit_artifact_download(composite_id)
     if result.t is not None:
@@ -59,7 +60,7 @@ def download_model_endpoint(composite_id: CompositeArtifactId, admin=Depends(get
 
 
 @router.post("/delete_model")
-def delete_model_endpoint(composite_id: CompositeArtifactId, admin=Depends(get_admin_user)) -> dict[str, str]:
+def delete_model_endpoint(composite_id: CompositeArtifactId, admin: UserRead | None = Depends(get_admin_user)) -> dict[str, str]:
     """Delete a locally available ML model."""
     try:
         result = delete_model(composite_id)

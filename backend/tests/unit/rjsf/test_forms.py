@@ -3,7 +3,7 @@ from forecastbox.utility.rsjf.jsonSchema import IntegerSchema, StringSchema
 from forecastbox.utility.rsjf.uiSchema import UIStringField
 
 
-def test_export_jsonschema_and_uischema():
+def test_export_jsonschema_and_uischema() -> None:
     # Compose a form with two fields, one with UI, one without
     fields = {
         "name": FieldWithUI(
@@ -25,7 +25,7 @@ def test_export_jsonschema_and_uischema():
     assert "age" not in uischema  # No UI for age
 
 
-def test_export_all_combines_json_and_ui():
+def test_export_all_combines_json_and_ui() -> None:
     fields = {"foo": FieldWithUI(jsonschema=StringSchema(type="string", title="Foo"), uischema=UIStringField(widget="text"))}
     form = FormDefinition(title="Test", fields=fields)
     all_export = form.export_all()
@@ -35,6 +35,6 @@ def test_export_all_combines_json_and_ui():
     assert "foo" in all_export["uiSchema"]
 
 
-def test_required_defaults_to_empty_list():
+def test_required_defaults_to_empty_list() -> None:
     form = FormDefinition(title="NoRequired", fields={})
     assert form.required == []

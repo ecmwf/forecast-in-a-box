@@ -5,7 +5,7 @@ from forecastbox.utility.rsjf import jsonSchema
 # Test StringSchema
 
 
-def test_string_schema_basic():
+def test_string_schema_basic() -> None:
     schema = jsonSchema.StringSchema(type="string", title="Name", minLength=2, maxLength=10)
     assert schema.type == "string"
     assert schema.title == "Name"
@@ -13,7 +13,7 @@ def test_string_schema_basic():
     assert schema.maxLength == 10
 
 
-def test_string_schema_enum():
+def test_string_schema_enum() -> None:
     schema = jsonSchema.StringSchema(type="string", title="TestEnum")
     # EnumMixin is not a pydantic field, so set directly
     schema.enum = ["a", "b", "c"]
@@ -27,7 +27,7 @@ def test_string_schema_enum():
 # Test IntegerSchema
 
 
-def test_integer_schema():
+def test_integer_schema() -> None:
     schema = jsonSchema.IntegerSchema(type="integer", title="IntField", minimum=0, maximum=100)
     assert schema.type == "integer"
     assert schema.minimum == 0
@@ -37,7 +37,7 @@ def test_integer_schema():
 # Test NumberSchema
 
 
-def test_number_schema():
+def test_number_schema() -> None:
     schema = jsonSchema.NumberSchema(type="number", title="NumField", minimum=0.5, maximum=2.5)
     assert schema.type == "number"
     assert schema.minimum == 0.5
@@ -47,7 +47,7 @@ def test_number_schema():
 # Test BooleanSchema
 
 
-def test_boolean_schema():
+def test_boolean_schema() -> None:
     schema = jsonSchema.BooleanSchema(type="boolean", title="BoolField")
     assert schema.type == "boolean"
 
@@ -55,7 +55,7 @@ def test_boolean_schema():
 # Test NullSchema
 
 
-def test_null_schema():
+def test_null_schema() -> None:
     schema = jsonSchema.NullSchema(type="null", title="NullField")
     assert schema.type == "null"
 
@@ -63,7 +63,7 @@ def test_null_schema():
 # Test ObjectSchema and recursion
 
 
-def test_object_schema():
+def test_object_schema() -> None:
     prop = jsonSchema.StringSchema(type="string", title="Test")
     obj = jsonSchema.ObjectSchema(type="object", title="ObjField", properties={"field": prop}, required=["field"])
     assert obj.type == "object"
@@ -71,7 +71,7 @@ def test_object_schema():
     assert obj.required == ["field"]
 
 
-def test_object_schema_properties_and_required():
+def test_object_schema_properties_and_required() -> None:
     prop1 = jsonSchema.StringSchema(type="string", title="Name")
     prop2 = jsonSchema.IntegerSchema(type="integer", title="Age")
     obj = jsonSchema.ObjectSchema(type="object", title="Person", properties={"name": prop1, "age": prop2}, required=["name"])
@@ -83,7 +83,7 @@ def test_object_schema_properties_and_required():
     assert isinstance(obj.properties["age"], jsonSchema.IntegerSchema)
 
 
-def test_object_schema_combinators():
+def test_object_schema_combinators() -> None:
     s1 = jsonSchema.StringSchema(type="string", title="A")
     s2 = jsonSchema.StringSchema(type="string", title="B")
     obj = jsonSchema.ObjectSchema(type="object", title="Combo", properties={}, anyOf=[s1, s2], oneOf=[s1], allOf=[s2])
@@ -95,7 +95,7 @@ def test_object_schema_combinators():
 # Test ArraySchema
 
 
-def test_array_schema():
+def test_array_schema() -> None:
     item_schema = jsonSchema.IntegerSchema(type="integer", title="ArrItem")
     arr = jsonSchema.ArraySchema(type="array", title="ArrField", items=item_schema, minItems=1, maxItems=5)
     assert arr.type == "array"
@@ -104,7 +104,7 @@ def test_array_schema():
     assert arr.items.type == "integer"
 
 
-def test_array_schema_items_and_limits():
+def test_array_schema_items_and_limits() -> None:
     item_schema = jsonSchema.StringSchema(type="string", title="Item")
     arr = jsonSchema.ArraySchema(type="array", title="StringArray", items=item_schema, minItems=2, maxItems=5, uniqueItems=True)
     assert arr.type == "array"
@@ -115,7 +115,7 @@ def test_array_schema_items_and_limits():
     assert arr.uniqueItems is True
 
 
-def test_array_schema_nested():
+def test_array_schema_nested() -> None:
     inner = jsonSchema.IntegerSchema(type="integer", title="Inner")
     arr = jsonSchema.ArraySchema(type="array", title="Outer", items=inner)
     assert arr.items == inner
@@ -127,7 +127,7 @@ def test_array_schema_nested():
 # Test FieldSchema Union
 
 
-def test_field_schema_union():
+def test_field_schema_union() -> None:
     s = jsonSchema.StringSchema(type="string", title="S")
     i = jsonSchema.IntegerSchema(type="integer", title="I")
     n = jsonSchema.NumberSchema(type="number", title="N")

@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__ if __name__ != "__main__" else __package__)
 pidfile = fiab_home / "pid"
 
 
-def mark_started(pid: int):
+def mark_started(pid: int) -> None:
     pidfile.write_text(f"{pid}")
 
 
@@ -47,8 +47,8 @@ if __name__ == "__main__":
     previous_cleanup()
     export_recursive(
         config.model_dump(exclude_defaults=True),
-        config.model_config["env_nested_delimiter"],
-        config.model_config["env_prefix"],
+        config.model_config["env_nested_delimiter"],  # ty:ignore[invalid-argument-type]
+        config.model_config["env_prefix"],  # ty:ignore[invalid-argument-type]
     )
     backend = get_context("forkserver").Process(target=launch_backend)
     backend.start()

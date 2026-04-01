@@ -1,7 +1,7 @@
 from forecastbox.utility.rsjf.uiSchema import UIBooleanField, UIField, UIIntegerField, UIObjectField, UIStringField
 
 
-def test_uifield_export_with_prefix():
+def test_uifield_export_with_prefix() -> None:
     field = UIField(widget="custom", classNames="my-class", placeholder="test")
     exported = field.export_with_prefix()
     assert "ui:options" in exported
@@ -12,7 +12,7 @@ def test_uifield_export_with_prefix():
     assert "style" not in opts
 
 
-def test_uistringfield_defaults_and_override():
+def test_uistringfield_defaults_and_override() -> None:
     field = UIStringField()
     exported = field.export_with_prefix()
     assert exported["ui:options"]["widget"] == "text"
@@ -23,7 +23,7 @@ def test_uistringfield_defaults_and_override():
     assert exported2["ui:options"]["format"] == "email"
 
 
-def test_uiintegerfield_and_uibooleanfield():
+def test_uiintegerfield_and_uibooleanfield() -> None:
     int_field = UIIntegerField()
     bool_field = UIBooleanField()
     assert int_field.widget == "updown"
@@ -33,7 +33,7 @@ def test_uiintegerfield_and_uibooleanfield():
     assert bool_field.export_with_prefix()["ui:options"]["widget"] == "checkbox"
 
 
-def test_uiarrayfield_and_uiobjectfield_export():
+def test_uiarrayfield_and_uiobjectfield_export() -> None:
     arr_field = UIObjectField()
     obj_field = UIObjectField(anyOf=[UIStringField(), UIIntegerField()])
     # Should export with only set fields
@@ -41,7 +41,7 @@ def test_uiarrayfield_and_uiobjectfield_export():
     assert obj_field.export_with_prefix() == {"anyOf": [{"ui:options": {"widget": "text"}}, {"ui:options": {"widget": "updown"}}]}
 
 
-def test_uifield_all_options():
+def test_uifield_all_options() -> None:
     field = UIField(
         widget="custom",
         classNames="cls",

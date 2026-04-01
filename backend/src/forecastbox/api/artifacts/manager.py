@@ -53,7 +53,7 @@ class ArtifactManager:
     refresh_error: str | None = None
 
     @classmethod
-    def _ensure_pool(cls):
+    def _ensure_pool(cls) -> None:
         # Temporary method until we refactor for external thread pool/dispatcher.
         # Assumes lock held!
         if cls.executor is None:

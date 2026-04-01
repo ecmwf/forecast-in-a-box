@@ -52,7 +52,9 @@ def _wait_for(client: httpx.Client, url: str, attempts: int, condition: Callable
     raise StartupError(f"failure on {url}: no more retries")
 
 
-def check_backend_ready(config: FIABConfig, handles: ChildProcessGroup | None = None, attempts: int = 20, spawn_gateway: bool = True):
+def check_backend_ready(
+    config: FIABConfig, handles: ChildProcessGroup | None = None, attempts: int = 20, spawn_gateway: bool = True
+) -> None:
     try:
         with httpx.Client() as client:
             _wait_for(client, config.api.local_url() + "/api/v1/status", attempts, _call_succ)
@@ -67,7 +69,7 @@ def check_backend_ready(config: FIABConfig, handles: ChildProcessGroup | None = 
         raise
 
 
-def install_default_plugins(config: FIABConfig):
+def install_default_plugins(config: FIABConfig) -> None:
     """Installs default plugins as specified by configs. Log-swallows all exceptions"""
     try:
         with httpx.Client(follow_redirects=True) as client:

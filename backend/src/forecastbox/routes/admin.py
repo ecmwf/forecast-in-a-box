@@ -74,7 +74,7 @@ class UpdateReleaseResponse(BaseModel):
 
 
 @router.get("/release", response_model=GetReleaseStatusResponse)
-async def get_release_status(admin=Depends(get_admin_user)) -> GetReleaseStatusResponse:
+async def get_release_status(admin: UserRead | None = Depends(get_admin_user)) -> GetReleaseStatusResponse:
     """Get release status"""
     local_dt, local_release = get_local_release()
     newest_available_release = await get_most_recent_release()
@@ -89,7 +89,7 @@ async def get_release_status(admin=Depends(get_admin_user)) -> GetReleaseStatusR
 
 
 @router.post("/release", response_model=UpdateReleaseResponse)
-async def update_release(tag: str | None = None, admin=Depends(get_admin_user)) -> UpdateReleaseResponse:
+async def update_release(tag: str | None = None, admin: UserRead | None = Depends(get_admin_user)) -> UpdateReleaseResponse:
     """Update release"""
     if tag:
         release = Release.from_string(tag)
@@ -106,17 +106,17 @@ async def update_release(tag: str | None = None, admin=Depends(get_admin_user)) 
 
 
 @router.get("/settings", response_model=ExportedSchemas)
-async def get_settings(admin=Depends(get_admin_user)) -> ExportedSchemas:
+async def get_settings(admin: UserRead | None = Depends(get_admin_user)) -> ExportedSchemas:
     """Get current settings"""
     settings = ExposedSettings()
     return settings.to_rjsf().export_all()
 
 
 @router.patch("/settings", response_class=HTMLResponse)
-async def update_settings(settings: ExposedSettings, admin=Depends(get_admin_user)) -> HTMLResponse:
+async def update_settings(settings: ExposedSettings, admin: UserRead | None = Depends(get_admin_user)) -> HTMLResponse:
     """Update settings"""
 
-    def update(old: BaseModel, new: BaseModel):
+    def update(old: BaseModel, new: BaseModel) -> None:
         for key, val in new.model_dump().items():
             setattr(old, key, val)
 
@@ -133,7 +133,7 @@ async def update_settings(settings: ExposedSettings, admin=Depends(get_admin_use
 
 
 @router.get("/users", response_model=list[UserRead])
-async def get_users(admin=Depends(get_admin_user)) -> list[UserRead]:
+async def get_users(admin: UserRead | None = Depends(get_admin_user)) -> list[UserRead]:
     """Get all users"""
     async with async_session_maker() as session:
         query = select(UserTable)
@@ -141,7 +141,7 @@ async def get_users(admin=Depends(get_admin_user)) -> list[UserRead]:
 
 
 @router.get("/users/{user_id}", response_model=UserRead)
-async def get_user(user_id: UUID4, admin=Depends(get_admin_user)) -> UserRead:
+async def get_user(user_id: UUID4, admin: UserRead | None = Depends(get_admin_user)) -> UserRead:
     """Get a specific user by ID"""
     async with async_session_maker() as session:
         query = select(UserTable).where(UserTable.id == user_id)  # type: ignore[invalid-argument-type] # NOTE db
@@ -152,7 +152,7 @@ async def get_user(user_id: UUID4, admin=Depends(get_admin_user)) -> UserRead:
 
 
 @router.delete("/users/{user_id}", response_class=HTMLResponse)
-async def delete_user(user_id: UUID4, admin=Depends(get_admin_user)) -> HTMLResponse:
+async def delete_user(user_id: UUID4, admin: UserRead | None = Depends(get_admin_user)) -> HTMLResponse:
     """Delete a user by ID"""
     async with async_session_maker() as session:
         query = delete(UserTable).where(UserTable.id == user_id)  # type: ignore[invalid-argument-type] # NOTE db
@@ -165,7 +165,7 @@ async def delete_user(user_id: UUID4, admin=Depends(get_admin_user)) -> HTMLResp
 
 
 @router.put("/users/{user_id}", response_model=UserRead)
-async def update_user(user_id: UUID4, user_data: UserUpdate, admin=Depends(get_admin_user)) -> UserRead:
+async def update_user(user_id: UUID4, user_data: UserUpdate, admin: UserRead | None = Depends(get_admin_user)) -> UserRead:
     """Update a user by ID"""
     async with async_session_maker() as session:
         update_dict = {k: v for k, v in user_data.model_dump().items() if v is not None}

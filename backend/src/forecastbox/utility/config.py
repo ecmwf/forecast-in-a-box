@@ -12,7 +12,7 @@ import os
 import threading
 import urllib.parse
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal, Self
 
 import toml
 from cascade.low.func import pydantic_recursive_collect
@@ -65,7 +65,7 @@ class OIDCSettings(BaseModel):
     required_roles: list[str] | None = None
 
     @model_validator(mode="after")
-    def pass_to_secret(self):
+    def pass_to_secret(self) -> Self:
         """Convert the client_secret to a SecretStr."""
         if isinstance(self.client_secret, str):
             self.client_secret = SecretStr(self.client_secret)
@@ -85,7 +85,7 @@ class AuthSettings(BaseModel):
     """List of allowed domains for user registration. If empty, any domain is allowed."""
 
     @model_validator(mode="after")
-    def pass_to_secret(self):
+    def pass_to_secret(self) -> Self:  # type: ignore[override]
         """Convert the jwt_secret to a SecretStr."""
         if isinstance(self.jwt_secret, str):
             self.jwt_secret = SecretStr(self.jwt_secret)
@@ -289,7 +289,7 @@ class FIABConfig(BaseSettings):
             init_settings,
         )
 
-    def _get_toml(self, **k) -> str:
+    def _get_toml(self, **k: Any) -> str:
         json_config = self.model_dump(mode="json", **k)
         toml_config = toml.dumps(json_config)
         return toml_config

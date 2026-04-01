@@ -7,7 +7,7 @@ import pytest
 from forecastbox.api.plugin.store import PluginStore, PluginStoreConfig, PluginStoreEntry
 
 
-def test_fetch():
+def test_fetch() -> None:
     fake_store = PluginStore(
         display_name="ecmwf",
         plugins={

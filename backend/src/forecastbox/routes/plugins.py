@@ -20,6 +20,7 @@ from pydantic import BaseModel
 from forecastbox.api.plugin.manager import PluginsStatus, modify_enabled, status_full, submit_update_single, uninstall_plugin
 from forecastbox.api.plugin.store import PluginRemoteInfo, PluginStoreEntry, get_plugins_detail, submit_install_plugin
 from forecastbox.routes.admin import get_admin_user
+from forecastbox.schemata.user import UserRead
 from forecastbox.utility.config import config
 
 router = APIRouter(
@@ -98,7 +99,7 @@ get_catalogue_redirect = lambda request: Response(status_code=202)
 
 
 @router.post("/update")
-def update_plugin(request: Request, pluginCompositeId: PluginCompositeId, admin=Depends(get_admin_user)) -> Response:
+def update_plugin(request: Request, pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)) -> Response:
     # TODO possibly add optional version parameter
     result = submit_update_single(pluginCompositeId, isUpdate=True)
     if result:
@@ -107,21 +108,23 @@ def update_plugin(request: Request, pluginCompositeId: PluginCompositeId, admin=
 
 
 @router.post("/install")
-def install_plugin(request: Request, pluginCompositeId: PluginCompositeId, admin=Depends(get_admin_user)) -> Response:
+def install_plugin(request: Request, pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)) -> Response:
     # TODO possibly add optional version parameter
     submit_install_plugin(pluginCompositeId)
     return get_catalogue_redirect(request)
 
 
 @router.post("/uninstall")
-def uninstall_plugin_endpoint(request: Request, pluginCompositeId: PluginCompositeId, admin=Depends(get_admin_user)) -> Response:
+def uninstall_plugin_endpoint(
+    request: Request, pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)
+) -> Response:
     uninstall_plugin(pluginCompositeId)
     return get_catalogue_redirect(request)
 
 
 @router.post("/modifyEnabled")
 def modify_enabled_endpoint(
-    request: Request, pluginCompositeId: PluginCompositeId, isEnabled: bool, admin=Depends(get_admin_user)
+    request: Request, pluginCompositeId: PluginCompositeId, isEnabled: bool, admin: UserRead | None = Depends(get_admin_user)
 ) -> Response:
     modify_enabled(pluginCompositeId, isEnabled)
     return get_catalogue_redirect(request)

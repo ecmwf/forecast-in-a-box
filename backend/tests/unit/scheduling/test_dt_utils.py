@@ -1,12 +1,13 @@
 import re
 from datetime import datetime
+from typing import Any
 
 import pytest
 
 from forecastbox.api.scheduling.dt_utils import calculate_next_run, current_scheduling_time, parse_crontab
 
 
-def test_parse_crontab_valid(subtests):
+def test_parse_crontab_valid(subtests: Any) -> None:
     valid_tabs = [
         "0 0 * * *",
         "*/15 * * * *",
@@ -21,8 +22,8 @@ def test_parse_crontab_valid(subtests):
             parse_crontab(tab)
 
 
-def test_parse_crontab_invalid():
-    def _test(crontab, expected):
+def test_parse_crontab_invalid() -> None:
+    def _test(crontab: str, expected: str) -> None:
         with pytest.raises(ValueError, match=re.escape(expected) + ".*"):
             parse_crontab(crontab)
 
@@ -51,70 +52,70 @@ def test_parse_crontab_invalid():
     _test("*/a * * * *", "Invalid cron field format: */a of minute")
 
 
-def test_next_run_every_minute():
+def test_next_run_every_minute() -> None:
     after = datetime(2025, 10, 20, 10, 0, 0)
     cron_tab = "* * * * *"
     expected = datetime(2025, 10, 20, 10, 1, 0)
     assert calculate_next_run(after, cron_tab) == expected
 
 
-def test_next_run_specific_time():
+def test_next_run_specific_time() -> None:
     after = datetime(2025, 10, 20, 10, 0, 0)
     cron_tab = "30 11 * * *"
     expected = datetime(2025, 10, 20, 11, 30, 0)
     assert calculate_next_run(after, cron_tab) == expected
 
 
-def test_next_run_next_day():
+def test_next_run_next_day() -> None:
     after = datetime(2025, 10, 20, 23, 30, 0)
     cron_tab = "0 0 * * *"
     expected = datetime(2025, 10, 21, 0, 0, 0)
     assert calculate_next_run(after, cron_tab) == expected
 
 
-def test_next_run_invalid_crontab():
+def test_next_run_invalid_crontab() -> None:
     after = datetime(2025, 10, 20, 10, 0, 0)
     cron_tab = "invalid cron"
     with pytest.raises(ValueError):
         calculate_next_run(after, cron_tab)
 
 
-def test_next_run_no_future_run():
+def test_next_run_no_future_run() -> None:
     after = datetime(2025, 10, 20, 10, 0, 0)
     cron_tab = "0 0 1 1 1"
     with pytest.raises(ValueError):
         calculate_next_run(after, cron_tab)
 
 
-def test_next_run_step_value():
+def test_next_run_step_value() -> None:
     after = datetime(2025, 10, 20, 10, 0, 0)
     cron_tab = "*/15 * * * *"
     expected = datetime(2025, 10, 20, 10, 15, 0)
     assert calculate_next_run(after, cron_tab) == expected
 
 
-def test_next_run_range_value():
+def test_next_run_range_value() -> None:
     after = datetime(2025, 10, 20, 10, 0, 0)
     cron_tab = "0 10-12 * * *"
     expected = datetime(2025, 10, 20, 11, 0, 0)
     assert calculate_next_run(after, cron_tab) == expected
 
 
-def test_next_run_list_value():
+def test_next_run_list_value() -> None:
     after = datetime(2025, 10, 20, 10, 0, 0)
     cron_tab = "0 10,12 * * *"
     expected = datetime(2025, 10, 20, 12, 0, 0)
     assert calculate_next_run(after, cron_tab) == expected
 
 
-def test_next_run_endofyear():
+def test_next_run_endofyear() -> None:
     after = datetime(2025, 12, 31, 23, 00)
     cron_tab = "0 0 * * *"
     expected = datetime(2026, 1, 1, 0, 0, 0)
     assert calculate_next_run(after, cron_tab) == expected
 
 
-def test_current_scheduling_time():
+def test_current_scheduling_time() -> None:
     before = datetime.now()
     result = current_scheduling_time()
     after = datetime.now()

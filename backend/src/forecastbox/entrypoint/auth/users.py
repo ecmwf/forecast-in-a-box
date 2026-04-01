@@ -8,6 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 import logging
+from collections.abc import AsyncGenerator
 
 import jwt
 import pydantic
@@ -55,7 +56,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[UserTable, pydantic.UUID4]):
     reset_password_token_secret = SECRET
     verification_token_secret = SECRET
 
-    async def on_after_register(self, user: UserTable, request: Request | None = None):
+    async def on_after_register(self, user: UserTable, request: Request | None = None) -> None:
         async with async_session_maker() as session:
             query = select(func.count("*")).select_from(UserTable)
             user_count = (await session.execute(query)).scalar()
@@ -64,7 +65,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[UserTable, pydantic.UUID4]):
                 _ = await session.execute(query)
                 await session.commit()
 
-    async def on_after_login(self, user: UserTable, request: Request | None = None, response: responses.Response | None = None):
+    async def on_after_login(self, user: UserTable, request: Request | None = None, response: responses.Response | None = None) -> None:
         if not verify_entitlements(user):
             logger.error(f"User {user.id} does not have the required entitlements.")
             raise HTTPException(status_code=403, detail="You do not have the required entitlements to access this resource.")
@@ -73,10 +74,10 @@ class UserManager(UUIDIDMixin, BaseUserManager[UserTable, pydantic.UUID4]):
             response.status_code = 302
             response.headers["location"] = "/"
 
-    async def on_after_forgot_password(self, user: UserTable, token: str, request: Request | None = None):
+    async def on_after_forgot_password(self, user: UserTable, token: str, request: Request | None = None) -> None:
         logger.error(f"User {user.id} has forgot their password. Reset token: {token}")
 
-    async def on_after_request_verify(self, user: UserTable, token: str, request: Request | None = None):
+    async def on_after_request_verify(self, user: UserTable, token: str, request: Request | None = None) -> None:
         logger.error(f"Verification requested for user {user.id}. Verification token: {token}")
 
     # TODO this is a hack, we validate email in this method. Consider a PR to the fastapi_users
@@ -87,7 +88,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[UserTable, pydantic.UUID4]):
                 raise InvalidPasswordException(reason=f"Domain '{domain}' is not allowed.")
 
 
-async def get_user_manager(user_db: SQLAlchemyUserDatabase = Depends(get_user_db)):
+async def get_user_manager(user_db: SQLAlchemyUserDatabase = Depends(get_user_db)) -> AsyncGenerator[UserManager, None]:
     yield UserManager(user_db)
 
 
