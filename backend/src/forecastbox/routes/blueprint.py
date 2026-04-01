@@ -7,9 +7,9 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Canonical job-definition entity routes — /job_definition/*"""
+"""Canonical blueprint entity routes — /blueprint/*"""
 
-PREFIX = "/api/v1/job_definition"
+PREFIX = "/api/v1/blueprint"
 from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends
@@ -18,21 +18,21 @@ from fastapi.exceptions import HTTPException
 from fiab_core.fable import BlockFactoryCatalogue
 from pydantic import BaseModel
 
-import forecastbox.domain.job_definition.db as job_definition_db
-import forecastbox.domain.job_definition.service as job_definition_service
+import forecastbox.domain.blueprint.db as blueprint_db
+import forecastbox.domain.blueprint.service as blueprint_service
 from forecastbox.api.plugin.manager import PluginCompositeId, catalogue_view, plugins_ready
-from forecastbox.api.types.fable import FableBuilder, FableSaveRequest, FableValidationExpansion
-from forecastbox.domain.job_definition.exceptions import (
-    JobDefinitionAccessDenied,
-    JobDefinitionNotFound,
-    JobDefinitionVersionConflict,
+from forecastbox.api.types.blueprint import BlueprintBuilder, BlueprintSaveRequest, BlueprintValidationExpansion
+from forecastbox.domain.blueprint.exceptions import (
+    BlueprintAccessDenied,
+    BlueprintNotFound,
+    BlueprintVersionConflict,
 )
 from forecastbox.entrypoint.auth.users import get_auth_context
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
 
 router = APIRouter(
-    tags=["job_definition"],
+    tags=["blueprint"],
     responses={404: {"description": "Not found"}},
 )
 
@@ -42,42 +42,42 @@ router = APIRouter(
 # ---------------------------------------------------------------------------
 
 
-class JobDefinitionId(BaseModel):
-    """Identifies a job definition, optionally pinning a specific version.
+class BlueprintId(BaseModel):
+    """Identifies a blueprint, optionally pinning a specific version.
 
     Used as a Depends()-based query-param group on GET endpoints, and as a
-    request body on PUT endpoints that target a specific definition.
+    request body on PUT endpoints that target a specific blueprint.
     """
 
-    job_definition_id: str
+    blueprint_id: str
     version: int | None = None
 
 
-class JobDefinitionCreateRequest(BaseModel):
-    builder: FableBuilder
+class BlueprintCreateRequest(BaseModel):
+    builder: BlueprintBuilder
     display_name: str | None = None
     display_description: str | None = None
     tags: list[str] = []
     parent_id: str | None = None
 
 
-class JobDefinitionCreateResponse(BaseModel):
-    job_definition_id: str
+class BlueprintCreateResponse(BaseModel):
+    blueprint_id: str
     version: int
 
 
-class JobDefinitionGetResponse(BaseModel):
-    job_definition_id: str
+class BlueprintGetResponse(BaseModel):
+    blueprint_id: str
     version: int
-    builder: FableBuilder
+    builder: BlueprintBuilder
     display_name: str | None = None
     display_description: str | None = None
     tags: list[str] = []
     parent_id: str | None = None
 
 
-class JobDefinitionListItem(BaseModel):
-    job_definition_id: str
+class BlueprintListItem(BaseModel):
+    blueprint_id: str
     version: int
     display_name: str | None = None
     display_description: str | None = None
@@ -86,30 +86,30 @@ class JobDefinitionListItem(BaseModel):
     created_by: str | None = None
 
 
-class JobDefinitionListResponse(BaseModel):
-    definitions: list[JobDefinitionListItem]
+class BlueprintListResponse(BaseModel):
+    blueprints: list[BlueprintListItem]
     total: int
     page: int
     page_size: int
 
 
-class JobDefinitionUpdateRequest(BaseModel):
-    job_definition_id: str
+class BlueprintUpdateRequest(BaseModel):
+    blueprint_id: str
     version: int
-    builder: FableBuilder
+    builder: BlueprintBuilder
     display_name: str | None = None
     display_description: str | None = None
     tags: list[str] = []
     parent_id: str | None = None
 
 
-class JobDefinitionUpdateResponse(BaseModel):
-    job_definition_id: str
+class BlueprintUpdateResponse(BaseModel):
+    blueprint_id: str
     version: int
 
 
-class JobDefinitionDeleteRequest(BaseModel):
-    job_definition_id: str
+class BlueprintDeleteRequest(BaseModel):
+    blueprint_id: str
     version: int
 
 
@@ -119,12 +119,12 @@ class JobDefinitionDeleteRequest(BaseModel):
 
 
 @router.post("/create")
-async def create_job_definition(
-    request: JobDefinitionCreateRequest,
+async def create_blueprint(
+    request: BlueprintCreateRequest,
     auth_context: AuthContext = Depends(get_auth_context),
-) -> JobDefinitionCreateResponse:
-    """Create a new job definition from a FableBuilder."""
-    payload = FableSaveRequest(
+) -> BlueprintCreateResponse:
+    """Create a new blueprint from a BlueprintBuilder."""
+    payload = BlueprintSaveRequest(
         builder=request.builder,
         display_name=request.display_name,
         display_description=request.display_description,
@@ -132,28 +132,28 @@ async def create_job_definition(
         parent_id=request.parent_id,
     )
     try:
-        result = await job_definition_service.save_builder(auth_context=auth_context, payload=payload, fable_id=None)
-    except JobDefinitionNotFound as e:
+        result = await blueprint_service.save_builder(auth_context=auth_context, payload=payload, blueprint_id=None)
+    except BlueprintNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except JobDefinitionAccessDenied as e:
+    except BlueprintAccessDenied as e:
         raise HTTPException(status_code=403, detail=str(e))
-    return JobDefinitionCreateResponse(job_definition_id=result.id, version=result.version)
+    return BlueprintCreateResponse(blueprint_id=result.id, version=result.version)
 
 
 @router.get("/get")
-async def get_job_definition(
-    spec: Annotated[JobDefinitionId, Depends()],
-) -> JobDefinitionGetResponse:
-    """Retrieve a saved job definition by id and optional version.
+async def get_blueprint(
+    spec: Annotated[BlueprintId, Depends()],
+) -> BlueprintGetResponse:
+    """Retrieve a saved blueprint by id and optional version.
 
     Returns the latest non-deleted version when version is omitted.
     """
     try:
-        retrieved = await job_definition_service.load_builder(spec.job_definition_id, spec.version)
-    except JobDefinitionNotFound as e:
+        retrieved = await blueprint_service.load_builder(spec.blueprint_id, spec.version)
+    except BlueprintNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return JobDefinitionGetResponse(
-        job_definition_id=retrieved.id,
+    return BlueprintGetResponse(
+        blueprint_id=retrieved.id,
         version=retrieved.version,
         builder=retrieved.builder,
         display_name=retrieved.display_name,
@@ -164,18 +164,18 @@ async def get_job_definition(
 
 
 @router.get("/list")
-async def list_job_definitions(
+async def list_blueprints(
     pagination: Annotated[PaginationSpec, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
-) -> JobDefinitionListResponse:
-    """List the latest non-deleted version of every job definition visible to the caller."""
-    definitions = list(await job_definition_db.list_job_definitions(auth_context=auth_context))
-    total = len(definitions)
+) -> BlueprintListResponse:
+    """List the latest non-deleted version of every blueprint visible to the caller."""
+    blueprints = list(await blueprint_db.list_blueprints(auth_context=auth_context))
+    total = len(blueprints)
     start = pagination.start()
-    page_defs = definitions[start : start + pagination.page_size]
+    page_defs = blueprints[start : start + pagination.page_size]
     items = [
-        JobDefinitionListItem(
-            job_definition_id=cast(str, defn.job_definition_id),
+        BlueprintListItem(
+            blueprint_id=cast(str, defn.blueprint_id),
             version=cast(int, defn.version),
             display_name=cast(str | None, defn.display_name),
             display_description=cast(str | None, defn.display_description),
@@ -185,20 +185,20 @@ async def list_job_definitions(
         )
         for defn in page_defs
     ]
-    return JobDefinitionListResponse(definitions=items, total=total, page=pagination.page, page_size=pagination.page_size)
+    return BlueprintListResponse(blueprints=items, total=total, page=pagination.page, page_size=pagination.page_size)
 
 
 @router.post("/update")
-async def update_job_definition(
-    request: JobDefinitionUpdateRequest,
+async def update_blueprint(
+    request: BlueprintUpdateRequest,
     auth_context: AuthContext = Depends(get_auth_context),
-) -> JobDefinitionUpdateResponse:
-    """Add a new version to an existing job definition.
+) -> BlueprintUpdateResponse:
+    """Add a new version to an existing blueprint.
 
     ``version`` must match the current latest version; returns 409 if it does not.
     Returns the new version number on success.
     """
-    payload = FableSaveRequest(
+    payload = BlueprintSaveRequest(
         builder=request.builder,
         display_name=request.display_name,
         display_description=request.display_description,
@@ -206,41 +206,41 @@ async def update_job_definition(
         parent_id=request.parent_id,
     )
     try:
-        result = await job_definition_service.save_builder(
+        result = await blueprint_service.save_builder(
             auth_context=auth_context,
             payload=payload,
-            fable_id=request.job_definition_id,
+            blueprint_id=request.blueprint_id,
             expected_version=request.version,
         )
-    except JobDefinitionVersionConflict as e:
+    except BlueprintVersionConflict as e:
         raise HTTPException(status_code=409, detail=str(e))
-    except JobDefinitionNotFound as e:
+    except BlueprintNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except JobDefinitionAccessDenied as e:
+    except BlueprintAccessDenied as e:
         raise HTTPException(status_code=403, detail=str(e))
-    return JobDefinitionUpdateResponse(job_definition_id=result.id, version=result.version)
+    return BlueprintUpdateResponse(blueprint_id=result.id, version=result.version)
 
 
 @router.post("/delete")
-async def delete_job_definition(
-    request: JobDefinitionDeleteRequest,
+async def delete_blueprint(
+    request: BlueprintDeleteRequest,
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> None:
-    """Soft-delete all versions of a job definition.
+    """Soft-delete all versions of a blueprint.
 
     ``version`` must match the current latest version; returns 409 if it does not.
     """
     try:
-        await job_definition_db.soft_delete_job_definition(
-            request.job_definition_id,
+        await blueprint_db.soft_delete_blueprint(
+            request.blueprint_id,
             expected_version=request.version,
             auth_context=auth_context,
         )
-    except JobDefinitionVersionConflict as e:
+    except BlueprintVersionConflict as e:
         raise HTTPException(status_code=409, detail=str(e))
-    except JobDefinitionNotFound as e:
+    except BlueprintNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except JobDefinitionAccessDenied as e:
+    except BlueprintAccessDenied as e:
         raise HTTPException(status_code=403, detail=str(e))
 
 
@@ -251,7 +251,7 @@ async def delete_job_definition(
 
 @router.get("/catalogue")
 def get_catalogue() -> dict[PluginCompositeId, BlockFactoryCatalogue]:
-    """All blocks this backend is capable of evaluating within a definition."""
+    """All blocks this backend is capable of evaluating within a blueprint."""
     if not plugins_ready():
         raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail="Plugins not ready")
     catalogue = catalogue_view()
@@ -261,10 +261,10 @@ def get_catalogue() -> dict[PluginCompositeId, BlockFactoryCatalogue]:
 
 
 @router.put("/expand")
-def expand_job_definition(fable: FableBuilder) -> FableValidationExpansion:
-    """Validate a partially-constructed FableBuilder and return completion options.
+def expand_blueprint(blueprint: BlueprintBuilder) -> BlueprintValidationExpansion:
+    """Validate a partially-constructed BlueprintBuilder and return completion options.
 
     Returns 200 regardless of whether validation errors are present; callers must
     inspect the returned error fields.
     """
-    return job_definition_service.validate_expand(fable)
+    return blueprint_service.validate_expand(blueprint)

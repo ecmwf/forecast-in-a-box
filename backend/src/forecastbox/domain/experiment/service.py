@@ -36,7 +36,7 @@ from forecastbox.domain.experiment.scheduling.scheduler_thread import (
     timeout_acquire_request,
 )
 from forecastbox.ecpyutil import timed_acquire
-from forecastbox.schemas.jobs import ExperimentDefinition, JobExecution
+from forecastbox.schemas.jobs import ExperimentDefinition, Run
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
 
@@ -63,8 +63,8 @@ def resolve_next_run(
 
 async def create_schedule(
     auth_context: AuthContext,
-    job_definition_id: str,
-    job_definition_version: int | None,
+    blueprint_id: str,
+    blueprint_version: int | None,
     cron_expr: str,
     dynamic_expr: dict[str, str],
     max_acceptable_delay_hours: int,
@@ -75,7 +75,7 @@ async def create_schedule(
 ) -> str:
     """Create a new cron schedule experiment and schedule its first run. Returns the experiment_id.
 
-    Raises ValueError for invalid cron expression or missing job definition.
+    Raises ValueError for invalid cron expression or missing blueprint.
     Raises ExperimentAccessDenied if the actor is unauthenticated.
     """
     try:
@@ -83,11 +83,11 @@ async def create_schedule(
     except ValueError as e:
         raise ValueError(f"Invalid crontab: {cron_expr} => {e}") from e
 
-    job_def = await db_jobs.get_job_definition(job_definition_id, job_definition_version)
+    job_def = await db_jobs.get_blueprint(blueprint_id, blueprint_version)
     if job_def is None:
-        raise ExperimentNotFound(f"JobDefinition {job_definition_id!r} not found")
+        raise ExperimentNotFound(f"Blueprint {blueprint_id!r} not found")
 
-    job_def_id = str(job_def.job_definition_id)  # ty:ignore[invalid-argument-type]
+    job_def_id = str(job_def.blueprint_id)  # ty:ignore[invalid-argument-type]
     job_def_version = cast(int, job_def.version)
 
     experiment_definition_payload = {
@@ -98,8 +98,8 @@ async def create_schedule(
     }
     experiment_id, _ = await experiment_db.upsert_experiment_definition(
         auth_context=auth_context,
-        job_definition_id=job_def_id,
-        job_definition_version=job_def_version,
+        blueprint_id=job_def_id,
+        blueprint_version=job_def_version,
         experiment_type="cron_schedule",
         created_by=auth_context.user_id,
         experiment_definition=experiment_definition_payload,
@@ -117,7 +117,7 @@ async def create_schedule(
 
 
 async def get_schedule(auth_context: AuthContext, experiment_id: str) -> ExperimentDefinition:
-    """Return the experiment definition for a cron schedule.
+    """Return the experiment blueprint for a cron schedule.
 
     Raises ExperimentNotFound if not found or not a cron schedule.
     Possession of the ID is treated as sufficient read access.
@@ -199,8 +199,8 @@ async def update_schedule(
         await experiment_db.upsert_experiment_definition(
             auth_context=auth_context,
             experiment_definition_id=experiment_id,
-            job_definition_id=str(current.job_definition_id),  # ty:ignore[invalid-argument-type]
-            job_definition_version=cast(int, current.job_definition_version),
+            blueprint_id=str(current.blueprint_id),  # ty:ignore[invalid-argument-type]
+            blueprint_version=cast(int, current.blueprint_version),
             experiment_type="cron_schedule",
             created_by=cast(str | None, current.created_by),
             experiment_definition=new_experiment_definition,
@@ -256,7 +256,7 @@ async def get_schedule_runs(
     auth_context: AuthContext,
     experiment_id: str,
     pagination: PaginationSpec,
-) -> tuple[Iterable[JobExecution], int, int]:
+) -> tuple[Iterable[Run], int, int]:
     """Return (executions, total, total_pages) for runs linked to a cron schedule experiment.
 
     Raises ExperimentNotFound if the schedule does not exist.
@@ -266,11 +266,11 @@ async def get_schedule_runs(
     if exp_def is None or exp_def.experiment_type != "cron_schedule":
         raise ExperimentNotFound(f"Schedule {experiment_id} not found")
 
-    total = await db_jobs.count_job_executions_by_experiment(experiment_id)
+    total = await db_jobs.count_runs_by_experiment(experiment_id)
     start = pagination.start()
 
     if start >= total and total > 0:
         raise ValueError("Page number out of range.")
 
-    executions = await db_jobs.list_job_executions_by_experiment(experiment_id, offset=start, limit=pagination.page_size)
+    executions = await db_jobs.list_runs_by_experiment(experiment_id, offset=start, limit=pagination.page_size)
     return executions, total, pagination.total_pages(total)

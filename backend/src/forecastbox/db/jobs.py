@@ -18,8 +18,8 @@ Soft-deleted rows are excluded from all normal read operations.
 We maintain that setting a delete sets it on all versions of a given entity,
 leading to simpler query semantics, ie, no need to select "last non-deleted".
 
-Note: ``JobDefinition`` persistence has moved to
-``forecastbox.domain.job_definition.db``.  ``get_job_definition`` is kept here as
+Note: ``Blueprint`` persistence has moved to
+``forecastbox.domain.blueprint.db``.  ``get_blueprint`` is kept here as
 a thin proxy so existing call-sites (execution, scheduling) continue to work
 without changes.
 
@@ -29,8 +29,8 @@ Note: ``ExperimentDefinition`` and ``ExperimentNext`` persistence has moved to
 below are thin proxies using a system-level (admin) actor so that callers not
 yet updated continue to work.
 
-Note: ``JobExecution`` persistence has moved to
-``forecastbox.domain.job_execution.db``.  The functions below are thin proxies
+Note: ``Run`` persistence has moved to
+``forecastbox.domain.run.db``.  The functions below are thin proxies
 using a system-level (admin) actor so that callers not yet updated continue to
 work.
 """
@@ -42,13 +42,13 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from forecastbox.schemas.jobs import (
     Base,
+    Blueprint,
+    BlueprintSource,
     ExperimentDefinition,
     ExperimentNext,
     ExperimentType,
-    JobDefinition,
-    JobDefinitionSource,
-    JobExecution,
-    JobExecutionStatus,
+    Run,
+    RunStatus,
 )
 from forecastbox.utility.config import config
 
@@ -64,19 +64,19 @@ async def create_db_and_tables() -> None:
 
 
 # ---------------------------------------------------------------------------
-# JobDefinition — thin proxy; canonical implementation in domain.job_definition.db
+# Blueprint — thin proxy; canonical implementation in domain.blueprint.db
 # ---------------------------------------------------------------------------
 
 
-async def get_job_definition(definition_id: str, version: int | None = None) -> JobDefinition | None:
-    """Return a specific or the latest non-deleted version of a JobDefinition.
+async def get_blueprint(blueprint_id: str, version: int | None = None) -> Blueprint | None:
+    """Return a specific or the latest non-deleted version of a Blueprint.
 
-    Delegates to ``forecastbox.domain.job_definition.db.get_job_definition``; kept
+    Delegates to ``forecastbox.domain.blueprint.db.get_blueprint``; kept
     here so execution and scheduling code need not be updated in this step.
     """
-    from forecastbox.domain.job_definition import db as job_definition_db
+    from forecastbox.domain.blueprint import db as blueprint_db
 
-    return await job_definition_db.get_job_definition(definition_id, version)
+    return await blueprint_db.get_blueprint(blueprint_id, version)
 
 
 # ---------------------------------------------------------------------------
@@ -87,8 +87,8 @@ async def get_job_definition(definition_id: str, version: int | None = None) -> 
 async def upsert_experiment_definition(
     *,
     experiment_definition_id: str | None = None,
-    job_definition_id: str,
-    job_definition_version: int,
+    blueprint_id: str,
+    blueprint_version: int,
     experiment_type: ExperimentType,
     created_by: str | None,
     experiment_definition: dict | None = None,
@@ -103,8 +103,8 @@ async def upsert_experiment_definition(
     return await _exp_db.upsert_experiment_definition(
         auth_context=AuthContext(user_id=None, is_admin=True),
         experiment_definition_id=experiment_definition_id,
-        job_definition_id=job_definition_id,
-        job_definition_version=job_definition_version,
+        blueprint_id=blueprint_id,
+        blueprint_version=blueprint_version,
         experiment_type=experiment_type,
         created_by=created_by,
         experiment_definition=experiment_definition,
@@ -164,29 +164,29 @@ async def soft_delete_experiment_definition(experiment_id: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# JobExecution — thin proxies; canonical implementation in domain.job_execution.db
+# Run — thin proxies; canonical implementation in domain.run.db
 # ---------------------------------------------------------------------------
 
 
-async def upsert_job_execution(
+async def upsert_run(
     *,
-    job_execution_id: str | None = None,
-    job_definition_id: str,
-    job_definition_version: int,
+    run_id: str | None = None,
+    blueprint_id: str,
+    blueprint_version: int,
     created_by: str | None,
-    status: JobExecutionStatus,
+    status: RunStatus,
     experiment_id: str | None = None,
     experiment_version: int | None = None,
     compiler_runtime_context: dict | None = None,
     experiment_context: str | None = None,
 ) -> tuple[str, int]:
-    """Thin proxy; canonical implementation in ``forecastbox.domain.job_execution.db``."""
-    from forecastbox.domain.job_execution import db as _exec_db
+    """Thin proxy; canonical implementation in ``forecastbox.domain.run.db``."""
+    from forecastbox.domain.run import db as _exec_db
 
-    return await _exec_db.upsert_job_execution(
-        job_execution_id=job_execution_id,
-        job_definition_id=job_definition_id,
-        job_definition_version=job_definition_version,
+    return await _exec_db.upsert_run(
+        run_id=run_id,
+        blueprint_id=blueprint_id,
+        blueprint_version=blueprint_version,
         created_by=created_by,
         status=status,
         experiment_id=experiment_id,
@@ -196,62 +196,62 @@ async def upsert_job_execution(
     )
 
 
-async def get_job_execution(execution_id: str, attempt_count: int | None = None) -> JobExecution | None:
-    """Thin proxy; canonical implementation in ``forecastbox.domain.job_execution.db``.
+async def get_run(run_id: str, attempt_count: int | None = None) -> Run | None:
+    """Thin proxy; canonical implementation in ``forecastbox.domain.run.db``.
 
     Returns None if not found (preserving the original interface). Uses a system-level actor.
     """
-    from forecastbox.domain.job_execution import db as _exec_db
-    from forecastbox.domain.job_execution.exceptions import JobExecutionNotFound
+    from forecastbox.domain.run import db as _exec_db
+    from forecastbox.domain.run.exceptions import RunNotFound
     from forecastbox.utility.auth import AuthContext
 
     try:
-        return await _exec_db.get_job_execution(execution_id, attempt_count, auth_context=AuthContext(user_id=None, is_admin=True))
-    except JobExecutionNotFound:
+        return await _exec_db.get_run(run_id, attempt_count, auth_context=AuthContext(user_id=None, is_admin=True))
+    except RunNotFound:
         return None
 
 
-async def update_job_execution_runtime(execution_id: str, attempt_count: int, **kwargs: object) -> None:
-    """Thin proxy; canonical implementation in ``forecastbox.domain.job_execution.db``."""
-    from forecastbox.domain.job_execution import db as _exec_db
+async def update_run_runtime(run_id: str, attempt_count: int, **kwargs: object) -> None:
+    """Thin proxy; canonical implementation in ``forecastbox.domain.run.db``."""
+    from forecastbox.domain.run import db as _exec_db
 
-    await _exec_db.update_job_execution_runtime(execution_id, attempt_count, **kwargs)
+    await _exec_db.update_run_runtime(run_id, attempt_count, **kwargs)
 
 
-async def list_job_executions(offset: int = 0, limit: int | None = None) -> Iterable[JobExecution]:
-    """Thin proxy; canonical implementation in ``forecastbox.domain.job_execution.db``.
+async def list_runs(offset: int = 0, limit: int | None = None) -> Iterable[Run]:
+    """Thin proxy; canonical implementation in ``forecastbox.domain.run.db``.
 
     Uses a system-level (admin) actor so that all executions are returned.
     """
-    from forecastbox.domain.job_execution import db as _exec_db
+    from forecastbox.domain.run import db as _exec_db
     from forecastbox.utility.auth import AuthContext
 
-    return await _exec_db.list_job_executions(auth_context=AuthContext(user_id=None, is_admin=True), offset=offset, limit=limit)
+    return await _exec_db.list_runs(auth_context=AuthContext(user_id=None, is_admin=True), offset=offset, limit=limit)
 
 
-async def count_job_executions() -> int:
-    """Thin proxy; canonical implementation in ``forecastbox.domain.job_execution.db``.
+async def count_runs() -> int:
+    """Thin proxy; canonical implementation in ``forecastbox.domain.run.db``.
 
     Uses a system-level (admin) actor so that all executions are counted.
     """
-    from forecastbox.domain.job_execution import db as _exec_db
+    from forecastbox.domain.run import db as _exec_db
     from forecastbox.utility.auth import AuthContext
 
-    return await _exec_db.count_job_executions(auth_context=AuthContext(user_id=None, is_admin=True))
+    return await _exec_db.count_runs(auth_context=AuthContext(user_id=None, is_admin=True))
 
 
-async def soft_delete_job_execution(execution_id: str) -> None:
-    """Thin proxy; canonical implementation in ``forecastbox.domain.job_execution.db``.
+async def soft_delete_run(run_id: str) -> None:
+    """Thin proxy; canonical implementation in ``forecastbox.domain.run.db``.
 
     Uses a system-level (admin) actor so that any execution can be deleted.
     """
-    from forecastbox.domain.job_execution import db as _exec_db
-    from forecastbox.domain.job_execution.exceptions import JobExecutionNotFound
+    from forecastbox.domain.run import db as _exec_db
+    from forecastbox.domain.run.exceptions import RunNotFound
     from forecastbox.utility.auth import AuthContext
 
     try:
-        await _exec_db.soft_delete_job_execution(execution_id, auth_context=AuthContext(user_id=None, is_admin=True))
-    except JobExecutionNotFound:
+        await _exec_db.soft_delete_run(run_id, auth_context=AuthContext(user_id=None, is_admin=True))
+    except RunNotFound:
         pass  # preserve original silent-no-op behaviour
 
 
@@ -295,25 +295,25 @@ async def next_schedulable_experiment() -> dt.datetime | None:
     return await _sched_db.next_schedulable_experiment()
 
 
-async def list_job_executions_by_experiment(experiment_id: str, offset: int = 0, limit: int | None = None) -> Iterable[JobExecution]:
-    """Thin proxy; canonical implementation in ``forecastbox.domain.job_execution.db``.
+async def list_runs_by_experiment(experiment_id: str, offset: int = 0, limit: int | None = None) -> Iterable[Run]:
+    """Thin proxy; canonical implementation in ``forecastbox.domain.run.db``.
 
     Uses a system-level (admin) actor so that all executions are returned.
     """
-    from forecastbox.domain.job_execution import db as _exec_db
+    from forecastbox.domain.run import db as _exec_db
     from forecastbox.utility.auth import AuthContext
 
-    return await _exec_db.list_job_executions_by_experiment(
+    return await _exec_db.list_runs_by_experiment(
         experiment_id, auth_context=AuthContext(user_id=None, is_admin=True), offset=offset, limit=limit
     )
 
 
-async def count_job_executions_by_experiment(experiment_id: str) -> int:
-    """Thin proxy; canonical implementation in ``forecastbox.domain.job_execution.db``.
+async def count_runs_by_experiment(experiment_id: str) -> int:
+    """Thin proxy; canonical implementation in ``forecastbox.domain.run.db``.
 
     Uses a system-level (admin) actor so that all executions are counted.
     """
-    from forecastbox.domain.job_execution import db as _exec_db
+    from forecastbox.domain.run import db as _exec_db
     from forecastbox.utility.auth import AuthContext
 
-    return await _exec_db.count_job_executions_by_experiment(experiment_id, auth_context=AuthContext(user_id=None, is_admin=True))
+    return await _exec_db.count_runs_by_experiment(experiment_id, auth_context=AuthContext(user_id=None, is_admin=True))

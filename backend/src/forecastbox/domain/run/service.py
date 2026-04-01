@@ -13,14 +13,14 @@ Owns:
 - compile-and-submit flow (execute),
 - restart flow,
 - status polling with cascade,
-- linked-definition lookup,
+- linked-blueprint lookup,
 - output availability / content lookups,
 - logs packaging.
 
 No HTTP exceptions are raised here; callers are responsible for mapping domain
-exceptions (``JobExecutionNotFound``, ``JobExecutionAccessDenied``) to HTTP responses.
+exceptions (``RunNotFound``, ``RunAccessDenied``) to HTTP responses.
 
-Authorization is enforced via ``domain.job_execution.db`` which filters / rejects
+Authorization is enforced via ``domain.run.db`` which filters / rejects
 based on the supplied ``AuthContext``.
 """
 
@@ -39,22 +39,22 @@ from earthkit.workflows.compilers import graph2job
 from earthkit.workflows.graph import Graph, deduplicate_nodes
 from pydantic import BaseModel
 
-import forecastbox.domain.job_definition.db as job_definition_db
-import forecastbox.domain.job_execution.db as job_execution_db
+import forecastbox.domain.blueprint.db as blueprint_db
+import forecastbox.domain.run.db as run_db
 from forecastbox.api.artifacts.manager import ArtifactManager, submit_artifact_download
-from forecastbox.api.types.fable import FableBuilder
+from forecastbox.api.types.blueprint import BlueprintBuilder
 from forecastbox.api.types.jobs import (
     EnvironmentSpecification,
     ExecutionSpecification,
-    JobExecuteResponse,
-    JobExecutionDetail,
     JobSpecification,
     RawCascadeJob,
+    RunDetail,
+    RunResponse,
 )
-from forecastbox.domain.job_definition.service import compile_builder
-from forecastbox.domain.job_execution.exceptions import JobExecutionNotFound
+from forecastbox.domain.blueprint.service import compile_builder
+from forecastbox.domain.run.exceptions import RunNotFound
 from forecastbox.ecpyutil import deep_union
-from forecastbox.schemas.jobs import JobDefinition, JobExecution
+from forecastbox.schemas.jobs import Blueprint, Run
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
 
@@ -128,39 +128,39 @@ def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobRespons
     return submit_job_response, product_to_id_mappings
 
 
-async def get_job_definition_for_execution(definition_id: str, definition_version: int | None) -> JobDefinition | None:
-    """Retrieve a JobDefinition from the jobs store by id and optional version."""
-    return await job_definition_db.get_job_definition(definition_id, definition_version)
+async def get_blueprint_for_execution(blueprint_id: str, blueprint_version: int | None) -> Blueprint | None:
+    """Retrieve a Blueprint from the jobs store by id and optional version."""
+    return await blueprint_db.get_blueprint(blueprint_id, blueprint_version)
 
 
 async def execute(
-    definition: JobDefinition,
+    blueprint: Blueprint,
     auth_context: AuthContext,
-    execution_id: str | None = None,
+    run_id: str | None = None,
     experiment_id: str | None = None,
     experiment_version: int | None = None,
     compiler_runtime_context: dict | None = None,
     experiment_context: str | None = None,
-) -> Either[JobExecuteResponse, str]:  # type: ignore[invalid-argument]
-    """Always creates a JobExecution linked to the given JobDefinition.
+) -> Either[RunResponse, str]:  # type: ignore[invalid-argument]
+    """Always creates a Run linked to the given Blueprint.
 
-    Compiles the definition's blocks via the fable compiler, applies
+    Compiles the blueprint's blocks via the blueprint compiler, applies
     compiler_runtime_context (if given) via deep_union to override compiled values
     (used by scheduled runs to inject dynamic expressions), submits the resulting
-    spec to cascade, and persists a JobExecution row. When ``execution_id`` is
+    spec to cascade, and persists a Run row. When ``run_id`` is
     supplied, the new attempt is appended under that existing id (restart semantics);
     otherwise a fresh id is generated. Experiment metadata is stored on the row when
     provided and is preserved on restart.
     """
-    if not definition.blocks:
-        return Either.error(f"JobDefinition {definition.job_definition_id!r} has no compilable blocks")
+    if not blueprint.blocks:
+        return Either.error(f"Blueprint {blueprint.blueprint_id!r} has no compilable blocks")
 
-    definition_id = str(definition.job_definition_id)  # ty:ignore[invalid-argument-type]
-    definition_version = cast(int, definition.version)
+    blueprint_id = str(blueprint.blueprint_id)  # ty:ignore[invalid-argument-type]
+    blueprint_version = cast(int, blueprint.version)
 
-    builder = FableBuilder(
-        blocks=definition.blocks,  # ty:ignore[invalid-argument-type]
-        environment=EnvironmentSpecification.model_validate(definition.environment_spec) if definition.environment_spec else None,
+    builder = BlueprintBuilder(
+        blocks=blueprint.blocks,  # ty:ignore[invalid-argument-type]
+        environment=EnvironmentSpecification.model_validate(blueprint.environment_spec) if blueprint.environment_spec else None,
     )
     compiled = compile_builder(builder)
 
@@ -169,10 +169,10 @@ async def execute(
     else:
         exec_spec = compiled
 
-    new_execution_id, attempt_count = await job_execution_db.upsert_job_execution(
-        job_execution_id=execution_id,
-        job_definition_id=definition_id,
-        job_definition_version=definition_version,
+    new_run_id, attempt_count = await run_db.upsert_run(
+        run_id=run_id,
+        blueprint_id=blueprint_id,
+        blueprint_version=blueprint_version,
         created_by=auth_context.user_id,
         status="submitted",
         experiment_id=experiment_id,
@@ -192,33 +192,33 @@ async def execute(
             update_kwargs["error"] = response.error[:255]
         else:
             update_kwargs["outputs"] = [x.model_dump() for x in product_to_id_mappings]
-        await job_execution_db.update_job_execution_runtime(new_execution_id, attempt_count, **update_kwargs)
+        await run_db.update_run_runtime(new_run_id, attempt_count, **update_kwargs)
 
-        return Either.ok(JobExecuteResponse(execution_id=new_execution_id, attempt_count=attempt_count))
+        return Either.ok(RunResponse(run_id=new_run_id, attempt_count=attempt_count))
     except Exception as e:
-        await job_execution_db.update_job_execution_runtime(new_execution_id, attempt_count, status="failed", error=repr(e)[:255])
+        await run_db.update_run_runtime(new_run_id, attempt_count, status="failed", error=repr(e)[:255])
         return Either.error(repr(e))
 
 
-async def restart_job_execution(execution_id: str, auth_context: AuthContext) -> Either[JobExecuteResponse, str]:  # type: ignore[invalid-argument]
-    """Create a new attempt under an existing execution_id, re-running its linked JobDefinition.
+async def restart_run(run_id: str, auth_context: AuthContext) -> Either[RunResponse, str]:  # type: ignore[invalid-argument]
+    """Create a new attempt under an existing run_id, re-running its linked Blueprint.
 
-    Raises ``JobExecutionNotFound`` if the execution does not exist.
-    Raises ``JobExecutionAccessDenied`` if the actor does not own the execution.
+    Raises ``RunNotFound`` if the execution does not exist.
+    Raises ``RunAccessDenied`` if the actor does not own the execution.
     """
-    existing = await job_execution_db.get_job_execution(execution_id, auth_context=auth_context)
-    # get_job_execution raises JobExecutionNotFound / JobExecutionAccessDenied on failure.
+    existing = await run_db.get_run(run_id, auth_context=auth_context)
+    # get_run raises RunNotFound / RunAccessDenied on failure.
 
-    definition_id = str(existing.job_definition_id)  # ty:ignore[invalid-argument-type]
-    definition_version = cast(int, existing.job_definition_version)
-    definition = await job_definition_db.get_job_definition(definition_id, definition_version)
-    if definition is None:
-        return Either.error(f"JobDefinition {definition_id!r} v{definition_version} not found")
+    blueprint_id = str(existing.blueprint_id)  # ty:ignore[invalid-argument-type]
+    blueprint_version = cast(int, existing.blueprint_version)
+    blueprint = await blueprint_db.get_blueprint(blueprint_id, blueprint_version)
+    if blueprint is None:
+        return Either.error(f"Blueprint {blueprint_id!r} v{blueprint_version} not found")
 
     return await execute(
-        definition,
+        blueprint,
         auth_context,
-        execution_id=execution_id,
+        run_id=run_id,
         experiment_id=cast(str | None, existing.experiment_id),
         experiment_version=cast(int | None, existing.experiment_version),
         compiler_runtime_context=cast(dict | None, existing.compiler_runtime_context),
@@ -226,16 +226,16 @@ async def restart_job_execution(execution_id: str, auth_context: AuthContext) ->
     )
 
 
-def execution_to_detail(execution: JobExecution) -> JobExecutionDetail:
-    """Convert a JobExecution ORM row to a JobExecutionDetail response model."""
-    return JobExecutionDetail(
-        execution_id=str(execution.job_execution_id),  # ty:ignore[invalid-argument-type]
+def execution_to_detail(execution: Run) -> RunDetail:
+    """Convert a Run ORM row to a RunDetail response model."""
+    return RunDetail(
+        run_id=str(execution.run_id),  # ty:ignore[invalid-argument-type]
         attempt_count=cast(int, execution.attempt_count),
         status=cast(str, execution.status),
         created_at=str(execution.created_at),
         updated_at=str(execution.updated_at),
-        job_definition_id=str(execution.job_definition_id),  # ty:ignore[invalid-argument-type]
-        job_definition_version=cast(int, execution.job_definition_version),
+        blueprint_id=str(execution.blueprint_id),  # ty:ignore[invalid-argument-type]
+        blueprint_version=cast(int, execution.blueprint_version),
         error=cast(str | None, execution.error),
         progress=cast(str | None, execution.progress),
         cascade_job_id=cast(str | None, execution.cascade_job_id),
@@ -243,32 +243,30 @@ def execution_to_detail(execution: JobExecution) -> JobExecutionDetail:
 
 
 async def poll_and_update_execution(
-    execution_id: str,
+    run_id: str,
     attempt_count: int | None,
     auth_context: AuthContext,
-) -> JobExecutionDetail:
-    """Fetch a JobExecution, poll cascade if active, update db, and return current detail.
+) -> RunDetail:
+    """Fetch a Run, poll cascade if active, update db, and return current detail.
 
-    Raises ``JobExecutionNotFound`` if the execution is not found.
-    Raises ``JobExecutionAccessDenied`` if the actor does not own it.
+    Raises ``RunNotFound`` if the execution is not found.
+    Raises ``RunAccessDenied`` if the actor does not own it.
     """
-    execution = await job_execution_db.get_job_execution(execution_id, attempt_count, auth_context=auth_context)
+    execution = await run_db.get_run(run_id, attempt_count, auth_context=auth_context)
 
     actual_attempt = cast(int, execution.attempt_count)
     cascade_job_id = cast(str | None, execution.cascade_job_id)
     status = cast(str, execution.status)
 
-    def _build(
-        status_override: str | None = None, error_override: str | None = None, progress_override: str | None = None
-    ) -> JobExecutionDetail:
-        return JobExecutionDetail(
-            execution_id=str(execution.job_execution_id),  # ty:ignore[invalid-argument-type]
+    def _build(status_override: str | None = None, error_override: str | None = None, progress_override: str | None = None) -> RunDetail:
+        return RunDetail(
+            run_id=str(execution.run_id),  # ty:ignore[invalid-argument-type]
             attempt_count=actual_attempt,
             status=status_override or status,
             created_at=str(execution.created_at),
             updated_at=str(execution.updated_at),
-            job_definition_id=str(execution.job_definition_id),  # ty:ignore[invalid-argument-type]
-            job_definition_version=cast(int, execution.job_definition_version),
+            blueprint_id=str(execution.blueprint_id),  # ty:ignore[invalid-argument-type]
+            blueprint_version=cast(int, execution.blueprint_version),
             error=error_override if error_override is not None else cast(str | None, execution.error),
             progress=progress_override if progress_override is not None else cast(str | None, execution.progress),
             cascade_job_id=cascade_job_id,
@@ -288,41 +286,41 @@ async def poll_and_update_execution(
 
         jobprogress = response.progresses.get(cascade_job_id)
         if jobprogress is None:
-            await job_execution_db.update_job_execution_runtime(execution_id, actual_attempt, status="failed", error="evicted from gateway")
+            await run_db.update_run_runtime(run_id, actual_attempt, status="failed", error="evicted from gateway")
             return _build(status_override="failed", error_override="evicted from gateway")
         elif jobprogress.failure:
-            await job_execution_db.update_job_execution_runtime(execution_id, actual_attempt, status="failed", error=jobprogress.failure)
+            await run_db.update_run_runtime(run_id, actual_attempt, status="failed", error=jobprogress.failure)
             return _build(status_override="failed", error_override=jobprogress.failure)
         elif jobprogress.completed or jobprogress.pct == "100.00":
-            await job_execution_db.update_job_execution_runtime(execution_id, actual_attempt, status="completed", progress="100.00")
+            await run_db.update_run_runtime(run_id, actual_attempt, status="completed", progress="100.00")
             return _build(status_override="completed", progress_override="100.00")
         else:
-            await job_execution_db.update_job_execution_runtime(execution_id, actual_attempt, status="running", progress=jobprogress.pct)
+            await run_db.update_run_runtime(run_id, actual_attempt, status="running", progress=jobprogress.pct)
             return _build(status_override="running", progress_override=jobprogress.pct)
 
     return _build()
 
 
-async def get_job_execution_specification(
-    execution_id: str,
+async def get_run_blueprint(
+    run_id: str,
     attempt_count: int | None,
     auth_context: AuthContext,
 ) -> JobSpecification:
     """Return the JobSpecification for the given execution attempt (latest if attempt_count is None).
 
-    Raises ``JobExecutionNotFound`` if the execution is not found.
-    Raises ``JobExecutionAccessDenied`` if the actor does not own it.
+    Raises ``RunNotFound`` if the execution is not found.
+    Raises ``RunAccessDenied`` if the actor does not own it.
     """
-    execution = await job_execution_db.get_job_execution(execution_id, attempt_count, auth_context=auth_context)
-    definition = await job_definition_db.get_job_definition(
-        str(execution.job_definition_id),  # ty:ignore[invalid-argument-type]
-        cast(int, execution.job_definition_version),
+    execution = await run_db.get_run(run_id, attempt_count, auth_context=auth_context)
+    blueprint = await blueprint_db.get_blueprint(
+        str(execution.blueprint_id),  # ty:ignore[invalid-argument-type]
+        cast(int, execution.blueprint_version),
     )
-    if definition is None:
-        raise JobExecutionNotFound(f"JobDefinition linked to execution {execution_id!r} not found.")
+    if blueprint is None:
+        raise RunNotFound(f"Blueprint linked to execution {run_id!r} not found.")
     return JobSpecification(
-        definition_id=str(definition.job_definition_id),  # ty:ignore[invalid-argument-type]
-        definition_version=cast(int, definition.version),
-        blocks=cast(dict | None, definition.blocks),
-        environment_spec=cast(dict | None, definition.environment_spec),
+        blueprint_id=str(blueprint.blueprint_id),  # ty:ignore[invalid-argument-type]
+        blueprint_version=cast(int, blueprint.version),
+        blocks=cast(dict | None, blueprint.blocks),
+        environment_spec=cast(dict | None, blueprint.environment_spec),
     )

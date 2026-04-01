@@ -13,7 +13,7 @@ import pytest
 from pydantic import SecretStr
 
 import forecastbox.utility.config
-from forecastbox.api.types.fable import PluginCompositeId, PluginId
+from forecastbox.api.types.blueprint import PluginCompositeId, PluginId
 from forecastbox.entrypoint.main import launch_all
 from forecastbox.utility.config import ArtifactStoreConfig, FIABConfig, PluginCompositeIdReadable, PluginSettings, PluginStoreConfig
 

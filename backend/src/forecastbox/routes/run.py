@@ -7,9 +7,9 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Canonical job-execution entity routes — /job_execution/*"""
+"""Canonical job-execution entity routes — /run/*"""
 
-PREFIX = "/api/v1/job_execution"
+PREFIX = "/api/v1/run"
 import asyncio
 import io
 import logging
@@ -26,11 +26,12 @@ from fastapi import APIRouter, Depends, Response
 from fastapi.exceptions import HTTPException
 from pydantic import BaseModel
 
-import forecastbox.domain.job_execution.db as job_execution_db
-import forecastbox.domain.job_execution.service as job_execution_service
+import forecastbox.domain.run.db as run_db
+import forecastbox.domain.run.service as run_service
+from forecastbox.api.types.jobs import JobSpecification
 from forecastbox.api.utils import encode_result
-from forecastbox.domain.job_execution.exceptions import JobExecutionAccessDenied, JobExecutionNotFound
-from forecastbox.domain.job_execution.service import ProductToOutputId
+from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
+from forecastbox.domain.run.service import ProductToOutputId
 from forecastbox.entrypoint.auth.users import get_auth_context
 from forecastbox.routes.gateway import Globals
 from forecastbox.utility.auth import AuthContext
@@ -50,64 +51,64 @@ router = APIRouter(
 # ---------------------------------------------------------------------------
 
 
-class JobExecutionId(BaseModel):
+class RunId(BaseModel):
     """Identifies a job execution attempt, optionally pinning a specific attempt.
 
     Used as a Depends()-based query-param group on GET endpoints, and as a
     request body field on endpoints that address a specific attempt.
     """
 
-    execution_id: str
+    run_id: str
     attempt_count: int | None = None
 
 
-class JobExecutionCreateRequest(BaseModel):
-    job_definition_id: str
-    job_definition_version: int | None = None
+class RunCreateRequest(BaseModel):
+    blueprint_id: str
+    blueprint_version: int | None = None
 
 
-class JobExecutionCreateResponse(BaseModel):
-    execution_id: str
+class RunCreateResponse(BaseModel):
+    run_id: str
     attempt_count: int
 
 
-class JobExecutionDetail(BaseModel):
-    execution_id: str
+class RunDetail(BaseModel):
+    run_id: str
     attempt_count: int
     status: str
     created_at: str
     updated_at: str
-    job_definition_id: str
-    job_definition_version: int
+    blueprint_id: str
+    blueprint_version: int
     error: str | None = None
     progress: str | None = None
     cascade_job_id: str | None = None
 
 
-class JobExecutionListResponse(BaseModel):
-    executions: list[JobExecutionDetail]
+class RunListResponse(BaseModel):
+    runs: list[RunDetail]
     total: int
     page: int
     page_size: int
     total_pages: int
 
 
-class JobExecutionRestartRequest(BaseModel):
+class RunRestartRequest(BaseModel):
     """Identifies the attempt to restart. ``attempt_count`` must match the current latest attempt."""
 
-    execution_id: str
+    run_id: str
     attempt_count: int
 
 
-class JobExecutionRestartResponse(BaseModel):
-    execution_id: str
+class RunRestartResponse(BaseModel):
+    run_id: str
     attempt_count: int
 
 
-class JobExecutionDeleteRequest(BaseModel):
+class RunDeleteRequest(BaseModel):
     """Identifies the attempt to delete. ``attempt_count`` must match the current latest attempt."""
 
-    execution_id: str
+    run_id: str
     attempt_count: int
 
 
@@ -116,44 +117,42 @@ class JobExecutionDeleteRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _to_job_execution_detail(domain_detail) -> JobExecutionDetail:
-    return JobExecutionDetail(
-        execution_id=domain_detail.execution_id,
+def _to_run_detail(domain_detail) -> RunDetail:
+    return RunDetail(
+        run_id=domain_detail.run_id,
         attempt_count=domain_detail.attempt_count,
         status=domain_detail.status,
         created_at=domain_detail.created_at,
         updated_at=domain_detail.updated_at,
-        job_definition_id=domain_detail.job_definition_id,
-        job_definition_version=domain_detail.job_definition_version,
+        blueprint_id=domain_detail.blueprint_id,
+        blueprint_version=domain_detail.blueprint_version,
         error=domain_detail.error,
         progress=domain_detail.progress,
         cascade_job_id=domain_detail.cascade_job_id,
     )
 
 
-async def _resolve_job_execution_with_cascade(
-    execution_spec: JobExecutionId,
+async def _resolve_run_with_cascade(
+    execution_spec: RunId,
     auth_context: AuthContext,
-) -> tuple[job_execution_db.JobExecution, str]:
-    """Fetch a JobExecution and validate it has a cascade_job_id.
+) -> tuple[run_db.Run, str]:
+    """Fetch a Run and validate it has a cascade_job_id.
 
     Raises HTTP 404 if not found or access denied, HTTP 409 if not yet submitted.
     """
     try:
-        execution = await job_execution_db.get_job_execution(
-            execution_spec.execution_id, execution_spec.attempt_count, auth_context=auth_context
-        )
-    except JobExecutionNotFound:
-        raise HTTPException(status_code=404, detail=f"JobExecution {execution_spec.execution_id!r} not found.")
-    except JobExecutionAccessDenied:
-        raise HTTPException(status_code=403, detail=f"Access denied to execution {execution_spec.execution_id!r}.")
+        execution = await run_db.get_run(execution_spec.run_id, execution_spec.attempt_count, auth_context=auth_context)
+    except RunNotFound:
+        raise HTTPException(status_code=404, detail=f"Run {execution_spec.run_id!r} not found.")
+    except RunAccessDenied:
+        raise HTTPException(status_code=403, detail=f"Access denied to execution {execution_spec.run_id!r}.")
     cascade_job_id = cast(str | None, execution.cascade_job_id)
     if cascade_job_id is None:
-        raise HTTPException(status_code=409, detail=f"JobExecution {execution_spec.execution_id!r} has not been submitted to cascade yet.")
+        raise HTTPException(status_code=409, detail=f"Run {execution_spec.run_id!r} has not been submitted to cascade yet.")
     return execution, cascade_job_id
 
 
-async def _build_job_execution_logs_response(cascade_job_id: str, db_entity_ser: bytes) -> Response:
+async def _build_run_logs_response(cascade_job_id: str, db_entity_ser: bytes) -> Response:
     try:
         request = cascade_api.JobProgressRequest(job_ids=[cascade_job_id])
         gw_state = cascade_client.request_response(request, f"{config.cascade.cascade_url}").model_dump()
@@ -198,102 +197,100 @@ async def _build_job_execution_logs_response(cascade_job_id: str, db_entity_ser:
 
 
 @router.post("/create")
-async def create_job_execution(
-    request: JobExecutionCreateRequest,
+async def create_run(
+    request: RunCreateRequest,
     auth_context: AuthContext = Depends(get_auth_context),
-) -> JobExecutionCreateResponse:
-    """Execute a saved job definition.
+) -> RunCreateResponse:
+    """Execute a saved blueprint.
 
-    Loads the referenced definition, compiles it, submits it to cascade, and
+    Loads the referenced blueprint, compiles it, submits it to cascade, and
     creates a linked execution row.
     """
-    definition = await job_execution_service.get_job_definition_for_execution(request.job_definition_id, request.job_definition_version)
-    if definition is None:
-        raise HTTPException(status_code=404, detail=f"JobDefinition {request.job_definition_id!r} not found.")
-    result = await job_execution_service.execute(definition, auth_context)
+    blueprint = await run_service.get_blueprint_for_execution(request.blueprint_id, request.blueprint_version)
+    if blueprint is None:
+        raise HTTPException(status_code=404, detail=f"Blueprint {request.blueprint_id!r} not found.")
+    result = await run_service.execute(blueprint, auth_context)
     if result.t is None:
         raise HTTPException(status_code=500, detail=f"Failed to execute: {result.e}")
-    return JobExecutionCreateResponse(execution_id=result.t.execution_id, attempt_count=result.t.attempt_count)
+    return RunCreateResponse(run_id=result.t.run_id, attempt_count=result.t.attempt_count)
 
 
 @router.get("/list")
-async def list_job_executions(
+async def list_runs(
     pagination: Annotated[PaginationSpec, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
-) -> JobExecutionListResponse:
+) -> RunListResponse:
     """List the latest attempt of every execution visible to the caller, with pagination.
 
     Admins see all executions; regular users see only their own.
     """
-    total = await job_execution_db.count_job_executions(auth_context=auth_context)
+    total = await run_db.count_runs(auth_context=auth_context)
     start = pagination.start()
     total_pages = pagination.total_pages(total)
     if start >= total and total > 0:
         raise HTTPException(status_code=404, detail="Page number out of range.")
-    executions = list(await job_execution_db.list_job_executions(auth_context=auth_context, offset=start, limit=pagination.page_size))
-    details = [_to_job_execution_detail(job_execution_service.execution_to_detail(e)) for e in executions]
-    return JobExecutionListResponse(
-        executions=details, total=total, page=pagination.page, page_size=pagination.page_size, total_pages=total_pages
-    )
+    executions = list(await run_db.list_runs(auth_context=auth_context, offset=start, limit=pagination.page_size))
+    details = [_to_run_detail(run_service.execution_to_detail(e)) for e in executions]
+    return RunListResponse(runs=details, total=total, page=pagination.page, page_size=pagination.page_size, total_pages=total_pages)
 
 
 @router.get("/get")
-async def get_job_execution(
-    spec: Annotated[JobExecutionId, Depends()],
+async def get_run(
+    spec: Annotated[RunId, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
-) -> JobExecutionDetail:
+) -> RunDetail:
     """Get status and detail for a specific execution; defaults to the latest attempt."""
     try:
-        domain_detail = await job_execution_service.poll_and_update_execution(spec.execution_id, spec.attempt_count, auth_context)
-    except JobExecutionNotFound:
-        raise HTTPException(status_code=404, detail=f"JobExecution {spec.execution_id!r} not found.")
-    except JobExecutionAccessDenied:
-        raise HTTPException(status_code=403, detail=f"Access denied to execution {spec.execution_id!r}.")
-    return _to_job_execution_detail(domain_detail)
+        domain_detail = await run_service.poll_and_update_execution(spec.run_id, spec.attempt_count, auth_context)
+    except RunNotFound:
+        raise HTTPException(status_code=404, detail=f"Run {spec.run_id!r} not found.")
+    except RunAccessDenied:
+        raise HTTPException(status_code=403, detail=f"Access denied to execution {spec.run_id!r}.")
+    return _to_run_detail(domain_detail)
 
 
 @router.post("/restart")
-async def restart_job_execution(
-    request: JobExecutionRestartRequest,
+async def restart_run(
+    request: RunRestartRequest,
     auth_context: AuthContext = Depends(get_auth_context),
-) -> JobExecutionRestartResponse:
+) -> RunRestartResponse:
     """Create a new attempt of an existing execution under the same logical id.
 
     ``attempt_count`` must match the current latest attempt to prevent races.
     Returns 409 if it does not match.
     """
     try:
-        current = await job_execution_db.get_job_execution(request.execution_id, auth_context=auth_context)
-    except JobExecutionNotFound:
-        raise HTTPException(status_code=404, detail=f"JobExecution {request.execution_id!r} not found.")
-    except JobExecutionAccessDenied:
-        raise HTTPException(status_code=403, detail=f"Access denied to execution {request.execution_id!r}.")
+        current = await run_db.get_run(request.run_id, auth_context=auth_context)
+    except RunNotFound:
+        raise HTTPException(status_code=404, detail=f"Run {request.run_id!r} not found.")
+    except RunAccessDenied:
+        raise HTTPException(status_code=403, detail=f"Access denied to execution {request.run_id!r}.")
     if cast(int, current.attempt_count) != request.attempt_count:
         raise HTTPException(
             status_code=409,
             detail=(
-                f"Attempt count conflict for execution {request.execution_id!r}: "
+                f"Attempt count conflict for execution {request.run_id!r}: "
                 f"expected {request.attempt_count}, current is {current.attempt_count}."
             ),
         )
     try:
-        result = await job_execution_service.restart_job_execution(request.execution_id, auth_context)
-    except JobExecutionNotFound:
-        raise HTTPException(status_code=404, detail=f"JobExecution {request.execution_id!r} not found.")
-    except JobExecutionAccessDenied:
-        raise HTTPException(status_code=403, detail=f"Access denied to execution {request.execution_id!r}.")
+        result = await run_service.restart_run(request.run_id, auth_context)
+    except RunNotFound:
+        raise HTTPException(status_code=404, detail=f"Run {request.run_id!r} not found.")
+    except RunAccessDenied:
+        raise HTTPException(status_code=403, detail=f"Access denied to execution {request.run_id!r}.")
     if result.t is None:
         raise HTTPException(status_code=500, detail=f"Failed to restart: {result.e}")
-    return JobExecutionRestartResponse(execution_id=result.t.execution_id, attempt_count=result.t.attempt_count)
+    return RunRestartResponse(run_id=result.t.run_id, attempt_count=result.t.attempt_count)
 
 
 @router.get("/outputAvailability")
-async def get_job_execution_output_availability(
-    spec: Annotated[JobExecutionId, Depends()],
+async def get_run_output_availability(
+    spec: Annotated[RunId, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> list[TaskId]:
     """Check which output tasks are available for a given execution."""
-    _, cascade_job_id = await _resolve_job_execution_with_cascade(spec, auth_context)
+    _, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
     response = cascade_client.request_response(cascade_api.JobProgressRequest(job_ids=[cascade_job_id]), f"{config.cascade.cascade_url}")
     response = cast(cascade_api.JobProgressResponse, response)
     if cascade_job_id not in response.datasets:
@@ -302,13 +299,13 @@ async def get_job_execution_output_availability(
 
 
 @router.get("/outputContent")
-async def get_job_execution_output_content(
-    spec: Annotated[JobExecutionId, Depends()],
+async def get_run_output_content(
+    spec: Annotated[RunId, Depends()],
     dataset_id: str,
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> Response:
     """Retrieve the result of a specific output task, encoded as bytes."""
-    _, cascade_job_id = await _resolve_job_execution_with_cascade(spec, auth_context)
+    _, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
     response = cascade_client.request_response(
         cascade_api.ResultRetrievalRequest(job_id=cascade_job_id, dataset_id=DatasetId(task=dataset_id, output="0")),
         f"{config.cascade.cascade_url}",
@@ -324,34 +321,34 @@ async def get_job_execution_output_content(
     return Response(bytez, media_type=media_type)
 
 
-@router.get("/definition")
-async def get_job_execution_definition(
-    spec: Annotated[JobExecutionId, Depends()],
+@router.get("/blueprint")
+async def get_run_blueprint(
+    spec: Annotated[RunId, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
-):
-    """Get the job specification linked to an execution attempt."""
+) -> JobSpecification:
+    """Get the blueprint linked to a run attempt."""
     try:
-        return await job_execution_service.get_job_execution_specification(spec.execution_id, spec.attempt_count, auth_context)
-    except JobExecutionNotFound:
-        raise HTTPException(status_code=404, detail=f"JobExecution {spec.execution_id!r} or its definition not found.")
-    except JobExecutionAccessDenied:
-        raise HTTPException(status_code=403, detail=f"Access denied to execution {spec.execution_id!r}.")
+        return await run_service.get_run_blueprint(spec.run_id, spec.attempt_count, auth_context)
+    except RunNotFound:
+        raise HTTPException(status_code=404, detail=f"Run {spec.run_id!r} or its blueprint not found.")
+    except RunAccessDenied:
+        raise HTTPException(status_code=403, detail=f"Access denied to run {spec.run_id!r}.")
 
 
 @router.get("/logs")
-async def get_job_execution_logs(
-    spec: Annotated[JobExecutionId, Depends()],
+async def get_run_logs(
+    spec: Annotated[RunId, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> Response:
     """Return a zip archive of logs for the given execution attempt."""
-    db_entity, cascade_job_id = await _resolve_job_execution_with_cascade(spec, auth_context)
+    db_entity, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
     entity_dict = {col.name: getattr(db_entity, col.name) for col in db_entity.__table__.columns}
-    return await _build_job_execution_logs_response(cascade_job_id, orjson.dumps(entity_dict))
+    return await _build_run_logs_response(cascade_job_id, orjson.dumps(entity_dict))
 
 
 @router.post("/delete")
-async def delete_job_execution(
-    request: JobExecutionDeleteRequest,
+async def delete_run(
+    request: RunDeleteRequest,
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> None:
     """Delete an execution from the database and cascade.
@@ -360,21 +357,21 @@ async def delete_job_execution(
     Returns 409 if it does not match.
     """
     try:
-        current = await job_execution_db.get_job_execution(request.execution_id, auth_context=auth_context)
-    except JobExecutionNotFound:
-        raise HTTPException(status_code=404, detail=f"JobExecution {request.execution_id!r} not found.")
-    except JobExecutionAccessDenied:
-        raise HTTPException(status_code=403, detail=f"Access denied to execution {request.execution_id!r}.")
+        current = await run_db.get_run(request.run_id, auth_context=auth_context)
+    except RunNotFound:
+        raise HTTPException(status_code=404, detail=f"Run {request.run_id!r} not found.")
+    except RunAccessDenied:
+        raise HTTPException(status_code=403, detail=f"Access denied to execution {request.run_id!r}.")
     if cast(int, current.attempt_count) != request.attempt_count:
         raise HTTPException(
             status_code=409,
             detail=(
-                f"Attempt count conflict for execution {request.execution_id!r}: "
+                f"Attempt count conflict for execution {request.run_id!r}: "
                 f"expected {request.attempt_count}, current is {current.attempt_count}."
             ),
         )
-    spec = JobExecutionId(execution_id=request.execution_id, attempt_count=request.attempt_count)
-    _, cascade_job_id = await _resolve_job_execution_with_cascade(spec, auth_context)
+    spec = RunId(run_id=request.run_id, attempt_count=request.attempt_count)
+    _, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
     try:
         cascade_client.request_response(
             cascade_api.ResultDeletionRequest(datasets={cascade_job_id: []}),  # type: ignore[invalid-argument-type]
@@ -384,6 +381,6 @@ async def delete_job_execution(
         raise HTTPException(500, f"Job deletion failed: {e}")
     finally:
         try:
-            await job_execution_db.soft_delete_job_execution(request.execution_id, auth_context=auth_context)
-        except (JobExecutionNotFound, JobExecutionAccessDenied):
+            await run_db.soft_delete_run(request.run_id, auth_context=auth_context)
+        except (RunNotFound, RunAccessDenied):
             pass

@@ -54,7 +54,7 @@ class ExposedSettings(BaseModel):
     cascade: CascadeSettings = config.cascade
 
     def to_rjsf(self) -> FormDefinition:
-        """Convert settings to RJSF form definition"""
+        """Convert settings to RJSF form blueprint"""
         fields, required = from_pydantic(self)
         return FormDefinition(
             title="Settings",

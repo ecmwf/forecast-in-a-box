@@ -32,8 +32,8 @@ async def upsert_experiment_definition(
     *,
     auth_context: AuthContext,
     experiment_definition_id: str | None = None,
-    job_definition_id: str,
-    job_definition_version: int,
+    blueprint_id: str,
+    blueprint_version: int,
     experiment_type: ExperimentType,
     created_by: str | None,
     experiment_definition: dict | None = None,
@@ -91,8 +91,8 @@ async def upsert_experiment_definition(
                     display_name=display_name,
                     display_description=display_description,
                     tags=tags,
-                    job_definition_id=job_definition_id,
-                    job_definition_version=job_definition_version,
+                    blueprint_id=blueprint_id,
+                    blueprint_version=blueprint_version,
                     experiment_type=experiment_type,
                     experiment_definition=experiment_definition,
                     is_deleted=False,
@@ -139,8 +139,8 @@ async def list_experiment_definitions(
 ) -> Iterable[ExperimentDefinition]:
     """Return the latest non-deleted version of every ExperimentDefinition visible to the caller.
 
-    Admins and passthrough callers (``auth_context.has_admin()``) see all definitions.
-    Authenticated non-admin users see only their own definitions.
+    Admins and passthrough callers (``auth_context.has_admin()``) see all experiment definitions.
+    Authenticated non-admin users see only their own experiment definitions.
     """
 
     async def function(i: int) -> list[ExperimentDefinition]:
@@ -179,7 +179,7 @@ async def count_experiment_definitions(
 ) -> int:
     """Return the number of distinct non-deleted ExperimentDefinition ids visible to the caller.
 
-    Admins and passthrough callers (``auth_context.has_admin()``) count all definitions.
+    Admins and passthrough callers (``auth_context.has_admin()``) count all experiment definitions.
     Authenticated non-admin users count only their own.
     """
 
@@ -213,7 +213,7 @@ async def count_experiment_definitions(
 async def soft_delete_experiment_definition(experiment_id: str, *, auth_context: AuthContext) -> None:
     """Mark all versions of an ExperimentDefinition as deleted.
 
-    Raises ``ExperimentNotFound`` if the definition does not exist, and
+    Raises ``ExperimentNotFound`` if the blueprint does not exist, and
     ``ExperimentAccessDenied`` if the actor is not the owner or an admin.
     """
     existing = await get_experiment_definition(experiment_id)

@@ -9,14 +9,14 @@
 
 """Domain exceptions for the job execution layer.
 
-Raised by domain.job_execution.db and domain.job_execution.service; translated to
+Raised by domain.run.db and domain.run.service; translated to
 HTTP responses at the router boundary.
 """
 
 
-class JobExecutionNotFound(Exception):
-    """Raised when a requested JobExecution does not exist (or has been soft-deleted)."""
+class RunNotFound(Exception):
+    """Raised when a requested Run does not exist (or has been soft-deleted)."""
 
 
-class JobExecutionAccessDenied(Exception):
-    """Raised when the actor lacks permission to read or mutate a JobExecution."""
+class RunAccessDenied(Exception):
+    """Raised when the actor lacks permission to read or mutate a Run."""

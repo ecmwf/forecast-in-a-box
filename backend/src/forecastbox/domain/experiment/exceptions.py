@@ -11,7 +11,7 @@
 
 
 class ExperimentNotFound(Exception):
-    """Raised when an experiment definition does not exist or has been deleted."""
+    """Raised when an experiment blueprint does not exist or has been deleted."""
 
 
 class ExperimentAccessDenied(Exception):

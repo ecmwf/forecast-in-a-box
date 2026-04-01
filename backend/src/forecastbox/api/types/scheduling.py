@@ -17,11 +17,11 @@ from pydantic import BaseModel, PositiveInt
 
 
 class ScheduleSpecification(BaseModel):
-    """Create request for a cron schedule backed by a persisted JobDefinition."""
+    """Create request for a cron schedule backed by a persisted Blueprint."""
 
-    job_definition_id: str
-    """ID of an existing JobDefinition to execute on each tick."""
-    job_definition_version: int | None = None
+    blueprint_id: str
+    """ID of an existing Blueprint to execute on each tick."""
+    blueprint_version: int | None = None
     """Specific version to pin; omit to use the latest version."""
     cron_expr: str
     """Cron expression for time scheduling."""

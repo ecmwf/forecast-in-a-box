@@ -17,7 +17,7 @@ import time
 
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
-from forecastbox.api.types.fable import FableBuilder, FableSaveRequest
+from forecastbox.api.types.blueprint import BlueprintBuilder, BlueprintSaveRequest
 from forecastbox.api.types.scheduling import ScheduleSpecification, ScheduleUpdate
 
 from .conftest import testPluginId
@@ -26,23 +26,23 @@ from .utils import ensure_completed_v2, ensure_schedule_run_v2, scheduling_endpo
 # *** helpers **
 
 
-def _save_fable(client) -> tuple[str, int]:
-    """Save a minimal FableBuilder and return (job_definition_id, version)."""
+def _save_blueprint(client) -> tuple[str, int]:
+    """Save a minimal BlueprintBuilder and return (blueprint_id, version)."""
     plugin_id = PluginCompositeId(store="ecmwf", local="ecmwf-base")
     source = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=plugin_id, factory="ekdSource"),
         configuration_values={"source": "ecmwf-open-data", "date": "2026-01-01", "expver": "0001"},
         input_ids={},
     )
-    builder = FableBuilder(blocks={"source1": source})
-    resp = client.post("/job_definition/create", json=FableSaveRequest(builder=builder, display_name="sched-v2 test").model_dump())
+    builder = BlueprintBuilder(blocks={"source1": source})
+    resp = client.post("/blueprint/create", json=BlueprintSaveRequest(builder=builder, display_name="sched-v2 test").model_dump())
     assert resp.is_success, resp.text
     data = resp.json()
-    return data["job_definition_id"], data["version"]
+    return data["blueprint_id"], data["version"]
 
 
-def _save_full_fable(client, output_path: str) -> tuple[str, int]:
-    """Save a full FableBuilder (with sink) and return (job_definition_id, version)."""
+def _save_full_blueprint(client, output_path: str) -> tuple[str, int]:
+    """Save a full BlueprintBuilder (with sink) and return (blueprint_id, version)."""
     source_42 = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="source_42"),
         configuration_values={},
@@ -63,7 +63,7 @@ def _save_full_fable(client, output_path: str) -> tuple[str, int]:
         configuration_values={"fname": output_path},
         input_ids={"data": "product_join"},
     )
-    builder = FableBuilder(
+    builder = BlueprintBuilder(
         blocks={
             "source_42": source_42,
             "transform_increment": transform_increment,
@@ -71,17 +71,17 @@ def _save_full_fable(client, output_path: str) -> tuple[str, int]:
             "sink_file": sink_file,
         }
     )
-    resp = client.post("/job_definition/create", json=FableSaveRequest(builder=builder).model_dump())
+    resp = client.post("/blueprint/create", json=BlueprintSaveRequest(builder=builder).model_dump())
     assert resp.is_success, resp.text
     data = resp.json()
-    return data["job_definition_id"], data["version"]
+    return data["blueprint_id"], data["version"]
 
 
 def _create_schedule_v2(client, job_def_id: str, job_def_version: int, cron_expr: str = "0 0 * * *") -> str:
     """Create a v2 cron schedule and return experiment_id."""
     spec = ScheduleSpecification(
-        job_definition_id=job_def_id,
-        job_definition_version=job_def_version,
+        blueprint_id=job_def_id,
+        blueprint_version=job_def_version,
         cron_expr=cron_expr,
         dynamic_expr={},
         max_acceptable_delay_hours=24,
@@ -98,7 +98,7 @@ def _create_schedule_v2(client, job_def_id: str, job_def_version: int, cron_expr
 def test_schedule_v2_crud(backend_client_with_auth):
     """Create, get, update, and verify persistence of a v2 schedule."""
     headers = {"Content-Type": "application/json"}
-    job_def_id, job_def_version = _save_fable(backend_client_with_auth)
+    job_def_id, job_def_version = _save_blueprint(backend_client_with_auth)
 
     # miss on unknown experiment_id
     response = backend_client_with_auth.get("/experiment/get", params={"experiment_id": "notToBeFound"})
@@ -106,8 +106,8 @@ def test_schedule_v2_crud(backend_client_with_auth):
 
     # create
     spec = ScheduleSpecification(
-        job_definition_id=job_def_id,
-        job_definition_version=job_def_version,
+        blueprint_id=job_def_id,
+        blueprint_version=job_def_version,
         cron_expr="0 0 * * *",
         dynamic_expr={},
         max_acceptable_delay_hours=24,
@@ -125,7 +125,7 @@ def test_schedule_v2_crud(backend_client_with_auth):
     assert data["experiment_id"] == experiment_id
     assert data["cron_expr"] == "0 0 * * *"
     assert data["enabled"] is True
-    assert data["job_definition_id"] == job_def_id
+    assert data["blueprint_id"] == job_def_id
     experiment_version = data["experiment_version"]
 
     # update cron and enabled
@@ -151,7 +151,7 @@ def test_schedule_v2_crud(backend_client_with_auth):
 def test_schedule_v2_list(backend_client_with_auth):
     """Creating v2 schedules makes them appear in the list_v2 endpoint with pagination."""
     headers = {"Content-Type": "application/json"}
-    job_def_id, job_def_version = _save_fable(backend_client_with_auth)
+    job_def_id, job_def_version = _save_blueprint(backend_client_with_auth)
 
     # baseline count
     response = backend_client_with_auth.get("/experiment/list")
@@ -159,13 +159,13 @@ def test_schedule_v2_list(backend_client_with_auth):
     baseline_total = response.json()["total"]
 
     spec1 = ScheduleSpecification(
-        job_definition_id=job_def_id,
-        job_definition_version=job_def_version,
+        blueprint_id=job_def_id,
+        blueprint_version=job_def_version,
         cron_expr="0 0 * * *",
     )
     spec2 = ScheduleSpecification(
-        job_definition_id=job_def_id,
-        job_definition_version=job_def_version,
+        blueprint_id=job_def_id,
+        blueprint_version=job_def_version,
         cron_expr="0 6 * * *",
     )
     r1 = backend_client_with_auth.put("/experiment/create", headers=headers, json=spec1.model_dump())
@@ -203,11 +203,11 @@ def test_schedule_v2_list(backend_client_with_auth):
 def test_schedule_v2_next_run(backend_client_with_auth):
     """Next-run endpoint reflects cron changes and disabled state."""
     headers = {"Content-Type": "application/json"}
-    job_def_id, job_def_version = _save_fable(backend_client_with_auth)
+    job_def_id, job_def_version = _save_blueprint(backend_client_with_auth)
 
     spec = ScheduleSpecification(
-        job_definition_id=job_def_id,
-        job_definition_version=job_def_version,
+        blueprint_id=job_def_id,
+        blueprint_version=job_def_version,
         cron_expr="0 0 * * *",
     )
     response = backend_client_with_auth.put("/experiment/create", headers=headers, json=spec.model_dump())
@@ -260,22 +260,22 @@ def test_schedule_v2_next_run(backend_client_with_auth):
 def test_schedule_v2_create_invalid_cron(backend_client_with_auth):
     """create_v2 with an invalid cron expression returns 400."""
     headers = {"Content-Type": "application/json"}
-    job_def_id, job_def_version = _save_fable(backend_client_with_auth)
+    job_def_id, job_def_version = _save_blueprint(backend_client_with_auth)
 
     spec = ScheduleSpecification(
-        job_definition_id=job_def_id,
-        job_definition_version=job_def_version,
+        blueprint_id=job_def_id,
+        blueprint_version=job_def_version,
         cron_expr="not a cron",
     )
     response = backend_client_with_auth.put("/experiment/create", headers=headers, json=spec.model_dump())
     assert response.status_code == 400
 
 
-def test_schedule_v2_create_unknown_job_definition(backend_client_with_auth):
-    """create_v2 referencing a non-existent JobDefinition returns 404."""
+def test_schedule_v2_create_unknown_blueprint(backend_client_with_auth):
+    """create_v2 referencing a non-existent Blueprint returns 404."""
     headers = {"Content-Type": "application/json"}
     spec = ScheduleSpecification(
-        job_definition_id="does-not-exist",
+        blueprint_id="does-not-exist",
         cron_expr="0 0 * * *",
     )
     response = backend_client_with_auth.put("/experiment/create", headers=headers, json=spec.model_dump())
@@ -287,7 +287,7 @@ def test_schedule_v2_create_unknown_job_definition(backend_client_with_auth):
 
 def test_schedule_v2_runs_empty(backend_client_with_auth):
     """A newly created v2 schedule with no executions returns an empty runs list."""
-    job_def_id, job_def_version = _save_fable(backend_client_with_auth)
+    job_def_id, job_def_version = _save_blueprint(backend_client_with_auth)
     experiment_id = _create_schedule_v2(backend_client_with_auth, job_def_id, job_def_version)
 
     response = backend_client_with_auth.get("/experiment/runs/list", params={"experiment_id": experiment_id})
@@ -308,7 +308,7 @@ def test_schedule_v2_runs_not_found(backend_client_with_auth):
 
 def test_schedule_v2_runs_invalid_pagination(backend_client_with_auth):
     """runs_v2 returns 422 for invalid page or page_size values."""
-    job_def_id, job_def_version = _save_fable(backend_client_with_auth)
+    job_def_id, job_def_version = _save_blueprint(backend_client_with_auth)
     experiment_id = _create_schedule_v2(backend_client_with_auth, job_def_id, job_def_version)
 
     response = backend_client_with_auth.get("/experiment/runs/list", params={"experiment_id": experiment_id, "page": 0, "page_size": 10})
@@ -320,7 +320,7 @@ def test_schedule_v2_runs_invalid_pagination(backend_client_with_auth):
 
 def test_schedule_v2_runs_page_beyond_empty(backend_client_with_auth):
     """Page 2 of an empty schedule returns an empty list (not 404), since total is 0."""
-    job_def_id, job_def_version = _save_fable(backend_client_with_auth)
+    job_def_id, job_def_version = _save_blueprint(backend_client_with_auth)
     experiment_id = _create_schedule_v2(backend_client_with_auth, job_def_id, job_def_version)
 
     response = backend_client_with_auth.get("/experiment/runs/list", params={"experiment_id": experiment_id, "page": 2, "page_size": 10})
@@ -332,7 +332,7 @@ def test_schedule_v2_runs_page_beyond_empty(backend_client_with_auth):
 
 def test_schedule_v2_runs_independent_per_experiment(backend_client_with_auth):
     """Two different experiments have independent runs_v2 results."""
-    job_def_id, job_def_version = _save_fable(backend_client_with_auth)
+    job_def_id, job_def_version = _save_blueprint(backend_client_with_auth)
     exp_id_1 = _create_schedule_v2(backend_client_with_auth, job_def_id, job_def_version, cron_expr="0 0 * * *")
     exp_id_2 = _create_schedule_v2(backend_client_with_auth, job_def_id, job_def_version, cron_expr="0 6 * * *")
 
@@ -346,12 +346,12 @@ def test_schedule_v2_runs_independent_per_experiment(backend_client_with_auth):
 def test_schedule_v2_execute(tmpdir, backend_client_with_auth):
     """Create a schedule with first_run_override in the past; verify the scheduler executes it and produces the correct output."""
     output_path = str(pathlib.Path(str(tmpdir)) / "output")
-    job_def_id, job_def_version = _save_full_fable(backend_client_with_auth, output_path)
+    job_def_id, job_def_version = _save_full_blueprint(backend_client_with_auth, output_path)
 
     first_run_override = dt.datetime.now() - dt.timedelta(minutes=5)
     spec = ScheduleSpecification(
-        job_definition_id=job_def_id,
-        job_definition_version=job_def_version,
+        blueprint_id=job_def_id,
+        blueprint_version=job_def_version,
         cron_expr="0 0 * * *",
         max_acceptable_delay_hours=1,
         first_run_override=first_run_override,
@@ -364,7 +364,7 @@ def test_schedule_v2_execute(tmpdir, backend_client_with_auth):
     assert create_resp.is_success, create_resp.text
     experiment_id = create_resp.json()["experiment_id"]
 
-    execution_id = ensure_schedule_run_v2(backend_client_with_auth, experiment_id, sleep=1, attempts=30)
-    ensure_completed_v2(backend_client_with_auth, execution_id, sleep=1, attempts=120)
+    run_id = ensure_schedule_run_v2(backend_client_with_auth, experiment_id, sleep=1, attempts=30)
+    ensure_completed_v2(backend_client_with_auth, run_id, sleep=1, attempts=120)
 
     assert pathlib.Path(output_path).read_text() == "85"  # 42 + 1 + 42

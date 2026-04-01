@@ -55,8 +55,8 @@ class ExperimentId(BaseModel):
 
 
 class ExperimentCreateRequest(BaseModel):
-    job_definition_id: str
-    job_definition_version: int | None = None
+    blueprint_id: str
+    blueprint_version: int | None = None
     cron_expr: str
     dynamic_expr: dict[str, str] = {}
     max_acceptable_delay_hours: PositiveInt = 24
@@ -73,8 +73,8 @@ class ExperimentCreateResponse(BaseModel):
 class ExperimentDetail(BaseModel):
     experiment_id: str
     experiment_version: int
-    job_definition_id: str
-    job_definition_version: int
+    blueprint_id: str
+    blueprint_version: int
     cron_expr: str
     dynamic_expr: dict[str, str]
     max_acceptable_delay_hours: int
@@ -114,7 +114,7 @@ class ExperimentDeleteRequest(BaseModel):
 
 
 class ExperimentRunDetail(BaseModel):
-    execution_id: str
+    run_id: str
     attempt_count: int
     status: str
     created_at: str
@@ -140,8 +140,8 @@ def _experiment_to_detail(exp: ExperimentDefinition) -> ExperimentDetail:
     return ExperimentDetail(
         experiment_id=str(exp.experiment_definition_id),  # ty:ignore[invalid-argument-type]
         experiment_version=cast(int, exp.version),
-        job_definition_id=str(exp.job_definition_id),  # ty:ignore[invalid-argument-type]
-        job_definition_version=cast(int, exp.job_definition_version),
+        blueprint_id=str(exp.blueprint_id),  # ty:ignore[invalid-argument-type]
+        blueprint_version=cast(int, exp.blueprint_version),
         cron_expr=str(exp_def.get("cron_expr", "")),
         dynamic_expr=cast(dict, exp_def.get("dynamic_expr", {})),
         max_acceptable_delay_hours=int(exp_def.get("max_acceptable_delay_hours", 24)),
@@ -168,8 +168,8 @@ async def create_experiment(
     try:
         experiment_id = await experiment_service.create_schedule(
             auth_context=auth_context,
-            job_definition_id=request.job_definition_id,
-            job_definition_version=request.job_definition_version,
+            blueprint_id=request.blueprint_id,
+            blueprint_version=request.blueprint_version,
             cron_expr=request.cron_expr,
             dynamic_expr=request.dynamic_expr,
             max_acceptable_delay_hours=request.max_acceptable_delay_hours,
@@ -311,7 +311,7 @@ async def list_experiment_runs(
         raise HTTPException(status_code=400, detail=str(e))
     runs = [
         ExperimentRunDetail(
-            execution_id=str(ex.job_execution_id),  # ty:ignore[invalid-argument-type]
+            run_id=str(ex.run_id),  # ty:ignore[invalid-argument-type]
             attempt_count=cast(int, ex.attempt_count),
             status=cast(str, ex.status),
             created_at=str(ex.created_at),

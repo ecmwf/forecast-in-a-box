@@ -34,46 +34,46 @@ class ExecutionSpecification(BaseModel):
     shared: bool = Field(default=False)
 
 
-class JobExecuteRequest(BaseModel):
+class RunRequest(BaseModel):
     """Request body for POST /job/execute.
 
-    References an existing saved JobDefinition by id and optional version.
+    References an existing saved Blueprint by id and optional version.
     """
 
-    job_definition_id: str
-    """Reference to an existing saved JobDefinition."""
-    job_definition_version: int | None = None
+    blueprint_id: str
+    """Reference to an existing saved Blueprint."""
+    blueprint_version: int | None = None
     """Specific version to use; omit to use the latest version."""
 
 
-class JobExecuteResponse(BaseModel):
+class RunResponse(BaseModel):
     """Response from POST /job/execute."""
 
-    execution_id: str
-    """Logical execution id (JobExecution.id)."""
+    run_id: str
+    """Logical execution id (Run.id)."""
     attempt_count: int
     """Attempt number; always 1 on a fresh execution."""
 
 
-class JobExecutionDetail(BaseModel):
+class RunDetail(BaseModel):
     """Detail of a single job execution attempt."""
 
-    execution_id: str
+    run_id: str
     attempt_count: int
     status: str
     created_at: str
     updated_at: str
-    job_definition_id: str
-    job_definition_version: int
+    blueprint_id: str
+    blueprint_version: int
     error: str | None = None
     progress: str | None = None
     cascade_job_id: str | None = None
 
 
-class JobExecutionList(BaseModel):
+class RunList(BaseModel):
     """List of latest-attempt job execution details with pagination metadata."""
 
-    executions: list[JobExecutionDetail]
+    runs: list[RunDetail]
     total: int
     """Total number of executions in the database."""
     page: int
@@ -87,7 +87,7 @@ class JobExecutionList(BaseModel):
 class JobSpecification(BaseModel):
     """Specification payload linked to a job execution attempt."""
 
-    definition_id: str
-    definition_version: int
+    blueprint_id: str
+    blueprint_version: int
     blocks: dict | None = None
     environment_spec: dict | None = None

@@ -7,20 +7,20 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Domain exceptions for the job definition layer.
+"""Domain exceptions for the blueprint layer.
 
-Raised by domain.job_definition.db and domain.job_definition.service; translated to
+Raised by domain.blueprint.db and domain.blueprint.service; translated to
 HTTP responses at the router boundary.
 """
 
 
-class JobDefinitionNotFound(Exception):
-    """Raised when a requested JobDefinition does not exist (or has been soft-deleted)."""
+class BlueprintNotFound(Exception):
+    """Raised when a requested Blueprint does not exist (or has been soft-deleted)."""
 
 
-class JobDefinitionAccessDenied(Exception):
-    """Raised when the actor lacks permission to mutate a JobDefinition."""
+class BlueprintAccessDenied(Exception):
+    """Raised when the actor lacks permission to mutate a Blueprint."""
 
 
-class JobDefinitionVersionConflict(Exception):
+class BlueprintVersionConflict(Exception):
     """Raised when the provided version does not match the current version in the database."""

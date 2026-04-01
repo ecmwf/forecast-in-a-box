@@ -8,7 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 """
-Types pertaining to Forecast As BLock Expression (Fable): builders and top-level API
+Types pertaining to Forecast as BLock Expression (Fable): builders and top-level API
 """
 
 from dataclasses import dataclass
@@ -19,13 +19,13 @@ from pydantic import BaseModel
 from forecastbox.api.types.jobs import EnvironmentSpecification
 
 
-class FableBuilder(BaseModel):
+class BlueprintBuilder(BaseModel):
     blocks: dict[BlockInstanceId, BlockInstance]
     environment: EnvironmentSpecification | None = None
 
 
-class FableValidationExpansion(BaseModel):
-    """When user submits invalid FableBuilder, backend returns a structured validation result and completion options"""
+class BlueprintValidationExpansion(BaseModel):
+    """When user submits invalid BlueprintBuilder, backend returns a structured validation result and completion options"""
 
     global_errors: list[str]
     block_errors: dict[BlockInstanceId, list[str]]
@@ -33,37 +33,37 @@ class FableValidationExpansion(BaseModel):
     possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]]
 
 
-class FableSaveRequest(BaseModel):
-    """Payload for saving a fable builder."""
+class BlueprintSaveRequest(BaseModel):
+    """Payload for saving a blueprint builder."""
 
-    builder: FableBuilder
+    builder: BlueprintBuilder
     display_name: str | None = None
     display_description: str | None = None
     tags: list[str] = []
     parent_id: str | None = None
 
 
-class FableSaveResponse(BaseModel):
+class BlueprintSaveResponse(BaseModel):
     """Returned by upsert; contains the stable id and the new version number."""
 
     id: str
     version: int
 
 
-class FableRetrieveResponse(BaseModel):
+class BlueprintRetrieveResponse(BaseModel):
     """Full payload returned by retrieve."""
 
     id: str
     version: int
-    builder: FableBuilder
+    builder: BlueprintBuilder
     display_name: str | None = None
     display_description: str | None = None
     tags: list[str] = []
     parent_id: str | None = None
 
 
-class FableCompileRequest(BaseModel):
-    """Reference to a saved JobDefinition for compile."""
+class BlueprintCompileRequest(BaseModel):
+    """Reference to a saved Blueprint for compile."""
 
     id: str
     version: int | None = None
