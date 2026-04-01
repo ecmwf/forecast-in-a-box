@@ -94,8 +94,12 @@ tag_regex = '^[vd](?P<version>\d+(?:\.\d+){0,2}[^\+]*)(?:\+.*)?$'
 [tool.ruff]
 line-length = 140
 
-lint.ignore = [ "E731" ]
-lint.select = ["I"]
+lint.select = ["I", "ANN"]
+# ANN401 disables usage of typing.Any -- but we kinda need that
+lint.ignore = [ "E731", "ANN401" ]
+
+[tool.ruff.lint.flake8-annotations]
+ignore-fully-untyped = false
 
 [tool.pytest.ini_options]
 log_cli = true
