@@ -17,8 +17,9 @@ import time
 
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
-from forecastbox.api.types.blueprint import BlueprintBuilder, BlueprintSaveRequest
-from forecastbox.api.types.scheduling import ScheduleSpecification, ScheduleUpdate
+from forecastbox.domain.blueprint.service import BlueprintBuilder
+from forecastbox.domain.blueprint.service import BlueprintSaveCommand as BlueprintSaveRequest
+from forecastbox.routes.experiment import ExperimentCreateRequest, ExperimentUpdateRequest
 
 from .conftest import testPluginId
 from .utils import ensure_completed_v2, ensure_schedule_run_v2, scheduling_endpoint_with_retries
@@ -79,7 +80,7 @@ def _save_full_blueprint(client, output_path: str) -> tuple[str, int]:
 
 def _create_schedule_v2(client, job_def_id: str, job_def_version: int, cron_expr: str = "0 0 * * *") -> str:
     """Create a v2 cron schedule and return experiment_id."""
-    spec = ScheduleSpecification(
+    spec = ExperimentCreateRequest(
         blueprint_id=job_def_id,
         blueprint_version=job_def_version,
         cron_expr=cron_expr,
@@ -105,7 +106,7 @@ def test_schedule_v2_crud(backend_client_with_auth):
     assert response.status_code == 404
 
     # create
-    spec = ScheduleSpecification(
+    spec = ExperimentCreateRequest(
         blueprint_id=job_def_id,
         blueprint_version=job_def_version,
         cron_expr="0 0 * * *",
@@ -130,8 +131,9 @@ def test_schedule_v2_crud(backend_client_with_auth):
 
     # update cron and enabled
     updated_cron = "0 1 * * *"
-    update = ScheduleUpdate(cron_expr=updated_cron, enabled=False)
-    update_body = {"experiment_id": experiment_id, "version": experiment_version, **update.model_dump(exclude_unset=True)}
+    update_body = ExperimentUpdateRequest(
+        experiment_id=experiment_id, version=experiment_version, cron_expr=updated_cron, enabled=False
+    ).model_dump(exclude_unset=True)
     response = scheduling_endpoint_with_retries(
         lambda: backend_client_with_auth.post("/experiment/update", headers=headers, json=update_body)
     )
@@ -158,12 +160,12 @@ def test_schedule_v2_list(backend_client_with_auth):
     assert response.is_success, response.text
     baseline_total = response.json()["total"]
 
-    spec1 = ScheduleSpecification(
+    spec1 = ExperimentCreateRequest(
         blueprint_id=job_def_id,
         blueprint_version=job_def_version,
         cron_expr="0 0 * * *",
     )
-    spec2 = ScheduleSpecification(
+    spec2 = ExperimentCreateRequest(
         blueprint_id=job_def_id,
         blueprint_version=job_def_version,
         cron_expr="0 6 * * *",
@@ -205,7 +207,7 @@ def test_schedule_v2_next_run(backend_client_with_auth):
     headers = {"Content-Type": "application/json"}
     job_def_id, job_def_version = _save_blueprint(backend_client_with_auth)
 
-    spec = ScheduleSpecification(
+    spec = ExperimentCreateRequest(
         blueprint_id=job_def_id,
         blueprint_version=job_def_version,
         cron_expr="0 0 * * *",
@@ -226,8 +228,9 @@ def test_schedule_v2_next_run(backend_client_with_auth):
     experiment_version = get_resp.json()["experiment_version"]
 
     # update cron to 2 AM
-    update = ScheduleUpdate(cron_expr="0 2 * * *")
-    update_body = {"experiment_id": experiment_id, "version": experiment_version, **update.model_dump(exclude_unset=True)}
+    update_body = ExperimentUpdateRequest(experiment_id=experiment_id, version=experiment_version, cron_expr="0 2 * * *").model_dump(
+        exclude_unset=True
+    )
     response = scheduling_endpoint_with_retries(
         lambda: backend_client_with_auth.post("/experiment/update", headers=headers, json=update_body)
     )
@@ -241,8 +244,9 @@ def test_schedule_v2_next_run(backend_client_with_auth):
     assert "02:00:00" in updated_next_run
 
     # disable: next run should be cleared
-    disable_update = ScheduleUpdate(enabled=False)
-    disable_body = {"experiment_id": experiment_id, "version": experiment_version, **disable_update.model_dump(exclude_unset=True)}
+    disable_body = ExperimentUpdateRequest(experiment_id=experiment_id, version=experiment_version, enabled=False).model_dump(
+        exclude_unset=True
+    )
     response = scheduling_endpoint_with_retries(
         lambda: backend_client_with_auth.post(
             "/experiment/update",
@@ -262,7 +266,7 @@ def test_schedule_v2_create_invalid_cron(backend_client_with_auth):
     headers = {"Content-Type": "application/json"}
     job_def_id, job_def_version = _save_blueprint(backend_client_with_auth)
 
-    spec = ScheduleSpecification(
+    spec = ExperimentCreateRequest(
         blueprint_id=job_def_id,
         blueprint_version=job_def_version,
         cron_expr="not a cron",
@@ -274,7 +278,7 @@ def test_schedule_v2_create_invalid_cron(backend_client_with_auth):
 def test_schedule_v2_create_unknown_blueprint(backend_client_with_auth):
     """create_v2 referencing a non-existent Blueprint returns 404."""
     headers = {"Content-Type": "application/json"}
-    spec = ScheduleSpecification(
+    spec = ExperimentCreateRequest(
         blueprint_id="does-not-exist",
         cron_expr="0 0 * * *",
     )
@@ -349,7 +353,7 @@ def test_schedule_v2_execute(tmpdir, backend_client_with_auth):
     job_def_id, job_def_version = _save_full_blueprint(backend_client_with_auth, output_path)
 
     first_run_override = dt.datetime.now() - dt.timedelta(minutes=5)
-    spec = ScheduleSpecification(
+    spec = ExperimentCreateRequest(
         blueprint_id=job_def_id,
         blueprint_version=job_def_version,
         cron_expr="0 0 * * *",

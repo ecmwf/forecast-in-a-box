@@ -15,18 +15,18 @@ from typing import Annotated, cast
 from fastapi import APIRouter, Depends
 from fastapi import status as http_status
 from fastapi.exceptions import HTTPException
-from fiab_core.fable import BlockFactoryCatalogue
+from fiab_core.fable import BlockFactoryCatalogue, BlockInstanceId, PluginBlockFactoryId, PluginCompositeId
 from pydantic import BaseModel
 
 import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.blueprint.service as blueprint_service
-from forecastbox.api.plugin.manager import PluginCompositeId, catalogue_view, plugins_ready
-from forecastbox.api.types.blueprint import BlueprintBuilder, BlueprintSaveRequest, BlueprintValidationExpansion
+from forecastbox.api.plugin.manager import catalogue_view, plugins_ready
 from forecastbox.domain.blueprint.exceptions import (
     BlueprintAccessDenied,
     BlueprintNotFound,
     BlueprintVersionConflict,
 )
+from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand, BlueprintValidationExpansion
 from forecastbox.entrypoint.auth.users import get_auth_context
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
@@ -113,6 +113,15 @@ class BlueprintDeleteRequest(BaseModel):
     version: int
 
 
+class BlueprintValidationExpansionResponse(BaseModel):
+    """HTTP response for blueprint expand — mirrors BlueprintValidationExpansion from the service layer."""
+
+    global_errors: list[str]
+    block_errors: dict[BlockInstanceId, list[str]]
+    possible_sources: list[PluginBlockFactoryId]
+    possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]]
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -124,7 +133,7 @@ async def create_blueprint(
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> BlueprintCreateResponse:
     """Create a new blueprint from a BlueprintBuilder."""
-    payload = BlueprintSaveRequest(
+    payload = BlueprintSaveCommand(
         builder=request.builder,
         display_name=request.display_name,
         display_description=request.display_description,
@@ -137,7 +146,7 @@ async def create_blueprint(
         raise HTTPException(status_code=404, detail=str(e))
     except BlueprintAccessDenied as e:
         raise HTTPException(status_code=403, detail=str(e))
-    return BlueprintCreateResponse(blueprint_id=result.id, version=result.version)
+    return BlueprintCreateResponse(blueprint_id=result.blueprint_id, version=result.blueprint_version)
 
 
 @router.get("/get")
@@ -153,8 +162,8 @@ async def get_blueprint(
     except BlueprintNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     return BlueprintGetResponse(
-        blueprint_id=retrieved.id,
-        version=retrieved.version,
+        blueprint_id=retrieved.blueprint_id,
+        version=retrieved.blueprint_version,
         builder=retrieved.builder,
         display_name=retrieved.display_name,
         display_description=retrieved.display_description,
@@ -198,7 +207,7 @@ async def update_blueprint(
     ``version`` must match the current latest version; returns 409 if it does not.
     Returns the new version number on success.
     """
-    payload = BlueprintSaveRequest(
+    payload = BlueprintSaveCommand(
         builder=request.builder,
         display_name=request.display_name,
         display_description=request.display_description,
@@ -218,7 +227,7 @@ async def update_blueprint(
         raise HTTPException(status_code=404, detail=str(e))
     except BlueprintAccessDenied as e:
         raise HTTPException(status_code=403, detail=str(e))
-    return BlueprintUpdateResponse(blueprint_id=result.id, version=result.version)
+    return BlueprintUpdateResponse(blueprint_id=result.blueprint_id, version=result.blueprint_version)
 
 
 @router.post("/delete")
@@ -261,10 +270,16 @@ def get_catalogue() -> dict[PluginCompositeId, BlockFactoryCatalogue]:
 
 
 @router.put("/expand")
-def expand_blueprint(blueprint: BlueprintBuilder) -> BlueprintValidationExpansion:
+def expand_blueprint(blueprint: BlueprintBuilder) -> BlueprintValidationExpansionResponse:
     """Validate a partially-constructed BlueprintBuilder and return completion options.
 
     Returns 200 regardless of whether validation errors are present; callers must
     inspect the returned error fields.
     """
-    return blueprint_service.validate_expand(blueprint)
+    result = blueprint_service.validate_expand(blueprint)
+    return BlueprintValidationExpansionResponse(
+        global_errors=result.global_errors,
+        block_errors=result.block_errors,
+        possible_sources=result.possible_sources,
+        possible_expansions=result.possible_expansions,
+    )

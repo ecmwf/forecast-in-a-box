@@ -28,7 +28,6 @@ from pydantic import BaseModel
 
 import forecastbox.domain.run.db as run_db
 import forecastbox.domain.run.service as run_service
-from forecastbox.api.types.jobs import JobSpecification
 from forecastbox.api.utils import encode_result
 from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
 from forecastbox.domain.run.service import ProductToOutputId
@@ -72,7 +71,7 @@ class RunCreateResponse(BaseModel):
     attempt_count: int
 
 
-class RunDetail(BaseModel):
+class RunDetailResponse(BaseModel):
     run_id: str
     attempt_count: int
     status: str
@@ -86,7 +85,7 @@ class RunDetail(BaseModel):
 
 
 class RunListResponse(BaseModel):
-    runs: list[RunDetail]
+    runs: list[RunDetailResponse]
     total: int
     page: int
     page_size: int
@@ -117,8 +116,8 @@ class RunDeleteRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _to_run_detail(domain_detail) -> RunDetail:
-    return RunDetail(
+def _to_run_detail(domain_detail: run_service.RunDetail) -> RunDetailResponse:
+    return RunDetailResponse(
         run_id=domain_detail.run_id,
         attempt_count=domain_detail.attempt_count,
         status=domain_detail.status,
@@ -238,8 +237,7 @@ async def list_runs(
 async def get_run(
     spec: Annotated[RunId, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
-) -> RunDetail:
-    """Get status and detail for a specific execution; defaults to the latest attempt."""
+) -> RunDetailResponse:
     try:
         domain_detail = await run_service.poll_and_update_execution(spec.run_id, spec.attempt_count, auth_context)
     except RunNotFound:
@@ -319,20 +317,6 @@ async def get_run_output_content(
         logger.exception("decoding failure")
         raise HTTPException(500, f"Result decoding failed: {repr(e)}")
     return Response(bytez, media_type=media_type)
-
-
-@router.get("/blueprint")
-async def get_run_blueprint(
-    spec: Annotated[RunId, Depends()],
-    auth_context: AuthContext = Depends(get_auth_context),
-) -> JobSpecification:
-    """Get the blueprint linked to a run attempt."""
-    try:
-        return await run_service.get_run_blueprint(spec.run_id, spec.attempt_count, auth_context)
-    except RunNotFound:
-        raise HTTPException(status_code=404, detail=f"Run {spec.run_id!r} or its blueprint not found.")
-    except RunAccessDenied:
-        raise HTTPException(status_code=403, detail=f"Access denied to run {spec.run_id!r}.")
 
 
 @router.get("/logs")

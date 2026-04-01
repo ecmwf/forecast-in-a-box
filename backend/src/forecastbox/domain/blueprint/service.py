@@ -35,22 +35,60 @@ from fiab_core.fable import (
     BlockKind,
     PluginBlockFactoryId,
 )
+from pydantic import BaseModel
 
 import forecastbox.domain.blueprint.db as _blueprint_db
 from forecastbox.api.plugin.manager import PluginManager
-from forecastbox.api.types.blueprint import (
-    BlueprintBuilder,
-    BlueprintRetrieveResponse,
-    BlueprintSaveRequest,
-    BlueprintSaveResponse,
-    BlueprintValidationExpansion,
-)
-from forecastbox.api.types.jobs import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
+from forecastbox.domain.blueprint.cascade import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
 from forecastbox.domain.blueprint.db import upsert_blueprint
 from forecastbox.domain.blueprint.exceptions import BlueprintNotFound
 from forecastbox.utility.auth import AuthContext
 
 logger = logging.getLogger(__name__)
+
+
+class BlueprintBuilder(BaseModel):
+    # NOTE warning -- this class is used by the web api. Be careful about changes here
+    blocks: dict[BlockInstanceId, BlockInstance]
+    environment: EnvironmentSpecification | None = None
+
+
+class BlueprintSaveResult(BaseModel):
+    """Returned by save_builder; contains the stable id and the new version number."""
+
+    blueprint_id: str
+    blueprint_version: int
+
+
+class BlueprintRetrieveResult(BaseModel):
+    """Full payload returned by load_builder."""
+
+    blueprint_id: str
+    blueprint_version: int
+    builder: BlueprintBuilder
+    display_name: str | None = None
+    display_description: str | None = None
+    tags: list[str] = []
+    parent_id: str | None = None
+
+
+class BlueprintValidationExpansion(BaseModel):
+    """Structured validation result and completion options for a BlueprintBuilder."""
+
+    global_errors: list[str]
+    block_errors: dict[BlockInstanceId, list[str]]
+    possible_sources: list[PluginBlockFactoryId]
+    possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]]
+
+
+class BlueprintSaveCommand(BaseModel):
+    """Command payload for saving a blueprint builder."""
+
+    builder: BlueprintBuilder
+    display_name: str | None = None
+    display_description: str | None = None
+    tags: list[str] = []
+    parent_id: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -196,10 +234,10 @@ def compile_builder(blueprint: BlueprintBuilder) -> ExecutionSpecification:
 async def save_builder(
     *,
     auth_context: AuthContext,
-    payload: BlueprintSaveRequest,
+    payload: BlueprintSaveCommand,
     blueprint_id: str | None = None,
     expected_version: int | None = None,
-) -> BlueprintSaveResponse:
+) -> BlueprintSaveResult:
     """Persist a BlueprintBuilder as a Blueprint and return the stable id and version.
 
     ``source`` is derived from ``display_name``: ``user_defined`` when a name is
@@ -223,11 +261,11 @@ async def save_builder(
         parent_id=payload.parent_id,
         expected_version=expected_version,
     )
-    return BlueprintSaveResponse(id=blueprint_id, version=version)
+    return BlueprintSaveResult(blueprint_id=blueprint_id, blueprint_version=version)
 
 
-async def load_builder(blueprint_id: str, version: int | None = None) -> BlueprintRetrieveResponse:
-    """Load a Blueprint and return it as a BlueprintRetrieveResponse.
+async def load_builder(blueprint_id: str, version: int | None = None) -> BlueprintRetrieveResult:
+    """Load a Blueprint and return it as a BlueprintRetrieveResult.
 
     Raises ``BlueprintNotFound`` if the id does not exist or has no builder spec.
     """
@@ -239,9 +277,9 @@ async def load_builder(blueprint_id: str, version: int | None = None) -> Bluepri
     builder = BlueprintBuilder(blocks=blueprint.blocks)  # ty:ignore[invalid-argument-type]
     if blueprint.environment_spec is not None:
         builder.environment = EnvironmentSpecification.model_validate(blueprint.environment_spec)
-    return BlueprintRetrieveResponse(
-        id=blueprint.blueprint_id,  # ty:ignore[invalid-argument-type]
-        version=blueprint.version,  # ty:ignore[invalid-argument-type]
+    return BlueprintRetrieveResult(
+        blueprint_id=str(blueprint.blueprint_id),  # ty:ignore[invalid-argument-type]
+        blueprint_version=cast(int, blueprint.version),
         builder=builder,
         display_name=blueprint.display_name,  # ty:ignore[invalid-argument-type]
         display_description=blueprint.display_description,  # ty:ignore[invalid-argument-type]

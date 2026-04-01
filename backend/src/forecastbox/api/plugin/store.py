@@ -16,13 +16,13 @@ import time
 import httpx
 import orjson
 from cascade.low.func import assert_never
+from fiab_core.fable import PluginCompositeId, PluginId
 from pydantic import BaseModel
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 from typing_extensions import Self
 
 from forecastbox.api.plugin.manager import submit_update_single
-from forecastbox.api.types.blueprint import PluginCompositeId, PluginId
 from forecastbox.ecpyutil import fetch_content, timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginStoreConfig, PluginStoreId, PluginStoresConfig, config, config_edit_lock
 

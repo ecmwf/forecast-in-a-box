@@ -10,10 +10,10 @@ from typing import Any, Generator
 
 import httpx
 import pytest
+from fiab_core.fable import PluginCompositeId, PluginId
 from pydantic import SecretStr
 
 import forecastbox.utility.config
-from forecastbox.api.types.blueprint import PluginCompositeId, PluginId
 from forecastbox.entrypoint.main import launch_all
 from forecastbox.utility.config import ArtifactStoreConfig, FIABConfig, PluginCompositeIdReadable, PluginSettings, PluginStoreConfig
 

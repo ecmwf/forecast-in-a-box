@@ -8,7 +8,7 @@ import cloudpickle
 import pytest
 from cascade.low.builders import JobBuilder, TaskBuilder
 
-from forecastbox.api.types.jobs import (
+from forecastbox.domain.blueprint.cascade import (
     EnvironmentSpecification,
     ExecutionSpecification,
     RawCascadeJob,

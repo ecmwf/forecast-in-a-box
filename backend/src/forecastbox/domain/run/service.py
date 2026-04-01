@@ -42,16 +42,8 @@ from pydantic import BaseModel
 import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.run.db as run_db
 from forecastbox.api.artifacts.manager import ArtifactManager, submit_artifact_download
-from forecastbox.api.types.blueprint import BlueprintBuilder
-from forecastbox.api.types.jobs import (
-    EnvironmentSpecification,
-    ExecutionSpecification,
-    JobSpecification,
-    RawCascadeJob,
-    RunDetail,
-    RunResponse,
-)
-from forecastbox.domain.blueprint.service import compile_builder
+from forecastbox.domain.blueprint.cascade import EnvironmentSpecification, ExecutionSpecification
+from forecastbox.domain.blueprint.service import BlueprintBuilder, compile_builder
 from forecastbox.domain.run.exceptions import RunNotFound
 from forecastbox.ecpyutil import deep_union
 from forecastbox.schemas.jobs import Blueprint, Run
@@ -59,6 +51,30 @@ from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
 
 logger = logging.getLogger(__name__)
+
+
+class RunDetail(BaseModel):
+    """Detail of a single job execution attempt."""
+
+    run_id: str
+    attempt_count: int
+    status: str
+    created_at: str
+    updated_at: str
+    blueprint_id: str
+    blueprint_version: int
+    error: str | None = None
+    progress: str | None = None
+    cascade_job_id: str | None = None
+
+
+class ExecuteResult(BaseModel):
+    """Result of a job execution submission."""
+
+    run_id: str
+    """Logical execution id (Run.id)."""
+    attempt_count: int
+    """Attempt number; always 1 on a fresh execution."""
 
 
 class ProductToOutputId(BaseModel):
@@ -141,7 +157,7 @@ async def execute(
     experiment_version: int | None = None,
     compiler_runtime_context: dict | None = None,
     experiment_context: str | None = None,
-) -> Either[RunResponse, str]:  # type: ignore[invalid-argument]
+) -> Either[ExecuteResult, str]:  # type: ignore[invalid-argument]
     """Always creates a Run linked to the given Blueprint.
 
     Compiles the blueprint's blocks via the blueprint compiler, applies
@@ -194,13 +210,13 @@ async def execute(
             update_kwargs["outputs"] = [x.model_dump() for x in product_to_id_mappings]
         await run_db.update_run_runtime(new_run_id, attempt_count, **update_kwargs)
 
-        return Either.ok(RunResponse(run_id=new_run_id, attempt_count=attempt_count))
+        return Either.ok(ExecuteResult(run_id=new_run_id, attempt_count=attempt_count))
     except Exception as e:
         await run_db.update_run_runtime(new_run_id, attempt_count, status="failed", error=repr(e)[:255])
         return Either.error(repr(e))
 
 
-async def restart_run(run_id: str, auth_context: AuthContext) -> Either[RunResponse, str]:  # type: ignore[invalid-argument]
+async def restart_run(run_id: str, auth_context: AuthContext) -> Either[ExecuteResult, str]:  # type: ignore[invalid-argument]
     """Create a new attempt under an existing run_id, re-running its linked Blueprint.
 
     Raises ``RunNotFound`` if the execution does not exist.
@@ -299,28 +315,3 @@ async def poll_and_update_execution(
             return _build(status_override="running", progress_override=jobprogress.pct)
 
     return _build()
-
-
-async def get_run_blueprint(
-    run_id: str,
-    attempt_count: int | None,
-    auth_context: AuthContext,
-) -> JobSpecification:
-    """Return the JobSpecification for the given execution attempt (latest if attempt_count is None).
-
-    Raises ``RunNotFound`` if the execution is not found.
-    Raises ``RunAccessDenied`` if the actor does not own it.
-    """
-    execution = await run_db.get_run(run_id, attempt_count, auth_context=auth_context)
-    blueprint = await blueprint_db.get_blueprint(
-        str(execution.blueprint_id),  # ty:ignore[invalid-argument-type]
-        cast(int, execution.blueprint_version),
-    )
-    if blueprint is None:
-        raise RunNotFound(f"Blueprint linked to execution {run_id!r} not found.")
-    return JobSpecification(
-        blueprint_id=str(blueprint.blueprint_id),  # ty:ignore[invalid-argument-type]
-        blueprint_version=cast(int, blueprint.version),
-        blocks=cast(dict | None, blueprint.blocks),
-        environment_spec=cast(dict | None, blueprint.environment_spec),
-    )

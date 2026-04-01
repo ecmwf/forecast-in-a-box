@@ -27,8 +27,8 @@ import zipfile
 
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
-from forecastbox.api.types.blueprint import BlueprintBuilder, BlueprintSaveRequest
-from forecastbox.api.types.jobs import EnvironmentSpecification
+from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
+from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand
 from forecastbox.routes.run import RunCreateResponse
 
 from .conftest import testPluginId
@@ -78,7 +78,7 @@ def _make_builder_full(tmpdir: str) -> BlueprintBuilder:
 def test_blueprint_save_and_retrieve(backend_client_with_auth):
     builder = _make_builder_source_only()
     builder.environment = EnvironmentSpecification(hosts=2, workers_per_host=4)
-    payload = BlueprintSaveRequest(
+    payload = BlueprintSaveCommand(
         builder=builder,
         display_name="Test Blueprint",
         display_description="A blueprint saved via the v2 API",
@@ -105,7 +105,7 @@ def test_blueprint_save_and_retrieve(backend_client_with_auth):
     assert retrieved["builder"]["environment"]["workers_per_host"] == 4
 
     # Saving again with the same id creates a new version
-    payload2 = BlueprintSaveRequest(builder=_make_builder_source_only(), display_name="Test Blueprint v2")
+    payload2 = BlueprintSaveCommand(builder=_make_builder_source_only(), display_name="Test Blueprint v2")
     response = backend_client_with_auth.post(
         "/blueprint/update",
         json={**payload2.model_dump(), "blueprint_id": saved["blueprint_id"], "version": saved["version"]},
@@ -138,7 +138,7 @@ def test_blueprint_retrieve_nonexistent(backend_client_with_auth):
 def test_blueprint_upsert_nonexistent_id(backend_client_with_auth):
     """Attempting to add a version to a non-existent id returns 404."""
     builder = _make_builder_source_only()
-    payload = BlueprintSaveRequest(builder=builder)
+    payload = BlueprintSaveCommand(builder=builder)
     response = backend_client_with_auth.post("/blueprint/update", json={**payload.model_dump(), "blueprint_id": "no-such-id", "version": 1})
     assert response.status_code == 404
 
@@ -203,7 +203,7 @@ def test_blueprint_expand(tmpdir, backend_client_with_auth):
 
 def test_blueprint_basic_execute(tmpdir, backend_client_with_auth):
     builder = _make_builder_full(tmpdir)
-    save_req = BlueprintSaveRequest(builder=builder)
+    save_req = BlueprintSaveCommand(builder=builder)
     save_resp = backend_client_with_auth.post("/blueprint/create", json=save_req.model_dump())
     assert save_resp.is_success, save_resp.text
     blueprint_id = save_resp.json()["blueprint_id"]
@@ -229,14 +229,6 @@ def test_blueprint_basic_execute(tmpdir, backend_client_with_auth):
     assert data["total"] >= 1
     ids = [e["run_id"] for e in data["runs"]]
     assert run_id in ids
-
-    resp = backend_client_with_auth.get("/run/blueprint", params={"run_id": run_id})
-    assert resp.is_success, resp.text
-    data = resp.json()
-    assert data["blueprint_id"] == blueprint_id
-    assert data["blueprint_version"] == 1
-    assert "blocks" in data
-    assert data["blocks"] is not None
 
     restart_resp = backend_client_with_auth.post("/run/restart", json={"run_id": run_id, "attempt_count": 1})
     assert restart_resp.is_success, restart_resp.text
@@ -288,12 +280,6 @@ def test_submit_job_v2_execute_unknown_definition(backend_client_with_auth):
 def test_submit_job_v2_read_status_not_found(backend_client_with_auth):
     """GET /execution/get with unknown run_id returns 404."""
     resp = backend_client_with_auth.get("/run/get", params={"run_id": "nonexistent-exec-id"})
-    assert resp.status_code == 404
-
-
-def test_submit_job_v2_read_specification_not_found(backend_client_with_auth):
-    """GET /execution/blueprint with unknown run_id returns 404."""
-    resp = backend_client_with_auth.get("/run/blueprint", params={"run_id": "nonexistent-exec-id"})
     assert resp.status_code == 404
 
 
