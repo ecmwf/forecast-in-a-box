@@ -53,24 +53,22 @@ def _get_artifacts_list(graph: Graph) -> list[CompositeArtifactId]:
     return list(artifacts)
 
 
-def compile_builder(blueprint: BlueprintBuilder, variable_values: dict[str, str] | None = None) -> ExecutionSpecification:
+def compile_builder(blueprint: BlueprintBuilder, variable_values: dict[str, str]) -> ExecutionSpecification:
     """Compile a BlueprintBuilder into an ExecutionSpecification.
 
     Raises ``ValueError`` if any block cannot be compiled. When ``variable_values`` is
-    provided, ${variable} patterns in configuration values are resolved before compilation.
+    non-empty, ${variable} patterns in configuration values are resolved before compilation.
     """
     graph = Graph([])
     plugins = PluginManager.plugins
     action_lookup = {}
-    resolved_variable_values: dict[str, str] = variable_values or {}
 
     for blockId in topological_order(blueprint.blocks.items(), lambda block: block.input_ids.values()):
         blockInstance = blueprint.blocks[blockId]
         plugin = plugins.get(blockInstance.factory_id.plugin, None)
         if not plugin:
             raise ValueError(f"plugin for {blockId=} not found: {blockInstance.factory_id.plugin}")
-        if resolved_variable_values:
-            resolve_configurations(blockInstance, resolved_variable_values)
+        resolve_configurations(blockInstance, variable_values)
         result = plugin.compiler(action_lookup, blockId, blockInstance)
         if result.t is None:
             raise ValueError(f"compile failed at {blockId=} with {result.e}")

@@ -9,18 +9,22 @@
 
 """Automatic (system-provided) variables available for workflow configuration interpolation."""
 
+import uuid
+from datetime import datetime
 from typing import Literal
 
 AvailableAutomaticVariables = Literal["runId", "submitDatetime"]
 
+# TODO: replace with frozendict once available so that we have immutability
+_values_and_examples: dict[AvailableAutomaticVariables, str] = {
+    "runId": str(uuid.uuid4()),
+    "submitDatetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+}
+
 
 def get_values_and_examples() -> dict[AvailableAutomaticVariables, str]:
-    """Return all automatic variable names with hardcoded example values.
+    """Return all automatic variable names with example values generated at import time.
 
-    Used for pre-submit validation and frontend display. The examples are stable
-    representative values, not generated at runtime.
+    Used for pre-submit validation and frontend display.
     """
-    return {
-        "runId": "run-abc123-def456",
-        "submitDatetime": "2025-10-11 12:00:00",
-    }
+    return _values_and_examples

@@ -113,6 +113,8 @@ def validate_expand(blueprint: BlueprintBuilder) -> BlueprintValidationExpansion
     possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]] = {}
     block_errors: dict[BlockInstanceId, list[str]] = defaultdict(list)
     outputs = {}
+    available_vars = set(get_values_and_examples().keys())
+    example_values = cast(dict[str, str], get_values_and_examples())
     for blockId in topological_order(blueprint.blocks.items(), lambda block: block.input_ids.values()):
         blockInstance = blueprint.blocks[blockId]
         plugin = plugins.get(blockInstance.factory_id.plugin, None)
@@ -131,13 +133,16 @@ def validate_expand(blueprint: BlueprintBuilder) -> BlueprintValidationExpansion
             # TODO most likely disable this, we would inject defaults at the compile level
             block_errors[blockId] += [f"Block contains missing config: {missingConfig}"]
 
-        extracted_vars = variable_resolution.extract_variables(blockInstance).t
-        available_vars = set(get_values_and_examples().keys())
-        unknown_vars = cast(set[str], extracted_vars) - available_vars
+        extract_result = variable_resolution.extract_variables(blockInstance)
+        if extract_result.e is not None:
+            block_errors[blockId] += extract_result.e
+            continue
+        extracted_vars = cast(set[str], extract_result.t)
+        unknown_vars = extracted_vars - available_vars
         if unknown_vars:
             block_errors[blockId] += [f"Unknown variables referenced: {unknown_vars}"]
             continue
-        variable_resolution.resolve_configurations(blockInstance, cast(dict[str, str], get_values_and_examples()))
+        variable_resolution.resolve_configurations(blockInstance, example_values)
 
         inputs = {input_id: outputs[source_id] for input_id, source_id in blockInstance.input_ids.items()}
         output_or_error = plugin.validator(blockInstance, inputs)
