@@ -1,3 +1,12 @@
+# (C) Copyright 2024- ECMWF.
+#
+# This software is licensed under the terms of the Apache Licence Version 2.0
+# which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# In applying this licence, ECMWF does not waive the privileges and immunities
+# granted to it by virtue of its status as an intergovernmental organisation
+# nor does it submit to any jurisdiction.
+
 """This module tries to collect all functionality related to updating fiab itself.
 As such, it is tightly coupled with the fiab.sh launcher -- make sure updates to either
 are done in concert, and that the coupling does not leak to other parts of the code.

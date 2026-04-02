@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import pytest_asyncio
 
-from forecastbox.api.updates import Release, get_local_release, get_lock_timestamp, get_most_recent_release, get_pylock, save_pylock
+from forecastbox.domain.admin import Release, get_local_release, get_lock_timestamp, get_most_recent_release, get_pylock, save_pylock
 
 
 def test_release_from_string() -> None:
@@ -65,7 +65,7 @@ async def test_get_most_recent_release_no_releases(mock_httpx_client: AsyncMock)
         await get_most_recent_release()
 
 
-@patch("forecastbox.api.updates.fiab_home", new=Path("/tmp/fiab_test"))
+@patch("forecastbox.domain.admin.fiab_home", new=Path("/tmp/fiab_test"))
 @patch("pathlib.Path.is_file")
 @patch("pathlib.Path.read_text")
 def test_get_lock_timestamp(mock_read_text: MagicMock, mock_is_file: MagicMock) -> None:
@@ -84,7 +84,7 @@ def test_get_lock_timestamp(mock_read_text: MagicMock, mock_is_file: MagicMock) 
     assert get_lock_timestamp() == ""
 
 
-@patch("forecastbox.api.updates.get_lock_timestamp")
+@patch("forecastbox.domain.admin.get_lock_timestamp")
 def test_get_local_release(mock_get_lock_timestamp: MagicMock) -> None:
     # Test case: valid timestamp and release string
     mock_get_lock_timestamp.return_value = "1761908420:v0.1.0"
@@ -130,7 +130,7 @@ async def test_get_pylock(mock_httpx_client: AsyncMock) -> None:
     assert content == mock_pylock_content
 
 
-@patch("forecastbox.api.updates.fiab_home")
+@patch("forecastbox.domain.admin.fiab_home")
 def test_save_pylock(mock_fiab_home: MagicMock) -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_path = Path(tmpdir)

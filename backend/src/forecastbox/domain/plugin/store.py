@@ -22,9 +22,10 @@ from pyrsistent import pmap
 from pyrsistent.typing import PMap
 from typing_extensions import Self
 
-from forecastbox.api.plugin.manager import submit_update_single
-from forecastbox.ecpyutil import fetch_content, timed_acquire
+from forecastbox.domain.plugin.manager import submit_update_single
+from forecastbox.utility.concurrent import timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginStoreConfig, PluginStoreId, PluginStoresConfig, config, config_edit_lock
+from forecastbox.utility.httpx import fetch_content
 
 logger = logging.getLogger(__name__)
 

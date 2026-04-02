@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-from forecastbox.ecpyutil import fetch_content
+from forecastbox.utility.httpx import fetch_content
 
 
 def test_fetch_content_http_success(mocker: Any) -> None:

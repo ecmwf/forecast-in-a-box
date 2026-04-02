@@ -22,8 +22,8 @@ from fastapi.exceptions import HTTPException
 from pydantic import BaseModel, PositiveInt
 
 import forecastbox.domain.experiment.service as experiment_service
-from forecastbox.api.scheduling.scheduler_thread import start_scheduler, stop_scheduler
 from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound, ExperimentVersionConflict, SchedulerBusy
+from forecastbox.domain.experiment.scheduling.background import start_scheduler, stop_scheduler
 from forecastbox.domain.experiment.scheduling.dt_utils import current_scheduling_time
 from forecastbox.entrypoint.auth.users import get_auth_context
 from forecastbox.schemata.jobs import ExperimentDefinition

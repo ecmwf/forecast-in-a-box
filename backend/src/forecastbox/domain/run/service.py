@@ -41,14 +41,14 @@ from pydantic import BaseModel
 
 import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.run.db as run_db
-from forecastbox.api.artifacts.manager import ArtifactManager, submit_artifact_download
+from forecastbox.domain.artifact.manager import ArtifactManager, submit_artifact_download
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification, ExecutionSpecification
 from forecastbox.domain.blueprint.service import BlueprintBuilder, compile_builder
 from forecastbox.domain.run.exceptions import RunNotFound
-from forecastbox.ecpyutil import deep_union
 from forecastbox.schemata.jobs import Blueprint, Run
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
+from forecastbox.utility.structural import deep_union
 
 logger = logging.getLogger(__name__)
 

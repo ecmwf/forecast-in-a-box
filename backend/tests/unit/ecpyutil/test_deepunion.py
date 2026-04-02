@@ -7,7 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from forecastbox.ecpyutil import deep_union
+from forecastbox.utility.structural import deep_union
 
 
 def test_deep_union_empty_dicts() -> None:

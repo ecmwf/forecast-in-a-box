@@ -18,8 +18,8 @@ from cascade.low.func import Either
 import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.experiment.db as experiment_db
 from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run
-from forecastbox.ecpyutil import deep_union
 from forecastbox.schemata.jobs import Blueprint
+from forecastbox.utility.structural import deep_union
 
 
 def eval_dynamic_expression(data: dict[str, Any], execution_time: dt.datetime) -> dict[str, Any]:

@@ -24,7 +24,7 @@ from cascade.low.func import assert_never
 from fiab_core.artifacts import ArtifactStoreId, MlModelCheckpoint
 from pyrsistent import pmap
 
-from forecastbox.api.artifacts.base import ArtifactCatalog, CompositeArtifactId, artifacts_subdir, get_artifact_local_path
+from forecastbox.domain.artifact.base import ArtifactCatalog, CompositeArtifactId, artifacts_subdir, get_artifact_local_path
 from forecastbox.utility.config import ArtifactStoresConfig
 
 logger = logging.getLogger(__name__)

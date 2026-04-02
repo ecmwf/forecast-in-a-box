@@ -4,7 +4,8 @@ import httpx
 import orjson
 import pytest
 
-from forecastbox.api.plugin.store import PluginStore, PluginStoreConfig, PluginStoreEntry
+from forecastbox.domain.plugin.store import PluginStore, PluginStoreEntry
+from forecastbox.utility.config import PluginStoreConfig
 
 
 def test_fetch() -> None:
