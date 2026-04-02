@@ -9,6 +9,9 @@
 
 """Compilation of a BlueprintBuilder into an ExecutionSpecification."""
 
+from datetime import datetime
+
+from cascade.low.func import assert_never
 from earthkit.workflows.compilers import graph2job
 from earthkit.workflows.graph import Graph, deduplicate_nodes
 from fiab_core.artifacts import CompositeArtifactId
@@ -17,7 +20,22 @@ from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.domain.run.cascade import ExecutionSpecification, RawCascadeJob
+from forecastbox.domain.variables.automatic import AvailableAutomaticVariables, get_values_and_examples
+from forecastbox.domain.variables.resolution import extract_variables, resolve_configurations
 from forecastbox.utility.graph import topological_order
+
+
+def resolve_automatic_values(run_id: str, submit_datetime: datetime) -> dict[AvailableAutomaticVariables, str]:
+    """Build a mapping of all automatic variable names to their runtime values."""
+    resolved: dict[AvailableAutomaticVariables, str] = {}
+    for var in get_values_and_examples():
+        if var == "runId":
+            resolved[var] = run_id
+        elif var == "submitDatetime":
+            resolved[var] = submit_datetime.strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            assert_never(var)
+    return resolved
 
 
 def _get_artifacts_list(graph: Graph) -> list[CompositeArtifactId]:
@@ -35,10 +53,11 @@ def _get_artifacts_list(graph: Graph) -> list[CompositeArtifactId]:
     return list(artifacts)
 
 
-def compile_builder(blueprint: BlueprintBuilder) -> ExecutionSpecification:
+def compile_builder(blueprint: BlueprintBuilder, variable_values: dict[str, str]) -> ExecutionSpecification:
     """Compile a BlueprintBuilder into an ExecutionSpecification.
 
-    Raises ``ValueError`` if any block cannot be compiled.
+    Raises ``ValueError`` if any block cannot be compiled. When ``variable_values`` is
+    non-empty, ${variable} patterns in configuration values are resolved before compilation.
     """
     graph = Graph([])
     plugins = PluginManager.plugins
@@ -49,6 +68,7 @@ def compile_builder(blueprint: BlueprintBuilder) -> ExecutionSpecification:
         plugin = plugins.get(blockInstance.factory_id.plugin, None)
         if not plugin:
             raise ValueError(f"plugin for {blockId=} not found: {blockInstance.factory_id.plugin}")
+        resolve_configurations(blockInstance, variable_values)
         result = plugin.compiler(action_lookup, blockId, blockInstance)
         if result.t is None:
             raise ValueError(f"compile failed at {blockId=} with {result.e}")

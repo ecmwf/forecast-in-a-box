@@ -27,6 +27,7 @@ based on the supplied ``AuthContext``.
 import asyncio
 import logging
 import uuid
+from datetime import datetime, timezone
 from typing import cast
 
 import cascade.gateway.api as api
@@ -39,7 +40,7 @@ import forecastbox.domain.run.db as run_db
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.run.cascade import ExecutionSpecification, ProductToOutputId, execute_cascade
-from forecastbox.domain.run.compile import compile_builder
+from forecastbox.domain.run.compile import compile_builder, resolve_automatic_values
 from forecastbox.domain.run.exceptions import RunNotFound
 from forecastbox.schemata.jobs import Blueprint, Run
 from forecastbox.utility.auth import AuthContext
@@ -103,11 +104,16 @@ async def execute(
     blueprint_id = str(blueprint.blueprint_id)  # ty:ignore[invalid-argument-type]
     blueprint_version = cast(int, blueprint.version)
 
+    # Generate run_id before compilation so it can be used as a variable value.
+    effective_run_id = run_id or str(uuid.uuid4())
+    submit_datetime = datetime.now(timezone.utc)
+    automatic_values: dict[str, str] = cast(dict[str, str], resolve_automatic_values(effective_run_id, submit_datetime))
+
     builder = BlueprintBuilder(
         blocks=blueprint.blocks,  # ty:ignore[invalid-argument-type]
         environment=EnvironmentSpecification.model_validate(blueprint.environment_spec) if blueprint.environment_spec else None,
     )
-    compiled = compile_builder(builder)
+    compiled = compile_builder(builder, automatic_values)
 
     if compiler_runtime_context:
         exec_spec = ExecutionSpecification.model_validate(deep_union(compiled.model_dump(), compiler_runtime_context))
@@ -115,7 +121,7 @@ async def execute(
         exec_spec = compiled
 
     new_run_id, attempt_count = await run_db.upsert_run(
-        run_id=run_id,
+        run_id=effective_run_id,
         blueprint_id=blueprint_id,
         blueprint_version=blueprint_version,
         created_by=auth_context.user_id,

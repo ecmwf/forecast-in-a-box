@@ -24,13 +24,14 @@ import io
 import os
 import pathlib
 import zipfile
-from typing import Any
+from typing import Any, get_args
 
 import httpx
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand
+from forecastbox.domain.variables.automatic import AvailableAutomaticVariables
 from forecastbox.routes.run import RunCreateResponse
 
 from .conftest import testPluginId
@@ -79,7 +80,7 @@ def _make_builder_full(tmpdir: str) -> BlueprintBuilder:
     )
     sink_file = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
-        configuration_values={"fname": f"{tmpdir}/output"},
+        configuration_values={"fname": f"{tmpdir}/output${{runId}}"},
         input_ids={"data": "product_join"},
     )
     return BlueprintBuilder(
@@ -204,13 +205,26 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
         configuration_values={},
         input_ids={"a": "transform_increment", "b": "source_42"},
     )
-    sink_file = BlockInstance(
+    # Using a missing variable should fail validation
+    sink_file_bad = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
-        configuration_values={"fname": f"{tmpdir}/output"},
+        configuration_values={"fname": f"{tmpdir}/output${{missingVariable}}"},
         input_ids={"data": "product_join"},
     )
     blocks["product_join"] = product_join
-    blocks["sink_file"] = sink_file
+    blocks["sink_file"] = sink_file_bad
+
+    builder = BlueprintBuilder(blocks=blocks)
+    response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
+    assert "sink_file" in response.json()["block_errors"]
+
+    # Using a known variable should pass validation
+    sink_file_ok = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
+        configuration_values={"fname": f"{tmpdir}/output${{runId}}"},
+        input_ids={"data": "product_join"},
+    )
+    blocks["sink_file"] = sink_file_ok
 
     builder = BlueprintBuilder(blocks=blocks)
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
@@ -231,7 +245,7 @@ def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Cl
     assert response.attempt_count == 1
     ensure_completed_v2(backend_client_with_auth, run_id, sleep=1, attempts=120)
 
-    output = pathlib.Path(tmpdir) / "output"
+    output = pathlib.Path(f"{tmpdir}/output{run_id}")
     assert output.read_text() == "85"  # the output of 42 + 1 + 42, thats what the job is configured to do
     output.unlink()
 
@@ -304,3 +318,19 @@ def test_submit_job_v2_restart_not_found(backend_client_with_auth: httpx.Client)
     """POST /execution/restart with unknown run_id returns 404."""
     resp = backend_client_with_auth.post("/run/restart", json={"run_id": "nonexistent-exec-id", "attempt_count": 1})
     assert resp.status_code == 404
+
+
+def test_list_available_variables(backend_client_with_auth: httpx.Client) -> None:
+    """The variables/list endpoint returns exactly the set of AvailableAutomaticVariables."""
+    response = backend_client_with_auth.get("/blueprint/variables/list")
+    assert response.is_success, response.text
+    data = response.json()
+    assert isinstance(data, list)
+    returned_names = {item["name"] for item in data}
+    expected_names = set(get_args(AvailableAutomaticVariables))
+    assert returned_names == expected_names
+    for item in data:
+        assert "display_name" in item
+        assert "valueExample" in item
+        assert item["display_name"]
+        assert item["valueExample"]
