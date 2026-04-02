@@ -7,7 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Canonical admin routes — /admin/* and /users/*"""
+"""Admin routes — /admin/* and /users/*"""
 
 PREFIX = "/api/v1/admin"
 import logging

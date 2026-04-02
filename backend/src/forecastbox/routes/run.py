@@ -7,7 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Canonical job-execution entity routes — /run/*"""
+"""Run entity routes — /run/*"""
 
 PREFIX = "/api/v1/run"
 import asyncio

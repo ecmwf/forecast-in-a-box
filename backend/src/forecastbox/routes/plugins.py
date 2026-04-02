@@ -7,7 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Canonical plugin management routes — /plugin/*"""
+"""Plugin management routes — /plugin/*"""
 
 PREFIX = "/api/v1/plugin"
 from typing import Literal

@@ -7,7 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Canonical artifacts routes — /artifacts/*"""
+"""Artifacts routes — /artifacts/*"""
 
 PREFIX = "/api/v1/artifacts"
 from fastapi import APIRouter, Depends, HTTPException

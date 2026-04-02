@@ -7,7 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Canonical blueprint entity routes — /blueprint/*"""
+"""Blueprint entity routes — /blueprint/*"""
 
 PREFIX = "/api/v1/blueprint"
 from typing import Annotated, cast
