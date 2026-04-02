@@ -46,11 +46,11 @@ async def upsert_run(
     """Insert a new attempt of a Run and return (id, attempt_count).
 
     If ``run_id`` is omitted a fresh UUID is generated (attempt 1).
-    If ``run_id`` is supplied the next attempt number is derived from the
-    database; raises ``KeyError`` if that id does not exist yet.
+    If ``run_id`` is supplied and a Run with that id already exists, a new attempt is
+    appended. If the id does not exist yet, attempt 1 is created with that id (used
+    when the caller pre-generates the id for variable resolution purposes).
     No actor-level auth is enforced on creation; any caller may create an execution.
     """
-    id_provided = run_id is not None
     run_id = run_id or str(uuid.uuid4())
     ref_time = dt.datetime.now()
 
@@ -58,8 +58,6 @@ async def upsert_run(
         async with _jobs_module.async_session_maker() as session:
             result = await session.execute(select(func.max(Run.attempt_count)).where(Run.run_id == run_id))
             max_attempt: int | None = result.scalar()
-            if id_provided and max_attempt is None:
-                raise KeyError(f"No Run with id={run_id!r} exists; cannot add a new attempt.")
             new_attempt = (max_attempt or 0) + 1
             session.add(
                 Run(

@@ -12,6 +12,7 @@
 PREFIX = "/api/v1/blueprint"
 from typing import Annotated, cast
 
+from cascade.low.func import assert_never
 from fastapi import APIRouter, Depends
 from fastapi import status as http_status
 from fastapi.exceptions import HTTPException
@@ -27,6 +28,7 @@ from forecastbox.domain.blueprint.exceptions import (
 )
 from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand, BlueprintValidationExpansion
 from forecastbox.domain.plugin.manager import catalogue_view, plugins_ready
+from forecastbox.domain.variables.automatic import AvailableAutomaticVariables, get_values_and_examples
 from forecastbox.entrypoint.auth.users import get_auth_context
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
@@ -120,6 +122,12 @@ class BlueprintValidationExpansionResponse(BaseModel):
     block_errors: dict[BlockInstanceId, list[str]]
     possible_sources: list[PluginBlockFactoryId]
     possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]]
+
+
+class VariableDetail(BaseModel):
+    name: str
+    display_name: str
+    valueExample: str
 
 
 # ---------------------------------------------------------------------------
@@ -282,3 +290,19 @@ def expand_blueprint(blueprint: BlueprintBuilder) -> BlueprintValidationExpansio
         possible_sources=result.possible_sources,
         possible_expansions=result.possible_expansions,
     )
+
+
+@router.get("/variables/list")
+def list_available_variables() -> list[VariableDetail]:
+    """List all automatic variables available for use in configuration value interpolation."""
+    result: list[VariableDetail] = []
+    for var_name, example in get_values_and_examples().items():
+        var: AvailableAutomaticVariables = var_name
+        if var == "runId":
+            display_name = "Run ID"
+        elif var == "submitDatetime":
+            display_name = "Submit Datetime"
+        else:
+            assert_never(var)
+        result.append(VariableDetail(name=var_name, display_name=display_name, valueExample=example))
+    return result

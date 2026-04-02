@@ -600,17 +600,19 @@ async def test_jobs_upsert_experiment_definition_unknown_id_raises(mem_session_m
 
 
 @pytest.mark.asyncio
-async def test_jobs_upsert_run_unknown_id_raises(mem_session_maker_both: async_sessionmaker[AsyncSession]) -> None:
+async def test_jobs_upsert_run_pregenerated_id(mem_session_maker_both: async_sessionmaker[AsyncSession]) -> None:
+    """Providing a run_id that does not yet exist creates a new run (attempt 1) with that id."""
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
 
-    with pytest.raises(KeyError, match="No Run"):
-        await run_db.upsert_run(
-            run_id="nonexistent-id",
-            blueprint_id=job_id,
-            blueprint_version=job_v,
-            created_by="user1",
-            status="submitted",
-        )
+    returned_id, attempt = await run_db.upsert_run(
+        run_id="pregenerated-id",
+        blueprint_id=job_id,
+        blueprint_version=job_v,
+        created_by="user1",
+        status="submitted",
+    )
+    assert returned_id == "pregenerated-id"
+    assert attempt == 1
 
 
 # ---------------------------------------------------------------------------
