@@ -23,7 +23,7 @@ No HTTP exceptions are raised here; callers are responsible for mapping
 import logging
 from collections import defaultdict
 from itertools import groupby
-from typing import Iterator, cast
+from typing import cast
 
 from earthkit.workflows.compilers import graph2job
 from earthkit.workflows.graph import Graph, deduplicate_nodes
@@ -43,6 +43,7 @@ from forecastbox.domain.blueprint.db import upsert_blueprint
 from forecastbox.domain.blueprint.exceptions import BlueprintNotFound
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.graph import topological_order
 
 logger = logging.getLogger(__name__)
 
@@ -96,27 +97,6 @@ class BlueprintSaveCommand(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _topological_order(blueprint: BlueprintBuilder) -> Iterator[BlockInstanceId]:
-    remaining = {}
-    children: dict[BlockInstanceId, list[BlockInstanceId]] = defaultdict(list)
-    queue: list[BlockInstanceId] = []
-    for blockId, blockInstance in blueprint.blocks.items():
-        l = len(blockInstance.input_ids)
-        if l == 0:
-            queue.append(blockId)
-        else:
-            remaining[blockId] = l
-        for parent in blockInstance.input_ids.values():
-            children[parent].append(blockId)
-    while queue:
-        head = queue.pop(0)
-        yield head
-        for child in children[head]:
-            remaining[child] -= 1
-            if remaining[child] == 0:
-                queue.append(child)
-
-
 def validate_expand(blueprint: BlueprintBuilder) -> BlueprintValidationExpansion:
     """Validate and expand a partially-constructed BlueprintBuilder.
 
@@ -134,7 +114,7 @@ def validate_expand(blueprint: BlueprintBuilder) -> BlueprintValidationExpansion
     possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]] = {}
     block_errors: dict[BlockInstanceId, list[str]] = defaultdict(list)
     outputs = {}
-    for blockId in _topological_order(blueprint):
+    for blockId in topological_order(blueprint.blocks.items(), lambda block: block.input_ids.values()):
         blockInstance = blueprint.blocks[blockId]
         plugin = plugins.get(blockInstance.factory_id.plugin, None)
         if not plugin:
@@ -199,7 +179,7 @@ def compile_builder(blueprint: BlueprintBuilder) -> ExecutionSpecification:
     plugins = PluginManager.plugins
     action_lookup = {}
 
-    for blockId in _topological_order(blueprint):
+    for blockId in topological_order(blueprint.blocks.items(), lambda block: block.input_ids.values()):
         blockInstance = blueprint.blocks[blockId]
         plugin = plugins.get(blockInstance.factory_id.plugin, None)
         if not plugin:
