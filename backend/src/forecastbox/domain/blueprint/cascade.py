@@ -7,13 +7,9 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Cascade execution data models: environment, job, and execution specification."""
+"""Cascade execution data models: environment specification."""
 
-from typing import Literal
-
-from cascade.low.core import JobInstance
 from fiab_core.artifacts import CompositeArtifactId
-from fiab_core.fable import BlockInstance, BlockInstanceId
 from pydantic import BaseModel, Field, PositiveInt
 
 
@@ -23,14 +19,3 @@ class EnvironmentSpecification(BaseModel):
     workers_per_host: PositiveInt | None = Field(default=None)
     environment_variables: dict[str, str] = Field(default_factory=dict)
     runtime_artifacts: list[CompositeArtifactId] = Field(default_factory=list)
-
-
-class RawCascadeJob(BaseModel):
-    job_type: Literal["raw_cascade_job"]
-    job_instance: JobInstance
-
-
-class ExecutionSpecification(BaseModel):
-    job: RawCascadeJob  # = Field(discriminator="job_type")
-    environment: EnvironmentSpecification
-    shared: bool = Field(default=False)

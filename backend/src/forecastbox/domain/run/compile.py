@@ -13,9 +13,10 @@ from earthkit.workflows.compilers import graph2job
 from earthkit.workflows.graph import Graph, deduplicate_nodes
 from fiab_core.artifacts import CompositeArtifactId
 
-from forecastbox.domain.blueprint.cascade import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
+from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.plugin.manager import PluginManager
+from forecastbox.domain.run.cascade import ExecutionSpecification, RawCascadeJob
 from forecastbox.utility.graph import topological_order
 
 

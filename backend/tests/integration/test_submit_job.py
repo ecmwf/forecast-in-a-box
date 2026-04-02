@@ -9,8 +9,8 @@ import httpx
 import pytest
 from cascade.low.builders import JobBuilder, TaskBuilder
 
-from forecastbox.domain.blueprint.cascade import (
-    EnvironmentSpecification,
+from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
+from forecastbox.domain.run.cascade import (
     ExecutionSpecification,
     RawCascadeJob,
 )

@@ -11,7 +11,7 @@ import io
 import logging
 import time
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Literal, Sequence
 
 import cascade.gateway.api as api
 import cascade.gateway.client as client
@@ -21,14 +21,25 @@ import numpy as np
 import xarray as xr
 from cascade.gateway.api import decoded_result
 from cascade.low import views as cascade_views
-from cascade.low.core import JobInstanceRich
-from pydantic import BaseModel
+from cascade.low.core import JobInstance, JobInstanceRich
+from pydantic import BaseModel, Field
 
 from forecastbox.domain.artifact.manager import ArtifactManager, submit_artifact_download
-from forecastbox.domain.blueprint.cascade import ExecutionSpecification
+from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.utility.config import config
 
 logger = logging.getLogger(__name__)
+
+
+class RawCascadeJob(BaseModel):
+    job_type: Literal["raw_cascade_job"]
+    job_instance: JobInstance
+
+
+class ExecutionSpecification(BaseModel):
+    job: RawCascadeJob  # = Field(discriminator="job_type")
+    environment: EnvironmentSpecification
+    shared: bool = Field(default=False)
 
 
 def encode_result(result: api.ResultRetrievalResponse) -> tuple[bytes, str]:

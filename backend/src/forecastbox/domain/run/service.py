@@ -36,9 +36,9 @@ from pydantic import BaseModel
 
 import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.run.db as run_db
-from forecastbox.domain.blueprint.cascade import EnvironmentSpecification, ExecutionSpecification
+from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.service import BlueprintBuilder
-from forecastbox.domain.run.cascade import ProductToOutputId, execute_cascade
+from forecastbox.domain.run.cascade import ExecutionSpecification, ProductToOutputId, execute_cascade
 from forecastbox.domain.run.compile import compile_builder
 from forecastbox.domain.run.exceptions import RunNotFound
 from forecastbox.schemata.jobs import Blueprint, Run
