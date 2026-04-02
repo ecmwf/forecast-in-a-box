@@ -242,34 +242,9 @@ async def restart_run(run_id: str, auth_context: AuthContext) -> Either[ExecuteR
     )
 
 
-def execution_to_detail(execution: Run) -> RunDetail:
-    """Convert a Run ORM row to a RunDetail response model."""
-    return RunDetail(
-        run_id=str(execution.run_id),  # ty:ignore[invalid-argument-type]
-        attempt_count=cast(int, execution.attempt_count),
-        status=cast(str, execution.status),
-        created_at=str(execution.created_at),
-        updated_at=str(execution.updated_at),
-        blueprint_id=str(execution.blueprint_id),  # ty:ignore[invalid-argument-type]
-        blueprint_version=cast(int, execution.blueprint_version),
-        error=cast(str | None, execution.error),
-        progress=cast(str | None, execution.progress),
-        cascade_job_id=cast(str | None, execution.cascade_job_id),
-    )
-
-
-async def poll_and_update_execution(
-    run_id: str,
-    attempt_count: int | None,
-    auth_context: AuthContext,
-) -> RunDetail:
-    """Fetch a Run, poll cascade if active, update db, and return current detail.
-
-    Raises ``RunNotFound`` if the execution is not found.
-    Raises ``RunAccessDenied`` if the actor does not own it.
-    """
-    execution = await run_db.get_run(run_id, attempt_count, auth_context=auth_context)
-
+async def poll_and_update(execution: Run) -> RunDetail:
+    """Poll cascade for a Run's status, update db if changed, and return current detail."""
+    run_id = str(execution.run_id)  # ty:ignore[invalid-argument-type]
     actual_attempt = cast(int, execution.attempt_count)
     cascade_job_id = cast(str | None, execution.cascade_job_id)
     status = cast(str, execution.status)

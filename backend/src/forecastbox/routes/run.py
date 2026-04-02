@@ -229,7 +229,7 @@ async def list_runs(
     if start >= total and total > 0:
         raise HTTPException(status_code=404, detail="Page number out of range.")
     executions = list(await run_db.list_runs(auth_context=auth_context, offset=start, limit=pagination.page_size))
-    details = [_to_run_detail(run_service.execution_to_detail(e)) for e in executions]
+    details = [_to_run_detail(await run_service.poll_and_update(e)) for e in executions]
     return RunListResponse(runs=details, total=total, page=pagination.page, page_size=pagination.page_size, total_pages=total_pages)
 
 
@@ -239,7 +239,8 @@ async def get_run(
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> RunDetailResponse:
     try:
-        domain_detail = await run_service.poll_and_update_execution(spec.run_id, spec.attempt_count, auth_context)
+        execution = await run_db.get_run(spec.run_id, spec.attempt_count, auth_context=auth_context)
+        domain_detail = await run_service.poll_and_update(execution)
     except RunNotFound:
         raise HTTPException(status_code=404, detail=f"Run {spec.run_id!r} not found.")
     except RunAccessDenied:
