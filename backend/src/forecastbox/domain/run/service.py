@@ -26,24 +26,20 @@ based on the supplied ``AuthContext``.
 
 import asyncio
 import logging
-import time
 import uuid
-from typing import Any, Sequence, cast
+from typing import cast
 
 import cascade.gateway.api as api
 import cascade.gateway.client as client
-from cascade.low import views as cascade_views
-from cascade.low.core import JobInstanceRich
 from cascade.low.func import Either
-from earthkit.workflows.compilers import graph2job
-from earthkit.workflows.graph import Graph, deduplicate_nodes
 from pydantic import BaseModel
 
 import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.run.db as run_db
-from forecastbox.domain.artifact.manager import ArtifactManager, submit_artifact_download
-from forecastbox.domain.blueprint.cascade import EnvironmentSpecification, ExecutionSpecification
-from forecastbox.domain.blueprint.service import BlueprintBuilder, compile_builder
+from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
+from forecastbox.domain.blueprint.service import BlueprintBuilder
+from forecastbox.domain.run.cascade import ExecutionSpecification, ProductToOutputId, execute_cascade
+from forecastbox.domain.run.compile import compile_builder
 from forecastbox.domain.run.exceptions import RunNotFound
 from forecastbox.schemata.jobs import Blueprint, Run
 from forecastbox.utility.auth import AuthContext
@@ -75,73 +71,6 @@ class ExecuteResult(BaseModel):
     """Logical execution id (Run.id)."""
     attempt_count: int
     """Attempt number; always 1 on a fresh execution."""
-
-
-class ProductToOutputId(BaseModel):
-    product_name: str
-    product_spec: dict[str, Any]
-    output_ids: Sequence[str]
-
-
-def _execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobResponse, list[ProductToOutputId]]:
-    """Convert spec to JobInstance and submit to cascade api, returning response."""
-    runtime_artifacts = spec.environment.runtime_artifacts
-    if runtime_artifacts:
-        missing_artifacts = [art for art in runtime_artifacts if art not in ArtifactManager.locally_available]
-
-        download_ids = []
-        for artifact_id in missing_artifacts:
-            result = submit_artifact_download(artifact_id)
-            if result.e:
-                error_msg = f"Failed to submit download for {artifact_id}: {result.e}"
-                logger.error(error_msg)
-                return api.SubmitJobResponse(job_id=None, error=error_msg), []
-            download_ids.append(artifact_id)
-
-        if download_ids:
-            max_wait_seconds = 3600
-            start_time = time.time()
-
-            while True:
-                remaining = set(download_ids) - ArtifactManager.locally_available
-
-                if not remaining:
-                    logger.info(f"All runtime artifacts downloaded: {download_ids}")
-                    break
-
-                if time.time() - start_time > max_wait_seconds:
-                    error_msg = "Timeout waiting for runtime artifacts to download"
-                    logger.error(error_msg)
-                    return api.SubmitJobResponse(job_id=None, error=error_msg), []
-
-                time.sleep(1)
-
-    job = spec.job.job_instance
-    sinks = cascade_views.sinks(job)
-    sinks = [s for s in sinks if not s.task.startswith("run_as_earthkit")]
-    job.ext_outputs = sinks
-    product_to_id_mappings = [ProductToOutputId(product_name="All Outputs", product_spec={}, output_ids=[x.task for x in sinks])]
-
-    environment = spec.environment
-    hosts = min(config.cascade.max_hosts, environment.hosts or config.cascade.default_hosts)
-    workers_per_host = min(config.cascade.max_workers_per_host, environment.workers_per_host or config.cascade.default_workers_per_host)
-    env_vars = {"TMPDIR": config.cascade.venv_temp_dir}
-
-    r = api.SubmitJobRequest(
-        job=api.JobSpec(
-            workers_per_host=workers_per_host,
-            hosts=hosts,
-            envvars=env_vars,
-            use_slurm=False,
-            job_instance=JobInstanceRich(jobInstance=job, checkpointSpec=None),
-        )
-    )
-    try:
-        submit_job_response: api.SubmitJobResponse = client.request_response(r, f"{config.cascade.cascade_url}")  # type: ignore
-    except Exception as e:
-        return api.SubmitJobResponse(job_id=None, error=repr(e)), []
-
-    return submit_job_response, product_to_id_mappings
 
 
 async def get_blueprint_for_execution(blueprint_id: str, blueprint_version: int | None) -> Blueprint | None:
@@ -199,7 +128,7 @@ async def execute(
 
     try:
         loop = asyncio.get_running_loop()
-        response, product_to_id_mappings = await loop.run_in_executor(None, _execute_cascade, exec_spec)
+        response, product_to_id_mappings = await loop.run_in_executor(None, execute_cascade, exec_spec)
         cascade_job_id = response.job_id or str(uuid.uuid4())
 
         update_kwargs: dict[str, object] = {"cascade_job_id": cascade_job_id}

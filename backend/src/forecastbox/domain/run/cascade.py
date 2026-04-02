@@ -9,18 +9,37 @@
 
 import io
 import logging
+import time
 from pathlib import Path
+from typing import Any, Literal, Sequence
 
 import cascade.gateway.api as api
+import cascade.gateway.client as client
 import cloudpickle
 import earthkit.data as ekd
 import numpy as np
 import xarray as xr
 from cascade.gateway.api import decoded_result
+from cascade.low import views as cascade_views
+from cascade.low.core import JobInstance, JobInstanceRich
+from pydantic import BaseModel, Field
 
+from forecastbox.domain.artifact.manager import ArtifactManager, submit_artifact_download
+from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.utility.config import config
 
 logger = logging.getLogger(__name__)
+
+
+class RawCascadeJob(BaseModel):
+    job_type: Literal["raw_cascade_job"]
+    job_instance: JobInstance
+
+
+class ExecutionSpecification(BaseModel):
+    job: RawCascadeJob  # = Field(discriminator="job_type")
+    environment: EnvironmentSpecification
+    shared: bool = Field(default=False)
 
 
 def encode_result(result: api.ResultRetrievalResponse) -> tuple[bytes, str]:
@@ -62,3 +81,70 @@ def encode_result(result: api.ResultRetrievalResponse) -> tuple[bytes, str]:
         return buf.getvalue(), "application/numpy"
 
     return cloudpickle.dumps(obj), "application/clpkl"
+
+
+class ProductToOutputId(BaseModel):
+    product_name: str
+    product_spec: dict[str, Any]
+    output_ids: Sequence[str]
+
+
+def execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobResponse, list[ProductToOutputId]]:
+    """Convert spec to JobInstance and submit to cascade api, returning response."""
+    runtime_artifacts = spec.environment.runtime_artifacts
+    if runtime_artifacts:
+        missing_artifacts = [art for art in runtime_artifacts if art not in ArtifactManager.locally_available]
+
+        download_ids = []
+        for artifact_id in missing_artifacts:
+            result = submit_artifact_download(artifact_id)
+            if result.e:
+                error_msg = f"Failed to submit download for {artifact_id}: {result.e}"
+                logger.error(error_msg)
+                return api.SubmitJobResponse(job_id=None, error=error_msg), []
+            download_ids.append(artifact_id)
+
+        if download_ids:
+            max_wait_seconds = 3600
+            start_time = time.time()
+
+            while True:
+                remaining = set(download_ids) - ArtifactManager.locally_available
+
+                if not remaining:
+                    logger.info(f"All runtime artifacts downloaded: {download_ids}")
+                    break
+
+                if time.time() - start_time > max_wait_seconds:
+                    error_msg = "Timeout waiting for runtime artifacts to download"
+                    logger.error(error_msg)
+                    return api.SubmitJobResponse(job_id=None, error=error_msg), []
+
+                time.sleep(1)
+
+    job = spec.job.job_instance
+    sinks = cascade_views.sinks(job)
+    sinks = [s for s in sinks if not s.task.startswith("run_as_earthkit")]
+    job.ext_outputs = sinks
+    product_to_id_mappings = [ProductToOutputId(product_name="All Outputs", product_spec={}, output_ids=[x.task for x in sinks])]
+
+    environment = spec.environment
+    hosts = min(config.cascade.max_hosts, environment.hosts or config.cascade.default_hosts)
+    workers_per_host = min(config.cascade.max_workers_per_host, environment.workers_per_host or config.cascade.default_workers_per_host)
+    env_vars = {"TMPDIR": config.cascade.venv_temp_dir}
+
+    r = api.SubmitJobRequest(
+        job=api.JobSpec(
+            workers_per_host=workers_per_host,
+            hosts=hosts,
+            envvars=env_vars,
+            use_slurm=False,
+            job_instance=JobInstanceRich(jobInstance=job, checkpointSpec=None),
+        )
+    )
+    try:
+        submit_job_response: api.SubmitJobResponse = client.request_response(r, f"{config.cascade.cascade_url}")  # type: ignore
+    except Exception as e:
+        return api.SubmitJobResponse(job_id=None, error=repr(e)), []
+
+    return submit_job_response, product_to_id_mappings

@@ -23,11 +23,8 @@ No HTTP exceptions are raised here; callers are responsible for mapping
 import logging
 from collections import defaultdict
 from itertools import groupby
-from typing import Iterator, cast
+from typing import cast
 
-from earthkit.workflows.compilers import graph2job
-from earthkit.workflows.graph import Graph, deduplicate_nodes
-from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import (
     BlockFactoryId,
     BlockInstance,
@@ -38,11 +35,12 @@ from fiab_core.fable import (
 from pydantic import BaseModel
 
 import forecastbox.domain.blueprint.db as _blueprint_db
-from forecastbox.domain.blueprint.cascade import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
+from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.db import upsert_blueprint
 from forecastbox.domain.blueprint.exceptions import BlueprintNotFound
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.graph import topological_order
 
 logger = logging.getLogger(__name__)
 
@@ -96,27 +94,6 @@ class BlueprintSaveCommand(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _topological_order(blueprint: BlueprintBuilder) -> Iterator[BlockInstanceId]:
-    remaining = {}
-    children: dict[BlockInstanceId, list[BlockInstanceId]] = defaultdict(list)
-    queue: list[BlockInstanceId] = []
-    for blockId, blockInstance in blueprint.blocks.items():
-        l = len(blockInstance.input_ids)
-        if l == 0:
-            queue.append(blockId)
-        else:
-            remaining[blockId] = l
-        for parent in blockInstance.input_ids.values():
-            children[parent].append(blockId)
-    while queue:
-        head = queue.pop(0)
-        yield head
-        for child in children[head]:
-            remaining[child] -= 1
-            if remaining[child] == 0:
-                queue.append(child)
-
-
 def validate_expand(blueprint: BlueprintBuilder) -> BlueprintValidationExpansion:
     """Validate and expand a partially-constructed BlueprintBuilder.
 
@@ -124,7 +101,7 @@ def validate_expand(blueprint: BlueprintBuilder) -> BlueprintValidationExpansion
     The presence of errors does not affect the return (callers decide how to
     surface them).
     """
-    plugins = PluginManager.plugins  # TODO we are avoiding a lock here! See the TODO at api/plugin.py
+    plugins = PluginManager.plugins
     possible_sources = [
         PluginBlockFactoryId(plugin=plugin_id, factory=block_factory_id)
         for plugin_id, plugin in plugins.items()
@@ -134,7 +111,7 @@ def validate_expand(blueprint: BlueprintBuilder) -> BlueprintValidationExpansion
     possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]] = {}
     block_errors: dict[BlockInstanceId, list[str]] = defaultdict(list)
     outputs = {}
-    for blockId in _topological_order(blueprint):
+    for blockId in topological_order(blueprint.blocks.items(), lambda block: block.input_ids.values()):
         blockInstance = blueprint.blocks[blockId]
         plugin = plugins.get(blockInstance.factory_id.plugin, None)
         if not plugin:
@@ -173,57 +150,6 @@ def validate_expand(blueprint: BlueprintBuilder) -> BlueprintValidationExpansion
         block_errors=block_errors,
         global_errors=global_errors,
     )
-
-
-def _get_artifacts_list(graph: Graph) -> list[CompositeArtifactId]:
-    payloads = (node.payload for node in graph.nodes())
-    artifactLists = (
-        payload.metadata.get("artifacts", []) for payload in payloads if hasattr(payload, "metadata") and isinstance(payload.metadata, dict)
-    )
-    artifacts = set(
-        artifact
-        for artifactList in artifactLists
-        if isinstance(artifactList, list)
-        for artifact in artifactList
-        if isinstance(artifact, CompositeArtifactId)
-    )
-    return list(artifacts)
-
-
-def compile_builder(blueprint: BlueprintBuilder) -> ExecutionSpecification:
-    """Compile a BlueprintBuilder into an ExecutionSpecification.
-
-    Raises ``ValueError`` if any block cannot be compiled.
-    """
-    graph = Graph([])
-    plugins = PluginManager.plugins
-    action_lookup = {}
-
-    for blockId in _topological_order(blueprint):
-        blockInstance = blueprint.blocks[blockId]
-        plugin = plugins.get(blockInstance.factory_id.plugin, None)
-        if not plugin:
-            logger.debug(f"plugin for {blockId=} not found: {blockInstance.factory_id.plugin}. Available plugins: {plugins.keys()}")
-            raise ValueError(f"plugin for {blockId=} not found: {blockInstance.factory_id.plugin}")
-        result = plugin.compiler(action_lookup, blockId, blockInstance)
-        if result.t is None:
-            raise ValueError(f"compile failed at {blockId=} with {result.e}")
-        action_lookup[blockId] = result.t
-        block_factory = plugin.catalogue.factories[blockInstance.factory_id.factory]
-        if block_factory.kind == "sink":
-            graph += action_lookup[blockId].graph()
-
-    graph = deduplicate_nodes(graph)
-    job_instance = graph2job(graph)
-    job = RawCascadeJob(job_type="raw_cascade_job", job_instance=job_instance)
-
-    graph_artifacts = _get_artifacts_list(graph)
-    if blueprint.environment is not None:
-        merged_artifacts = list(set(blueprint.environment.runtime_artifacts).union(set(graph_artifacts)))
-        environment = blueprint.environment.model_copy(update={"runtime_artifacts": merged_artifacts})
-    else:
-        environment = EnvironmentSpecification(runtime_artifacts=graph_artifacts)
-    return ExecutionSpecification(job=job, environment=environment)
 
 
 # ---------------------------------------------------------------------------

@@ -6,8 +6,9 @@ from datetime import datetime, timedelta
 import httpx
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
-from forecastbox.domain.blueprint.cascade import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
+from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.service import BlueprintBuilder
+from forecastbox.domain.run.cascade import ExecutionSpecification, RawCascadeJob
 from forecastbox.entrypoint.main import launch_all
 from forecastbox.utility.config import FIABConfig
 
