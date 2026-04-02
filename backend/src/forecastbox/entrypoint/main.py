@@ -22,7 +22,7 @@ from multiprocessing import Process, get_context
 from fiab_core.fable import PluginCompositeId
 
 import forecastbox.entrypoint.bootstrap.service
-from forecastbox.api.updates import should_install_default_plugin
+from forecastbox.domain.admin import should_install_default_plugin
 from forecastbox.entrypoint.bootstrap.checks import check_backend_ready, install_default_plugins
 from forecastbox.entrypoint.bootstrap.config import export_recursive, setup_process
 from forecastbox.entrypoint.bootstrap.launchers import launch_backend

@@ -28,9 +28,9 @@ from cascade.low.func import Either
 from pyrsistent import pmap, pset
 from pyrsistent.typing import PMap, PSet
 
-from forecastbox.api.artifacts.base import ArtifactCatalog, CompositeArtifactId, MlModelCheckpoint, MlModelDetail, MlModelOverview
-from forecastbox.api.artifacts.io import delete_artifact, download_artifact, get_artifacts_catalog, list_local_storage
-from forecastbox.ecpyutil import timed_acquire
+from forecastbox.domain.artifact.base import ArtifactCatalog, CompositeArtifactId, MlModelCheckpoint, MlModelDetail, MlModelOverview
+from forecastbox.domain.artifact.io import delete_artifact, download_artifact, get_artifacts_catalog, list_local_storage
+from forecastbox.utility.concurrent import timed_acquire
 from forecastbox.utility.config import config
 
 logger = logging.getLogger(__name__)

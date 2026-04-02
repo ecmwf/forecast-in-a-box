@@ -19,12 +19,12 @@ import pytest
 from fiab_core.artifacts import MlModelCheckpoint
 from pyrsistent import pmap
 
-from forecastbox.api.artifacts.base import (
+from forecastbox.domain.artifact.base import (
     ArtifactCatalog,
     CompositeArtifactId,
     get_artifact_local_path,
 )
-from forecastbox.api.artifacts.io import (
+from forecastbox.domain.artifact.io import (
     download_artifact,
     get_artifacts_catalog,
     list_local_storage,

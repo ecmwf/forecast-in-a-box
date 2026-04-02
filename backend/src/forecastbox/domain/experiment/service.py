@@ -30,15 +30,15 @@ import forecastbox.domain.experiment.db as experiment_db
 import forecastbox.domain.experiment.scheduling.db as scheduling_db
 import forecastbox.domain.run.db as run_db
 from forecastbox.domain.experiment.exceptions import ExperimentNotFound, SchedulerBusy
-from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run, current_scheduling_time, parse_crontab
-from forecastbox.domain.experiment.scheduling.scheduler_thread import (
+from forecastbox.domain.experiment.scheduling.background import (
     prod_scheduler,
     scheduler_lock,
     timeout_acquire_request,
 )
-from forecastbox.ecpyutil import timed_acquire
+from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run, current_scheduling_time, parse_crontab
 from forecastbox.schemata.jobs import ExperimentDefinition, Run
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.concurrent import timed_acquire
 from forecastbox.utility.pagination import PaginationSpec
 
 logger = logging.getLogger(__name__)

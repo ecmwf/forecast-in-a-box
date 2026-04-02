@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from forecastbox.api.scheduling.dt_utils import calculate_next_run, current_scheduling_time, parse_crontab
+from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run, current_scheduling_time, parse_crontab
 
 
 def test_parse_crontab_valid(subtests: Any) -> None:

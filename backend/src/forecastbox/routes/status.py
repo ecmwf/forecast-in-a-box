@@ -7,7 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Canonical status route — /status"""
+"""Root status route — /status"""
 
 PREFIX = "/api/v1/status"
 import logging
@@ -17,8 +17,8 @@ import cascade.gateway.api as cascade_gateway_api
 import cascade.gateway.client as cascade_gateway_client
 from fastapi import APIRouter, Request
 
-from forecastbox.api.plugin.manager import status_brief as status_plugins
-from forecastbox.api.scheduling.scheduler_thread import status_scheduler
+from forecastbox.domain.experiment.scheduling.background import status_scheduler
+from forecastbox.domain.plugin.manager import status_brief as status_plugins
 from forecastbox.utility.config import config
 
 logger = logging.getLogger(__name__)

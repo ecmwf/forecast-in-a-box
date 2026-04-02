@@ -7,7 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Canonical admin routes — /admin/* and /users/*"""
+"""Admin routes — /admin/* and /users/*"""
 
 PREFIX = "/api/v1/admin"
 import logging
@@ -20,7 +20,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import UUID4, BaseModel
 from sqlalchemy import delete, select, update
 
-from forecastbox.api.updates import Release, get_local_release, get_most_recent_release, get_pylock, mark_release, save_pylock
+from forecastbox.domain.admin import Release, get_local_release, get_most_recent_release, get_pylock, mark_release, save_pylock
 from forecastbox.entrypoint.auth.users import current_active_user
 from forecastbox.schemata.user import UserRead, UserTable, UserUpdate, async_session_maker
 from forecastbox.utility.config import BackendAPISettings, CascadeSettings, ProductSettings, config

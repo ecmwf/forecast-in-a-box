@@ -2,7 +2,7 @@ from datetime import datetime
 
 import pytest
 
-from forecastbox.api.scheduling.job_utils import eval_dynamic_expression
+from forecastbox.domain.experiment.scheduling.job_utils import eval_dynamic_expression
 
 
 def test_eval_dynamic_expression_no_replacement() -> None:

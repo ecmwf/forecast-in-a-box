@@ -44,7 +44,7 @@ from pydantic import BaseModel
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
-from forecastbox.ecpyutil import delayed_thread, timed_acquire
+from forecastbox.utility.concurrent import delayed_thread, timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginsSettings, config, config_edit_lock
 
 logger = logging.getLogger(__name__)

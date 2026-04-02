@@ -29,12 +29,12 @@ from starlette.exceptions import HTTPException
 
 import forecastbox.routes
 import forecastbox.schemata
-from forecastbox.api.artifacts.base import get_artifact_local_path
-from forecastbox.api.artifacts.manager import ArtifactManager, join_artifact_manager, submit_refresh_catalog
-from forecastbox.api.plugin.manager import join_updater_thread, submit_load_plugins
-from forecastbox.api.plugin.store import join_stores_thread, submit_initialize_stores
-from forecastbox.api.scheduling.scheduler_thread import start_scheduler, stop_scheduler
-from forecastbox.api.updates import get_local_release
+from forecastbox.domain.admin import get_local_release
+from forecastbox.domain.artifact.base import get_artifact_local_path
+from forecastbox.domain.artifact.manager import ArtifactManager, join_artifact_manager, submit_refresh_catalog
+from forecastbox.domain.experiment.scheduling.background import start_scheduler, stop_scheduler
+from forecastbox.domain.plugin.manager import join_updater_thread, submit_load_plugins
+from forecastbox.domain.plugin.store import join_stores_thread, submit_initialize_stores
 from forecastbox.routes.gateway import shutdown_processes
 from forecastbox.utility.config import config
 

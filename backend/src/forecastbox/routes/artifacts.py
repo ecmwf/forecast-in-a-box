@@ -7,13 +7,13 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Canonical artifacts routes — /artifacts/*"""
+"""Artifacts routes — /artifacts/*"""
 
 PREFIX = "/api/v1/artifacts"
 from fastapi import APIRouter, Depends, HTTPException
 
-from forecastbox.api.artifacts.base import CompositeArtifactId, MlModelDetail, MlModelOverview
-from forecastbox.api.artifacts.manager import delete_model, get_model_details, list_models, submit_artifact_download
+from forecastbox.domain.artifact.base import CompositeArtifactId, MlModelDetail, MlModelOverview
+from forecastbox.domain.artifact.manager import delete_model, get_model_details, list_models, submit_artifact_download
 from forecastbox.routes.admin import get_admin_user
 from forecastbox.schemata.user import UserRead
 

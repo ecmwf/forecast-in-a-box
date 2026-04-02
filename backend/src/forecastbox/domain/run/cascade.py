@@ -23,11 +23,6 @@ from forecastbox.utility.config import config
 logger = logging.getLogger(__name__)
 
 
-def get_model_path(model: str) -> Path:
-    """Get the path to a model."""
-    return (Path(config.api.data_path) / (model.replace("_", "/") + ".ckpt")).absolute()
-
-
 def encode_result(result: api.ResultRetrievalResponse) -> tuple[bytes, str]:
     """Converts cascade Result response to bytes+mime"""
     obj = decoded_result(result, job=None)  # type: ignore

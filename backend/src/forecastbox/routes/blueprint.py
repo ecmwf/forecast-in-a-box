@@ -7,7 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Canonical blueprint entity routes — /blueprint/*"""
+"""Blueprint entity routes — /blueprint/*"""
 
 PREFIX = "/api/v1/blueprint"
 from typing import Annotated, cast
@@ -20,13 +20,13 @@ from pydantic import BaseModel
 
 import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.blueprint.service as blueprint_service
-from forecastbox.api.plugin.manager import catalogue_view, plugins_ready
 from forecastbox.domain.blueprint.exceptions import (
     BlueprintAccessDenied,
     BlueprintNotFound,
     BlueprintVersionConflict,
 )
 from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand, BlueprintValidationExpansion
+from forecastbox.domain.plugin.manager import catalogue_view, plugins_ready
 from forecastbox.entrypoint.auth.users import get_auth_context
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec

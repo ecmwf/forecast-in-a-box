@@ -23,8 +23,8 @@ import forecastbox.domain.experiment.scheduling.db as scheduling_db
 from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run, current_scheduling_time
 from forecastbox.domain.experiment.scheduling.job_utils import experiment2runnable
 from forecastbox.domain.run.service import execute
-from forecastbox.ecpyutil import timed_acquire
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.concurrent import timed_acquire
 from forecastbox.utility.config import config
 
 logger = logging.getLogger(__name__)

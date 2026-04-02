@@ -38,10 +38,10 @@ from fiab_core.fable import (
 from pydantic import BaseModel
 
 import forecastbox.domain.blueprint.db as _blueprint_db
-from forecastbox.api.plugin.manager import PluginManager
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification, ExecutionSpecification, RawCascadeJob
 from forecastbox.domain.blueprint.db import upsert_blueprint
 from forecastbox.domain.blueprint.exceptions import BlueprintNotFound
+from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.utility.auth import AuthContext
 
 logger = logging.getLogger(__name__)

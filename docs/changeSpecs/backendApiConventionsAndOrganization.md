@@ -53,6 +53,8 @@ Notes:
      - the endpoint-exposed class is used minimally in the codebase, to prevent accidental contract changes. It is declared in the `routes` module, with a class factory method `from_db(e: DbEntity)`
      - instead of primitive types like `str` we use newtypes like `JobExecutionId = typing.NewType("JobExecutionId", str)` for safety andreadabily
  - `utility` is invoked from the `domain` module, and handles aspects like multiprocessing/futures -- anything shareable across multiple domains
+ - generally the import/dependency order is as follows: (utility < schemata < domain < routes < entrypoint)
+   - `utility.config` is a bit of an oddity -- while the config is mostly pertaining to domains, it needs to drive the selected behaviours in utility or schemata. We could have separated config, but we prefer a centralization under a single model. Or we could have introduced some sort of dependency injection to provide it to utility/schemata and move it to domain and register during endpoint, but that would weaken type safety and complicate -- so we accept this weakening of hierarchy-fitness
 
 Tests are organized in three top level modules:
  - unit
