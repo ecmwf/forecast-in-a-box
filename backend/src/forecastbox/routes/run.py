@@ -28,9 +28,8 @@ from pydantic import BaseModel
 
 import forecastbox.domain.run.db as run_db
 import forecastbox.domain.run.service as run_service
-from forecastbox.domain.run.cascade import encode_result
+from forecastbox.domain.run.cascade import ProductToOutputId, encode_result
 from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
-from forecastbox.domain.run.service import ProductToOutputId
 from forecastbox.entrypoint.auth.users import get_auth_context
 from forecastbox.routes.gateway import Globals
 from forecastbox.utility.auth import AuthContext
