@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 optional-dependencies.runtime = [
-
+    "anemoi-inference>=0.10.0",
 ]
 
 [dependency-groups]
