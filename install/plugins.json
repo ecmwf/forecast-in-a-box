@@ -7,6 +7,13 @@
             "display_title": "ECMWF Plugin",
             "display_description": "ECMWF plugin for Earthkit-data sources and products",
             "display_author": "ECMWF"
+        },
+        "ecmwf-anemoi": {
+            "pip_source": "fiab-plugin-anemoi",
+            "module_name": "fiab_plugin_anemoi",
+            "display_title": "Anemoi Plugin",
+            "display_description": "Anemoi plugin for data-driven weather forecasting",
+            "display_author": "ECMWF"
         }
     }
 }

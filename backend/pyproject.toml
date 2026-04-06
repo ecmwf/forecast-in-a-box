@@ -25,13 +25,9 @@ dynamic = [ "version" ]
 # just a minimal set of dependencies to run the servers. Individual tasks install their runtime dependencies on their own
 dependencies = [
   "aiosqlite",
-  "anemoi-inference==0.8.3",
-  "anemoi-plugins-ecmwf-inference[opendata,polytope]>=0.1.20",
-  "anemoi-utils>=0.4.36",
   "apscheduler",
   "cloudpickle",
   "earthkit-workflows>=0.9.0",
-  "earthkit-workflows-anemoi>=0.3.12",
   "earthkit-workflows-pproc",
   "fastapi",
   "fastapi-users[oauth]",
@@ -40,8 +36,6 @@ dependencies = [
   "httpx<1",
   "httpx-oauth",
   "jinja2",
-  "mir-python==1.27.10.5", # NOTE once the pinning is fixed for mir-python, we can remove both this and multiolib pin
-  "multiolib==2.7.1.5",
   "orjson",
   "pproc",
   "psutil",
@@ -65,9 +59,6 @@ optional-dependencies.plots = [
 optional-dependencies.thermo = [
   "thermofeel>=2.1.1",
 ]
-optional-dependencies.webmars = [
-  "ecmwf-api-client>=1.6.5",
-]
 urls."Source code" = "https://github.com/ecmwf/forecast-in-a-box"
 
 [dependency-groups]
@@ -80,6 +71,7 @@ dev = [
   "ty==0.0.2",
   "prek",
   "fiab-plugin-ecmwf[runtime]", # TODO remove after first publish
+  "fiab-plugin-anemoi[runtime]", # TODO remove after first publish
   "ruff>=0.15.8",
 ]
 
@@ -127,12 +119,14 @@ earthkit-workflows-pproc = { git = "https://github.com/ecmwf/earthkit-workflows-
 fiab-core = {workspace = true}
 fiab-mcp-server = {workspace = true}
 fiab-plugin-ecmwf = {workspace = true}
+fiab-plugin-anemoi = { workspace = true }
 
 [tool.uv.workspace]
 members = [
     "packages/fiab-core",
     "packages/fiab-mcp-server",
     "packages/fiab-plugin-ecmwf",
+    "packages/fiab-plugin-anemoi",
     "packages/fiab-plugin-test",
 ]
 
