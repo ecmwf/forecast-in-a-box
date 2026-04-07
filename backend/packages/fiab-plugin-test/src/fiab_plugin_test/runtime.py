@@ -5,6 +5,10 @@ def source_42() -> int:
     return 42
 
 
+def source_text(text: str) -> str:
+    return text
+
+
 def transform_increment(a: int, amount: int) -> int:
     return a + amount
 

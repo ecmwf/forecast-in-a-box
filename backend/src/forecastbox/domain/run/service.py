@@ -40,14 +40,14 @@ import forecastbox.domain.run.db as run_db
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.run.cascade import ExecutionSpecification, ProductToOutputId, execute_cascade
-from forecastbox.domain.run.compile import compile_builder, resolve_automatic_values
+from forecastbox.domain.run.compile import compile_builder, merge_variable_values, resolve_automatic_values
 from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.exceptions import RunNotFound
-from forecastbox.domain.variables.resolution import merge_variables
 from forecastbox.schemata.jobs import Blueprint, Run
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
 from forecastbox.utility.structural import deep_union
+from forecastbox.utility.time import current_time
 
 logger = logging.getLogger(__name__)
 
@@ -108,10 +108,10 @@ async def execute(
 
     # Generate run_id before compilation so it can be used as a variable value.
     effective_run_id = run_id or str(uuid.uuid4())
-    submit_datetime = datetime.now(timezone.utc)
+    submit_datetime = current_time()
     automatic_values: dict[str, str] = cast(dict[str, str], resolve_automatic_values(effective_run_id, submit_datetime))
 
-    all_variables = merge_variables(automatic_values, compiler_runtime_context.variables)
+    all_variables = merge_variable_values(automatic_values, compiler_runtime_context.variables)
 
     builder = BlueprintBuilder(
         blocks=blueprint.blocks,  # ty:ignore[invalid-argument-type]

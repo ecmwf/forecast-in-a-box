@@ -12,7 +12,7 @@
 import pytest
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
-from forecastbox.domain.variables.resolution import extract_variables, merge_variables, resolve_configurations
+from forecastbox.domain.variables.resolution import extract_variables, resolve_configurations
 
 
 def _block(config: dict[str, str]) -> BlockInstance:
@@ -116,28 +116,3 @@ def test_resolve_configurations_mutates_in_place() -> None:
     resolve_configurations(block, {"var": "resolved"})
     assert block.configuration_values is original_dict
     assert block.configuration_values["key"] == "resolved"
-
-
-# ---------------------------------------------------------------------------
-# merge_variables
-# ---------------------------------------------------------------------------
-
-
-def test_merge_variables_automatic_only() -> None:
-    result = merge_variables({"runId": "abc"}, {})
-    assert result == {"runId": "abc"}
-
-
-def test_merge_variables_context_only() -> None:
-    result = merge_variables({}, {"date": "20260101T00"})
-    assert result == {"date": "20260101T00"}
-
-
-def test_merge_variables_context_overrides_automatic() -> None:
-    result = merge_variables({"runId": "abc", "submitDatetime": "2026-01-01 00:00:00"}, {"runId": "custom"})
-    assert result == {"runId": "custom", "submitDatetime": "2026-01-01 00:00:00"}
-
-
-def test_merge_variables_both_combined() -> None:
-    result = merge_variables({"runId": "abc"}, {"date": "20260101T00"})
-    assert result == {"runId": "abc", "date": "20260101T00"}

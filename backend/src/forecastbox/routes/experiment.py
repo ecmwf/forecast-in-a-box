@@ -24,11 +24,11 @@ from pydantic import BaseModel, PositiveInt
 import forecastbox.domain.experiment.service as experiment_service
 from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound, ExperimentVersionConflict, SchedulerBusy
 from forecastbox.domain.experiment.scheduling.background import start_scheduler, stop_scheduler
-from forecastbox.domain.experiment.scheduling.dt_utils import current_scheduling_time
 from forecastbox.entrypoint.auth.users import get_auth_context
 from forecastbox.schemata.jobs import ExperimentDefinition
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
+from forecastbox.utility.time import current_time
 
 logger = logging.getLogger(__name__)
 
@@ -343,7 +343,7 @@ async def get_next_experiment_run(
 @router.get("/operational/scheduler/current_time")
 async def get_scheduler_current_time() -> str:
     """Return the current time used for scheduling decisions (ISO 8601)."""
-    return current_scheduling_time().isoformat()
+    return current_time().isoformat()
 
 
 @router.post("/operational/scheduler/restart")

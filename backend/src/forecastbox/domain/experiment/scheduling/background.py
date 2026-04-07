@@ -20,12 +20,13 @@ import threading
 from typing import Any, cast
 
 import forecastbox.domain.experiment.scheduling.db as scheduling_db
-from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run, current_scheduling_time
+from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run
 from forecastbox.domain.experiment.scheduling.job_utils import experiment2runnable
 from forecastbox.domain.run.service import execute
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.concurrent import timed_acquire
 from forecastbox.utility.config import config
+from forecastbox.utility.time import current_time
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +122,7 @@ class SchedulerThread(threading.Thread):
 
         sleep_duration = sleep_duration_min
         if next_schedulable_at:
-            time_to_next_schedulable_at = int((next_schedulable_at - current_scheduling_time()).total_seconds())
+            time_to_next_schedulable_at = int((next_schedulable_at - current_time()).total_seconds())
             if time_to_next_schedulable_at > 0:
                 sleep_duration = min(time_to_next_schedulable_at, sleep_duration_min)
             else:

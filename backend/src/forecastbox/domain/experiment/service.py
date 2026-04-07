@@ -35,11 +35,12 @@ from forecastbox.domain.experiment.scheduling.background import (
     scheduler_lock,
     timeout_acquire_request,
 )
-from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run, current_scheduling_time, parse_crontab
+from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run, parse_crontab
 from forecastbox.schemata.jobs import ExperimentDefinition, Run
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.concurrent import timed_acquire
 from forecastbox.utility.pagination import PaginationSpec
+from forecastbox.utility.time import current_time
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ def resolve_next_run(
 
     Raises ValueError if first_run_override is provided but older than max_delay_hours.
     """
-    now = current_scheduling_time()
+    now = current_time()
     if first_run_override is not None:
         age_hours = (now - first_run_override).total_seconds() / 3600
         if age_hours > max_delay_hours:
