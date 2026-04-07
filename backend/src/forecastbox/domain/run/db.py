@@ -54,7 +54,7 @@ async def upsert_run(
     status: RunStatus,
     experiment_id: str | None = None,
     experiment_version: int | None = None,
-    compiler_runtime_context: CompilerRuntimeContext | None = None,
+    compiler_runtime_context: CompilerRuntimeContext = CompilerRuntimeContext(),
     experiment_context: str | None = None,
 ) -> tuple[str, int]:
     """Insert a new attempt of a Run and return (id, attempt_count).
@@ -84,7 +84,7 @@ async def upsert_run(
                     blueprint_version=blueprint_version,
                     experiment_id=experiment_id,
                     experiment_version=experiment_version,
-                    compiler_runtime_context=compiler_runtime_context.model_dump(exclude_unset=True) if compiler_runtime_context else None,
+                    compiler_runtime_context=compiler_runtime_context.model_dump(exclude_unset=True),
                     experiment_context=experiment_context,
                     status=status,
                     is_deleted=False,

@@ -128,7 +128,7 @@ class Run(Base):
 
     experiment_id = Column(String(255), nullable=True)
     experiment_version = Column(Integer, nullable=True)
-    compiler_runtime_context = Column(JSON, nullable=True)
+    compiler_runtime_context = Column(JSON, nullable=False)
     experiment_context = Column(String(255), nullable=True)
 
     # TODO later -- make sure entity validates this

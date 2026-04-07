@@ -87,13 +87,13 @@ async def execute(
     run_id: str | None = None,
     experiment_id: str | None = None,
     experiment_version: int | None = None,
-    compiler_runtime_context: CompilerRuntimeContext | None = None,
+    compiler_runtime_context: CompilerRuntimeContext = CompilerRuntimeContext(),
     experiment_context: str | None = None,
 ) -> Either[ExecuteResult, str]:  # type: ignore[invalid-argument]
     """Always creates a Run linked to the given Blueprint.
 
     Compiles the blueprint's blocks via the blueprint compiler, applies
-    compiler_runtime_context (if given) via deep_union to override compiled values
+    compiler_runtime_context via deep_union to override compiled values
     (used by scheduled runs to inject dynamic expressions), submits the resulting
     spec to cascade, and persists a Run row. When ``run_id`` is
     supplied, the new attempt is appended under that existing id (restart semantics);
@@ -111,7 +111,7 @@ async def execute(
     submit_datetime = datetime.now(timezone.utc)
     automatic_values: dict[str, str] = cast(dict[str, str], resolve_automatic_values(effective_run_id, submit_datetime))
 
-    all_variables = merge_variables(automatic_values, compiler_runtime_context.variables if compiler_runtime_context is not None else {})
+    all_variables = merge_variables(automatic_values, compiler_runtime_context.variables)
 
     builder = BlueprintBuilder(
         blocks=blueprint.blocks,  # ty:ignore[invalid-argument-type]
@@ -119,14 +119,11 @@ async def execute(
     )
     compiled = compile_builder(builder, all_variables)
 
-    if compiler_runtime_context:
-        exec_spec = ExecutionSpecification.model_validate(
-            deep_union(compiled.model_dump(), compiler_runtime_context.model_dump(exclude_unset=True))
-        )
-    else:
-        exec_spec = compiled
+    exec_spec = ExecutionSpecification.model_validate(
+        deep_union(compiled.model_dump(), compiler_runtime_context.model_dump(exclude_unset=True))
+    )
 
-    persisted_context = (compiler_runtime_context or CompilerRuntimeContext()).model_copy(update={"variables": all_variables})
+    persisted_context = compiler_runtime_context.model_copy(update={"variables": all_variables})
 
     new_run_id, attempt_count = await run_db.upsert_run(
         run_id=effective_run_id,
@@ -174,8 +171,8 @@ async def restart_run(run_id: str, auth_context: AuthContext) -> Either[ExecuteR
     if blueprint is None:
         return Either.error(f"Blueprint {blueprint_id!r} v{blueprint_version} not found")
 
-    raw_context = cast(dict | None, existing.compiler_runtime_context)
-    context = CompilerRuntimeContext.model_validate(raw_context) if raw_context is not None else None
+    raw_context = cast(dict, existing.compiler_runtime_context)
+    context = CompilerRuntimeContext.model_validate(raw_context)
 
     return await execute(
         blueprint,
