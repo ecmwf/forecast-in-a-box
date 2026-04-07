@@ -13,13 +13,23 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-AvailableAutomaticVariables = Literal["runId", "submitDatetime", "startDatetime"]
+from forecastbox.utility.time import current_time
+
+# fmt: off
+AvailableAutomaticVariables = Literal[
+    "runId",          # Unique identifier for the run; stable across restarts.
+    "submitDatetime", # Datetime when the run was first submitted; preserved on restart.
+    "startDatetime",  # Datetime when the current attempt started; updated on every restart.
+]
+# fmt: on
+
+_current_time_example = current_time().strftime("%Y-%m-%d %H:%M:%S")
 
 # TODO: replace with frozendict once available so that we have immutability
 _values_and_examples: dict[AvailableAutomaticVariables, str] = {
     "runId": str(uuid.uuid4()),
-    "submitDatetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    "startDatetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    "submitDatetime": _current_time_example,
+    "startDatetime": _current_time_example,
 }
 
 
@@ -27,8 +37,5 @@ def get_values_and_examples() -> dict[AvailableAutomaticVariables, str]:
     """Return all automatic variable names with example values generated at import time.
 
     Used for pre-submit validation and frontend display.
-    ``submitDatetime`` is fixed to the time a run is first created and does not
-    change across restarts.  ``startDatetime`` reflects the time the current
-    attempt was started and is updated on every restart.
     """
     return _values_and_examples
