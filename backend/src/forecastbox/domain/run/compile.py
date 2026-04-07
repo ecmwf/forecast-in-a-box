@@ -28,18 +28,31 @@ from forecastbox.utility.graph import topological_order
 def merge_variable_values(automatic_values: dict[str, str], context_values: dict[str, str]) -> dict[str, str]:
     """Merge automatic system variables with caller-supplied context variables.
 
-    context_values take precedence over automatic_values for the same key.
+    context_values take precedence over automatic_values for the same key, with
+    the exception of ``startDatetime`` which is always taken from automatic_values
+    so that each restart records its own actual start time.
     """
-    return {**automatic_values, **context_values}
+    merged = {**automatic_values, **context_values}
+    if "startDatetime" in automatic_values:
+        merged["startDatetime"] = automatic_values["startDatetime"]
+    return merged
 
 
 def resolve_automatic_values(run_id: str, submit_datetime: datetime) -> dict[AvailableAutomaticVariables, str]:
-    """Build a mapping of all automatic variable names to their runtime values."""
+    """Build a mapping of all automatic variable names to their runtime values.
+
+    ``submitDatetime`` is set to ``submit_datetime`` and is preserved across restarts
+    (callers pass the original first-run time on retry).  ``startDatetime`` is also
+    derived from ``submit_datetime`` here, but ``merge_variable_values`` ensures it
+    is always overwritten with the current attempt's time, so restarts see a fresh value.
+    """
     resolved: dict[AvailableAutomaticVariables, str] = {}
     for var in get_values_and_examples():
         if var == "runId":
             resolved[var] = run_id
         elif var == "submitDatetime":
+            resolved[var] = submit_datetime.strftime("%Y-%m-%d %H:%M:%S")
+        elif var == "startDatetime":
             resolved[var] = submit_datetime.strftime("%Y-%m-%d %H:%M:%S")
         else:
             assert_never(var)

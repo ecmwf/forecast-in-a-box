@@ -13,12 +13,13 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-AvailableAutomaticVariables = Literal["runId", "submitDatetime"]
+AvailableAutomaticVariables = Literal["runId", "submitDatetime", "startDatetime"]
 
 # TODO: replace with frozendict once available so that we have immutability
 _values_and_examples: dict[AvailableAutomaticVariables, str] = {
     "runId": str(uuid.uuid4()),
     "submitDatetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    "startDatetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
 }
 
 
@@ -26,5 +27,8 @@ def get_values_and_examples() -> dict[AvailableAutomaticVariables, str]:
     """Return all automatic variable names with example values generated at import time.
 
     Used for pre-submit validation and frontend display.
+    ``submitDatetime`` is fixed to the time a run is first created and does not
+    change across restarts.  ``startDatetime`` reflects the time the current
+    attempt was started and is updated on every restart.
     """
     return _values_and_examples

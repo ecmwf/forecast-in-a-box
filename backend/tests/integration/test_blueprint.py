@@ -85,7 +85,7 @@ def _make_builder_full(tmpdir: str) -> BlueprintBuilder:
     )
     source_time = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="source_text"),
-        configuration_values={"text": "${submitDatetime}"},
+        configuration_values={"text": "${submitDatetime};${startDatetime}"},
         input_ids={},
     )
     sink_time = BlockInstance(
@@ -267,8 +267,10 @@ def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Cl
     assert status_resp.is_success, status_resp.text
     created_at = status_resp.json()["created_at"]
     outputTime = pathlib.Path(f"{tmpdir}/output{run_id}.time.txt")
-    # created_at is at higher precision
-    assert created_at.split(".", 1)[0] == outputTime.read_text()
+    # Both submitDatetime and startDatetime equal created_at on the first run.
+    # created_at is at higher precision than the second-resolution variable values.
+    created_at_sec = created_at.split(".", 1)[0]
+    assert outputTime.read_text() == f"{created_at_sec};{created_at_sec}"
     outputTime.unlink()
 
     list_resp = backend_client_with_auth.get("/run/list")
@@ -301,6 +303,13 @@ def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Cl
 
     ensure_completed_v2(backend_client_with_auth, run_id, sleep=1, attempts=120)
     assert outputMain.read_text() == "85"  # the output of 42 + 1 + 42, thats what the job is configured to do
+
+    # After restart: submitDatetime must still equal original created_at; startDatetime
+    # must reflect the restart's own created_at (attempt 2).
+    status_restarted_resp = backend_client_with_auth.get("/run/get", params={"run_id": run_id})
+    assert status_restarted_resp.is_success, status_restarted_resp.text
+    created_at_restarted = status_restarted_resp.json()["created_at"].split(".", 1)[0]
+    assert outputTime.read_text() == f"{created_at_sec};{created_at_restarted}"
 
     avail_resp = backend_client_with_auth.get("/run/outputAvailability", params={"run_id": run_id})
     assert avail_resp.is_success, avail_resp.text
