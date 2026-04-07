@@ -43,6 +43,7 @@ from forecastbox.domain.run.cascade import ExecutionSpecification, ProductToOutp
 from forecastbox.domain.run.compile import compile_builder, resolve_automatic_values
 from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.exceptions import RunNotFound
+from forecastbox.domain.variables.resolution import merge_variables
 from forecastbox.schemata.jobs import Blueprint, Run
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
@@ -110,11 +111,13 @@ async def execute(
     submit_datetime = datetime.now(timezone.utc)
     automatic_values: dict[str, str] = cast(dict[str, str], resolve_automatic_values(effective_run_id, submit_datetime))
 
+    all_variables = merge_variables(automatic_values, compiler_runtime_context.variables if compiler_runtime_context is not None else {})
+
     builder = BlueprintBuilder(
         blocks=blueprint.blocks,  # ty:ignore[invalid-argument-type]
         environment=EnvironmentSpecification.model_validate(blueprint.environment_spec) if blueprint.environment_spec else None,
     )
-    compiled = compile_builder(builder, automatic_values)
+    compiled = compile_builder(builder, all_variables)
 
     if compiler_runtime_context:
         exec_spec = ExecutionSpecification.model_validate(
@@ -122,6 +125,8 @@ async def execute(
         )
     else:
         exec_spec = compiled
+
+    persisted_context = (compiler_runtime_context or CompilerRuntimeContext()).model_copy(update={"variables": all_variables})
 
     new_run_id, attempt_count = await run_db.upsert_run(
         run_id=effective_run_id,
@@ -131,7 +136,7 @@ async def execute(
         status="submitted",
         experiment_id=experiment_id,
         experiment_version=experiment_version,
-        compiler_runtime_context=compiler_runtime_context,
+        compiler_runtime_context=persisted_context,
         experiment_context=experiment_context,
     )
 

@@ -17,6 +17,14 @@ from fiab_core.fable import BlockInstance
 _VARIABLE_PATTERN = re.compile(r"\$\{(\w+)\}")
 
 
+def merge_variables(automatic_values: dict[str, str], context_values: dict[str, str]) -> dict[str, str]:
+    """Merge automatic system variables with caller-supplied context variables.
+
+    context_values take precedence over automatic_values for the same key.
+    """
+    return {**automatic_values, **context_values}
+
+
 def _extract_variable_names_from_value(value: str) -> set[str]:
     return set(_VARIABLE_PATTERN.findall(value))
 

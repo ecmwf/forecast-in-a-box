@@ -22,7 +22,7 @@ import datetime as dt
 import uuid
 from collections.abc import Iterable
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select, update
 
 import forecastbox.schemata.jobs as _jobs_module
@@ -42,6 +42,7 @@ class CompilerRuntimeContext(BaseModel):
     """
 
     environment: EnvironmentSpecification | None = None
+    variables: dict[str, str] = Field(default_factory=dict)
 
 
 async def upsert_run(
