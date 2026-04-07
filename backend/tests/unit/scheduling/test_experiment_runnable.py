@@ -14,7 +14,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.experiment.scheduling.job_utils import RunnableExperiment, experiment2runnable
+from forecastbox.domain.run.db import CompilerRuntimeContext
 
 
 def _make_experiment(experiment_id: str = "exp-1", job_def_id: str = "jd-1", job_def_version: int = 1) -> MagicMock:
@@ -72,7 +74,9 @@ async def test_experiment2runnable_success(mock_get_jd: AsyncMock, mock_get_exp:
     assert runnable.max_acceptable_delay_hours == 24
     assert runnable.scheduled_at == exec_time
     assert runnable.next_run_at is not None  # cron_expr computes a next run
-    assert runnable.compiler_runtime_context == {"environment": {"environment_variables": {"date": "20260101T00"}}}
+    assert runnable.compiler_runtime_context == CompilerRuntimeContext(
+        environment=EnvironmentSpecification(environment_variables={"date": "20260101T00"})
+    )
     assert runnable.blueprint is jd
 
 
@@ -124,5 +128,7 @@ async def test_experiment2runnable_dynamic_expr_applied(mock_get_jd: AsyncMock, 
     assert result.t is not None
     runnable = result.t
     # Dynamic expression "$execution_time" should be evaluated and stored in compiler_runtime_context
-    assert runnable.compiler_runtime_context == {"environment": {"environment_variables": {"date": "20260315T12"}}}
+    assert runnable.compiler_runtime_context == CompilerRuntimeContext(
+        environment=EnvironmentSpecification(environment_variables={"date": "20260315T12"})
+    )
     assert runnable.max_acceptable_delay_hours == 48

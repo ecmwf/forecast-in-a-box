@@ -41,6 +41,7 @@ from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.run.cascade import ExecutionSpecification, ProductToOutputId, execute_cascade
 from forecastbox.domain.run.compile import compile_builder, resolve_automatic_values
+from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.exceptions import RunNotFound
 from forecastbox.schemata.jobs import Blueprint, Run
 from forecastbox.utility.auth import AuthContext
@@ -85,7 +86,7 @@ async def execute(
     run_id: str | None = None,
     experiment_id: str | None = None,
     experiment_version: int | None = None,
-    compiler_runtime_context: dict | None = None,
+    compiler_runtime_context: CompilerRuntimeContext | None = None,
     experiment_context: str | None = None,
 ) -> Either[ExecuteResult, str]:  # type: ignore[invalid-argument]
     """Always creates a Run linked to the given Blueprint.
@@ -116,7 +117,9 @@ async def execute(
     compiled = compile_builder(builder, automatic_values)
 
     if compiler_runtime_context:
-        exec_spec = ExecutionSpecification.model_validate(deep_union(compiled.model_dump(), compiler_runtime_context))
+        exec_spec = ExecutionSpecification.model_validate(
+            deep_union(compiled.model_dump(), compiler_runtime_context.model_dump(exclude_unset=True))
+        )
     else:
         exec_spec = compiled
 
@@ -166,13 +169,16 @@ async def restart_run(run_id: str, auth_context: AuthContext) -> Either[ExecuteR
     if blueprint is None:
         return Either.error(f"Blueprint {blueprint_id!r} v{blueprint_version} not found")
 
+    raw_context = cast(dict | None, existing.compiler_runtime_context)
+    context = CompilerRuntimeContext.model_validate(raw_context) if raw_context is not None else None
+
     return await execute(
         blueprint,
         auth_context,
         run_id=run_id,
         experiment_id=cast(str | None, existing.experiment_id),
         experiment_version=cast(int | None, existing.experiment_version),
-        compiler_runtime_context=cast(dict | None, existing.compiler_runtime_context),
+        compiler_runtime_context=context,
         experiment_context=cast(str | None, existing.experiment_context),
     )
 

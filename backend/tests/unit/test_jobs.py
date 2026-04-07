@@ -19,7 +19,7 @@ work in-memory.  The ``mem_session_maker_all`` fixture applies all patches at on
 
 import datetime as dt
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import Any, cast
 
 import pytest
 import pytest_asyncio
@@ -29,8 +29,10 @@ import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.experiment.db as experiment_db
 import forecastbox.domain.experiment.scheduling.db as scheduling_db
 import forecastbox.domain.run.db as run_db
+from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.exceptions import BlueprintAccessDenied, BlueprintNotFound
 from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound
+from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
 from forecastbox.schemata.jobs import Base
 from forecastbox.utility.auth import AuthContext
@@ -613,6 +615,28 @@ async def test_jobs_upsert_run_pregenerated_id(mem_session_maker_both: async_ses
     )
     assert returned_id == "pregenerated-id"
     assert attempt == 1
+
+
+@pytest.mark.asyncio
+async def test_jobs_run_compiler_runtime_context_roundtrip(mem_session_maker_both: async_sessionmaker[AsyncSession]) -> None:
+    """compiler_runtime_context is persisted and retrieved as a CompilerRuntimeContext."""
+    job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
+    context = CompilerRuntimeContext(environment=EnvironmentSpecification(environment_variables={"date": "20260101T00"}))
+
+    exec_id, attempt = await run_db.upsert_run(
+        blueprint_id=job_id,
+        blueprint_version=job_v,
+        created_by="user1",
+        status="submitted",
+        compiler_runtime_context=context,
+    )
+
+    row = await run_db.get_run(exec_id, attempt_count=attempt, auth_context=_admin)
+    raw = row.compiler_runtime_context
+    assert raw == {"environment": {"environment_variables": {"date": "20260101T00"}}}
+
+    restored = CompilerRuntimeContext.model_validate(cast(dict, raw))
+    assert restored == context
 
 
 # ---------------------------------------------------------------------------

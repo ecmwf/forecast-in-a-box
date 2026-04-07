@@ -22,13 +22,26 @@ import datetime as dt
 import uuid
 from collections.abc import Iterable
 
+from pydantic import BaseModel
 from sqlalchemy import func, select, update
 
 import forecastbox.schemata.jobs as _jobs_module
+from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
 from forecastbox.schemata.jobs import Run, RunStatus
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.db import dbRetry, executeAndCommit, querySingle
+
+
+class CompilerRuntimeContext(BaseModel):
+    """Per-execution dynamic values that override compiled ExecutionSpecification fields.
+
+    Merged via deep_union into the compiled spec before job submission; only the fields
+    explicitly set here override the compiled values. Persisted as JSON on the Run row
+    so that retries reproduce the same overrides.
+    """
+
+    environment: EnvironmentSpecification | None = None
 
 
 async def upsert_run(
@@ -40,7 +53,7 @@ async def upsert_run(
     status: RunStatus,
     experiment_id: str | None = None,
     experiment_version: int | None = None,
-    compiler_runtime_context: dict | None = None,
+    compiler_runtime_context: CompilerRuntimeContext | None = None,
     experiment_context: str | None = None,
 ) -> tuple[str, int]:
     """Insert a new attempt of a Run and return (id, attempt_count).
@@ -70,7 +83,7 @@ async def upsert_run(
                     blueprint_version=blueprint_version,
                     experiment_id=experiment_id,
                     experiment_version=experiment_version,
-                    compiler_runtime_context=compiler_runtime_context,
+                    compiler_runtime_context=compiler_runtime_context.model_dump(exclude_unset=True) if compiler_runtime_context else None,
                     experiment_context=experiment_context,
                     status=status,
                     is_deleted=False,
