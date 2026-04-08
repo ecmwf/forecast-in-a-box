@@ -64,7 +64,6 @@ export const scheduleHandlers = [
       blueprint_id: 'mock-blueprint',
       blueprint_version: 1,
       cron_expr: '0 6 * * *',
-      dynamic_expr: {},
       max_acceptable_delay_hours: 24,
       enabled: true,
       created_at: new Date().toISOString(),

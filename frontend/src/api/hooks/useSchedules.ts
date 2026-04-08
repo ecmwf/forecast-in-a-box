@@ -225,7 +225,6 @@ interface CreateScheduleParams {
   fableId: string | null
   cronExpr: string
   maxAcceptableDelayHours: number
-  dynamicExpr: Record<string, string>
 }
 
 export function useCreateSchedule() {
@@ -240,7 +239,6 @@ export function useCreateSchedule() {
       fableId,
       cronExpr,
       maxAcceptableDelayHours,
-      dynamicExpr,
     }) => {
       // Upsert the fable to get a persisted id/version
       const { blueprint_id, version } = await upsertFable({
@@ -255,7 +253,6 @@ export function useCreateSchedule() {
         blueprint_id,
         blueprint_version: version,
         cron_expr: cronExpr,
-        dynamic_expr: dynamicExpr,
         max_acceptable_delay_hours: maxAcceptableDelayHours,
         display_name: name,
         display_description: description,

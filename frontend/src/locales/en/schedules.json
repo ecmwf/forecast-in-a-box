@@ -15,8 +15,6 @@
     "maxDelay": "Max delay",
     "maxDelayValue": "{{hours}} hours",
     "cronExpression": "Schedule",
-    "dynamicExpressions": "Dynamic expressions",
-    "noDynamicExpressions": "None configured",
     "runsTitle": "Execution Journal",
     "noRuns": "No executions yet",
     "scheduledAt": "Scheduled at",

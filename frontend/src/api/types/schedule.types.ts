@@ -28,7 +28,6 @@ export const ScheduleDefinitionResponseSchema = z.object({
   blueprint_id: z.string(),
   blueprint_version: z.number(),
   cron_expr: z.string(),
-  dynamic_expr: z.record(z.string(), z.string()),
   max_acceptable_delay_hours: z.number(),
   enabled: z.boolean(),
   created_at: z.string(),
@@ -90,7 +89,6 @@ export interface ScheduleSpecification {
   blueprint_id: string
   blueprint_version?: number
   cron_expr: string
-  dynamic_expr: Record<string, string>
   max_acceptable_delay_hours: number
   first_run_override?: string
   display_name?: string
@@ -102,7 +100,6 @@ export interface ScheduleSpecification {
 export interface ScheduleUpdate {
   enabled?: boolean
   cron_expr?: string
-  dynamic_expr?: Record<string, string>
   max_acceptable_delay_hours?: number
   first_run_override?: string
   display_name?: string
