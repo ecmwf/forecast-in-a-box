@@ -101,7 +101,6 @@ def _create_schedule_v2(client: httpx.Client, job_def_id: str, job_def_version: 
         blueprint_id=job_def_id,
         blueprint_version=job_def_version,
         cron_expr=cron_expr,
-        dynamic_expr={},
         max_acceptable_delay_hours=24,
         display_name="Runs v2 Test Schedule",
     )
@@ -127,7 +126,6 @@ def test_schedule_v2_crud(backend_client_with_auth: httpx.Client) -> None:
         blueprint_id=job_def_id,
         blueprint_version=job_def_version,
         cron_expr="0 0 * * *",
-        dynamic_expr={},
         max_acceptable_delay_hours=24,
         display_name="Test v2 Schedule",
     )

@@ -68,7 +68,6 @@ async def create_schedule(
     blueprint_id: str,
     blueprint_version: int | None,
     cron_expr: str,
-    dynamic_expr: dict[str, str],
     max_acceptable_delay_hours: int,
     first_run_override: dt.datetime | None,
     display_name: str | None,
@@ -94,7 +93,6 @@ async def create_schedule(
 
     experiment_definition_payload = {
         "cron_expr": cron_expr,
-        "dynamic_expr": dynamic_expr,
         "max_acceptable_delay_hours": max_acceptable_delay_hours,
         "enabled": True,
     }
@@ -157,7 +155,6 @@ async def update_schedule(
     experiment_id: str,
     cron_expr: str | None,
     enabled: bool | None,
-    dynamic_expr: dict[str, str] | None,
     max_acceptable_delay_hours: int | None,
     first_run_override: dt.datetime | None,
 ) -> ExperimentDefinition:
@@ -186,14 +183,12 @@ async def update_schedule(
                 raise ValueError(f"Invalid crontab: {cron_expr} => {e}") from e
 
         new_enabled = enabled if enabled is not None else bool(current_def.get("enabled", True))
-        new_dynamic_expr = dynamic_expr if dynamic_expr is not None else cast(dict, current_def.get("dynamic_expr", {}))
         new_max_delay = (
             max_acceptable_delay_hours if max_acceptable_delay_hours is not None else int(current_def.get("max_acceptable_delay_hours", 24))
         )
 
         new_experiment_definition = {
             "cron_expr": new_cron_expr,
-            "dynamic_expr": new_dynamic_expr,
             "max_acceptable_delay_hours": new_max_delay,
             "enabled": new_enabled,
         }

@@ -58,7 +58,6 @@ class ExperimentCreateRequest(BaseModel):
     blueprint_id: str
     blueprint_version: int | None = None
     cron_expr: str
-    dynamic_expr: dict[str, str] = {}
     max_acceptable_delay_hours: PositiveInt = 24
     first_run_override: dt.datetime | None = None
     display_name: str | None = None
@@ -76,7 +75,6 @@ class ExperimentDetail(BaseModel):
     blueprint_id: str
     blueprint_version: int
     cron_expr: str
-    dynamic_expr: dict[str, str]
     max_acceptable_delay_hours: int
     enabled: bool
     created_at: str
@@ -101,7 +99,6 @@ class ExperimentUpdateRequest(BaseModel):
     version: int
     cron_expr: str | None = None
     enabled: bool | None = None
-    dynamic_expr: dict[str, str] | None = None
     max_acceptable_delay_hours: PositiveInt | None = None
     first_run_override: dt.datetime | None = None
 
@@ -143,7 +140,6 @@ def _experiment_to_detail(exp: ExperimentDefinition) -> ExperimentDetail:
         blueprint_id=str(exp.blueprint_id),  # ty:ignore[invalid-argument-type]
         blueprint_version=cast(int, exp.blueprint_version),
         cron_expr=str(exp_def.get("cron_expr", "")),
-        dynamic_expr=cast(dict, exp_def.get("dynamic_expr", {})),
         max_acceptable_delay_hours=int(exp_def.get("max_acceptable_delay_hours", 24)),
         enabled=bool(exp_def.get("enabled", True)),
         created_at=str(exp.created_at),
@@ -171,7 +167,6 @@ async def create_experiment(
             blueprint_id=request.blueprint_id,
             blueprint_version=request.blueprint_version,
             cron_expr=request.cron_expr,
-            dynamic_expr=request.dynamic_expr,
             max_acceptable_delay_hours=request.max_acceptable_delay_hours,
             first_run_override=request.first_run_override,
             display_name=request.display_name,
@@ -243,7 +238,6 @@ async def update_experiment(
             experiment_id=update.experiment_id,
             cron_expr=update.cron_expr,
             enabled=update.enabled,
-            dynamic_expr=update.dynamic_expr,
             max_acceptable_delay_hours=update.max_acceptable_delay_hours,
             first_run_override=update.first_run_override,
         )
