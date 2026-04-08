@@ -47,7 +47,12 @@ export const QUERY_CONSTANTS = {
   RETRY: {
     DEFAULT: 3, // matches queryClient default
     NONE: 0,
+    MINIMAL: 2, // light retry for server errors only
+    ON_503: 4, // scheduler lock / plugin reload: retry up to 4 times
     AGGRESSIVE: 5,
+  },
+  RETRY_DELAY: {
+    ON_503: 500, // 503 retries: 500ms fixed delay
   },
 } as const
 

@@ -18,10 +18,10 @@ import { z } from 'zod'
 import { JobStatusSchema } from '@/api/types/job.types'
 
 // ---------------------------------------------------------------------------
-// Schemas — must match backend dataclasses in routers/schedule.py
+// Schemas — must match backend models in routes/experiment.py
 // ---------------------------------------------------------------------------
 
-/** schedule.py: ScheduleDefinitionResponse */
+/** routes/experiment.py: ScheduleDefinitionResponse */
 export const ScheduleDefinitionResponseSchema = z.object({
   experiment_id: z.string(),
   experiment_version: z.number(),
@@ -38,22 +38,21 @@ export const ScheduleDefinitionResponseSchema = z.object({
   tags: z.array(z.string()).nullable(),
 })
 
-/** schedule.py: ListSchedulesResponse */
+/** routes/experiment.py: ListSchedulesResponse */
 export const ScheduleListResponseSchema = z.object({
-  schedules: z.array(ScheduleDefinitionResponseSchema),
+  experiments: z.array(ScheduleDefinitionResponseSchema),
   total: z.number(),
   page: z.number(),
   page_size: z.number(),
   total_pages: z.number(),
-  error: z.string().nullable(),
 })
 
-/** schedule.py: CreateScheduleResponse */
+/** routes/experiment.py: CreateScheduleResponse */
 export const CreateScheduleResponseSchema = z.object({
   experiment_id: z.string(),
 })
 
-/** schedule.py: ScheduleRunResponse; status narrowed from str to known values) */
+/** routes/experiment.py: ScheduleRunResponse; status narrowed from str to known values) */
 export const ScheduleRunResponseSchema = z.object({
   run_id: z.string(),
   attempt_count: z.number(),
@@ -63,14 +62,13 @@ export const ScheduleRunResponseSchema = z.object({
   experiment_context: z.string().nullable(),
 })
 
-/** schedule.py: ScheduleRunsResponse */
+/** routes/experiment.py: ScheduleRunsResponse */
 export const ScheduleRunsResponseSchema = z.object({
   runs: z.array(ScheduleRunResponseSchema),
   total: z.number(),
   page: z.number(),
   page_size: z.number(),
   total_pages: z.number(),
-  error: z.string().nullable(),
 })
 
 // ---------------------------------------------------------------------------
@@ -92,7 +90,7 @@ export interface ScheduleSpecification {
   blueprint_id: string
   blueprint_version?: number
   cron_expr: string
-  dynamic_expr: Record<string, unknown>
+  dynamic_expr: Record<string, string>
   max_acceptable_delay_hours: number
   first_run_override?: string
   display_name?: string
@@ -104,7 +102,7 @@ export interface ScheduleSpecification {
 export interface ScheduleUpdate {
   enabled?: boolean
   cron_expr?: string
-  dynamic_expr?: Record<string, unknown>
+  dynamic_expr?: Record<string, string>
   max_acceptable_delay_hours?: number
   first_run_override?: string
   display_name?: string

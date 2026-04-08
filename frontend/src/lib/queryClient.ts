@@ -16,6 +16,7 @@
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
 import { createLogger } from './logger'
 import { showToast } from './toast'
+import { ApiClientError } from '@/api/client'
 import { QUERY_CONSTANTS } from '@/utils/constants'
 
 const log = createLogger('QueryClient')
@@ -30,6 +31,15 @@ const queryCache = new QueryCache({
       queryKey: query.queryKey,
       error: error instanceof Error ? error.message : error,
     })
+
+    // Provide specific message for 403 errors (ownership enforcement)
+    if (error instanceof ApiClientError && error.status === 403) {
+      showToast.error(
+        'Access denied',
+        'You do not have permission to view this resource.',
+      )
+      return
+    }
 
     // Only show toast for queries that had data before (user-initiated refetches)
     // This avoids showing toasts for initial loads that might have their own error UI
@@ -52,6 +62,24 @@ const mutationCache = new MutationCache({
       mutationKey: mutation.options.mutationKey,
       error: error instanceof Error ? error.message : error,
     })
+
+    // Provide specific messages for known HTTP status codes
+    if (error instanceof ApiClientError) {
+      if (error.status === 403) {
+        showToast.error(
+          'Access denied',
+          'You do not have permission to perform this action.',
+        )
+        return
+      }
+      if (error.status === 409) {
+        showToast.error(
+          'Conflict',
+          'This item was modified elsewhere. Please refresh and try again.',
+        )
+        return
+      }
+    }
 
     // Show toast for all mutation failures since they represent user actions
     showToast.error(

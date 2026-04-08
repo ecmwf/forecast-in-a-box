@@ -50,8 +50,8 @@ export const STORAGE_KEYS = {
    * Fable-related storage keys (direct localStorage)
    */
   fable: {
-    /** Metadata for saved fable configurations (title, comments, summary) */
-    metadata: 'fiab.fable.metadata',
+    /** Favourite flags for blueprints (keyed by blueprint_id) */
+    favourites: 'fiab.fable.favourites',
   },
 
   /**

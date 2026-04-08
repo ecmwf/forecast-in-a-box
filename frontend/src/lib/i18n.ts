@@ -28,6 +28,7 @@ import pluginsEN from '@/locales/en/plugins.json'
 import artifactsEN from '@/locales/en/artifacts.json'
 import executionsEN from '@/locales/en/executions.json'
 import schedulesEN from '@/locales/en/schedules.json'
+import configureEN from '@/locales/en/configure.json'
 
 // Translation resources organized by namespace
 const resources = {
@@ -43,6 +44,7 @@ const resources = {
     artifacts: artifactsEN,
     executions: executionsEN,
     schedules: schedulesEN,
+    configure: configureEN,
   },
 }
 
@@ -68,6 +70,7 @@ i18n
       'artifacts',
       'executions',
       'schedules',
+      'configure',
     ],
 
     // Interpolation options

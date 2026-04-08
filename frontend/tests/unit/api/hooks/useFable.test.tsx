@@ -448,11 +448,11 @@ describe('useUpsertFable', () => {
     expect(mutationResult!.data!.version).toBe(1)
   })
 
-  it('updates existing fable by sending parent_id in body', async () => {
+  it('updates existing fable via update endpoint when fableVersion is provided', async () => {
     let capturedBody: unknown = null
 
     worker.use(
-      http.post(API_ENDPOINTS.fable.create, async ({ request }) => {
+      http.post(API_ENDPOINTS.fable.update, async ({ request }) => {
         capturedBody = await request.json()
         return HttpResponse.json({
           blueprint_id: 'existing-id',
@@ -471,6 +471,7 @@ describe('useUpsertFable', () => {
               result.mutate({
                 fable: mockFable,
                 fableId: 'existing-id',
+                fableVersion: 1,
                 display_name: 'Updated Config',
                 display_description: '',
               })
@@ -490,7 +491,10 @@ describe('useUpsertFable', () => {
     await expect
       .element(screen.getByTestId('status'))
       .toHaveTextContent('success')
-    expect(capturedBody).toMatchObject({ parent_id: 'existing-id' })
+    expect(capturedBody).toMatchObject({
+      blueprint_id: 'existing-id',
+      version: 1,
+    })
   })
 })
 

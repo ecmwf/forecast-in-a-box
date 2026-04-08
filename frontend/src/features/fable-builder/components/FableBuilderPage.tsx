@@ -125,10 +125,13 @@ export function FableBuilderPage({
 
     if (fableId && existingFable) {
       setFable(existingFable, fableId)
-      // Restore saved title from backend metadata without marking dirty
-      if (fableRetrieveData?.display_name) {
+      // Restore saved metadata from backend without marking dirty
+      if (fableRetrieveData) {
         useFableBuilderStore.setState({
-          fableName: fableRetrieveData.display_name,
+          fableVersion: fableRetrieveData.version,
+          ...(fableRetrieveData.display_name && {
+            fableName: fableRetrieveData.display_name,
+          }),
         })
       }
       initializedRef.current = true

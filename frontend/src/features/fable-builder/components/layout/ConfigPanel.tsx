@@ -9,8 +9,9 @@
  */
 
 import { useMemo } from 'react'
-import { AlertCircle, Link2, Trash2, X } from 'lucide-react'
+import { AlertCircle, Braces, Link2, Trash2, X } from 'lucide-react'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
+import { useAvailableVariables } from '@/api/hooks/useFable'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import {
   BLOCK_KIND_METADATA,
@@ -189,6 +190,7 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
                 />
               ))}
             </div>
+            <VariablesHint />
           </div>
         )}
 
@@ -229,6 +231,37 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+      </div>
+    </div>
+  )
+}
+
+function VariablesHint(): React.ReactNode {
+  const { data: variables } = useAvailableVariables()
+
+  if (!variables || variables.length === 0) return null
+
+  return (
+    <div className="rounded-md border border-dashed border-border bg-muted/30 p-3">
+      <div className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+        <Braces className="h-3.5 w-3.5" />
+        Available Variables
+        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+          WIP
+        </span>
+      </div>
+      <div className="space-y-1">
+        {variables.map((v) => (
+          <div key={v.name} className="flex items-baseline gap-2 text-sm">
+            <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">
+              {'${' + v.name + '}'}
+            </code>
+            <span className="text-muted-foreground">
+              {v.display_name}
+              <span className="ml-1 opacity-60">e.g. {v.valueExample}</span>
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   )

@@ -21,21 +21,12 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
-import { formatDistanceToNow } from 'date-fns'
 import { useConfigPresets } from '../hooks/useConfigPresets'
 import type { PresetEntry } from '../hooks/useConfigPresets'
-import {
-  useBlockCatalogue,
-  useFableRetrieve,
-  useUpsertFable,
-} from '@/api/hooks/useFable'
-import {
-  BLOCK_KIND_METADATA,
-  BLOCK_KIND_ORDER,
-  getBlocksByKind,
-} from '@/api/types/fable.types'
+import { useFableRetrieve, useUpsertFable } from '@/api/hooks/useFable'
 import { PageHeader } from '@/components/common/PageHeader'
 import { H2, P } from '@/components/base/typography'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
@@ -57,11 +48,11 @@ import { useUiStore } from '@/stores/uiStore'
 import { cn } from '@/lib/utils'
 
 function RenamePopover({
-  fableId,
+  blueprintId,
   currentTitle,
   currentComments,
 }: {
-  fableId: string
+  blueprintId: string
   currentTitle: string
   currentComments: string
 }) {
@@ -70,7 +61,7 @@ function RenamePopover({
   const [title, setTitle] = useState(currentTitle)
   const [comments, setComments] = useState(currentComments)
   const upsertFable = useUpsertFable()
-  const { data: fableData } = useFableRetrieve(fableId)
+  const { data: fableData } = useFableRetrieve(blueprintId)
 
   function handleOpen(nextOpen: boolean) {
     if (nextOpen) {
@@ -85,7 +76,8 @@ function RenamePopover({
     if (!trimmed || !fableData) return
     upsertFable.mutate({
       fable: fableData.builder,
-      fableId,
+      fableId: blueprintId,
+      fableVersion: fableData.version,
       display_name: trimmed,
       display_description: comments.trim(),
       tags: fableData.tags,
@@ -114,9 +106,9 @@ function RenamePopover({
         </PopoverHeader>
 
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor={`rename-title-${fableId}`}>Title</Label>
+          <Label htmlFor={`rename-title-${blueprintId}`}>Title</Label>
           <Input
-            id={`rename-title-${fableId}`}
+            id={`rename-title-${blueprintId}`}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => {
@@ -126,9 +118,9 @@ function RenamePopover({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor={`rename-comments-${fableId}`}>Comments</Label>
+          <Label htmlFor={`rename-comments-${blueprintId}`}>Comments</Label>
           <textarea
-            id={`rename-comments-${fableId}`}
+            id={`rename-comments-${blueprintId}`}
             rows={2}
             value={comments}
             onChange={(e) => setComments(e.target.value)}
@@ -155,16 +147,14 @@ function PresetRow({
   onToggleFavourite,
 }: {
   preset: PresetEntry
-  onDelete: (fableId: string) => void
-  onToggleFavourite: (fableId: string) => void
+  onDelete: (blueprintId: string, version: number) => void
+  onToggleFavourite: (blueprintId: string) => void
 }) {
   const { t } = useTranslation('dashboard')
-  const { data: fableData } = useFableRetrieve(preset.fableId)
-  const { data: catalogue } = useBlockCatalogue()
 
-  const title = fableData?.display_name || preset.fableId.slice(0, 8)
-  const comments = fableData?.display_description || ''
-  const tags = fableData?.tags ?? []
+  const title = preset.displayName || preset.blueprintId.slice(0, 8)
+  const comments = preset.displayDescription || ''
+  const tags = preset.tags
 
   return (
     <div className="p-6 transition-colors hover:bg-muted/50">
@@ -174,7 +164,7 @@ function PresetRow({
           <div className="mb-1 flex items-center gap-2">
             <P className="truncate font-medium">{title}</P>
             <RenamePopover
-              fableId={preset.fableId}
+              blueprintId={preset.blueprintId}
               currentTitle={title}
               currentComments={comments}
             />
@@ -185,48 +175,15 @@ function PresetRow({
             </P>
           )}
           <div className="flex flex-wrap items-center gap-3">
-            {fableData?.builder && catalogue && (
-              <div className="flex flex-wrap gap-1.5">
-                {BLOCK_KIND_ORDER.filter(
-                  (kind) =>
-                    getBlocksByKind(fableData.builder, catalogue, kind).length >
-                    0,
-                ).map((kind) => {
-                  const meta = BLOCK_KIND_METADATA[kind]
-                  const count = getBlocksByKind(
-                    fableData.builder,
-                    catalogue,
-                    kind,
-                  ).length
-                  return (
-                    <span
-                      key={kind}
-                      className="rounded bg-muted px-2 py-1 text-sm text-muted-foreground"
-                    >
-                      {count} {meta.label.toLowerCase()}
-                      {count !== 1 ? 's' : ''}
-                    </span>
-                  )
-                })}
-              </div>
-            )}
             {tags.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-xs text-primary"
-                  >
+                  <Badge key={tag} variant="outline" className="text-xs">
                     {tag}
-                  </span>
+                  </Badge>
                 ))}
               </div>
             )}
-            <P className="text-sm text-muted-foreground">
-              {formatDistanceToNow(new Date(preset.savedAt), {
-                addSuffix: true,
-              })}
-            </P>
           </div>
         </div>
 
@@ -237,7 +194,7 @@ function PresetRow({
             size="sm"
             className="h-7 text-sm"
             render={
-              <Link to="/configure" search={{ fableId: preset.fableId }} />
+              <Link to="/configure" search={{ fableId: preset.blueprintId }} />
             }
             nativeButton={false}
           >
@@ -246,7 +203,7 @@ function PresetRow({
 
           <div className="flex items-center gap-2 text-muted-foreground">
             <button
-              onClick={() => onToggleFavourite(preset.fableId)}
+              onClick={() => onToggleFavourite(preset.blueprintId)}
               className={cn(
                 'transition-colors hover:text-yellow-500',
                 preset.isFavourite && 'text-yellow-500',
@@ -274,7 +231,7 @@ function PresetRow({
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
-                  onClick={() => onDelete(preset.fableId)}
+                  onClick={() => onDelete(preset.blueprintId, preset.version)}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   {t('presets.delete')}
@@ -312,7 +269,12 @@ export function PresetsPage() {
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
-      result = result.filter((p) => p.fableId.toLowerCase().includes(query))
+      result = result.filter(
+        (p) =>
+          (p.displayName ?? '').toLowerCase().includes(query) ||
+          p.blueprintId.toLowerCase().includes(query) ||
+          p.tags.some((tag) => tag.toLowerCase().includes(query)),
+      )
     }
 
     return result
@@ -324,7 +286,6 @@ export function PresetsPage() {
     page * PAGE_SIZE,
   )
 
-  // Reset page when filters change
   const handleFilterChange = (newFilter: PresetFilter) => {
     setFilter(newFilter)
     setPage(1)
@@ -392,7 +353,7 @@ export function PresetsPage() {
           {paginatedPresets.length > 0 ? (
             paginatedPresets.map((preset) => (
               <PresetRow
-                key={preset.fableId}
+                key={preset.blueprintId}
                 preset={preset}
                 onDelete={deletePreset}
                 onToggleFavourite={toggleFavourite}

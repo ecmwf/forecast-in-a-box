@@ -11,20 +11,20 @@
 /**
  * useConfigPresets Hook Unit Tests
  *
- * Tests the preset data-access hook:
- * - Sorting: favourites first, then by date descending
- * - deletePreset: removes a preset from the store
- * - toggleFavourite: toggles isFavourite on a preset
+ * Tests the preset data-access hook backed by the Blueprint list API:
+ * - Sorting: favourites first (from localStorage), then backend order
+ * - deletePreset: calls backend delete + cleans up favourite flag
+ * - toggleFavourite: toggles isFavourite in localStorage
  * - hasPresets: boolean for conditional rendering
  */
 
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { FableMetadataStore } from '@/features/fable-builder/components/SaveConfigPopover'
+import type { BlueprintListResponse } from '@/api/types/fable.types'
 import { useConfigPresets } from '@/features/dashboard/hooks/useConfigPresets'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
 
-// Mock logger to suppress expected error output in tests
+// Mock logger
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({
     debug: vi.fn(),
@@ -34,7 +34,7 @@ vi.mock('@/lib/logger', () => ({
   }),
 }))
 
-// Mock toast to suppress notifications
+// Mock toast
 vi.mock('@/lib/toast', () => ({
   showToast: {
     success: vi.fn(),
@@ -43,250 +43,185 @@ vi.mock('@/lib/toast', () => ({
   },
 }))
 
-function setMockPresets(presets: FableMetadataStore) {
-  localStorage.setItem(STORAGE_KEYS.fable.metadata, JSON.stringify(presets))
+const mockListResponse: BlueprintListResponse = {
+  blueprints: [
+    {
+      blueprint_id: 'bp-001',
+      version: 1,
+      display_name: 'First Config',
+      display_description: 'Description 1',
+      tags: ['prod'],
+      source: null,
+      created_by: null,
+    },
+    {
+      blueprint_id: 'bp-002',
+      version: 2,
+      display_name: 'Second Config',
+      display_description: null,
+      tags: null,
+      source: null,
+      created_by: null,
+    },
+    {
+      blueprint_id: 'bp-003',
+      version: 1,
+      display_name: null,
+      display_description: null,
+      tags: ['test', 'europe'],
+      source: null,
+      created_by: null,
+    },
+  ],
+  total: 3,
+  page: 1,
+  page_size: 50,
 }
 
-const basePresets: FableMetadataStore = {
-  'fable-001': {
-    savedAt: '2026-01-01T10:00:00Z',
-    isFavourite: false,
+const mockDeleteBlueprint = vi.fn()
+
+vi.mock('@/api/hooks/useFable', () => ({
+  useListBlueprints: () => ({
+    data: mockListResponse,
+    isLoading: false,
+    isError: false,
+  }),
+  useDeleteBlueprint: () => ({
+    mutate: mockDeleteBlueprint,
+    isPending: false,
+  }),
+  fableKeys: {
+    all: ['fable'] as const,
+    blueprints: () => ['fable', 'blueprints'] as const,
+    detail: (id: string) => ['fable', 'detail', id] as const,
   },
-  'fable-002': {
-    savedAt: '2026-01-10T10:00:00Z',
-    isFavourite: false,
-  },
-  'fable-003': {
-    savedAt: '2026-02-01T10:00:00Z',
-    isFavourite: false,
-  },
+}))
+
+function setFavourites(favourites: Record<string, boolean>) {
+  localStorage.setItem(
+    STORAGE_KEYS.fable.favourites,
+    JSON.stringify(favourites),
+  )
 }
 
 describe('useConfigPresets', () => {
   beforeEach(() => {
     localStorage.clear()
+    mockDeleteBlueprint.mockClear()
   })
 
   describe('initialization', () => {
-    it('returns empty presets when no data in localStorage', () => {
-      const { result } = renderHook(() => useConfigPresets())
-
-      expect(result.current.presets).toHaveLength(0)
-      expect(result.current.hasPresets).toBe(false)
-    })
-
-    it('returns presets from localStorage', () => {
-      setMockPresets(basePresets)
-
+    it('returns presets from the backend API', () => {
       const { result } = renderHook(() => useConfigPresets())
 
       expect(result.current.presets).toHaveLength(3)
       expect(result.current.hasPresets).toBe(true)
     })
+
+    it('maps blueprint fields to PresetEntry', () => {
+      const { result } = renderHook(() => useConfigPresets())
+
+      const first = result.current.presets[0]
+      expect(first.blueprintId).toBe('bp-001')
+      expect(first.displayName).toBe('First Config')
+      expect(first.displayDescription).toBe('Description 1')
+      expect(first.tags).toEqual(['prod'])
+      expect(first.version).toBe(1)
+      expect(first.isFavourite).toBe(false)
+    })
+
+    it('defaults tags to empty array when null', () => {
+      const { result } = renderHook(() => useConfigPresets())
+
+      const second = result.current.presets.find(
+        (p) => p.blueprintId === 'bp-002',
+      )
+      expect(second?.tags).toEqual([])
+    })
   })
 
   describe('sorting', () => {
-    it('sorts by date descending (newest first)', () => {
-      setMockPresets(basePresets)
-
-      const { result } = renderHook(() => useConfigPresets())
-
-      expect(result.current.presets[0].fableId).toBe('fable-003')
-      expect(result.current.presets[1].fableId).toBe('fable-002')
-      expect(result.current.presets[2].fableId).toBe('fable-001')
-    })
-
     it('sorts favourites before non-favourites', () => {
-      setMockPresets({
-        ...basePresets,
-        'fable-001': { ...basePresets['fable-001'], isFavourite: true },
-      })
+      setFavourites({ 'bp-003': true })
 
       const { result } = renderHook(() => useConfigPresets())
 
-      // fable-001 (oldest) is favourite, so it comes first
-      expect(result.current.presets[0].fableId).toBe('fable-001')
+      expect(result.current.presets[0].blueprintId).toBe('bp-003')
       expect(result.current.presets[0].isFavourite).toBe(true)
-      // Then newest non-favourites
-      expect(result.current.presets[1].fableId).toBe('fable-003')
-      expect(result.current.presets[2].fableId).toBe('fable-002')
-    })
-
-    it('sorts multiple favourites by date descending', () => {
-      setMockPresets({
-        ...basePresets,
-        'fable-001': { ...basePresets['fable-001'], isFavourite: true },
-        'fable-003': { ...basePresets['fable-003'], isFavourite: true },
-      })
-
-      const { result } = renderHook(() => useConfigPresets())
-
-      // Both favourites first, newest favourite first
-      expect(result.current.presets[0].fableId).toBe('fable-003')
-      expect(result.current.presets[1].fableId).toBe('fable-001')
-      // Then non-favourite
-      expect(result.current.presets[2].fableId).toBe('fable-002')
     })
   })
 
   describe('deletePreset', () => {
-    it('removes a preset from the store', () => {
-      setMockPresets(basePresets)
-
+    it('calls backend delete with blueprint_id and version', () => {
       const { result } = renderHook(() => useConfigPresets())
 
-      expect(result.current.presets).toHaveLength(3)
-
       act(() => {
-        result.current.deletePreset('fable-002')
+        result.current.deletePreset('bp-001', 1)
       })
 
-      expect(result.current.presets).toHaveLength(2)
-      expect(
-        result.current.presets.find((p) => p.fableId === 'fable-002'),
-      ).toBeUndefined()
+      expect(mockDeleteBlueprint).toHaveBeenCalledWith({
+        blueprint_id: 'bp-001',
+        version: 1,
+      })
     })
 
-    it('persists deletion to localStorage', () => {
-      setMockPresets(basePresets)
+    it('cleans up favourite flag on delete', () => {
+      setFavourites({ 'bp-001': true, 'bp-002': true })
 
       const { result } = renderHook(() => useConfigPresets())
 
       act(() => {
-        result.current.deletePreset('fable-001')
+        result.current.deletePreset('bp-001', 1)
       })
 
       const stored = JSON.parse(
-        localStorage.getItem(STORAGE_KEYS.fable.metadata) ?? '{}',
-      ) as FableMetadataStore
-      expect(stored['fable-001']).toBeUndefined()
-      expect(stored['fable-002']).toBeDefined()
-      expect(stored['fable-003']).toBeDefined()
+        localStorage.getItem(STORAGE_KEYS.fable.favourites) ?? '{}',
+      )
+      expect(stored['bp-001']).toBeUndefined()
+      expect(stored['bp-002']).toBe(true)
     })
   })
 
   describe('toggleFavourite', () => {
     it('toggles isFavourite from false to true', () => {
-      setMockPresets(basePresets)
-
       const { result } = renderHook(() => useConfigPresets())
 
-      const preset = result.current.presets.find(
-        (p) => p.fableId === 'fable-002',
-      )
-      expect(preset?.isFavourite).toBeFalsy()
-
       act(() => {
-        result.current.toggleFavourite('fable-002')
+        result.current.toggleFavourite('bp-002')
       })
 
       const updated = result.current.presets.find(
-        (p) => p.fableId === 'fable-002',
+        (p) => p.blueprintId === 'bp-002',
       )
       expect(updated?.isFavourite).toBe(true)
     })
 
     it('toggles isFavourite from true to false', () => {
-      setMockPresets({
-        ...basePresets,
-        'fable-002': { ...basePresets['fable-002'], isFavourite: true },
-      })
+      setFavourites({ 'bp-002': true })
 
       const { result } = renderHook(() => useConfigPresets())
 
       act(() => {
-        result.current.toggleFavourite('fable-002')
+        result.current.toggleFavourite('bp-002')
       })
 
       const updated = result.current.presets.find(
-        (p) => p.fableId === 'fable-002',
+        (p) => p.blueprintId === 'bp-002',
       )
       expect(updated?.isFavourite).toBe(false)
     })
 
-    it('does nothing for non-existent fableId', () => {
-      setMockPresets(basePresets)
-
-      const { result } = renderHook(() => useConfigPresets())
-
-      act(() => {
-        result.current.toggleFavourite('nonexistent')
-      })
-
-      // All presets should remain unchanged
-      expect(result.current.presets).toHaveLength(3)
-    })
-
     it('persists toggle to localStorage', () => {
-      setMockPresets(basePresets)
-
       const { result } = renderHook(() => useConfigPresets())
 
       act(() => {
-        result.current.toggleFavourite('fable-001')
+        result.current.toggleFavourite('bp-001')
       })
 
       const stored = JSON.parse(
-        localStorage.getItem(STORAGE_KEYS.fable.metadata) ?? '{}',
-      ) as FableMetadataStore
-      expect(stored['fable-001'].isFavourite).toBe(true)
-    })
-  })
-
-  describe('hasPresets', () => {
-    it('returns false when no presets exist', () => {
-      const { result } = renderHook(() => useConfigPresets())
-
-      expect(result.current.hasPresets).toBe(false)
-    })
-
-    it('returns true when presets exist', () => {
-      setMockPresets(basePresets)
-
-      const { result } = renderHook(() => useConfigPresets())
-
-      expect(result.current.hasPresets).toBe(true)
-    })
-
-    it('returns false after deleting all presets', () => {
-      setMockPresets({
-        'fable-001': basePresets['fable-001'],
-      })
-
-      const { result } = renderHook(() => useConfigPresets())
-
-      expect(result.current.hasPresets).toBe(true)
-
-      act(() => {
-        result.current.deletePreset('fable-001')
-      })
-
-      expect(result.current.hasPresets).toBe(false)
-    })
-  })
-
-  describe('preset entries', () => {
-    it('includes fableId in each entry', () => {
-      setMockPresets(basePresets)
-
-      const { result } = renderHook(() => useConfigPresets())
-
-      for (const preset of result.current.presets) {
-        expect(preset.fableId).toBeTruthy()
-      }
-    })
-
-    it('includes savedAt and isFavourite fields', () => {
-      setMockPresets(basePresets)
-
-      const { result } = renderHook(() => useConfigPresets())
-
-      const preset = result.current.presets.find(
-        (p) => p.fableId === 'fable-002',
+        localStorage.getItem(STORAGE_KEYS.fable.favourites) ?? '{}',
       )
-      expect(preset).toBeDefined()
-      expect(preset?.savedAt).toBe('2026-01-10T10:00:00Z')
-      expect(preset?.isFavourite).toBe(false)
+      expect(stored['bp-001']).toBe(true)
     })
   })
 })

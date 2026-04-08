@@ -12,41 +12,69 @@
  * Configuration Presets Integration Tests
  *
  * Tests the ConfigPresetsSection (dashboard row) and PresetsPage:
- * - Dashboard row renders preset cards from localStorage IDs + backend data
+ * - Dashboard row renders preset cards from backend Blueprint list API
  * - Dashboard row hidden when no presets exist
  * - PresetsPage renders with search, filters, and pagination
- * - PresetsPage favourite toggle and delete
  */
 
+import { HttpResponse, http } from 'msw'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithRouter } from '@tests/utils/render'
-import type { FableMetadataStore } from '@/features/fable-builder/components/SaveConfigPopover'
+import { worker } from '@tests/test-extend'
 import { ConfigPresetsSection } from '@/features/dashboard/components/ConfigPresetsSection'
 import { PresetsPage } from '@/features/dashboard/components/PresetsPage'
-import { STORAGE_KEYS } from '@/lib/storage-keys'
+import { API_ENDPOINTS } from '@/api/endpoints'
 
 // Mock useMedia to simulate desktop layout
 vi.mock('@/hooks/useMedia', () => ({
   useMedia: () => true,
 }))
 
-function setMockPresets(presets: FableMetadataStore) {
-  localStorage.setItem(STORAGE_KEYS.fable.metadata, JSON.stringify(presets))
+const mockBlueprints = [
+  {
+    blueprint_id: 'bp-001',
+    version: 1,
+    display_name: 'European Forecast',
+    display_description: 'Standard European config',
+    tags: ['prod', 'europe'],
+    source: null,
+    created_by: null,
+  },
+  {
+    blueprint_id: 'bp-002',
+    version: 2,
+    display_name: 'Test Config',
+    display_description: null,
+    tags: null,
+    source: null,
+    created_by: null,
+  },
+  {
+    blueprint_id: 'bp-003',
+    version: 1,
+    display_name: 'Global Forecast',
+    display_description: 'Full global run',
+    tags: ['global'],
+    source: null,
+    created_by: null,
+  },
+]
+
+function useBlueprintListHandler(blueprints = mockBlueprints) {
+  worker.use(
+    http.get(API_ENDPOINTS.fable.list, () => {
+      return HttpResponse.json({
+        blueprints,
+        total: blueprints.length,
+        page: 1,
+        page_size: 50,
+      })
+    }),
+  )
 }
 
-const mockPresets: FableMetadataStore = {
-  'fable-001': {
-    savedAt: '2026-01-15T14:30:00Z',
-    isFavourite: true,
-  },
-  'fable-002': {
-    savedAt: '2026-01-10T10:00:00Z',
-    isFavourite: false,
-  },
-  'fable-003': {
-    savedAt: '2026-02-01T10:00:00Z',
-    isFavourite: false,
-  },
+function useEmptyBlueprintListHandler() {
+  useBlueprintListHandler([])
 }
 
 describe('ConfigPresetsSection', () => {
@@ -55,27 +83,27 @@ describe('ConfigPresetsSection', () => {
   })
 
   it('renders nothing when no presets exist', async () => {
+    useEmptyBlueprintListHandler()
+
     const screen = await renderWithRouter(<ConfigPresetsSection />)
 
-    // The component should return null
     await expect
       .element(screen.getByText('My Configuration Presets'))
       .not.toBeInTheDocument()
   })
 
-  it('renders preset cards when presets exist in localStorage', async () => {
-    setMockPresets(mockPresets)
+  it('renders preset cards when blueprints exist on backend', async () => {
+    useBlueprintListHandler()
 
     const screen = await renderWithRouter(<ConfigPresetsSection />)
 
-    // Section heading should be visible
     await expect
       .element(screen.getByText('My Configuration Presets'))
       .toBeVisible()
   })
 
   it('shows "View all presets" link', async () => {
-    setMockPresets(mockPresets)
+    useBlueprintListHandler()
 
     const screen = await renderWithRouter(<ConfigPresetsSection />)
 
@@ -83,18 +111,19 @@ describe('ConfigPresetsSection', () => {
   })
 
   it('shows at most 4 preset cards on the dashboard', async () => {
-    const manyPresets: FableMetadataStore = {}
-    for (let i = 0; i < 6; i++) {
-      manyPresets[`fable-many-${i}`] = {
-        savedAt: new Date(2026, 0, i + 1).toISOString(),
-        isFavourite: false,
-      }
-    }
-    setMockPresets(manyPresets)
+    const manyBlueprints = Array.from({ length: 6 }, (_, i) => ({
+      blueprint_id: `bp-many-${i}`,
+      version: 1,
+      display_name: `Config ${i}`,
+      display_description: null,
+      tags: null,
+      source: null,
+      created_by: null,
+    }))
+    useBlueprintListHandler(manyBlueprints)
 
     const screen = await renderWithRouter(<ConfigPresetsSection />)
 
-    // Section should render
     await expect
       .element(screen.getByText('My Configuration Presets'))
       .toBeVisible()
@@ -107,17 +136,18 @@ describe('PresetsPage', () => {
   })
 
   it('shows empty state when no presets exist', async () => {
+    useEmptyBlueprintListHandler()
+
     const screen = await renderWithRouter(<PresetsPage />)
 
     await expect.element(screen.getByText('No saved presets yet')).toBeVisible()
   })
 
-  it('renders preset list when presets exist', async () => {
-    setMockPresets(mockPresets)
+  it('renders preset list when blueprints exist', async () => {
+    useBlueprintListHandler()
 
     const screen = await renderWithRouter(<PresetsPage />)
 
-    // Should render the page heading
     await expect
       .element(
         screen.getByRole('heading', {
@@ -129,7 +159,7 @@ describe('PresetsPage', () => {
   })
 
   it('renders search input', async () => {
-    setMockPresets(mockPresets)
+    useBlueprintListHandler()
 
     const screen = await renderWithRouter(<PresetsPage />)
 
@@ -138,7 +168,7 @@ describe('PresetsPage', () => {
   })
 
   it('shows empty filtered state when search matches nothing', async () => {
-    setMockPresets(mockPresets)
+    useBlueprintListHandler()
 
     const screen = await renderWithRouter(<PresetsPage />)
 
@@ -151,7 +181,7 @@ describe('PresetsPage', () => {
   })
 
   it('renders filter buttons', async () => {
-    setMockPresets(mockPresets)
+    useBlueprintListHandler()
 
     const screen = await renderWithRouter(<PresetsPage />)
 
@@ -160,11 +190,10 @@ describe('PresetsPage', () => {
   })
 
   it('renders Load buttons for each preset', async () => {
-    setMockPresets(mockPresets)
+    useBlueprintListHandler()
 
     const screen = await renderWithRouter(<PresetsPage />)
 
-    // Each preset should have a "Use this Preset" button
     const loadButtons = screen.getByText('Use this Preset')
     await expect.element(loadButtons.first()).toBeVisible()
   })

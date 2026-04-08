@@ -16,6 +16,7 @@ import {
 } from '../data/fable.data'
 import { consumeCatalogueUnavailable } from './plugins.handlers'
 import type {
+  BlueprintUpdateRequest,
   FableBuilderV1,
   FableUpsertRequest,
 } from '@/api/types/fable.types'
@@ -154,6 +155,76 @@ export const fableHandlers = [
     }
 
     return HttpResponse.json({ blueprint_id: newId, version: 1 })
+  }),
+
+  http.post(API_ENDPOINTS.fable.update, async ({ request }) => {
+    await delay(400)
+
+    let body: BlueprintUpdateRequest
+    try {
+      body = (await request.json()) as BlueprintUpdateRequest
+    } catch {
+      return HttpResponse.json(
+        { message: 'Invalid request body' },
+        { status: 400 },
+      )
+    }
+
+    const existing = savedFablesState[body.blueprint_id]
+    if (!existing) {
+      return HttpResponse.json(
+        { message: 'Blueprint not found' },
+        { status: 404 },
+      )
+    }
+
+    const currentVersion = fableVersions[body.blueprint_id] ?? 1
+    if (body.version !== currentVersion) {
+      return HttpResponse.json({ message: 'Version conflict' }, { status: 409 })
+    }
+
+    const newVersion = currentVersion + 1
+    fableVersions[body.blueprint_id] = newVersion
+
+    savedFablesState[body.blueprint_id] = {
+      ...existing,
+      fable: body.builder,
+      display_name: body.display_name ?? existing.display_name,
+      display_description:
+        body.display_description ?? existing.display_description,
+      tags: body.tags ?? existing.tags,
+      updated_at: new Date().toISOString(),
+    }
+
+    return HttpResponse.json({
+      blueprint_id: body.blueprint_id,
+      version: newVersion,
+    })
+  }),
+
+  http.get(API_ENDPOINTS.fable.list, async () => {
+    await delay(200)
+
+    const blueprints = Object.entries(savedFablesState)
+      .filter(
+        (pair): pair is [string, SavedFableEntry] => pair[1] !== undefined,
+      )
+      .map(([id, entry]) => ({
+        blueprint_id: id,
+        version: fableVersions[id] ?? 1,
+        display_name: entry.display_name,
+        display_description: entry.display_description,
+        tags: entry.tags,
+        source: null,
+        created_by: entry.user_id,
+      }))
+
+    return HttpResponse.json({
+      blueprints,
+      total: blueprints.length,
+      page: 1,
+      page_size: 50,
+    })
   }),
 
   http.get(API_ENDPOINTS.fable.get, async ({ request }) => {

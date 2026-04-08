@@ -18,8 +18,8 @@ import { formatDistanceToNow } from 'date-fns'
 import { Clock, Eye, MoreVertical, Pause, Play } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
-import { toast } from 'sonner'
 import type { ScheduleDefinitionResponse } from '@/api/types/schedule.types'
+import { showToast } from '@/lib/toast'
 import { useServerTime, useUpdateSchedule } from '@/api/hooks/useSchedules'
 import { cronToHumanReadable } from '@/features/schedules/utils/cron'
 import {
@@ -74,7 +74,7 @@ export function ScheduleListItem({
         version: schedule.experiment_version,
         update: { enabled: newEnabled },
       })
-      toast.success(
+      showToast.success(
         newEnabled ? t('actions.enableSuccess') : t('actions.disableSuccess'),
       )
     } catch {

@@ -44,6 +44,7 @@ function getDefaultLayoutDirection(): LayoutDirection {
 interface FableBuilderState {
   fable: FableBuilderV1
   fableId: string | null
+  fableVersion: number | null
   fableName: string
   mode: BuilderMode
   step: BuilderStep
@@ -114,7 +115,7 @@ interface FableBuilderState {
   setValidationState: (state: FableValidationState | null) => void
   setIsValidating: (validating: boolean) => void
   setSubmitDialogOpen: (open: boolean) => void
-  markSaved: (id: string, name?: string) => void
+  markSaved: (id: string, version: number, name?: string) => void
   markDirty: () => void
   reset: () => void
 }
@@ -122,6 +123,7 @@ interface FableBuilderState {
 const initialState = {
   fable: createEmptyFable(),
   fableId: null,
+  fableVersion: null,
   fableName: 'Untitled Configuration',
   mode: 'graph' as BuilderMode,
   step: 'edit' as BuilderStep,
@@ -154,6 +156,7 @@ export const useFableBuilderStore = create<FableBuilderState>()(
           set({
             fable,
             fableId: id,
+            fableVersion: null,
             isDirty: false,
             selectedBlockId: null,
             validationState: null,
@@ -502,9 +505,10 @@ export const useFableBuilderStore = create<FableBuilderState>()(
         setIsValidating: (validating) => set({ isValidating: validating }),
         setSubmitDialogOpen: (open) => set({ submitDialogOpen: open }),
 
-        markSaved: (id, name) =>
+        markSaved: (id, version, name) =>
           set({
             fableId: id,
+            fableVersion: version,
             isDirty: false,
             lastSavedAt: Date.now(),
             ...(name !== undefined && { fableName: name }),

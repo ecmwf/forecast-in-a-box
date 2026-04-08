@@ -28,7 +28,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams } from '@tanstack/react-router'
-import { toast } from 'sonner'
+import { showToast } from '@/lib/toast'
 import { useBlockCatalogue, useFable } from '@/api/hooks/useFable'
 import {
   useSchedule,
@@ -153,7 +153,7 @@ export function ScheduleDetailPage() {
         version: schedule!.experiment_version,
         update: { enabled: newEnabled },
       })
-      toast.success(
+      showToast.success(
         newEnabled ? t('actions.enableSuccess') : t('actions.disableSuccess'),
       )
     } catch {
@@ -173,7 +173,7 @@ export function ScheduleDetailPage() {
         version: schedule!.experiment_version,
         update: { cron_expr: editCronExpr },
       })
-      toast.success(t('schedules:actions.scheduleUpdated'))
+      showToast.success(t('schedules:actions.scheduleUpdated'))
       setEditScheduleOpen(false)
     } catch {
       // Error handled by mutation

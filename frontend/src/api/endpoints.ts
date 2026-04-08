@@ -71,6 +71,8 @@ export const API_ENDPOINTS = {
     list: `${API_PREFIX}/blueprint/list`,
     /** POST - Delete a fable definition */
     delete: `${API_PREFIX}/blueprint/delete`,
+    /** GET - List available automatic variables for configuration interpolation */
+    variablesList: `${API_PREFIX}/blueprint/variables/list`,
   },
 
   /**

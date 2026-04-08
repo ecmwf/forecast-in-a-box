@@ -120,7 +120,9 @@ describe('Fable Builder Save & Load', () => {
 
       // Set up a fable that is already saved (has fableId)
       setupFableWithSource()
-      useFableBuilderStore.getState().markSaved('fable-001', 'Existing Config')
+      useFableBuilderStore
+        .getState()
+        .markSaved('fable-001', 1, 'Existing Config')
 
       // Make a change to trigger dirty state
       useFableBuilderStore
@@ -280,7 +282,7 @@ describe('Fable Builder Save & Load', () => {
       useFableBuilderStore.getState().setFable(savedFable, 'fable-001')
       useFableBuilderStore
         .getState()
-        .markSaved('fable-001', 'European Temperature Forecast')
+        .markSaved('fable-001', 1, 'European Temperature Forecast')
 
       // Initially not dirty
       expect(useFableBuilderStore.getState().isDirty).toBe(false)
