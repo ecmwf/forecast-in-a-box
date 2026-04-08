@@ -26,7 +26,6 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select, update
 
 import forecastbox.schemata.jobs as _jobs_module
-from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
 from forecastbox.schemata.jobs import Run, RunStatus
 from forecastbox.utility.auth import AuthContext
@@ -41,7 +40,6 @@ class CompilerRuntimeContext(BaseModel):
     so that retries reproduce the same overrides.
     """
 
-    environment: EnvironmentSpecification | None = None
     variables: dict[str, str] = Field(default_factory=dict)
 
 

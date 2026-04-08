@@ -29,7 +29,6 @@ import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.experiment.db as experiment_db
 import forecastbox.domain.experiment.scheduling.db as scheduling_db
 import forecastbox.domain.run.db as run_db
-from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.exceptions import BlueprintAccessDenied, BlueprintNotFound
 from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound
 from forecastbox.domain.run.db import CompilerRuntimeContext
@@ -622,7 +621,6 @@ async def test_jobs_run_compiler_runtime_context_roundtrip(mem_session_maker_bot
     """compiler_runtime_context is persisted and retrieved as a CompilerRuntimeContext."""
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
     context = CompilerRuntimeContext(
-        environment=EnvironmentSpecification(environment_variables={"date": "20260101T00"}),
         variables={"runId": "test-run-id", "date": "20260101T00"},
     )
 
@@ -637,7 +635,6 @@ async def test_jobs_run_compiler_runtime_context_roundtrip(mem_session_maker_bot
     row = await run_db.get_run(exec_id, attempt_count=attempt, auth_context=_admin)
     raw = row.compiler_runtime_context
     assert raw == {
-        "environment": {"environment_variables": {"date": "20260101T00"}},
         "variables": {"runId": "test-run-id", "date": "20260101T00"},
     }
 
