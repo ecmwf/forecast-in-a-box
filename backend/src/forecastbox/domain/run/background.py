@@ -60,7 +60,7 @@ def execute_background(
         start_time = current_time()
         automatic_values: dict[str, str] = cast(
             dict[str, str],
-            resolve_automatic_values(run_id, submit_time, start_time),
+            resolve_automatic_values(run_id, submit_time, start_time, attempt_count),
         )
 
         all_variables = merge_variable_values(automatic_values, compiler_runtime_context.variables)

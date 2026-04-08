@@ -304,6 +304,8 @@ def list_available_variables() -> list[VariableDetail]:
             display_name = "Submit Datetime (fixed at first submission, preserved on restart)"
         elif var == "startDatetime":
             display_name = "Start Datetime (updated on every restart)"
+        elif var == "attemptCount":
+            display_name = "Attempt Count (incremented on every restart)"
         else:
             assert_never(var)
         result.append(VariableDetail(name=var_name, display_name=display_name, valueExample=example))

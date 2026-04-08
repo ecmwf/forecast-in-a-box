@@ -18,9 +18,10 @@ from forecastbox.utility.time import current_time
 
 # fmt: off
 AvailableAutomaticVariables = Literal[
-    "runId",          # Unique identifier for the run; stable across restarts.
+    "runId",        # Unique identifier for the run; stable across restarts.
     "submitDatetime", # Datetime when the run was first submitted; preserved on restart.
     "startDatetime",  # Datetime when the current attempt started; updated on every restart.
+    "attemptCount",   # Attempt number for the current run; incremented on every restart.
 ]
 # fmt: on
 
@@ -31,6 +32,7 @@ _values_and_examples: dict[AvailableAutomaticVariables, str] = {
     "runId": str(uuid.uuid4()),
     "submitDatetime": _current_time_example,
     "startDatetime": _current_time_example,
+    "attemptCount": "1",
 }
 
 
