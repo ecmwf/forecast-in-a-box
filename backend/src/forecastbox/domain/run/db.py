@@ -54,8 +54,8 @@ async def upsert_run(
     experiment_version: int | None = None,
     compiler_runtime_context: CompilerRuntimeContext = CompilerRuntimeContext(),
     experiment_context: str | None = None,
-) -> tuple[str, int]:
-    """Insert a new attempt of a Run and return (id, attempt_count).
+) -> tuple[str, int, dt.datetime]:
+    """Insert a new attempt of a Run and return (id, attempt_count, created_at).
 
     If ``run_id`` is omitted a fresh UUID is generated (attempt 1).
     If ``run_id`` is supplied and a Run with that id already exists, a new attempt is
@@ -92,7 +92,7 @@ async def upsert_run(
             return new_attempt
 
     new_attempt = await dbRetry(function)
-    return run_id, new_attempt
+    return run_id, new_attempt, ref_time
 
 
 async def get_run(

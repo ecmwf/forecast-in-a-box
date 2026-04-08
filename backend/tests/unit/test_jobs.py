@@ -468,7 +468,7 @@ async def test_anon_delete_experiment_bypasses_ownership(mem_session_maker_both:
 async def test_jobs_run_latest_attempt(mem_session_maker_both: async_sessionmaker[AsyncSession]) -> None:
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
 
-    exec_id, a1 = await run_db.upsert_run(
+    exec_id, a1, _ = await run_db.upsert_run(
         blueprint_id=job_id,
         blueprint_version=job_v,
         created_by="user1",
@@ -476,7 +476,7 @@ async def test_jobs_run_latest_attempt(mem_session_maker_both: async_sessionmake
     )
     assert a1 == 1
 
-    _, a2 = await run_db.upsert_run(
+    _, a2, __ = await run_db.upsert_run(
         run_id=exec_id,
         blueprint_id=job_id,
         blueprint_version=job_v,
@@ -499,7 +499,7 @@ async def test_jobs_run_latest_attempt(mem_session_maker_both: async_sessionmake
 @pytest.mark.asyncio
 async def test_jobs_update_run_runtime(mem_session_maker_both: async_sessionmaker[AsyncSession]) -> None:
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, attempt = await run_db.upsert_run(
+    exec_id, attempt, _ = await run_db.upsert_run(
         blueprint_id=job_id,
         blueprint_version=job_v,
         created_by="user1",
@@ -518,7 +518,7 @@ async def test_jobs_update_run_runtime(mem_session_maker_both: async_sessionmake
 @pytest.mark.asyncio
 async def test_jobs_run_soft_delete(mem_session_maker_both: async_sessionmaker[AsyncSession]) -> None:
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, _ = await run_db.upsert_run(
+    exec_id, _, __ = await run_db.upsert_run(
         blueprint_id=job_id,
         blueprint_version=job_v,
         created_by="user1",
@@ -536,7 +536,7 @@ async def test_jobs_run_soft_delete(mem_session_maker_both: async_sessionmaker[A
 @pytest.mark.asyncio
 async def test_jobs_list_runs_latest_only(mem_session_maker_both: async_sessionmaker[AsyncSession]) -> None:
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, _ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
+    exec_id, _, __ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
 
     executions = list(await run_db.list_runs(auth_context=_admin))
     matching = [e for e in executions if e.run_id == exec_id]
@@ -605,7 +605,7 @@ async def test_jobs_upsert_run_pregenerated_id(mem_session_maker_both: async_ses
     """Providing a run_id that does not yet exist creates a new run (attempt 1) with that id."""
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
 
-    returned_id, attempt = await run_db.upsert_run(
+    returned_id, attempt, _ = await run_db.upsert_run(
         run_id="pregenerated-id",
         blueprint_id=job_id,
         blueprint_version=job_v,
@@ -624,7 +624,7 @@ async def test_jobs_run_compiler_runtime_context_roundtrip(mem_session_maker_bot
         variables={"runId": "test-run-id", "date": "20260101T00"},
     )
 
-    exec_id, attempt = await run_db.upsert_run(
+    exec_id, attempt, _ = await run_db.upsert_run(
         blueprint_id=job_id,
         blueprint_version=job_v,
         created_by="user1",
@@ -651,7 +651,7 @@ async def test_jobs_run_compiler_runtime_context_roundtrip(mem_session_maker_bot
 async def test_run_get_own(mem_session_maker_both: async_sessionmaker[AsyncSession]) -> None:
     """Owner can retrieve their own execution."""
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, _ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
+    exec_id, _, __ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
     result = await run_db.get_run(exec_id, auth_context=_user1)
     assert result is not None
     assert result.run_id == exec_id
@@ -661,7 +661,7 @@ async def test_run_get_own(mem_session_maker_both: async_sessionmaker[AsyncSessi
 async def test_run_get_other_user_denied(mem_session_maker_both: async_sessionmaker[AsyncSession]) -> None:
     """Non-owner cannot access another user's execution."""
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, _ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
+    exec_id, _, __ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
     with pytest.raises(RunAccessDenied):
         await run_db.get_run(exec_id, auth_context=_user2)
 
@@ -670,7 +670,7 @@ async def test_run_get_other_user_denied(mem_session_maker_both: async_sessionma
 async def test_run_get_admin_sees_all(mem_session_maker_both: async_sessionmaker[AsyncSession]) -> None:
     """Admin can access any execution."""
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, _ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
+    exec_id, _, __ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
     result = await run_db.get_run(exec_id, auth_context=_admin)
     assert result is not None
 
@@ -679,7 +679,7 @@ async def test_run_get_admin_sees_all(mem_session_maker_both: async_sessionmaker
 async def test_run_get_anon_sees_all(mem_session_maker_both: async_sessionmaker[AsyncSession]) -> None:
     """Anonymous actor (unauthenticated regime) can access all executions."""
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, _ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
+    exec_id, _, __ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
     result = await run_db.get_run(exec_id, auth_context=_anon)
     assert result is not None
 
@@ -695,8 +695,8 @@ async def test_run_get_not_found(mem_session_maker_both: async_sessionmaker[Asyn
 async def test_run_list_filters_by_owner(mem_session_maker_both: async_sessionmaker[AsyncSession]) -> None:
     """Non-admin users see only their own executions in list."""
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_u1, _ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
-    exec_u2, _ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user2", status="submitted")
+    exec_u1, _, __ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
+    exec_u2, _, __ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user2", status="submitted")
 
     u1_execs = {e.run_id for e in await run_db.list_runs(auth_context=_user1)}
     assert exec_u1 in u1_execs
@@ -711,7 +711,7 @@ async def test_run_list_filters_by_owner(mem_session_maker_both: async_sessionma
 async def test_run_delete_own(mem_session_maker_both: async_sessionmaker[AsyncSession]) -> None:
     """Owner can delete their own execution."""
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, _ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
+    exec_id, _, __ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
     await run_db.soft_delete_run(exec_id, auth_context=_user1)
     with pytest.raises(RunNotFound):
         await run_db.get_run(exec_id, auth_context=_admin)
@@ -721,7 +721,7 @@ async def test_run_delete_own(mem_session_maker_both: async_sessionmaker[AsyncSe
 async def test_run_delete_other_user_denied(mem_session_maker_both: async_sessionmaker[AsyncSession]) -> None:
     """Non-owner cannot delete another user's execution."""
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, _ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
+    exec_id, _, __ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
     with pytest.raises(RunAccessDenied):
         await run_db.soft_delete_run(exec_id, auth_context=_user2)
 
@@ -730,7 +730,7 @@ async def test_run_delete_other_user_denied(mem_session_maker_both: async_sessio
 async def test_run_delete_admin_can_delete_any(mem_session_maker_both: async_sessionmaker[AsyncSession]) -> None:
     """Admin can delete any execution."""
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
-    exec_id, _ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
+    exec_id, _, __ = await run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
     await run_db.soft_delete_run(exec_id, auth_context=_admin)
     with pytest.raises(RunNotFound):
         await run_db.get_run(exec_id, auth_context=_admin)
