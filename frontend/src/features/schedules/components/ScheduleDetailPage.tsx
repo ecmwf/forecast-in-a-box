@@ -203,8 +203,6 @@ export function ScheduleDetailPage() {
     )
   }
 
-  const hasDynamicExpr = Object.keys(schedule.dynamic_expr).length > 0
-
   return (
     <div
       className={cn(
@@ -295,18 +293,6 @@ export function ScheduleDetailPage() {
           />
         )}
       </div>
-
-      {/* Dynamic expressions */}
-      {hasDynamicExpr && (
-        <Card className="p-4">
-          <P className="mb-2 text-sm font-medium text-muted-foreground">
-            {t('detail.dynamicExpressions')}
-          </P>
-          <pre className="rounded bg-muted p-3 text-sm">
-            {JSON.stringify(schedule.dynamic_expr, null, 2)}
-          </pre>
-        </Card>
-      )}
 
       {/* Configuration overview */}
       {fableBuilder && catalogue && (
