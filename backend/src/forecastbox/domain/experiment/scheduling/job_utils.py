@@ -67,6 +67,6 @@ async def experiment2runnable(experiment_id: str, exec_time: dt.datetime) -> Eit
         blueprint_id=job_def_id,
         blueprint_version=job_def_version,
         max_acceptable_delay_hours=max_acceptable_delay_hours,
-        compiler_runtime_context=CompilerRuntimeContext(),
+        compiler_runtime_context=CompilerRuntimeContext(variables={"submitDatetime": exec_time.strftime("%Y-%m-%d %H:%M:%S")}),
     )
     return Either.ok(rv)

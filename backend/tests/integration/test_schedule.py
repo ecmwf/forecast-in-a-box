@@ -59,7 +59,7 @@ def _save_blueprint(client: httpx.Client) -> tuple[str, int]:
     return data["blueprint_id"], data["version"]
 
 
-def _save_full_blueprint(client: httpx.Client, output_path: str) -> tuple[str, int]:
+def _save_full_blueprint(client: httpx.Client, output_path: str, time_output_path: str) -> tuple[str, int]:
     """Save a full BlueprintBuilder (with sink) and return (blueprint_id, version)."""
     source_42 = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="source_42"),
@@ -81,12 +81,24 @@ def _save_full_blueprint(client: httpx.Client, output_path: str) -> tuple[str, i
         configuration_values={"fname": output_path},
         input_ids={"data": "product_join"},
     )
+    source_time = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="source_text"),
+        configuration_values={"text": "${submitDatetime};${startDatetime}"},
+        input_ids={},
+    )
+    sink_time = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
+        configuration_values={"fname": time_output_path},
+        input_ids={"data": "source_time"},
+    )
     builder = BlueprintBuilder(
         blocks={
             "source_42": source_42,
             "transform_increment": transform_increment,
             "product_join": product_join,
             "sink_file": sink_file,
+            "source_time": source_time,
+            "sink_time": sink_time,
         }
     )
     resp = client.post("/blueprint/create", json=BlueprintSaveRequest(builder=builder).model_dump())
@@ -365,7 +377,8 @@ def test_schedule_v2_runs_independent_per_experiment(backend_client_with_auth: h
 def test_schedule_v2_execute(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
     """Create a schedule with first_run_override in the past; verify the scheduler executes it and produces the correct output."""
     output_path = str(pathlib.Path(str(tmpdir)) / "output")
-    job_def_id, job_def_version = _save_full_blueprint(backend_client_with_auth, output_path)
+    time_output_path = str(pathlib.Path(str(tmpdir)) / "time_output")
+    job_def_id, job_def_version = _save_full_blueprint(backend_client_with_auth, output_path, time_output_path)
 
     first_run_override = dt.datetime.now() - dt.timedelta(minutes=5)
     spec = ExperimentCreateRequest(
@@ -387,3 +400,10 @@ def test_schedule_v2_execute(tmpdir: Any, backend_client_with_auth: httpx.Client
     ensure_completed_v2(backend_client_with_auth, run_id, sleep=1, attempts=120)
 
     assert pathlib.Path(output_path).read_text() == "85"  # 42 + 1 + 42
+
+    # submitDatetime must equal exec_time (first_run_override), startDatetime must equal run's created_at.
+    status_resp = backend_client_with_auth.get("/run/get", params={"run_id": run_id})
+    assert status_resp.is_success, status_resp.text
+    created_at_sec = status_resp.json()["created_at"].split(".", 1)[0]
+    expected_submit = first_run_override.strftime("%Y-%m-%d %H:%M:%S")
+    assert pathlib.Path(time_output_path).read_text() == f"{expected_submit};{created_at_sec}"
