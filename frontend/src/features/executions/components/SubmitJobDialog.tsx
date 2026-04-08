@@ -107,7 +107,6 @@ function SubmitJobForm({
   // Schedule-specific state
   const [cronExpr, setCronExpr] = useState('0 6 * * *')
   const [maxDelayHours, setMaxDelayHours] = useState(2)
-  const [dynamicExpr] = useState<Record<string, string>>({})
 
   function addTag(value: string) {
     const trimmed = value.trim()
@@ -198,7 +197,6 @@ function SubmitJobForm({
         fableId,
         cronExpr,
         maxAcceptableDelayHours: maxDelayHours,
-        dynamicExpr,
       })
 
       showToast.success(t('submit.scheduleCreated'), name.trim())

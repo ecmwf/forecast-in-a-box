@@ -78,17 +78,29 @@ def _make_builder_full(tmpdir: str) -> BlueprintBuilder:
         configuration_values={},
         input_ids={"a": "transform_increment", "b": "source_42"},
     )
-    sink_file = BlockInstance(
+    sink_main = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
-        configuration_values={"fname": f"{tmpdir}/output${{runId}}"},
+        configuration_values={"fname": f"{tmpdir}/output${{runId}}.main.txt"},
         input_ids={"data": "product_join"},
+    )
+    source_time = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="source_text"),
+        configuration_values={"text": "${submitDatetime};${startDatetime}"},
+        input_ids={},
+    )
+    sink_time = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
+        configuration_values={"fname": f"{tmpdir}/output${{runId}}.time.txt"},
+        input_ids={"data": "source_time"},
     )
     return BlueprintBuilder(
         blocks={
             "source_42": source_42,
             "transform_increment": transform_increment,
             "product_join": product_join,
-            "sink_file": sink_file,
+            "sink_main": sink_main,
+            "source_time": source_time,
+            "sink_time": sink_time,
         }
     )
 
@@ -167,7 +179,10 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
 
     builder = BlueprintBuilder(blocks={})
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
-    assert response.json()["possible_sources"] == [{"plugin": {"store": "localTest", "local": "single"}, "factory": "source_42"}]
+    assert response.json()["possible_sources"] == [
+        {"plugin": {"store": "localTest", "local": "single"}, "factory": "source_42"},
+        {"plugin": {"store": "localTest", "local": "single"}, "factory": "source_text"},
+    ]
     assert response.json()["possible_expansions"] == {}
 
     source_42 = BlockInstance(
@@ -208,7 +223,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     # Using a missing variable should fail validation
     sink_file_bad = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
-        configuration_values={"fname": f"{tmpdir}/output${{missingVariable}}"},
+        configuration_values={"fname": f"{tmpdir}/output${{missingVariable}}.main.txt"},
         input_ids={"data": "product_join"},
     )
     blocks["product_join"] = product_join
@@ -221,7 +236,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     # Using a known variable should pass validation
     sink_file_ok = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
-        configuration_values={"fname": f"{tmpdir}/output${{runId}}"},
+        configuration_values={"fname": f"{tmpdir}/output${{runId}}.main.txt"},
         input_ids={"data": "product_join"},
     )
     blocks["sink_file"] = sink_file_ok
@@ -245,9 +260,18 @@ def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Cl
     assert response.attempt_count == 1
     ensure_completed_v2(backend_client_with_auth, run_id, sleep=1, attempts=120)
 
-    output = pathlib.Path(f"{tmpdir}/output{run_id}")
-    assert output.read_text() == "85"  # the output of 42 + 1 + 42, thats what the job is configured to do
-    output.unlink()
+    outputMain = pathlib.Path(f"{tmpdir}/output{run_id}.main.txt")
+    assert outputMain.read_text() == "85"  # the output of 42 + 1 + 42, thats what the job is configured to do
+    outputMain.unlink()
+    status_resp = backend_client_with_auth.get("/run/get", params={"run_id": run_id})
+    assert status_resp.is_success, status_resp.text
+    created_at = status_resp.json()["created_at"]
+    outputTime = pathlib.Path(f"{tmpdir}/output{run_id}.time.txt")
+    # Both submitDatetime and startDatetime equal created_at on the first run.
+    # created_at is at higher precision than the second-resolution variable values.
+    created_at_sec = created_at.split(".", 1)[0]
+    assert outputTime.read_text() == f"{created_at_sec};{created_at_sec}"
+    outputTime.unlink()
 
     list_resp = backend_client_with_auth.get("/run/list")
     assert list_resp.is_success, list_resp.text
@@ -278,7 +302,14 @@ def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Cl
     assert status_1_resp.json()["attempt_count"] == 1
 
     ensure_completed_v2(backend_client_with_auth, run_id, sleep=1, attempts=120)
-    assert output.read_text() == "85"  # the output of 42 + 1 + 42, thats what the job is configured to do
+    assert outputMain.read_text() == "85"  # the output of 42 + 1 + 42, thats what the job is configured to do
+
+    # After restart: submitDatetime must still equal original created_at; startDatetime
+    # must reflect the restart's own created_at (attempt 2).
+    status_restarted_resp = backend_client_with_auth.get("/run/get", params={"run_id": run_id})
+    assert status_restarted_resp.is_success, status_restarted_resp.text
+    created_at_restarted = status_restarted_resp.json()["created_at"].split(".", 1)[0]
+    assert outputTime.read_text() == f"{created_at_sec};{created_at_restarted}"
 
     avail_resp = backend_client_with_auth.get("/run/outputAvailability", params={"run_id": run_id})
     assert avail_resp.is_success, avail_resp.text

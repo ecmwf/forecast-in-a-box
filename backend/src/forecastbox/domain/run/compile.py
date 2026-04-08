@@ -21,18 +21,44 @@ from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.domain.run.cascade import ExecutionSpecification, RawCascadeJob
 from forecastbox.domain.variables.automatic import AvailableAutomaticVariables, get_values_and_examples
-from forecastbox.domain.variables.resolution import extract_variables, resolve_configurations
+from forecastbox.domain.variables.resolution import extract_variables, resolve_configurations, value_dt2str
 from forecastbox.utility.graph import topological_order
 
 
-def resolve_automatic_values(run_id: str, submit_datetime: datetime) -> dict[AvailableAutomaticVariables, str]:
-    """Build a mapping of all automatic variable names to their runtime values."""
+def merge_variable_values(automatic_values: dict[str, str], context_values: dict[str, str]) -> dict[str, str]:
+    """Merge automatic system variables with caller-supplied context variables.
+
+    context_values take precedence over automatic_values for the same key, with
+    the exception of ``startDatetime`` and ``attemptCount`` which are always taken
+    from automatic_values so that each restart records its own actual values.
+    """
+    merged = {**automatic_values, **context_values}
+    for pinned in ("startDatetime", "attemptCount"):
+        if pinned in automatic_values:
+            merged[pinned] = automatic_values[pinned]
+    return merged
+
+
+def resolve_automatic_values(
+    run_id: str, submit_datetime: datetime, start_datetime: datetime, attempt_count: int
+) -> dict[AvailableAutomaticVariables, str]:
+    """Build a mapping of all automatic variable names to their runtime values.
+
+    ``submitDatetime`` is set to ``submit_datetime`` and is preserved across restarts
+    (callers pass the original first-run time on retry).  ``startDatetime`` is set to
+    ``start_datetime`` (the moment execution actually begins), so restarts see a fresh value.
+    ``attemptCount`` is the current attempt number, incremented on every restart.
+    """
     resolved: dict[AvailableAutomaticVariables, str] = {}
     for var in get_values_and_examples():
         if var == "runId":
             resolved[var] = run_id
         elif var == "submitDatetime":
-            resolved[var] = submit_datetime.strftime("%Y-%m-%d %H:%M:%S")
+            resolved[var] = value_dt2str(submit_datetime)
+        elif var == "startDatetime":
+            resolved[var] = value_dt2str(start_datetime)
+        elif var == "attemptCount":
+            resolved[var] = str(attempt_count)
         else:
             assert_never(var)
     return resolved

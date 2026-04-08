@@ -22,6 +22,7 @@ import datetime as dt
 import uuid
 from collections.abc import Iterable
 
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select, update
 
 import forecastbox.schemata.jobs as _jobs_module
@@ -29,6 +30,17 @@ from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
 from forecastbox.schemata.jobs import Run, RunStatus
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.db import dbRetry, executeAndCommit, querySingle
+
+
+class CompilerRuntimeContext(BaseModel):
+    """Per-execution dynamic values that override compiled ExecutionSpecification fields.
+
+    Merged via deep_union into the compiled spec before job submission; only the fields
+    explicitly set here override the compiled values. Persisted as JSON on the Run row
+    so that retries reproduce the same overrides.
+    """
+
+    variables: dict[str, str] = Field(default_factory=dict)
 
 
 async def upsert_run(
@@ -40,28 +52,30 @@ async def upsert_run(
     status: RunStatus,
     experiment_id: str | None = None,
     experiment_version: int | None = None,
-    compiler_runtime_context: dict | None = None,
+    compiler_runtime_context: CompilerRuntimeContext = CompilerRuntimeContext(),
     experiment_context: str | None = None,
-) -> tuple[str, int]:
-    """Insert a new attempt of a Run and return (id, attempt_count).
+) -> tuple[str, int, dt.datetime]:
+    """Insert a new attempt of a Run and return (id, attempt_count, created_at).
 
     If ``run_id`` is omitted a fresh UUID is generated (attempt 1).
-    If ``run_id`` is supplied and a Run with that id already exists, a new attempt is
-    appended. If the id does not exist yet, attempt 1 is created with that id (used
-    when the caller pre-generates the id for variable resolution purposes).
+    If ``run_id`` is supplied the next attempt number is derived from the database;
+    raises ``KeyError`` if that id does not exist yet.
     No actor-level auth is enforced on creation; any caller may create an execution.
     """
-    run_id = run_id or str(uuid.uuid4())
+    supplied_run_id = run_id
+    effective_run_id = run_id or str(uuid.uuid4())
     ref_time = dt.datetime.now()
 
     async def function(i: int) -> int:
         async with _jobs_module.async_session_maker() as session:
-            result = await session.execute(select(func.max(Run.attempt_count)).where(Run.run_id == run_id))
+            result = await session.execute(select(func.max(Run.attempt_count)).where(Run.run_id == effective_run_id))
             max_attempt: int | None = result.scalar()
+            if supplied_run_id is not None and max_attempt is None:
+                raise KeyError(f"Run {supplied_run_id!r} does not exist")
             new_attempt = (max_attempt or 0) + 1
             session.add(
                 Run(
-                    run_id=run_id,
+                    run_id=effective_run_id,
                     attempt_count=new_attempt,
                     created_by=created_by,
                     created_at=ref_time,
@@ -70,7 +84,7 @@ async def upsert_run(
                     blueprint_version=blueprint_version,
                     experiment_id=experiment_id,
                     experiment_version=experiment_version,
-                    compiler_runtime_context=compiler_runtime_context,
+                    compiler_runtime_context=compiler_runtime_context.model_dump(exclude_unset=True),
                     experiment_context=experiment_context,
                     status=status,
                     is_deleted=False,
@@ -80,7 +94,7 @@ async def upsert_run(
             return new_attempt
 
     new_attempt = await dbRetry(function)
-    return run_id, new_attempt
+    return effective_run_id, new_attempt, ref_time
 
 
 async def get_run(

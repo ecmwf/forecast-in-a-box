@@ -4,7 +4,8 @@ from typing import Any
 
 import pytest
 
-from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run, current_scheduling_time, parse_crontab
+from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run, parse_crontab
+from forecastbox.utility.time import current_time
 
 
 def test_parse_crontab_valid(subtests: Any) -> None:
@@ -117,7 +118,7 @@ def test_next_run_endofyear() -> None:
 
 def test_current_scheduling_time() -> None:
     before = datetime.now()
-    result = current_scheduling_time()
+    result = current_time()
     after = datetime.now()
     assert isinstance(result, datetime)
     assert before <= result <= after

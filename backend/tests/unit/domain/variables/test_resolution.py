@@ -9,10 +9,12 @@
 
 """Unit tests for domain/variables/resolution."""
 
+import datetime as dt
+
 import pytest
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
-from forecastbox.domain.variables.resolution import extract_variables, resolve_configurations
+from forecastbox.domain.variables.resolution import extract_variables, resolve_configurations, value_dt2str
 
 
 def _block(config: dict[str, str]) -> BlockInstance:
@@ -116,3 +118,18 @@ def test_resolve_configurations_mutates_in_place() -> None:
     resolve_configurations(block, {"var": "resolved"})
     assert block.configuration_values is original_dict
     assert block.configuration_values["key"] == "resolved"
+
+
+# ---------------------------------------------------------------------------
+# value_dt2str
+# ---------------------------------------------------------------------------
+
+
+def test_value_dt2str_format() -> None:
+    d = dt.datetime(2026, 3, 15, 12, 5, 9)
+    assert value_dt2str(d) == "2026-03-15 12:05:09"
+
+
+def test_value_dt2str_midnight() -> None:
+    d = dt.datetime(2026, 1, 1, 0, 0, 0)
+    assert value_dt2str(d) == "2026-01-01 00:00:00"
