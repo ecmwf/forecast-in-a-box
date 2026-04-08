@@ -21,7 +21,7 @@ from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.domain.run.cascade import ExecutionSpecification, RawCascadeJob
 from forecastbox.domain.variables.automatic import AvailableAutomaticVariables, get_values_and_examples
-from forecastbox.domain.variables.resolution import extract_variables, resolve_configurations
+from forecastbox.domain.variables.resolution import extract_variables, resolve_configurations, value_dt2str
 from forecastbox.utility.graph import topological_order
 
 
@@ -51,9 +51,9 @@ def resolve_automatic_values(run_id: str, submit_datetime: datetime) -> dict[Ava
         if var == "runId":
             resolved[var] = run_id
         elif var == "submitDatetime":
-            resolved[var] = submit_datetime.strftime("%Y-%m-%d %H:%M:%S")
+            resolved[var] = value_dt2str(submit_datetime)
         elif var == "startDatetime":
-            resolved[var] = submit_datetime.strftime("%Y-%m-%d %H:%M:%S")
+            resolved[var] = value_dt2str(submit_datetime)
         else:
             assert_never(var)
     return resolved

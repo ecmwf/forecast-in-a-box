@@ -13,6 +13,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
+from forecastbox.domain.variables.resolution import value_dt2str
 from forecastbox.utility.time import current_time
 
 # fmt: off
@@ -23,7 +24,7 @@ AvailableAutomaticVariables = Literal[
 ]
 # fmt: on
 
-_current_time_example = current_time().strftime("%Y-%m-%d %H:%M:%S")
+_current_time_example = value_dt2str(current_time())
 
 # TODO: replace with frozendict once available so that we have immutability
 _values_and_examples: dict[AvailableAutomaticVariables, str] = {

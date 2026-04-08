@@ -9,12 +9,21 @@
 
 """Core parsing and resolution of ${variable} interpolation in BlockInstance configuration values."""
 
+import datetime as dt
 import re
 
 from cascade.low.func import Either
 from fiab_core.fable import BlockInstance
 
 _VARIABLE_PATTERN = re.compile(r"\$\{(\w+)\}")
+
+
+def value_dt2str(value: dt.datetime) -> str:
+    """Convert a datetime to the canonical string format used for all runtime variables.
+
+    To ensure that all runtime variables are stringified the same way.
+    """
+    return value.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _extract_variable_names_from_value(value: str) -> set[str]:
