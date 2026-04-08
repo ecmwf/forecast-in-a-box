@@ -9,52 +9,77 @@
  */
 
 import { useMemo } from 'react'
-import type {
-  FableMetadataStore,
-  FableSaveMetadata,
-} from '@/features/fable-builder/components/SaveConfigPopover'
+import type { BlueprintListItem } from '@/api/types/fable.types'
+import { useDeleteBlueprint, useListBlueprints } from '@/api/hooks/useFable'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
 
-export interface PresetEntry extends FableSaveMetadata {
-  fableId: string
+/** localStorage only stores favourite flags — everything else comes from the backend */
+type FavouritesStore = Record<string, boolean>
+
+export interface PresetEntry {
+  blueprintId: string
+  displayName: string | null
+  displayDescription: string | null
+  tags: Array<string>
+  version: number
+  isFavourite: boolean
 }
 
 export function useConfigPresets() {
-  const [metadataStore, setMetadataStore] = useLocalStorage<FableMetadataStore>(
-    STORAGE_KEYS.fable.metadata,
+  const { data, isLoading, isError } = useListBlueprints(1, 50)
+  const deleteMutation = useDeleteBlueprint()
+
+  const [favourites, setFavourites] = useLocalStorage<FavouritesStore>(
+    STORAGE_KEYS.fable.favourites,
     {},
   )
 
-  const presets = useMemo<Array<PresetEntry>>(
-    () =>
-      Object.entries(metadataStore)
-        .map(([fableId, meta]) => ({ fableId, ...meta }))
-        .sort((a, b) => {
-          // Favourites first
-          if (a.isFavourite && !b.isFavourite) return -1
-          if (!a.isFavourite && b.isFavourite) return 1
-          // Then by date descending
-          return new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime()
-        }),
-    [metadataStore],
-  )
+  const presets = useMemo<Array<PresetEntry>>(() => {
+    if (!data?.blueprints) return []
 
-  function deletePreset(fableId: string) {
-    const { [fableId]: _, ...rest } = metadataStore
-    setMetadataStore(rest)
+    return data.blueprints
+      .map(
+        (bp: BlueprintListItem): PresetEntry => ({
+          blueprintId: bp.blueprint_id,
+          displayName: bp.display_name,
+          displayDescription: bp.display_description,
+          tags: bp.tags ?? [],
+          version: bp.version,
+          isFavourite: !!favourites[bp.blueprint_id],
+        }),
+      )
+      .sort((a, b) => {
+        // Favourites first
+        if (a.isFavourite && !b.isFavourite) return -1
+        if (!a.isFavourite && b.isFavourite) return 1
+        return 0
+      })
+  }, [data, favourites])
+
+  function deletePreset(blueprintId: string, version: number) {
+    deleteMutation.mutate({ blueprint_id: blueprintId, version })
+    // Clean up favourite flag
+    const { [blueprintId]: _, ...rest } = favourites
+    setFavourites(rest)
   }
 
-  function toggleFavourite(fableId: string) {
-    const existing = metadataStore[fableId] as FableSaveMetadata | undefined
-    if (!existing) return
-    setMetadataStore({
-      ...metadataStore,
-      [fableId]: { ...existing, isFavourite: !existing.isFavourite },
+  function toggleFavourite(blueprintId: string) {
+    setFavourites({
+      ...favourites,
+      [blueprintId]: !favourites[blueprintId],
     })
   }
 
   const hasPresets = presets.length > 0
 
-  return { presets, deletePreset, toggleFavourite, hasPresets }
+  return {
+    presets,
+    deletePreset,
+    toggleFavourite,
+    hasPresets,
+    isLoading,
+    isError,
+    isDeleting: deleteMutation.isPending,
+  }
 }

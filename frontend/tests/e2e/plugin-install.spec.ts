@@ -50,7 +50,7 @@ test.describe('Plugin Install Flow', () => {
     let catalogue503Count = 0
     let catalogue200Count = 0
     page.on('response', (response) => {
-      if (response.url().includes('/fable/catalogue')) {
+      if (response.url().includes('/blueprint/catalogue')) {
         if (response.status() === 503) catalogue503Count++
         if (response.status() === 200) catalogue200Count++
       }

@@ -19,12 +19,11 @@ export const scheduleHandlers = [
   // GET endpoints
   http.get(API_ENDPOINTS.schedule.list, () => {
     return HttpResponse.json({
-      schedules: [],
+      experiments: [],
       total: 0,
       page: 1,
       page_size: 10,
       total_pages: 0,
-      error: null,
     })
   }),
 

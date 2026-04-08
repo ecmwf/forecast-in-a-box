@@ -96,6 +96,18 @@ export const FableBuilderV1Schema = z.object({
 
 export type FableBuilderV1 = z.infer<typeof FableBuilderV1Schema>
 
+/**
+ * Automatic variable available for ${variable} interpolation in block configuration values.
+ * Returned by GET /api/v1/blueprint/variables/list
+ */
+export const VariableDetailSchema = z.object({
+  name: z.string(),
+  display_name: z.string(),
+  valueExample: z.string(),
+})
+
+export type VariableDetail = z.infer<typeof VariableDetailSchema>
+
 export const FableValidationExpansionSchema = z.object({
   global_errors: z.array(z.string()),
   block_errors: z.record(z.string(), z.array(z.string())),
@@ -137,6 +149,46 @@ export interface FableUpsertRequest {
   parent_id?: string
 }
 
+/** routes/blueprint.py: BlueprintListItem */
+export const BlueprintListItemSchema = z.object({
+  blueprint_id: z.string(),
+  version: z.number(),
+  display_name: z.string().nullable(),
+  display_description: z.string().nullable(),
+  tags: z.array(z.string()).nullable(),
+  source: z.string().nullable(),
+  created_by: z.string().nullable(),
+})
+
+export type BlueprintListItem = z.infer<typeof BlueprintListItemSchema>
+
+/** routes/blueprint.py: BlueprintListResponse */
+export const BlueprintListResponseSchema = z.object({
+  blueprints: z.array(BlueprintListItemSchema),
+  total: z.number(),
+  page: z.number(),
+  page_size: z.number(),
+})
+
+export type BlueprintListResponse = z.infer<typeof BlueprintListResponseSchema>
+
+/** POST /blueprint/update — outbound only */
+export interface BlueprintUpdateRequest {
+  blueprint_id: string
+  version: number
+  builder: FableBuilderV1
+  display_name?: string | null
+  display_description?: string | null
+  tags?: Array<string>
+  parent_id?: string | null
+}
+
+/** POST /blueprint/delete — outbound only */
+export interface BlueprintDeleteRequest {
+  blueprint_id: string
+  version: number
+}
+
 export const FableRetrieveResponseSchema = z.object({
   blueprint_id: z.string(),
   version: z.number(),
@@ -144,8 +196,6 @@ export const FableRetrieveResponseSchema = z.object({
   display_name: z.string().nullable(),
   display_description: z.string().nullable(),
   tags: z.array(z.string()),
-  created_at: z.string().optional(),
-  updated_at: z.string().optional(),
   parent_id: z.string().nullable().optional(),
 })
 

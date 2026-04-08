@@ -12,12 +12,12 @@ import { useState } from 'react'
 import { AlertCircle, Calendar, Loader2, Play, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from '@tanstack/react-router'
-import { toast } from 'sonner'
 import type {
   FableBuilderV1,
   FableRetrieveResponse,
 } from '@/api/types/fable.types'
 import type { EnvironmentSpecification } from '@/api/types/job.types'
+import { showToast } from '@/lib/toast'
 import { createDefaultEnvironment } from '@/api/types/job.types'
 import { useFableRetrieve } from '@/api/hooks/useFable'
 import { useSubmitFable } from '@/api/hooks/useJobs'
@@ -107,7 +107,7 @@ function SubmitJobForm({
   // Schedule-specific state
   const [cronExpr, setCronExpr] = useState('0 6 * * *')
   const [maxDelayHours, setMaxDelayHours] = useState(2)
-  const [dynamicExpr] = useState<Record<string, unknown>>({})
+  const [dynamicExpr] = useState<Record<string, string>>({})
 
   function addTag(value: string) {
     const trimmed = value.trim()
@@ -168,9 +168,7 @@ function SubmitJobForm({
         environment,
       })
 
-      toast.success(t('submit.title'), {
-        description: trimmedName ?? undefined,
-      })
+      showToast.success(t('submit.title'), trimmedName ?? undefined)
 
       onOpenChange(false)
       navigate({
@@ -203,9 +201,7 @@ function SubmitJobForm({
         dynamicExpr,
       })
 
-      toast.success(t('submit.scheduleCreated'), {
-        description: name.trim(),
-      })
+      showToast.success(t('submit.scheduleCreated'), name.trim())
 
       onOpenChange(false)
       navigate({ to: '/schedules' })

@@ -90,7 +90,7 @@ export function ScheduleListPage() {
     )
   }
 
-  const schedules = data?.schedules ?? []
+  const schedules = data?.experiments ?? []
   let filteredSchedules = [...schedules].sort((a, b) =>
     b.created_at.localeCompare(a.created_at),
   )

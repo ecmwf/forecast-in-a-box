@@ -34,8 +34,12 @@ import {
   uninstallPlugin,
   updatePlugin,
 } from '@/api/endpoints/plugins'
+import { getCatalogue } from '@/api/endpoints/fable'
 import { toPluginInfoList } from '@/api/types/plugins.types'
 import { fableKeys } from '@/api/hooks/useFable'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('usePlugins')
 
 /** Query keys for plugins */
 export const pluginKeys = {
@@ -121,6 +125,32 @@ export function usePlugins(catalogue?: BlockFactoryCatalogue) {
 }
 
 /**
+ * Poll the catalogue endpoint until it stops returning 503.
+ *
+ * After a plugin install/uninstall/update the backend reloads plugins,
+ * which makes the catalogue return 503 for a variable amount of time
+ * (depends on plugin size). We poll with a generous timeout rather than
+ * relying on TanStack Query's retry budget, which is too small for
+ * large plugins.
+ */
+const CATALOGUE_POLL_INTERVAL_MS = 2000
+const CATALOGUE_POLL_TIMEOUT_MS = 60_000
+
+async function waitForCatalogue(): Promise<void> {
+  const deadline = Date.now() + CATALOGUE_POLL_TIMEOUT_MS
+  while (Date.now() < deadline) {
+    try {
+      await getCatalogue()
+      return
+    } catch {
+      log.debug('Catalogue not ready yet, retrying...')
+      await new Promise((r) => setTimeout(r, CATALOGUE_POLL_INTERVAL_MS))
+    }
+  }
+  log.warn('Catalogue poll timed out — proceeding with details refresh')
+}
+
+/**
  * Create a plugin mutation that waits for catalogue + details to refresh.
  *
  * After any plugin operation the backend reloads plugins, which temporarily
@@ -135,10 +165,9 @@ function usePluginMutation<TVariables>(
   return useMutation({
     mutationFn: async (variables: TVariables) => {
       await action(variables)
-      // Sequential on purpose: the catalogue endpoint returns 503 while plugins
-      // reload after an install/uninstall/update. Waiting for the catalogue to
-      // succeed (via retry) ensures plugins are fully loaded before we refetch
-      // details, so the UI sees the updated state. Do NOT parallelize these.
+      // Poll until the catalogue is available again (plugins finished reloading)
+      await waitForCatalogue()
+      // Now refresh both caches — catalogue is ready so these will succeed
       await queryClient.invalidateQueries({ queryKey: fableKeys.catalogue() })
       await queryClient.invalidateQueries({ queryKey: pluginKeys.details() })
     },

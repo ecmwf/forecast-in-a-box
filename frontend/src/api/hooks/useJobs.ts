@@ -91,12 +91,11 @@ export function useRestartJob() {
   return useMutation<
     JobExecuteResponse,
     Error,
-    { executionId: string; attemptCount: number }
+    { runId: string; attemptCount: number }
   >({
-    mutationFn: ({ executionId, attemptCount }) =>
-      restartJob(executionId, attemptCount),
-    onSuccess: (_data, { executionId }) => {
-      queryClient.invalidateQueries({ queryKey: jobKeys.status(executionId) })
+    mutationFn: ({ runId, attemptCount }) => restartJob(runId, attemptCount),
+    onSuccess: (_data, { runId }) => {
+      queryClient.invalidateQueries({ queryKey: jobKeys.status(runId) })
     },
   })
 }
@@ -104,13 +103,8 @@ export function useRestartJob() {
 export function useDeleteJob() {
   const queryClient = useQueryClient()
 
-  return useMutation<
-    void,
-    Error,
-    { executionId: string; attemptCount: number }
-  >({
-    mutationFn: ({ executionId, attemptCount }) =>
-      deleteJob(executionId, attemptCount),
+  return useMutation<void, Error, { runId: string; attemptCount: number }>({
+    mutationFn: ({ runId, attemptCount }) => deleteJob(runId, attemptCount),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: jobKeys.all })
     },

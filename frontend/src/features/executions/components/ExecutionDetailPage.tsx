@@ -18,13 +18,13 @@ import { useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
-import { toast } from 'sonner'
 import { ExecutionCanvas } from './ExecutionCanvas'
 import { ExecutionErrorBanner } from './ExecutionErrorBanner'
 import { ExecutionStatusHeader } from './ExecutionStatusHeader'
 import { LogsPanel } from './LogsPanel'
 import { OutputsPanel } from './OutputsPanel'
 import { SpecificationPanel } from './SpecificationPanel'
+import { showToast } from '@/lib/toast'
 import { ApiClientError } from '@/api/client'
 import { useBlockCatalogue, useFableRetrieve } from '@/api/hooks/useFable'
 import { useDeleteJob, useJobStatus, useRestartJob } from '@/api/hooks/useJobs'
@@ -56,14 +56,14 @@ export function ExecutionDetailPage() {
 
   const handleRestart = () => {
     restartMutation.mutate(
-      { executionId: jobId, attemptCount: jobData!.attempt_count },
+      { runId: jobId, attemptCount: jobData!.attempt_count },
       {
         onSuccess: () => {
-          toast.success(t('actions.restartJob'))
+          showToast.success(t('actions.restartJob'))
         },
         onError: (error) => {
           log.error('Failed to restart job', { jobId, error })
-          toast.error(error.message)
+          showToast.error(error.message)
         },
       },
     )
@@ -71,15 +71,15 @@ export function ExecutionDetailPage() {
 
   const handleDelete = () => {
     deleteMutation.mutate(
-      { executionId: jobId, attemptCount: jobData!.attempt_count },
+      { runId: jobId, attemptCount: jobData!.attempt_count },
       {
         onSuccess: () => {
-          toast.success(t('actions.deleteJob'))
+          showToast.success(t('actions.deleteJob'))
           navigate({ to: '/executions' })
         },
         onError: (error) => {
           log.error('Failed to delete job', { jobId, error })
-          toast.error(error.message)
+          showToast.error(error.message)
         },
       },
     )

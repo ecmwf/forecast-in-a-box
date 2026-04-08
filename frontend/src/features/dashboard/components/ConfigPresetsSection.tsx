@@ -11,16 +11,9 @@
 import { ChevronRight, Star } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
-import { formatDistanceToNow } from 'date-fns'
 import { useConfigPresets } from '../hooks/useConfigPresets'
 import type { PresetEntry } from '../hooks/useConfigPresets'
 import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
-import { useBlockCatalogue, useFableRetrieve } from '@/api/hooks/useFable'
-import {
-  BLOCK_KIND_METADATA,
-  BLOCK_KIND_ORDER,
-  getBlocksByKind,
-} from '@/api/types/fable.types'
 import { Badge } from '@/components/ui/badge'
 import { H2, H3, P } from '@/components/base/typography'
 import { Card } from '@/components/ui/card'
@@ -32,17 +25,14 @@ interface ConfigPresetsSectionProps {
 }
 
 function PresetCard({ preset }: { preset: PresetEntry }) {
-  const { data: fableData } = useFableRetrieve(preset.fableId)
-  const { data: catalogue } = useBlockCatalogue()
-  const tags = fableData?.tags ?? []
-
-  const title = fableData?.display_name || preset.fableId.slice(0, 8)
-  const comments = fableData?.display_description || ''
+  const title = preset.displayName || preset.blueprintId.slice(0, 8)
+  const comments = preset.displayDescription || ''
+  const tags = preset.tags
 
   return (
     <Link
       to="/configure"
-      search={{ fableId: preset.fableId }}
+      search={{ fableId: preset.blueprintId }}
       className={cn(
         'relative flex h-full cursor-pointer flex-col rounded-lg border p-5 transition-colors',
         'bg-card',
@@ -63,45 +53,15 @@ function PresetCard({ preset }: { preset: PresetEntry }) {
       )}
 
       <div className="mt-auto space-y-3">
-        {fableData?.builder && catalogue && (
-          <div className="flex flex-wrap gap-1.5">
-            {BLOCK_KIND_ORDER.filter(
-              (kind) =>
-                getBlocksByKind(fableData.builder, catalogue, kind).length > 0,
-            ).map((kind) => {
-              const meta = BLOCK_KIND_METADATA[kind]
-              const count = getBlocksByKind(
-                fableData.builder,
-                catalogue,
-                kind,
-              ).length
-              return (
-                <Badge key={kind} variant="outline" className="gap-1.5 text-xs">
-                  <span
-                    className={`inline-block h-2 w-2 rounded-full ${meta.topBarColor}`}
-                  />
-                  {count} {meta.label.toLowerCase()}
-                  {count !== 1 ? 's' : ''}
-                </Badge>
-              )
-            })}
-          </div>
-        )}
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {tags.map((tag) => (
-              <span
-                key={tag}
-                className="rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-xs text-primary"
-              >
+              <Badge key={tag} variant="outline" className="text-xs">
                 {tag}
-              </span>
+              </Badge>
             ))}
           </div>
         )}
-        <P className="text-sm text-muted-foreground">
-          {formatDistanceToNow(new Date(preset.savedAt), { addSuffix: true })}
-        </P>
       </div>
     </Link>
   )
@@ -112,9 +72,9 @@ export function ConfigPresetsSection({
   shadow,
 }: ConfigPresetsSectionProps) {
   const { t } = useTranslation('dashboard')
-  const { presets, hasPresets } = useConfigPresets()
+  const { presets, hasPresets, isLoading } = useConfigPresets()
 
-  if (!hasPresets) return null
+  if (isLoading || !hasPresets) return null
 
   const displayPresets = presets.slice(0, 4)
 
@@ -136,7 +96,7 @@ export function ConfigPresetsSection({
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         {displayPresets.map((preset) => (
-          <PresetCard key={preset.fableId} preset={preset} />
+          <PresetCard key={preset.blueprintId} preset={preset} />
         ))}
       </div>
     </>

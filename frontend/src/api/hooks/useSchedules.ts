@@ -32,6 +32,8 @@ import {
   getSchedules,
   updateSchedule,
 } from '@/api/endpoints/schedule'
+import { ApiClientError } from '@/api/client'
+import { QUERY_CONSTANTS } from '@/utils/constants'
 import { upsertFable } from '@/api/endpoints/fable'
 
 export const scheduleKeys = {
@@ -112,6 +114,13 @@ export function useUpdateSchedule() {
   >({
     mutationFn: ({ experimentId, version, update }) =>
       updateSchedule(experimentId, version, update),
+    retry: (failureCount, error) => {
+      if (error instanceof ApiClientError && error.status === 503) {
+        return failureCount < QUERY_CONSTANTS.RETRY.ON_503
+      }
+      return false
+    },
+    retryDelay: QUERY_CONSTANTS.RETRY_DELAY.ON_503,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: scheduleKeys.all })
     },
@@ -125,6 +134,13 @@ export function useDeleteSchedule() {
     {
       mutationFn: ({ experimentId, version }) =>
         deleteSchedule(experimentId, version),
+      retry: (failureCount, error) => {
+        if (error instanceof ApiClientError && error.status === 503) {
+          return failureCount < QUERY_CONSTANTS.RETRY.ON_503
+        }
+        return false
+      },
+      retryDelay: QUERY_CONSTANTS.RETRY_DELAY.ON_503,
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: scheduleKeys.all })
       },
@@ -209,7 +225,7 @@ interface CreateScheduleParams {
   fableId: string | null
   cronExpr: string
   maxAcceptableDelayHours: number
-  dynamicExpr: Record<string, unknown>
+  dynamicExpr: Record<string, string>
 }
 
 export function useCreateSchedule() {

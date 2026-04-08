@@ -10,7 +10,8 @@
     "unauthorized": "You are not authorized to access this resource",
     "forbidden": "Access to this resource is forbidden",
     "notFound": "The requested resource was not found",
-    "serverError": "Internal server error. Please try again later."
+    "serverError": "Internal server error. Please try again later.",
+    "conflict": "This item was modified elsewhere. Please refresh and try again."
   },
   "validation": {
     "required": "This field is required",

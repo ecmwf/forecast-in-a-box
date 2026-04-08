@@ -77,30 +77,26 @@ function buildHeaders(): HeadersInit {
   return headers
 }
 
-export async function getJobStatus(
-  executionId: string,
-): Promise<JobExecutionDetail> {
+export async function getJobStatus(runId: string): Promise<JobExecutionDetail> {
   return apiClient.get(API_ENDPOINTS.job.get, {
-    params: { run_id: executionId },
+    params: { run_id: runId },
     schema: JobExecutionDetailSchema,
   })
 }
 
-export async function getJobAvailable(
-  executionId: string,
-): Promise<Array<string>> {
+export async function getJobAvailable(runId: string): Promise<Array<string>> {
   return apiClient.get(API_ENDPOINTS.job.outputAvailability, {
-    params: { run_id: executionId },
+    params: { run_id: runId },
     schema: z.array(z.string()),
   })
 }
 
 export async function getJobResult(
-  executionId: string,
+  runId: string,
   datasetId: string,
 ): Promise<{ blob: Blob; contentType: string }> {
   const url = buildFullUrl(API_ENDPOINTS.job.outputContent, {
-    run_id: executionId,
+    run_id: runId,
     dataset_id: datasetId,
   })
 
@@ -122,9 +118,9 @@ export async function getJobResult(
   return { blob, contentType }
 }
 
-export async function downloadJobLogs(executionId: string): Promise<Blob> {
+export async function downloadJobLogs(runId: string): Promise<Blob> {
   const url = buildFullUrl(API_ENDPOINTS.job.logs, {
-    run_id: executionId,
+    run_id: runId,
   })
 
   const response = await fetch(url, {
@@ -143,12 +139,12 @@ export async function downloadJobLogs(executionId: string): Promise<Blob> {
 }
 
 export async function restartJob(
-  executionId: string,
+  runId: string,
   attemptCount: number,
 ): Promise<JobExecuteResponse> {
   return apiClient.post(
     API_ENDPOINTS.job.restart,
-    { run_id: executionId, attempt_count: attemptCount },
+    { run_id: runId, attempt_count: attemptCount },
     {
       schema: JobExecuteResponseSchema,
     },
@@ -156,11 +152,11 @@ export async function restartJob(
 }
 
 export async function deleteJob(
-  executionId: string,
+  runId: string,
   attemptCount: number,
 ): Promise<void> {
   return apiClient.post(API_ENDPOINTS.job.delete, {
-    run_id: executionId,
+    run_id: runId,
     attempt_count: attemptCount,
   })
 }
