@@ -30,7 +30,6 @@ from forecastbox.domain.run.cascade import ExecutionSpecification, execute_casca
 from forecastbox.domain.run.compile import compile_builder, merge_glyph_values, resolve_intrinsic_glyph_values
 from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.schemata.jobs import Blueprint
-from forecastbox.utility.structural import deep_union
 from forecastbox.utility.time import current_time
 
 logger = logging.getLogger(__name__)
@@ -79,11 +78,7 @@ def execute_background(
         referenced_glyph_names = {name for block in builder.blocks.values() for name in (cast(set[str], extract_glyphs(block).t) or set())}
         used_glyphs = {k: v for k, v in all_glyphs.items() if k in referenced_glyph_names}
 
-        compiled = compile_builder(builder, all_glyphs)
-
-        exec_spec = ExecutionSpecification.model_validate(
-            deep_union(compiled.model_dump(), compiler_runtime_context.model_dump(exclude_unset=True))
-        )
+        exec_spec = compile_builder(builder, all_glyphs)
 
         persisted_context = compiler_runtime_context.model_copy(update={"glyphs": used_glyphs})
         run_async(

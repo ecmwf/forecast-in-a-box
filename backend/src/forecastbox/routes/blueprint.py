@@ -28,6 +28,7 @@ from forecastbox.domain.blueprint.exceptions import (
     BlueprintVersionConflict,
 )
 from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand, BlueprintValidationExpansion
+from forecastbox.domain.glyphs.exceptions import GlobalGlyphAccessDenied
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples
 from forecastbox.domain.plugin.manager import catalogue_view, plugins_ready
 from forecastbox.entrypoint.auth.users import get_auth_context
@@ -376,7 +377,10 @@ async def post_global_glyph(
             status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Key {request.key!r} is reserved as an intrinsic glyph and cannot be overridden.",
         )
-    row = await global_glyph_db.upsert_global_glyph(request.key, request.value, auth_context.user_id)
+    try:
+        row = await global_glyph_db.upsert_global_glyph(request.key, request.value, auth_context)
+    except GlobalGlyphAccessDenied as e:
+        raise HTTPException(status_code=403, detail=str(e))
     return GlobalGlyphResponse(
         global_glyph_id=str(row.global_glyph_id),
         key=str(row.key),

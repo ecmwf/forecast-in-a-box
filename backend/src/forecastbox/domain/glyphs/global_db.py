@@ -16,16 +16,18 @@ from collections.abc import Iterable
 from sqlalchemy import func, select, update
 
 import forecastbox.schemata.jobs as _jobs_module
+from forecastbox.domain.glyphs.exceptions import GlobalGlyphAccessDenied
 from forecastbox.schemata.jobs import GlobalGlyph
-from forecastbox.utility.db import dbRetry, executeAndCommit, querySingle
+from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.db import dbRetry, querySingle
 
 
-async def upsert_global_glyph(key: str, value: str, created_by: str | None) -> GlobalGlyph:
+async def upsert_global_glyph(key: str, value: str, auth_context: AuthContext) -> GlobalGlyph:
     """Insert or update a GlobalGlyph by key and return it.
 
-    If the key already exists the value and updated_at are refreshed in-place;
-    the global_glyph_id and created_at are preserved.  If the key is new a
-    fresh id is generated.
+    On insert the caller becomes the owner.  On update the caller must be the
+    owner (or an admin); otherwise ``GlobalGlyphAccessDenied`` is raised so
+    that ownership cannot be hijacked via an update.
     """
     ref_time = dt.datetime.now()
 
@@ -34,10 +36,11 @@ async def upsert_global_glyph(key: str, value: str, created_by: str | None) -> G
             result = await session.execute(select(GlobalGlyph).where(GlobalGlyph.key == key))
             existing: GlobalGlyph | None = result.scalar_one_or_none()
             if existing is not None:
+                if not auth_context.allowed(existing.created_by):  # ty:ignore
+                    raise GlobalGlyphAccessDenied(f"User {auth_context.user_id!r} is not allowed to modify global glyph {key!r}.")
                 glyph_id: str = str(existing.global_glyph_id)  # ty:ignore
                 await session.execute(update(GlobalGlyph).where(GlobalGlyph.key == key).values(value=value, updated_at=ref_time))
                 await session.commit()
-                # Re-fetch to return consistent state after update.
                 refreshed = await session.execute(select(GlobalGlyph).where(GlobalGlyph.global_glyph_id == glyph_id))
                 return refreshed.scalar_one()
             else:
@@ -45,7 +48,7 @@ async def upsert_global_glyph(key: str, value: str, created_by: str | None) -> G
                     global_glyph_id=str(uuid.uuid4()),
                     key=key,
                     value=value,
-                    created_by=created_by,
+                    created_by=auth_context.user_id,
                     created_at=ref_time,
                     updated_at=ref_time,
                 )
