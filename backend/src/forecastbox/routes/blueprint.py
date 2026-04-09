@@ -383,6 +383,11 @@ async def post_global_glyph(
             status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Key {request.key!r} is reserved as an intrinsic glyph and cannot be overridden.",
         )
+    if request.public and not auth_context.has_admin():
+        raise HTTPException(
+            status_code=403,
+            detail="Only admins may create or update public global glyphs.",
+        )
     try:
         row = await global_glyph_db.upsert_global_glyph(request.key, request.value, request.public, auth_context)
     except GlobalGlyphAccessDenied as e:

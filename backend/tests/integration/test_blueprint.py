@@ -426,3 +426,10 @@ def test_list_available_glyphs(backend_client_with_auth: httpx.Client) -> None:
     assert fetched["key"] == "listGlyphsGlobalGlyph"
     assert fetched["value"] == "list_test_value"
     assert fetched["global_glyph_id"] == posted["global_glyph_id"]
+
+    # Non-admin users must not be able to create public global glyphs
+    public_resp = backend_client_with_auth.post(
+        "/blueprint/glyphs/global/post",
+        json={"key": "shouldBeRejected", "value": "v", "public": True},
+    )
+    assert public_resp.status_code == 403
