@@ -1,0 +1,19 @@
+[package]
+name = "fiab-cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "fiab"
+path = "src/main.rs"
+
+[dependencies]
+fiab-lib-client = { path = "../fiab-lib-client" }
+tokio = { version = "1", features = ["full"] }
+clap = { version = "4", features = ["derive", "env"] }
+serde_json = "1"
+toml = "0.8"
+serde = { version = "1", features = ["derive"] }
+dirs = "5"
+comfy-table = "7"
+anyhow = "1"
