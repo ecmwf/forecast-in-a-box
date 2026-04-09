@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "crates/fiab-client",
+    "crates/fiab-cli",
+]
+resolver = "2"
