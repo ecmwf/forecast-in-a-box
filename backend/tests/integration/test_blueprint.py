@@ -47,7 +47,7 @@ def ensure_completed_v2(backend_client: httpx.Client, job_id: str, sleep: float 
     def verify_ok(data: Any) -> bool | None:
         if data["status"] == "failed":
             raise RuntimeError(f"Job {job_id} failed: {data}")
-        assert data["status"] in {"submitted", "running", "completed"}, data["status"]
+        assert data["status"] in {"submitted", "preparing", "running", "completed"}, data["status"]
         return True if data["status"] == "completed" else None
 
     retry_until(do_action, verify_ok, attempts=attempts, sleep=sleep, error_msg=f"Failed to finish job {job_id}")
