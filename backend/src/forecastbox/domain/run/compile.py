@@ -18,38 +18,38 @@ from fiab_core.artifacts import CompositeArtifactId
 
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.service import BlueprintBuilder
+from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples
+from forecastbox.domain.glyphs.resolution import extract_glyphs, resolve_configurations, value_dt2str
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.domain.run.cascade import ExecutionSpecification, RawCascadeJob
-from forecastbox.domain.variables.automatic import AvailableAutomaticVariables, get_values_and_examples
-from forecastbox.domain.variables.resolution import extract_variables, resolve_configurations, value_dt2str
 from forecastbox.utility.graph import topological_order
 
 
-def merge_variable_values(automatic_values: dict[str, str], context_values: dict[str, str]) -> dict[str, str]:
-    """Merge automatic system variables with caller-supplied context variables.
+def merge_glyph_values(intrinsic_values: dict[str, str], context_values: dict[str, str]) -> dict[str, str]:
+    """Merge intrinsic system glyphs with caller-supplied context glyphs.
 
-    context_values take precedence over automatic_values for the same key, with
+    context_values take precedence over intrinsic_values for the same key, with
     the exception of ``startDatetime`` and ``attemptCount`` which are always taken
-    from automatic_values so that each restart records its own actual values.
+    from intrinsic_values so that each restart records its own actual values.
     """
-    merged = {**automatic_values, **context_values}
+    merged = {**intrinsic_values, **context_values}
     for pinned in ("startDatetime", "attemptCount"):
-        if pinned in automatic_values:
-            merged[pinned] = automatic_values[pinned]
+        if pinned in intrinsic_values:
+            merged[pinned] = intrinsic_values[pinned]
     return merged
 
 
-def resolve_automatic_values(
+def resolve_intrinsic_glyph_values(
     run_id: str, submit_datetime: datetime, start_datetime: datetime, attempt_count: int
-) -> dict[AvailableAutomaticVariables, str]:
-    """Build a mapping of all automatic variable names to their runtime values.
+) -> dict[AvailableIntrinsicGlyphs, str]:
+    """Build a mapping of all intrinsic glyph names to their runtime values.
 
     ``submitDatetime`` is set to ``submit_datetime`` and is preserved across restarts
     (callers pass the original first-run time on retry).  ``startDatetime`` is set to
     ``start_datetime`` (the moment execution actually begins), so restarts see a fresh value.
     ``attemptCount`` is the current attempt number, incremented on every restart.
     """
-    resolved: dict[AvailableAutomaticVariables, str] = {}
+    resolved: dict[AvailableIntrinsicGlyphs, str] = {}
     for var in get_values_and_examples():
         if var == "runId":
             resolved[var] = run_id
@@ -79,11 +79,11 @@ def _get_artifacts_list(graph: Graph) -> list[CompositeArtifactId]:
     return list(artifacts)
 
 
-def compile_builder(blueprint: BlueprintBuilder, variable_values: dict[str, str]) -> ExecutionSpecification:
+def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -> ExecutionSpecification:
     """Compile a BlueprintBuilder into an ExecutionSpecification.
 
-    Raises ``ValueError`` if any block cannot be compiled. When ``variable_values`` is
-    non-empty, ${variable} patterns in configuration values are resolved before compilation.
+    Raises ``ValueError`` if any block cannot be compiled. When ``glyph_values`` is
+    non-empty, ${glyph} patterns in configuration values are resolved before compilation.
     """
     graph = Graph([])
     plugins = PluginManager.plugins
@@ -94,7 +94,7 @@ def compile_builder(blueprint: BlueprintBuilder, variable_values: dict[str, str]
         plugin = plugins.get(blockInstance.factory_id.plugin, None)
         if not plugin:
             raise ValueError(f"plugin for {blockId=} not found: {blockInstance.factory_id.plugin}")
-        resolve_configurations(blockInstance, variable_values)
+        resolve_configurations(blockInstance, glyph_values)
         result = plugin.compiler(action_lookup, blockId, blockInstance)
         if result.t is None:
             raise ValueError(f"compile failed at {blockId=} with {result.e}")

@@ -21,7 +21,7 @@ from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginComposite
 
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.blueprint.service import BlueprintSaveCommand as BlueprintSaveRequest
-from forecastbox.domain.variables.resolution import value_dt2str
+from forecastbox.domain.glyphs.resolution import value_dt2str
 from forecastbox.routes.experiment import ExperimentCreateRequest, ExperimentUpdateRequest
 
 from .conftest import testPluginId

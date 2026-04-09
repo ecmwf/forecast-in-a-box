@@ -27,8 +27,8 @@ from forecastbox.domain.blueprint.exceptions import (
     BlueprintVersionConflict,
 )
 from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand, BlueprintValidationExpansion
+from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples
 from forecastbox.domain.plugin.manager import catalogue_view, plugins_ready
-from forecastbox.domain.variables.automatic import AvailableAutomaticVariables, get_values_and_examples
 from forecastbox.entrypoint.auth.users import get_auth_context
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
@@ -124,7 +124,7 @@ class BlueprintValidationExpansionResponse(BaseModel):
     possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]]
 
 
-class VariableDetail(BaseModel):
+class GlyphDetail(BaseModel):
     name: str
     display_name: str
     valueExample: str
@@ -292,21 +292,21 @@ def expand_blueprint(blueprint: BlueprintBuilder) -> BlueprintValidationExpansio
     )
 
 
-@router.get("/variables/list")
-def list_available_variables() -> list[VariableDetail]:
-    """List all automatic variables available for use in configuration value interpolation."""
-    result: list[VariableDetail] = []
-    for var_name, example in get_values_and_examples().items():
-        var: AvailableAutomaticVariables = var_name
-        if var == "runId":
+@router.get("/glyphs/list")
+def list_available_glyphs() -> list[GlyphDetail]:
+    """List all intrinsic glyphs available for use in configuration value interpolation."""
+    result: list[GlyphDetail] = []
+    for glyph_name, example in get_values_and_examples().items():
+        glyph: AvailableIntrinsicGlyphs = glyph_name
+        if glyph == "runId":
             display_name = "Run ID"
-        elif var == "submitDatetime":
+        elif glyph == "submitDatetime":
             display_name = "Submit Datetime (fixed at first submission, preserved on restart)"
-        elif var == "startDatetime":
+        elif glyph == "startDatetime":
             display_name = "Start Datetime (updated on every restart)"
-        elif var == "attemptCount":
+        elif glyph == "attemptCount":
             display_name = "Attempt Count (incremented on every restart)"
         else:
-            assert_never(var)
-        result.append(VariableDetail(name=var_name, display_name=display_name, valueExample=example))
+            assert_never(glyph)
+        result.append(GlyphDetail(name=glyph_name, display_name=display_name, valueExample=example))
     return result

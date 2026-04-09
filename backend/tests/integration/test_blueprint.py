@@ -31,7 +31,7 @@ from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginComposite
 
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand
-from forecastbox.domain.variables.automatic import AvailableAutomaticVariables
+from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs
 from forecastbox.routes.run import RunCreateResponse
 
 from .conftest import testPluginId
@@ -220,7 +220,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
         configuration_values={},
         input_ids={"a": "transform_increment", "b": "source_42"},
     )
-    # Using a missing variable should fail validation
+    # Using a missing glyph should fail validation
     sink_file_bad = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
         configuration_values={"fname": f"{tmpdir}/output${{missingVariable}}.main.txt"},
@@ -233,7 +233,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert "sink_file" in response.json()["block_errors"]
 
-    # Using a known variable should pass validation
+    # Using a known glyph should pass validation
     sink_file_ok = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
         configuration_values={"fname": f"{tmpdir}/output${{runId}}.main.txt"},
@@ -268,7 +268,7 @@ def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Cl
     created_at = status_resp.json()["created_at"]
     outputTime = pathlib.Path(f"{tmpdir}/output{run_id}.time.txt")
     # Both submitDatetime and startDatetime equal created_at on the first run.
-    # created_at is at higher precision than the second-resolution variable values.
+    # created_at is at higher precision than the second-resolution glyph values.
     created_at_sec = created_at.split(".", 1)[0]
     assert outputTime.read_text() == f"{created_at_sec};{created_at_sec}"
     outputTime.unlink()
@@ -351,14 +351,14 @@ def test_submit_job_v2_restart_not_found(backend_client_with_auth: httpx.Client)
     assert resp.status_code == 404
 
 
-def test_list_available_variables(backend_client_with_auth: httpx.Client) -> None:
-    """The variables/list endpoint returns exactly the set of AvailableAutomaticVariables."""
-    response = backend_client_with_auth.get("/blueprint/variables/list")
+def test_list_available_glyphs(backend_client_with_auth: httpx.Client) -> None:
+    """The glyphs/list endpoint returns exactly the set of AvailableIntrinsicGlyphs."""
+    response = backend_client_with_auth.get("/blueprint/glyphs/list")
     assert response.is_success, response.text
     data = response.json()
     assert isinstance(data, list)
     returned_names = {item["name"] for item in data}
-    expected_names = set(get_args(AvailableAutomaticVariables))
+    expected_names = set(get_args(AvailableIntrinsicGlyphs))
     assert returned_names == expected_names
     for item in data:
         assert "display_name" in item
