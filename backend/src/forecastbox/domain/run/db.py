@@ -40,7 +40,7 @@ class CompilerRuntimeContext(BaseModel):
     so that retries reproduce the same overrides.
     """
 
-    variables: dict[str, str] = Field(default_factory=dict)
+    glyphs: dict[str, str] = Field(default_factory=dict)
 
 
 async def upsert_run(

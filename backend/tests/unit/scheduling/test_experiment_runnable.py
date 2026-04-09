@@ -72,7 +72,7 @@ async def test_experiment2runnable_success(mock_get_jd: AsyncMock, mock_get_exp:
     assert runnable.max_acceptable_delay_hours == 24
     assert runnable.scheduled_at == exec_time
     assert runnable.next_run_at is not None  # cron_expr computes a next run
-    assert runnable.compiler_runtime_context == CompilerRuntimeContext(variables={"submitDatetime": "2026-01-01 00:00:00"})
+    assert runnable.compiler_runtime_context == CompilerRuntimeContext(glyphs={"submitDatetime": "2026-01-01 00:00:00"})
     assert runnable.blueprint is jd
 
 

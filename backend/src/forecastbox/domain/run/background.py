@@ -21,14 +21,16 @@ import uuid
 from datetime import datetime
 from typing import cast
 
+import forecastbox.domain.glyphs.global_db as global_glyph_db
 import forecastbox.domain.run.db as run_db
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.service import BlueprintBuilder
+from forecastbox.domain.glyphs.resolution import extract_glyphs
 from forecastbox.domain.run.cascade import ExecutionSpecification, execute_cascade
-from forecastbox.domain.run.compile import compile_builder, merge_variable_values, resolve_automatic_values
+from forecastbox.domain.run.compile import compile_builder, merge_glyph_values, resolve_intrinsic_glyph_values
 from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.schemata.jobs import Blueprint
-from forecastbox.utility.structural import deep_union
+from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.time import current_time
 
 logger = logging.getLogger(__name__)
@@ -41,6 +43,7 @@ def execute_background(
     blueprint: Blueprint,
     compiler_runtime_context: CompilerRuntimeContext,
     loop: asyncio.AbstractEventLoop,
+    auth_context: AuthContext,
 ) -> None:
     """Compile a blueprint and submit it to cascade, updating the Run row as we go.
 
@@ -48,7 +51,7 @@ def execute_background(
     dispatched to ``loop`` via ``asyncio.run_coroutine_threadsafe``.
 
     ``submit_time`` is the ``created_at`` timestamp recorded when the Run row was
-    first inserted; it becomes ``submitDatetime`` in the automatic variables so that
+    first inserted; it becomes ``submitDatetime`` in the intrinsic glyphs so that
     retries preserve the original submission time. ``startDatetime`` is set to the
     moment this function actually begins executing (i.e. ``current_time()``).
     """
@@ -58,24 +61,28 @@ def execute_background(
 
     try:
         start_time = current_time()
-        automatic_values: dict[str, str] = cast(
+        intrinsic_values: dict[str, str] = cast(
             dict[str, str],
-            resolve_automatic_values(run_id, submit_time, start_time, attempt_count),
+            resolve_intrinsic_glyph_values(run_id, submit_time, start_time, attempt_count),
         )
 
-        all_variables = merge_variable_values(automatic_values, compiler_runtime_context.variables)
+        global_rows = list(cast(list, run_async(global_glyph_db.list_global_glyphs(auth_context))))
+        global_values: dict[str, str] = {str(row.key): str(row.value) for row in global_rows}
+
+        all_glyphs = merge_glyph_values(intrinsic_values, global_values, compiler_runtime_context.glyphs)
 
         builder = BlueprintBuilder(
             blocks=blueprint.blocks,  # ty:ignore[invalid-argument-type]
             environment=EnvironmentSpecification.model_validate(blueprint.environment_spec) if blueprint.environment_spec else None,
         )
-        compiled = compile_builder(builder, all_variables)
 
-        exec_spec = ExecutionSpecification.model_validate(
-            deep_union(compiled.model_dump(), compiler_runtime_context.model_dump(exclude_unset=True))
-        )
+        # Persist only the glyphs actually referenced in the builder, keeping the stored context lean.
+        referenced_glyph_names = {name for block in builder.blocks.values() for name in (cast(set[str], extract_glyphs(block).t) or set())}
+        used_glyphs = {k: v for k, v in all_glyphs.items() if k in referenced_glyph_names}
 
-        persisted_context = compiler_runtime_context.model_copy(update={"variables": all_variables})
+        exec_spec = compile_builder(builder, all_glyphs)
+
+        persisted_context = compiler_runtime_context.model_copy(update={"glyphs": used_glyphs})
         run_async(
             run_db.update_run_runtime(
                 run_id,

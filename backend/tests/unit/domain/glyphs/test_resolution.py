@@ -7,14 +7,14 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Unit tests for domain/variables/resolution."""
+"""Unit tests for domain/glyphs/resolution."""
 
 import datetime as dt
 
 import pytest
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
-from forecastbox.domain.variables.resolution import extract_variables, resolve_configurations, value_dt2str
+from forecastbox.domain.glyphs.resolution import extract_glyphs, resolve_configurations, value_dt2str
 
 
 def _block(config: dict[str, str]) -> BlockInstance:
@@ -29,48 +29,48 @@ def _block(config: dict[str, str]) -> BlockInstance:
 
 
 # ---------------------------------------------------------------------------
-# extract_variables
+# extract_glyphs
 # ---------------------------------------------------------------------------
 
 
-def test_extract_variables_no_vars() -> None:
+def test_extract_glyphs_no_glyphs() -> None:
     block = _block({"key": "plain_value"})
-    result = extract_variables(block)
+    result = extract_glyphs(block)
     assert result.e is None
     assert result.t == set()
 
 
-def test_extract_variables_single() -> None:
+def test_extract_glyphs_single() -> None:
     block = _block({"key": "${myVar}"})
-    result = extract_variables(block)
+    result = extract_glyphs(block)
     assert result.e is None
     assert result.t == {"myVar"}
 
 
-def test_extract_variables_multiple_in_one_value() -> None:
+def test_extract_glyphs_multiple_in_one_value() -> None:
     block = _block({"key": "${var1}_${var2}"})
-    result = extract_variables(block)
+    result = extract_glyphs(block)
     assert result.e is None
     assert result.t == {"var1", "var2"}
 
 
-def test_extract_variables_across_multiple_keys() -> None:
+def test_extract_glyphs_across_multiple_keys() -> None:
     block = _block({"key1": "${var1}", "key2": "${var2}"})
-    result = extract_variables(block)
+    result = extract_glyphs(block)
     assert result.e is None
     assert result.t == {"var1", "var2"}
 
 
-def test_extract_variables_deduplicates() -> None:
+def test_extract_glyphs_deduplicates() -> None:
     block = _block({"a": "${runId}", "b": "prefix_${runId}_suffix"})
-    result = extract_variables(block)
+    result = extract_glyphs(block)
     assert result.e is None
     assert result.t == {"runId"}
 
 
-def test_extract_variables_mixed_plain_and_template() -> None:
+def test_extract_glyphs_mixed_plain_and_template() -> None:
     block = _block({"a": "static", "b": "${dynamic}"})
-    result = extract_variables(block)
+    result = extract_glyphs(block)
     assert result.e is None
     assert result.t == {"dynamic"}
 
@@ -92,7 +92,7 @@ def test_resolve_configurations_partial_substitution() -> None:
     assert block.configuration_values["key"] == "prefix_world_suffix"
 
 
-def test_resolve_configurations_multiple_vars_in_value() -> None:
+def test_resolve_configurations_multiple_glyphs_in_value() -> None:
     block = _block({"key": "${a}_${b}"})
     resolve_configurations(block, {"a": "hello", "b": "world"})
     assert block.configuration_values["key"] == "hello_world"

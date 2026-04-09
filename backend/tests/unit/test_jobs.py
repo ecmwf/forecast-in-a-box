@@ -620,7 +620,7 @@ async def test_jobs_run_compiler_runtime_context_roundtrip(mem_session_maker_bot
     """compiler_runtime_context is persisted and retrieved as a CompilerRuntimeContext."""
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
     context = CompilerRuntimeContext(
-        variables={"runId": "test-run-id", "date": "20260101T00"},
+        glyphs={"runId": "test-run-id", "date": "20260101T00"},
     )
 
     exec_id, attempt, _ = await run_db.upsert_run(
@@ -634,7 +634,7 @@ async def test_jobs_run_compiler_runtime_context_roundtrip(mem_session_maker_bot
     row = await run_db.get_run(exec_id, attempt_count=attempt, auth_context=_admin)
     raw = row.compiler_runtime_context
     assert raw == {
-        "variables": {"runId": "test-run-id", "date": "20260101T00"},
+        "glyphs": {"runId": "test-run-id", "date": "20260101T00"},
     }
 
     restored = CompilerRuntimeContext.model_validate(cast(dict, raw))

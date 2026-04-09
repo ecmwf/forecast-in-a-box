@@ -18,8 +18,8 @@ from cascade.low.func import Either
 import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.experiment.db as experiment_db
 from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run
+from forecastbox.domain.glyphs.resolution import value_dt2str
 from forecastbox.domain.run.db import CompilerRuntimeContext
-from forecastbox.domain.variables.resolution import value_dt2str
 from forecastbox.schemata.jobs import Blueprint
 
 
@@ -68,6 +68,6 @@ async def experiment2runnable(experiment_id: str, exec_time: dt.datetime) -> Eit
         blueprint_id=job_def_id,
         blueprint_version=job_def_version,
         max_acceptable_delay_hours=max_acceptable_delay_hours,
-        compiler_runtime_context=CompilerRuntimeContext(variables={"submitDatetime": value_dt2str(exec_time)}),
+        compiler_runtime_context=CompilerRuntimeContext(glyphs={"submitDatetime": value_dt2str(exec_time)}),
     )
     return Either.ok(rv)

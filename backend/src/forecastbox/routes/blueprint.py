@@ -10,7 +10,7 @@
 """Blueprint entity routes — /blueprint/*"""
 
 PREFIX = "/api/v1/blueprint"
-from typing import Annotated, cast
+from typing import Annotated, Literal, cast
 
 from cascade.low.func import assert_never
 from fastapi import APIRouter, Depends
@@ -21,14 +21,16 @@ from pydantic import BaseModel
 
 import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.blueprint.service as blueprint_service
+import forecastbox.domain.glyphs.global_db as global_glyph_db
 from forecastbox.domain.blueprint.exceptions import (
     BlueprintAccessDenied,
     BlueprintNotFound,
     BlueprintVersionConflict,
 )
 from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand, BlueprintValidationExpansion
+from forecastbox.domain.glyphs.exceptions import GlobalGlyphAccessDenied
+from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples
 from forecastbox.domain.plugin.manager import catalogue_view, plugins_ready
-from forecastbox.domain.variables.automatic import AvailableAutomaticVariables, get_values_and_examples
 from forecastbox.entrypoint.auth.users import get_auth_context
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
@@ -124,10 +126,45 @@ class BlueprintValidationExpansionResponse(BaseModel):
     possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]]
 
 
-class VariableDetail(BaseModel):
+class GlyphDetail(BaseModel):
     name: str
     display_name: str
     valueExample: str
+
+
+class GlyphListResponse(BaseModel):
+    """Paginated list of glyphs, for both intrinsic and global types."""
+
+    glyphs: list[GlyphDetail]
+    total: int
+    page: int
+    page_size: int
+
+
+class GlobalGlyphPostRequest(BaseModel):
+    """Request body for creating or updating a global glyph."""
+
+    key: str
+    value: str
+    public: bool = False
+
+
+class GlobalGlyphResponse(BaseModel):
+    """Detail of a single global glyph, returned by get and post endpoints."""
+
+    global_glyph_id: str
+    key: str
+    value: str
+    public: bool
+    created_by: str | None = None
+    created_at: str
+    updated_at: str
+
+
+class GlobalGlyphId(BaseModel):
+    """Identifies a global glyph by its stable id."""
+
+    global_glyph_id: str
 
 
 # ---------------------------------------------------------------------------
@@ -277,13 +314,16 @@ def get_catalogue() -> dict[PluginCompositeId, BlockFactoryCatalogue]:
 
 
 @router.put("/expand")
-def expand_blueprint(blueprint: BlueprintBuilder) -> BlueprintValidationExpansionResponse:
+async def expand_blueprint(
+    blueprint: BlueprintBuilder,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> BlueprintValidationExpansionResponse:
     """Validate a partially-constructed BlueprintBuilder and return completion options.
 
     Returns 200 regardless of whether validation errors are present; callers must
     inspect the returned error fields.
     """
-    result = blueprint_service.validate_expand(blueprint)
+    result = await blueprint_service.validate_expand(blueprint, auth_context)
     return BlueprintValidationExpansionResponse(
         global_errors=result.global_errors,
         block_errors=result.block_errors,
@@ -292,21 +332,92 @@ def expand_blueprint(blueprint: BlueprintBuilder) -> BlueprintValidationExpansio
     )
 
 
-@router.get("/variables/list")
-def list_available_variables() -> list[VariableDetail]:
-    """List all automatic variables available for use in configuration value interpolation."""
-    result: list[VariableDetail] = []
-    for var_name, example in get_values_and_examples().items():
-        var: AvailableAutomaticVariables = var_name
-        if var == "runId":
-            display_name = "Run ID"
-        elif var == "submitDatetime":
-            display_name = "Submit Datetime (fixed at first submission, preserved on restart)"
-        elif var == "startDatetime":
-            display_name = "Start Datetime (updated on every restart)"
-        elif var == "attemptCount":
-            display_name = "Attempt Count (incremented on every restart)"
-        else:
-            assert_never(var)
-        result.append(VariableDetail(name=var_name, display_name=display_name, valueExample=example))
-    return result
+@router.get("/glyphs/list")
+async def list_available_glyphs(
+    glyph_type: Literal["intrinsic", "global"] = "intrinsic",
+    pagination: Annotated[PaginationSpec, Depends()] = PaginationSpec(),
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> GlyphListResponse:
+    """List available glyphs.
+
+    When ``glyph_type`` is ``intrinsic``, returns the fixed set of system-provided
+    glyphs; pagination params are ignored.  When ``glyph_type`` is ``global``,
+    returns user-defined glyphs visible to the caller with paging applied.
+    """
+    if glyph_type == "intrinsic":
+        glyphs: list[GlyphDetail] = []
+        for glyph_name, example in get_values_and_examples().items():
+            glyph: AvailableIntrinsicGlyphs = glyph_name
+            if glyph == "runId":
+                display_name = "Run ID"
+            elif glyph == "submitDatetime":
+                display_name = "Submit Datetime (fixed at first submission, preserved on restart)"
+            elif glyph == "startDatetime":
+                display_name = "Start Datetime (updated on every restart)"
+            elif glyph == "attemptCount":
+                display_name = "Attempt Count (incremented on every restart)"
+            else:
+                assert_never(glyph)
+            glyphs.append(GlyphDetail(name=glyph_name, display_name=display_name, valueExample=example))
+        return GlyphListResponse(glyphs=glyphs, total=len(glyphs), page=1, page_size=len(glyphs))
+    else:
+        total = await global_glyph_db.count_global_glyphs(auth_context)
+        start = pagination.start()
+        rows = list(await global_glyph_db.list_global_glyphs(auth_context, offset=start, limit=pagination.page_size))
+        glyphs_global = [GlyphDetail(name=str(row.key), display_name=str(row.key), valueExample=str(row.value)) for row in rows]
+        return GlyphListResponse(glyphs=glyphs_global, total=total, page=pagination.page, page_size=pagination.page_size)
+
+
+@router.post("/glyphs/global/post")
+async def post_global_glyph(
+    request: GlobalGlyphPostRequest,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> GlobalGlyphResponse:
+    """Create or update a global glyph by key.
+
+    Returns 422 if the key collides with any intrinsic glyph name.
+    """
+    intrinsic_names = set(get_values_and_examples().keys())
+    if request.key in intrinsic_names:
+        raise HTTPException(
+            status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Key {request.key!r} is reserved as an intrinsic glyph and cannot be overridden.",
+        )
+    if request.public and not auth_context.has_admin():
+        raise HTTPException(
+            status_code=403,
+            detail="Only admins may create or update public global glyphs.",
+        )
+    try:
+        row = await global_glyph_db.upsert_global_glyph(request.key, request.value, request.public, auth_context)
+    except GlobalGlyphAccessDenied as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    return GlobalGlyphResponse(
+        global_glyph_id=str(row.global_glyph_id),
+        key=str(row.key),
+        value=str(row.value),
+        public=bool(row.public),
+        created_by=str(row.created_by) if row.created_by is not None else None,
+        created_at=str(row.created_at),
+        updated_at=str(row.updated_at),
+    )
+
+
+@router.get("/glyphs/global/get")
+async def get_global_glyph(
+    spec: Annotated[GlobalGlyphId, Depends()],
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> GlobalGlyphResponse:
+    """Retrieve a global glyph visible to the caller by its stable id."""
+    row = await global_glyph_db.get_global_glyph(spec.global_glyph_id, auth_context)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"GlobalGlyph {spec.global_glyph_id!r} not found.")
+    return GlobalGlyphResponse(
+        global_glyph_id=str(row.global_glyph_id),
+        key=str(row.key),
+        value=str(row.value),
+        public=bool(row.public),
+        created_by=str(row.created_by) if row.created_by is not None else None,
+        created_at=str(row.created_at),
+        updated_at=str(row.updated_at),
+    )

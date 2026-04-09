@@ -7,17 +7,17 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Automatic (system-provided) variables available for workflow configuration interpolation."""
+"""Intrinsic (system-provided) glyphs available for workflow configuration interpolation."""
 
 import uuid
 from datetime import datetime
 from typing import Literal
 
-from forecastbox.domain.variables.resolution import value_dt2str
+from forecastbox.domain.glyphs.resolution import value_dt2str
 from forecastbox.utility.time import current_time
 
 # fmt: off
-AvailableAutomaticVariables = Literal[
+AvailableIntrinsicGlyphs = Literal[
     "runId",        # Unique identifier for the run; stable across restarts.
     "submitDatetime", # Datetime when the run was first submitted; preserved on restart.
     "startDatetime",  # Datetime when the current attempt started; updated on every restart.
@@ -28,7 +28,7 @@ AvailableAutomaticVariables = Literal[
 _current_time_example = value_dt2str(current_time())
 
 # TODO: replace with frozendict once available so that we have immutability
-_values_and_examples: dict[AvailableAutomaticVariables, str] = {
+_values_and_examples: dict[AvailableIntrinsicGlyphs, str] = {
     "runId": str(uuid.uuid4()),
     "submitDatetime": _current_time_example,
     "startDatetime": _current_time_example,
@@ -36,8 +36,8 @@ _values_and_examples: dict[AvailableAutomaticVariables, str] = {
 }
 
 
-def get_values_and_examples() -> dict[AvailableAutomaticVariables, str]:
-    """Return all automatic variable names with example values generated at import time.
+def get_values_and_examples() -> dict[AvailableIntrinsicGlyphs, str]:
+    """Return all intrinsic glyph names with example values generated at import time.
 
     Used for pre-submit validation and frontend display.
     """

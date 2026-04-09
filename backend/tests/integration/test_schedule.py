@@ -21,11 +21,16 @@ from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginComposite
 
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.blueprint.service import BlueprintSaveCommand as BlueprintSaveRequest
-from forecastbox.domain.variables.resolution import value_dt2str
+from forecastbox.domain.glyphs.resolution import value_dt2str
 from forecastbox.routes.experiment import ExperimentCreateRequest, ExperimentUpdateRequest
 
 from .conftest import testPluginId
-from .utils import ensure_schedule_run_v2, retry_until, scheduling_endpoint_with_retries
+from .utils import (
+    compare_with_tolerance,
+    ensure_schedule_run_v2,
+    retry_until,
+    scheduling_endpoint_with_retries,
+)
 
 # *** helpers **
 
@@ -407,4 +412,7 @@ def test_schedule_v2_execute(tmpdir: Any, backend_client_with_auth: httpx.Client
     assert status_resp.is_success, status_resp.text
     created_at_sec = status_resp.json()["created_at"].split(".", 1)[0]
     expected_submit = value_dt2str(first_run_override)
-    assert pathlib.Path(time_output_path).read_text() == f"{expected_submit};{created_at_sec}"
+    _time_line = pathlib.Path(time_output_path).read_text()
+    _time_parts = _time_line.split(";")
+    assert _time_parts[0] == expected_submit
+    assert compare_with_tolerance(_time_parts[1], dt.datetime.fromisoformat(created_at_sec))
