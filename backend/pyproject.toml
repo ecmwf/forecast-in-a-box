@@ -49,6 +49,7 @@ dependencies = [
   "pyrsistent",
   "python-multipart",
   "qubed",
+  "starlette>=1.0", # NOTE we actually dont depend on starlette directly, only via fastapi/sse, but our code is already assuming 1.0+
   "sse-starlette",
   "toml",
   "uvicorn",
