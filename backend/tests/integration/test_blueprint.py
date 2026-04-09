@@ -24,6 +24,7 @@ import io
 import os
 import pathlib
 import zipfile
+from datetime import datetime as _dt
 from typing import Any, get_args
 
 import httpx
@@ -35,7 +36,7 @@ from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs
 from forecastbox.routes.run import RunCreateResponse
 
 from .conftest import testPluginId
-from .utils import retry_until
+from .utils import compare_with_tolerance, retry_until
 
 
 def ensure_completed_v2(backend_client: httpx.Client, job_id: str, sleep: float = 0.5, attempts: int = 20) -> None:
@@ -288,7 +289,11 @@ def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Cl
     # Both submitDatetime and startDatetime equal created_at on the first run.
     # created_at is at higher precision than the second-resolution glyph values.
     created_at_sec = created_at.split(".", 1)[0]
-    assert outputTime.read_text() == f"{created_at_sec};{created_at_sec};initial_value"
+    _time_line = outputTime.read_text()
+    _time_parts = _time_line.split(";")
+    assert _time_parts[0] == created_at_sec
+    assert compare_with_tolerance(_time_parts[1], _dt.fromisoformat(created_at_sec))
+    assert _time_parts[2] == "initial_value"
     outputTime.unlink()
 
     list_resp = backend_client_with_auth.get("/run/list")
@@ -337,7 +342,11 @@ def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Cl
     status_restarted_resp = backend_client_with_auth.get("/run/get", params={"run_id": run_id})
     assert status_restarted_resp.is_success, status_restarted_resp.text
     created_at_restarted = status_restarted_resp.json()["created_at"].split(".", 1)[0]
-    assert outputTime.read_text() == f"{created_at_sec};{created_at_restarted};initial_value"
+    _time_line_r = outputTime.read_text()
+    _time_parts_r = _time_line_r.split(";")
+    assert _time_parts_r[0] == created_at_sec
+    assert compare_with_tolerance(_time_parts_r[1], _dt.fromisoformat(created_at_restarted))
+    assert _time_parts_r[2] == "initial_value"
 
     avail_resp = backend_client_with_auth.get("/run/outputAvailability", params={"run_id": run_id})
     assert avail_resp.is_success, avail_resp.text

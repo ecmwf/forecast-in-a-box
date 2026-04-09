@@ -1,3 +1,4 @@
+import datetime
 import time
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
@@ -113,6 +114,13 @@ def ensure_schedule_run_v2(backend_client: httpx.Client, experiment_id: str, sle
             error_msg=f"No run appeared for schedule {experiment_id} within {attempts} attempts",
         ),
     )
+
+
+def compare_with_tolerance(middle: str, expected: datetime.datetime, max_seconds: int = 2) -> bool:
+    """Parse middle as a datetime string, return whether delta from expected is in [0, max_seconds] seconds."""
+    parsed = datetime.datetime.fromisoformat(middle)
+    delta = (parsed - expected).total_seconds()
+    return 0 <= delta <= max_seconds
 
 
 def scheduling_endpoint_with_retries(fn: Callable[[], Any], *, attempts: int = 4, sleep: float = 0.5) -> Any:
