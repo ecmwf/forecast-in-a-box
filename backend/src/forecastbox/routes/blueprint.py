@@ -146,6 +146,7 @@ class GlobalGlyphPostRequest(BaseModel):
 
     key: str
     value: str
+    public: bool = False
 
 
 class GlobalGlyphResponse(BaseModel):
@@ -154,6 +155,7 @@ class GlobalGlyphResponse(BaseModel):
     global_glyph_id: str
     key: str
     value: str
+    public: bool
     created_by: str | None = None
     created_at: str
     updated_at: str
@@ -312,13 +314,16 @@ def get_catalogue() -> dict[PluginCompositeId, BlockFactoryCatalogue]:
 
 
 @router.put("/expand")
-async def expand_blueprint(blueprint: BlueprintBuilder) -> BlueprintValidationExpansionResponse:
+async def expand_blueprint(
+    blueprint: BlueprintBuilder,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> BlueprintValidationExpansionResponse:
     """Validate a partially-constructed BlueprintBuilder and return completion options.
 
     Returns 200 regardless of whether validation errors are present; callers must
     inspect the returned error fields.
     """
-    result = await blueprint_service.validate_expand(blueprint)
+    result = await blueprint_service.validate_expand(blueprint, auth_context)
     return BlueprintValidationExpansionResponse(
         global_errors=result.global_errors,
         block_errors=result.block_errors,
@@ -331,12 +336,13 @@ async def expand_blueprint(blueprint: BlueprintBuilder) -> BlueprintValidationEx
 async def list_available_glyphs(
     glyph_type: Literal["intrinsic", "global"] = "intrinsic",
     pagination: Annotated[PaginationSpec, Depends()] = PaginationSpec(),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> GlyphListResponse:
     """List available glyphs.
 
     When ``glyph_type`` is ``intrinsic``, returns the fixed set of system-provided
     glyphs; pagination params are ignored.  When ``glyph_type`` is ``global``,
-    returns user-defined glyphs with paging applied.
+    returns user-defined glyphs visible to the caller with paging applied.
     """
     if glyph_type == "intrinsic":
         glyphs: list[GlyphDetail] = []
@@ -355,9 +361,9 @@ async def list_available_glyphs(
             glyphs.append(GlyphDetail(name=glyph_name, display_name=display_name, valueExample=example))
         return GlyphListResponse(glyphs=glyphs, total=len(glyphs), page=1, page_size=len(glyphs))
     else:
-        total = await global_glyph_db.count_global_glyphs()
+        total = await global_glyph_db.count_global_glyphs(auth_context)
         start = pagination.start()
-        rows = list(await global_glyph_db.list_global_glyphs(offset=start, limit=pagination.page_size))
+        rows = list(await global_glyph_db.list_global_glyphs(auth_context, offset=start, limit=pagination.page_size))
         glyphs_global = [GlyphDetail(name=str(row.key), display_name=str(row.key), valueExample=str(row.value)) for row in rows]
         return GlyphListResponse(glyphs=glyphs_global, total=total, page=pagination.page, page_size=pagination.page_size)
 
@@ -378,13 +384,14 @@ async def post_global_glyph(
             detail=f"Key {request.key!r} is reserved as an intrinsic glyph and cannot be overridden.",
         )
     try:
-        row = await global_glyph_db.upsert_global_glyph(request.key, request.value, auth_context)
+        row = await global_glyph_db.upsert_global_glyph(request.key, request.value, request.public, auth_context)
     except GlobalGlyphAccessDenied as e:
         raise HTTPException(status_code=403, detail=str(e))
     return GlobalGlyphResponse(
         global_glyph_id=str(row.global_glyph_id),
         key=str(row.key),
         value=str(row.value),
+        public=bool(row.public),
         created_by=str(row.created_by) if row.created_by is not None else None,
         created_at=str(row.created_at),
         updated_at=str(row.updated_at),
@@ -394,15 +401,17 @@ async def post_global_glyph(
 @router.get("/glyphs/global/get")
 async def get_global_glyph(
     spec: Annotated[GlobalGlyphId, Depends()],
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> GlobalGlyphResponse:
-    """Retrieve a global glyph by its stable id."""
-    row = await global_glyph_db.get_global_glyph(spec.global_glyph_id)
+    """Retrieve a global glyph visible to the caller by its stable id."""
+    row = await global_glyph_db.get_global_glyph(spec.global_glyph_id, auth_context)
     if row is None:
         raise HTTPException(status_code=404, detail=f"GlobalGlyph {spec.global_glyph_id!r} not found.")
     return GlobalGlyphResponse(
         global_glyph_id=str(row.global_glyph_id),
         key=str(row.key),
         value=str(row.value),
+        public=bool(row.public),
         created_by=str(row.created_by) if row.created_by is not None else None,
         created_at=str(row.created_at),
         updated_at=str(row.updated_at),

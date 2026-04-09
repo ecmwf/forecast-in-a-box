@@ -97,12 +97,13 @@ class BlueprintSaveCommand(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-async def validate_expand(blueprint: BlueprintBuilder) -> BlueprintValidationExpansion:
+async def validate_expand(blueprint: BlueprintBuilder, auth_context: AuthContext) -> BlueprintValidationExpansion:
     """Validate and expand a partially-constructed BlueprintBuilder.
 
     Returns structured validation errors and possible completion options.
     The presence of errors does not affect the return (callers decide how to
-    surface them). Intrinsic and global glyphs are both considered known.
+    surface them). Intrinsic and global glyphs visible to the caller are both
+    considered known.
     """
     plugins = PluginManager.plugins
     possible_sources = [
@@ -114,7 +115,7 @@ async def validate_expand(blueprint: BlueprintBuilder) -> BlueprintValidationExp
     possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]] = {}
     block_errors: dict[BlockInstanceId, list[str]] = defaultdict(list)
     outputs = {}
-    global_glyphs = {str(row.key): str(row.value) for row in await global_glyph_db.list_global_glyphs()}
+    global_glyphs = {str(row.key): str(row.value) for row in await global_glyph_db.list_global_glyphs(auth_context)}
     available_glyphs = set(get_values_and_examples().keys()).union(global_glyphs.keys())
     glyph_values: dict[str, str] = {**global_glyphs, **cast(dict[str, str], get_values_and_examples())}
     for blockId in topological_order(blueprint.blocks.items(), lambda block: block.input_ids.values()):

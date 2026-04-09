@@ -43,18 +43,26 @@ async def mem_session_maker(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[a
 
 @pytest.mark.asyncio
 async def test_upsert_creates_new_glyph(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
-    row = await global_glyph_db.upsert_global_glyph("myKey", "myValue", _user1)
+    row = await global_glyph_db.upsert_global_glyph("myKey", "myValue", False, _user1)
     assert row.key == "myKey"
     assert row.value == "myValue"
+    assert row.public is False
     assert row.created_by == "user1"
     assert row.global_glyph_id is not None
 
 
 @pytest.mark.asyncio
+async def test_upsert_creates_public_glyph(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
+    row = await global_glyph_db.upsert_global_glyph("pubKey", "pubVal", True, _user1)
+    assert row.public is True
+
+
+@pytest.mark.asyncio
 async def test_upsert_owner_can_update(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
-    row1 = await global_glyph_db.upsert_global_glyph("myKey", "initial", _user1)
-    row2 = await global_glyph_db.upsert_global_glyph("myKey", "updated", _user1)
+    row1 = await global_glyph_db.upsert_global_glyph("myKey", "initial", False, _user1)
+    row2 = await global_glyph_db.upsert_global_glyph("myKey", "updated", True, _user1)
     assert row2.value == "updated"
+    assert row2.public is True
     # id and created_by are preserved from the original insert
     assert str(row2.global_glyph_id) == str(row1.global_glyph_id)
     assert row2.created_by == "user1"
@@ -63,68 +71,115 @@ async def test_upsert_owner_can_update(mem_session_maker: async_sessionmaker[Asy
 @pytest.mark.asyncio
 async def test_upsert_non_owner_cannot_update(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
     """A user who is not the owner must not be able to update a glyph."""
-    await global_glyph_db.upsert_global_glyph("myKey", "initial", _user1)
+    await global_glyph_db.upsert_global_glyph("myKey", "initial", False, _user1)
     with pytest.raises(GlobalGlyphAccessDenied):
-        await global_glyph_db.upsert_global_glyph("myKey", "hijacked", _user2)
+        await global_glyph_db.upsert_global_glyph("myKey", "hijacked", False, _user2)
 
 
 @pytest.mark.asyncio
 async def test_upsert_admin_can_update_any_glyph(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
     """Admins may update glyphs regardless of who created them."""
-    row1 = await global_glyph_db.upsert_global_glyph("myKey", "initial", _user1)
-    row2 = await global_glyph_db.upsert_global_glyph("myKey", "admin_updated", _admin)
+    row1 = await global_glyph_db.upsert_global_glyph("myKey", "initial", False, _user1)
+    row2 = await global_glyph_db.upsert_global_glyph("myKey", "admin_updated", False, _admin)
     assert row2.value == "admin_updated"
-    # id and created_by are still preserved
     assert str(row2.global_glyph_id) == str(row1.global_glyph_id)
     assert row2.created_by == "user1"
 
 
 @pytest.mark.asyncio
 async def test_upsert_different_keys_are_independent(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
-    await global_glyph_db.upsert_global_glyph("keyA", "valA", _admin)
-    await global_glyph_db.upsert_global_glyph("keyB", "valB", _admin)
-    count = await global_glyph_db.count_global_glyphs()
+    await global_glyph_db.upsert_global_glyph("keyA", "valA", False, _admin)
+    await global_glyph_db.upsert_global_glyph("keyB", "valB", False, _admin)
+    count = await global_glyph_db.count_global_glyphs(_admin)
     assert count == 2
 
 
 # ---------------------------------------------------------------------------
-# get_global_glyph
+# get_global_glyph — visibility
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_get_existing_glyph(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
-    created = await global_glyph_db.upsert_global_glyph("getKey", "getVal", _user1)
-    fetched = await global_glyph_db.get_global_glyph(str(created.global_glyph_id))
+async def test_get_own_private_glyph(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
+    created = await global_glyph_db.upsert_global_glyph("getKey", "getVal", False, _user1)
+    fetched = await global_glyph_db.get_global_glyph(str(created.global_glyph_id), _user1)
     assert fetched is not None
     assert fetched.key == "getKey"
-    assert fetched.value == "getVal"
+
+
+@pytest.mark.asyncio
+async def test_get_public_glyph_by_other_user(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
+    """user2 can get a public glyph owned by user1."""
+    created = await global_glyph_db.upsert_global_glyph("pubKey", "pubVal", True, _user1)
+    fetched = await global_glyph_db.get_global_glyph(str(created.global_glyph_id), _user2)
+    assert fetched is not None
+
+
+@pytest.mark.asyncio
+async def test_get_private_glyph_invisible_to_other_user(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
+    """user2 cannot get a private glyph owned by user1."""
+    created = await global_glyph_db.upsert_global_glyph("privKey", "privVal", False, _user1)
+    fetched = await global_glyph_db.get_global_glyph(str(created.global_glyph_id), _user2)
+    assert fetched is None
+
+
+@pytest.mark.asyncio
+async def test_get_admin_sees_private_glyph(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
+    created = await global_glyph_db.upsert_global_glyph("privKey", "privVal", False, _user1)
+    fetched = await global_glyph_db.get_global_glyph(str(created.global_glyph_id), _admin)
+    assert fetched is not None
 
 
 @pytest.mark.asyncio
 async def test_get_nonexistent_glyph_returns_none(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
-    result = await global_glyph_db.get_global_glyph("no-such-id")
+    result = await global_glyph_db.get_global_glyph("no-such-id", _admin)
     assert result is None
 
 
 # ---------------------------------------------------------------------------
-# list_global_glyphs / count_global_glyphs
+# list_global_glyphs / count_global_glyphs — visibility
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_list_empty(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
-    rows = list(await global_glyph_db.list_global_glyphs())
+    rows = list(await global_glyph_db.list_global_glyphs(_admin))
     assert rows == []
-    assert await global_glyph_db.count_global_glyphs() == 0
+    assert await global_glyph_db.count_global_glyphs(_admin) == 0
+
+
+@pytest.mark.asyncio
+async def test_list_user_sees_own_and_public(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
+    """user1 sees their private glyph and user2's public glyph, but not user2's private glyph."""
+    await global_glyph_db.upsert_global_glyph("u1priv", "v", False, _user1)
+    await global_glyph_db.upsert_global_glyph("u2pub", "v", True, _user2)
+    await global_glyph_db.upsert_global_glyph("u2priv", "v", False, _user2)
+
+    rows = list(await global_glyph_db.list_global_glyphs(_user1))
+    keys = {str(r.key) for r in rows}
+    assert "u1priv" in keys
+    assert "u2pub" in keys
+    assert "u2priv" not in keys
+    assert await global_glyph_db.count_global_glyphs(_user1) == 2
+
+
+@pytest.mark.asyncio
+async def test_list_admin_sees_all(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
+    await global_glyph_db.upsert_global_glyph("u1priv", "v", False, _user1)
+    await global_glyph_db.upsert_global_glyph("u2pub", "v", True, _user2)
+    await global_glyph_db.upsert_global_glyph("u2priv", "v", False, _user2)
+
+    rows = list(await global_glyph_db.list_global_glyphs(_admin))
+    assert len(rows) == 3
+    assert await global_glyph_db.count_global_glyphs(_admin) == 3
 
 
 @pytest.mark.asyncio
 async def test_list_ordered_by_key(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
-    await global_glyph_db.upsert_global_glyph("zz", "v", _admin)
-    await global_glyph_db.upsert_global_glyph("aa", "v", _admin)
-    await global_glyph_db.upsert_global_glyph("mm", "v", _admin)
-    rows = list(await global_glyph_db.list_global_glyphs())
+    await global_glyph_db.upsert_global_glyph("zz", "v", False, _admin)
+    await global_glyph_db.upsert_global_glyph("aa", "v", False, _admin)
+    await global_glyph_db.upsert_global_glyph("mm", "v", False, _admin)
+    rows = list(await global_glyph_db.list_global_glyphs(_admin))
     keys = [str(r.key) for r in rows]
     assert keys == ["aa", "mm", "zz"]
 
@@ -132,10 +187,10 @@ async def test_list_ordered_by_key(mem_session_maker: async_sessionmaker[AsyncSe
 @pytest.mark.asyncio
 async def test_list_pagination(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
     for i in range(5):
-        await global_glyph_db.upsert_global_glyph(f"key{i}", "v", _admin)
-    page1 = list(await global_glyph_db.list_global_glyphs(offset=0, limit=2))
-    page2 = list(await global_glyph_db.list_global_glyphs(offset=2, limit=2))
-    page3 = list(await global_glyph_db.list_global_glyphs(offset=4, limit=2))
+        await global_glyph_db.upsert_global_glyph(f"key{i}", "v", False, _admin)
+    page1 = list(await global_glyph_db.list_global_glyphs(_admin, offset=0, limit=2))
+    page2 = list(await global_glyph_db.list_global_glyphs(_admin, offset=2, limit=2))
+    page3 = list(await global_glyph_db.list_global_glyphs(_admin, offset=4, limit=2))
     assert len(page1) == 2
     assert len(page2) == 2
     assert len(page3) == 1
@@ -145,10 +200,10 @@ async def test_list_pagination(mem_session_maker: async_sessionmaker[AsyncSessio
 
 @pytest.mark.asyncio
 async def test_count_reflects_upserts(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
-    assert await global_glyph_db.count_global_glyphs() == 0
-    await global_glyph_db.upsert_global_glyph("k1", "v", _user1)
-    assert await global_glyph_db.count_global_glyphs() == 1
-    await global_glyph_db.upsert_global_glyph("k1", "v2", _user1)  # update, not new row
-    assert await global_glyph_db.count_global_glyphs() == 1
-    await global_glyph_db.upsert_global_glyph("k2", "v", _user1)
-    assert await global_glyph_db.count_global_glyphs() == 2
+    assert await global_glyph_db.count_global_glyphs(_admin) == 0
+    await global_glyph_db.upsert_global_glyph("k1", "v", False, _user1)
+    assert await global_glyph_db.count_global_glyphs(_admin) == 1
+    await global_glyph_db.upsert_global_glyph("k1", "v2", False, _user1)  # update, not new row
+    assert await global_glyph_db.count_global_glyphs(_admin) == 1
+    await global_glyph_db.upsert_global_glyph("k2", "v", False, _user1)
+    assert await global_glyph_db.count_global_glyphs(_admin) == 2

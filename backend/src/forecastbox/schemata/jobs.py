@@ -80,6 +80,7 @@ class GlobalGlyph(Base):
     global_glyph_id = Column(String(255), primary_key=True, nullable=False)
     key = Column(String(255), nullable=False)
     value = Column(String(1024), nullable=False)
+    public = Column(Boolean, nullable=False, default=False)
     created_by = Column(String(255), nullable=True)
     created_at = Column(DateTime, nullable=False)
     updated_at = Column(DateTime, nullable=False)

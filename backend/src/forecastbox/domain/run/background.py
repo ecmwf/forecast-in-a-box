@@ -30,6 +30,7 @@ from forecastbox.domain.run.cascade import ExecutionSpecification, execute_casca
 from forecastbox.domain.run.compile import compile_builder, merge_glyph_values, resolve_intrinsic_glyph_values
 from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.schemata.jobs import Blueprint
+from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.time import current_time
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,7 @@ def execute_background(
     blueprint: Blueprint,
     compiler_runtime_context: CompilerRuntimeContext,
     loop: asyncio.AbstractEventLoop,
+    auth_context: AuthContext,
 ) -> None:
     """Compile a blueprint and submit it to cascade, updating the Run row as we go.
 
@@ -64,7 +66,7 @@ def execute_background(
             resolve_intrinsic_glyph_values(run_id, submit_time, start_time, attempt_count),
         )
 
-        global_rows = list(cast(list, run_async(global_glyph_db.list_global_glyphs())))
+        global_rows = list(cast(list, run_async(global_glyph_db.list_global_glyphs(auth_context))))
         global_values: dict[str, str] = {str(row.key): str(row.value) for row in global_rows}
 
         all_glyphs = merge_glyph_values(intrinsic_values, global_values, compiler_runtime_context.glyphs)

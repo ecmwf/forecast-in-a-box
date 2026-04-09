@@ -119,6 +119,7 @@ async def execute(
         blueprint,
         compiler_runtime_context,
         loop,
+        auth_context,
     )
 
     return Either.ok(ExecuteResult(run_id=new_run_id, attempt_count=attempt_count))
