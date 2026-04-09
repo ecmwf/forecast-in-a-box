@@ -20,7 +20,7 @@ entrypoint.spec
 lightning_logs
 
 # Rust build artifacts
-rust/target/
+cli/target/
 
 .dmypy.json
 

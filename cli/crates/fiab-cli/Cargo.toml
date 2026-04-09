@@ -8,7 +8,7 @@ name = "fiab"
 path = "src/main.rs"
 
 [dependencies]
-fiab-client = { path = "../fiab-client" }
+fiab-lib-client = { path = "../fiab-lib-client" }
 tokio = { version = "1", features = ["full"] }
 clap = { version = "4", features = ["derive", "env"] }
 serde_json = "1"

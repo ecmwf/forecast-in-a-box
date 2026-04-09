@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use fiab_client::ClientConfig;
+use fiab_lib_client::ClientConfig;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Default)]
@@ -31,13 +31,7 @@ fn load_profile(profile: &str) -> ProfileConfig {
         return ProfileConfig::default();
     }
     let content = std::fs::read_to_string(&path).unwrap_or_default();
-    let config: FileConfig = toml::from_str(&content).unwrap_or_default();
-    config.profiles.into_values().next().unwrap_or_default();
-    // Actually look up the named profile
-    let mut parsed: FileConfig = toml::from_str(
-        &std::fs::read_to_string(&path).unwrap_or_default(),
-    )
-    .unwrap_or_default();
+    let mut parsed: FileConfig = toml::from_str(&content).unwrap_or_default();
     parsed.profiles.remove(profile).unwrap_or_default()
 }
 
