@@ -85,7 +85,7 @@ def _make_builder_full(tmpdir: str) -> BlueprintBuilder:
     )
     source_time = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="source_text"),
-        configuration_values={"text": "${submitDatetime};${startDatetime}"},
+        configuration_values={"text": "${submitDatetime};${startDatetime};${basicExecuteGlobalGlyph}"},
         input_ids={},
     )
     sink_time = BlockInstance(
@@ -220,10 +220,10 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
         configuration_values={},
         input_ids={"a": "transform_increment", "b": "source_42"},
     )
-    # Using a missing glyph should fail validation
+    # Using an unknown glyph should fail validation
     sink_file_bad = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
-        configuration_values={"fname": f"{tmpdir}/output${{missingVariable}}.main.txt"},
+        configuration_values={"fname": f"{tmpdir}/output${{blueprintExpandGlobalGlyph}}.main.txt"},
         input_ids={"data": "product_join"},
     )
     blocks["product_join"] = product_join
@@ -233,21 +233,26 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert "sink_file" in response.json()["block_errors"]
 
-    # Using a known glyph should pass validation
-    sink_file_ok = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
-        configuration_values={"fname": f"{tmpdir}/output${{runId}}.main.txt"},
-        input_ids={"data": "product_join"},
+    # After posting blueprintExpandGlobalGlyph as a global glyph, the same blueprint should pass validation
+    post_resp = backend_client_with_auth.post(
+        "/blueprint/glyphs/global/post",
+        json={"key": "blueprintExpandGlobalGlyph", "value": "test_expand_value"},
     )
-    blocks["sink_file"] = sink_file_ok
+    assert post_resp.is_success, post_resp.text
 
-    builder = BlueprintBuilder(blocks=blocks)
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
-    assert len(response.json()["possible_expansions"]["sink_file"]) == 0
+    assert "sink_file" not in response.json()["block_errors"]
     assert len(response.json()["block_errors"]) == 0
 
 
 def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
+    # Set the global glyph that the builder's source_time block references
+    post_resp = backend_client_with_auth.post(
+        "/blueprint/glyphs/global/post",
+        json={"key": "basicExecuteGlobalGlyph", "value": "initial_value"},
+    )
+    assert post_resp.is_success, post_resp.text
+
     builder = _make_builder_full(tmpdir)
     save_req = BlueprintSaveCommand(builder=builder)
     save_resp = backend_client_with_auth.post("/blueprint/create", json=save_req.model_dump())
@@ -270,7 +275,7 @@ def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Cl
     # Both submitDatetime and startDatetime equal created_at on the first run.
     # created_at is at higher precision than the second-resolution glyph values.
     created_at_sec = created_at.split(".", 1)[0]
-    assert outputTime.read_text() == f"{created_at_sec};{created_at_sec}"
+    assert outputTime.read_text() == f"{created_at_sec};{created_at_sec};initial_value"
     outputTime.unlink()
 
     list_resp = backend_client_with_auth.get("/run/list")
@@ -284,6 +289,14 @@ def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Cl
     assert data["total"] >= 1
     ids = [e["run_id"] for e in data["runs"]]
     assert run_id in ids
+
+    # Change the global glyph value before restarting — the restart must use the
+    # persisted context from attempt 1 and NOT the updated global value.
+    update_resp = backend_client_with_auth.post(
+        "/blueprint/glyphs/global/post",
+        json={"key": "basicExecuteGlobalGlyph", "value": "changed_value"},
+    )
+    assert update_resp.is_success, update_resp.text
 
     restart_resp = backend_client_with_auth.post("/run/restart", json={"run_id": run_id, "attempt_count": 1})
     assert restart_resp.is_success, restart_resp.text
@@ -305,11 +318,13 @@ def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Cl
     assert outputMain.read_text() == "85"  # the output of 42 + 1 + 42, thats what the job is configured to do
 
     # After restart: submitDatetime must still equal original created_at; startDatetime
-    # must reflect the restart's own created_at (attempt 2).
+    # must reflect the restart's own created_at (attempt 2).  The global glyph value
+    # must equal "initial_value" — the persisted context from attempt 1 triumphs over
+    # the updated global value "changed_value".
     status_restarted_resp = backend_client_with_auth.get("/run/get", params={"run_id": run_id})
     assert status_restarted_resp.is_success, status_restarted_resp.text
     created_at_restarted = status_restarted_resp.json()["created_at"].split(".", 1)[0]
-    assert outputTime.read_text() == f"{created_at_sec};{created_at_restarted}"
+    assert outputTime.read_text() == f"{created_at_sec};{created_at_restarted};initial_value"
 
     avail_resp = backend_client_with_auth.get("/run/outputAvailability", params={"run_id": run_id})
     assert avail_resp.is_success, avail_resp.text
@@ -352,15 +367,16 @@ def test_submit_job_v2_restart_not_found(backend_client_with_auth: httpx.Client)
 
 
 def test_list_available_glyphs(backend_client_with_auth: httpx.Client) -> None:
-    """The glyphs/list endpoint returns exactly the set of AvailableIntrinsicGlyphs."""
-    response = backend_client_with_auth.get("/blueprint/glyphs/list")
+    """The glyphs/list endpoint returns exactly the set of AvailableIntrinsicGlyphs when glyph_type=intrinsic."""
+    response = backend_client_with_auth.get("/blueprint/glyphs/list", params={"glyph_type": "intrinsic"})
     assert response.is_success, response.text
     data = response.json()
-    assert isinstance(data, list)
-    returned_names = {item["name"] for item in data}
+    assert "glyphs" in data
+    assert "total" in data
+    returned_names = {item["name"] for item in data["glyphs"]}
     expected_names = set(get_args(AvailableIntrinsicGlyphs))
     assert returned_names == expected_names
-    for item in data:
+    for item in data["glyphs"]:
         assert "display_name" in item
         assert "valueExample" in item
         assert item["display_name"]

@@ -35,6 +35,7 @@ from fiab_core.fable import (
 from pydantic import BaseModel
 
 import forecastbox.domain.blueprint.db as _blueprint_db
+import forecastbox.domain.glyphs.global_ as global_glyph_db
 import forecastbox.domain.glyphs.resolution as glyph_resolution
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.db import upsert_blueprint
@@ -96,12 +97,12 @@ class BlueprintSaveCommand(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def validate_expand(blueprint: BlueprintBuilder) -> BlueprintValidationExpansion:
+async def validate_expand(blueprint: BlueprintBuilder) -> BlueprintValidationExpansion:
     """Validate and expand a partially-constructed BlueprintBuilder.
 
     Returns structured validation errors and possible completion options.
     The presence of errors does not affect the return (callers decide how to
-    surface them).
+    surface them). Intrinsic and global glyphs are both considered known.
     """
     plugins = PluginManager.plugins
     possible_sources = [
@@ -113,8 +114,14 @@ def validate_expand(blueprint: BlueprintBuilder) -> BlueprintValidationExpansion
     possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]] = {}
     block_errors: dict[BlockInstanceId, list[str]] = defaultdict(list)
     outputs = {}
-    available_glyphs = set(get_values_and_examples().keys())
-    example_values = cast(dict[str, str], get_values_and_examples())
+    available_glyphs: set[str] = set(get_values_and_examples().keys())
+    example_values: dict[str, str] = cast(dict[str, str], get_values_and_examples())
+
+    global_rows = list(await global_glyph_db.list_global_glyphs())
+    for row in global_rows:
+        key = str(row.key)
+        available_glyphs.add(key)
+        example_values = {**example_values, key: str(row.value)}
     for blockId in topological_order(blueprint.blocks.items(), lambda block: block.input_ids.values()):
         blockInstance = blueprint.blocks[blockId]
         plugin = plugins.get(blockInstance.factory_id.plugin, None)

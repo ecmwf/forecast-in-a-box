@@ -21,9 +21,11 @@ import uuid
 from datetime import datetime
 from typing import cast
 
+import forecastbox.domain.glyphs.global_ as global_glyph_db
 import forecastbox.domain.run.db as run_db
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.service import BlueprintBuilder
+from forecastbox.domain.glyphs.resolution import extract_glyphs
 from forecastbox.domain.run.cascade import ExecutionSpecification, execute_cascade
 from forecastbox.domain.run.compile import compile_builder, merge_glyph_values, resolve_intrinsic_glyph_values
 from forecastbox.domain.run.db import CompilerRuntimeContext
@@ -63,19 +65,35 @@ def execute_background(
             resolve_intrinsic_glyph_values(run_id, submit_time, start_time, attempt_count),
         )
 
-        all_glyphs = merge_glyph_values(intrinsic_values, compiler_runtime_context.glyphs)
+        global_rows = list(cast(list, run_async(global_glyph_db.list_global_glyphs())))
+        global_values: dict[str, str] = {str(row.key): str(row.value) for row in global_rows}
+
+        # Resolution order (lowest to highest): intrinsic < global < per-execution context.
+        # Intrinsic pinned keys (startDatetime, attemptCount) always win regardless.
+        merged_context = {**global_values, **compiler_runtime_context.glyphs}
+        all_glyphs = merge_glyph_values(intrinsic_values, merged_context)
 
         builder = BlueprintBuilder(
             blocks=blueprint.blocks,  # ty:ignore[invalid-argument-type]
             environment=EnvironmentSpecification.model_validate(blueprint.environment_spec) if blueprint.environment_spec else None,
         )
+
+        # Collect every glyph name actually referenced in the builder so that we
+        # persist only the values that were used, keeping the stored context lean.
+        referenced_glyph_names: set[str] = set()
+        for block in builder.blocks.values():
+            result = extract_glyphs(block)
+            if result.t is not None:
+                referenced_glyph_names.update(cast(set[str], result.t))
+        used_glyphs = {k: v for k, v in all_glyphs.items() if k in referenced_glyph_names}
+
         compiled = compile_builder(builder, all_glyphs)
 
         exec_spec = ExecutionSpecification.model_validate(
             deep_union(compiled.model_dump(), compiler_runtime_context.model_dump(exclude_unset=True))
         )
 
-        persisted_context = compiler_runtime_context.model_copy(update={"glyphs": all_glyphs})
+        persisted_context = compiler_runtime_context.model_copy(update={"glyphs": used_glyphs})
         run_async(
             run_db.update_run_runtime(
                 run_id,

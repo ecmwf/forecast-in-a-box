@@ -20,7 +20,7 @@ via automatic schemata iteration.
 
 from typing import Literal
 
-from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKeyConstraint, Integer, String
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKeyConstraint, Integer, String, UniqueConstraint
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -67,6 +67,24 @@ class Blueprint(Base):
     environment_spec = Column(JSON, nullable=True)
 
     is_deleted = Column(Boolean, nullable=False, default=False)
+
+
+class GlobalGlyph(Base):
+    """A user-defined glyph available for interpolation in all blueprint configurations.
+
+    Each key is unique; upsert replaces the value when the key already exists.
+    """
+
+    __tablename__ = "global_glyph"
+
+    global_glyph_id = Column(String(255), primary_key=True, nullable=False)
+    key = Column(String(255), nullable=False)
+    value = Column(String(1024), nullable=False)
+    created_by = Column(String(255), nullable=True)
+    created_at = Column(DateTime, nullable=False)
+    updated_at = Column(DateTime, nullable=False)
+
+    __table_args__ = (UniqueConstraint("key", name="uq_global_glyph_key"),)
 
 
 class ExperimentDefinition(Base):
