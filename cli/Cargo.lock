@@ -328,7 +328,7 @@ dependencies = [
  "clap",
  "comfy-table",
  "dirs",
- "fiab-client",
+ "fiab-lib-client",
  "serde",
  "serde_json",
  "tokio",
@@ -336,7 +336,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "fiab-client"
+name = "fiab-lib-client"
 version = "0.1.0"
 dependencies = [
  "bytes",
