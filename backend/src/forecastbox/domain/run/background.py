@@ -21,7 +21,7 @@ import uuid
 from datetime import datetime
 from typing import cast
 
-import forecastbox.domain.glyphs.global_ as global_glyph_db
+import forecastbox.domain.glyphs.global_db as global_glyph_db
 import forecastbox.domain.run.db as run_db
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.service import BlueprintBuilder
@@ -68,23 +68,15 @@ def execute_background(
         global_rows = list(cast(list, run_async(global_glyph_db.list_global_glyphs())))
         global_values: dict[str, str] = {str(row.key): str(row.value) for row in global_rows}
 
-        # Resolution order (lowest to highest): intrinsic < global < per-execution context.
-        # Intrinsic pinned keys (startDatetime, attemptCount) always win regardless.
-        merged_context = {**global_values, **compiler_runtime_context.glyphs}
-        all_glyphs = merge_glyph_values(intrinsic_values, merged_context)
+        all_glyphs = merge_glyph_values(intrinsic_values, global_values, compiler_runtime_context.glyphs)
 
         builder = BlueprintBuilder(
             blocks=blueprint.blocks,  # ty:ignore[invalid-argument-type]
             environment=EnvironmentSpecification.model_validate(blueprint.environment_spec) if blueprint.environment_spec else None,
         )
 
-        # Collect every glyph name actually referenced in the builder so that we
-        # persist only the values that were used, keeping the stored context lean.
-        referenced_glyph_names: set[str] = set()
-        for block in builder.blocks.values():
-            result = extract_glyphs(block)
-            if result.t is not None:
-                referenced_glyph_names.update(cast(set[str], result.t))
+        # Persist only the glyphs actually referenced in the builder, keeping the stored context lean.
+        referenced_glyph_names = {name for block in builder.blocks.values() for name in (cast(set[str], extract_glyphs(block).t) or set())}
         used_glyphs = {k: v for k, v in all_glyphs.items() if k in referenced_glyph_names}
 
         compiled = compile_builder(builder, all_glyphs)

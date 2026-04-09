@@ -7,7 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Unit tests for domain/glyphs/global_ persistence layer."""
+"""Unit tests for domain/glyphs/global_db persistence layer."""
 
 from collections.abc import AsyncGenerator
 
@@ -15,7 +15,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-import forecastbox.domain.glyphs.global_ as global_glyph_db
+import forecastbox.domain.glyphs.global_db as global_glyph_db
 from forecastbox.schemata.jobs import Base
 
 

@@ -21,7 +21,7 @@ from pydantic import BaseModel
 
 import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.blueprint.service as blueprint_service
-import forecastbox.domain.glyphs.global_ as global_glyph_db
+import forecastbox.domain.glyphs.global_db as global_glyph_db
 from forecastbox.domain.blueprint.exceptions import (
     BlueprintAccessDenied,
     BlueprintNotFound,

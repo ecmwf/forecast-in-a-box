@@ -244,6 +244,19 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     assert "sink_file" not in response.json()["block_errors"]
     assert len(response.json()["block_errors"]) == 0
 
+    # A known intrinsic glyph (${runId}) should also pass validation
+    sink_file_intrinsic = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
+        configuration_values={"fname": f"{tmpdir}/output${{runId}}.main.txt"},
+        input_ids={"data": "product_join"},
+    )
+    blocks["sink_file"] = sink_file_intrinsic
+
+    builder = BlueprintBuilder(blocks=blocks)
+    response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
+    assert len(response.json()["possible_expansions"]["sink_file"]) == 0
+    assert len(response.json()["block_errors"]) == 0
+
 
 def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
     # Set the global glyph that the builder's source_time block references
@@ -381,3 +394,35 @@ def test_list_available_glyphs(backend_client_with_auth: httpx.Client) -> None:
         assert "valueExample" in item
         assert item["display_name"]
         assert item["valueExample"]
+
+    # Global glyphs list reflects whatever has been posted by other tests; record the baseline
+    global_resp = backend_client_with_auth.get("/blueprint/glyphs/list", params={"glyph_type": "global"})
+    assert global_resp.is_success, global_resp.text
+    global_data = global_resp.json()
+    initial_total = global_data["total"]
+    assert isinstance(global_data["glyphs"], list)
+
+    # Post a new global glyph and verify the count increases and the glyph appears
+    post_resp = backend_client_with_auth.post(
+        "/blueprint/glyphs/global/post",
+        json={"key": "listGlyphsGlobalGlyph", "value": "list_test_value"},
+    )
+    assert post_resp.is_success, post_resp.text
+    posted = post_resp.json()
+    assert posted["key"] == "listGlyphsGlobalGlyph"
+    assert posted["value"] == "list_test_value"
+    assert "global_glyph_id" in posted
+
+    global_resp2 = backend_client_with_auth.get("/blueprint/glyphs/list", params={"glyph_type": "global"})
+    assert global_resp2.is_success, global_resp2.text
+    global_data2 = global_resp2.json()
+    assert global_data2["total"] == initial_total + 1
+    names = {item["name"] for item in global_data2["glyphs"]}
+    assert "listGlyphsGlobalGlyph" in names
+
+    get_resp = backend_client_with_auth.get("/blueprint/glyphs/global/get", params={"global_glyph_id": posted["global_glyph_id"]})
+    assert get_resp.is_success, get_resp.text
+    fetched = get_resp.json()
+    assert fetched["key"] == "listGlyphsGlobalGlyph"
+    assert fetched["value"] == "list_test_value"
+    assert fetched["global_glyph_id"] == posted["global_glyph_id"]

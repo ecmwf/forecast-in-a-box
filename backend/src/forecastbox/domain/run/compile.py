@@ -25,14 +25,18 @@ from forecastbox.domain.run.cascade import ExecutionSpecification, RawCascadeJob
 from forecastbox.utility.graph import topological_order
 
 
-def merge_glyph_values(intrinsic_values: dict[str, str], context_values: dict[str, str]) -> dict[str, str]:
-    """Merge intrinsic system glyphs with caller-supplied context glyphs.
+def merge_glyph_values(
+    intrinsic_values: dict[str, str],
+    global_values: dict[str, str],
+    context_values: dict[str, str],
+) -> dict[str, str]:
+    """Merge glyphs from all three sources into a single resolution map.
 
-    context_values take precedence over intrinsic_values for the same key, with
-    the exception of ``startDatetime`` and ``attemptCount`` which are always taken
-    from intrinsic_values so that each restart records its own actual values.
+    Resolution order (lowest to highest precedence): intrinsic < global < context.
+    Intrinsic pinned keys (``startDatetime``, ``attemptCount``) always win regardless,
+    so that each restart records its own actual values.
     """
-    merged = {**intrinsic_values, **context_values}
+    merged = {**intrinsic_values, **global_values, **context_values}
     for pinned in ("startDatetime", "attemptCount"):
         if pinned in intrinsic_values:
             merged[pinned] = intrinsic_values[pinned]
