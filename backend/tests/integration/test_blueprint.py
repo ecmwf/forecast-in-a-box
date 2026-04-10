@@ -86,7 +86,7 @@ def _make_builder_full(tmpdir: str) -> BlueprintBuilder:
     )
     source_time = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="source_text"),
-        configuration_values={"text": "${submitDatetime};${startDatetime};${basicExecuteGlobalGlyph}"},
+        configuration_values={"text": "${submitDatetime};${startDatetime};${basicExecuteGlobalGlyph};${blueprintExecuteLocalGlyph}"},
         input_ids={},
     )
     sink_time = BlockInstance(
@@ -102,7 +102,8 @@ def _make_builder_full(tmpdir: str) -> BlueprintBuilder:
             "sink_main": sink_main,
             "source_time": source_time,
             "sink_time": sink_time,
-        }
+        },
+        local_glyphs={"blueprintExecuteLocalGlyph": "local_glyph_value"},
     )
 
 
@@ -245,6 +246,29 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     assert "sink_file" not in response.json()["block_errors"]
     assert len(response.json()["block_errors"]) == 0
 
+    # A builder with an intrinsic name used as a local glyph key should fail validation
+    builder_invalid_local = BlueprintBuilder(
+        blocks=dict(blocks),
+        local_glyphs={"runId": "should-not-be-allowed"},
+    )
+    response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder_invalid_local.model_dump())
+    assert len(response.json()["global_errors"]) > 0
+
+    # A block using a local glyph defined on the builder should pass validation
+    sink_file_local = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
+        configuration_values={"fname": f"{tmpdir}/output${{blueprintExpandLocalGlyph}}.main.txt"},
+        input_ids={"data": "product_join"},
+    )
+    blocks["sink_file"] = sink_file_local
+    builder_with_local = BlueprintBuilder(
+        blocks=dict(blocks),
+        local_glyphs={"blueprintExpandLocalGlyph": "expand_local_value"},
+    )
+    response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder_with_local.model_dump())
+    assert "sink_file" not in response.json()["block_errors"]
+    assert len(response.json()["global_errors"]) == 0
+
     # A known intrinsic glyph (${runId}) should also pass validation
     sink_file_intrinsic = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
@@ -294,6 +318,7 @@ def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Cl
     assert _time_parts[0] == created_at_sec
     assert compare_with_tolerance(_time_parts[1], _dt.fromisoformat(created_at_sec))
     assert _time_parts[2] == "initial_value"
+    assert _time_parts[3] == "local_glyph_value"
     outputTime.unlink()
 
     list_resp = backend_client_with_auth.get("/run/list")
@@ -347,6 +372,7 @@ def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Cl
     assert _time_parts_r[0] == created_at_sec
     assert compare_with_tolerance(_time_parts_r[1], _dt.fromisoformat(created_at_restarted))
     assert _time_parts_r[2] == "initial_value"
+    assert _time_parts_r[3] == "local_glyph_value"
 
     avail_resp = backend_client_with_auth.get("/run/outputAvailability", params={"run_id": run_id})
     assert avail_resp.is_success, avail_resp.text

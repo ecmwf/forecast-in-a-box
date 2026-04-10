@@ -177,7 +177,17 @@ async def create_blueprint(
     request: BlueprintCreateRequest,
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> BlueprintCreateResponse:
-    """Create a new blueprint from a BlueprintBuilder."""
+    """Create a new blueprint from a BlueprintBuilder.
+
+    Returns 422 if the builder fails validation (unknown plugins, undefined
+    glyphs, config errors, intrinsic glyph key collisions, etc.).
+    """
+    validation = await blueprint_service.validate_expand(request.builder, auth_context, validate_only=True)
+    if validation.global_errors or validation.block_errors:
+        raise HTTPException(
+            status_code=422,
+            detail={"global_errors": validation.global_errors, "block_errors": validation.block_errors},
+        )
     payload = BlueprintSaveCommand(
         builder=request.builder,
         display_name=request.display_name,
@@ -249,8 +259,16 @@ async def update_blueprint(
     """Add a new version to an existing blueprint.
 
     ``version`` must match the current latest version; returns 409 if it does not.
+    Returns 422 if the builder fails validation (unknown plugins, undefined
+    glyphs, config errors, intrinsic glyph key collisions, etc.).
     Returns the new version number on success.
     """
+    validation = await blueprint_service.validate_expand(request.builder, auth_context, validate_only=True)
+    if validation.global_errors or validation.block_errors:
+        raise HTTPException(
+            status_code=422,
+            detail={"global_errors": validation.global_errors, "block_errors": validation.block_errors},
+        )
     payload = BlueprintSaveCommand(
         builder=request.builder,
         display_name=request.display_name,
@@ -323,7 +341,7 @@ async def expand_blueprint(
     Returns 200 regardless of whether validation errors are present; callers must
     inspect the returned error fields.
     """
-    result = await blueprint_service.validate_expand(blueprint, auth_context)
+    result = await blueprint_service.validate_expand(blueprint, auth_context, validate_only=False)
     return BlueprintValidationExpansionResponse(
         global_errors=result.global_errors,
         block_errors=result.block_errors,

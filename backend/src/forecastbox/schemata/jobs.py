@@ -60,11 +60,8 @@ class Blueprint(Base):
     display_description = Column(String(1024), nullable=True)
     tags = Column(JSON, nullable=True)
 
-    # Payload stored as JSON to avoid over-normalisation
-    # stores the blocks field of forecastbox.api.types.blueprint.BlueprintBuilder
-    blocks = Column(JSON, nullable=True)
-    # stores forecastbox.api.types.jobs.EnvironmentSpecification
-    environment_spec = Column(JSON, nullable=True)
+    # stores the full forecastbox.domain.blueprint.service.BlueprintBuilder as JSON
+    builder = Column(JSON, nullable=True)
 
     is_deleted = Column(Boolean, nullable=False, default=False)
 

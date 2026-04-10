@@ -81,7 +81,7 @@ async def test_jobs_blueprint_insert_and_get(mem_session_maker_both: async_sessi
         source="user_defined",
         created_by="user1",
         display_name="My job",
-        blocks={"source1": {}},
+        builder={"blocks": {"source1": {}}, "environment": None, "local_glyphs": {}},
         tags=["tag1"],
     )
     assert v1 == 1

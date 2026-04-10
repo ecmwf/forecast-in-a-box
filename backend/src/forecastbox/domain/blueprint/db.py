@@ -34,8 +34,7 @@ async def upsert_blueprint(
     blueprint_id: str | None = None,
     source: BlueprintSource,
     created_by: str | None,
-    blocks: dict | None = None,
-    environment_spec: dict | None = None,
+    builder: dict | None = None,
     display_name: str | None = None,
     display_description: str | None = None,
     tags: list[str] | None = None,
@@ -96,8 +95,7 @@ async def upsert_blueprint(
                     display_name=display_name,
                     display_description=display_description,
                     tags=tags,
-                    blocks=blocks,
-                    environment_spec=environment_spec,
+                    builder=builder,
                     is_deleted=False,
                 )
             )
