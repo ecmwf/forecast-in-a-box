@@ -23,8 +23,10 @@ import { Route as AuthenticatedSchedulesScheduleIdRouteImport } from './routes/_
 import { Route as AuthenticatedExecutionsJobIdRouteImport } from './routes/_authenticated/executions.$jobId'
 import { Route as AuthenticatedConfigureFableIdRouteImport } from './routes/_authenticated/configure.$fableId'
 import { Route as AuthenticatedAdminPluginsRouteImport } from './routes/_authenticated/admin/plugins'
+import { Route as AuthenticatedAdminGlyphsRouteImport } from './routes/_authenticated/admin/glyphs'
 import { Route as AuthenticatedAdminArtifactsRouteImport } from './routes/_authenticated/admin/artifacts'
 import { Route as AuthenticatedAdminPluginsIndexRouteImport } from './routes/_authenticated/admin/plugins.index'
+import { Route as AuthenticatedAdminGlyphsIndexRouteImport } from './routes/_authenticated/admin/glyphs.index'
 import { Route as AuthenticatedAdminArtifactsIndexRouteImport } from './routes/_authenticated/admin/artifacts.index'
 import { Route as AuthenticatedAdminPluginsPluginIdRouteImport } from './routes/_authenticated/admin/plugins.$pluginId'
 import { Route as AuthenticatedAdminArtifactsArtifactIdRouteImport } from './routes/_authenticated/admin/artifacts.$artifactId'
@@ -104,6 +106,12 @@ const AuthenticatedAdminPluginsRoute =
     path: '/plugins',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminGlyphsRoute =
+  AuthenticatedAdminGlyphsRouteImport.update({
+    id: '/glyphs',
+    path: '/glyphs',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminArtifactsRoute =
   AuthenticatedAdminArtifactsRouteImport.update({
     id: '/artifacts',
@@ -115,6 +123,12 @@ const AuthenticatedAdminPluginsIndexRoute =
     id: '/',
     path: '/',
     getParentRoute: () => AuthenticatedAdminPluginsRoute,
+  } as any)
+const AuthenticatedAdminGlyphsIndexRoute =
+  AuthenticatedAdminGlyphsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedAdminGlyphsRoute,
   } as any)
 const AuthenticatedAdminArtifactsIndexRoute =
   AuthenticatedAdminArtifactsIndexRouteImport.update({
@@ -143,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/presets': typeof AuthenticatedPresetsRoute
   '/admin/artifacts': typeof AuthenticatedAdminArtifactsRouteWithChildren
+  '/admin/glyphs': typeof AuthenticatedAdminGlyphsRouteWithChildren
   '/admin/plugins': typeof AuthenticatedAdminPluginsRouteWithChildren
   '/configure/$fableId': typeof AuthenticatedConfigureFableIdRoute
   '/executions/$jobId': typeof AuthenticatedExecutionsJobIdRoute
@@ -153,6 +168,7 @@ export interface FileRoutesByFullPath {
   '/admin/artifacts/$artifactId': typeof AuthenticatedAdminArtifactsArtifactIdRoute
   '/admin/plugins/$pluginId': typeof AuthenticatedAdminPluginsPluginIdRoute
   '/admin/artifacts/': typeof AuthenticatedAdminArtifactsIndexRoute
+  '/admin/glyphs/': typeof AuthenticatedAdminGlyphsIndexRoute
   '/admin/plugins/': typeof AuthenticatedAdminPluginsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -170,6 +186,7 @@ export interface FileRoutesByTo {
   '/admin/artifacts/$artifactId': typeof AuthenticatedAdminArtifactsArtifactIdRoute
   '/admin/plugins/$pluginId': typeof AuthenticatedAdminPluginsPluginIdRoute
   '/admin/artifacts': typeof AuthenticatedAdminArtifactsIndexRoute
+  '/admin/glyphs': typeof AuthenticatedAdminGlyphsIndexRoute
   '/admin/plugins': typeof AuthenticatedAdminPluginsIndexRoute
 }
 export interface FileRoutesById {
@@ -182,6 +199,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/presets': typeof AuthenticatedPresetsRoute
   '/_authenticated/admin/artifacts': typeof AuthenticatedAdminArtifactsRouteWithChildren
+  '/_authenticated/admin/glyphs': typeof AuthenticatedAdminGlyphsRouteWithChildren
   '/_authenticated/admin/plugins': typeof AuthenticatedAdminPluginsRouteWithChildren
   '/_authenticated/configure/$fableId': typeof AuthenticatedConfigureFableIdRoute
   '/_authenticated/executions/$jobId': typeof AuthenticatedExecutionsJobIdRoute
@@ -192,6 +210,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/artifacts/$artifactId': typeof AuthenticatedAdminArtifactsArtifactIdRoute
   '/_authenticated/admin/plugins/$pluginId': typeof AuthenticatedAdminPluginsPluginIdRoute
   '/_authenticated/admin/artifacts/': typeof AuthenticatedAdminArtifactsIndexRoute
+  '/_authenticated/admin/glyphs/': typeof AuthenticatedAdminGlyphsIndexRoute
   '/_authenticated/admin/plugins/': typeof AuthenticatedAdminPluginsIndexRoute
 }
 export interface FileRouteTypes {
@@ -204,6 +223,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/presets'
     | '/admin/artifacts'
+    | '/admin/glyphs'
     | '/admin/plugins'
     | '/configure/$fableId'
     | '/executions/$jobId'
@@ -214,6 +234,7 @@ export interface FileRouteTypes {
     | '/admin/artifacts/$artifactId'
     | '/admin/plugins/$pluginId'
     | '/admin/artifacts/'
+    | '/admin/glyphs/'
     | '/admin/plugins/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -231,6 +252,7 @@ export interface FileRouteTypes {
     | '/admin/artifacts/$artifactId'
     | '/admin/plugins/$pluginId'
     | '/admin/artifacts'
+    | '/admin/glyphs'
     | '/admin/plugins'
   id:
     | '__root__'
@@ -242,6 +264,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/presets'
     | '/_authenticated/admin/artifacts'
+    | '/_authenticated/admin/glyphs'
     | '/_authenticated/admin/plugins'
     | '/_authenticated/configure/$fableId'
     | '/_authenticated/executions/$jobId'
@@ -252,6 +275,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/artifacts/$artifactId'
     | '/_authenticated/admin/plugins/$pluginId'
     | '/_authenticated/admin/artifacts/'
+    | '/_authenticated/admin/glyphs/'
     | '/_authenticated/admin/plugins/'
   fileRoutesById: FileRoutesById
 }
@@ -361,6 +385,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminPluginsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/glyphs': {
+      id: '/_authenticated/admin/glyphs'
+      path: '/glyphs'
+      fullPath: '/admin/glyphs'
+      preLoaderRoute: typeof AuthenticatedAdminGlyphsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/artifacts': {
       id: '/_authenticated/admin/artifacts'
       path: '/artifacts'
@@ -374,6 +405,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/plugins/'
       preLoaderRoute: typeof AuthenticatedAdminPluginsIndexRouteImport
       parentRoute: typeof AuthenticatedAdminPluginsRoute
+    }
+    '/_authenticated/admin/glyphs/': {
+      id: '/_authenticated/admin/glyphs/'
+      path: '/'
+      fullPath: '/admin/glyphs/'
+      preLoaderRoute: typeof AuthenticatedAdminGlyphsIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminGlyphsRoute
     }
     '/_authenticated/admin/artifacts/': {
       id: '/_authenticated/admin/artifacts/'
@@ -417,6 +455,20 @@ const AuthenticatedAdminArtifactsRouteWithChildren =
     AuthenticatedAdminArtifactsRouteChildren,
   )
 
+interface AuthenticatedAdminGlyphsRouteChildren {
+  AuthenticatedAdminGlyphsIndexRoute: typeof AuthenticatedAdminGlyphsIndexRoute
+}
+
+const AuthenticatedAdminGlyphsRouteChildren: AuthenticatedAdminGlyphsRouteChildren =
+  {
+    AuthenticatedAdminGlyphsIndexRoute: AuthenticatedAdminGlyphsIndexRoute,
+  }
+
+const AuthenticatedAdminGlyphsRouteWithChildren =
+  AuthenticatedAdminGlyphsRoute._addFileChildren(
+    AuthenticatedAdminGlyphsRouteChildren,
+  )
+
 interface AuthenticatedAdminPluginsRouteChildren {
   AuthenticatedAdminPluginsPluginIdRoute: typeof AuthenticatedAdminPluginsPluginIdRoute
   AuthenticatedAdminPluginsIndexRoute: typeof AuthenticatedAdminPluginsIndexRoute
@@ -436,6 +488,7 @@ const AuthenticatedAdminPluginsRouteWithChildren =
 
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminArtifactsRoute: typeof AuthenticatedAdminArtifactsRouteWithChildren
+  AuthenticatedAdminGlyphsRoute: typeof AuthenticatedAdminGlyphsRouteWithChildren
   AuthenticatedAdminPluginsRoute: typeof AuthenticatedAdminPluginsRouteWithChildren
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
@@ -443,6 +496,7 @@ interface AuthenticatedAdminRouteChildren {
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminArtifactsRoute:
     AuthenticatedAdminArtifactsRouteWithChildren,
+  AuthenticatedAdminGlyphsRoute: AuthenticatedAdminGlyphsRouteWithChildren,
   AuthenticatedAdminPluginsRoute: AuthenticatedAdminPluginsRouteWithChildren,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
 }

@@ -210,6 +210,7 @@ export function ExecutionStatusHeader({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <AlertDialogTrigger
+                  nativeButton={false}
                   render={
                     <DropdownMenuItem
                       variant="destructive"

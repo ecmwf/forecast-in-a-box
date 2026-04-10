@@ -50,6 +50,43 @@ const fableVersions: Record<string, number> = Object.fromEntries(
   Object.keys(mockSavedFables).map((id) => [id, 1]),
 )
 
+interface MockGlobalGlyph {
+  global_glyph_id: string
+  key: string
+  value: string
+  public: boolean
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+const mockGlobalGlyphs: Array<MockGlobalGlyph> = []
+let glyphIdCounter = 1
+
+const mockIntrinsicGlyphs = [
+  {
+    name: 'runId',
+    display_name: 'Run ID',
+    valueExample: '550e8400-e29b-41d4-a716-446655440000',
+  },
+  {
+    name: 'submitDatetime',
+    display_name:
+      'Submit Datetime (fixed at first submission, preserved on restart)',
+    valueExample: '2026-04-10 12:00:00',
+  },
+  {
+    name: 'startDatetime',
+    display_name: 'Start Datetime (updated on every restart)',
+    valueExample: '2026-04-10 12:00:00',
+  },
+  {
+    name: 'attemptCount',
+    display_name: 'Attempt Count (incremented on every restart)',
+    valueExample: '1',
+  },
+]
+
 export const fableHandlers = [
   http.get(API_ENDPOINTS.fable.catalogue, async () => {
     await delay(300)
@@ -225,6 +262,91 @@ export const fableHandlers = [
       page: 1,
       page_size: 50,
     })
+  }),
+
+  http.get(API_ENDPOINTS.fable.glyphsList, async ({ request }) => {
+    await delay(200)
+    const url = new URL(request.url)
+    const glyphType = url.searchParams.get('glyph_type') ?? 'intrinsic'
+
+    if (glyphType === 'intrinsic') {
+      return HttpResponse.json({
+        glyphs: mockIntrinsicGlyphs,
+        total: mockIntrinsicGlyphs.length,
+        page: 1,
+        page_size: mockIntrinsicGlyphs.length,
+      })
+    }
+
+    // global
+    const page = Number(url.searchParams.get('page') ?? '1')
+    const pageSize = Number(url.searchParams.get('page_size') ?? '50')
+    const start = (page - 1) * pageSize
+    const slice = mockGlobalGlyphs.slice(start, start + pageSize)
+    return HttpResponse.json({
+      glyphs: slice.map((g) => ({
+        name: g.key,
+        display_name: g.key,
+        valueExample: g.value,
+      })),
+      total: mockGlobalGlyphs.length,
+      page,
+      page_size: pageSize,
+    })
+  }),
+
+  http.post(API_ENDPOINTS.fable.glyphsGlobalPost, async ({ request }) => {
+    await delay(300)
+    const body = (await request.json()) as {
+      key: string
+      value: string
+      public?: boolean
+    }
+
+    const intrinsicNames = new Set(mockIntrinsicGlyphs.map((g) => g.name))
+    if (intrinsicNames.has(body.key)) {
+      return HttpResponse.json(
+        {
+          detail: `Key '${body.key}' is reserved as an intrinsic glyph and cannot be overridden.`,
+        },
+        { status: 422 },
+      )
+    }
+
+    const existing = mockGlobalGlyphs.find((g) => g.key === body.key)
+    const now = new Date().toISOString()
+    if (existing) {
+      existing.value = body.value
+      existing.public = body.public ?? false
+      existing.updated_at = now
+      return HttpResponse.json(existing)
+    }
+
+    const newGlyph: MockGlobalGlyph = {
+      global_glyph_id: `glyph-${String(glyphIdCounter++).padStart(3, '0')}`,
+      key: body.key,
+      value: body.value,
+      public: body.public ?? false,
+      created_by: 'mock-user-123',
+      created_at: now,
+      updated_at: now,
+    }
+    mockGlobalGlyphs.push(newGlyph)
+    return HttpResponse.json(newGlyph)
+  }),
+
+  http.get(API_ENDPOINTS.fable.glyphsGlobalGet, async ({ request }) => {
+    await delay(200)
+    const url = new URL(request.url)
+    const id = url.searchParams.get('global_glyph_id')
+    const glyph = mockGlobalGlyphs.find((g) => g.global_glyph_id === id)
+    if (!glyph) {
+      return HttpResponse.json(
+        { detail: `GlobalGlyph '${id}' not found.` },
+        { status: 404 },
+      )
+    }
+    return HttpResponse.json(glyph)
   }),
 
   http.get(API_ENDPOINTS.fable.get, async ({ request }) => {

@@ -52,6 +52,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { parseGlyphSegments } from '@/features/fable-builder/utils/glyph-display'
 import { cn } from '@/lib/utils'
 
 export type FableNode = Node<FableNodeData>
@@ -66,7 +67,7 @@ const OUTPUT_POSITIONS: Record<'TB' | 'LR', Position> = {
   LR: Position.Right,
 }
 
-export const BlockNode = memo(function BlockNode({
+export const BlockNode = memo(function ({
   id,
   data,
   selected,
@@ -289,6 +290,12 @@ export const BlockNode = memo(function BlockNode({
           <div className="flex flex-wrap gap-1.5">
             {configSummary.map(([key, value]) => {
               const stringValue = String(value)
+              const truncated =
+                stringValue.length > 15
+                  ? `${stringValue.slice(0, 15)}...`
+                  : stringValue
+              const segments = parseGlyphSegments(truncated)
+              const hasGlyphs = segments.some((s) => s.isGlyph)
               return (
                 <span
                   key={key}
@@ -299,9 +306,20 @@ export const BlockNode = memo(function BlockNode({
                     metadata.color,
                   )}
                 >
-                  {stringValue.length > 15
-                    ? `${stringValue.slice(0, 15)}...`
-                    : stringValue}
+                  {hasGlyphs
+                    ? segments.map((seg, i) =>
+                        seg.isGlyph ? (
+                          <span
+                            key={i}
+                            className="rounded bg-primary/15 px-0.5 font-mono text-primary"
+                          >
+                            {seg.text}
+                          </span>
+                        ) : (
+                          <span key={i}>{seg.text}</span>
+                        ),
+                      )
+                    : truncated}
                 </span>
               )
             })}

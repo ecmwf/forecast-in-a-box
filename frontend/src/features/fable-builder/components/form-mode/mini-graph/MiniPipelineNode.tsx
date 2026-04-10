@@ -65,7 +65,7 @@ export type MiniPipelineNodeType = Node<MiniPipelineNodeData>
  * - Highlight ring when isCurrentBlock
  * - onClick main area → navigate to block
  */
-export const MiniPipelineNode = memo(function MiniPipelineNode({
+export const MiniPipelineNode = memo(function ({
   data,
 }: NodeProps<MiniPipelineNodeType>) {
   const {

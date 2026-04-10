@@ -42,7 +42,7 @@ export type AddBlockNodeType = Node<AddBlockNodeData>
  * - Plus icon + "Add [Kind]" text
  * - onClick → dropdown to select block type
  */
-export const AddBlockNode = memo(function AddBlockNode({
+export const AddBlockNode = memo(function ({
   data,
 }: NodeProps<AddBlockNodeType>) {
   const { kind, addOptions, onAddBlock } = data
