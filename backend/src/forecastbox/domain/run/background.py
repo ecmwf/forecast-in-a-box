@@ -68,7 +68,7 @@ def execute_background(
         global_rows = list(cast(list, run_async(global_glyph_db.list_global_glyphs(auth_context))))
         global_values: dict[str, str] = {str(row.key): str(row.value) for row in global_rows}
 
-        builder = BlueprintBuilder.model_validate(blueprint.builder)  # ty:ignore[arg-type]
+        builder = BlueprintBuilder.model_validate(blueprint.builder)
         local_values: dict[str, str] = builder.local_glyphs
 
         all_glyphs = merge_glyph_values(intrinsic_values, global_values, local_values, compiler_runtime_context.glyphs)

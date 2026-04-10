@@ -241,9 +241,9 @@ async def load_builder(blueprint_id: str, version: int | None = None) -> Bluepri
     blueprint = await _blueprint_db.get_blueprint(blueprint_id, version)
     if blueprint is None:
         raise BlueprintNotFound(f"Blueprint {blueprint_id!r} not found.")
-    if blueprint.builder is None:  # ty:ignore[truthy-bool]
+    if blueprint.builder is None:
         raise BlueprintNotFound(f"Blueprint {blueprint_id!r} has no builder spec.")
-    builder = BlueprintBuilder.model_validate(blueprint.builder)  # ty:ignore[arg-type]
+    builder = BlueprintBuilder.model_validate(blueprint.builder)
     return BlueprintRetrieveResult(
         blueprint_id=str(blueprint.blueprint_id),  # ty:ignore[invalid-argument-type]
         blueprint_version=cast(int, blueprint.version),
