@@ -17,7 +17,7 @@ import time
 from typing import Any
 
 import httpx
-from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
+from fiab_core.fable import BlockInstance, PluginBlockFactoryId
 
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.blueprint.service import BlueprintSaveCommand as BlueprintSaveRequest
@@ -52,10 +52,9 @@ def ensure_completed_v2(backend_client: httpx.Client, job_id: str, sleep: float 
 
 def _save_blueprint(client: httpx.Client) -> tuple[str, int]:
     """Save a minimal BlueprintBuilder and return (blueprint_id, version)."""
-    plugin_id = PluginCompositeId(store="ecmwf", local="ecmwf-base")
     source = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=plugin_id, factory="ekdSource"),
-        configuration_values={"source": "ecmwf-open-data", "date": "2026-01-01", "expver": "0001"},
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="source_42"),
+        configuration_values={},
         input_ids={},
     )
     builder = BlueprintBuilder(blocks={"source1": source})

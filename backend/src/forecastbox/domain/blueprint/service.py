@@ -99,21 +99,36 @@ class BlueprintSaveCommand(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-async def validate_expand(blueprint: BlueprintBuilder, auth_context: AuthContext) -> BlueprintValidationExpansion:
+async def validate_expand(
+    blueprint: BlueprintBuilder, auth_context: AuthContext, *, validate_only: bool = False
+) -> BlueprintValidationExpansion:
     """Validate and expand a partially-constructed BlueprintBuilder.
 
     Returns structured validation errors and possible completion options.
     The presence of errors does not affect the return (callers decide how to
     surface them). Intrinsic and global glyphs visible to the caller, along
     with local glyphs defined on the builder, are all considered known.
+
+    When ``validate_only`` is True, ``possible_sources`` and
+    ``possible_expansions`` are omitted from the result (saves work when the
+    caller only needs error checking), and the blueprint is deep-copied so
+    that ``resolve_configurations`` mutations do not affect the caller's object.
+    When ``validate_only`` is False (the default, used by the expand endpoint),
+    the passed-in blueprint may be mutated in place and expansion data is computed.
     """
     plugins = PluginManager.plugins
-    possible_sources = [
-        PluginBlockFactoryId(plugin=plugin_id, factory=block_factory_id)
-        for plugin_id, plugin in plugins.items()
-        for block_factory_id, block_factory in plugin.catalogue.factories.items()
-        if block_factory.kind == "source" and not block_factory.inputs
-    ]
+    if validate_only:
+        blueprint = blueprint.model_copy(deep=True)
+    possible_sources = (
+        []
+        if validate_only
+        else [
+            PluginBlockFactoryId(plugin=plugin_id, factory=block_factory_id)
+            for plugin_id, plugin in plugins.items()
+            for block_factory_id, block_factory in plugin.catalogue.factories.items()
+            if block_factory.kind == "source" and not block_factory.inputs
+        ]
+    )
     possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]] = {}
     block_errors: dict[BlockInstanceId, list[str]] = defaultdict(list)
     outputs = {}
@@ -167,11 +182,12 @@ async def validate_expand(blueprint: BlueprintBuilder, auth_context: AuthContext
             continue
         outputs[blockId] = output_or_error.t
 
-        possible_expansions[blockId] = [
-            PluginBlockFactoryId(plugin=any_plugin_id, factory=block_factory_id)
-            for any_plugin_id, any_plugin in plugins.items()
-            for block_factory_id in any_plugin.expander(output_or_error.t)
-        ]
+        if not validate_only:
+            possible_expansions[blockId] = [
+                PluginBlockFactoryId(plugin=any_plugin_id, factory=block_factory_id)
+                for any_plugin_id, any_plugin in plugins.items()
+                for block_factory_id in any_plugin.expander(output_or_error.t)
+            ]
 
     return BlueprintValidationExpansion(
         possible_sources=possible_sources,
