@@ -23,7 +23,6 @@ from typing import cast
 
 import forecastbox.domain.glyphs.global_db as global_glyph_db
 import forecastbox.domain.run.db as run_db
-from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.glyphs.resolution import extract_glyphs, merge_glyph_values
 from forecastbox.domain.run.cascade import ExecutionSpecification, execute_cascade
@@ -69,11 +68,7 @@ def execute_background(
         global_rows = list(cast(list, run_async(global_glyph_db.list_global_glyphs(auth_context))))
         global_values: dict[str, str] = {str(row.key): str(row.value) for row in global_rows}
 
-        builder = BlueprintBuilder(
-            blocks=blueprint.blocks,  # ty:ignore[invalid-argument-type]
-            environment=EnvironmentSpecification.model_validate(blueprint.environment_spec) if blueprint.environment_spec else None,
-            local_glyphs=dict(blueprint.local_glyphs) if blueprint.local_glyphs else {},  # ty:ignore[no-matching-overload]
-        )
+        builder = BlueprintBuilder.model_validate(blueprint.builder)  # ty:ignore[arg-type]
         local_values: dict[str, str] = builder.local_glyphs
 
         all_glyphs = merge_glyph_values(intrinsic_values, global_values, local_values, compiler_runtime_context.glyphs)

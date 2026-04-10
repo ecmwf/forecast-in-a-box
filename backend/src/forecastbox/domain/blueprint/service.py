@@ -202,15 +202,12 @@ async def save_builder(
     Raises ``BlueprintNotFound`` or ``BlueprintAccessDenied`` from the db layer.
     """
     source: str = "user_defined" if payload.display_name is not None else "oneoff_execution"
-    env = payload.builder.environment
     blueprint_id, version = await upsert_blueprint(
         auth_context=auth_context,
         blueprint_id=blueprint_id,
         source=source,
         created_by=auth_context.user_id,
-        blocks=payload.builder.model_dump(mode="json")["blocks"],
-        environment_spec=env.model_dump(mode="json") if env is not None else None,
-        local_glyphs=payload.builder.local_glyphs if payload.builder.local_glyphs else None,
+        builder=payload.builder.model_dump(mode="json"),
         display_name=payload.display_name,
         display_description=payload.display_description,
         tags=payload.tags if payload.tags else None,
@@ -228,13 +225,9 @@ async def load_builder(blueprint_id: str, version: int | None = None) -> Bluepri
     blueprint = await _blueprint_db.get_blueprint(blueprint_id, version)
     if blueprint is None:
         raise BlueprintNotFound(f"Blueprint {blueprint_id!r} not found.")
-    if blueprint.blocks is None:
+    if blueprint.builder is None:  # ty:ignore[truthy-bool]
         raise BlueprintNotFound(f"Blueprint {blueprint_id!r} has no builder spec.")
-    builder = BlueprintBuilder(blocks=blueprint.blocks)  # ty:ignore[invalid-argument-type]
-    if blueprint.environment_spec is not None:
-        builder.environment = EnvironmentSpecification.model_validate(blueprint.environment_spec)
-    if blueprint.local_glyphs:
-        builder.local_glyphs = blueprint.local_glyphs  # ty:ignore[invalid-assignment]
+    builder = BlueprintBuilder.model_validate(blueprint.builder)  # ty:ignore[arg-type]
     return BlueprintRetrieveResult(
         blueprint_id=str(blueprint.blueprint_id),  # ty:ignore[invalid-argument-type]
         blueprint_version=cast(int, blueprint.version),

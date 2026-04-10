@@ -92,7 +92,7 @@ async def execute(
     database layer.  Experiment metadata is stored on the row when provided and
     preserved on restart.
     """
-    if not blueprint.blocks:
+    if not blueprint.builder:
         return Either.error(f"Blueprint {blueprint.blueprint_id!r} has no compilable blocks")
 
     blueprint_id = str(blueprint.blueprint_id)  # ty:ignore[invalid-argument-type]
