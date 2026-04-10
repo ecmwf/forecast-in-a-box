@@ -14,7 +14,6 @@
  * API functions for fable (configuration builder) operations.
  */
 
-import { z } from 'zod'
 import type {
   BlockFactoryCatalogue,
   BlueprintDeleteRequest,
@@ -25,7 +24,10 @@ import type {
   FableUpsertRequest,
   FableUpsertResponse,
   FableValidationExpansion,
-  VariableDetail,
+  GlobalGlyphPostRequest,
+  GlobalGlyphResponse,
+  GlyphDetail,
+  GlyphListResponse,
 } from '@/api/types/fable.types'
 import { apiClient } from '@/api/client'
 import { API_ENDPOINTS } from '@/api/endpoints'
@@ -35,7 +37,8 @@ import {
   FableRetrieveResponseSchema,
   FableUpsertResponseSchema,
   FableValidationExpansionSchema,
-  VariableDetailSchema,
+  GlobalGlyphResponseSchema,
+  GlyphListResponseSchema,
   normalizeCatalogueKeys,
 } from '@/api/types/fable.types'
 
@@ -137,10 +140,51 @@ export async function deleteBlueprint(
 }
 
 /**
- * List available automatic variables for ${variable} interpolation in block configs
+ * List available intrinsic glyphs for ${glyph} interpolation in block configs
  */
-export async function getAvailableVariables(): Promise<Array<VariableDetail>> {
-  return apiClient.get(API_ENDPOINTS.fable.variablesList, {
-    schema: z.array(VariableDetailSchema),
+export async function getAvailableGlyphs(): Promise<Array<GlyphDetail>> {
+  const response: GlyphListResponse = await apiClient.get(
+    API_ENDPOINTS.fable.glyphsList,
+    {
+      params: { glyph_type: 'intrinsic' },
+      schema: GlyphListResponseSchema,
+    },
+  )
+  return response.glyphs
+}
+
+/**
+ * List global glyphs (paginated)
+ */
+export async function listGlobalGlyphs(
+  page: number = 1,
+  pageSize: number = 50,
+): Promise<GlyphListResponse> {
+  return apiClient.get(API_ENDPOINTS.fable.glyphsList, {
+    params: { glyph_type: 'global', page, page_size: pageSize },
+    schema: GlyphListResponseSchema,
+  })
+}
+
+/**
+ * Create or update a global glyph
+ */
+export async function createGlobalGlyph(
+  request: GlobalGlyphPostRequest,
+): Promise<GlobalGlyphResponse> {
+  return apiClient.post(API_ENDPOINTS.fable.glyphsGlobalPost, request, {
+    schema: GlobalGlyphResponseSchema,
+  })
+}
+
+/**
+ * Get a global glyph by ID
+ */
+export async function getGlobalGlyph(
+  globalGlyphId: string,
+): Promise<GlobalGlyphResponse> {
+  return apiClient.get(API_ENDPOINTS.fable.glyphsGlobalGet, {
+    params: { global_glyph_id: globalGlyphId },
+    schema: GlobalGlyphResponseSchema,
   })
 }

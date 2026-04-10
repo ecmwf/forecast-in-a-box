@@ -147,7 +147,7 @@ function getEdgePath({
   }
 }
 
-export const FableEdgeComponent = memo(function FableEdgeComponent({
+export const FableEdgeComponent = memo(function ({
   id,
   sourceX,
   sourceY,

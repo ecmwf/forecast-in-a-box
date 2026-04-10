@@ -1,0 +1,60 @@
+{
+  "page": {
+    "title": "Global Glyphs",
+    "description": "Manage global glyph definitions used in fable configuration interpolation."
+  },
+  "list": {
+    "loading": "Loading glyphs..."
+  },
+  "filter": {
+    "searchPlaceholder": "Search by key or value..."
+  },
+  "empty": {
+    "title": "No global glyphs",
+    "description": "Create a global glyph to use ${glyph} interpolation across all fable configurations."
+  },
+  "table": {
+    "key": "Key",
+    "value": "Value"
+  },
+  "actions": {
+    "create": "Create Glyph",
+    "edit": "Edit",
+    "save": "Save",
+    "saving": "Saving...",
+    "cancel": "Cancel",
+    "createSuccess": "Glyph created",
+    "updateSuccess": "Glyph updated"
+  },
+  "form": {
+    "title": "Create Global Glyph",
+    "editTitle": "Edit Global Glyph",
+    "key": "Key",
+    "keyPlaceholder": "e.g. myVariable",
+    "keyHelp": "Used as ${key} in fable configurations",
+    "value": "Value",
+    "valuePlaceholder": "The value to interpolate",
+    "public": "Public",
+    "publicHelp": "Public glyphs are visible to all users (admin only)"
+  },
+  "pagination": {
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page {{current}} of {{total}}"
+  },
+  "panel": {
+    "title": "Available Glyphs",
+    "manage": "Manage",
+    "help": "Use ${name} syntax in block configuration values to reference dynamic glyphs.\n\nIntrinsic — system-provided, always available (e.g., runId, submitDatetime). startDatetime and attemptCount update on each retry.\n\nGlobal — user-defined key-value pairs shared across fables. Manage them via the admin page.\n\nContext — injected automatically per-execution (e.g., by the scheduler). Not shown here.\n\nPrecedence: Intrinsic → Global → Context.\nPinned glyphs (startDatetime, attemptCount) always use the intrinsic value.",
+    "intrinsic": "Intrinsic",
+    "global": "Global",
+    "noGlobal": "No global glyphs yet.",
+    "createOne": "Create one",
+    "copied": "Copied",
+    "example": "e.g.",
+    "resolvesTo": "resolves to"
+  },
+  "autocomplete": {
+    "filter": "Filter glyphs..."
+  }
+}

@@ -97,16 +97,46 @@ export const FableBuilderV1Schema = z.object({
 export type FableBuilderV1 = z.infer<typeof FableBuilderV1Schema>
 
 /**
- * Automatic variable available for ${variable} interpolation in block configuration values.
- * Returned by GET /api/v1/blueprint/variables/list
+ * Intrinsic glyph available for ${glyph} interpolation in block configuration values.
+ * Returned by GET /api/v1/blueprint/glyphs/list?glyph_type=intrinsic
  */
-export const VariableDetailSchema = z.object({
+export const GlyphDetailSchema = z.object({
   name: z.string(),
   display_name: z.string(),
   valueExample: z.string(),
 })
 
-export type VariableDetail = z.infer<typeof VariableDetailSchema>
+export type GlyphDetail = z.infer<typeof GlyphDetailSchema>
+
+/** Paginated response from GET /api/v1/blueprint/glyphs/list */
+export const GlyphListResponseSchema = z.object({
+  glyphs: z.array(GlyphDetailSchema),
+  total: z.number(),
+  page: z.number(),
+  page_size: z.number(),
+})
+
+export type GlyphListResponse = z.infer<typeof GlyphListResponseSchema>
+
+/** POST /blueprint/glyphs/global/post — outbound request */
+export interface GlobalGlyphPostRequest {
+  key: string
+  value: string
+  public?: boolean
+}
+
+/** Response from global glyph endpoints */
+export const GlobalGlyphResponseSchema = z.object({
+  global_glyph_id: z.string(),
+  key: z.string(),
+  value: z.string(),
+  public: z.boolean(),
+  created_by: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+})
+
+export type GlobalGlyphResponse = z.infer<typeof GlobalGlyphResponseSchema>
 
 export const FableValidationExpansionSchema = z.object({
   global_errors: z.array(z.string()),

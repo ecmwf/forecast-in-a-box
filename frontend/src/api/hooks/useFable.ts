@@ -18,15 +18,21 @@ import type {
   FableRetrieveResponse,
   FableUpsertResponse,
   FableValidationExpansion,
+  GlobalGlyphPostRequest,
+  GlobalGlyphResponse,
+  GlyphDetail,
+  GlyphListResponse,
   PluginBlockFactoryId,
-  VariableDetail,
 } from '@/api/types/fable.types'
 import {
+  createGlobalGlyph,
   deleteBlueprint,
   expandFable,
-  getAvailableVariables,
+  getAvailableGlyphs,
   getCatalogue,
+  getGlobalGlyph,
   listBlueprints,
+  listGlobalGlyphs,
   retrieveFable,
   updateBlueprint,
   upsertFable,
@@ -43,7 +49,11 @@ export const fableKeys = {
   detail: (id: string) => [...fableKeys.all, 'detail', id] as const,
   validation: (fable: FableBuilderV1) =>
     [...fableKeys.all, 'validation', JSON.stringify(fable)] as const,
-  variables: () => [...fableKeys.all, 'variables'] as const,
+  glyphs: () => [...fableKeys.all, 'glyphs'] as const,
+  globalGlyphsBase: () => [...fableKeys.all, 'globalGlyphs'] as const,
+  globalGlyphs: (page?: number, pageSize?: number) =>
+    [...fableKeys.all, 'globalGlyphs', page, pageSize] as const,
+  globalGlyph: (id: string) => [...fableKeys.all, 'globalGlyph', id] as const,
 }
 
 export function useBlockCatalogue(language?: string) {
@@ -221,15 +231,53 @@ export function useDeleteBlueprint() {
 }
 
 /**
- * Fetch available automatic variables for ${variable} interpolation in block configs.
- * Variables are static (e.g., runId, submitDatetime), so we cache aggressively.
+ * Fetch available intrinsic glyphs for ${glyph} interpolation in block configs.
+ * Intrinsic glyphs are static (e.g., runId, submitDatetime), so we cache aggressively.
  */
-export function useAvailableVariables() {
-  return useQuery<Array<VariableDetail>>({
-    queryKey: fableKeys.variables(),
-    queryFn: getAvailableVariables,
-    staleTime: 30 * 60 * 1000, // 30 minutes — variables change rarely
+export function useAvailableGlyphs() {
+  return useQuery<Array<GlyphDetail>>({
+    queryKey: fableKeys.glyphs(),
+    queryFn: getAvailableGlyphs,
+    staleTime: 30 * 60 * 1000, // 30 minutes — intrinsic glyphs change rarely
     gcTime: 60 * 60 * 1000, // 1 hour
+  })
+}
+
+/**
+ * List global glyphs (paginated)
+ */
+export function useListGlobalGlyphs(page: number = 1, pageSize: number = 50) {
+  return useQuery<GlyphListResponse>({
+    queryKey: fableKeys.globalGlyphs(page, pageSize),
+    queryFn: () => listGlobalGlyphs(page, pageSize),
+    staleTime: QUERY_CONSTANTS.STALE_TIMES.DEFAULT,
+  })
+}
+
+/**
+ * Get a single global glyph by ID
+ */
+export function useGlobalGlyph(globalGlyphId: string | null | undefined) {
+  return useQuery<GlobalGlyphResponse>({
+    queryKey: fableKeys.globalGlyph(globalGlyphId ?? ''),
+    queryFn: () => getGlobalGlyph(globalGlyphId!),
+    enabled: !!globalGlyphId,
+  })
+}
+
+/**
+ * Create or update a global glyph
+ */
+export function useCreateGlobalGlyph() {
+  const queryClient = useQueryClient()
+
+  return useMutation<GlobalGlyphResponse, Error, GlobalGlyphPostRequest>({
+    mutationFn: createGlobalGlyph,
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: fableKeys.globalGlyphsBase(),
+      })
+    },
   })
 }
 

@@ -24,10 +24,7 @@ const NODE_TYPE_TO_KIND: Record<string, BlockKind> = {
   sinkBlock: 'sink',
 }
 
-export const ExecutionNode = memo(function ExecutionNode({
-  data,
-  type,
-}: NodeProps) {
+export const ExecutionNode = memo(function ({ data, type }: NodeProps) {
   const nodeData = data as FableNodeData
   const showConfig = useShowConfig()
   const kind = NODE_TYPE_TO_KIND[type] ?? 'source'

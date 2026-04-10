@@ -71,8 +71,12 @@ export const API_ENDPOINTS = {
     list: `${API_PREFIX}/blueprint/list`,
     /** POST - Delete a fable definition */
     delete: `${API_PREFIX}/blueprint/delete`,
-    /** GET - List available automatic variables for configuration interpolation */
-    variablesList: `${API_PREFIX}/blueprint/variables/list`,
+    /** GET - List available intrinsic glyphs for ${glyph} interpolation in block configs */
+    glyphsList: `${API_PREFIX}/blueprint/glyphs/list`,
+    /** POST - Create or update a global glyph */
+    glyphsGlobalPost: `${API_PREFIX}/blueprint/glyphs/global/post`,
+    /** GET - Get a global glyph by ID */
+    glyphsGlobalGet: `${API_PREFIX}/blueprint/glyphs/global/get`,
   },
 
   /**

@@ -53,7 +53,7 @@ const POPOVER_SIDE: Record<string, 'top' | 'bottom' | 'left' | 'right'> = {
   RL: 'left',
 }
 
-export const AddNodeButton = memo(function AddNodeButton({
+export const AddNodeButton = memo(function ({
   sourceBlockId,
   possibleExpansions,
   catalogue,
