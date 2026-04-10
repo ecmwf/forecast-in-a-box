@@ -1,0 +1,14 @@
+┌────────────────┬─────────┬─────────┬─────────┬──────────┐
+│ Implementation │ mean    │ std     │ min     │ max      │
+├────────────────┼─────────┼─────────┼─────────┼──────────┤
+│ simpleeval     │ 0.13 ms │ 0.06 ms │ 0.12 ms │ 1.41 ms  │
+├────────────────┼─────────┼─────────┼─────────┼──────────┤
+│ jinja2         │ 1.08 ms │ 0.08 ms │ 1.01 ms │ 2.46 ms  │
+├────────────────┼─────────┼─────────┼─────────┼──────────┤
+│ cel            │ 1.22 ms │ 0.05 ms │ 1.16 ms │ 1.60 ms  │
+├────────────────┼─────────┼─────────┼─────────┼──────────┤
+│ lark           │ 9.08 ms │ 1.01 ms │ 8.02 ms │ 20.25 ms │
+└────────────────┴─────────┴─────────┴─────────┴──────────┘
+
+simpleeval is fastest (it delegates directly to Python's own AST evaluator). Lark is slowest — Earley parsing on every call has significant overhead (a compiled grammar cache
+would help). Jinja2 and CEL are comparable at ~1 ms.
