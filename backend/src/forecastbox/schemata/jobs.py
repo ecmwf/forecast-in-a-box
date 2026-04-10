@@ -64,6 +64,8 @@ class Blueprint(Base):
     blocks = Column(JSON, nullable=True)
     # stores the forecastbox.domain.blueprint.cascade.EnvironmentSpecification
     environment_spec = Column(JSON, nullable=True)
+    # stores local glyphs dict[str, str] from BlueprintBuilder
+    local_glyphs = Column(JSON, nullable=True)
 
     is_deleted = Column(Boolean, nullable=False, default=False)
 

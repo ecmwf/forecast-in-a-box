@@ -36,6 +36,7 @@ async def upsert_blueprint(
     created_by: str | None,
     blocks: dict | None = None,
     environment_spec: dict | None = None,
+    local_glyphs: dict | None = None,
     display_name: str | None = None,
     display_description: str | None = None,
     tags: list[str] | None = None,
@@ -98,6 +99,7 @@ async def upsert_blueprint(
                     tags=tags,
                     blocks=blocks,
                     environment_spec=environment_spec,
+                    local_glyphs=local_glyphs,
                     is_deleted=False,
                 )
             )

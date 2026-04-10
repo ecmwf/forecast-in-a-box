@@ -11,6 +11,7 @@
 
 import datetime as dt
 import re
+from typing import TYPE_CHECKING
 
 from cascade.low.func import Either
 from fiab_core.fable import BlockInstance
@@ -54,3 +55,22 @@ def resolve_configurations(blockInstance: BlockInstance, glyph_values: dict[str,
     """
     for key, value in blockInstance.configuration_values.items():
         blockInstance.configuration_values[key] = _substitute_glyphs(value, glyph_values)
+
+
+def merge_glyph_values(
+    intrinsic_values: dict[str, str],
+    global_values: dict[str, str],
+    local_values: dict[str, str],
+    context_values: dict[str, str],
+) -> dict[str, str]:
+    """Merge glyphs from all four sources into a single resolution map.
+
+    Resolution order (lowest to highest precedence): intrinsic < global < local < context.
+    Intrinsic pinned keys (``startDatetime``, ``attemptCount``) always win regardless,
+    so that each restart records its own actual values.
+    """
+    merged = {**intrinsic_values, **global_values, **local_values, **context_values}
+    for pinned in ("startDatetime", "attemptCount"):
+        if pinned in intrinsic_values:
+            merged[pinned] = intrinsic_values[pinned]
+    return merged

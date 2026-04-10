@@ -19,28 +19,10 @@ from fiab_core.artifacts import CompositeArtifactId
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples
-from forecastbox.domain.glyphs.resolution import extract_glyphs, resolve_configurations, value_dt2str
+from forecastbox.domain.glyphs.resolution import extract_glyphs, merge_glyph_values, resolve_configurations, value_dt2str
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.domain.run.cascade import ExecutionSpecification, RawCascadeJob
 from forecastbox.utility.graph import topological_order
-
-
-def merge_glyph_values(
-    intrinsic_values: dict[str, str],
-    global_values: dict[str, str],
-    context_values: dict[str, str],
-) -> dict[str, str]:
-    """Merge glyphs from all three sources into a single resolution map.
-
-    Resolution order (lowest to highest precedence): intrinsic < global < context.
-    Intrinsic pinned keys (``startDatetime``, ``attemptCount``) always win regardless,
-    so that each restart records its own actual values.
-    """
-    merged = {**intrinsic_values, **global_values, **context_values}
-    for pinned in ("startDatetime", "attemptCount"):
-        if pinned in intrinsic_values:
-            merged[pinned] = intrinsic_values[pinned]
-    return merged
 
 
 def resolve_intrinsic_glyph_values(

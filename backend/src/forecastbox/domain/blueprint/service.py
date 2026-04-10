@@ -41,6 +41,7 @@ from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.db import upsert_blueprint
 from forecastbox.domain.blueprint.exceptions import BlueprintNotFound
 from forecastbox.domain.glyphs.intrinsic import get_values_and_examples
+from forecastbox.domain.glyphs.resolution import merge_glyph_values
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.graph import topological_order
@@ -52,6 +53,7 @@ class BlueprintBuilder(BaseModel):
     # NOTE warning -- this class is used by the web api. Be careful about changes here
     blocks: dict[BlockInstanceId, BlockInstance]
     environment: EnvironmentSpecification | None = None
+    local_glyphs: dict[str, str] = {}
 
 
 class BlueprintSaveResult(BaseModel):
@@ -102,8 +104,8 @@ async def validate_expand(blueprint: BlueprintBuilder, auth_context: AuthContext
 
     Returns structured validation errors and possible completion options.
     The presence of errors does not affect the return (callers decide how to
-    surface them). Intrinsic and global glyphs visible to the caller are both
-    considered known.
+    surface them). Intrinsic and global glyphs visible to the caller, along
+    with local glyphs defined on the builder, are all considered known.
     """
     plugins = PluginManager.plugins
     possible_sources = [
@@ -115,9 +117,20 @@ async def validate_expand(blueprint: BlueprintBuilder, auth_context: AuthContext
     possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]] = {}
     block_errors: dict[BlockInstanceId, list[str]] = defaultdict(list)
     outputs = {}
+
+    intrinsic_values = cast(dict[str, str], get_values_and_examples())
     global_glyphs = {str(row.key): str(row.value) for row in await global_glyph_db.list_global_glyphs(auth_context)}
-    available_glyphs = set(get_values_and_examples().keys()).union(global_glyphs.keys())
-    glyph_values: dict[str, str] = {**global_glyphs, **cast(dict[str, str], get_values_and_examples())}
+    local_glyphs = blueprint.local_glyphs
+
+    all_glyphs = merge_glyph_values(intrinsic_values, global_glyphs, local_glyphs, {})
+    available_glyphs = set(all_glyphs.keys())
+
+    global_errors: list[str] = []
+    intrinsic_names = set(intrinsic_values.keys())
+    colliding_keys = set(local_glyphs.keys()) & intrinsic_names
+    for key in sorted(colliding_keys):
+        global_errors.append(f"Local glyph key {key!r} is reserved as an intrinsic glyph and cannot be overridden.")
+
     for blockId in topological_order(blueprint.blocks.items(), lambda block: block.input_ids.values()):
         blockInstance = blueprint.blocks[blockId]
         plugin = plugins.get(blockInstance.factory_id.plugin, None)
@@ -145,7 +158,7 @@ async def validate_expand(blueprint: BlueprintBuilder, auth_context: AuthContext
         if unknown_glyphs:
             block_errors[blockId] += [f"Unknown glyphs referenced: {unknown_glyphs}"]
             continue
-        glyph_resolution.resolve_configurations(blockInstance, glyph_values)
+        glyph_resolution.resolve_configurations(blockInstance, all_glyphs)
 
         inputs = {input_id: outputs[source_id] for input_id, source_id in blockInstance.input_ids.items()}
         output_or_error = plugin.validator(blockInstance, inputs)
@@ -159,8 +172,6 @@ async def validate_expand(blueprint: BlueprintBuilder, auth_context: AuthContext
             for any_plugin_id, any_plugin in plugins.items()
             for block_factory_id in any_plugin.expander(output_or_error.t)
         ]
-
-    global_errors: list[str] = []
 
     return BlueprintValidationExpansion(
         possible_sources=possible_sources,
@@ -199,6 +210,7 @@ async def save_builder(
         created_by=auth_context.user_id,
         blocks=payload.builder.model_dump(mode="json")["blocks"],
         environment_spec=env.model_dump(mode="json") if env is not None else None,
+        local_glyphs=payload.builder.local_glyphs if payload.builder.local_glyphs else None,
         display_name=payload.display_name,
         display_description=payload.display_description,
         tags=payload.tags if payload.tags else None,
@@ -221,6 +233,8 @@ async def load_builder(blueprint_id: str, version: int | None = None) -> Bluepri
     builder = BlueprintBuilder(blocks=blueprint.blocks)  # ty:ignore[invalid-argument-type]
     if blueprint.environment_spec is not None:
         builder.environment = EnvironmentSpecification.model_validate(blueprint.environment_spec)
+    if blueprint.local_glyphs:
+        builder.local_glyphs = blueprint.local_glyphs  # ty:ignore[invalid-assignment]
     return BlueprintRetrieveResult(
         blueprint_id=str(blueprint.blueprint_id),  # ty:ignore[invalid-argument-type]
         blueprint_version=cast(int, blueprint.version),

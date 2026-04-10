@@ -25,9 +25,9 @@ import forecastbox.domain.glyphs.global_db as global_glyph_db
 import forecastbox.domain.run.db as run_db
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.service import BlueprintBuilder
-from forecastbox.domain.glyphs.resolution import extract_glyphs
+from forecastbox.domain.glyphs.resolution import extract_glyphs, merge_glyph_values
 from forecastbox.domain.run.cascade import ExecutionSpecification, execute_cascade
-from forecastbox.domain.run.compile import compile_builder, merge_glyph_values, resolve_intrinsic_glyph_values
+from forecastbox.domain.run.compile import compile_builder, resolve_intrinsic_glyph_values
 from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.schemata.jobs import Blueprint
 from forecastbox.utility.auth import AuthContext
@@ -69,12 +69,14 @@ def execute_background(
         global_rows = list(cast(list, run_async(global_glyph_db.list_global_glyphs(auth_context))))
         global_values: dict[str, str] = {str(row.key): str(row.value) for row in global_rows}
 
-        all_glyphs = merge_glyph_values(intrinsic_values, global_values, compiler_runtime_context.glyphs)
-
         builder = BlueprintBuilder(
             blocks=blueprint.blocks,  # ty:ignore[invalid-argument-type]
             environment=EnvironmentSpecification.model_validate(blueprint.environment_spec) if blueprint.environment_spec else None,
+            local_glyphs=dict(blueprint.local_glyphs) if blueprint.local_glyphs else {},  # ty:ignore[no-matching-overload]
         )
+        local_values: dict[str, str] = builder.local_glyphs
+
+        all_glyphs = merge_glyph_values(intrinsic_values, global_values, local_values, compiler_runtime_context.glyphs)
 
         # Persist only the glyphs actually referenced in the builder, keeping the stored context lean.
         referenced_glyph_names = {name for block in builder.blocks.values() for name in (cast(set[str], extract_glyphs(block).t) or set())}
