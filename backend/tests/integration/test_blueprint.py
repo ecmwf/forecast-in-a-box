@@ -283,10 +283,11 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert len(response.json()["possible_expansions"]["sink_file"]) == 0
     assert len(response.json()["block_errors"]) == 0
-    resolved_fname = response.json()["resolved_configuration_options"]["sink_file"]["fname"]
-    assert resolved_fname.startswith(f"{tmpdir}/output")
-    assert resolved_fname.endswith(".main.txt")
-    assert "${runId}" not in resolved_fname
+    glyphs_resp = backend_client_with_auth.get("/blueprint/glyphs/list", params={"glyph_type": "intrinsic"})
+    assert glyphs_resp.is_success, glyphs_resp.text
+    run_id_glyph = next(g for g in glyphs_resp.json()["glyphs"] if g["name"] == "runId")
+    expected_run_id = run_id_glyph["valueExample"]
+    assert response.json()["resolved_configuration_options"]["sink_file"]["fname"] == f"{tmpdir}/output{expected_run_id}.main.txt"
 
 
 def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:

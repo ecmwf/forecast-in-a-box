@@ -177,7 +177,7 @@ async def validate_expand(
             continue
         glyph_resolution.resolve_configurations(blockInstance, all_glyphs)
         # TODO: optimize to copy only when there was a glyph in the first place
-        resolved_configuration_options[blockId] = dict(blockInstance.configuration_values)
+        resolved_configuration_options[blockId] = blockInstance.configuration_values
 
         inputs = {input_id: outputs[source_id] for input_id, source_id in blockInstance.input_ids.items()}
         output_or_error = plugin.validator(blockInstance, inputs)
