@@ -101,6 +101,7 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         td = tempfile.TemporaryDirectory()
         td_data = tempfile.TemporaryDirectory()
         os.environ["FIAB_ROOT"] = td.name
+        os.environ["FIAB_TEST_FRONTEND"] = str(pathlib.Path(__file__).parent / "static")
         (pathlib.Path(td.name) / "pylock.toml.timestamp").write_text("1761908420:d0.0.1")
         # we need to monkeypath this, because of eager import this was already initialised
         # to user's personal config file
