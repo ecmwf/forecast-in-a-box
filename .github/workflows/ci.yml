@@ -87,7 +87,7 @@ jobs:
           uv sync --extra plots --python "${{ matrix.python_version }}" --all-packages
           uv run prek --all-files
           mkdir /tmp/tmpFiabHome
-          mkdir src/forecastbox/static && touch src/forecastbox/static/index.html # TODO replace with proper static file build
+          # TODO utilize a proper static file build, instead of relying on integration tests index.html
           if [[ "${{ matrix.python_version }}" != "3.13" ]] ; then
             # see tests of the admin/release endpoint for explanation
             export CI_GITHUB_RATELIMIT=yes
