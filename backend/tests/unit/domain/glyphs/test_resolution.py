@@ -14,7 +14,7 @@ import datetime as dt
 import pytest
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
-from forecastbox.domain.glyphs.resolution import extract_glyphs, resolve_configurations, value_dt2str
+from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, extract_glyphs, resolve_configurations, value_dt2str
 
 
 def _block(config: dict[str, str]) -> BlockInstance:
@@ -37,42 +37,42 @@ def test_extract_glyphs_no_glyphs() -> None:
     block = _block({"key": "plain_value"})
     result = extract_glyphs(block)
     assert result.e is None
-    assert result.t == set()
+    assert result.t == ExtractedGlyphs(glyphs=set(), glyphed_options=set())
 
 
 def test_extract_glyphs_single() -> None:
     block = _block({"key": "${myVar}"})
     result = extract_glyphs(block)
     assert result.e is None
-    assert result.t == {"myVar"}
+    assert result.t == ExtractedGlyphs(glyphs={"myVar"}, glyphed_options={"key"})
 
 
 def test_extract_glyphs_multiple_in_one_value() -> None:
     block = _block({"key": "${var1}_${var2}"})
     result = extract_glyphs(block)
     assert result.e is None
-    assert result.t == {"var1", "var2"}
+    assert result.t == ExtractedGlyphs(glyphs={"var1", "var2"}, glyphed_options={"key"})
 
 
 def test_extract_glyphs_across_multiple_keys() -> None:
     block = _block({"key1": "${var1}", "key2": "${var2}"})
     result = extract_glyphs(block)
     assert result.e is None
-    assert result.t == {"var1", "var2"}
+    assert result.t == ExtractedGlyphs(glyphs={"var1", "var2"}, glyphed_options={"key1", "key2"})
 
 
 def test_extract_glyphs_deduplicates() -> None:
     block = _block({"a": "${runId}", "b": "prefix_${runId}_suffix"})
     result = extract_glyphs(block)
     assert result.e is None
-    assert result.t == {"runId"}
+    assert result.t == ExtractedGlyphs(glyphs={"runId"}, glyphed_options={"a", "b"})
 
 
 def test_extract_glyphs_mixed_plain_and_template() -> None:
     block = _block({"a": "static", "b": "${dynamic}"})
     result = extract_glyphs(block)
     assert result.e is None
-    assert result.t == {"dynamic"}
+    assert result.t == ExtractedGlyphs(glyphs={"dynamic"}, glyphed_options={"b"})
 
 
 # ---------------------------------------------------------------------------

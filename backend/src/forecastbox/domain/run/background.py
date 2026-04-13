@@ -24,7 +24,7 @@ from typing import cast
 import forecastbox.domain.glyphs.global_db as global_glyph_db
 import forecastbox.domain.run.db as run_db
 from forecastbox.domain.blueprint.service import BlueprintBuilder
-from forecastbox.domain.glyphs.resolution import extract_glyphs, merge_glyph_values
+from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, extract_glyphs, merge_glyph_values
 from forecastbox.domain.run.cascade import ExecutionSpecification, execute_cascade
 from forecastbox.domain.run.compile import compile_builder, resolve_intrinsic_glyph_values
 from forecastbox.domain.run.db import CompilerRuntimeContext
@@ -74,7 +74,9 @@ def execute_background(
         all_glyphs = merge_glyph_values(intrinsic_values, global_values, local_values, compiler_runtime_context.glyphs)
 
         # Persist only the glyphs actually referenced in the builder, keeping the stored context lean.
-        referenced_glyph_names = {name for block in builder.blocks.values() for name in (cast(set[str], extract_glyphs(block).t) or set())}
+        referenced_glyph_names = {
+            name for block in builder.blocks.values() for name in cast(ExtractedGlyphs, extract_glyphs(block).t).glyphs
+        }
         used_glyphs = {k: v for k, v in all_glyphs.items() if k in referenced_glyph_names}
 
         exec_spec = compile_builder(builder, all_glyphs)
