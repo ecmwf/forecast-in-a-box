@@ -245,6 +245,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert "sink_file" not in response.json()["block_errors"]
     assert len(response.json()["block_errors"]) == 0
+    assert response.json()["resolved_configuration_options"]["sink_file"]["fname"] == f"{tmpdir}/outputtest_expand_value.main.txt"
 
     # A builder with an intrinsic name used as a local glyph key should fail validation
     builder_invalid_local = BlueprintBuilder(
@@ -268,6 +269,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder_with_local.model_dump())
     assert "sink_file" not in response.json()["block_errors"]
     assert len(response.json()["global_errors"]) == 0
+    assert response.json()["resolved_configuration_options"]["sink_file"]["fname"] == f"{tmpdir}/outputexpand_local_value.main.txt"
 
     # A known intrinsic glyph (${runId}) should also pass validation
     sink_file_intrinsic = BlockInstance(
@@ -281,6 +283,10 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert len(response.json()["possible_expansions"]["sink_file"]) == 0
     assert len(response.json()["block_errors"]) == 0
+    resolved_fname = response.json()["resolved_configuration_options"]["sink_file"]["fname"]
+    assert resolved_fname.startswith(f"{tmpdir}/output")
+    assert resolved_fname.endswith(".main.txt")
+    assert "${runId}" not in resolved_fname
 
 
 def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
