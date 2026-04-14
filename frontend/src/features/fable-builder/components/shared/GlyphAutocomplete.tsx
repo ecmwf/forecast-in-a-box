@@ -47,7 +47,8 @@ export function GlyphAutocomplete({
 
   const intrinsic = filtered.filter((g) => g.type === 'intrinsic')
   const global = filtered.filter((g) => g.type === 'global')
-  const allItems = [...global, ...intrinsic]
+  const local = filtered.filter((g) => g.type === 'local')
+  const allItems = [...local, ...global, ...intrinsic]
 
   useEffect(() => {
     setActiveIndex(0)
@@ -91,8 +92,28 @@ export function GlyphAutocomplete({
       ref={listRef}
       className="max-h-48 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md"
     >
+      {local.length > 0 && (
+        <>
+          <P className="px-2 py-1 text-sm font-medium text-muted-foreground">
+            {t('panel.local')}
+          </P>
+          {local.map((g) => {
+            const idx = itemIndex++
+            return (
+              <AutocompleteItem
+                key={g.name}
+                glyph={g}
+                active={idx === activeIndex}
+                onSelect={() => onSelect(g.name)}
+                onHover={() => setActiveIndex(idx)}
+              />
+            )
+          })}
+        </>
+      )}
       {global.length > 0 && (
         <>
+          {local.length > 0 && <div className="my-1 border-t border-border" />}
           <P className="px-2 py-1 text-sm font-medium text-muted-foreground">
             {t('panel.global')}
           </P>
@@ -112,7 +133,9 @@ export function GlyphAutocomplete({
       )}
       {intrinsic.length > 0 && (
         <>
-          {global.length > 0 && <div className="my-1 border-t border-border" />}
+          {(local.length > 0 || global.length > 0) && (
+            <div className="my-1 border-t border-border" />
+          )}
           <P className="px-2 py-1 text-sm font-medium text-muted-foreground">
             {t('panel.intrinsic')}
           </P>

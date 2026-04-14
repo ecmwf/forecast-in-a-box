@@ -15,14 +15,16 @@
 import { useMemo } from 'react'
 import { useAvailableGlyphs, useListGlobalGlyphs } from '@/api/hooks/useFable'
 
+export type GlyphType = 'intrinsic' | 'global' | 'local'
+
 export interface GlyphInfo {
   name: string
   displayName: string
   valueExample: string
-  type: 'intrinsic' | 'global'
+  type: GlyphType
 }
 
-export function useAllGlyphs(): {
+export function useAllGlyphs(localGlyphs?: Record<string, string>): {
   glyphs: Array<GlyphInfo>
   isLoading: boolean
 } {
@@ -54,8 +56,19 @@ export function useAllGlyphs(): {
       }
     }
 
+    if (localGlyphs) {
+      for (const [key, value] of Object.entries(localGlyphs)) {
+        result.push({
+          name: key,
+          displayName: key,
+          valueExample: value,
+          type: 'local',
+        })
+      }
+    }
+
     return result
-  }, [intrinsic, globalData])
+  }, [intrinsic, globalData, localGlyphs])
 
   return { glyphs, isLoading: intrinsicLoading || globalLoading }
 }

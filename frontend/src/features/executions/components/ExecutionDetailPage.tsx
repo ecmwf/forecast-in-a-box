@@ -31,6 +31,7 @@ import { useDeleteJob, useJobStatus, useRestartJob } from '@/api/hooks/useJobs'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useActivityStore } from '@/stores/activityStore'
 import { useUiStore } from '@/stores/uiStore'
 import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
@@ -59,6 +60,15 @@ export function ExecutionDetailPage() {
       { runId: jobId, attemptCount: jobData!.attempt_count },
       {
         onSuccess: () => {
+          useActivityStore.getState().addTask({
+            id: `job:${jobId}`,
+            type: 'job',
+            label: fableData?.display_name ?? `Job ${jobId.slice(0, 8)}`,
+            description: `Restarting (attempt ${jobData!.attempt_count + 1})`,
+            status: 'active',
+            startedAt: Date.now(),
+            navigateTo: `/executions/${jobId}`,
+          })
           showToast.success(t('actions.restartJob'))
         },
         onError: (error) => {

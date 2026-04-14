@@ -8,6 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
+import { GlyphFieldWrapper } from './GlyphFieldWrapper'
 import {
   Select,
   SelectContent,
@@ -36,21 +37,34 @@ export function EnumField({
   className,
 }: EnumFieldProps) {
   return (
-    <Select
-      value={value || null}
-      onValueChange={(newValue) => onChange(newValue ?? '')}
+    <GlyphFieldWrapper
+      id={id}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
       disabled={disabled}
+      className={className}
     >
-      <SelectTrigger id={id} className={className}>
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((option) => (
-          <SelectItem key={option} value={option}>
-            {option}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+      <Select
+        value={value || null}
+        onValueChange={(newValue) => onChange(newValue ?? '')}
+        disabled={disabled}
+      >
+        <SelectTrigger
+          id={id}
+          data-slot="input-group-control"
+          className="flex-1 border-0 shadow-none ring-0 focus-visible:ring-0"
+        >
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option} value={option}>
+              {option}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </GlyphFieldWrapper>
   )
 }

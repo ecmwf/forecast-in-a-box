@@ -112,6 +112,8 @@ interface FableBuilderState {
   setAutoLayout: (enabled: boolean) => void
   setLayoutDirection: (direction: LayoutDirection) => void
   setNodesLocked: (locked: boolean) => void
+  setLocalGlyph: (key: string, value: string) => void
+  removeLocalGlyph: (key: string) => void
   setValidationState: (state: FableValidationState | null) => void
   setIsValidating: (validating: boolean) => void
   setSubmitDialogOpen: (open: boolean) => void
@@ -496,6 +498,28 @@ export const useFableBuilderStore = create<FableBuilderState>()(
         setAutoLayout: (enabled) => set({ autoLayout: enabled }),
         setLayoutDirection: (direction) => set({ layoutDirection: direction }),
         setNodesLocked: (locked) => set({ nodesLocked: locked }),
+
+        setLocalGlyph: (key, value) => {
+          const { fable } = get()
+          set({
+            fable: {
+              ...fable,
+              local_glyphs: { ...(fable.local_glyphs ?? {}), [key]: value },
+            },
+            isDirty: true,
+            validationState: null,
+          })
+        },
+
+        removeLocalGlyph: (key) => {
+          const { fable } = get()
+          const { [key]: _removed, ...rest } = fable.local_glyphs ?? {}
+          set({
+            fable: { ...fable, local_glyphs: rest },
+            isDirty: true,
+            validationState: null,
+          })
+        },
 
         setValidationState: (state) =>
           set({

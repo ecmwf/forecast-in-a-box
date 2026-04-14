@@ -49,6 +49,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Logo } from '@/components/common/Logo'
+import { ActivityMonitor } from '@/components/common/ActivityMonitor'
 import { NavToggle } from '@/components/layout/NavToggle'
 import { StatusDetailsPopover } from '@/components/common/StatusDetailsPopover'
 import { StatusIndicator } from '@/components/common/StatusIndicator'
@@ -117,6 +118,9 @@ export function AuthenticatedHeader() {
               showLabel={trafficLightStatus !== 'green'}
             />
           </StatusDetailsPopover>
+
+          {/* Activity Monitor */}
+          <ActivityMonitor />
 
           {/* Help Button */}
           <Button

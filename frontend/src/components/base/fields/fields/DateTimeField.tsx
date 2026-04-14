@@ -8,7 +8,8 @@
  * does it submit to any jurisdiction.
  */
 
-import { Input } from '@/components/ui/input'
+import { GlyphFieldWrapper } from './GlyphFieldWrapper'
+import { InputGroupInput } from '@/components/ui/input-group'
 
 export interface DateTimeFieldProps {
   id: string
@@ -30,14 +31,22 @@ export function DateTimeField({
   className,
 }: DateTimeFieldProps) {
   return (
-    <Input
+    <GlyphFieldWrapper
       id={id}
-      type={isDateOnly ? 'date' : 'datetime-local'}
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={onChange}
       placeholder={placeholder}
       disabled={disabled}
       className={className}
-    />
+    >
+      <InputGroupInput
+        id={id}
+        type={isDateOnly ? 'date' : 'datetime-local'}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        disabled={disabled}
+      />
+    </GlyphFieldWrapper>
   )
 }

@@ -92,6 +92,7 @@ export type BlockInstance = z.infer<typeof BlockInstanceSchema>
 
 export const FableBuilderV1Schema = z.object({
   blocks: z.record(z.string(), BlockInstanceSchema),
+  local_glyphs: z.record(z.string(), z.string()).optional(),
 })
 
 export type FableBuilderV1 = z.infer<typeof FableBuilderV1Schema>
@@ -330,6 +331,7 @@ export function getBlockKindIcon(kind: BlockKind): LucideIcon {
 export function createEmptyFable(): FableBuilderV1 {
   return {
     blocks: {},
+    local_glyphs: {},
   }
 }
 

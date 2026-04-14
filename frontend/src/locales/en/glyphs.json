@@ -45,16 +45,29 @@
   "panel": {
     "title": "Available Glyphs",
     "manage": "Manage",
-    "help": "Use ${name} syntax in block configuration values to reference dynamic glyphs.\n\nIntrinsic — system-provided, always available (e.g., runId, submitDatetime). startDatetime and attemptCount update on each retry.\n\nGlobal — user-defined key-value pairs shared across fables. Manage them via the admin page.\n\nContext — injected automatically per-execution (e.g., by the scheduler). Not shown here.\n\nPrecedence: Intrinsic → Global → Context.\nPinned glyphs (startDatetime, attemptCount) always use the intrinsic value.",
+    "help": "Use ${name} syntax in block configuration values to reference dynamic glyphs.\n\nIntrinsic — system-provided, always available (e.g., runId, submitDatetime). startDatetime and attemptCount update on each retry.\n\nGlobal — user-defined key-value pairs shared across fables. Manage them via the admin page.\n\nLocal — scoped to this blueprint only. Override global glyphs of the same name.\n\nContext — injected automatically per-execution (e.g., by the scheduler). Not shown here.\n\nPrecedence: Intrinsic → Global → Local → Context.\nPinned glyphs (startDatetime, attemptCount) always use the intrinsic value.",
     "intrinsic": "Intrinsic",
     "global": "Global",
+    "local": "Local",
+    "localTooltip": "Glyphs scoped to this blueprint. Override global glyphs of the same name.",
     "noGlobal": "No global glyphs yet.",
+    "noLocal": "No local glyphs.",
+    "addLocalHint": "Add one to override a global value for this blueprint only.",
     "createOne": "Create one",
+    "addLocal": "Add",
+    "localKeyPlaceholder": "key",
+    "localValuePlaceholder": "value",
     "copied": "Copied",
     "example": "e.g.",
     "resolvesTo": "resolves to"
   },
   "autocomplete": {
     "filter": "Filter glyphs..."
+  },
+  "field": {
+    "switchToGlyph": "Use a glyph expression",
+    "switchToConcrete": "Use the value picker",
+    "cannotSwitchBack": "Clear the glyph expression to switch back",
+    "glyphPlaceholder": "e.g. $\\{glyphName}"
   }
 }

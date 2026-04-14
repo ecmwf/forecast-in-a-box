@@ -8,7 +8,8 @@
  * does it submit to any jurisdiction.
  */
 
-import { Input } from '@/components/ui/input'
+import { GlyphFieldWrapper } from './GlyphFieldWrapper'
+import { InputGroupInput } from '@/components/ui/input-group'
 
 export interface NumberFieldProps {
   id: string
@@ -30,15 +31,23 @@ export function NumberField({
   className,
 }: NumberFieldProps) {
   return (
-    <Input
+    <GlyphFieldWrapper
       id={id}
-      type="number"
-      step={isInteger ? '1' : 'any'}
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={onChange}
       placeholder={placeholder}
       disabled={disabled}
       className={className}
-    />
+    >
+      <InputGroupInput
+        id={id}
+        type="number"
+        step={isInteger ? '1' : 'any'}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        disabled={disabled}
+      />
+    </GlyphFieldWrapper>
   )
 }
