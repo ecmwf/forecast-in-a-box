@@ -1,7 +1,22 @@
-# Backend API and routes
+TODOS:
+
+- update domain submods with init, including allowed imports
+- update routers with what thei
+- clean the rest of this file, possibly updating development.md
+- revisit individual subpackages
+- revisit backend/readme
+- revisit top-level readme links to docs, the whole docs/ subfolder
+
+
+--> docstring for routes
+
+* the `routes` modules declare their own classes for Request and Responses, to provide stable contracts to the clients. Do not change the existing ones, unless part of an effort that simulatenously changes the client codebases.
+  * there are a few places where classes declared in the `domain` modules are utilized directly by `routes`. Those are explicitly marked in the code. Do not change those classes. Do not add new such classes unless having a very good reason.
+
 - resides in /api/v1
-- provides CRUD-like functionality for domain entities (JobExecution, JobDefinition, ExperimentDefinition, JobOptionDefaults...)
-- organized into main subrouters: execution/, definition/, experiment/
+
+- organized into subrouters, each of which corresponds to one or more domains. Each router file declares which domains it handles
+
 - each domain entity is keyed by its own Id and (optionally) a Version. In every operation Version can be omitted, defaulting to latest
 - each domain entity exposes a `get(id, version)` and `list(?filter, pagination)` GET endpoints
 - entities either reflect user activity (JobDefinition, ExperimentDefinition, JobOptionDefaults) or computation activity (JobExecution)
@@ -28,23 +43,10 @@
   - additional lookup GET endpoints related to job executions -- those reside in execution, provide more detail of a given execution (eg, outputAvailability, outputContent, definition, logs), and accept a single JobExecutionIdRequest
 - environment management routers: artifacts/ and plugins/ -- those mix lookups (list, get) and operational commands (install, download, delete-uninstall), and mostly follow specific convention, except for basics like being self contained and isolated wrt contract pydantic classes
 - admin and operational routers: admin, auth, gateway -- specific conventions only
+   - code in `routes` is often a single call of a function from `domain`, with a translation of domain errors to HTTPExceptions
 
 # Backend Internals
-There are 5 top level modules:
- - utility: domain independent functionality and concerns
- - routes: endpoints which the backend exposes
- - schemata: definition of sql alchemy models corresponding to domain entities
- - domain: specific functionality for domain entities
- - entrypoint: the bootstrapping module for starting the app
-
 Notes:
- - the primary reason for exposing `routes` and `schemata` on the top level is that `entrypoint` automatically discovers tables to be created and routes to be exposed.
-   - thus each table/router is expected to be at exactly 1-level of nesting under `routes`/`schemata`, exposed there in a module-level global `router` or `create_db_and_tables()`
-   - routers contain endpoints and also the classes representing the contracts
- - entrypoint is not just a simple FastAPI's `app`-exposing file, it also deals with multiprocessing bootstrapping, self-verifying logic, logging config
-   - it has its own utility submodules, which are not part of the top-level `utility`, because they would be of no use to `domain`
- - `domain` contains majority of business logic, separated roughly along the domain entity lines
-   - code in `routes` is often a single call of a function from `domain`, with a translation of domain errors to HTTPExceptions
    - `domain` submodules typically contain a `db` submodules which handles storage and retrieval of entities from `schemata`
      - each `db` submodule handles automated version increments and validation of atomicity of updates
      - each `db` submodule handles authorization enforcement: entities whose `user` is None can only be affected when `user` of the post request (update/delete) is None or admin, entities whose `user` is not None can only be affected by the same user or admin
@@ -53,8 +55,6 @@ Notes:
      - the endpoint-exposed class is used minimally in the codebase, to prevent accidental contract changes. It is declared in the `routes` module, with a class factory method `from_db(e: DbEntity)`
      - instead of primitive types like `str` we use newtypes like `JobExecutionId = typing.NewType("JobExecutionId", str)` for safety andreadabily
  - `utility` is invoked from the `domain` module, and handles aspects like multiprocessing/futures -- anything shareable across multiple domains
- - generally the import/dependency order is as follows: (utility < schemata < domain < routes < entrypoint)
-   - `utility.config` is a bit of an oddity -- while the config is mostly pertaining to domains, it needs to drive the selected behaviours in utility or schemata. We could have separated config, but we prefer a centralization under a single model. Or we could have introduced some sort of dependency injection to provide it to utility/schemata and move it to domain and register during endpoint, but that would weaken type safety and complicate -- so we accept this weakening of hierarchy-fitness
 
 Tests are organized in three top level modules:
  - unit

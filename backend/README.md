@@ -1,3 +1,5 @@
+TODO minimize this, just the rudimentary user oriented docs which should go into the wheel
+
 See project's [readme](https://github.com/ecmwf/forecast-in-a-box/blob/main/README.md).
 
 # Development
@@ -25,14 +27,6 @@ The frontend is actually expected to be present as artifact _inside_ the backend
 See the [`justfile`](../justfile)'s `fiabwheel` recipe for instruction how to build the frontend and create a symlink inside the backend.
 
 Backend wheels on pypi do contain a frontend copy -- you can alternatively pull a wheel and extract the built frontend into the local install.
-
-## Developer Flow
-Primary means is running `ruff`, `ty`, and `pytest`, with the config being in `pyproject.toml`.
-Ideally, you utilize the `val` recipe from the [justfile](./justfile) here, and install pre-commit hooks.
-
-Type annotations are present and enforced.
-
-In the [`bigtest.py`](../scripts/bigtest.py) there is a larger integration test, triggered at CI in addition to the regular `pytest` -- see the [github action](../.github/workflows/bigtest.yml) for execution.
 
 ## Architecture Overview
 Consists of a four primary components:
