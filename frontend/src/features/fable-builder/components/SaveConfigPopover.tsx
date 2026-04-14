@@ -20,6 +20,7 @@ import {
   BLOCK_KIND_ORDER,
   getBlocksByKind,
 } from '@/api/types/fable.types'
+import { ApiClientError } from '@/api/client'
 import { useFableRetrieve, useUpsertFable } from '@/api/hooks/useFable'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { showToast } from '@/lib/toast'
@@ -215,10 +216,25 @@ export function SaveConfigPopover({
         asCopy ? t('configure:save.savedAsNew') : t('configure:save.saved'),
       )
     } catch (error) {
-      showToast.error(
-        t('configure:save.saveFailed'),
-        error instanceof Error ? error.message : String(error),
-      )
+      let description: string
+      if (
+        error instanceof ApiClientError &&
+        error.status === 422 &&
+        error.details
+      ) {
+        const detail = error.details as {
+          global_errors?: Array<string>
+          block_errors?: Record<string, Array<string>>
+        }
+        const messages = [
+          ...(detail.global_errors ?? []),
+          ...Object.values(detail.block_errors ?? {}).flat(),
+        ]
+        description = messages.join('; ') || error.message
+      } else {
+        description = error instanceof Error ? error.message : String(error)
+      }
+      showToast.error(t('configure:save.saveFailed'), description)
     }
   }
 

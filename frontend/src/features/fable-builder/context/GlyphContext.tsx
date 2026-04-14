@@ -17,11 +17,17 @@ import { createContext, useContext } from 'react'
 import type { ReactNode } from 'react'
 import type { GlyphInfo } from '@/features/fable-builder/hooks/useAllGlyphs'
 import { useAllGlyphs } from '@/features/fable-builder/hooks/useAllGlyphs'
+import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 
-const GlyphContext = createContext<Array<GlyphInfo>>([])
+const EMPTY_GLYPHS: Record<string, string> = {}
+
+/** Exported for test use — wrap with `<TestGlyphProvider>` to inject test glyphs */
+export const GlyphContext = createContext<Array<GlyphInfo>>([])
 
 export function GlyphProvider({ children }: { children: ReactNode }) {
-  const { glyphs } = useAllGlyphs()
+  const localGlyphs =
+    useFableBuilderStore((state) => state.fable.local_glyphs) ?? EMPTY_GLYPHS
+  const { glyphs } = useAllGlyphs(localGlyphs)
   return (
     <GlyphContext.Provider value={glyphs}>{children}</GlyphContext.Provider>
   )

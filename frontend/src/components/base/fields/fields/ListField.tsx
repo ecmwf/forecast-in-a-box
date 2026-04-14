@@ -10,9 +10,10 @@
 
 import { useCallback, useState } from 'react'
 import { X } from 'lucide-react'
+import { GlyphFieldWrapper } from './GlyphFieldWrapper'
 import type { KeyboardEvent } from 'react'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
+import { InputGroupInput } from '@/components/ui/input-group'
 import { cn } from '@/lib/utils'
 
 export interface ListFieldProps {
@@ -43,6 +44,34 @@ function serializeListValue(items: Array<string>): string {
 }
 
 export function ListField({
+  id,
+  value,
+  onChange,
+  placeholder = 'Add item...',
+  disabled,
+  className,
+}: ListFieldProps) {
+  return (
+    <GlyphFieldWrapper
+      id={id}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      disabled={disabled}
+      className={className}
+    >
+      <ListFieldConcrete
+        id={id}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        disabled={disabled}
+      />
+    </GlyphFieldWrapper>
+  )
+}
+
+function ListFieldConcrete({
   id,
   value,
   onChange,
@@ -84,28 +113,30 @@ export function ListField({
 
   return (
     <div className={cn('space-y-2', className)}>
-      <div className="flex flex-wrap gap-1.5">
-        {items.map((item, index) => (
-          <Badge
-            key={`${item}-${index}`}
-            variant="secondary"
-            className="gap-1 pr-1"
-          >
-            {item}
-            {!disabled && (
-              <button
-                type="button"
-                onClick={() => removeItem(index)}
-                className="ml-1 rounded-full p-0.5 transition-colors hover:bg-muted-foreground/20"
-                aria-label={`Remove ${item}`}
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </Badge>
-        ))}
-      </div>
-      <Input
+      {items.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {items.map((item, index) => (
+            <Badge
+              key={`${item}-${index}`}
+              variant="secondary"
+              className="gap-1 pr-1"
+            >
+              {item}
+              {!disabled && (
+                <button
+                  type="button"
+                  onClick={() => removeItem(index)}
+                  className="ml-1 rounded-full p-0.5 transition-colors hover:bg-muted-foreground/20"
+                  aria-label={`Remove ${item}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </Badge>
+          ))}
+        </div>
+      )}
+      <InputGroupInput
         id={id}
         type="text"
         value={inputValue}

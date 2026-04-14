@@ -55,7 +55,9 @@ export function parseGlyphSegments(value: string): Array<GlyphSegment> {
  * Check if a value contains any glyph references.
  */
 export function containsGlyphs(value: string): boolean {
-  return GLYPH_PATTERN.test(value)
+  // Use a fresh regex — GLYPH_PATTERN has the `g` flag which makes .test()
+  // stateful (advances lastIndex), causing alternating true/false results.
+  return /\$\{\w+\}/.test(value)
 }
 
 /**

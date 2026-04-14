@@ -36,6 +36,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useActivityStore } from '@/stores/activityStore'
 import { cn } from '@/lib/utils'
 
 type SubmitMode = 'run' | 'schedule'
@@ -165,6 +166,16 @@ function SubmitJobForm({
         tags: finalTags,
         fableId,
         environment,
+      })
+
+      useActivityStore.getState().addTask({
+        id: `job:${response.run_id}`,
+        type: 'job',
+        label: trimmedName ?? `Job ${response.run_id.slice(0, 8)}`,
+        description: 'Submitted',
+        status: 'active',
+        startedAt: Date.now(),
+        navigateTo: `/executions/${response.run_id}`,
       })
 
       showToast.success(t('submit.title'), trimmedName ?? undefined)

@@ -17,6 +17,13 @@
   "clear": "Clear",
   "yes": "Yes",
   "no": "No",
+  "activity": {
+    "label": "Notifications",
+    "title": "Notifications",
+    "help": "Monitor long-running tasks such as model downloads, plugin installations, and forecast job executions.",
+    "clear": "Clear",
+    "empty": "No active tasks"
+  },
   "nav": {
     "label": "Main navigation",
     "overview": "Overview",
