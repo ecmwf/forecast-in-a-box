@@ -11,11 +11,20 @@
 
 import datetime as dt
 import re
+from dataclasses import dataclass
 
 from cascade.low.func import Either
 from fiab_core.fable import BlockInstance
 
 _GLYPH_PATTERN = re.compile(r"\$\{(\w+)\}")
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class ExtractedGlyphs:
+    glyphs: set[str]
+    """All glyph names referenced across all configuration_values."""
+    glyphed_options: set[str]
+    """Keys from configuration_values that contain at least one glyph reference."""
 
 
 def value_dt2str(value: dt.datetime) -> str:
@@ -34,16 +43,21 @@ def _substitute_glyphs(value: str, glyph_values: dict[str, str]) -> str:
     return _GLYPH_PATTERN.sub(lambda m: glyph_values[m.group(1)], value)
 
 
-def extract_glyphs(blockInstance: BlockInstance) -> Either[set[str], list[str]]:  # type: ignore[invalid-argument]
+def extract_glyphs(blockInstance: BlockInstance) -> Either[ExtractedGlyphs, list[str]]:  # type: ignore[invalid-argument]
     """Extract all ${glyph} references from the blockInstance's configuration_values.
 
-    Always succeeds; returns the set of referenced glyph names. The error branch
-    is reserved for future validation (e.g. malformed templates).
+    Always succeeds; returns an ExtractedGlyphs with the set of referenced glyph names
+    and the set of option keys that contain at least one glyph. The error branch is
+    reserved for future validation (e.g. malformed templates).
     """
     glyphs: set[str] = set()
-    for value in blockInstance.configuration_values.values():
-        glyphs.update(_extract_glyph_names_from_value(value))
-    return Either.ok(glyphs)
+    glyphed_options: set[str] = set()
+    for key, value in blockInstance.configuration_values.items():
+        names = _extract_glyph_names_from_value(value)
+        if names:
+            glyphs.update(names)
+            glyphed_options.add(key)
+    return Either.ok(ExtractedGlyphs(glyphs=glyphs, glyphed_options=glyphed_options))
 
 
 def resolve_configurations(blockInstance: BlockInstance, glyph_values: dict[str, str]) -> None:

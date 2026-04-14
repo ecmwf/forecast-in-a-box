@@ -124,6 +124,7 @@ class BlueprintValidationExpansionResponse(BaseModel):
     block_errors: dict[BlockInstanceId, list[str]]
     possible_sources: list[PluginBlockFactoryId]
     possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]]
+    resolved_configuration_options: dict[BlockInstanceId, dict[str, str]]
 
 
 class GlyphDetail(BaseModel):
@@ -347,6 +348,7 @@ async def expand_blueprint(
         block_errors=result.block_errors,
         possible_sources=result.possible_sources,
         possible_expansions=result.possible_expansions,
+        resolved_configuration_options=result.resolved_configuration_options,
     )
 
 

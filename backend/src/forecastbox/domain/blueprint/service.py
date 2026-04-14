@@ -41,7 +41,7 @@ from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.db import upsert_blueprint
 from forecastbox.domain.blueprint.exceptions import BlueprintNotFound
 from forecastbox.domain.glyphs.intrinsic import get_values_and_examples
-from forecastbox.domain.glyphs.resolution import merge_glyph_values
+from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, merge_glyph_values
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.graph import topological_order
@@ -82,6 +82,7 @@ class BlueprintValidationExpansion(BaseModel):
     block_errors: dict[BlockInstanceId, list[str]]
     possible_sources: list[PluginBlockFactoryId]
     possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]]
+    resolved_configuration_options: dict[BlockInstanceId, dict[str, str]] = {}
 
 
 class BlueprintSaveCommand(BaseModel):
@@ -130,6 +131,7 @@ async def validate_expand(
         ]
     )
     possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]] = {}
+    resolved_configuration_options: dict[BlockInstanceId, dict[str, str]] = {}
     block_errors: dict[BlockInstanceId, list[str]] = defaultdict(list)
     outputs = {}
 
@@ -168,12 +170,13 @@ async def validate_expand(
         if extract_result.e is not None:
             block_errors[blockId] += extract_result.e
             continue
-        extracted_glyphs = cast(set[str], extract_result.t)
-        unknown_glyphs = extracted_glyphs - available_glyphs
+        extracted = cast(ExtractedGlyphs, extract_result.t)
+        unknown_glyphs = extracted.glyphs - available_glyphs
         if unknown_glyphs:
             block_errors[blockId] += [f"Unknown glyphs referenced: {unknown_glyphs}"]
             continue
         glyph_resolution.resolve_configurations(blockInstance, all_glyphs)
+        resolved_configuration_options[blockId] = {k: blockInstance.configuration_values[k] for k in extracted.glyphed_options}
 
         inputs = {input_id: outputs[source_id] for input_id, source_id in blockInstance.input_ids.items()}
         output_or_error = plugin.validator(blockInstance, inputs)
@@ -192,6 +195,7 @@ async def validate_expand(
     return BlueprintValidationExpansion(
         possible_sources=possible_sources,
         possible_expansions=possible_expansions,
+        resolved_configuration_options=resolved_configuration_options,
         block_errors=block_errors,
         global_errors=global_errors,
     )

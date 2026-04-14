@@ -245,6 +245,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert "sink_file" not in response.json()["block_errors"]
     assert len(response.json()["block_errors"]) == 0
+    assert response.json()["resolved_configuration_options"]["sink_file"]["fname"] == f"{tmpdir}/outputtest_expand_value.main.txt"
 
     # A builder with an intrinsic name used as a local glyph key should fail validation
     builder_invalid_local = BlueprintBuilder(
@@ -268,6 +269,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder_with_local.model_dump())
     assert "sink_file" not in response.json()["block_errors"]
     assert len(response.json()["global_errors"]) == 0
+    assert response.json()["resolved_configuration_options"]["sink_file"]["fname"] == f"{tmpdir}/outputexpand_local_value.main.txt"
 
     # A known intrinsic glyph (${runId}) should also pass validation
     sink_file_intrinsic = BlockInstance(
@@ -281,6 +283,11 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert len(response.json()["possible_expansions"]["sink_file"]) == 0
     assert len(response.json()["block_errors"]) == 0
+    glyphs_resp = backend_client_with_auth.get("/blueprint/glyphs/list", params={"glyph_type": "intrinsic"})
+    assert glyphs_resp.is_success, glyphs_resp.text
+    run_id_glyph = next(g for g in glyphs_resp.json()["glyphs"] if g["name"] == "runId")
+    expected_run_id = run_id_glyph["valueExample"]
+    assert response.json()["resolved_configuration_options"]["sink_file"]["fname"] == f"{tmpdir}/output{expected_run_id}.main.txt"
 
 
 def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
