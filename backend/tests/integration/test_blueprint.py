@@ -475,3 +475,63 @@ def test_list_available_glyphs(backend_client_with_auth: httpx.Client) -> None:
         json={"key": "shouldBeRejected", "value": "v", "public": True},
     )
     assert public_resp.status_code == 403
+
+
+def test_blueprint_expand_failure_01(backend_client_with_auth: httpx.Client) -> None:
+    """Source has an invalid factory; transform referencing it must not generate its own error."""
+    bad_source = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="nonexistent_factory"),
+        configuration_values={},
+        input_ids={},
+    )
+    good_transform = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="transform_increment"),
+        configuration_values={"amount": "1"},
+        input_ids={"a": "bad_source"},
+    )
+    builder = BlueprintBuilder(blocks={"bad_source": bad_source, "good_transform": good_transform})
+    response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
+    assert response.is_success, response.text
+    block_errors = response.json()["block_errors"]
+    assert "bad_source" in block_errors
+    assert "good_transform" not in block_errors
+
+
+def test_blueprint_expand_failure_02(backend_client_with_auth: httpx.Client) -> None:
+    """Transform declares an input id that does not exist in the blueprint; only the transform errors."""
+    source_42 = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="source_42"),
+        configuration_values={},
+        input_ids={},
+    )
+    bad_transform = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="transform_increment"),
+        configuration_values={"amount": "1"},
+        input_ids={"a": "nonexistent_block"},
+    )
+    builder = BlueprintBuilder(blocks={"source_42": source_42, "bad_transform": bad_transform})
+    response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
+    assert response.is_success, response.text
+    block_errors = response.json()["block_errors"]
+    assert "source_42" not in block_errors
+    assert "bad_transform" in block_errors
+
+
+def test_blueprint_expand_failure_03(backend_client_with_auth: httpx.Client) -> None:
+    """Bad source and transform with a non-existent input id both report independent errors."""
+    bad_source = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="nonexistent_factory"),
+        configuration_values={},
+        input_ids={},
+    )
+    bad_transform = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="transform_increment"),
+        configuration_values={"amount": "1"},
+        input_ids={"a": "nonexistent_block"},
+    )
+    builder = BlueprintBuilder(blocks={"bad_source": bad_source, "bad_transform": bad_transform})
+    response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
+    assert response.is_success, response.text
+    block_errors = response.json()["block_errors"]
+    assert "bad_source" in block_errors
+    assert "bad_transform" in block_errors
