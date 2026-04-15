@@ -43,3 +43,11 @@ This application is deployed at multiple machines owned by users, over which we 
 * when adding new fields to config.py, make sure they contain defaults -- we need to be backwards compatible wrt users configs. Do not change existing fields -- there are currently no means for migrations.
 * there is currently no mechanism for handling migrations -- do not change existing classes in the schemata module. You can add new classes
 * when changing anything in the `routes` submodule, consult its docstring for mandatory guidelines
+
+# Concurrency Considerations
+There is currently async loop which serves all the requests to the FastAPI app, as well as multiple background threads created in various domains: scheduler thread, plugin thread, artifact thread. Particular care must be paid to handling things correctly
+
+* sqlite, the current persistence layer, supports only one concurrent writer -- thats why we have async Lock in the `utility/db.py` module, and this lock governs all database access. Eventually we'll allow concurrent reads as those are allowed by sqlite. When doing database access, you *must* respect this lock, as all existing `db.py` subdomules across domains do.
+  * this is particularly interesting in the background threads which don't run in the async loop -- for now, all such threads receive a reference of the loop, and submit their database access there. When implementing a new background thread, it is critical you utilize this pattern.
+* multiple state structures are updated via the background threads, but consumed by the async loop -- to achieve synchronization, we rely on immutable data structures from the `pyrsistent` package. All concurrently accessed state is declared as pyrsistent structure, reads are lock-free, and the lock only needs to provide for atomic swap after updates. When working with shared state, make sure you utilize this pattern -- see `Manager` classes in plugin or artifact domains.
+* sometimes a request to the FastAPI app triggers a possibly long operation, which we offload to the default thread pool executor registered to asyncio -- for example, submitting a Run domain entity. It is imperative that all such operations are fully wrapped in a try-catch block, and any error manifests by updating the database state with the respective error message.

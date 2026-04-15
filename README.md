@@ -26,8 +26,7 @@ For more information read: [AI-driven solutions for the Digital Twin Engine](htt
 There are the following guides:
 * [User Guide](docs/userGuide.md) -- basic installation and usage on a personal laptop. Audience: Researcher
 * [Troubleshooting](docs/troubleshooting.md) -- general purpose troubleshooting and tuning. Audience: Operator, Developer
-* [Advanced Installation](docs/advancedInstallation.md) -- cluster, cloud, and docker deployments. Audience: Operator, Developer
-* [Tuning and Configuration](docs/tuningAndConfiguration.md) -- advanced tweaking. Audience: Operator
+* [Advanced Installation](docs/operator/installation.md) -- cluster, cloud, and docker deployments. Audience: Operator, Developer
 * [Frontend Development](frontend/README.md) -- specifics to the javascript frontend. Audience: Developer
 * [Backend Development](backend/development.md) -- specifics to the python backend. Audience: Developer
 
