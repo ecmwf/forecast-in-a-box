@@ -11,7 +11,7 @@
 Types pertaining to Forecast As BLock Expression (Fable): blocks
 """
 
-from typing import Literal, Protocol
+from typing import Literal
 
 from earthkit.workflows.fluent import Action
 from pydantic import BaseModel, ConfigDict
@@ -95,43 +95,19 @@ class BlockInstance(BaseModel):
     """Keys come from factory's `inputs`, values are other blocks in the (partial) fable"""
 
 
-class BlockInstanceOutput(Protocol):
-    def is_empty(self) -> bool: ...
-    def dimensions(self) -> set[str]: ...
-
-
-class XarrayOutput(BaseModel):
-    """
-    XarrayOutput is just an example of what a BlockInstanceOutput could look like,
-    but we want to allow plugins to define their own output types as needed.
-    """
-
+class XarrayOutput(BaseModel):  # NOTE eventually Qubed
     variables: list[str]
     coords: list[str]
-
-    def is_empty(self) -> bool:
-        return len(self.variables) == 0
-
-    def dimensions(self) -> set[str]:
-        return set(self.coords)
 
 
 class RawOutput(BaseModel):
     type_fqn: str  # most likely you want Any here
 
-    def is_empty(self) -> bool:
-        return False
-
-    def dimensions(self) -> set[str]:
-        return set()
-
 
 class NoOutput(BaseModel):
-    def is_empty(self) -> bool:
-        return True
+    pass
 
-    def dimensions(self) -> set[str]:
-        return set()
 
+BlockInstanceOutput = XarrayOutput | RawOutput | NoOutput
 
 ActionLookup = dict[BlockInstanceId, Action]

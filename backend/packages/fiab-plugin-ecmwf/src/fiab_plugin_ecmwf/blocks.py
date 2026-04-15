@@ -18,12 +18,11 @@ from fiab_core.fable import (
     BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
-    NoOutput,
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import Product, Sink, Source
 
-from .metadata import QubedInstanceOutput
+from .metadata import PluginNoOutput, QubedInstanceOutput
 
 IFS_REQUEST = {
     "class": "od",
@@ -170,7 +169,7 @@ class EnsembleStatistics(Product):
             return Either.error(f"Unsupported statistic '{stat}'")
         return Either.ok(action)
 
-    def intersect(self, input: BlockInstanceOutput) -> bool:
+    def intersect(self, input: BlockInstanceOutput) -> bool:  # type: ignore[override]
         if not isinstance(input, QubedInstanceOutput):
             return False
         dims = input.dimensions()
@@ -222,7 +221,7 @@ class TemporalStatistics(Product):
             action = param.max(dim=STEP_DIM)
         return Either.ok(action)
 
-    def intersect(self, input: BlockInstanceOutput) -> bool:
+    def intersect(self, input: BlockInstanceOutput) -> bool:  # type: ignore[override]
         if not isinstance(input, QubedInstanceOutput):
             return False
         dims = input.dimensions()
@@ -242,7 +241,7 @@ class ZarrSink(Sink):
     inputs: list[str] = ["dataset"]
 
     def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[QubedInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        return Either.ok(NoOutput())
+        return Either.ok(PluginNoOutput())
 
     def compile(
         self,
@@ -256,5 +255,5 @@ class ZarrSink(Sink):
         )
         return Either.ok(action)
 
-    def intersect(self, input: BlockInstanceOutput) -> bool:
-        return not input.is_empty()
+    def intersect(self, input: BlockInstanceOutput) -> bool:  # type: ignore[override]
+        return not input.is_empty()  # type: ignore[union-attr]
