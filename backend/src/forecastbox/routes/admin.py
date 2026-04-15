@@ -7,7 +7,11 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Admin routes — /admin/* and /users/*"""
+"""
+Admin routes — /admin/*. Corresponds to the `domain.admin` submodule.
+
+Contains many varied utility routes related to user management, releases, versioning.
+"""
 
 PREFIX = "/api/v1/admin"
 import logging

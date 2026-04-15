@@ -1,7 +1,10 @@
+You may want to consult the [c4 diagrams](./c4diagrams.md) to give you a better picture.
+
+After you are done with installation, you may want to visit [tuning and configuration](tuningAndConfiguration.md) as well.
+
 # Cluster/Cloud Setup
 
 TODO
-
 
 # Docker Setup
 ## Developer Setup, with Docker

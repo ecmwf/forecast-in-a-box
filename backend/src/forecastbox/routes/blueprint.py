@@ -7,7 +7,17 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Blueprint entity routes — /blueprint/*"""
+"""
+Blueprint routes — /blueprint/*. Corresponds to the user-managed domain entities:
+ - Blueprint, `domain.blueprint`,
+ - Glyph, `domain.glyphs`.
+Refers to `domain.plugin`, but does not explicitly manage it.
+
+Contains three categories of routes:
+ - complete CRUD+list for blueprints,
+ - limited CRUD+list for glyphs,
+ - building helper routes, which the clients call in sequence before creating a blueprint.
+"""
 
 PREFIX = "/api/v1/blueprint"
 from typing import Annotated, Literal, cast
@@ -169,7 +179,7 @@ class GlobalGlyphId(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Endpoints
+# Blueprint CRUD+List Endpoints
 # ---------------------------------------------------------------------------
 
 
@@ -350,6 +360,11 @@ async def expand_blueprint(
         possible_expansions=result.possible_expansions,
         resolved_configuration_options=result.resolved_configuration_options,
     )
+
+
+# ---------------------------------------------------------------------------
+# Glyph CRUD+List Endpoints
+# ---------------------------------------------------------------------------
 
 
 @router.get("/glyphs/list")

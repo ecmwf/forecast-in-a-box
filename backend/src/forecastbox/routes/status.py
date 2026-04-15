@@ -7,7 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Root status route — /status"""
+"""Root status route — contains /status of the backend, not related to any domain entities"""
 
 PREFIX = "/api/v1/status"
 import logging

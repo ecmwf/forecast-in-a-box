@@ -6,10 +6,11 @@ It is *not* recommended to download the whole git repository -- do that _only_ i
 
 Then just run `bash ./fiab.sh` every time you feel like forecasting something.
 
-By default, this script upgrades itself regularly -- if you want to disable this, consult the [tuning and configuration](tuningAndConfiguration.md) guide.
+The script does not upgrade itself regularly -- you best run an upgrade from the web interface itself.
+Alternatively, consult the script's help on how to run an upgrade or a full reinstall.
 
 # Usage
 The run of the `fiab.sh` script should open a window in your browser, with url like `localhost:8000`.
 See [troubleshooting](troubleshooting.md) if it doesn't.
 
-For the usage of the browser app, TODO -- the current PoC won't be thoroughly documented, but once the next gen UI is in place, the docs will end up here
+The browser app itself contains embedded help.

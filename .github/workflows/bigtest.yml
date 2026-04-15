@@ -28,4 +28,4 @@ jobs:
           export FIAB_ROOT=/tmp/tmpFiabHome
           bash ./scripts/fiab.sh warmup
           source /tmp/tmpFiabHome/venv/bin/activate
-          PYTHONPATH=backend/tests/nonpytest python -m bigtest
+          PYTHONPATH=backend/tests/largeE2E python -m bigtest

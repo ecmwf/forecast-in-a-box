@@ -7,9 +7,13 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Experiment entity routes — /experiment/*
+"""
+Experiment entity routes — /experiment/*. Corresponds to the `domain.experiment` submodule.
 
-Covers cron-schedule experiments and their operational controls.
+Contains three categories of routes:
+ - complete CRUD+list for Experiment,
+ - routes related to the domain entity Run -- each Run has a foreign key to Experiment, thus with an ExperimentId we can list all its Runs, or determine when a next Run will be in case the Experiment is cron-based
+ - operational routes for the scheduler module -- not related to any domain entity, but to backend itself
 """
 
 PREFIX = "/api/v1/experiment"
