@@ -8,19 +8,19 @@ styles:
     type: Style
     colors: turbo
     extend: max
-    levels: [0.1, 0.2, 0.5, 1, 2, 3, 4, 5]
+    levels: [0.1, 0.5, 1, 2, 4, 5, 10, 20, 30, 50, 70, 100]
     units: mm
 
   TOTAL_PRECIPITATION_IN_M:
     type: Style
     colors: turbo
     extend: max
-    levels: [0.1, 0.2, 0.5, 1, 2, 3, 4, 5]
+    levels: [0.1, 0.5, 1, 2, 4, 5, 10, 20, 30, 50, 70, 100]
     units: m
 
   TOTAL_PRECIPITATION_IN_KG_M-2:
     type: Style
     colors: turbo
     extend: max
-    levels: [0.1, 0.2, 0.5, 1, 2, 3, 4, 5]
+    levels: [0.1, 0.5, 1, 2, 4, 5, 10, 20, 30, 50, 70, 100]
     units: kg m-2
