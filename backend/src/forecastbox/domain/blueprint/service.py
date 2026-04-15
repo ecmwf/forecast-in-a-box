@@ -148,15 +148,21 @@ async def validate_expand(
     for key in sorted(colliding_keys):
         global_errors.append(f"Local glyph key {key!r} is reserved as an intrinsic glyph and cannot be overridden.")
 
+    invalidable: set[BlockInstanceId] = set()
+    visited: set[BlockInstanceId] = set()
+
     for blockId in topological_order(blueprint.blocks.items(), lambda block: block.input_ids.values()):
+        visited.add(blockId)
         blockInstance = blueprint.blocks[blockId]
         plugin = plugins.get(blockInstance.factory_id.plugin, None)
         if not plugin:
             block_errors[blockId] += ["Plugin not found"]
+            invalidable.add(blockId)
             continue
         blockFactory = plugin.catalogue.factories.get(blockInstance.factory_id.factory, None)
         if not blockFactory:
             block_errors[blockId] += ["BlockFactory not found in the catalogue"]
+            invalidable.add(blockId)
             continue
         extraConfig = blockInstance.configuration_values.keys() - blockFactory.configuration_options.keys()
         if extraConfig:
@@ -169,19 +175,26 @@ async def validate_expand(
         extract_result = glyph_resolution.extract_glyphs(blockInstance)
         if extract_result.e is not None:
             block_errors[blockId] += extract_result.e
+            invalidable.add(blockId)
             continue
         extracted = cast(ExtractedGlyphs, extract_result.t)
         unknown_glyphs = extracted.glyphs - available_glyphs
         if unknown_glyphs:
             block_errors[blockId] += [f"Unknown glyphs referenced: {unknown_glyphs}"]
+            invalidable.add(blockId)
             continue
         glyph_resolution.resolve_configurations(blockInstance, all_glyphs)
         resolved_configuration_options[blockId] = {k: blockInstance.configuration_values[k] for k in extracted.glyphed_options}
+
+        if any(source_id in invalidable for source_id in blockInstance.input_ids.values()):
+            invalidable.add(blockId)
+            continue
 
         inputs = {input_id: outputs[source_id] for input_id, source_id in blockInstance.input_ids.items()}
         output_or_error = plugin.validator(blockInstance, inputs)
         if output_or_error.t is None:
             block_errors[blockId] += [cast(str, output_or_error.e)]
+            invalidable.add(blockId)
             continue
         outputs[blockId] = output_or_error.t
 
@@ -191,6 +204,14 @@ async def validate_expand(
                 for any_plugin_id, any_plugin in plugins.items()
                 for block_factory_id in any_plugin.expander(output_or_error.t)
             ]
+
+    # the topological search *omits* nodes in cycles or with missing ancestors -- thus we need to report and detect them
+    for blockId, blockInstance in blueprint.blocks.items():
+        if blockId not in visited:
+            missing = [source_id for source_id in blockInstance.input_ids.values() if source_id not in blueprint.blocks]
+            if missing:
+                block_errors[blockId] += [f"References non-existent block(s): {missing}"]
+                invalidable.add(blockId)
 
     return BlueprintValidationExpansion(
         possible_sources=possible_sources,
