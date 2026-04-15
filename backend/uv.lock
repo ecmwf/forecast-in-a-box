@@ -21,6 +21,7 @@ resolution-markers = [
 members = [
     "fiab-core",
     "fiab-mcp-server",
+    "fiab-plugin-anemoi",
     "fiab-plugin-ecmwf",
     "fiab-plugin-test",
     "forecast-in-a-box",
@@ -76,7 +77,7 @@ wheels = [
 
 [[package]]
 name = "anemoi-inference"
-version = "0.8.3"
+version = "0.10.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anemoi-transform" },
@@ -95,32 +96,9 @@ dependencies = [
     { name = "semantic-version" },
     { name = "torch" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ff/7a/0e57cdd3b8817322d647c3c519bfbaff0c2f6c82ef91eebaab5df26d077c/anemoi_inference-0.8.3.tar.gz", hash = "sha256:2cca60774f088ac2d0cb4aff0dda904757b5bdc78fc9ce4c07ef5fdbdf6cf609", size = 1420448, upload-time = "2025-12-10T11:25:49.181Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a8/36/11628e27b35715f858e35d3ce493f643552d7d6204a7b4877daa77e99ec8/anemoi_inference-0.10.0.tar.gz", hash = "sha256:96c45c16d1ee3259f8dae38be22fba3672bff24b4099cb5abdbaf80a9c4ac150", size = 1494496, upload-time = "2026-03-13T14:14:20.338Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ce/8b/6a6c07f27af93f0d38a3a7aeb5e30224564237c049506d7cbd8305f0aee0/anemoi_inference-0.8.3-py3-none-any.whl", hash = "sha256:dd2744318c15ffb10870387f7723a842a32316d9f027bf3144c010e7726f75d0", size = 222100, upload-time = "2025-12-10T11:25:47.571Z" },
-]
-
-[[package]]
-name = "anemoi-plugins-ecmwf-inference"
-version = "0.2.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "anemoi-inference" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/f2/b2/163a018027d7687c727914f326e435bb5b7be8a94767afbb61c801295834/anemoi_plugins_ecmwf_inference-0.2.1.tar.gz", hash = "sha256:6650502f764eabbac689a14fe7269b239b501bec348bb3354981c9a0953494c1", size = 41197, upload-time = "2026-03-03T15:09:20.896Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/5f/11/ea49b7320dc24bca10f670bb60be4589247d5eaf09b9300b06be0aa82a9a/anemoi_plugins_ecmwf_inference-0.2.1-py3-none-any.whl", hash = "sha256:f65040338fe9a079c445b7bd043a4acf94c9998de0251795fe0320158b5ab8b3", size = 42865, upload-time = "2026-03-03T15:09:19.211Z" },
-]
-
-[package.optional-dependencies]
-opendata = [
-    { name = "earthkit-data" },
-    { name = "earthkit-regrid" },
-    { name = "ecmwf-opendata" },
-    { name = "mir-python" },
-]
-polytope = [
-    { name = "earthkit-data", extra = ["polytope"] },
+    { url = "https://files.pythonhosted.org/packages/08/b8/ed6676a4ad3f72942f7115a3052bb4e9d27d67c3c16f2f6355bcabe1544e/anemoi_inference-0.10.0-py3-none-any.whl", hash = "sha256:711744e4789d42d90868c846318051cf2997a571f619254864751bbcd2e2fbcd", size = 224988, upload-time = "2026-03-13T14:14:19.034Z" },
 ]
 
 [[package]]
@@ -1278,9 +1256,6 @@ all = [
     { name = "pyodc" },
     { name = "scitools-iris" },
 ]
-polytope = [
-    { name = "polytope-client" },
-]
 
 [[package]]
 name = "earthkit-geo"
@@ -1459,16 +1434,17 @@ wheels = [
 
 [[package]]
 name = "earthkit-workflows-anemoi"
-version = "0.3.12"
+version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anemoi-datasets" },
     { name = "anemoi-inference" },
     { name = "earthkit-workflows" },
+    { name = "qubed" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6e/ea/08acbc89ab32e71946e30aada90aca7dde21ebc6cc072ebe9b0e7eb36422/earthkit_workflows_anemoi-0.3.12.tar.gz", hash = "sha256:47b4f0de324116cdc09ffb185c6211d128a37ef1317032a1c193bea7c4718356", size = 28752, upload-time = "2025-11-06T11:08:41.894Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e5/36/143fb5b1c3849adca84afb4a9e0fc440b38b7f022dcdd5d074f73fc803d8/earthkit_workflows_anemoi-0.4.0.tar.gz", hash = "sha256:aeb75dc586634dd5f040b88ab0d1ac7ce35cdff8b601296d41dc138c57c5bf61", size = 32604, upload-time = "2026-03-22T23:17:29.029Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5b/f9/a454f5052d5ae6aea8799203d6420ffa9dae915364f1b441a0b00e9e5ff5/earthkit_workflows_anemoi-0.3.12-py3-none-any.whl", hash = "sha256:00df16a734bf72a8ddb0a431b316ee56e7bc96543333bae43fa6265d10b6f2a6", size = 20366, upload-time = "2025-11-06T11:08:41.066Z" },
+    { url = "https://files.pythonhosted.org/packages/64/00/d1e7a3034cca8f4b232c86d439b75e5a863ff92ebbdbf8cedc0e795a730e/earthkit_workflows_anemoi-0.4.0-py3-none-any.whl", hash = "sha256:90148ad13838c2edc0873b59f552216768b79bddea008b2eb3dac88f07965f5f", size = 21726, upload-time = "2026-03-22T23:17:27.892Z" },
 ]
 
 [[package]]
@@ -1709,27 +1685,6 @@ wheels = [
 ]
 
 [[package]]
-name = "fdb5lib"
-version = "5.18.0.5"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "eccodeslib" },
-    { name = "eckitlib" },
-    { name = "metkitlib" },
-]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d2/62/acd3629301e226cbced7b489943f7c620730ca94632d1517cadad4a3323e/fdb5lib-5.18.0.5-cp311-cp311-macosx_13_0_arm64.whl", hash = "sha256:c37614732ac6f71627606cae476dad2ad839f5f1698ec0273645e57109b5303d", size = 1470649, upload-time = "2025-10-29T13:07:13.67Z" },
-    { url = "https://files.pythonhosted.org/packages/be/81/66128ac344e92ecc2f787d7f6be85caf2b801d6064d4df16c3101bb35f73/fdb5lib-5.18.0.5-cp311-cp311-macosx_13_0_x86_64.whl", hash = "sha256:a6dcfd238ef15d5fa14aab5563f69bcf8f4e314dc66b650261134d4fa4f554bd", size = 1469344, upload-time = "2025-10-29T13:22:15.619Z" },
-    { url = "https://files.pythonhosted.org/packages/12/e4/1d9bbf916857662683bc5bb2f715824bf4b51182d8fa771b9ee8f6bcab44/fdb5lib-5.18.0.5-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:b2e588c854426c67a5274c5e19cc31316870f4ecdcf6721a3e74fbd09b861177", size = 29730895, upload-time = "2025-10-29T13:14:53.722Z" },
-    { url = "https://files.pythonhosted.org/packages/1b/6b/1244c2132feb7df9c0cd11210690315c915b5da9e3b6d7a2558a6ac3420b/fdb5lib-5.18.0.5-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha256:5001685bec10d87fd00d6b5f66ff6bd76bdb7a15212226dd502e8b42a6620e29", size = 1470648, upload-time = "2025-10-29T12:58:26.328Z" },
-    { url = "https://files.pythonhosted.org/packages/c9/aa/3200b392247825aec35c4689d41cde18cb12f3d74d7f4ef9f9146da04776/fdb5lib-5.18.0.5-cp312-cp312-macosx_13_0_x86_64.whl", hash = "sha256:50895e09c08ee6b5a3321724d2a65b06ed65e5347f2312f315e9380f908c9ee1", size = 1469329, upload-time = "2025-10-29T13:05:57.231Z" },
-    { url = "https://files.pythonhosted.org/packages/d5/d8/f0a285975cd260d99ebae8add936afd30459abf864132246fc76f665c743/fdb5lib-5.18.0.5-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:5950398d9913113c8818bc40de23254d2dc239f210ec1a37bbab922c77268393", size = 29730896, upload-time = "2025-10-29T13:15:56.205Z" },
-    { url = "https://files.pythonhosted.org/packages/fd/96/a4f7a17ac0f9c29f2c97b1645fc97949f79a553f493e8349695505052a0a/fdb5lib-5.18.0.5-cp313-cp313-macosx_13_0_arm64.whl", hash = "sha256:19d27150dd8fa7733a51ed06cba3a100f977cd4b47096f21f184c395166805a8", size = 1470659, upload-time = "2025-10-29T12:58:36.142Z" },
-    { url = "https://files.pythonhosted.org/packages/f0/49/150749833938a0ea511d3e7b0dd15f8315e12dc2ffa9a427a11a224e3859/fdb5lib-5.18.0.5-cp313-cp313-macosx_13_0_x86_64.whl", hash = "sha256:4dce2dc44545d34b575b72499d5c0e04a14562c85c120fce8b68cf3cb87cdc2e", size = 1469329, upload-time = "2025-10-29T13:20:09.645Z" },
-    { url = "https://files.pythonhosted.org/packages/c6/17/f276bd6d8248406d4da092d9cb06a76135ed9bad421744712e865f4816c7/fdb5lib-5.18.0.5-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:452677efcd630a2fb95e03bb47a9d23651634dbb331436d95081cb0f56d1bc74", size = 29730896, upload-time = "2025-10-29T13:22:10.427Z" },
-]
-
-[[package]]
 name = "fiab-core"
 source = { editable = "packages/fiab-core" }
 dependencies = [
@@ -1771,6 +1726,35 @@ requires-dist = [
     { name = "mcp", specifier = ">=1.1.0" },
     { name = "pydantic" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "ty", specifier = "==0.0.2" }]
+
+[[package]]
+name = "fiab-plugin-anemoi"
+source = { editable = "packages/fiab-plugin-anemoi" }
+dependencies = [
+    { name = "earthkit-workflows-anemoi" },
+    { name = "fiab-plugin-ecmwf" },
+]
+
+[package.optional-dependencies]
+runtime = [
+    { name = "anemoi-inference" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "ty" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "anemoi-inference", marker = "extra == 'runtime'", specifier = ">=0.10.0" },
+    { name = "earthkit-workflows-anemoi", specifier = ">=0.4.0" },
+    { name = "fiab-plugin-ecmwf", editable = "packages/fiab-plugin-ecmwf" },
+]
+provides-extras = ["runtime"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "ty", specifier = "==0.0.2" }]
@@ -1962,13 +1946,9 @@ name = "forecast-in-a-box"
 source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
-    { name = "anemoi-inference" },
-    { name = "anemoi-plugins-ecmwf-inference", extra = ["opendata", "polytope"] },
-    { name = "anemoi-utils" },
     { name = "apscheduler" },
     { name = "cloudpickle" },
     { name = "earthkit-workflows" },
-    { name = "earthkit-workflows-anemoi" },
     { name = "earthkit-workflows-pproc" },
     { name = "fastapi" },
     { name = "fastapi-users", extra = ["oauth"] },
@@ -1977,8 +1957,6 @@ dependencies = [
     { name = "httpx" },
     { name = "httpx-oauth" },
     { name = "jinja2" },
-    { name = "mir-python" },
-    { name = "multiolib" },
     { name = "orjson" },
     { name = "pproc" },
     { name = "psutil" },
@@ -2005,12 +1983,10 @@ plots = [
 thermo = [
     { name = "thermofeel" },
 ]
-webmars = [
-    { name = "ecmwf-api-client" },
-]
 
 [package.dev-dependencies]
 dev = [
+    { name = "fiab-plugin-anemoi", extra = ["runtime"] },
     { name = "fiab-plugin-ecmwf", extra = ["runtime"] },
     { name = "prek" },
     { name = "pytest" },
@@ -2025,17 +2001,12 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiosqlite" },
-    { name = "anemoi-inference", specifier = "==0.8.3" },
-    { name = "anemoi-plugins-ecmwf-inference", extras = ["opendata", "polytope"], specifier = ">=0.1.20" },
-    { name = "anemoi-utils", specifier = ">=0.4.36" },
     { name = "apscheduler" },
     { name = "cloudpickle" },
     { name = "earthkit-plots", marker = "extra == 'plots'", specifier = ">=0.3.5" },
     { name = "earthkit-plots-default-styles", marker = "extra == 'plots'", specifier = ">=0.1" },
     { name = "earthkit-workflows", specifier = ">=0.9.0" },
-    { name = "earthkit-workflows-anemoi", specifier = ">=0.3.12" },
     { name = "earthkit-workflows-pproc", git = "https://github.com/ecmwf/earthkit-workflows-pproc" },
-    { name = "ecmwf-api-client", marker = "extra == 'webmars'", specifier = ">=1.6.5" },
     { name = "fastapi" },
     { name = "fastapi-users", extras = ["oauth"] },
     { name = "fastapi-users-db-sqlalchemy" },
@@ -2044,8 +2015,6 @@ requires-dist = [
     { name = "httpx", specifier = "<1" },
     { name = "httpx-oauth" },
     { name = "jinja2" },
-    { name = "mir-python", specifier = "==1.27.10.5" },
-    { name = "multiolib", specifier = "==2.7.1.5" },
     { name = "orjson" },
     { name = "pproc", git = "https://github.com/ecmwf/pproc" },
     { name = "psutil" },
@@ -2059,10 +2028,11 @@ requires-dist = [
     { name = "toml" },
     { name = "uvicorn" },
 ]
-provides-extras = ["all", "plots", "thermo", "webmars"]
+provides-extras = ["all", "plots", "thermo"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "fiab-plugin-anemoi", extras = ["runtime"], editable = "packages/fiab-plugin-anemoi" },
     { name = "fiab-plugin-ecmwf", extras = ["runtime"], editable = "packages/fiab-plugin-ecmwf" },
     { name = "prek" },
     { name = "pytest" },
@@ -2867,26 +2837,6 @@ wheels = [
 ]
 
 [[package]]
-name = "metkitlib"
-version = "1.15.3.5"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "eccodeslib" },
-    { name = "eckitlib" },
-]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/5f/6f/d2a7169a9e252d286f2d49d60a20fc43e61be49e62ac65771f69920ffb58/metkitlib-1.15.3.5-cp311-cp311-macosx_13_0_arm64.whl", hash = "sha256:5832d1df739335163b6d1b5e1f762e87dc2e93334ea9635efb404c51fef19b37", size = 559075, upload-time = "2025-10-29T13:07:17.25Z" },
-    { url = "https://files.pythonhosted.org/packages/43/54/356488f9f04865369f1a41c82949ab4ce471b105cd0c3144eee01a3b0847/metkitlib-1.15.3.5-cp311-cp311-macosx_13_0_x86_64.whl", hash = "sha256:4025f969ce26323a216a3dd4bff4a148d96a0c27347d970a2f668bcdb2f21494", size = 561008, upload-time = "2025-10-29T13:22:18.518Z" },
-    { url = "https://files.pythonhosted.org/packages/99/b2/052697af5224d3ee54512924439e6a2f846dafb86f7e66cfea430b8644fd/metkitlib-1.15.3.5-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:512ca771ede4bbef262ae87ab97a3beb0be55a11dd32aca88e951275ab9461eb", size = 7647396, upload-time = "2025-10-29T13:15:00.813Z" },
-    { url = "https://files.pythonhosted.org/packages/a5/65/734e4912168d02d006815d403ef8c567beb1f692fcaa6e0bf0ab27005622/metkitlib-1.15.3.5-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha256:851721886c0c7de3e11088142659a5e40950d27efafc6490705d216400040dc7", size = 559082, upload-time = "2025-10-29T12:58:29.799Z" },
-    { url = "https://files.pythonhosted.org/packages/7c/7a/c073d90c1711139f3fabbf22e241f50bf9adb9a7cdca704d7a70cd22098e/metkitlib-1.15.3.5-cp312-cp312-macosx_13_0_x86_64.whl", hash = "sha256:a542410f478581172f355d6852ec37680127bc01efa7d3fe43e9e6bb37ca1bce", size = 561009, upload-time = "2025-10-29T13:06:00.119Z" },
-    { url = "https://files.pythonhosted.org/packages/55/49/76940f57fc5fd4032a6720919a999817e5a6148c874326b659a49f0b9050/metkitlib-1.15.3.5-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:7488227b35fd644641f47fa45fff61db38191c75e33b83921580a1c576c36bbb", size = 7647395, upload-time = "2025-10-29T13:16:02.775Z" },
-    { url = "https://files.pythonhosted.org/packages/7a/d8/58f334bfc284a618d71caf2bd803a90f82230d762de50a71d17668d65393/metkitlib-1.15.3.5-cp313-cp313-macosx_13_0_arm64.whl", hash = "sha256:3c0b30d4e5760a7a3d7cc3afa62d2f821583ba562823aaa89dc4cdbc5a247d42", size = 559076, upload-time = "2025-10-29T12:58:38.754Z" },
-    { url = "https://files.pythonhosted.org/packages/dd/42/d23f2c979e4f2d7beb1fc67b70d19b100a600dfd0538175b19c8a6d72939/metkitlib-1.15.3.5-cp313-cp313-macosx_13_0_x86_64.whl", hash = "sha256:97015bda0511e8451a46a59dc7591c5febfff7b9ae0344e883dba182ab5eb31c", size = 561010, upload-time = "2025-10-29T13:20:12.629Z" },
-    { url = "https://files.pythonhosted.org/packages/cf/08/3195e00fa6750d8e8e5a3c0b7c722fa224f99f25d06b84d3a13188cdf444/metkitlib-1.15.3.5-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:b36f3a8a812fa004cfd892fb344098bf2507414a8d808f0868e691f974371fa5", size = 7647396, upload-time = "2025-10-29T13:22:17.603Z" },
-]
-
-[[package]]
 name = "mir-python"
 version = "1.27.10.5"
 source = { registry = "https://pypi.org/simple" }
@@ -2936,31 +2886,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/e0/47/dd32fa426cc72114383ac549964eecb20ecfd886d1e5ccf5340b55b02f57/mpmath-1.3.0.tar.gz", hash = "sha256:7a28eb2a9774d00c7bc92411c19a89209d5da7c4c9a9e227be8330a23a25b91f", size = 508106, upload-time = "2023-03-07T16:47:11.061Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/43/e3/7d92a15f894aa0c9c4b49b8ee9ac9850d6e63b03c9c32c0367a13ae62209/mpmath-1.3.0-py3-none-any.whl", hash = "sha256:a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c", size = 536198, upload-time = "2023-03-07T16:47:09.197Z" },
-]
-
-[[package]]
-name = "multiolib"
-version = "2.7.1.5"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "atlaslib-ecmwf" },
-    { name = "eccodeslib" },
-    { name = "eckitlib" },
-    { name = "fckitlib" },
-    { name = "fdb5lib" },
-    { name = "metkitlib" },
-    { name = "mirlib" },
-]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9a/2f/cde8cd068a9bea8f9cf8bf2769b048a0804376e5b1d7d63579bdf636f7bb/multiolib-2.7.1.5-cp311-cp311-macosx_13_0_arm64.whl", hash = "sha256:5e7ee5f428fd1005031958167c58d347fe7117955c19bcb5b23f4dbc8cef1d5e", size = 4285874, upload-time = "2025-10-29T13:07:27.059Z" },
-    { url = "https://files.pythonhosted.org/packages/e1/05/9640539b862ed07d6ba08f41b5052ddff9ff2e5cca2619093b74b9274af5/multiolib-2.7.1.5-cp311-cp311-macosx_13_0_x86_64.whl", hash = "sha256:7d4683634d195cfb6dbd947c15f58ef627469b1876be4b3e415a4c7af8a0ff59", size = 4385243, upload-time = "2025-10-29T13:22:29.783Z" },
-    { url = "https://files.pythonhosted.org/packages/35/ce/dd6259fec21d12aef3194ce8614fb80b6b9c083ee2a96c62471ee7ab96b9/multiolib-2.7.1.5-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:efc7caf82f15a34ff90f7ca8e68b943b482e66617b9cfddbbb4aa376890b6d6f", size = 64395285, upload-time = "2025-10-29T13:15:22.675Z" },
-    { url = "https://files.pythonhosted.org/packages/8c/9d/fab41690eecf5d4cede528038022a818f786d4e790e1ec6f0085fffaae60/multiolib-2.7.1.5-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha256:814d87b19efa889b6553f638abd48c463f417c8d258c8ddc31feae7b6be916a7", size = 4285864, upload-time = "2025-10-29T12:58:38.192Z" },
-    { url = "https://files.pythonhosted.org/packages/94/58/29e412856d9f53597fd00bf4d31495dbba51bebfa769c9e8d37dc7400290/multiolib-2.7.1.5-cp312-cp312-macosx_13_0_x86_64.whl", hash = "sha256:a7dfda0f1bf20f7fab32a381c2c27d8ab7f47160aad55e8301e8c216def3f15c", size = 4385251, upload-time = "2025-10-29T13:06:09.238Z" },
-    { url = "https://files.pythonhosted.org/packages/8e/78/5d28eff7e1e5a8e49b71cba3faa6f58c85f43d29c6c25f0a497aad87fcf6/multiolib-2.7.1.5-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:214af2cd5ada66ddcb1a43775f9cb7c8cb2f8b76f67c07a165ebfc5c347b7a62", size = 64395339, upload-time = "2025-10-29T13:16:25.239Z" },
-    { url = "https://files.pythonhosted.org/packages/e2/d0/e4e043bbdc47d06b794258901bafe916a420937863ad026983ae897cbf60/multiolib-2.7.1.5-cp313-cp313-macosx_13_0_arm64.whl", hash = "sha256:8fc11fdccc2b79c3657511835b3b9111ba6ce9f4ff6687e7b6892e771050ac0b", size = 4285884, upload-time = "2025-10-29T12:58:47.365Z" },
-    { url = "https://files.pythonhosted.org/packages/0d/09/ec52b26fdc0e0abac294af999939acd0b08a38f05be848da5274a346b24c/multiolib-2.7.1.5-cp313-cp313-macosx_13_0_x86_64.whl", hash = "sha256:2475b4022a3a1686f75eafcbd6fc65be1aa251f3c986003dee7a2933852f7098", size = 4385247, upload-time = "2025-10-29T13:20:22.066Z" },
-    { url = "https://files.pythonhosted.org/packages/17/ea/d52dc51031e02ef3d64d8eee152ecfdf24b078a22e44fe8a6818a8e86fe5/multiolib-2.7.1.5-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:bc001930965d8854a7e24a526aba0671dca69659fbea101eb55520374755d811", size = 64395255, upload-time = "2025-10-29T13:22:42.965Z" },
 ]
 
 [[package]]
