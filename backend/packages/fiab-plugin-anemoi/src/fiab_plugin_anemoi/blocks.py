@@ -75,8 +75,8 @@ class AnemoiSource(Source):
         if result.e or not result.t:
             return result
 
-        ensemble_members = block.configuration_values["ensemble_members"]
-        qubed_instance = result.t.expand({"number": range(1, (int(ensemble_members) or 1) + 1)})
+        ensemble_members = int(block.configuration_values.get("ensemble_members") or 1)
+        qubed_instance = result.t.expand({"number": range(1, ensemble_members + 1)})
         return Either.ok(qubed_instance)
 
     def compile(
@@ -87,12 +87,13 @@ class AnemoiSource(Source):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         configuration = block.configuration_values
         composite_id = CompositeArtifactId.from_str(configuration["checkpoint"])
+        ensemble_members_str = configuration.get("ensemble_members")
         action = from_input(
             get_local_path(composite_id),
             configuration["input_source"],
             lead_time=configuration["lead_time"],
             date=configuration["base_time"],
-            ensemble_members=cast(int, configuration["ensemble_members"]) if configuration["ensemble_members"] is not None else None,
+            ensemble_members=int(ensemble_members_str) if ensemble_members_str else None,
             environment=get_environment(composite_id, configuration["input_source"]),
         )
         return Either.ok(action)
