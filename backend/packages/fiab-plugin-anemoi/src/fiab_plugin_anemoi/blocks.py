@@ -62,11 +62,6 @@ class AnemoiSource(Source):
             description="Number of ensemble members, default is 1.",
             value_type="optional[int]",
         ),
-        "configuration": BlockConfigurationOption(
-            title="Anemoi Configuration",
-            description="Extra Anemoi configuration parameters",
-            value_type="optional[dict]",
-        ),
     }
     inputs: list[str] = []
 
@@ -91,7 +86,7 @@ class AnemoiSource(Source):
         action = from_input(
             get_local_path(composite_id),
             configuration["input_source"],
-            lead_time=configuration["lead_time"],
+            lead_time=int(configuration["lead_time"]),
             date=configuration["base_time"],
             ensemble_members=int(ensemble_members_str) if ensemble_members_str else None,
             environment=get_environment(composite_id, configuration["input_source"]),
@@ -112,11 +107,6 @@ class AnemoiTransform(Transform):
             title="Lead time",
             description="Lead time of the forecast",
             value_type="int",
-        ),
-        "configuration": BlockConfigurationOption(
-            title="Anemoi Configuration",
-            description="Extra Anemoi configuration parameters",
-            value_type="optional[dict]",
         ),
     }
     inputs: list[str] = ["dataset"]
@@ -143,7 +133,7 @@ class AnemoiTransform(Transform):
         action = from_initial_conditions(
             ckpt=get_local_path(composite_id),
             initial_conditions=inputs[input_task],
-            lead_time=block.configuration_values["lead_time"],
+            lead_time=int(block.configuration_values["lead_time"]),
             environment=get_environment(composite_id),
         )
         return Either.ok(action)
