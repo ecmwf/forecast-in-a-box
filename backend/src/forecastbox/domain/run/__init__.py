@@ -6,3 +6,11 @@
 # In applying this licence, ECMWF does not waive the privileges and immunities
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
+
+"""
+Manages the Run domain -- execution of python workflows using the `cascade`
+execution engine, based on a Blueprint.
+
+Depends on Blueprint, Glyph and Plugin domains -- all are used when compiling a Run.
+Depended on by Experiment domain (which spawns Runs).
+"""

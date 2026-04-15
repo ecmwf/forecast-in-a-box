@@ -7,7 +7,11 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Artifacts routes — /artifacts/*"""
+"""
+Artifacts routes — /artifacts/*. Corresponds to the `domain.artifact` domain.
+
+Contains CRUD routes for artifacts (models): list, get, download (which is effectively a create), delete.
+"""
 
 PREFIX = "/api/v1/artifacts"
 from fastapi import APIRouter, Depends, HTTPException

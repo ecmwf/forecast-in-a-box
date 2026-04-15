@@ -7,7 +7,12 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Plugin management routes — /plugin/*"""
+"""Plugin management routes — /plugin/*. Corresponds to `domain.plugin` submodule.
+
+Contains:
+ - one operational route for status of the plugin installer module status,
+ - complete CRUD+List routes for the Plugin entity.
+"""
 
 PREFIX = "/api/v1/plugin"
 from typing import Literal
@@ -29,11 +34,6 @@ router = APIRouter(
 )
 
 
-@router.get("/status")
-def get_plugins_status_full() -> PluginsStatus:
-    return status_full()
-
-
 class PluginDetail(BaseModel):
     status: Literal["available", "disabled", "errored", "loaded"]
     """Status of the plugin, mutually exclusive. All of (disabled, errored, loaded) imply that the plugin is installed"""
@@ -51,6 +51,21 @@ class PluginDetail(BaseModel):
 
 class PluginListing(BaseModel):
     plugins: dict[PluginCompositeId, PluginDetail]
+
+
+# ---------------------------------------------------------------------------
+# Operational routes
+# ---------------------------------------------------------------------------
+
+
+@router.get("/status")
+def get_plugins_status_full() -> PluginsStatus:
+    return status_full()
+
+
+# ---------------------------------------------------------------------------
+# CRUD routes
+# ---------------------------------------------------------------------------
 
 
 @router.get("/details")

@@ -7,7 +7,13 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Run entity routes — /run/*"""
+"""
+Run entity routes — /run/*. Corresponds to `domain.run` backend-managed entity.
+
+Contains three categories of routes:
+ - CRD+List endpoints (no update, this is backend-managed entity), and a restart endpoint (which is effectively another create),
+ - Further detail endpoints -- inspecting outputs, getting logs
+"""
 
 PREFIX = "/api/v1/run"
 import asyncio
@@ -190,7 +196,7 @@ async def _build_run_logs_response(cascade_job_id: str, db_entity_ser: bytes) ->
 
 
 # ---------------------------------------------------------------------------
-# Endpoints
+# CRUD endpoints
 # ---------------------------------------------------------------------------
 
 
@@ -247,6 +253,46 @@ async def get_run(
     return _to_run_detail(domain_detail)
 
 
+@router.post("/delete")
+async def delete_run(
+    request: RunDeleteRequest,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> None:
+    """Delete an execution from the database and cascade.
+
+    ``attempt_count`` must match the current latest attempt to prevent races.
+    Returns 409 if it does not match.
+    """
+    try:
+        current = await run_db.get_run(request.run_id, auth_context=auth_context)
+    except RunNotFound:
+        raise HTTPException(status_code=404, detail=f"Run {request.run_id!r} not found.")
+    except RunAccessDenied:
+        raise HTTPException(status_code=403, detail=f"Access denied to execution {request.run_id!r}.")
+    if cast(int, current.attempt_count) != request.attempt_count:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Attempt count conflict for execution {request.run_id!r}: "
+                f"expected {request.attempt_count}, current is {current.attempt_count}."
+            ),
+        )
+    spec = RunId(run_id=request.run_id, attempt_count=request.attempt_count)
+    _, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
+    try:
+        cascade_client.request_response(
+            cascade_api.ResultDeletionRequest(datasets={cascade_job_id: []}),  # type: ignore[invalid-argument-type]
+            f"{config.cascade.cascade_url}",
+        )
+    except Exception as e:
+        raise HTTPException(500, f"Job deletion failed: {e}")
+    finally:
+        try:
+            await run_db.soft_delete_run(request.run_id, auth_context=auth_context)
+        except (RunNotFound, RunAccessDenied):
+            pass
+
+
 @router.post("/restart")
 async def restart_run(
     request: RunRestartRequest,
@@ -280,6 +326,11 @@ async def restart_run(
     if result.t is None:
         raise HTTPException(status_code=500, detail=f"Failed to restart: {result.e}")
     return RunRestartResponse(run_id=result.t.run_id, attempt_count=result.t.attempt_count)
+
+
+# ---------------------------------------------------------------------------
+# Further detail endpoints
+# ---------------------------------------------------------------------------
 
 
 @router.get("/outputAvailability")
@@ -328,43 +379,3 @@ async def get_run_logs(
     db_entity, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
     entity_dict = {col.name: getattr(db_entity, col.name) for col in db_entity.__table__.columns}
     return await _build_run_logs_response(cascade_job_id, orjson.dumps(entity_dict))
-
-
-@router.post("/delete")
-async def delete_run(
-    request: RunDeleteRequest,
-    auth_context: AuthContext = Depends(get_auth_context),
-) -> None:
-    """Delete an execution from the database and cascade.
-
-    ``attempt_count`` must match the current latest attempt to prevent races.
-    Returns 409 if it does not match.
-    """
-    try:
-        current = await run_db.get_run(request.run_id, auth_context=auth_context)
-    except RunNotFound:
-        raise HTTPException(status_code=404, detail=f"Run {request.run_id!r} not found.")
-    except RunAccessDenied:
-        raise HTTPException(status_code=403, detail=f"Access denied to execution {request.run_id!r}.")
-    if cast(int, current.attempt_count) != request.attempt_count:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                f"Attempt count conflict for execution {request.run_id!r}: "
-                f"expected {request.attempt_count}, current is {current.attempt_count}."
-            ),
-        )
-    spec = RunId(run_id=request.run_id, attempt_count=request.attempt_count)
-    _, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
-    try:
-        cascade_client.request_response(
-            cascade_api.ResultDeletionRequest(datasets={cascade_job_id: []}),  # type: ignore[invalid-argument-type]
-            f"{config.cascade.cascade_url}",
-        )
-    except Exception as e:
-        raise HTTPException(500, f"Job deletion failed: {e}")
-    finally:
-        try:
-            await run_db.soft_delete_run(request.run_id, auth_context=auth_context)
-        except (RunNotFound, RunAccessDenied):
-            pass

@@ -7,7 +7,10 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Gateway operations routes — /gateway/*"""
+"""
+Gateway operations routes — /gateway/*. Corresponds to no domain entity.
+
+All routes are purely operational, no ids -- gateway start, status, kill."""
 
 PREFIX = "/api/v1/gateway"
 import asyncio

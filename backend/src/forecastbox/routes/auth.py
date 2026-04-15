@@ -7,7 +7,11 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Auth routes — /auth/* and /users/*"""
+"""
+Auth routes — /auth/*". Corresponds to no internal domain, wraps the `fastapi_users` external library.
+
+Responsible for all user authentication.
+"""
 
 PREFIX = "/api/v1"
 from fastapi import APIRouter
