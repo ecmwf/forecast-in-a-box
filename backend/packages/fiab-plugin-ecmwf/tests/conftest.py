@@ -10,6 +10,7 @@
 import contextlib
 from pathlib import Path
 
+import pytest
 from fiab_core.artifacts import ArtifactsProvider, CompositeArtifactId, MlModelCheckpoint
 
 
@@ -37,6 +38,13 @@ def dummy_provider():
     yield
     ArtifactsProvider._get_checkpoint_lookup = None
     ArtifactsProvider._get_artifact_local_path = None
+
+
+@pytest.fixture
+def registered_provider():
+    """Pytest fixture that registers the dummy ArtifactsProvider for the duration of a test."""
+    with dummy_provider():
+        yield
 
 
 with dummy_provider():  # Configure the fiab_plugin_ecmwf.blocks module to use the dummy provider for testing

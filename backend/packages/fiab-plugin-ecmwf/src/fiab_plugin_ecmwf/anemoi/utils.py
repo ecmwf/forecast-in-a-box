@@ -87,8 +87,8 @@ def validate_anemoi_block(block: BlockInstance) -> Either[QubedInstanceOutput, E
     if not isinstance(block.configuration_values["checkpoint"], str):
         return Either.error("Checkpoint must be given")
 
-    if not block.configuration_values["lead_time"].isdigit() or int(block.configuration_values["lead_time"]) < 0:  # type: ignore
-        return Either.error("Lead time must be an int and non-negative")
+    if not block.configuration_values["lead_time"].isdigit():  # type: ignore
+        return Either.error("Lead time must be a non-negative integer")
 
     ensemble_members = block.configuration_values.get("ensemble_members")
     if ensemble_members is not None and (not ensemble_members.isdigit() or int(ensemble_members) < 1):  # type: ignore
