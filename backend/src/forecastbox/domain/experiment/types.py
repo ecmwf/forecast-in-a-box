@@ -10,3 +10,5 @@
 import typing
 
 ExperimentDefinitionId = typing.NewType("ExperimentDefinitionId", str)
+
+# NOTE we *dont* define ExperimentNextId as a new type, because its not really exposed
