@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from cascade.low.func import Either
 from fiab_core.fable import BlockInstance
 
+from forecastbox.domain.glyphs.exceptions import GlyphCircularReferenceError
+
 _GLYPH_PATTERN = re.compile(r"\$\{(\w+)\}")
 
 
@@ -87,3 +89,40 @@ def merge_glyph_values(
         if pinned in intrinsic_values:
             merged[pinned] = intrinsic_values[pinned]
     return merged
+
+
+def expand_glyph_values(glyph_values: dict[str, str]) -> dict[str, str]:
+    """Expand glyph values that themselves reference other glyphs using DFS.
+
+    A glyph value like ``${root}/${runId}`` will be expanded to its fully-resolved
+    string when ``root`` and ``runId`` are present in ``glyph_values``. Unknown
+    references (keys absent from ``glyph_values``) are kept as-is so that the
+    normal block-level unknown-glyph validation can surface them.
+
+    Raises ``GlyphCircularReferenceError`` if any cycle is detected (including
+    self-references like ``a = ${a}``).
+    """
+    result = dict(glyph_values)
+
+    def _expand(key: str, visiting: frozenset[str]) -> str:
+        value = result[key]
+        if not _GLYPH_PATTERN.search(value):
+            return value
+        visiting = visiting | {key}
+
+        def substitute(m: re.Match[str]) -> str:
+            ref = m.group(1)
+            if ref not in result:
+                return m.group(0)
+            if ref in visiting:
+                cycle_path = " -> ".join(sorted(visiting)) + f" -> {ref}"
+                raise GlyphCircularReferenceError(f"Circular glyph reference detected: {cycle_path}")
+            return _expand(ref, visiting)
+
+        expanded = _GLYPH_PATTERN.sub(substitute, value)
+        result[key] = expanded
+        return expanded
+
+    for key in list(result.keys()):
+        result[key] = _expand(key, frozenset())
+    return result

@@ -39,8 +39,9 @@ from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.db import upsert_blueprint
 from forecastbox.domain.blueprint.exceptions import BlueprintNotFound
 from forecastbox.domain.glyphs import global_db, resolution
+from forecastbox.domain.glyphs.exceptions import GlyphCircularReferenceError
 from forecastbox.domain.glyphs.intrinsic import get_values_and_examples
-from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, merge_glyph_values
+from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, expand_glyph_values, merge_glyph_values
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.graph import topological_order
@@ -146,6 +147,11 @@ async def validate_expand(
     colliding_keys = set(local_glyphs.keys()) & intrinsic_names
     for key in sorted(colliding_keys):
         global_errors.append(f"Local glyph key {key!r} is reserved as an intrinsic glyph and cannot be overridden.")
+
+    try:
+        all_glyphs = expand_glyph_values(all_glyphs)
+    except GlyphCircularReferenceError as e:
+        global_errors.append(str(e))
 
     invalidable: set[BlockInstanceId] = set()
     visited: set[BlockInstanceId] = set()

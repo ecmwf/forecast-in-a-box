@@ -23,7 +23,7 @@ from typing import cast
 
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.glyphs import global_db
-from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, extract_glyphs, merge_glyph_values
+from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, expand_glyph_values, extract_glyphs, merge_glyph_values
 from forecastbox.domain.run import db
 from forecastbox.domain.run.cascade import ExecutionSpecification, execute_cascade
 from forecastbox.domain.run.compile import compile_builder, resolve_intrinsic_glyph_values
@@ -71,13 +71,16 @@ def execute_background(
         builder = BlueprintBuilder.model_validate(blueprint.builder)
         local_values: dict[str, str] = builder.local_glyphs
 
-        all_glyphs = merge_glyph_values(intrinsic_values, global_values, local_values, compiler_runtime_context.glyphs)
+        all_glyphs_raw = merge_glyph_values(intrinsic_values, global_values, local_values, compiler_runtime_context.glyphs)
+        all_glyphs = expand_glyph_values(all_glyphs_raw)
 
         # Persist only the glyphs actually referenced in the builder, keeping the stored context lean.
+        # Pre-expansion values are persisted so that composite glyphs (e.g. "${root}/${runId}") can
+        # re-expand correctly on restart, picking up refreshed pinned intrinsics like startDatetime.
         referenced_glyph_names = {
             name for block in builder.blocks.values() for name in cast(ExtractedGlyphs, extract_glyphs(block).t).glyphs
         }
-        used_glyphs = {k: v for k, v in all_glyphs.items() if k in referenced_glyph_names}
+        used_glyphs = {k: all_glyphs_raw[k] for k in all_glyphs_raw if k in referenced_glyph_names}
 
         exec_spec = compile_builder(builder, all_glyphs)
 
