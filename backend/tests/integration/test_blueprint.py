@@ -21,6 +21,7 @@ change (such as change of return error code).
 import io
 import os
 import pathlib
+import sys
 import zipfile
 from datetime import datetime as _dt
 from typing import Any, get_args
@@ -665,7 +666,18 @@ def test_run_output_content(tmpdir: Any, backend_client_with_auth: httpx.Client)
     assert len(sink_tasks) == 1, f"Expected exactly one sink_file task, got: {available_tasks}"
     sink_task_id = sink_tasks[0]
 
-    content_resp = backend_client_with_auth.get("/run/outputContent", params={"run_id": run_id, "dataset_id": sink_task_id})
+    content_resp = backend_client_with_auth.get(
+        "/run/outputContent",
+        params={"run_id": run_id, "dataset_id": sink_task_id},
+        # macOS has a delayed first cloudpickle import under forking; give it more time
+        timeout=40.0 if sys.platform == "darwin" else None,
+    )
     assert content_resp.is_success, content_resp.text
     assert content_resp.headers.get("content-type", "").startswith("application/clpkl")
     assert cloudpickle.loads(content_resp.content) == "ok"
+
+    if sys.platform == "darwin":
+        # Re-fetch without an extended timeout to confirm the import delay was a one-off
+        content_resp2 = backend_client_with_auth.get("/run/outputContent", params={"run_id": run_id, "dataset_id": sink_task_id})
+        assert content_resp2.is_success, content_resp2.text
+        assert cloudpickle.loads(content_resp2.content) == "ok"
