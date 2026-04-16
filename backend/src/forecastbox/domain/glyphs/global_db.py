@@ -17,6 +17,7 @@ from sqlalchemy import Select, func, or_, select, update
 
 import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.domain.glyphs.exceptions import GlobalGlyphAccessDenied
+from forecastbox.domain.glyphs.types import GlobalGlyphId
 from forecastbox.schemata.jobs import GlobalGlyph
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.db import dbRetry, querySingle
@@ -54,7 +55,7 @@ async def upsert_global_glyph(key: str, value: str, public: bool, auth_context: 
             if existing is not None:
                 if not auth_context.allowed(existing.created_by):  # ty:ignore
                     raise GlobalGlyphAccessDenied(f"User {auth_context.user_id!r} is not allowed to modify global glyph {key!r}.")
-                glyph_id: str = str(existing.global_glyph_id)  # ty:ignore
+                glyph_id: GlobalGlyphId = GlobalGlyphId(str(existing.global_glyph_id))  # ty:ignore[invalid-argument-type]
                 await session.execute(
                     update(GlobalGlyph).where(GlobalGlyph.key == key).values(value=value, public=public, updated_at=ref_time)
                 )
@@ -63,7 +64,7 @@ async def upsert_global_glyph(key: str, value: str, public: bool, auth_context: 
                 return refreshed.scalar_one()
             else:
                 new = GlobalGlyph(
-                    global_glyph_id=str(uuid.uuid4()),
+                    global_glyph_id=GlobalGlyphId(str(uuid.uuid4())),  # ty:ignore[invalid-argument-type]
                     key=key,
                     value=value,
                     public=public,
@@ -78,7 +79,7 @@ async def upsert_global_glyph(key: str, value: str, public: bool, auth_context: 
     return await dbRetry(function)
 
 
-async def get_global_glyph(global_glyph_id: str, auth_context: AuthContext) -> GlobalGlyph | None:
+async def get_global_glyph(global_glyph_id: GlobalGlyphId, auth_context: AuthContext) -> GlobalGlyph | None:
     """Return a GlobalGlyph visible to the caller by its stable id, or None if not found or not visible."""
     query = _visibility_filter(
         select(GlobalGlyph).where(GlobalGlyph.global_glyph_id == global_glyph_id),

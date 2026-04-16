@@ -40,6 +40,7 @@ from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.glyphs import global_db
 from forecastbox.domain.glyphs.exceptions import GlobalGlyphAccessDenied
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples
+from forecastbox.domain.glyphs.types import GlobalGlyphId
 from forecastbox.domain.plugin.manager import catalogue_view, plugins_ready
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
@@ -162,7 +163,7 @@ class GlobalGlyphPostRequest(BaseModel):
 class GlobalGlyphResponse(BaseModel):
     """Detail of a single global glyph, returned by get and post endpoints."""
 
-    global_glyph_id: str
+    global_glyph_id: GlobalGlyphId
     key: str
     value: str
     public: bool
@@ -171,15 +172,10 @@ class GlobalGlyphResponse(BaseModel):
     updated_at: str
 
 
-class GlobalGlyphId(BaseModel):
+class GlobalGlyphLookup(BaseModel):
     """Identifies a global glyph by its stable id."""
 
-    global_glyph_id: str
-
-
-# ---------------------------------------------------------------------------
-# Blueprint CRUD+List Endpoints
-# ---------------------------------------------------------------------------
+    global_glyph_id: GlobalGlyphId
 
 
 @router.post("/create")
@@ -427,7 +423,7 @@ async def post_global_glyph(
     except GlobalGlyphAccessDenied as e:
         raise HTTPException(status_code=403, detail=str(e))
     return GlobalGlyphResponse(
-        global_glyph_id=str(row.global_glyph_id),
+        global_glyph_id=GlobalGlyphId(str(row.global_glyph_id)),  # ty:ignore[invalid-argument-type]
         key=str(row.key),
         value=str(row.value),
         public=bool(row.public),
@@ -439,7 +435,7 @@ async def post_global_glyph(
 
 @router.get("/glyphs/global/get")
 async def get_global_glyph(
-    spec: Annotated[GlobalGlyphId, Depends()],
+    spec: Annotated[GlobalGlyphLookup, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> GlobalGlyphResponse:
     """Retrieve a global glyph visible to the caller by its stable id."""
@@ -447,7 +443,7 @@ async def get_global_glyph(
     if row is None:
         raise HTTPException(status_code=404, detail=f"GlobalGlyph {spec.global_glyph_id!r} not found.")
     return GlobalGlyphResponse(
-        global_glyph_id=str(row.global_glyph_id),
+        global_glyph_id=GlobalGlyphId(str(row.global_glyph_id)),  # ty:ignore[invalid-argument-type]
         key=str(row.key),
         value=str(row.value),
         public=bool(row.public),
