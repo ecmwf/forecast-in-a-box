@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 import cascade.gateway.api as cascade_gateway_api
 import cascade.gateway.client as cascade_gateway_client
+import requests
 from fastapi import APIRouter, Request
 
 from forecastbox.domain.experiment.scheduling.background import status_scheduler
@@ -39,7 +40,6 @@ class StatusResponse:
 @router.get("")
 def get_status(request: Request) -> StatusResponse:
     """Overall system status endpoint."""
-    import requests as http_requests
 
     status: dict[str, str] = {"api": "up", "cascade": "up", "ecmwf": "up", "scheduler": "up", "version": request.app.version}
 
@@ -65,7 +65,7 @@ def get_status(request: Request) -> StatusResponse:
         status["plugins"] = f"failure getting status"
 
     try:
-        response = http_requests.get(f"{config.api.model_repository}/MANIFEST", timeout=5)
+        response = requests.get(f"{config.api.model_repository}/MANIFEST", timeout=5)
         if response.status_code == 200:
             status["ecmwf"] = "up"
         else:

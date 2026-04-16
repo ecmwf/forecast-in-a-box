@@ -5,61 +5,12 @@ This document records places where the codebase conflicts with the instructions 
 
 ---
 
-## 🔴 Import Hierarchy Violations
-
-The required hierarchy is `utility < schemata < domain < routes < entrypoint`.
-
-### `utility` importing from `schemata`
-
-- `utility/auth.py:14` — `from forecastbox.schemata.user import UserRead`
-
-### `routes` importing from `entrypoint`
-
-- `routes/blueprint.py:44` — `from forecastbox.entrypoint.auth.users import get_auth_context`
-- `routes/auth.py:19–20` — `from forecastbox.entrypoint.auth.oidc import oauth_client` / `from forecastbox.entrypoint.auth.users import auth_backend, fastapi_users`
-- `routes/experiment.py:31` — `from forecastbox.entrypoint.auth.users import get_auth_context`
-- `routes/run.py:39` — `from forecastbox.entrypoint.auth.users import get_auth_context`
-- `routes/gateway.py:31` — `from forecastbox.entrypoint.bootstrap.launchers import launch_cascade`
-- `routes/admin.py:28` — `from forecastbox.entrypoint.auth.users import current_active_user`
-
----
-
-## 🟠 Imports Inside Function Bodies
-
-Guide: _"Do not import inside function definitions unless necessitated by runtime."_
-
-- `routes/status.py:42` — `import requests as http_requests` inside `get_status()` — no runtime necessity; also a double violation as an alias
-- `domain/run/cascade.py:57` — imports inside `encode_result()` — no runtime necessity
-
-> Note: `entrypoint/bootstrap/launchers.py` also has imports inside functions but these are
-> likely justified by circular-import avoidance at runtime — borderline case.
-
----
-
 ## 🟠 Aliased Imports Without Name Collisions
 
 Guide: _"Do not alias imports unless there is a name collision."_
 
-- `import datetime as dt` — used in **11 files**, including:
-  `domain/plugin/manager.py:28`, `domain/experiment/service.py:23`, `domain/run/db.py:21`,
-  `routes/experiment.py:20`, and others
 - `import forecastbox.domain.blueprint.db as blueprint_db` and similar module-level aliases
   throughout `domain/` and `routes/` — used purely for brevity, no collision
-- `from fastapi import status as http_status` — `routes/blueprint.py:27`
-- `import numpy as np`, `import xarray as xr`, `import earthkit.data as ekd` — `domain/run/cascade.py:19–21`
-- `from sqlalchemy import delete as sa_delete` — `domain/experiment/scheduling/db.py:19`
-- `from multiprocessing import BaseProcess as Process` — `entrypoint/bootstrap/procs.py:11`
-
----
-
-## 🟠 Functions Declared in Schemata Files
-
-Guide: _"do not declare any functions in these files, only the ORM classes themselves."_
-
-- `schemata/jobs.py:190` — `create_db_and_tables()`
-- `schemata/user.py:66` — `create_db_and_tables()`
-- `schemata/user.py:71` — `get_async_session()`
-- `schemata/user.py:76` — `get_user_db()`
 
 ---
 

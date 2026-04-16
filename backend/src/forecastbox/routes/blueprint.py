@@ -23,8 +23,7 @@ PREFIX = "/api/v1/blueprint"
 from typing import Annotated, Literal, cast
 
 from cascade.low.func import assert_never
-from fastapi import APIRouter, Depends
-from fastapi import status as http_status
+from fastapi import APIRouter, Depends, status
 from fastapi.exceptions import HTTPException
 from fiab_core.fable import BlockFactoryCatalogue, BlockInstanceId, PluginBlockFactoryId, PluginCompositeId
 from pydantic import BaseModel
@@ -32,6 +31,7 @@ from pydantic import BaseModel
 import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.blueprint.service as blueprint_service
 import forecastbox.domain.glyphs.global_db as global_glyph_db
+from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint.exceptions import (
     BlueprintAccessDenied,
     BlueprintNotFound,
@@ -41,7 +41,6 @@ from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSave
 from forecastbox.domain.glyphs.exceptions import GlobalGlyphAccessDenied
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples
 from forecastbox.domain.plugin.manager import catalogue_view, plugins_ready
-from forecastbox.entrypoint.auth.users import get_auth_context
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
 
@@ -335,10 +334,10 @@ async def delete_blueprint(
 def get_catalogue() -> dict[PluginCompositeId, BlockFactoryCatalogue]:
     """All blocks this backend is capable of evaluating within a blueprint."""
     if not plugins_ready():
-        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail="Plugins not ready")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Plugins not ready")
     catalogue = catalogue_view()
     if isinstance(catalogue, bool):
-        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail="Plugins not ready")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Plugins not ready")
     return catalogue
 
 
@@ -415,7 +414,7 @@ async def post_global_glyph(
     intrinsic_names = set(get_values_and_examples().keys())
     if request.key in intrinsic_names:
         raise HTTPException(
-            status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Key {request.key!r} is reserved as an intrinsic glyph and cannot be overridden.",
         )
     if request.public and not auth_context.has_admin():

@@ -13,13 +13,12 @@ import time
 from pathlib import Path
 from typing import Any, Literal, Sequence
 
-import cascade.gateway.api as api
-import cascade.gateway.client as client
 import cloudpickle
-import earthkit.data as ekd
+import earthkit.data
 import numpy as np
 import xarray as xr
-from cascade.gateway.api import decoded_result
+from cascade.gateway.api import JobSpec, ResultRetrievalResponse, SubmitJobRequest, SubmitJobResponse, decoded_result
+from cascade.gateway.client import request_response
 from cascade.low import views as cascade_views
 from cascade.low.core import JobInstance, JobInstanceRich
 from pydantic import BaseModel, Field
@@ -42,7 +41,7 @@ class ExecutionSpecification(BaseModel):
     shared: bool = Field(default=False)
 
 
-def encode_result(result: api.ResultRetrievalResponse) -> tuple[bytes, str]:
+def encode_result(result: ResultRetrievalResponse) -> tuple[bytes, str]:
     """Converts cascade Result response to bytes+mime"""
     obj = decoded_result(result, job=None)  # type: ignore
     if isinstance(obj, bytes):
@@ -54,7 +53,7 @@ def encode_result(result: api.ResultRetrievalResponse) -> tuple[bytes, str]:
             raise ValueError("Tuple result must contain exactly two elements: (bytes, mime_type)")
 
     try:
-        from earthkit.plots import Figure
+        from earthkit.plots import Figure  # NOTE plots is an optional dependency -- import inside body allowed
 
         if isinstance(obj, Figure):
             buf = io.BytesIO()
@@ -63,11 +62,11 @@ def encode_result(result: api.ResultRetrievalResponse) -> tuple[bytes, str]:
     except ImportError:
         pass
 
-    if isinstance(obj, ekd.FieldList):
-        encoder = ekd.create_encoder("grib")
-        if isinstance(obj, ekd.Field):
+    if isinstance(obj, earthkit.data.FieldList):
+        encoder = earthkit.data.create_encoder("grib")
+        if isinstance(obj, earthkit.data.Field):
             return encoder.encode(obj).to_bytes(), "application/grib"  # type: ignore
-        elif isinstance(obj, ekd.FieldList):
+        elif isinstance(obj, earthkit.data.FieldList):
             return encoder.encode(obj[0], template=obj[0]).to_bytes(), "application/grib"  # type: ignore
 
     elif isinstance(obj, (xr.Dataset, xr.DataArray)):
@@ -89,7 +88,7 @@ class ProductToOutputId(BaseModel):
     output_ids: Sequence[str]
 
 
-def execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobResponse, list[ProductToOutputId]]:
+def execute_cascade(spec: ExecutionSpecification) -> tuple[SubmitJobResponse, list[ProductToOutputId]]:
     """Convert spec to JobInstance and submit to cascade api, returning response."""
     runtime_artifacts = spec.environment.runtime_artifacts
     if runtime_artifacts:
@@ -101,7 +100,7 @@ def execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobResponse
             if result.e:
                 error_msg = f"Failed to submit download for {artifact_id}: {result.e}"
                 logger.error(error_msg)
-                return api.SubmitJobResponse(job_id=None, error=error_msg), []
+                return SubmitJobResponse(job_id=None, error=error_msg), []
             download_ids.append(artifact_id)
 
         if download_ids:
@@ -118,7 +117,7 @@ def execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobResponse
                 if time.time() - start_time > max_wait_seconds:
                     error_msg = "Timeout waiting for runtime artifacts to download"
                     logger.error(error_msg)
-                    return api.SubmitJobResponse(job_id=None, error=error_msg), []
+                    return SubmitJobResponse(job_id=None, error=error_msg), []
 
                 time.sleep(1)
 
@@ -133,8 +132,8 @@ def execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobResponse
     workers_per_host = min(config.cascade.max_workers_per_host, environment.workers_per_host or config.cascade.default_workers_per_host)
     env_vars = {"TMPDIR": config.cascade.venv_temp_dir}
 
-    r = api.SubmitJobRequest(
-        job=api.JobSpec(
+    r = SubmitJobRequest(
+        job=JobSpec(
             workers_per_host=workers_per_host,
             hosts=hosts,
             envvars=env_vars,
@@ -143,8 +142,8 @@ def execute_cascade(spec: ExecutionSpecification) -> tuple[api.SubmitJobResponse
         )
     )
     try:
-        submit_job_response: api.SubmitJobResponse = client.request_response(r, f"{config.cascade.cascade_url}")  # type: ignore
+        submit_job_response: SubmitJobResponse = request_response(r, f"{config.cascade.cascade_url}")  # type: ignore
     except Exception as e:
-        return api.SubmitJobResponse(job_id=None, error=repr(e)), []
+        return SubmitJobResponse(job_id=None, error=repr(e)), []
 
     return submit_job_response, product_to_id_mappings

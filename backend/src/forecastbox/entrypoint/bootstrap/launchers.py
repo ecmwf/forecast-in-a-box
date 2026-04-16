@@ -17,6 +17,8 @@ import asyncio
 import logging
 
 import uvicorn
+from cascade.deployment.logging import LoggingConfig
+from cascade.gateway.server import main_enp
 
 from forecastbox.entrypoint.bootstrap.config import setup_process
 from forecastbox.utility.config import FIABConfig
@@ -44,7 +46,7 @@ async def _uvicorn_run(app_name: str, host: str, port: int) -> None:
 def launch_backend() -> None:
     config = FIABConfig()
     # TODO something imported by this module reconfigures the logging -- find and remove!
-    import forecastbox.entrypoint.app
+    import forecastbox.entrypoint.app  # import inside function justified due to side effects
 
     setup_process()
     logger.debug(f"logging initialized post-{forecastbox.entrypoint.app.__name__} import")
@@ -59,8 +61,6 @@ def launch_backend() -> None:
 
 def launch_cascade(log_base: str | None, max_concurrent_jobs: int | None) -> None:
     config = FIABConfig()
-    from cascade.deployment.logging import LoggingConfig
-    from cascade.gateway.server import main_enp
 
     loggingConfig = LoggingConfig(path_base=log_base, formatter="line")
 
