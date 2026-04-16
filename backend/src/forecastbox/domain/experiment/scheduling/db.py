@@ -16,8 +16,7 @@ single connection pool and in-process tests can monkeypatch a single attribute.
 import datetime as dt
 import uuid
 
-from sqlalchemy import delete as sa_delete
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 
 import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.schemata.jobs import ExperimentDefinition, ExperimentNext
@@ -56,7 +55,7 @@ async def get_experiment_next(experiment_id: str) -> ExperimentNext | None:
 
 async def delete_experiment_next(experiment_id: str) -> None:
     """Remove the next scheduled run entry for an experiment, clearing the pending tick."""
-    stmt = sa_delete(ExperimentNext).where(ExperimentNext.experiment_id == experiment_id)
+    stmt = delete(ExperimentNext).where(ExperimentNext.experiment_id == experiment_id)
     await executeAndCommit(stmt, _jobs_module.async_session_maker)
 
 

@@ -21,10 +21,10 @@ import uuid
 from datetime import datetime
 from typing import cast
 
-import forecastbox.domain.glyphs.global_db as global_glyph_db
-import forecastbox.domain.run.db as run_db
 from forecastbox.domain.blueprint.service import BlueprintBuilder
+from forecastbox.domain.glyphs import global_db
 from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, extract_glyphs, merge_glyph_values
+from forecastbox.domain.run import db
 from forecastbox.domain.run.cascade import ExecutionSpecification, execute_cascade
 from forecastbox.domain.run.compile import compile_builder, resolve_intrinsic_glyph_values
 from forecastbox.domain.run.db import CompilerRuntimeContext
@@ -65,7 +65,7 @@ def execute_background(
             resolve_intrinsic_glyph_values(run_id, submit_time, start_time, attempt_count),
         )
 
-        global_rows = list(cast(list, run_async(global_glyph_db.list_global_glyphs(auth_context))))
+        global_rows = list(cast(list, run_async(global_db.list_global_glyphs(auth_context))))
         global_values: dict[str, str] = {str(row.key): str(row.value) for row in global_rows}
 
         builder = BlueprintBuilder.model_validate(blueprint.builder)
@@ -83,7 +83,7 @@ def execute_background(
 
         persisted_context = compiler_runtime_context.model_copy(update={"glyphs": used_glyphs})
         run_async(
-            run_db.update_run_runtime(
+            db.update_run_runtime(
                 run_id,
                 attempt_count,
                 compiler_runtime_context=persisted_context.model_dump(exclude_unset=True),
@@ -100,8 +100,8 @@ def execute_background(
             update_kwargs["error"] = response.error[:255]
         else:
             update_kwargs["outputs"] = [x.model_dump() for x in product_to_id_mappings]
-        run_async(run_db.update_run_runtime(run_id, attempt_count, **update_kwargs))
+        run_async(db.update_run_runtime(run_id, attempt_count, **update_kwargs))
 
     except Exception as e:
         logger.exception(f"execute_background failed for run {run_id!r} attempt {attempt_count}: {e}")
-        run_async(run_db.update_run_runtime(run_id, attempt_count, status="failed", error=repr(e)[:255]))
+        run_async(db.update_run_runtime(run_id, attempt_count, status="failed", error=repr(e)[:255]))

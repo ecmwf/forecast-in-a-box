@@ -24,19 +24,17 @@ import pathlib
 import zipfile
 from typing import Annotated, cast
 
-import cascade.gateway.api as cascade_api
-import cascade.gateway.client as cascade_client
 import orjson
+from cascade.gateway import api, client
 from cascade.low.core import DatasetId, TaskId
 from fastapi import APIRouter, Depends, Response
 from fastapi.exceptions import HTTPException
 from pydantic import BaseModel
 
-import forecastbox.domain.run.db as run_db
-import forecastbox.domain.run.service as run_service
+from forecastbox.domain.auth.users import get_auth_context
+from forecastbox.domain.run import db, service
 from forecastbox.domain.run.cascade import ProductToOutputId, encode_result
 from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
-from forecastbox.entrypoint.auth.users import get_auth_context
 from forecastbox.routes.gateway import Globals
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
@@ -121,7 +119,7 @@ class RunDeleteRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _to_run_detail(domain_detail: run_service.RunDetail) -> RunDetailResponse:
+def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
     return RunDetailResponse(
         run_id=domain_detail.run_id,
         attempt_count=domain_detail.attempt_count,
@@ -139,13 +137,13 @@ def _to_run_detail(domain_detail: run_service.RunDetail) -> RunDetailResponse:
 async def _resolve_run_with_cascade(
     execution_spec: RunId,
     auth_context: AuthContext,
-) -> tuple[run_db.Run, str]:
+) -> tuple[db.Run, str]:
     """Fetch a Run and validate it has a cascade_job_id.
 
     Raises HTTP 404 if not found or access denied, HTTP 409 if not yet submitted.
     """
     try:
-        execution = await run_db.get_run(execution_spec.run_id, execution_spec.attempt_count, auth_context=auth_context)
+        execution = await db.get_run(execution_spec.run_id, execution_spec.attempt_count, auth_context=auth_context)
     except RunNotFound:
         raise HTTPException(status_code=404, detail=f"Run {execution_spec.run_id!r} not found.")
     except RunAccessDenied:
@@ -158,8 +156,8 @@ async def _resolve_run_with_cascade(
 
 async def _build_run_logs_response(cascade_job_id: str, db_entity_ser: bytes) -> Response:
     try:
-        request = cascade_api.JobProgressRequest(job_ids=[cascade_job_id])
-        gw_state = cascade_client.request_response(request, f"{config.cascade.cascade_url}").model_dump()
+        request = api.JobProgressRequest(job_ids=[cascade_job_id])
+        gw_state = client.request_response(request, f"{config.cascade.cascade_url}").model_dump()
     except TimeoutError:
         gw_state = {"progresses": {}, "datasets": {}, "error": "TimeoutError"}
     except Exception as e:
@@ -210,10 +208,10 @@ async def create_run(
     Loads the referenced blueprint, compiles it, submits it to cascade, and
     creates a linked execution row.
     """
-    blueprint = await run_service.get_blueprint_for_execution(request.blueprint_id, request.blueprint_version)
+    blueprint = await service.get_blueprint_for_execution(request.blueprint_id, request.blueprint_version)
     if blueprint is None:
         raise HTTPException(status_code=404, detail=f"Blueprint {request.blueprint_id!r} not found.")
-    result = await run_service.execute(blueprint, auth_context)
+    result = await service.execute(blueprint, auth_context)
     if result.t is None:
         raise HTTPException(status_code=500, detail=f"Failed to execute: {result.e}")
     return RunCreateResponse(run_id=result.t.run_id, attempt_count=result.t.attempt_count)
@@ -228,13 +226,13 @@ async def list_runs(
 
     Admins see all executions; regular users see only their own.
     """
-    total = await run_db.count_runs(auth_context=auth_context)
+    total = await db.count_runs(auth_context=auth_context)
     start = pagination.start()
     total_pages = pagination.total_pages(total)
     if start >= total and total > 0:
         raise HTTPException(status_code=404, detail="Page number out of range.")
-    executions = list(await run_db.list_runs(auth_context=auth_context, offset=start, limit=pagination.page_size))
-    details = [_to_run_detail(await run_service.poll_and_update(e)) for e in executions]
+    executions = list(await db.list_runs(auth_context=auth_context, offset=start, limit=pagination.page_size))
+    details = [_to_run_detail(await service.poll_and_update(e)) for e in executions]
     return RunListResponse(runs=details, total=total, page=pagination.page, page_size=pagination.page_size, total_pages=total_pages)
 
 
@@ -244,8 +242,8 @@ async def get_run(
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> RunDetailResponse:
     try:
-        execution = await run_db.get_run(spec.run_id, spec.attempt_count, auth_context=auth_context)
-        domain_detail = await run_service.poll_and_update(execution)
+        execution = await db.get_run(spec.run_id, spec.attempt_count, auth_context=auth_context)
+        domain_detail = await service.poll_and_update(execution)
     except RunNotFound:
         raise HTTPException(status_code=404, detail=f"Run {spec.run_id!r} not found.")
     except RunAccessDenied:
@@ -264,7 +262,7 @@ async def delete_run(
     Returns 409 if it does not match.
     """
     try:
-        current = await run_db.get_run(request.run_id, auth_context=auth_context)
+        current = await db.get_run(request.run_id, auth_context=auth_context)
     except RunNotFound:
         raise HTTPException(status_code=404, detail=f"Run {request.run_id!r} not found.")
     except RunAccessDenied:
@@ -280,15 +278,15 @@ async def delete_run(
     spec = RunId(run_id=request.run_id, attempt_count=request.attempt_count)
     _, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
     try:
-        cascade_client.request_response(
-            cascade_api.ResultDeletionRequest(datasets={cascade_job_id: []}),  # type: ignore[invalid-argument-type]
+        client.request_response(
+            api.ResultDeletionRequest(datasets={cascade_job_id: []}),  # type: ignore[invalid-argument-type]
             f"{config.cascade.cascade_url}",
         )
     except Exception as e:
         raise HTTPException(500, f"Job deletion failed: {e}")
     finally:
         try:
-            await run_db.soft_delete_run(request.run_id, auth_context=auth_context)
+            await db.soft_delete_run(request.run_id, auth_context=auth_context)
         except (RunNotFound, RunAccessDenied):
             pass
 
@@ -304,7 +302,7 @@ async def restart_run(
     Returns 409 if it does not match.
     """
     try:
-        current = await run_db.get_run(request.run_id, auth_context=auth_context)
+        current = await db.get_run(request.run_id, auth_context=auth_context)
     except RunNotFound:
         raise HTTPException(status_code=404, detail=f"Run {request.run_id!r} not found.")
     except RunAccessDenied:
@@ -318,7 +316,7 @@ async def restart_run(
             ),
         )
     try:
-        result = await run_service.restart_run(request.run_id, auth_context)
+        result = await service.restart_run(request.run_id, auth_context)
     except RunNotFound:
         raise HTTPException(status_code=404, detail=f"Run {request.run_id!r} not found.")
     except RunAccessDenied:
@@ -340,8 +338,8 @@ async def get_run_output_availability(
 ) -> list[TaskId]:
     """Check which output tasks are available for a given execution."""
     _, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
-    response = cascade_client.request_response(cascade_api.JobProgressRequest(job_ids=[cascade_job_id]), f"{config.cascade.cascade_url}")
-    response = cast(cascade_api.JobProgressResponse, response)
+    response = client.request_response(api.JobProgressRequest(job_ids=[cascade_job_id]), f"{config.cascade.cascade_url}")
+    response = cast(api.JobProgressResponse, response)
     if cascade_job_id not in response.datasets:
         raise HTTPException(status_code=404, detail=f"Job {cascade_job_id} not found in gateway.")
     return [x.task for x in response.datasets[cascade_job_id]]
@@ -355,11 +353,11 @@ async def get_run_output_content(
 ) -> Response:
     """Retrieve the result of a specific output task, encoded as bytes."""
     _, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
-    response = cascade_client.request_response(
-        cascade_api.ResultRetrievalRequest(job_id=cascade_job_id, dataset_id=DatasetId(task=dataset_id, output="0")),
+    response = client.request_response(
+        api.ResultRetrievalRequest(job_id=cascade_job_id, dataset_id=DatasetId(task=dataset_id, output="0")),
         f"{config.cascade.cascade_url}",
     )
-    response = cast(cascade_api.ResultRetrievalResponse, response)
+    response = cast(api.ResultRetrievalResponse, response)
     if response.error:
         raise HTTPException(500, f"Result retrieval failed: {response.error}")
     try:

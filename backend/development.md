@@ -15,11 +15,13 @@
   * use `typing.cast` when the code logic is implicitly erasing the type information
 * prioritize using pydantic.BaseModel or dataclasses.dataclass object for capturing contracts and interfaces.
   * ideally keep them plain, stateless, frozen, without functions -- we end up serializing those objects often over to other python processes or different languages
+    * having a few methods that provide convenience views, ser/de, validation, conversion does not necessarilly hurt -- its primarily about keeping the codebase generally functional and data-oriented rather than object-oriented.
   * for simple immutable data transfer objects, use `@dataclass(frozen=True, eq=True, slots=True)` directly for best type checker support -- provides immutability, hashability, and memory efficiency via slots. We set `eq=True` explicitly, despite being a default, for clarity.
   * a convenience decorator `frozendc` exists in `forecastbox.utility.structural` but direct decorator syntax is preferred for type safety
   * when using a primitive type in a semantically restricted context, utilize typing.NewType -- for example, dont do `user_id: str` but `UserId = typing.NewType("UserId", str); user_id: UserId`, because not every string is a valid UserId. This prevents a mixture of ids and gives a stronger type validity
 * use comments sparingly, for non-obvious code only. Add docstrings to functions called from other modules only. When adding docstring, use compact style -- dont separate out Args and Returns, describe everything in one or two paragraphs.
-* all imports belong to top level of the file, dont import inside function definitions unless necessiated by runtime. Dont alias imports unless there is a name collision
+* all imports belong to top level of the file, dont import inside function definitions unless necessiated by runtime.
+* dont alias in imports unless there is a name collision, or unless its a standard shortcut: `datetime as dt`, `multiprocessing as mp`, `numpy as np`, `xarray as xr`
 * never use python keywords and builtins as variable names -- for example, don't use `id` variable, prefer `id_<something>` or `id_`
 
 # High Level Code Organization and Placement
@@ -27,11 +29,11 @@ When adding new code, make sure you place it in the right submodule:
 * routes: *all* backend routes are declared here. There is autodiscovery mechanism, do _not_ make submodules here; only declare routes in `routes/*.py` files.
   * when making changes to any code in the routes submodule, consult `routes/__init__.py` docstring!
 * schemata: *all* database schemata, ie, ORM classes, are declared here. There is autodiscovery mechanism, do _not_ make submodules here; only declare schemata in `routes/*.py` files.
-  * do not declare any functions in these files, only the ORM classes themselves
+  * do not declare any functions in these files, only the ORM classes themselves, and the function related to discovery: `create_db_and_tables`
 * domain: the domain entities, related service functions, database helpers, domain dataclasses, et cetera. Most of the business logic lives here. Consult each domain's docstring in `__init__.py` to understand its role. When making *any* change to a code in a domain, consult the docstring to see if you need to make a change in the docstring itself.
   * within domain submodules there is often a `db.py` which contains helper functions to operate on top of ORMs from schemata. This module is always expected to handle automated version increments when mutating versioned entities, and to enforce authorization.
 * utility: code that can be utilized across domains, that is, helper functions operating primarily on standard library constructs
-  * there is one exception: utility/config.py, which is containing a lot of domain-specific code. We chose to place it in `utility` to have all config centralized and available to the whole application. 
+  * an exception is utility/config.py, which is containing a lot of domain-specific code. We chose to place it in `utility` to have all config centralized and available to the whole application.
 * entrypoint: code related to bootstrapping the FastAPI backend itself, including self-checks, config management, logging setup, et cetera.
   * there are utility-like functions here as well -- when deciding whether to add here or to top-level utility module, consider whether its entrypoint-only or of plausible usage to domains as well
 

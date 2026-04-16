@@ -28,8 +28,7 @@ import asyncio
 import logging
 from typing import cast
 
-import cascade.gateway.api as api
-import cascade.gateway.client as client
+from cascade.gateway import api, client
 from cascade.low.func import Either
 from pydantic import BaseModel
 

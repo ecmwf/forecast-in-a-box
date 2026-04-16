@@ -8,7 +8,7 @@ import os
 import signal
 from dataclasses import dataclass
 from multiprocessing import connection
-from multiprocessing.process import BaseProcess as Process
+from multiprocessing.process import BaseProcess
 from typing import cast
 
 import psutil
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ChildProcessGroup:
-    procs: list[Process]
+    procs: list[BaseProcess]
 
     def wait(self) -> None:
         if self.procs:  # NOTE wait([]) actually stucks forever

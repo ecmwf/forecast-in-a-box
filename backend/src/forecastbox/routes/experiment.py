@@ -25,10 +25,10 @@ from fastapi import APIRouter, Depends
 from fastapi.exceptions import HTTPException
 from pydantic import BaseModel, PositiveInt
 
-import forecastbox.domain.experiment.service as experiment_service
+from forecastbox.domain.auth.users import get_auth_context
+from forecastbox.domain.experiment import service
 from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound, ExperimentVersionConflict, SchedulerBusy
 from forecastbox.domain.experiment.scheduling.background import start_scheduler, stop_scheduler
-from forecastbox.entrypoint.auth.users import get_auth_context
 from forecastbox.schemata.jobs import ExperimentDefinition
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
@@ -166,7 +166,7 @@ async def create_experiment(
 ) -> ExperimentCreateResponse:
     """Create a new cron-schedule experiment."""
     try:
-        experiment_id = await experiment_service.create_schedule(
+        experiment_id = await service.create_schedule(
             auth_context=auth_context,
             blueprint_id=request.blueprint_id,
             blueprint_version=request.blueprint_version,
@@ -193,7 +193,7 @@ async def get_experiment(
 ) -> ExperimentDetail:
     """Retrieve a single experiment by id."""
     try:
-        exp = await experiment_service.get_schedule(auth_context, spec.experiment_id)
+        exp = await service.get_schedule(auth_context, spec.experiment_id)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     return _experiment_to_detail(exp)
@@ -206,7 +206,7 @@ async def list_experiments(
 ) -> ExperimentListResponse:
     """List experiments visible to the caller, with pagination."""
     try:
-        experiments, total, total_pages = await experiment_service.list_schedules(auth_context, pagination)
+        experiments, total, total_pages = await service.list_schedules(auth_context, pagination)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     items = [_experiment_to_detail(exp) for exp in experiments]
@@ -225,7 +225,7 @@ async def update_experiment(
     ``version`` must match the current experiment version; returns 409 if it does not.
     """
     try:
-        current = await experiment_service.get_schedule(auth_context, update.experiment_id)
+        current = await service.get_schedule(auth_context, update.experiment_id)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     if cast(int, current.version) != update.version:
@@ -237,7 +237,7 @@ async def update_experiment(
             ),
         )
     try:
-        updated = await experiment_service.update_schedule(
+        updated = await service.update_schedule(
             auth_context=auth_context,
             experiment_id=update.experiment_id,
             cron_expr=update.cron_expr,
@@ -268,7 +268,7 @@ async def delete_experiment(
     ``version`` must match the current experiment version; returns 409 if it does not.
     """
     try:
-        current = await experiment_service.get_schedule(auth_context, request.experiment_id)
+        current = await service.get_schedule(auth_context, request.experiment_id)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     if cast(int, current.version) != request.version:
@@ -280,7 +280,7 @@ async def delete_experiment(
             ),
         )
     try:
-        await experiment_service.delete_schedule(auth_context, request.experiment_id)
+        await service.delete_schedule(auth_context, request.experiment_id)
     except SchedulerBusy as e:
         raise HTTPException(status_code=503, detail=str(e))
     except ExperimentNotFound as e:
@@ -302,7 +302,7 @@ async def list_experiment_runs(
 ) -> ExperimentRunsResponse:
     """Return paginated execution rows linked to a cron-schedule experiment."""
     try:
-        executions, total, total_pages = await experiment_service.get_schedule_runs(auth_context, spec.experiment_id, pagination)
+        executions, total, total_pages = await service.get_schedule_runs(auth_context, spec.experiment_id, pagination)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -328,7 +328,7 @@ async def get_next_experiment_run(
 ) -> str:
     """Return the next scheduled run time, or 'not scheduled currently'."""
     try:
-        return await experiment_service.get_next_run(auth_context, spec.experiment_id)
+        return await service.get_next_run(auth_context, spec.experiment_id)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
 

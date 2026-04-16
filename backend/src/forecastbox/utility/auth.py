@@ -11,7 +11,6 @@
 
 from dataclasses import dataclass
 
-from forecastbox.schemata.user import UserRead
 from forecastbox.utility.config import config
 
 
@@ -47,10 +46,3 @@ class AuthContext:
         when the caller's ``user_id`` matches the resource owner.
         """
         return self.has_admin() or self.user_id == resource_owner
-
-
-def user2auth(user: UserRead | None) -> AuthContext:
-    """Build an AuthContext from an optional authenticated user."""
-    if user is None:
-        return AuthContext(user_id=None, is_admin=False)
-    return AuthContext(user_id=str(user.id), is_admin=user.is_superuser)
