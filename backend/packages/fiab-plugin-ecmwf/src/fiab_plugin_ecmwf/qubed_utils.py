@@ -42,18 +42,18 @@ def collapse(qube: QubedOutput, axis: str | list[str]) -> QubedOutput:
 
     Returns
     -------
-    Self
-        A new QubedInstanceOutput with the collapsed dataqube.
+    QubedOutput
+        A new QubedOutput with the collapsed dataqube.
 
     Usage
     -----
-    >>> output = QubedInstanceOutput(dataqube=Qube.from_datacube({
+    >>> output = QubedOutput(dataqube=Qube.from_datacube({
     ...     'param': ['2t', 'tp'],
     ...     'time': [0, 1, 2],
     ...     'level': [1000, 850, 700],
     ... }))
-    >>> collapsed = output.collapse('level')
-    >>> collapsed.dimensions()
+    >>> collapsed = collapse(output, 'level')
+    >>> dimensions(collapsed)
     {'param', 'time'}
     >>> contains(collapsed, 'level')
     False
