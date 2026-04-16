@@ -4,7 +4,7 @@ import httpx
 import orjson
 import pytest
 
-from forecastbox.domain.plugin.store import PluginStore, PluginStoreEntry
+from forecastbox.domain.plugin.store import PluginStore, PluginStoreEntry, fetch_store
 from forecastbox.utility.config import PluginStoreConfig
 
 
@@ -34,6 +34,6 @@ def test_fetch() -> None:
     with patch("httpx.Client.get") as mocked_get:
         mocked_get.return_value = mock_response
         with httpx.Client() as client:
-            result = PluginStore.fetch(client, store_config)
+            result = fetch_store(client, store_config)
 
     assert result == fake_store
