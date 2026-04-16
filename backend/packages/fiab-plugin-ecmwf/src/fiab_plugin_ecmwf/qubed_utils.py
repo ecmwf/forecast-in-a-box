@@ -181,7 +181,7 @@ def contains(qube: QubedOutput, item: Qube | str | dict) -> bool:
     dict_cast_to_list = {k: list(v) if isinstance(v, (set, tuple, list)) else [v] for k, v in lookup.items()}
     current_axes = axes(qube)
 
-    def contains(key, values):
+    def _contains_axis_values(key, values):
         return key in current_axes and all(v in current_axes[key] for v in values)
 
-    return all(contains(k, v) for k, v in dict_cast_to_list.items())
+    return all(_contains_axis_values(k, v) for k, v in dict_cast_to_list.items())
