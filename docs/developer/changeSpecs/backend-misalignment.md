@@ -5,15 +5,6 @@ This document records places where the codebase conflicts with the instructions 
 
 ---
 
-## 🔴 Package Structure
-
-| Issue | Location |
-|---|---|
-| `fiab-plugin-anemoi` has no `justfile`, no `pyproject.toml`, and is not listed in the workspace | `backend/pyproject.toml` `[tool.uv.workspace]`; `backend/packages/fiab-plugin-anemoi/` |
-| `fiab-plugin-test` has no `justfile` | `backend/packages/fiab-plugin-test/` |
-
----
-
 ## 🔴 Import Hierarchy Violations
 
 The required hierarchy is `utility < schemata < domain < routes < entrypoint`.
