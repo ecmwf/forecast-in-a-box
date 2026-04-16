@@ -118,6 +118,7 @@ describe('useFableBuilderStore', () => {
           globalErrors: [],
           blockStates: {},
           possibleSources: [],
+          resolvedConfigurationOptions: {},
         }),
       )
       act(() => useFableBuilderStore.getState().setFable(mockFable))
@@ -630,10 +631,12 @@ describe('useFableBuilderStore', () => {
       expect(useFableBuilderStore.getState().isConfigPanelOpen).toBe(true)
     })
 
-    it('closes config panel when deselecting', () => {
+    it('keeps config panel open when deselecting (Blender pattern)', () => {
       act(() => useFableBuilderStore.getState().selectBlock('block-1'))
       act(() => useFableBuilderStore.getState().selectBlock(null))
-      expect(useFableBuilderStore.getState().isConfigPanelOpen).toBe(false)
+      // Sidebar stays visible with placeholder — user closes explicitly
+      expect(useFableBuilderStore.getState().isConfigPanelOpen).toBe(true)
+      expect(useFableBuilderStore.getState().selectedBlockId).toBeNull()
     })
   })
 
@@ -668,6 +671,7 @@ describe('useFableBuilderStore', () => {
         globalErrors: ['Missing required block'],
         blockStates: {},
         possibleSources: [],
+        resolvedConfigurationOptions: {},
       }
       act(() =>
         useFableBuilderStore.getState().setValidationState(validationState),
@@ -685,6 +689,7 @@ describe('useFableBuilderStore', () => {
           globalErrors: [],
           blockStates: {},
           possibleSources: [],
+          resolvedConfigurationOptions: {},
         }),
       )
       const after = Date.now()
@@ -775,6 +780,7 @@ describe('selector hooks', () => {
           globalErrors: [],
           blockStates: {},
           possibleSources: [],
+          resolvedConfigurationOptions: {},
         }),
       )
       const { result } = renderHook(() => useIsValid())
@@ -788,6 +794,7 @@ describe('selector hooks', () => {
           globalErrors: ['Error'],
           blockStates: {},
           possibleSources: [],
+          resolvedConfigurationOptions: {},
         }),
       )
       const { result } = renderHook(() => useIsValid())

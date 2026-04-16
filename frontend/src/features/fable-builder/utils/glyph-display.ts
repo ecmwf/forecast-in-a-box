@@ -66,17 +66,3 @@ export function containsGlyphs(value: string): boolean {
 export function extractGlyphKey(ref: string): string {
   return ref.slice(2, -1)
 }
-
-/**
- * Resolve a config value by substituting glyph references with their values.
- * Unknown glyphs are left as-is.
- */
-export function resolveGlyphValue(
-  value: string,
-  glyphValues: Record<string, string>,
-): string {
-  return value.replace(GLYPH_PATTERN, (match) => {
-    const key = extractGlyphKey(match)
-    return glyphValues[key] ?? match
-  })
-}

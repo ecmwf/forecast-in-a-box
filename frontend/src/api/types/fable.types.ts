@@ -147,6 +147,10 @@ export const FableValidationExpansionSchema = z.object({
     z.string(),
     z.array(PluginBlockFactoryIdSchema),
   ),
+  resolved_configuration_options: z
+    .record(z.string(), z.record(z.string(), z.string()))
+    .optional()
+    .default({}),
 })
 
 export type FableValidationExpansion = z.infer<
@@ -249,6 +253,13 @@ export interface FableValidationState {
   globalErrors: Array<string>
   blockStates: Record<BlockInstanceId, BlockValidationState>
   possibleSources: Array<PluginBlockFactoryId>
+  /**
+   * Backend-resolved configuration values, keyed by BlockInstanceId then
+   * configuration key. Only contains entries whose original value contained
+   * glyph references (${...}). Sourced from /blueprint/expand — the frontend
+   * never resolves glyphs client-side.
+   */
+  resolvedConfigurationOptions: Record<BlockInstanceId, Record<string, string>>
 }
 
 export interface BlockKindMetadata {
@@ -559,5 +570,6 @@ export function toValidationState(
     globalErrors: expansion.global_errors,
     blockStates,
     possibleSources: expansion.possible_sources,
+    resolvedConfigurationOptions: expansion.resolved_configuration_options,
   }
 }

@@ -37,6 +37,10 @@ interface AddNodeButtonProps {
   sourceBlockId: BlockInstanceId
   possibleExpansions: Array<PluginBlockFactoryId>
   catalogue: BlockFactoryCatalogue
+  /** When true, the button adopts the destructive color to signal errors on the parent node */
+  hasErrors?: boolean
+  /** When true, this block already has a downstream connection — hide the button */
+  hasDownstream?: boolean
 }
 
 const POSITION_CLASSES: Record<string, string> = {
@@ -57,6 +61,8 @@ export const AddNodeButton = memo(function ({
   sourceBlockId,
   possibleExpansions,
   catalogue,
+  hasErrors = false,
+  hasDownstream = false,
 }: AddNodeButtonProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -65,9 +71,12 @@ export const AddNodeButton = memo(function ({
   const connectBlocks = useFableBuilderStore((state) => state.connectBlocks)
   const layoutDirection = useFableBuilderStore((state) => state.layoutDirection)
 
-  const availableFactories = useMemo(
-    () =>
-      possibleExpansions
+  // When the backend provides validated expansions, use them. Otherwise build
+  // a fallback from the full catalogue (all factories that accept inputs) so
+  // the user can always add blocks even when the parent node has errors.
+  const availableFactories = useMemo(() => {
+    if (possibleExpansions.length > 0) {
+      return possibleExpansions
         .map((id) => ({
           id,
           factory: getFactory(catalogue, id),
@@ -75,9 +84,28 @@ export const AddNodeButton = memo(function ({
         .filter(
           (item): item is { id: PluginBlockFactoryId; factory: BlockFactory } =>
             item.factory !== undefined,
-        ),
-    [possibleExpansions, catalogue],
-  )
+        )
+    }
+
+    // Fallback: all factories with at least one input (i.e. can be downstream)
+    const fallback: Array<{
+      id: PluginBlockFactoryId
+      factory: BlockFactory
+    }> = []
+    for (const [pluginKey, plugin] of Object.entries(catalogue)) {
+      for (const [factoryKey, factory] of Object.entries(plugin.factories)) {
+        if (factory.inputs.length > 0) {
+          // Reconstruct the PluginBlockFactoryId — pluginKey is "store/local"
+          const [store, local] = pluginKey.split('/')
+          fallback.push({
+            id: { plugin: { store, local }, factory: factoryKey },
+            factory,
+          })
+        }
+      }
+    }
+    return fallback
+  }, [possibleExpansions, catalogue])
 
   const filteredFactories = useMemo(() => {
     if (!search.trim()) return availableFactories
@@ -119,7 +147,9 @@ export const AddNodeButton = memo(function ({
     setSearch('')
   }
 
-  if (possibleExpansions.length === 0) {
+  // Once a downstream block is connected, the output Handle is enough —
+  // the plus button is only for adding the first downstream block.
+  if (hasDownstream) {
     return null
   }
 
@@ -133,8 +163,10 @@ export const AddNodeButton = memo(function ({
             className={cn(
               POSITION_CLASSES[layoutDirection],
               'h-7 w-7 rounded-full',
-              'border-2 bg-background shadow-md',
-              'hover:border-primary hover:bg-primary hover:text-primary-foreground',
+              'border-2 bg-background shadow-md hover:bg-background',
+              hasErrors
+                ? 'border-destructive text-destructive hover:border-destructive/70'
+                : 'hover:border-primary hover:text-primary',
               'nodrag nopan transition-all duration-200',
             )}
             onClick={(e) => e.stopPropagation()}

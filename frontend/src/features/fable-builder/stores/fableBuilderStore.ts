@@ -472,7 +472,10 @@ export const useFableBuilderStore = create<FableBuilderState>()(
         selectBlock: (blockId) =>
           set({
             selectedBlockId: blockId,
-            isConfigPanelOpen: blockId !== null,
+            // Sidebar stays open even on deselect (blockId === null) —
+            // it shows a "Select a block to configure" placeholder.
+            // User closes it explicitly via toggleConfigPanel.
+            isConfigPanelOpen: true,
           }),
 
         clearSelection: () => set({ selectedBlockId: null }),

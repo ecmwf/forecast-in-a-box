@@ -9,7 +9,12 @@
  */
 
 import { useMemo } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import type {
   BlockFactoryCatalogue,
   BlueprintDeleteRequest,
@@ -135,10 +140,16 @@ export function useFableValidation(
     enabled: enabled && hasBlocks,
     staleTime: 10 * 1000, // 10 seconds
     refetchOnWindowFocus: false,
-    // Retry server errors (503 during plugin reload) but not validation errors (4xx)
+    // Keep previous error state visible while a new validation is in flight.
+    // Prevents the right panel and graph nodes from flickering between
+    // "errors" and "clean" across keystrokes.
+    placeholderData: keepPreviousData,
+    // Only retry 503 (plugin reload). 4xx are validation errors (don't retry),
+    // and other 5xx (e.g. a backend crash in validate_expand) aren't transient —
+    // retrying just spams the server logs without changing the outcome.
     retry: (failureCount, error) => {
-      if (error instanceof ApiClientError && error.status && error.status < 500)
-        return false
+      if (!(error instanceof ApiClientError)) return false
+      if (error.status !== 503) return false
       return failureCount < QUERY_CONSTANTS.RETRY.ON_503
     },
     retryDelay: QUERY_CONSTANTS.RETRY_DELAY.ON_503,

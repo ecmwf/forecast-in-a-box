@@ -30,6 +30,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { GlyphContext } from '@/features/fable-builder/context/GlyphContext'
+import { ResolvedConfigContext } from '@/features/fable-builder/context/ResolvedConfigContext'
+import { FieldErrorsContext } from '@/features/fable-builder/context/FieldErrorsContext'
 
 // ---------------------------------------------------------------------------
 // Test data
@@ -63,20 +65,42 @@ const TEST_GLYPHS: Array<GlyphInfo> = [
 function WithGlyphs({
   children,
   glyphs = TEST_GLYPHS,
+  resolvedConfig = null,
+  fieldErrors = null,
 }: {
   children: React.ReactNode
   glyphs?: Array<GlyphInfo>
+  resolvedConfig?: Record<string, string> | null
+  fieldErrors?: Record<string, Array<string>> | null
 }) {
   return (
-    <GlyphContext.Provider value={glyphs}>{children}</GlyphContext.Provider>
+    <GlyphContext.Provider value={glyphs}>
+      <ResolvedConfigContext.Provider value={resolvedConfig}>
+        <FieldErrorsContext.Provider value={fieldErrors}>
+          {children}
+        </FieldErrorsContext.Provider>
+      </ResolvedConfigContext.Provider>
+    </GlyphContext.Provider>
   )
 }
 
-function ControlledStringField(props: { initialValue?: string }) {
+function ControlledStringField(props: {
+  initialValue?: string
+  resolvedConfig?: Record<string, string> | null
+  fieldErrors?: Record<string, Array<string>> | null
+}) {
   const [value, setValue] = useState(props.initialValue ?? '')
   return (
-    <WithGlyphs>
-      <GlyphFieldWrapper id="test-field" value={value} onChange={setValue}>
+    <WithGlyphs
+      resolvedConfig={props.resolvedConfig ?? null}
+      fieldErrors={props.fieldErrors ?? null}
+    >
+      <GlyphFieldWrapper
+        id="test-field"
+        configKey="value"
+        value={value}
+        onChange={setValue}
+      >
         <InputGroupInput
           id="test-field"
           type="text"
@@ -93,7 +117,12 @@ function ControlledDateField(props: { initialValue?: string }) {
   const [value, setValue] = useState(props.initialValue ?? '')
   return (
     <WithGlyphs>
-      <GlyphFieldWrapper id="test-field" value={value} onChange={setValue}>
+      <GlyphFieldWrapper
+        id="test-field"
+        configKey="value"
+        value={value}
+        onChange={setValue}
+      >
         <InputGroupInput
           id="test-field"
           type="date"
@@ -110,7 +139,12 @@ function ControlledNumberField(props: { initialValue?: string }) {
   const [value, setValue] = useState(props.initialValue ?? '')
   return (
     <WithGlyphs>
-      <GlyphFieldWrapper id="test-field" value={value} onChange={setValue}>
+      <GlyphFieldWrapper
+        id="test-field"
+        configKey="value"
+        value={value}
+        onChange={setValue}
+      >
         <InputGroupInput
           id="test-field"
           type="number"
@@ -124,17 +158,22 @@ function ControlledNumberField(props: { initialValue?: string }) {
   )
 }
 
-function ControlledEnumField(props: { initialValue?: string }) {
+function ControlledEnumField(props: {
+  initialValue?: string
+  fieldErrors?: Record<string, Array<string>> | null
+}) {
   const [value, setValue] = useState(props.initialValue ?? '')
   return (
-    <WithGlyphs>
-      <GlyphFieldWrapper id="test-field" value={value} onChange={setValue}>
+    <WithGlyphs fieldErrors={props.fieldErrors ?? null}>
+      <GlyphFieldWrapper
+        id="test-field"
+        configKey="value"
+        value={value}
+        onChange={setValue}
+        allowGlyphMode={false}
+      >
         <Select value={value || null} onValueChange={(v) => setValue(v ?? '')}>
-          <SelectTrigger
-            id="test-field"
-            data-slot="input-group-control"
-            className="flex-1 border-0 shadow-none ring-0 focus-visible:ring-0"
-          >
+          <SelectTrigger id="test-field">
             <SelectValue placeholder="Select..." />
           </SelectTrigger>
           <SelectContent>
@@ -152,7 +191,12 @@ function NoGlyphsStringField() {
   const [value, setValue] = useState('')
   return (
     <WithGlyphs glyphs={[]}>
-      <GlyphFieldWrapper id="test-field" value={value} onChange={setValue}>
+      <GlyphFieldWrapper
+        id="test-field"
+        configKey="value"
+        value={value}
+        onChange={setValue}
+      >
         <InputGroupInput
           id="test-field"
           type="text"
@@ -198,11 +242,13 @@ describe('GlyphFieldWrapper Integration', () => {
         .toBeVisible()
     })
 
-    it('shows toggle on enum fields', async () => {
+    it('hides toggle on enum fields (allowGlyphMode=false)', async () => {
       const screen = await renderWithProviders(<ControlledEnumField />)
+      // Enum dropdowns opt out of glyph mode — no toggle, combobox only
+      await expect.element(screen.getByRole('combobox')).toBeVisible()
       await expect
         .element(screen.getByRole('button', { name: /glyph/i }))
-        .toBeVisible()
+        .not.toBeInTheDocument()
     })
   })
 
@@ -260,17 +306,49 @@ describe('GlyphFieldWrapper Integration', () => {
   })
 
   describe('Resolved preview', () => {
-    it('shows "resolves to" preview for glyph values', async () => {
+    it('shows "resolves to" preview using server-resolved value', async () => {
       const screen = await renderWithProviders(
-        <ControlledStringField initialValue="${expver}" />,
+        <ControlledStringField
+          initialValue="${expver}"
+          resolvedConfig={{ value: 'server-0042' }}
+        />,
       )
       await expect.element(screen.getByText(/resolves to/i)).toBeVisible()
-      await expect.element(screen.getByText('0001')).toBeVisible()
+      // Must show the backend value, not the glyph's valueExample ('0001')
+      await expect.element(screen.getByText('server-0042')).toBeVisible()
+    })
+
+    it('hides preview when backend has not resolved the value yet', async () => {
+      // Glyph value present, but resolvedConfig is null (in-flight / error)
+      const screen = await renderWithProviders(
+        <ControlledStringField
+          initialValue="${expver}"
+          resolvedConfig={null}
+        />,
+      )
+      await expect
+        .element(screen.getByText(/resolves to/i))
+        .not.toBeInTheDocument()
+    })
+
+    it('hides preview when backend map lacks this configKey', async () => {
+      const screen = await renderWithProviders(
+        <ControlledStringField
+          initialValue="${expver}"
+          resolvedConfig={{ other_key: 'whatever' }}
+        />,
+      )
+      await expect
+        .element(screen.getByText(/resolves to/i))
+        .not.toBeInTheDocument()
     })
 
     it('does not show preview when value has no glyphs', async () => {
       const screen = await renderWithProviders(
-        <ControlledStringField initialValue="plain text" />,
+        <ControlledStringField
+          initialValue="plain text"
+          resolvedConfig={{ value: 'anything' }}
+        />,
       )
       await expect
         .element(screen.getByText(/resolves to/i))
@@ -289,28 +367,6 @@ describe('GlyphFieldWrapper Integration', () => {
     })
   })
 
-  describe('Blur-exit from glyph mode', () => {
-    it('returns to concrete mode when toggling on enum field', async () => {
-      const screen = await renderWithProviders(
-        <ControlledEnumField initialValue="opt1" />,
-      )
-
-      // Start in concrete mode — combobox visible
-      await expect.element(screen.getByRole('combobox')).toBeVisible()
-
-      // Toggle to glyph mode
-      await screen.getByTestId('glyph-toggle').click()
-      await expect.element(screen.getByRole('textbox')).toBeVisible()
-
-      // Close autocomplete then toggle back
-      await userEvent.keyboard('{Escape}')
-      await screen.getByTestId('glyph-toggle').click()
-
-      // Combobox should be back
-      await expect.element(screen.getByRole('combobox')).toBeVisible()
-    })
-  })
-
   describe('Prevents switching back with glyph value', () => {
     it('disables toggle when value contains a glyph', async () => {
       const screen = await renderWithProviders(
@@ -321,7 +377,10 @@ describe('GlyphFieldWrapper Integration', () => {
     })
   })
 
-  describe('All field types support glyph entry', () => {
+  describe('Text-like field types support glyph entry', () => {
+    // Enum fields are excluded by design: their values are constrained by
+    // the backend, so free-form glyph expressions are not meaningful.
+
     it('string field', async () => {
       const screen = await renderWithProviders(<ControlledStringField />)
       await screen.getByRole('button', { name: /glyph/i }).click()
@@ -342,16 +401,6 @@ describe('GlyphFieldWrapper Integration', () => {
         .toHaveTextContent('${runId}')
     })
 
-    it('enum field', async () => {
-      const screen = await renderWithProviders(<ControlledEnumField />)
-      await screen.getByRole('button', { name: /glyph/i }).click()
-      const input = screen.getByRole('textbox')
-      await input.fill('${expver}')
-      await expect
-        .element(screen.getByTestId('current-value'))
-        .toHaveTextContent('${expver}')
-    })
-
     it('date field', async () => {
       const screen = await renderWithProviders(<ControlledDateField />)
       await screen.getByRole('button', { name: /glyph/i }).click()
@@ -360,6 +409,57 @@ describe('GlyphFieldWrapper Integration', () => {
       await expect
         .element(screen.getByTestId('current-value'))
         .toHaveTextContent('${forecastDate}')
+    })
+  })
+
+  describe('Field-level validation errors', () => {
+    it('renders inline error message for the field when FieldErrorsContext has entries', async () => {
+      const screen = await renderWithProviders(
+        <ControlledStringField
+          initialValue="${runtd}"
+          fieldErrors={{ value: ['Unknown glyph: ${runtd}'] }}
+        />,
+      )
+      await expect
+        .element(screen.getByText('Unknown glyph: ${runtd}'))
+        .toBeVisible()
+    })
+
+    it('does not render an error when FieldErrorsContext is null', async () => {
+      const screen = await renderWithProviders(
+        <ControlledStringField initialValue="${runtd}" />,
+      )
+      await expect
+        .element(screen.getByText(/Unknown glyph/))
+        .not.toBeInTheDocument()
+    })
+
+    it('collapses multiple errors into "(+N more)" suffix', async () => {
+      const screen = await renderWithProviders(
+        <ControlledStringField
+          initialValue="${runtd}-${ghost}"
+          fieldErrors={{
+            value: ['Unknown glyph: ${runtd}', 'Unknown glyph: ${ghost}'],
+          }}
+        />,
+      )
+      await expect
+        .element(screen.getByText('Unknown glyph: ${runtd} (+1 more)'))
+        .toBeVisible()
+    })
+
+    it('renders inline error on enum fields too (allowGlyphMode=false path)', async () => {
+      const screen = await renderWithProviders(
+        <ControlledEnumField
+          initialValue="opt1"
+          fieldErrors={{ value: ['Missing required value'] }}
+        />,
+      )
+      await expect
+        .element(screen.getByText('Missing required value'))
+        .toBeVisible()
+      // Combobox still rendered (no glyph toggle)
+      await expect.element(screen.getByRole('combobox')).toBeVisible()
     })
   })
 })
