@@ -248,9 +248,9 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
     [selectBlock],
   )
 
-  const onPaneClick = useCallback(() => {
-    selectBlock(null)
-  }, [selectBlock])
+  // Clicking empty canvas intentionally does NOT deselect the node (Blender
+  // pattern). The sidebar stays with the last-selected node's config. To
+  // deselect, use the X button in the ConfigPanel header.
 
   return (
     <div ref={containerRef} className="h-full w-full">
@@ -261,7 +261,6 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}
-        onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         nodesDraggable={!nodesLocked}

@@ -22,6 +22,11 @@ import { ReviewStep as ReviewStepComponent } from './review/ReviewStep'
 import type { PresetId } from '@/features/fable-builder/presets/presets'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import { useURLStateSync } from '@/features/fable-builder/hooks/useURLStateSync'
+import {
+  clearDraft,
+  readDraft,
+  useDraftPersistence,
+} from '@/features/fable-builder/hooks/useDraftPersistence'
 import { getPreset } from '@/features/fable-builder/presets/presets'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { useMedia } from '@/hooks/useMedia'
@@ -40,6 +45,7 @@ import { Button } from '@/components/ui/button'
 import { useAuth } from '@/features/auth/AuthContext'
 import { useUser } from '@/hooks/useUser'
 import { ApiClientError } from '@/api/client'
+import { showToast } from '@/lib/toast'
 
 /**
  * Extract a user-friendly error message from a validation error
@@ -98,6 +104,9 @@ export function FableBuilderPage({
 
   const initializedRef = useRef(false)
 
+  // Auto-persist drafts to localStorage + beforeunload guard
+  useDraftPersistence()
+
   useURLStateSync({
     encodedState: fableId ? undefined : encodedState,
     enabled: !fableId,
@@ -120,9 +129,40 @@ export function FableBuilderPage({
     error: validationError,
   } = useFableValidation(fable)
 
-  // Initialize fable state - only runs once per mount
+  // Initialize fable state - only runs once per mount.
+  // Checks for a stale draft in localStorage before loading from backend.
   useEffect(() => {
     if (initializedRef.current) return
+
+    // Check for a recoverable draft before normal initialization
+    const draft = readDraft()
+    if (draft) {
+      const draftMatchesRoute =
+        (fableId && draft.fableId === fableId) || (!fableId && !draft.fableId)
+
+      if (draftMatchesRoute && Object.keys(draft.fable.blocks).length > 0) {
+        const ago = Math.round((Date.now() - draft.savedAt) / 60_000)
+        const timeLabel = ago < 1 ? 'just now' : `${ago} min ago`
+
+        showToast.info(`Unsaved draft restored (${timeLabel})`, draft.fableName)
+        setFable(draft.fable, draft.fableId)
+        if (draft.fableName) setFableName(draft.fableName)
+        if (draft.fableVersion) {
+          useFableBuilderStore.setState({
+            fableVersion: draft.fableVersion,
+            isDirty: true,
+          })
+        } else {
+          useFableBuilderStore.setState({ isDirty: true })
+        }
+        clearDraft()
+        initializedRef.current = true
+        return
+      }
+
+      // Draft doesn't match current route — discard silently
+      clearDraft()
+    }
 
     if (fableId && existingFable) {
       setFable(existingFable, fableId)

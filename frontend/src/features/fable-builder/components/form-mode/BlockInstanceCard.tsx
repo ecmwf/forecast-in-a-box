@@ -32,6 +32,9 @@ import {
 import { P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import { FieldRenderer } from '@/components/base/fields/FieldRenderer'
+import { ResolvedConfigContext } from '@/features/fable-builder/context/ResolvedConfigContext'
+import { FieldErrorsContext } from '@/features/fable-builder/context/FieldErrorsContext'
+import { mapBlockErrorsToFields } from '@/features/fable-builder/utils/map-block-errors-to-fields'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import {
   ContextMenu,
@@ -104,6 +107,10 @@ export function BlockInstanceCard({
   )
   const connectBlocks = useFableBuilderStore((state) => state.connectBlocks)
   const disconnectBlock = useFableBuilderStore((state) => state.disconnectBlock)
+  const resolvedConfigForBlock = useFableBuilderStore(
+    (state) =>
+      state.validationState?.resolvedConfigurationOptions[instanceId] ?? null,
+  )
   const blockValidation = useBlockValidation(instanceId)
 
   const instance = fable.blocks[instanceId]
@@ -127,14 +134,19 @@ export function BlockInstanceCard({
       }))
   }, [fable.blocks, instanceId, catalogue])
 
+  const hasErrors = blockValidation?.hasErrors ?? false
+  const errors = blockValidation?.errors ?? []
+  const mappedErrors = useMemo(
+    () => mapBlockErrorsToFields(errors, instance.configuration_values),
+    [errors, instance.configuration_values],
+  )
+
   if (!factory) {
     return null
   }
 
   const metadata = BLOCK_KIND_METADATA[factory.kind]
   const IconComponent = getBlockKindIcon(factory.kind)
-  const hasErrors = blockValidation?.hasErrors ?? false
-  const errors = blockValidation?.errors ?? []
 
   return (
     <ContextMenu>
@@ -236,17 +248,6 @@ export function BlockInstanceCard({
 
           {isExpanded && (
             <CardContent className="border-t px-4 py-3">
-              {hasErrors && (
-                <div className="mb-4 rounded-md bg-destructive/10 p-3 text-destructive">
-                  <P className="mb-1 font-medium">Configuration Issues</P>
-                  <ul className="list-disc space-y-0.5 pl-4 text-sm">
-                    {errors.map((error, index) => (
-                      <li key={`${error}-${index}`}>{error}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
               {factory.inputs.length > 0 && (
                 <div className="mb-4 border-b pb-4">
                   <P className="mb-3 font-medium">Input Connections</P>
@@ -313,23 +314,28 @@ export function BlockInstanceCard({
               )}
 
               {Object.keys(factory.configuration_options).length > 0 ? (
-                <div className="space-y-4">
-                  {Object.entries(factory.configuration_options).map(
-                    ([key, option]) => (
-                      <FieldRenderer
-                        key={key}
-                        id={`${instanceId}-${key}`}
-                        valueType={option.value_type}
-                        value={instance.configuration_values[key] ?? ''}
-                        onChange={(value) =>
-                          updateBlockConfig(instanceId, key, value)
-                        }
-                        label={option.title}
-                        description={option.description}
-                      />
-                    ),
-                  )}
-                </div>
+                <ResolvedConfigContext.Provider value={resolvedConfigForBlock}>
+                  <FieldErrorsContext.Provider value={mappedErrors.byConfigKey}>
+                    <div className="space-y-4">
+                      {Object.entries(factory.configuration_options).map(
+                        ([key, option]) => (
+                          <FieldRenderer
+                            key={key}
+                            id={`${instanceId}-${key}`}
+                            configKey={key}
+                            valueType={option.value_type}
+                            value={instance.configuration_values[key] ?? ''}
+                            onChange={(value) =>
+                              updateBlockConfig(instanceId, key, value)
+                            }
+                            label={option.title}
+                            description={option.description}
+                          />
+                        ),
+                      )}
+                    </div>
+                  </FieldErrorsContext.Provider>
+                </ResolvedConfigContext.Provider>
               ) : (
                 <P className="py-2 text-center text-muted-foreground">
                   No configuration options

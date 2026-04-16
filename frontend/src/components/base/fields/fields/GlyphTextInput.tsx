@@ -20,20 +20,10 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useTranslation } from 'react-i18next'
 import { Input } from '@/components/ui/input'
 import { InputGroupInput } from '@/components/ui/input-group'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import { useGlyphContext } from '@/features/fable-builder/context/GlyphContext'
 import { GlyphAutocomplete } from '@/features/fable-builder/components/shared/GlyphAutocomplete'
-import {
-  containsGlyphs,
-  resolveGlyphValue,
-} from '@/features/fable-builder/utils/glyph-display'
 
 export interface GlyphTextInputProps {
   id: string
@@ -79,7 +69,6 @@ export function GlyphTextInput({
   autoTrigger = false,
   onBlurEmpty,
 }: GlyphTextInputProps) {
-  const { t } = useTranslation('glyphs')
   const glyphs = useGlyphContext()
   const inputRef = useRef<HTMLInputElement>(null)
   const [autocompleteFilter, setAutocompleteFilter] = useState<string | null>(
@@ -176,15 +165,6 @@ export function GlyphTextInput({
     }, 150)
   }, [onBlurEmpty])
 
-  // Build resolved preview
-  const showPreview = hasGlyphs && containsGlyphs(value)
-  const resolvedPreview = showPreview
-    ? resolveGlyphValue(
-        value,
-        Object.fromEntries(glyphs.map((g) => [g.name, g.valueExample])),
-      )
-    : null
-
   const inputProps = {
     ref: inputRef,
     id,
@@ -211,24 +191,8 @@ export function GlyphTextInput({
     </div>
   )
 
-  const previewElement = resolvedPreview && resolvedPreview !== value && (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <div className="mt-1 truncate text-sm text-muted-foreground italic" />
-        }
-      >
-        {t('panel.resolvesTo')}{' '}
-        <span className="font-mono">{resolvedPreview}</span>
-      </TooltipTrigger>
-      <TooltipContent side="bottom" className="max-w-96 font-mono break-all">
-        {resolvedPreview}
-      </TooltipContent>
-    </Tooltip>
-  )
-
   // When grouped (inside InputGroup), only render the input inline.
-  // The autocomplete and preview are rendered outside via the wrapper.
+  // The autocomplete and resolved preview are rendered outside via the wrapper.
   if (grouped) {
     return (
       <>
@@ -242,7 +206,6 @@ export function GlyphTextInput({
     <div className="relative">
       <Input {...inputProps} />
       {autocompleteDropdown}
-      {previewElement}
     </div>
   )
 }
