@@ -319,7 +319,7 @@ class TestQubedOutputContains:
 
 
 class TestQubedOutputAxes:
-    """Tests for axes(the) method"""
+    """Tests for axes() method"""
 
     @pytest.mark.parametrize(
         "fixture_name,expected_axes",
