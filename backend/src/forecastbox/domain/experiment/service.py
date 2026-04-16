@@ -29,6 +29,7 @@ import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.experiment.db as experiment_db
 import forecastbox.domain.experiment.scheduling.db as scheduling_db
 import forecastbox.domain.run.db as run_db
+from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment.exceptions import ExperimentNotFound, SchedulerBusy
 from forecastbox.domain.experiment.scheduling.background import (
     prod_scheduler,
@@ -36,6 +37,7 @@ from forecastbox.domain.experiment.scheduling.background import (
     timeout_acquire_request,
 )
 from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run, parse_crontab
+from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.schemata.jobs import ExperimentDefinition, Run
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.concurrent import timed_acquire
@@ -65,7 +67,7 @@ def resolve_next_run(
 
 async def create_schedule(
     auth_context: AuthContext,
-    blueprint_id: str,
+    blueprint_id: BlueprintId,
     blueprint_version: int | None,
     cron_expr: str,
     max_acceptable_delay_hours: int,
@@ -73,7 +75,7 @@ async def create_schedule(
     display_name: str | None,
     display_description: str | None,
     tags: list[str] | None,
-) -> str:
+) -> ExperimentDefinitionId:
     """Create a new cron schedule experiment and schedule its first run. Returns the experiment_id.
 
     Raises ValueError for invalid cron expression or missing blueprint.
@@ -88,7 +90,7 @@ async def create_schedule(
     if job_def is None:
         raise ExperimentNotFound(f"Blueprint {blueprint_id!r} not found")
 
-    job_def_id = str(job_def.blueprint_id)  # ty:ignore[invalid-argument-type]
+    job_def_id = BlueprintId(str(job_def.blueprint_id))  # ty:ignore[invalid-argument-type]
     job_def_version = cast(int, job_def.version)
 
     experiment_definition_payload = {
@@ -116,7 +118,7 @@ async def create_schedule(
     return experiment_id
 
 
-async def get_schedule(auth_context: AuthContext, experiment_id: str) -> ExperimentDefinition:
+async def get_schedule(auth_context: AuthContext, experiment_id: ExperimentDefinitionId) -> ExperimentDefinition:
     """Return the experiment blueprint for a cron schedule.
 
     Raises ExperimentNotFound if not found or not a cron schedule.
@@ -152,7 +154,7 @@ async def list_schedules(
 
 async def update_schedule(
     auth_context: AuthContext,
-    experiment_id: str,
+    experiment_id: ExperimentDefinitionId,
     cron_expr: str | None,
     enabled: bool | None,
     max_acceptable_delay_hours: int | None,
@@ -196,7 +198,7 @@ async def update_schedule(
         await experiment_db.upsert_experiment_definition(
             auth_context=auth_context,
             experiment_definition_id=experiment_id,
-            blueprint_id=str(current.blueprint_id),  # ty:ignore[invalid-argument-type]
+            blueprint_id=BlueprintId(str(current.blueprint_id)),  # ty:ignore[invalid-argument-type]
             blueprint_version=cast(int, current.blueprint_version),
             experiment_type="cron_schedule",
             created_by=cast(str | None, current.created_by),
@@ -221,7 +223,7 @@ async def update_schedule(
     return updated
 
 
-async def delete_schedule(auth_context: AuthContext, experiment_id: str) -> None:
+async def delete_schedule(auth_context: AuthContext, experiment_id: ExperimentDefinitionId) -> None:
     """Soft-delete a cron schedule experiment and clear its next run.
 
     Acquires scheduler_lock for the duration.  Raises SchedulerBusy if lock
@@ -235,7 +237,7 @@ async def delete_schedule(auth_context: AuthContext, experiment_id: str) -> None
     prod_scheduler()
 
 
-async def get_next_run(auth_context: AuthContext, experiment_id: str) -> str:
+async def get_next_run(auth_context: AuthContext, experiment_id: ExperimentDefinitionId) -> str:
     """Return the next scheduled run time for a cron schedule, or a 'not scheduled' message.
 
     Raises ExperimentNotFound if the schedule does not exist.
@@ -251,7 +253,7 @@ async def get_next_run(auth_context: AuthContext, experiment_id: str) -> str:
 
 async def get_schedule_runs(
     auth_context: AuthContext,
-    experiment_id: str,
+    experiment_id: ExperimentDefinitionId,
     pagination: PaginationSpec,
 ) -> tuple[Iterable[Run], int, int]:
     """Return (executions, total, total_pages) for runs linked to a cron schedule experiment.

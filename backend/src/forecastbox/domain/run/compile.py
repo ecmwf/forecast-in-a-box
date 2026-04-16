@@ -22,11 +22,12 @@ from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_va
 from forecastbox.domain.glyphs.resolution import merge_glyph_values, resolve_configurations, value_dt2str
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.domain.run.cascade import ExecutionSpecification, RawCascadeJob
+from forecastbox.domain.run.types import RunId
 from forecastbox.utility.graph import topological_order
 
 
 def resolve_intrinsic_glyph_values(
-    run_id: str, submit_datetime: datetime, start_datetime: datetime, attempt_count: int
+    run_id: RunId, submit_datetime: datetime, start_datetime: datetime, attempt_count: int
 ) -> dict[AvailableIntrinsicGlyphs, str]:
     """Build a mapping of all intrinsic glyph names to their runtime values.
 

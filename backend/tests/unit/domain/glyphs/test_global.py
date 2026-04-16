@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 import forecastbox.domain.glyphs.global_db as global_glyph_db
 from forecastbox.domain.glyphs.exceptions import GlobalGlyphAccessDenied
+from forecastbox.domain.glyphs.types import GlobalGlyphId
 from forecastbox.schemata.jobs import Base
 from forecastbox.utility.auth import AuthContext
 
@@ -102,7 +103,7 @@ async def test_upsert_different_keys_are_independent(mem_session_maker: async_se
 @pytest.mark.asyncio
 async def test_get_own_private_glyph(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
     created = await global_glyph_db.upsert_global_glyph("getKey", "getVal", False, _user1)
-    fetched = await global_glyph_db.get_global_glyph(str(created.global_glyph_id), _user1)
+    fetched = await global_glyph_db.get_global_glyph(GlobalGlyphId(str(created.global_glyph_id)), _user1)
     assert fetched is not None
     assert fetched.key == "getKey"
 
@@ -111,7 +112,7 @@ async def test_get_own_private_glyph(mem_session_maker: async_sessionmaker[Async
 async def test_get_public_glyph_by_other_user(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
     """user2 can get a public glyph owned by user1."""
     created = await global_glyph_db.upsert_global_glyph("pubKey", "pubVal", True, _user1)
-    fetched = await global_glyph_db.get_global_glyph(str(created.global_glyph_id), _user2)
+    fetched = await global_glyph_db.get_global_glyph(GlobalGlyphId(str(created.global_glyph_id)), _user2)
     assert fetched is not None
 
 
@@ -119,20 +120,20 @@ async def test_get_public_glyph_by_other_user(mem_session_maker: async_sessionma
 async def test_get_private_glyph_invisible_to_other_user(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
     """user2 cannot get a private glyph owned by user1."""
     created = await global_glyph_db.upsert_global_glyph("privKey", "privVal", False, _user1)
-    fetched = await global_glyph_db.get_global_glyph(str(created.global_glyph_id), _user2)
+    fetched = await global_glyph_db.get_global_glyph(GlobalGlyphId(str(created.global_glyph_id)), _user2)
     assert fetched is None
 
 
 @pytest.mark.asyncio
 async def test_get_admin_sees_private_glyph(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
     created = await global_glyph_db.upsert_global_glyph("privKey", "privVal", False, _user1)
-    fetched = await global_glyph_db.get_global_glyph(str(created.global_glyph_id), _admin)
+    fetched = await global_glyph_db.get_global_glyph(GlobalGlyphId(str(created.global_glyph_id)), _admin)
     assert fetched is not None
 
 
 @pytest.mark.asyncio
 async def test_get_nonexistent_glyph_returns_none(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
-    result = await global_glyph_db.get_global_glyph("no-such-id", _admin)
+    result = await global_glyph_db.get_global_glyph(GlobalGlyphId("no-such-id"), _admin)
     assert result is None
 
 
