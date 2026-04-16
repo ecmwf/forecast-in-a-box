@@ -21,6 +21,7 @@ from fiab_core.fable import BlockInstance, PluginBlockFactoryId
 
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.blueprint.service import BlueprintSaveCommand as BlueprintSaveRequest
+from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.glyphs.resolution import value_dt2str
 from forecastbox.routes.experiment import ExperimentCreateRequest, ExperimentUpdateRequest
 
@@ -115,7 +116,7 @@ def _save_full_blueprint(client: httpx.Client, output_path: str, time_output_pat
 def _create_schedule_v2(client: httpx.Client, job_def_id: str, job_def_version: int, cron_expr: str = "0 0 * * *") -> str:
     """Create a v2 cron schedule and return experiment_id."""
     spec = ExperimentCreateRequest(
-        blueprint_id=job_def_id,
+        blueprint_id=BlueprintId(job_def_id),
         blueprint_version=job_def_version,
         cron_expr=cron_expr,
         max_acceptable_delay_hours=24,
@@ -140,7 +141,7 @@ def test_schedule_v2_crud(backend_client_with_auth: httpx.Client) -> None:
 
     # create
     spec = ExperimentCreateRequest(
-        blueprint_id=job_def_id,
+        blueprint_id=BlueprintId(job_def_id),
         blueprint_version=job_def_version,
         cron_expr="0 0 * * *",
         max_acceptable_delay_hours=24,
@@ -193,12 +194,12 @@ def test_schedule_v2_list(backend_client_with_auth: httpx.Client) -> None:
     baseline_total = response.json()["total"]
 
     spec1 = ExperimentCreateRequest(
-        blueprint_id=job_def_id,
+        blueprint_id=BlueprintId(job_def_id),
         blueprint_version=job_def_version,
         cron_expr="0 0 * * *",
     )
     spec2 = ExperimentCreateRequest(
-        blueprint_id=job_def_id,
+        blueprint_id=BlueprintId(job_def_id),
         blueprint_version=job_def_version,
         cron_expr="0 6 * * *",
     )
@@ -240,7 +241,7 @@ def test_schedule_v2_next_run(backend_client_with_auth: httpx.Client) -> None:
     job_def_id, job_def_version = _save_blueprint(backend_client_with_auth)
 
     spec = ExperimentCreateRequest(
-        blueprint_id=job_def_id,
+        blueprint_id=BlueprintId(job_def_id),
         blueprint_version=job_def_version,
         cron_expr="0 0 * * *",
     )
@@ -299,7 +300,7 @@ def test_schedule_v2_create_invalid_cron(backend_client_with_auth: httpx.Client)
     job_def_id, job_def_version = _save_blueprint(backend_client_with_auth)
 
     spec = ExperimentCreateRequest(
-        blueprint_id=job_def_id,
+        blueprint_id=BlueprintId(job_def_id),
         blueprint_version=job_def_version,
         cron_expr="not a cron",
     )
@@ -311,7 +312,7 @@ def test_schedule_v2_create_unknown_blueprint(backend_client_with_auth: httpx.Cl
     """create_v2 referencing a non-existent Blueprint returns 404."""
     headers = {"Content-Type": "application/json"}
     spec = ExperimentCreateRequest(
-        blueprint_id="does-not-exist",
+        blueprint_id=BlueprintId("does-not-exist"),
         cron_expr="0 0 * * *",
     )
     response = backend_client_with_auth.put("/experiment/create", headers=headers, json=spec.model_dump())
@@ -387,7 +388,7 @@ def test_schedule_v2_execute(tmpdir: Any, backend_client_with_auth: httpx.Client
 
     first_run_override = dt.datetime.now() - dt.timedelta(minutes=5)
     spec = ExperimentCreateRequest(
-        blueprint_id=job_def_id,
+        blueprint_id=BlueprintId(job_def_id),
         blueprint_version=job_def_version,
         cron_expr="0 0 * * *",
         max_acceptable_delay_hours=1,
