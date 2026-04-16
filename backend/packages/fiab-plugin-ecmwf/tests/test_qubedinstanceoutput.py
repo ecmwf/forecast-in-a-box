@@ -433,7 +433,7 @@ class TestQubedOutputMetadata:
         output = request.getfixturevalue(fixture_name)
         result = output
         for dt in ["netcdf", "grib", "plot"]:
-            result = output.model_copy(update={"datatype": dt})
+            result = result.model_copy(update={"datatype": dt})
 
         assert result.datatype == "plot"
         assert output.datatype == ""
