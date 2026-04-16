@@ -362,7 +362,7 @@ class TestQubedOutputAxes:
 
 
 class TestQubedOutputDimensions:
-    """Tests for dimensions(the) method"""
+    """Tests for dimensions() method"""
 
     @pytest.mark.parametrize(
         "fixture_name,expand_dim,collapse_dim,expected_dims",
