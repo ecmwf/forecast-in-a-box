@@ -122,27 +122,15 @@ class TestAnemoiTransformValidate:
     def test_valid_config_no_number_axis(self, mock_anemoi_utils):
         input_dataset = QubedInstanceOutput(dataqube=DUMMY_QUBE)
         block = make_block("AnemoiTransform", {"checkpoint": DUMMY_CHECKPOINT, "lead_time": "24"}, input_ids={"dataset": "src"})
-        output: QubedInstanceOutput = (
-            AnemoiTransform()
-            .validate(  # type: ignore[assignment]
-                block=block,
-                inputs={"dataset": input_dataset},  # type: ignore[dict-item]
-            )
-            .get_or_raise()
-        )
+        output = AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset}).get_or_raise()  # type: ignore[dict-item]
+        assert isinstance(output, QubedInstanceOutput)
         assert "number" not in output
 
     def test_valid_config_propagates_number_axis(self, mock_anemoi_utils):
         input_dataset = QubedInstanceOutput(dataqube=DUMMY_QUBE).expand({"number": [1, 2, 3]})
         block = make_block("AnemoiTransform", {"checkpoint": DUMMY_CHECKPOINT, "lead_time": "24"}, input_ids={"dataset": "src"})
-        output: QubedInstanceOutput = (
-            AnemoiTransform()
-            .validate(  # type: ignore[assignment]
-                block=block,
-                inputs={"dataset": input_dataset},  # type: ignore[dict-item]
-            )
-            .get_or_raise()
-        )
+        output = AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset}).get_or_raise()  # type: ignore[dict-item]
+        assert isinstance(output, QubedInstanceOutput)
         assert "number" in output
         assert set(output.axes()["number"]) == {1, 2, 3}
 
