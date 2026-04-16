@@ -535,3 +535,17 @@ def test_blueprint_expand_failure_03(backend_client_with_auth: httpx.Client) -> 
     block_errors = response.json()["block_errors"]
     assert "bad_source" in block_errors
     assert "bad_transform" in block_errors
+
+    # we now verify that the validation of transform happens in some form, despite parent being invalid
+    bad_transform2 = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="transform_increment"),
+        configuration_values={"amount": "${nonExistentGlyph}"},
+        input_ids={"a": "bad_source"},
+    )
+    builder = BlueprintBuilder(blocks={"bad_source": bad_source, "bad_transform": bad_transform2})
+    response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
+    assert response.is_success, response.text
+    block_errors = response.json()["block_errors"]
+    assert "bad_source" in block_errors
+    assert "bad_transform" in block_errors
+    assert "nonExistentGlyph" in ";".join(block_errors["bad_transform"])
