@@ -27,7 +27,7 @@ from fiab_core.tools.blocks import Source, Transform
 from fiab_plugin_ecmwf.metadata import QubedInstanceOutput
 
 from .utils import (
-    get_checkpoint_enum_type,
+    CHECKPOINT_ENUM_TYPE,
     get_environment,
     get_local_path,
     validate_anemoi_block,
@@ -43,7 +43,7 @@ class AnemoiSource(Source):
         "checkpoint": BlockConfigurationOption(
             title="Anemoi Checkpoint",
             description="Anemoi checkpoint name",
-            value_type=get_checkpoint_enum_type(),
+            value_type=CHECKPOINT_ENUM_TYPE,
         ),
         "input_source": BlockConfigurationOption(
             title="Input Source",
@@ -105,7 +105,7 @@ class AnemoiTransform(Transform):
         "checkpoint": BlockConfigurationOption(
             title="Anemoi Checkpoint",
             description="Anemoi checkpoint name",
-            value_type=get_checkpoint_enum_type(),
+            value_type=CHECKPOINT_ENUM_TYPE,
         ),
         "lead_time": BlockConfigurationOption(
             title="Lead time",

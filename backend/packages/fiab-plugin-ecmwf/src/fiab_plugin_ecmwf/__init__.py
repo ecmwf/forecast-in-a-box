@@ -7,26 +7,18 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-_plugin = None
+from fiab_core.tools.blocks import QubedBlockBuilder
+from fiab_core.tools.plugins import QubedPluginBuilder
+from fiab_plugin_ecmwf.anemoi.blocks import AnemoiSource, AnemoiTransform
+from fiab_plugin_ecmwf.blocks import EkdSource, EnsembleStatistics, TemporalStatistics, ZarrSink
 
-def __getattr__(name: str):
-    global _plugin
-    if name == "plugin":
-        if _plugin is None:
-            from fiab_core.tools.blocks import QubedBlockBuilder
-            from fiab_core.tools.plugins import QubedPluginBuilder
+blocks: dict[str, QubedBlockBuilder] = {
+    "ekdSource": EkdSource(),
+    "ensembleStatistics": EnsembleStatistics(),
+    "temporalStatistics": TemporalStatistics(),
+    "zarrSink": ZarrSink(),
+    "anemoiSource": AnemoiSource(),
+    "anemoiTransform": AnemoiTransform(),
+}
 
-            from fiab_plugin_ecmwf.anemoi.blocks import AnemoiSource, AnemoiTransform
-            from fiab_plugin_ecmwf.blocks import EkdSource, EnsembleStatistics, TemporalStatistics, ZarrSink
-
-            blocks: dict[str, QubedBlockBuilder]  = {
-                "ekdSource": EkdSource(),
-                "ensembleStatistics": EnsembleStatistics(),
-                "temporalStatistics": TemporalStatistics(),
-                "zarrSink": ZarrSink(),
-                "anemoiSource": AnemoiSource(),
-                "anemoiTransform": AnemoiTransform(),
-            }
-            _plugin = QubedPluginBuilder(block_builders=blocks).as_plugin()
-        return _plugin
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+plugin = QubedPluginBuilder(block_builders=blocks).as_plugin()

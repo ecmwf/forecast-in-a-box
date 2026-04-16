@@ -9,7 +9,6 @@
 
 import importlib.metadata
 import re
-from functools import lru_cache
 from pathlib import Path
 from typing import cast
 
@@ -29,20 +28,13 @@ ENVIRONMENT_PACKAGES: list[str] = [
     "torch_geometric",
 ]
 
-
-@lru_cache(maxsize=1)
-def get_available_checkpoints() -> CheckpointLookup:
-    all_checkpoints: CheckpointLookup = ArtifactsProvider.get_checkpoint_lookup()
-    return {
-        composite_id: checkpoint
-        for composite_id, checkpoint in all_checkpoints.items()
-        # TODO: Add filtering here
-    }
-
-
-@lru_cache(maxsize=1)
-def get_checkpoint_enum_type() -> str:
-    return f"enum['{', '.join(CompositeArtifactId.to_str(k) for k in get_available_checkpoints().keys())}']"
+all_checkpoints: CheckpointLookup = ArtifactsProvider.get_checkpoint_lookup()
+AVAILABLE_CHECKPOINTS: CheckpointLookup = {
+    composite_id: checkpoint
+    for composite_id, checkpoint in all_checkpoints.items()
+    # TODO: Add filtering here
+}
+CHECKPOINT_ENUM_TYPE = f"enum['{', '.join(CompositeArtifactId.to_str(k) for k in AVAILABLE_CHECKPOINTS.keys())}']"
 
 
 def get_local_path(composite_id: CompositeArtifactId) -> Path:
@@ -50,7 +42,7 @@ def get_local_path(composite_id: CompositeArtifactId) -> Path:
 
 
 def get_metadata(composite_id: CompositeArtifactId) -> InferenceMetadata:
-    checkpoint = get_available_checkpoints()[composite_id]
+    checkpoint = AVAILABLE_CHECKPOINTS[composite_id]
     return cast(InferenceMetadata, InferenceMetadataFactory(checkpoint.metadata))
 
 
