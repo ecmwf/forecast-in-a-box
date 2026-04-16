@@ -28,6 +28,7 @@ from forecastbox.domain.run import db
 from forecastbox.domain.run.cascade import ExecutionSpecification, execute_cascade
 from forecastbox.domain.run.compile import compile_builder, resolve_intrinsic_glyph_values
 from forecastbox.domain.run.db import CompilerRuntimeContext
+from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import Blueprint
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.time import current_time
@@ -36,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 def execute_background(
-    run_id: str,
+    run_id: RunId,
     attempt_count: int,
     submit_time: datetime,
     blueprint: Blueprint,

@@ -29,6 +29,7 @@ from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.experiment import service
 from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound, ExperimentVersionConflict, SchedulerBusy
 from forecastbox.domain.experiment.scheduling.background import start_scheduler, stop_scheduler
+from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import ExperimentDefinition
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
@@ -115,7 +116,7 @@ class ExperimentDeleteRequest(BaseModel):
 
 
 class ExperimentRunDetail(BaseModel):
-    run_id: str
+    run_id: RunId
     attempt_count: int
     status: str
     created_at: str
@@ -309,7 +310,7 @@ async def list_experiment_runs(
         raise HTTPException(status_code=400, detail=str(e))
     runs = [
         ExperimentRunDetail(
-            run_id=str(ex.run_id),  # ty:ignore[invalid-argument-type]
+            run_id=RunId(str(ex.run_id)),  # ty:ignore[invalid-argument-type]
             attempt_count=cast(int, ex.attempt_count),
             status=cast(str, ex.status),
             created_at=str(ex.created_at),

@@ -37,6 +37,7 @@ import forecastbox.domain.run.db as run_db
 from forecastbox.domain.run.background import execute_background
 from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.exceptions import RunNotFound
+from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import Blueprint, Run
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
@@ -47,7 +48,7 @@ logger = logging.getLogger(__name__)
 class RunDetail(BaseModel):
     """Detail of a single job execution attempt."""
 
-    run_id: str
+    run_id: RunId
     attempt_count: int
     status: str
     created_at: str
@@ -62,7 +63,7 @@ class RunDetail(BaseModel):
 class ExecuteResult(BaseModel):
     """Result of a job execution submission."""
 
-    run_id: str
+    run_id: RunId
     """Logical execution id (Run.id)."""
     attempt_count: int
     """Attempt number; always 1 on a fresh execution."""
@@ -76,7 +77,7 @@ async def get_blueprint_for_execution(blueprint_id: str, blueprint_version: int 
 async def execute(
     blueprint: Blueprint,
     auth_context: AuthContext,
-    run_id: str | None = None,
+    run_id: RunId | None = None,
     experiment_id: str | None = None,
     experiment_version: int | None = None,
     compiler_runtime_context: CompilerRuntimeContext = CompilerRuntimeContext(),
@@ -124,7 +125,7 @@ async def execute(
     return Either.ok(ExecuteResult(run_id=new_run_id, attempt_count=attempt_count))
 
 
-async def restart_run(run_id: str, auth_context: AuthContext) -> Either[ExecuteResult, str]:  # type: ignore[invalid-argument]
+async def restart_run(run_id: RunId, auth_context: AuthContext) -> Either[ExecuteResult, str]:  # type: ignore[invalid-argument]
     """Create a new attempt under an existing run_id, re-running its linked Blueprint.
 
     Raises ``RunNotFound`` if the execution does not exist.
@@ -155,14 +156,14 @@ async def restart_run(run_id: str, auth_context: AuthContext) -> Either[ExecuteR
 
 async def poll_and_update(execution: Run) -> RunDetail:
     """Poll cascade for a Run's status, update db if changed, and return current detail."""
-    run_id = str(execution.run_id)  # ty:ignore[invalid-argument-type]
+    run_id = RunId(str(execution.run_id))  # ty:ignore[invalid-argument-type]
     actual_attempt = cast(int, execution.attempt_count)
     cascade_job_id = cast(str | None, execution.cascade_job_id)
     status = cast(str, execution.status)
 
     def _build(status_override: str | None = None, error_override: str | None = None, progress_override: str | None = None) -> RunDetail:
         return RunDetail(
-            run_id=str(execution.run_id),  # ty:ignore[invalid-argument-type]
+            run_id=run_id,
             attempt_count=actual_attempt,
             status=status_override or status,
             created_at=str(execution.created_at),

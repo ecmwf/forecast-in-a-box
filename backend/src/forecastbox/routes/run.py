@@ -35,6 +35,7 @@ from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.run import db, service
 from forecastbox.domain.run.cascade import ProductToOutputId, encode_result
 from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
+from forecastbox.domain.run.types import RunId
 from forecastbox.routes.gateway import Globals
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
@@ -53,14 +54,14 @@ router = APIRouter(
 # ---------------------------------------------------------------------------
 
 
-class RunId(BaseModel):
+class RunLookup(BaseModel):
     """Identifies a job execution attempt, optionally pinning a specific attempt.
 
     Used as a Depends()-based query-param group on GET endpoints, and as a
     request body field on endpoints that address a specific attempt.
     """
 
-    run_id: str
+    run_id: RunId
     attempt_count: int | None = None
 
 
@@ -70,12 +71,12 @@ class RunCreateRequest(BaseModel):
 
 
 class RunCreateResponse(BaseModel):
-    run_id: str
+    run_id: RunId
     attempt_count: int
 
 
 class RunDetailResponse(BaseModel):
-    run_id: str
+    run_id: RunId
     attempt_count: int
     status: str
     created_at: str
@@ -98,19 +99,19 @@ class RunListResponse(BaseModel):
 class RunRestartRequest(BaseModel):
     """Identifies the attempt to restart. ``attempt_count`` must match the current latest attempt."""
 
-    run_id: str
+    run_id: RunId
     attempt_count: int
 
 
 class RunRestartResponse(BaseModel):
-    run_id: str
+    run_id: RunId
     attempt_count: int
 
 
 class RunDeleteRequest(BaseModel):
     """Identifies the attempt to delete. ``attempt_count`` must match the current latest attempt."""
 
-    run_id: str
+    run_id: RunId
     attempt_count: int
 
 
@@ -135,7 +136,7 @@ def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
 
 
 async def _resolve_run_with_cascade(
-    execution_spec: RunId,
+    execution_spec: RunLookup,
     auth_context: AuthContext,
 ) -> tuple[db.Run, str]:
     """Fetch a Run and validate it has a cascade_job_id.
@@ -238,7 +239,7 @@ async def list_runs(
 
 @router.get("/get")
 async def get_run(
-    spec: Annotated[RunId, Depends()],
+    spec: Annotated[RunLookup, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> RunDetailResponse:
     try:
@@ -275,7 +276,7 @@ async def delete_run(
                 f"expected {request.attempt_count}, current is {current.attempt_count}."
             ),
         )
-    spec = RunId(run_id=request.run_id, attempt_count=request.attempt_count)
+    spec = RunLookup(run_id=request.run_id, attempt_count=request.attempt_count)
     _, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
     try:
         client.request_response(
@@ -333,7 +334,7 @@ async def restart_run(
 
 @router.get("/outputAvailability")
 async def get_run_output_availability(
-    spec: Annotated[RunId, Depends()],
+    spec: Annotated[RunLookup, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> list[TaskId]:
     """Check which output tasks are available for a given execution."""
@@ -347,7 +348,7 @@ async def get_run_output_availability(
 
 @router.get("/outputContent")
 async def get_run_output_content(
-    spec: Annotated[RunId, Depends()],
+    spec: Annotated[RunLookup, Depends()],
     dataset_id: str,
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> Response:
@@ -370,7 +371,7 @@ async def get_run_output_content(
 
 @router.get("/logs")
 async def get_run_logs(
-    spec: Annotated[RunId, Depends()],
+    spec: Annotated[RunLookup, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> Response:
     """Return a zip archive of logs for the given execution attempt."""
