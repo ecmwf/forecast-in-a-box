@@ -30,6 +30,7 @@ from fiab_core.fable import (
     BlockInstance,
     BlockInstanceId,
     BlockKind,
+    NoOutput,
     PluginBlockFactoryId,
 )
 from pydantic import BaseModel
@@ -186,11 +187,15 @@ async def validate_expand(
         outputs[blockId] = output_or_error.t
 
         if not validate_only:
-            possible_expansions[blockId] = [
-                PluginBlockFactoryId(plugin=any_plugin_id, factory=block_factory_id)
-                for any_plugin_id, any_plugin in plugins.items()
-                for block_factory_id in any_plugin.expander(output_or_error.t)
-            ]
+            possible_expansions[blockId] = (
+                [
+                    PluginBlockFactoryId(plugin=any_plugin_id, factory=block_factory_id)
+                    for any_plugin_id, any_plugin in plugins.items()
+                    for block_factory_id in any_plugin.expander(output_or_error.t)
+                ]
+                if not isinstance(output_or_error.t, NoOutput)
+                else []
+            )
 
     return BlueprintValidationExpansion(
         possible_sources=possible_sources,
