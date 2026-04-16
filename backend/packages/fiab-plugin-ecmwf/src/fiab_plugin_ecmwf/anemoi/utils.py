@@ -28,13 +28,22 @@ ENVIRONMENT_PACKAGES: list[str] = [
     "torch_geometric",
 ]
 
-all_checkpoints: CheckpointLookup = ArtifactsProvider.get_checkpoint_lookup()
-AVAILABLE_CHECKPOINTS: CheckpointLookup = {
-    composite_id: checkpoint
-    for composite_id, checkpoint in all_checkpoints.items()
-    # TODO: Add filtering here
-}
-CHECKPOINT_ENUM_TYPE = f"enum['{', '.join(CompositeArtifactId.to_str(k) for k in AVAILABLE_CHECKPOINTS.keys())}']"
+
+def get_available_checkpoints() -> CheckpointLookup:
+    all_checkpoints: CheckpointLookup = ArtifactsProvider.get_checkpoint_lookup()
+    return {
+        composite_id: checkpoint
+        for composite_id, checkpoint in all_checkpoints.items()
+        # TODO: Add filtering here
+    }
+
+
+def get_checkpoint_enum_type() -> str:
+    available_checkpoints = get_available_checkpoints()
+    if not available_checkpoints:
+        return "str"
+    values = ", ".join(f"'{CompositeArtifactId.to_str(k)}'" for k in available_checkpoints.keys())
+    return f"enum[{values}]"
 
 
 def get_local_path(composite_id: CompositeArtifactId) -> Path:
@@ -42,7 +51,7 @@ def get_local_path(composite_id: CompositeArtifactId) -> Path:
 
 
 def get_metadata(composite_id: CompositeArtifactId) -> InferenceMetadata:
-    checkpoint = AVAILABLE_CHECKPOINTS[composite_id]
+    checkpoint = get_available_checkpoints()[composite_id]
     return cast(InferenceMetadata, InferenceMetadataFactory(checkpoint.metadata))
 
 
@@ -85,6 +94,17 @@ def validate_anemoi_block(block: BlockInstance) -> Either[QubedInstanceOutput, E
     if ensemble_members is not None and (not ensemble_members.isdigit() or int(ensemble_members) < 1):  # type: ignore
         return Either.error("Ensemble members must be an int and positive")
 
-    metadata = get_metadata(CompositeArtifactId.from_str(block.configuration_values["checkpoint"]))
-    qube = expansion_qube(metadata, block.configuration_values["lead_time"])
+    checkpoint = block.configuration_values["checkpoint"]
+    try:
+        composite_id = CompositeArtifactId.from_str(checkpoint)
+    except ValueError:
+        return Either.error("Checkpoint must be a valid checkpoint identifier")
+
+    try:
+        metadata = get_metadata(composite_id)
+    except KeyError:
+        return Either.error(f"Unknown checkpoint: {checkpoint}")
+
+    lead_time = int(block.configuration_values["lead_time"])
+    qube = expansion_qube(metadata, lead_time)
     return Either.ok(QubedInstanceOutput(dataqube=qube))

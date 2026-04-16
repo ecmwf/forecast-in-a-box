@@ -38,7 +38,8 @@ def get_artifacts_catalog(artifact_stores_config: ArtifactStoresConfig) -> Artif
     for store_id, store_config in artifact_stores_config.items():
         if store_config.method == "file":
             if Path(store_config.url).exists():
-                store_data = json.load(Path(store_config.url).open())
+                with open(Path(store_config.url)) as f:
+                    store_data = json.load(f)
             else:
                 response = httpx.get(store_config.url, follow_redirects=True)
                 response.raise_for_status()

@@ -14,7 +14,7 @@ Declarations related to Artifacts such as ML Model Checkpoints.
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -33,7 +33,7 @@ class CompositeArtifactId:
     ml_model_checkpoint_id: MlModelCheckpointId
 
     @classmethod
-    def from_str(cls, v) -> "CompositeArtifactId":
+    def from_str(cls, v: str) -> "CompositeArtifactId":
         if not ":" in v:
             raise ValueError(f"must be of the form artifact_store_id:ml_model_checkpoint_id, got {v}")
         artifact_store_id, ml_model_checkpoint_id = v.split(":", 1)
@@ -65,7 +65,9 @@ class MlModelCheckpoint(BaseModel):
         description="List of config keys that this model exposes"
     )  # Question: do we want key-values, or just keys and the plugins define values?
     # Question: how would we capture memory requirements? May be tricky since technically its a function of config and backend
-    metadata: dict = Field(default_factory=dict, description="Additional metadata from the checkpoint, for anemoi this is the raw dump")
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Additional metadata from the checkpoint, for anemoi this is the raw dump"
+    )
 
 
 CheckpointLookup = Mapping[CompositeArtifactId, MlModelCheckpoint]

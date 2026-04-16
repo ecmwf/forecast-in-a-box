@@ -145,10 +145,6 @@ def _default_plugins() -> PluginsSettings:
             pip_source="fiab-plugin-ecmwf",
             module_name="fiab_plugin_ecmwf",
         ),
-        PluginCompositeIdReadable.from_str("ecmwf:anemoi"): PluginSettings(
-            pip_source="fiab-plugin-anemoi",
-            module_name="fiab_plugin_anemoi",
-        ),
     }
 
 
