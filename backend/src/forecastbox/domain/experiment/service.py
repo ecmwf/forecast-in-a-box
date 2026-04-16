@@ -29,6 +29,7 @@ import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.experiment.db as experiment_db
 import forecastbox.domain.experiment.scheduling.db as scheduling_db
 import forecastbox.domain.run.db as run_db
+from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment.exceptions import ExperimentNotFound, SchedulerBusy
 from forecastbox.domain.experiment.scheduling.background import (
     prod_scheduler,
@@ -65,7 +66,7 @@ def resolve_next_run(
 
 async def create_schedule(
     auth_context: AuthContext,
-    blueprint_id: str,
+    blueprint_id: BlueprintId,
     blueprint_version: int | None,
     cron_expr: str,
     max_acceptable_delay_hours: int,
@@ -88,7 +89,7 @@ async def create_schedule(
     if job_def is None:
         raise ExperimentNotFound(f"Blueprint {blueprint_id!r} not found")
 
-    job_def_id = str(job_def.blueprint_id)  # ty:ignore[invalid-argument-type]
+    job_def_id = BlueprintId(str(job_def.blueprint_id))  # ty:ignore[invalid-argument-type]
     job_def_version = cast(int, job_def.version)
 
     experiment_definition_payload = {
@@ -196,7 +197,7 @@ async def update_schedule(
         await experiment_db.upsert_experiment_definition(
             auth_context=auth_context,
             experiment_definition_id=experiment_id,
-            blueprint_id=str(current.blueprint_id),  # ty:ignore[invalid-argument-type]
+            blueprint_id=BlueprintId(str(current.blueprint_id)),  # ty:ignore[invalid-argument-type]
             blueprint_version=cast(int, current.blueprint_version),
             experiment_type="cron_schedule",
             created_by=cast(str | None, current.created_by),

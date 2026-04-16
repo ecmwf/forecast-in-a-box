@@ -22,6 +22,7 @@ from typing import cast
 from sqlalchemy import func, select, update
 
 import forecastbox.schemata.jobs as _jobs_module
+from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound
 from forecastbox.schemata.jobs import ExperimentDefinition, ExperimentType
 from forecastbox.utility.auth import AuthContext
@@ -32,7 +33,7 @@ async def upsert_experiment_definition(
     *,
     auth_context: AuthContext,
     experiment_definition_id: str | None = None,
-    blueprint_id: str,
+    blueprint_id: BlueprintId,
     blueprint_version: int,
     experiment_type: ExperimentType,
     created_by: str | None,

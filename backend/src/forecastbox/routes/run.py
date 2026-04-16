@@ -32,6 +32,7 @@ from fastapi.exceptions import HTTPException
 from pydantic import BaseModel
 
 from forecastbox.domain.auth.users import get_auth_context
+from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.run import db, service
 from forecastbox.domain.run.cascade import ProductToOutputId, encode_result
 from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
@@ -66,7 +67,7 @@ class RunLookup(BaseModel):
 
 
 class RunCreateRequest(BaseModel):
-    blueprint_id: str
+    blueprint_id: BlueprintId
     blueprint_version: int | None = None
 
 
@@ -81,7 +82,7 @@ class RunDetailResponse(BaseModel):
     status: str
     created_at: str
     updated_at: str
-    blueprint_id: str
+    blueprint_id: BlueprintId
     blueprint_version: int
     error: str | None = None
     progress: str | None = None

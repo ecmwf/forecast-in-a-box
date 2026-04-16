@@ -34,6 +34,7 @@ from pydantic import BaseModel
 
 import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.run.db as run_db
+from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.run.background import execute_background
 from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.exceptions import RunNotFound
@@ -53,7 +54,7 @@ class RunDetail(BaseModel):
     status: str
     created_at: str
     updated_at: str
-    blueprint_id: str
+    blueprint_id: BlueprintId
     blueprint_version: int
     error: str | None = None
     progress: str | None = None
@@ -69,7 +70,7 @@ class ExecuteResult(BaseModel):
     """Attempt number; always 1 on a fresh execution."""
 
 
-async def get_blueprint_for_execution(blueprint_id: str, blueprint_version: int | None) -> Blueprint | None:
+async def get_blueprint_for_execution(blueprint_id: BlueprintId, blueprint_version: int | None) -> Blueprint | None:
     """Retrieve a Blueprint from the jobs store by id and optional version."""
     return await blueprint_db.get_blueprint(blueprint_id, blueprint_version)
 
@@ -95,7 +96,7 @@ async def execute(
     if not blueprint.builder:
         return Either.error(f"Blueprint {blueprint.blueprint_id!r} has no compilable blocks")
 
-    blueprint_id = str(blueprint.blueprint_id)  # ty:ignore[invalid-argument-type]
+    blueprint_id = BlueprintId(str(blueprint.blueprint_id))  # ty:ignore[invalid-argument-type]
     blueprint_version = cast(int, blueprint.version)
 
     new_run_id, attempt_count, created_at = await run_db.upsert_run(
@@ -134,7 +135,7 @@ async def restart_run(run_id: RunId, auth_context: AuthContext) -> Either[Execut
     existing = await run_db.get_run(run_id, auth_context=auth_context)
     # get_run raises RunNotFound / RunAccessDenied on failure.
 
-    blueprint_id = str(existing.blueprint_id)  # ty:ignore[invalid-argument-type]
+    blueprint_id = BlueprintId(str(existing.blueprint_id))  # ty:ignore[invalid-argument-type]
     blueprint_version = cast(int, existing.blueprint_version)
     blueprint = await blueprint_db.get_blueprint(blueprint_id, blueprint_version)
     if blueprint is None:
@@ -168,7 +169,7 @@ async def poll_and_update(execution: Run) -> RunDetail:
             status=status_override or status,
             created_at=str(execution.created_at),
             updated_at=str(execution.updated_at),
-            blueprint_id=str(execution.blueprint_id),  # ty:ignore[invalid-argument-type]
+            blueprint_id=BlueprintId(str(execution.blueprint_id)),  # ty:ignore[invalid-argument-type]
             blueprint_version=cast(int, execution.blueprint_version),
             error=error_override if error_override is not None else cast(str | None, execution.error),
             progress=progress_override if progress_override is not None else cast(str | None, execution.progress),

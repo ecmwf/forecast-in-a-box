@@ -36,6 +36,7 @@ from forecastbox.domain.blueprint.exceptions import (
     BlueprintVersionConflict,
 )
 from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand, BlueprintValidationExpansion
+from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.glyphs import global_db
 from forecastbox.domain.glyphs.exceptions import GlobalGlyphAccessDenied
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples
@@ -54,14 +55,14 @@ router = APIRouter(
 # ---------------------------------------------------------------------------
 
 
-class BlueprintId(BaseModel):
+class BlueprintLookup(BaseModel):
     """Identifies a blueprint, optionally pinning a specific version.
 
     Used as a Depends()-based query-param group on GET endpoints, and as a
     request body on PUT endpoints that target a specific blueprint.
     """
 
-    blueprint_id: str
+    blueprint_id: BlueprintId
     version: int | None = None
 
 
@@ -74,12 +75,12 @@ class BlueprintCreateRequest(BaseModel):
 
 
 class BlueprintCreateResponse(BaseModel):
-    blueprint_id: str
+    blueprint_id: BlueprintId
     version: int
 
 
 class BlueprintGetResponse(BaseModel):
-    blueprint_id: str
+    blueprint_id: BlueprintId
     version: int
     builder: BlueprintBuilder
     display_name: str | None = None
@@ -89,7 +90,7 @@ class BlueprintGetResponse(BaseModel):
 
 
 class BlueprintListItem(BaseModel):
-    blueprint_id: str
+    blueprint_id: BlueprintId
     version: int
     display_name: str | None = None
     display_description: str | None = None
@@ -106,7 +107,7 @@ class BlueprintListResponse(BaseModel):
 
 
 class BlueprintUpdateRequest(BaseModel):
-    blueprint_id: str
+    blueprint_id: BlueprintId
     version: int
     builder: BlueprintBuilder
     display_name: str | None = None
@@ -116,12 +117,12 @@ class BlueprintUpdateRequest(BaseModel):
 
 
 class BlueprintUpdateResponse(BaseModel):
-    blueprint_id: str
+    blueprint_id: BlueprintId
     version: int
 
 
 class BlueprintDeleteRequest(BaseModel):
-    blueprint_id: str
+    blueprint_id: BlueprintId
     version: int
 
 
@@ -215,7 +216,7 @@ async def create_blueprint(
 
 @router.get("/get")
 async def get_blueprint(
-    spec: Annotated[BlueprintId, Depends()],
+    spec: Annotated[BlueprintLookup, Depends()],
 ) -> BlueprintGetResponse:
     """Retrieve a saved blueprint by id and optional version.
 
@@ -247,7 +248,7 @@ async def list_blueprints(
     page_defs = list(await db.list_blueprints(auth_context=auth_context, offset=start, limit=pagination.page_size))
     items = [
         BlueprintListItem(
-            blueprint_id=cast(str, defn.blueprint_id),
+            blueprint_id=BlueprintId(str(defn.blueprint_id)),  # ty:ignore[invalid-argument-type]
             version=cast(int, defn.version),
             display_name=cast(str | None, defn.display_name),
             display_description=cast(str | None, defn.display_description),

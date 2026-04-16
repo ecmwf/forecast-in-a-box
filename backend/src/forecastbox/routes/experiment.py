@@ -26,6 +26,7 @@ from fastapi.exceptions import HTTPException
 from pydantic import BaseModel, PositiveInt
 
 from forecastbox.domain.auth.users import get_auth_context
+from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment import service
 from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound, ExperimentVersionConflict, SchedulerBusy
 from forecastbox.domain.experiment.scheduling.background import start_scheduler, stop_scheduler
@@ -60,7 +61,7 @@ class ExperimentId(BaseModel):
 
 
 class ExperimentCreateRequest(BaseModel):
-    blueprint_id: str
+    blueprint_id: BlueprintId
     blueprint_version: int | None = None
     cron_expr: str
     max_acceptable_delay_hours: PositiveInt = 24
@@ -77,7 +78,7 @@ class ExperimentCreateResponse(BaseModel):
 class ExperimentDetail(BaseModel):
     experiment_id: str
     experiment_version: int
-    blueprint_id: str
+    blueprint_id: BlueprintId
     blueprint_version: int
     cron_expr: str
     max_acceptable_delay_hours: int
@@ -142,7 +143,7 @@ def _experiment_to_detail(exp: ExperimentDefinition) -> ExperimentDetail:
     return ExperimentDetail(
         experiment_id=str(exp.experiment_definition_id),  # ty:ignore[invalid-argument-type]
         experiment_version=cast(int, exp.version),
-        blueprint_id=str(exp.blueprint_id),  # ty:ignore[invalid-argument-type]
+        blueprint_id=BlueprintId(str(exp.blueprint_id)),  # ty:ignore[invalid-argument-type]
         blueprint_version=cast(int, exp.blueprint_version),
         cron_expr=str(exp_def.get("cron_expr", "")),
         max_acceptable_delay_hours=int(exp_def.get("max_acceptable_delay_hours", 24)),

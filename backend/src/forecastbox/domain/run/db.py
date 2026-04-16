@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select, update
 
 import forecastbox.schemata.jobs as _jobs_module
+from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
 from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import Run, RunStatus
@@ -47,7 +48,7 @@ class CompilerRuntimeContext(BaseModel):
 async def upsert_run(
     *,
     run_id: RunId | None = None,
-    blueprint_id: str,
+    blueprint_id: BlueprintId,
     blueprint_version: int,
     created_by: str | None,
     status: RunStatus,

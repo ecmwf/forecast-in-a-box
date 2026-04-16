@@ -38,6 +38,7 @@ from forecastbox.domain.blueprint import db
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.db import upsert_blueprint
 from forecastbox.domain.blueprint.exceptions import BlueprintNotFound
+from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.glyphs import global_db, resolution
 from forecastbox.domain.glyphs.intrinsic import get_values_and_examples
 from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, merge_glyph_values
@@ -58,14 +59,14 @@ class BlueprintBuilder(BaseModel):
 class BlueprintSaveResult(BaseModel):
     """Returned by save_builder; contains the stable id and the new version number."""
 
-    blueprint_id: str
+    blueprint_id: BlueprintId
     blueprint_version: int
 
 
 class BlueprintRetrieveResult(BaseModel):
     """Full payload returned by load_builder."""
 
-    blueprint_id: str
+    blueprint_id: BlueprintId
     blueprint_version: int
     builder: BlueprintBuilder
     display_name: str | None = None
@@ -230,7 +231,7 @@ async def save_builder(
     *,
     auth_context: AuthContext,
     payload: BlueprintSaveCommand,
-    blueprint_id: str | None = None,
+    blueprint_id: BlueprintId | None = None,
     expected_version: int | None = None,
 ) -> BlueprintSaveResult:
     """Persist a BlueprintBuilder as a Blueprint and return the stable id and version.
@@ -257,7 +258,7 @@ async def save_builder(
     return BlueprintSaveResult(blueprint_id=blueprint_id, blueprint_version=version)
 
 
-async def load_builder(blueprint_id: str, version: int | None = None) -> BlueprintRetrieveResult:
+async def load_builder(blueprint_id: BlueprintId, version: int | None = None) -> BlueprintRetrieveResult:
     """Load a Blueprint and return it as a BlueprintRetrieveResult.
 
     Raises ``BlueprintNotFound`` if the id does not exist or has no builder spec.
@@ -269,7 +270,7 @@ async def load_builder(blueprint_id: str, version: int | None = None) -> Bluepri
         raise BlueprintNotFound(f"Blueprint {blueprint_id!r} has no builder spec.")
     builder = BlueprintBuilder.model_validate(blueprint.builder)
     return BlueprintRetrieveResult(
-        blueprint_id=str(blueprint.blueprint_id),  # ty:ignore[invalid-argument-type]
+        blueprint_id=BlueprintId(str(blueprint.blueprint_id)),  # ty:ignore[invalid-argument-type]
         blueprint_version=cast(int, blueprint.version),
         builder=builder,
         display_name=blueprint.display_name,  # ty:ignore[invalid-argument-type]
