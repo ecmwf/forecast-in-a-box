@@ -59,7 +59,7 @@ class QubedBlockBuilder(abc.ABC):
 class Source(QubedBlockBuilder):
     kind: BlockKind = "source"
 
-    def intersect(self, other: BlockInstanceOutput) -> bool:
+    def intersect(self, other: QubedOutput) -> bool:
         return False
 
 
