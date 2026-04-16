@@ -13,13 +13,12 @@ PREFIX = "/api/v1/status"
 import logging
 from dataclasses import dataclass
 
-import cascade.gateway.api as cascade_gateway_api
-import cascade.gateway.client as cascade_gateway_client
 import requests
+from cascade.gateway import api, client
 from fastapi import APIRouter, Request
 
 from forecastbox.domain.experiment.scheduling.background import status_scheduler
-from forecastbox.domain.plugin.manager import status_brief as status_plugins
+from forecastbox.domain.plugin.manager import status_brief
 from forecastbox.utility.config import config
 
 logger = logging.getLogger(__name__)
@@ -44,9 +43,7 @@ def get_status(request: Request) -> StatusResponse:
     status: dict[str, str] = {"api": "up", "cascade": "up", "ecmwf": "up", "scheduler": "up", "version": request.app.version}
 
     try:
-        cascade_gateway_client.request_response(
-            cascade_gateway_api.JobProgressRequest(job_ids=[]), config.cascade.cascade_url, timeout_ms=1000
-        )
+        client.request_response(api.JobProgressRequest(job_ids=[]), config.cascade.cascade_url, timeout_ms=1000)
         status["cascade"] = "up"
     except Exception as e:
         logger.warning(f"Error connecting to Cascade: {repr(e)}")
@@ -59,7 +56,7 @@ def get_status(request: Request) -> StatusResponse:
         status["scheduler"] = "down"
 
     try:
-        status["plugins"] = status_plugins()
+        status["plugins"] = status_brief()
     except Exception as e:
         logger.warning(f"Error discerning plugins status: {repr(e)}")
         status["plugins"] = f"failure getting status"

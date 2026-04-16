@@ -28,16 +28,15 @@ from fastapi.exceptions import HTTPException
 from fiab_core.fable import BlockFactoryCatalogue, BlockInstanceId, PluginBlockFactoryId, PluginCompositeId
 from pydantic import BaseModel
 
-import forecastbox.domain.blueprint.db as blueprint_db
-import forecastbox.domain.blueprint.service as blueprint_service
-import forecastbox.domain.glyphs.global_db as global_glyph_db
 from forecastbox.domain.auth.users import get_auth_context
+from forecastbox.domain.blueprint import db, service
 from forecastbox.domain.blueprint.exceptions import (
     BlueprintAccessDenied,
     BlueprintNotFound,
     BlueprintVersionConflict,
 )
 from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand, BlueprintValidationExpansion
+from forecastbox.domain.glyphs import global_db
 from forecastbox.domain.glyphs.exceptions import GlobalGlyphAccessDenied
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples
 from forecastbox.domain.plugin.manager import catalogue_view, plugins_ready
@@ -192,7 +191,7 @@ async def create_blueprint(
     Returns 422 if the builder fails validation (unknown plugins, undefined
     glyphs, config errors, intrinsic glyph key collisions, etc.).
     """
-    validation = await blueprint_service.validate_expand(request.builder, auth_context, validate_only=True)
+    validation = await service.validate_expand(request.builder, auth_context, validate_only=True)
     if validation.global_errors or validation.block_errors:
         raise HTTPException(
             status_code=422,
@@ -206,7 +205,7 @@ async def create_blueprint(
         parent_id=request.parent_id,
     )
     try:
-        result = await blueprint_service.save_builder(auth_context=auth_context, payload=payload, blueprint_id=None)
+        result = await service.save_builder(auth_context=auth_context, payload=payload, blueprint_id=None)
     except BlueprintNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     except BlueprintAccessDenied as e:
@@ -223,7 +222,7 @@ async def get_blueprint(
     Returns the latest non-deleted version when version is omitted.
     """
     try:
-        retrieved = await blueprint_service.load_builder(spec.blueprint_id, spec.version)
+        retrieved = await service.load_builder(spec.blueprint_id, spec.version)
     except BlueprintNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     return BlueprintGetResponse(
@@ -243,9 +242,9 @@ async def list_blueprints(
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> BlueprintListResponse:
     """List the latest non-deleted version of every blueprint visible to the caller."""
-    total = await blueprint_db.count_blueprints(auth_context=auth_context)
+    total = await db.count_blueprints(auth_context=auth_context)
     start = pagination.start()
-    page_defs = list(await blueprint_db.list_blueprints(auth_context=auth_context, offset=start, limit=pagination.page_size))
+    page_defs = list(await db.list_blueprints(auth_context=auth_context, offset=start, limit=pagination.page_size))
     items = [
         BlueprintListItem(
             blueprint_id=cast(str, defn.blueprint_id),
@@ -273,7 +272,7 @@ async def update_blueprint(
     glyphs, config errors, intrinsic glyph key collisions, etc.).
     Returns the new version number on success.
     """
-    validation = await blueprint_service.validate_expand(request.builder, auth_context, validate_only=True)
+    validation = await service.validate_expand(request.builder, auth_context, validate_only=True)
     if validation.global_errors or validation.block_errors:
         raise HTTPException(
             status_code=422,
@@ -287,7 +286,7 @@ async def update_blueprint(
         parent_id=request.parent_id,
     )
     try:
-        result = await blueprint_service.save_builder(
+        result = await service.save_builder(
             auth_context=auth_context,
             payload=payload,
             blueprint_id=request.blueprint_id,
@@ -312,7 +311,7 @@ async def delete_blueprint(
     ``version`` must match the current latest version; returns 409 if it does not.
     """
     try:
-        await blueprint_db.soft_delete_blueprint(
+        await db.soft_delete_blueprint(
             request.blueprint_id,
             expected_version=request.version,
             auth_context=auth_context,
@@ -351,7 +350,7 @@ async def expand_blueprint(
     Returns 200 regardless of whether validation errors are present; callers must
     inspect the returned error fields.
     """
-    result = await blueprint_service.validate_expand(blueprint, auth_context, validate_only=False)
+    result = await service.validate_expand(blueprint, auth_context, validate_only=False)
     return BlueprintValidationExpansionResponse(
         global_errors=result.global_errors,
         block_errors=result.block_errors,
@@ -395,9 +394,9 @@ async def list_available_glyphs(
             glyphs.append(GlyphDetail(name=glyph_name, display_name=display_name, valueExample=example))
         return GlyphListResponse(glyphs=glyphs, total=len(glyphs), page=1, page_size=len(glyphs))
     else:
-        total = await global_glyph_db.count_global_glyphs(auth_context)
+        total = await global_db.count_global_glyphs(auth_context)
         start = pagination.start()
-        rows = list(await global_glyph_db.list_global_glyphs(auth_context, offset=start, limit=pagination.page_size))
+        rows = list(await global_db.list_global_glyphs(auth_context, offset=start, limit=pagination.page_size))
         glyphs_global = [GlyphDetail(name=str(row.key), display_name=str(row.key), valueExample=str(row.value)) for row in rows]
         return GlyphListResponse(glyphs=glyphs_global, total=total, page=pagination.page, page_size=pagination.page_size)
 
@@ -423,7 +422,7 @@ async def post_global_glyph(
             detail="Only admins may create or update public global glyphs.",
         )
     try:
-        row = await global_glyph_db.upsert_global_glyph(request.key, request.value, request.public, auth_context)
+        row = await global_db.upsert_global_glyph(request.key, request.value, request.public, auth_context)
     except GlobalGlyphAccessDenied as e:
         raise HTTPException(status_code=403, detail=str(e))
     return GlobalGlyphResponse(
@@ -443,7 +442,7 @@ async def get_global_glyph(
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> GlobalGlyphResponse:
     """Retrieve a global glyph visible to the caller by its stable id."""
-    row = await global_glyph_db.get_global_glyph(spec.global_glyph_id, auth_context)
+    row = await global_db.get_global_glyph(spec.global_glyph_id, auth_context)
     if row is None:
         raise HTTPException(status_code=404, detail=f"GlobalGlyph {spec.global_glyph_id!r} not found.")
     return GlobalGlyphResponse(

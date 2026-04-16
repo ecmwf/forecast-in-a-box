@@ -19,7 +19,7 @@ import numpy as np
 import xarray as xr
 from cascade.gateway.api import JobSpec, ResultRetrievalResponse, SubmitJobRequest, SubmitJobResponse, decoded_result
 from cascade.gateway.client import request_response
-from cascade.low import views as cascade_views
+from cascade.low import views
 from cascade.low.core import JobInstance, JobInstanceRich
 from pydantic import BaseModel, Field
 
@@ -122,7 +122,7 @@ def execute_cascade(spec: ExecutionSpecification) -> tuple[SubmitJobResponse, li
                 time.sleep(1)
 
     job = spec.job.job_instance
-    sinks = cascade_views.sinks(job)
+    sinks = views.sinks(job)
     sinks = [s for s in sinks if not s.task.startswith("run_as_earthkit")]
     job.ext_outputs = sinks
     product_to_id_mappings = [ProductToOutputId(product_name="All Outputs", product_spec={}, output_ids=[x.task for x in sinks])]

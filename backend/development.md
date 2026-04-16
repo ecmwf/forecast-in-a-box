@@ -15,6 +15,7 @@
   * use `typing.cast` when the code logic is implicitly erasing the type information
 * prioritize using pydantic.BaseModel or dataclasses.dataclass object for capturing contracts and interfaces.
   * ideally keep them plain, stateless, frozen, without functions -- we end up serializing those objects often over to other python processes or different languages
+    * having a few methods that provide convenience views, ser/de, validation, conversion does not necessarilly hurt -- its primarily about keeping the codebase generally functional and data-oriented rather than object-oriented.
   * for simple immutable data transfer objects, use `@dataclass(frozen=True, eq=True, slots=True)` directly for best type checker support -- provides immutability, hashability, and memory efficiency via slots. We set `eq=True` explicitly, despite being a default, for clarity.
   * a convenience decorator `frozendc` exists in `forecastbox.utility.structural` but direct decorator syntax is preferred for type safety
   * when using a primitive type in a semantically restricted context, utilize typing.NewType -- for example, dont do `user_id: str` but `UserId = typing.NewType("UserId", str); user_id: UserId`, because not every string is a valid UserId. This prevents a mixture of ids and gives a stronger type validity

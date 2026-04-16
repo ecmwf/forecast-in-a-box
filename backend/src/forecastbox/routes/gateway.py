@@ -22,9 +22,8 @@ from dataclasses import dataclass
 from multiprocessing.process import BaseProcess
 from tempfile import TemporaryDirectory
 
-import cascade.executor.platform as cascade_platform
-import cascade.gateway.api
-import cascade.gateway.client
+from cascade.executor import platform
+from cascade.gateway import api, client
 from fastapi import APIRouter, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
 
@@ -43,8 +42,8 @@ class GatewayProcess:
 
     def kill(self) -> None:
         logger.debug("gateway shutdown message")
-        m = cascade.gateway.api.ShutdownRequest()
-        cascade.gateway.client.request_response(m, config.cascade.cascade_url, 4_000)
+        m = api.ShutdownRequest()
+        client.request_response(m, config.cascade.cascade_url, 4_000)
         logger.debug("gateway terminate and join")
         self.process.terminate()
         self.process.join(1)
@@ -95,7 +94,7 @@ async def start_gateway() -> str:
     max_concurrent_jobs = config.cascade.max_concurrent_jobs
     # TODO for some reason changes to os.environ were *not* visible by the child process! Investigate and re-enable:
     # export_recursive(config.model_dump(), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"])
-    process = cascade_platform.get_mp_ctx("gateway").Process(target=launch_cascade, args=(logs_directory, max_concurrent_jobs))  # type: ignore[unresolved-attribute] # context
+    process = platform.get_mp_ctx("gateway").Process(target=launch_cascade, args=(logs_directory, max_concurrent_jobs))  # type: ignore[unresolved-attribute] # context
     process.start()
     Globals.gateway = GatewayProcess(process=process)
     logger.debug(f"spawned new gateway process with pid {process.pid}")

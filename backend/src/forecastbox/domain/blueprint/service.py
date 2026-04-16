@@ -34,12 +34,11 @@ from fiab_core.fable import (
 )
 from pydantic import BaseModel
 
-import forecastbox.domain.blueprint.db as _blueprint_db
-import forecastbox.domain.glyphs.global_db as global_glyph_db
-import forecastbox.domain.glyphs.resolution as glyph_resolution
+from forecastbox.domain.blueprint import db
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.db import upsert_blueprint
 from forecastbox.domain.blueprint.exceptions import BlueprintNotFound
+from forecastbox.domain.glyphs import global_db, resolution
 from forecastbox.domain.glyphs.intrinsic import get_values_and_examples
 from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, merge_glyph_values
 from forecastbox.domain.plugin.manager import PluginManager
@@ -136,7 +135,7 @@ async def validate_expand(
     outputs = {}
 
     intrinsic_values = cast(dict[str, str], get_values_and_examples())
-    global_glyphs = {str(row.key): str(row.value) for row in await global_glyph_db.list_global_glyphs(auth_context)}
+    global_glyphs = {str(row.key): str(row.value) for row in await global_db.list_global_glyphs(auth_context)}
     local_glyphs = blueprint.local_glyphs
 
     all_glyphs = merge_glyph_values(intrinsic_values, global_glyphs, local_glyphs, {})
@@ -172,7 +171,7 @@ async def validate_expand(
             # TODO most likely disable this, we would inject defaults at the compile level
             block_errors[blockId] += [f"Block contains missing config: {missingConfig}"]
 
-        extract_result = glyph_resolution.extract_glyphs(blockInstance)
+        extract_result = resolution.extract_glyphs(blockInstance)
         if extract_result.e is not None:
             block_errors[blockId] += extract_result.e
             invalidable.add(blockId)
@@ -183,7 +182,7 @@ async def validate_expand(
             block_errors[blockId] += [f"Unknown glyphs referenced: {unknown_glyphs}"]
             invalidable.add(blockId)
             continue
-        glyph_resolution.resolve_configurations(blockInstance, all_glyphs)
+        resolution.resolve_configurations(blockInstance, all_glyphs)
         resolved_configuration_options[blockId] = {k: blockInstance.configuration_values[k] for k in extracted.glyphed_options}
 
         if any(source_id in invalidable for source_id in blockInstance.input_ids.values()):
@@ -263,7 +262,7 @@ async def load_builder(blueprint_id: str, version: int | None = None) -> Bluepri
 
     Raises ``BlueprintNotFound`` if the id does not exist or has no builder spec.
     """
-    blueprint = await _blueprint_db.get_blueprint(blueprint_id, version)
+    blueprint = await db.get_blueprint(blueprint_id, version)
     if blueprint is None:
         raise BlueprintNotFound(f"Blueprint {blueprint_id!r} not found.")
     if blueprint.builder is None:
