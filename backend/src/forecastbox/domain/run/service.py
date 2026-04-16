@@ -35,6 +35,7 @@ from pydantic import BaseModel
 import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.run.db as run_db
 from forecastbox.domain.blueprint.types import BlueprintId
+from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.background import execute_background
 from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.exceptions import RunNotFound
@@ -79,7 +80,7 @@ async def execute(
     blueprint: Blueprint,
     auth_context: AuthContext,
     run_id: RunId | None = None,
-    experiment_id: str | None = None,
+    experiment_id: ExperimentDefinitionId | None = None,
     experiment_version: int | None = None,
     compiler_runtime_context: CompilerRuntimeContext = CompilerRuntimeContext(),
     experiment_context: str | None = None,
@@ -148,7 +149,7 @@ async def restart_run(run_id: RunId, auth_context: AuthContext) -> Either[Execut
         blueprint,
         auth_context,
         run_id=run_id,
-        experiment_id=cast(str | None, existing.experiment_id),
+        experiment_id=ExperimentDefinitionId(str(existing.experiment_id)) if existing.experiment_id is not None else None,  # ty:ignore[invalid-argument-type]
         experiment_version=cast(int | None, existing.experiment_version),
         compiler_runtime_context=context,
         experiment_context=cast(str | None, existing.experiment_context),

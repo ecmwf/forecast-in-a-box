@@ -27,6 +27,7 @@ from sqlalchemy import func, select, update
 
 import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.domain.blueprint.types import BlueprintId
+from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
 from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import Run, RunStatus
@@ -52,7 +53,7 @@ async def upsert_run(
     blueprint_version: int,
     created_by: str | None,
     status: RunStatus,
-    experiment_id: str | None = None,
+    experiment_id: ExperimentDefinitionId | None = None,
     experiment_version: int | None = None,
     compiler_runtime_context: CompilerRuntimeContext = CompilerRuntimeContext(),
     experiment_context: str | None = None,
@@ -200,7 +201,7 @@ async def soft_delete_run(run_id: RunId, *, auth_context: AuthContext) -> None:
 
 
 async def list_runs_by_experiment(
-    experiment_id: str,
+    experiment_id: ExperimentDefinitionId,
     *,
     auth_context: AuthContext,
     offset: int = 0,
@@ -239,7 +240,7 @@ async def list_runs_by_experiment(
     return await dbRetry(function)
 
 
-async def count_runs_by_experiment(experiment_id: str, *, auth_context: AuthContext) -> int:
+async def count_runs_by_experiment(experiment_id: ExperimentDefinitionId, *, auth_context: AuthContext) -> int:
     """Return the total number of distinct non-deleted Run ids linked to an experiment and visible to the actor."""
 
     async def function(i: int) -> int:

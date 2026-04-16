@@ -22,6 +22,7 @@ from typing import Any, cast
 from forecastbox.domain.experiment.scheduling import db
 from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run
 from forecastbox.domain.experiment.scheduling.job_utils import experiment2runnable
+from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.service import execute
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.concurrent import timed_acquire
@@ -71,7 +72,7 @@ class SchedulerThread(threading.Thread):
         schedulable = self._run_async(db.get_schedulable_experiments(now))
 
         for exp_next, exp_def in schedulable:
-            experiment_id = cast(str, exp_next.experiment_id)
+            experiment_id = ExperimentDefinitionId(cast(str, exp_next.experiment_id))  # ty:ignore[invalid-argument-type]
             scheduled_at = cast(dt.datetime, exp_next.scheduled_at)
             logger.debug(f"Processing scheduled experiment {experiment_id} at {scheduled_at}")
 

@@ -24,6 +24,7 @@ from sqlalchemy import func, select, update
 import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound
+from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.schemata.jobs import ExperimentDefinition, ExperimentType
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.db import dbRetry, executeAndCommit, querySingle
@@ -32,7 +33,7 @@ from forecastbox.utility.db import dbRetry, executeAndCommit, querySingle
 async def upsert_experiment_definition(
     *,
     auth_context: AuthContext,
-    experiment_definition_id: str | None = None,
+    experiment_definition_id: ExperimentDefinitionId | None = None,
     blueprint_id: BlueprintId,
     blueprint_version: int,
     experiment_type: ExperimentType,
@@ -41,7 +42,7 @@ async def upsert_experiment_definition(
     display_name: str | None = None,
     display_description: str | None = None,
     tags: list[str] | None = None,
-) -> tuple[str, int]:
+) -> tuple[ExperimentDefinitionId, int]:
     """Insert a new version of an ExperimentDefinition and return ``(id, version)``.
 
     If ``experiment_definition_id`` is omitted a fresh UUID is generated (version 1).
@@ -51,7 +52,7 @@ async def upsert_experiment_definition(
     does not exist.  ``created_by`` may be ``None`` in passthrough deployments.
     """
     id_provided = experiment_definition_id is not None
-    experiment_id = experiment_definition_id or str(uuid.uuid4())
+    experiment_id = experiment_definition_id if experiment_definition_id is not None else ExperimentDefinitionId(str(uuid.uuid4()))
     ref_time = dt.datetime.now()
 
     async def function(i: int) -> int:
@@ -106,7 +107,9 @@ async def upsert_experiment_definition(
     return experiment_id, new_version
 
 
-async def get_experiment_definition(experiment_definition_id: str, version: int | None = None) -> ExperimentDefinition | None:
+async def get_experiment_definition(
+    experiment_definition_id: ExperimentDefinitionId, version: int | None = None
+) -> ExperimentDefinition | None:
     """Return a specific or the latest non-deleted version of an ExperimentDefinition.
 
     No authorization is applied; possession of the experiment ID is treated as
@@ -211,7 +214,7 @@ async def count_experiment_definitions(
     return await dbRetry(function)
 
 
-async def soft_delete_experiment_definition(experiment_id: str, *, auth_context: AuthContext) -> None:
+async def soft_delete_experiment_definition(experiment_id: ExperimentDefinitionId, *, auth_context: AuthContext) -> None:
     """Mark all versions of an ExperimentDefinition as deleted.
 
     Raises ``ExperimentNotFound`` if the blueprint does not exist, and
