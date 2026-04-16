@@ -18,11 +18,14 @@ from fiab_core.fable import (
     BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
+    NoOutput,
+    QubedOutput,
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import Product, Sink, Source
+from qubed import Qube
 
-from .metadata import PluginNoOutput, QubedInstanceOutput
+from .qubed_utils import axes, contains, coxpand, dimensions
 
 IFS_REQUEST = {
     "class": "od",
@@ -72,13 +75,15 @@ class EkdSource(Source):
     }
     inputs: list[str] = []
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[QubedInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        output = QubedInstanceOutput(
-            dataqube={
-                PARAM_DIM: cast(list[str], IFS_REQUEST[PARAM_DIM]),
-                ENSEMBLE_DIM: cast(list[int], IFS_REQUEST[ENSEMBLE_DIM]),
-                STEP_DIM: cast(list[int], IFS_REQUEST[STEP_DIM]),
-            }
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        output = QubedOutput(
+            dataqube=Qube.from_datacube(
+                {
+                    PARAM_DIM: cast(list[str], IFS_REQUEST[PARAM_DIM]),
+                    ENSEMBLE_DIM: cast(list[int], IFS_REQUEST[ENSEMBLE_DIM]),
+                    STEP_DIM: cast(list[int], IFS_REQUEST[STEP_DIM]),
+                }
+            )
         )
         return Either.ok(output)
 
@@ -138,17 +143,14 @@ class EnsembleStatistics(Product):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[QubedInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_dataset = inputs.get("dataset")
-        if not isinstance(input_dataset, QubedInstanceOutput):
-            actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
-            return Either.error(f"Unsupported input type for 'dataset': expected QubedInstanceOutput, got {actual_type}")
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_dataset = inputs["dataset"]
 
         param = block.configuration_values[PARAM_DIM]
-        if {PARAM_DIM: param} not in input_dataset:
-            return Either.error(f"param {param} is not in the input parameters: {input_dataset.axes().get(PARAM_DIM, [])}")
+        if not contains(input_dataset, {PARAM_DIM: param}):
+            return Either.error(f"param {param} is not in the input parameters: {axes(input_dataset).get(PARAM_DIM, [])}")
 
-        output = input_dataset.collapse([PARAM_DIM, ENSEMBLE_DIM]).expand({PARAM_DIM: [param]})
+        output = coxpand(input_dataset, [PARAM_DIM, ENSEMBLE_DIM], {PARAM_DIM: [param]})
         return Either.ok(output)
 
     def compile(
@@ -169,10 +171,8 @@ class EnsembleStatistics(Product):
             return Either.error(f"Unsupported statistic '{stat}'")
         return Either.ok(action)
 
-    def intersect(self, input: BlockInstanceOutput) -> bool:  # type: ignore[override]
-        if not isinstance(input, QubedInstanceOutput):
-            return False
-        dims = input.dimensions()
+    def intersect(self, other: QubedOutput) -> bool:  # type: ignore[override]
+        dims = dimensions(other)
         return ENSEMBLE_DIM in dims and PARAM_DIM in dims
 
 
@@ -189,16 +189,12 @@ class TemporalStatistics(Product):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[QubedInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_dataset = inputs.get("dataset")
-        if not isinstance(input_dataset, QubedInstanceOutput):
-            actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
-            return Either.error(f"Unsupported input type for 'dataset': expected QubedInstanceOutput, got {actual_type}")
-
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_dataset = inputs["dataset"]
         param = block.configuration_values[PARAM_DIM]
-        if {PARAM_DIM: param} not in input_dataset:
-            return Either.error(f"param {param} is not in the input parameters: {input_dataset.axes().get(PARAM_DIM, [])}")
-        output = input_dataset.collapse([PARAM_DIM, STEP_DIM]).expand({PARAM_DIM: [param]})
+        if not contains(input_dataset, {PARAM_DIM: param}):
+            return Either.error(f"param {param} is not in the input parameters: {axes(input_dataset).get(PARAM_DIM, [])}")
+        output = coxpand(input_dataset, [PARAM_DIM, STEP_DIM], {PARAM_DIM: [param]})
         return Either.ok(output)
 
     def compile(
@@ -221,10 +217,8 @@ class TemporalStatistics(Product):
             action = param.max(dim=STEP_DIM)
         return Either.ok(action)
 
-    def intersect(self, input: BlockInstanceOutput) -> bool:  # type: ignore[override]
-        if not isinstance(input, QubedInstanceOutput):
-            return False
-        dims = input.dimensions()
+    def intersect(self, other: QubedOutput) -> bool:  # type: ignore[override]
+        dims = dimensions(other)
         return STEP_DIM in dims and PARAM_DIM in dims
 
 
@@ -240,8 +234,8 @@ class ZarrSink(Sink):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[QubedInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        return Either.ok(PluginNoOutput())
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        return Either.ok(NoOutput())
 
     def compile(
         self,
@@ -255,5 +249,5 @@ class ZarrSink(Sink):
         )
         return Either.ok(action)
 
-    def intersect(self, input: BlockInstanceOutput) -> bool:  # type: ignore[override]
-        return not input.is_empty()  # type: ignore[union-attr]
+    def intersect(self, other: QubedOutput) -> bool:  # type: ignore[override]
+        return True
