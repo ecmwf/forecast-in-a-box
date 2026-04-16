@@ -55,7 +55,7 @@ def collapse(qube: QubedOutput, axis: str | list[str]) -> QubedOutput:
     >>> collapsed = output.collapse('level')
     >>> collapsed.dimensions()
     {'param', 'time'}
-    >>> 'level' in collapsed
+    >>> contains(collapsed, 'level')
     False
     """
     dims = dimensions(qube)
@@ -161,17 +161,17 @@ def contains(qube: QubedOutput, item: Qube | str | dict) -> bool:
     ...     'param': ['2t', 'tp'],
     ...     'time': [0, 1, 2],
     ... }))
-    >>> 'param' in output
+    >>> contains(output, 'param')
     True
-    >>> 'level' in output
+    >>> contains(output, 'level')
     False
-    >>> {'param': ['2t']} in output
+    >>> contains(output, {'param': ['2t']})
     True
-    >>> {'param': ['2t2']} in output
+    >>> contains(output, {'param': ['2t2']})
     False
-    >>> {'param': ['2t'], 'time': [0, 1], } in output
+    >>> contains(output, {'param': ['2t'], 'time': [0, 1], })
     True
-    >>> {'param': ['2t'], 'time': [0, 3], } in output
+    >>> contains(output, {'param': ['2t'], 'time': [0, 3], })
     False
     """
     if isinstance(item, str):
