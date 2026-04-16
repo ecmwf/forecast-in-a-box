@@ -18,6 +18,7 @@ dynamic = [ "version" ]
 
 dependencies = [
     "pydantic",
+    "qubed>=0.3.1",
     "earthkit-workflows", # NOTE technically we would need just cascade.low.core and some fluent.core, not the whole runtime -- possibly split down there as well
 ]
 

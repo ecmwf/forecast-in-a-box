@@ -78,18 +78,18 @@ def expand(qube: QubedOutput, dimension: dict[str, Iterable]) -> QubedOutput:
     Returns
     -------
     Self
-        A new QubedInstanceOutput with the expanded dataqube.
+        A new QubedOutput with the expanded dataqube.
 
     Usage
     -----
-    >>> output = QubedInstanceOutput(dataqube=Qube.from_datacube({
+    >>> output = QubedOutput(dataqube=Qube.from_datacube({
     ...     'param': ['2t', 'tp'],
     ...     'time': [0, 1, 2],
     ... }))
-    >>> expanded = output.expand({'ensemble': ['ens1', 'ens2']})
-    >>> expanded.dimensions()
+    >>> expanded = expand(output, {'ensemble': ['ens1', 'ens2']})
+    >>> dimensions(expanded)
     {'ensemble', 'param', 'time'}
-    >>> expanded.axes()
+    >>> axes(expanded)
     {'ensemble': {'ens1', 'ens2'}, 'param': {'2t', 'tp'}, 'time': {0, 1, 2}}
     """
     dataqube = functools.reduce(
