@@ -5,6 +5,13 @@ def source_42() -> int:
     return 42
 
 
+def source_sleep(text: str, duration: float) -> str:
+    import time
+
+    time.sleep(duration)
+    return text
+
+
 def source_text(text: str) -> str:
     return text
 

@@ -16,17 +16,17 @@ Those two must be preserved under any refactoring, and their failure is always
 suspicious. The remaining ones test edge cases and funcionality which is
 possibly subject of changes, and their failure may be a legitimate behavioral
 change (such as change of return error code).
-
-NOTE: there is not enough coverage in terms of job variety -- see the test_submit_job.py
 """
 
 import io
 import os
 import pathlib
+import sys
 import zipfile
 from datetime import datetime as _dt
 from typing import Any, get_args
 
+import cloudpickle
 import httpx
 from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
 
@@ -184,6 +184,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     assert response.json()["possible_sources"] == [
         {"plugin": {"store": "localTest", "local": "single"}, "factory": "source_42"},
         {"plugin": {"store": "localTest", "local": "single"}, "factory": "source_text"},
+        {"plugin": {"store": "localTest", "local": "single"}, "factory": "source_sleep"},
     ]
     assert response.json()["possible_expansions"] == {}
 
@@ -663,3 +664,201 @@ def test_blueprint_composite_glyph_execute(tmpdir: Any, backend_client_with_auth
     # Content must be "exec_global/<run_id>"
     assert content == f"exec_global/{run_id}", f"Unexpected output: {content!r}"
     output.unlink()
+
+
+# ---------------------------------------------------------------------------
+# Run delete and output-content tests
+# ---------------------------------------------------------------------------
+
+
+def _make_builder_source_and_sink(tmpdir: str) -> BlueprintBuilder:
+    """Minimal two-block blueprint: source_42 → sink_file.
+
+    Produces exactly one non-sink task (source_42) whose output is the integer 42,
+    and one sink task (sink_file).
+    """
+    source_42 = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="source_42"),
+        configuration_values={},
+        input_ids={},
+    )
+    sink = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
+        configuration_values={"fname": f"{tmpdir}/output_${{runId}}.txt"},
+        input_ids={"data": "source_42"},
+    )
+    return BlueprintBuilder(blocks={"source_42": source_42, "my_sink": sink})
+
+
+def test_run_delete_not_found(backend_client_with_auth: httpx.Client) -> None:
+    """POST /run/delete with a non-existent run_id returns 404."""
+    resp = backend_client_with_auth.post("/run/delete", json={"run_id": "nonexistent-run-id", "attempt_count": 1})
+    assert resp.status_code == 404
+
+
+def test_run_delete_attempt_conflict(backend_client_with_auth: httpx.Client) -> None:
+    """POST /run/delete with a mismatched attempt_count returns 409."""
+    builder = _make_builder_source_only()
+    save_resp = backend_client_with_auth.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
+    assert save_resp.is_success, save_resp.text
+    blueprint_id = save_resp.json()["blueprint_id"]
+
+    run_resp = backend_client_with_auth.post("/run/create", json={"blueprint_id": blueprint_id})
+    assert run_resp.is_success, run_resp.text
+    run_id = run_resp.json()["run_id"]
+    attempt_count = run_resp.json()["attempt_count"]
+
+    del_resp = backend_client_with_auth.post("/run/delete", json={"run_id": run_id, "attempt_count": attempt_count + 1})
+    assert del_resp.status_code == 409
+
+
+def test_run_restart_attempt_conflict(backend_client_with_auth: httpx.Client) -> None:
+    """POST /run/restart with a mismatched attempt_count returns 409."""
+    builder = _make_builder_source_only()
+    save_resp = backend_client_with_auth.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
+    assert save_resp.is_success, save_resp.text
+    blueprint_id = save_resp.json()["blueprint_id"]
+
+    run_resp = backend_client_with_auth.post("/run/create", json={"blueprint_id": blueprint_id})
+    assert run_resp.is_success, run_resp.text
+    run_id = run_resp.json()["run_id"]
+    attempt_count = run_resp.json()["attempt_count"]
+
+    restart_resp = backend_client_with_auth.post("/run/restart", json={"run_id": run_id, "attempt_count": attempt_count + 1})
+    assert restart_resp.status_code == 409
+
+
+def test_run_delete_ok(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
+    """Create a run, wait for completion, delete it, verify it disappears."""
+    builder = _make_builder_source_and_sink(tmpdir)
+    save_resp = backend_client_with_auth.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
+    assert save_resp.is_success, save_resp.text
+    blueprint_id = save_resp.json()["blueprint_id"]
+
+    run_resp = backend_client_with_auth.post("/run/create", json={"blueprint_id": blueprint_id})
+    assert run_resp.is_success, run_resp.text
+    run_id = run_resp.json()["run_id"]
+    attempt_count = run_resp.json()["attempt_count"]
+
+    ensure_completed_v2(backend_client_with_auth, run_id, sleep=1, attempts=120)
+
+    total_before = backend_client_with_auth.get("/run/list").raise_for_status().json()["total"]
+
+    del_resp = backend_client_with_auth.post("/run/delete", json={"run_id": run_id, "attempt_count": attempt_count})
+    assert del_resp.is_success, del_resp.text
+
+    # Deleted run is no longer accessible
+    get_resp = backend_client_with_auth.get("/run/get", params={"run_id": run_id})
+    assert get_resp.status_code == 404
+
+    # And no longer appears in the list
+    list_after = backend_client_with_auth.get("/run/list").raise_for_status().json()
+    assert list_after["total"] == total_before - 1
+    assert run_id not in [r["run_id"] for r in list_after["runs"]]
+
+
+def test_run_output_content(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
+    """Execute a run, wait for completion, then retrieve output content via outputContent."""
+    builder = _make_builder_source_and_sink(tmpdir)
+    save_resp = backend_client_with_auth.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
+    assert save_resp.is_success, save_resp.text
+    blueprint_id = save_resp.json()["blueprint_id"]
+
+    run_resp = backend_client_with_auth.post("/run/create", json={"blueprint_id": blueprint_id})
+    assert run_resp.is_success, run_resp.text
+    run_id = run_resp.json()["run_id"]
+
+    ensure_completed_v2(backend_client_with_auth, run_id, sleep=1, attempts=120)
+
+    avail_resp = backend_client_with_auth.get("/run/outputAvailability", params={"run_id": run_id})
+    assert avail_resp.is_success, avail_resp.text
+    available_tasks = avail_resp.json()
+    assert len(available_tasks) > 0
+
+    # Cascade only exposes sink tasks as ext_outputs; our blueprint has exactly one sink (my_sink).
+    # Its task ID encodes the runtime function name: fiab_plugin_test.runtime.sink_file:<hash>
+    sink_tasks = [t for t in available_tasks if "sink_file" in t]
+    assert len(sink_tasks) == 1, f"Expected exactly one sink_file task, got: {available_tasks}"
+    sink_task_id = sink_tasks[0]
+
+    content_resp = backend_client_with_auth.get(
+        "/run/outputContent",
+        params={"run_id": run_id, "dataset_id": sink_task_id},
+        # macOS has a delayed first cloudpickle import under forking; give it more time
+        timeout=40.0 if sys.platform == "darwin" else None,
+    )
+    assert content_resp.is_success, content_resp.text
+    assert content_resp.headers.get("content-type", "").startswith("application/clpkl")
+    assert cloudpickle.loads(content_resp.content) == "ok"
+
+    if sys.platform == "darwin":
+        # Re-fetch without an extended timeout to confirm the import delay was a one-off
+        content_resp2 = backend_client_with_auth.get("/run/outputContent", params={"run_id": run_id, "dataset_id": sink_task_id})
+        assert content_resp2.is_success, content_resp2.text
+        assert cloudpickle.loads(content_resp2.content) == "ok"
+
+
+def _wait_until_running(client: httpx.Client, run_id: str, sleep: float = 1.0, attempts: int = 60) -> None:
+    def do_action() -> Any:
+        resp = client.get("/run/get", params={"run_id": run_id}, timeout=10)
+        assert resp.is_success, resp.text
+        return resp.json()
+
+    def verify_ok(data: Any) -> bool | None:
+        status = data["status"]
+        if status in ("failed", "unknown"):
+            raise RuntimeError(f"Run {run_id} reached terminal status {status!r} before running: {data}")
+        return True if status == "running" else None
+
+    retry_until(do_action, verify_ok, attempts=attempts, sleep=sleep, error_msg=f"Run {run_id} never reached 'running'")
+
+
+def test_gateway_restart_with_in_progress_job(backend_client_with_auth: httpx.Client) -> None:
+    """Kill the gateway while a job is active; verify the expected status transitions."""
+    sleeper = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="source_sleep"),
+        configuration_values={"text": "hello", "duration": "30"},
+        input_ids={},
+    )
+    sink = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
+        configuration_values={"fname": "/dev/null"},
+        input_ids={"data": "sleeper"},
+    )
+    builder = BlueprintBuilder(blocks={"sleeper": sleeper, "sleeper_sink": sink})
+    save_resp = backend_client_with_auth.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
+    assert save_resp.is_success, save_resp.text
+    blueprint_id = save_resp.json()["blueprint_id"]
+
+    run_resp = backend_client_with_auth.post("/run/create", json={"blueprint_id": blueprint_id})
+    assert run_resp.is_success, run_resp.text
+    run_id = run_resp.json()["run_id"]
+
+    _wait_until_running(backend_client_with_auth, run_id)
+
+    kill_resp = backend_client_with_auth.post("/gateway/kill")
+    assert kill_resp.is_success, kill_resp.text
+
+    # Polling while the gateway is down returns "unknown"
+    status_resp = backend_client_with_auth.get("/run/get", params={"run_id": run_id}, timeout=30)
+    assert status_resp.is_success, status_resp.text
+    assert status_resp.json()["status"] == "unknown"
+    assert "failed to communicate with gateway" in status_resp.json()["error"]
+
+    start_resp = backend_client_with_auth.post("/gateway/start")
+    assert start_resp.is_success, start_resp.text
+
+    # After the gateway restarts (fresh, empty), the job is unknown to it → "evicted from gateway"
+    def poll_evicted() -> Any:
+        resp = backend_client_with_auth.get("/run/get", params={"run_id": run_id}, timeout=10)
+        assert resp.is_success, resp.text
+        return resp.json()
+
+    def verify_evicted(data: Any) -> bool | None:
+        if data["status"] == "failed" and data.get("error") == "evicted from gateway":
+            return True
+        if data["status"] == "completed":
+            raise RuntimeError(f"Unexpected terminal status: {data}")
+        return None
+
+    retry_until(poll_evicted, verify_evicted, attempts=30, sleep=1.0, error_msg=f"Run {run_id} never reached 'evicted from gateway'")
