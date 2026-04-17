@@ -190,6 +190,15 @@ async def validate_expand(
             invalidable.add(blockId)
             continue
         resolution.resolve_configurations(blockInstance, all_glyphs)
+        # A glyph value may itself reference an unknown glyph (e.g. myPath="${root}/${missing}").
+        # After substitution those unresolved ${...} patterns survive in the config values;
+        # a second extract_glyphs pass surfaces them.
+        extract_after = resolution.extract_glyphs(blockInstance)
+        nested_unknowns = cast(ExtractedGlyphs, extract_after.t).glyphs
+        if nested_unknowns:
+            block_errors[blockId] += [f"Unknown glyphs referenced: {nested_unknowns}"]
+            invalidable.add(blockId)
+            continue
         resolved_configuration_options[blockId] = {k: blockInstance.configuration_values[k] for k in extracted.glyphed_options}
 
         if any(source_id in invalidable for source_id in blockInstance.input_ids.values()):

@@ -23,7 +23,13 @@ from typing import cast
 
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.glyphs import global_db
-from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, expand_glyph_values, extract_glyphs, merge_glyph_values
+from forecastbox.domain.glyphs.resolution import (
+    PINNED_INTRINSIC_KEYS,
+    ExtractedGlyphs,
+    expand_glyph_values,
+    extract_glyphs,
+    merge_glyph_values,
+)
 from forecastbox.domain.run import db
 from forecastbox.domain.run.cascade import ExecutionSpecification, execute_cascade
 from forecastbox.domain.run.compile import compile_builder, resolve_intrinsic_glyph_values
@@ -75,12 +81,16 @@ def execute_background(
         all_glyphs = expand_glyph_values(all_glyphs_raw)
 
         # Persist only the glyphs actually referenced in the builder, keeping the stored context lean.
-        # Pre-expansion values are persisted so that composite glyphs (e.g. "${root}/${runId}") can
-        # re-expand correctly on restart, picking up refreshed pinned intrinsics like startDatetime.
+        # Use expand_glyph_values with roots to get the full transitive closure of dependencies,
+        # then persist raw (pre-expansion) values for all of them (excluding intrinsics, which are
+        # always freshly computed). This ensures composite glyphs like "${root}/${runId}" can
+        # re-expand correctly on restart even if the intermediate dependency (e.g. "root") is no
+        # longer in the global DB.
         referenced_glyph_names = {
             name for block in builder.blocks.values() for name in cast(ExtractedGlyphs, extract_glyphs(block).t).glyphs
         }
-        used_glyphs = {k: all_glyphs_raw[k] for k in all_glyphs_raw if k in referenced_glyph_names}
+        transitive_keys = set(expand_glyph_values(all_glyphs_raw, roots=referenced_glyph_names).keys())
+        used_glyphs = {k: all_glyphs_raw[k] for k in transitive_keys if k not in PINNED_INTRINSIC_KEYS}
 
         exec_spec = compile_builder(builder, all_glyphs)
 

@@ -377,7 +377,7 @@ def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Cl
     _time_line_r = outputTime.read_text()
     _time_parts_r = _time_line_r.split(";")
     assert _time_parts_r[0] == created_at_sec
-    assert compare_with_tolerance(_time_parts_r[1], _dt.fromisoformat(created_at_restarted))
+    assert compare_with_tolerance(_time_parts_r[1], _dt.fromisoformat(created_at_restarted), max_seconds=3)
     assert _time_parts_r[2] == "initial_value"
     assert _time_parts_r[3] == "local_glyph_value"
 
@@ -591,6 +591,23 @@ def test_blueprint_composite_glyph_expand(tmpdir: Any, backend_client_with_auth:
     run_id_example = next(g["valueExample"] for g in glyphs_resp.json()["glyphs"] if g["name"] == "runId")
     resolved_text = data["resolved_configuration_options"]["source_text"]["text"]
     assert resolved_text == f"global_part/{run_id_example}", f"Unexpected: {resolved_text!r}"
+
+    # A local glyph that references an unknown glyph must surface as a block_error,
+    # even though the composite glyph key itself is known.
+    sink_file_missing = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
+        configuration_values={"fname": f"{tmpdir}/output.txt"},
+        input_ids={"data": "source_text"},
+    )
+    builder_nested_unknown = BlueprintBuilder(
+        blocks={"source_text": source_text, "sink_file": sink_file_missing},
+        local_glyphs={"compositeLocalGlyph": "${compositeExpandGlobalPart}/${notDefinedAnywhere}"},
+    )
+    response_nested = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder_nested_unknown.model_dump())
+    assert response_nested.is_success, response_nested.text
+    nested_data = response_nested.json()
+    assert "source_text" in nested_data["block_errors"]
+    assert any("notDefinedAnywhere" in err for err in nested_data["block_errors"]["source_text"])
 
     # A builder with a circular glyph reference must report a global_error
     builder_cyclic = BlueprintBuilder(

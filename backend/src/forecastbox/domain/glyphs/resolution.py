@@ -20,6 +20,11 @@ from forecastbox.domain.glyphs.exceptions import GlyphCircularReferenceError
 
 _GLYPH_PATTERN = re.compile(r"\$\{(\w+)\}")
 
+PINNED_INTRINSIC_KEYS: frozenset[str] = frozenset({"startDatetime", "attemptCount"})
+"""Intrinsic glyph keys that are always forced to their fresh intrinsic value in each attempt,
+regardless of any stored context value. These must NOT be persisted in the runtime context
+so that restarts always reflect the new attempt's own start time and attempt counter."""
+
 
 @dataclass(frozen=True, eq=True, slots=True)
 class ExtractedGlyphs:
@@ -85,13 +90,13 @@ def merge_glyph_values(
     so that each restart records its own actual values.
     """
     merged = {**intrinsic_values, **global_values, **local_values, **context_values}
-    for pinned in ("startDatetime", "attemptCount"):
+    for pinned in PINNED_INTRINSIC_KEYS:
         if pinned in intrinsic_values:
             merged[pinned] = intrinsic_values[pinned]
     return merged
 
 
-def expand_glyph_values(glyph_values: dict[str, str]) -> dict[str, str]:
+def expand_glyph_values(glyph_values: dict[str, str], roots: set[str] | None = None) -> dict[str, str]:
     """Expand glyph values that themselves reference other glyphs using DFS.
 
     A glyph value like ``${root}/${runId}`` will be expanded to its fully-resolved
@@ -99,20 +104,30 @@ def expand_glyph_values(glyph_values: dict[str, str]) -> dict[str, str]:
     references (keys absent from ``glyph_values``) are kept as-is so that the
     normal block-level unknown-glyph validation can surface them.
 
+    When ``roots`` is provided, only the keys in ``roots`` and their transitive
+    dependencies are visited and returned. This is useful when callers only need
+    a subset of the expanded map — for example, to determine which raw glyph values
+    to persist for a run. When ``roots`` is ``None`` (the default), all keys are
+    expanded and the full map is returned.
+
     Raises ``GlyphCircularReferenceError`` if any cycle is detected (including
     self-references like ``a = ${a}``).
     """
-    result = dict(glyph_values)
+    source = glyph_values
+    memo: dict[str, str] = {}
 
     def _expand(key: str, visiting: frozenset[str]) -> str:
-        value = result[key]
+        if key in memo:
+            return memo[key]
+        value = source[key]
         if not _GLYPH_PATTERN.search(value):
+            memo[key] = value
             return value
         visiting = visiting | {key}
 
         def substitute(m: re.Match[str]) -> str:
             ref = m.group(1)
-            if ref not in result:
+            if ref not in source:
                 return m.group(0)
             if ref in visiting:
                 cycle_path = " -> ".join(sorted(visiting)) + f" -> {ref}"
@@ -120,9 +135,11 @@ def expand_glyph_values(glyph_values: dict[str, str]) -> dict[str, str]:
             return _expand(ref, visiting)
 
         expanded = _GLYPH_PATTERN.sub(substitute, value)
-        result[key] = expanded
+        memo[key] = expanded
         return expanded
 
-    for key in list(result.keys()):
-        result[key] = _expand(key, frozenset())
-    return result
+    for key in roots if roots is not None else list(source.keys()):
+        if key in source:
+            _expand(key, frozenset())
+
+    return dict(memo) if roots is not None else {k: memo[k] for k in source}

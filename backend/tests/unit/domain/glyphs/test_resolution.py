@@ -211,3 +211,47 @@ def test_expand_composite_with_intrinsic_style_value() -> None:
     glyphs = {"runId": "abc123", "root": "/data", "myPath": "${root}/${runId}"}
     result = expand_glyph_values(glyphs)
     assert result["myPath"] == "/data/abc123"
+
+
+# ---------------------------------------------------------------------------
+# expand_glyph_values with roots parameter
+# ---------------------------------------------------------------------------
+
+
+def test_expand_roots_returns_only_reachable_keys() -> None:
+    glyphs = {"root": "/data", "myPath": "${root}/output", "unrelated": "ignored"}
+    result = expand_glyph_values(glyphs, roots={"myPath"})
+    assert set(result.keys()) == {"myPath", "root"}
+    assert result["myPath"] == "/data/output"
+    assert result["root"] == "/data"
+
+
+def test_expand_roots_single_plain_value() -> None:
+    glyphs = {"a": "plain", "b": "also_plain"}
+    result = expand_glyph_values(glyphs, roots={"a"})
+    assert result == {"a": "plain"}
+
+
+def test_expand_roots_transitive_chain() -> None:
+    glyphs = {"base": "/x", "mid": "${base}/y", "full": "${mid}/z", "other": "skip"}
+    result = expand_glyph_values(glyphs, roots={"full"})
+    assert set(result.keys()) == {"full", "mid", "base"}
+    assert result["full"] == "/x/y/z"
+
+
+def test_expand_roots_unknown_root_key_ignored() -> None:
+    """A root key not present in glyph_values is silently skipped."""
+    glyphs = {"a": "hello"}
+    result = expand_glyph_values(glyphs, roots={"a", "nonexistent"})
+    assert result == {"a": "hello"}
+
+
+def test_expand_roots_cycle_still_raises() -> None:
+    glyphs = {"a": "${b}", "b": "${a}"}
+    with pytest.raises(GlyphCircularReferenceError):
+        expand_glyph_values(glyphs, roots={"a"})
+
+
+def test_expand_roots_none_equivalent_to_no_roots() -> None:
+    glyphs = {"root": "/data", "myPath": "${root}/output"}
+    assert expand_glyph_values(glyphs, roots=None) == expand_glyph_values(glyphs)
