@@ -77,9 +77,6 @@ def execute_background(
         builder = BlueprintBuilder.model_validate(blueprint.builder)
         local_values: dict[str, str] = builder.local_glyphs
 
-        all_glyphs_raw = merge_glyph_values(intrinsic_values, global_values, local_values, compiler_runtime_context.glyphs)
-        all_glyphs = expand_glyph_values(all_glyphs_raw)
-
         # Persist only the glyphs actually referenced in the builder, keeping the stored context lean.
         # Use expand_glyph_values with roots to get the full transitive closure of dependencies,
         # then persist raw (pre-expansion) values for all of them (excluding intrinsics, which are
@@ -89,10 +86,11 @@ def execute_background(
         referenced_glyph_names = {
             name for block in builder.blocks.values() for name in cast(ExtractedGlyphs, extract_glyphs(block).t).glyphs
         }
-        transitive_keys = set(expand_glyph_values(all_glyphs_raw, roots=referenced_glyph_names).keys())
-        used_glyphs = {k: all_glyphs_raw[k] for k in transitive_keys if k not in PINNED_INTRINSIC_KEYS}
+        all_glyphs_raw = merge_glyph_values(intrinsic_values, global_values, local_values, compiler_runtime_context.glyphs)
+        relevant_glyphs_and_values = expand_glyph_values(all_glyphs_raw, roots=referenced_glyph_names)
+        used_glyphs = {k: all_glyphs_raw[k] for k in relevant_glyphs_and_values.keys() if k not in PINNED_INTRINSIC_KEYS}
 
-        exec_spec = compile_builder(builder, all_glyphs)
+        exec_spec = compile_builder(builder, relevant_glyphs_and_values)
 
         persisted_context = compiler_runtime_context.model_copy(update={"glyphs": used_glyphs})
         run_async(

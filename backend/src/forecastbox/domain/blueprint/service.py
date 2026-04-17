@@ -199,6 +199,8 @@ async def validate_expand(
             block_errors[blockId] += [f"Unknown glyphs referenced: {nested_unknowns}"]
             invalidable.add(blockId)
             continue
+        # We dont want to return resolutions of nested glyphs, just the top levels. For this reason
+        # we need to run the extraction twice, not just once after the substitution
         resolved_configuration_options[blockId] = {k: blockInstance.configuration_values[k] for k in extracted.glyphed_options}
 
         if any(source_id in invalidable for source_id in blockInstance.input_ids.values()):
