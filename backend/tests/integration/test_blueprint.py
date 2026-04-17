@@ -184,6 +184,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     assert response.json()["possible_sources"] == [
         {"plugin": {"store": "localTest", "local": "single"}, "factory": "source_42"},
         {"plugin": {"store": "localTest", "local": "single"}, "factory": "source_text"},
+        {"plugin": {"store": "localTest", "local": "single"}, "factory": "source_sleep"},
     ]
     assert response.json()["possible_expansions"] == {}
 
