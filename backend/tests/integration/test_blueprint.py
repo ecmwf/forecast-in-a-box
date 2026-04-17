@@ -681,3 +681,69 @@ def test_run_output_content(tmpdir: Any, backend_client_with_auth: httpx.Client)
         content_resp2 = backend_client_with_auth.get("/run/outputContent", params={"run_id": run_id, "dataset_id": sink_task_id})
         assert content_resp2.is_success, content_resp2.text
         assert cloudpickle.loads(content_resp2.content) == "ok"
+
+
+def _wait_until_running(client: httpx.Client, run_id: str, sleep: float = 1.0, attempts: int = 60) -> None:
+    def do_action() -> Any:
+        resp = client.get("/run/get", params={"run_id": run_id}, timeout=10)
+        assert resp.is_success, resp.text
+        return resp.json()
+
+    def verify_ok(data: Any) -> bool | None:
+        status = data["status"]
+        if status in ("failed", "unknown"):
+            raise RuntimeError(f"Run {run_id} reached terminal status {status!r} before running: {data}")
+        return True if status == "running" else None
+
+    retry_until(do_action, verify_ok, attempts=attempts, sleep=sleep, error_msg=f"Run {run_id} never reached 'running'")
+
+
+def test_gateway_restart_with_in_progress_job(backend_client_with_auth: httpx.Client) -> None:
+    """Kill the gateway while a job is active; verify the expected status transitions."""
+    sleeper = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="source_sleep"),
+        configuration_values={"text": "hello", "duration": "30"},
+        input_ids={},
+    )
+    sink = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
+        configuration_values={"fname": "/dev/null"},
+        input_ids={"data": "sleeper"},
+    )
+    builder = BlueprintBuilder(blocks={"sleeper": sleeper, "sleeper_sink": sink})
+    save_resp = backend_client_with_auth.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
+    assert save_resp.is_success, save_resp.text
+    blueprint_id = save_resp.json()["blueprint_id"]
+
+    run_resp = backend_client_with_auth.post("/run/create", json={"blueprint_id": blueprint_id})
+    assert run_resp.is_success, run_resp.text
+    run_id = run_resp.json()["run_id"]
+
+    _wait_until_running(backend_client_with_auth, run_id)
+
+    kill_resp = backend_client_with_auth.post("/gateway/kill")
+    assert kill_resp.is_success, kill_resp.text
+
+    # Polling while the gateway is down returns "unknown"
+    status_resp = backend_client_with_auth.get("/run/get", params={"run_id": run_id}, timeout=30)
+    assert status_resp.is_success, status_resp.text
+    assert status_resp.json()["status"] == "unknown"
+    assert "failed to communicate with gateway" in status_resp.json()["error"]
+
+    start_resp = backend_client_with_auth.post("/gateway/start")
+    assert start_resp.is_success, start_resp.text
+
+    # After the gateway restarts (fresh, empty), the job is unknown to it → "evicted from gateway"
+    def poll_evicted() -> Any:
+        resp = backend_client_with_auth.get("/run/get", params={"run_id": run_id}, timeout=10)
+        assert resp.is_success, resp.text
+        return resp.json()
+
+    def verify_evicted(data: Any) -> bool | None:
+        if data["status"] == "failed" and data.get("error") == "evicted from gateway":
+            return True
+        if data["status"] == "completed":
+            raise RuntimeError(f"Unexpected terminal status: {data}")
+        return None
+
+    retry_until(poll_evicted, verify_evicted, attempts=30, sleep=1.0, error_msg=f"Run {run_id} never reached 'evicted from gateway'")

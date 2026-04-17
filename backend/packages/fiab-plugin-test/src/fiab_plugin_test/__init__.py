@@ -32,6 +32,16 @@ catalogue = BlockFactoryCatalogue(
             },
             inputs=[],
         ),
+        "source_sleep": BlockFactory(
+            kind="source",
+            title="",
+            description="",
+            configuration_options={
+                "text": BlockConfigurationOption(title="", description="", value_type="str"),
+                "duration": BlockConfigurationOption(title="", description="", value_type="float"),
+            },
+            inputs=[],
+        ),
         "transform_increment": BlockFactory(
             kind="transform",
             title="",
@@ -64,6 +74,8 @@ catalogue = BlockFactoryCatalogue(
 def validator(instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
     if instance.factory_id.factory == "sink_file":
         return Either.ok(NoOutput)
+    elif instance.factory_id.factory in ("source_sleep", "source_text"):
+        return Either.ok(RawOutput(type_fqn="str"))
     else:
         return Either.ok(RawOutput(type_fqn="int"))
 
@@ -72,6 +84,8 @@ def expander(output: BlockInstanceOutput) -> list[BlockFactoryId]:
     if isinstance(output, RawOutput):
         if output.type_fqn == "int":
             return ["transform_increment", "product_join", "sink_file"]
+        if output.type_fqn == "str":
+            return ["sink_file"]
     return []
 
 
@@ -81,6 +95,10 @@ def compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance
     elif instance.factory_id.factory == "source_text":
         text = instance.configuration_values["text"]
         action = from_source(Payload("fiab_plugin_test.runtime.source_text", kwargs={"text": text}))  # type: ignore
+    elif instance.factory_id.factory == "source_sleep":
+        text = instance.configuration_values["text"]
+        duration = float(instance.configuration_values["duration"])
+        action = from_source(Payload("fiab_plugin_test.runtime.source_sleep", kwargs={"text": text, "duration": duration}))  # type: ignore
     elif instance.factory_id.factory == "transform_increment":
         a = lookup[instance.input_ids["a"]]
         amount = instance.configuration_values["amount"]
