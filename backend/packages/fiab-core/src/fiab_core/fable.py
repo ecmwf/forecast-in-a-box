@@ -11,10 +11,11 @@
 Types pertaining to Forecast As BLock Expression (Fable): blocks
 """
 
-from typing import Literal
+from typing import Any, Literal
 
 from earthkit.workflows.fluent import Action
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+from qubed import Qube
 from typing_extensions import Self
 
 
@@ -95,9 +96,11 @@ class BlockInstance(BaseModel):
     """Keys come from factory's `inputs`, values are other blocks in the (partial) fable"""
 
 
-class XarrayOutput(BaseModel):  # NOTE eventually Qubed
-    variables: list[str]
-    coords: list[str]
+class QubedOutput(BaseModel):
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)  # otherwise Qube cannot be here
+    dataqube: Qube = Field(default_factory=Qube.empty)
+    datatype: str = Field(default="")
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class RawOutput(BaseModel):
@@ -105,9 +108,10 @@ class RawOutput(BaseModel):
 
 
 class NoOutput(BaseModel):
+    # use this when there is no output whatsoever -- this stops *any* expansion of the block
     pass
 
 
-BlockInstanceOutput = XarrayOutput | RawOutput | NoOutput
+BlockInstanceOutput = QubedOutput | RawOutput | NoOutput
 
 ActionLookup = dict[BlockInstanceId, Action]
