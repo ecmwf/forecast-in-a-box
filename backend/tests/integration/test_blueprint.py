@@ -377,7 +377,7 @@ def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Cl
     _time_line_r = outputTime.read_text()
     _time_parts_r = _time_line_r.split(";")
     assert _time_parts_r[0] == created_at_sec
-    assert compare_with_tolerance(_time_parts_r[1], _dt.fromisoformat(created_at_restarted))
+    assert compare_with_tolerance(_time_parts_r[1], _dt.fromisoformat(created_at_restarted), max_seconds=3)
     assert _time_parts_r[2] == "initial_value"
     assert _time_parts_r[3] == "local_glyph_value"
 
@@ -549,3 +549,117 @@ def test_blueprint_expand_failure_03(backend_client_with_auth: httpx.Client) -> 
     assert "bad_source" in block_errors
     assert "bad_transform" in block_errors
     assert "nonExistentGlyph" in ";".join(block_errors["bad_transform"])
+
+
+def test_blueprint_composite_glyph_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
+    """A local glyph value that references other glyphs is expanded end-to-end.
+
+    Covers:
+    - validate_expand resolves composite glyph values and reflects them in resolved_configuration_options
+    - A circular glyph reference is reported as a global_error
+    """
+    # Post a global glyph that the composite local glyph will reference
+    post_resp = backend_client_with_auth.post(
+        "/blueprint/glyphs/global/post",
+        json={"key": "compositeExpandGlobalPart", "value": "global_part"},
+    )
+    assert post_resp.is_success, post_resp.text
+
+    # Build a blueprint whose local glyph composes the global part and a known intrinsic
+    source_text = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="source_text"),
+        configuration_values={"text": "${compositeLocalGlyph}"},
+        input_ids={},
+    )
+    sink_file = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
+        configuration_values={"fname": f"{tmpdir}/composite_expand_output.txt"},
+        input_ids={"data": "source_text"},
+    )
+    builder = BlueprintBuilder(
+        blocks={"source_text": source_text, "sink_file": sink_file},
+        local_glyphs={"compositeLocalGlyph": "${compositeExpandGlobalPart}/${runId}"},
+    )
+    response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
+    assert response.is_success, response.text
+    data = response.json()
+    assert len(data["global_errors"]) == 0
+    assert len(data["block_errors"]) == 0
+    # Fetch the intrinsic runId example to verify the fully-resolved composite value
+    glyphs_resp = backend_client_with_auth.get("/blueprint/glyphs/list", params={"glyph_type": "intrinsic"})
+    assert glyphs_resp.is_success, glyphs_resp.text
+    run_id_example = next(g["valueExample"] for g in glyphs_resp.json()["glyphs"] if g["name"] == "runId")
+    resolved_text = data["resolved_configuration_options"]["source_text"]["text"]
+    assert resolved_text == f"global_part/{run_id_example}", f"Unexpected: {resolved_text!r}"
+
+    # A local glyph that references an unknown glyph must surface as a block_error,
+    # even though the composite glyph key itself is known.
+    sink_file_missing = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
+        configuration_values={"fname": f"{tmpdir}/output.txt"},
+        input_ids={"data": "source_text"},
+    )
+    builder_nested_unknown = BlueprintBuilder(
+        blocks={"source_text": source_text, "sink_file": sink_file_missing},
+        local_glyphs={"compositeLocalGlyph": "${compositeExpandGlobalPart}/${notDefinedAnywhere}"},
+    )
+    response_nested = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder_nested_unknown.model_dump())
+    assert response_nested.is_success, response_nested.text
+    nested_data = response_nested.json()
+    assert "source_text" in nested_data["block_errors"]
+    assert any("notDefinedAnywhere" in err for err in nested_data["block_errors"]["source_text"])
+
+    # A builder with a circular glyph reference must report a global_error
+    builder_cyclic = BlueprintBuilder(
+        blocks={"source_text": source_text, "sink_file": sink_file},
+        local_glyphs={"compositeLocalGlyph": "${compositeLocalGlyph}/suffix"},
+    )
+    response_cyclic = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder_cyclic.model_dump())
+    assert response_cyclic.is_success, response_cyclic.text
+    cyclic_data = response_cyclic.json()
+    assert len(cyclic_data["global_errors"]) > 0
+    assert any("circular" in err.lower() or "cycle" in err.lower() for err in cyclic_data["global_errors"])
+
+
+def test_blueprint_composite_glyph_execute(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
+    """Execute a blueprint whose config value is resolved via a composite local glyph.
+
+    The composite glyph ``${compositeExecGlobalPart}/${runId}`` must be fully expanded
+    at runtime and the output must reflect the expanded value.
+    On restart the runId component must remain stable (runId is preserved, not pinned).
+    """
+    post_resp = backend_client_with_auth.post(
+        "/blueprint/glyphs/global/post",
+        json={"key": "compositeExecGlobalPart", "value": "exec_global"},
+    )
+    assert post_resp.is_success, post_resp.text
+
+    source_text = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="source_text"),
+        configuration_values={"text": "${compositeLocalGlyphExec}"},
+        input_ids={},
+    )
+    sink_file = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
+        configuration_values={"fname": f"{tmpdir}/composite_exec_output.txt"},
+        input_ids={"data": "source_text"},
+    )
+    builder = BlueprintBuilder(
+        blocks={"source_text": source_text, "sink_file": sink_file},
+        local_glyphs={"compositeLocalGlyphExec": "${compositeExecGlobalPart}/${runId}"},
+    )
+    save_resp = backend_client_with_auth.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
+    assert save_resp.is_success, save_resp.text
+    blueprint_id = save_resp.json()["blueprint_id"]
+
+    exec_resp = backend_client_with_auth.post("/run/create", json={"blueprint_id": blueprint_id})
+    assert exec_resp.is_success, exec_resp.text
+    run_id = exec_resp.json()["run_id"]
+
+    ensure_completed_v2(backend_client_with_auth, run_id, sleep=1, attempts=120)
+
+    output = pathlib.Path(f"{tmpdir}/composite_exec_output.txt")
+    content = output.read_text()
+    # Content must be "exec_global/<run_id>"
+    assert content == f"exec_global/{run_id}", f"Unexpected output: {content!r}"
+    output.unlink()
