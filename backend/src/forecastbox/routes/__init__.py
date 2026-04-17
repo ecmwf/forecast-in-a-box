@@ -24,5 +24,6 @@ Guidelines:
 * the second type of Domain Entity backend-managed, and contains eg Run, a reflection of backend's internal computation. As such, it is not versioned but backend internally mutates it, but user cannot create or update or delete. Other backend-managed entity examples are Artifact and Plugin -- those are reflections of persisted state of which plugins are installed and which artifacts are downloaded, and similarly to Runs the operations by the user are not a full CRUD control
 * when adding new Domain Entity, make a decision based on context whether its user-managed or backend-managed, then use existing entities and their routes as templates and follow the same patterns
 * we never use path parameters in routes -- to prevent misrouting, long url trimming and normalization, etc
+  * the *only* exception is the `routes/admin.py`, where the `{user_id}` in routes is an accepted non-domain convention
 * each route module is additionally responsible for converting Exception classes from domain submodules into concrete HttpExceptions + codes
 """

@@ -68,7 +68,6 @@ Several function parameters in the packages lack type annotations.
 | File | Function / line | Missing annotation |
 |------|-----------------|--------------------|
 | `backend/packages/fiab-core/src/fiab_core/fable.py` | `PluginCompositeId.from_str`, line 62 | Parameter `v` has no type; should be `str` |
-| `backend/packages/fiab-plugin-ecmwf/src/fiab_plugin_ecmwf/runtime/sinks.py` | `write_zarr`, line 1 | Parameter `fieldlist` has no type; should be typed (e.g. `earthkit.data.FieldList` or a suitable protocol) |
 | `backend/packages/fiab-plugin-test/src/fiab_plugin_test/runtime.py` | `sink_file`, line 27 | Parameter `data` has no type; could be `object` if truly unconstrained, or a concrete type |
 
 **Hint**: Add annotations to each untyped parameter. Use `ty:ignore` only if the type checker
@@ -191,37 +190,8 @@ that `routes/gateway.py` can import it without crossing the hierarchy boundary. 
 is to pass the function as a dependency/callable injected at startup, keeping `routes` free of
 any entrypoint import.
 
----
-
-## Section 8 — Path parameters used in admin routes
-
-**Guideline reference**: `routes/__init__.py` docstring — "we never use path parameters in
-routes — to prevent misrouting, long url trimming and normalization, etc"
-
-Four admin route handlers accept `{user_id}` as a URL path segment.
-
-**Affected file and lines**
-
-| File | Line | Route |
-|------|------|-------|
-| `backend/src/forecastbox/routes/admin.py` | 147 | `@router.get("/users/{user_id}", …)` |
-| `backend/src/forecastbox/routes/admin.py` | 158 | `@router.delete("/users/{user_id}", …)` |
-| `backend/src/forecastbox/routes/admin.py` | 171 | `@router.put("/users/{user_id}", …)` |
-| `backend/src/forecastbox/routes/admin.py` | 189 | `@router.patch("/users/{user_id}", …)` |
-
-**Hint**: Replace path parameters with query parameters or a request body. For example:
-
-```python
-# Before
-@router.get("/users/{user_id}", …)
-async def get_user(user_id: UUID4, …):
-
-# After
-@router.get("/users/get", …)
-async def get_user(user_id: UUID4, …):
-```
-
-This is a breaking API change; coordinate with any existing clients.
+Note: do *NOT* implement this right away -- propose one or more solutions first, then have the
+user approve explicitly!
 
 ---
 
