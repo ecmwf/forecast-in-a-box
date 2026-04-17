@@ -585,9 +585,12 @@ def test_blueprint_composite_glyph_expand(tmpdir: Any, backend_client_with_auth:
     data = response.json()
     assert len(data["global_errors"]) == 0
     assert len(data["block_errors"]) == 0
-    # The resolved value must have the global part expanded and a placeholder for runId
+    # Fetch the intrinsic runId example to verify the fully-resolved composite value
+    glyphs_resp = backend_client_with_auth.get("/blueprint/glyphs/list", params={"glyph_type": "intrinsic"})
+    assert glyphs_resp.is_success, glyphs_resp.text
+    run_id_example = next(g["valueExample"] for g in glyphs_resp.json()["glyphs"] if g["name"] == "runId")
     resolved_text = data["resolved_configuration_options"]["source_text"]["text"]
-    assert resolved_text.startswith("global_part/"), f"Unexpected: {resolved_text!r}"
+    assert resolved_text == f"global_part/{run_id_example}", f"Unexpected: {resolved_text!r}"
 
     # A builder with a circular glyph reference must report a global_error
     builder_cyclic = BlueprintBuilder(
