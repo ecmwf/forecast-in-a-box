@@ -17,10 +17,8 @@ from anemoi.inference.metadata import MetadataFactory as InferenceMetadataFactor
 from cascade.low.func import Either
 from earthkit.workflows.plugins.anemoi.utils import expansion_qube
 from fiab_core.artifacts import ArtifactsProvider, CheckpointLookup, CompositeArtifactId
-from fiab_core.fable import BlockInstance
+from fiab_core.fable import BlockInstance, QubedOutput
 from fiab_core.plugin import Error
-
-from fiab_plugin_ecmwf.metadata import QubedInstanceOutput
 
 ENVIRONMENT_PACKAGES: list[str] = [
     "anemoi.models",
@@ -82,8 +80,8 @@ def get_environment(composite_id: CompositeArtifactId, input_source: str | None 
     return packages
 
 
-def validate_anemoi_block(block: BlockInstance) -> Either[QubedInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-    """Validate common Anemoi block configuration, returning the base QubedInstanceOutput on success."""
+def validate_anemoi_block(block: BlockInstance) -> Either[QubedOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+    """Validate common Anemoi block configuration, returning the base QubedOutput on success."""
     if not isinstance(block.configuration_values["checkpoint"], str):
         return Either.error("Checkpoint must be given")
 
@@ -107,4 +105,4 @@ def validate_anemoi_block(block: BlockInstance) -> Either[QubedInstanceOutput, E
 
     lead_time = int(block.configuration_values["lead_time"])
     qube = expansion_qube(metadata, lead_time)
-    return Either.ok(QubedInstanceOutput(dataqube=qube))
+    return Either.ok(QubedOutput(dataqube=qube))

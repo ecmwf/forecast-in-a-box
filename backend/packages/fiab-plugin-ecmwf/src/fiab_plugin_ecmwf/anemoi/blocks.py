@@ -8,8 +8,6 @@
 # nor does it submit to any jurisdiction.
 
 
-from typing import cast
-
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
 from earthkit.workflows.plugins.anemoi.fluent import from_initial_conditions, from_input
@@ -20,11 +18,12 @@ from fiab_core.fable import (
     BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
+    QubedOutput,
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import Source, Transform
 
-from fiab_plugin_ecmwf.metadata import QubedInstanceOutput
+from fiab_plugin_ecmwf.qubed_utils import axes, contains, dimensions, expand
 
 from .utils import (
     get_checkpoint_enum_type,
@@ -67,13 +66,13 @@ class AnemoiSource(Source):
         ),
     }
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[QubedInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         result = validate_anemoi_block(block)
         if result.e or not result.t:
-            return result
+            return Either.error(result.e)
 
         ensemble_members = int(block.configuration_values.get("ensemble_members") or 1)
-        qubed_instance = result.t.expand({"number": range(1, ensemble_members + 1)})
+        qubed_instance = expand(result.t, {"number": range(1, ensemble_members + 1)})
         return Either.ok(qubed_instance)
 
     def compile(
@@ -114,15 +113,15 @@ class AnemoiTransform(Transform):
         ),
     }
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         result = validate_anemoi_block(block)
         if result.e or not result.t:
-            return result  # type: ignore
+            return Either.error(result.e)
 
         qubed_instance = result.t
-        input_dataset = cast(QubedInstanceOutput, inputs["dataset"])
-        if "number" in input_dataset:
-            qubed_instance = qubed_instance.expand({"number": input_dataset.axes()["number"]})
+        input_dataset = inputs["dataset"]
+        if contains(input_dataset, "number"):
+            qubed_instance = expand(qubed_instance, {"number": axes(input_dataset)["number"]})
         return Either.ok(qubed_instance)
 
     def compile(
@@ -141,7 +140,6 @@ class AnemoiTransform(Transform):
         )
         return Either.ok(action)
 
-    def intersect(self, input: BlockInstanceOutput) -> bool:
-        if not isinstance(input, QubedInstanceOutput) or input.is_empty():
-            return False
-        return True
+    def intersect(self, other: QubedOutput) -> bool:
+        # NOTE not sure if this is exactly correct -- tests prescribe that for QubedOutput() this should return False, otherwise True
+        return bool(dimensions(other))
