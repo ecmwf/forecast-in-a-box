@@ -36,9 +36,11 @@ from forecastbox.domain.blueprint.exceptions import (
     BlueprintVersionConflict,
 )
 from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand, BlueprintValidationExpansion
+from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.glyphs import global_db
 from forecastbox.domain.glyphs.exceptions import GlobalGlyphAccessDenied
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples
+from forecastbox.domain.glyphs.types import GlobalGlyphId
 from forecastbox.domain.plugin.manager import catalogue_view, plugins_ready
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
@@ -54,14 +56,14 @@ router = APIRouter(
 # ---------------------------------------------------------------------------
 
 
-class BlueprintId(BaseModel):
+class BlueprintLookup(BaseModel):
     """Identifies a blueprint, optionally pinning a specific version.
 
     Used as a Depends()-based query-param group on GET endpoints, and as a
     request body on PUT endpoints that target a specific blueprint.
     """
 
-    blueprint_id: str
+    blueprint_id: BlueprintId
     version: int | None = None
 
 
@@ -74,12 +76,12 @@ class BlueprintCreateRequest(BaseModel):
 
 
 class BlueprintCreateResponse(BaseModel):
-    blueprint_id: str
+    blueprint_id: BlueprintId
     version: int
 
 
 class BlueprintGetResponse(BaseModel):
-    blueprint_id: str
+    blueprint_id: BlueprintId
     version: int
     builder: BlueprintBuilder
     display_name: str | None = None
@@ -89,7 +91,7 @@ class BlueprintGetResponse(BaseModel):
 
 
 class BlueprintListItem(BaseModel):
-    blueprint_id: str
+    blueprint_id: BlueprintId
     version: int
     display_name: str | None = None
     display_description: str | None = None
@@ -106,7 +108,7 @@ class BlueprintListResponse(BaseModel):
 
 
 class BlueprintUpdateRequest(BaseModel):
-    blueprint_id: str
+    blueprint_id: BlueprintId
     version: int
     builder: BlueprintBuilder
     display_name: str | None = None
@@ -116,12 +118,12 @@ class BlueprintUpdateRequest(BaseModel):
 
 
 class BlueprintUpdateResponse(BaseModel):
-    blueprint_id: str
+    blueprint_id: BlueprintId
     version: int
 
 
 class BlueprintDeleteRequest(BaseModel):
-    blueprint_id: str
+    blueprint_id: BlueprintId
     version: int
 
 
@@ -161,7 +163,7 @@ class GlobalGlyphPostRequest(BaseModel):
 class GlobalGlyphResponse(BaseModel):
     """Detail of a single global glyph, returned by get and post endpoints."""
 
-    global_glyph_id: str
+    global_glyph_id: GlobalGlyphId
     key: str
     value: str
     public: bool
@@ -170,15 +172,10 @@ class GlobalGlyphResponse(BaseModel):
     updated_at: str
 
 
-class GlobalGlyphId(BaseModel):
+class GlobalGlyphLookup(BaseModel):
     """Identifies a global glyph by its stable id."""
 
-    global_glyph_id: str
-
-
-# ---------------------------------------------------------------------------
-# Blueprint CRUD+List Endpoints
-# ---------------------------------------------------------------------------
+    global_glyph_id: GlobalGlyphId
 
 
 @router.post("/create")
@@ -215,7 +212,7 @@ async def create_blueprint(
 
 @router.get("/get")
 async def get_blueprint(
-    spec: Annotated[BlueprintId, Depends()],
+    spec: Annotated[BlueprintLookup, Depends()],
 ) -> BlueprintGetResponse:
     """Retrieve a saved blueprint by id and optional version.
 
@@ -247,7 +244,7 @@ async def list_blueprints(
     page_defs = list(await db.list_blueprints(auth_context=auth_context, offset=start, limit=pagination.page_size))
     items = [
         BlueprintListItem(
-            blueprint_id=cast(str, defn.blueprint_id),
+            blueprint_id=BlueprintId(str(defn.blueprint_id)),  # ty:ignore[invalid-argument-type]
             version=cast(int, defn.version),
             display_name=cast(str | None, defn.display_name),
             display_description=cast(str | None, defn.display_description),
@@ -426,7 +423,7 @@ async def post_global_glyph(
     except GlobalGlyphAccessDenied as e:
         raise HTTPException(status_code=403, detail=str(e))
     return GlobalGlyphResponse(
-        global_glyph_id=str(row.global_glyph_id),
+        global_glyph_id=GlobalGlyphId(str(row.global_glyph_id)),  # ty:ignore[invalid-argument-type]
         key=str(row.key),
         value=str(row.value),
         public=bool(row.public),
@@ -438,7 +435,7 @@ async def post_global_glyph(
 
 @router.get("/glyphs/global/get")
 async def get_global_glyph(
-    spec: Annotated[GlobalGlyphId, Depends()],
+    spec: Annotated[GlobalGlyphLookup, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> GlobalGlyphResponse:
     """Retrieve a global glyph visible to the caller by its stable id."""
@@ -446,7 +443,7 @@ async def get_global_glyph(
     if row is None:
         raise HTTPException(status_code=404, detail=f"GlobalGlyph {spec.global_glyph_id!r} not found.")
     return GlobalGlyphResponse(
-        global_glyph_id=str(row.global_glyph_id),
+        global_glyph_id=GlobalGlyphId(str(row.global_glyph_id)),  # ty:ignore[invalid-argument-type]
         key=str(row.key),
         value=str(row.value),
         public=bool(row.public),

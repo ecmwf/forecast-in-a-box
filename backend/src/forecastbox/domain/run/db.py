@@ -26,7 +26,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select, update
 
 import forecastbox.schemata.jobs as _jobs_module
+from forecastbox.domain.blueprint.types import BlueprintId
+from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
+from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import Run, RunStatus
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.db import dbRetry, executeAndCommit, querySingle
@@ -45,16 +48,16 @@ class CompilerRuntimeContext(BaseModel):
 
 async def upsert_run(
     *,
-    run_id: str | None = None,
-    blueprint_id: str,
+    run_id: RunId | None = None,
+    blueprint_id: BlueprintId,
     blueprint_version: int,
     created_by: str | None,
     status: RunStatus,
-    experiment_id: str | None = None,
+    experiment_id: ExperimentDefinitionId | None = None,
     experiment_version: int | None = None,
     compiler_runtime_context: CompilerRuntimeContext = CompilerRuntimeContext(),
     experiment_context: str | None = None,
-) -> tuple[str, int, dt.datetime]:
+) -> tuple[RunId, int, dt.datetime]:
     """Insert a new attempt of a Run and return (id, attempt_count, created_at).
 
     If ``run_id`` is omitted a fresh UUID is generated (attempt 1).
@@ -63,7 +66,7 @@ async def upsert_run(
     No actor-level auth is enforced on creation; any caller may create an execution.
     """
     supplied_run_id = run_id
-    effective_run_id = run_id or str(uuid.uuid4())
+    effective_run_id = run_id if run_id is not None else RunId(str(uuid.uuid4()))
     ref_time = dt.datetime.now()
 
     async def function(i: int) -> int:
@@ -98,7 +101,7 @@ async def upsert_run(
 
 
 async def get_run(
-    run_id: str,
+    run_id: RunId,
     attempt_count: int | None = None,
     *,
     auth_context: AuthContext,
@@ -125,7 +128,7 @@ async def get_run(
     return row
 
 
-async def update_run_runtime(run_id: str, attempt_count: int, **kwargs: object) -> None:
+async def update_run_runtime(run_id: RunId, attempt_count: int, **kwargs: object) -> None:
     """Update mutable runtime fields on a specific Run attempt.
 
     No actor-level auth; this is an internal system operation called during execution.
@@ -183,7 +186,7 @@ async def count_runs(*, auth_context: AuthContext) -> int:
     return await dbRetry(function)
 
 
-async def soft_delete_run(run_id: str, *, auth_context: AuthContext) -> None:
+async def soft_delete_run(run_id: RunId, *, auth_context: AuthContext) -> None:
     """Mark all attempts of a Run as deleted.
 
     Raises ``RunNotFound`` if the execution does not exist.
@@ -198,7 +201,7 @@ async def soft_delete_run(run_id: str, *, auth_context: AuthContext) -> None:
 
 
 async def list_runs_by_experiment(
-    experiment_id: str,
+    experiment_id: ExperimentDefinitionId,
     *,
     auth_context: AuthContext,
     offset: int = 0,
@@ -237,7 +240,7 @@ async def list_runs_by_experiment(
     return await dbRetry(function)
 
 
-async def count_runs_by_experiment(experiment_id: str, *, auth_context: AuthContext) -> int:
+async def count_runs_by_experiment(experiment_id: ExperimentDefinitionId, *, auth_context: AuthContext) -> int:
     """Return the total number of distinct non-deleted Run ids linked to an experiment and visible to the actor."""
 
     async def function(i: int) -> int:

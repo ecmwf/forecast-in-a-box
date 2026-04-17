@@ -19,3 +19,7 @@ class GlobalGlyphNotFound(Exception):
 
 class GlobalGlyphAccessDenied(Exception):
     """Raised when the actor lacks permission to mutate a GlobalGlyph they do not own."""
+
+
+class GlyphCircularReferenceError(Exception):
+    """Raised when glyph values form a circular dependency chain."""

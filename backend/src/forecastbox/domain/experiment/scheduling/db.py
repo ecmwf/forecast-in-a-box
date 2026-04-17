@@ -19,11 +19,12 @@ import uuid
 from sqlalchemy import delete, func, select, update
 
 import forecastbox.schemata.jobs as _jobs_module
+from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.schemata.jobs import ExperimentDefinition, ExperimentNext
 from forecastbox.utility.db import addAndCommit, dbRetry, executeAndCommit, querySingle
 
 
-async def upsert_experiment_next(*, experiment_id: str, scheduled_at: dt.datetime) -> None:
+async def upsert_experiment_next(*, experiment_id: ExperimentDefinitionId, scheduled_at: dt.datetime) -> None:
     """Insert or update the next scheduled run time for an experiment."""
     ref_time = dt.datetime.now()
     existing = await querySingle(
@@ -47,13 +48,13 @@ async def upsert_experiment_next(*, experiment_id: str, scheduled_at: dt.datetim
         await addAndCommit(entity, _jobs_module.async_session_maker)
 
 
-async def get_experiment_next(experiment_id: str) -> ExperimentNext | None:
+async def get_experiment_next(experiment_id: ExperimentDefinitionId) -> ExperimentNext | None:
     """Return the next scheduled run entry for an experiment."""
     query = select(ExperimentNext).where(ExperimentNext.experiment_id == experiment_id)
     return await querySingle(query, _jobs_module.async_session_maker)
 
 
-async def delete_experiment_next(experiment_id: str) -> None:
+async def delete_experiment_next(experiment_id: ExperimentDefinitionId) -> None:
     """Remove the next scheduled run entry for an experiment, clearing the pending tick."""
     stmt = delete(ExperimentNext).where(ExperimentNext.experiment_id == experiment_id)
     await executeAndCommit(stmt, _jobs_module.async_session_maker)
