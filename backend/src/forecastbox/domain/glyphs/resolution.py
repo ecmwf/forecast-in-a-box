@@ -16,8 +16,10 @@ from dataclasses import dataclass
 from cascade.low.func import Either
 from fiab_core.fable import BlockInstance
 
+from forecastbox.domain.glyphs._interpolation import extract_glyph_names, render_expression
 from forecastbox.domain.glyphs.exceptions import GlyphCircularReferenceError
 
+# Used only by expand_glyph_values for simple ${varname} chain detection and substitution.
 _GLYPH_PATTERN = re.compile(r"\$\{(\w+)\}")
 
 PINNED_INTRINSIC_KEYS: frozenset[str] = frozenset({"startDatetime", "attemptCount"})
@@ -42,39 +44,38 @@ def value_dt2str(value: dt.datetime) -> str:
     return value.strftime("%Y-%m-%d %H:%M:%S")
 
 
-def _extract_glyph_names_from_value(value: str) -> set[str]:
-    return set(_GLYPH_PATTERN.findall(value))
-
-
-def _substitute_glyphs(value: str, glyph_values: dict[str, str]) -> str:
-    return _GLYPH_PATTERN.sub(lambda m: glyph_values[m.group(1)], value)
-
-
 def extract_glyphs(blockInstance: BlockInstance) -> Either[ExtractedGlyphs, list[str]]:  # type: ignore[invalid-argument]
-    """Extract all ${glyph} references from the blockInstance's configuration_values.
+    """Extract all ${...} references from the blockInstance's configuration_values.
 
-    Always succeeds; returns an ExtractedGlyphs with the set of referenced glyph names
-    and the set of option keys that contain at least one glyph. The error branch is
-    reserved for future validation (e.g. malformed templates).
+    Returns an ``Either.ok`` with the set of referenced glyph names and the set of
+    option keys that contain at least one glyph reference, or ``Either.err`` with a
+    list of error messages if any configuration value contains a malformed expression.
     """
     glyphs: set[str] = set()
     glyphed_options: set[str] = set()
+    errors: list[str] = []
     for key, value in blockInstance.configuration_values.items():
-        names = _extract_glyph_names_from_value(value)
+        names, error = extract_glyph_names(value)
+        if error is not None:
+            errors.append(f"{key!r}: {error}")
+            continue
         if names:
             glyphs.update(names)
             glyphed_options.add(key)
+    if errors:
+        return Either.error(errors)
     return Either.ok(ExtractedGlyphs(glyphs=glyphs, glyphed_options=glyphed_options))
 
 
 def resolve_configurations(blockInstance: BlockInstance, glyph_values: dict[str, str]) -> None:
-    """Mutate blockInstance's configuration_values, replacing ${glyph} patterns with their values.
+    """Mutate blockInstance's configuration_values, evaluating ${...} expressions against glyph_values.
 
+    Supports the full Jinja2 expression language with custom date/string filters.
     All glyphs referenced must be present in glyph_values. Call extract_glyphs
     and validate the set against available glyphs before invoking this function.
     """
     for key, value in blockInstance.configuration_values.items():
-        blockInstance.configuration_values[key] = _substitute_glyphs(value, glyph_values)
+        blockInstance.configuration_values[key] = render_expression(value, glyph_values)
 
 
 def merge_glyph_values(
