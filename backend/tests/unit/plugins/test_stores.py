@@ -3,6 +3,7 @@ from unittest.mock import patch
 import httpx
 import orjson
 import pytest
+from fiab_core.fable import PluginId
 
 from forecastbox.domain.plugin.store import PluginStore, PluginStoreEntry, fetch_store
 from forecastbox.utility.config import PluginStoreConfig
@@ -12,7 +13,7 @@ def test_fetch() -> None:
     fake_store = PluginStore(
         display_name="ecmwf",
         plugins={
-            "plugin1": PluginStoreEntry(
+            PluginId("plugin1"): PluginStoreEntry(
                 pip_source="pip_source",
                 module_name="module_name",
                 display_title="display_title",

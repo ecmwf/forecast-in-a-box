@@ -16,14 +16,14 @@ from fiab_core.plugin import Error, Plugin
 
 catalogue = BlockFactoryCatalogue(
     factories={
-        "source_42": BlockFactory(
+        BlockFactoryId("source_42"): BlockFactory(
             kind="source",
             title="",
             description="",
             configuration_options={},
             inputs=[],
         ),
-        "source_text": BlockFactory(
+        BlockFactoryId("source_text"): BlockFactory(
             kind="source",
             title="",
             description="",
@@ -32,7 +32,7 @@ catalogue = BlockFactoryCatalogue(
             },
             inputs=[],
         ),
-        "source_sleep": BlockFactory(
+        BlockFactoryId("source_sleep"): BlockFactory(
             kind="source",
             title="",
             description="",
@@ -42,7 +42,7 @@ catalogue = BlockFactoryCatalogue(
             },
             inputs=[],
         ),
-        "transform_increment": BlockFactory(
+        BlockFactoryId("transform_increment"): BlockFactory(
             kind="transform",
             title="",
             description="",
@@ -51,14 +51,14 @@ catalogue = BlockFactoryCatalogue(
             },
             inputs=["a"],
         ),
-        "product_join": BlockFactory(
+        BlockFactoryId("product_join"): BlockFactory(
             kind="product",
             title="",
             description="",
             configuration_options={},
             inputs=["a", "b"],
         ),
-        "sink_file": BlockFactory(
+        BlockFactoryId("sink_file"): BlockFactory(
             kind="sink",
             title="",
             description="",
@@ -83,9 +83,9 @@ def validator(instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -
 def expander(output: BlockInstanceOutput) -> list[BlockFactoryId]:
     if isinstance(output, RawOutput):
         if output.type_fqn == "int":
-            return ["transform_increment", "product_join", "sink_file"]
+            return [BlockFactoryId("transform_increment"), BlockFactoryId("product_join"), BlockFactoryId("sink_file")]
         if output.type_fqn == "str":
-            return ["sink_file"]
+            return [BlockFactoryId("sink_file")]
     return []
 
 

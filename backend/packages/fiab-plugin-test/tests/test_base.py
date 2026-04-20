@@ -10,6 +10,6 @@
 from fiab_plugin_test import *  # noqa: F403
 
 
-def test_ok():
+def test_ok() -> None:
     """Tests, as a minimum, that everything can be imported"""
     assert True

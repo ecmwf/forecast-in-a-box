@@ -19,7 +19,6 @@ Contains three categories of routes:
  - building helper routes, which the clients call in sequence before creating a blueprint.
 """
 
-PREFIX = "/api/v1/blueprint"
 from typing import Annotated, Literal, cast
 
 from cascade.low.func import assert_never
@@ -44,6 +43,8 @@ from forecastbox.domain.glyphs.types import GlobalGlyphId
 from forecastbox.domain.plugin.manager import catalogue_view, plugins_ready
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
+
+PREFIX = "/api/v1/blueprint"
 
 router = APIRouter(
     tags=["blueprint"],

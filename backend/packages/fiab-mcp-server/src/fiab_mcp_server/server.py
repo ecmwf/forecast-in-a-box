@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 class FiabMcpServer:
     """MCP Server that interfaces with Forecast in a Box backend."""
 
-    def __init__(self, base_url: str):
+    def __init__(self, base_url: str) -> None:
         self.base_url = base_url.rstrip("/")
         self.client = httpx.AsyncClient(base_url=self.base_url, follow_redirects=True, timeout=30.0)
         self.server = Server("fiab_mcp_server")

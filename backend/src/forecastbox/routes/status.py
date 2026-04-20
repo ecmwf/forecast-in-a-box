@@ -9,7 +9,6 @@
 
 """Root status route — contains /status of the backend, not related to any domain entities"""
 
-PREFIX = "/api/v1/status"
 import logging
 from dataclasses import dataclass
 
@@ -20,6 +19,8 @@ from fastapi import APIRouter, Request
 from forecastbox.domain.experiment.scheduling.background import status_scheduler
 from forecastbox.domain.plugin.manager import status_brief
 from forecastbox.utility.config import config
+
+PREFIX = "/api/v1/status"
 
 logger = logging.getLogger(__name__)
 

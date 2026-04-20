@@ -14,7 +14,7 @@ from fiab_core.tools.blocks import BlockBuilder
 
 
 class PluginBuilder:
-    def __init__(self, block_builders: dict[BlockFactoryId, BlockBuilder]):
+    def __init__(self, block_builders: dict[BlockFactoryId, BlockBuilder]) -> None:
         self.block_builders = block_builders
 
     def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup

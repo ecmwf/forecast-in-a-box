@@ -4,7 +4,7 @@ import time
 from datetime import datetime, timedelta
 
 import httpx
-from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId
+from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId, PluginBlockFactoryId, PluginCompositeId, PluginId, PluginStoreId
 
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.service import BlueprintBuilder
@@ -54,10 +54,10 @@ if __name__ == "__main__":
             response = client.get("/blueprint/catalogue").raise_for_status()
             assert len(response.json()) > 0
 
-            pluginId = PluginCompositeId(store="ecmwf", local="ecmwf-base")
-            blocks = {
-                "source1": BlockInstance(
-                    factory_id=PluginBlockFactoryId(plugin=pluginId, factory="ekdSource"),
+            pluginId = PluginCompositeId(store=PluginStoreId("ecmwf"), local=PluginId("ecmwf-base"))
+            blocks: dict[BlockInstanceId, BlockInstance] = {
+                BlockInstanceId("source1"): BlockInstance(
+                    factory_id=PluginBlockFactoryId(plugin=pluginId, factory=BlockFactoryId("ekdSource")),
                     configuration_values={
                         "source": "ecmwf-open-data",
                         "date": (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"),
@@ -65,25 +65,25 @@ if __name__ == "__main__":
                     },
                     input_ids={},
                 ),
-                "temporalMean": BlockInstance(
-                    factory_id=PluginBlockFactoryId(plugin=pluginId, factory="temporalStatistics"),
+                BlockInstanceId("temporalMean"): BlockInstance(
+                    factory_id=PluginBlockFactoryId(plugin=pluginId, factory=BlockFactoryId("temporalStatistics")),
                     configuration_values={"variable": "2t", "statistic": "mean"},
-                    input_ids={"dataset": "source1"},
+                    input_ids={"dataset": BlockInstanceId("source1")},
                 ),
             }
             for statistic in ["mean", "std"]:
                 block = BlockInstance(
-                    factory_id=PluginBlockFactoryId(plugin=pluginId, factory="ensembleStatistics"),
+                    factory_id=PluginBlockFactoryId(plugin=pluginId, factory=BlockFactoryId("ensembleStatistics")),
                     configuration_values={"variable": "2t", "statistic": statistic},
-                    input_ids={"dataset": "temporalMean"},
+                    input_ids={"dataset": BlockInstanceId("temporalMean")},
                 )
                 sink = BlockInstance(
-                    factory_id=PluginBlockFactoryId(plugin=pluginId, factory="zarrSink"),
+                    factory_id=PluginBlockFactoryId(plugin=pluginId, factory=BlockFactoryId("zarrSink")),
                     configuration_values={"path": f"{tmpdir}/output{statistic.capitalize()}.zarr"},
-                    input_ids={"dataset": f"ensemble{statistic.capitalize()}"},
+                    input_ids={"dataset": BlockInstanceId(f"ensemble{statistic.capitalize()}")},
                 )
-                blocks[f"ensemble{statistic.capitalize()}"] = block
-                blocks[f"sink{statistic.capitalize()}"] = sink
+                blocks[BlockInstanceId(f"ensemble{statistic.capitalize()}")] = block
+                blocks[BlockInstanceId(f"sink{statistic.capitalize()}")] = sink
 
             builder = BlueprintBuilder(blocks=blocks)
             response = client.request(url="/blueprint/compile", method="put", json=builder.model_dump()).json()

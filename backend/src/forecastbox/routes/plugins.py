@@ -14,7 +14,6 @@ Contains:
  - complete CRUD+List routes for the Plugin entity.
 """
 
-PREFIX = "/api/v1/plugin"
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -27,6 +26,8 @@ from forecastbox.domain.plugin.store import PluginRemoteInfo, PluginStoreEntry, 
 from forecastbox.routes.admin import get_admin_user
 from forecastbox.schemata.user import UserRead
 from forecastbox.utility.config import config
+
+PREFIX = "/api/v1/plugin"
 
 router = APIRouter(
     tags=["blueprint"],

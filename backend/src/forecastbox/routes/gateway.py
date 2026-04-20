@@ -12,7 +12,6 @@ Gateway operations routes — /gateway/*. Corresponds to no domain entity.
 
 All routes are purely operational, no ids -- gateway start, status, kill."""
 
-PREFIX = "/api/v1/gateway"
 import asyncio
 import logging
 import os
@@ -30,6 +29,8 @@ from sse_starlette.sse import EventSourceResponse
 
 from forecastbox.entrypoint.bootstrap.launchers import launch_cascade
 from forecastbox.utility.config import StatusMessage, config
+
+PREFIX = "/api/v1/gateway"
 
 logger = logging.getLogger(__name__)
 

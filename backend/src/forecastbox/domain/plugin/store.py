@@ -82,7 +82,7 @@ def fetch_store(client: httpx.Client, plugin_store_config: PluginStoreConfig) ->
             return PluginStore(
                 display_name=f"local:{fname}",
                 plugins={
-                    "single": PluginStoreEntry(
+                    PluginId("single"): PluginStoreEntry(
                         pip_source=url,
                         module_name=fname.replace("-", "_"),
                         display_title=fname,
