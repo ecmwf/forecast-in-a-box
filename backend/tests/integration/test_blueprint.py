@@ -28,6 +28,7 @@ from typing import Any, get_args
 
 import cloudpickle
 import httpx
+import pytest
 from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId, PluginBlockFactoryId, PluginCompositeId
 
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
@@ -813,6 +814,7 @@ def _wait_until_running(client: httpx.Client, run_id: str, sleep: float = 1.0, a
     retry_until(do_action, verify_ok, attempts=attempts, sleep=sleep, error_msg=f"Run {run_id} never reached 'running'")
 
 
+@pytest.mark.skip("leaves hanging process behind")
 def test_gateway_restart_with_in_progress_job(backend_client_with_auth: httpx.Client) -> None:
     """Kill the gateway while a job is active; verify the expected status transitions."""
     sleeper = BlockInstance(
@@ -836,6 +838,7 @@ def test_gateway_restart_with_in_progress_job(backend_client_with_auth: httpx.Cl
 
     _wait_until_running(backend_client_with_auth, run_id)
 
+    # TODO this leaves the workers hanging. We need some solution to collect them properly
     kill_resp = backend_client_with_auth.post("/gateway/kill")
     assert kill_resp.is_success, kill_resp.text
 
