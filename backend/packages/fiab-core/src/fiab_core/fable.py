@@ -11,7 +11,7 @@
 Types pertaining to Forecast As BLock Expression (Fable): blocks
 """
 
-from typing import Literal
+from typing import Literal, NewType
 
 from earthkit.workflows.fluent import Action
 from pydantic import BaseModel, ConfigDict
@@ -47,12 +47,10 @@ class BlockFactory(BaseModel):
     """A list of input names, such as 'initial conditions' or 'forecast', for the purpose of description/configuration"""
 
 
-import typing
-
-BlockFactoryId = typing.NewType("BlockFactoryId", str)
-BlockInstanceId = typing.NewType("BlockInstanceId", str)
-PluginId = typing.NewType("PluginId", str)
-PluginStoreId = typing.NewType("PluginStoreId", str)
+BlockFactoryId = NewType("BlockFactoryId", str)
+BlockInstanceId = NewType("BlockInstanceId", str)
+PluginId = NewType("PluginId", str)
+PluginStoreId = NewType("PluginStoreId", str)
 
 
 class PluginCompositeId(BaseModel):
@@ -61,7 +59,7 @@ class PluginCompositeId(BaseModel):
     local: PluginId
 
     @classmethod
-    def from_str(cls, v: str) -> "PluginCompositeId":
+    def from_str(cls, v: str) -> Self:
         if ":" not in v:
             raise ValueError("must be of the form store:local")
         store, local = v.split(":", 1)
