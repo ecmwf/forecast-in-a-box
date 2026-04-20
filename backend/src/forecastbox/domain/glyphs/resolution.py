@@ -16,8 +16,8 @@ from dataclasses import dataclass
 from cascade.low.func import Either
 from fiab_core.fable import BlockInstance
 
-from forecastbox.domain.glyphs._interpolation import extract_glyph_names, render_expression
 from forecastbox.domain.glyphs.exceptions import GlyphCircularReferenceError
+from forecastbox.domain.glyphs.jinja_interpolation import extract_glyph_names, render_expression
 
 # Used only by expand_glyph_values for simple ${varname} chain detection and substitution.
 _GLYPH_PATTERN = re.compile(r"\$\{(\w+)\}")
@@ -55,12 +55,12 @@ def extract_glyphs(blockInstance: BlockInstance) -> Either[ExtractedGlyphs, list
     glyphed_options: set[str] = set()
     errors: list[str] = []
     for key, value in blockInstance.configuration_values.items():
-        names, error = extract_glyph_names(value)
-        if error is not None:
-            errors.append(f"{key!r}: {error}")
+        result = extract_glyph_names(value)
+        if result.e is not None:
+            errors.append(f"{key!r}: {result.e}")
             continue
-        if names:
-            glyphs.update(names)
+        if result.t:
+            glyphs.update(result.t)
             glyphed_options.add(key)
     if errors:
         return Either.error(errors)

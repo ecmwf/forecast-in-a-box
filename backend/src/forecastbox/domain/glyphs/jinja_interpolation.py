@@ -17,6 +17,7 @@ auto-coerced to :class:`datetime` objects so that date filters and arithmetic wo
 import re
 from datetime import datetime, timedelta
 
+from cascade.low.func import Either
 from jinja2 import Environment, StrictUndefined, TemplateSyntaxError
 from jinja2 import nodes as jnodes
 from jinja2.sandbox import SandboxedEnvironment
@@ -117,10 +118,10 @@ def _collect_glyph_names(node: jnodes.Node, glyphs: set[str]) -> None:
         _collect_glyph_names(child, glyphs)
 
 
-def extract_glyph_names(raw: str) -> tuple[set[str], str | None]:
+def extract_glyph_names(raw: str) -> Either[set[str], str]:
     """Extract variable names from ``${...}`` expressions in ``raw`` using the Jinja2 AST.
 
-    Returns ``(names, None)`` on success and ``(set(), error_message)`` if the template
+    Returns ``Either.ok(names)`` on success and ``Either.error(message)`` if the template
     contains a syntax error.  Filter names, globals (``timedelta``, ``datetime``), and
     built-in Jinja2 names are excluded from the returned set.
     """
@@ -130,8 +131,8 @@ def extract_glyph_names(raw: str) -> tuple[set[str], str | None]:
     try:
         ast = parse_env.parse(normalised)
     except TemplateSyntaxError as exc:
-        return set(), str(exc)
+        return Either.error(str(exc))
 
     glyphs: set[str] = set()
     _collect_glyph_names(ast, glyphs)
-    return glyphs - _FILTER_NAMES, None
+    return Either.ok(glyphs - _FILTER_NAMES)
