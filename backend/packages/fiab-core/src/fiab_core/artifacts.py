@@ -21,8 +21,10 @@ from pydantic import BaseModel, Field
 # NOTE we may eventually fine-grain this with like cuda versions or architecture etc, form a hierarchy, etc. Or maybe not and this will be enough.
 Platform = Literal["macos", "linux"]
 
-MlModelCheckpointId = str
-ArtifactStoreId = str
+import typing
+
+MlModelCheckpointId = typing.NewType("MlModelCheckpointId", str)
+ArtifactStoreId = typing.NewType("ArtifactStoreId", str)
 
 
 @dataclass(frozen=True, eq=True, slots=True)
