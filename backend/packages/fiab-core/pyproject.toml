@@ -39,5 +39,5 @@ tag_regex = '^[vd](?P<version>\d+(?:\.\d+){0,2}[^\+]*)(?:\+.*)?$'
 [tool.ruff]
 line-length = 140
 
-lint.ignore = [ "E731" ]
-lint.select = [ "I" ]
+lint.ignore = [ "E731", "ANN401" ]
+lint.select = ["I", "ANN"]
