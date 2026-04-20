@@ -18,7 +18,7 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 from cascade.low.func import Either
 from jinja2 import Environment, StrictUndefined, TemplateSyntaxError
@@ -84,7 +84,7 @@ class CustomFunction:
     name: str
     implementation: Callable[..., Any]
     description: str
-    kind: str  # "filter" | "global"
+    kind: Literal["filter", "global"]
 
 
 CUSTOM_FUNCTIONS: list[CustomFunction] = [

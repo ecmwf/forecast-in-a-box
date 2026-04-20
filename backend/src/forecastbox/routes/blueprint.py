@@ -17,6 +17,12 @@ Contains three categories of routes:
  - complete CRUD+list for blueprints,
  - limited CRUD+list for glyphs,
  - building helper routes, which the clients call in sequence before creating a blueprint.
+
+Glyph routes:
+ - GET  glyphs/list      — list intrinsic or global glyphs
+ - GET  glyphs/functions — list all custom interpolation functions (filters and globals)
+ - POST glyphs/global/post  — create or update a global glyph
+ - GET  glyphs/global/get   — retrieve a global glyph by id
 """
 
 from typing import Annotated, Literal, cast
@@ -185,6 +191,7 @@ class GlyphFunctionDetail(BaseModel):
 
     name: str
     description: str
+    kind: Literal["filter", "global"]
 
 
 class GlyphFunctionsResponse(BaseModel):
@@ -421,7 +428,7 @@ def list_glyph_functions() -> GlyphFunctionsResponse:
     (direct call syntax, e.g. ``${timedelta(days=1)}``).
     """
     return GlyphFunctionsResponse(
-        functions=[GlyphFunctionDetail(name=fn.name, description=fn.description) for fn in get_custom_functions()]
+        functions=[GlyphFunctionDetail(name=fn.name, description=fn.description, kind=fn.kind) for fn in get_custom_functions()]
     )
 
 
