@@ -479,6 +479,30 @@ def test_list_available_glyphs(backend_client_with_auth: httpx.Client) -> None:
     assert public_resp.status_code == 403
 
 
+def test_list_glyph_functions(backend_client_with_auth: httpx.Client) -> None:
+    """The glyphs/functions endpoint returns all registered custom functions with name and description."""
+    from forecastbox.domain.glyphs.jinja_interpolation import CUSTOM_FUNCTIONS
+
+    response = backend_client_with_auth.get("/blueprint/glyphs/functions")
+    assert response.is_success, response.text
+    data = response.json()
+
+    assert "functions" in data
+    functions = data["functions"]
+    assert isinstance(functions, list)
+    assert len(functions) == len(CUSTOM_FUNCTIONS)
+
+    returned_names = {fn["name"] for fn in functions}
+    expected_names = {fn.name for fn in CUSTOM_FUNCTIONS}
+    assert returned_names == expected_names
+
+    for fn in functions:
+        assert "name" in fn
+        assert "description" in fn
+        assert fn["name"]
+        assert fn["description"]
+
+
 def test_blueprint_expand_failure_01(backend_client_with_auth: httpx.Client) -> None:
     """Source has an invalid factory; transform referencing it must not generate its own error."""
     bad_source = BlockInstance(

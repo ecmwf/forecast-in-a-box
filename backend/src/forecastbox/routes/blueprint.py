@@ -39,6 +39,7 @@ from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.glyphs import global_db
 from forecastbox.domain.glyphs.exceptions import GlobalGlyphAccessDenied
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples
+from forecastbox.domain.glyphs.jinja_interpolation import get_custom_functions
 from forecastbox.domain.glyphs.types import GlobalGlyphId
 from forecastbox.domain.plugin.manager import catalogue_view, plugins_ready
 from forecastbox.utility.auth import AuthContext
@@ -177,6 +178,19 @@ class GlobalGlyphLookup(BaseModel):
     """Identifies a global glyph by its stable id."""
 
     global_glyph_id: GlobalGlyphId
+
+
+class GlyphFunctionDetail(BaseModel):
+    """Description of a single custom function available in glyph expressions."""
+
+    name: str
+    description: str
+
+
+class GlyphFunctionsResponse(BaseModel):
+    """All custom functions (filters and globals) registered in the interpolation environment."""
+
+    functions: list[GlyphFunctionDetail]
 
 
 @router.post("/create")
@@ -397,6 +411,18 @@ async def list_available_glyphs(
         rows = list(await global_db.list_global_glyphs(auth_context, offset=start, limit=pagination.page_size))
         glyphs_global = [GlyphDetail(name=str(row.key), display_name=str(row.key), valueExample=str(row.value)) for row in rows]
         return GlyphListResponse(glyphs=glyphs_global, total=total, page=pagination.page, page_size=pagination.page_size)
+
+
+@router.get("/glyphs/functions")
+def list_glyph_functions() -> GlyphFunctionsResponse:
+    """Return all custom functions available in glyph interpolation expressions.
+
+    Includes both filters (pipe syntax, e.g. ``${dt | add_days(1)}``) and globals
+    (direct call syntax, e.g. ``${timedelta(days=1)}``).
+    """
+    return GlyphFunctionsResponse(
+        functions=[GlyphFunctionDetail(name=fn.name, description=fn.description) for fn in get_custom_functions()]
+    )
 
 
 @router.post("/glyphs/global/post")

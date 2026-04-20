@@ -15,7 +15,10 @@ auto-coerced to :class:`datetime` objects so that date filters and arithmetic wo
 """
 
 import re
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Any
 
 from cascade.low.func import Either
 from jinja2 import Environment, StrictUndefined, TemplateSyntaxError
@@ -68,6 +71,74 @@ def _stringify_result(value: object) -> str:
     return str(value)
 
 
+@dataclass(frozen=True)
+class CustomFunction:
+    """A named function registered in the Jinja2 interpolation environment.
+
+    ``name`` is the keyword used in expressions (e.g. ``add_days``).
+    ``implementation`` is the callable registered as a filter or global.
+    ``description`` is a human-readable explanation shown via the API.
+    ``kind`` is either ``"filter"`` (pipe syntax) or ``"global"`` (direct call).
+    """
+
+    name: str
+    implementation: Callable[..., Any]
+    description: str
+    kind: str  # "filter" | "global"
+
+
+CUSTOM_FUNCTIONS: list[CustomFunction] = [
+    CustomFunction(
+        name="floor_day",
+        implementation=_floor_day,
+        description="Truncate a datetime to midnight: ${dt | floor_day}",
+        kind="filter",
+    ),
+    CustomFunction(
+        name="floor_hour",
+        implementation=_floor_hour,
+        description="Truncate a datetime to the start of the hour: ${dt | floor_hour}",
+        kind="filter",
+    ),
+    CustomFunction(
+        name="add_days",
+        implementation=_add_days,
+        description="Add n days to a datetime: ${dt | add_days(n)}",
+        kind="filter",
+    ),
+    CustomFunction(
+        name="sub_days",
+        implementation=_sub_days,
+        description="Subtract n days from a datetime: ${dt | sub_days(n)}",
+        kind="filter",
+    ),
+    CustomFunction(
+        name="add_hours",
+        implementation=_add_hours,
+        description="Add n hours to a datetime: ${dt | add_hours(n)}",
+        kind="filter",
+    ),
+    CustomFunction(
+        name="split",
+        implementation=_split,
+        description="Split a string on a separator: ${s | split('_')}",
+        kind="filter",
+    ),
+    CustomFunction(
+        name="timedelta",
+        implementation=timedelta,
+        description="Python timedelta constructor, for inline arithmetic: ${dt + timedelta(days=1)}",
+        kind="global",
+    ),
+    CustomFunction(
+        name="datetime",
+        implementation=datetime,
+        description="Python datetime constructor: ${datetime(2024, 1, 15)}",
+        kind="global",
+    ),
+]
+
+
 def _make_env() -> SandboxedEnvironment:
     env = SandboxedEnvironment(
         variable_start_string="${",
@@ -79,14 +150,11 @@ def _make_env() -> SandboxedEnvironment:
         keep_trailing_newline=True,
         undefined=StrictUndefined,
     )
-    env.filters["floor_day"] = _floor_day
-    env.filters["floor_hour"] = _floor_hour
-    env.filters["add_days"] = _add_days
-    env.filters["sub_days"] = _sub_days
-    env.filters["add_hours"] = _add_hours
-    env.filters["split"] = _split
-    env.globals["timedelta"] = timedelta
-    env.globals["datetime"] = datetime
+    for fn in CUSTOM_FUNCTIONS:
+        if fn.kind == "filter":
+            env.filters[fn.name] = fn.implementation
+        else:
+            env.globals[fn.name] = fn.implementation
     env.finalize = _stringify_result  # type: ignore[method-assign]
     return env
 
@@ -95,6 +163,11 @@ _ENV = _make_env()
 
 # Names that are part of the jinja2 environment (filters + globals) rather than user variables.
 _FILTER_NAMES: frozenset[str] = frozenset(_ENV.filters) | frozenset(_ENV.globals)
+
+
+def get_custom_functions() -> list[CustomFunction]:
+    """Return all custom functions registered in the interpolation environment."""
+    return list(CUSTOM_FUNCTIONS)
 
 
 def render_expression(raw: str, variables: dict[str, str]) -> str:
@@ -118,7 +191,7 @@ def _collect_glyph_names(node: jnodes.Node, glyphs: set[str]) -> None:
         _collect_glyph_names(child, glyphs)
 
 
-def extract_glyph_names(raw: str) -> Either[set[str], str]:
+def extract_glyph_names(raw: str) -> Either[set[str], str]:  # type: ignore[invalid-argument]
     """Extract variable names from ``${...}`` expressions in ``raw`` using the Jinja2 AST.
 
     Returns ``Either.ok(names)`` on success and ``Either.error(message)`` if the template
