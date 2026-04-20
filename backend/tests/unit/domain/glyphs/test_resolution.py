@@ -255,3 +255,159 @@ def test_expand_roots_cycle_still_raises() -> None:
 def test_expand_roots_none_equivalent_to_no_roots() -> None:
     glyphs = {"root": "/data", "myPath": "${root}/output"}
     assert expand_glyph_values(glyphs, roots=None) == expand_glyph_values(glyphs)
+
+
+# ---------------------------------------------------------------------------
+# extract_glyphs — jinja2 expression syntax
+# ---------------------------------------------------------------------------
+
+
+def test_extract_glyphs_datetime_filter_expression() -> None:
+    """Datetime filter expressions are parsed; only the variable name is returned."""
+    block = _block({"key": "${submitDatetime | add_days(1)}"})
+    result = extract_glyphs(block)
+    assert result.e is None
+    assert result.t == ExtractedGlyphs(glyphs={"submitDatetime"}, glyphed_options={"key"})
+
+
+def test_extract_glyphs_chained_filters() -> None:
+    block = _block({"key": "${submitDatetime | add_days(1) | floor_day}"})
+    result = extract_glyphs(block)
+    assert result.e is None
+    assert result.t == ExtractedGlyphs(glyphs={"submitDatetime"}, glyphed_options={"key"})
+
+
+def test_extract_glyphs_string_filters() -> None:
+    block = _block({"key": "${myParam | upper}"})
+    result = extract_glyphs(block)
+    assert result.e is None
+    assert result.t == ExtractedGlyphs(glyphs={"myParam"}, glyphed_options={"key"})
+
+
+def test_extract_glyphs_excludes_globals() -> None:
+    """timedelta and datetime globals must not appear as glyph names."""
+    block = _block({"key": "${submitDatetime + timedelta(days=1)}"})
+    result = extract_glyphs(block)
+    assert result.e is None
+    assert result.t == ExtractedGlyphs(glyphs={"submitDatetime"}, glyphed_options={"key"})
+
+
+def test_extract_glyphs_pure_arithmetic_no_variables() -> None:
+    block = _block({"key": "${42 ** 10}"})
+    result = extract_glyphs(block)
+    assert result.e is None
+    assert result.t == ExtractedGlyphs(glyphs=set(), glyphed_options=set())
+
+
+def test_extract_glyphs_multiple_variables_in_expression() -> None:
+    block = _block({"key": "${a + b | floor_day}"})
+    result = extract_glyphs(block)
+    assert result.e is None
+    assert result.t == ExtractedGlyphs(glyphs={"a", "b"}, glyphed_options={"key"})
+
+
+def test_extract_glyphs_malformed_expression_returns_error() -> None:
+    block = _block({"key": "${x |}"})
+    result = extract_glyphs(block)
+    assert result.e is not None
+    assert len(result.e) == 1
+    assert "'key'" in result.e[0]
+
+
+# ---------------------------------------------------------------------------
+# resolve_configurations — jinja2 datetime filters
+# ---------------------------------------------------------------------------
+
+_DT = "2024-01-15 06:00:00"
+_GLYPHS = {"submitDatetime": _DT}
+
+
+def test_resolve_add_days() -> None:
+    block = _block({"key": "${submitDatetime | add_days(1)}"})
+    resolve_configurations(block, _GLYPHS)
+    assert block.configuration_values["key"] == "2024-01-16 06:00:00"
+
+
+def test_resolve_sub_days() -> None:
+    block = _block({"key": "${submitDatetime | sub_days(2)}"})
+    resolve_configurations(block, _GLYPHS)
+    assert block.configuration_values["key"] == "2024-01-13 06:00:00"
+
+
+def test_resolve_add_hours() -> None:
+    block = _block({"key": "${submitDatetime | add_hours(6)}"})
+    resolve_configurations(block, _GLYPHS)
+    assert block.configuration_values["key"] == "2024-01-15 12:00:00"
+
+
+def test_resolve_floor_day() -> None:
+    block = _block({"key": "${submitDatetime | floor_day}"})
+    resolve_configurations(block, {"submitDatetime": "2024-01-15 06:30:00"})
+    assert block.configuration_values["key"] == "2024-01-15 00:00:00"
+
+
+def test_resolve_floor_hour() -> None:
+    block = _block({"key": "${submitDatetime | floor_hour}"})
+    resolve_configurations(block, {"submitDatetime": "2024-01-15 06:45:00"})
+    assert block.configuration_values["key"] == "2024-01-15 06:00:00"
+
+
+def test_resolve_chained_datetime_filters() -> None:
+    block = _block({"key": "${submitDatetime | add_days(1) | floor_day}"})
+    resolve_configurations(block, {"submitDatetime": "2024-01-15 14:30:00"})
+    assert block.configuration_values["key"] == "2024-01-16 00:00:00"
+
+
+def test_resolve_timedelta_global() -> None:
+    block = _block({"key": "${submitDatetime + timedelta(days=1)}"})
+    resolve_configurations(block, _GLYPHS)
+    assert block.configuration_values["key"] == "2024-01-16 06:00:00"
+
+
+def test_resolve_string_upper() -> None:
+    block = _block({"key": "${myParam | upper}"})
+    resolve_configurations(block, {"myParam": "hello_world"})
+    assert block.configuration_values["key"] == "HELLO_WORLD"
+
+
+def test_resolve_string_lower() -> None:
+    block = _block({"key": "${myParam | lower}"})
+    resolve_configurations(block, {"myParam": "Hello"})
+    assert block.configuration_values["key"] == "hello"
+
+
+def test_resolve_string_split_first() -> None:
+    block = _block({"key": "${myParam | split('_') | first}"})
+    resolve_configurations(block, {"myParam": "hello_world"})
+    assert block.configuration_values["key"] == "hello"
+
+
+def test_resolve_string_replace() -> None:
+    block = _block({"key": "${myParam | replace('_', '-')}"})
+    resolve_configurations(block, {"myParam": "hello_world"})
+    assert block.configuration_values["key"] == "hello-world"
+
+
+def test_resolve_arithmetic_expression() -> None:
+    block = _block({"key": "${x | int * 2 + 1}"})
+    resolve_configurations(block, {"x": "7"})
+    assert block.configuration_values["key"] == "15"
+
+
+def test_resolve_pure_arithmetic_literal() -> None:
+    block = _block({"key": "${42 ** 2}"})
+    resolve_configurations(block, {})
+    assert block.configuration_values["key"] == "1764"
+
+
+def test_resolve_date_like_string_not_coerced() -> None:
+    """A date-only string ('2024-01-15') must be passed through as-is without coercion."""
+    block = _block({"key": "${myDate}"})
+    resolve_configurations(block, {"myDate": "2024-01-15"})
+    assert block.configuration_values["key"] == "2024-01-15"
+
+
+def test_resolve_mixed_literal_and_expression() -> None:
+    block = _block({"key": "prefix_${submitDatetime | floor_day}_suffix"})
+    resolve_configurations(block, _GLYPHS)
+    assert block.configuration_values["key"] == "prefix_2024-01-15 00:00:00_suffix"
