@@ -47,10 +47,12 @@ class BlockFactory(BaseModel):
     """A list of input names, such as 'initial conditions' or 'forecast', for the purpose of description/configuration"""
 
 
-BlockFactoryId = str
-BlockInstanceId = str
-PluginId = str
-PluginStoreId = str
+import typing
+
+BlockFactoryId = typing.NewType("BlockFactoryId", str)
+BlockInstanceId = typing.NewType("BlockInstanceId", str)
+PluginId = typing.NewType("PluginId", str)
+PluginStoreId = typing.NewType("PluginStoreId", str)
 
 
 class PluginCompositeId(BaseModel):
@@ -59,11 +61,11 @@ class PluginCompositeId(BaseModel):
     local: PluginId
 
     @classmethod
-    def from_str(cls, v) -> "PluginCompositeId":
+    def from_str(cls, v: str) -> "PluginCompositeId":
         if ":" not in v:
             raise ValueError("must be of the form store:local")
         store, local = v.split(":", 1)
-        return cls(store=store, local=local)
+        return cls(store=PluginStoreId(store), local=PluginId(local))
 
     @staticmethod
     def to_str(k: Self) -> str:
