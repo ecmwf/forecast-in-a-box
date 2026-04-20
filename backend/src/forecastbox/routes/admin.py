@@ -13,7 +13,6 @@ Admin routes — /admin/*. Corresponds to the `domain.admin` submodule.
 Contains many varied utility routes related to user management, releases, versioning.
 """
 
-PREFIX = "/api/v1/admin"
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -29,6 +28,8 @@ from forecastbox.domain.auth.users import current_active_user
 from forecastbox.schemata.user import UserRead, UserTable, UserUpdate, async_session_maker
 from forecastbox.utility.config import BackendAPISettings, CascadeSettings, ProductSettings, config
 from forecastbox.utility.rsjf import ExportedSchemas, FormDefinition, from_pydantic
+
+PREFIX = "/api/v1/admin"
 
 logger = logging.getLogger(__name__)
 

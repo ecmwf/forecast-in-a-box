@@ -15,7 +15,6 @@ Contains three categories of routes:
  - Further detail endpoints -- inspecting outputs, getting logs
 """
 
-PREFIX = "/api/v1/run"
 import asyncio
 import io
 import logging
@@ -41,6 +40,8 @@ from forecastbox.routes.gateway import Globals
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
 from forecastbox.utility.pagination import PaginationSpec
+
+PREFIX = "/api/v1/run"
 
 logger = logging.getLogger(__name__)
 

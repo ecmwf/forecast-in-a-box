@@ -16,7 +16,6 @@ Contains three categories of routes:
  - operational routes for the scheduler module -- not related to any domain entity, but to backend itself
 """
 
-PREFIX = "/api/v1/experiment"
 import datetime as dt
 import logging
 from typing import Annotated, cast
@@ -36,6 +35,8 @@ from forecastbox.schemata.jobs import ExperimentDefinition
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.time import current_time
+
+PREFIX = "/api/v1/experiment"
 
 logger = logging.getLogger(__name__)
 
