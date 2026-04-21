@@ -11,7 +11,7 @@
 
 from dataclasses import dataclass, field
 
-PASSTHROUGH_USER_ID = "anonymous"
+PASSTHROUGH_USER_ID = "user"
 """Sentinel user-id stored in all resources created under passthrough (auth-disabled) mode."""
 
 

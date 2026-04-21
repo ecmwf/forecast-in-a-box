@@ -132,6 +132,8 @@ current_active_user = fastapi_users.current_user(active=True, optional=config.au
 async def get_auth_context(user: UserRead | None = Depends(current_active_user)) -> AuthContext:
     """Build an AuthContext from an optional authenticated user."""
     if user is None:
+        if not config.auth.passthrough:
+            raise ValueError("Unauthenticated request in non-passthrough deployment")
         return AuthContext(user_id=PASSTHROUGH_USER_ID, is_admin=False, is_passthrough=True)
     else:
         return AuthContext(user_id=str(user.id), is_admin=user.is_superuser, is_passthrough=False)
