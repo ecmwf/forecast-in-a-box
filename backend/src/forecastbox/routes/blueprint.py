@@ -31,7 +31,7 @@ from cascade.low.func import assert_never
 from fastapi import APIRouter, Depends, status
 from fastapi.exceptions import HTTPException
 from fiab_core.fable import BlockFactoryCatalogue, BlockInstanceId, PluginBlockFactoryId, PluginCompositeId
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint import db, service
@@ -43,7 +43,6 @@ from forecastbox.domain.blueprint.exceptions import (
 from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand, BlueprintValidationExpansion
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.glyphs import global_db
-from forecastbox.domain.glyphs.exceptions import GlobalGlyphAccessDenied
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples
 from forecastbox.domain.glyphs.jinja_interpolation import get_custom_functions
 from forecastbox.domain.glyphs.types import GlobalGlyphId
@@ -161,11 +160,24 @@ class GlyphListResponse(BaseModel):
 
 
 class GlobalGlyphPostRequest(BaseModel):
-    """Request body for creating or updating a global glyph."""
+    """Request body for creating or updating a global glyph.
+
+    ``overriddable`` must be omitted (or ``None``) when ``public=False`` and must
+    be provided when ``public=True``.  Non-admins may not set ``public=True``.
+    """
 
     key: str
     value: str
     public: bool = False
+    overriddable: bool | None = None
+
+    @model_validator(mode="after")
+    def check_overriddable(self) -> "GlobalGlyphPostRequest":
+        if self.public and self.overriddable is None:
+            raise ValueError("overriddable must be specified when public=True")
+        if not self.public and self.overriddable is not None:
+            raise ValueError("overriddable must not be specified when public=False")
+        return self
 
 
 class GlobalGlyphResponse(BaseModel):
@@ -175,6 +187,7 @@ class GlobalGlyphResponse(BaseModel):
     key: str
     value: str
     public: bool
+    overriddable: bool | None = None
     created_by: str | None = None
     created_at: str
     updated_at: str
@@ -452,15 +465,13 @@ async def post_global_glyph(
             status_code=403,
             detail="Only admins may create or update public global glyphs.",
         )
-    try:
-        row = await global_db.upsert_global_glyph(request.key, request.value, request.public, auth_context)
-    except GlobalGlyphAccessDenied as e:
-        raise HTTPException(status_code=403, detail=str(e))
+    row = await global_db.upsert_global_glyph(request.key, request.value, request.public, request.overriddable, auth_context)
     return GlobalGlyphResponse(
         global_glyph_id=GlobalGlyphId(str(row.global_glyph_id)),  # ty:ignore[invalid-argument-type]
         key=str(row.key),
         value=str(row.value),
         public=bool(row.public),
+        overriddable=bool(row.overriddable) if row.overriddable is not None else None,
         created_by=str(row.created_by) if row.created_by is not None else None,
         created_at=str(row.created_at),
         updated_at=str(row.updated_at),
@@ -481,6 +492,7 @@ async def get_global_glyph(
         key=str(row.key),
         value=str(row.value),
         public=bool(row.public),
+        overriddable=bool(row.overriddable) if row.overriddable is not None else None,
         created_by=str(row.created_by) if row.created_by is not None else None,
         created_at=str(row.created_at),
         updated_at=str(row.updated_at),
