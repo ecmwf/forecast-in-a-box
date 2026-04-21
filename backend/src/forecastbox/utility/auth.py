@@ -9,7 +9,7 @@
 
 """Cross-domain authentication context helpers."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 PASSTHROUGH_USER_ID = "user"
 """Sentinel user-id stored in all resources created under passthrough (auth-disabled) mode."""
@@ -22,25 +22,18 @@ class AuthContext:
     Two special regimes exist beyond ordinary authenticated users:
 
     - **Admin** (``is_admin=True``): sees and may mutate all resources.
-    - **Passthrough** (``is_passthrough=True``): used in single-user local
-      deployments where authentication is disabled.  Treated identically to an
-      admin — ``has_admin()`` returns ``True`` and ``allowed()`` always grants
-      access.  In this regime ``user_id`` is set to ``PASSTHROUGH_USER_ID``
-      ("anonymous") rather than ``None`` so that ``created_by`` columns are
-      always non-null.
+    - **Passthrough**: used in single-user local deployments where
+      authentication is disabled.  Created with ``is_admin=True`` and
+      ``user_id=PASSTHROUGH_USER_ID`` so that ``created_by`` columns are
+      always non-null and admin access is granted.
     """
 
     user_id: str
     is_admin: bool
-    is_passthrough: bool = field(default=False)
 
     def has_admin(self) -> bool:
-        """Return True if the caller has unrestricted access.
-
-        True for explicit admins (``is_admin=True``) and for the passthrough
-        regime (``is_passthrough=True``, auth disabled).
-        """
-        return self.is_admin or self.is_passthrough
+        """Return True if the caller has unrestricted access (``is_admin=True``)."""
+        return self.is_admin
 
     def allowed(self, resource_owner: str) -> bool:
         """Return True if the caller may mutate a resource owned by resource_owner.

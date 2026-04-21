@@ -69,7 +69,7 @@ mem_session_maker_all = mem_session_maker_both
 _admin = AuthContext(user_id="admin", is_admin=True)
 _user1 = AuthContext(user_id="user1", is_admin=False)
 _user2 = AuthContext(user_id="user2", is_admin=False)
-_anon = AuthContext(user_id=PASSTHROUGH_USER_ID, is_admin=False, is_passthrough=True)
+_anon = AuthContext(user_id=PASSTHROUGH_USER_ID, is_admin=True)
 
 
 # ---------------------------------------------------------------------------

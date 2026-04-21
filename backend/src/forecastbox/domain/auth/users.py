@@ -134,6 +134,6 @@ async def get_auth_context(user: UserRead | None = Depends(current_active_user))
     if user is None:
         if not config.auth.passthrough:
             raise ValueError("Unauthenticated request in non-passthrough deployment")
-        return AuthContext(user_id=PASSTHROUGH_USER_ID, is_admin=False, is_passthrough=True)
+        return AuthContext(user_id=PASSTHROUGH_USER_ID, is_admin=True)
     else:
-        return AuthContext(user_id=str(user.id), is_admin=user.is_superuser, is_passthrough=False)
+        return AuthContext(user_id=str(user.id), is_admin=user.is_superuser)
