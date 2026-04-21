@@ -31,7 +31,7 @@ from cascade.low.func import assert_never
 from fastapi import APIRouter, Depends, status
 from fastapi.exceptions import HTTPException
 from fiab_core.fable import BlockFactoryCatalogue, BlockInstanceId, PluginBlockFactoryId, PluginCompositeId
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel
 
 from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint import db, service
@@ -148,6 +148,7 @@ class GlyphDetail(BaseModel):
     name: str
     display_name: str
     valueExample: str
+    created_by: str
 
 
 class GlyphListResponse(BaseModel):
@@ -170,14 +171,6 @@ class GlobalGlyphPostRequest(BaseModel):
     value: str
     public: bool = False
     overriddable: bool | None = None
-
-    @model_validator(mode="after")
-    def check_overriddable(self) -> "GlobalGlyphPostRequest":
-        if self.public and self.overriddable is None:
-            raise ValueError("overriddable must be specified when public=True")
-        if not self.public and self.overriddable is not None:
-            raise ValueError("overriddable must not be specified when public=False")
-        return self
 
 
 class GlobalGlyphResponse(BaseModel):
@@ -423,13 +416,21 @@ async def list_available_glyphs(
                 display_name = "Attempt Count (incremented on every restart)"
             else:
                 assert_never(glyph)
-            glyphs.append(GlyphDetail(name=glyph_name, display_name=display_name, valueExample=example))
+            glyphs.append(GlyphDetail(name=glyph_name, display_name=display_name, valueExample=example, created_by="intrinsic"))
         return GlyphListResponse(glyphs=glyphs, total=len(glyphs), page=1, page_size=len(glyphs))
     else:
         total = await global_db.count_global_glyphs(auth_context)
         start = pagination.start()
         rows = list(await global_db.list_global_glyphs(auth_context, offset=start, limit=pagination.page_size))
-        glyphs_global = [GlyphDetail(name=str(row.key), display_name=str(row.key), valueExample=str(row.value)) for row in rows]
+        glyphs_global = [
+            GlyphDetail(
+                name=str(row.key),
+                display_name=str(row.key),
+                valueExample=str(row.value),
+                created_by=str(row.created_by) if row.created_by is not None else "",
+            )
+            for row in rows
+        ]
         return GlyphListResponse(glyphs=glyphs_global, total=total, page=pagination.page, page_size=pagination.page_size)
 
 
@@ -452,13 +453,26 @@ async def post_global_glyph(
 ) -> GlobalGlyphResponse:
     """Create or update a global glyph by key.
 
-    Returns 422 if the key collides with any intrinsic glyph name.
+    Returns 422 if the key collides with any intrinsic glyph name, or if
+    ``overriddable`` is inconsistent with ``public`` (must be set when public=True,
+    must be absent when public=False).
+    Returns 403 if a non-admin tries to create a public glyph.
     """
     intrinsic_names = set(get_values_and_examples().keys())
     if request.key in intrinsic_names:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Key {request.key!r} is reserved as an intrinsic glyph and cannot be overridden.",
+        )
+    if request.public and request.overriddable is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="overriddable must be specified when public=True.",
+        )
+    if not request.public and request.overriddable is not None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="overriddable must not be specified when public=False.",
         )
     if request.public and not auth_context.has_admin():
         raise HTTPException(

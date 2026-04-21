@@ -17,7 +17,6 @@ from dataclasses import dataclass
 from sqlalchemy import Select, func, or_, select, update
 
 import forecastbox.schemata.jobs as _jobs_module
-from forecastbox.domain.glyphs.exceptions import GlobalGlyphAccessDenied
 from forecastbox.domain.glyphs.types import GlobalGlyphId
 from forecastbox.schemata.jobs import GlobalGlyph
 from forecastbox.utility.auth import AuthContext
