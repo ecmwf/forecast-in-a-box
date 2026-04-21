@@ -181,7 +181,7 @@ class GlobalGlyphResponse(BaseModel):
     value: str
     public: bool
     overriddable: bool | None = None
-    created_by: str | None = None
+    created_by: str
     created_at: str
     updated_at: str
 
@@ -427,7 +427,7 @@ async def list_available_glyphs(
                 name=str(row.key),
                 display_name=str(row.key),
                 valueExample=str(row.value),
-                created_by=str(row.created_by) if row.created_by is not None else "",
+                created_by=str(row.created_by),
             )
             for row in rows
         ]
@@ -486,7 +486,7 @@ async def post_global_glyph(
         value=str(row.value),
         public=bool(row.public),
         overriddable=bool(row.overriddable) if row.overriddable is not None else None,
-        created_by=str(row.created_by) if row.created_by is not None else None,
+        created_by=str(row.created_by),
         created_at=str(row.created_at),
         updated_at=str(row.updated_at),
     )
@@ -507,7 +507,7 @@ async def get_global_glyph(
         value=str(row.value),
         public=bool(row.public),
         overriddable=bool(row.overriddable) if row.overriddable is not None else None,
-        created_by=str(row.created_by) if row.created_by is not None else None,
+        created_by=str(row.created_by),
         created_at=str(row.created_at),
         updated_at=str(row.updated_at),
     )

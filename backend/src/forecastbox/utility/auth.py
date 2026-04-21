@@ -30,7 +30,7 @@ class AuthContext:
       always non-null.
     """
 
-    user_id: str | None
+    user_id: str
     is_admin: bool
     is_passthrough: bool = field(default=False)
 
