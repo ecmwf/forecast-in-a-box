@@ -32,13 +32,15 @@ class AuthContext:
     is_admin: bool
 
     def has_admin(self) -> bool:
-        """Return True if the caller has unrestricted access (``is_admin=True``)."""
+        """Return True if the caller has unrestricted access (``is_admin=True``).
+        Note: this is a standalone function for historical reasons, when the condition
+        was more complicated -- stick to that, it may change in the future again."""
         return self.is_admin
 
     def allowed(self, resource_owner: str) -> bool:
         """Return True if the caller may mutate a resource owned by resource_owner.
 
-        Grants access when ``has_admin()`` is True (admins and passthrough) or
+        Grants access when ``has_admin()`` is True (true admins and passthrough) or
         when the caller's ``user_id`` matches the resource owner.
         """
         return self.has_admin() or self.user_id == resource_owner

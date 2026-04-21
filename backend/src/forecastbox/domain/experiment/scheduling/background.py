@@ -97,10 +97,10 @@ class SchedulerThread(threading.Thread):
                     exec_result = self._run_async(
                         execute(
                             runnable.blueprint,
-                            # NOTE we dont know the actual value of the is_admin flag, but its not important for this call
+                            # NOTE the is_admin may be True, but we dont know and its not important for this call
                             AuthContext(
                                 user_id=runnable.created_by,
-                                is_admin=runnable.created_by == PASSTHROUGH_USER_ID,
+                                is_admin=False,
                             ),
                             experiment_id=experiment_id,
                             experiment_version=cast(int, exp_def.version),
