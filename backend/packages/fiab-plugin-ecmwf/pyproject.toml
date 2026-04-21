@@ -25,7 +25,7 @@ dependencies = [
 optional-dependencies.runtime = [
     "earthkit-data>=0.18.2",
     "earthkit>=0.13.2",
-    "earthkit-plots>=0.3.5",
+    "earthkit-plots>=0.3.5,<1.0",
     "earthkit-plots-default-styles>=0.1",
 ]
 
