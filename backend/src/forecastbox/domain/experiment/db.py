@@ -37,7 +37,7 @@ async def upsert_experiment_definition(
     blueprint_id: BlueprintId,
     blueprint_version: int,
     experiment_type: ExperimentType,
-    created_by: str | None,
+    created_by: str,
     experiment_definition: dict | None = None,
     display_name: str | None = None,
     display_description: str | None = None,
@@ -49,7 +49,7 @@ async def upsert_experiment_definition(
     For updates, checks that the caller is the owner or has admin access (via
     ``auth_context.allowed()``), raising ``ExperimentAccessDenied`` otherwise.
     Raises ``ExperimentNotFound`` if an ``experiment_definition_id`` is given but
-    does not exist.  ``created_by`` may be ``None`` in passthrough deployments.
+    does not exist.
     """
     id_provided = experiment_definition_id is not None
     experiment_id = experiment_definition_id if experiment_definition_id is not None else ExperimentDefinitionId(str(uuid.uuid4()))
@@ -77,7 +77,7 @@ async def upsert_experiment_definition(
                 owner_result = await session.execute(owner_query)
                 row = owner_result.first()
                 if row is not None:
-                    owner: str | None = row[0]
+                    owner: str = row[0]
                     if not auth_context.allowed(owner):
                         raise ExperimentAccessDenied(
                             f"User {auth_context.user_id!r} is not allowed to modify ExperimentDefinition {experiment_id!r}."
@@ -223,7 +223,7 @@ async def soft_delete_experiment_definition(experiment_id: ExperimentDefinitionI
     existing = await get_experiment_definition(experiment_id)
     if existing is None:
         raise ExperimentNotFound(f"No ExperimentDefinition with id={experiment_id!r}.")
-    if not auth_context.allowed(cast(str | None, existing.created_by)):
+    if not auth_context.allowed(cast(str, existing.created_by)):
         raise ExperimentAccessDenied(f"User {auth_context.user_id!r} is not allowed to delete ExperimentDefinition {experiment_id!r}.")
     stmt = update(ExperimentDefinition).where(ExperimentDefinition.experiment_definition_id == experiment_id).values(is_deleted=True)
     await executeAndCommit(stmt, _jobs_module.async_session_maker)

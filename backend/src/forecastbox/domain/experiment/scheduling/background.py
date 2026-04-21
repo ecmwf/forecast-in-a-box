@@ -24,7 +24,7 @@ from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run
 from forecastbox.domain.experiment.scheduling.job_utils import experiment2runnable
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.service import execute
-from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.auth import PASSTHROUGH_USER_ID, AuthContext
 from forecastbox.utility.concurrent import timed_acquire
 from forecastbox.utility.config import config
 from forecastbox.utility.time import current_time
@@ -98,7 +98,11 @@ class SchedulerThread(threading.Thread):
                         execute(
                             runnable.blueprint,
                             # NOTE we dont know the actual value of the is_admin flag, but its not important for this call
-                            AuthContext(user_id=runnable.created_by, is_admin=False),
+                            AuthContext(
+                                user_id=runnable.created_by,
+                                is_admin=False,
+                                is_passthrough=runnable.created_by == PASSTHROUGH_USER_ID,
+                            ),
                             experiment_id=experiment_id,
                             experiment_version=cast(int, exp_def.version),
                             compiler_runtime_context=runnable.compiler_runtime_context,

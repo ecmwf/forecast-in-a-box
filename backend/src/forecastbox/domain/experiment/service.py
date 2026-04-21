@@ -201,7 +201,7 @@ async def update_schedule(
             blueprint_id=BlueprintId(str(current.blueprint_id)),  # ty:ignore[invalid-argument-type]
             blueprint_version=cast(int, current.blueprint_version),
             experiment_type="cron_schedule",
-            created_by=cast(str | None, current.created_by),
+            created_by=cast(str, current.created_by),
             experiment_definition=new_experiment_definition,
             display_name=cast(str | None, current.display_name),
             display_description=cast(str | None, current.display_description),

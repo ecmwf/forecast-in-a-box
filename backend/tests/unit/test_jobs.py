@@ -37,7 +37,7 @@ from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
 from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import Base
-from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.auth import PASSTHROUGH_USER_ID, AuthContext
 
 
 @pytest_asyncio.fixture
@@ -69,7 +69,7 @@ mem_session_maker_all = mem_session_maker_both
 _admin = AuthContext(user_id="admin", is_admin=True)
 _user1 = AuthContext(user_id="user1", is_admin=False)
 _user2 = AuthContext(user_id="user2", is_admin=False)
-_anon = AuthContext(user_id=None, is_admin=False)
+_anon = AuthContext(user_id=PASSTHROUGH_USER_ID, is_admin=False, is_passthrough=True)
 
 
 # ---------------------------------------------------------------------------
@@ -275,19 +275,19 @@ async def test_jobs_experiment_definition_soft_delete(mem_session_maker_both: as
 
 @pytest.mark.asyncio
 async def test_experiment_create_anon_allowed(mem_session_maker_both: async_sessionmaker[AsyncSession]) -> None:
-    """Passthrough (user_id=None) callers may create experiments; created_by is stored as None."""
+    """Passthrough callers may create experiments; created_by is stored as the passthrough sentinel."""
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
     exp_id, v1 = await experiment_db.upsert_experiment_definition(
         auth_context=_anon,
         blueprint_id=job_id,
         blueprint_version=job_v,
         experiment_type="cron_schedule",
-        created_by=None,
+        created_by=PASSTHROUGH_USER_ID,
     )
     assert v1 == 1
     result = await experiment_db.get_experiment_definition(exp_id)
     assert result is not None
-    assert result.created_by is None
+    assert result.created_by == PASSTHROUGH_USER_ID
 
 
 @pytest.mark.asyncio
@@ -400,7 +400,7 @@ async def test_anon_update_blueprint_bypasses_ownership(mem_session_maker_both: 
         auth_context=_anon,
         blueprint_id=job_id,
         source="user_defined",
-        created_by=None,
+        created_by=PASSTHROUGH_USER_ID,
     )
     assert v2 == 2
 
@@ -444,7 +444,7 @@ async def test_anon_update_experiment_bypasses_ownership(mem_session_maker_both:
         blueprint_id=job_id,
         blueprint_version=job_v,
         experiment_type="cron_schedule",
-        created_by=None,
+        created_by=PASSTHROUGH_USER_ID,
     )
     assert v2 == 2
 

@@ -51,7 +51,7 @@ async def upsert_run(
     run_id: RunId | None = None,
     blueprint_id: BlueprintId,
     blueprint_version: int,
-    created_by: str | None,
+    created_by: str,
     status: RunStatus,
     experiment_id: ExperimentDefinitionId | None = None,
     experiment_version: int | None = None,
