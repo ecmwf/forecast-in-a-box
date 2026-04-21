@@ -202,6 +202,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
             {"plugin": {"store": "localTest", "local": "single"}, "factory": "transform_increment"},
             {"plugin": {"store": "localTest", "local": "single"}, "factory": "product_join"},
             {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_file"},
+            {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_image"},
         ]
     }
 
@@ -217,6 +218,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
         {"plugin": {"store": "localTest", "local": "single"}, "factory": "transform_increment"},
         {"plugin": {"store": "localTest", "local": "single"}, "factory": "product_join"},
         {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_file"},
+        {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_image"},
     ]
 
     product_join = BlockInstance(
@@ -715,6 +717,32 @@ def _make_builder_source_and_sink(tmpdir: str) -> BlueprintBuilder:
     return BlueprintBuilder(blocks={BlockInstanceId("source_42"): source_42, BlockInstanceId("my_sink"): sink})
 
 
+def _make_builder_source_and_two_sinks(tmpdir: str) -> BlueprintBuilder:
+    """Blueprint with source_42 → sink_file and source_42 → sink_image."""
+    source_42 = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_42")),
+        configuration_values={},
+        input_ids={},
+    )
+    sink_file = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
+        configuration_values={"fname": f"{tmpdir}/output_${{runId}}.txt"},
+        input_ids={"data": BlockInstanceId("source_42")},
+    )
+    sink_image = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_image")),
+        configuration_values={},
+        input_ids={"data": BlockInstanceId("source_42")},
+    )
+    return BlueprintBuilder(
+        blocks={
+            BlockInstanceId("source_42"): source_42,
+            BlockInstanceId("my_sink"): sink_file,
+            BlockInstanceId("my_image_sink"): sink_image,
+        }
+    )
+
+
 def test_run_delete_not_found(backend_client_with_auth: httpx.Client) -> None:
     """POST /run/delete with a non-existent run_id returns 404."""
     resp = backend_client_with_auth.post("/run/delete", json={"run_id": "nonexistent-run-id", "attempt_count": 1})
@@ -784,7 +812,7 @@ def test_run_delete_ok(tmpdir: Any, backend_client_with_auth: httpx.Client) -> N
 
 def test_run_output_content(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
     """Execute a run, wait for completion, then retrieve output content via outputContent."""
-    builder = _make_builder_source_and_sink(tmpdir)
+    builder = _make_builder_source_and_two_sinks(tmpdir)
     save_resp = backend_client_with_auth.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
     assert save_resp.is_success, save_resp.text
     blueprint_id = save_resp.json()["blueprint_id"]
@@ -800,15 +828,20 @@ def test_run_output_content(tmpdir: Any, backend_client_with_auth: httpx.Client)
     available_tasks = avail_resp.json()
     assert len(available_tasks) > 0
 
-    # Cascade only exposes sink tasks as ext_outputs; our blueprint has exactly one sink (my_sink).
-    # Its task ID encodes the runtime function name: fiab_plugin_test.runtime.sink_file:<hash>
-    sink_tasks = [t for t in available_tasks if "sink_file" in t]
-    assert len(sink_tasks) == 1, f"Expected exactly one sink_file task, got: {available_tasks}"
-    sink_task_id = sink_tasks[0]
+    # Cascade only exposes sink tasks as ext_outputs; our blueprint has two sinks.
+    # Task IDs encode the runtime function name: fiab_plugin_test.runtime.sink_file:<hash>
+    # and fiab_plugin_test.runtime.sink_image:<hash>
+    sink_file_tasks = [t for t in available_tasks if "sink_file" in t]
+    assert len(sink_file_tasks) == 1, f"Expected exactly one sink_file task, got: {available_tasks}"
+    sink_file_task_id = sink_file_tasks[0]
+
+    sink_image_tasks = [t for t in available_tasks if "sink_image" in t]
+    assert len(sink_image_tasks) == 1, f"Expected exactly one sink_image task, got: {available_tasks}"
+    sink_image_task_id = sink_image_tasks[0]
 
     content_resp = backend_client_with_auth.get(
         "/run/outputContent",
-        params={"run_id": run_id, "dataset_id": sink_task_id},
+        params={"run_id": run_id, "dataset_id": sink_file_task_id},
         # macOS has a delayed first cloudpickle import under forking; give it more time
         timeout=40.0 if sys.platform == "darwin" else None,
     )
@@ -818,9 +851,17 @@ def test_run_output_content(tmpdir: Any, backend_client_with_auth: httpx.Client)
 
     if sys.platform == "darwin":
         # Re-fetch without an extended timeout to confirm the import delay was a one-off
-        content_resp2 = backend_client_with_auth.get("/run/outputContent", params={"run_id": run_id, "dataset_id": sink_task_id})
+        content_resp2 = backend_client_with_auth.get("/run/outputContent", params={"run_id": run_id, "dataset_id": sink_file_task_id})
         assert content_resp2.is_success, content_resp2.text
         assert cloudpickle.loads(content_resp2.content) == "ok"
+
+    image_resp = backend_client_with_auth.get(
+        "/run/outputContent",
+        params={"run_id": run_id, "dataset_id": sink_image_task_id},
+    )
+    assert image_resp.is_success, image_resp.text
+    assert image_resp.headers.get("content-type", "").startswith("application/pickle")
+    assert len(image_resp.content) > 0
 
 
 def _wait_until_running(client: httpx.Client, run_id: str, sleep: float = 1.0, attempts: int = 60) -> None:
