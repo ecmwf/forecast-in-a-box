@@ -23,6 +23,7 @@ from typing import cast
 
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.glyphs import global_db
+from forecastbox.domain.glyphs.global_db import GlyphResolutionBuckets
 from forecastbox.domain.glyphs.resolution import (
     PINNED_INTRINSIC_KEYS,
     ExtractedGlyphs,
@@ -72,8 +73,7 @@ def execute_background(
             resolve_intrinsic_glyph_values(run_id, submit_time, start_time, attempt_count),
         )
 
-        global_rows = list(cast(list, run_async(global_db.list_global_glyphs(auth_context))))
-        global_values: dict[str, str] = {str(row.key): str(row.value) for row in global_rows}
+        global_buckets = cast(GlyphResolutionBuckets, run_async(global_db.get_glyphs_for_resolution(auth_context)))
 
         builder = BlueprintBuilder.model_validate(blueprint.builder)
         local_values: dict[str, str] = builder.local_glyphs
@@ -87,7 +87,14 @@ def execute_background(
         referenced_glyph_names = {
             name for block in builder.blocks.values() for name in cast(ExtractedGlyphs, extract_glyphs(block).t).glyphs
         }
-        all_glyphs_raw = merge_glyph_values(intrinsic_values, global_values, local_values, compiler_runtime_context.glyphs)
+        all_glyphs_raw = merge_glyph_values(
+            intrinsic_values,
+            global_buckets.public_overriddable,
+            global_buckets.user_own,
+            global_buckets.public_nonoverridable,
+            local_values,
+            compiler_runtime_context.glyphs,
+        )
         relevant_glyphs_and_values = expand_glyph_values(all_glyphs_raw, roots=referenced_glyph_names)
         used_glyphs = {k: all_glyphs_raw[k] for k in relevant_glyphs_and_values.keys() if k not in PINNED_INTRINSIC_KEYS}
 

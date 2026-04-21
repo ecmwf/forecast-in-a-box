@@ -80,17 +80,28 @@ def resolve_configurations(blockInstance: BlockInstance, glyph_values: dict[str,
 
 def merge_glyph_values(
     intrinsic_values: dict[str, str],
-    global_values: dict[str, str],
+    public_overriddable_values: dict[str, str],
+    user_values: dict[str, str],
+    public_nonoverridable_values: dict[str, str],
     local_values: dict[str, str],
     context_values: dict[str, str],
 ) -> dict[str, str]:
-    """Merge glyphs from all four sources into a single resolution map.
+    """Merge glyphs from all sources into a single resolution map.
 
-    Resolution order (lowest to highest precedence): intrinsic < global < local < context.
+    Resolution order (lowest to highest precedence):
+    intrinsic < public_overriddable < user_own < public_nonoverridable < local < context.
+
     Intrinsic pinned keys (``startDatetime``, ``attemptCount``) always win regardless,
     so that each restart records its own actual values.
     """
-    merged = {**intrinsic_values, **global_values, **local_values, **context_values}
+    merged = {
+        **intrinsic_values,
+        **public_overriddable_values,
+        **user_values,
+        **public_nonoverridable_values,
+        **local_values,
+        **context_values,
+    }
     for pinned in PINNED_INTRINSIC_KEYS:
         if pinned in intrinsic_values:
             merged[pinned] = intrinsic_values[pinned]

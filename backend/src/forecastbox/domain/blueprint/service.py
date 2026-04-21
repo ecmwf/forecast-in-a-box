@@ -137,10 +137,17 @@ async def validate_expand(
     outputs = {}
 
     intrinsic_values = cast(dict[str, str], get_values_and_examples())
-    global_glyphs = {str(row.key): str(row.value) for row in await global_db.list_global_glyphs(auth_context)}
+    global_buckets = await global_db.get_glyphs_for_resolution(auth_context)
     local_glyphs = blueprint.local_glyphs
 
-    all_glyphs_raw = merge_glyph_values(intrinsic_values, global_glyphs, local_glyphs, {})
+    all_glyphs_raw = merge_glyph_values(
+        intrinsic_values,
+        global_buckets.public_overriddable,
+        global_buckets.user_own,
+        global_buckets.public_nonoverridable,
+        local_glyphs,
+        {},
+    )
     available_glyphs = set(all_glyphs_raw.keys())
 
     global_errors: list[str] = []
