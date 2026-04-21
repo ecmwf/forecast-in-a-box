@@ -67,12 +67,19 @@ catalogue = BlockFactoryCatalogue(
             },
             inputs=["data"],
         ),
+        BlockFactoryId("sink_image"): BlockFactory(
+            kind="sink",
+            title="",
+            description="",
+            configuration_options={},
+            inputs=["data"],
+        ),
     }
 )
 
 
 def validator(instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-    if instance.factory_id.factory == "sink_file":
+    if instance.factory_id.factory in ("sink_file", "sink_image"):
         return Either.ok(NoOutput)
     elif instance.factory_id.factory in ("source_sleep", "source_text"):
         return Either.ok(RawOutput(type_fqn="str"))
@@ -83,7 +90,12 @@ def validator(instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -
 def expander(output: BlockInstanceOutput) -> list[BlockFactoryId]:
     if isinstance(output, RawOutput):
         if output.type_fqn == "int":
-            return [BlockFactoryId("transform_increment"), BlockFactoryId("product_join"), BlockFactoryId("sink_file")]
+            return [
+                BlockFactoryId("transform_increment"),
+                BlockFactoryId("product_join"),
+                BlockFactoryId("sink_file"),
+                BlockFactoryId("sink_image"),
+            ]
         if output.type_fqn == "str":
             return [BlockFactoryId("sink_file")]
     return []
@@ -111,6 +123,9 @@ def compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance
         data = lookup[instance.input_ids["data"]]
         fname = instance.configuration_values["fname"]
         action = data.map(Payload("fiab_plugin_test.runtime.sink_file", kwargs={"fname": fname}))  # type: ignore
+    elif instance.factory_id.factory == "sink_image":
+        data = lookup[instance.input_ids["data"]]
+        action = data.map(Payload("fiab_plugin_test.runtime.sink_image"))  # type: ignore
     else:
         raise TypeError(instance.factory_id.factory)
     return Either.ok(action)
