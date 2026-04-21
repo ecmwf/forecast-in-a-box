@@ -43,7 +43,6 @@ from forecastbox.domain.blueprint.exceptions import (
 from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand, BlueprintValidationExpansion
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.glyphs import global_db
-from forecastbox.domain.glyphs.exceptions import GlobalGlyphAccessDenied
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples
 from forecastbox.domain.glyphs.jinja_interpolation import get_custom_functions
 from forecastbox.domain.glyphs.types import GlobalGlyphId
@@ -149,6 +148,7 @@ class GlyphDetail(BaseModel):
     name: str
     display_name: str
     valueExample: str
+    created_by: str
 
 
 class GlyphListResponse(BaseModel):
@@ -161,11 +161,16 @@ class GlyphListResponse(BaseModel):
 
 
 class GlobalGlyphPostRequest(BaseModel):
-    """Request body for creating or updating a global glyph."""
+    """Request body for creating or updating a global glyph.
+
+    ``overriddable`` must be omitted (or ``None``) when ``public=False`` and must
+    be provided when ``public=True``.  Non-admins may not set ``public=True``.
+    """
 
     key: str
     value: str
     public: bool = False
+    overriddable: bool | None = None
 
 
 class GlobalGlyphResponse(BaseModel):
@@ -175,6 +180,7 @@ class GlobalGlyphResponse(BaseModel):
     key: str
     value: str
     public: bool
+    overriddable: bool | None = None
     created_by: str | None = None
     created_at: str
     updated_at: str
@@ -410,13 +416,21 @@ async def list_available_glyphs(
                 display_name = "Attempt Count (incremented on every restart)"
             else:
                 assert_never(glyph)
-            glyphs.append(GlyphDetail(name=glyph_name, display_name=display_name, valueExample=example))
+            glyphs.append(GlyphDetail(name=glyph_name, display_name=display_name, valueExample=example, created_by="intrinsic"))
         return GlyphListResponse(glyphs=glyphs, total=len(glyphs), page=1, page_size=len(glyphs))
     else:
         total = await global_db.count_global_glyphs(auth_context)
         start = pagination.start()
         rows = list(await global_db.list_global_glyphs(auth_context, offset=start, limit=pagination.page_size))
-        glyphs_global = [GlyphDetail(name=str(row.key), display_name=str(row.key), valueExample=str(row.value)) for row in rows]
+        glyphs_global = [
+            GlyphDetail(
+                name=str(row.key),
+                display_name=str(row.key),
+                valueExample=str(row.value),
+                created_by=str(row.created_by) if row.created_by is not None else "",
+            )
+            for row in rows
+        ]
         return GlyphListResponse(glyphs=glyphs_global, total=total, page=pagination.page, page_size=pagination.page_size)
 
 
@@ -439,7 +453,10 @@ async def post_global_glyph(
 ) -> GlobalGlyphResponse:
     """Create or update a global glyph by key.
 
-    Returns 422 if the key collides with any intrinsic glyph name.
+    Returns 422 if the key collides with any intrinsic glyph name, or if
+    ``overriddable`` is inconsistent with ``public`` (must be set when public=True,
+    must be absent when public=False).
+    Returns 403 if a non-admin tries to create a public glyph.
     """
     intrinsic_names = set(get_values_and_examples().keys())
     if request.key in intrinsic_names:
@@ -447,20 +464,28 @@ async def post_global_glyph(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Key {request.key!r} is reserved as an intrinsic glyph and cannot be overridden.",
         )
+    if request.public and request.overriddable is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="overriddable must be specified when public=True.",
+        )
+    if not request.public and request.overriddable is not None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="overriddable must not be specified when public=False.",
+        )
     if request.public and not auth_context.has_admin():
         raise HTTPException(
             status_code=403,
             detail="Only admins may create or update public global glyphs.",
         )
-    try:
-        row = await global_db.upsert_global_glyph(request.key, request.value, request.public, auth_context)
-    except GlobalGlyphAccessDenied as e:
-        raise HTTPException(status_code=403, detail=str(e))
+    row = await global_db.upsert_global_glyph(request.key, request.value, request.public, request.overriddable, auth_context)
     return GlobalGlyphResponse(
         global_glyph_id=GlobalGlyphId(str(row.global_glyph_id)),  # ty:ignore[invalid-argument-type]
         key=str(row.key),
         value=str(row.value),
         public=bool(row.public),
+        overriddable=bool(row.overriddable) if row.overriddable is not None else None,
         created_by=str(row.created_by) if row.created_by is not None else None,
         created_at=str(row.created_at),
         updated_at=str(row.updated_at),
@@ -481,6 +506,7 @@ async def get_global_glyph(
         key=str(row.key),
         value=str(row.value),
         public=bool(row.public),
+        overriddable=bool(row.overriddable) if row.overriddable is not None else None,
         created_by=str(row.created_by) if row.created_by is not None else None,
         created_at=str(row.created_at),
         updated_at=str(row.updated_at),
