@@ -293,7 +293,7 @@ class TestMapPlotSink:
             factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="MapPlotSink"),
             input_ids={"dataset": "source_output"},
             configuration_values={
-                "param": '["2t", "msl"]',
+                "param": "2t,msl",
                 "domain": "global",
                 "format": "png",
                 "groupby": "none",
@@ -326,7 +326,7 @@ class TestMapPlotSink:
             factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="MapPlotSink"),
             input_ids={"dataset": "source_output"},
             configuration_values={
-                "param": '["2t", "nonexistent"]',
+                "param": "2t,nonexistent",
                 "domain": "global",
                 "format": "png",
                 "groupby": "none",

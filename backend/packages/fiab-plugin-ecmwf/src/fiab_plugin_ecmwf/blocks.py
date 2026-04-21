@@ -310,7 +310,7 @@ class ZarrSink(Sink):
     def intersect(self, other: BlockInstanceOutput) -> bool:  # type: ignore[override]
         if not isinstance(other, QubedOutput):
             return False
-        return not other.dataqube.is_empty()
+        return bool(dimensions(other))
 
 
 class MapPlotSink(Sink):
