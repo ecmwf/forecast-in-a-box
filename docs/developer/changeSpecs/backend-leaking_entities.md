@@ -1,4 +1,10 @@
- Here's the consolidated analysis — only cases where a route's return type or its field types come from outside that route file:
+There are Domain Entities that are part of Request/Response fields in routers.
+This is an undesirable leak -- it makes the backend fragile to internal refactorings causing contract breakages.
+
+Locate all such cases, and propose a fix for them.
+
+
+Note: a prompt like the above was executed once, with the result included below. I did not take action at that time due to low priority.
 
   ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 

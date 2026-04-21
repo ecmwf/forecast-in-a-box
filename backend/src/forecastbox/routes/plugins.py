@@ -7,9 +7,13 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Plugin management routes — /plugin/*"""
+"""Plugin management routes — /plugin/*. Corresponds to `domain.plugin` submodule.
 
-PREFIX = "/api/v1/plugin"
+Contains:
+ - one operational route for status of the plugin installer module status,
+ - complete CRUD+List routes for the Plugin entity.
+"""
+
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -23,15 +27,12 @@ from forecastbox.routes.admin import get_admin_user
 from forecastbox.schemata.user import UserRead
 from forecastbox.utility.config import config
 
+PREFIX = "/api/v1/plugin"
+
 router = APIRouter(
     tags=["blueprint"],
     responses={404: {"description": "Not found"}},
 )
-
-
-@router.get("/status")
-def get_plugins_status_full() -> PluginsStatus:
-    return status_full()
 
 
 class PluginDetail(BaseModel):
@@ -51,6 +52,21 @@ class PluginDetail(BaseModel):
 
 class PluginListing(BaseModel):
     plugins: dict[PluginCompositeId, PluginDetail]
+
+
+# ---------------------------------------------------------------------------
+# Operational routes
+# ---------------------------------------------------------------------------
+
+
+@router.get("/status")
+def get_plugins_status_full() -> PluginsStatus:
+    return status_full()
+
+
+# ---------------------------------------------------------------------------
+# CRUD routes
+# ---------------------------------------------------------------------------
 
 
 @router.get("/details")

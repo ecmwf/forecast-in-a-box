@@ -13,6 +13,7 @@ import { InputGroupInput } from '@/components/ui/input-group'
 
 export interface StringFieldProps {
   id: string
+  configKey: string
   value: string
   onChange: (value: string) => void
   placeholder?: string
@@ -26,6 +27,7 @@ export interface StringFieldProps {
  */
 export function StringField({
   id,
+  configKey,
   value,
   onChange,
   placeholder,
@@ -35,6 +37,7 @@ export function StringField({
   return (
     <GlyphFieldWrapper
       id={id}
+      configKey={configKey}
       value={value}
       onChange={onChange}
       placeholder={placeholder}

@@ -7,11 +7,19 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
 
-from fiab_core.artifacts import ArtifactsProvider, CheckpointLookup, CompositeArtifactId, MlModelCheckpoint
+from fiab_core.artifacts import (
+    ArtifactsProvider,
+    ArtifactStoreId,
+    CheckpointLookup,
+    CompositeArtifactId,
+    MlModelCheckpoint,
+    MlModelCheckpointId,
+)
 
 
 def _reset_provider() -> None:
@@ -20,24 +28,24 @@ def _reset_provider() -> None:
 
 
 @pytest.fixture(autouse=True)
-def clean_provider():
+def clean_provider() -> Generator[None, None, None]:
     _reset_provider()
     yield
     _reset_provider()
 
 
-def test_get_checkpoint_lookup_raises_before_registration():
+def test_get_checkpoint_lookup_raises_before_registration() -> None:
     with pytest.raises(RuntimeError, match="get_checkpoint_lookup"):
         ArtifactsProvider.get_checkpoint_lookup()
 
 
-def test_get_artifact_local_path_raises_before_registration():
-    composite_id = CompositeArtifactId(artifact_store_id="store", ml_model_checkpoint_id="ckpt")
+def test_get_artifact_local_path_raises_before_registration() -> None:
+    composite_id = CompositeArtifactId(artifact_store_id=ArtifactStoreId("store"), ml_model_checkpoint_id=MlModelCheckpointId("ckpt"))
     with pytest.raises(RuntimeError, match="get_artifact_local_path"):
         ArtifactsProvider.get_artifact_local_path(composite_id)
 
 
-def test_get_checkpoint_lookup_returns_registered_result():
+def test_get_checkpoint_lookup_returns_registered_result() -> None:
     checkpoint = MlModelCheckpoint(
         url="http://example.com/model.ckpt",
         display_name="My Model",
@@ -49,14 +57,14 @@ def test_get_checkpoint_lookup_returns_registered_result():
         output_characteristics=[],
         input_characteristics=[],
     )
-    composite_id = CompositeArtifactId(artifact_store_id="s", ml_model_checkpoint_id="c")
+    composite_id = CompositeArtifactId(artifact_store_id=ArtifactStoreId("s"), ml_model_checkpoint_id=MlModelCheckpointId("c"))
     catalog: CheckpointLookup = {composite_id: checkpoint}
     ArtifactsProvider.register_get_checkpoint_lookup(lambda: catalog)
     result = ArtifactsProvider.get_checkpoint_lookup()
     assert result[composite_id] == checkpoint
 
 
-def test_get_checkpoint_lookup_returns_current_value_of_mutable_source():
+def test_get_checkpoint_lookup_returns_current_value_of_mutable_source() -> None:
     """Verifies that registering a lambda (not an instance) means callers see mutations."""
     catalog: dict[CompositeArtifactId, MlModelCheckpoint] = {}
     ArtifactsProvider.register_get_checkpoint_lookup(lambda: catalog)
@@ -73,13 +81,13 @@ def test_get_checkpoint_lookup_returns_current_value_of_mutable_source():
         output_characteristics=[],
         input_characteristics=[],
     )
-    catalog[CompositeArtifactId(artifact_store_id="s", ml_model_checkpoint_id="c")] = checkpoint
+    catalog[CompositeArtifactId(artifact_store_id=ArtifactStoreId("s"), ml_model_checkpoint_id=MlModelCheckpointId("c"))] = checkpoint
     assert len(ArtifactsProvider.get_checkpoint_lookup()) == 1
 
 
-def test_get_artifact_local_path_returns_registered_result():
+def test_get_artifact_local_path_returns_registered_result() -> None:
     base = Path("/data")
     ArtifactsProvider.register_get_artifact_local_path(lambda cid: base / cid.artifact_store_id / cid.ml_model_checkpoint_id)
 
-    composite_id = CompositeArtifactId(artifact_store_id="store", ml_model_checkpoint_id="ckpt")
+    composite_id = CompositeArtifactId(artifact_store_id=ArtifactStoreId("store"), ml_model_checkpoint_id=MlModelCheckpointId("ckpt"))
     assert ArtifactsProvider.get_artifact_local_path(composite_id) == Path("/data/store/ckpt")

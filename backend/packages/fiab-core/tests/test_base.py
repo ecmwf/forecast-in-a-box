@@ -11,6 +11,6 @@ from fiab_core.fable import *  # noqa: F403
 from fiab_core.plugin import *  # noqa: F403
 
 
-def test_ok():
+def test_ok() -> None:
     """Tests, as a minimum, that everything can be imported"""
     assert True

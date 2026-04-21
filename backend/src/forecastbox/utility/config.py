@@ -150,7 +150,7 @@ def _default_plugins() -> PluginsSettings:
 
 def _default_plugin_stores() -> PluginStoresConfig:
     return {
-        "ecmwf": PluginStoreConfig(
+        PluginStoreId("ecmwf"): PluginStoreConfig(
             url="https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/heads/main/install/plugins.json",
             method="file",
         ),
@@ -167,7 +167,7 @@ ArtifactStoresConfig = dict[ArtifactStoreId, ArtifactStoreConfig]
 
 def _default_artifact_stores() -> ArtifactStoresConfig:
     return {
-        "ecmwf": ArtifactStoreConfig(
+        ArtifactStoreId("ecmwf"): ArtifactStoreConfig(
             # TODO fix pre merge
             url="https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/d092af0130a1bc4b09d25d9f1785b94fe1e54b18/install/artifacts.json",
             method="file",

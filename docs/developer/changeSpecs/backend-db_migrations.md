@@ -1,7 +1,12 @@
-# Alembic
+# Current State
+We have no means of automatically migrating instances of user databases after we modify any database schema.
+
+# Options
+
+## Alembic
 looked too heavy handed to me, and more "server-oriented" whereas we deal with end-station deployed software
 
-# Manual
+## Manual
 Each schema change would be manually extracted as respective sql statement, and put in place.
 
 Ideally, it would execute changes based on versions (and version persistence would follow these updates transactionally),

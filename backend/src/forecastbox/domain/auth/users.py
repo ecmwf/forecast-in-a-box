@@ -18,15 +18,33 @@ from fastapi_users.authentication import AuthenticationBackend, CookieTransport,
 from fastapi_users.db import SQLAlchemyUserDatabase
 from fastapi_users.exceptions import InvalidPasswordException
 from sqlalchemy import func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from forecastbox.schemata.user import UserCreate, UserRead, UserTable, async_session_maker, get_user_db
-from forecastbox.utility.auth import AuthContext, user2auth
+from forecastbox.schemata.user import OAuthAccount, UserCreate, UserRead, UserTable, async_session_maker
+from forecastbox.utility.auth import PASSTHROUGH_USER_ID, AuthContext
 from forecastbox.utility.config import config
 
 SECRET = config.auth.jwt_secret.get_secret_value()
 COOKIE_NAME = "forecastbox_auth"
 
 logger = logging.getLogger(__name__)
+
+
+# ** DB part **
+
+
+async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
+    async with async_session_maker() as session:
+        yield session
+
+
+async def get_user_db(
+    session: AsyncSession = Depends(get_async_session),
+) -> AsyncGenerator[SQLAlchemyUserDatabase[UserTable, pydantic.UUID4], None]:
+    yield SQLAlchemyUserDatabase(session, UserTable, OAuthAccount)
+
+
+# ** util part **
 
 
 def verify_entitlements(user: UserTable) -> bool:
@@ -112,4 +130,10 @@ current_active_user = fastapi_users.current_user(active=True, optional=config.au
 
 
 async def get_auth_context(user: UserRead | None = Depends(current_active_user)) -> AuthContext:
-    return user2auth(user)
+    """Build an AuthContext from an optional authenticated user."""
+    if user is None:
+        if not config.auth.passthrough:
+            raise ValueError("Unauthenticated request in non-passthrough deployment")
+        return AuthContext(user_id=PASSTHROUGH_USER_ID, is_admin=True)
+    else:
+        return AuthContext(user_id=str(user.id), is_admin=user.is_superuser)

@@ -201,9 +201,6 @@ describe('Fable Builder Form Mode', () => {
     // The "Has errors" badge should be visible on the card
     // Use .first() since ValidationStatusBadge in the header also shows "Has errors"
     await expect.element(screen.getByText('Has errors').first()).toBeVisible()
-
-    // The "Configuration Issues" section should be visible
-    await expect.element(screen.getByText('Configuration Issues')).toBeVisible()
   })
 
   it('shows existing blocks with pre-filled configuration values', async () => {

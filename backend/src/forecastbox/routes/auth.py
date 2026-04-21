@@ -7,15 +7,20 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Auth routes — /auth/* and /users/*"""
+"""
+Auth routes — /auth/*". Corresponds to no internal domain, wraps the `fastapi_users` external library.
 
-PREFIX = "/api/v1"
+Responsible for all user authentication.
+"""
+
 from fastapi import APIRouter
 
-from forecastbox.entrypoint.auth.oidc import oauth_client
-from forecastbox.entrypoint.auth.users import auth_backend, fastapi_users
+from forecastbox.domain.auth.oidc import oauth_client
+from forecastbox.domain.auth.users import auth_backend, fastapi_users
 from forecastbox.schemata.user import UserCreate, UserRead, UserUpdate
 from forecastbox.utility.config import config
+
+PREFIX = "/api/v1"
 
 router = APIRouter()
 SECRET = config.auth.jwt_secret.get_secret_value()

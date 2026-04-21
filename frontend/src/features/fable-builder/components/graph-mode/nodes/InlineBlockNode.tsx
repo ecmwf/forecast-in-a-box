@@ -15,6 +15,7 @@ import { AlertCircle, Trash2 } from 'lucide-react'
 import type { Node, NodeProps } from '@xyflow/react'
 import type { FableNodeData } from '@/features/fable-builder/utils/fable-to-graph'
 import type { BlockFactory, BlockInstance } from '@/api/types/fable.types'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AddNodeButton } from '@/features/fable-builder/components/graph-mode/AddNodeButton'
 import { useNodeDimensions } from '@/features/fable-builder/hooks/useNodeDimensions'
 import {
@@ -39,6 +40,9 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { FieldRenderer } from '@/components/base/fields/FieldRenderer'
+import { ResolvedConfigContext } from '@/features/fable-builder/context/ResolvedConfigContext'
+import { FieldErrorsContext } from '@/features/fable-builder/context/FieldErrorsContext'
+import { mapBlockErrorsToFields } from '@/features/fable-builder/utils/map-block-errors-to-fields'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import {
@@ -49,11 +53,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 export type FableNode = Node<FableNodeData>
@@ -87,6 +86,13 @@ export const InlineBlockNode = memo(function ({
   const errors = blockValidation?.errors ?? []
   const possibleExpansions =
     validationState?.blockStates[id]?.possibleExpansions ?? []
+  const hasDownstream = useMemo(
+    () =>
+      Object.values(fable.blocks).some((block) =>
+        Object.values(block.input_ids).includes(id),
+      ),
+    [fable.blocks, id],
+  )
 
   const availableSources = useMemo(() => {
     const sources: Array<{
@@ -120,6 +126,11 @@ export const InlineBlockNode = memo(function ({
   const configOptions = Object.entries(factory.configuration_options)
   const inputs = factory.inputs
 
+  const mappedErrors = useMemo(
+    () => mapBlockErrorsToFields(errors, instance.configuration_values),
+    [errors, instance.configuration_values],
+  )
+
   return (
     <div
       ref={containerRef}
@@ -129,32 +140,20 @@ export const InlineBlockNode = memo(function ({
       onKeyDown={(e) => e.key === 'Enter' && selectBlock(id)}
       className={cn(
         'relative w-[380px] rounded-2xl border bg-card shadow-sm',
-        'cursor-pointer transition-all duration-300 hover:shadow-lg',
+        'cursor-pointer transition-all duration-200',
+        // Hover: subtle border hint (distinct from full selection)
+        !isSelected &&
+          !hasErrors &&
+          'hover:shadow-md hover:ring-1 hover:ring-primary/20',
+        // Selected: prominent blue ring + lifted scale
         isSelected &&
-          'shadow-[0_0_0_2px_rgba(18,69,222,1),0_15px_35px_-5px_rgba(18,69,222,0.15)]',
+          'scale-[1.02] shadow-[0_0_0_2.5px_rgba(18,69,222,1),0_20px_40px_-5px_rgba(18,69,222,0.2)]',
+        // Error (unselected): red ring
         hasErrors &&
           !isSelected &&
           'shadow-[0_0_0_2px_rgba(220,38,38,1),0_15px_35px_-5px_rgba(220,38,38,0.15)]',
       )}
     >
-      {hasErrors && (
-        <Tooltip>
-          <TooltipTrigger className="absolute -top-2 -right-2 z-10 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-destructive text-destructive-foreground">
-            <AlertCircle className="h-3 w-3" />
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-75">
-            <div className="space-y-1">
-              <P className="font-medium text-destructive">Validation Errors</P>
-              <ul className="list-disc space-y-0.5 pl-4 text-sm">
-                {errors.map((error, index) => (
-                  <li key={`${error}-${index}`}>{error}</li>
-                ))}
-              </ul>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      )}
-
       <div
         className={cn(
           'h-1.5 w-full rounded-t-2xl opacity-80',
@@ -273,34 +272,53 @@ export const InlineBlockNode = memo(function ({
         )}
 
         {configOptions.length > 0 && (
-          <div className="space-y-3">
-            {inputs.length > 0 && <Separator />}
-            <div className="text-sm font-medium text-muted-foreground">
-              Configuration
-            </div>
-            {configOptions.map(([key, option]) => (
-              <div
-                key={key}
-                className="nodrag space-y-1"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <FieldRenderer
-                  id={`config-${id}-${key}`}
-                  valueType={option.value_type}
-                  value={instance.configuration_values[key] || ''}
-                  onChange={(value) => updateBlockConfig(id, key, value)}
-                  label={option.title || key}
-                  description={option.description}
-                  inputClassName="h-8 text-sm"
-                />
+          <ResolvedConfigContext.Provider
+            value={validationState?.resolvedConfigurationOptions[id] ?? null}
+          >
+            <FieldErrorsContext.Provider value={mappedErrors.byConfigKey}>
+              <div className="space-y-3">
+                {inputs.length > 0 && <Separator />}
+                <div className="text-sm font-medium text-muted-foreground">
+                  Configuration
+                </div>
+                {configOptions.map(([key, option]) => (
+                  <div
+                    key={key}
+                    className="nodrag space-y-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <FieldRenderer
+                      id={`config-${id}-${key}`}
+                      configKey={key}
+                      valueType={option.value_type}
+                      value={instance.configuration_values[key] || ''}
+                      onChange={(value) => updateBlockConfig(id, key, value)}
+                      label={option.title || key}
+                      description={option.description}
+                      inputClassName="h-8 text-sm"
+                    />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </FieldErrorsContext.Provider>
+          </ResolvedConfigContext.Provider>
+        )}
+
+        {hasErrors && (
+          <Alert
+            variant="destructive"
+            className="nodrag mt-3 gap-1 px-2 py-1.5 text-xs"
+          >
+            <AlertCircle className="h-3 w-3" />
+            <AlertDescription className="line-clamp-2 text-xs">
+              {errors[0]}
+              {errors.length > 1 && ` (+${errors.length - 1} more)`}
+            </AlertDescription>
+          </Alert>
         )}
       </div>
 
       {inputs.map((inputName, index) => {
-        const isConnected = Boolean(instance.input_ids[inputName])
         const topPercent = ((index + 1) / (inputs.length + 1)) * 100
 
         return (
@@ -312,9 +330,7 @@ export const InlineBlockNode = memo(function ({
             title={inputName}
             className={cn(
               '-left-2.5! h-5! w-5! rounded-full! border-4! bg-card!',
-              isConnected
-                ? 'border-primary!'
-                : 'border-muted-foreground/30! hover:border-muted-foreground/50!',
+              'border-foreground/30!',
               'transition-all hover:scale-110',
             )}
             style={{
@@ -333,7 +349,7 @@ export const InlineBlockNode = memo(function ({
           title="Output"
           className={cn(
             '-right-2.5! h-5! w-5! rounded-full! border-4! bg-card!',
-            metadata.handleColor,
+            'border-foreground/30!',
             'transition-all hover:scale-110',
           )}
           style={{
@@ -348,6 +364,8 @@ export const InlineBlockNode = memo(function ({
           sourceBlockId={id}
           possibleExpansions={possibleExpansions}
           catalogue={catalogue}
+          hasErrors={hasErrors}
+          hasDownstream={hasDownstream}
         />
       )}
     </div>

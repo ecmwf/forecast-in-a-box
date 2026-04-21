@@ -17,7 +17,9 @@ from cascade.low.func import Either
 
 import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.experiment.db as experiment_db
+from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run
+from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.glyphs.resolution import value_dt2str
 from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.schemata.jobs import Blueprint
@@ -28,17 +30,17 @@ class RunnableExperiment:
     """Carries the Blueprint and all metadata needed to submit and track a scheduled run."""
 
     blueprint: Blueprint
-    created_by: str | None
+    created_by: str
     next_run_at: dt.datetime | None
     scheduled_at: dt.datetime
-    experiment_id: str
-    blueprint_id: str
+    experiment_id: ExperimentDefinitionId
+    blueprint_id: BlueprintId
     blueprint_version: int
     max_acceptable_delay_hours: int
     compiler_runtime_context: CompilerRuntimeContext
 
 
-async def experiment2runnable(experiment_id: str, exec_time: dt.datetime) -> Either[RunnableExperiment, str]:  # type: ignore[invalid-argument]
+async def experiment2runnable(experiment_id: ExperimentDefinitionId, exec_time: dt.datetime) -> Either[RunnableExperiment, str]:  # type: ignore[invalid-argument]
     """Convert an ExperimentDefinition into a RunnableExperiment for the given execution time.
 
     Loads the linked Blueprint and builds a CompilerRuntimeContext for the run.
@@ -51,7 +53,7 @@ async def experiment2runnable(experiment_id: str, exec_time: dt.datetime) -> Eit
     cron_expr = str(exp_def.get("cron_expr", ""))
     max_acceptable_delay_hours = int(exp_def.get("max_acceptable_delay_hours", 24))
 
-    job_def_id = str(exp.blueprint_id)  # ty:ignore[invalid-argument-type]
+    job_def_id = BlueprintId(str(exp.blueprint_id))  # ty:ignore[invalid-argument-type]
     job_def_version = cast(int, exp.blueprint_version)
     job_def = await blueprint_db.get_blueprint(job_def_id, job_def_version)
     if job_def is None:
@@ -61,7 +63,7 @@ async def experiment2runnable(experiment_id: str, exec_time: dt.datetime) -> Eit
 
     rv = RunnableExperiment(
         blueprint=job_def,
-        created_by=cast(str | None, exp.created_by),
+        created_by=cast(str, exp.created_by),
         next_run_at=next_run_at,
         scheduled_at=exec_time,
         experiment_id=experiment_id,

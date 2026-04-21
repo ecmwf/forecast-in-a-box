@@ -11,7 +11,8 @@
 Types pertaining to Forecast As BLock Expression (Fable): blocks
 """
 
-from typing import Any, Literal
+import abc
+from typing import Any, Literal, NewType
 
 from earthkit.workflows.fluent import Action
 from pydantic import BaseModel, ConfigDict, Field
@@ -48,10 +49,10 @@ class BlockFactory(BaseModel):
     """A list of input names, such as 'initial conditions' or 'forecast', for the purpose of description/configuration"""
 
 
-BlockFactoryId = str
-BlockInstanceId = str
-PluginId = str
-PluginStoreId = str
+BlockFactoryId = NewType("BlockFactoryId", str)
+BlockInstanceId = NewType("BlockInstanceId", str)
+PluginId = NewType("PluginId", str)
+PluginStoreId = NewType("PluginStoreId", str)
 
 
 class PluginCompositeId(BaseModel):
@@ -60,11 +61,11 @@ class PluginCompositeId(BaseModel):
     local: PluginId
 
     @classmethod
-    def from_str(cls, v) -> "PluginCompositeId":
+    def from_str(cls, v: str) -> Self:
         if ":" not in v:
             raise ValueError("must be of the form store:local")
         store, local = v.split(":", 1)
-        return cls(store=store, local=local)
+        return cls(store=PluginStoreId(store), local=PluginId(local))
 
     @staticmethod
     def to_str(k: Self) -> str:
@@ -96,22 +97,35 @@ class BlockInstance(BaseModel):
     """Keys come from factory's `inputs`, values are other blocks in the (partial) fable"""
 
 
-class QubedOutput(BaseModel):
+class BlockInstanceOutput(BaseModel, abc.ABC):
+    """Base class for all block outputs. Subclasses must implement is_empty()."""
+
+    @abc.abstractmethod
+    def is_empty(self) -> bool: ...
+
+
+class QubedOutput(BlockInstanceOutput):
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)  # otherwise Qube cannot be here
     dataqube: Qube = Field(default_factory=Qube.empty)
     datatype: str = Field(default="")
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+    def is_empty(self) -> bool:
+        return self.dataqube == Qube.empty()
 
-class RawOutput(BaseModel):
+
+class RawOutput(BlockInstanceOutput):
     type_fqn: str  # most likely you want Any here
 
+    def is_empty(self) -> bool:
+        return False
 
-class NoOutput(BaseModel):
+
+class NoOutput(BlockInstanceOutput):
     # use this when there is no output whatsoever -- this stops *any* expansion of the block
-    pass
 
+    def is_empty(self) -> bool:
+        return True
 
-BlockInstanceOutput = QubedOutput | RawOutput | NoOutput
 
 ActionLookup = dict[BlockInstanceId, Action]

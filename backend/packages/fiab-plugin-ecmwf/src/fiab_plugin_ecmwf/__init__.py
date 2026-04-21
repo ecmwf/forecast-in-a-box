@@ -7,16 +7,17 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+from fiab_core.fable import BlockFactoryId
 from fiab_core.tools.blocks import QubedBlockBuilder
 from fiab_core.tools.plugins import QubedPluginBuilder
 
 from fiab_plugin_ecmwf.blocks import EkdSource, EnsembleStatistics, TemporalStatistics, ZarrSink
 
-blocks: dict[str, QubedBlockBuilder] = {
-    "ekdSource": EkdSource(),
-    "ensembleStatistics": EnsembleStatistics(),
-    "temporalStatistics": TemporalStatistics(),
-    "zarrSink": ZarrSink(),
+blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
+    BlockFactoryId("ekdSource"): EkdSource(),
+    BlockFactoryId("ensembleStatistics"): EnsembleStatistics(),
+    BlockFactoryId("temporalStatistics"): TemporalStatistics(),
+    BlockFactoryId("zarrSink"): ZarrSink(),
 }
 
 plugin = QubedPluginBuilder(block_builders=blocks).as_plugin()
