@@ -89,8 +89,10 @@ def merge_glyph_values(
     """Merge glyphs from all sources into a single resolution map.
 
     Resolution order (lowest to highest precedence):
-    intrinsic < public_overriddable < user_own < public_nonoverridable < local < context.
+    intrinsic < public_overriddable < user_own < local < public_nonoverridable < context.
 
+    ``public_nonoverridable`` beats local blueprint glyphs so that admin-mandated
+    values cannot be bypassed at the blueprint level.
     Intrinsic pinned keys (``startDatetime``, ``attemptCount``) always win regardless,
     so that each restart records its own actual values.
     """
@@ -98,8 +100,8 @@ def merge_glyph_values(
         **intrinsic_values,
         **public_overriddable_values,
         **user_values,
-        **public_nonoverridable_values,
         **local_values,
+        **public_nonoverridable_values,
         **context_values,
     }
     for pinned in PINNED_INTRINSIC_KEYS:

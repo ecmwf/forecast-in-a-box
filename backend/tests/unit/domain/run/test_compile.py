@@ -66,10 +66,16 @@ def test_merge_glyph_values_start_datetime_preserved_alongside_context() -> None
     assert result["globalKey"] == "gval"
 
 
-def test_merge_glyph_values_local_overrides_global() -> None:
-    """local_values take precedence over all global tiers for the same key."""
+def test_merge_glyph_values_local_overrides_overriddable_global() -> None:
+    """local_values take precedence over pub_overriddable and user_own tiers for the same key."""
     result = merge_glyph_values({}, {}, {"sharedKey": "globalVal"}, {}, {"sharedKey": "localVal"}, {})
     assert result == {"sharedKey": "localVal"}
+
+
+def test_merge_glyph_values_pub_nonoverridable_overrides_local() -> None:
+    """pub_nonoverridable_values take precedence over local_values, enforcing admin mandates."""
+    result = merge_glyph_values({}, {}, {}, {"sharedKey": "adminVal"}, {"sharedKey": "localVal"}, {})
+    assert result == {"sharedKey": "adminVal"}
 
 
 def test_merge_glyph_values_context_overrides_local() -> None:
@@ -92,10 +98,10 @@ def test_merge_glyph_values_local_not_overridable_for_pinned() -> None:
 
 
 def test_merge_glyph_values_resolution_order() -> None:
-    """Resolution order: pub_overriddable < user_own < pub_nonoverridable < local < context."""
+    """Resolution order: pub_overriddable < user_own < local < pub_nonoverridable < context."""
     key = "x"
     assert merge_glyph_values({}, {key: "a"}, {}, {}, {}, {})[key] == "a"
     assert merge_glyph_values({}, {key: "a"}, {key: "b"}, {}, {}, {})[key] == "b"
-    assert merge_glyph_values({}, {key: "a"}, {key: "b"}, {key: "c"}, {}, {})[key] == "c"
-    assert merge_glyph_values({}, {key: "a"}, {key: "b"}, {key: "c"}, {key: "d"}, {})[key] == "d"
-    assert merge_glyph_values({}, {key: "a"}, {key: "b"}, {key: "c"}, {key: "d"}, {key: "e"})[key] == "e"
+    assert merge_glyph_values({}, {key: "a"}, {key: "b"}, {}, {key: "c"}, {})[key] == "c"
+    assert merge_glyph_values({}, {key: "a"}, {key: "b"}, {key: "d"}, {key: "c"}, {})[key] == "d"
+    assert merge_glyph_values({}, {key: "a"}, {key: "b"}, {key: "d"}, {key: "c"}, {key: "e"})[key] == "e"
