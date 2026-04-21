@@ -41,6 +41,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
+import { GlyphReferencePanel } from '@/features/fable-builder/components/shared/GlyphReferencePanel'
 import { cn } from '@/lib/utils'
 
 interface ConfigPanelProps {
@@ -189,6 +190,7 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
                 />
               ))}
             </div>
+            <GlyphReferencePanel />
           </div>
         )}
 

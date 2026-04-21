@@ -9,7 +9,7 @@
 
 # Main module interface for React JSON Schema Form (RJSF) integration.
 # Provides pydantic implementations for both JSON Schema and UI Schema components,
-# enabling definition and rendering of forms based on JSON Schema.
+# enabling blueprint and rendering of forms based on JSON Schema.
 # https://rjsf-team.github.io/react-jsonschema-form/docs/
 
 

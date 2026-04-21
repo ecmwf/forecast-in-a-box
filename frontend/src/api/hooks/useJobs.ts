@@ -20,14 +20,12 @@ import type {
   JobExecutionDetail,
   JobExecutionList,
   JobStatus,
-  ProductToOutputId,
 } from '@/api/types/job.types'
 import { isTerminalStatus } from '@/api/types/job.types'
 import {
   deleteJob,
   executeJob,
   getJobAvailable,
-  getJobOutputs,
   getJobStatus,
   getJobsStatus,
   restartJob,
@@ -39,7 +37,6 @@ export const jobKeys = {
   status: (jobId: string) => [...jobKeys.all, 'status', jobId] as const,
   list: (page: number, pageSize: number, status?: JobStatus) =>
     [...jobKeys.all, 'list', page, pageSize, status] as const,
-  outputs: (jobId: string) => [...jobKeys.all, 'outputs', jobId] as const,
   available: (jobId: string) => [...jobKeys.all, 'available', jobId] as const,
 }
 
@@ -71,15 +68,6 @@ export function useJobsStatus(
   })
 }
 
-export function useJobOutputs(jobId: string | undefined) {
-  return useQuery<Array<ProductToOutputId>>({
-    queryKey: jobKeys.outputs(jobId ?? ''),
-    queryFn: () => getJobOutputs(jobId!),
-    enabled: !!jobId,
-    staleTime: 30 * 1000,
-  })
-}
-
 export function useJobAvailable(
   jobId: string | undefined,
   jobStatus?: JobStatus,
@@ -100,10 +88,14 @@ export function useJobAvailable(
 export function useRestartJob() {
   const queryClient = useQueryClient()
 
-  return useMutation<JobExecuteResponse, Error, string>({
-    mutationFn: restartJob,
-    onSuccess: (_data, executionId) => {
-      queryClient.invalidateQueries({ queryKey: jobKeys.status(executionId) })
+  return useMutation<
+    JobExecuteResponse,
+    Error,
+    { runId: string; attemptCount: number }
+  >({
+    mutationFn: ({ runId, attemptCount }) => restartJob(runId, attemptCount),
+    onSuccess: (_data, { runId }) => {
+      queryClient.invalidateQueries({ queryKey: jobKeys.status(runId) })
     },
   })
 }
@@ -111,8 +103,8 @@ export function useRestartJob() {
 export function useDeleteJob() {
   const queryClient = useQueryClient()
 
-  return useMutation<void, Error, string>({
-    mutationFn: deleteJob,
+  return useMutation<void, Error, { runId: string; attemptCount: number }>({
+    mutationFn: ({ runId, attemptCount }) => deleteJob(runId, attemptCount),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: jobKeys.all })
     },
@@ -129,10 +121,9 @@ interface SubmitFableParams {
 }
 
 export function useSubmitFable() {
-  return useMutation<{ execution_id: string }, Error, SubmitFableParams>({
+  return useMutation<{ run_id: string }, Error, SubmitFableParams>({
     mutationFn: async ({ fable, name, description, tags, fableId }) => {
-      // Save or update the fable definition first to get a persisted id/version
-      const { id, version } = await upsertFable({
+      const { blueprint_id, version } = await upsertFable({
         builder: fable,
         display_name: name,
         display_description: description,
@@ -140,10 +131,9 @@ export function useSubmitFable() {
         parent_id: fableId ?? undefined,
       })
 
-      // Execute the persisted definition by reference
       return executeJob({
-        job_definition_id: id,
-        job_definition_version: version,
+        blueprint_id,
+        blueprint_version: version,
       })
     },
   })

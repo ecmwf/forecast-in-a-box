@@ -1,6 +1,7 @@
 import json
 import re
 import tempfile
+from collections.abc import AsyncGenerator
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -8,10 +9,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import pytest_asyncio
 
-from forecastbox.api.updates import Release, get_local_release, get_lock_timestamp, get_most_recent_release, get_pylock, save_pylock
+from forecastbox.domain.admin import Release, get_local_release, get_lock_timestamp, get_most_recent_release, get_pylock, save_pylock
 
 
-def test_release_from_string():
+def test_release_from_string() -> None:
     assert Release.from_string("1.2.3") == Release(1, 2, 3)
     assert Release.from_string("v1.2.3") == Release(1, 2, 3)
     assert Release.from_string("d1.2.3") == Release(1, 2, 3)
@@ -19,7 +20,7 @@ def test_release_from_string():
     assert Release.from_string("1.2.3.dev4") == Release(1, 2, 3)
 
 
-def test_release_from_string_invalid():
+def test_release_from_string_invalid() -> None:
     with pytest.raises(ValueError):
         Release.from_string("1.2")
     with pytest.raises(ValueError):
@@ -27,7 +28,7 @@ def test_release_from_string_invalid():
 
 
 @pytest_asyncio.fixture
-async def mock_httpx_client():
+async def mock_httpx_client() -> AsyncGenerator[AsyncMock, None]:
     with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()
         mock_client_class.return_value.__aenter__.return_value = mock_client
@@ -35,7 +36,7 @@ async def mock_httpx_client():
 
 
 @pytest.mark.asyncio
-async def test_get_most_recent_release(mock_httpx_client):
+async def test_get_most_recent_release(mock_httpx_client: AsyncMock) -> None:
     mock_response_json = """
     [{
         "url":"https://api.github.com/repos/ecmwf/forecast-in-a-box/releases/257019467",
@@ -55,7 +56,7 @@ async def test_get_most_recent_release(mock_httpx_client):
 
 
 @pytest.mark.asyncio
-async def test_get_most_recent_release_no_releases(mock_httpx_client):
+async def test_get_most_recent_release_no_releases(mock_httpx_client: AsyncMock) -> None:
     mock_response_obj = MagicMock()
     mock_response_obj.json.return_value = []
     mock_response_obj.raise_for_status.return_value = None
@@ -64,10 +65,10 @@ async def test_get_most_recent_release_no_releases(mock_httpx_client):
         await get_most_recent_release()
 
 
-@patch("forecastbox.api.updates.fiab_home", new=Path("/tmp/fiab_test"))
+@patch("forecastbox.domain.admin.fiab_home", new=Path("/tmp/fiab_test"))
 @patch("pathlib.Path.is_file")
 @patch("pathlib.Path.read_text")
-def test_get_lock_timestamp(mock_read_text, mock_is_file):
+def test_get_lock_timestamp(mock_read_text: MagicMock, mock_is_file: MagicMock) -> None:
     # Test case: file exists and contains content
     mock_is_file.return_value = True
     mock_read_text.return_value = "1761908420:v0.1.0\n"
@@ -83,8 +84,8 @@ def test_get_lock_timestamp(mock_read_text, mock_is_file):
     assert get_lock_timestamp() == ""
 
 
-@patch("forecastbox.api.updates.get_lock_timestamp")
-def test_get_local_release(mock_get_lock_timestamp):
+@patch("forecastbox.domain.admin.get_lock_timestamp")
+def test_get_local_release(mock_get_lock_timestamp: MagicMock) -> None:
     # Test case: valid timestamp and release string
     mock_get_lock_timestamp.return_value = "1761908420:v0.1.0"
     dt, release = get_local_release()
@@ -113,7 +114,7 @@ def test_get_local_release(mock_get_lock_timestamp):
 
 
 @pytest.mark.asyncio
-async def test_get_pylock(mock_httpx_client):
+async def test_get_pylock(mock_httpx_client: AsyncMock) -> None:
     mock_pylock_content = '[tool.uv]\npython = "3.12"\n'
     mock_response_obj = MagicMock()
     mock_response_obj.text = mock_pylock_content
@@ -129,8 +130,8 @@ async def test_get_pylock(mock_httpx_client):
     assert content == mock_pylock_content
 
 
-@patch("forecastbox.api.updates.fiab_home")
-def test_save_pylock(mock_fiab_home):
+@patch("forecastbox.domain.admin.fiab_home")
+def test_save_pylock(mock_fiab_home: MagicMock) -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_path = Path(tmpdir)
 

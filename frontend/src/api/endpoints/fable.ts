@@ -16,22 +16,29 @@
 
 import type {
   BlockFactoryCatalogue,
+  BlueprintDeleteRequest,
+  BlueprintListResponse,
+  BlueprintUpdateRequest,
   FableBuilderV1,
-  FableCompileRequest,
   FableRetrieveResponse,
   FableUpsertRequest,
   FableUpsertResponse,
   FableValidationExpansion,
+  GlobalGlyphPostRequest,
+  GlobalGlyphResponse,
+  GlyphDetail,
+  GlyphListResponse,
 } from '@/api/types/fable.types'
-import type { ExecutionSpecification } from '@/api/types/job.types'
-import { ExecutionSpecificationSchema } from '@/api/types/job.types'
 import { apiClient } from '@/api/client'
 import { API_ENDPOINTS } from '@/api/endpoints'
 import {
   BlockFactoryCatalogueSchema,
+  BlueprintListResponseSchema,
   FableRetrieveResponseSchema,
   FableUpsertResponseSchema,
   FableValidationExpansionSchema,
+  GlobalGlyphResponseSchema,
+  GlyphListResponseSchema,
   normalizeCatalogueKeys,
 } from '@/api/types/fable.types'
 
@@ -77,35 +84,107 @@ export async function retrieveFable(
   version?: number,
 ): Promise<FableRetrieveResponse> {
   const params: Record<string, string | number> = {
-    fable_id: fableId,
+    blueprint_id: fableId,
   }
   if (version !== undefined) {
     params.version = version
   }
-  return apiClient.get(API_ENDPOINTS.fable.retrieve, {
+  return apiClient.get(API_ENDPOINTS.fable.get, {
     params,
     schema: FableRetrieveResponseSchema,
   })
 }
 
 /**
- * Create or update a fable with full metadata, returning { id, version }
+ * Create a fable with full metadata, returning { blueprint_id, version }
  */
 export async function upsertFable(
   request: FableUpsertRequest,
 ): Promise<FableUpsertResponse> {
-  return apiClient.post(API_ENDPOINTS.fable.upsert, request, {
+  return apiClient.post(API_ENDPOINTS.fable.create, request, {
     schema: FableUpsertResponseSchema,
   })
 }
 
 /**
- * Compile a fable by persisted definition reference
+ * List all saved blueprints (paginated)
  */
-export async function compileFable(
-  request: FableCompileRequest,
-): Promise<ExecutionSpecification> {
-  return apiClient.put(API_ENDPOINTS.fable.compile, request, {
-    schema: ExecutionSpecificationSchema,
+export async function listBlueprints(
+  page: number = 1,
+  pageSize: number = 10,
+): Promise<BlueprintListResponse> {
+  return apiClient.get(API_ENDPOINTS.fable.list, {
+    params: { page, page_size: pageSize },
+    schema: BlueprintListResponseSchema,
+  })
+}
+
+/**
+ * Update an existing blueprint (requires version for optimistic concurrency)
+ */
+export async function updateBlueprint(
+  request: BlueprintUpdateRequest,
+): Promise<FableUpsertResponse> {
+  return apiClient.post(API_ENDPOINTS.fable.update, request, {
+    schema: FableUpsertResponseSchema,
+  })
+}
+
+/**
+ * Delete a blueprint (requires version for optimistic concurrency)
+ */
+export async function deleteBlueprint(
+  request: BlueprintDeleteRequest,
+): Promise<void> {
+  return apiClient.post(API_ENDPOINTS.fable.delete, request)
+}
+
+/**
+ * List available intrinsic glyphs for ${glyph} interpolation in block configs
+ */
+export async function getAvailableGlyphs(): Promise<Array<GlyphDetail>> {
+  const response: GlyphListResponse = await apiClient.get(
+    API_ENDPOINTS.fable.glyphsList,
+    {
+      params: { glyph_type: 'intrinsic' },
+      schema: GlyphListResponseSchema,
+    },
+  )
+  return response.glyphs
+}
+
+/**
+ * List global glyphs (paginated)
+ */
+export async function listGlobalGlyphs(
+  page: number = 1,
+  pageSize: number = 50,
+): Promise<GlyphListResponse> {
+  return apiClient.get(API_ENDPOINTS.fable.glyphsList, {
+    params: { glyph_type: 'global', page, page_size: pageSize },
+    schema: GlyphListResponseSchema,
+  })
+}
+
+/**
+ * Create or update a global glyph
+ */
+export async function createGlobalGlyph(
+  request: GlobalGlyphPostRequest,
+): Promise<GlobalGlyphResponse> {
+  return apiClient.post(API_ENDPOINTS.fable.glyphsGlobalPost, request, {
+    schema: GlobalGlyphResponseSchema,
+  })
+}
+
+/**
+ * Get a global glyph by ID
+ */
+export async function getGlobalGlyph(
+  globalGlyphId: string,
+): Promise<GlobalGlyphResponse> {
+  return apiClient.get(API_ENDPOINTS.fable.glyphsGlobalGet, {
+    params: { global_glyph_id: globalGlyphId },
+    schema: GlobalGlyphResponseSchema,
   })
 }

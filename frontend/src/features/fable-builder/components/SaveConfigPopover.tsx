@@ -9,6 +9,7 @@
  */
 
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Loader2, Save, X } from 'lucide-react'
 import type {
   BlockFactoryCatalogue,
@@ -19,10 +20,9 @@ import {
   BLOCK_KIND_ORDER,
   getBlocksByKind,
 } from '@/api/types/fable.types'
+import { ApiClientError } from '@/api/client'
 import { useFableRetrieve, useUpsertFable } from '@/api/hooks/useFable'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
-import { useLocalStorage } from '@/hooks/useLocalStorage'
-import { STORAGE_KEYS } from '@/lib/storage-keys'
 import { showToast } from '@/lib/toast'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -36,19 +36,12 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 
-export interface FableBlockSummary {
+interface FableBlockSummary {
   source: number
   transform: number
   product: number
   sink: number
 }
-
-export interface FableSaveMetadata {
-  savedAt: string
-  isFavourite?: boolean
-}
-
-export type FableMetadataStore = Record<string, FableSaveMetadata>
 
 function computeBlockSummary(
   fable: FableBuilderV1,
@@ -90,11 +83,12 @@ export function BlockSummaryBadges({
   )
 }
 
-function generateDefaultTitle(): string {
+function generateDefaultTitleParts(): { date: string; time: string } {
   const now = new Date()
-  const date = now.toISOString().split('T')[0]
-  const time = now.toTimeString().slice(0, 5)
-  return `Forecast Config ${date} ${time}`
+  return {
+    date: now.toISOString().split('T')[0],
+    time: now.toTimeString().slice(0, 5),
+  }
 }
 
 interface SaveConfigPopoverProps {
@@ -112,15 +106,13 @@ export function SaveConfigPopover({
   open,
   onOpenChange,
 }: SaveConfigPopoverProps) {
+  const { t } = useTranslation(['configure', 'common'])
   const fable = useFableBuilderStore((s) => s.fable)
   const storeFableId = useFableBuilderStore((s) => s.fableId)
+  const storeFableVersion = useFableBuilderStore((s) => s.fableVersion)
   const markSaved = useFableBuilderStore((s) => s.markSaved)
 
   const upsertFable = useUpsertFable()
-  const [metadataStore, setMetadataStore] = useLocalStorage<FableMetadataStore>(
-    STORAGE_KEYS.fable.metadata,
-    {},
-  )
 
   const isControlled = open !== undefined
   const [internalOpen, setInternalOpen] = useState(false)
@@ -129,6 +121,9 @@ export function SaveConfigPopover({
   const effectiveFableId = fableId ?? storeFableId
   const isUpdate = !!effectiveFableId
   const { data: fableData } = useFableRetrieve(effectiveFableId)
+
+  const generateDefaultTitle = () =>
+    t('configure:save.defaultTitle', generateDefaultTitleParts())
 
   const [title, setTitle] = useState(generateDefaultTitle)
   const [comments, setComments] = useState('')
@@ -158,7 +153,7 @@ export function SaveConfigPopover({
   }
 
   function handleTagKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && tagInput.trim()) {
       e.preventDefault()
       addTag(tagInput)
       setTagInput('')
@@ -174,7 +169,10 @@ export function SaveConfigPopover({
 
   function handleOpenChange(nextOpen: boolean) {
     if (nextOpen) {
-      setTitle(fableData?.display_name || generateDefaultTitle())
+      setTitle(
+        fableData?.display_name ||
+          t('configure:save.defaultTitle', generateDefaultTitleParts()),
+      )
       setComments(fableData?.display_description || '')
       setTags(fableData?.tags ? [...fableData.tags] : [])
       setTagInput('')
@@ -188,8 +186,10 @@ export function SaveConfigPopover({
 
   async function handleSave(asCopy: boolean = false) {
     try {
-      const idToPass = asCopy ? undefined : (effectiveFableId ?? undefined)
-      const displayTitle = title.trim() || generateDefaultTitle()
+      const isExistingUpdate = !asCopy && !!effectiveFableId
+      const displayTitle =
+        title.trim() ||
+        t('configure:save.defaultTitle', generateDefaultTitleParts())
       // Include any pending text in the input as a final tag
       const finalTags = [...tags]
       const pendingTag = tagInput.trim()
@@ -198,36 +198,43 @@ export function SaveConfigPopover({
       }
       const result = await upsertFable.mutateAsync({
         fable,
-        fableId: idToPass,
+        // Update: pass ID + version for in-place update
+        // Save as New: pass ID as parentId for lineage tracking
+        fableId: isExistingUpdate ? effectiveFableId : undefined,
+        fableVersion: isExistingUpdate
+          ? (storeFableVersion ?? fableData?.version)
+          : undefined,
+        parentId: asCopy ? (effectiveFableId ?? undefined) : undefined,
         display_name: displayTitle,
         display_description: comments.trim(),
         tags: finalTags,
       })
 
-      const updatedStore = { ...metadataStore }
-      // If the backend returned a new ID (versioning), remove the old entry
-      const oldEntry = idToPass
-        ? (metadataStore[idToPass] as FableSaveMetadata | undefined)
-        : undefined
-      if (idToPass && result.id !== idToPass) {
-        delete updatedStore[idToPass]
-      }
-      updatedStore[result.id] = {
-        savedAt: new Date().toISOString(),
-        isFavourite: oldEntry?.isFavourite,
-      }
-      setMetadataStore(updatedStore)
-
-      markSaved(result.id, displayTitle)
+      markSaved(result.blueprint_id, result.version, displayTitle)
       handleOpenChange(false)
       showToast.success(
-        asCopy ? 'Configuration saved as new' : 'Configuration saved',
+        asCopy ? t('configure:save.savedAsNew') : t('configure:save.saved'),
       )
     } catch (error) {
-      showToast.error(
-        'Failed to save configuration',
-        error instanceof Error ? error.message : String(error),
-      )
+      let description: string
+      if (
+        error instanceof ApiClientError &&
+        error.status === 422 &&
+        error.details
+      ) {
+        const detail = error.details as {
+          global_errors?: Array<string>
+          block_errors?: Record<string, Array<string>>
+        }
+        const messages = [
+          ...(detail.global_errors ?? []),
+          ...Object.values(detail.block_errors ?? {}).flat(),
+        ]
+        description = messages.join('; ') || error.message
+      } else {
+        description = error instanceof Error ? error.message : String(error)
+      }
+      showToast.error(t('configure:save.saveFailed'), description)
     }
   }
 
@@ -254,104 +261,122 @@ export function SaveConfigPopover({
           ) : (
             <Save className="h-4 w-4" />
           )}
-          {isUpdate ? 'Update Config' : 'Save Config'}
+          {isUpdate
+            ? t('configure:save.triggerUpdate')
+            : t('configure:save.triggerSave')}
         </PopoverTrigger>
       )}
       <PopoverContent align="end" className="w-80">
         <PopoverHeader>
           <PopoverTitle>
-            {isUpdate ? 'Update Configuration' : 'Save Configuration'}
+            {isUpdate
+              ? t('configure:save.titleUpdate')
+              : t('configure:save.titleSave')}
           </PopoverTitle>
         </PopoverHeader>
 
-        {/* Block summary */}
-        <BlockSummaryBadges summary={summary} />
+        <form
+          className="flex flex-col gap-4"
+          onSubmit={(e) => {
+            e.preventDefault()
+            handleSave(false)
+          }}
+        >
+          {/* Block summary */}
+          <BlockSummaryBadges summary={summary} />
 
-        {/* Title input */}
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="save-config-title">Title</Label>
-          <Input
-            id="save-config-title"
-            placeholder="e.g. European forecast run"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </div>
-
-        {/* Comments textarea */}
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="save-config-comments">Comments</Label>
-          <textarea
-            id="save-config-comments"
-            rows={2}
-            placeholder="Optional notes about this configuration..."
-            value={comments}
-            onChange={(e) => setComments(e.target.value)}
-            className="w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
-          />
-        </div>
-
-        {/* Tags input */}
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="save-config-tags">Tags</Label>
-          <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border border-input bg-transparent px-3 py-1.5 shadow-xs transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 dark:bg-input/30">
-            {tags.map((tag) => (
-              <Badge
-                key={tag}
-                variant="secondary"
-                className="shrink-0 gap-1 py-0.5"
-              >
-                {tag}
-                <button
-                  type="button"
-                  onClick={() => handleRemoveTag(tag)}
-                  className="ml-0.5 rounded-full hover:bg-destructive/10 hover:text-destructive"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            ))}
-            <input
-              id="save-config-tags"
-              placeholder={tags.length === 0 ? 'e.g. production, europe' : ''}
-              value={tagInput}
-              onChange={handleTagChange}
-              onKeyDown={handleTagKeyDown}
-              className="min-w-[80px] flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          {/* Title input */}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="save-config-title">
+              {t('configure:save.titleLabel')}
+            </Label>
+            <Input
+              id="save-config-title"
+              placeholder={t('configure:save.titlePlaceholder')}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
             />
           </div>
-        </div>
 
-        {/* Actions */}
-        <div className="flex justify-end gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleOpenChange(false)}
-          >
-            Cancel
-          </Button>
-          {isUpdate && (
+          {/* Comments textarea */}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="save-config-comments">
+              {t('configure:save.commentsLabel')}
+            </Label>
+            <textarea
+              id="save-config-comments"
+              rows={2}
+              placeholder={t('configure:save.commentsPlaceholder')}
+              value={comments}
+              onChange={(e) => setComments(e.target.value)}
+              className="w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+            />
+          </div>
+
+          {/* Tags input */}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="save-config-tags">
+              {t('configure:save.tagsLabel')}
+            </Label>
+            <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border border-input bg-transparent px-3 py-1.5 shadow-xs transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 dark:bg-input/30">
+              {tags.map((tag) => (
+                <Badge
+                  key={tag}
+                  variant="secondary"
+                  className="shrink-0 gap-1 py-0.5"
+                >
+                  {tag}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveTag(tag)}
+                    className="ml-0.5 rounded-full hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+              <input
+                id="save-config-tags"
+                placeholder={
+                  tags.length === 0 ? t('configure:save.tagsPlaceholder') : ''
+                }
+                value={tagInput}
+                onChange={handleTagChange}
+                onKeyDown={handleTagKeyDown}
+                className="min-w-20 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              />
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex justify-end gap-2">
             <Button
+              type="button"
               variant="outline"
               size="sm"
-              onClick={() => handleSave(true)}
-              disabled={upsertFable.isPending}
+              onClick={() => handleOpenChange(false)}
             >
-              Save as New
+              {t('common:cancel')}
             </Button>
-          )}
-          <Button
-            size="sm"
-            onClick={() => handleSave(false)}
-            disabled={upsertFable.isPending}
-          >
-            {upsertFable.isPending && (
-              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            {isUpdate && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleSave(true)}
+                disabled={upsertFable.isPending}
+              >
+                {t('configure:save.saveAsNew')}
+              </Button>
             )}
-            {isUpdate ? 'Update' : 'Save'}
-          </Button>
-        </div>
+            <Button type="submit" size="sm" disabled={upsertFable.isPending}>
+              {upsertFable.isPending && (
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              )}
+              {isUpdate ? t('configure:save.update') : t('configure:save.save')}
+            </Button>
+          </div>
+        </form>
       </PopoverContent>
     </Popover>
   )

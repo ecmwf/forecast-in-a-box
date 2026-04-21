@@ -19,12 +19,11 @@ export const scheduleHandlers = [
   // GET endpoints
   http.get(API_ENDPOINTS.schedule.list, () => {
     return HttpResponse.json({
-      schedules: [],
+      experiments: [],
       total: 0,
       page: 1,
       page_size: 10,
       total_pages: 0,
-      error: null,
     })
   }),
 
@@ -62,10 +61,9 @@ export const scheduleHandlers = [
     return HttpResponse.json({
       experiment_id: 'mock-schedule-1',
       experiment_version: 1,
-      job_definition_id: 'mock-job-def',
-      job_definition_version: 1,
+      blueprint_id: 'mock-blueprint',
+      blueprint_version: 1,
       cron_expr: '0 6 * * *',
-      dynamic_expr: {},
       max_acceptable_delay_hours: 24,
       enabled: true,
       created_at: new Date().toISOString(),

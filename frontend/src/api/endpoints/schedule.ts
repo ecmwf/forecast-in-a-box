@@ -64,17 +64,23 @@ export async function createSchedule(
 
 export async function updateSchedule(
   experimentId: string,
+  version: number,
   update: ScheduleUpdate,
 ): Promise<ScheduleDefinitionResponse> {
-  return apiClient.post(API_ENDPOINTS.schedule.update, update, {
-    params: { experiment_id: experimentId },
-    schema: ScheduleDefinitionResponseSchema,
-  })
+  return apiClient.post(
+    API_ENDPOINTS.schedule.update,
+    { experiment_id: experimentId, version, ...update },
+    { schema: ScheduleDefinitionResponseSchema },
+  )
 }
 
-export async function deleteSchedule(experimentId: string): Promise<void> {
-  return apiClient.post(API_ENDPOINTS.schedule.delete, null, {
-    params: { experiment_id: experimentId },
+export async function deleteSchedule(
+  experimentId: string,
+  version: number,
+): Promise<void> {
+  return apiClient.post(API_ENDPOINTS.schedule.delete, {
+    experiment_id: experimentId,
+    version,
   })
 }
 

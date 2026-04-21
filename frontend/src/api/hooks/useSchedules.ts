@@ -32,6 +32,8 @@ import {
   getSchedules,
   updateSchedule,
 } from '@/api/endpoints/schedule'
+import { ApiClientError } from '@/api/client'
+import { QUERY_CONSTANTS } from '@/utils/constants'
 import { upsertFable } from '@/api/endpoints/fable'
 
 export const scheduleKeys = {
@@ -108,10 +110,17 @@ export function useUpdateSchedule() {
   return useMutation<
     unknown,
     Error,
-    { experimentId: string; update: ScheduleUpdate }
+    { experimentId: string; version: number; update: ScheduleUpdate }
   >({
-    mutationFn: ({ experimentId, update }) =>
-      updateSchedule(experimentId, update),
+    mutationFn: ({ experimentId, version, update }) =>
+      updateSchedule(experimentId, version, update),
+    retry: (failureCount, error) => {
+      if (error instanceof ApiClientError && error.status === 503) {
+        return failureCount < QUERY_CONSTANTS.RETRY.ON_503
+      }
+      return false
+    },
+    retryDelay: QUERY_CONSTANTS.RETRY_DELAY.ON_503,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: scheduleKeys.all })
     },
@@ -121,12 +130,22 @@ export function useUpdateSchedule() {
 export function useDeleteSchedule() {
   const queryClient = useQueryClient()
 
-  return useMutation<unknown, Error, string>({
-    mutationFn: deleteSchedule,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: scheduleKeys.all })
+  return useMutation<unknown, Error, { experimentId: string; version: number }>(
+    {
+      mutationFn: ({ experimentId, version }) =>
+        deleteSchedule(experimentId, version),
+      retry: (failureCount, error) => {
+        if (error instanceof ApiClientError && error.status === 503) {
+          return failureCount < QUERY_CONSTANTS.RETRY.ON_503
+        }
+        return false
+      },
+      retryDelay: QUERY_CONSTANTS.RETRY_DELAY.ON_503,
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: scheduleKeys.all })
+      },
     },
-  })
+  )
 }
 
 /**
@@ -206,7 +225,6 @@ interface CreateScheduleParams {
   fableId: string | null
   cronExpr: string
   maxAcceptableDelayHours: number
-  dynamicExpr: Record<string, unknown>
 }
 
 export function useCreateSchedule() {
@@ -221,10 +239,9 @@ export function useCreateSchedule() {
       fableId,
       cronExpr,
       maxAcceptableDelayHours,
-      dynamicExpr,
     }) => {
       // Upsert the fable to get a persisted id/version
-      const { id, version } = await upsertFable({
+      const { blueprint_id, version } = await upsertFable({
         builder: fable,
         display_name: name,
         display_description: description,
@@ -233,10 +250,9 @@ export function useCreateSchedule() {
       })
 
       return createSchedule({
-        job_definition_id: id,
-        job_definition_version: version,
+        blueprint_id,
+        blueprint_version: version,
         cron_expr: cronExpr,
-        dynamic_expr: dynamicExpr,
         max_acceptable_delay_hours: maxAcceptableDelayHours,
         display_name: name,
         display_description: description,

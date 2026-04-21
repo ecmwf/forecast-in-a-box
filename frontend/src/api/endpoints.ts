@@ -44,7 +44,7 @@ export const API_PREFIX = `/api/${API_VERSION}`
  * apiClient.get(API_ENDPOINTS.status)
  *
  * // Dynamic endpoint
- * apiClient.get(API_ENDPOINTS.job.statusById(jobId))
+ * apiClient.get(API_ENDPOINTS.job.list)
  * ```
  */
 export const API_ENDPOINTS = {
@@ -58,15 +58,25 @@ export const API_ENDPOINTS = {
    */
   fable: {
     /** GET - Get block catalogue */
-    catalogue: `${API_PREFIX}/fable/catalogue`,
+    catalogue: `${API_PREFIX}/blueprint/catalogue`,
     /** PUT - Expand a fable configuration */
-    expand: `${API_PREFIX}/fable/expand`,
+    expand: `${API_PREFIX}/blueprint/expand`,
     /** GET - Retrieve a saved fable with metadata */
-    retrieve: `${API_PREFIX}/fable/retrieve`,
-    /** POST - Create or update a fable with metadata (returns { id, version }) */
-    upsert: `${API_PREFIX}/fable/upsert`,
-    /** PUT - Compile a fable by persisted reference */
-    compile: `${API_PREFIX}/fable/compile`,
+    get: `${API_PREFIX}/blueprint/get`,
+    /** POST - Create a fable with metadata (returns { blueprint_id, version }) */
+    create: `${API_PREFIX}/blueprint/create`,
+    /** POST - Update a fable with metadata */
+    update: `${API_PREFIX}/blueprint/update`,
+    /** GET - List all fable definitions */
+    list: `${API_PREFIX}/blueprint/list`,
+    /** POST - Delete a fable definition */
+    delete: `${API_PREFIX}/blueprint/delete`,
+    /** GET - List available intrinsic glyphs for ${glyph} interpolation in block configs */
+    glyphsList: `${API_PREFIX}/blueprint/glyphs/list`,
+    /** POST - Create or update a global glyph */
+    glyphsGlobalPost: `${API_PREFIX}/blueprint/glyphs/global/post`,
+    /** GET - Get a global glyph by ID */
+    glyphsGlobalGet: `${API_PREFIX}/blueprint/glyphs/global/get`,
   },
 
   /**
@@ -133,29 +143,22 @@ export const API_ENDPOINTS = {
    * Job monitoring and execution endpoints
    */
   job: {
-    /** POST - Submit a job for execution (by definition id) */
-    execute: `${API_PREFIX}/job/execute`,
+    /** POST - Submit a job for execution (by blueprint id) */
+    create: `${API_PREFIX}/run/create`,
     /** GET - Get paginated status of all executions */
-    status: `${API_PREFIX}/job/status`,
-    /** GET - Get status of a single execution */
-    statusById: (executionId: string) =>
-      `${API_PREFIX}/job/${executionId}/status`,
-    /** GET - Get job outputs (product-to-task mapping) */
-    outputs: (executionId: string) =>
-      `${API_PREFIX}/job/${executionId}/outputs`,
-    /** GET - Get list of available output task IDs */
-    available: (executionId: string) =>
-      `${API_PREFIX}/job/${executionId}/available`,
-    /** GET - Get job result data by task ID */
-    results: (executionId: string) =>
-      `${API_PREFIX}/job/${executionId}/results`,
-    /** GET - Download job logs as ZIP */
-    logs: (executionId: string) => `${API_PREFIX}/job/${executionId}/logs`,
-    /** POST - Restart an execution (returns same execution_id with bumped attempt_count) */
-    restart: (executionId: string) =>
-      `${API_PREFIX}/job/${executionId}/restart`,
-    /** DELETE - Delete an execution (execution_id as query param) */
-    delete: `${API_PREFIX}/job/delete`,
+    list: `${API_PREFIX}/run/list`,
+    /** GET - Get status of a single execution (query: run_id) */
+    get: `${API_PREFIX}/run/get`,
+    /** POST - Restart an execution (body: { run_id, attempt_count }) */
+    restart: `${API_PREFIX}/run/restart`,
+    /** GET - Get list of available output task IDs (query: run_id) */
+    outputAvailability: `${API_PREFIX}/run/outputAvailability`,
+    /** GET - Get job result data by task ID (query: run_id, dataset_id) */
+    outputContent: `${API_PREFIX}/run/outputContent`,
+    /** GET - Download job logs as ZIP (query: run_id) */
+    logs: `${API_PREFIX}/run/logs`,
+    /** POST - Delete an execution (body: { run_id, attempt_count }) */
+    delete: `${API_PREFIX}/run/delete`,
   },
 
   /**
@@ -173,23 +176,23 @@ export const API_ENDPOINTS = {
    */
   schedule: {
     /** GET - List all schedules (query: page, page_size, enabled) */
-    list: `${API_PREFIX}/schedule/list`,
+    list: `${API_PREFIX}/experiment/list`,
     /** PUT - Create a new schedule */
-    create: `${API_PREFIX}/schedule/create`,
+    create: `${API_PREFIX}/experiment/create`,
     /** GET - Get a schedule (query: experiment_id) */
-    get: `${API_PREFIX}/schedule/get`,
-    /** POST - Update a schedule (query: experiment_id) */
-    update: `${API_PREFIX}/schedule/update`,
-    /** POST - Delete a schedule (query: experiment_id) */
-    delete: `${API_PREFIX}/schedule/delete`,
-    /** GET - Get next run time (query: experiment_id) */
-    nextRun: `${API_PREFIX}/schedule/next_run`,
+    get: `${API_PREFIX}/experiment/get`,
+    /** POST - Update a schedule (body: experiment_id, version, ...update) */
+    update: `${API_PREFIX}/experiment/update`,
+    /** POST - Delete a schedule (body: experiment_id, version) */
+    delete: `${API_PREFIX}/experiment/delete`,
     /** GET - Get runs for a schedule (query: experiment_id, page, page_size, status) */
-    runs: `${API_PREFIX}/schedule/runs`,
-    /** POST - Restart the scheduler thread */
-    restart: `${API_PREFIX}/schedule/restart`,
+    runs: `${API_PREFIX}/experiment/runs/list`,
+    /** GET - Get next run time (query: experiment_id) */
+    nextRun: `${API_PREFIX}/experiment/runs/next`,
     /** GET - Get the scheduler's current time */
-    currentTime: `${API_PREFIX}/schedule/current_time`,
+    currentTime: `${API_PREFIX}/experiment/operational/scheduler/current_time`,
+    /** POST - Restart the scheduler thread */
+    restart: `${API_PREFIX}/experiment/operational/scheduler/restart`,
   },
 } as const
 
@@ -203,7 +206,7 @@ export const API_ENDPOINTS = {
  * ```typescript
  * import { API_PATTERNS } from '@/api/endpoints'
  *
- * http.get(API_PATTERNS.job.statusById, async ({ params }) => {
+ * http.get(API_PATTERNS.artifacts.listModels, async ({ request }) => {
  *   const { jobId } = params
  *   // ...
  * })
@@ -230,21 +233,5 @@ export const API_PATTERNS = {
     uninstall: `${API_PREFIX}/plugin/uninstall`,
     update: `${API_PREFIX}/plugin/update`,
     modifyEnabled: `${API_PREFIX}/plugin/modifyEnabled`,
-  },
-  job: {
-    /** Pattern: /api/v1/job/:executionId/status */
-    statusById: `${API_PREFIX}/job/:executionId/status`,
-    /** Pattern: /api/v1/job/:executionId/outputs */
-    outputs: `${API_PREFIX}/job/:executionId/outputs`,
-    /** Pattern: /api/v1/job/:executionId/available */
-    available: `${API_PREFIX}/job/:executionId/available`,
-    /** Pattern: /api/v1/job/:executionId/results */
-    results: `${API_PREFIX}/job/:executionId/results`,
-    /** Pattern: /api/v1/job/:executionId/logs */
-    logs: `${API_PREFIX}/job/:executionId/logs`,
-    /** Pattern: /api/v1/job/:executionId/restart */
-    restart: `${API_PREFIX}/job/:executionId/restart`,
-    /** Pattern: /api/v1/job/delete (execution_id as query param) */
-    delete: `${API_PREFIX}/job/delete`,
   },
 } as const

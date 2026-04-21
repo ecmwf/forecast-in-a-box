@@ -20,11 +20,11 @@ logger = logging.getLogger(__name__)
 class ChildProcessGroup:
     procs: list[Process]
 
-    def wait(self):
+    def wait(self) -> None:
         if self.procs:  # NOTE wait([]) actually stucks forever
             connection.wait([p.sentinel for p in self.procs])
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         for p in self.procs:
             if p.is_alive():
                 # p.interrupt() # TODO after 3.14 add
@@ -38,7 +38,7 @@ class ChildProcessGroup:
                 p.join(3)
 
 
-def previous_cleanup():
+def previous_cleanup() -> None:
     """Attempts killing all cascade/fiab procesess. To be executed prior to starting,
     to deal with leftovers from previous possibly unclean exit. *Not* to be executed
     when we are in service mode, ie, the system automatically started fiab process
@@ -53,7 +53,7 @@ def previous_cleanup():
     self = psutil.Process()
     executable = self.exe()
 
-    def filtering(p: psutil.Process):
+    def filtering(p: psutil.Process) -> bool:
         try:
             return p.exe() == executable and p.pid != self.pid and p.ppid() != self.pid
         except (psutil.AccessDenied, psutil.ZombieProcess):

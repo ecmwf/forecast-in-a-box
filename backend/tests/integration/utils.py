@@ -1,11 +1,38 @@
+import datetime
 import time
 from collections.abc import Callable
-from typing import Any
+from typing import Any, TypeVar, cast
 
-from forecastbox.api.types.jobs import JobExecutionDetail
+import httpx
+
+T = TypeVar("T")
 
 
-def extract_auth_token_from_response(response) -> None | str:
+def retry_until(
+    do_action: Callable[[], Any],
+    verify_ok: Callable[[Any], T | None],
+    *,
+    attempts: int = 20,
+    sleep: float = 0.5,
+    error_msg: str = "Max attempts exceeded",
+) -> T:
+    """Repeatedly call do_action() and pass the result to verify_ok().
+
+    verify_ok should return None to indicate "not yet done", raise to signal an
+    error, or return any truthy value to indicate success. That truthy value is
+    then returned by retry_until. Raises AssertionError after exhausting all
+    attempts.
+    """
+    for _ in range(attempts):
+        result = do_action()
+        ok = verify_ok(result)
+        if ok is not None:
+            return ok  # ty: ignore
+        time.sleep(sleep)
+    raise AssertionError(error_msg)
+
+
+def extract_auth_token_from_response(response: httpx.Response) -> None | str:
     """Extracts the authentication token from the response cookies.
 
     Will look for the `forecastbox_auth` cookie in the response,
@@ -31,7 +58,7 @@ def extract_auth_token_from_response(response) -> None | str:
     return None
 
 
-def prepare_cookie_with_auth_token(token) -> dict:
+def prepare_cookie_with_auth_token(token: str) -> dict:
     """Prepares a cookie with the authentication token.
 
     Parameters
@@ -47,67 +74,61 @@ def prepare_cookie_with_auth_token(token) -> dict:
     return {"name": "forecastbox_auth", "value": token}
 
 
-def ensure_completed(backend_client, job_id, sleep=0.5, attempts=20):
-    i = attempts
-    while i > 0:
+def ensure_completed(backend_client: httpx.Client, job_id: str, sleep: float = 0.5, attempts: int = 20) -> None:
+    def do_action() -> Any:
         response = backend_client.get("/job/status", timeout=10)
         assert response.is_success
-        status = response.json()["progresses"][job_id]["status"]
-        if status == "failed":
-            raise RuntimeError(f"Job {job_id} failed: {response.json()['progresses'][job_id]['error']}")
+        return response.json()["progresses"][job_id]
+
+    def verify_ok(progress: Any) -> bool | None:
+        if progress["status"] == "failed":
+            raise RuntimeError(f"Job {job_id} failed: {progress['error']}")
         # TODO parse response with corresponding class, define a method `not_failed` instead
-        assert status in {"submitted", "running", "completed"}
-        if status == "completed":
-            break
-        time.sleep(sleep)
-        i -= 1
+        assert progress["status"] in {"submitted", "running", "completed"}
+        return True if progress["status"] == "completed" else None
 
-    assert i > 0, f"Failed to finish job {job_id}"
+    retry_until(do_action, verify_ok, attempts=attempts, sleep=sleep, error_msg=f"Failed to finish job {job_id}")
 
 
-def ensure_schedule_run_v2(backend_client, experiment_id: str, sleep: float = 1.0, attempts: int = 30) -> str:
-    """Wait for at least one run to appear for the given schedule; return the execution_id.
+def ensure_schedule_run_v2(backend_client: httpx.Client, experiment_id: str, sleep: float = 1.0, attempts: int = 30) -> str:
+    """Wait for at least one run to appear for the given schedule; return the run_id.
 
-    Polls GET /schedule/runs until total > 0, up to attempts * sleep seconds.
+    Polls GET /experiment/runs/list until total > 0, up to attempts * sleep seconds.
     """
-    for _ in range(attempts):
-        response = backend_client.get("/schedule/runs", params={"experiment_id": experiment_id}, timeout=10)
+
+    def do_action() -> Any:
+        response = backend_client.get("/experiment/runs/list", params={"experiment_id": experiment_id}, timeout=10)
         assert response.is_success, response.text
-        data = response.json()
-        if data["total"] > 0:
-            return data["runs"][0]["execution_id"]
-        time.sleep(sleep)
-    raise AssertionError(f"No run appeared for schedule {experiment_id} within {attempts} attempts")
+        return response.json()
+
+    def verify_ok(data: Any) -> str | None:
+        return data["runs"][0]["run_id"] if data["total"] > 0 else None
+
+    return cast(
+        str,
+        retry_until(
+            do_action,
+            verify_ok,
+            attempts=attempts,
+            sleep=sleep,
+            error_msg=f"No run appeared for schedule {experiment_id} within {attempts} attempts",
+        ),
+    )
 
 
-def ensure_completed_v2(backend_client, job_id, sleep=0.5, attempts=20):
-    i = attempts
-    while i > 0:
-        response = backend_client.get(f"/job/{job_id}/status", timeout=10)
-        assert response.is_success, response.text
-        detail = JobExecutionDetail(**response.json())
-        if detail.status == "failed":
-            raise RuntimeError(f"Job {job_id} failed: {detail}")
-        # TODO define a method `not_failed` instead
-        assert detail.status in {"submitted", "running", "completed"}, detail.status
-        if detail.status == "completed":
-            break
-        time.sleep(sleep)
-        i -= 1
-
-    assert i > 0, f"Failed to finish job {job_id}"
+def compare_with_tolerance(middle: str, expected: datetime.datetime, max_seconds: int = 2) -> bool:
+    """Parse middle as a datetime string, return whether delta from expected is in [0, max_seconds] seconds."""
+    parsed = datetime.datetime.fromisoformat(middle)
+    delta = (parsed - expected).total_seconds()
+    return 0 <= delta <= max_seconds
 
 
 def scheduling_endpoint_with_retries(fn: Callable[[], Any], *, attempts: int = 4, sleep: float = 0.5) -> Any:
     """Call fn() and retry on 503 Scheduler is busy, up to attempts times with sleep in between.
 
     fn should be a zero-argument callable that performs an HTTP request and returns the response.
-    Returns the last response regardless of status; callers should assert success as usual.
+    Raises AssertionError if all attempts return 503; callers should assert success as usual.
     """
-    response = fn()
-    for _ in range(attempts - 1):
-        if response.status_code != 503:
-            break
-        time.sleep(sleep)
-        response = fn()
-    return response
+    return retry_until(
+        fn, lambda r: r if r.status_code != 503 else None, attempts=attempts, sleep=sleep, error_msg="Scheduler busy after all retries"
+    )

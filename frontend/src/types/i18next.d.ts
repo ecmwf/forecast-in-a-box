@@ -25,6 +25,8 @@ import type pluginsEN from '@/locales/en/plugins.json'
 import type artifactsEN from '@/locales/en/artifacts.json'
 import type executionsEN from '@/locales/en/executions.json'
 import type schedulesEN from '@/locales/en/schedules.json'
+import type configureEN from '@/locales/en/configure.json'
+import type glyphsEN from '@/locales/en/glyphs.json'
 
 declare module 'i18next' {
   interface CustomTypeOptions {
@@ -41,6 +43,8 @@ declare module 'i18next' {
       artifacts: typeof artifactsEN
       executions: typeof executionsEN
       schedules: typeof schedulesEN
+      configure: typeof configureEN
+      glyphs: typeof glyphsEN
     }
   }
 }

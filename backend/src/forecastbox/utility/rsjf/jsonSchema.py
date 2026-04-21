@@ -38,7 +38,7 @@ class BaseSchema(BaseModel):
 
     model_config = ConfigDict(extra="allow", use_enum_values=True, json_schema_extra={"discriminator": "type"})
 
-    def update(self, *a, **k):
+    def update(self, *a: Any, **k: Any) -> None:
         pass
 
 
@@ -57,7 +57,7 @@ class EnumMixin:
     enum: list[Any] | None = None
     """list of allowed values for the schema."""
 
-    def update_enum(self, new_enum: list[Any]):
+    def update_enum(self, new_enum: list[Any]) -> None:
         if not isinstance(new_enum, list):
             raise TypeError("Enum must be a list")
         self.enum = new_enum

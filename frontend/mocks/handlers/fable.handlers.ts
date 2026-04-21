@@ -16,6 +16,7 @@ import {
 } from '../data/fable.data'
 import { consumeCatalogueUnavailable } from './plugins.handlers'
 import type {
+  BlueprintUpdateRequest,
   FableBuilderV1,
   FableUpsertRequest,
 } from '@/api/types/fable.types'
@@ -48,6 +49,43 @@ let fableIdCounter = 100
 const fableVersions: Record<string, number> = Object.fromEntries(
   Object.keys(mockSavedFables).map((id) => [id, 1]),
 )
+
+interface MockGlobalGlyph {
+  global_glyph_id: string
+  key: string
+  value: string
+  public: boolean
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+const mockGlobalGlyphs: Array<MockGlobalGlyph> = []
+let glyphIdCounter = 1
+
+const mockIntrinsicGlyphs = [
+  {
+    name: 'runId',
+    display_name: 'Run ID',
+    valueExample: '550e8400-e29b-41d4-a716-446655440000',
+  },
+  {
+    name: 'submitDatetime',
+    display_name:
+      'Submit Datetime (fixed at first submission, preserved on restart)',
+    valueExample: '2026-04-10 12:00:00',
+  },
+  {
+    name: 'startDatetime',
+    display_name: 'Start Datetime (updated on every restart)',
+    valueExample: '2026-04-10 12:00:00',
+  },
+  {
+    name: 'attemptCount',
+    display_name: 'Attempt Count (incremented on every restart)',
+    valueExample: '1',
+  },
+]
 
 export const fableHandlers = [
   http.get(API_ENDPOINTS.fable.catalogue, async () => {
@@ -82,7 +120,7 @@ export const fableHandlers = [
     return HttpResponse.json(expansion)
   }),
 
-  http.post(API_ENDPOINTS.fable.upsert, async ({ request }) => {
+  http.post(API_ENDPOINTS.fable.create, async ({ request }) => {
     await delay(500)
 
     let body: FableUpsertRequest
@@ -133,7 +171,10 @@ export const fableHandlers = [
         updated_at: now,
       }
 
-      return HttpResponse.json({ id: parent_id, version: newVersion })
+      return HttpResponse.json({
+        blueprint_id: parent_id,
+        version: newVersion,
+      })
     }
 
     const newId = `fable-${String(fableIdCounter++).padStart(3, '0')}`
@@ -150,18 +191,173 @@ export const fableHandlers = [
       updated_at: now,
     }
 
-    return HttpResponse.json({ id: newId, version: 1 })
+    return HttpResponse.json({ blueprint_id: newId, version: 1 })
   }),
 
-  http.get(API_ENDPOINTS.fable.retrieve, async ({ request }) => {
+  http.post(API_ENDPOINTS.fable.update, async ({ request }) => {
+    await delay(400)
+
+    let body: BlueprintUpdateRequest
+    try {
+      body = (await request.json()) as BlueprintUpdateRequest
+    } catch {
+      return HttpResponse.json(
+        { message: 'Invalid request body' },
+        { status: 400 },
+      )
+    }
+
+    const existing = savedFablesState[body.blueprint_id]
+    if (!existing) {
+      return HttpResponse.json(
+        { message: 'Blueprint not found' },
+        { status: 404 },
+      )
+    }
+
+    const currentVersion = fableVersions[body.blueprint_id] ?? 1
+    if (body.version !== currentVersion) {
+      return HttpResponse.json({ message: 'Version conflict' }, { status: 409 })
+    }
+
+    const newVersion = currentVersion + 1
+    fableVersions[body.blueprint_id] = newVersion
+
+    savedFablesState[body.blueprint_id] = {
+      ...existing,
+      fable: body.builder,
+      display_name: body.display_name ?? existing.display_name,
+      display_description:
+        body.display_description ?? existing.display_description,
+      tags: body.tags ?? existing.tags,
+      updated_at: new Date().toISOString(),
+    }
+
+    return HttpResponse.json({
+      blueprint_id: body.blueprint_id,
+      version: newVersion,
+    })
+  }),
+
+  http.get(API_ENDPOINTS.fable.list, async () => {
+    await delay(200)
+
+    const blueprints = Object.entries(savedFablesState)
+      .filter(
+        (pair): pair is [string, SavedFableEntry] => pair[1] !== undefined,
+      )
+      .map(([id, entry]) => ({
+        blueprint_id: id,
+        version: fableVersions[id] ?? 1,
+        display_name: entry.display_name,
+        display_description: entry.display_description,
+        tags: entry.tags,
+        source: null,
+        created_by: entry.user_id,
+      }))
+
+    return HttpResponse.json({
+      blueprints,
+      total: blueprints.length,
+      page: 1,
+      page_size: 50,
+    })
+  }),
+
+  http.get(API_ENDPOINTS.fable.glyphsList, async ({ request }) => {
+    await delay(200)
+    const url = new URL(request.url)
+    const glyphType = url.searchParams.get('glyph_type') ?? 'intrinsic'
+
+    if (glyphType === 'intrinsic') {
+      return HttpResponse.json({
+        glyphs: mockIntrinsicGlyphs,
+        total: mockIntrinsicGlyphs.length,
+        page: 1,
+        page_size: mockIntrinsicGlyphs.length,
+      })
+    }
+
+    // global
+    const page = Number(url.searchParams.get('page') ?? '1')
+    const pageSize = Number(url.searchParams.get('page_size') ?? '50')
+    const start = (page - 1) * pageSize
+    const slice = mockGlobalGlyphs.slice(start, start + pageSize)
+    return HttpResponse.json({
+      glyphs: slice.map((g) => ({
+        name: g.key,
+        display_name: g.key,
+        valueExample: g.value,
+      })),
+      total: mockGlobalGlyphs.length,
+      page,
+      page_size: pageSize,
+    })
+  }),
+
+  http.post(API_ENDPOINTS.fable.glyphsGlobalPost, async ({ request }) => {
+    await delay(300)
+    const body = (await request.json()) as {
+      key: string
+      value: string
+      public?: boolean
+    }
+
+    const intrinsicNames = new Set(mockIntrinsicGlyphs.map((g) => g.name))
+    if (intrinsicNames.has(body.key)) {
+      return HttpResponse.json(
+        {
+          detail: `Key '${body.key}' is reserved as an intrinsic glyph and cannot be overridden.`,
+        },
+        { status: 422 },
+      )
+    }
+
+    const existing = mockGlobalGlyphs.find((g) => g.key === body.key)
+    const now = new Date().toISOString()
+    if (existing) {
+      existing.value = body.value
+      existing.public = body.public ?? false
+      existing.updated_at = now
+      return HttpResponse.json(existing)
+    }
+
+    const newGlyph: MockGlobalGlyph = {
+      global_glyph_id: `glyph-${String(glyphIdCounter++).padStart(3, '0')}`,
+      key: body.key,
+      value: body.value,
+      public: body.public ?? false,
+      created_by: 'mock-user-123',
+      created_at: now,
+      updated_at: now,
+    }
+    mockGlobalGlyphs.push(newGlyph)
+    return HttpResponse.json(newGlyph)
+  }),
+
+  http.get(API_ENDPOINTS.fable.glyphsGlobalGet, async ({ request }) => {
+    await delay(200)
+    const url = new URL(request.url)
+    const id = url.searchParams.get('global_glyph_id')
+    const glyph = mockGlobalGlyphs.find((g) => g.global_glyph_id === id)
+    if (!glyph) {
+      return HttpResponse.json(
+        { detail: `GlobalGlyph '${id}' not found.` },
+        { status: 404 },
+      )
+    }
+    return HttpResponse.json(glyph)
+  }),
+
+  http.get(API_ENDPOINTS.fable.get, async ({ request }) => {
     await delay(300)
 
     const url = new URL(request.url)
-    const fableId = url.searchParams.get('fable_id')
+    const fableId = url.searchParams.get('blueprint_id')
 
     if (!fableId) {
       return HttpResponse.json(
-        { message: 'Missing fable_id parameter' },
+        { message: 'Missing blueprint_id parameter' },
         { status: 400 },
       )
     }
@@ -172,7 +368,7 @@ export const fableHandlers = [
     }
 
     return HttpResponse.json({
-      id: fableId,
+      blueprint_id: fableId,
       version: fableVersions[fableId] ?? 1,
       builder: saved.fable,
       display_name: saved.display_name,
@@ -180,50 +376,6 @@ export const fableHandlers = [
       tags: saved.tags,
       created_at: saved.created_at,
       updated_at: saved.updated_at,
-    })
-  }),
-
-  http.put(API_ENDPOINTS.fable.compile, async ({ request }) => {
-    await delay(600)
-
-    let body: { id: string; version?: number }
-    try {
-      body = (await request.json()) as { id: string; version?: number }
-    } catch {
-      return HttpResponse.json(
-        { message: 'Invalid request body' },
-        { status: 400 },
-      )
-    }
-
-    const saved = savedFablesState[body.id]
-    if (!saved) {
-      return HttpResponse.json({ message: 'Fable not found' }, { status: 404 })
-    }
-
-    const expansion = calculateExpansion(saved.fable)
-    const hasErrors =
-      expansion.global_errors.length > 0 ||
-      Object.values(expansion.block_errors).some((errors) => errors.length > 0)
-
-    if (hasErrors) {
-      return HttpResponse.json(
-        { message: 'Fable validation failed', errors: expansion },
-        { status: 422 },
-      )
-    }
-
-    return HttpResponse.json({
-      job: {
-        job_type: 'raw_cascade_job',
-        job_instance: { tasks: {}, edges: [] },
-      },
-      environment: {
-        hosts: null,
-        workers_per_host: null,
-        environment_variables: {},
-      },
-      shared: false,
     })
   }),
 ]

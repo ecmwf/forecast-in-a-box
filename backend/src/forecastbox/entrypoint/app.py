@@ -14,37 +14,38 @@ import logging
 import os
 import pkgutil
 import time
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fiab_core.artifacts import ArtifactsProvider
 from starlette.exceptions import HTTPException
 
-import forecastbox.db
-from forecastbox.api.artifacts.base import get_artifact_local_path
-from forecastbox.api.artifacts.manager import ArtifactManager, join_artifact_manager, submit_refresh_catalog
-from forecastbox.api.plugin.manager import PluginsStatus, join_updater_thread, submit_load_plugins
-from forecastbox.api.plugin.manager import status_brief as status_plugins
-from forecastbox.api.plugin.store import join_stores_thread, submit_initialize_stores
-from forecastbox.api.routers import admin, artifacts, auth, fable, gateway, job, plugin, schedule
-from forecastbox.api.scheduling.scheduler_thread import start_scheduler, status_scheduler, stop_scheduler
-from forecastbox.api.updates import get_local_release
+import forecastbox.routes
+import forecastbox.schemata
+from forecastbox.domain.admin import get_local_release
+from forecastbox.domain.artifact.base import get_artifact_local_path
+from forecastbox.domain.artifact.manager import ArtifactManager, join_artifact_manager, submit_refresh_catalog
+from forecastbox.domain.experiment.scheduling.background import start_scheduler, stop_scheduler
+from forecastbox.domain.plugin.manager import join_updater_thread, submit_load_plugins
+from forecastbox.domain.plugin.store import join_stores_thread, submit_initialize_stores
+from forecastbox.routes.gateway import shutdown_processes
 from forecastbox.utility.config import config
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.debug(f"Starting FIAB with config: {config}")
-    for module_info in pkgutil.iter_modules(forecastbox.db.__path__):
-        module = importlib.import_module(f"forecastbox.db.{module_info.name}")
+    for module_info in pkgutil.iter_modules(forecastbox.schemata.__path__):
+        module = importlib.import_module(f"forecastbox.schemata.{module_info.name}")
         if hasattr(module, "create_db_and_tables"):
             await module.create_db_and_tables()  # type: ignore[call-non-callable] # NOTE no module protocol
     if config.api.allow_scheduler:
@@ -61,7 +62,7 @@ async def lifespan(app: FastAPI):
     yield
     if config.api.allow_scheduler:
         stop_scheduler()
-    await gateway.shutdown_processes()
+    await shutdown_processes()
     join_updater_thread(timeout_sec=10)
     join_stores_thread(timeout_sec=10)
     join_artifact_manager(timeout_sec=10)
@@ -78,15 +79,12 @@ app = FastAPI(
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 
-# TODO replace with iter modules, this is awkward
-app.include_router(job.router, prefix="/api/v1/job")
-app.include_router(admin.router, prefix="/api/v1/admin")
-app.include_router(auth.router, prefix="/api/v1")
-app.include_router(gateway.router, prefix="/api/v1/gateway")
-app.include_router(schedule.router, prefix="/api/v1/schedule")
-app.include_router(fable.router, prefix="/api/v1/fable")
-app.include_router(plugin.router, prefix="/api/v1/plugin")
-app.include_router(artifacts.router, prefix="/api/v1/artifacts")
+# Auto-discover and register all route modules under forecastbox.routes.
+# Each module must expose a module-level `router` (APIRouter) and a `PREFIX` string.
+for _module_info in pkgutil.iter_modules(forecastbox.routes.__path__):
+    _module = importlib.import_module(f"forecastbox.routes.{_module_info.name}")
+    if hasattr(_module, "router") and hasattr(_module, "PREFIX"):
+        app.include_router(_module.router, prefix=_module.PREFIX)
 
 app.add_middleware(
     CORSMiddleware,  # type: ignore[invalid-argument-type]
@@ -104,7 +102,7 @@ app.add_middleware(
 
 
 @app.middleware("http")
-async def add_process_time_header(request: Request, call_next):
+async def add_process_time_header(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
     start_time = time.time()
     response = await call_next(request)
     logger.debug(f"Request took {time.time() - start_time:0.2f} sec")
@@ -112,7 +110,7 @@ async def add_process_time_header(request: Request, call_next):
 
 
 @app.middleware("http")
-async def circumvent_auth(request: Request, call_next):
+async def circumvent_auth(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
     # TODO this is a hotfix, we'd instead like to fix properly in api/routers/auth.py
     if request.url.path == "/api/v1/users/me" and config.auth.passthrough:
         from starlette.responses import JSONResponse
@@ -122,78 +120,21 @@ async def circumvent_auth(request: Request, call_next):
         return await call_next(request)
 
 
-@dataclass(frozen=True, eq=True, slots=True)
-class StatusResponse:
-    """Status response model"""
-
-    api: str
-    cascade: str
-    ecmwf: str
-    scheduler: str
-    version: str
-    plugins: str
-
-
-@app.get("/api/v1/status", tags=["status"])
-def status() -> StatusResponse:
-    """Status endpoint"""
-    from forecastbox.utility.config import config
-
-    status = {"api": "up", "cascade": "up", "ecmwf": "up", "scheduler": "up", "version": app.version}
-
-    from cascade.gateway import api, client
-
-    try:
-        client.request_response(api.JobProgressRequest(job_ids=[]), config.cascade.cascade_url, timeout_ms=1000)
-        status["cascade"] = "up"
-    except Exception as e:
-        logger.warning(f"Error connecting to Cascade: {repr(e)}")
-        status["cascade"] = "down"
-
-    try:
-        status["scheduler"] = status_scheduler()
-    except Exception as e:
-        logger.warning(f"Error discerning scheduler status: {repr(e)}")
-        status["scheduler"] = "down"
-
-    try:
-        status["plugins"] = status_plugins()
-    except Exception as e:
-        logger.warning(f"Error discerning plugins status: {repr(e)}")
-        status["plugins"] = f"failure getting status"
-
-    # Check connection to model_repository
-    import requests
-
-    try:
-        # TODO this is not good: we dont want a timeout=5 for the status endpoint, the status should return under a sec
-        # we probably need to evaluate this async, returing cached value, possibly `unknown` in case refresh in progres
-        response = requests.get(f"{config.api.model_repository}/MANIFEST", timeout=5)
-        if response.status_code == 200:
-            status["ecmwf"] = "up"
-        else:
-            status["ecmwf"] = "down"
-    except Exception:
-        status["ecmwf"] = "down"
-
-    return StatusResponse(**status)
-
-
 @app.get("/api/v1/share/{job_id}/{dataset_id}", response_class=HTMLResponse, tags=["share"], summary="Share Image")
-async def share_image(request: Request, job_id: str, dataset_id: str):
+async def share_image(request: Request, job_id: str, dataset_id: str) -> HTMLResponse:
     """Endpoint to share an image from a job and dataset ID."""
     base_url = str(request.base_url).rstrip("/")
     image_url = f"{base_url}/api/v1/job/{job_id}/{dataset_id}"
-    return templates.TemplateResponse("share.html", {"request": request, "image_url": image_url, "image_name": f"{job_id}_{dataset_id}"})  # type: ignore[reportArgumentType]
+    return templates.TemplateResponse(request, "share.html", {"image_url": image_url, "image_name": f"{job_id}_{dataset_id}"})
 
 
-frontend = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+frontend = os.environ.get("FIAB_TEST_FRONTEND") or os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 
 
 class SPAStaticFiles(StaticFiles):
     """Custom StaticFiles class to handle SPA routing."""
 
-    async def get_response(self, path: str, scope):
+    async def get_response(self, path: str, scope: Any) -> Response:
         try:
             return await super().get_response(path, scope)
         except HTTPException as ex:

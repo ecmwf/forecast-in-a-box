@@ -92,9 +92,52 @@ export type BlockInstance = z.infer<typeof BlockInstanceSchema>
 
 export const FableBuilderV1Schema = z.object({
   blocks: z.record(z.string(), BlockInstanceSchema),
+  local_glyphs: z.record(z.string(), z.string()).optional(),
 })
 
 export type FableBuilderV1 = z.infer<typeof FableBuilderV1Schema>
+
+/**
+ * Intrinsic glyph available for ${glyph} interpolation in block configuration values.
+ * Returned by GET /api/v1/blueprint/glyphs/list?glyph_type=intrinsic
+ */
+export const GlyphDetailSchema = z.object({
+  name: z.string(),
+  display_name: z.string(),
+  valueExample: z.string(),
+})
+
+export type GlyphDetail = z.infer<typeof GlyphDetailSchema>
+
+/** Paginated response from GET /api/v1/blueprint/glyphs/list */
+export const GlyphListResponseSchema = z.object({
+  glyphs: z.array(GlyphDetailSchema),
+  total: z.number(),
+  page: z.number(),
+  page_size: z.number(),
+})
+
+export type GlyphListResponse = z.infer<typeof GlyphListResponseSchema>
+
+/** POST /blueprint/glyphs/global/post — outbound request */
+export interface GlobalGlyphPostRequest {
+  key: string
+  value: string
+  public?: boolean
+}
+
+/** Response from global glyph endpoints */
+export const GlobalGlyphResponseSchema = z.object({
+  global_glyph_id: z.string(),
+  key: z.string(),
+  value: z.string(),
+  public: z.boolean(),
+  created_by: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+})
+
+export type GlobalGlyphResponse = z.infer<typeof GlobalGlyphResponseSchema>
 
 export const FableValidationExpansionSchema = z.object({
   global_errors: z.array(z.string()),
@@ -123,7 +166,7 @@ export const SavedFableSchema = z.object({
 export type SavedFable = z.infer<typeof SavedFableSchema>
 
 export const FableUpsertResponseSchema = z.object({
-  id: z.string(),
+  blueprint_id: z.string(),
   version: z.number(),
 })
 
@@ -137,24 +180,57 @@ export interface FableUpsertRequest {
   parent_id?: string
 }
 
+/** routes/blueprint.py: BlueprintListItem */
+export const BlueprintListItemSchema = z.object({
+  blueprint_id: z.string(),
+  version: z.number(),
+  display_name: z.string().nullable(),
+  display_description: z.string().nullable(),
+  tags: z.array(z.string()).nullable(),
+  source: z.string().nullable(),
+  created_by: z.string().nullable(),
+})
+
+export type BlueprintListItem = z.infer<typeof BlueprintListItemSchema>
+
+/** routes/blueprint.py: BlueprintListResponse */
+export const BlueprintListResponseSchema = z.object({
+  blueprints: z.array(BlueprintListItemSchema),
+  total: z.number(),
+  page: z.number(),
+  page_size: z.number(),
+})
+
+export type BlueprintListResponse = z.infer<typeof BlueprintListResponseSchema>
+
+/** POST /blueprint/update — outbound only */
+export interface BlueprintUpdateRequest {
+  blueprint_id: string
+  version: number
+  builder: FableBuilderV1
+  display_name?: string | null
+  display_description?: string | null
+  tags?: Array<string>
+  parent_id?: string | null
+}
+
+/** POST /blueprint/delete — outbound only */
+export interface BlueprintDeleteRequest {
+  blueprint_id: string
+  version: number
+}
+
 export const FableRetrieveResponseSchema = z.object({
-  id: z.string(),
+  blueprint_id: z.string(),
   version: z.number(),
   builder: FableBuilderV1Schema,
   display_name: z.string().nullable(),
   display_description: z.string().nullable(),
   tags: z.array(z.string()),
-  created_at: z.string().optional(),
-  updated_at: z.string().optional(),
   parent_id: z.string().nullable().optional(),
 })
 
 export type FableRetrieveResponse = z.infer<typeof FableRetrieveResponseSchema>
-
-export interface FableCompileRequest {
-  id: string
-  version?: number
-}
 
 export interface BlockWithFactory {
   instanceId: BlockInstanceId
@@ -255,6 +331,7 @@ export function getBlockKindIcon(kind: BlockKind): LucideIcon {
 export function createEmptyFable(): FableBuilderV1 {
   return {
     blocks: {},
+    local_glyphs: {},
   }
 }
 

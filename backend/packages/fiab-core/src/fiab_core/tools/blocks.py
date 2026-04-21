@@ -20,18 +20,19 @@ from fiab_core.fable import (
     BlockInstanceId,
     BlockInstanceOutput,
     BlockKind,
+    QubedOutput,
 )
 from fiab_core.plugin import Error
 
 
-class BlockBuilder(abc.ABC):
+class QubedBlockBuilder(abc.ABC):
     kind: BlockKind
     title: str
     description: str
     configuration_options: dict[str, BlockConfigurationOption]
     inputs: list[str]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         raise NotImplementedError
 
     def compile(
@@ -42,7 +43,7 @@ class BlockBuilder(abc.ABC):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         raise NotImplementedError
 
-    def intersect(self, input: BlockInstanceOutput) -> bool:
+    def intersect(self, other: QubedOutput) -> bool:
         raise NotImplementedError
 
     def as_catalogue(self) -> BlockFactory:
@@ -55,20 +56,20 @@ class BlockBuilder(abc.ABC):
         )
 
 
-class Source(BlockBuilder):
+class Source(QubedBlockBuilder):
     kind: BlockKind = "source"
 
-    def intersect(self, input: BlockInstanceOutput) -> bool:
+    def intersect(self, other: QubedOutput) -> bool:
         return False
 
 
-class Product(BlockBuilder):
+class Product(QubedBlockBuilder):
     kind: BlockKind = "product"
 
 
-class Sink(BlockBuilder):
+class Sink(QubedBlockBuilder):
     kind: BlockKind = "sink"
 
 
-class Transform(BlockBuilder):
+class Transform(QubedBlockBuilder):
     kind: BlockKind = "transform"

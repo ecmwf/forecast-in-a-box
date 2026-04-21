@@ -5,11 +5,12 @@ import time
 import zipfile
 
 import cloudpickle
+import httpx
 import pytest
 from cascade.low.builders import JobBuilder, TaskBuilder
 
-from forecastbox.api.types.jobs import (
-    EnvironmentSpecification,
+from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
+from forecastbox.domain.run.cascade import (
     ExecutionSpecification,
     RawCascadeJob,
 )
@@ -17,7 +18,7 @@ from forecastbox.api.types.jobs import (
 from .utils import ensure_completed
 
 
-def test_submit_job(backend_client_with_auth):
+def test_submit_job(backend_client_with_auth: httpx.Client) -> None:
     pytest.skip("disabled until test plugin is available")
     # TODO this test is disabled because the endpoints are being removed. However,
     # some coverage of this test has not yet been migrated, because we cannot
@@ -86,7 +87,7 @@ def test_submit_job(backend_client_with_auth):
     ensure_completed(backend_client_with_auth, requests_job_id)
 
     # sleeper job
-    def sleep_with_sgn(secs: int):
+    def sleep_with_sgn(secs: int) -> None:
         import time
 
         time.sleep(secs)

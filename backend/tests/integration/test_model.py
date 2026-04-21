@@ -1,12 +1,12 @@
-import time
+from typing import Any
 
 import httpx
 
 from .conftest import fake_artifact_checkpoint_id, fake_artifact_registry_port, fake_artifact_store_id
-from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
+from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token, retry_until
 
 
-def test_download_model(backend_client):
+def test_download_model(backend_client: httpx.Client) -> None:
     """Downloads bunch of artifacts in parallel, tests they successfully appear"""
 
     # TODO shame! This test *assumes* that test_admin_flows has already been executed,
@@ -39,67 +39,41 @@ def test_download_model(backend_client):
     models = response.json()
     assert len(models) >= 4, f"Expected at least 4 models, got {len(models)}"
 
-    # Find our test model (test_checkpoint0 is the main one)
-    test_model = None
+    # Verify none are downloaded yet
     for model in models:
-        if (
-            model["composite_id"]["artifact_store_id"] == fake_artifact_store_id
-            and model["composite_id"]["ml_model_checkpoint_id"] == f"{fake_artifact_checkpoint_id}0"
-        ):
-            test_model = model
-            break
+        if model["composite_id"]["artifact_store_id"] == fake_artifact_store_id:
+            assert model["is_available"] == False, f"Model {model['composite_id']['ml_model_checkpoint_id']} should not be downloaded yet"
 
-    assert test_model is not None, "Test model not found in list"
-    assert test_model["is_available"] == False, "Model should not be downloaded yet"
-
-    # Download models in parallel (test_checkpoint1, test_checkpoint2, test_checkpoint3)
-    parallelism = 3
-    composite_ids = []
-    for e in range(1, parallelism + 1):
+    # Submit download for all 4 models in parallel
+    expected_checkpoints = {f"{fake_artifact_checkpoint_id}{e}" for e in range(4)}
+    for checkpoint_id in expected_checkpoints:
         composite_id = {
             "artifact_store_id": fake_artifact_store_id,
-            "ml_model_checkpoint_id": f"{fake_artifact_checkpoint_id}{e}",
+            "ml_model_checkpoint_id": checkpoint_id,
         }
         response = backend_client.post("/artifacts/download_model", json=composite_id).raise_for_status()
         result = response.json()
         assert result["status"] in ["download submitted", "download in progress"], f"Unexpected status: {result}"
-        composite_ids.append(composite_id)
 
-    # Download the main test model (test_checkpoint0)
+    # Wait until all 4 are available
+    def do_action() -> Any:
+        return backend_client.get("/artifacts/list_models").raise_for_status().json()
+
+    def verify_ok(models: Any) -> bool | None:
+        available = {
+            m["composite_id"]["ml_model_checkpoint_id"]
+            for m in models
+            if m["composite_id"]["artifact_store_id"] == fake_artifact_store_id and m["is_available"]
+        }
+        return True if expected_checkpoints.issubset(available) else None
+
+    retry_until(do_action, verify_ok, attempts=128, sleep=0.2, error_msg="Failed to download all artifacts")
+
+    # Test model details endpoint for checkpoint0
     main_composite_id = {
         "artifact_store_id": fake_artifact_store_id,
         "ml_model_checkpoint_id": f"{fake_artifact_checkpoint_id}0",
     }
-    response = backend_client.post("/artifacts/download_model", json=main_composite_id).raise_for_status()
-    result = response.json()
-    assert result["status"] in ["download submitted", "download in progress"], f"Unexpected status: {result}"
-
-    # Poll for completion
-    i = 128
-    while i > 0:
-        response = backend_client.post("/artifacts/download_model", json=main_composite_id).raise_for_status()
-        result = response.json()
-        if result["status"] == "available" and result["progress"] == 100:
-            break
-        time.sleep(0.2)
-        i -= 1
-
-    assert i > 0, "Failed to download artifact"
-
-    # Verify all models are now available
-    response = backend_client.get("/artifacts/list_models").raise_for_status()
-    models = response.json()
-
-    available_checkpoints = set()
-    for model in models:
-        if model["composite_id"]["artifact_store_id"] == fake_artifact_store_id and model["is_available"]:
-            available_checkpoints.add(model["composite_id"]["ml_model_checkpoint_id"])
-
-    assert f"{fake_artifact_checkpoint_id}0" in available_checkpoints, "Main model (test_checkpoint0) should be available"
-    for e in range(1, parallelism + 1):
-        assert f"{fake_artifact_checkpoint_id}{e}" in available_checkpoints, f"Model test_checkpoint{e} should be available"
-
-    # Test model details endpoint
     response = backend_client.post("/artifacts/model_details", json=main_composite_id).raise_for_status()
     details = response.json()
     assert details["composite_id"]["artifact_store_id"] == fake_artifact_store_id

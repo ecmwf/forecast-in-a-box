@@ -8,7 +8,8 @@
  * does it submit to any jurisdiction.
  */
 
-import { Input } from '@/components/ui/input'
+import { GlyphFieldWrapper } from './GlyphFieldWrapper'
+import { InputGroupInput } from '@/components/ui/input-group'
 
 export interface StringFieldProps {
   id: string
@@ -19,6 +20,10 @@ export interface StringFieldProps {
   className?: string
 }
 
+/**
+ * String config field — uses GlyphFieldWrapper for consistent visual treatment.
+ * In concrete mode: plain text input. In glyph mode: text input with autocomplete.
+ */
 export function StringField({
   id,
   value,
@@ -28,14 +33,22 @@ export function StringField({
   className,
 }: StringFieldProps) {
   return (
-    <Input
+    <GlyphFieldWrapper
       id={id}
-      type="text"
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={onChange}
       placeholder={placeholder}
       disabled={disabled}
       className={className}
-    />
+    >
+      <InputGroupInput
+        id={id}
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        disabled={disabled}
+      />
+    </GlyphFieldWrapper>
   )
 }

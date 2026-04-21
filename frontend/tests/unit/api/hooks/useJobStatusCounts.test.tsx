@@ -23,51 +23,51 @@ vi.mock('@/utils/env', () => ({
 }))
 
 const mockJobsResponse: JobExecutionList = {
-  executions: [
+  runs: [
     {
-      execution_id: 'exec-1',
+      run_id: 'exec-1',
       attempt_count: 1,
       status: 'running',
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
-      job_definition_id: 'def-1',
-      job_definition_version: 1,
+      blueprint_id: 'def-1',
+      blueprint_version: 1,
       error: null,
       progress: '45',
       cascade_job_id: null,
     },
     {
-      execution_id: 'exec-2',
+      run_id: 'exec-2',
       attempt_count: 1,
       status: 'completed',
       created_at: '2026-01-01T01:00:00Z',
       updated_at: '2026-01-01T01:00:00Z',
-      job_definition_id: 'def-2',
-      job_definition_version: 1,
+      blueprint_id: 'def-2',
+      blueprint_version: 1,
       error: null,
       progress: '100',
       cascade_job_id: null,
     },
     {
-      execution_id: 'exec-3',
+      run_id: 'exec-3',
       attempt_count: 1,
       status: 'failed',
       created_at: '2026-01-01T02:00:00Z',
       updated_at: '2026-01-01T02:00:00Z',
-      job_definition_id: 'def-3',
-      job_definition_version: 1,
+      blueprint_id: 'def-3',
+      blueprint_version: 1,
       error: 'OOM',
       progress: '60',
       cascade_job_id: null,
     },
     {
-      execution_id: 'exec-4',
+      run_id: 'exec-4',
       attempt_count: 1,
       status: 'submitted',
       created_at: '2026-01-01T03:00:00Z',
       updated_at: '2026-01-01T03:00:00Z',
-      job_definition_id: 'def-4',
-      job_definition_version: 1,
+      blueprint_id: 'def-4',
+      blueprint_version: 1,
       error: null,
       progress: '0',
       cascade_job_id: null,
@@ -110,7 +110,7 @@ describe('useJobStatusCounts', () => {
 
   it('computes counts correctly from API response', async () => {
     worker.use(
-      http.get(API_ENDPOINTS.job.status, () => {
+      http.get(API_ENDPOINTS.job.list, () => {
         return HttpResponse.json(mockJobsResponse)
       }),
     )
@@ -142,7 +142,7 @@ describe('useJobStatusCounts', () => {
 
   it('returns correct runningCount', async () => {
     worker.use(
-      http.get(API_ENDPOINTS.job.status, () => {
+      http.get(API_ENDPOINTS.job.list, () => {
         return HttpResponse.json(mockJobsResponse)
       }),
     )
@@ -171,7 +171,7 @@ describe('useJobStatusCounts', () => {
 
   it('returns zero counts while loading', async () => {
     worker.use(
-      http.get(API_ENDPOINTS.job.status, async () => {
+      http.get(API_ENDPOINTS.job.list, async () => {
         await new Promise((resolve) => setTimeout(resolve, 5000))
         return HttpResponse.json(mockJobsResponse)
       }),

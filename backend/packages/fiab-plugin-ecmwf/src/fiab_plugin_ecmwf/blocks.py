@@ -20,11 +20,13 @@ from fiab_core.fable import (
     BlockInstanceId,
     BlockInstanceOutput,
     NoOutput,
+    QubedOutput,
 )
 from fiab_core.plugin import Error
-from fiab_core.tools.blocks import Product, Sink, Source, Transform
+from fiab_core.tools.blocks import Product, Sink, Source
+from qubed import Qube
 
-from .metadata import QubedInstanceOutput
+from .qubed_utils import axes, contains, coxpand, dimensions
 
 IFS_REQUEST = {
     "class": "od",
@@ -107,7 +109,7 @@ class EkdSource(Source):
     }
     inputs: list[str] = []
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[QubedInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         param = _get_item_list(block.configuration_values.get("param") or IFS_REQUEST["param"], str)
         step = _get_item_list(block.configuration_values.get("step") or IFS_REQUEST["step"], int)
         number = _get_item_list(block.configuration_values.get("number") or IFS_REQUEST["number"], int)
@@ -115,12 +117,14 @@ class EkdSource(Source):
         if any(map(lambda x: x.e is not None, [param, step, number])):
             return Either.error(f"Invalid configuration: {param.e}, {step.e}, {number.e}")
 
-        output = QubedInstanceOutput(
-            dataqube={
-                PARAM_DIM: param.get_or_raise(),
-                ENSEMBLE_DIM: number.get_or_raise(),
-                STEP_DIM: step.get_or_raise(),
-            }
+        output = QubedOutput(
+            dataqube=Qube.from_datacube(
+                {
+                    PARAM_DIM: param.get_or_raise(),
+                    ENSEMBLE_DIM: number.get_or_raise(),
+                    STEP_DIM: step.get_or_raise(),
+                }
+            )
         )
         return Either.ok(output)
 
@@ -186,17 +190,17 @@ class EnsembleStatistics(Product):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[QubedInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         input_dataset = inputs.get("dataset")
-        if not isinstance(input_dataset, QubedInstanceOutput):
+        if not isinstance(input_dataset, QubedOutput):
             actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
-            return Either.error(f"Unsupported input type for 'dataset': expected QubedInstanceOutput, got {actual_type}")
+            return Either.error(f"Unsupported input type for 'dataset': expected QubedOutput, got {actual_type}")
 
         param = block.configuration_values[PARAM_DIM]
-        if {PARAM_DIM: param} not in input_dataset:
-            return Either.error(f"param {param} is not in the input parameters: {input_dataset.axes().get(PARAM_DIM, [])}")
+        if not contains(input_dataset, {PARAM_DIM: param}):
+            return Either.error(f"param {param} is not in the input parameters: {axes(input_dataset).get(PARAM_DIM, [])}")
 
-        output = input_dataset.collapse([PARAM_DIM, ENSEMBLE_DIM]).expand({PARAM_DIM: [param]})
+        output = coxpand(input_dataset, [PARAM_DIM, ENSEMBLE_DIM], {PARAM_DIM: [param]})
         return Either.ok(output)
 
     def compile(
@@ -217,10 +221,10 @@ class EnsembleStatistics(Product):
             return Either.error(f"Unsupported statistic '{stat}'")
         return Either.ok(action)
 
-    def intersect(self, input: BlockInstanceOutput) -> bool:
-        if not isinstance(input, QubedInstanceOutput):
+    def intersect(self, other: BlockInstanceOutput) -> bool:  # type: ignore[override]
+        if not isinstance(other, QubedOutput):
             return False
-        dims = input.dimensions()
+        dims = dimensions(other)
         return ENSEMBLE_DIM in dims and PARAM_DIM in dims
 
 
@@ -237,16 +241,16 @@ class TemporalStatistics(Product):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[QubedInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         input_dataset = inputs.get("dataset")
-        if not isinstance(input_dataset, QubedInstanceOutput):
+        if not isinstance(input_dataset, QubedOutput):
             actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
-            return Either.error(f"Unsupported input type for 'dataset': expected QubedInstanceOutput, got {actual_type}")
+            return Either.error(f"Unsupported input type for 'dataset': expected QubedOutput, got {actual_type}")
 
         param = block.configuration_values[PARAM_DIM]
-        if {PARAM_DIM: param} not in input_dataset:
-            return Either.error(f"param {param} is not in the input parameters: {input_dataset.axes().get(PARAM_DIM, [])}")
-        output = input_dataset.collapse([PARAM_DIM, STEP_DIM]).expand({PARAM_DIM: [param]})
+        if not contains(input_dataset, {PARAM_DIM: param}):
+            return Either.error(f"param {param} is not in the input parameters: {axes(input_dataset).get(PARAM_DIM, [])}")
+        output = coxpand(input_dataset, [PARAM_DIM, STEP_DIM], {PARAM_DIM: [param]})
         return Either.ok(output)
 
     def compile(
@@ -269,10 +273,10 @@ class TemporalStatistics(Product):
             action = param.max(dim=STEP_DIM)
         return Either.ok(action)
 
-    def intersect(self, input: BlockInstanceOutput) -> bool:
-        if not isinstance(input, QubedInstanceOutput):
+    def intersect(self, other: BlockInstanceOutput) -> bool:  # type: ignore[override]
+        if not isinstance(other, QubedOutput):
             return False
-        dims = input.dimensions()
+        dims = dimensions(other)
         return STEP_DIM in dims and PARAM_DIM in dims
 
 
@@ -288,7 +292,7 @@ class ZarrSink(Sink):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[QubedInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         return Either.ok(NoOutput())
 
     def compile(
@@ -303,8 +307,10 @@ class ZarrSink(Sink):
         )
         return Either.ok(action)
 
-    def intersect(self, input: BlockInstanceOutput) -> bool:
-        return not input.is_empty()
+    def intersect(self, other: BlockInstanceOutput) -> bool:  # type: ignore[override]
+        if not isinstance(other, QubedOutput):
+            return False
+        return not other.dataqube.is_empty()
 
 
 class MapPlotSink(Sink):
@@ -339,27 +345,29 @@ class MapPlotSink(Sink):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[QubedInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         input_dataset = inputs.get("dataset")
-        if not isinstance(input_dataset, QubedInstanceOutput):
+        if not isinstance(input_dataset, QubedOutput):
             actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
-            return Either.error(f"Unsupported input type for 'dataset': expected QubedInstanceOutput, got {actual_type}")
+            return Either.error(f"Unsupported input type for 'dataset': expected QubedOutput, got {actual_type}")
 
         params = _get_item_list(block.configuration_values[PARAM_DIM], str, allow_empty=False)
         if any(map(lambda x: x.e is not None, [params])):
             return Either.error(f"Invalid configuration: {params.e}")
 
         params = params.get_or_raise()
-        missing = [p for p in params if {PARAM_DIM: p} not in input_dataset]
+        missing = [p for p in params if not contains(input_dataset, {PARAM_DIM: p})]
         if missing:
-            return Either.error(f"params {missing} are not in the input parameters: {input_dataset.axes().get(PARAM_DIM, [])}")
+            return Either.error(f"params {missing} are not in the input parameters: {axes(input_dataset).get(PARAM_DIM, [])}")
 
-        if (
-            block.configuration_values["groupby"] not in ("valid_datetime", "step", "number", "none")
-            or block.configuration_values["groupby"] not in input_dataset.dimensions()
-        ):
+        groupby_value = block.configuration_values["groupby"]
+        if groupby_value not in ("valid_datetime", "step", "number", "none"):
             return Either.error(
-                f"Invalid groupby value: {block.configuration_values['groupby']}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(set(input_dataset.dimensions()))}"
+                f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
+            )
+        if groupby_value != "none" and groupby_value not in dimensions(input_dataset):
+            return Either.error(
+                f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
             )
 
         return Either.ok(NoOutput())
@@ -392,7 +400,7 @@ class MapPlotSink(Sink):
         )
         return Either.ok(action)
 
-    def intersect(self, input: BlockInstanceOutput) -> bool:
-        if not isinstance(input, QubedInstanceOutput):
+    def intersect(self, other: BlockInstanceOutput) -> bool:  # type: ignore[override]
+        if not isinstance(other, QubedOutput):
             return False
-        return PARAM_DIM in input.dimensions()
+        return PARAM_DIM in dimensions(other)

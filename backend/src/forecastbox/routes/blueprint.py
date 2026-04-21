@@ -1,0 +1,443 @@
+# (C) Copyright 2024- ECMWF.
+#
+# This software is licensed under the terms of the Apache Licence Version 2.0
+# which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# In applying this licence, ECMWF does not waive the privileges and immunities
+# granted to it by virtue of its status as an intergovernmental organisation
+# nor does it submit to any jurisdiction.
+
+"""Blueprint entity routes — /blueprint/*"""
+
+PREFIX = "/api/v1/blueprint"
+from typing import Annotated, Literal, cast
+
+from cascade.low.func import assert_never
+from fastapi import APIRouter, Depends
+from fastapi import status as http_status
+from fastapi.exceptions import HTTPException
+from fiab_core.fable import BlockFactoryCatalogue, BlockInstanceId, PluginBlockFactoryId, PluginCompositeId
+from pydantic import BaseModel
+
+import forecastbox.domain.blueprint.db as blueprint_db
+import forecastbox.domain.blueprint.service as blueprint_service
+import forecastbox.domain.glyphs.global_db as global_glyph_db
+from forecastbox.domain.blueprint.exceptions import (
+    BlueprintAccessDenied,
+    BlueprintNotFound,
+    BlueprintVersionConflict,
+)
+from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand, BlueprintValidationExpansion
+from forecastbox.domain.glyphs.exceptions import GlobalGlyphAccessDenied
+from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples
+from forecastbox.domain.plugin.manager import catalogue_view, plugins_ready
+from forecastbox.entrypoint.auth.users import get_auth_context
+from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.pagination import PaginationSpec
+
+router = APIRouter(
+    tags=["blueprint"],
+    responses={404: {"description": "Not found"}},
+)
+
+
+# ---------------------------------------------------------------------------
+# Route-local contracts
+# ---------------------------------------------------------------------------
+
+
+class BlueprintId(BaseModel):
+    """Identifies a blueprint, optionally pinning a specific version.
+
+    Used as a Depends()-based query-param group on GET endpoints, and as a
+    request body on PUT endpoints that target a specific blueprint.
+    """
+
+    blueprint_id: str
+    version: int | None = None
+
+
+class BlueprintCreateRequest(BaseModel):
+    builder: BlueprintBuilder
+    display_name: str | None = None
+    display_description: str | None = None
+    tags: list[str] = []
+    parent_id: str | None = None
+
+
+class BlueprintCreateResponse(BaseModel):
+    blueprint_id: str
+    version: int
+
+
+class BlueprintGetResponse(BaseModel):
+    blueprint_id: str
+    version: int
+    builder: BlueprintBuilder
+    display_name: str | None = None
+    display_description: str | None = None
+    tags: list[str] = []
+    parent_id: str | None = None
+
+
+class BlueprintListItem(BaseModel):
+    blueprint_id: str
+    version: int
+    display_name: str | None = None
+    display_description: str | None = None
+    tags: list[str] | None = None
+    source: str | None = None
+    created_by: str | None = None
+
+
+class BlueprintListResponse(BaseModel):
+    blueprints: list[BlueprintListItem]
+    total: int
+    page: int
+    page_size: int
+
+
+class BlueprintUpdateRequest(BaseModel):
+    blueprint_id: str
+    version: int
+    builder: BlueprintBuilder
+    display_name: str | None = None
+    display_description: str | None = None
+    tags: list[str] = []
+    parent_id: str | None = None
+
+
+class BlueprintUpdateResponse(BaseModel):
+    blueprint_id: str
+    version: int
+
+
+class BlueprintDeleteRequest(BaseModel):
+    blueprint_id: str
+    version: int
+
+
+class BlueprintValidationExpansionResponse(BaseModel):
+    """HTTP response for blueprint expand — mirrors BlueprintValidationExpansion from the service layer."""
+
+    global_errors: list[str]
+    block_errors: dict[BlockInstanceId, list[str]]
+    possible_sources: list[PluginBlockFactoryId]
+    possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]]
+    resolved_configuration_options: dict[BlockInstanceId, dict[str, str]]
+
+
+class GlyphDetail(BaseModel):
+    name: str
+    display_name: str
+    valueExample: str
+
+
+class GlyphListResponse(BaseModel):
+    """Paginated list of glyphs, for both intrinsic and global types."""
+
+    glyphs: list[GlyphDetail]
+    total: int
+    page: int
+    page_size: int
+
+
+class GlobalGlyphPostRequest(BaseModel):
+    """Request body for creating or updating a global glyph."""
+
+    key: str
+    value: str
+    public: bool = False
+
+
+class GlobalGlyphResponse(BaseModel):
+    """Detail of a single global glyph, returned by get and post endpoints."""
+
+    global_glyph_id: str
+    key: str
+    value: str
+    public: bool
+    created_by: str | None = None
+    created_at: str
+    updated_at: str
+
+
+class GlobalGlyphId(BaseModel):
+    """Identifies a global glyph by its stable id."""
+
+    global_glyph_id: str
+
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.post("/create")
+async def create_blueprint(
+    request: BlueprintCreateRequest,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> BlueprintCreateResponse:
+    """Create a new blueprint from a BlueprintBuilder.
+
+    Returns 422 if the builder fails validation (unknown plugins, undefined
+    glyphs, config errors, intrinsic glyph key collisions, etc.).
+    """
+    validation = await blueprint_service.validate_expand(request.builder, auth_context, validate_only=True)
+    if validation.global_errors or validation.block_errors:
+        raise HTTPException(
+            status_code=422,
+            detail={"global_errors": validation.global_errors, "block_errors": validation.block_errors},
+        )
+    payload = BlueprintSaveCommand(
+        builder=request.builder,
+        display_name=request.display_name,
+        display_description=request.display_description,
+        tags=request.tags,
+        parent_id=request.parent_id,
+    )
+    try:
+        result = await blueprint_service.save_builder(auth_context=auth_context, payload=payload, blueprint_id=None)
+    except BlueprintNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except BlueprintAccessDenied as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    return BlueprintCreateResponse(blueprint_id=result.blueprint_id, version=result.blueprint_version)
+
+
+@router.get("/get")
+async def get_blueprint(
+    spec: Annotated[BlueprintId, Depends()],
+) -> BlueprintGetResponse:
+    """Retrieve a saved blueprint by id and optional version.
+
+    Returns the latest non-deleted version when version is omitted.
+    """
+    try:
+        retrieved = await blueprint_service.load_builder(spec.blueprint_id, spec.version)
+    except BlueprintNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return BlueprintGetResponse(
+        blueprint_id=retrieved.blueprint_id,
+        version=retrieved.blueprint_version,
+        builder=retrieved.builder,
+        display_name=retrieved.display_name,
+        display_description=retrieved.display_description,
+        tags=retrieved.tags,
+        parent_id=retrieved.parent_id,
+    )
+
+
+@router.get("/list")
+async def list_blueprints(
+    pagination: Annotated[PaginationSpec, Depends()],
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> BlueprintListResponse:
+    """List the latest non-deleted version of every blueprint visible to the caller."""
+    total = await blueprint_db.count_blueprints(auth_context=auth_context)
+    start = pagination.start()
+    page_defs = list(await blueprint_db.list_blueprints(auth_context=auth_context, offset=start, limit=pagination.page_size))
+    items = [
+        BlueprintListItem(
+            blueprint_id=cast(str, defn.blueprint_id),
+            version=cast(int, defn.version),
+            display_name=cast(str | None, defn.display_name),
+            display_description=cast(str | None, defn.display_description),
+            tags=cast(list[str] | None, defn.tags),
+            source=cast(str | None, defn.source),
+            created_by=cast(str | None, defn.created_by),
+        )
+        for defn in page_defs
+    ]
+    return BlueprintListResponse(blueprints=items, total=total, page=pagination.page, page_size=pagination.page_size)
+
+
+@router.post("/update")
+async def update_blueprint(
+    request: BlueprintUpdateRequest,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> BlueprintUpdateResponse:
+    """Add a new version to an existing blueprint.
+
+    ``version`` must match the current latest version; returns 409 if it does not.
+    Returns 422 if the builder fails validation (unknown plugins, undefined
+    glyphs, config errors, intrinsic glyph key collisions, etc.).
+    Returns the new version number on success.
+    """
+    validation = await blueprint_service.validate_expand(request.builder, auth_context, validate_only=True)
+    if validation.global_errors or validation.block_errors:
+        raise HTTPException(
+            status_code=422,
+            detail={"global_errors": validation.global_errors, "block_errors": validation.block_errors},
+        )
+    payload = BlueprintSaveCommand(
+        builder=request.builder,
+        display_name=request.display_name,
+        display_description=request.display_description,
+        tags=request.tags,
+        parent_id=request.parent_id,
+    )
+    try:
+        result = await blueprint_service.save_builder(
+            auth_context=auth_context,
+            payload=payload,
+            blueprint_id=request.blueprint_id,
+            expected_version=request.version,
+        )
+    except BlueprintVersionConflict as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except BlueprintNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except BlueprintAccessDenied as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    return BlueprintUpdateResponse(blueprint_id=result.blueprint_id, version=result.blueprint_version)
+
+
+@router.post("/delete")
+async def delete_blueprint(
+    request: BlueprintDeleteRequest,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> None:
+    """Soft-delete all versions of a blueprint.
+
+    ``version`` must match the current latest version; returns 409 if it does not.
+    """
+    try:
+        await blueprint_db.soft_delete_blueprint(
+            request.blueprint_id,
+            expected_version=request.version,
+            auth_context=auth_context,
+        )
+    except BlueprintVersionConflict as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except BlueprintNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except BlueprintAccessDenied as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Building helpers
+# ---------------------------------------------------------------------------
+
+
+@router.get("/catalogue")
+def get_catalogue() -> dict[PluginCompositeId, BlockFactoryCatalogue]:
+    """All blocks this backend is capable of evaluating within a blueprint."""
+    if not plugins_ready():
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail="Plugins not ready")
+    catalogue = catalogue_view()
+    if isinstance(catalogue, bool):
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail="Plugins not ready")
+    return catalogue
+
+
+@router.put("/expand")
+async def expand_blueprint(
+    blueprint: BlueprintBuilder,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> BlueprintValidationExpansionResponse:
+    """Validate a partially-constructed BlueprintBuilder and return completion options.
+
+    Returns 200 regardless of whether validation errors are present; callers must
+    inspect the returned error fields.
+    """
+    result = await blueprint_service.validate_expand(blueprint, auth_context, validate_only=False)
+    return BlueprintValidationExpansionResponse(
+        global_errors=result.global_errors,
+        block_errors=result.block_errors,
+        possible_sources=result.possible_sources,
+        possible_expansions=result.possible_expansions,
+        resolved_configuration_options=result.resolved_configuration_options,
+    )
+
+
+@router.get("/glyphs/list")
+async def list_available_glyphs(
+    glyph_type: Literal["intrinsic", "global"] = "intrinsic",
+    pagination: Annotated[PaginationSpec, Depends()] = PaginationSpec(),
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> GlyphListResponse:
+    """List available glyphs.
+
+    When ``glyph_type`` is ``intrinsic``, returns the fixed set of system-provided
+    glyphs; pagination params are ignored.  When ``glyph_type`` is ``global``,
+    returns user-defined glyphs visible to the caller with paging applied.
+    """
+    if glyph_type == "intrinsic":
+        glyphs: list[GlyphDetail] = []
+        for glyph_name, example in get_values_and_examples().items():
+            glyph: AvailableIntrinsicGlyphs = glyph_name
+            if glyph == "runId":
+                display_name = "Run ID"
+            elif glyph == "submitDatetime":
+                display_name = "Submit Datetime (fixed at first submission, preserved on restart)"
+            elif glyph == "startDatetime":
+                display_name = "Start Datetime (updated on every restart)"
+            elif glyph == "attemptCount":
+                display_name = "Attempt Count (incremented on every restart)"
+            else:
+                assert_never(glyph)
+            glyphs.append(GlyphDetail(name=glyph_name, display_name=display_name, valueExample=example))
+        return GlyphListResponse(glyphs=glyphs, total=len(glyphs), page=1, page_size=len(glyphs))
+    else:
+        total = await global_glyph_db.count_global_glyphs(auth_context)
+        start = pagination.start()
+        rows = list(await global_glyph_db.list_global_glyphs(auth_context, offset=start, limit=pagination.page_size))
+        glyphs_global = [GlyphDetail(name=str(row.key), display_name=str(row.key), valueExample=str(row.value)) for row in rows]
+        return GlyphListResponse(glyphs=glyphs_global, total=total, page=pagination.page, page_size=pagination.page_size)
+
+
+@router.post("/glyphs/global/post")
+async def post_global_glyph(
+    request: GlobalGlyphPostRequest,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> GlobalGlyphResponse:
+    """Create or update a global glyph by key.
+
+    Returns 422 if the key collides with any intrinsic glyph name.
+    """
+    intrinsic_names = set(get_values_and_examples().keys())
+    if request.key in intrinsic_names:
+        raise HTTPException(
+            status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Key {request.key!r} is reserved as an intrinsic glyph and cannot be overridden.",
+        )
+    if request.public and not auth_context.has_admin():
+        raise HTTPException(
+            status_code=403,
+            detail="Only admins may create or update public global glyphs.",
+        )
+    try:
+        row = await global_glyph_db.upsert_global_glyph(request.key, request.value, request.public, auth_context)
+    except GlobalGlyphAccessDenied as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    return GlobalGlyphResponse(
+        global_glyph_id=str(row.global_glyph_id),
+        key=str(row.key),
+        value=str(row.value),
+        public=bool(row.public),
+        created_by=str(row.created_by) if row.created_by is not None else None,
+        created_at=str(row.created_at),
+        updated_at=str(row.updated_at),
+    )
+
+
+@router.get("/glyphs/global/get")
+async def get_global_glyph(
+    spec: Annotated[GlobalGlyphId, Depends()],
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> GlobalGlyphResponse:
+    """Retrieve a global glyph visible to the caller by its stable id."""
+    row = await global_glyph_db.get_global_glyph(spec.global_glyph_id, auth_context)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"GlobalGlyph {spec.global_glyph_id!r} not found.")
+    return GlobalGlyphResponse(
+        global_glyph_id=str(row.global_glyph_id),
+        key=str(row.key),
+        value=str(row.value),
+        public=bool(row.public),
+        created_by=str(row.created_by) if row.created_by is not None else None,
+        created_at=str(row.created_at),
+        updated_at=str(row.updated_at),
+    )

@@ -23,6 +23,15 @@ catalogue = BlockFactoryCatalogue(
             configuration_options={},
             inputs=[],
         ),
+        "source_text": BlockFactory(
+            kind="source",
+            title="",
+            description="",
+            configuration_options={
+                "text": BlockConfigurationOption(title="", description="", value_type="str"),
+            },
+            inputs=[],
+        ),
         "transform_increment": BlockFactory(
             kind="transform",
             title="",
@@ -69,6 +78,9 @@ def expander(output: BlockInstanceOutput) -> list[BlockFactoryId]:
 def compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
     if instance.factory_id.factory == "source_42":
         action = from_source(Payload("fiab_plugin_test.runtime.source_42"))  # type: ignore
+    elif instance.factory_id.factory == "source_text":
+        text = instance.configuration_values["text"]
+        action = from_source(Payload("fiab_plugin_test.runtime.source_text", kwargs={"text": text}))  # type: ignore
     elif instance.factory_id.factory == "transform_increment":
         a = lookup[instance.input_ids["a"]]
         amount = instance.configuration_values["amount"]

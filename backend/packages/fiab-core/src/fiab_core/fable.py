@@ -11,10 +11,11 @@
 Types pertaining to Forecast As BLock Expression (Fable): blocks
 """
 
-from typing import Literal, Protocol
+from typing import Any, Literal
 
 from earthkit.workflows.fluent import Action
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+from qubed import Qube
 from typing_extensions import Self
 
 
@@ -95,43 +96,22 @@ class BlockInstance(BaseModel):
     """Keys come from factory's `inputs`, values are other blocks in the (partial) fable"""
 
 
-class BlockInstanceOutput(Protocol):
-    def is_empty(self) -> bool: ...
-    def dimensions(self) -> set[str]: ...
-
-
-class XarrayOutput(BaseModel):
-    """
-    XarrayOutput is just an example of what a BlockInstanceOutput could look like,
-    but we want to allow plugins to define their own output types as needed.
-    """
-
-    variables: list[str]
-    coords: list[str]
-
-    def is_empty(self) -> bool:
-        return len(self.variables) == 0
-
-    def dimensions(self) -> set[str]:
-        return set(self.coords)
+class QubedOutput(BaseModel):
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)  # otherwise Qube cannot be here
+    dataqube: Qube = Field(default_factory=Qube.empty)
+    datatype: str = Field(default="")
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class RawOutput(BaseModel):
     type_fqn: str  # most likely you want Any here
 
-    def is_empty(self) -> bool:
-        return False
-
-    def dimensions(self) -> set[str]:
-        return set()
-
 
 class NoOutput(BaseModel):
-    def is_empty(self) -> bool:
-        return True
+    # use this when there is no output whatsoever -- this stops *any* expansion of the block
+    pass
 
-    def dimensions(self) -> set[str]:
-        return set()
 
+BlockInstanceOutput = QubedOutput | RawOutput | NoOutput
 
 ActionLookup = dict[BlockInstanceId, Action]

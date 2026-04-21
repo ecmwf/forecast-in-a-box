@@ -111,8 +111,18 @@ async function request<T>(
 
       try {
         const errorData = (await response.json()) as ApiError
-        errorMessage = errorData.message || errorMessage
-        errorDetails = errorData.details
+        // FastAPI returns errors as { detail: "..." } (string or object),
+        // our schema uses { message: "..." }
+        const detail = (errorData as unknown as { detail?: unknown }).detail
+        if (typeof detail === 'string') {
+          errorMessage = errorData.message || detail || errorMessage
+        } else if (typeof detail === 'object' && detail !== null) {
+          errorMessage = errorData.message || `HTTP ${response.status}`
+          errorDetails = detail
+        } else {
+          errorMessage = errorData.message || errorMessage
+        }
+        if (!errorDetails) errorDetails = errorData.details
       } catch {
         // If response is not JSON, use the status text
       }

@@ -8,18 +8,11 @@
  * does it submit to any jurisdiction.
  */
 
-/**
- * OutputsPanel Component
- *
- * Grid of output cards for a job execution.
- */
-
-import { useMemo } from 'react'
 import { Package } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { JobStatus } from '@/api/types/job.types'
 import { isTerminalStatus } from '@/api/types/job.types'
-import { useJobAvailable, useJobOutputs } from '@/api/hooks/useJobs'
+import { useJobAvailable } from '@/api/hooks/useJobs'
 import { OutputCard } from '@/features/executions/components/OutputCard'
 import { P } from '@/components/base/typography'
 import { Card } from '@/components/ui/card'
@@ -32,19 +25,6 @@ interface OutputsPanelProps {
 export function OutputsPanel({ jobId, status }: OutputsPanelProps) {
   const { t } = useTranslation('executions')
   const { data: availableIds } = useJobAvailable(jobId, status)
-  const { data: outputs } = useJobOutputs(jobId)
-
-  // Build a lookup from task ID to product name
-  const taskToProduct = useMemo(() => {
-    const map = new Map<string, string>()
-    if (!outputs) return map
-    for (const entry of outputs) {
-      for (const outputId of entry.output_ids) {
-        map.set(outputId, entry.product_name)
-      }
-    }
-    return map
-  }, [outputs])
 
   const hasResults = availableIds && availableIds.length > 0
   const isRunning = !isTerminalStatus(status)
@@ -79,7 +59,7 @@ export function OutputsPanel({ jobId, status }: OutputsPanelProps) {
               key={taskId}
               jobId={jobId}
               taskId={taskId}
-              productName={taskToProduct.get(taskId) ?? taskId}
+              productName={taskId}
               contentType={null}
             />
           ))}

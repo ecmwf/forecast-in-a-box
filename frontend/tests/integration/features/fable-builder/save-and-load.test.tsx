@@ -120,7 +120,9 @@ describe('Fable Builder Save & Load', () => {
 
       // Set up a fable that is already saved (has fableId)
       setupFableWithSource()
-      useFableBuilderStore.getState().markSaved('fable-001', 'Existing Config')
+      useFableBuilderStore
+        .getState()
+        .markSaved('fable-001', 1, 'Existing Config')
 
       // Make a change to trigger dirty state
       useFableBuilderStore
@@ -154,7 +156,7 @@ describe('Fable Builder Save & Load', () => {
 
       // Override upsert handler to return an error
       worker.use(
-        http.post(API_ENDPOINTS.fable.upsert, () => {
+        http.post(API_ENDPOINTS.fable.create, () => {
           return HttpResponse.json(
             { message: 'Internal server error' },
             { status: 500 },
@@ -218,7 +220,7 @@ describe('Fable Builder Save & Load', () => {
       // Override retrieve handler to return 404 BEFORE rendering
       // so the component sees the error on its initial fetch
       worker.use(
-        http.get(API_ENDPOINTS.fable.retrieve, () => {
+        http.get(API_ENDPOINTS.fable.get, () => {
           return HttpResponse.json(
             { message: 'Fable not found' },
             { status: 404 },
@@ -280,7 +282,7 @@ describe('Fable Builder Save & Load', () => {
       useFableBuilderStore.getState().setFable(savedFable, 'fable-001')
       useFableBuilderStore
         .getState()
-        .markSaved('fable-001', 'European Temperature Forecast')
+        .markSaved('fable-001', 1, 'European Temperature Forecast')
 
       // Initially not dirty
       expect(useFableBuilderStore.getState().isDirty).toBe(false)

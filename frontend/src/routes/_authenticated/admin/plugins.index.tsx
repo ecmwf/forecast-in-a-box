@@ -44,6 +44,7 @@ import { PluginsPageHeader } from '@/features/plugins/components/PluginsPageHead
 import { UninstalledPluginsSection } from '@/features/plugins/components/UninstalledPluginsSection'
 import { UpdatesAvailableSection } from '@/features/plugins/components/UpdatesAvailableSection'
 import { cn } from '@/lib/utils'
+import { useActivityStore } from '@/stores/activityStore'
 import { useUiStore } from '@/stores/uiStore'
 import { getPluginStatusError } from '@/types/status.types'
 
@@ -159,6 +160,51 @@ function PluginsPage() {
     }
   }, [plugins, searchQuery, statusFilter, capabilityFilter])
 
+  // Activity tracking for long-running plugin ops
+  const addActivity = useActivityStore((state) => state.addTask)
+
+  function getPluginName(compositeId: PluginCompositeId): string {
+    const match = plugins.find(
+      (p) =>
+        p.id.store === compositeId.store && p.id.local === compositeId.local,
+    )
+    return match?.name ?? `${compositeId.store}/${compositeId.local}`
+  }
+
+  function trackPluginOp(
+    compositeId: PluginCompositeId,
+    op: string,
+    mutation: { mutateAsync: (id: PluginCompositeId) => Promise<void> },
+  ) {
+    const id = `plugin:${compositeId.store}/${compositeId.local}:${op}`
+    const name = getPluginName(compositeId)
+    addActivity({
+      id,
+      type: 'plugin',
+      label: name,
+      description: `${op}...`,
+      status: 'active',
+      startedAt: Date.now(),
+      navigateTo: `/admin/plugins/${encodePluginId(compositeId)}`,
+    })
+    mutation.mutateAsync(compositeId).then(
+      () => {
+        useActivityStore.getState().updateTask(id, {
+          status: 'completed',
+          description: 'Done',
+          completedAt: Date.now(),
+        })
+      },
+      () => {
+        useActivityStore.getState().updateTask(id, {
+          status: 'failed',
+          description: 'Failed',
+          completedAt: Date.now(),
+        })
+      },
+    )
+  }
+
   // Handlers
   const handleToggle = (compositeId: PluginCompositeId, enabled: boolean) => {
     if (enabled) {
@@ -169,15 +215,15 @@ function PluginsPage() {
   }
 
   const handleInstall = (compositeId: PluginCompositeId) => {
-    installPlugin.mutate(compositeId)
+    trackPluginOp(compositeId, 'Installing', installPlugin)
   }
 
   const handleUninstall = (compositeId: PluginCompositeId) => {
-    uninstallPlugin.mutate(compositeId)
+    trackPluginOp(compositeId, 'Uninstalling', uninstallPlugin)
   }
 
   const handleUpdate = (compositeId: PluginCompositeId) => {
-    updatePlugin.mutate(compositeId)
+    trackPluginOp(compositeId, 'Updating', updatePlugin)
   }
 
   const handleRefresh = () => {

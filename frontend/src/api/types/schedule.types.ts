@@ -18,17 +18,16 @@ import { z } from 'zod'
 import { JobStatusSchema } from '@/api/types/job.types'
 
 // ---------------------------------------------------------------------------
-// Schemas — must match backend dataclasses in routers/schedule.py
+// Schemas — must match backend models in routes/experiment.py
 // ---------------------------------------------------------------------------
 
-/** schedule.py: ScheduleDefinitionResponse */
+/** routes/experiment.py: ScheduleDefinitionResponse */
 export const ScheduleDefinitionResponseSchema = z.object({
   experiment_id: z.string(),
   experiment_version: z.number(),
-  job_definition_id: z.string(),
-  job_definition_version: z.number(),
+  blueprint_id: z.string(),
+  blueprint_version: z.number(),
   cron_expr: z.string(),
-  dynamic_expr: z.record(z.string(), z.string()),
   max_acceptable_delay_hours: z.number(),
   enabled: z.boolean(),
   created_at: z.string(),
@@ -38,24 +37,23 @@ export const ScheduleDefinitionResponseSchema = z.object({
   tags: z.array(z.string()).nullable(),
 })
 
-/** schedule.py: ListSchedulesResponse */
+/** routes/experiment.py: ListSchedulesResponse */
 export const ScheduleListResponseSchema = z.object({
-  schedules: z.array(ScheduleDefinitionResponseSchema),
+  experiments: z.array(ScheduleDefinitionResponseSchema),
   total: z.number(),
   page: z.number(),
   page_size: z.number(),
   total_pages: z.number(),
-  error: z.string().nullable(),
 })
 
-/** schedule.py: CreateScheduleResponse */
+/** routes/experiment.py: CreateScheduleResponse */
 export const CreateScheduleResponseSchema = z.object({
   experiment_id: z.string(),
 })
 
-/** schedule.py: ScheduleRunResponse; status narrowed from str to known values) */
+/** routes/experiment.py: ScheduleRunResponse; status narrowed from str to known values) */
 export const ScheduleRunResponseSchema = z.object({
-  execution_id: z.string(),
+  run_id: z.string(),
   attempt_count: z.number(),
   status: JobStatusSchema,
   created_at: z.string(),
@@ -63,14 +61,13 @@ export const ScheduleRunResponseSchema = z.object({
   experiment_context: z.string().nullable(),
 })
 
-/** schedule.py: ScheduleRunsResponse */
+/** routes/experiment.py: ScheduleRunsResponse */
 export const ScheduleRunsResponseSchema = z.object({
   runs: z.array(ScheduleRunResponseSchema),
   total: z.number(),
   page: z.number(),
   page_size: z.number(),
   total_pages: z.number(),
-  error: z.string().nullable(),
 })
 
 // ---------------------------------------------------------------------------
@@ -87,12 +84,11 @@ export type CreateScheduleResponse = z.infer<
 export type ScheduleRunResponse = z.infer<typeof ScheduleRunResponseSchema>
 export type ScheduleRunsResponse = z.infer<typeof ScheduleRunsResponseSchema>
 
-/** PUT /schedule/create - request body (not validated — outbound only) */
+/** PUT /experiment/create - request body (not validated — outbound only) */
 export interface ScheduleSpecification {
-  job_definition_id: string
-  job_definition_version?: number
+  blueprint_id: string
+  blueprint_version?: number
   cron_expr: string
-  dynamic_expr: Record<string, unknown>
   max_acceptable_delay_hours: number
   first_run_override?: string
   display_name?: string
@@ -100,11 +96,10 @@ export interface ScheduleSpecification {
   tags?: Array<string>
 }
 
-/** POST /schedule/update - request body (not validated — outbound only) */
+/** POST /experiment/update - request body (not validated — outbound only) */
 export interface ScheduleUpdate {
   enabled?: boolean
   cron_expr?: string
-  dynamic_expr?: Record<string, unknown>
   max_acceptable_delay_hours?: number
   first_run_override?: string
   display_name?: string

@@ -1,0 +1,21 @@
+{
+  "save": {
+    "triggerUpdate": "Update Config",
+    "triggerSave": "Save Config",
+    "titleUpdate": "Update Configuration",
+    "titleSave": "Save Configuration",
+    "titleLabel": "Title",
+    "titlePlaceholder": "e.g. European forecast run",
+    "commentsLabel": "Comments",
+    "commentsPlaceholder": "Optional notes about this configuration...",
+    "tagsLabel": "Tags",
+    "tagsPlaceholder": "e.g. production, europe",
+    "defaultTitle": "Forecast Config {{date}} {{time}}",
+    "savedAsNew": "Configuration saved as new",
+    "saved": "Configuration saved",
+    "saveFailed": "Failed to save configuration",
+    "saveAsNew": "Save as New",
+    "update": "Update",
+    "save": "Save"
+  }
+}

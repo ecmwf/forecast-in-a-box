@@ -9,8 +9,10 @@
 
 import pathlib
 
+import httpx
 
-def test_dbs_created(backend_client):
+
+def test_dbs_created(backend_client: httpx.Client) -> None:
     """Verify that databases were created during backend startup."""
     import forecastbox.utility.config
 

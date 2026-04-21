@@ -58,7 +58,7 @@ import { cn } from '@/lib/utils'
 
 export type FableNode = Node<FableNodeData>
 
-export const InlineBlockNode = memo(function InlineBlockNode({
+export const InlineBlockNode = memo(function ({
   id,
   data,
   selected,

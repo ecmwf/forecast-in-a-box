@@ -44,6 +44,7 @@ function getDefaultLayoutDirection(): LayoutDirection {
 interface FableBuilderState {
   fable: FableBuilderV1
   fableId: string | null
+  fableVersion: number | null
   fableName: string
   mode: BuilderMode
   step: BuilderStep
@@ -111,10 +112,12 @@ interface FableBuilderState {
   setAutoLayout: (enabled: boolean) => void
   setLayoutDirection: (direction: LayoutDirection) => void
   setNodesLocked: (locked: boolean) => void
+  setLocalGlyph: (key: string, value: string) => void
+  removeLocalGlyph: (key: string) => void
   setValidationState: (state: FableValidationState | null) => void
   setIsValidating: (validating: boolean) => void
   setSubmitDialogOpen: (open: boolean) => void
-  markSaved: (id: string, name?: string) => void
+  markSaved: (id: string, version: number, name?: string) => void
   markDirty: () => void
   reset: () => void
 }
@@ -122,6 +125,7 @@ interface FableBuilderState {
 const initialState = {
   fable: createEmptyFable(),
   fableId: null,
+  fableVersion: null,
   fableName: 'Untitled Configuration',
   mode: 'graph' as BuilderMode,
   step: 'edit' as BuilderStep,
@@ -154,6 +158,7 @@ export const useFableBuilderStore = create<FableBuilderState>()(
           set({
             fable,
             fableId: id,
+            fableVersion: null,
             isDirty: false,
             selectedBlockId: null,
             validationState: null,
@@ -494,6 +499,28 @@ export const useFableBuilderStore = create<FableBuilderState>()(
         setLayoutDirection: (direction) => set({ layoutDirection: direction }),
         setNodesLocked: (locked) => set({ nodesLocked: locked }),
 
+        setLocalGlyph: (key, value) => {
+          const { fable } = get()
+          set({
+            fable: {
+              ...fable,
+              local_glyphs: { ...(fable.local_glyphs ?? {}), [key]: value },
+            },
+            isDirty: true,
+            validationState: null,
+          })
+        },
+
+        removeLocalGlyph: (key) => {
+          const { fable } = get()
+          const { [key]: _removed, ...rest } = fable.local_glyphs ?? {}
+          set({
+            fable: { ...fable, local_glyphs: rest },
+            isDirty: true,
+            validationState: null,
+          })
+        },
+
         setValidationState: (state) =>
           set({
             validationState: state,
@@ -502,9 +529,10 @@ export const useFableBuilderStore = create<FableBuilderState>()(
         setIsValidating: (validating) => set({ isValidating: validating }),
         setSubmitDialogOpen: (open) => set({ submitDialogOpen: open }),
 
-        markSaved: (id, name) =>
+        markSaved: (id, version, name) =>
           set({
             fableId: id,
+            fableVersion: version,
             isDirty: false,
             lastSavedAt: Date.now(),
             ...(name !== undefined && { fableName: name }),

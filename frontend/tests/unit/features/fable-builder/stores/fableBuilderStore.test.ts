@@ -700,10 +700,11 @@ describe('useFableBuilderStore', () => {
   })
 
   describe('save state', () => {
-    it('markSaved sets fableId and isDirty', () => {
+    it('markSaved sets fableId, fableVersion, and isDirty', () => {
       act(() => useFableBuilderStore.getState().markDirty())
-      act(() => useFableBuilderStore.getState().markSaved('saved-id-123'))
+      act(() => useFableBuilderStore.getState().markSaved('saved-id-123', 1))
       expect(useFableBuilderStore.getState().fableId).toBe('saved-id-123')
+      expect(useFableBuilderStore.getState().fableVersion).toBe(1)
       expect(useFableBuilderStore.getState().isDirty).toBe(false)
     })
 

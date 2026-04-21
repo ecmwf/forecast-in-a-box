@@ -49,6 +49,7 @@ dependencies = [
   "pyrsistent",
   "python-multipart",
   "qubed",
+  "starlette>=1.0", # NOTE we actually dont depend on starlette directly, only via fastapi/sse, but our code is already assuming 1.0+
   "sse-starlette",
   "toml",
   "uvicorn",
@@ -79,6 +80,7 @@ dev = [
   "ty==0.0.2",
   "prek",
   "fiab-plugin-ecmwf[runtime]", # TODO remove after first publish
+  "ruff>=0.15.8",
 ]
 
 [tool.setuptools_scm]
@@ -94,8 +96,12 @@ tag_regex = '^[vd](?P<version>\d+(?:\.\d+){0,2}[^\+]*)(?:\+.*)?$'
 [tool.ruff]
 line-length = 140
 
-lint.ignore = [ "E731" ]
-lint.select = ["I"]
+lint.select = ["I", "ANN"]
+# ANN401 disables usage of typing.Any -- but we kinda need that
+lint.ignore = [ "E731", "ANN401" ]
+
+[tool.ruff.lint.flake8-annotations]
+ignore-fully-untyped = false
 
 [tool.pytest.ini_options]
 log_cli = true

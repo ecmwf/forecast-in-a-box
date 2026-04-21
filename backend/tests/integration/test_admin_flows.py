@@ -1,12 +1,14 @@
 import os
 
-from forecastbox.api.routers.admin import ConfigResponse, GetReleaseStatusResponse
-from forecastbox.api.updates import Release
+import httpx
+
+from forecastbox.domain.admin import Release
+from forecastbox.routes.admin import ConfigResponse, GetReleaseStatusResponse
 
 from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
 
 
-def test_admin_flows(backend_client):
+def test_admin_flows(backend_client: httpx.Client) -> None:
     # TODO this test is a bit flaky, because it must be executed first to ensure admin actually ending up admin
     # but then the impl itself is flaky
     # NOTE there is additionally dependence of test_model.py on this test
@@ -59,7 +61,7 @@ def test_admin_flows(backend_client):
     data = {"username": "user@somewhere.org", "password": "something"}
     response = backend_client.post("/auth/jwt/login", data=data)
     assert response.is_success
-    backend_client.cookies.set(**prepare_cookie_with_auth_token(extract_auth_token_from_response(response)))
+    backend_client.cookies.set(**prepare_cookie_with_auth_token(extract_auth_token_from_response(response)))  # ty:ignore[invalid-argument-type]
 
     response = backend_client.get("admin/users")
     assert not response.is_success

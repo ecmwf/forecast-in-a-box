@@ -33,6 +33,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/features/auth/AuthContext'
 import { getCurrentUser } from '@/api/endpoints/users'
+import { QUERY_CONSTANTS } from '@/utils/constants'
 
 /**
  * Hook to get current user data
@@ -51,7 +52,7 @@ export function useUser() {
       // Don't retry 401/403 errors
       if (error instanceof Error && error.message.includes('401')) return false
       if (error instanceof Error && error.message.includes('403')) return false
-      return failureCount < 2
+      return failureCount < QUERY_CONSTANTS.RETRY.MINIMAL
     },
     staleTime: 5 * 60 * 1000, // Cache user for 5 minutes
     refetchOnWindowFocus: false, // Don't refetch when window regains focus

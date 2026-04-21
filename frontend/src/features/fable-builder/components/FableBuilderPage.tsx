@@ -25,6 +25,7 @@ import { useURLStateSync } from '@/features/fable-builder/hooks/useURLStateSync'
 import { getPreset } from '@/features/fable-builder/presets/presets'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { useMedia } from '@/hooks/useMedia'
+import { GlyphProvider } from '@/features/fable-builder/context/GlyphContext'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { toValidationState } from '@/api/types/fable.types'
 import {
@@ -125,10 +126,13 @@ export function FableBuilderPage({
 
     if (fableId && existingFable) {
       setFable(existingFable, fableId)
-      // Restore saved title from backend metadata without marking dirty
-      if (fableRetrieveData?.display_name) {
+      // Restore saved metadata from backend without marking dirty
+      if (fableRetrieveData) {
         useFableBuilderStore.setState({
-          fableName: fableRetrieveData.display_name,
+          fableVersion: fableRetrieveData.version,
+          ...(fableRetrieveData.display_name && {
+            fableName: fableRetrieveData.display_name,
+          }),
         })
       }
       initializedRef.current = true
@@ -205,30 +209,32 @@ export function FableBuilderPage({
   }
 
   return (
-    <div
-      className="flex min-w-0 flex-col"
-      style={{ height: 'calc(100vh - 60px)' }}
-    >
-      <FableBuilderHeader fableId={fableId} catalogue={catalogue} />
+    <GlyphProvider>
+      <div
+        className="flex min-w-0 flex-col"
+        style={{ height: 'calc(100vh - 60px)' }}
+      >
+        <FableBuilderHeader fableId={fableId} catalogue={catalogue} />
 
-      {validationError && (
-        <Alert variant="destructive" className="mx-4 mt-2">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Validation Error</AlertTitle>
-          <AlertDescription>
-            {getValidationErrorMessage(validationError)}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-        {step === 'edit' ? (
-          <EditStep catalogue={catalogue} isDesktop={isDesktop} mode={mode} />
-        ) : (
-          <ReviewStepComponent catalogue={catalogue} />
+        {validationError && (
+          <Alert variant="destructive" className="mx-4 mt-2">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Validation Error</AlertTitle>
+            <AlertDescription>
+              {getValidationErrorMessage(validationError)}
+            </AlertDescription>
+          </Alert>
         )}
+
+        <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+          {step === 'edit' ? (
+            <EditStep catalogue={catalogue} isDesktop={isDesktop} mode={mode} />
+          ) : (
+            <ReviewStepComponent catalogue={catalogue} />
+          )}
+        </div>
       </div>
-    </div>
+    </GlyphProvider>
   )
 }
 

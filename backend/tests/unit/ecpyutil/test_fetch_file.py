@@ -7,15 +7,16 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
 
-from forecastbox.ecpyutil import fetch_content
+from forecastbox.utility.httpx import fetch_content
 
 
-def test_fetch_content_http_success(mocker):
+def test_fetch_content_http_success(mocker: Any) -> None:
     # Setup mock client
     mock_client = MagicMock(spec=httpx.Client)
     mock_response = MagicMock()
@@ -31,7 +32,7 @@ def test_fetch_content_http_success(mocker):
     mock_response.raise_for_status.assert_called_once()
 
 
-def test_fetch_content_file_success(mocker):
+def test_fetch_content_file_success(mocker: Any) -> None:
     mock_client = MagicMock(spec=httpx.Client)
 
     # Mocking Path.read_bytes to avoid actual disk access
@@ -46,7 +47,7 @@ def test_fetch_content_file_success(mocker):
         mock_read.assert_called_once()
 
 
-def test_fetch_content_unsupported_protocol():
+def test_fetch_content_unsupported_protocol() -> None:
     mock_client = MagicMock(spec=httpx.Client)
     with pytest.raises(ValueError, match="Unsupported protocol"):
         fetch_content("ftp://invalid.com", mock_client)
