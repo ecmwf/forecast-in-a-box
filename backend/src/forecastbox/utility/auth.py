@@ -9,9 +9,10 @@
 
 """Cross-domain authentication context helpers."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from forecastbox.utility.config import config
+PASSTHROUGH_USER_ID = "anonymous"
+"""Sentinel user-id stored in all resources created under passthrough (auth-disabled) mode."""
 
 
 @dataclass(frozen=True, eq=True, slots=True)
@@ -21,25 +22,27 @@ class AuthContext:
     Two special regimes exist beyond ordinary authenticated users:
 
     - **Admin** (``is_admin=True``): sees and may mutate all resources.
-    - **Passthrough / anonymous** (``user_id=None``): used in single-user local
+    - **Passthrough** (``is_passthrough=True``): used in single-user local
       deployments where authentication is disabled.  Treated identically to an
       admin — ``has_admin()`` returns ``True`` and ``allowed()`` always grants
-      access.  ``user_id`` being ``None`` does *not* mean "unauthenticated
-      restricted user"; that state simply does not exist in this model.
+      access.  In this regime ``user_id`` is set to ``PASSTHROUGH_USER_ID``
+      ("anonymous") rather than ``None`` so that ``created_by`` columns are
+      always non-null.
     """
 
     user_id: str | None
     is_admin: bool
+    is_passthrough: bool = field(default=False)
 
     def has_admin(self) -> bool:
         """Return True if the caller has unrestricted access.
 
         True for explicit admins (``is_admin=True``) and for the passthrough
-        regime (``user_id=None``, auth disabled).
+        regime (``is_passthrough=True``, auth disabled).
         """
-        return self.is_admin or (self.user_id is None and config.auth.passthrough)
+        return self.is_admin or self.is_passthrough
 
-    def allowed(self, resource_owner: str | None) -> bool:
+    def allowed(self, resource_owner: str) -> bool:
         """Return True if the caller may mutate a resource owned by resource_owner.
 
         Grants access when ``has_admin()`` is True (admins and passthrough) or
