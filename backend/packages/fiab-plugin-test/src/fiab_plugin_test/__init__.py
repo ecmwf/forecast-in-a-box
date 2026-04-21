@@ -18,15 +18,15 @@ catalogue = BlockFactoryCatalogue(
     factories={
         BlockFactoryId("source_42"): BlockFactory(
             kind="source",
-            title="",
-            description="",
+            title="Source 42",
+            description="Returns 42",
             configuration_options={},
             inputs=[],
         ),
         BlockFactoryId("source_text"): BlockFactory(
             kind="source",
-            title="",
-            description="",
+            title="Source Text",
+            description="Returns the input text",
             configuration_options={
                 "text": BlockConfigurationOption(title="", description="", value_type="str"),
             },
@@ -34,8 +34,8 @@ catalogue = BlockFactoryCatalogue(
         ),
         BlockFactoryId("source_sleep"): BlockFactory(
             kind="source",
-            title="",
-            description="",
+            title="Source Sleep",
+            description="Sleeps for a duration, then retuns the input text",
             configuration_options={
                 "text": BlockConfigurationOption(title="", description="", value_type="str"),
                 "duration": BlockConfigurationOption(title="", description="", value_type="float"),
@@ -44,8 +44,8 @@ catalogue = BlockFactoryCatalogue(
         ),
         BlockFactoryId("transform_increment"): BlockFactory(
             kind="transform",
-            title="",
-            description="",
+            title="Increment",
+            description="Adds the amount to the input",
             configuration_options={
                 "amount": BlockConfigurationOption(title="", description="", value_type="int"),
             },
@@ -53,15 +53,15 @@ catalogue = BlockFactoryCatalogue(
         ),
         BlockFactoryId("product_join"): BlockFactory(
             kind="product",
-            title="",
-            description="",
+            title="Join",
+            description="Adds the two inputs together",
             configuration_options={},
             inputs=["a", "b"],
         ),
         BlockFactoryId("sink_file"): BlockFactory(
             kind="sink",
-            title="",
-            description="",
+            title="File",
+            description="Saves the input to a file",
             configuration_options={
                 "fname": BlockConfigurationOption(title="", description="", value_type="str"),
             },
@@ -69,8 +69,8 @@ catalogue = BlockFactoryCatalogue(
         ),
         BlockFactoryId("sink_image"): BlockFactory(
             kind="sink",
-            title="",
-            description="",
+            title="Image",
+            description="Generates a png image, using the input number as the grayscale",
             configuration_options={},
             inputs=["data"],
         ),

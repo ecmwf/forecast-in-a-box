@@ -860,7 +860,7 @@ def test_run_output_content(tmpdir: Any, backend_client_with_auth: httpx.Client)
         params={"run_id": run_id, "dataset_id": sink_image_task_id},
     )
     assert image_resp.is_success, image_resp.text
-    assert image_resp.headers.get("content-type", "").startswith("application/pickle")
+    assert image_resp.headers.get("content-type", "").startswith("image/png")
     assert len(image_resp.content) > 0
 
 
