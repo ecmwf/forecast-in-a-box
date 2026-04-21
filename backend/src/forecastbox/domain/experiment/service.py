@@ -260,18 +260,17 @@ async def get_schedule_runs(
 
     Raises ExperimentNotFound if the schedule does not exist.
     Raises ValueError if page is out of range.
+    Will return empty if the user is not authenticated to see the resource.
     """
     exp_def = await experiment_db.get_experiment_definition(experiment_id)
     if exp_def is None or exp_def.experiment_type != "cron_schedule":
         raise ExperimentNotFound(f"Schedule {experiment_id} not found")
 
-    total = await run_db.count_runs_by_experiment(experiment_id, auth_context=AuthContext(user_id=None, is_admin=True))
+    total = await run_db.count_runs_by_experiment(experiment_id, auth_context=auth_context)
     start = pagination.start()
 
     if start >= total and total > 0:
         raise ValueError("Page number out of range.")
 
-    executions = await run_db.list_runs_by_experiment(
-        experiment_id, auth_context=AuthContext(user_id=None, is_admin=True), offset=start, limit=pagination.page_size
-    )
+    executions = await run_db.list_runs_by_experiment(experiment_id, auth_context=auth_context, offset=start, limit=pagination.page_size)
     return executions, total, pagination.total_pages(total)
