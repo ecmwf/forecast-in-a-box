@@ -86,7 +86,7 @@ class ExperimentDetail(BaseModel):
     max_acceptable_delay_hours: int
     enabled: bool
     created_at: str
-    created_by: str | None
+    created_by: str
     display_name: str | None
     display_description: str | None
     tags: list[str] | None = None
@@ -151,7 +151,7 @@ def _experiment_to_detail(exp: ExperimentDefinition) -> ExperimentDetail:
         max_acceptable_delay_hours=int(exp_def.get("max_acceptable_delay_hours", 24)),
         enabled=bool(exp_def.get("enabled", True)),
         created_at=str(exp.created_at),
-        created_by=cast(str | None, exp.created_by),
+        created_by=cast(str, exp.created_by),
         display_name=cast(str | None, exp.display_name),
         display_description=cast(str | None, exp.display_description),
         tags=cast(list[str] | None, exp.tags),

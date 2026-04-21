@@ -30,7 +30,7 @@ class RunnableExperiment:
     """Carries the Blueprint and all metadata needed to submit and track a scheduled run."""
 
     blueprint: Blueprint
-    created_by: str | None
+    created_by: str
     next_run_at: dt.datetime | None
     scheduled_at: dt.datetime
     experiment_id: ExperimentDefinitionId
@@ -63,7 +63,7 @@ async def experiment2runnable(experiment_id: ExperimentDefinitionId, exec_time: 
 
     rv = RunnableExperiment(
         blueprint=job_def,
-        created_by=cast(str | None, exp.created_by),
+        created_by=cast(str, exp.created_by),
         next_run_at=next_run_at,
         scheduled_at=exec_time,
         experiment_id=experiment_id,

@@ -21,7 +21,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from forecastbox.schemata.user import OAuthAccount, UserCreate, UserRead, UserTable, async_session_maker
-from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.auth import PASSTHROUGH_USER_ID, AuthContext
 from forecastbox.utility.config import config
 
 SECRET = config.auth.jwt_secret.get_secret_value()
@@ -132,6 +132,8 @@ current_active_user = fastapi_users.current_user(active=True, optional=config.au
 async def get_auth_context(user: UserRead | None = Depends(current_active_user)) -> AuthContext:
     """Build an AuthContext from an optional authenticated user."""
     if user is None:
-        return AuthContext(user_id=None, is_admin=False)
+        if not config.auth.passthrough:
+            raise ValueError("Unauthenticated request in non-passthrough deployment")
+        return AuthContext(user_id=PASSTHROUGH_USER_ID, is_admin=True)
     else:
         return AuthContext(user_id=str(user.id), is_admin=user.is_superuser)

@@ -24,7 +24,7 @@ from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run
 from forecastbox.domain.experiment.scheduling.job_utils import experiment2runnable
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.service import execute
-from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.auth import PASSTHROUGH_USER_ID, AuthContext
 from forecastbox.utility.concurrent import timed_acquire
 from forecastbox.utility.config import config
 from forecastbox.utility.time import current_time
@@ -97,7 +97,11 @@ class SchedulerThread(threading.Thread):
                     exec_result = self._run_async(
                         execute(
                             runnable.blueprint,
-                            AuthContext(user_id=runnable.created_by, is_admin=False),
+                            # NOTE the is_admin may be True, but we dont know and its not important for this call
+                            AuthContext(
+                                user_id=runnable.created_by,
+                                is_admin=False,
+                            ),
                             experiment_id=experiment_id,
                             experiment_version=cast(int, exp_def.version),
                             compiler_runtime_context=runnable.compiler_runtime_context,

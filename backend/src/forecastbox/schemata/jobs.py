@@ -48,7 +48,7 @@ class Blueprint(Base):
 
     blueprint_id = Column(String(255), primary_key=True, nullable=False)
     version = Column(Integer, primary_key=True, nullable=False)
-    created_by = Column(String(255), nullable=True)
+    created_by = Column(String(255), nullable=False)
     created_at = Column(DateTime, nullable=False)
 
     # TODO later -- make sure entity validates this
@@ -86,7 +86,7 @@ class GlobalGlyph(Base):
     value = Column(String(1024), nullable=False)
     public = Column(Boolean, nullable=False, default=False)
     overriddable = Column(Boolean, nullable=True)
-    created_by = Column(String(255), nullable=True)
+    created_by = Column(String(255), nullable=False)
     created_at = Column(DateTime, nullable=False)
     updated_at = Column(DateTime, nullable=False)
 
@@ -111,7 +111,7 @@ class ExperimentDefinition(Base):
 
     experiment_definition_id = Column(String(255), primary_key=True, nullable=False)
     version = Column(Integer, primary_key=True, nullable=False)
-    created_by = Column(String(255), nullable=True)
+    created_by = Column(String(255), nullable=False)
     created_at = Column(DateTime, nullable=False)
 
     display_name = Column(String(255), nullable=True)
@@ -149,7 +149,7 @@ class Run(Base):
 
     run_id = Column(String(255), primary_key=True, nullable=False)
     attempt_count = Column(Integer, primary_key=True, nullable=False)
-    created_by = Column(String(255), nullable=True)
+    created_by = Column(String(255), nullable=False)
     created_at = Column(DateTime, nullable=False)
     updated_at = Column(DateTime, nullable=False)
 

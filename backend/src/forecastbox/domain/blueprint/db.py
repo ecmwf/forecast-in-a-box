@@ -34,7 +34,7 @@ async def upsert_blueprint(
     auth_context: AuthContext,
     blueprint_id: BlueprintId | None = None,
     source: BlueprintSource,
-    created_by: str | None,
+    created_by: str,
     builder: dict | None = None,
     display_name: str | None = None,
     display_description: str | None = None,
@@ -80,7 +80,7 @@ async def upsert_blueprint(
                 owner_result = await session.execute(owner_query)
                 row = owner_result.first()
                 if row is not None:
-                    owner: str | None = row[0]
+                    owner: str = row[0]
                     if not auth_context.allowed(owner):
                         raise BlueprintAccessDenied(f"User {auth_context.user_id!r} is not allowed to modify Blueprint {blueprint_id!r}.")
 
@@ -209,7 +209,7 @@ async def soft_delete_blueprint(blueprint_id: BlueprintId, *, expected_version: 
         raise BlueprintVersionConflict(
             f"Version conflict for Blueprint {blueprint_id!r}: expected version {expected_version}, current is {existing.version}."
         )
-    if not auth_context.allowed(cast(str | None, existing.created_by)):
+    if not auth_context.allowed(cast(str, existing.created_by)):
         raise BlueprintAccessDenied(f"User {auth_context.user_id!r} is not allowed to delete Blueprint {blueprint_id!r}.")
     stmt = update(Blueprint).where(Blueprint.blueprint_id == blueprint_id).values(is_deleted=True)
     await executeAndCommit(stmt, _jobs_module.async_session_maker)
