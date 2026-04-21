@@ -12,7 +12,8 @@
 * lastly, docs/ contains documentation -- currently contains all of end-user docs, developer docs, faqs and troubleshootings
 * there is pre-commit configured. Ideally do `uv run prek` before every commit. The `prek` itself is declared as a `dev` dependency in the `backend`s venv managed by `uv`
 
-# GitHub and Pull Requests
+# General
+* do not use fancy unicode or emoji characters when creating text/markdown files
 * when asked to fetch PR review comments, use the GitHub GraphQL API to fetch only **unresolved** threads:
   ```bash
   gh api graphql -f query='
@@ -31,10 +32,10 @@
     }
   }' | jq -r '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | "File: \(.comments.nodes[0].path)\nLine: \(.comments.nodes[0].line // .comments.nodes[0].originalLine)\nComment: \(.comments.nodes[0].body)\n---"'
   ```
-  This provides the actual inline review comments which `gh pr view` doesn't show properly, and filters out resolved threads.
+  This provides the actual inline review comments which `gh pr view` doesn't show properly, and filters out resolved threads
 
 # Backend
-* for development related to backend or backend/packages, consult `backend/development.md`.
+* for development related to backend or backend/packages, consult `backend/development.md`
 
 # Frontend
-* for development related to frontend, consult `frontend/GUIDELINES.md`.
+* for development related to frontend, consult `frontend/GUIDELINES.md`
