@@ -8,8 +8,7 @@
             "display_description": "",
             "disk_size_bytes": 188732703,
             "pip_package_constraints": [
-                "anemoi.graphs==0.5.1",
-                "anemoi.models==0.5.0",
+                "anemoi-models==0.5.0",
                 "torch>=2.6.0",
                 "torch_geometric==2.4.0"
             ],
@@ -1050,41 +1049,7 @@
                     ],
                     "variables_metadata": {},
                     "version": "0.5.21"
-                },
-                "provenance_training": {
-                    "git_versions": {},
-                    "module_versions": {
-                        "anemoi.datasets": "0.5.21",
-                        "anemoi.graphs": "0.5.1",
-                        "anemoi.models": "0.5.0",
-                        "anemoi.training": "0.4.0",
-                        "anemoi.utils": "0.4.22",
-                        "lightning_fabric": "2.5.1",
-                        "lightning_utilities": "0.14.3",
-                        "matplotlib": "3.10.1",
-                        "netCDF4": "1.7.2",
-                        "numpy": "1.26.4",
-                        "pandas": "2.2.3",
-                        "pydantic": "2.11.3",
-                        "pydantic_core": "2.33.1",
-                        "pyshtools": "4.13.1",
-                        "pytorch_lightning": "2.5.1",
-                        "safetensors": "0.5.3",
-                        "scipy": "1.15.2",
-                        "torch": "2.6.0+cu124",
-                        "torch_geometric": "2.4.0",
-                        "torchinfo": "1.8.0",
-                        "torchmetrics": "1.7.1",
-                        "torchvision": "0.21.0+cu124",
-                        "tqdm": "4.67.1",
-                        "trimesh": "4.6.8",
-                        "triton": "3.2.0"
-                    },
-                    "python": "3.12.6",
-                    "time": "2025-07-01T12:08:22.804247"
-                },
-                "uuid": "41a541f8-0cd1-4bf0-8769-749b1f7a8e53",
-                "version": "1.0"
+                }
             }
         }
     }

@@ -20,12 +20,6 @@ from fiab_core.artifacts import ArtifactsProvider, CheckpointLookup, CompositeAr
 from fiab_core.fable import BlockInstance, QubedOutput
 from fiab_core.plugin import Error
 
-ENVIRONMENT_PACKAGES: list[str] = [
-    "anemoi.models",
-    "torch",
-    "torch_geometric",
-]
-
 
 def get_available_checkpoints() -> CheckpointLookup:
     all_checkpoints: CheckpointLookup = ArtifactsProvider.get_checkpoint_lookup()
@@ -61,18 +55,7 @@ INPUT_SOURCE_EXTRAS: dict[str, str] = {
 
 
 def get_environment(composite_id: CompositeArtifactId, input_source: str | None = None) -> list[str]:
-    metadata = get_metadata(composite_id)
-    training_env = metadata.provenance_training()["module_versions"]
-
-    matched_packages = set()
-    for package in ENVIRONMENT_PACKAGES:
-        matched_packages.update(re.findall(package, " ".join(training_env.keys())))
-
-    environment = {pkg: training_env[pkg] for pkg in matched_packages}
-    # Handle recent utils change where version is now a dict with version
-    environment = {key: val if not isinstance(val, dict) else val["version"] for key, val in environment.items()}
-    packages = list(f"{key.replace('.', '-')}=={val.split('+')[0]}" for key, val in environment.items())
-
+    packages = get_available_checkpoints()[composite_id].pip_package_constraints
     if input_source in INPUT_SOURCE_EXTRAS:
         packages.append(INPUT_SOURCE_EXTRAS[input_source])
 
