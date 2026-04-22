@@ -27,6 +27,7 @@ from pyrsistent import pmap
 
 from forecastbox.domain.artifact.base import ArtifactCatalog, CompositeArtifactId, artifacts_subdir, get_artifact_local_path
 from forecastbox.utility.config import ArtifactStoresConfig
+from forecastbox.utility.httpx import fetch_content
 
 logger = logging.getLogger(__name__)
 
@@ -35,23 +36,18 @@ def get_artifacts_catalog(artifact_stores_config: ArtifactStoresConfig) -> Artif
     """Query each artifact store and return a composed catalog of all available artifacts."""
     catalog = {}
 
-    for store_id, store_config in artifact_stores_config.items():
-        if store_config.method == "file":
-            if Path(store_config.url).exists():
-                with open(Path(store_config.url)) as f:
-                    store_data = json.load(f)
+    with httpx.Client(follow_redirects=True) as client:
+        for store_id, store_config in artifact_stores_config.items():
+            if store_config.method == "file":
+                raw = fetch_content(store_config.url, client)
+                store_data = json.loads(raw)
+                artifacts = store_data.get("artifacts", {})
+                for checkpoint_id, checkpoint_data in artifacts.items():
+                    composite_id = CompositeArtifactId(artifact_store_id=store_id, ml_model_checkpoint_id=checkpoint_id)
+                    catalog[composite_id] = MlModelCheckpoint(**checkpoint_data)
+                    logger.debug(f"Loaded artifact {composite_id} from store {store_id}")
             else:
-                response = httpx.get(store_config.url, follow_redirects=True)
-                response.raise_for_status()
-                store_data = response.json()
-
-            artifacts = store_data.get("artifacts", {})
-            for checkpoint_id, checkpoint_data in artifacts.items():
-                composite_id = CompositeArtifactId(artifact_store_id=store_id, ml_model_checkpoint_id=checkpoint_id)
-                catalog[composite_id] = MlModelCheckpoint(**checkpoint_data)
-                logger.debug(f"Loaded artifact {composite_id} from store {store_id}")
-        else:
-            assert_never(store_config.method)
+                assert_never(store_config.method)
 
     return pmap(catalog)
 
