@@ -16,6 +16,7 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
+from cascade.low.exceptions import CascadeInternalError
 from fiab_core.artifacts import ArtifactStoreId, MlModelCheckpoint, MlModelCheckpointId
 from pyrsistent import pmap
 
@@ -146,7 +147,7 @@ def test_get_artifacts_catalog_unsupported_method() -> None:
     # Temporarily change method to something unsupported
     config[ArtifactStoreId("store1")].method = cast(Literal["file"], "unsupported")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(CascadeInternalError):
         get_artifacts_catalog(config)
 
 
