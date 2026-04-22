@@ -21,21 +21,22 @@ from cascade.gateway.api import JobSpec, ResultRetrievalResponse, SubmitJobReque
 from cascade.gateway.client import request_response
 from cascade.low import views
 from cascade.low.core import JobInstance, JobInstanceRich
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from forecastbox.domain.artifact.manager import ArtifactManager, submit_artifact_download
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.utility.config import config
+from forecastbox.utility.pydantic import FiabBaseModel
 
 logger = logging.getLogger(__name__)
 
 
-class RawCascadeJob(BaseModel):
+class RawCascadeJob(FiabBaseModel):
     job_type: Literal["raw_cascade_job"]
     job_instance: JobInstance
 
 
-class ExecutionSpecification(BaseModel):
+class ExecutionSpecification(FiabBaseModel):
     job: RawCascadeJob  # = Field(discriminator="job_type")
     environment: EnvironmentSpecification
     shared: bool = Field(default=False)
@@ -82,7 +83,7 @@ def encode_result(result: ResultRetrievalResponse) -> tuple[bytes, str]:
     return cloudpickle.dumps(obj), "application/clpkl"
 
 
-class ProductToOutputId(BaseModel):
+class ProductToOutputId(FiabBaseModel):
     product_name: str
     product_spec: dict[str, Any]
     output_ids: Sequence[str]

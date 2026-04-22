@@ -20,12 +20,13 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
-from pydantic import UUID4, BaseModel
+from pydantic import UUID4
 
 from forecastbox.domain.admin import Release, get_local_release, get_most_recent_release, get_pylock, mark_release, save_pylock
 from forecastbox.domain.auth.db import delete_user_by_id, get_user_by_id, list_users, patch_user_by_id, update_user_by_id
 from forecastbox.domain.auth.users import UserRead, UserUpdate, current_active_user
 from forecastbox.utility.config import BackendAPISettings, CascadeSettings, ProductSettings, config
+from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.rsjf import ExportedSchemas, FormDefinition, from_pydantic
 
 PREFIX = "/api/v1/admin"
@@ -48,7 +49,7 @@ router = APIRouter(
 )
 
 
-class ExposedSettings(BaseModel):
+class ExposedSettings(FiabBaseModel):
     """Exposed settings for modification"""
 
     product: ProductSettings = config.product
@@ -67,13 +68,13 @@ class ExposedSettings(BaseModel):
         )
 
 
-class GetReleaseStatusResponse(BaseModel):
+class GetReleaseStatusResponse(FiabBaseModel):
     local_release: Release
     local_release_age_days: int
     newest_available_release: Release
 
 
-class UpdateReleaseResponse(BaseModel):
+class UpdateReleaseResponse(FiabBaseModel):
     release: Release
 
 
@@ -120,7 +121,7 @@ async def get_settings(admin: UserRead | None = Depends(get_admin_user)) -> Expo
 async def update_settings(settings: ExposedSettings, admin: UserRead | None = Depends(get_admin_user)) -> HTMLResponse:
     """Update settings"""
 
-    def update(old: BaseModel, new: BaseModel) -> None:
+    def update(old: FiabBaseModel, new: FiabBaseModel) -> None:
         for key, val in new.model_dump().items():
             setattr(old, key, val)
 

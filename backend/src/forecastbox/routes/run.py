@@ -28,7 +28,6 @@ from cascade.gateway import api, client
 from cascade.low.core import DatasetId, TaskId
 from fastapi import APIRouter, Depends, Response
 from fastapi.exceptions import HTTPException
-from pydantic import BaseModel
 
 from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint.types import BlueprintId
@@ -40,6 +39,7 @@ from forecastbox.routes.gateway import Globals
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
 from forecastbox.utility.pagination import PaginationSpec
+from forecastbox.utility.pydantic import FiabBaseModel
 
 PREFIX = "/api/v1/run"
 
@@ -56,7 +56,7 @@ router = APIRouter(
 # ---------------------------------------------------------------------------
 
 
-class RunLookup(BaseModel):
+class RunLookup(FiabBaseModel):
     """Identifies a job execution attempt, optionally pinning a specific attempt.
 
     Used as a Depends()-based query-param group on GET endpoints, and as a
@@ -67,17 +67,17 @@ class RunLookup(BaseModel):
     attempt_count: int | None = None
 
 
-class RunCreateRequest(BaseModel):
+class RunCreateRequest(FiabBaseModel):
     blueprint_id: BlueprintId
     blueprint_version: int | None = None
 
 
-class RunCreateResponse(BaseModel):
+class RunCreateResponse(FiabBaseModel):
     run_id: RunId
     attempt_count: int
 
 
-class RunDetailResponse(BaseModel):
+class RunDetailResponse(FiabBaseModel):
     run_id: RunId
     attempt_count: int
     status: str
@@ -90,7 +90,7 @@ class RunDetailResponse(BaseModel):
     cascade_job_id: str | None = None
 
 
-class RunListResponse(BaseModel):
+class RunListResponse(FiabBaseModel):
     runs: list[RunDetailResponse]
     total: int
     page: int
@@ -98,19 +98,19 @@ class RunListResponse(BaseModel):
     total_pages: int
 
 
-class RunRestartRequest(BaseModel):
+class RunRestartRequest(FiabBaseModel):
     """Identifies the attempt to restart. ``attempt_count`` must match the current latest attempt."""
 
     run_id: RunId
     attempt_count: int
 
 
-class RunRestartResponse(BaseModel):
+class RunRestartResponse(FiabBaseModel):
     run_id: RunId
     attempt_count: int
 
 
-class RunDeleteRequest(BaseModel):
+class RunDeleteRequest(FiabBaseModel):
     """Identifies the attempt to delete. ``attempt_count`` must match the current latest attempt."""
 
     run_id: RunId

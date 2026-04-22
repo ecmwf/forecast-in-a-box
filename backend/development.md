@@ -13,7 +13,8 @@
   * when working with a package with insufficient typing coverage like sqlalchemy, use `ty:ignore` comment
   * when `ty` is not powerful enough, use `ty:ignore `
   * use `typing.cast` when the code logic is implicitly erasing the type information
-* prioritize using pydantic.BaseModel or dataclasses.dataclass object for capturing contracts and interfaces.
+* prioritize using pydantic BaseModel or dataclasses.dataclass object for capturing contracts and interfaces.
+  * when using pydantic, use `FiabBaseModel` from `forecastbox.utility.pydantic` (or `FiabCoreBaseModel` from `fiab_core.pydantic_utils` in fiab-core) instead of `pydantic.BaseModel` directly, unless the model requires dynamic field handling (e.g., `extra="allow"` for JSON Schema types). These base models set `extra="forbid"` to catch misconfigured constructors early. If you need the dynamic model handling, mark it clearly with a comment.
   * ideally keep them plain, stateless, frozen, without functions -- we end up serializing those objects often over to other python processes or different languages
     * having a few methods that provide convenience views, ser/de, validation, conversion does not necessarilly hurt -- its primarily about keeping the codebase generally functional and data-oriented rather than object-oriented.
   * for simple immutable data transfer objects, use `@dataclass(frozen=True, eq=True, slots=True)` directly for best type checker support -- provides immutability, hashability, and memory efficiency via slots. We set `eq=True` explicitly, despite being a default, for clarity.

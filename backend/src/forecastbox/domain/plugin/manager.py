@@ -40,12 +40,12 @@ from typing import Iterator, Literal
 from cascade.low.func import assert_never
 from fiab_core.fable import BlockFactoryCatalogue, PluginCompositeId
 from fiab_core.plugin import Plugin
-from pydantic import BaseModel
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
 from forecastbox.utility.concurrent import delayed_thread, timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginsSettings, config, config_edit_lock
+from forecastbox.utility.pydantic import FiabBaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -226,7 +226,7 @@ def submit_load_plugins(start_after: Future[None]) -> None:
             PluginManager.updater.start()
 
 
-class PluginsStatus(BaseModel):
+class PluginsStatus(FiabBaseModel):
     # TODO: Change these fields to use pyrsistent types (PMap) instead of dict once we solve pydantic serialization
     updater_status: Literal["ok", "running", "retrieving"] | str
     plugin_errors: dict[PluginCompositeId, str]
