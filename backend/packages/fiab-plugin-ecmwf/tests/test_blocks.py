@@ -8,10 +8,8 @@
 # nor does it submit to any jurisdiction.
 
 
-from typing import cast
-
 import pytest
-from fiab_core.fable import BlockInstance, BlockInstanceId, NoOutput, PluginBlockFactoryId, PluginCompositeId, QubedOutput
+from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId, NoOutput, PluginBlockFactoryId, PluginCompositeId, QubedOutput
 
 from fiab_plugin_ecmwf.blocks import (
     EkdSource,
@@ -94,7 +92,7 @@ def zarr_sink_configuration() -> BlockInstance:
 def map_plot_sink_configuration() -> BlockInstance:
     return BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="MapPlotSink"),  # type: ignore
-        input_ids={"dataset": "source_output"},
+        input_ids={"dataset": BlockInstanceId("source_output")},
         configuration_values={
             "param": "2t",
             "domain": "global",
@@ -290,8 +288,8 @@ class TestMapPlotSink:
     def test_validate_multi_param(self, ekdsource_output: QubedOutput) -> None:
         block = MapPlotSink()
         config = BlockInstance(
-            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="MapPlotSink"),
-            input_ids={"dataset": "source_output"},
+            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),
+            input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values={
                 "param": "2t,msl",
                 "domain": "global",
@@ -306,8 +304,8 @@ class TestMapPlotSink:
     def test_validate_missing_param(self, ekdsource_output: QubedOutput) -> None:
         block = MapPlotSink()
         config = BlockInstance(
-            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="MapPlotSink"),
-            input_ids={"dataset": "source_output"},
+            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),
+            input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values={
                 "param": "nonexistent",
                 "domain": "global",
@@ -323,8 +321,8 @@ class TestMapPlotSink:
     def test_validate_partial_missing_params(self, ekdsource_output: QubedOutput) -> None:
         block = MapPlotSink()
         config = BlockInstance(
-            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="MapPlotSink"),
-            input_ids={"dataset": "source_output"},
+            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),
+            input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values={
                 "param": "2t,nonexistent",
                 "domain": "global",

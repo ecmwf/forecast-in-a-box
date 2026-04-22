@@ -26,6 +26,7 @@ QubedOutput(dataqube=Qube(...), datatype='netcdf')
 """
 
 import functools
+from collections.abc import Mapping
 from typing import Any, Iterable
 
 from fiab_core.fable import QubedOutput
@@ -67,7 +68,7 @@ def collapse(qube: QubedOutput, axis: str | list[str]) -> QubedOutput:
     return qube.model_copy(update={"dataqube": reduced_qube})
 
 
-def expand(qube: QubedOutput, dimension: dict[str, Iterable]) -> QubedOutput:
+def expand(qube: QubedOutput, dimension: Mapping[str, Iterable[Any]]) -> QubedOutput:
     """Return a new QubedOutput with the dataqube expanded by adding the specified dimension(s).
 
     Parameters
@@ -99,7 +100,7 @@ def expand(qube: QubedOutput, dimension: dict[str, Iterable]) -> QubedOutput:
     return qube.model_copy(update={"dataqube": dataqube})
 
 
-def coxpand(qube: QubedOutput, axis: str | list[str], dimension: dict[str, Iterable]) -> QubedOutput:
+def coxpand(qube: QubedOutput, axis: str | list[str], dimension: Mapping[str, Iterable[Any]]) -> QubedOutput:
     """Collapse, then expand"""
     return expand(collapse(qube, axis), dimension)
 
@@ -181,7 +182,7 @@ def contains(qube: QubedOutput, item: Qube | str | dict) -> bool:
     dict_cast_to_list = {k: list(v) if isinstance(v, (set, tuple, list)) else [v] for k, v in lookup.items()}
     current_axes = axes(qube)
 
-    def _contains_axis_values(key, values):
+    def _contains_axis_values(key: str, values: Iterable[Any]) -> bool:
         return key in current_axes and all(v in current_axes[key] for v in values)
 
     return all(_contains_axis_values(k, v) for k, v in dict_cast_to_list.items())
