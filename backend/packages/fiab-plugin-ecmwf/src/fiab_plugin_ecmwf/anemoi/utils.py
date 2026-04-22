@@ -8,7 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 import importlib.metadata
-import re
+import logging
 from pathlib import Path
 from typing import cast
 
@@ -19,6 +19,8 @@ from earthkit.workflows.plugins.anemoi.utils import expansion_qube_from_metadata
 from fiab_core.artifacts import ArtifactsProvider, CheckpointLookup, CompositeArtifactId
 from fiab_core.fable import BlockInstance, QubedOutput
 from fiab_core.plugin import Error
+
+logger = logging.getLogger(__name__)
 
 
 def get_available_checkpoints() -> CheckpointLookup:
@@ -31,7 +33,11 @@ def get_available_checkpoints() -> CheckpointLookup:
 
 
 def get_checkpoint_enum_type() -> str:
-    available_checkpoints = get_available_checkpoints()
+    try:
+        available_checkpoints = get_available_checkpoints()
+    except Exception as e:
+        logger.error(f"Error fetching available checkpoints: {e}")
+        return "str"
     if not available_checkpoints:
         return "str"
     values = ", ".join(f"'{CompositeArtifactId.to_str(k)}'" for k in available_checkpoints.keys())
