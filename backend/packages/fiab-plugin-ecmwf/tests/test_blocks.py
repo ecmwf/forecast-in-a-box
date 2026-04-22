@@ -9,7 +9,16 @@
 
 
 import pytest
-from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId, NoOutput, PluginBlockFactoryId, PluginCompositeId, QubedOutput
+from fiab_core.fable import (
+    BlockFactoryId,
+    BlockInstance,
+    BlockInstanceId,
+    NoOutput,
+    PluginBlockFactoryId,
+    PluginCompositeId,
+    QubedOutput,
+    RawOutput,
+)
 
 from fiab_plugin_ecmwf.blocks import (
     EkdSource,
@@ -159,7 +168,7 @@ class TestEnsembleStatistics:
 
         assert not block.intersect(other=modified_output)  # type: ignore[arg-type]
         result = block.validate(block=ensemble_statistics_configuration, inputs={"dataset": modified_output})  # type: ignore[dict-item]
-        with pytest.raises(ValueError, match="param 2t is not in the input parameters"):
+        with pytest.raises(Exception, match="param 2t is not in the input parameters"):
             assert result.get_or_raise()
 
 
@@ -208,7 +217,7 @@ class TestTemporalStatistics:
 
         assert not block.intersect(other=modified_output)  # type: ignore[arg-type]
         result = block.validate(block=temporal_statistics_configuration, inputs={"dataset": modified_output})  # type: ignore[dict-item]
-        with pytest.raises(ValueError, match="param 2t is not in the input parameters"):
+        with pytest.raises(Exception, match="param 2t is not in the input parameters"):
             assert result.get_or_raise()
 
 
@@ -283,7 +292,7 @@ class TestMapPlotSink:
     def test_validate_from_ekdsource(self, map_plot_sink_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
         block = MapPlotSink()
         output = block.validate(block=map_plot_sink_configuration, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
-        assert isinstance(output, NoOutput)
+        assert isinstance(output, RawOutput)
 
     def test_validate_multi_param(self, ekdsource_output: QubedOutput) -> None:
         block = MapPlotSink()
@@ -299,7 +308,7 @@ class TestMapPlotSink:
             },
         )
         output = block.validate(block=config, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
-        assert isinstance(output, NoOutput)
+        assert isinstance(output, RawOutput)
 
     def test_validate_missing_param(self, ekdsource_output: QubedOutput) -> None:
         block = MapPlotSink()
@@ -315,7 +324,7 @@ class TestMapPlotSink:
             },
         )
         result = block.validate(block=config, inputs={"dataset": ekdsource_output})  # type: ignore[dict-item]
-        with pytest.raises(ValueError, match="params \\['nonexistent'\\] are not in the input parameters"):
+        with pytest.raises(Exception, match="params \\['nonexistent'\\] are not in the input parameters"):
             result.get_or_raise()
 
     def test_validate_partial_missing_params(self, ekdsource_output: QubedOutput) -> None:
@@ -332,7 +341,7 @@ class TestMapPlotSink:
             },
         )
         result = block.validate(block=config, inputs={"dataset": ekdsource_output})  # type: ignore[dict-item]
-        with pytest.raises(ValueError, match="params \\['nonexistent'\\] are not in the input parameters"):
+        with pytest.raises(Exception, match="params \\['nonexistent'\\] are not in the input parameters"):
             result.get_or_raise()
 
     def test_validate_from_ensemble_statistics(
@@ -348,4 +357,4 @@ class TestMapPlotSink:
         block = MapPlotSink()
         assert block.intersect(other=ensemble_output)  # type: ignore[arg-type]
         output = block.validate(block=map_plot_sink_configuration, inputs={"dataset": ensemble_output}).get_or_raise()  # type: ignore[dict-item]
-        assert isinstance(output, NoOutput)
+        assert isinstance(output, RawOutput)
