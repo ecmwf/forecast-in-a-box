@@ -90,7 +90,7 @@ def test_composite_artifact_id_from_str_round_trip() -> None:
     """Test CompositeArtifactId.from_str / to_str round-trip"""
     from fiab_core.artifacts import CompositeArtifactId as CoreCompositeArtifactId
 
-    original = CoreCompositeArtifactId(artifact_store_id="my_store", ml_model_checkpoint_id="my_ckpt")
+    original = CoreCompositeArtifactId(artifact_store_id=ArtifactStoreId("my_store"), ml_model_checkpoint_id=MlModelCheckpointId("my_ckpt"))
     serialised = CoreCompositeArtifactId.to_str(original)
     assert serialised == "my_store:my_ckpt"
 
@@ -193,7 +193,7 @@ def test_get_artifacts_catalog_from_local_file(tmpdir_path: Path, sample_checkpo
     catalog_file.write_text(json.dumps(store_data))
 
     config: ArtifactStoresConfig = {
-        "local_store": ArtifactStoreConfig(
+        ArtifactStoreId("local_store"): ArtifactStoreConfig(
             url=str(catalog_file),
             method="file",
         ),
@@ -202,7 +202,7 @@ def test_get_artifacts_catalog_from_local_file(tmpdir_path: Path, sample_checkpo
     catalog = get_artifacts_catalog(config)
 
     assert len(catalog) == 1
-    composite_id = CompositeArtifactId("local_store", "local_model")
+    composite_id = CompositeArtifactId(ArtifactStoreId("local_store"), MlModelCheckpointId("local_model"))
     assert composite_id in catalog
     assert catalog[composite_id].display_name == "Test Model"
 

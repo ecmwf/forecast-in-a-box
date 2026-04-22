@@ -40,7 +40,7 @@ class CompositeArtifactId:
         return cls(artifact_store_id=artifact_store_id, ml_model_checkpoint_id=ml_model_checkpoint_id)
 
     @staticmethod
-    def to_str(k: "CompositeArtifactId") -> str:
+    def to_str(k: Self) -> str:
         return f"{k.artifact_store_id}:{k.ml_model_checkpoint_id}"
 
 

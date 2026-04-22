@@ -357,7 +357,7 @@ async def get_run_output_content(
     """Retrieve the result of a specific output task, encoded as bytes."""
     _, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
     response = client.request_response(
-        api.ResultRetrievalRequest(job_id=cascade_job_id, dataset_id=DatasetId(task=dataset_id, output="0")),
+        api.ResultRetrievalRequest(job_id=cascade_job_id, dataset_id=DatasetId(task=TaskId(dataset_id), output="0")),
         f"{config.cascade.cascade_url}",
     )
     response = cast(api.ResultRetrievalResponse, response)

@@ -97,35 +97,22 @@ class BlockInstance(BaseModel):
     """Keys come from factory's `inputs`, values are other blocks in the (partial) fable"""
 
 
-class BlockInstanceOutput(BaseModel, abc.ABC):
-    """Base class for all block outputs. Subclasses must implement is_empty()."""
-
-    @abc.abstractmethod
-    def is_empty(self) -> bool: ...
-
-
-class QubedOutput(BlockInstanceOutput):
+class QubedOutput(BaseModel):
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)  # otherwise Qube cannot be here
     dataqube: Qube = Field(default_factory=Qube.empty)
     datatype: str = Field(default="")
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-    def is_empty(self) -> bool:
-        return self.dataqube == Qube.empty()
 
-
-class RawOutput(BlockInstanceOutput):
+class RawOutput(BaseModel):
     type_fqn: str  # most likely you want Any here
 
-    def is_empty(self) -> bool:
-        return False
 
-
-class NoOutput(BlockInstanceOutput):
+class NoOutput(BaseModel):
     # use this when there is no output whatsoever -- this stops *any* expansion of the block
+    pass
 
-    def is_empty(self) -> bool:
-        return True
 
+BlockInstanceOutput = QubedOutput | RawOutput | NoOutput
 
 ActionLookup = dict[BlockInstanceId, Action]
