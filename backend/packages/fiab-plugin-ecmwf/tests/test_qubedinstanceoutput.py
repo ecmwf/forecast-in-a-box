@@ -14,13 +14,13 @@ from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, coxpand, dim
 
 
 @pytest.fixture
-def empty_output():
+def empty_output() -> QubedOutput:
     """Create an empty QubedOutput"""
     return QubedOutput()
 
 
 @pytest.fixture
-def simple_output():
+def simple_output() -> QubedOutput:
     """Create a simple QubedOutput with param and time dimensions"""
     return QubedOutput(
         dataqube=Qube.from_datacube(
@@ -33,7 +33,7 @@ def simple_output():
 
 
 @pytest.fixture
-def complex_output():
+def complex_output() -> QubedOutput:
     """Create a complex QubedOutput with param, time, and level dimensions"""
     return QubedOutput(
         dataqube=Qube.from_datacube(
@@ -57,7 +57,12 @@ class TestQubedOutputCreation:
             ("complex_output", {"param", "time", "level"}),
         ],
     )
-    def test_creation_with_dimensions(self, fixture_name, expected_dimensions, request):
+    def test_creation_with_dimensions(
+        self,
+        fixture_name: str,
+        expected_dimensions: set[str],
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test creating QubedOutput with various dimensions"""
         output = request.getfixturevalue(fixture_name)
         assert dimensions(output) == expected_dimensions
@@ -67,13 +72,13 @@ class TestQubedOutputCreation:
 class TestQubedOutputExpand:
     """Tests for the expand() method"""
 
-    def test_expand_from_empty(self, empty_output):
+    def test_expand_from_empty(self, empty_output: QubedOutput) -> None:
         """Test expanding from an empty output"""
         expanded = expand(empty_output, {"param": ["t", "q"]})
         assert dimensions(expanded) == {"param"}
         assert set(axes(expanded)["param"]) == {"t", "q"}
 
-    def test_expand_multiple_dimensions(self, simple_output):
+    def test_expand_multiple_dimensions(self, simple_output: QubedOutput) -> None:
         """Test expanding with multiple dimensions at once"""
         expanded = expand(
             simple_output,
@@ -87,7 +92,11 @@ class TestQubedOutputExpand:
         assert set(axes(expanded)["level"]) == {1000, 850}
 
     @pytest.mark.parametrize("fixture_name", ["empty_output", "simple_output", "complex_output"])
-    def test_expand_preserves_original(self, fixture_name, request):
+    def test_expand_preserves_original(
+        self,
+        fixture_name: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test that expand preserves the original output across all fixture types"""
         output = request.getfixturevalue(fixture_name)
         original_dims = dimensions(output)
@@ -100,7 +109,7 @@ class TestQubedOutputExpand:
         assert not contains(output, "ensemble")
         assert contains(expanded, "ensemble")
 
-    def test_expand_chain(self, empty_output):
+    def test_expand_chain(self, empty_output: QubedOutput) -> None:
         """Test chaining multiple expand operations"""
         output = expand(empty_output, {"param": ["t"]})
         output = expand(output, {"time": [0, 1]})
@@ -116,7 +125,12 @@ class TestQubedOutputExpand:
             ("complex_output", ["val1", "val2", "val3", "val4", "val5"]),
         ],
     )
-    def test_expand_with_varying_value_counts(self, fixture_name, dimension_values, request):
+    def test_expand_with_varying_value_counts(
+        self,
+        fixture_name: str,
+        dimension_values: list[str],
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test expanding with different numbers of values across fixtures"""
         output = request.getfixturevalue(fixture_name)
         expanded = expand(output, {"new_dim": dimension_values})
@@ -124,7 +138,11 @@ class TestQubedOutputExpand:
         assert set(axes(expanded)["new_dim"]) == set(dimension_values)
 
     @pytest.mark.parametrize("fixture_name", ["empty_output", "simple_output", "complex_output"])
-    def test_expand_with_empty_dict(self, fixture_name, request):
+    def test_expand_with_empty_dict(
+        self,
+        fixture_name: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test expanding with an empty dictionary preserves state"""
         output = request.getfixturevalue(fixture_name)
         original_dims = dimensions(output)
@@ -138,7 +156,12 @@ class TestQubedOutputExpand:
             ("complex_output", "level"),
         ],
     )
-    def test_expand_existing_dimension(self, fixture_name, dimension_name, request):
+    def test_expand_existing_dimension(
+        self,
+        fixture_name: str,
+        dimension_name: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test expanding with a dimension that already exists"""
         output = request.getfixturevalue(fixture_name)
         expanded = expand(output, {dimension_name: ["new1", "new2"]})
@@ -158,14 +181,24 @@ class TestQubedOutputCollapse:
             ("complex_output", ["param", "time", "level"], set()),
         ],
     )
-    def test_collapse_dimensions(self, fixture_name, dimensions_to_collapse, expected_dims, request):
+    def test_collapse_dimensions(
+        self,
+        fixture_name: str,
+        dimensions_to_collapse: str | list[str],
+        expected_dims: set[str],
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test collapsing single and multiple dimensions"""
         output = request.getfixturevalue(fixture_name)
         collapsed = collapse(output, dimensions_to_collapse)
         assert dimensions(collapsed) == expected_dims
 
     @pytest.mark.parametrize("fixture_name", ["simple_output", "complex_output"])
-    def test_collapse_preserves_original(self, fixture_name, request):
+    def test_collapse_preserves_original(
+        self,
+        fixture_name: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test that collapse preserves the original output across fixtures"""
         output = request.getfixturevalue(fixture_name)
         original_dims = dimensions(output)
@@ -187,13 +220,18 @@ class TestQubedOutputCollapse:
             ("complex_output", "ensemble"),
         ],
     )
-    def test_collapse_nonexistent_dimension_raises(self, fixture_name, invalid_dimension, request):
+    def test_collapse_nonexistent_dimension_raises(
+        self,
+        fixture_name: str,
+        invalid_dimension: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test that collapsing a nonexistent dimension raises ValueError"""
         output = request.getfixturevalue(fixture_name)
         with pytest.raises(ValueError, match=f"Dimension '{invalid_dimension}' not in dataqube dimensions"):
             collapse(output, invalid_dimension)
 
-    def test_collapse_chain(self, complex_output):
+    def test_collapse_chain(self, complex_output: QubedOutput) -> None:
         """Test chaining multiple collapse operations"""
         output = collapse(collapse(complex_output, "level"), "time")
         assert dimensions(output) == {"param"}
@@ -205,7 +243,13 @@ class TestQubedOutputCollapse:
             ("simple_output", {"ensemble": ["ens1", "ens2"]}, "ensemble"),
         ],
     )
-    def test_expand_then_collapse_roundtrip(self, fixture_name, expand_dimension, collapse_dimension, request):
+    def test_expand_then_collapse_roundtrip(
+        self,
+        fixture_name: str,
+        expand_dimension: dict[str, list],
+        collapse_dimension: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test expanding then collapsing returns to original state"""
         output = request.getfixturevalue(fixture_name)
         expanded = expand(output, expand_dimension)
@@ -221,7 +265,13 @@ class TestQubedOutputCollapse:
             ("complex_output", "level", {"level": [1000, 850, 700]}),
         ],
     )
-    def test_collapse_then_expand_roundtrip(self, fixture_name, collapse_dimension, expand_dimension, request):
+    def test_collapse_then_expand_roundtrip(
+        self,
+        fixture_name: str,
+        collapse_dimension: str,
+        expand_dimension: dict[str, list],
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test collapsing then expanding with same dimension"""
         output = request.getfixturevalue(fixture_name)
         collapsed = collapse(output, collapse_dimension)
@@ -229,7 +279,11 @@ class TestQubedOutputCollapse:
         assert dimensions(expanded) == dimensions(output)
 
     @pytest.mark.parametrize("fixture_name", ["simple_output", "complex_output"])
-    def test_collapse_same_dimension_twice(self, fixture_name, request):
+    def test_collapse_same_dimension_twice(
+        self,
+        fixture_name: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test that collapsing the same dimension twice raises error"""
         output = request.getfixturevalue(fixture_name)
         first_dim = list(dimensions(output))[0]
@@ -251,13 +305,23 @@ class TestQubedOutputContains:
             ("empty_output", "param", False),
         ],
     )
-    def test_contains_dimension_string(self, fixture_name, dimension, expected, request):
+    def test_contains_dimension_string(
+        self,
+        fixture_name: str,
+        dimension: str,
+        expected: bool,
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test checking if a dimension exists using string"""
         output = request.getfixturevalue(fixture_name)
         assert contains(output, dimension) == expected
 
     @pytest.mark.parametrize("fixture_name", ["empty_output", "simple_output", "complex_output"])
-    def test_contains_empty_dict(self, fixture_name, request):
+    def test_contains_empty_dict(
+        self,
+        fixture_name: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test that empty dict is always contained"""
         output = request.getfixturevalue(fixture_name)
         assert contains(output, {})
@@ -276,11 +340,16 @@ class TestQubedOutputContains:
             ({"param": ["2t"], "time": [99]}, False),
         ],
     )
-    def test_contains_various_subsets(self, simple_output, subset, expected):
+    def test_contains_various_subsets(
+        self,
+        simple_output: QubedOutput,
+        subset: dict[str, list],
+        expected: bool,
+    ) -> None:
         """Test contains with various subset combinations"""
         assert contains(simple_output, subset) == expected
 
-    def test_contains_subset_after_expand_collapse(self):
+    def test_contains_subset_after_expand_collapse(self) -> None:
         """Test checking if a subset exists after expand and collapse"""
         output = QubedOutput(
             dataqube=Qube.from_datacube(
@@ -307,7 +376,12 @@ class TestQubedOutputContains:
             ("complex_output", 3),
         ],
     )
-    def test_contains_with_varying_subset_sizes(self, fixture_name, subset_size, request):
+    def test_contains_with_varying_subset_sizes(
+        self,
+        fixture_name: str,
+        subset_size: int,
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test contains with subsets of varying sizes"""
         output = request.getfixturevalue(fixture_name)
         output_axes = axes(output)
@@ -329,7 +403,12 @@ class TestQubedOutputAxes:
             ("complex_output", {"param": {"t", "q"}, "time": {0, 1, 2}, "level": {1000, 850, 700}}),
         ],
     )
-    def test_axes_basic(self, fixture_name, expected_axes, request):
+    def test_axes_basic(
+        self,
+        fixture_name: str,
+        expected_axes: dict[str, set],
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test getting axes from different fixtures"""
         output = request.getfixturevalue(fixture_name)
         output_axes = axes(output)
@@ -339,7 +418,11 @@ class TestQubedOutputAxes:
             assert set(output_axes[key]) == expected_values
 
     @pytest.mark.parametrize("fixture_name", ["empty_output", "simple_output", "complex_output"])
-    def test_axes_after_expand(self, fixture_name, request):
+    def test_axes_after_expand(
+        self,
+        fixture_name: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test axes after expansion across fixtures"""
         output = request.getfixturevalue(fixture_name)
         expanded = expand(output, {"ensemble": ["ens1", "ens2"]})
@@ -350,7 +433,11 @@ class TestQubedOutputAxes:
         assert len(expanded_axes) == len(dimensions(output)) + 1
 
     @pytest.mark.parametrize("fixture_name", ["simple_output", "complex_output"])
-    def test_axes_after_collapse(self, fixture_name, request):
+    def test_axes_after_collapse(
+        self,
+        fixture_name: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test axes after collapse across fixtures"""
         output = request.getfixturevalue(fixture_name)
         dimension_to_collapse = list(dimensions(output))[0]
@@ -372,7 +459,14 @@ class TestQubedOutputDimensions:
             ("complex_output", {"ensemble": ["ens1"]}, "level", {"param", "time", "ensemble"}),
         ],
     )
-    def test_dimensions_after_operations(self, fixture_name, expand_dim, collapse_dim, expected_dims, request):
+    def test_dimensions_after_operations(
+        self,
+        fixture_name: str,
+        expand_dim: dict[str, list],
+        collapse_dim: str,
+        expected_dims: set[str],
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test dimensions after expand and collapse operations"""
         output = request.getfixturevalue(fixture_name)
         expanded = expand(output, expand_dim)
@@ -392,7 +486,12 @@ class TestQubedOutputMetadata:
             ("complex_output", "plot"),
         ],
     )
-    def test_update_metadata_single_field(self, fixture_name, datatype, request):
+    def test_update_metadata_single_field(
+        self,
+        fixture_name: str,
+        datatype: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test updating a single metadata field across fixtures"""
         output = request.getfixturevalue(fixture_name)
         updated = output.model_copy(update={"datatype": datatype})
@@ -401,7 +500,11 @@ class TestQubedOutputMetadata:
         assert dimensions(updated) == dimensions(output)
 
     @pytest.mark.parametrize("fixture_name", ["empty_output", "simple_output", "complex_output"])
-    def test_update_metadata_preserves_original(self, fixture_name, request):
+    def test_update_metadata_preserves_original(
+        self,
+        fixture_name: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test that update preserves original metadata across fixtures"""
         output = request.getfixturevalue(fixture_name)
         original_datatype = output.datatype
@@ -417,7 +520,13 @@ class TestQubedOutputMetadata:
             ("complex_output", {"ensemble": ["ens1"]}, "netcdf"),
         ],
     )
-    def test_update_metadata_after_expand(self, fixture_name, expand_dim, datatype, request):
+    def test_update_metadata_after_expand(
+        self,
+        fixture_name: str,
+        expand_dim: dict[str, list],
+        datatype: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test updating metadata after expansion"""
         output = request.getfixturevalue(fixture_name)
         expanded = expand(output, expand_dim)
@@ -428,7 +537,11 @@ class TestQubedOutputMetadata:
         assert dimensions(updated) == expected_dims
 
     @pytest.mark.parametrize("fixture_name", ["empty_output", "simple_output", "complex_output"])
-    def test_multiple_updates_chain(self, fixture_name, request):
+    def test_multiple_updates_chain(
+        self,
+        fixture_name: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test chaining multiple update operations across fixtures"""
         output = request.getfixturevalue(fixture_name)
         result = output
@@ -442,7 +555,7 @@ class TestQubedOutputMetadata:
 class TestQubedOutputIntegration:
     """Integration tests combining multiple operations"""
 
-    def test_full_workflow_from_empty(self, empty_output):
+    def test_full_workflow_from_empty(self, empty_output: QubedOutput) -> None:
         """Test complete workflow from empty to complex operations"""
         # Start with empty
         assert dimensions(empty_output) == set()
@@ -466,7 +579,7 @@ class TestQubedOutputIntegration:
         output = collapse(output, ["param", "time"])
         assert dimensions(output) == set()
 
-    def test_complex_expand_collapse_sequence(self, simple_output):
+    def test_complex_expand_collapse_sequence(self, simple_output: QubedOutput) -> None:
         """Test complex sequence of expand and collapse operations"""
         output = simple_output
         output = expand(output, {"level": [1000, 850, 700]})
@@ -483,7 +596,11 @@ class TestQubedOutputIntegration:
         assert dimensions(output) == {"param", "ensemble"}
 
     @pytest.mark.parametrize("fixture_name", ["empty_output", "simple_output", "complex_output"])
-    def test_immutability_with_chained_operations(self, fixture_name, request):
+    def test_immutability_with_chained_operations(
+        self,
+        fixture_name: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test immutability with complex operation chains across fixtures"""
         output = request.getfixturevalue(fixture_name)
         original_dims = dimensions(output)
@@ -513,7 +630,12 @@ class TestQubedOutputIntegration:
             ("complex_output", [("collapse", ["time", "level"]), ("expand", {"step": [0, 6, 12]})]),
         ],
     )
-    def test_operation_sequences(self, fixture_name, operations, request):
+    def test_operation_sequences(
+        self,
+        fixture_name: str,
+        operations: list[tuple[str, typing.Any]],
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test various sequences of operations across fixtures"""
         output = request.getfixturevalue(fixture_name)
 
@@ -535,7 +657,12 @@ class TestQubedOutputIntegration:
             ("complex_output", [1.5, 2.5, 3.5]),  # floats
         ],
     )
-    def test_expand_with_different_value_types(self, fixture_name, value_types, request):
+    def test_expand_with_different_value_types(
+        self,
+        fixture_name: str,
+        value_types: list[typing.Any],
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test expanding with different value types across fixtures"""
         output = request.getfixturevalue(fixture_name)
         expanded = expand(output, {"new_dimension": value_types})
@@ -544,7 +671,11 @@ class TestQubedOutputIntegration:
         assert set(axes(expanded)["new_dimension"]) == set(value_types)
 
     @pytest.mark.parametrize("fixture_name", ["simple_output", "complex_output"])
-    def test_roundtrip_all_dimensions(self, fixture_name, request):
+    def test_roundtrip_all_dimensions(
+        self,
+        fixture_name: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
         """Test collapsing all dimensions then restoring them"""
         output = request.getfixturevalue(fixture_name)
         original_dims = list(dimensions(output))
