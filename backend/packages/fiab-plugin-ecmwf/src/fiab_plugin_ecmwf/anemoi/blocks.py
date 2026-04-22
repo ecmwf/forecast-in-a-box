@@ -8,9 +8,11 @@
 # nor does it submit to any jurisdiction.
 
 
+from pathlib import Path
+
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
-from earthkit.workflows.plugins.anemoi.fluent import from_initial_conditions, from_input
+from earthkit.workflows.plugins.anemoi.fluent import Inference, from_initial_conditions, from_input
 from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import (
     ActionLookup,
@@ -29,8 +31,29 @@ from .utils import (
     get_checkpoint_enum_type,
     get_environment,
     get_local_path,
+    get_metadata,
     validate_anemoi_block,
 )
+
+
+class AnemoiBuilder:
+    """Utility to build an Inference from an Anemoi checkpoint, for use in both Source and Transform blocks"""
+
+    def __init__(self, checkpoint: str):
+        self.checkpoint = checkpoint
+        self.artifact_id = CompositeArtifactId.from_str(checkpoint)
+
+    def _local_path(self) -> Path:
+        return get_local_path(self.artifact_id)
+
+    def build(self, lead_time: int) -> Inference:
+        return Inference(
+            ckpt=self._local_path(),
+            lead_time=lead_time,
+            environment=get_environment(self.artifact_id),
+            metadata=get_metadata(self.artifact_id),
+            payload_metadata={"artifacts": [self.artifact_id]},
+        )
 
 
 class AnemoiSource(Source):
@@ -82,15 +105,12 @@ class AnemoiSource(Source):
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         configuration = block.configuration_values
-        composite_id = CompositeArtifactId.from_str(configuration["checkpoint"])
-        ensemble_members_str = configuration.get("ensemble_members")
-        action = from_input(
-            get_local_path(composite_id),
+
+        inference = AnemoiBuilder(configuration["checkpoint"]).build(lead_time=int(configuration["lead_time"]))
+        action = inference.from_input(
             configuration["input_source"],
-            lead_time=int(configuration["lead_time"]),
             date=configuration["base_time"],
-            ensemble_members=int(ensemble_members_str) if ensemble_members_str else None,
-            environment=get_environment(composite_id, configuration["input_source"]),
+            ensemble_members=int(configuration.get("ensemble_members") or 1),
         )
         return Either.ok(action)
 
@@ -131,12 +151,9 @@ class AnemoiTransform(Transform):
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
-        composite_id = CompositeArtifactId.from_str(block.configuration_values["checkpoint"])
-        action = from_initial_conditions(
-            ckpt=get_local_path(composite_id),
-            initial_conditions=inputs[input_task],
-            lead_time=int(block.configuration_values["lead_time"]),
-            environment=get_environment(composite_id),
+        inference = AnemoiBuilder(block.configuration_values["checkpoint"]).build(lead_time=int(block.configuration_values["lead_time"]))
+        action = inference.from_initial_conditions(
+            inputs[input_task],
         )
         return Either.ok(action)
 

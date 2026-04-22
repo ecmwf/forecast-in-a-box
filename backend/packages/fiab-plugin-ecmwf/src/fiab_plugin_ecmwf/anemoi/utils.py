@@ -15,7 +15,7 @@ from typing import cast
 from anemoi.inference.metadata import Metadata as InferenceMetadata
 from anemoi.inference.metadata import MetadataFactory as InferenceMetadataFactory
 from cascade.low.func import Either
-from earthkit.workflows.plugins.anemoi.utils import expansion_qube
+from earthkit.workflows.plugins.anemoi.utils import expansion_qube_from_metadata
 from fiab_core.artifacts import ArtifactsProvider, CheckpointLookup, CompositeArtifactId
 from fiab_core.fable import BlockInstance, QubedOutput
 from fiab_core.plugin import Error
@@ -104,5 +104,5 @@ def validate_anemoi_block(block: BlockInstance) -> Either[QubedOutput, Error]:  
         return Either.error(f"Unknown checkpoint: {checkpoint}")
 
     lead_time = int(block.configuration_values["lead_time"])
-    qube = expansion_qube(metadata, lead_time)
+    qube = expansion_qube_from_metadata(metadata, lead_time)
     return Either.ok(QubedOutput(dataqube=qube))

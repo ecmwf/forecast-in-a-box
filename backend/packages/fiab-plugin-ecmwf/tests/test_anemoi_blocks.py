@@ -33,7 +33,7 @@ def mock_anemoi_utils():
     """Patch get_metadata and expansion_qube so validate_anemoi_block can complete successfully."""
     with (
         patch("fiab_plugin_ecmwf.anemoi.utils.get_metadata", return_value=MagicMock()),
-        patch("fiab_plugin_ecmwf.anemoi.utils.expansion_qube", return_value=DUMMY_QUBE),
+        patch("fiab_plugin_ecmwf.anemoi.utils.expansion_qube_from_metadata", return_value=DUMMY_QUBE),
     ):
         yield
 
