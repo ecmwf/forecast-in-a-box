@@ -28,6 +28,7 @@ import {
   getJobAvailable,
   getJobStatus,
   getJobsStatus,
+  headJobResultContentType,
   restartJob,
 } from '@/api/endpoints/job'
 import { upsertFable } from '@/api/endpoints/fable'
@@ -38,6 +39,8 @@ export const jobKeys = {
   list: (page: number, pageSize: number, status?: JobStatus) =>
     [...jobKeys.all, 'list', page, pageSize, status] as const,
   available: (jobId: string) => [...jobKeys.all, 'available', jobId] as const,
+  contentType: (jobId: string, datasetId: string) =>
+    [...jobKeys.all, 'contentType', jobId, datasetId] as const,
 }
 
 export function useJobStatus(jobId: string | undefined) {
@@ -82,6 +85,25 @@ export function useJobAvailable(
       return 5000
     },
     refetchOnWindowFocus: false,
+  })
+}
+
+/**
+ * Probe the MIME type of a single output via a HEAD request.
+ * Lightweight (no body transfer); cached so repeat mounts don't re-probe.
+ */
+export function useJobContentType(
+  jobId: string | undefined,
+  datasetId: string | undefined,
+) {
+  return useQuery<string | null>({
+    queryKey: jobKeys.contentType(jobId ?? '', datasetId ?? ''),
+    queryFn: () => headJobResultContentType(jobId!, datasetId!),
+    enabled: !!jobId && !!datasetId,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 1,
   })
 }
 

@@ -19,6 +19,7 @@ import { Binary, Download, FileDown, Globe, Map, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { LucideIcon } from 'lucide-react'
 import { getJobResult } from '@/api/endpoints/job'
+import { useJobContentType } from '@/api/hooks/useJobs'
 import { Button } from '@/components/ui/button'
 import { P } from '@/components/base/typography'
 import { createLogger } from '@/lib/logger'
@@ -30,56 +31,51 @@ interface OutputCardProps {
   jobId: string
   taskId: string
   productName: string
-  contentType: string | null
 }
 
-const MIME_ICONS: Record<string, LucideIcon> = {
-  'image/png': Map,
-  'application/grib': FileDown,
-  'application/netcdf': Globe,
-  'application/numpy': Binary,
+interface MimeMeta {
+  icon: LucideIcon
+  label: string
+  ext: string
 }
 
-function getMimeIcon(contentType: string | null): LucideIcon {
-  if (!contentType) return FileDown
-  return MIME_ICONS[contentType] ?? FileDown
+const MIME_META: Record<string, MimeMeta> = {
+  'image/png': { icon: Map, label: 'PNG Image', ext: 'png' },
+  'application/grib': { icon: FileDown, label: 'GRIB', ext: 'grib' },
+  'application/netcdf': { icon: Globe, label: 'NetCDF', ext: 'nc' },
+  'application/numpy': { icon: Binary, label: 'NumPy', ext: 'npy' },
 }
 
-function getMimeLabel(contentType: string | null): string {
-  if (!contentType) return 'Unknown'
-  const labels: Record<string, string> = {
-    'image/png': 'PNG Image',
-    'application/grib': 'GRIB',
-    'application/netcdf': 'NetCDF',
-    'application/numpy': 'NumPy',
-  }
-  return labels[contentType] ?? contentType
+const UNKNOWN_META: MimeMeta = {
+  icon: FileDown,
+  label: 'Unknown',
+  ext: 'bin',
 }
 
-function getFileExtension(contentType: string | null): string {
-  if (!contentType) return 'bin'
-  const extensions: Record<string, string> = {
-    'image/png': 'png',
-    'application/grib': 'grib',
-    'application/netcdf': 'nc',
-    'application/numpy': 'npy',
-  }
-  return extensions[contentType] ?? 'bin'
+function getMimeMeta(contentType: string | null): MimeMeta {
+  if (!contentType) return UNKNOWN_META
+  // Without `noUncheckedIndexedAccess` the record lookup is typed as
+  // `MimeMeta` (not `MimeMeta | undefined`), but at runtime it can be
+  // missing — the cast keeps the fallback reachable.
+  const known = MIME_META[contentType] as MimeMeta | undefined
+  if (known) return known
+  return { ...UNKNOWN_META, label: contentType }
 }
 
-export function OutputCard({
-  jobId,
-  taskId,
-  productName,
-  contentType,
-}: OutputCardProps) {
+export function OutputCard({ jobId, taskId, productName }: OutputCardProps) {
   const { t } = useTranslation('executions')
+  // Probe the MIME type with a HEAD request so we can render the correct
+  // icon / inline preview without forcing a full download of every output.
+  const { data: contentType = null } = useJobContentType(jobId, taskId)
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
 
-  const Icon = getMimeIcon(contentType)
-  const contentTypeLabel = getMimeLabel(contentType)
+  const {
+    icon: Icon,
+    label: contentTypeLabel,
+    ext: fileExt,
+  } = getMimeMeta(contentType)
   const isPng = contentType === 'image/png'
 
   useEffect(() => {
@@ -117,7 +113,7 @@ export function OutputCard({
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${productName}.${getFileExtension(contentType)}`
+      a.download = `${productName}.${fileExt}`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -126,7 +122,7 @@ export function OutputCard({
       log.error('Failed to download output', { jobId, taskId, error: err })
       showToast.error(err instanceof Error ? err.message : String(err))
     }
-  }, [jobId, taskId, productName, contentType])
+  }, [jobId, taskId, productName, fileExt])
 
   const handleView = () => setLightboxOpen(true)
 

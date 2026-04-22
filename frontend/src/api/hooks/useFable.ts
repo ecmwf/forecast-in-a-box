@@ -26,6 +26,7 @@ import type {
   GlobalGlyphPostRequest,
   GlobalGlyphResponse,
   GlyphDetail,
+  GlyphFunctionsResponse,
   GlyphListResponse,
   PluginBlockFactoryId,
 } from '@/api/types/fable.types'
@@ -38,6 +39,7 @@ import {
   getGlobalGlyph,
   listBlueprints,
   listGlobalGlyphs,
+  listGlyphFunctions,
   retrieveFable,
   updateBlueprint,
   upsertFable,
@@ -55,6 +57,7 @@ export const fableKeys = {
   validation: (fable: FableBuilderV1) =>
     [...fableKeys.all, 'validation', JSON.stringify(fable)] as const,
   glyphs: () => [...fableKeys.all, 'glyphs'] as const,
+  glyphFunctions: () => [...fableKeys.all, 'glyphFunctions'] as const,
   globalGlyphsBase: () => [...fableKeys.all, 'globalGlyphs'] as const,
   globalGlyphs: (page?: number, pageSize?: number) =>
     [...fableKeys.all, 'globalGlyphs', page, pageSize] as const,
@@ -67,6 +70,10 @@ export function useBlockCatalogue(language?: string) {
     queryFn: () => getCatalogue(language),
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
+    // Always refetch on mount so a previously-cached error state
+    // (e.g. the backend was still loading plugins on first visit) doesn't
+    // silently persist until the user hits F5.
+    refetchOnMount: 'always',
     retry: (failureCount, error) => {
       // Retry more on 503 (plugins temporarily unavailable after install/update)
       if (error instanceof ApiClientError && error.status === 503) {
@@ -251,6 +258,19 @@ export function useAvailableGlyphs() {
     queryFn: getAvailableGlyphs,
     staleTime: 30 * 60 * 1000, // 30 minutes — intrinsic glyphs change rarely
     gcTime: 60 * 60 * 1000, // 1 hour
+  })
+}
+
+/**
+ * Fetch the list of custom Jinja filters/globals available in glyph expressions.
+ * Static for the lifetime of the backend process, so we cache aggressively.
+ */
+export function useGlyphFunctions() {
+  return useQuery<GlyphFunctionsResponse>({
+    queryKey: fableKeys.glyphFunctions(),
+    queryFn: listGlyphFunctions,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
   })
 }
 

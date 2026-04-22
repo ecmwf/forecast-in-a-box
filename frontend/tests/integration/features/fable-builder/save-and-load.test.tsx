@@ -108,8 +108,10 @@ describe('Fable Builder Save & Load', () => {
       // lastSavedAt should be set
       expect(useFableBuilderStore.getState().lastSavedAt).toBeTruthy()
 
-      // "Unsaved" badge should no longer be visible
-      await expect.element(screen.getByText('Unsaved')).not.toBeInTheDocument()
+      // Draft-status chip should no longer be visible after a successful save
+      await expect
+        .element(screen.getByText(/saving draft|draft saved/i))
+        .not.toBeInTheDocument()
     })
 
     it('updates an existing configuration when fableId is set', async () => {
@@ -296,8 +298,10 @@ describe('Fable Builder Save & Load', () => {
       // Should now be dirty
       expect(useFableBuilderStore.getState().isDirty).toBe(true)
 
-      // "Unsaved" badge should appear
-      await expect.element(screen.getByText('Unsaved')).toBeVisible()
+      // Draft-status chip should appear while dirty
+      await expect
+        .element(screen.getByText(/saving draft|draft saved/i))
+        .toBeVisible()
     })
   })
 

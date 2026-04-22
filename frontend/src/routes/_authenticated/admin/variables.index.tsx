@@ -9,17 +9,14 @@
  */
 
 /**
- * Glyphs Layout Route
+ * Variables List Page Route
  *
- * Layout wrapper for all glyph-related routes.
+ * Admin page for managing global variable definitions.
  */
 
-import { Outlet, createFileRoute } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
+import { GlyphsPage } from '@/features/glyphs/components/GlyphsPage'
 
-export const Route = createFileRoute('/_authenticated/admin/glyphs')({
-  component: GlyphsLayout,
+export const Route = createFileRoute('/_authenticated/admin/variables/')({
+  component: GlyphsPage,
 })
-
-function GlyphsLayout() {
-  return <Outlet />
-}

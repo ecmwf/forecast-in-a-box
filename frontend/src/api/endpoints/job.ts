@@ -118,6 +118,29 @@ export async function getJobResult(
   return { blob, contentType }
 }
 
+/**
+ * Probe the output's MIME type without fetching the full body. Starlette
+ * answers HEAD for every GET route automatically, so the response carries
+ * Content-Type with no payload — cheap for GRIB/NetCDF outputs that might
+ * otherwise be megabytes or gigabytes.
+ */
+export async function headJobResultContentType(
+  runId: string,
+  datasetId: string,
+): Promise<string | null> {
+  const url = buildFullUrl(API_ENDPOINTS.job.outputContent, {
+    run_id: runId,
+    dataset_id: datasetId,
+  })
+  const response = await fetch(url, {
+    method: 'HEAD',
+    credentials: 'include',
+    headers: buildHeaders(),
+  })
+  if (!response.ok) return null
+  return response.headers.get('content-type')
+}
+
 export async function downloadJobLogs(runId: string): Promise<Blob> {
   const url = buildFullUrl(API_ENDPOINTS.job.logs, {
     run_id: runId,

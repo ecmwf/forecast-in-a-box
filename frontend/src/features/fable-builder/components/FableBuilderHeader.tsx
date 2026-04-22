@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { ValidationStatusBadge } from './shared/ValidationStatus'
+import { DraftStatus } from './DraftStatus'
 import { GraphOptionsDropdown } from './graph-mode/GraphOptionsDropdown'
 import { SaveConfigPopover } from './SaveConfigPopover'
 import type {
@@ -32,7 +33,6 @@ import { getBlocksByKind } from '@/api/types/fable.types'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
-import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,7 +68,6 @@ export function FableBuilderHeader({
   const step = useFableBuilderStore((s) => s.step)
   const fableName = useFableBuilderStore((s) => s.fableName)
   const fable = useFableBuilderStore((s) => s.fable)
-  const isDirty = useFableBuilderStore((s) => s.isDirty)
   const validationState = useFableBuilderStore((s) => s.validationState)
   const storeFableId = useFableBuilderStore((s) => s.fableId)
 
@@ -213,20 +212,13 @@ export function FableBuilderHeader({
                 <H1 className="min-w-0 truncate text-lg font-semibold">
                   {fableName}
                 </H1>
-                {isDirty && (
-                  <Badge
-                    variant="outline"
-                    className="hidden shrink-0 text-sm sm:inline-flex"
-                  >
-                    Unsaved
-                  </Badge>
-                )}
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span>
                   {blockCount} {blockCount === 1 ? 'block' : 'blocks'}
                 </span>
                 {hasBlocks && <ValidationStatusBadge />}
+                <DraftStatus className="hidden sm:inline-flex" />
               </div>
             </div>
           </div>
