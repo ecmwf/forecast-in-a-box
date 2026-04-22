@@ -14,7 +14,7 @@ Declarations related to Artifacts such as ML Model Checkpoints.
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, NewType
+from typing import Any, Literal, NewType, Self
 
 from pydantic import BaseModel, Field
 
