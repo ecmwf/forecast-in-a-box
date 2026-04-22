@@ -86,6 +86,36 @@ def test_composite_artifact_id() -> None:
     assert test_dict[id2] == "value1"
 
 
+def test_composite_artifact_id_from_str_round_trip() -> None:
+    """Test CompositeArtifactId.from_str / to_str round-trip"""
+    from fiab_core.artifacts import CompositeArtifactId as CoreCompositeArtifactId
+
+    original = CoreCompositeArtifactId(artifact_store_id="my_store", ml_model_checkpoint_id="my_ckpt")
+    serialised = CoreCompositeArtifactId.to_str(original)
+    assert serialised == "my_store:my_ckpt"
+
+    restored = CoreCompositeArtifactId.from_str(serialised)
+    assert restored == original
+
+
+def test_composite_artifact_id_from_str_with_colon_in_checkpoint() -> None:
+    """Checkpoint IDs containing colons should only split on the first colon"""
+    from fiab_core.artifacts import CompositeArtifactId as CoreCompositeArtifactId
+
+    parsed = CoreCompositeArtifactId.from_str("store:ckpt:extra")
+    assert parsed.artifact_store_id == "store"
+    assert parsed.ml_model_checkpoint_id == "ckpt:extra"
+
+
+def test_composite_artifact_id_from_str_missing_colon() -> None:
+    """from_str must raise ValueError when the separator is absent"""
+    import pytest
+    from fiab_core.artifacts import CompositeArtifactId as CoreCompositeArtifactId
+
+    with pytest.raises(ValueError):
+        CoreCompositeArtifactId.from_str("no_colon_here")
+
+
 def test_get_artifacts_catalog(sample_artifact_stores_config: Any, sample_checkpoint: Any) -> None:
     """Test getting artifacts catalog from multiple stores"""
     store1_data = {
@@ -148,6 +178,33 @@ def test_get_artifacts_catalog_unsupported_method() -> None:
 
     with pytest.raises(TypeError):
         get_artifacts_catalog(config)
+
+
+def test_get_artifacts_catalog_from_local_file(tmpdir_path: Path, sample_checkpoint: Any) -> None:
+    """Test that get_artifacts_catalog loads from a local JSON file when the URL is a valid file path"""
+    store_data = {
+        "display_name": "Local Store",
+        "artifacts": {
+            "local_model": sample_checkpoint.model_dump(),
+        },
+    }
+
+    catalog_file = tmpdir_path / "artifacts.json"
+    catalog_file.write_text(json.dumps(store_data))
+
+    config: ArtifactStoresConfig = {
+        "local_store": ArtifactStoreConfig(
+            url=str(catalog_file),
+            method="file",
+        ),
+    }
+
+    catalog = get_artifacts_catalog(config)
+
+    assert len(catalog) == 1
+    composite_id = CompositeArtifactId("local_store", "local_model")
+    assert composite_id in catalog
+    assert catalog[composite_id].display_name == "Test Model"
 
 
 def test_list_local_storage_empty(tmpdir_path: Path, sample_checkpoint: Any) -> None:

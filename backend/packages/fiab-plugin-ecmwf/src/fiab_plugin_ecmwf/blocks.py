@@ -174,6 +174,7 @@ class EnsembleStatistics(Product):
     def intersect(self, other: QubedOutput) -> bool:  # type: ignore[override]
         dims = dimensions(other)
         return ENSEMBLE_DIM in dims and PARAM_DIM in dims
+        return ENSEMBLE_DIM in dims and len(axes(other)[ENSEMBLE_DIM]) > 1 and PARAM_DIM in dims
 
 
 class TemporalStatistics(Product):

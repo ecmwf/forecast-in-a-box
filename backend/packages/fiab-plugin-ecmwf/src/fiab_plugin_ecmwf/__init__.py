@@ -11,6 +11,7 @@ from fiab_core.fable import BlockFactoryId
 from fiab_core.tools.blocks import QubedBlockBuilder
 from fiab_core.tools.plugins import QubedPluginBuilder
 
+from fiab_plugin_ecmwf.anemoi.blocks import AnemoiSource, AnemoiTransform
 from fiab_plugin_ecmwf.blocks import EkdSource, EnsembleStatistics, TemporalStatistics, ZarrSink
 
 blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
@@ -18,6 +19,8 @@ blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
     BlockFactoryId("ensembleStatistics"): EnsembleStatistics(),
     BlockFactoryId("temporalStatistics"): TemporalStatistics(),
     BlockFactoryId("zarrSink"): ZarrSink(),
+    BlockFactoryId("anemoiSource"): AnemoiSource(),
+    BlockFactoryId("anemoiTransform"): AnemoiTransform(),
 }
 
 plugin = QubedPluginBuilder(block_builders=blocks).as_plugin()
