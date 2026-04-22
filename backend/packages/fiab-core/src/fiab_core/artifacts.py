@@ -39,7 +39,7 @@ class CompositeArtifactId:
         if not ":" in v:
             raise ValueError(f"must be of the form artifact_store_id:ml_model_checkpoint_id, got {v}")
         artifact_store_id, ml_model_checkpoint_id = v.split(":", 1)
-        return cls(artifact_store_id=artifact_store_id, ml_model_checkpoint_id=ml_model_checkpoint_id)
+        return cls(artifact_store_id=ArtifactStoreId(artifact_store_id), ml_model_checkpoint_id=MlModelCheckpointId(ml_model_checkpoint_id))
 
     @staticmethod
     def to_str(k: Self) -> str:
