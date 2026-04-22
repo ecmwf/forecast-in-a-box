@@ -123,8 +123,10 @@ describe('Fable Builder Integration', () => {
     // Fable should be marked as dirty
     expect(state.isDirty).toBe(true)
 
-    // The "Unsaved" badge should appear in the header
-    await expect.element(screen.getByText('Unsaved')).toBeVisible()
+    // The draft-status chip should appear in the header while dirty
+    await expect
+      .element(screen.getByText(/saving draft|draft saved/i))
+      .toBeVisible()
 
     // Block count should update to "1 block"
     await expect.element(screen.getByText('1 block')).toBeVisible()
@@ -209,8 +211,10 @@ describe('Fable Builder Integration', () => {
       .poll(() => useFableBuilderStore.getState().isDirty, { timeout: 2000 })
       .toBe(false)
 
-    // "Unsaved" badge should no longer be visible
-    await expect.element(screen.getByText('Unsaved')).not.toBeInTheDocument()
+    // Draft-status chip should no longer be visible after a successful save
+    await expect
+      .element(screen.getByText(/saving draft|draft saved/i))
+      .not.toBeInTheDocument()
 
     // Store should have fableId set after save
     expect(useFableBuilderStore.getState().fableId).toBeTruthy()

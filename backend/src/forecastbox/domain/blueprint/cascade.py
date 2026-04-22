@@ -10,10 +10,12 @@
 """Cascade execution data models: environment specification."""
 
 from fiab_core.artifacts import CompositeArtifactId
-from pydantic import BaseModel, Field, PositiveInt
+from pydantic import Field, PositiveInt
+
+from forecastbox.utility.pydantic import FiabBaseModel
 
 
-class EnvironmentSpecification(BaseModel):
+class EnvironmentSpecification(FiabBaseModel):
     # NOTE warning -- this class is used by the web api. Be careful about changes here
     hosts: PositiveInt | None = Field(default=None)
     workers_per_host: PositiveInt | None = Field(default=None)

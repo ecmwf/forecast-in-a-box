@@ -27,6 +27,7 @@ import type {
   GlobalGlyphPostRequest,
   GlobalGlyphResponse,
   GlyphDetail,
+  GlyphFunctionsResponse,
   GlyphListResponse,
 } from '@/api/types/fable.types'
 import { apiClient } from '@/api/client'
@@ -38,6 +39,7 @@ import {
   FableUpsertResponseSchema,
   FableValidationExpansionSchema,
   GlobalGlyphResponseSchema,
+  GlyphFunctionsResponseSchema,
   GlyphListResponseSchema,
   normalizeCatalogueKeys,
 } from '@/api/types/fable.types'
@@ -151,6 +153,15 @@ export async function getAvailableGlyphs(): Promise<Array<GlyphDetail>> {
     },
   )
   return response.glyphs
+}
+
+/**
+ * List Jinja filters and globals available inside ${...} glyph expressions.
+ */
+export async function listGlyphFunctions(): Promise<GlyphFunctionsResponse> {
+  return apiClient.get(API_ENDPOINTS.fable.glyphsFunctions, {
+    schema: GlyphFunctionsResponseSchema,
+  })
 }
 
 /**

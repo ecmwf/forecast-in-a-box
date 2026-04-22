@@ -24,11 +24,11 @@ import zipfile
 from typing import Annotated, cast
 
 import orjson
+from cascade.controller.report import JobId
 from cascade.gateway import api, client
 from cascade.low.core import DatasetId, TaskId
 from fastapi import APIRouter, Depends, Response
 from fastapi.exceptions import HTTPException
-from pydantic import BaseModel
 
 from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint.types import BlueprintId
@@ -40,6 +40,7 @@ from forecastbox.routes.gateway import Globals
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
 from forecastbox.utility.pagination import PaginationSpec
+from forecastbox.utility.pydantic import FiabBaseModel
 
 PREFIX = "/api/v1/run"
 
@@ -56,7 +57,7 @@ router = APIRouter(
 # ---------------------------------------------------------------------------
 
 
-class RunLookup(BaseModel):
+class RunLookup(FiabBaseModel):
     """Identifies a job execution attempt, optionally pinning a specific attempt.
 
     Used as a Depends()-based query-param group on GET endpoints, and as a
@@ -67,17 +68,17 @@ class RunLookup(BaseModel):
     attempt_count: int | None = None
 
 
-class RunCreateRequest(BaseModel):
+class RunCreateRequest(FiabBaseModel):
     blueprint_id: BlueprintId
     blueprint_version: int | None = None
 
 
-class RunCreateResponse(BaseModel):
+class RunCreateResponse(FiabBaseModel):
     run_id: RunId
     attempt_count: int
 
 
-class RunDetailResponse(BaseModel):
+class RunDetailResponse(FiabBaseModel):
     run_id: RunId
     attempt_count: int
     status: str
@@ -90,7 +91,7 @@ class RunDetailResponse(BaseModel):
     cascade_job_id: str | None = None
 
 
-class RunListResponse(BaseModel):
+class RunListResponse(FiabBaseModel):
     runs: list[RunDetailResponse]
     total: int
     page: int
@@ -98,19 +99,19 @@ class RunListResponse(BaseModel):
     total_pages: int
 
 
-class RunRestartRequest(BaseModel):
+class RunRestartRequest(FiabBaseModel):
     """Identifies the attempt to restart. ``attempt_count`` must match the current latest attempt."""
 
     run_id: RunId
     attempt_count: int
 
 
-class RunRestartResponse(BaseModel):
+class RunRestartResponse(FiabBaseModel):
     run_id: RunId
     attempt_count: int
 
 
-class RunDeleteRequest(BaseModel):
+class RunDeleteRequest(FiabBaseModel):
     """Identifies the attempt to delete. ``attempt_count`` must match the current latest attempt."""
 
     run_id: RunId
@@ -159,7 +160,7 @@ async def _resolve_run_with_cascade(
 
 async def _build_run_logs_response(cascade_job_id: str, db_entity_ser: bytes) -> Response:
     try:
-        request = api.JobProgressRequest(job_ids=[cascade_job_id])
+        request = api.JobProgressRequest(job_ids=[JobId(cascade_job_id)])
         gw_state = client.request_response(request, f"{config.cascade.cascade_url}").model_dump()
     except TimeoutError:
         gw_state = {"progresses": {}, "datasets": {}, "error": "TimeoutError"}
@@ -341,11 +342,12 @@ async def get_run_output_availability(
 ) -> list[TaskId]:
     """Check which output tasks are available for a given execution."""
     _, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
-    response = client.request_response(api.JobProgressRequest(job_ids=[cascade_job_id]), f"{config.cascade.cascade_url}")
+    job_id = JobId(cascade_job_id)
+    response = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}")
     response = cast(api.JobProgressResponse, response)
-    if cascade_job_id not in response.datasets:
+    if job_id not in response.datasets:
         raise HTTPException(status_code=404, detail=f"Job {cascade_job_id} not found in gateway.")
-    return [x.task for x in response.datasets[cascade_job_id]]
+    return [x.task for x in response.datasets[job_id]]
 
 
 @router.get("/outputContent")
@@ -357,7 +359,7 @@ async def get_run_output_content(
     """Retrieve the result of a specific output task, encoded as bytes."""
     _, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
     response = client.request_response(
-        api.ResultRetrievalRequest(job_id=cascade_job_id, dataset_id=DatasetId(task=TaskId(dataset_id), output="0")),
+        api.ResultRetrievalRequest(job_id=JobId(cascade_job_id), dataset_id=DatasetId(task=TaskId(dataset_id), output="0")),
         f"{config.cascade.cascade_url}",
     )
     response = cast(api.ResultRetrievalResponse, response)

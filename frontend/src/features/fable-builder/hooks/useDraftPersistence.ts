@@ -14,11 +14,15 @@
  *
  * - Writes debounced (2 s) after every store change that sets isDirty.
  * - Clears the draft on successful save (markSaved).
- * - On mount, checks for a stale draft and returns it for recovery.
- * - Registers a `beforeunload` guard when isDirty.
+ * - On mount, restoration is handled by FableBuilderPage via readDraft().
+ *
+ * No `beforeunload` guard — the localStorage draft is the safety net, and
+ * the header already shows an "Unsaved" badge when the state is dirty. The
+ * native "Leave site?" prompt is intrusive and inconsistent with modern
+ * autosave UX (Figma / Google Docs / Airtable).
  */
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 
@@ -80,6 +84,7 @@ export function useDraftPersistence(): void {
           clearTimeout(timerRef.current)
           timerRef.current = null
         }
+        useFableBuilderStore.setState({ draftWritePending: false })
         return
       }
 
@@ -92,6 +97,7 @@ export function useDraftPersistence(): void {
         return
 
       if (timerRef.current) clearTimeout(timerRef.current)
+      useFableBuilderStore.setState({ draftWritePending: true })
       timerRef.current = setTimeout(() => {
         writeDraft({
           fable: state.fable,
@@ -101,6 +107,7 @@ export function useDraftPersistence(): void {
           savedAt: Date.now(),
         })
         timerRef.current = null
+        useFableBuilderStore.setState({ draftWritePending: false })
       }, DEBOUNCE_MS)
     })
 
@@ -109,21 +116,4 @@ export function useDraftPersistence(): void {
       if (timerRef.current) clearTimeout(timerRef.current)
     }
   }, [])
-
-  // beforeunload guard
-  const isDirty = useFableBuilderStore((s) => s.isDirty)
-
-  const handleBeforeUnload = useCallback(
-    (e: BeforeUnloadEvent) => {
-      if (isDirty) {
-        e.preventDefault()
-      }
-    },
-    [isDirty],
-  )
-
-  useEffect(() => {
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [handleBeforeUnload])
 }

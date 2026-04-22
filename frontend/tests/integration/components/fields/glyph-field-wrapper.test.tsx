@@ -216,7 +216,7 @@ describe('GlyphFieldWrapper Integration', () => {
   describe('Toggle visibility', () => {
     it('shows glyph toggle when glyphs are available', async () => {
       const screen = await renderWithProviders(<ControlledStringField />)
-      const toggle = screen.getByRole('button', { name: /glyph/i })
+      const toggle = screen.getByRole('button', { name: /variable/i })
       await expect.element(toggle).toBeVisible()
     })
 
@@ -224,21 +224,21 @@ describe('GlyphFieldWrapper Integration', () => {
       const screen = await renderWithProviders(<NoGlyphsStringField />)
       await expect.element(screen.getByRole('textbox')).toBeVisible()
       await expect
-        .element(screen.getByRole('button', { name: /glyph/i }))
+        .element(screen.getByRole('button', { name: /variable/i }))
         .not.toBeInTheDocument()
     })
 
     it('shows toggle on date fields', async () => {
       const screen = await renderWithProviders(<ControlledDateField />)
       await expect
-        .element(screen.getByRole('button', { name: /glyph/i }))
+        .element(screen.getByRole('button', { name: /variable/i }))
         .toBeVisible()
     })
 
     it('shows toggle on number fields', async () => {
       const screen = await renderWithProviders(<ControlledNumberField />)
       await expect
-        .element(screen.getByRole('button', { name: /glyph/i }))
+        .element(screen.getByRole('button', { name: /variable/i }))
         .toBeVisible()
     })
 
@@ -247,7 +247,7 @@ describe('GlyphFieldWrapper Integration', () => {
       // Enum dropdowns opt out of glyph mode — no toggle, combobox only
       await expect.element(screen.getByRole('combobox')).toBeVisible()
       await expect
-        .element(screen.getByRole('button', { name: /glyph/i }))
+        .element(screen.getByRole('button', { name: /variable/i }))
         .not.toBeInTheDocument()
     })
   })
@@ -255,7 +255,7 @@ describe('GlyphFieldWrapper Integration', () => {
   describe('Mode switching', () => {
     it('switches date field to glyph mode on toggle click', async () => {
       const screen = await renderWithProviders(<ControlledDateField />)
-      await screen.getByRole('button', { name: /glyph/i }).click()
+      await screen.getByRole('button', { name: /variable/i }).click()
 
       // Text input should appear (glyph mode)
       const textInput = screen.getByRole('textbox')
@@ -359,7 +359,7 @@ describe('GlyphFieldWrapper Integration', () => {
   describe('Auto-trigger on empty field', () => {
     it('auto-inserts ${ when toggling on an empty field', async () => {
       const screen = await renderWithProviders(<ControlledDateField />)
-      await screen.getByRole('button', { name: /glyph/i }).click()
+      await screen.getByRole('button', { name: /variable/i }).click()
 
       await expect
         .element(screen.getByTestId('current-value'))
@@ -372,7 +372,7 @@ describe('GlyphFieldWrapper Integration', () => {
       const screen = await renderWithProviders(
         <ControlledDateField initialValue="${forecastDate}" />,
       )
-      const toggle = screen.getByRole('button', { name: /glyph/i })
+      const toggle = screen.getByRole('button', { name: /variable/i })
       await expect.element(toggle).toBeDisabled()
     })
   })
@@ -383,7 +383,7 @@ describe('GlyphFieldWrapper Integration', () => {
 
     it('string field', async () => {
       const screen = await renderWithProviders(<ControlledStringField />)
-      await screen.getByRole('button', { name: /glyph/i }).click()
+      await screen.getByRole('button', { name: /variable/i }).click()
       const input = screen.getByRole('textbox')
       await input.fill('${expver}')
       await expect
@@ -393,7 +393,7 @@ describe('GlyphFieldWrapper Integration', () => {
 
     it('number field', async () => {
       const screen = await renderWithProviders(<ControlledNumberField />)
-      await screen.getByRole('button', { name: /glyph/i }).click()
+      await screen.getByRole('button', { name: /variable/i }).click()
       const input = screen.getByRole('textbox')
       await input.fill('${runId}')
       await expect
@@ -403,7 +403,7 @@ describe('GlyphFieldWrapper Integration', () => {
 
     it('date field', async () => {
       const screen = await renderWithProviders(<ControlledDateField />)
-      await screen.getByRole('button', { name: /glyph/i }).click()
+      await screen.getByRole('button', { name: /variable/i }).click()
       const input = screen.getByRole('textbox')
       await input.fill('${forecastDate}')
       await expect

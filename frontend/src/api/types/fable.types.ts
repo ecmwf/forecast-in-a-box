@@ -105,6 +105,8 @@ export const GlyphDetailSchema = z.object({
   name: z.string(),
   display_name: z.string(),
   valueExample: z.string(),
+  /** "intrinsic" for intrinsic glyphs; owner id (or passthrough sentinel "user") otherwise. */
+  created_by: z.string(),
 })
 
 export type GlyphDetail = z.infer<typeof GlyphDetailSchema>
@@ -119,11 +121,18 @@ export const GlyphListResponseSchema = z.object({
 
 export type GlyphListResponse = z.infer<typeof GlyphListResponseSchema>
 
-/** POST /blueprint/glyphs/global/post — outbound request */
+/**
+ * POST /blueprint/glyphs/global/post — outbound request.
+ *
+ * `overriddable` must be omitted (or null) when `public=false` and set to a
+ * concrete boolean when `public=true`. Non-admins may not submit `public=true`;
+ * the server returns 403 in that case.
+ */
 export interface GlobalGlyphPostRequest {
   key: string
   value: string
   public?: boolean
+  overriddable?: boolean | null
 }
 
 /** Response from global glyph endpoints */
@@ -132,12 +141,31 @@ export const GlobalGlyphResponseSchema = z.object({
   key: z.string(),
   value: z.string(),
   public: z.boolean(),
-  created_by: z.string().nullable(),
+  overriddable: z.boolean().nullable(),
+  created_by: z.string(),
   created_at: z.string(),
   updated_at: z.string(),
 })
 
 export type GlobalGlyphResponse = z.infer<typeof GlobalGlyphResponseSchema>
+
+/** Single entry from GET /blueprint/glyphs/functions — a Jinja filter or global. */
+export const GlyphFunctionDetailSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  kind: z.enum(['filter', 'global']),
+})
+
+export type GlyphFunctionDetail = z.infer<typeof GlyphFunctionDetailSchema>
+
+/** Response from GET /blueprint/glyphs/functions */
+export const GlyphFunctionsResponseSchema = z.object({
+  functions: z.array(GlyphFunctionDetailSchema),
+})
+
+export type GlyphFunctionsResponse = z.infer<
+  typeof GlyphFunctionsResponseSchema
+>
 
 export const FableValidationExpansionSchema = z.object({
   global_errors: z.array(z.string()),

@@ -11,7 +11,6 @@
 import { memo, useMemo, useState } from 'react'
 import { Handle, Position } from '@xyflow/react'
 import {
-  AlertCircle,
   Bookmark,
   Copy,
   CopyPlus,
@@ -47,7 +46,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { BlockErrorOverlay } from '@/features/fable-builder/components/graph-mode/nodes/BlockErrorOverlay'
 import { parseGlyphSegments } from '@/features/fable-builder/utils/glyph-display'
 import { cn } from '@/lib/utils'
 
@@ -323,20 +322,8 @@ export const BlockNode = memo(function ({
             )}
           </div>
         )}
-
-        {hasErrors && (
-          <Alert
-            variant="destructive"
-            className="nodrag mt-3 gap-1 px-2 py-1.5 text-xs"
-          >
-            <AlertCircle className="h-3 w-3" />
-            <AlertDescription className="line-clamp-2 text-xs">
-              {errors[0]}
-              {errors.length > 1 && ` (+${errors.length - 1} more)`}
-            </AlertDescription>
-          </Alert>
-        )}
       </div>
+      <BlockErrorOverlay errors={errors} />
 
       {factory.inputs.map((inputName, index) => {
         const percent = ((index + 1) / (factory.inputs.length + 1)) * 100

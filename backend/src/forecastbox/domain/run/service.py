@@ -28,9 +28,9 @@ import asyncio
 import logging
 from typing import cast
 
+from cascade.controller.report import JobId
 from cascade.gateway import api, client
 from cascade.low.func import Either
-from pydantic import BaseModel
 
 import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.run.db as run_db
@@ -43,11 +43,12 @@ from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import Blueprint, Run
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
+from forecastbox.utility.pydantic import FiabBaseModel
 
 logger = logging.getLogger(__name__)
 
 
-class RunDetail(BaseModel):
+class RunDetail(FiabBaseModel):
     """Detail of a single job execution attempt."""
 
     run_id: RunId
@@ -62,7 +63,7 @@ class RunDetail(BaseModel):
     cascade_job_id: str | None = None
 
 
-class ExecuteResult(BaseModel):
+class ExecuteResult(FiabBaseModel):
     """Result of a job execution submission."""
 
     run_id: RunId
@@ -179,7 +180,7 @@ async def poll_and_update(execution: Run) -> RunDetail:
 
     if status in ("submitted", "preparing", "running") and cascade_job_id:
         try:
-            response = client.request_response(api.JobProgressRequest(job_ids=[cascade_job_id]), f"{config.cascade.cascade_url}")
+            response = client.request_response(api.JobProgressRequest(job_ids=[JobId(cascade_job_id)]), f"{config.cascade.cascade_url}")
             response = cast(api.JobProgressResponse, response)
         except TimeoutError:
             return _build(status_override="unknown", error_override="failed to communicate with gateway")
@@ -189,7 +190,7 @@ async def poll_and_update(execution: Run) -> RunDetail:
         if response.error:
             return _build(status_override="unknown", error_override=response.error)
 
-        jobprogress = response.progresses.get(cascade_job_id)
+        jobprogress = response.progresses.get(JobId(cascade_job_id))
         if jobprogress is None:
             await run_db.update_run_runtime(run_id, actual_attempt, status="failed", error="evicted from gateway")
             return _build(status_override="failed", error_override="evicted from gateway")

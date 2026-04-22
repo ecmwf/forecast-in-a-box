@@ -10,12 +10,12 @@
 
 import { memo, useMemo } from 'react'
 import { Handle, Position } from '@xyflow/react'
-import { AlertCircle, Trash2 } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 
 import type { Node, NodeProps } from '@xyflow/react'
 import type { FableNodeData } from '@/features/fable-builder/utils/fable-to-graph'
 import type { BlockFactory, BlockInstance } from '@/api/types/fable.types'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { BlockErrorOverlay } from '@/features/fable-builder/components/graph-mode/nodes/BlockErrorOverlay'
 import { AddNodeButton } from '@/features/fable-builder/components/graph-mode/AddNodeButton'
 import { useNodeDimensions } from '@/features/fable-builder/hooks/useNodeDimensions'
 import {
@@ -303,20 +303,8 @@ export const InlineBlockNode = memo(function ({
             </FieldErrorsContext.Provider>
           </ResolvedConfigContext.Provider>
         )}
-
-        {hasErrors && (
-          <Alert
-            variant="destructive"
-            className="nodrag mt-3 gap-1 px-2 py-1.5 text-xs"
-          >
-            <AlertCircle className="h-3 w-3" />
-            <AlertDescription className="line-clamp-2 text-xs">
-              {errors[0]}
-              {errors.length > 1 && ` (+${errors.length - 1} more)`}
-            </AlertDescription>
-          </Alert>
-        )}
       </div>
+      <BlockErrorOverlay errors={errors} />
 
       {inputs.map((inputName, index) => {
         const topPercent = ((index + 1) / (inputs.length + 1)) * 100

@@ -217,7 +217,7 @@ test.describe('Fable Builder - Form Mode', () => {
       await page.waitForTimeout(1000)
 
       // Should show "Unsaved" badge in header
-      const unsavedBadge = page.getByText('Unsaved')
+      const unsavedBadge = page.getByText(/saving draft|draft saved/i)
       if (
         await unsavedBadge
           .first()
@@ -474,7 +474,7 @@ test.describe('Fable Builder - Save & Load', () => {
             await page.waitForTimeout(2000)
 
             // Unsaved badge should disappear
-            const unsavedBadge = page.getByText('Unsaved')
+            const unsavedBadge = page.getByText(/saving draft|draft saved/i)
             const isUnsavedVisible = await unsavedBadge
               .first()
               .isVisible({ timeout: 2000 })
@@ -523,7 +523,7 @@ test.describe('Fable Builder - Save & Load', () => {
         await page.waitForTimeout(1000)
 
         // Unsaved badge should reappear
-        const unsavedBadge = page.getByText('Unsaved')
+        const unsavedBadge = page.getByText(/saving draft|draft saved/i)
         if (
           await unsavedBadge
             .first()

@@ -41,6 +41,7 @@ export function DateTimeField({
       placeholder={placeholder}
       disabled={disabled}
       className={className}
+      isDateOnly={isDateOnly}
     >
       <InputGroupInput
         id={id}

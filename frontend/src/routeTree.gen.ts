@@ -22,11 +22,11 @@ import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authentic
 import { Route as AuthenticatedSchedulesScheduleIdRouteImport } from './routes/_authenticated/schedules.$scheduleId'
 import { Route as AuthenticatedExecutionsJobIdRouteImport } from './routes/_authenticated/executions.$jobId'
 import { Route as AuthenticatedConfigureFableIdRouteImport } from './routes/_authenticated/configure.$fableId'
+import { Route as AuthenticatedAdminVariablesRouteImport } from './routes/_authenticated/admin/variables'
 import { Route as AuthenticatedAdminPluginsRouteImport } from './routes/_authenticated/admin/plugins'
-import { Route as AuthenticatedAdminGlyphsRouteImport } from './routes/_authenticated/admin/glyphs'
 import { Route as AuthenticatedAdminArtifactsRouteImport } from './routes/_authenticated/admin/artifacts'
+import { Route as AuthenticatedAdminVariablesIndexRouteImport } from './routes/_authenticated/admin/variables.index'
 import { Route as AuthenticatedAdminPluginsIndexRouteImport } from './routes/_authenticated/admin/plugins.index'
-import { Route as AuthenticatedAdminGlyphsIndexRouteImport } from './routes/_authenticated/admin/glyphs.index'
 import { Route as AuthenticatedAdminArtifactsIndexRouteImport } from './routes/_authenticated/admin/artifacts.index'
 import { Route as AuthenticatedAdminPluginsPluginIdRouteImport } from './routes/_authenticated/admin/plugins.$pluginId'
 import { Route as AuthenticatedAdminArtifactsArtifactIdRouteImport } from './routes/_authenticated/admin/artifacts.$artifactId'
@@ -100,16 +100,16 @@ const AuthenticatedConfigureFableIdRoute =
     path: '/$fableId',
     getParentRoute: () => AuthenticatedConfigureRoute,
   } as any)
+const AuthenticatedAdminVariablesRoute =
+  AuthenticatedAdminVariablesRouteImport.update({
+    id: '/variables',
+    path: '/variables',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminPluginsRoute =
   AuthenticatedAdminPluginsRouteImport.update({
     id: '/plugins',
     path: '/plugins',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminGlyphsRoute =
-  AuthenticatedAdminGlyphsRouteImport.update({
-    id: '/glyphs',
-    path: '/glyphs',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 const AuthenticatedAdminArtifactsRoute =
@@ -118,17 +118,17 @@ const AuthenticatedAdminArtifactsRoute =
     path: '/artifacts',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminVariablesIndexRoute =
+  AuthenticatedAdminVariablesIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedAdminVariablesRoute,
+  } as any)
 const AuthenticatedAdminPluginsIndexRoute =
   AuthenticatedAdminPluginsIndexRouteImport.update({
     id: '/',
     path: '/',
     getParentRoute: () => AuthenticatedAdminPluginsRoute,
-  } as any)
-const AuthenticatedAdminGlyphsIndexRoute =
-  AuthenticatedAdminGlyphsIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedAdminGlyphsRoute,
   } as any)
 const AuthenticatedAdminArtifactsIndexRoute =
   AuthenticatedAdminArtifactsIndexRouteImport.update({
@@ -157,8 +157,8 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/presets': typeof AuthenticatedPresetsRoute
   '/admin/artifacts': typeof AuthenticatedAdminArtifactsRouteWithChildren
-  '/admin/glyphs': typeof AuthenticatedAdminGlyphsRouteWithChildren
   '/admin/plugins': typeof AuthenticatedAdminPluginsRouteWithChildren
+  '/admin/variables': typeof AuthenticatedAdminVariablesRouteWithChildren
   '/configure/$fableId': typeof AuthenticatedConfigureFableIdRoute
   '/executions/$jobId': typeof AuthenticatedExecutionsJobIdRoute
   '/schedules/$scheduleId': typeof AuthenticatedSchedulesScheduleIdRoute
@@ -168,8 +168,8 @@ export interface FileRoutesByFullPath {
   '/admin/artifacts/$artifactId': typeof AuthenticatedAdminArtifactsArtifactIdRoute
   '/admin/plugins/$pluginId': typeof AuthenticatedAdminPluginsPluginIdRoute
   '/admin/artifacts/': typeof AuthenticatedAdminArtifactsIndexRoute
-  '/admin/glyphs/': typeof AuthenticatedAdminGlyphsIndexRoute
   '/admin/plugins/': typeof AuthenticatedAdminPluginsIndexRoute
+  '/admin/variables/': typeof AuthenticatedAdminVariablesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -186,8 +186,8 @@ export interface FileRoutesByTo {
   '/admin/artifacts/$artifactId': typeof AuthenticatedAdminArtifactsArtifactIdRoute
   '/admin/plugins/$pluginId': typeof AuthenticatedAdminPluginsPluginIdRoute
   '/admin/artifacts': typeof AuthenticatedAdminArtifactsIndexRoute
-  '/admin/glyphs': typeof AuthenticatedAdminGlyphsIndexRoute
   '/admin/plugins': typeof AuthenticatedAdminPluginsIndexRoute
+  '/admin/variables': typeof AuthenticatedAdminVariablesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -199,8 +199,8 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/presets': typeof AuthenticatedPresetsRoute
   '/_authenticated/admin/artifacts': typeof AuthenticatedAdminArtifactsRouteWithChildren
-  '/_authenticated/admin/glyphs': typeof AuthenticatedAdminGlyphsRouteWithChildren
   '/_authenticated/admin/plugins': typeof AuthenticatedAdminPluginsRouteWithChildren
+  '/_authenticated/admin/variables': typeof AuthenticatedAdminVariablesRouteWithChildren
   '/_authenticated/configure/$fableId': typeof AuthenticatedConfigureFableIdRoute
   '/_authenticated/executions/$jobId': typeof AuthenticatedExecutionsJobIdRoute
   '/_authenticated/schedules/$scheduleId': typeof AuthenticatedSchedulesScheduleIdRoute
@@ -210,8 +210,8 @@ export interface FileRoutesById {
   '/_authenticated/admin/artifacts/$artifactId': typeof AuthenticatedAdminArtifactsArtifactIdRoute
   '/_authenticated/admin/plugins/$pluginId': typeof AuthenticatedAdminPluginsPluginIdRoute
   '/_authenticated/admin/artifacts/': typeof AuthenticatedAdminArtifactsIndexRoute
-  '/_authenticated/admin/glyphs/': typeof AuthenticatedAdminGlyphsIndexRoute
   '/_authenticated/admin/plugins/': typeof AuthenticatedAdminPluginsIndexRoute
+  '/_authenticated/admin/variables/': typeof AuthenticatedAdminVariablesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -223,8 +223,8 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/presets'
     | '/admin/artifacts'
-    | '/admin/glyphs'
     | '/admin/plugins'
+    | '/admin/variables'
     | '/configure/$fableId'
     | '/executions/$jobId'
     | '/schedules/$scheduleId'
@@ -234,8 +234,8 @@ export interface FileRouteTypes {
     | '/admin/artifacts/$artifactId'
     | '/admin/plugins/$pluginId'
     | '/admin/artifacts/'
-    | '/admin/glyphs/'
     | '/admin/plugins/'
+    | '/admin/variables/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -252,8 +252,8 @@ export interface FileRouteTypes {
     | '/admin/artifacts/$artifactId'
     | '/admin/plugins/$pluginId'
     | '/admin/artifacts'
-    | '/admin/glyphs'
     | '/admin/plugins'
+    | '/admin/variables'
   id:
     | '__root__'
     | '/'
@@ -264,8 +264,8 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/presets'
     | '/_authenticated/admin/artifacts'
-    | '/_authenticated/admin/glyphs'
     | '/_authenticated/admin/plugins'
+    | '/_authenticated/admin/variables'
     | '/_authenticated/configure/$fableId'
     | '/_authenticated/executions/$jobId'
     | '/_authenticated/schedules/$scheduleId'
@@ -275,8 +275,8 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/artifacts/$artifactId'
     | '/_authenticated/admin/plugins/$pluginId'
     | '/_authenticated/admin/artifacts/'
-    | '/_authenticated/admin/glyphs/'
     | '/_authenticated/admin/plugins/'
+    | '/_authenticated/admin/variables/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -378,18 +378,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedConfigureFableIdRouteImport
       parentRoute: typeof AuthenticatedConfigureRoute
     }
+    '/_authenticated/admin/variables': {
+      id: '/_authenticated/admin/variables'
+      path: '/variables'
+      fullPath: '/admin/variables'
+      preLoaderRoute: typeof AuthenticatedAdminVariablesRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/plugins': {
       id: '/_authenticated/admin/plugins'
       path: '/plugins'
       fullPath: '/admin/plugins'
       preLoaderRoute: typeof AuthenticatedAdminPluginsRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/glyphs': {
-      id: '/_authenticated/admin/glyphs'
-      path: '/glyphs'
-      fullPath: '/admin/glyphs'
-      preLoaderRoute: typeof AuthenticatedAdminGlyphsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/artifacts': {
@@ -399,19 +399,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminArtifactsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/variables/': {
+      id: '/_authenticated/admin/variables/'
+      path: '/'
+      fullPath: '/admin/variables/'
+      preLoaderRoute: typeof AuthenticatedAdminVariablesIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminVariablesRoute
+    }
     '/_authenticated/admin/plugins/': {
       id: '/_authenticated/admin/plugins/'
       path: '/'
       fullPath: '/admin/plugins/'
       preLoaderRoute: typeof AuthenticatedAdminPluginsIndexRouteImport
       parentRoute: typeof AuthenticatedAdminPluginsRoute
-    }
-    '/_authenticated/admin/glyphs/': {
-      id: '/_authenticated/admin/glyphs/'
-      path: '/'
-      fullPath: '/admin/glyphs/'
-      preLoaderRoute: typeof AuthenticatedAdminGlyphsIndexRouteImport
-      parentRoute: typeof AuthenticatedAdminGlyphsRoute
     }
     '/_authenticated/admin/artifacts/': {
       id: '/_authenticated/admin/artifacts/'
@@ -455,20 +455,6 @@ const AuthenticatedAdminArtifactsRouteWithChildren =
     AuthenticatedAdminArtifactsRouteChildren,
   )
 
-interface AuthenticatedAdminGlyphsRouteChildren {
-  AuthenticatedAdminGlyphsIndexRoute: typeof AuthenticatedAdminGlyphsIndexRoute
-}
-
-const AuthenticatedAdminGlyphsRouteChildren: AuthenticatedAdminGlyphsRouteChildren =
-  {
-    AuthenticatedAdminGlyphsIndexRoute: AuthenticatedAdminGlyphsIndexRoute,
-  }
-
-const AuthenticatedAdminGlyphsRouteWithChildren =
-  AuthenticatedAdminGlyphsRoute._addFileChildren(
-    AuthenticatedAdminGlyphsRouteChildren,
-  )
-
 interface AuthenticatedAdminPluginsRouteChildren {
   AuthenticatedAdminPluginsPluginIdRoute: typeof AuthenticatedAdminPluginsPluginIdRoute
   AuthenticatedAdminPluginsIndexRoute: typeof AuthenticatedAdminPluginsIndexRoute
@@ -486,18 +472,34 @@ const AuthenticatedAdminPluginsRouteWithChildren =
     AuthenticatedAdminPluginsRouteChildren,
   )
 
+interface AuthenticatedAdminVariablesRouteChildren {
+  AuthenticatedAdminVariablesIndexRoute: typeof AuthenticatedAdminVariablesIndexRoute
+}
+
+const AuthenticatedAdminVariablesRouteChildren: AuthenticatedAdminVariablesRouteChildren =
+  {
+    AuthenticatedAdminVariablesIndexRoute:
+      AuthenticatedAdminVariablesIndexRoute,
+  }
+
+const AuthenticatedAdminVariablesRouteWithChildren =
+  AuthenticatedAdminVariablesRoute._addFileChildren(
+    AuthenticatedAdminVariablesRouteChildren,
+  )
+
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminArtifactsRoute: typeof AuthenticatedAdminArtifactsRouteWithChildren
-  AuthenticatedAdminGlyphsRoute: typeof AuthenticatedAdminGlyphsRouteWithChildren
   AuthenticatedAdminPluginsRoute: typeof AuthenticatedAdminPluginsRouteWithChildren
+  AuthenticatedAdminVariablesRoute: typeof AuthenticatedAdminVariablesRouteWithChildren
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminArtifactsRoute:
     AuthenticatedAdminArtifactsRouteWithChildren,
-  AuthenticatedAdminGlyphsRoute: AuthenticatedAdminGlyphsRouteWithChildren,
   AuthenticatedAdminPluginsRoute: AuthenticatedAdminPluginsRouteWithChildren,
+  AuthenticatedAdminVariablesRoute:
+    AuthenticatedAdminVariablesRouteWithChildren,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
 }
 
