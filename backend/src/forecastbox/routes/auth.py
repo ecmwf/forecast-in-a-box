@@ -16,8 +16,7 @@ Responsible for all user authentication.
 from fastapi import APIRouter
 
 from forecastbox.domain.auth.oidc import oauth_client
-from forecastbox.domain.auth.users import auth_backend, fastapi_users
-from forecastbox.schemata.user import UserCreate, UserRead, UserUpdate
+from forecastbox.domain.auth.users import UserCreate, UserRead, UserUpdate, auth_backend, fastapi_users
 from forecastbox.utility.config import config
 
 PREFIX = "/api/v1"
