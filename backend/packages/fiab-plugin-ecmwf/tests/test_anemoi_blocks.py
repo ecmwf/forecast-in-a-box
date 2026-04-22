@@ -7,6 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+from collections.abc import Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -29,7 +30,7 @@ def make_block(factory: str, config: dict, input_ids: dict | None = None) -> Blo
 
 
 @pytest.fixture
-def mock_anemoi_utils():
+def mock_anemoi_utils() -> Generator[None, None, None]:
     """Patch get_metadata and expansion_qube so validate_anemoi_block can complete successfully."""
     with (
         patch("fiab_plugin_ecmwf.anemoi.utils.get_metadata", return_value=MagicMock()),
@@ -39,19 +40,19 @@ def mock_anemoi_utils():
 
 
 class TestAnemoiSourceValidate:
-    def test_invalid_lead_time_not_a_digit(self):
+    def test_invalid_lead_time_not_a_digit(self) -> None:
         block = make_block("AnemoiSource", {"checkpoint": DUMMY_CHECKPOINT, "lead_time": "abc", "base_time": "2024-01-01"})
         result = AnemoiSource().validate(block=block, inputs={})
         with pytest.raises(Exception, match="Lead time"):
             result.get_or_raise()
 
-    def test_invalid_lead_time_negative(self):
+    def test_invalid_lead_time_negative(self) -> None:
         block = make_block("AnemoiSource", {"checkpoint": DUMMY_CHECKPOINT, "lead_time": "-1", "base_time": "2024-01-01"})
         result = AnemoiSource().validate(block=block, inputs={})
         with pytest.raises(Exception, match="Lead time"):
             result.get_or_raise()
 
-    def test_invalid_ensemble_members_zero(self):
+    def test_invalid_ensemble_members_zero(self) -> None:
         block = make_block(
             "AnemoiSource",
             {"checkpoint": DUMMY_CHECKPOINT, "lead_time": "24", "base_time": "2024-01-01", "ensemble_members": "0"},
@@ -60,7 +61,7 @@ class TestAnemoiSourceValidate:
         with pytest.raises(Exception, match="Ensemble members must be an int and positive"):
             result.get_or_raise()
 
-    def test_invalid_ensemble_members_not_a_digit(self):
+    def test_invalid_ensemble_members_not_a_digit(self) -> None:
         block = make_block(
             "AnemoiSource",
             {"checkpoint": DUMMY_CHECKPOINT, "lead_time": "24", "base_time": "2024-01-01", "ensemble_members": "two"},
@@ -69,25 +70,25 @@ class TestAnemoiSourceValidate:
         with pytest.raises(Exception, match="Ensemble members must be an int and positive"):
             result.get_or_raise()
 
-    def test_unknown_checkpoint(self, registered_provider):
+    def test_unknown_checkpoint(self, registered_provider: None) -> None:
         block = make_block("AnemoiSource", {"checkpoint": "dummy_store:unknown", "lead_time": "24", "base_time": "2024-01-01"})
         result = AnemoiSource().validate(block=block, inputs={})
         with pytest.raises(Exception, match="Unknown checkpoint"):
             result.get_or_raise()
 
-    def test_invalid_checkpoint_format(self):
+    def test_invalid_checkpoint_format(self) -> None:
         block = make_block("AnemoiSource", {"checkpoint": "not-a-valid-id", "lead_time": "24", "base_time": "2024-01-01"})
         result = AnemoiSource().validate(block=block, inputs={})
         with pytest.raises(Exception, match="valid checkpoint identifier"):
             result.get_or_raise()
 
-    def test_valid_config_default_ensemble(self, mock_anemoi_utils):
+    def test_valid_config_default_ensemble(self, mock_anemoi_utils: None) -> None:
         block = make_block("AnemoiSource", {"checkpoint": DUMMY_CHECKPOINT, "lead_time": "24", "base_time": "2024-01-01"})
         output: QubedOutput = AnemoiSource().validate(block=block, inputs={}).get_or_raise()  # type: ignore[assignment]
         assert contains(output, "number")
         assert set(axes(output)["number"]) == {1}
 
-    def test_valid_config_with_ensemble_members(self, mock_anemoi_utils):
+    def test_valid_config_with_ensemble_members(self, mock_anemoi_utils: None) -> None:
         block = make_block(
             "AnemoiSource",
             {"checkpoint": DUMMY_CHECKPOINT, "lead_time": "24", "base_time": "2024-01-01", "ensemble_members": "3"},
@@ -98,35 +99,35 @@ class TestAnemoiSourceValidate:
 
 
 class TestAnemoiTransformValidate:
-    def test_invalid_lead_time_not_a_digit(self):
+    def test_invalid_lead_time_not_a_digit(self) -> None:
         input_dataset = QubedOutput(dataqube=DUMMY_QUBE)
         block = make_block("AnemoiTransform", {"checkpoint": DUMMY_CHECKPOINT, "lead_time": "abc"}, input_ids={"dataset": "src"})
         result = AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset})
         with pytest.raises(Exception, match="Lead time must be a non-negative integer"):
             result.get_or_raise()
 
-    def test_invalid_lead_time_negative(self):
+    def test_invalid_lead_time_negative(self) -> None:
         input_dataset = QubedOutput(dataqube=DUMMY_QUBE)
         block = make_block("AnemoiTransform", {"checkpoint": DUMMY_CHECKPOINT, "lead_time": "-1"}, input_ids={"dataset": "src"})
         result = AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset})
         with pytest.raises(Exception, match="Lead time must be a non-negative integer"):
             result.get_or_raise()
 
-    def test_unknown_checkpoint(self, registered_provider):
+    def test_unknown_checkpoint(self, registered_provider: None) -> None:
         input_dataset = QubedOutput(dataqube=DUMMY_QUBE)
         block = make_block("AnemoiTransform", {"checkpoint": "dummy_store:unknown", "lead_time": "24"}, input_ids={"dataset": "src"})
         result = AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset})
         with pytest.raises(Exception, match="Unknown checkpoint"):
             result.get_or_raise()
 
-    def test_valid_config_no_number_axis(self, mock_anemoi_utils):
+    def test_valid_config_no_number_axis(self, mock_anemoi_utils: None) -> None:
         input_dataset = QubedOutput(dataqube=DUMMY_QUBE)
         block = make_block("AnemoiTransform", {"checkpoint": DUMMY_CHECKPOINT, "lead_time": "24"}, input_ids={"dataset": "src"})
         output = AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset}).get_or_raise()
         assert isinstance(output, QubedOutput)
         assert not contains(output, "number")
 
-    def test_valid_config_propagates_number_axis(self, mock_anemoi_utils):
+    def test_valid_config_propagates_number_axis(self, mock_anemoi_utils: None) -> None:
         input_dataset = expand(QubedOutput(dataqube=DUMMY_QUBE), {"number": [1, 2, 3]})
         block = make_block("AnemoiTransform", {"checkpoint": DUMMY_CHECKPOINT, "lead_time": "24"}, input_ids={"dataset": "src"})
         output = AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset}).get_or_raise()

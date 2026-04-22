@@ -40,7 +40,7 @@ from .utils import (
 class AnemoiBuilder:
     """Utility to build an Inference from an Anemoi checkpoint, for use in both Source and Transform blocks"""
 
-    def __init__(self, checkpoint: str):
+    def __init__(self, checkpoint: str) -> None:
         self.checkpoint = checkpoint
         self.artifact_id = CompositeArtifactId.from_str(checkpoint)
 
@@ -52,11 +52,11 @@ class AnemoiBuilder:
 
         class WrappedInference(Inference):
             @functools.wraps(Inference.from_input)
-            def from_input(s, *a, **k) -> Action:  # type: ignore[reportIncompatibleMethodOverride, reportSelfClsParameterName]
+            def from_input(s, *a: Any, **k: Any) -> Action:  # type: ignore[reportIncompatibleMethodOverride, reportSelfClsParameterName]
                 return super().from_input(*a, **k, payload_metadata={"artifacts": [self.artifact_id]})
 
             @functools.wraps(Inference.from_initial_conditions)
-            def from_initial_conditions(s, *a, **k) -> Action:  # type: ignore[reportIncompatibleMethodOverride, reportSelfClsParameterName]
+            def from_initial_conditions(s, *a: Any, **k: Any) -> Action:  # type: ignore[reportIncompatibleMethodOverride, reportSelfClsParameterName]
                 return super().from_initial_conditions(*a, **k, payload_metadata={"artifacts": [self.artifact_id]})
 
         return WrappedInference(

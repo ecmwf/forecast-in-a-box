@@ -8,6 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 import contextlib
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -15,7 +16,7 @@ from fiab_core.artifacts import ArtifactsProvider, CompositeArtifactId, MlModelC
 
 
 @contextlib.contextmanager
-def dummy_provider():
+def dummy_provider() -> Generator[None, None, None]:
     ArtifactsProvider.register_get_checkpoint_lookup(
         lambda: {
             CompositeArtifactId.from_str("dummy_store:dummy_ckpt"): MlModelCheckpoint(
@@ -41,7 +42,7 @@ def dummy_provider():
 
 
 @pytest.fixture
-def registered_provider():
+def registered_provider() -> Generator[None, None, None]:
     """Pytest fixture that registers the dummy ArtifactsProvider for the duration of a test."""
     with dummy_provider():
         yield
