@@ -17,8 +17,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from forecastbox.domain.artifact.base import CompositeArtifactId, MlModelDetail, MlModelOverview
 from forecastbox.domain.artifact.manager import delete_model, get_model_details, list_models, submit_artifact_download
+from forecastbox.domain.auth.users import UserRead
 from forecastbox.routes.admin import get_admin_user
-from forecastbox.schemata.user import UserRead
 
 PREFIX = "/api/v1/artifacts"
 

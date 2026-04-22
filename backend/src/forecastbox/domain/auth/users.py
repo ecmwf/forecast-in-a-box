@@ -13,14 +13,14 @@ from collections.abc import AsyncGenerator
 import jwt
 import pydantic
 from fastapi import Depends, HTTPException, Request, responses
-from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
+from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin, schemas
 from fastapi_users.authentication import AuthenticationBackend, CookieTransport, JWTStrategy
 from fastapi_users.db import SQLAlchemyUserDatabase
 from fastapi_users.exceptions import InvalidPasswordException
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from forecastbox.schemata.user import OAuthAccount, UserCreate, UserRead, UserTable, async_session_maker
+from forecastbox.schemata.user import OAuthAccount, UserTable, async_session_maker
 from forecastbox.utility.auth import PASSTHROUGH_USER_ID, AuthContext
 from forecastbox.utility.config import config
 
@@ -28,6 +28,18 @@ SECRET = config.auth.jwt_secret.get_secret_value()
 COOKIE_NAME = "forecastbox_auth"
 
 logger = logging.getLogger(__name__)
+
+
+class UserRead(schemas.BaseUser[pydantic.UUID4]):
+    pass
+
+
+class UserCreate(schemas.BaseUserCreate):
+    pass
+
+
+class UserUpdate(schemas.BaseUserUpdate):
+    pass
 
 
 # ** DB part **

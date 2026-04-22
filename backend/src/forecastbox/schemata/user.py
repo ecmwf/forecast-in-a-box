@@ -13,25 +13,11 @@ Exposes ``create_db_and_tables`` so the entrypoint can discover and run it
 via automatic schemata iteration.
 """
 
-import pydantic
-from fastapi_users import schemas
 from fastapi_users.db import SQLAlchemyBaseOAuthAccountTableUUID, SQLAlchemyBaseUserTableUUID
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, relationship
 
 from forecastbox.utility.config import config
-
-
-class UserRead(schemas.BaseUser[pydantic.UUID4]):
-    pass
-
-
-class UserCreate(schemas.BaseUserCreate):
-    pass
-
-
-class UserUpdate(schemas.BaseUserUpdate):
-    pass
 
 
 class Base(DeclarativeBase):
