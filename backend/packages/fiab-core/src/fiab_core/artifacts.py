@@ -14,7 +14,7 @@ Declarations related to Artifacts such as ML Model Checkpoints.
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, Field
 
@@ -33,7 +33,7 @@ class CompositeArtifactId:
     ml_model_checkpoint_id: MlModelCheckpointId
 
     @classmethod
-    def from_str(cls, v: str) -> "CompositeArtifactId":
+    def from_str(cls, v: str) -> Self:
         if not ":" in v:
             raise ValueError(f"must be of the form artifact_store_id:ml_model_checkpoint_id, got {v}")
         artifact_store_id, ml_model_checkpoint_id = v.split(":", 1)
