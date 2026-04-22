@@ -162,7 +162,7 @@ async def get_glyphs_for_resolution(auth_context: AuthContext) -> GlyphResolutio
             pub_overriddable: dict[str, str] = {}
             pub_nonoverridable: dict[str, str] = {}
             for row in pub_rows_result.scalars():
-                if bool(row.overriddable):  # ty:ignore[argument-type]
+                if bool(row.overriddable):
                     pub_overriddable[str(row.key)] = str(row.value)
                 else:
                     pub_nonoverridable[str(row.key)] = str(row.value)
