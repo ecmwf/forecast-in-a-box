@@ -30,7 +30,6 @@ from typing import cast
 
 from cascade.gateway import api, client
 from cascade.low.func import Either
-from pydantic import BaseModel
 
 import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.run.db as run_db
@@ -43,11 +42,12 @@ from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import Blueprint, Run
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
+from forecastbox.utility.pydantic import FiabBaseModel
 
 logger = logging.getLogger(__name__)
 
 
-class RunDetail(BaseModel):
+class RunDetail(FiabBaseModel):
     """Detail of a single job execution attempt."""
 
     run_id: RunId
@@ -62,7 +62,7 @@ class RunDetail(BaseModel):
     cascade_job_id: str | None = None
 
 
-class ExecuteResult(BaseModel):
+class ExecuteResult(FiabBaseModel):
     """Result of a job execution submission."""
 
     run_id: RunId

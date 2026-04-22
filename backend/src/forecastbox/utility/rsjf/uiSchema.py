@@ -13,10 +13,12 @@
 
 from typing import Any, Union
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from forecastbox.utility.pydantic import FiabBaseModel
 
 
-class UIField(BaseModel):
+class UIField(FiabBaseModel):
     """Base UI schema field for RJSF.
 
     See Also

@@ -16,7 +16,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, NewType
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from fiab_core.pydantic_utils import FiabCoreBaseModel
 
 # NOTE we may eventually fine-grain this with like cuda versions or architecture etc, form a hierarchy, etc. Or maybe not and this will be enough.
 Platform = Literal["macos", "linux"]
@@ -33,7 +35,7 @@ class CompositeArtifactId:
     ml_model_checkpoint_id: MlModelCheckpointId
 
 
-class MlModelCheckpoint(BaseModel):
+class MlModelCheckpoint(FiabCoreBaseModel):
     url: str = Field(
         description="Location such as anemoi catalogue or hugging face registry url. Represents the source url, not an url of a local copy"
     )

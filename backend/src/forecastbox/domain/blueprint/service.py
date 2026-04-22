@@ -32,7 +32,6 @@ from fiab_core.fable import (
     BlockKind,
     PluginBlockFactoryId,
 )
-from pydantic import BaseModel
 
 from forecastbox.domain.blueprint import db
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
@@ -46,25 +45,26 @@ from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, expand_glyph_v
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.graph import topological_order
+from forecastbox.utility.pydantic import FiabBaseModel
 
 logger = logging.getLogger(__name__)
 
 
-class BlueprintBuilder(BaseModel):
+class BlueprintBuilder(FiabBaseModel):
     # NOTE warning -- this class is used by the web api. Be careful about changes here
     blocks: dict[BlockInstanceId, BlockInstance]
     environment: EnvironmentSpecification | None = None
     local_glyphs: dict[str, str] = {}
 
 
-class BlueprintSaveResult(BaseModel):
+class BlueprintSaveResult(FiabBaseModel):
     """Returned by save_builder; contains the stable id and the new version number."""
 
     blueprint_id: BlueprintId
     blueprint_version: int
 
 
-class BlueprintRetrieveResult(BaseModel):
+class BlueprintRetrieveResult(FiabBaseModel):
     """Full payload returned by load_builder."""
 
     blueprint_id: BlueprintId
@@ -76,7 +76,7 @@ class BlueprintRetrieveResult(BaseModel):
     parent_id: str | None = None
 
 
-class BlueprintValidationExpansion(BaseModel):
+class BlueprintValidationExpansion(FiabBaseModel):
     """Structured validation result and completion options for a BlueprintBuilder."""
 
     global_errors: list[str]
@@ -86,7 +86,7 @@ class BlueprintValidationExpansion(BaseModel):
     resolved_configuration_options: dict[BlockInstanceId, dict[str, str]] = {}
 
 
-class BlueprintSaveCommand(BaseModel):
+class BlueprintSaveCommand(FiabBaseModel):
     """Command payload for saving a blueprint builder."""
 
     builder: BlueprintBuilder

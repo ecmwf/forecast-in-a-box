@@ -22,7 +22,7 @@ import datetime as dt
 import uuid
 from collections.abc import Iterable
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 from sqlalchemy import func, select, update
 
 import forecastbox.schemata.jobs as _jobs_module
@@ -33,9 +33,10 @@ from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import Run, RunStatus
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.db import dbRetry, executeAndCommit, querySingle
+from forecastbox.utility.pydantic import FiabBaseModel
 
 
-class CompilerRuntimeContext(BaseModel):
+class CompilerRuntimeContext(FiabBaseModel):
     """Per-execution dynamic values that override compiled ExecutionSpecification fields.
 
     Merged via deep_union into the compiled spec before job submission; only the fields

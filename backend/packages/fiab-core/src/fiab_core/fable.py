@@ -14,11 +14,13 @@ Types pertaining to Forecast As BLock Expression (Fable): blocks
 from typing import Literal, NewType
 
 from earthkit.workflows.fluent import Action
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
 from typing_extensions import Self
 
+from fiab_core.pydantic_utils import FiabCoreBaseModel
 
-class BlockConfigurationOption(BaseModel):
+
+class BlockConfigurationOption(FiabCoreBaseModel):
     title: str
     """Brief string to display in the BlockFactory detail"""
     description: str
@@ -31,7 +33,7 @@ class BlockConfigurationOption(BaseModel):
 BlockKind = Literal["source", "transform", "product", "sink"]
 
 
-class BlockFactory(BaseModel):
+class BlockFactory(FiabCoreBaseModel):
     """When building a fable, user selects from an available catalogue of BlockFactories which
     have description of what they do and specification of configuration options they offer"""
 
@@ -53,7 +55,7 @@ PluginId = NewType("PluginId", str)
 PluginStoreId = NewType("PluginStoreId", str)
 
 
-class PluginCompositeId(BaseModel):
+class PluginCompositeId(FiabCoreBaseModel):
     model_config = ConfigDict(frozen=True)
     store: PluginStoreId
     local: PluginId
@@ -70,7 +72,7 @@ class PluginCompositeId(BaseModel):
         return f"{k.store}:{k.local}"
 
 
-class PluginBlockFactoryId(BaseModel):
+class PluginBlockFactoryId(FiabCoreBaseModel):
     """Note to plugin authors: This is a routing class. When you implement your BlockFactories for the catalogue,
     you dont use this, you only need to declare a BlockFactoryId unique inside your plugin. Similarly, when you
     return which BlockFactories are possible in the expand method, you only return your BlockFactoryIds. This
@@ -81,11 +83,11 @@ class PluginBlockFactoryId(BaseModel):
     factory: BlockFactoryId
 
 
-class BlockFactoryCatalogue(BaseModel):
+class BlockFactoryCatalogue(FiabCoreBaseModel):
     factories: dict[BlockFactoryId, BlockFactory]
 
 
-class BlockInstance(BaseModel):
+class BlockInstance(FiabCoreBaseModel):
     """As produced by BlockFactory *by the client* -- basically the configuration/inputs values"""
 
     factory_id: PluginBlockFactoryId
@@ -95,16 +97,16 @@ class BlockInstance(BaseModel):
     """Keys come from factory's `inputs`, values are other blocks in the (partial) fable"""
 
 
-class XarrayOutput(BaseModel):  # NOTE eventually Qubed
+class XarrayOutput(FiabCoreBaseModel):  # NOTE eventually Qubed
     variables: list[str]
     coords: list[str]
 
 
-class RawOutput(BaseModel):
+class RawOutput(FiabCoreBaseModel):
     type_fqn: str  # most likely you want Any here
 
 
-class NoOutput(BaseModel):
+class NoOutput(FiabCoreBaseModel):
     pass
 
 

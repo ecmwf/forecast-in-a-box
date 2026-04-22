@@ -31,7 +31,6 @@ from cascade.low.func import assert_never
 from fastapi import APIRouter, Depends, status
 from fastapi.exceptions import HTTPException
 from fiab_core.fable import BlockFactoryCatalogue, BlockInstanceId, PluginBlockFactoryId, PluginCompositeId
-from pydantic import BaseModel
 
 from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint import db, service
@@ -49,6 +48,7 @@ from forecastbox.domain.glyphs.types import GlobalGlyphId
 from forecastbox.domain.plugin.manager import catalogue_view, plugins_ready
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
+from forecastbox.utility.pydantic import FiabBaseModel
 
 PREFIX = "/api/v1/blueprint"
 
@@ -63,7 +63,7 @@ router = APIRouter(
 # ---------------------------------------------------------------------------
 
 
-class BlueprintLookup(BaseModel):
+class BlueprintLookup(FiabBaseModel):
     """Identifies a blueprint, optionally pinning a specific version.
 
     Used as a Depends()-based query-param group on GET endpoints, and as a
@@ -74,7 +74,7 @@ class BlueprintLookup(BaseModel):
     version: int | None = None
 
 
-class BlueprintCreateRequest(BaseModel):
+class BlueprintCreateRequest(FiabBaseModel):
     builder: BlueprintBuilder
     display_name: str | None = None
     display_description: str | None = None
@@ -82,12 +82,12 @@ class BlueprintCreateRequest(BaseModel):
     parent_id: str | None = None
 
 
-class BlueprintCreateResponse(BaseModel):
+class BlueprintCreateResponse(FiabBaseModel):
     blueprint_id: BlueprintId
     version: int
 
 
-class BlueprintGetResponse(BaseModel):
+class BlueprintGetResponse(FiabBaseModel):
     blueprint_id: BlueprintId
     version: int
     builder: BlueprintBuilder
@@ -97,7 +97,7 @@ class BlueprintGetResponse(BaseModel):
     parent_id: str | None = None
 
 
-class BlueprintListItem(BaseModel):
+class BlueprintListItem(FiabBaseModel):
     blueprint_id: BlueprintId
     version: int
     display_name: str | None = None
@@ -107,14 +107,14 @@ class BlueprintListItem(BaseModel):
     created_by: str | None = None
 
 
-class BlueprintListResponse(BaseModel):
+class BlueprintListResponse(FiabBaseModel):
     blueprints: list[BlueprintListItem]
     total: int
     page: int
     page_size: int
 
 
-class BlueprintUpdateRequest(BaseModel):
+class BlueprintUpdateRequest(FiabBaseModel):
     blueprint_id: BlueprintId
     version: int
     builder: BlueprintBuilder
@@ -124,17 +124,17 @@ class BlueprintUpdateRequest(BaseModel):
     parent_id: str | None = None
 
 
-class BlueprintUpdateResponse(BaseModel):
+class BlueprintUpdateResponse(FiabBaseModel):
     blueprint_id: BlueprintId
     version: int
 
 
-class BlueprintDeleteRequest(BaseModel):
+class BlueprintDeleteRequest(FiabBaseModel):
     blueprint_id: BlueprintId
     version: int
 
 
-class BlueprintValidationExpansionResponse(BaseModel):
+class BlueprintValidationExpansionResponse(FiabBaseModel):
     """HTTP response for blueprint expand — mirrors BlueprintValidationExpansion from the service layer."""
 
     global_errors: list[str]
@@ -144,14 +144,14 @@ class BlueprintValidationExpansionResponse(BaseModel):
     resolved_configuration_options: dict[BlockInstanceId, dict[str, str]]
 
 
-class GlyphDetail(BaseModel):
+class GlyphDetail(FiabBaseModel):
     name: str
     display_name: str
     valueExample: str
     created_by: str
 
 
-class GlyphListResponse(BaseModel):
+class GlyphListResponse(FiabBaseModel):
     """Paginated list of glyphs, for both intrinsic and global types."""
 
     glyphs: list[GlyphDetail]
@@ -160,7 +160,7 @@ class GlyphListResponse(BaseModel):
     page_size: int
 
 
-class GlobalGlyphPostRequest(BaseModel):
+class GlobalGlyphPostRequest(FiabBaseModel):
     """Request body for creating or updating a global glyph.
 
     ``overriddable`` must be omitted (or ``None``) when ``public=False`` and must
@@ -173,7 +173,7 @@ class GlobalGlyphPostRequest(BaseModel):
     overriddable: bool | None = None
 
 
-class GlobalGlyphResponse(BaseModel):
+class GlobalGlyphResponse(FiabBaseModel):
     """Detail of a single global glyph, returned by get and post endpoints."""
 
     global_glyph_id: GlobalGlyphId
@@ -186,13 +186,13 @@ class GlobalGlyphResponse(BaseModel):
     updated_at: str
 
 
-class GlobalGlyphLookup(BaseModel):
+class GlobalGlyphLookup(FiabBaseModel):
     """Identifies a global glyph by its stable id."""
 
     global_glyph_id: GlobalGlyphId
 
 
-class GlyphFunctionDetail(BaseModel):
+class GlyphFunctionDetail(FiabBaseModel):
     """Description of a single custom function available in glyph expressions."""
 
     name: str
@@ -200,7 +200,7 @@ class GlyphFunctionDetail(BaseModel):
     kind: Literal["filter", "global"]
 
 
-class GlyphFunctionsResponse(BaseModel):
+class GlyphFunctionsResponse(FiabBaseModel):
     """All custom functions (filters and globals) registered in the interpolation environment."""
 
     functions: list[GlyphFunctionDetail]

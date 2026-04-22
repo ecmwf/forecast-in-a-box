@@ -13,7 +13,7 @@
 
 from typing import Any, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field  # NOTE we need dynamicity, cant use FiabBaseModel
 
 
 # Base Schema with discriminator

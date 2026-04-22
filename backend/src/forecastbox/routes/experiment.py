@@ -22,7 +22,7 @@ from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends
 from fastapi.exceptions import HTTPException
-from pydantic import BaseModel, PositiveInt
+from pydantic import PositiveInt
 
 from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint.types import BlueprintId
@@ -34,6 +34,7 @@ from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import ExperimentDefinition
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
+from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import current_time
 
 PREFIX = "/api/v1/experiment"
@@ -51,7 +52,7 @@ router = APIRouter(
 # ---------------------------------------------------------------------------
 
 
-class ExperimentLookup(BaseModel):
+class ExperimentLookup(FiabBaseModel):
     """Identifies an experiment, optionally pinning a specific version.
 
     Used as a Depends()-based query-param group on GET endpoints, and as a
@@ -62,7 +63,7 @@ class ExperimentLookup(BaseModel):
     version: int | None = None
 
 
-class ExperimentCreateRequest(BaseModel):
+class ExperimentCreateRequest(FiabBaseModel):
     blueprint_id: BlueprintId
     blueprint_version: int | None = None
     cron_expr: str
@@ -73,11 +74,11 @@ class ExperimentCreateRequest(BaseModel):
     tags: list[str] | None = None
 
 
-class ExperimentCreateResponse(BaseModel):
+class ExperimentCreateResponse(FiabBaseModel):
     experiment_id: ExperimentDefinitionId
 
 
-class ExperimentDetail(BaseModel):
+class ExperimentDetail(FiabBaseModel):
     experiment_id: ExperimentDefinitionId
     experiment_version: int
     blueprint_id: BlueprintId
@@ -92,7 +93,7 @@ class ExperimentDetail(BaseModel):
     tags: list[str] | None = None
 
 
-class ExperimentListResponse(BaseModel):
+class ExperimentListResponse(FiabBaseModel):
     experiments: list[ExperimentDetail]
     total: int
     page: int
@@ -100,7 +101,7 @@ class ExperimentListResponse(BaseModel):
     total_pages: int
 
 
-class ExperimentUpdateRequest(BaseModel):
+class ExperimentUpdateRequest(FiabBaseModel):
     """Update a cron-schedule experiment. ``version`` must match the current version."""
 
     experiment_id: ExperimentDefinitionId
@@ -111,14 +112,14 @@ class ExperimentUpdateRequest(BaseModel):
     first_run_override: dt.datetime | None = None
 
 
-class ExperimentDeleteRequest(BaseModel):
+class ExperimentDeleteRequest(FiabBaseModel):
     """Soft-delete an experiment. ``version`` must match the current version."""
 
     experiment_id: ExperimentDefinitionId
     version: int
 
 
-class ExperimentRunDetail(BaseModel):
+class ExperimentRunDetail(FiabBaseModel):
     run_id: RunId
     attempt_count: int
     status: str
@@ -127,7 +128,7 @@ class ExperimentRunDetail(BaseModel):
     experiment_context: str | None
 
 
-class ExperimentRunsResponse(BaseModel):
+class ExperimentRunsResponse(FiabBaseModel):
     runs: list[ExperimentRunDetail]
     total: int
     page: int

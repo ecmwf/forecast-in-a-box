@@ -19,13 +19,13 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse, Response
 from fiab_core.fable import PluginCompositeId
-from pydantic import BaseModel
 
 from forecastbox.domain.auth.users import UserRead
 from forecastbox.domain.plugin.manager import PluginsStatus, modify_enabled, status_full, submit_update_single, uninstall_plugin
 from forecastbox.domain.plugin.store import PluginRemoteInfo, PluginStoreEntry, get_plugins_detail, submit_install_plugin
 from forecastbox.routes.admin import get_admin_user
 from forecastbox.utility.config import config
+from forecastbox.utility.pydantic import FiabBaseModel
 
 PREFIX = "/api/v1/plugin"
 
@@ -35,7 +35,7 @@ router = APIRouter(
 )
 
 
-class PluginDetail(BaseModel):
+class PluginDetail(FiabBaseModel):
     status: Literal["available", "disabled", "errored", "loaded"]
     """Status of the plugin, mutually exclusive. All of (disabled, errored, loaded) imply that the plugin is installed"""
     store_info: PluginStoreEntry | None = None
@@ -50,7 +50,7 @@ class PluginDetail(BaseModel):
     """In case the plugin is installed, this shows the most recent update date"""
 
 
-class PluginListing(BaseModel):
+class PluginListing(FiabBaseModel):
     plugins: dict[PluginCompositeId, PluginDetail]
 
 
