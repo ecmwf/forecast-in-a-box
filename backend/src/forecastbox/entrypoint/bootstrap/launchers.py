@@ -10,7 +10,6 @@
 """Launcher methods for backend and cascade -- utilized by
 - entrypoint.main for launch_backend,
 - entrypoint.bootstrap.service for launch_backend,
-- api.routers.gateway for spawning cascade itself (regardless how backend was launched).
 """
 
 import asyncio
@@ -44,7 +43,7 @@ async def _uvicorn_run(app_name: str, host: str, port: int) -> None:
 def launch_backend() -> None:
     config = FIABConfig()
     # TODO something imported by this module reconfigures the logging -- find and remove!
-    import forecastbox.entrypoint.app
+    import forecastbox.entrypoint.app  # import inside function justified due to side effects
 
     setup_process()
     logger.debug(f"logging initialized post-{forecastbox.entrypoint.app.__name__} import")
@@ -53,18 +52,5 @@ def launch_backend() -> None:
     task = _uvicorn_run("forecastbox.entrypoint.app:app", host, port)
     try:
         asyncio.run(task)
-    except KeyboardInterrupt:
-        pass  # no need to spew stacktrace to log
-
-
-def launch_cascade(log_base: str | None, max_concurrent_jobs: int | None) -> None:
-    config = FIABConfig()
-    from cascade.deployment.logging import LoggingConfig
-    from cascade.gateway.server import main_enp
-
-    loggingConfig = LoggingConfig(path_base=log_base, formatter="line")
-
-    try:
-        main_enp(url=config.cascade.cascade_url, loggingConfig=loggingConfig, max_jobs=max_concurrent_jobs)
     except KeyboardInterrupt:
         pass  # no need to spew stacktrace to log

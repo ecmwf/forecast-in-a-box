@@ -9,10 +9,12 @@
 
 """Shared pagination contract used across routes and service layers."""
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
+
+from forecastbox.utility.pydantic import FiabBaseModel
 
 
-class PaginationSpec(BaseModel):
+class PaginationSpec(FiabBaseModel):
     """Query-parameter group for paginated list endpoints.
 
     Use with ``Depends()`` in FastAPI route signatures to accept ``page`` and

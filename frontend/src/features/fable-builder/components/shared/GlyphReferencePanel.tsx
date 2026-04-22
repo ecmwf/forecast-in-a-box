@@ -28,13 +28,17 @@ import {
   Pencil,
   Plus,
   Trash2,
+  Wand2,
   X,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
+import type { GlyphFunctionDetail } from '@/api/types/fable.types'
 import type { GlyphInfo } from '@/features/fable-builder/hooks/useAllGlyphs'
+import { useGlyphFunctions } from '@/api/hooks/useFable'
 import { useAllGlyphs } from '@/features/fable-builder/hooks/useAllGlyphs'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
+import { GlyphFormDialog } from '@/features/glyphs/components/GlyphFormDialog'
 import { showToast } from '@/lib/toast'
 import { P } from '@/components/base/typography'
 import {
@@ -46,14 +50,18 @@ import { cn } from '@/lib/utils'
 
 const EMPTY_GLYPHS: Record<string, string> = {}
 
-export function GlyphReferencePanel() {
+export function GlyphReferencePanel({ className }: { className?: string }) {
   const { t } = useTranslation('glyphs')
   const localGlyphs =
     useFableBuilderStore((state) => state.fable.local_glyphs) ?? EMPTY_GLYPHS
   const { glyphs, isLoading } = useAllGlyphs(localGlyphs)
+  const { data: functionsResponse } = useGlyphFunctions()
+  const helperFunctions = functionsResponse?.functions ?? []
   const [intrinsicOpen, setIntrinsicOpen] = useState(false)
   const [globalOpen, setGlobalOpen] = useState(true)
   const [localOpen, setLocalOpen] = useState(true)
+  const [helpersOpen, setHelpersOpen] = useState(false)
+  const [createGlobalOpen, setCreateGlobalOpen] = useState(false)
 
   if (isLoading) return null
 
@@ -67,39 +75,79 @@ export function GlyphReferencePanel() {
     showToast.success(t('panel.copied'), ref)
   }
 
+  function handleCopyHelper(fn: GlyphFunctionDetail) {
+    const snippet = fn.kind === 'filter' ? `| ${fn.name}` : `${fn.name}()`
+    navigator.clipboard.writeText(snippet)
+    showToast.success(t('panel.copied'), snippet)
+  }
+
   return (
-    <div className="rounded-md border border-dashed border-border bg-muted/30">
-      {/* Header */}
-      <div className="flex items-center justify-between p-3 pb-0">
-        <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-          <Braces className="h-3.5 w-3.5" />
+    <div
+      className={cn(
+        'rounded-md border border-dashed border-border bg-muted/30',
+        className,
+      )}
+    >
+      {/* Header — icon-only actions so the row stays readable in a
+          narrow sidebar. Labels are preserved via tooltips. */}
+      <div className="flex items-center gap-1.5 p-3 pb-0">
+        <Braces className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <span className="truncate text-sm font-medium text-muted-foreground">
           {t('panel.title')}
+        </span>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <button
+                type="button"
+                className="shrink-0 text-muted-foreground/60 hover:text-muted-foreground"
+              />
+            }
+          >
+            <HelpCircle className="h-3.5 w-3.5" />
+          </TooltipTrigger>
+          <TooltipContent
+            side="bottom"
+            className="max-w-80 whitespace-pre-line"
+          >
+            {t('panel.help')}
+          </TooltipContent>
+        </Tooltip>
+        <div className="ml-auto flex items-center gap-0.5">
           <Tooltip>
             <TooltipTrigger
               render={
                 <button
                   type="button"
-                  className="text-muted-foreground/60 hover:text-muted-foreground"
+                  aria-label={t('panel.addGlobal')}
+                  onClick={() => setCreateGlobalOpen(true)}
+                  className="shrink-0 rounded p-1 text-primary hover:bg-primary/10"
                 />
               }
             >
-              <HelpCircle className="h-3.5 w-3.5" />
+              <Plus className="h-3.5 w-3.5" />
             </TooltipTrigger>
-            <TooltipContent
-              side="bottom"
-              className="max-w-80 whitespace-pre-line"
+            <TooltipContent side="bottom">
+              {t('panel.addGlobal')}
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Link
+                  to="/admin/variables"
+                  aria-label={t('panel.manageAll')}
+                  className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                />
+              }
             >
-              {t('panel.help')}
+              <ExternalLink className="h-3.5 w-3.5" />
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {t('panel.manageAll')}
             </TooltipContent>
           </Tooltip>
         </div>
-        <Link
-          to="/admin/glyphs"
-          className="flex items-center gap-1 text-sm text-primary hover:underline"
-        >
-          {t('panel.manage')}
-          <ExternalLink className="h-3 w-3" />
-        </Link>
       </div>
 
       {/* Local section */}
@@ -131,9 +179,13 @@ export function GlyphReferencePanel() {
         ) : (
           <div className="px-3 pb-2 text-sm text-muted-foreground">
             {t('panel.noGlobal')}{' '}
-            <Link to="/admin/glyphs" className="text-primary hover:underline">
+            <button
+              type="button"
+              onClick={() => setCreateGlobalOpen(true)}
+              className="text-primary hover:underline"
+            >
               {t('panel.createOne')}
-            </Link>
+            </button>
           </div>
         )}
       </GlyphSection>
@@ -153,7 +205,147 @@ export function GlyphReferencePanel() {
           />
         ))}
       </GlyphSection>
+
+      {/* Helpers section — Jinja filters/globals from /blueprint/glyphs/functions */}
+      <HelperSection
+        open={helpersOpen}
+        onToggle={() => setHelpersOpen(!helpersOpen)}
+        helpers={helperFunctions}
+        onCopy={handleCopyHelper}
+      />
+
+      {/* Inline create-variable dialog: stays on the canvas; mutation invalidates
+          fableKeys.globalGlyphsBase so the panel refetches automatically. */}
+      <GlyphFormDialog
+        open={createGlobalOpen}
+        onOpenChange={setCreateGlobalOpen}
+      />
     </div>
+  )
+}
+
+function HelperSection({
+  open,
+  onToggle,
+  helpers,
+  onCopy,
+}: {
+  open: boolean
+  onToggle: () => void
+  helpers: Array<GlyphFunctionDetail>
+  onCopy: (fn: GlyphFunctionDetail) => void
+}) {
+  const { t } = useTranslation('glyphs')
+
+  return (
+    <div className="border-t border-border/50">
+      <div className="flex w-full items-center gap-1.5 px-3 py-2">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+        >
+          {open ? (
+            <ChevronDown className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5" />
+          )}
+          <Wand2 className="h-3.5 w-3.5" />
+          {t('panel.helpers.title')}
+        </button>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <button
+                type="button"
+                className="text-muted-foreground/60 hover:text-muted-foreground"
+              />
+            }
+          >
+            <HelpCircle className="h-3 w-3" />
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-64">
+            {t('panel.helpers.tooltip')}
+          </TooltipContent>
+        </Tooltip>
+      </div>
+      {open && (
+        <div className="space-y-0.5 pb-2">
+          {helpers.length === 0 ? (
+            <div className="px-3 pb-1 text-sm text-muted-foreground">
+              {t('panel.helpers.empty')}
+            </div>
+          ) : (
+            helpers.map((fn) => (
+              <HelperRow
+                key={`${fn.kind}:${fn.name}`}
+                fn={fn}
+                onCopy={onCopy}
+              />
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function HelperRow({
+  fn,
+  onCopy,
+}: {
+  fn: GlyphFunctionDetail
+  onCopy: (fn: GlyphFunctionDetail) => void
+}) {
+  const { t } = useTranslation('glyphs')
+  const snippet = fn.kind === 'filter' ? `| ${fn.name}` : `${fn.name}()`
+  const hint =
+    fn.kind === 'filter'
+      ? t('panel.helpers.copyHintFilter', { name: fn.name })
+      : t('panel.helpers.copyHintGlobal', { name: fn.name })
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <button
+            type="button"
+            onClick={() => onCopy(fn)}
+            className={cn(
+              'group flex w-full items-center gap-2 rounded px-3 py-1 text-left text-sm',
+              'transition-colors hover:bg-muted/80',
+            )}
+          />
+        }
+      >
+        <code className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+          {snippet}
+        </code>
+        <span
+          className={cn(
+            'shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase',
+            fn.kind === 'filter'
+              ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+              : 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+          )}
+        >
+          {fn.kind === 'filter'
+            ? t('panel.helpers.filterBadge')
+            : t('panel.helpers.globalBadge')}
+        </span>
+        <P className="min-w-0 truncate text-xs text-muted-foreground">
+          {fn.description}
+        </P>
+        <Copy className="ml-auto h-3 w-3 shrink-0 text-muted-foreground/0 transition-colors group-hover:text-muted-foreground" />
+      </TooltipTrigger>
+      <TooltipContent side="left" className="max-w-72">
+        <div className="space-y-1">
+          <div className="font-medium">{fn.name}</div>
+          <div className="text-muted-foreground">{fn.description}</div>
+          <div className="text-[10px] text-muted-foreground">{hint}</div>
+        </div>
+      </TooltipContent>
+    </Tooltip>
   )
 }
 

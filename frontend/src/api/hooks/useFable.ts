@@ -9,7 +9,12 @@
  */
 
 import { useMemo } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import type {
   BlockFactoryCatalogue,
   BlueprintDeleteRequest,
@@ -21,6 +26,7 @@ import type {
   GlobalGlyphPostRequest,
   GlobalGlyphResponse,
   GlyphDetail,
+  GlyphFunctionsResponse,
   GlyphListResponse,
   PluginBlockFactoryId,
 } from '@/api/types/fable.types'
@@ -33,6 +39,7 @@ import {
   getGlobalGlyph,
   listBlueprints,
   listGlobalGlyphs,
+  listGlyphFunctions,
   retrieveFable,
   updateBlueprint,
   upsertFable,
@@ -50,6 +57,7 @@ export const fableKeys = {
   validation: (fable: FableBuilderV1) =>
     [...fableKeys.all, 'validation', JSON.stringify(fable)] as const,
   glyphs: () => [...fableKeys.all, 'glyphs'] as const,
+  glyphFunctions: () => [...fableKeys.all, 'glyphFunctions'] as const,
   globalGlyphsBase: () => [...fableKeys.all, 'globalGlyphs'] as const,
   globalGlyphs: (page?: number, pageSize?: number) =>
     [...fableKeys.all, 'globalGlyphs', page, pageSize] as const,
@@ -62,6 +70,10 @@ export function useBlockCatalogue(language?: string) {
     queryFn: () => getCatalogue(language),
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
+    // Always refetch on mount so a previously-cached error state
+    // (e.g. the backend was still loading plugins on first visit) doesn't
+    // silently persist until the user hits F5.
+    refetchOnMount: 'always',
     retry: (failureCount, error) => {
       // Retry more on 503 (plugins temporarily unavailable after install/update)
       if (error instanceof ApiClientError && error.status === 503) {
@@ -135,10 +147,16 @@ export function useFableValidation(
     enabled: enabled && hasBlocks,
     staleTime: 10 * 1000, // 10 seconds
     refetchOnWindowFocus: false,
-    // Retry server errors (503 during plugin reload) but not validation errors (4xx)
+    // Keep previous error state visible while a new validation is in flight.
+    // Prevents the right panel and graph nodes from flickering between
+    // "errors" and "clean" across keystrokes.
+    placeholderData: keepPreviousData,
+    // Only retry 503 (plugin reload). 4xx are validation errors (don't retry),
+    // and other 5xx (e.g. a backend crash in validate_expand) aren't transient —
+    // retrying just spams the server logs without changing the outcome.
     retry: (failureCount, error) => {
-      if (error instanceof ApiClientError && error.status && error.status < 500)
-        return false
+      if (!(error instanceof ApiClientError)) return false
+      if (error.status !== 503) return false
       return failureCount < QUERY_CONSTANTS.RETRY.ON_503
     },
     retryDelay: QUERY_CONSTANTS.RETRY_DELAY.ON_503,
@@ -240,6 +258,19 @@ export function useAvailableGlyphs() {
     queryFn: getAvailableGlyphs,
     staleTime: 30 * 60 * 1000, // 30 minutes — intrinsic glyphs change rarely
     gcTime: 60 * 60 * 1000, // 1 hour
+  })
+}
+
+/**
+ * Fetch the list of custom Jinja filters/globals available in glyph expressions.
+ * Static for the lifetime of the backend process, so we cache aggressively.
+ */
+export function useGlyphFunctions() {
+  return useQuery<GlyphFunctionsResponse>({
+    queryKey: fableKeys.glyphFunctions(),
+    queryFn: listGlyphFunctions,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
   })
 }
 

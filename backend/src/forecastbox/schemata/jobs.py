@@ -20,7 +20,7 @@ via automatic schemata iteration.
 
 from typing import Literal
 
-from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKeyConstraint, Integer, String, UniqueConstraint
+from sqlalchemy import JSON, Boolean, CheckConstraint, Column, DateTime, ForeignKeyConstraint, Integer, String, UniqueConstraint
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -48,7 +48,7 @@ class Blueprint(Base):
 
     blueprint_id = Column(String(255), primary_key=True, nullable=False)
     version = Column(Integer, primary_key=True, nullable=False)
-    created_by = Column(String(255), nullable=True)
+    created_by = Column(String(255), nullable=False)
     created_at = Column(DateTime, nullable=False)
 
     # TODO later -- make sure entity validates this
@@ -69,7 +69,14 @@ class Blueprint(Base):
 class GlobalGlyph(Base):
     """A user-defined glyph available for interpolation in all blueprint configurations.
 
-    Each key is unique; upsert replaces the value when the key already exists.
+    The combination of (created_by, key) is unique, so each user may define their own
+    glyph for the same key name independently.  Public glyphs (created by admins only)
+    carry an additional ``overriddable`` flag that controls resolution priority:
+    public-overriddable glyphs have the lowest priority and can be shadowed by a user's
+    own private glyph; public-nonoverridable glyphs have the highest priority and always win.
+
+    Invariant: ``overriddable`` must be NULL when ``public=False``, and non-NULL when
+    ``public=True``.  This is enforced at both the schema and domain layers.
     """
 
     __tablename__ = "global_glyph"
@@ -78,11 +85,18 @@ class GlobalGlyph(Base):
     key = Column(String(255), nullable=False)
     value = Column(String(1024), nullable=False)
     public = Column(Boolean, nullable=False, default=False)
-    created_by = Column(String(255), nullable=True)
+    overriddable = Column(Boolean, nullable=True)
+    created_by = Column(String(255), nullable=False)
     created_at = Column(DateTime, nullable=False)
     updated_at = Column(DateTime, nullable=False)
 
-    __table_args__ = (UniqueConstraint("key", name="uq_global_glyph_key"),)
+    __table_args__ = (
+        UniqueConstraint("created_by", "key", name="uq_global_glyph_created_by_key"),
+        CheckConstraint(
+            "(public = 1 AND overriddable IS NOT NULL) OR (public = 0 AND overriddable IS NULL)",
+            name="chk_global_glyph_overriddable",
+        ),
+    )
 
 
 class ExperimentDefinition(Base):
@@ -97,7 +111,7 @@ class ExperimentDefinition(Base):
 
     experiment_definition_id = Column(String(255), primary_key=True, nullable=False)
     version = Column(Integer, primary_key=True, nullable=False)
-    created_by = Column(String(255), nullable=True)
+    created_by = Column(String(255), nullable=False)
     created_at = Column(DateTime, nullable=False)
 
     display_name = Column(String(255), nullable=True)
@@ -135,7 +149,7 @@ class Run(Base):
 
     run_id = Column(String(255), primary_key=True, nullable=False)
     attempt_count = Column(Integer, primary_key=True, nullable=False)
-    created_by = Column(String(255), nullable=True)
+    created_by = Column(String(255), nullable=False)
     created_at = Column(DateTime, nullable=False)
     updated_at = Column(DateTime, nullable=False)
 

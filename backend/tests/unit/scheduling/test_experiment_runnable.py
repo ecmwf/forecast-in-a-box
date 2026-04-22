@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from forecastbox.domain.experiment.scheduling.job_utils import RunnableExperiment, experiment2runnable
+from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.db import CompilerRuntimeContext
 
 
@@ -59,7 +60,7 @@ async def test_experiment2runnable_success(mock_get_jd: AsyncMock, mock_get_exp:
     mock_get_exp.return_value = exp
     mock_get_jd.return_value = jd
 
-    result = await experiment2runnable("exp-1", exec_time)
+    result = await experiment2runnable(ExperimentDefinitionId("exp-1"), exec_time)
 
     assert result.e is None
     assert result.t is not None
@@ -81,7 +82,7 @@ async def test_experiment2runnable_success(mock_get_jd: AsyncMock, mock_get_exp:
 async def test_experiment2runnable_not_found(mock_get_exp: AsyncMock) -> None:
     mock_get_exp.return_value = None
 
-    result = await experiment2runnable("does-not-exist", dt.datetime.now())
+    result = await experiment2runnable(ExperimentDefinitionId("does-not-exist"), dt.datetime.now())
 
     assert result.t is None
     assert result.e is not None
@@ -95,7 +96,7 @@ async def test_experiment2runnable_job_def_missing(mock_get_jd: AsyncMock, mock_
     mock_get_exp.return_value = _make_experiment()
     mock_get_jd.return_value = None
 
-    result = await experiment2runnable("exp-1", dt.datetime.now())
+    result = await experiment2runnable(ExperimentDefinitionId("exp-1"), dt.datetime.now())
 
     assert result.t is None
     assert result.e is not None

@@ -17,10 +17,12 @@ import time
 from typing import Any
 
 import httpx
-from fiab_core.fable import BlockInstance, PluginBlockFactoryId
+from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId, PluginBlockFactoryId
 
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.blueprint.service import BlueprintSaveCommand as BlueprintSaveRequest
+from forecastbox.domain.blueprint.types import BlueprintId
+from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.glyphs.resolution import value_dt2str
 from forecastbox.routes.experiment import ExperimentCreateRequest, ExperimentUpdateRequest
 
@@ -50,69 +52,71 @@ def ensure_completed_v2(backend_client: httpx.Client, job_id: str, sleep: float 
     retry_until(do_action, verify_ok, attempts=attempts, sleep=sleep, error_msg=f"Failed to finish job {job_id}")
 
 
-def _save_blueprint(client: httpx.Client) -> tuple[str, int]:
+def _save_blueprint(client: httpx.Client) -> tuple[BlueprintId, int]:
     """Save a minimal BlueprintBuilder and return (blueprint_id, version)."""
     source = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="source_42"),
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_42")),
         configuration_values={},
         input_ids={},
     )
-    builder = BlueprintBuilder(blocks={"source1": source})
+    builder = BlueprintBuilder(blocks={BlockInstanceId("source1"): source})
     resp = client.post("/blueprint/create", json=BlueprintSaveRequest(builder=builder, display_name="sched-v2 test").model_dump())
     assert resp.is_success, resp.text
     data = resp.json()
-    return data["blueprint_id"], data["version"]
+    return BlueprintId(data["blueprint_id"]), data["version"]
 
 
-def _save_full_blueprint(client: httpx.Client, output_path: str, time_output_path: str) -> tuple[str, int]:
+def _save_full_blueprint(client: httpx.Client, output_path: str, time_output_path: str) -> tuple[BlueprintId, int]:
     """Save a full BlueprintBuilder (with sink) and return (blueprint_id, version)."""
     source_42 = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="source_42"),
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_42")),
         configuration_values={},
         input_ids={},
     )
     transform_increment = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="transform_increment"),
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("transform_increment")),
         configuration_values={"amount": "1"},
-        input_ids={"a": "source_42"},
+        input_ids={"a": BlockInstanceId("source_42")},
     )
     product_join = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="product_join"),
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("product_join")),
         configuration_values={},
-        input_ids={"a": "transform_increment", "b": "source_42"},
+        input_ids={"a": BlockInstanceId("transform_increment"), "b": BlockInstanceId("source_42")},
     )
     sink_file = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
         configuration_values={"fname": output_path},
-        input_ids={"data": "product_join"},
+        input_ids={"data": BlockInstanceId("product_join")},
     )
     source_time = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="source_text"),
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_text")),
         configuration_values={"text": "${submitDatetime};${startDatetime}"},
         input_ids={},
     )
     sink_time = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory="sink_file"),
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
         configuration_values={"fname": time_output_path},
-        input_ids={"data": "source_time"},
+        input_ids={"data": BlockInstanceId("source_time")},
     )
     builder = BlueprintBuilder(
         blocks={
-            "source_42": source_42,
-            "transform_increment": transform_increment,
-            "product_join": product_join,
-            "sink_file": sink_file,
-            "source_time": source_time,
-            "sink_time": sink_time,
+            BlockInstanceId("source_42"): source_42,
+            BlockInstanceId("transform_increment"): transform_increment,
+            BlockInstanceId("product_join"): product_join,
+            BlockInstanceId("sink_file"): sink_file,
+            BlockInstanceId("source_time"): source_time,
+            BlockInstanceId("sink_time"): sink_time,
         }
     )
     resp = client.post("/blueprint/create", json=BlueprintSaveRequest(builder=builder).model_dump())
     assert resp.is_success, resp.text
     data = resp.json()
-    return data["blueprint_id"], data["version"]
+    return BlueprintId(data["blueprint_id"]), data["version"]
 
 
-def _create_schedule_v2(client: httpx.Client, job_def_id: str, job_def_version: int, cron_expr: str = "0 0 * * *") -> str:
+def _create_schedule_v2(
+    client: httpx.Client, job_def_id: BlueprintId, job_def_version: int, cron_expr: str = "0 0 * * *"
+) -> ExperimentDefinitionId:
     """Create a v2 cron schedule and return experiment_id."""
     spec = ExperimentCreateRequest(
         blueprint_id=job_def_id,
@@ -123,7 +127,7 @@ def _create_schedule_v2(client: httpx.Client, job_def_id: str, job_def_version: 
     )
     resp = client.put("/experiment/create", headers={"Content-Type": "application/json"}, json=spec.model_dump())
     assert resp.is_success, resp.text
-    return resp.json()["experiment_id"]
+    return ExperimentDefinitionId(resp.json()["experiment_id"])
 
 
 # *** schedule crud endpoints ***
@@ -148,7 +152,7 @@ def test_schedule_v2_crud(backend_client_with_auth: httpx.Client) -> None:
     )
     response = backend_client_with_auth.put("/experiment/create", headers=headers, json=spec.model_dump())
     assert response.is_success, response.text
-    experiment_id = response.json()["experiment_id"]
+    experiment_id = ExperimentDefinitionId(response.json()["experiment_id"])
     assert experiment_id
 
     # get
@@ -204,10 +208,10 @@ def test_schedule_v2_list(backend_client_with_auth: httpx.Client) -> None:
     )
     r1 = backend_client_with_auth.put("/experiment/create", headers=headers, json=spec1.model_dump())
     assert r1.is_success, r1.text
-    exp_id_1 = r1.json()["experiment_id"]
+    exp_id_1 = ExperimentDefinitionId(r1.json()["experiment_id"])
     r2 = backend_client_with_auth.put("/experiment/create", headers=headers, json=spec2.model_dump())
     assert r2.is_success, r2.text
-    exp_id_2 = r2.json()["experiment_id"]
+    exp_id_2 = ExperimentDefinitionId(r2.json()["experiment_id"])
 
     response = backend_client_with_auth.get("/experiment/list")
     assert response.is_success, response.text
@@ -246,7 +250,7 @@ def test_schedule_v2_next_run(backend_client_with_auth: httpx.Client) -> None:
     )
     response = backend_client_with_auth.put("/experiment/create", headers=headers, json=spec.model_dump())
     assert response.is_success, response.text
-    experiment_id = response.json()["experiment_id"]
+    experiment_id = ExperimentDefinitionId(response.json()["experiment_id"])
 
     # initial next run at midnight
     response = backend_client_with_auth.get("/experiment/runs/next", params={"experiment_id": experiment_id})
@@ -311,7 +315,7 @@ def test_schedule_v2_create_unknown_blueprint(backend_client_with_auth: httpx.Cl
     """create_v2 referencing a non-existent Blueprint returns 404."""
     headers = {"Content-Type": "application/json"}
     spec = ExperimentCreateRequest(
-        blueprint_id="does-not-exist",
+        blueprint_id=BlueprintId("does-not-exist"),
         cron_expr="0 0 * * *",
     )
     response = backend_client_with_auth.put("/experiment/create", headers=headers, json=spec.model_dump())
@@ -399,7 +403,7 @@ def test_schedule_v2_execute(tmpdir: Any, backend_client_with_auth: httpx.Client
         json=spec.model_dump(mode="json"),
     )
     assert create_resp.is_success, create_resp.text
-    experiment_id = create_resp.json()["experiment_id"]
+    experiment_id = ExperimentDefinitionId(create_resp.json()["experiment_id"])
 
     run_id = ensure_schedule_run_v2(backend_client_with_auth, experiment_id, sleep=1, attempts=30)
     ensure_completed_v2(backend_client_with_auth, run_id, sleep=1, attempts=120)

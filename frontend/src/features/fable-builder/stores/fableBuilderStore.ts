@@ -64,6 +64,9 @@ interface FableBuilderState {
   lastValidatedAt: number | null
   isDirty: boolean
   lastSavedAt: number | null
+  /** True while the 2 s localStorage draft debounce is pending. Set by
+   *  `useDraftPersistence`; read by the DraftStatus indicator. */
+  draftWritePending: boolean
   submitDialogOpen: boolean
 
   setFable: (fable: FableBuilderV1, id?: string | null) => void
@@ -145,6 +148,7 @@ const initialState = {
   lastValidatedAt: null,
   isDirty: false,
   lastSavedAt: null,
+  draftWritePending: false,
   submitDialogOpen: false,
 }
 
@@ -472,7 +476,10 @@ export const useFableBuilderStore = create<FableBuilderState>()(
         selectBlock: (blockId) =>
           set({
             selectedBlockId: blockId,
-            isConfigPanelOpen: blockId !== null,
+            // Sidebar stays open even on deselect (blockId === null) —
+            // it shows a "Select a block to configure" placeholder.
+            // User closes it explicitly via toggleConfigPanel.
+            isConfigPanelOpen: true,
           }),
 
         clearSelection: () => set({ selectedBlockId: null }),

@@ -73,6 +73,8 @@ export const API_ENDPOINTS = {
     delete: `${API_PREFIX}/blueprint/delete`,
     /** GET - List available intrinsic glyphs for ${glyph} interpolation in block configs */
     glyphsList: `${API_PREFIX}/blueprint/glyphs/list`,
+    /** GET - List custom Jinja filters/globals available in glyph expressions */
+    glyphsFunctions: `${API_PREFIX}/blueprint/glyphs/functions`,
     /** POST - Create or update a global glyph */
     glyphsGlobalPost: `${API_PREFIX}/blueprint/glyphs/global/post`,
     /** GET - Get a global glyph by ID */

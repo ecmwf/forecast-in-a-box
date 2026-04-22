@@ -11,26 +11,57 @@
 /**
  * GlyphAutocomplete Component
  *
- * Dropdown list of available glyphs, triggered when user types ${ in a config field.
- * Supports keyboard navigation (arrow keys + Enter) and filtering by partial input.
+ * Dropdown of candidates for the current cursor position inside a `${...}`
+ * expression. Driven by `parseGlyphContext`: shows variables + callable
+ * helpers in `value` position, and pipe-style helper filters in `filter`
+ * position. Supports keyboard navigation (arrow keys + Enter / Escape).
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { GlyphInfo } from '@/features/fable-builder/hooks/useAllGlyphs'
 import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
 
+export type AutocompleteSource =
+  | 'local'
+  | 'global'
+  | 'intrinsic'
+  | 'filter'
+  | 'helperGlobal'
+
+export interface AutocompleteCandidate {
+  /** Identifier inserted on selection. */
+  name: string
+  /** Display label; for intrinsics this is friendlier than `name`. */
+  displayName: string
+  /** Right-aligned meta text (value example or backend description). */
+  meta: string
+  /** Drives section header, ordering, and badge. */
+  source: AutocompleteSource
+}
+
+export type AutocompleteContextKind = 'value' | 'filter'
+
 interface GlyphAutocompleteProps {
-  glyphs: Array<GlyphInfo>
+  candidates: Array<AutocompleteCandidate>
   filter: string
-  onSelect: (glyphName: string) => void
+  contextKind: AutocompleteContextKind
+  onSelect: (candidate: AutocompleteCandidate) => void
   onClose: () => void
 }
 
+const VALUE_SECTION_ORDER: ReadonlyArray<AutocompleteSource> = [
+  'local',
+  'global',
+  'intrinsic',
+  'helperGlobal',
+]
+const FILTER_SECTION_ORDER: ReadonlyArray<AutocompleteSource> = ['filter']
+
 export function GlyphAutocomplete({
-  glyphs,
+  candidates,
   filter,
+  contextKind,
   onSelect,
   onClose,
 }: GlyphAutocompleteProps) {
@@ -38,21 +69,37 @@ export function GlyphAutocomplete({
   const [activeIndex, setActiveIndex] = useState(0)
   const listRef = useRef<HTMLDivElement>(null)
 
-  const query = filter.toLowerCase()
-  const filtered = glyphs.filter(
-    (g) =>
-      g.name.toLowerCase().includes(query) ||
-      g.displayName.toLowerCase().includes(query),
-  )
+  const filtered = useMemo(() => {
+    const query = filter.toLowerCase()
+    return candidates.filter(
+      (c) =>
+        c.name.toLowerCase().includes(query) ||
+        c.displayName.toLowerCase().includes(query),
+    )
+  }, [candidates, filter])
 
-  const intrinsic = filtered.filter((g) => g.type === 'intrinsic')
-  const global = filtered.filter((g) => g.type === 'global')
-  const local = filtered.filter((g) => g.type === 'local')
-  const allItems = [...local, ...global, ...intrinsic]
+  const sectionOrder =
+    contextKind === 'filter' ? FILTER_SECTION_ORDER : VALUE_SECTION_ORDER
+
+  // Group filtered candidates by source, preserving the section order so the
+  // flat `allItems` index aligns with what the user sees vertically.
+  const grouped = useMemo(() => {
+    const bySource = new Map<AutocompleteSource, Array<AutocompleteCandidate>>()
+    for (const c of filtered) {
+      const arr = bySource.get(c.source) ?? []
+      arr.push(c)
+      bySource.set(c.source, arr)
+    }
+    return sectionOrder
+      .map((source) => ({ source, items: bySource.get(source) ?? [] }))
+      .filter((g) => g.items.length > 0)
+  }, [filtered, sectionOrder])
+
+  const allItems = useMemo(() => grouped.flatMap((g) => g.items), [grouped])
 
   useEffect(() => {
     setActiveIndex(0)
-  }, [filter])
+  }, [filter, contextKind])
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -64,7 +111,7 @@ export function GlyphAutocomplete({
         setActiveIndex((i) => Math.max(i - 1, 0))
       } else if (e.key === 'Enter' && allItems.length > 0) {
         e.preventDefault()
-        onSelect(allItems[activeIndex].name)
+        onSelect(allItems[activeIndex])
       } else if (e.key === 'Escape') {
         e.preventDefault()
         onClose()
@@ -90,90 +137,67 @@ export function GlyphAutocomplete({
   return (
     <div
       ref={listRef}
-      className="max-h-48 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md"
+      className="max-h-60 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md"
     >
-      {local.length > 0 && (
-        <>
-          <P className="px-2 py-1 text-sm font-medium text-muted-foreground">
-            {t('panel.local')}
-          </P>
-          {local.map((g) => {
-            const idx = itemIndex++
-            return (
-              <AutocompleteItem
-                key={g.name}
-                glyph={g}
-                active={idx === activeIndex}
-                onSelect={() => onSelect(g.name)}
-                onHover={() => setActiveIndex(idx)}
-              />
-            )
-          })}
-        </>
-      )}
-      {global.length > 0 && (
-        <>
-          {local.length > 0 && <div className="my-1 border-t border-border" />}
-          <P className="px-2 py-1 text-sm font-medium text-muted-foreground">
-            {t('panel.global')}
-          </P>
-          {global.map((g) => {
-            const idx = itemIndex++
-            return (
-              <AutocompleteItem
-                key={g.name}
-                glyph={g}
-                active={idx === activeIndex}
-                onSelect={() => onSelect(g.name)}
-                onHover={() => setActiveIndex(idx)}
-              />
-            )
-          })}
-        </>
-      )}
-      {intrinsic.length > 0 && (
-        <>
-          {(local.length > 0 || global.length > 0) && (
-            <div className="my-1 border-t border-border" />
-          )}
-          <P className="px-2 py-1 text-sm font-medium text-muted-foreground">
-            {t('panel.intrinsic')}
-          </P>
-          {intrinsic.map((g) => {
-            const idx = itemIndex++
-            return (
-              <AutocompleteItem
-                key={g.name}
-                glyph={g}
-                active={idx === activeIndex}
-                onSelect={() => onSelect(g.name)}
-                onHover={() => setActiveIndex(idx)}
-              />
-            )
-          })}
-        </>
-      )}
+      {grouped.map((group, groupIdx) => {
+        const label =
+          group.source === 'local'
+            ? t('panel.local')
+            : group.source === 'global'
+              ? t('panel.global')
+              : group.source === 'intrinsic'
+                ? t('panel.intrinsic')
+                : t('panel.helpers.title')
+        return (
+          <div key={group.source}>
+            {groupIdx > 0 && <div className="my-1 border-t border-border" />}
+            <P className="px-2 py-1 text-sm font-medium text-muted-foreground">
+              {label}
+            </P>
+            {group.items.map((c) => {
+              const idx = itemIndex++
+              return (
+                <AutocompleteItem
+                  key={`${c.source}:${c.name}`}
+                  candidate={c}
+                  active={idx === activeIndex}
+                  onSelect={() => onSelect(c)}
+                  onHover={() => setActiveIndex(idx)}
+                />
+              )
+            })}
+          </div>
+        )
+      })}
     </div>
   )
 }
 
 function AutocompleteItem({
-  glyph,
+  candidate,
   active,
   onSelect,
   onHover,
 }: {
-  glyph: GlyphInfo
+  candidate: AutocompleteCandidate
   active: boolean
   onSelect: () => void
   onHover: () => void
 }) {
+  const { t } = useTranslation('glyphs')
+  const badge =
+    candidate.source === 'filter'
+      ? t('panel.helpers.filterBadge')
+      : candidate.source === 'helperGlobal'
+        ? t('panel.helpers.globalBadge')
+        : null
+
   return (
     <button
       type="button"
       data-active={active}
       onMouseDown={(e) => {
-        e.preventDefault() // Prevent input blur
+        e.preventDefault() // prevent input blur
         onSelect()
       }}
       onMouseEnter={onHover}
@@ -183,10 +207,22 @@ function AutocompleteItem({
       )}
     >
       <code className="shrink-0 font-mono text-sm font-medium">
-        {glyph.name}
+        {candidate.name}
       </code>
+      {badge && (
+        <span
+          className={cn(
+            'shrink-0 rounded px-1 py-0.5 text-[10px] font-medium uppercase',
+            candidate.source === 'filter'
+              ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+              : 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+          )}
+        >
+          {badge}
+        </span>
+      )}
       <span className="min-w-0 truncate text-muted-foreground">
-        {glyph.type === 'intrinsic' ? glyph.displayName : glyph.valueExample}
+        {candidate.meta}
       </span>
     </button>
   )

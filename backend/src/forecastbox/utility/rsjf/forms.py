@@ -13,8 +13,10 @@
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 from typing_extensions import TypedDict
+
+from forecastbox.utility.pydantic import FiabBaseModel
 
 from .jsonSchema import FieldSchema
 from .uiSchema import UISchema
@@ -35,7 +37,7 @@ class ExportedSchemas(TypedDict):
 
 
 # Combined Schema + UI
-class FieldWithUI(BaseModel):
+class FieldWithUI(FiabBaseModel):
     """Combines a JSON Schema field with an optional UI Schema for RJSF."""
 
     jsonschema: FieldSchema
@@ -44,7 +46,7 @@ class FieldWithUI(BaseModel):
     """The UI Schema blueprint for the field (controls rendering and widgets)."""
 
 
-class FormDefinition(BaseModel):
+class FormDefinition(FiabBaseModel):
     """Defines a form using a set of fields, each with JSON Schema and optional UI Schema."""
 
     title: str

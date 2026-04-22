@@ -24,9 +24,10 @@
  */
 
 import { useEffect, useState } from 'react'
-import { Braces } from 'lucide-react'
+import { AlertCircle, Braces } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { GlyphTextInput } from './GlyphTextInput'
+import { Button } from '@/components/ui/button'
 import {
   InputGroup,
   InputGroupAddon,
@@ -38,19 +39,39 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { useGlyphContext } from '@/features/fable-builder/context/GlyphContext'
+import { useResolvedConfig } from '@/features/fable-builder/context/ResolvedConfigContext'
+import { useFieldErrors } from '@/features/fable-builder/context/FieldErrorsContext'
+import { containsGlyphs } from '@/features/fable-builder/utils/glyph-display'
 import {
-  containsGlyphs,
-  resolveGlyphValue,
-} from '@/features/fable-builder/utils/glyph-display'
+  applyFloorDay,
+  canApplyFloorDay,
+  previewHasTimeComponent,
+} from '@/features/fable-builder/utils/date-preview-nudge'
 import { cn } from '@/lib/utils'
 
 export interface GlyphFieldWrapperProps {
   id: string
+  /** Configuration key under which the backend publishes the resolved value */
+  configKey: string
   value: string
   onChange: (value: string) => void
   placeholder?: string
   disabled?: boolean
   className?: string
+  /**
+   * When false, glyph mode is unavailable and the wrapper renders children
+   * directly with no toggle or InputGroup chrome. Used for field types
+   * where free-form glyph expressions don't make sense (e.g. enum dropdowns,
+   * whose values are constrained to a backend-declared set).
+   */
+  allowGlyphMode?: boolean
+  /**
+   * When true, the backend expects a calendar-date-only value
+   * (`YYYY-MM-DD`). If a glyph expression resolves to a datetime with a
+   * time component, the wrapper surfaces a nudge below the preview and
+   * offers a one-click `| floor_day` fix where applicable.
+   */
+  isDateOnly?: boolean
   /** The specialized widget (must use InputGroupInput or data-slot="input-group-control") */
   children: React.ReactNode
 }
@@ -59,11 +80,14 @@ type FieldMode = 'concrete' | 'glyph'
 
 export function GlyphFieldWrapper({
   id,
+  configKey,
   value,
   onChange,
   placeholder,
   disabled,
   className,
+  allowGlyphMode = true,
+  isDateOnly = false,
   children,
 }: GlyphFieldWrapperProps) {
   const { t } = useTranslation('glyphs')
@@ -82,9 +106,30 @@ export function GlyphFieldWrapper({
     }
   }, [value, mode])
 
-  // If no glyphs available, always render concrete mode without the wrapper
-  if (!hasGlyphs) {
-    return <>{children}</>
+  // All hooks must be called before any conditional early return to satisfy
+  // Rules of Hooks — hasGlyphs / allowGlyphMode can toggle at runtime
+  // (glyphs load async), so the hook count must stay constant across renders.
+  const resolvedConfig = useResolvedConfig()
+  const fieldErrors = useFieldErrors()?.[configKey] ?? null
+  const hasFieldError = fieldErrors !== null && fieldErrors.length > 0
+  const errorMessage = hasFieldError
+    ? fieldErrors.length > 1
+      ? `${fieldErrors[0]} (+${fieldErrors.length - 1} more)`
+      : fieldErrors[0]
+    : null
+
+  // No glyphs / glyph mode disabled → render children directly, only adding
+  // an error ring + absolute-positioned error text when the field is invalid.
+  if (!hasGlyphs || !allowGlyphMode) {
+    if (!hasFieldError) return <>{children}</>
+    return (
+      <div className="relative">
+        <div className="rounded-md ring-1 ring-destructive">{children}</div>
+        <p className="pointer-events-none absolute top-full left-0 mt-0.5 truncate text-xs text-destructive">
+          {errorMessage}
+        </p>
+      </div>
+    )
   }
 
   const valueHasGlyphs = containsGlyphs(value)
@@ -107,20 +152,38 @@ export function GlyphFieldWrapper({
         ? t('field.cannotSwitchBack')
         : t('field.switchToConcrete')
 
-  // Resolved preview — rendered below the InputGroup
+  // Resolved preview — backend is the sole source of truth. If the backend
+  // hasn't returned a resolved value for this config key (validation in-flight,
+  // block in error state, etc.) we simply don't render a preview. Also
+  // suppressed when a field-level error is active — the error takes priority
+  // for the below-field slot.
   const resolvedPreview =
-    mode === 'glyph' && valueHasGlyphs
-      ? resolveGlyphValue(
-          value,
-          Object.fromEntries(glyphs.map((g) => [g.name, g.valueExample])),
-        )
+    mode === 'glyph' && valueHasGlyphs && !hasFieldError
+      ? (resolvedConfig?.[configKey] ?? null)
       : null
 
+  const showPreview = resolvedPreview !== null && resolvedPreview !== value
+
+  // Nudge when a date-typed field gets a datetime-resolving expression.
+  const dateNudgeVisible =
+    isDateOnly &&
+    resolvedPreview !== null &&
+    previewHasTimeComponent(resolvedPreview)
+  const dateNudgeFixAvailable = dateNudgeVisible && canApplyFloorDay(value)
+
+  function handleApplyFloorDay() {
+    const next = applyFloorDay(value)
+    if (next !== value) onChange(next)
+  }
+
   return (
-    <div>
+    <div className="relative">
       <InputGroup
         data-disabled={disabled || undefined}
-        className={cn(mode === 'glyph' && 'border-primary/30')}
+        className={cn(
+          mode === 'glyph' && 'border-primary/30',
+          hasFieldError && 'border-destructive',
+        )}
       >
         {mode === 'glyph' ? (
           <GlyphTextInput
@@ -167,7 +230,16 @@ export function GlyphFieldWrapper({
         </InputGroupAddon>
       </InputGroup>
 
-      {resolvedPreview && resolvedPreview !== value && (
+      {errorMessage && (
+        <p className="pointer-events-none absolute top-full left-0 mt-0.5 truncate text-xs text-destructive">
+          {errorMessage}
+        </p>
+      )}
+
+      {/* In-flow so visual order reads Input → Preview → Nudge. Validation
+          is debounced 300 ms, so these appear/disappear at pause boundaries,
+          not per keystroke — an honest layout reaction, not flicker. */}
+      {showPreview && (
         <Tooltip>
           <TooltipTrigger
             render={
@@ -184,6 +256,35 @@ export function GlyphFieldWrapper({
             {resolvedPreview}
           </TooltipContent>
         </Tooltip>
+      )}
+
+      {dateNudgeVisible && (
+        <div className="mt-1 flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 px-2 py-1.5 text-xs text-amber-700 dark:text-amber-400">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+          <span className="min-w-0 flex-1 truncate">
+            {t('field.datePreview.hasTime')}
+          </span>
+          {dateNudgeFixAvailable && (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-6 border-amber-500/60 px-2 text-xs text-amber-700 hover:bg-amber-500/10 dark:text-amber-400"
+                    onClick={handleApplyFloorDay}
+                  />
+                }
+              >
+                {t('field.datePreview.floorDayAction')}
+              </TooltipTrigger>
+              <TooltipContent side="left" className="max-w-64">
+                {t('field.datePreview.floorDayTooltip')}
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
       )}
     </div>
   )

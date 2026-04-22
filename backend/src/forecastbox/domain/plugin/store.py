@@ -17,7 +17,6 @@ import httpx
 import orjson
 from cascade.low.func import assert_never
 from fiab_core.fable import PluginCompositeId, PluginId
-from pydantic import BaseModel
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 from typing_extensions import Self
@@ -26,11 +25,12 @@ from forecastbox.domain.plugin.manager import submit_update_single
 from forecastbox.utility.concurrent import timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginStoreConfig, PluginStoreId, PluginStoresConfig, config, config_edit_lock
 from forecastbox.utility.httpx import fetch_content
+from forecastbox.utility.pydantic import FiabBaseModel
 
 logger = logging.getLogger(__name__)
 
 
-class PluginStoreEntry(BaseModel):
+class PluginStoreEntry(FiabBaseModel):
     pip_source: str
     """Name of the package if assuming PyPI, or a local path, git repo, ... Anything that pip accepts"""
     module_name: str
@@ -45,7 +45,7 @@ class PluginStoreEntry(BaseModel):
     """Any comment or clarification to developers or maintainers. Not propagated to the frontend"""
 
 
-class PluginRemoteInfo(BaseModel):
+class PluginRemoteInfo(FiabBaseModel):
     """Data from eg PyPI such as the most recent version"""
 
     version: str
@@ -64,42 +64,43 @@ def get_latest_version(package_name: str, client: httpx.Client) -> str:
     return "unknown"
 
 
-class PluginStore(BaseModel):
+class PluginStore(FiabBaseModel):
     display_name: str
     plugins: dict[PluginId, PluginStoreEntry] = {}
     remote: dict[PluginId, PluginRemoteInfo] = {}
 
-    @classmethod
-    def fetch(cls, client: httpx.Client, plugin_store_config: PluginStoreConfig) -> Self:
-        url = plugin_store_config.url
-        match plugin_store_config.method:
-            case "file":
-                raw = fetch_content(url, client)
-                as_json = orjson.loads(raw)
-                return cls(**as_json)
-            case "localSingle":
-                fname = url.rsplit("/", 1)[1]
-                return cls(
-                    display_name=f"local:{fname}",
-                    plugins={
-                        "single": PluginStoreEntry(
-                            pip_source=url,
-                            module_name=fname.replace("-", "_"),
-                            display_title=fname,
-                            display_description="",
-                            display_author="local",
-                            comment="",
-                        )
-                    },
-                )
-            case s:
-                assert_never(s)
 
-    def populate(self, client: httpx.Client) -> None:
-        for pluginId, storeEntry in self.plugins.items():
-            self.remote[pluginId] = PluginRemoteInfo(
-                version=get_latest_version(storeEntry.pip_source, client),
+def fetch_store(client: httpx.Client, plugin_store_config: PluginStoreConfig) -> PluginStore:
+    url = plugin_store_config.url
+    match plugin_store_config.method:
+        case "file":
+            raw = fetch_content(url, client)
+            as_json = orjson.loads(raw)
+            return PluginStore(**as_json)
+        case "localSingle":
+            fname = url.rsplit("/", 1)[1]
+            return PluginStore(
+                display_name=f"local:{fname}",
+                plugins={
+                    PluginId("single"): PluginStoreEntry(
+                        pip_source=url,
+                        module_name=fname.replace("-", "_"),
+                        display_title=fname,
+                        display_description="",
+                        display_author="local",
+                        comment="",
+                    )
+                },
             )
+        case s:
+            assert_never(s)
+
+
+def populate_store(store: PluginStore, client: httpx.Client) -> None:
+    for pluginId, storeEntry in store.plugins.items():
+        store.remote[pluginId] = PluginRemoteInfo(
+            version=get_latest_version(storeEntry.pip_source, client),
+        )
 
 
 class StoresManager:
@@ -112,9 +113,9 @@ def initialize_stores(plugin_stores_config: PluginStoresConfig) -> None:
     # assumed to be submitted from a thread
     with httpx.Client() as client:
         # a thread pool / async could work here but we dont expect many stores here
-        stores = {key: PluginStore.fetch(client, value) for key, value in plugin_stores_config.items()}
+        stores = {key: fetch_store(client, value) for key, value in plugin_stores_config.items()}
         for store in stores.values():
-            store.populate(client)
+            populate_store(store, client)
     with timed_acquire(StoresManager.stores_lock, 600) as result:
         if not result:
             raise ValueError("failed to acquire lock")

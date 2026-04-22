@@ -8,10 +8,9 @@
  * does it submit to any jurisdiction.
  */
 
-import { memo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { Handle, Position } from '@xyflow/react'
 import {
-  AlertCircle,
   Bookmark,
   Copy,
   CopyPlus,
@@ -47,11 +46,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { BlockErrorOverlay } from '@/features/fable-builder/components/graph-mode/nodes/BlockErrorOverlay'
 import { parseGlyphSegments } from '@/features/fable-builder/utils/glyph-display'
 import { cn } from '@/lib/utils'
 
@@ -99,11 +94,20 @@ export const BlockNode = memo(function ({
   const outputPosition = OUTPUT_POSITIONS[layoutDirection]
   const isHorizontalLayout = layoutDirection === 'LR'
 
+  const fable = useFableBuilderStore((state) => state.fable)
+
   const isSelected = selected || selectedBlockId === id
   const hasErrors = blockValidation?.hasErrors ?? false
   const errors = blockValidation?.errors ?? []
   const possibleExpansions =
     validationState?.blockStates[id]?.possibleExpansions ?? []
+  const hasDownstream = useMemo(
+    () =>
+      Object.values(fable.blocks).some((block) =>
+        Object.values(block.input_ids).includes(id),
+      ),
+    [fable.blocks, id],
+  )
 
   function handleClick(): void {
     selectBlock(id)
@@ -151,32 +155,20 @@ export const BlockNode = memo(function ({
       onKeyDown={(e) => e.key === 'Enter' && handleClick()}
       className={cn(
         'relative w-70 rounded-2xl border bg-card shadow-sm',
-        'cursor-pointer transition-all duration-300 hover:shadow-lg',
+        'cursor-pointer transition-all duration-200',
+        // Hover: subtle border hint (distinct from full selection)
+        !isSelected &&
+          !hasErrors &&
+          'hover:shadow-md hover:ring-1 hover:ring-primary/20',
+        // Selected: prominent blue ring + lifted scale
         isSelected &&
-          'shadow-[0_0_0_2px_rgba(18,69,222,1),0_15px_35px_-5px_rgba(18,69,222,0.15)]',
+          'scale-[1.02] shadow-[0_0_0_2.5px_rgba(18,69,222,1),0_20px_40px_-5px_rgba(18,69,222,0.2)]',
+        // Error (unselected): red ring
         hasErrors &&
           !isSelected &&
           'shadow-[0_0_0_2px_rgba(220,38,38,1),0_15px_35px_-5px_rgba(220,38,38,0.15)]',
       )}
     >
-      {hasErrors && (
-        <Tooltip>
-          <TooltipTrigger className="absolute -top-2 -right-2 z-10 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-destructive text-destructive-foreground">
-            <AlertCircle className="h-3 w-3" />
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-75">
-            <div className="space-y-1">
-              <P className="font-medium text-destructive">Validation Errors</P>
-              <ul className="list-disc space-y-0.5 pl-4 text-sm">
-                {errors.map((error, index) => (
-                  <li key={`${error}-${index}`}>{error}</li>
-                ))}
-              </ul>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      )}
-
       <div
         className={cn(
           'h-1.5 w-full rounded-t-2xl opacity-80',
@@ -331,9 +323,9 @@ export const BlockNode = memo(function ({
           </div>
         )}
       </div>
+      <BlockErrorOverlay errors={errors} />
 
       {factory.inputs.map((inputName, index) => {
-        const isConnected = Boolean(instance.input_ids[inputName])
         const percent = ((index + 1) / (factory.inputs.length + 1)) * 100
 
         return (
@@ -348,9 +340,7 @@ export const BlockNode = memo(function ({
               isHorizontalLayout ? '-left-2.5!' : '-top-2.5!',
               inputPosition === Position.Right && '-right-2.5! left-auto!',
               inputPosition === Position.Bottom && 'top-auto! -bottom-2.5!',
-              isConnected
-                ? 'border-primary!'
-                : 'border-muted-foreground/30! hover:border-muted-foreground/50!',
+              'border-foreground/30!',
               'transition-all hover:scale-110',
             )}
             style={
@@ -371,7 +361,7 @@ export const BlockNode = memo(function ({
             title="Output"
             className={cn(
               'h-5! w-5! rounded-full! border-4! bg-card!',
-              metadata.handleColor,
+              'border-foreground/30!',
               isHorizontalLayout ? '-right-2.5!' : '-bottom-2.5!',
               outputPosition === Position.Left && 'right-auto! -left-2.5!',
               outputPosition === Position.Top && '-top-2.5! bottom-auto!',
@@ -386,6 +376,8 @@ export const BlockNode = memo(function ({
           <AddNodeButton
             sourceBlockId={id}
             possibleExpansions={possibleExpansions}
+            hasErrors={hasErrors}
+            hasDownstream={hasDownstream}
             catalogue={catalogue}
           />
         </>

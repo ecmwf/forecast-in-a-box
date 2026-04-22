@@ -14,15 +14,17 @@ Declarations related to Artifacts such as ML Model Checkpoints.
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal, NewType, Self
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from fiab_core.pydantic_utils import FiabCoreBaseModel
 
 # NOTE we may eventually fine-grain this with like cuda versions or architecture etc, form a hierarchy, etc. Or maybe not and this will be enough.
 Platform = Literal["macos", "linux"]
 
-MlModelCheckpointId = str
-ArtifactStoreId = str
+MlModelCheckpointId = NewType("MlModelCheckpointId", str)
+ArtifactStoreId = NewType("ArtifactStoreId", str)
 
 
 @dataclass(frozen=True, eq=True, slots=True)
@@ -32,8 +34,19 @@ class CompositeArtifactId:
     artifact_store_id: ArtifactStoreId
     ml_model_checkpoint_id: MlModelCheckpointId
 
+    @classmethod
+    def from_str(cls, v: str) -> Self:
+        if not ":" in v:
+            raise ValueError(f"must be of the form artifact_store_id:ml_model_checkpoint_id, got {v}")
+        artifact_store_id, ml_model_checkpoint_id = v.split(":", 1)
+        return cls(artifact_store_id=ArtifactStoreId(artifact_store_id), ml_model_checkpoint_id=MlModelCheckpointId(ml_model_checkpoint_id))
 
-class MlModelCheckpoint(BaseModel):
+    @staticmethod
+    def to_str(k: Self) -> str:
+        return f"{k.artifact_store_id}:{k.ml_model_checkpoint_id}"
+
+
+class MlModelCheckpoint(FiabCoreBaseModel):
     url: str = Field(
         description="Location such as anemoi catalogue or hugging face registry url. Represents the source url, not an url of a local copy"
     )
@@ -54,6 +67,9 @@ class MlModelCheckpoint(BaseModel):
         description="List of config keys that this model exposes"
     )  # Question: do we want key-values, or just keys and the plugins define values?
     # Question: how would we capture memory requirements? May be tricky since technically its a function of config and backend
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Additional metadata from the checkpoint, for anemoi this is the raw dump"
+    )
 
 
 CheckpointLookup = Mapping[CompositeArtifactId, MlModelCheckpoint]

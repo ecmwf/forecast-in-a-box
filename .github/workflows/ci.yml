@@ -24,6 +24,10 @@ on:
   # Trigger the workflow manually
   workflow_dispatch: ~
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 # TODO unify with a single matrix over platforms
 jobs:
   changes:

@@ -226,6 +226,7 @@ class EnsembleStatistics(Product):
             return False
         dims = dimensions(other)
         return ENSEMBLE_DIM in dims and PARAM_DIM in dims
+        return ENSEMBLE_DIM in dims and len(axes(other)[ENSEMBLE_DIM]) > 1 and PARAM_DIM in dims
 
 
 class TemporalStatistics(Product):
@@ -271,6 +272,8 @@ class TemporalStatistics(Product):
             action = param.min(dim=STEP_DIM)
         elif stat == "max":
             action = param.max(dim=STEP_DIM)
+        else:
+            return Either.error(f"Unsupported temporal statistic: {stat}")
         return Either.ok(action)
 
     def intersect(self, other: BlockInstanceOutput) -> bool:  # type: ignore[override]

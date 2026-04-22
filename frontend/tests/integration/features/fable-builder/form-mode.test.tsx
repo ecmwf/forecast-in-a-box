@@ -115,8 +115,10 @@ describe('Fable Builder Form Mode', () => {
     // Fable should be marked as dirty
     expect(useFableBuilderStore.getState().isDirty).toBe(true)
 
-    // The "Unsaved" badge should appear in the header
-    await expect.element(screen.getByText('Unsaved')).toBeVisible()
+    // The draft-status chip should appear in the header while dirty
+    await expect
+      .element(screen.getByText(/saving draft|draft saved/i))
+      .toBeVisible()
 
     // Block count should update to "1 block"
     await expect.element(screen.getByText('1 block')).toBeVisible()
@@ -201,9 +203,6 @@ describe('Fable Builder Form Mode', () => {
     // The "Has errors" badge should be visible on the card
     // Use .first() since ValidationStatusBadge in the header also shows "Has errors"
     await expect.element(screen.getByText('Has errors').first()).toBeVisible()
-
-    // The "Configuration Issues" section should be visible
-    await expect.element(screen.getByText('Configuration Issues')).toBeVisible()
   })
 
   it('shows existing blocks with pre-filled configuration values', async () => {

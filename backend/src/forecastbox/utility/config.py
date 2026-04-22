@@ -18,8 +18,10 @@ import toml
 from cascade.low.func import pydantic_recursive_collect
 from fiab_core.artifacts import ArtifactStoreId
 from fiab_core.fable import PluginCompositeId, PluginId, PluginStoreId
-from pydantic import BaseModel, BeforeValidator, Field, PlainSerializer, SecretStr, model_validator
+from pydantic import BeforeValidator, Field, PlainSerializer, SecretStr, model_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict, TomlConfigSettingsSource
+
+from forecastbox.utility.pydantic import FiabBaseModel
 
 fiab_home = Path(os.environ["FIAB_ROOT"]) if "FIAB_ROOT" in os.environ else (Path.home() / ".fiab")
 logger = logging.getLogger(__name__)
@@ -38,7 +40,7 @@ class StatusMessage:
     gateway_running = "running"
 
 
-class DatabaseSettings(BaseModel):
+class DatabaseSettings(FiabBaseModel):
     sqlite_userdb_path: str = str(fiab_home / "user.db")
     """Location of the sqlite file for user auth+info"""
     sqlite_jobdb_path: str = str(fiab_home / "job.db")
@@ -56,7 +58,7 @@ class DatabaseSettings(BaseModel):
     # NOTE keep job and user dbs separate -- latter is more sensitive and likely to be externalized
 
 
-class OIDCSettings(BaseModel):
+class OIDCSettings(FiabBaseModel):
     client_id: str | None = None
     client_secret: SecretStr | None = None
     openid_configuration_endpoint: str | None = None
@@ -72,7 +74,7 @@ class OIDCSettings(BaseModel):
         return self
 
 
-class AuthSettings(BaseModel):
+class AuthSettings(FiabBaseModel):
     jwt_secret: SecretStr = SecretStr("fiab_secret")
     """JWT secret key for authentication."""
     oidc: OIDCSettings | None = None
@@ -100,7 +102,7 @@ class AuthSettings(BaseModel):
         return errors
 
 
-class GeneralSettings(BaseModel):
+class GeneralSettings(FiabBaseModel):
     launch_browser: bool = True
     """Whether a browser window should be opened after start. Used only when
     entrypoint.main.launch_all module is used"""
@@ -109,7 +111,7 @@ class GeneralSettings(BaseModel):
 PluginRefreshStrategy = Literal["automatic", "manual"]
 
 
-class PluginSettings(BaseModel):
+class PluginSettings(FiabBaseModel):
     """A pip-installable plugin with an importible module"""
 
     pip_source: str
@@ -128,7 +130,7 @@ PluginCompositeIdReadable = Annotated[
 PluginsSettings = dict[PluginCompositeIdReadable, PluginSettings]
 
 
-class PluginStoreConfig(BaseModel):
+class PluginStoreConfig(FiabBaseModel):
     url: str
     method: Literal["file", "localSingle"]
     """In case of file, the `url` points  to a json parseable as api.plugin.store.PluginStore
@@ -150,14 +152,14 @@ def _default_plugins() -> PluginsSettings:
 
 def _default_plugin_stores() -> PluginStoresConfig:
     return {
-        "ecmwf": PluginStoreConfig(
+        PluginStoreId("ecmwf"): PluginStoreConfig(
             url="https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/heads/main/install/plugins.json",
             method="file",
         ),
     }
 
 
-class ArtifactStoreConfig(BaseModel):
+class ArtifactStoreConfig(FiabBaseModel):
     url: str
     method: Literal["file"]
 
@@ -167,7 +169,7 @@ ArtifactStoresConfig = dict[ArtifactStoreId, ArtifactStoreConfig]
 
 def _default_artifact_stores() -> ArtifactStoresConfig:
     return {
-        "ecmwf": ArtifactStoreConfig(
+        ArtifactStoreId("ecmwf"): ArtifactStoreConfig(
             # TODO fix pre merge
             url="https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/d092af0130a1bc4b09d25d9f1785b94fe1e54b18/install/artifacts.json",
             method="file",
@@ -175,7 +177,7 @@ def _default_artifact_stores() -> ArtifactStoresConfig:
     }
 
 
-class ProductSettings(BaseModel):
+class ProductSettings(FiabBaseModel):
     pproc_schema_dir: str | None = None
     """Path to the directory containing the PPROC schema files."""
 
@@ -204,7 +206,7 @@ class ProductSettings(BaseModel):
             return []
 
 
-class BackendAPISettings(BaseModel):
+class BackendAPISettings(FiabBaseModel):
     data_path: str = str(fiab_home / "data_dir")
     """Path to the data directory."""
     model_repository: str = "https://sites.ecmwf.int/repository/fiab"
@@ -233,7 +235,7 @@ class BackendAPISettings(BaseModel):
         return errors
 
 
-class CascadeSettings(BaseModel):
+class CascadeSettings(FiabBaseModel):
     default_hosts: int = 1
     """Default number of hosts for Cascade if unspecified in a job."""
     max_hosts: int = 1

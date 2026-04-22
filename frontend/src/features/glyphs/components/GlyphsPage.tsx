@@ -144,7 +144,7 @@ export function GlyphsPage() {
           {filteredGlyphs.length > 0 ? (
             filteredGlyphs.map((glyph) => (
               <GlyphListItem
-                key={glyph.name}
+                key={`${glyph.created_by}:${glyph.name}`}
                 glyph={glyph}
                 onEdit={handleEdit}
               />

@@ -17,7 +17,7 @@ from fiab_core.tools.blocks import QubedBlockBuilder
 
 
 class QubedPluginBuilder:
-    def __init__(self, block_builders: dict[BlockFactoryId, QubedBlockBuilder]):
+    def __init__(self, block_builders: dict[BlockFactoryId, QubedBlockBuilder]) -> None:
         self.block_builders = block_builders
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup

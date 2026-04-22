@@ -10,7 +10,8 @@ from typing import Any, Generator
 
 import httpx
 import pytest
-from fiab_core.fable import PluginCompositeId, PluginId
+from fiab_core.artifacts import ArtifactStoreId
+from fiab_core.fable import PluginCompositeId, PluginId, PluginStoreId
 from pydantic import SecretStr
 
 import forecastbox.utility.config
@@ -116,13 +117,13 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         config.api.data_path = td_data.name
         config.api.allow_scheduler = True
         config.product.artifact_stores = {
-            fake_artifact_store_id: ArtifactStoreConfig(
+            ArtifactStoreId(fake_artifact_store_id): ArtifactStoreConfig(
                 url=f"http://localhost:{fake_artifact_registry_port}/artifacts.json",
                 method="file",
             )
         }
         config.product.plugin_stores = {
-            "localTest": PluginStoreConfig(
+            PluginStoreId("localTest"): PluginStoreConfig(
                 url="file://../../packages/fiab-plugin-test",
                 method="localSingle",
             ),

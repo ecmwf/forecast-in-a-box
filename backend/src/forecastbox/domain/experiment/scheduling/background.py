@@ -19,11 +19,12 @@ import logging
 import threading
 from typing import Any, cast
 
-import forecastbox.domain.experiment.scheduling.db as scheduling_db
+from forecastbox.domain.experiment.scheduling import db
 from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run
 from forecastbox.domain.experiment.scheduling.job_utils import experiment2runnable
+from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.service import execute
-from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.auth import PASSTHROUGH_USER_ID, AuthContext
 from forecastbox.utility.concurrent import timed_acquire
 from forecastbox.utility.config import config
 from forecastbox.utility.time import current_time
@@ -68,10 +69,10 @@ class SchedulerThread(threading.Thread):
         now = self.mark_alive()
         logger.debug(f"Scheduler inquiry at {now}")
 
-        schedulable = self._run_async(scheduling_db.get_schedulable_experiments(now))
+        schedulable = self._run_async(db.get_schedulable_experiments(now))
 
         for exp_next, exp_def in schedulable:
-            experiment_id = cast(str, exp_next.experiment_id)
+            experiment_id = ExperimentDefinitionId(cast(str, exp_next.experiment_id))  # ty:ignore[invalid-argument-type]
             scheduled_at = cast(dt.datetime, exp_next.scheduled_at)
             logger.debug(f"Processing scheduled experiment {experiment_id} at {scheduled_at}")
 
@@ -96,7 +97,11 @@ class SchedulerThread(threading.Thread):
                     exec_result = self._run_async(
                         execute(
                             runnable.blueprint,
-                            AuthContext(user_id=runnable.created_by, is_admin=False),
+                            # NOTE the is_admin may be True, but we dont know and its not important for this call
+                            AuthContext(
+                                user_id=runnable.created_by,
+                                is_admin=False,
+                            ),
                             experiment_id=experiment_id,
                             experiment_version=cast(int, exp_def.version),
                             compiler_runtime_context=runnable.compiler_runtime_context,
@@ -108,17 +113,17 @@ class SchedulerThread(threading.Thread):
                     else:
                         logger.error(f"Failed to submit experiment {experiment_id}: {exec_result.e}")
 
-                self._run_async(scheduling_db.delete_experiment_next(experiment_id))
+                self._run_async(db.delete_experiment_next(experiment_id))
                 if runnable.next_run_at and is_valid:
-                    self._run_async(scheduling_db.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=runnable.next_run_at))
+                    self._run_async(db.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=runnable.next_run_at))
                     logger.debug(f"Next run for {experiment_id}: {runnable.next_run_at}")
                 else:
                     logger.warning(f"No next run computed for {experiment_id}")
             else:
                 logger.error(f"Could not create runnable for experiment {experiment_id}: {get_spec_result.e}")
-                self._run_async(scheduling_db.delete_experiment_next(experiment_id))
+                self._run_async(db.delete_experiment_next(experiment_id))
 
-        next_schedulable_at = self._run_async(scheduling_db.next_schedulable_experiment())
+        next_schedulable_at = self._run_async(db.next_schedulable_experiment())
 
         sleep_duration = sleep_duration_min
         if next_schedulable_at:

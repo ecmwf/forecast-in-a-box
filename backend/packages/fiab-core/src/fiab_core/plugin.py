@@ -39,7 +39,7 @@ Compiler = Callable[
 """Given a cascade builder, represented as lookup of fluent actions, and a block instance corresponding to this plugin's Factory, either return the fluent action resulting from this block or an error"""
 
 
-@dataclass
+@dataclass(frozen=True, eq=True, slots=True)
 class Plugin:
     """Base plugin with a block catalogue and default validate/expand/compile behavior.
 

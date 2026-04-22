@@ -11,7 +11,7 @@ from datetime import date
 from types import NoneType, UnionType
 from typing import Callable, Literal, Union, get_args, get_origin
 
-from pydantic import BaseModel
+from pydantic import BaseModel  # NOTE we require dynamicity, cant use FiabBaseModel here
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 

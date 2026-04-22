@@ -28,48 +28,51 @@ import asyncio
 import logging
 from typing import cast
 
-import cascade.gateway.api as api
-import cascade.gateway.client as client
+from cascade.controller.report import JobId
+from cascade.gateway import api, client
 from cascade.low.func import Either
-from pydantic import BaseModel
 
 import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.run.db as run_db
+from forecastbox.domain.blueprint.types import BlueprintId
+from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.background import execute_background
 from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.exceptions import RunNotFound
+from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import Blueprint, Run
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
+from forecastbox.utility.pydantic import FiabBaseModel
 
 logger = logging.getLogger(__name__)
 
 
-class RunDetail(BaseModel):
+class RunDetail(FiabBaseModel):
     """Detail of a single job execution attempt."""
 
-    run_id: str
+    run_id: RunId
     attempt_count: int
     status: str
     created_at: str
     updated_at: str
-    blueprint_id: str
+    blueprint_id: BlueprintId
     blueprint_version: int
     error: str | None = None
     progress: str | None = None
     cascade_job_id: str | None = None
 
 
-class ExecuteResult(BaseModel):
+class ExecuteResult(FiabBaseModel):
     """Result of a job execution submission."""
 
-    run_id: str
+    run_id: RunId
     """Logical execution id (Run.id)."""
     attempt_count: int
     """Attempt number; always 1 on a fresh execution."""
 
 
-async def get_blueprint_for_execution(blueprint_id: str, blueprint_version: int | None) -> Blueprint | None:
+async def get_blueprint_for_execution(blueprint_id: BlueprintId, blueprint_version: int | None) -> Blueprint | None:
     """Retrieve a Blueprint from the jobs store by id and optional version."""
     return await blueprint_db.get_blueprint(blueprint_id, blueprint_version)
 
@@ -77,8 +80,8 @@ async def get_blueprint_for_execution(blueprint_id: str, blueprint_version: int 
 async def execute(
     blueprint: Blueprint,
     auth_context: AuthContext,
-    run_id: str | None = None,
-    experiment_id: str | None = None,
+    run_id: RunId | None = None,
+    experiment_id: ExperimentDefinitionId | None = None,
     experiment_version: int | None = None,
     compiler_runtime_context: CompilerRuntimeContext = CompilerRuntimeContext(),
     experiment_context: str | None = None,
@@ -95,7 +98,7 @@ async def execute(
     if not blueprint.builder:
         return Either.error(f"Blueprint {blueprint.blueprint_id!r} has no compilable blocks")
 
-    blueprint_id = str(blueprint.blueprint_id)  # ty:ignore[invalid-argument-type]
+    blueprint_id = BlueprintId(str(blueprint.blueprint_id))  # ty:ignore[invalid-argument-type]
     blueprint_version = cast(int, blueprint.version)
 
     new_run_id, attempt_count, created_at = await run_db.upsert_run(
@@ -125,7 +128,7 @@ async def execute(
     return Either.ok(ExecuteResult(run_id=new_run_id, attempt_count=attempt_count))
 
 
-async def restart_run(run_id: str, auth_context: AuthContext) -> Either[ExecuteResult, str]:  # type: ignore[invalid-argument]
+async def restart_run(run_id: RunId, auth_context: AuthContext) -> Either[ExecuteResult, str]:  # type: ignore[invalid-argument]
     """Create a new attempt under an existing run_id, re-running its linked Blueprint.
 
     Raises ``RunNotFound`` if the execution does not exist.
@@ -134,7 +137,7 @@ async def restart_run(run_id: str, auth_context: AuthContext) -> Either[ExecuteR
     existing = await run_db.get_run(run_id, auth_context=auth_context)
     # get_run raises RunNotFound / RunAccessDenied on failure.
 
-    blueprint_id = str(existing.blueprint_id)  # ty:ignore[invalid-argument-type]
+    blueprint_id = BlueprintId(str(existing.blueprint_id))  # ty:ignore[invalid-argument-type]
     blueprint_version = cast(int, existing.blueprint_version)
     blueprint = await blueprint_db.get_blueprint(blueprint_id, blueprint_version)
     if blueprint is None:
@@ -147,7 +150,7 @@ async def restart_run(run_id: str, auth_context: AuthContext) -> Either[ExecuteR
         blueprint,
         auth_context,
         run_id=run_id,
-        experiment_id=cast(str | None, existing.experiment_id),
+        experiment_id=ExperimentDefinitionId(str(existing.experiment_id)) if existing.experiment_id is not None else None,  # ty:ignore[invalid-argument-type]
         experiment_version=cast(int | None, existing.experiment_version),
         compiler_runtime_context=context,
         experiment_context=cast(str | None, existing.experiment_context),
@@ -156,19 +159,19 @@ async def restart_run(run_id: str, auth_context: AuthContext) -> Either[ExecuteR
 
 async def poll_and_update(execution: Run) -> RunDetail:
     """Poll cascade for a Run's status, update db if changed, and return current detail."""
-    run_id = str(execution.run_id)  # ty:ignore[invalid-argument-type]
+    run_id = RunId(str(execution.run_id))  # ty:ignore[invalid-argument-type]
     actual_attempt = cast(int, execution.attempt_count)
     cascade_job_id = cast(str | None, execution.cascade_job_id)
     status = cast(str, execution.status)
 
     def _build(status_override: str | None = None, error_override: str | None = None, progress_override: str | None = None) -> RunDetail:
         return RunDetail(
-            run_id=str(execution.run_id),  # ty:ignore[invalid-argument-type]
+            run_id=run_id,
             attempt_count=actual_attempt,
             status=status_override or status,
             created_at=str(execution.created_at),
             updated_at=str(execution.updated_at),
-            blueprint_id=str(execution.blueprint_id),  # ty:ignore[invalid-argument-type]
+            blueprint_id=BlueprintId(str(execution.blueprint_id)),  # ty:ignore[invalid-argument-type]
             blueprint_version=cast(int, execution.blueprint_version),
             error=error_override if error_override is not None else cast(str | None, execution.error),
             progress=progress_override if progress_override is not None else cast(str | None, execution.progress),
@@ -177,7 +180,7 @@ async def poll_and_update(execution: Run) -> RunDetail:
 
     if status in ("submitted", "preparing", "running") and cascade_job_id:
         try:
-            response = client.request_response(api.JobProgressRequest(job_ids=[cascade_job_id]), f"{config.cascade.cascade_url}")
+            response = client.request_response(api.JobProgressRequest(job_ids=[JobId(cascade_job_id)]), f"{config.cascade.cascade_url}")
             response = cast(api.JobProgressResponse, response)
         except TimeoutError:
             return _build(status_override="unknown", error_override="failed to communicate with gateway")
@@ -187,7 +190,7 @@ async def poll_and_update(execution: Run) -> RunDetail:
         if response.error:
             return _build(status_override="unknown", error_override=response.error)
 
-        jobprogress = response.progresses.get(cascade_job_id)
+        jobprogress = response.progresses.get(JobId(cascade_job_id))
         if jobprogress is None:
             await run_db.update_run_runtime(run_id, actual_attempt, status="failed", error="evicted from gateway")
             return _build(status_override="failed", error_override="evicted from gateway")

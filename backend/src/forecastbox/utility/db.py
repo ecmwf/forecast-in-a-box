@@ -19,6 +19,7 @@ import sqlalchemy.exc
 
 logger = logging.getLogger(__name__)
 retries = 3
+# TODO we have one lock per two sqlite files -- overkill
 lock = Lock()
 T = TypeVar("T")
 
