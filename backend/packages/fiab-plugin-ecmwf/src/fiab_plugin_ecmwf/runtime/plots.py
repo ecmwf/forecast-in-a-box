@@ -37,7 +37,7 @@ def _configure_schema(style_schema: str) -> None:
         schema.use(style_schema)
 
 
-def _plot_fields(subplot: "Subplot", fields: ekd.FieldList) -> None:
+def _plot_fields(subplot: "Subplot", fields: ekd.FieldList, **kwargs: Any) -> None:
     """Plot fields on a subplot, selecting the appropriate method based on field metadata.
 
     Wind fields (u/v components) are plotted with ``quiver``; all others use ``quickplot``.
@@ -52,11 +52,11 @@ def _plot_fields(subplot: "Subplot", fields: ekd.FieldList) -> None:
     for method, comp in plot_categories.items():
         for _sub_cat, sub_fields in comp.items():
             try:
-                getattr(subplot, method)(ekd.FieldList.from_fields(sub_fields))
+                getattr(subplot, method)(ekd.FieldList.from_fields(sub_fields), **kwargs.get(method, {}))
             except Exception as err:
                 if method == "quickplot":
                     raise err
-                subplot.quickplot(ekd.FieldList.from_fields(sub_fields))
+                subplot.quickplot(ekd.FieldList.from_fields(sub_fields), **kwargs.get("quickplot", {}))
 
 
 def _export_figure(figure: "Figure", fmt: str = "png", dpi: int = 100) -> tuple[bytes, str]:
