@@ -1,41 +1,50 @@
 {
   "page": {
-    "title": "Global Glyphs",
-    "description": "Manage global glyph definitions used in fable configuration interpolation."
+    "title": "Global Variables",
+    "description": "Manage global variable definitions used in fable configuration interpolation."
   },
   "list": {
-    "loading": "Loading glyphs..."
+    "loading": "Loading variables..."
   },
   "filter": {
     "searchPlaceholder": "Search by key or value..."
   },
   "empty": {
-    "title": "No global glyphs",
-    "description": "Create a global glyph to use ${glyph} interpolation across all fable configurations."
+    "title": "No global variables",
+    "description": "Create a global variable to use ${variable} interpolation across all fable configurations."
   },
   "table": {
     "key": "Key",
     "value": "Value"
   },
+  "creator": {
+    "intrinsic": "intrinsic",
+    "you": "you",
+    "passthrough": "local",
+    "label": "by"
+  },
   "actions": {
-    "create": "Create Glyph",
+    "create": "Create Variable",
     "edit": "Edit",
     "save": "Save",
     "saving": "Saving...",
     "cancel": "Cancel",
-    "createSuccess": "Glyph created",
-    "updateSuccess": "Glyph updated"
+    "createSuccess": "Variable created",
+    "updateSuccess": "Variable updated"
   },
   "form": {
-    "title": "Create Global Glyph",
-    "editTitle": "Edit Global Glyph",
+    "title": "Create Global Variable",
+    "editTitle": "Edit Global Variable",
     "key": "Key",
     "keyPlaceholder": "e.g. myVariable",
     "keyHelp": "Used as ${key} in fable configurations",
     "value": "Value",
     "valuePlaceholder": "The value to interpolate",
     "public": "Public",
-    "publicHelp": "Public glyphs are visible to all users (admin only)"
+    "publicHelp": "Public variables are visible to all users (admin only)",
+    "overriddable": "Overriddable",
+    "overriddableHelp": "Allow users to shadow this variable with their own value of the same name",
+    "overriddableTooltip": "Overriddable: a user can define a private variable with the same name and it will win during resolution. Pinned (off): the public value always wins, even if a user defines their own."
   },
   "pagination": {
     "previous": "Previous",
@@ -43,17 +52,28 @@
     "page": "Page {{current}} of {{total}}"
   },
   "panel": {
-    "title": "Available Glyphs",
+    "title": "Variables",
     "manage": "Manage",
-    "help": "Use ${name} syntax in block configuration values to reference dynamic glyphs.\n\nIntrinsic — system-provided, always available (e.g., runId, submitDatetime). startDatetime and attemptCount update on each retry.\n\nGlobal — user-defined key-value pairs shared across fables. Manage them via the admin page.\n\nLocal — scoped to this blueprint only. Override global glyphs of the same name.\n\nContext — injected automatically per-execution (e.g., by the scheduler). Not shown here.\n\nPrecedence: Intrinsic → Global → Local → Context.\nPinned glyphs (startDatetime, attemptCount) always use the intrinsic value.",
+    "helpers": {
+      "title": "Helpers",
+      "tooltip": "Custom filters and globals you can use inside ${...} expressions.",
+      "empty": "No helpers available.",
+      "filterBadge": "filter",
+      "globalBadge": "global",
+      "copyHintFilter": "Copies | {{name}} — append after a value",
+      "copyHintGlobal": "Copies {{name}}() — call directly"
+    },
+    "help": "Use ${name} syntax in block configuration values to reference dynamic variables.\n\nIntrinsic — system-provided, always available (e.g., runId, submitDatetime). startDatetime and attemptCount update on each retry.\n\nGlobal — user-defined key-value pairs shared across fables. Manage them via the admin page.\n\nLocal — scoped to this blueprint only. Override global variables of the same name.\n\nContext — injected automatically per-execution (e.g., by the scheduler). Not shown here.\n\nPrecedence: Intrinsic → Global → Local → Context.\nPinned variables (startDatetime, attemptCount) always use the intrinsic value.",
     "intrinsic": "Intrinsic",
     "global": "Global",
     "local": "Local",
-    "localTooltip": "Glyphs scoped to this blueprint. Override global glyphs of the same name.",
-    "noGlobal": "No global glyphs yet.",
-    "noLocal": "No local glyphs.",
+    "localTooltip": "Variables scoped to this blueprint. Override global variables of the same name.",
+    "noGlobal": "No global variables yet.",
+    "noLocal": "No local variables.",
     "addLocalHint": "Add one to override a global value for this blueprint only.",
     "createOne": "Create one",
+    "addGlobal": "Add global variable",
+    "manageAll": "Manage all",
     "addLocal": "Add",
     "localKeyPlaceholder": "key",
     "localValuePlaceholder": "value",
@@ -62,12 +82,17 @@
     "resolvesTo": "resolves to"
   },
   "autocomplete": {
-    "filter": "Filter glyphs..."
+    "filter": "Filter variables..."
   },
   "field": {
-    "switchToGlyph": "Use a glyph expression",
+    "switchToGlyph": "Use a variable expression",
     "switchToConcrete": "Use the value picker",
-    "cannotSwitchBack": "Clear the glyph expression to switch back",
-    "glyphPlaceholder": "e.g. $\\{glyphName}"
+    "cannotSwitchBack": "Clear the variable expression to switch back",
+    "glyphPlaceholder": "e.g. ${variableName}",
+    "datePreview": {
+      "hasTime": "Date field — the value carries a time component",
+      "floorDayAction": "Truncate to date",
+      "floorDayTooltip": "Appends `| floor_day` to truncate the expression to midnight"
+    }
   }
 }

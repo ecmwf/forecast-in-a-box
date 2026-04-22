@@ -83,6 +83,11 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   const prevLayoutDirectionRef = useRef(layoutDirection)
   const hasInitializedViewportRef = useRef<boolean>(false)
   const lastBlockCountRef = useRef<number>(0)
+  // Nodes whose dimensions have been measured at least once. Used to skip
+  // auto-relayout on subsequent content-driven resizes (e.g. config badges
+  // growing/shrinking while the user types), which would otherwise jostle
+  // the whole graph.
+  const measuredNodesRef = useRef<Set<string>>(new Set())
 
   // Debounced re-layout function that uses measured node dimensions
   const debouncedRelayout = useDebouncedCallback(() => {
@@ -107,17 +112,27 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
     setNodes(layouted)
   }, 300)
 
-  // Wrap onNodesChange to detect dimension changes and trigger re-layout
+  // Trigger re-layout only on a node's FIRST measured dimension (freshly
+  // inserted or after layout direction change). Later resizes — e.g. a
+  // config badge wrap changing rows while the user types — are ignored
+  // so the graph doesn't jostle with every keystroke.
   const onNodesChange = useCallback(
     (changes: Array<NodeChange<FableNode>>) => {
       onNodesChangeInternal(changes)
 
-      // Check for dimension changes
-      const hasDimensionChange = changes.some(
-        (c) => c.type === 'dimensions' && c.dimensions,
-      )
+      let hasFirstMeasurement = false
+      for (const change of changes) {
+        if (change.type === 'remove') {
+          measuredNodesRef.current.delete(change.id)
+          continue
+        }
+        if (change.type !== 'dimensions' || !change.dimensions) continue
+        if (measuredNodesRef.current.has(change.id)) continue
+        measuredNodesRef.current.add(change.id)
+        hasFirstMeasurement = true
+      }
 
-      if (hasDimensionChange && autoLayout) {
+      if (hasFirstMeasurement && autoLayout) {
         debouncedRelayout()
       }
     },
