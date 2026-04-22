@@ -24,6 +24,7 @@ import zipfile
 from typing import Annotated, cast
 
 import orjson
+from cascade.controller.report import JobId
 from cascade.gateway import api, client
 from cascade.low.core import DatasetId, TaskId
 from fastapi import APIRouter, Depends, Response
@@ -159,7 +160,7 @@ async def _resolve_run_with_cascade(
 
 async def _build_run_logs_response(cascade_job_id: str, db_entity_ser: bytes) -> Response:
     try:
-        request = api.JobProgressRequest(job_ids=[cascade_job_id])
+        request = api.JobProgressRequest(job_ids=[JobId(cascade_job_id)])
         gw_state = client.request_response(request, f"{config.cascade.cascade_url}").model_dump()
     except TimeoutError:
         gw_state = {"progresses": {}, "datasets": {}, "error": "TimeoutError"}
@@ -341,11 +342,12 @@ async def get_run_output_availability(
 ) -> list[TaskId]:
     """Check which output tasks are available for a given execution."""
     _, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
-    response = client.request_response(api.JobProgressRequest(job_ids=[cascade_job_id]), f"{config.cascade.cascade_url}")
+    job_id = JobId(cascade_job_id)
+    response = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}")
     response = cast(api.JobProgressResponse, response)
-    if cascade_job_id not in response.datasets:
+    if job_id not in response.datasets:
         raise HTTPException(status_code=404, detail=f"Job {cascade_job_id} not found in gateway.")
-    return [x.task for x in response.datasets[cascade_job_id]]
+    return [x.task for x in response.datasets[job_id]]
 
 
 @router.get("/outputContent")
@@ -357,7 +359,7 @@ async def get_run_output_content(
     """Retrieve the result of a specific output task, encoded as bytes."""
     _, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
     response = client.request_response(
-        api.ResultRetrievalRequest(job_id=cascade_job_id, dataset_id=DatasetId(task=dataset_id, output="0")),
+        api.ResultRetrievalRequest(job_id=JobId(cascade_job_id), dataset_id=DatasetId(task=TaskId(dataset_id), output="0")),
         f"{config.cascade.cascade_url}",
     )
     response = cast(api.ResultRetrievalResponse, response)
