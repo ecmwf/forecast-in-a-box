@@ -52,4 +52,5 @@ the lock, creating a potential concurrent-write race for the user SQLite file.
 **Hint**: Extract these operations into a `domain/auth/db.py` (or extend the existing
 `domain/auth/users.py`) and wrap them with `dbRetry` from `utility/db.py`, as done in all
 other domain db modules. The user and jobs databases are separate SQLite files, so a single
-shared lock is conservative but consistent with the stated policy.
+shared lock is conservative but consistent with the stated policy. But add a comment on top
+of the lock like # TODO we have one lock per two sqlite files -- overkill
