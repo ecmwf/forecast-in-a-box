@@ -76,7 +76,9 @@ def get_environment(composite_id: CompositeArtifactId, input_source: str | None 
     if input_source in INPUT_SOURCE_EXTRAS:
         packages.append(INPUT_SOURCE_EXTRAS[input_source])
 
-    packages.append(f"earthkit-workflows-anemoi[runtime]=={importlib.metadata.version('earthkit-workflows-anemoi')}")
+    ekw_anemoi_version = importlib.metadata.version("earthkit-workflows-anemoi")
+    if not "dev" in ekw_anemoi_version:
+        packages.append(f"earthkit-workflows-anemoi[runtime]=={importlib.metadata.version('earthkit-workflows-anemoi')}")
     return packages
 
 

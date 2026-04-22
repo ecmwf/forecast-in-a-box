@@ -9,10 +9,11 @@
 
 
 from pathlib import Path
+from typing import Any
 
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
-from earthkit.workflows.plugins.anemoi.fluent import Inference, from_initial_conditions, from_input
+from earthkit.workflows.plugins.anemoi.fluent import Inference
 from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import (
     ActionLookup,
@@ -46,13 +47,23 @@ class AnemoiBuilder:
     def _local_path(self) -> Path:
         return get_local_path(self.artifact_id)
 
-    def build(self, lead_time: int) -> Inference:
-        return Inference(
+    def build(self, lead_time: int) -> Inference:  # type: ignore[reportReturnType]
+        import functools
+
+        class WrappedInference(Inference):
+            @functools.wraps(Inference.from_input)
+            def from_input(s, *a, **k) -> Action:  # type: ignore[reportIncompatibleMethodOverride, reportSelfClsParameterName]
+                return super().from_input(*a, **k, payload_metadata={"artifacts": [self.artifact_id]})
+
+            @functools.wraps(Inference.from_initial_conditions)
+            def from_initial_conditions(s, *a, **k) -> Action:  # type: ignore[reportIncompatibleMethodOverride, reportSelfClsParameterName]
+                return super().from_initial_conditions(*a, **k, payload_metadata={"artifacts": [self.artifact_id]})
+
+        return WrappedInference(
             ckpt=self._local_path(),
             lead_time=lead_time,
             environment=get_environment(self.artifact_id),
             metadata=get_metadata(self.artifact_id),
-            payload_metadata={"artifacts": [self.artifact_id]},
         )
 
 
