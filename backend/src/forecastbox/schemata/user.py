@@ -13,14 +13,10 @@ Exposes ``create_db_and_tables`` so the entrypoint can discover and run it
 via automatic schemata iteration.
 """
 
-from collections.abc import AsyncGenerator
-
 import pydantic
-from fastapi import Depends
 from fastapi_users import schemas
-from fastapi_users.db import SQLAlchemyBaseOAuthAccountTableUUID, SQLAlchemyBaseUserTableUUID, SQLAlchemyUserDatabase
-from sqlalchemy import create_engine
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from fastapi_users.db import SQLAlchemyBaseOAuthAccountTableUUID, SQLAlchemyBaseUserTableUUID
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, relationship
 
 from forecastbox.utility.config import config
@@ -60,20 +56,8 @@ sync_url = f"sqlite:///{config.db.sqlite_userdb_path}"
 
 async_engine = create_async_engine(async_url)
 async_session_maker = async_sessionmaker(async_engine, expire_on_commit=False)
-sync_engine = create_engine(sync_url)
 
 
 async def create_db_and_tables() -> None:
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-
-
-async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
-    async with async_session_maker() as session:
-        yield session
-
-
-async def get_user_db(
-    session: AsyncSession = Depends(get_async_session),
-) -> AsyncGenerator[SQLAlchemyUserDatabase[UserTable, pydantic.UUID4], None]:
-    yield SQLAlchemyUserDatabase(session, UserTable, OAuthAccount)

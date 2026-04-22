@@ -45,6 +45,8 @@ class QubedPluginBuilder:
 
     def as_plugin(self) -> Plugin:
         def _generic_expand(block: BlockInstanceOutput) -> list[BlockFactoryId]:
+            if block.is_empty():
+                return []
             if isinstance(block, QubedOutput):
                 return self.expand(block)
             else:

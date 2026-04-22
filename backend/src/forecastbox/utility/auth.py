@@ -11,8 +11,8 @@
 
 from dataclasses import dataclass
 
-from forecastbox.schemata.user import UserRead
-from forecastbox.utility.config import config
+PASSTHROUGH_USER_ID = "user"
+"""Sentinel user-id stored in all resources created under passthrough (auth-disabled) mode."""
 
 
 @dataclass(frozen=True, eq=True, slots=True)
@@ -22,35 +22,25 @@ class AuthContext:
     Two special regimes exist beyond ordinary authenticated users:
 
     - **Admin** (``is_admin=True``): sees and may mutate all resources.
-    - **Passthrough / anonymous** (``user_id=None``): used in single-user local
-      deployments where authentication is disabled.  Treated identically to an
-      admin — ``has_admin()`` returns ``True`` and ``allowed()`` always grants
-      access.  ``user_id`` being ``None`` does *not* mean "unauthenticated
-      restricted user"; that state simply does not exist in this model.
+    - **Passthrough**: used in single-user local deployments where
+      authentication is disabled.  Created with ``is_admin=True`` and
+      ``user_id=PASSTHROUGH_USER_ID`` so that ``created_by`` columns are
+      always non-null and admin access is granted.
     """
 
-    user_id: str | None
+    user_id: str
     is_admin: bool
 
     def has_admin(self) -> bool:
-        """Return True if the caller has unrestricted access.
+        """Return True if the caller has unrestricted access (``is_admin=True``).
+        Note: this is a standalone function for historical reasons, when the condition
+        was more complicated -- stick to that, it may change in the future again."""
+        return self.is_admin
 
-        True for explicit admins (``is_admin=True``) and for the passthrough
-        regime (``user_id=None``, auth disabled).
-        """
-        return self.is_admin or (self.user_id is None and config.auth.passthrough)
-
-    def allowed(self, resource_owner: str | None) -> bool:
+    def allowed(self, resource_owner: str) -> bool:
         """Return True if the caller may mutate a resource owned by resource_owner.
 
-        Grants access when ``has_admin()`` is True (admins and passthrough) or
+        Grants access when ``has_admin()`` is True (true admins and passthrough) or
         when the caller's ``user_id`` matches the resource owner.
         """
         return self.has_admin() or self.user_id == resource_owner
-
-
-def user2auth(user: UserRead | None) -> AuthContext:
-    """Build an AuthContext from an optional authenticated user."""
-    if user is None:
-        return AuthContext(user_id=None, is_admin=False)
-    return AuthContext(user_id=str(user.id), is_admin=user.is_superuser)

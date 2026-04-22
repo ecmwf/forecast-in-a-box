@@ -30,11 +30,14 @@ import forecastbox.domain.experiment.db as experiment_db
 import forecastbox.domain.experiment.scheduling.db as scheduling_db
 import forecastbox.domain.run.db as run_db
 from forecastbox.domain.blueprint.exceptions import BlueprintAccessDenied, BlueprintNotFound
+from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound
+from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
+from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import Base
-from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.auth import PASSTHROUGH_USER_ID, AuthContext
 
 
 @pytest_asyncio.fixture
@@ -66,7 +69,7 @@ mem_session_maker_all = mem_session_maker_both
 _admin = AuthContext(user_id="admin", is_admin=True)
 _user1 = AuthContext(user_id="user1", is_admin=False)
 _user2 = AuthContext(user_id="user2", is_admin=False)
-_anon = AuthContext(user_id=None, is_admin=False)
+_anon = AuthContext(user_id=PASSTHROUGH_USER_ID, is_admin=True)
 
 
 # ---------------------------------------------------------------------------
@@ -168,7 +171,9 @@ async def test_jobs_list_blueprints_ownership_filter(mem_session_maker_both: asy
 @pytest.mark.asyncio
 async def test_jobs_upsert_blueprint_unknown_id_raises(mem_session_maker_both: async_sessionmaker[AsyncSession]) -> None:
     with pytest.raises(BlueprintNotFound):
-        await blueprint_db.upsert_blueprint(auth_context=_user1, blueprint_id="nonexistent-id", source="user_defined", created_by="user1")
+        await blueprint_db.upsert_blueprint(
+            auth_context=_user1, blueprint_id=BlueprintId("nonexistent-id"), source="user_defined", created_by="user1"
+        )
 
 
 @pytest.mark.asyncio
@@ -211,7 +216,7 @@ async def test_jobs_soft_delete_wrong_owner_raises(mem_session_maker_both: async
 @pytest.mark.asyncio
 async def test_jobs_soft_delete_not_found_raises(mem_session_maker_both: async_sessionmaker[AsyncSession]) -> None:
     with pytest.raises(BlueprintNotFound):
-        await blueprint_db.soft_delete_blueprint("no-such-id", expected_version=1, auth_context=_admin)
+        await blueprint_db.soft_delete_blueprint(BlueprintId("no-such-id"), expected_version=1, auth_context=_admin)
 
 
 # ---------------------------------------------------------------------------
@@ -270,19 +275,19 @@ async def test_jobs_experiment_definition_soft_delete(mem_session_maker_both: as
 
 @pytest.mark.asyncio
 async def test_experiment_create_anon_allowed(mem_session_maker_both: async_sessionmaker[AsyncSession]) -> None:
-    """Passthrough (user_id=None) callers may create experiments; created_by is stored as None."""
+    """Passthrough callers may create experiments; created_by is stored as the passthrough sentinel."""
     job_id, job_v = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
     exp_id, v1 = await experiment_db.upsert_experiment_definition(
         auth_context=_anon,
         blueprint_id=job_id,
         blueprint_version=job_v,
         experiment_type="cron_schedule",
-        created_by=None,
+        created_by=PASSTHROUGH_USER_ID,
     )
     assert v1 == 1
     result = await experiment_db.get_experiment_definition(exp_id)
     assert result is not None
-    assert result.created_by is None
+    assert result.created_by == PASSTHROUGH_USER_ID
 
 
 @pytest.mark.asyncio
@@ -395,7 +400,7 @@ async def test_anon_update_blueprint_bypasses_ownership(mem_session_maker_both: 
         auth_context=_anon,
         blueprint_id=job_id,
         source="user_defined",
-        created_by=None,
+        created_by=PASSTHROUGH_USER_ID,
     )
     assert v2 == 2
 
@@ -439,7 +444,7 @@ async def test_anon_update_experiment_bypasses_ownership(mem_session_maker_both:
         blueprint_id=job_id,
         blueprint_version=job_v,
         experiment_type="cron_schedule",
-        created_by=None,
+        created_by=PASSTHROUGH_USER_ID,
     )
     assert v2 == 2
 
@@ -592,7 +597,7 @@ async def test_jobs_upsert_experiment_definition_unknown_id_raises(mem_session_m
     with pytest.raises(ExperimentNotFound):
         await experiment_db.upsert_experiment_definition(
             auth_context=_user1,
-            experiment_definition_id="nonexistent-id",
+            experiment_definition_id=ExperimentDefinitionId("nonexistent-id"),
             blueprint_id=job_id,
             blueprint_version=job_v,
             experiment_type="cron_schedule",
@@ -607,7 +612,7 @@ async def test_jobs_upsert_run_pregenerated_id(mem_session_maker_both: async_ses
 
     with pytest.raises(KeyError, match="pregenerated-id"):
         await run_db.upsert_run(
-            run_id="pregenerated-id",
+            run_id=RunId("pregenerated-id"),
             blueprint_id=job_id,
             blueprint_version=job_v,
             created_by="user1",
@@ -687,7 +692,7 @@ async def test_run_get_anon_sees_all(mem_session_maker_both: async_sessionmaker[
 async def test_run_get_not_found(mem_session_maker_both: async_sessionmaker[AsyncSession]) -> None:
     """get_run raises RunNotFound for missing id."""
     with pytest.raises(RunNotFound):
-        await run_db.get_run("nonexistent-id", auth_context=_admin)
+        await run_db.get_run(RunId("nonexistent-id"), auth_context=_admin)
 
 
 @pytest.mark.asyncio

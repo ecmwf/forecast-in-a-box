@@ -26,15 +26,13 @@ For more information read: [AI-driven solutions for the Digital Twin Engine](htt
 There are the following guides:
 * [User Guide](docs/userGuide.md) -- basic installation and usage on a personal laptop. Audience: Researcher
 * [Troubleshooting](docs/troubleshooting.md) -- general purpose troubleshooting and tuning. Audience: Operator, Developer
-* [Advanced Installation](docs/advancedInstallation.md) -- cluster, cloud, and docker deployments. Audience: Operator, Developer
-* [Tuning and Configuration](docs/tuningAndConfiguration.md) -- advanced tweaking. Audience: Operator
+* [Advanced Installation](docs/operator/installation.md) -- cluster, cloud, and docker deployments. Audience: Operator, Developer
 * [Frontend Development](frontend/README.md) -- specifics to the javascript frontend. Audience: Developer
-* [Backend Development](backend/README.md#Development) -- specifics to the python backend. Audience: Developer
+* [Backend Development](backend/development.md) -- specifics to the python backend. Audience: Developer
 
 ## Contributions and Support
 Due to the maturity and status of the project, there is no support provided -- unless the usage of this project happens within some higher-status initiative that ECMWF participates at.
-External contributions and created issues will be looked at, but are not guaranteed to be accepted or responded to.
-In general, follow ECMWF's guidelines for [external contributions](https://github.com/ecmwf/codex/tree/main/External%20Contributions).
+For external contributions, see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## License
 See [license](./LICENSE).

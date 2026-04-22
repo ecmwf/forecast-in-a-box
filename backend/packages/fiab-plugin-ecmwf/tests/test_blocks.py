@@ -11,7 +11,7 @@
 from typing import cast
 
 import pytest
-from fiab_core.fable import BlockInstance, NoOutput, PluginBlockFactoryId, PluginCompositeId, QubedOutput
+from fiab_core.fable import BlockInstance, BlockInstanceId, NoOutput, PluginBlockFactoryId, PluginCompositeId, QubedOutput
 
 from fiab_plugin_ecmwf.blocks import EkdSource, EnsembleStatistics, TemporalStatistics, ZarrSink
 from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains
@@ -53,7 +53,7 @@ def ekdsource_output(dummy_blockinstance: BlockInstance) -> QubedOutput:
 def ensemble_statistics_configuration() -> BlockInstance:
     return BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="EnsembleStatistics"),  # type: ignore
-        input_ids={"dataset": "source_output"},
+        input_ids={"dataset": BlockInstanceId("source_output")},
         configuration_values={
             "param": "2t",
             "statistic": "mean",
@@ -65,7 +65,7 @@ def ensemble_statistics_configuration() -> BlockInstance:
 def temporal_statistics_configuration() -> BlockInstance:
     return BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="TemporalStatistics"),  # type: ignore
-        input_ids={"dataset": "source_output"},
+        input_ids={"dataset": BlockInstanceId("source_output")},
         configuration_values={
             "param": "2t",
             "statistic": "mean",
@@ -77,7 +77,7 @@ def temporal_statistics_configuration() -> BlockInstance:
 def zarr_sink_configuration() -> BlockInstance:
     return BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="ZarrSink"),  # type: ignore
-        input_ids={"dataset": "source_output"},
+        input_ids={"dataset": BlockInstanceId("source_output")},
         configuration_values={
             "path": "/path/to/output.zarr",
         },

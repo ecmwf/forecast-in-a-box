@@ -7,15 +7,8 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Domain exceptions for the glyphs layer.
-
-Raised by domain.glyphs.global_db; translated to HTTP responses at the router boundary.
-"""
+"""Domain exceptions for the glyphs layer."""
 
 
-class GlobalGlyphNotFound(Exception):
-    """Raised when a requested GlobalGlyph does not exist."""
-
-
-class GlobalGlyphAccessDenied(Exception):
-    """Raised when the actor lacks permission to mutate a GlobalGlyph they do not own."""
+class GlyphCircularReferenceError(Exception):
+    """Raised when glyph values form a circular dependency chain."""

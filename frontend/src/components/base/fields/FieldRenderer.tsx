@@ -21,6 +21,8 @@ import { cn } from '@/lib/utils'
 
 export interface FieldRendererProps {
   id: string
+  /** Configuration key for this field, used to look up server-resolved glyph values */
+  configKey: string
   valueType: string | undefined
   value: string
   onChange: (value: string) => void
@@ -34,6 +36,7 @@ export interface FieldRendererProps {
 
 export function FieldRenderer({
   id,
+  configKey,
   valueType,
   value,
   onChange,
@@ -49,6 +52,7 @@ export function FieldRenderer({
   const inputElement = renderField(
     parsedType,
     id,
+    configKey,
     value,
     onChange,
     placeholder,
@@ -74,6 +78,7 @@ export function FieldRenderer({
 function renderField(
   parsedType: ParsedValueType,
   id: string,
+  configKey: string,
   value: string,
   onChange: (value: string) => void,
   placeholder?: string,
@@ -86,6 +91,7 @@ function renderField(
       return (
         <StringField
           id={id}
+          configKey={configKey}
           value={value}
           onChange={onChange}
           placeholder={placeholder}
@@ -98,6 +104,7 @@ function renderField(
       return (
         <NumberField
           id={id}
+          configKey={configKey}
           value={value}
           onChange={onChange}
           isInteger={true}
@@ -111,6 +118,7 @@ function renderField(
       return (
         <NumberField
           id={id}
+          configKey={configKey}
           value={value}
           onChange={onChange}
           isInteger={false}
@@ -124,6 +132,7 @@ function renderField(
       return (
         <DateTimeField
           id={id}
+          configKey={configKey}
           value={value}
           onChange={onChange}
           isDateOnly={false}
@@ -137,6 +146,7 @@ function renderField(
       return (
         <DateTimeField
           id={id}
+          configKey={configKey}
           value={value}
           onChange={onChange}
           isDateOnly={true}
@@ -150,6 +160,7 @@ function renderField(
       return (
         <EnumField
           id={id}
+          configKey={configKey}
           value={value}
           onChange={onChange}
           options={parsedType.options}
@@ -163,6 +174,7 @@ function renderField(
       return (
         <ListField
           id={id}
+          configKey={configKey}
           value={value}
           onChange={onChange}
           placeholder={placeholder}
@@ -178,6 +190,7 @@ function renderField(
  */
 export interface InlineFieldRendererProps {
   id: string
+  configKey: string
   valueType: string | undefined
   value: string
   onChange: (value: string) => void
@@ -188,6 +201,7 @@ export interface InlineFieldRendererProps {
 
 export function InlineFieldRenderer({
   id,
+  configKey,
   valueType,
   value,
   onChange,
@@ -200,6 +214,7 @@ export function InlineFieldRenderer({
   return renderField(
     parsedType,
     id,
+    configKey,
     value,
     onChange,
     placeholder,

@@ -40,6 +40,7 @@ function ControlledFieldRenderer(props: {
     <div>
       <FieldRenderer
         id="test-field"
+        configKey="test-field"
         valueType={props.valueType}
         value={value}
         onChange={setValue}
@@ -259,6 +260,7 @@ describe('FieldRenderer Integration', () => {
       const screen = await renderWithProviders(
         <InlineFieldRenderer
           id="inline-test"
+          configKey="inline-test"
           valueType="str"
           value="hello"
           onChange={() => {}}

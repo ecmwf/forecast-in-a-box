@@ -7,9 +7,12 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Admin routes — /admin/* and /users/*"""
+"""
+Admin routes — /admin/*. Corresponds to the `domain.admin` submodule.
 
-PREFIX = "/api/v1/admin"
+Contains many varied utility routes related to user management, releases, versioning.
+"""
+
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -21,10 +24,12 @@ from pydantic import UUID4, BaseModel
 from sqlalchemy import delete, select, update
 
 from forecastbox.domain.admin import Release, get_local_release, get_most_recent_release, get_pylock, mark_release, save_pylock
-from forecastbox.entrypoint.auth.users import current_active_user
+from forecastbox.domain.auth.users import current_active_user
 from forecastbox.schemata.user import UserRead, UserTable, UserUpdate, async_session_maker
 from forecastbox.utility.config import BackendAPISettings, CascadeSettings, ProductSettings, config
 from forecastbox.utility.rsjf import ExportedSchemas, FormDefinition, from_pydantic
+
+PREFIX = "/api/v1/admin"
 
 logger = logging.getLogger(__name__)
 

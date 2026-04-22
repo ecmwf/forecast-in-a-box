@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils'
 
 export interface ListFieldProps {
   id: string
+  configKey: string
   value: string
   onChange: (value: string) => void
   placeholder?: string
@@ -45,6 +46,7 @@ function serializeListValue(items: Array<string>): string {
 
 export function ListField({
   id,
+  configKey,
   value,
   onChange,
   placeholder = 'Add item...',
@@ -54,6 +56,7 @@ export function ListField({
   return (
     <GlyphFieldWrapper
       id={id}
+      configKey={configKey}
       value={value}
       onChange={onChange}
       placeholder={placeholder}
@@ -78,7 +81,7 @@ function ListFieldConcrete({
   placeholder = 'Add item...',
   disabled,
   className,
-}: ListFieldProps) {
+}: Omit<ListFieldProps, 'configKey'>) {
   const [inputValue, setInputValue] = useState('')
   const items = parseListValue(value)
 

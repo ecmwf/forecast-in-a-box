@@ -14,15 +14,15 @@ Declarations related to Artifacts such as ML Model Checkpoints.
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, Self
+from typing import Any, Literal, NewType
 
 from pydantic import BaseModel, Field
 
 # NOTE we may eventually fine-grain this with like cuda versions or architecture etc, form a hierarchy, etc. Or maybe not and this will be enough.
 Platform = Literal["macos", "linux"]
 
-MlModelCheckpointId = str
-ArtifactStoreId = str
+MlModelCheckpointId = NewType("MlModelCheckpointId", str)
+ArtifactStoreId = NewType("ArtifactStoreId", str)
 
 
 @dataclass(frozen=True, eq=True, slots=True)

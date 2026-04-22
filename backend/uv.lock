@@ -1689,6 +1689,7 @@ source = { editable = "packages/fiab-core" }
 dependencies = [
     { name = "earthkit-workflows" },
     { name = "pydantic" },
+    { name = "qubed" },
 ]
 
 [package.dev-dependencies]
@@ -1700,6 +1701,7 @@ dev = [
 requires-dist = [
     { name = "earthkit-workflows" },
     { name = "pydantic" },
+    { name = "qubed", specifier = ">=0.3.1" },
 ]
 
 [package.metadata.requires-dev]
@@ -1736,7 +1738,6 @@ dependencies = [
     { name = "earthkit-workflows" },
     { name = "earthkit-workflows-anemoi" },
     { name = "fiab-core" },
-    { name = "qubed" },
 ]
 
 [package.optional-dependencies]
@@ -1759,7 +1760,6 @@ requires-dist = [
     { name = "earthkit-workflows", specifier = ">=0.9.0" },
     { name = "earthkit-workflows-anemoi", specifier = ">=0.4.0" },
     { name = "fiab-core", editable = "packages/fiab-core" },
-    { name = "qubed", specifier = ">=0.3.1" },
 ]
 provides-extras = ["runtime"]
 

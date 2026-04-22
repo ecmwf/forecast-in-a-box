@@ -1,8 +1,15 @@
 # NOTE we install this runtime along with the main plugin because it has no external dependencies, and the whole testing is a single venv anyway
+import pathlib
+import time
 
 
 def source_42() -> int:
     return 42
+
+
+def source_sleep(text: str, duration: float) -> str:
+    time.sleep(duration)
+    return text
 
 
 def source_text(text: str) -> str:
@@ -17,9 +24,7 @@ def product_join(a: int, b: int) -> int:
     return a + b
 
 
-def sink_file(data, fname: str) -> str:
-    import pathlib
-
+def sink_file(data: object, fname: str) -> str:
     pathlib.Path(fname).write_text(str(data))
 
     # TODO sadly important, otherwise cascade won't detect completion at the moment. Investigate

@@ -7,15 +7,20 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Artifacts routes — /artifacts/*"""
+"""
+Artifacts routes — /artifacts/*. Corresponds to the `domain.artifact` domain.
 
-PREFIX = "/api/v1/artifacts"
+Contains CRUD routes for artifacts (models): list, get, download (which is effectively a create), delete.
+"""
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from forecastbox.domain.artifact.base import CompositeArtifactId, MlModelDetail, MlModelOverview
 from forecastbox.domain.artifact.manager import delete_model, get_model_details, list_models, submit_artifact_download
 from forecastbox.routes.admin import get_admin_user
 from forecastbox.schemata.user import UserRead
+
+PREFIX = "/api/v1/artifacts"
 
 router = APIRouter(
     tags=["artifacts"],

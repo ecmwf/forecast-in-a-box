@@ -22,7 +22,9 @@ from typing import cast
 from sqlalchemy import func, select, update
 
 import forecastbox.schemata.jobs as _jobs_module
+from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound
+from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.schemata.jobs import ExperimentDefinition, ExperimentType
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.db import dbRetry, executeAndCommit, querySingle
@@ -31,26 +33,26 @@ from forecastbox.utility.db import dbRetry, executeAndCommit, querySingle
 async def upsert_experiment_definition(
     *,
     auth_context: AuthContext,
-    experiment_definition_id: str | None = None,
-    blueprint_id: str,
+    experiment_definition_id: ExperimentDefinitionId | None = None,
+    blueprint_id: BlueprintId,
     blueprint_version: int,
     experiment_type: ExperimentType,
-    created_by: str | None,
+    created_by: str,
     experiment_definition: dict | None = None,
     display_name: str | None = None,
     display_description: str | None = None,
     tags: list[str] | None = None,
-) -> tuple[str, int]:
+) -> tuple[ExperimentDefinitionId, int]:
     """Insert a new version of an ExperimentDefinition and return ``(id, version)``.
 
     If ``experiment_definition_id`` is omitted a fresh UUID is generated (version 1).
     For updates, checks that the caller is the owner or has admin access (via
     ``auth_context.allowed()``), raising ``ExperimentAccessDenied`` otherwise.
     Raises ``ExperimentNotFound`` if an ``experiment_definition_id`` is given but
-    does not exist.  ``created_by`` may be ``None`` in passthrough deployments.
+    does not exist.
     """
     id_provided = experiment_definition_id is not None
-    experiment_id = experiment_definition_id or str(uuid.uuid4())
+    experiment_id = experiment_definition_id if experiment_definition_id is not None else ExperimentDefinitionId(str(uuid.uuid4()))
     ref_time = dt.datetime.now()
 
     async def function(i: int) -> int:
@@ -75,7 +77,7 @@ async def upsert_experiment_definition(
                 owner_result = await session.execute(owner_query)
                 row = owner_result.first()
                 if row is not None:
-                    owner: str | None = row[0]
+                    owner: str = row[0]
                     if not auth_context.allowed(owner):
                         raise ExperimentAccessDenied(
                             f"User {auth_context.user_id!r} is not allowed to modify ExperimentDefinition {experiment_id!r}."
@@ -105,7 +107,9 @@ async def upsert_experiment_definition(
     return experiment_id, new_version
 
 
-async def get_experiment_definition(experiment_definition_id: str, version: int | None = None) -> ExperimentDefinition | None:
+async def get_experiment_definition(
+    experiment_definition_id: ExperimentDefinitionId, version: int | None = None
+) -> ExperimentDefinition | None:
     """Return a specific or the latest non-deleted version of an ExperimentDefinition.
 
     No authorization is applied; possession of the experiment ID is treated as
@@ -210,7 +214,7 @@ async def count_experiment_definitions(
     return await dbRetry(function)
 
 
-async def soft_delete_experiment_definition(experiment_id: str, *, auth_context: AuthContext) -> None:
+async def soft_delete_experiment_definition(experiment_id: ExperimentDefinitionId, *, auth_context: AuthContext) -> None:
     """Mark all versions of an ExperimentDefinition as deleted.
 
     Raises ``ExperimentNotFound`` if the blueprint does not exist, and
@@ -219,7 +223,7 @@ async def soft_delete_experiment_definition(experiment_id: str, *, auth_context:
     existing = await get_experiment_definition(experiment_id)
     if existing is None:
         raise ExperimentNotFound(f"No ExperimentDefinition with id={experiment_id!r}.")
-    if not auth_context.allowed(cast(str | None, existing.created_by)):
+    if not auth_context.allowed(cast(str, existing.created_by)):
         raise ExperimentAccessDenied(f"User {auth_context.user_id!r} is not allowed to delete ExperimentDefinition {experiment_id!r}.")
     stmt = update(ExperimentDefinition).where(ExperimentDefinition.experiment_definition_id == experiment_id).values(is_deleted=True)
     await executeAndCommit(stmt, _jobs_module.async_session_maker)

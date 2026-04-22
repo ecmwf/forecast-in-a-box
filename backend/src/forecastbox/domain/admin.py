@@ -10,7 +10,8 @@
 """This module tries to collect all functionality related to updating fiab itself.
 As such, it is tightly coupled with the fiab.sh launcher -- make sure updates to either
 are done in concert, and that the coupling does not leak to other parts of the code.
-"""
+
+No dependence on or by any other domain."""
 
 import dataclasses
 import logging

@@ -13,6 +13,7 @@ import { InputGroupInput } from '@/components/ui/input-group'
 
 export interface DateTimeFieldProps {
   id: string
+  configKey: string
   value: string
   onChange: (value: string) => void
   isDateOnly?: boolean
@@ -23,6 +24,7 @@ export interface DateTimeFieldProps {
 
 export function DateTimeField({
   id,
+  configKey,
   value,
   onChange,
   isDateOnly = false,
@@ -33,6 +35,7 @@ export function DateTimeField({
   return (
     <GlyphFieldWrapper
       id={id}
+      configKey={configKey}
       value={value}
       onChange={onChange}
       placeholder={placeholder}

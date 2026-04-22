@@ -216,6 +216,8 @@ class TemporalStatistics(Product):
             action = param.min(dim=STEP_DIM)
         elif stat == "max":
             action = param.max(dim=STEP_DIM)
+        else:
+            return Either.error(f"Unsupported temporal statistic: {stat}")
         return Either.ok(action)
 
     def intersect(self, other: QubedOutput) -> bool:  # type: ignore[override]

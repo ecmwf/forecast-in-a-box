@@ -7,12 +7,15 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Experiment entity routes — /experiment/*
+"""
+Experiment entity routes — /experiment/*. Corresponds to the `domain.experiment` submodule.
 
-Covers cron-schedule experiments and their operational controls.
+Contains three categories of routes:
+ - complete CRUD+list for Experiment,
+ - routes related to the domain entity Run -- each Run has a foreign key to Experiment, thus with an ExperimentId we can list all its Runs, or determine when a next Run will be in case the Experiment is cron-based
+ - operational routes for the scheduler module -- not related to any domain entity, but to backend itself
 """
 
-PREFIX = "/api/v1/experiment"
 import datetime as dt
 import logging
 from typing import Annotated, cast
@@ -21,14 +24,19 @@ from fastapi import APIRouter, Depends
 from fastapi.exceptions import HTTPException
 from pydantic import BaseModel, PositiveInt
 
-import forecastbox.domain.experiment.service as experiment_service
+from forecastbox.domain.auth.users import get_auth_context
+from forecastbox.domain.blueprint.types import BlueprintId
+from forecastbox.domain.experiment import service
 from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound, ExperimentVersionConflict, SchedulerBusy
 from forecastbox.domain.experiment.scheduling.background import start_scheduler, stop_scheduler
-from forecastbox.entrypoint.auth.users import get_auth_context
+from forecastbox.domain.experiment.types import ExperimentDefinitionId
+from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import ExperimentDefinition
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.time import current_time
+
+PREFIX = "/api/v1/experiment"
 
 logger = logging.getLogger(__name__)
 
@@ -43,19 +51,19 @@ router = APIRouter(
 # ---------------------------------------------------------------------------
 
 
-class ExperimentId(BaseModel):
+class ExperimentLookup(BaseModel):
     """Identifies an experiment, optionally pinning a specific version.
 
     Used as a Depends()-based query-param group on GET endpoints, and as a
     request body field on endpoints that address a specific experiment version.
     """
 
-    experiment_id: str
+    experiment_id: ExperimentDefinitionId
     version: int | None = None
 
 
 class ExperimentCreateRequest(BaseModel):
-    blueprint_id: str
+    blueprint_id: BlueprintId
     blueprint_version: int | None = None
     cron_expr: str
     max_acceptable_delay_hours: PositiveInt = 24
@@ -66,19 +74,19 @@ class ExperimentCreateRequest(BaseModel):
 
 
 class ExperimentCreateResponse(BaseModel):
-    experiment_id: str
+    experiment_id: ExperimentDefinitionId
 
 
 class ExperimentDetail(BaseModel):
-    experiment_id: str
+    experiment_id: ExperimentDefinitionId
     experiment_version: int
-    blueprint_id: str
+    blueprint_id: BlueprintId
     blueprint_version: int
     cron_expr: str
     max_acceptable_delay_hours: int
     enabled: bool
     created_at: str
-    created_by: str | None
+    created_by: str
     display_name: str | None
     display_description: str | None
     tags: list[str] | None = None
@@ -95,7 +103,7 @@ class ExperimentListResponse(BaseModel):
 class ExperimentUpdateRequest(BaseModel):
     """Update a cron-schedule experiment. ``version`` must match the current version."""
 
-    experiment_id: str
+    experiment_id: ExperimentDefinitionId
     version: int
     cron_expr: str | None = None
     enabled: bool | None = None
@@ -106,12 +114,12 @@ class ExperimentUpdateRequest(BaseModel):
 class ExperimentDeleteRequest(BaseModel):
     """Soft-delete an experiment. ``version`` must match the current version."""
 
-    experiment_id: str
+    experiment_id: ExperimentDefinitionId
     version: int
 
 
 class ExperimentRunDetail(BaseModel):
-    run_id: str
+    run_id: RunId
     attempt_count: int
     status: str
     created_at: str
@@ -135,15 +143,15 @@ class ExperimentRunsResponse(BaseModel):
 def _experiment_to_detail(exp: ExperimentDefinition) -> ExperimentDetail:
     exp_def = cast(dict, exp.experiment_definition) or {}
     return ExperimentDetail(
-        experiment_id=str(exp.experiment_definition_id),  # ty:ignore[invalid-argument-type]
+        experiment_id=ExperimentDefinitionId(str(exp.experiment_definition_id)),  # ty:ignore[invalid-argument-type]
         experiment_version=cast(int, exp.version),
-        blueprint_id=str(exp.blueprint_id),  # ty:ignore[invalid-argument-type]
+        blueprint_id=BlueprintId(str(exp.blueprint_id)),  # ty:ignore[invalid-argument-type]
         blueprint_version=cast(int, exp.blueprint_version),
         cron_expr=str(exp_def.get("cron_expr", "")),
         max_acceptable_delay_hours=int(exp_def.get("max_acceptable_delay_hours", 24)),
         enabled=bool(exp_def.get("enabled", True)),
         created_at=str(exp.created_at),
-        created_by=cast(str | None, exp.created_by),
+        created_by=cast(str, exp.created_by),
         display_name=cast(str | None, exp.display_name),
         display_description=cast(str | None, exp.display_description),
         tags=cast(list[str] | None, exp.tags),
@@ -162,7 +170,7 @@ async def create_experiment(
 ) -> ExperimentCreateResponse:
     """Create a new cron-schedule experiment."""
     try:
-        experiment_id = await experiment_service.create_schedule(
+        experiment_id = await service.create_schedule(
             auth_context=auth_context,
             blueprint_id=request.blueprint_id,
             blueprint_version=request.blueprint_version,
@@ -184,12 +192,12 @@ async def create_experiment(
 
 @router.get("/get")
 async def get_experiment(
-    spec: Annotated[ExperimentId, Depends()],
+    spec: Annotated[ExperimentLookup, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> ExperimentDetail:
     """Retrieve a single experiment by id."""
     try:
-        exp = await experiment_service.get_schedule(auth_context, spec.experiment_id)
+        exp = await service.get_schedule(auth_context, spec.experiment_id)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     return _experiment_to_detail(exp)
@@ -202,7 +210,7 @@ async def list_experiments(
 ) -> ExperimentListResponse:
     """List experiments visible to the caller, with pagination."""
     try:
-        experiments, total, total_pages = await experiment_service.list_schedules(auth_context, pagination)
+        experiments, total, total_pages = await service.list_schedules(auth_context, pagination)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     items = [_experiment_to_detail(exp) for exp in experiments]
@@ -221,7 +229,7 @@ async def update_experiment(
     ``version`` must match the current experiment version; returns 409 if it does not.
     """
     try:
-        current = await experiment_service.get_schedule(auth_context, update.experiment_id)
+        current = await service.get_schedule(auth_context, update.experiment_id)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     if cast(int, current.version) != update.version:
@@ -233,7 +241,7 @@ async def update_experiment(
             ),
         )
     try:
-        updated = await experiment_service.update_schedule(
+        updated = await service.update_schedule(
             auth_context=auth_context,
             experiment_id=update.experiment_id,
             cron_expr=update.cron_expr,
@@ -264,7 +272,7 @@ async def delete_experiment(
     ``version`` must match the current experiment version; returns 409 if it does not.
     """
     try:
-        current = await experiment_service.get_schedule(auth_context, request.experiment_id)
+        current = await service.get_schedule(auth_context, request.experiment_id)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     if cast(int, current.version) != request.version:
@@ -276,7 +284,7 @@ async def delete_experiment(
             ),
         )
     try:
-        await experiment_service.delete_schedule(auth_context, request.experiment_id)
+        await service.delete_schedule(auth_context, request.experiment_id)
     except SchedulerBusy as e:
         raise HTTPException(status_code=503, detail=str(e))
     except ExperimentNotFound as e:
@@ -292,20 +300,20 @@ async def delete_experiment(
 
 @router.get("/runs/list")
 async def list_experiment_runs(
-    spec: Annotated[ExperimentId, Depends()],
+    spec: Annotated[ExperimentLookup, Depends()],
     pagination: Annotated[PaginationSpec, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> ExperimentRunsResponse:
     """Return paginated execution rows linked to a cron-schedule experiment."""
     try:
-        executions, total, total_pages = await experiment_service.get_schedule_runs(auth_context, spec.experiment_id, pagination)
+        executions, total, total_pages = await service.get_schedule_runs(auth_context, spec.experiment_id, pagination)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     runs = [
         ExperimentRunDetail(
-            run_id=str(ex.run_id),  # ty:ignore[invalid-argument-type]
+            run_id=RunId(str(ex.run_id)),  # ty:ignore[invalid-argument-type]
             attempt_count=cast(int, ex.attempt_count),
             status=cast(str, ex.status),
             created_at=str(ex.created_at),
@@ -319,12 +327,12 @@ async def list_experiment_runs(
 
 @router.get("/runs/next")
 async def get_next_experiment_run(
-    spec: Annotated[ExperimentId, Depends()],
+    spec: Annotated[ExperimentLookup, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> str:
     """Return the next scheduled run time, or 'not scheduled currently'."""
     try:
-        return await experiment_service.get_next_run(auth_context, spec.experiment_id)
+        return await service.get_next_run(auth_context, spec.experiment_id)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
 

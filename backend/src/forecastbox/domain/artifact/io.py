@@ -22,7 +22,7 @@ from pathlib import Path
 
 import httpx
 from cascade.low.func import assert_never
-from fiab_core.artifacts import ArtifactStoreId, MlModelCheckpoint
+from fiab_core.artifacts import ArtifactStoreId, MlModelCheckpoint, MlModelCheckpointId
 from pyrsistent import pmap
 
 from forecastbox.domain.artifact.base import ArtifactCatalog, CompositeArtifactId, artifacts_subdir, get_artifact_local_path
@@ -79,7 +79,9 @@ def list_local_storage(artifacts_catalog: ArtifactCatalog, data_dir: Path) -> li
                 continue
 
             checkpoint_id = checkpoint_item.name
-            composite_id = CompositeArtifactId(artifact_store_id=store_id, ml_model_checkpoint_id=checkpoint_id)
+            composite_id = CompositeArtifactId(
+                artifact_store_id=ArtifactStoreId(store_id), ml_model_checkpoint_id=MlModelCheckpointId(checkpoint_id)
+            )
 
             if composite_id in artifacts_catalog:
                 local_artifacts.append(composite_id)

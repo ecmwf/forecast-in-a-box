@@ -13,6 +13,7 @@ import { InputGroupInput } from '@/components/ui/input-group'
 
 export interface NumberFieldProps {
   id: string
+  configKey: string
   value: string
   onChange: (value: string) => void
   isInteger?: boolean
@@ -23,6 +24,7 @@ export interface NumberFieldProps {
 
 export function NumberField({
   id,
+  configKey,
   value,
   onChange,
   isInteger = false,
@@ -33,6 +35,7 @@ export function NumberField({
   return (
     <GlyphFieldWrapper
       id={id}
+      configKey={configKey}
       value={value}
       onChange={onChange}
       placeholder={placeholder}
