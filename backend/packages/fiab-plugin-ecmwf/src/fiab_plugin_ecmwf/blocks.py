@@ -21,6 +21,7 @@ from fiab_core.fable import (
     BlockInstanceOutput,
     NoOutput,
     QubedOutput,
+    RawOutput,
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import Product, Sink, Source
@@ -340,11 +341,12 @@ class MapPlotSink(Sink):
             description="Dimension to create subplots over",
             value_type="enum['valid_datetime', 'step', 'number', 'none']",
         ),
-        "style_schema": BlockConfigurationOption(
-            title="Style Schema",
-            description="earthkit-plots schema identifier (e.g. 'inbuilt://fiab')",
-            value_type="str",
-        ),
+        # Disabled for now
+        # "style_schema": BlockConfigurationOption(
+        #     title="Style Schema",
+        #     description="earthkit-plots schema identifier",
+        #     value_type="str",
+        # ),
     }
     inputs: list[str] = ["dataset"]
 
@@ -373,7 +375,7 @@ class MapPlotSink(Sink):
                 f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
             )
 
-        return Either.ok(NoOutput())
+        return Either.ok(RawOutput(type_fqn=f"image/{block.configuration_values['format']}"))
 
     def compile(
         self,
@@ -397,7 +399,7 @@ class MapPlotSink(Sink):
                     "domain": block.configuration_values["domain"] or None,
                     "format": block.configuration_values["format"] or "png",
                     "groupby": block.configuration_values["groupby"] or "valid_datetime",
-                    "style_schema": block.configuration_values["style_schema"] or "inbuilt://fiab",
+                    # "style_schema": block.configuration_values["style_schema"] or "inbuilt://fiab",
                 },
             )
         )
