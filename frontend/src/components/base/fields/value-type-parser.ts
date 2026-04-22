@@ -20,7 +20,6 @@
  * - datetime → datetime-local input
  * - date-iso8601 → date input
  * - list[str] → tag input (badges with add/remove)
- * - list[int] → tag input (badges with add/remove)
  * - enum['a','b','c'] → select dropdown
  */
 
@@ -31,7 +30,6 @@ export type ParsedValueType =
   | { type: 'datetime' }
   | { type: 'date' }
   | { type: 'list'; itemType: 'string' }
-  | { type: 'list'; itemType: 'int' }
   | { type: 'enum'; options: Array<string> }
   | { type: 'unknown'; raw: string }
 
@@ -66,17 +64,14 @@ export function parseValueType(valueType: string | undefined): ParsedValueType {
     return { type: 'date' }
   }
 
-  // List type: list[str] or list[int]
+  // List type: list[str]
   const listMatch = valueType.match(/^list\[(\w+)\]$/i)
   if (listMatch) {
     const itemType = listMatch[1].toLowerCase()
     if (itemType === 'str' || itemType === 'string') {
       return { type: 'list', itemType: 'string' }
     }
-    if (itemType === 'int' || itemType === 'integer') {
-      return { type: 'list', itemType: 'int' }
-    }
-    // For now, only support list[str] and list[int]
+    // For now, only support list[str]
     return { type: 'unknown', raw: valueType }
   }
 
