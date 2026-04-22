@@ -22,12 +22,13 @@ from multiprocessing.process import BaseProcess
 from tempfile import TemporaryDirectory
 from typing import NewType
 
+from cascade.deployment.logging import LoggingConfig
 from cascade.executor import platform
 from cascade.gateway import api, client
+from cascade.gateway.server import main_enp
 from fastapi import APIRouter, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
 
-from forecastbox.entrypoint.bootstrap.launchers import launch_cascade
 from forecastbox.utility.config import StatusMessage, config
 
 PREFIX = "/api/v1/gateway"
@@ -51,6 +52,15 @@ def kill_gw(process: GatewayProcess) -> None:
     if process.exitcode is None:
         logger.debug("gateway kill")
         process.kill()
+
+
+def launch_cascade(cascade_url: str, log_base: str | None, max_concurrent_jobs: int | None) -> None:
+    loggingConfig = LoggingConfig(path_base=log_base, formatter="line")
+
+    try:
+        main_enp(url=cascade_url, loggingConfig=loggingConfig, max_jobs=max_concurrent_jobs)
+    except KeyboardInterrupt:
+        pass  # no need to spew stacktrace to log
 
 
 class Globals:
@@ -93,9 +103,9 @@ async def start_gateway() -> str:
 
     logs_directory = None if os.getenv("FIAB_LOGSTDOUT", "nay") == "yea" else Globals.logs_directory.name + os.sep
     max_concurrent_jobs = config.cascade.max_concurrent_jobs
-    # TODO for some reason changes to os.environ were *not* visible by the child process! Investigate and re-enable:
-    # export_recursive(config.model_dump(), config.model_config["env_nested_delimiter"], config.model_config["env_prefix"])
-    process = platform.get_mp_ctx("gateway").Process(target=launch_cascade, args=(logs_directory, max_concurrent_jobs))  # type: ignore[unresolved-attribute] # context
+    process = platform.get_mp_ctx("gateway").Process(
+        target=launch_cascade, args=(config.cascade.cascade_url, logs_directory, max_concurrent_jobs)
+    )  # type: ignore[unresolved-attribute] # context
     process.start()
     Globals.gateway = GatewayProcess(process)
     logger.debug(f"spawned new gateway process with pid {process.pid}")

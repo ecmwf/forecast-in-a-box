@@ -5,32 +5,7 @@ The subtasks are not related, you can use subagents per task.
 There is no behaviour change, thus only syntactic or cosmetic changes to tests are expected. No new tests are expected.
 
 
-## Section 1 — Import hierarchy violation: `routes` imports from `entrypoint`
-
-**Guideline reference**: _High Level Code Organization_ — "Make sure you don't break importing
-hierarchies: utility < schemata < domain < routes < entrypoint"
-
-`routes/gateway.py` imports `launch_cascade` from `forecastbox.entrypoint.bootstrap.launchers`.
-Routes must not depend on entrypoint; the hierarchy explicitly forbids this direction.
-
-**Affected file and line**
-
-| File | Line | Import |
-|------|------|--------|
-| `backend/src/forecastbox/routes/gateway.py` | 31 | `from forecastbox.entrypoint.bootstrap.launchers import launch_cascade` |
-
-**Hint**: Move the `launch_cascade` function (or an appropriate subset of its logic) out of
-`entrypoint` and into a lower layer — either `utility` or a dedicated `domain` module — so
-that `routes/gateway.py` can import it without crossing the hierarchy boundary. An alternative
-is to pass the function as a dependency/callable injected at startup, keeping `routes` free of
-any entrypoint import.
-
-Note: do *NOT* implement this right away -- propose one or more solutions first, then have the
-user approve explicitly!
-
----
-
-## Section 2 — Non-ORM classes declared in `schemata/user.py`
+## Section 1 — Non-ORM classes declared in `schemata/user.py`
 
 **Guideline reference**: _High Level Code Organization_ — "do not declare any functions in
 these files, only the ORM classes themselves, and the function related to discovery:
@@ -54,7 +29,7 @@ works after the move.
 
 ---
 
-## Section 3 — Direct database session access in `routes/admin.py` bypasses the db lock
+## Section 2 — Direct database session access in `routes/admin.py` bypasses the db lock
 
 **Guideline reference**: _Concurrency Considerations_ — "When doing database access, you *must*
 respect this lock, as all existing `db.py` submodules across domains do"
