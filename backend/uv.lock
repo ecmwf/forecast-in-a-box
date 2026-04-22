@@ -1302,16 +1302,16 @@ wheels = [
 
 [[package]]
 name = "earthkit-workflows-anemoi"
-version = "0.5.1"
+version = "0.5.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anemoi-utils" },
     { name = "earthkit-workflows" },
     { name = "qubed" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b9/18/49df56d5f08cc56e7931b9821a8fd121f9e9c5ee87b406d7581f8d08c8aa/earthkit_workflows_anemoi-0.5.1.tar.gz", hash = "sha256:f3eca88aa33011c6ea6d70783fef71ad7843991485efed3b4f64c3233b0e985c", size = 36389, upload-time = "2026-04-22T13:42:42.41Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fd/ce/54b35e0e3c34b0a2fd17637265bc28f7697aac864cff65a14d5f2ca57010/earthkit_workflows_anemoi-0.5.2.tar.gz", hash = "sha256:df45eb62ed51aca68fe8f90da7411988a23d1322a1c1546ce58286859615efbb", size = 36313, upload-time = "2026-04-22T16:17:34.72Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/62/47/87516850b85c1aa5181eb51a76a30cea185917c0cc34946bcdabf43479cd/earthkit_workflows_anemoi-0.5.1-py3-none-any.whl", hash = "sha256:c648e92a45b7f630f67aeeebb084c445d46260306d508af0842fe88a19e29714", size = 22967, upload-time = "2026-04-22T13:42:41.45Z" },
+    { url = "https://files.pythonhosted.org/packages/42/4d/a5fc0199b7962475130b09388a02a5be02051c2b4295ebfee72c50304e79/earthkit_workflows_anemoi-0.5.2-py3-none-any.whl", hash = "sha256:4ebc454f18d1966a943ba253f499992750619ba4cf56fdf36a8620594abdc336", size = 22934, upload-time = "2026-04-22T16:17:33.745Z" },
 ]
 
 [[package]]
@@ -1609,7 +1609,7 @@ requires-dist = [
     { name = "earthkit-plots", marker = "extra == 'runtime'", specifier = ">=0.3.5,<1.0" },
     { name = "earthkit-plots-default-styles", marker = "extra == 'runtime'", specifier = ">=0.1" },
     { name = "earthkit-workflows", specifier = ">=0.9.0" },
-    { name = "earthkit-workflows-anemoi", specifier = ">=0.5.1" },
+    { name = "earthkit-workflows-anemoi", specifier = ">=0.5.2" },
     { name = "fiab-core", editable = "packages/fiab-core" },
 ]
 provides-extras = ["runtime"]
