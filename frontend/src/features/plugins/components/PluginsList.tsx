@@ -15,7 +15,7 @@
  * Follows the ForecastJournal pattern for responsive table design.
  */
 
-import { ChevronLeft, ChevronRight, Package } from 'lucide-react'
+import { Package } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { PluginCard } from './PluginCard'
 import { PluginRow } from './PluginRow'
@@ -117,7 +117,7 @@ export function PluginsList({
         ))}
       </div>
 
-      {/* Footer/Pagination */}
+      {/* Footer */}
       <div className="flex items-center justify-between border-t border-border bg-muted/50 px-6 py-4">
         <span className="text-sm text-muted-foreground">
           {t('pagination.showing', {
@@ -126,17 +126,6 @@ export function PluginsList({
             total: plugins.length,
           })}
         </span>
-        <div className="flex gap-2">
-          <button
-            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
-            disabled
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-          <button className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
-            <ChevronRight className="h-5 w-5" />
-          </button>
-        </div>
       </div>
     </Card>
   )

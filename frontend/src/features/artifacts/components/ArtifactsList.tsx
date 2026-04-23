@@ -15,7 +15,7 @@
  * Follows the PluginsList pattern for responsive table design.
  */
 
-import { ChevronLeft, ChevronRight, Package } from 'lucide-react'
+import { Package } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ArtifactCard } from './ArtifactCard'
 import { ArtifactRow } from './ArtifactRow'
@@ -138,17 +138,6 @@ export function ArtifactsList({
             total: artifacts.length,
           })}
         </span>
-        <div className="flex gap-2">
-          <button
-            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
-            disabled
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-          <button className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
-            <ChevronRight className="h-5 w-5" />
-          </button>
-        </div>
       </div>
     </Card>
   )

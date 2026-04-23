@@ -29,8 +29,6 @@ import { useJobsStatus } from '@/api/hooks/useJobs'
 import { isTerminalStatus } from '@/api/types/job.types'
 import { useActivityStore } from '@/stores/activityStore'
 
-const COMPLETION_RETENTION_MS = 15_000
-
 /**
  * Sync model downloads from the download store into the activity store.
  */
@@ -142,46 +140,16 @@ function useCollectJobs() {
   }, [data])
 }
 
-/**
- * Auto-remove completed/failed tasks after retention period.
- */
-function useRetentionCleanup() {
-  const tasks = useActivityStore((state) => state.tasks)
-
-  useEffect(() => {
-    const completedTasks = Object.values(tasks).filter(
-      (item): item is NonNullable<typeof item> =>
-        item !== undefined && item.status !== 'active' && !!item.completedAt,
-    )
-
-    if (completedTasks.length === 0) return
-
-    const timers: Array<ReturnType<typeof setTimeout>> = []
-    for (const task of completedTasks) {
-      // completedAt is guaranteed non-undefined by the filter above
-      const elapsed = Date.now() - task.completedAt!
-      const remaining = Math.max(0, COMPLETION_RETENTION_MS - elapsed)
-      timers.push(
-        setTimeout(
-          () => useActivityStore.getState().removeTask(task.id),
-          remaining,
-        ),
-      )
-    }
-
-    return () => timers.forEach(clearTimeout)
-  }, [tasks])
-}
-
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 /**
  * Mount this hook once in the app shell to collect activity from all sources.
+ * Completed/failed entries remain in the Notification Center until the user
+ * dismisses them (individually or via "Clear").
  */
 export function useActivityCollector() {
   useCollectDownloads()
   useCollectJobs()
-  useRetentionCleanup()
 }

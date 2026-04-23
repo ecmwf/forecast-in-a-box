@@ -31,8 +31,8 @@
 import { createLogger } from '@/lib/logger'
 
 export function getBackendBaseUrl(): string {
-  // Use nullish coalescing to preserve empty string as a valid value
-  return import.meta.env.VITE_API_BASE_URL ?? ''
+  // Default to empty string if the env var is unset at runtime.
+  return import.meta.env.VITE_API_BASE_URL || ''
 }
 
 /**

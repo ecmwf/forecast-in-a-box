@@ -119,10 +119,13 @@ export async function getJobResult(
 }
 
 /**
- * Probe the output's MIME type without fetching the full body. Starlette
- * answers HEAD for every GET route automatically, so the response carries
- * Content-Type with no payload — cheap for GRIB/NetCDF outputs that might
- * otherwise be megabytes or gigabytes.
+ * Probe the output's MIME type without downloading the full body.
+ *
+ * We issue a GET and abort as soon as the response headers arrive. A HEAD
+ * request would be cheaper on paper, but Vite's dev proxy doesn't forward
+ * HEAD to /api routes — the SPA fallback intercepts and serves index.html
+ * (text/html). GET + abort works uniformly in dev and prod, still avoids
+ * downloading multi-gigabyte GRIB/NetCDF payloads.
  */
 export async function headJobResultContentType(
   runId: string,
@@ -132,13 +135,26 @@ export async function headJobResultContentType(
     run_id: runId,
     dataset_id: datasetId,
   })
-  const response = await fetch(url, {
-    method: 'HEAD',
-    credentials: 'include',
-    headers: buildHeaders(),
-  })
-  if (!response.ok) return null
-  return response.headers.get('content-type')
+  const controller = new AbortController()
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+      headers: buildHeaders(),
+      signal: controller.signal,
+    })
+    // Headers have arrived — abort to cancel body streaming.
+    controller.abort()
+    if (!response.ok) return null
+    return response.headers.get('content-type')
+  } catch (err) {
+    // AbortError can fire if the abort races the fetch resolution; treat
+    // as "unknown mime type" rather than propagating.
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      return null
+    }
+    throw err
+  }
 }
 
 export async function downloadJobLogs(runId: string): Promise<Blob> {

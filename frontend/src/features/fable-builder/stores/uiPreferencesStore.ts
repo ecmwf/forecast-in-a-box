@@ -17,6 +17,7 @@
 
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { STORAGE_KEYS } from '@/lib/storage-keys'
 
 const LEFT_MIN = 200
 const LEFT_MAX = 400
@@ -51,7 +52,7 @@ export const useUiPreferencesStore = create<UiPreferencesState>()(
       resetRightSidebarWidth: () => set({ rightSidebarWidth: RIGHT_DEFAULT }),
     }),
     {
-      name: 'fable-builder-ui-preferences',
+      name: STORAGE_KEYS.stores.fableBuilderUi,
       partialize: (state) => ({
         leftSidebarWidth: state.leftSidebarWidth,
         rightSidebarWidth: state.rightSidebarWidth,

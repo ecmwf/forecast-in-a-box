@@ -40,7 +40,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { H1 } from '@/components/base/typography'
-import { cn } from '@/lib/utils'
+import { cn, copyToClipboard } from '@/lib/utils'
 import { showToast } from '@/lib/toast'
 import {
   Tooltip,
@@ -91,8 +91,12 @@ export function FableBuilderHeader({
         ? 'Fix validation errors before submitting'
         : undefined
 
-  function handleShare(): void {
-    navigator.clipboard.writeText(window.location.href)
+  async function handleShare(): Promise<void> {
+    const ok = await copyToClipboard(window.location.href)
+    if (!ok) {
+      showToast.error('Could not copy link to clipboard')
+      return
+    }
     setShareButtonText('Copied!')
     clearTimeout(shareTimeoutRef.current)
     shareTimeoutRef.current = setTimeout(

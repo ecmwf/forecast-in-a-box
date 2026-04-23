@@ -14,7 +14,13 @@
  * Shared status icon for job execution status display.
  */
 
-import { AlertCircle, CheckCircle2, Hourglass, Loader2 } from 'lucide-react'
+import {
+  AlertCircle,
+  CheckCircle2,
+  HelpCircle,
+  Hourglass,
+  Loader2,
+} from 'lucide-react'
 import type { JobStatus } from '@/api/types/job.types'
 
 export function JobStatusIcon({ status }: { status: JobStatus }) {
@@ -30,5 +36,7 @@ export function JobStatusIcon({ status }: { status: JobStatus }) {
       )
     case 'failed':
       return <AlertCircle className="h-5 w-5 fill-red-500 text-red-500" />
+    case 'unknown':
+      return <HelpCircle className="h-5 w-5 text-gray-400" />
   }
 }

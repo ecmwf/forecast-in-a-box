@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { P } from '@/components/base/typography'
 import { FiabStackSection } from '@/features/landing/components/FiabStackSection.tsx'
@@ -28,6 +28,7 @@ export const Route = createFileRoute('/')({
 
 function Index() {
   const { isAuthenticated, isLoading } = useAuth()
+  const navigate = useNavigate()
 
   // Redirect authenticated users to dashboard
   useEffect(() => {
@@ -40,17 +41,17 @@ function Index() {
 
       if (storedRedirect && isValidInternalRedirect(storedRedirect)) {
         log.info('Redirecting to stored location:', storedRedirect)
-        window.location.href = storedRedirect
-      } else if (storedRedirect) {
-        // Log if a redirect was present but invalid
+        navigate({ to: storedRedirect })
+        return
+      }
+      if (storedRedirect) {
         log.warn('Invalid redirect URL blocked:', storedRedirect)
       }
 
-      // Default redirect to dashboard
       log.info('Redirecting to /dashboard')
-      window.location.href = '/dashboard'
+      navigate({ to: '/dashboard' })
     }
-  }, [isLoading, isAuthenticated])
+  }, [isLoading, isAuthenticated, navigate])
 
   // Show loading while checking auth
   if (isLoading) {

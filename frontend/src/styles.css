@@ -21,7 +21,7 @@
   --accent: oklch(0.9674 0.0013 286.3752);
   --accent-foreground: oklch(0.2103 0.0059 285.8852);
   --destructive: oklch(0.583 0.2387 28.4765);
-  --destructive-foreground: oklch(0.583 0.2387 28.4765);
+  --destructive-foreground: oklch(0.9851 0 0);
   --border: oklch(0.9197 0.004 286.3202);
   --input: oklch(0.9197 0.004 286.3202);
   --ring: oklch(0.8711 0.0055 286.286);
@@ -191,29 +191,20 @@
   }
 }
 
-/* Dark mode scrollbar styling */
-.dark-scrollbar {
-  scrollbar-color: hsl(0 0% 40%) transparent;
-  scrollbar-width: thin;
-}
-
-.dark-scrollbar::-webkit-scrollbar {
-  width: 8px;
-}
-
-.dark-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.dark-scrollbar::-webkit-scrollbar-thumb {
-  background-color: hsl(0 0% 40%);
-  border-radius: 4px;
-}
-
-.dark .dark-scrollbar {
-  scrollbar-color: hsl(0 0% 50%) transparent;
-}
-
-.dark .dark-scrollbar::-webkit-scrollbar-thumb {
-  background-color: hsl(0 0% 50%);
+/*
+ * Respect the user's OS-level motion preference. Disables page-wide
+ * CSS transitions, animations, scroll behaviour, and scroll-linked
+ * animations when `prefers-reduced-motion: reduce` is set. Components
+ * that still need controlled motion can opt back in by setting
+ * `animation` / `transition` explicitly on a more specific selector.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -18,11 +18,20 @@
   "yes": "Yes",
   "no": "No",
   "activity": {
-    "label": "Notifications",
-    "title": "Notifications",
-    "help": "Monitor long-running tasks such as model downloads, plugin installations, and forecast job executions.",
+    "label": "Notification Center",
+    "title": "Notification Center",
+    "help": "Shows long-running tasks such as model downloads, plugin installations, and forecast job executions. Completed items stay here until you dismiss them.",
     "clear": "Clear",
-    "empty": "No active tasks"
+    "clearAll": "Clear all",
+    "empty": "No notifications",
+    "sectionOngoing": "Ongoing",
+    "sectionCompleted": "Completed",
+    "emptyOngoing": "No active tasks",
+    "emptyCompleted": "No completed tasks",
+    "filterPlaceholder": "Filter notifications…",
+    "noMatches": "No matches",
+    "dismiss": "Dismiss",
+    "viewAll": "Open executions"
   },
   "nav": {
     "label": "Main navigation",

@@ -44,6 +44,7 @@ const MIME_META: Record<string, MimeMeta> = {
   'application/grib': { icon: FileDown, label: 'GRIB', ext: 'grib' },
   'application/netcdf': { icon: Globe, label: 'NetCDF', ext: 'nc' },
   'application/numpy': { icon: Binary, label: 'NumPy', ext: 'npy' },
+  'application/pickle': { icon: Binary, label: 'Pickle (bytes)', ext: 'pkl' },
 }
 
 const UNKNOWN_META: MimeMeta = {
@@ -51,6 +52,11 @@ const UNKNOWN_META: MimeMeta = {
   label: 'Unknown',
   ext: 'bin',
 }
+
+// PNG file signature (first 8 bytes).
+const PNG_MAGIC = new Uint8Array([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+])
 
 function getMimeMeta(contentType: string | null): MimeMeta {
   if (!contentType) return UNKNOWN_META
@@ -70,23 +76,54 @@ export function OutputCard({ jobId, taskId, productName }: OutputCardProps) {
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
+  // Promoted MIME when a PNG magic sniff succeeds on an application/pickle
+  // blob. See the effect below — remove alongside that block once the
+  // backend emits correct Content-Type for image sinks.
+  const [sniffedContentType, setSniffedContentType] = useState<string | null>(
+    null,
+  )
 
+  const effectiveContentType = sniffedContentType ?? contentType
   const {
     icon: Icon,
     label: contentTypeLabel,
     ext: fileExt,
-  } = getMimeMeta(contentType)
-  const isPng = contentType === 'image/png'
+  } = getMimeMeta(effectiveContentType)
+  const isPng = effectiveContentType === 'image/png'
+  // WORKAROUND: cascade's encode_result (backend/src/forecastbox/domain/run/
+  // cascade.py) labels any raw-bytes result as `application/pickle`, including
+  // the PNG bytes from sink_image. We sniff the PNG magic bytes to render
+  // inline anyway. Drop this branch (and the sniffedContentType state) once
+  // the backend emits Content-Type: image/png for image sinks.
+  const shouldFetchForPreview =
+    isPng ||
+    (contentType === 'application/pickle' && sniffedContentType === null)
 
   useEffect(() => {
-    if (!isPng) return
+    if (!shouldFetchForPreview) return
 
     let revoked = false
     setIsLoading(true)
 
     getJobResult(jobId, taskId)
-      .then(({ blob }) => {
+      .then(async ({ blob }) => {
         if (revoked) return
+
+        // For pickle-labeled blobs, promote to image/png only if the magic
+        // matches; otherwise fall through to the non-preview rendering.
+        if (contentType === 'application/pickle') {
+          const head = new Uint8Array(await blob.slice(0, 8).arrayBuffer())
+          // Re-check revoked since we just awaited — the component may have
+          // unmounted while the arraybuffer was being read.
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+          if (revoked) return
+          const isPngBlob =
+            head.length === PNG_MAGIC.length &&
+            PNG_MAGIC.every((byte, i) => byte === head[i])
+          if (!isPngBlob) return
+          setSniffedContentType('image/png')
+        }
+
         const url = URL.createObjectURL(blob)
         setThumbnailUrl(url)
       })
@@ -105,7 +142,7 @@ export function OutputCard({ jobId, taskId, productName }: OutputCardProps) {
         return null
       })
     }
-  }, [jobId, taskId, isPng])
+  }, [jobId, taskId, shouldFetchForPreview, contentType])
 
   const handleDownload = useCallback(async () => {
     try {
@@ -197,7 +234,7 @@ export function OutputCard({ jobId, taskId, productName }: OutputCardProps) {
             <img
               src={thumbnailUrl}
               alt={productName}
-              className="max-h-[85vh] max-w-[85vw] rounded-lg object-contain"
+              className="h-[85vh] w-[85vw] rounded-lg object-contain [image-rendering:pixelated]"
             />
             <div className="absolute top-2 right-2 flex gap-2">
               <Button size="sm" variant="outline" onClick={handleDownload}>
