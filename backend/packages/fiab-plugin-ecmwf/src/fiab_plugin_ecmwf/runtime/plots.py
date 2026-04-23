@@ -70,7 +70,7 @@ def map_plot(
     fields: ekd.FieldList,
     domain: str = "global",
     format: str = "png",
-    groupby: str = "valid_datetime",
+    groupby: str = "none",
     style_schema: str = "default",
 ) -> tuple[bytes, str]:
     """Render a geographic map from *fields* using earthkit-plots.

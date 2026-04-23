@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version < '3.12' and platform_machine == 'ARM64' and sys_platform == 'win32'",
@@ -21,6 +21,7 @@ resolution-markers = [
 members = [
     "fiab-core",
     "fiab-mcp-server",
+    "fiab-plugin-demo",
     "fiab-plugin-ecmwf",
     "fiab-plugin-test",
     "forecast-in-a-box",
@@ -1653,6 +1654,24 @@ requires-dist = [
     { name = "mcp", specifier = ">=1.1.0" },
     { name = "pydantic" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "ty", specifier = "==0.0.2" }]
+
+[[package]]
+name = "fiab-plugin-demo"
+source = { editable = "packages/fiab-plugin-demo" }
+dependencies = [
+    { name = "fiab-core" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "ty" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "fiab-core", editable = "packages/fiab-core" }]
 
 [package.metadata.requires-dev]
 dev = [{ name = "ty", specifier = "==0.0.2" }]

@@ -1,6 +1,13 @@
 {
     "display_name": "ECMWF Plugin Store",
     "plugins": {
+        "demo": {
+            "pip_source": "fiab-plugin-demo",
+            "module_name": "fiab_plugin_demo",
+            "display_title": "Demo Plugin",
+            "display_description": "Demo plugin with placeholder blocks for examples and experimentation",
+            "display_author": "ECMWF"
+        },
         "ecmwf-base": {
             "pip_source": "fiab-plugin-ecmwf",
             "module_name": "fiab_plugin_ecmwf",

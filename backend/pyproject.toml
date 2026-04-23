@@ -116,6 +116,7 @@ plugins = "pydantic.mypy"
 pproc = { git = "https://github.com/ecmwf/pproc" }
 earthkit-workflows-pproc = { git = "https://github.com/ecmwf/earthkit-workflows-pproc" }
 fiab-core = {workspace = true}
+fiab-plugin-demo = {workspace = true}
 fiab-mcp-server = {workspace = true}
 fiab-plugin-ecmwf = {workspace = true}
 
@@ -123,6 +124,7 @@ fiab-plugin-ecmwf = {workspace = true}
 members = [
     "packages/fiab-core",
     "packages/fiab-mcp-server",
+    "packages/fiab-plugin-demo",
     "packages/fiab-plugin-ecmwf",
     "packages/fiab-plugin-test",
 ]
