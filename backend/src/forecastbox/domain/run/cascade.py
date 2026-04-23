@@ -109,7 +109,7 @@ def execute_cascade(spec: ExecutionSpecification) -> tuple[SubmitJobResponse, li
             start_time = time.time()
 
             while True:
-                remaining = set(download_ids) - ArtifactManager.locally_available
+                remaining = {e for e in download_ids if e not in ArtifactManager.locally_available}
 
                 if not remaining:
                     logger.info(f"All runtime artifacts downloaded: {download_ids}")
