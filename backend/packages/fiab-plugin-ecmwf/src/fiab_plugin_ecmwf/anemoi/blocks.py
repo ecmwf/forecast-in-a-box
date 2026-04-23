@@ -128,7 +128,7 @@ class AnemoiSource(Source):
 
 class AnemoiTransform(Transform):
     title: str = "Anemoi Model Transform"
-    description: str = "Initialise an Anemoi model from a source"
+    description: str = "Initialise an Anemoi model from an existing datasource"
     inputs: list[str] = ["dataset"]
 
     configuration_options: dict[str, BlockConfigurationOption] = {
@@ -145,6 +145,7 @@ class AnemoiTransform(Transform):
     }
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        # TODO: Validate that initial conditions are fully provided
         result = validate_anemoi_block(block)
         if result.e or not result.t:
             return Either.error(result.e)

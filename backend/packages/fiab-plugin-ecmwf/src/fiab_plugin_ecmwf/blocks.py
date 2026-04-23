@@ -110,7 +110,7 @@ class EkdSource(Source):
     }
     inputs: list[str] = []
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         param = _get_item_list(block.configuration_values.get("param") or IFS_REQUEST["param"], str)
         step = _get_item_list(block.configuration_values.get("step") or IFS_REQUEST["step"], int)
         number = _get_item_list(block.configuration_values.get("number") or IFS_REQUEST["number"], int)
@@ -191,7 +191,7 @@ class EnsembleStatistics(Product):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         input_dataset = inputs.get("dataset")
         if not isinstance(input_dataset, QubedOutput):
             actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
@@ -222,12 +222,8 @@ class EnsembleStatistics(Product):
             return Either.error(f"Unsupported statistic '{stat}'")
         return Either.ok(action)
 
-    def intersect(self, other: BlockInstanceOutput) -> bool:  # type: ignore[override]
-        if not isinstance(other, QubedOutput):
-            return False
-        dims = dimensions(other)
-        return ENSEMBLE_DIM in dims and PARAM_DIM in dims
-        return ENSEMBLE_DIM in dims and len(axes(other)[ENSEMBLE_DIM]) > 1 and PARAM_DIM in dims
+    def intersect(self, other: QubedOutput) -> bool:
+        return contains(other, ENSEMBLE_DIM) and contains(other, PARAM_DIM)
 
 
 class TemporalStatistics(Product):
@@ -243,7 +239,7 @@ class TemporalStatistics(Product):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         input_dataset = inputs.get("dataset")
         if not isinstance(input_dataset, QubedOutput):
             actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
@@ -277,11 +273,8 @@ class TemporalStatistics(Product):
             return Either.error(f"Unsupported temporal statistic: {stat}")
         return Either.ok(action)
 
-    def intersect(self, other: BlockInstanceOutput) -> bool:  # type: ignore[override]
-        if not isinstance(other, QubedOutput):
-            return False
-        dims = dimensions(other)
-        return STEP_DIM in dims and PARAM_DIM in dims
+    def intersect(self, other: QubedOutput) -> bool:
+        return contains(other, STEP_DIM) and contains(other, PARAM_DIM)
 
 
 class ZarrSink(Sink):
@@ -296,7 +289,7 @@ class ZarrSink(Sink):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         return Either.ok(NoOutput())
 
     def compile(
@@ -311,9 +304,7 @@ class ZarrSink(Sink):
         )
         return Either.ok(action)
 
-    def intersect(self, other: BlockInstanceOutput) -> bool:  # type: ignore[override]
-        if not isinstance(other, QubedOutput):
-            return False
+    def intersect(self, other: QubedOutput) -> bool:
         return bool(dimensions(other))
 
 
@@ -405,7 +396,5 @@ class MapPlotSink(Sink):
         )
         return Either.ok(action)
 
-    def intersect(self, other: BlockInstanceOutput) -> bool:  # type: ignore[override]
-        if not isinstance(other, QubedOutput):
-            return False
-        return PARAM_DIM in dimensions(other)
+    def intersect(self, other: QubedOutput) -> bool:
+        return contains(other, PARAM_DIM)
