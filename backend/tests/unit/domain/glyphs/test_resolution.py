@@ -293,10 +293,13 @@ def test_extract_glyphs_excludes_globals() -> None:
 
 
 def test_extract_glyphs_pure_arithmetic_no_variables() -> None:
+    # A value with ${...} containing only constants/globals (no glyph variable names)
+    # must still be added to glyphed_options so it gets rendered and returned in
+    # resolved_configuration_options.
     block = _block({"key": "${42 ** 10}"})
     result = extract_glyphs(block)
     assert result.e is None
-    assert result.t == ExtractedGlyphs(glyphs=set(), glyphed_options=set())
+    assert result.t == ExtractedGlyphs(glyphs=set(), glyphed_options={"key"})
 
 
 def test_extract_glyphs_multiple_variables_in_expression() -> None:

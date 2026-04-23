@@ -649,6 +649,49 @@ def test_blueprint_composite_glyph_expand(tmpdir: Any, backend_client_with_auth:
     assert any("circular" in err.lower() or "cycle" in err.lower() for err in cyclic_data["global_errors"])
 
 
+def test_blueprint_jinja_interpolation_expand(backend_client_with_auth: httpx.Client) -> None:
+    """Jinja interpolation is validated and resolved via the /expand endpoint.
+
+    Covers:
+    - A malformed jinja expression such as ``${startDatetime | this-is-no-filter}`` results in
+      block_errors (the expand endpoint always returns 200; callers inspect block_errors).
+      Jinja2 parses ``this-is-no-filter`` as subtraction so the tokens ``is``, ``no``, ``filter``
+      are treated as unknown glyph variables and reported accordingly.
+    - A well-formed pure-jinja expression ``${(datetime(2024, 1, 15) + timedelta(days=1)) | floor_day}``
+      (using only registered globals/filters, no glyph variables) is evaluated correctly and its
+      resolved value appears in resolved_configuration_options.
+    """
+    # Malformed: hyphens make `this-is-no-filter` parsed as subtraction; the resulting "glyph"
+    # names (is, no, filter) are unknown, so the block gets an error entry.
+    source_malformed = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_text")),
+        configuration_values={"text": "${startDatetime | this-is-no-filter}"},
+        input_ids={},
+    )
+    builder_malformed = BlueprintBuilder(blocks={BlockInstanceId("source_text"): source_malformed})
+    response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder_malformed.model_dump())
+    assert response.is_success, response.text
+    data = response.json()
+    assert "source_text" in data["block_errors"], f"Expected block error for malformed jinja: {data}"
+    assert any("Unknown glyphs referenced" in err for err in data["block_errors"]["source_text"])
+
+    # Well-formed: pure jinja arithmetic using registered globals (datetime, timedelta) and filter (floor_day).
+    # Parentheses are required because Jinja2's | (filter) has higher precedence than +.
+    # (datetime(2024, 1, 15) + timedelta(days=1)) | floor_day = 2024-01-16 00:00:00
+    source_wellformed = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_text")),
+        configuration_values={"text": "${(datetime(2024, 1, 15) + timedelta(days=1)) | floor_day}"},
+        input_ids={},
+    )
+    builder_wellformed = BlueprintBuilder(blocks={BlockInstanceId("source_text"): source_wellformed})
+    response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder_wellformed.model_dump())
+    assert response.is_success, response.text
+    data = response.json()
+    assert len(data["block_errors"]) == 0, data["block_errors"]
+    resolved = data["resolved_configuration_options"]["source_text"]["text"]
+    assert resolved == "2024-01-16 00:00:00", f"Unexpected resolved value: {resolved!r}"
+
+
 def test_blueprint_composite_glyph_execute(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
     """Execute a blueprint whose config value is resolved via a composite local glyph.
 

@@ -62,6 +62,10 @@ def extract_glyphs(blockInstance: BlockInstance) -> Either[ExtractedGlyphs, list
         if result.t:
             glyphs.update(result.t)
             glyphed_options.add(key)
+        elif _GLYPH_PATTERN.search(value) or "${" in value:
+            # The value contains ${...} but all names are jinja globals/filters, not glyph variables.
+            # Still mark it as glyphed so its rendered result appears in resolved_configuration_options.
+            glyphed_options.add(key)
     if errors:
         return Either.error(errors)
     return Either.ok(ExtractedGlyphs(glyphs=glyphs, glyphed_options=glyphed_options))
