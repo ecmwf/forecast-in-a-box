@@ -170,8 +170,7 @@ ArtifactStoresConfig = dict[ArtifactStoreId, ArtifactStoreConfig]
 def _default_artifact_stores() -> ArtifactStoresConfig:
     return {
         ArtifactStoreId("ecmwf"): ArtifactStoreConfig(
-            # TODO fix pre merge
-            url="https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/d092af0130a1bc4b09d25d9f1785b94fe1e54b18/install/artifacts.json",
+            url="https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/heads/main/install/artifacts.json",
             method="file",
         ),
     }
