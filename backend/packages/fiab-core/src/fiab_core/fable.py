@@ -29,7 +29,9 @@ class BlockConfigurationOption(FiabCoreBaseModel):
     """Extended description, possibly with example values and their effect"""
     value_type: str
     """Will be used when deserializing the actual value"""
-    # TODO do we want Literal instead of str for values? Do we prefer nesting or flattening for complex config?
+    # TODO do we want Literal instead of str for values? Probably `str` since this will need to be parsed anyway
+    # TODO do we prefer nesting or flattening for complex config? Ideally we support both, its just about the type system
+    default_value: str | None = None
 
 
 BlockKind = Literal["source", "transform", "product", "sink"]
