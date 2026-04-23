@@ -120,7 +120,6 @@ def test_composite_artifact_id_from_str_missing_colon() -> None:
 import pytest
 
 
-@pytest.mark.skip("todo fix the mock")
 def test_get_artifacts_catalog(sample_artifact_stores_config: Any, sample_checkpoint: Any) -> None:
     """Test getting artifacts catalog from multiple stores"""
     store1_data = {
@@ -138,15 +137,18 @@ def test_get_artifacts_catalog(sample_artifact_stores_config: Any, sample_checkp
         },
     }
 
-    with patch("httpx.get") as mock_get:
+    with patch("httpx.Client") as mock_client_class:
+        mock_client = MagicMock()
+        mock_client_class.return_value.__enter__.return_value = mock_client
+
         mock_responses = []
         for data in [store1_data, store2_data]:
             mock_response = MagicMock()
-            mock_response.json.return_value = data
+            mock_response.content = json.dumps(data).encode()
             mock_response.raise_for_status = MagicMock()
             mock_responses.append(mock_response)
 
-        mock_get.side_effect = mock_responses
+        mock_client.get.side_effect = mock_responses
 
         catalog = get_artifacts_catalog(sample_artifact_stores_config)
 
