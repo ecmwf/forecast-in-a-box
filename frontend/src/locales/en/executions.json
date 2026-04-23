@@ -18,7 +18,8 @@
     "preparing": "Preparing",
     "running": "Running",
     "completed": "Completed",
-    "failed": "Failed"
+    "failed": "Failed",
+    "unknown": "Unknown"
   },
   "tabs": {
     "outputs": "Outputs",

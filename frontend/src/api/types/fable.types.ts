@@ -10,6 +10,7 @@
 
 import { Cloud, Cog, Download, Shuffle } from 'lucide-react'
 import { z } from 'zod'
+import { EnvironmentSpecificationSchema } from './job.types'
 import {
   PluginCompositeIdSchema,
   parsePluginKey,
@@ -92,6 +93,7 @@ export type BlockInstance = z.infer<typeof BlockInstanceSchema>
 
 export const FableBuilderV1Schema = z.object({
   blocks: z.record(z.string(), BlockInstanceSchema),
+  environment: EnvironmentSpecificationSchema.nullable().optional(),
   local_glyphs: z.record(z.string(), z.string()).optional(),
 })
 

@@ -6,7 +6,7 @@ This document defines the visual design language and guidelines for the Forecast
 
 ### Font Family
 
-- **Primary Font**: Source Sans 3 Variable
+- **Primary Font**: IBM Plex Sans Variable
 - **Monospace Font**: System monospace stack for code/technical values
 
 ### Font Size Scale

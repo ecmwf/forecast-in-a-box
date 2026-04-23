@@ -11,9 +11,10 @@
 import { useEffect, useState } from 'react'
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { STORAGE_KEYS } from '@/lib/storage-keys'
 import { cn } from '@/lib/utils'
 
-const STORAGE_KEY = 'fable-builder-pipeline-sidebar-open'
+const STORAGE_KEY = STORAGE_KEYS.fable.pipelineSidebarOpen
 
 interface PipelineSidebarProps {
   children: React.ReactNode

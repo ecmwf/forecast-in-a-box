@@ -19,6 +19,8 @@
 import { Outlet, createFileRoute, redirect } from '@tanstack/react-router'
 import { useConfigStore } from '@/stores/configStore'
 import { getCurrentUser } from '@/api/endpoints/users'
+import { queryClient } from '@/lib/queryClient'
+import { showToast } from '@/lib/toast'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('AdminRoute')
@@ -33,12 +35,19 @@ export const Route = createFileRoute('/_authenticated/admin')({
       return
     }
 
-    // In authenticated mode, verify superuser status
+    // In authenticated mode, verify superuser status. Go through the shared
+    // query cache (matches the ['user', 'me', 'authenticated'] key used by
+    // useUser()) so repeat admin navigations don't re-fetch /users/me.
     let user
     try {
-      user = await getCurrentUser()
+      user = await queryClient.ensureQueryData({
+        queryKey: ['user', 'me', 'authenticated'],
+        queryFn: getCurrentUser,
+        staleTime: 5 * 60 * 1000,
+      })
     } catch (error) {
       log.error('Failed to verify admin access:', error)
+      showToast.error('Could not verify admin access. Please try again.')
       throw redirect({ to: '/dashboard' })
     }
 

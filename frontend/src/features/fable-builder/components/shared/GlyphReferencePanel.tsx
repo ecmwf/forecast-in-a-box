@@ -46,7 +46,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { cn } from '@/lib/utils'
+import { cn, copyToClipboard } from '@/lib/utils'
 
 const EMPTY_GLYPHS: Record<string, string> = {}
 
@@ -69,16 +69,24 @@ export function GlyphReferencePanel({ className }: { className?: string }) {
   const globalGlyphs = glyphs.filter((g) => g.type === 'global')
   const localGlyphList = glyphs.filter((g) => g.type === 'local')
 
-  function handleCopy(name: string) {
+  async function handleCopy(name: string) {
     const ref = '${' + name + '}'
-    navigator.clipboard.writeText(ref)
-    showToast.success(t('panel.copied'), ref)
+    const ok = await copyToClipboard(ref)
+    if (ok) {
+      showToast.success(t('panel.copied'), ref)
+    } else {
+      showToast.error(t('panel.copyFailed'), ref)
+    }
   }
 
-  function handleCopyHelper(fn: GlyphFunctionDetail) {
+  async function handleCopyHelper(fn: GlyphFunctionDetail) {
     const snippet = fn.kind === 'filter' ? `| ${fn.name}` : `${fn.name}()`
-    navigator.clipboard.writeText(snippet)
-    showToast.success(t('panel.copied'), snippet)
+    const ok = await copyToClipboard(snippet)
+    if (ok) {
+      showToast.success(t('panel.copied'), snippet)
+    } else {
+      showToast.error(t('panel.copyFailed'), snippet)
+    }
   }
 
   return (

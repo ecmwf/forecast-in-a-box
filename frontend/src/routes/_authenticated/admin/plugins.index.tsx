@@ -173,16 +173,16 @@ function PluginsPage() {
 
   function trackPluginOp(
     compositeId: PluginCompositeId,
-    op: string,
+    labels: { active: string; success: string; failure: string },
     mutation: { mutateAsync: (id: PluginCompositeId) => Promise<void> },
   ) {
-    const id = `plugin:${compositeId.store}/${compositeId.local}:${op}`
+    const id = `plugin:${compositeId.store}/${compositeId.local}:${labels.active}`
     const name = getPluginName(compositeId)
     addActivity({
       id,
       type: 'plugin',
       label: name,
-      description: `${op}...`,
+      description: `${labels.active}…`,
       status: 'active',
       startedAt: Date.now(),
       navigateTo: `/admin/plugins/${encodePluginId(compositeId)}`,
@@ -191,14 +191,14 @@ function PluginsPage() {
       () => {
         useActivityStore.getState().updateTask(id, {
           status: 'completed',
-          description: 'Done',
+          description: labels.success,
           completedAt: Date.now(),
         })
       },
       () => {
         useActivityStore.getState().updateTask(id, {
           status: 'failed',
-          description: 'Failed',
+          description: labels.failure,
           completedAt: Date.now(),
         })
       },
@@ -215,15 +215,35 @@ function PluginsPage() {
   }
 
   const handleInstall = (compositeId: PluginCompositeId) => {
-    trackPluginOp(compositeId, 'Installing', installPlugin)
+    trackPluginOp(
+      compositeId,
+      {
+        active: 'Installing',
+        success: 'Installed',
+        failure: 'Install failed',
+      },
+      installPlugin,
+    )
   }
 
   const handleUninstall = (compositeId: PluginCompositeId) => {
-    trackPluginOp(compositeId, 'Uninstalling', uninstallPlugin)
+    trackPluginOp(
+      compositeId,
+      {
+        active: 'Uninstalling',
+        success: 'Uninstalled',
+        failure: 'Uninstall failed',
+      },
+      uninstallPlugin,
+    )
   }
 
   const handleUpdate = (compositeId: PluginCompositeId) => {
-    trackPluginOp(compositeId, 'Updating', updatePlugin)
+    trackPluginOp(
+      compositeId,
+      { active: 'Updating', success: 'Updated', failure: 'Update failed' },
+      updatePlugin,
+    )
   }
 
   const handleRefresh = () => {

@@ -24,6 +24,7 @@ export const JobStatusSchema = z.enum([
   'running',
   'completed',
   'failed',
+  'unknown',
 ])
 
 /** routes/run.py: ProductToOutputId */
@@ -62,13 +63,14 @@ export const JobExecutionListSchema = z.object({
   total_pages: z.number(),
 })
 
-/** routes/run.py: EnvironmentSpecification */
-const CompositeArtifactIdSchema = z.object({
+/** fiab_core/artifacts.py: CompositeArtifactId */
+export const CompositeArtifactIdSchema = z.object({
   artifact_store_id: z.string(),
   ml_model_checkpoint_id: z.string(),
 })
 
-const EnvironmentSpecificationSchema = z.object({
+/** domain/blueprint/cascade.py: EnvironmentSpecification */
+export const EnvironmentSpecificationSchema = z.object({
   hosts: z.number().nullable(),
   workers_per_host: z.number().nullable(),
   environment_variables: z.record(z.string(), z.string()),
@@ -138,4 +140,5 @@ export const JOB_STATUS_META: Record<
   running: { label: 'Running', color: 'amber' },
   completed: { label: 'Completed', color: 'green' },
   failed: { label: 'Failed', color: 'red' },
+  unknown: { label: 'Unknown', color: 'gray' },
 } as const

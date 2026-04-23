@@ -25,7 +25,13 @@ import { FableEdgeComponent } from './FableEdge'
 import { BlockNode } from './nodes/BlockNode'
 import { InlineBlockNode } from './nodes/InlineBlockNode'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
-import type { Connection, Edge, NodeChange } from '@xyflow/react'
+import type {
+  Connection,
+  Edge,
+  EdgeTypes,
+  NodeChange,
+  NodeTypes,
+} from '@xyflow/react'
 import type { NodeDimensions } from '@/features/fable-builder/utils/layout-blocks'
 import type { FableNode } from './nodes/BlockNode'
 import {
@@ -42,7 +48,7 @@ interface FableGraphCanvasProps {
   catalogue: BlockFactoryCatalogue
 }
 
-const nodeTypes: Record<string, any> = {
+const nodeTypes: NodeTypes = {
   sourceBlock: BlockNode,
   transformBlock: BlockNode,
   productBlock: BlockNode,
@@ -53,7 +59,7 @@ const nodeTypes: Record<string, any> = {
   sinkBlockInline: InlineBlockNode,
 }
 
-const edgeTypes: Record<string, any> = {
+const edgeTypes: EdgeTypes = {
   fableEdge: FableEdgeComponent,
 }
 

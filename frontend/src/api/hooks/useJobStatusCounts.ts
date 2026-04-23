@@ -31,6 +31,7 @@ export function useJobStatusCounts() {
     running: 0,
     completed: 0,
     failed: 0,
+    unknown: 0,
   }
 
   let total = 0

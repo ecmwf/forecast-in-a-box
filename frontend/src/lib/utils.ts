@@ -55,3 +55,40 @@ export function isValidInternalRedirect(url: string | null): url is string {
 export function isExternalUrl(url: string): boolean {
   return /^(https?:)?\/\//.test(url)
 }
+
+/**
+ * Copy text to the clipboard with a graceful fallback for unsupported or
+ * permission-denied environments. Returns true on success, false otherwise.
+ * Callers can use the result to decide whether to show a success or error toast.
+ */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  // Preferred: the Async Clipboard API. Available in secure contexts only,
+  // so the dynamic `in` check avoids a runtime crash when it's missing
+  // (e.g. older browsers, `file://`, insecure HTTP pages).
+  if ('clipboard' in navigator) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      // fall through to the textarea fallback
+    }
+  }
+
+  // Fallback: hidden textarea + execCommand. Deprecated but still widely
+  // supported and works outside secure contexts.
+  if (typeof document === 'undefined') return false
+  try {
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    textarea.setAttribute('readonly', '')
+    document.body.appendChild(textarea)
+    textarea.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(textarea)
+    return ok
+  } catch {
+    return false
+  }
+}

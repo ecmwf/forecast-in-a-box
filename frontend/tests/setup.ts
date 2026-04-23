@@ -25,7 +25,7 @@ import { worker } from '../mocks/browser'
 // Start MSW browser worker before all tests
 beforeAll(async () => {
   await worker.start({
-    onUnhandledRequest: 'warn',
+    onUnhandledRequest: 'error',
     quiet: true,
   })
 })

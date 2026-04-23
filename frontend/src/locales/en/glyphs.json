@@ -78,6 +78,7 @@
     "localKeyPlaceholder": "key",
     "localValuePlaceholder": "value",
     "copied": "Copied",
+    "copyFailed": "Couldn't copy to clipboard",
     "example": "e.g.",
     "resolvesTo": "resolves to"
   },
