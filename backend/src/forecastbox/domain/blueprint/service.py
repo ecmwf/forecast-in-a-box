@@ -198,7 +198,12 @@ async def validate_expand(
             block_errors[blockId] += [f"Unknown glyphs referenced: {unknown_glyphs}"]
             invalidable.add(blockId)
             continue
-        resolution.resolve_configurations(blockInstance, all_glyphs)
+        try:
+            resolution.resolve_configurations(blockInstance, all_glyphs)
+        except Exception as exc:
+            block_errors[blockId] += [f"Jinja expression error: {exc}"]
+            invalidable.add(blockId)
+            continue
         # A glyph value may itself reference an unknown glyph (e.g. myPath="${root}/${missing}").
         # After substitution those unresolved ${...} patterns survive in the config values;
         # a second extract_glyphs pass surfaces them.
