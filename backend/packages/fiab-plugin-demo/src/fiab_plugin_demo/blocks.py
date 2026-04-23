@@ -22,7 +22,7 @@ from fiab_core.plugin import Error
 from fiab_core.tools.blocks import Product, Sink, Transform
 
 
-class _DummyTransform(Transform):
+class _DemoTransform(Transform):
     configuration_options: dict[str, BlockConfigurationOption] = {}
     inputs: list[str] = ["dataset"]
 
@@ -44,7 +44,7 @@ class _DummyTransform(Transform):
         return True
 
 
-class _DummyProduct(Product):
+class _DemoProduct(Product):
     configuration_options: dict[str, BlockConfigurationOption] = {}
     inputs: list[str] = ["dataset"]
 
@@ -66,7 +66,7 @@ class _DummyProduct(Product):
         return True
 
 
-class _DummySink(Sink):
+class _DemoSink(Sink):
     configuration_options: dict[str, BlockConfigurationOption] = {}
     inputs: list[str] = ["dataset"]
 
@@ -87,7 +87,7 @@ class _DummySink(Sink):
         return True
 
 
-class NetCDFOutputSink(_DummySink):
+class NetCDFOutputSink(_DemoSink):
     title: str = "NetCDF Output"
     description: str = "Placeholder sink for writing dataset output as NetCDF."
     configuration_options: dict[str, BlockConfigurationOption] = {
@@ -99,7 +99,7 @@ class NetCDFOutputSink(_DummySink):
     }
 
 
-class GRIBOutputSink(_DummySink):
+class GRIBOutputSink(_DemoSink):
     title: str = "GRIB Output"
     description: str = "Placeholder sink for writing dataset output as GRIB."
     configuration_options: dict[str, BlockConfigurationOption] = {
@@ -111,7 +111,7 @@ class GRIBOutputSink(_DummySink):
     }
 
 
-class FilterParam(_DummyTransform):
+class FilterParam(_DemoTransform):
     title: str = "Filter Parameters"
     description: str = "Placeholder transform for selecting specific parameters."
     configuration_options: dict[str, BlockConfigurationOption] = {
@@ -123,7 +123,7 @@ class FilterParam(_DummyTransform):
     }
 
 
-class InterpolationTransform(_DummyTransform):
+class InterpolationTransform(_DemoTransform):
     title: str = "Interpolation"
     description: str = "Placeholder transform for interpolating datasets."
     configuration_options: dict[str, BlockConfigurationOption] = {
@@ -135,26 +135,26 @@ class InterpolationTransform(_DummyTransform):
     }
 
 
-class WeeklyMeanTransform(_DummyTransform):
+class WeeklyMeanTransform(_DemoTransform):
     title: str = "Weekly Mean"
     description: str = "Placeholder transform for computing weekly means."
 
 
-class MonthlyMeanTransform(_DummyTransform):
+class MonthlyMeanTransform(_DemoTransform):
     title: str = "Monthly Mean"
     description: str = "Placeholder transform for computing monthly means."
 
 
-class EnsembleProbabilityTransform(_DummyTransform):
+class EnsembleProbabilityTransform(_DemoTransform):
     title: str = "Ensemble Probability"
     description: str = "Placeholder transform for computing ensemble probabilities."
 
 
-class ExtremeIndexProduct(_DummyProduct):
+class ExtremeIndexProduct(_DemoProduct):
     title: str = "Extreme Index"
     description: str = "Placeholder product for computing extreme indices."
 
 
-class TropicalCycloneProduct(_DummyProduct):
+class TropicalCycloneProduct(_DemoProduct):
     title: str = "Tropical Cyclone"
     description: str = "Placeholder product for tropical cyclone products."
