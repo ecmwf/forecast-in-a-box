@@ -1,0 +1,188 @@
+"""Utility methods for the QubedOutput type of block instance outputs
+
+Usage
+-----
+>>> output = QubedOutput(dataqube=Qube.from_datacube({
+...     'param': ['2t', 'tp'],
+...     'time': [0, 1, 2],
+...     'level': [1000, 850, 700],
+... }))
+>>> dimensions(output)
+{'param', 'time', 'level'}
+>>> expanded = expand(output, {'ensemble': ['ens1', 'ens2']})
+>>> dimensions(expanded)
+{'param', 'time', 'level', 'ensemble'}
+>>> collapsed = collapse(expanded, 'level')
+>>> dimensions(collapsed)
+{'param', 'time', 'ensemble'}
+>>> contains(collapsed, 'time')
+True
+>>> contains(collapsed, 'level')
+False
+>>> contains(collapsed, {'param': ['2t'], 'time': [0, 1], 'ensemble': ['ens1']})
+True
+>>> collapsed.model_copy(update={'datatype': 'netcdf'})
+QubedOutput(dataqube=Qube(...), datatype='netcdf')
+"""
+
+import functools
+from collections.abc import Mapping
+from typing import Any, Iterable
+
+from fiab_core.fable import QubedOutput
+from qubed import Qube
+
+
+def collapse(qube: QubedOutput, axis: str | list[str]) -> QubedOutput:
+    """Return a new QubedOutput with the dataqube collapsed by removing the specified axis.
+
+    Parameters
+    ----------
+    axis : str | list[str]
+        The dimension name(s) to remove from the dataqube.
+
+    Returns
+    -------
+    QubedOutput
+        A new QubedOutput with the collapsed dataqube.
+
+    Usage
+    -----
+    >>> output = QubedOutput(dataqube=Qube.from_datacube({
+    ...     'param': ['2t', 'tp'],
+    ...     'time': [0, 1, 2],
+    ...     'level': [1000, 850, 700],
+    ... }))
+    >>> collapsed = collapse(output, 'level')
+    >>> dimensions(collapsed)
+    {'param', 'time'}
+    >>> contains(collapsed, 'level')
+    False
+    """
+    dims = dimensions(qube)
+    axes = [axis] if isinstance(axis, str) else axis
+    if not all(ax in dims for ax in axes):
+        raise ValueError(f"Dimension '{', '.join(set(axes) - dims)}' not in dataqube dimensions {dims}")
+
+    reduced_qube = qube.dataqube.remove_by_key(axes)
+    return qube.model_copy(update={"dataqube": reduced_qube})
+
+
+def expand(qube: QubedOutput, dimension: Mapping[str, Iterable[Any]]) -> QubedOutput:
+    """Return a new QubedOutput with the dataqube expanded by adding the specified dimension(s).
+
+    Parameters
+    ----------
+    dimension : dict[str, Iterable]
+        A dictionary where keys are dimension names and values are sequences of values for those dimensions.
+
+    Returns
+    -------
+    Self
+        A new QubedOutput with the expanded dataqube.
+
+    Usage
+    -----
+    >>> output = QubedOutput(dataqube=Qube.from_datacube({
+    ...     'param': ['2t', 'tp'],
+    ...     'time': [0, 1, 2],
+    ... }))
+    >>> expanded = expand(output, {'ensemble': ['ens1', 'ens2']})
+    >>> dimensions(expanded)
+    {'ensemble', 'param', 'time'}
+    >>> axes(expanded)
+    {'ensemble': {'ens1', 'ens2'}, 'param': {'2t', 'tp'}, 'time': {0, 1, 2}}
+    """
+    dataqube = functools.reduce(
+        lambda q, kv: Qube.make_root([Qube.make_node(kv[0], list(kv[1]), q.children)]), dimension.items(), qube.dataqube
+    )
+
+    return qube.model_copy(update={"dataqube": dataqube})
+
+
+def coxpand(qube: QubedOutput, axis: str | list[str], dimension: Mapping[str, Iterable[Any]]) -> QubedOutput:
+    """Collapse, then expand"""
+    return expand(collapse(qube, axis), dimension)
+
+
+def axes(qube: QubedOutput) -> dict[str, set[Any]]:
+    """Return the axes of the dataqube.
+
+    Returns
+    -------
+    dict[str, set[Any]]
+        A dictionary where keys are dimension names and values are sets of axis values.
+
+    Usage
+    -----
+    >>> output = QubedInstanceOutput(dataqube=Qube.from_datacube({
+    ...     'param': ['2t', 'tp'],
+    ...     'time': [0, 1, 2],
+    ... }))
+    >>> axes = output.axes()
+    >>> axes['param']
+    {'2t', 'tp'}
+    >>> axes['time']
+    {0, 1, 2}
+    """
+    return qube.dataqube.axes()
+
+
+def dimensions(qube: QubedOutput) -> set[str]:
+    """Return the list of dimension names of the dataqube.
+
+    Returns
+    -------
+    set[str]
+        A set of dimension names.
+
+    Usage
+    -----
+    >>> output = QubedInstanceOutput(dataqube=Qube.from_datacube({
+    ...     'param': ['2t', 'tp'],
+    ...     'time': [0, 1, 2],
+    ... }))
+    >>> output.dimensions()
+    {'param', 'time'}
+    """
+    return set(axes(qube).keys())
+
+
+def contains(qube: QubedOutput, item: Qube | str | dict) -> bool:
+    """Check if the QubedOutput contains the specified dimension(s) or axes.
+
+    If a string is provided, it checks if that dimension exists.
+    If a dict is provided, it checks if the axes and their values exist in the data
+    qube. This will be an exclusive check, i.e., all specified axes and their values
+    must be present in the dataqube for it to return True.
+
+    Usage
+    -----
+    >>> output = QubedOutput(dataqube=Qube.from_datacube({
+    ...     'param': ['2t', 'tp'],
+    ...     'time': [0, 1, 2],
+    ... }))
+    >>> contains(output, 'param')
+    True
+    >>> contains(output, 'level')
+    False
+    >>> contains(output, {'param': ['2t']})
+    True
+    >>> contains(output, {'param': ['2t2']})
+    False
+    >>> contains(output, {'param': ['2t'], 'time': [0, 1], })
+    True
+    >>> contains(output, {'param': ['2t'], 'time': [0, 3], })
+    False
+    """
+    if isinstance(item, str):
+        return item in dimensions(qube)
+
+    lookup: dict = item.axes() if isinstance(item, Qube) else item
+    dict_cast_to_list = {k: list(v) if isinstance(v, (set, tuple, list)) else [v] for k, v in lookup.items()}
+    current_axes = axes(qube)
+
+    def _contains_axis_values(key: str, values: Iterable[Any]) -> bool:
+        return key in current_axes and all(v in current_axes[key] for v in values)
+
+    return all(_contains_axis_values(k, v) for k, v in dict_cast_to_list.items())

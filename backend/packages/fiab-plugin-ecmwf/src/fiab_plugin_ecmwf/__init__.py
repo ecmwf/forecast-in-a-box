@@ -8,16 +8,20 @@
 # nor does it submit to any jurisdiction.
 
 from fiab_core.fable import BlockFactoryId
-from fiab_core.tools.blocks import BlockBuilder
-from fiab_core.tools.plugins import PluginBuilder
+from fiab_core.tools.blocks import QubedBlockBuilder
+from fiab_core.tools.plugins import QubedPluginBuilder
 
-from fiab_plugin_ecmwf.blocks import EkdSource, EnsembleStatistics, TemporalStatistics, ZarrSink
+from fiab_plugin_ecmwf.anemoi.blocks import AnemoiSource, AnemoiTransform
+from fiab_plugin_ecmwf.blocks import EkdSource, EnsembleStatistics, MapPlotSink, TemporalStatistics, ZarrSink
 
-blocks: dict[BlockFactoryId, BlockBuilder] = {
+blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
     BlockFactoryId("ekdSource"): EkdSource(),
     BlockFactoryId("ensembleStatistics"): EnsembleStatistics(),
     BlockFactoryId("temporalStatistics"): TemporalStatistics(),
     BlockFactoryId("zarrSink"): ZarrSink(),
+    BlockFactoryId("anemoiSource"): AnemoiSource(),
+    BlockFactoryId("anemoiTransform"): AnemoiTransform(),
+    BlockFactoryId("mapPlotSink"): MapPlotSink(),
 }
 
-plugin = PluginBuilder(block_builders=blocks).as_plugin()
+plugin = QubedPluginBuilder(block_builders=blocks).as_plugin()

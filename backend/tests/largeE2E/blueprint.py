@@ -67,14 +67,14 @@ if __name__ == "__main__":
                 ),
                 BlockInstanceId("temporalMean"): BlockInstance(
                     factory_id=PluginBlockFactoryId(plugin=pluginId, factory=BlockFactoryId("temporalStatistics")),
-                    configuration_values={"variable": "2t", "statistic": "mean"},
+                    configuration_values={"param": "2t", "statistic": "mean"},
                     input_ids={"dataset": BlockInstanceId("source1")},
                 ),
             }
             for statistic in ["mean", "std"]:
                 block = BlockInstance(
                     factory_id=PluginBlockFactoryId(plugin=pluginId, factory=BlockFactoryId("ensembleStatistics")),
-                    configuration_values={"variable": "2t", "statistic": statistic},
+                    configuration_values={"param": "2t", "statistic": statistic},
                     input_ids={"dataset": BlockInstanceId("temporalMean")},
                 )
                 sink = BlockInstance(

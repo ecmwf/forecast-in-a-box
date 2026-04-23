@@ -80,7 +80,7 @@ catalogue = BlockFactoryCatalogue(
 
 def validator(instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
     if instance.factory_id.factory in ("sink_file", "sink_image"):
-        return Either.ok(NoOutput)
+        return Either.ok(NoOutput())
     elif instance.factory_id.factory in ("source_sleep", "source_text"):
         return Either.ok(RawOutput(type_fqn="str"))
     else:

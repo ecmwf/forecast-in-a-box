@@ -7,7 +7,8 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from typing import cast
+import logging
+from typing import TypeVar
 
 import numpy as np
 from cascade.low.func import Either
@@ -18,10 +19,15 @@ from fiab_core.fable import (
     BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
-    XarrayOutput,
+    NoOutput,
+    QubedOutput,
+    RawOutput,
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import Product, Sink, Source
+from qubed import Qube
+
+from .qubed_utils import axes, contains, coxpand, dimensions
 
 IFS_REQUEST = {
     "class": "od",
@@ -48,6 +54,24 @@ PARAM_DIM = "param"
 ENSEMBLE_DIM = "number"
 STEP_DIM = "step"
 
+logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+
+def _get_item_list(raw: str | list, item_type: type[T], *, allow_empty: bool = True) -> Either[list[T], Error]:  # type:ignore[invalid-argument] # semigroup
+    if isinstance(raw, list):
+        split = raw
+    else:
+        split = raw.split(",")
+
+    if not raw:
+        return Either.ok([]) if allow_empty else Either.error(f"Empty list of {item_type.__name__}")
+    try:
+        return Either.ok(list(map(item_type, split)))
+    except ValueError:
+        return Either.error(f"Invalid list of {item_type.__name__}: '{raw}'")
+
 
 class EkdSource(Source):
     title: str = "Earthkit Data Source"
@@ -68,11 +92,41 @@ class EkdSource(Source):
             description="The expver value of the forecast",
             value_type="str",
         ),
+        "param": BlockConfigurationOption(
+            title="Parameters",
+            description="Parameters to select and plot (e.g. '2t', 'msl')",
+            value_type="list[str]",
+        ),
+        "step": BlockConfigurationOption(
+            title="Steps",
+            description="Forecast steps to select (e.g. '0,6,12,...')",
+            value_type="list[int]",
+        ),
+        "number": BlockConfigurationOption(
+            title="Ensemble Members",
+            description="Ensemble members to select (e.g. '1,2,3,...')",
+            value_type="list[int]",
+        ),
     }
     inputs: list[str] = []
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        output = XarrayOutput(variables=cast(list[str], IFS_REQUEST["param"]), coords=[STEP_DIM, ENSEMBLE_DIM])
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        param = _get_item_list(block.configuration_values.get("param") or IFS_REQUEST["param"], str)
+        step = _get_item_list(block.configuration_values.get("step") or IFS_REQUEST["step"], int)
+        number = _get_item_list(block.configuration_values.get("number") or IFS_REQUEST["number"], int)
+
+        if any(map(lambda x: x.e is not None, [param, step, number])):
+            return Either.error(f"Invalid configuration: {param.e}, {step.e}, {number.e}")
+
+        output = QubedOutput(
+            dataqube=Qube.from_datacube(
+                {
+                    PARAM_DIM: param.get_or_raise(),
+                    ENSEMBLE_DIM: number.get_or_raise(),
+                    STEP_DIM: step.get_or_raise(),
+                }
+            )
+        )
         return Either.ok(output)
 
     def compile(
@@ -81,6 +135,10 @@ class EkdSource(Source):
         block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
+        param = _get_item_list(block.configuration_values.get("param") or IFS_REQUEST["param"], str).get_or_raise()
+        step = _get_item_list(block.configuration_values.get("step") or IFS_REQUEST["step"], int).get_or_raise()
+        number = _get_item_list(block.configuration_values.get("number") or IFS_REQUEST["number"], int).get_or_raise()
+
         action = (
             from_source(
                 np.asarray(
@@ -93,25 +151,27 @@ class EkdSource(Source):
                                     **IFS_REQUEST,
                                     "date": block.configuration_values["date"],
                                     "expver": block.configuration_values["expver"],
-                                    "param": param,
+                                    PARAM_DIM: p,
+                                    ENSEMBLE_DIM: number,
+                                    STEP_DIM: step,
                                 }
                             },
                         )
-                        for param in IFS_REQUEST["param"]
+                        for p in param
                     ]
                 ),
-                coords={PARAM_DIM: IFS_REQUEST[x] for x in ["param"]},
+                coords={PARAM_DIM: param},
             )
             .expand(
-                (ENSEMBLE_DIM, cast(list[int], IFS_REQUEST["number"])),
+                (ENSEMBLE_DIM, number),
                 "number",
-                dim_size=len(IFS_REQUEST["number"]),
+                dim_size=len(number),
                 backend_kwargs={"method": "isel"},
             )
             .expand(
-                (STEP_DIM, cast(list[int], IFS_REQUEST["step"])),
+                (STEP_DIM, step),
                 "step",
-                dim_size=len(IFS_REQUEST["step"]),
+                dim_size=len(step),
                 backend_kwargs={"method": "isel"},
             )
         )
@@ -122,7 +182,7 @@ class EnsembleStatistics(Product):
     title: str = "Ensemble Statistics"
     description: str = "Computes ensemble mean or standard deviation"
     configuration_options: dict[str, BlockConfigurationOption] = {
-        "variable": BlockConfigurationOption(title="Variable", description="Variable name like '2t'", value_type="str"),
+        PARAM_DIM: BlockConfigurationOption(title="Parameter", description="Parameter name like '2t'", value_type="str"),
         "statistic": BlockConfigurationOption(
             title="Statistic",
             description="Statistic to compute over the ensemble",
@@ -131,12 +191,17 @@ class EnsembleStatistics(Product):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_dataset = cast(XarrayOutput, inputs["dataset"])  # type:ignore[redundant-cast] # NOTE the warning is correct but we expect more
-        variable = block.configuration_values["variable"]
-        if variable not in input_dataset.variables:
-            return Either.error(f"variable {variable} is not in the input variables: {input_dataset.variables}")
-        output = XarrayOutput(variables=[variable], coords=[x for x in input_dataset.coords if x != ENSEMBLE_DIM])
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_dataset = inputs.get("dataset")
+        if not isinstance(input_dataset, QubedOutput):
+            actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
+            return Either.error(f"Unsupported input type for 'dataset': expected QubedOutput, got {actual_type}")
+
+        param = block.configuration_values[PARAM_DIM]
+        if not contains(input_dataset, {PARAM_DIM: param}):
+            return Either.error(f"param {param} is not in the input parameters: {axes(input_dataset).get(PARAM_DIM, [])}")
+
+        output = coxpand(input_dataset, [PARAM_DIM, ENSEMBLE_DIM], {PARAM_DIM: [param]})
         return Either.ok(output)
 
     def compile(
@@ -148,24 +213,24 @@ class EnsembleStatistics(Product):
         input_task = block.input_ids["dataset"]
         input_task_action = inputs[input_task]
         stat = block.configuration_values["statistic"]
-        param = input_task_action.select({PARAM_DIM: block.configuration_values["variable"]})
+        param = input_task_action.select({PARAM_DIM: block.configuration_values[PARAM_DIM]})
         if stat == "mean":
             action = param.mean(dim=ENSEMBLE_DIM)
         elif stat == "std":
             action = param.std(dim=ENSEMBLE_DIM)
         else:
-            return Either.error(f"unknown {stat=}")
+            return Either.error(f"Unsupported statistic '{stat}'")
         return Either.ok(action)
 
-    def intersect(self, input: BlockInstanceOutput) -> bool:
-        return isinstance(input, XarrayOutput) and len(input.variables) > 0 and ENSEMBLE_DIM in input.coords
+    def intersect(self, other: QubedOutput) -> bool:
+        return contains(other, ENSEMBLE_DIM) and contains(other, PARAM_DIM)
 
 
 class TemporalStatistics(Product):
     title: str = "Temporal Statistics"
     description: str = "Computes temporal statistics"
     configuration_options: dict[str, BlockConfigurationOption] = {
-        "variable": BlockConfigurationOption(title="Variable", description="Variable name like '2t'", value_type="str"),
+        PARAM_DIM: BlockConfigurationOption(title=PARAM_DIM, description="Param name like '2t'", value_type="str"),
         "statistic": BlockConfigurationOption(
             title="Statistic",
             description="Statistic to compute over steps",
@@ -174,12 +239,16 @@ class TemporalStatistics(Product):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_dataset = cast(XarrayOutput, inputs["dataset"])  # type:ignore[redundant-cast] # NOTE the warning is correct but we expect more
-        variable = block.configuration_values["variable"]
-        if variable not in input_dataset.variables:
-            return Either.error(f"variable {variable} is not in the input variables: {input_dataset.variables}")
-        output = XarrayOutput(variables=[variable], coords=[x for x in input_dataset.coords if x != STEP_DIM])
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_dataset = inputs.get("dataset")
+        if not isinstance(input_dataset, QubedOutput):
+            actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
+            return Either.error(f"Unsupported input type for 'dataset': expected QubedOutput, got {actual_type}")
+
+        param = block.configuration_values[PARAM_DIM]
+        if not contains(input_dataset, {PARAM_DIM: param}):
+            return Either.error(f"param {param} is not in the input parameters: {axes(input_dataset).get(PARAM_DIM, [])}")
+        output = coxpand(input_dataset, [PARAM_DIM, STEP_DIM], {PARAM_DIM: [param]})
         return Either.ok(output)
 
     def compile(
@@ -191,7 +260,7 @@ class TemporalStatistics(Product):
         input_task = block.input_ids["dataset"]
         input_task_action = inputs[input_task]
         stat = block.configuration_values["statistic"]
-        param = input_task_action.select({PARAM_DIM: block.configuration_values["variable"]})
+        param = input_task_action.select({PARAM_DIM: block.configuration_values[PARAM_DIM]})
         if stat == "mean":
             action = param.mean(dim=STEP_DIM)
         elif stat == "std":
@@ -200,10 +269,12 @@ class TemporalStatistics(Product):
             action = param.min(dim=STEP_DIM)
         elif stat == "max":
             action = param.max(dim=STEP_DIM)
+        else:
+            return Either.error(f"Unsupported temporal statistic: {stat}")
         return Either.ok(action)
 
-    def intersect(self, input: BlockInstanceOutput) -> bool:
-        return isinstance(input, XarrayOutput) and len(input.variables) > 0 and STEP_DIM in input.coords
+    def intersect(self, other: QubedOutput) -> bool:
+        return contains(other, STEP_DIM) and contains(other, PARAM_DIM)
 
 
 class ZarrSink(Sink):
@@ -218,9 +289,8 @@ class ZarrSink(Sink):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        output = XarrayOutput(variables=[], coords=[])
-        return Either.ok(output)
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        return Either.ok(NoOutput())
 
     def compile(
         self,
@@ -234,5 +304,97 @@ class ZarrSink(Sink):
         )
         return Either.ok(action)
 
-    def intersect(self, input: BlockInstanceOutput) -> bool:
-        return len(input.variables) > 0
+    def intersect(self, other: QubedOutput) -> bool:
+        return bool(dimensions(other))
+
+
+class MapPlotSink(Sink):
+    title: str = "Map Plot"
+    description: str = "Render a geographic map using earthkit-plots"
+    configuration_options: dict[str, BlockConfigurationOption] = {
+        PARAM_DIM: BlockConfigurationOption(
+            title="Parameters",
+            description="Parameters to select and plot (e.g. '2t', 'msl')",
+            value_type="list[str]",
+        ),
+        "domain": BlockConfigurationOption(
+            title="Domain",
+            description="Geographic domain: global, europe, or a named region",
+            value_type="str",
+        ),
+        "format": BlockConfigurationOption(
+            title="Format",
+            description="Output image format",
+            value_type="enum['png', 'pdf', 'svg']",
+        ),
+        "groupby": BlockConfigurationOption(
+            title="Group By",
+            description="Dimension to create subplots over",
+            value_type="enum['valid_datetime', 'step', 'number', 'none']",
+        ),
+        # Disabled for now
+        # "style_schema": BlockConfigurationOption(
+        #     title="Style Schema",
+        #     description="earthkit-plots schema identifier",
+        #     value_type="str",
+        # ),
+    }
+    inputs: list[str] = ["dataset"]
+
+    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_dataset = inputs.get("dataset")
+        if not isinstance(input_dataset, QubedOutput):
+            actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
+            return Either.error(f"Unsupported input type for 'dataset': expected QubedOutput, got {actual_type}")
+
+        params = _get_item_list(block.configuration_values[PARAM_DIM], str, allow_empty=False)
+        if any(map(lambda x: x.e is not None, [params])):
+            return Either.error(f"Invalid configuration: {params.e}")
+
+        params = params.get_or_raise()
+        missing = [p for p in params if not contains(input_dataset, {PARAM_DIM: p})]
+        if missing:
+            return Either.error(f"params {missing} are not in the input parameters: {axes(input_dataset).get(PARAM_DIM, [])}")
+
+        groupby_value = block.configuration_values["groupby"]
+        if groupby_value not in ("valid_datetime", "step", "number", "none"):
+            return Either.error(
+                f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
+            )
+        if groupby_value != "none" and groupby_value not in dimensions(input_dataset):
+            return Either.error(
+                f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
+            )
+
+        return Either.ok(RawOutput(type_fqn=f"image/{block.configuration_values['format']}"))
+
+    def compile(
+        self,
+        inputs: ActionLookup,
+        block_id: BlockInstanceId,
+        block: BlockInstance,
+    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_task = block.input_ids["dataset"]
+        params = _get_item_list(block.configuration_values[PARAM_DIM], str, allow_empty=False).get_or_raise()
+        selected = inputs[input_task].select({PARAM_DIM: params if len(params) > 1 else params[0]})
+
+        groupby = block.configuration_values["groupby"] or "valid_datetime"
+
+        if groupby != "none":
+            selected = selected.concatenate(groupby)
+
+        action = selected.map(
+            Payload(
+                "fiab_plugin_ecmwf.runtime.plots.map_plot",
+                kwargs={
+                    "domain": block.configuration_values["domain"] or None,
+                    "format": block.configuration_values["format"] or "png",
+                    "groupby": block.configuration_values["groupby"] or "valid_datetime",
+                    # "style_schema": block.configuration_values["style_schema"] or "inbuilt://fiab",
+                },
+            )
+        )
+        return Either.ok(action)
+
+    def intersect(self, other: QubedOutput) -> bool:
+        return contains(other, PARAM_DIM)

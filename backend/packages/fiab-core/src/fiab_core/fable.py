@@ -11,10 +11,12 @@
 Types pertaining to Forecast As BLock Expression (Fable): blocks
 """
 
-from typing import Literal, NewType
+import abc
+from typing import Any, Literal, NewType
 
 from earthkit.workflows.fluent import Action
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field
+from qubed import Qube
 from typing_extensions import Self
 
 from fiab_core.pydantic_utils import FiabCoreBaseModel
@@ -97,9 +99,11 @@ class BlockInstance(FiabCoreBaseModel):
     """Keys come from factory's `inputs`, values are other blocks in the (partial) fable"""
 
 
-class XarrayOutput(FiabCoreBaseModel):  # NOTE eventually Qubed
-    variables: list[str]
-    coords: list[str]
+class QubedOutput(FiabCoreBaseModel):
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)  # otherwise Qube cannot be here
+    dataqube: Qube = Field(default_factory=Qube.empty)
+    datatype: str = Field(default="")
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class RawOutput(FiabCoreBaseModel):
@@ -107,9 +111,10 @@ class RawOutput(FiabCoreBaseModel):
 
 
 class NoOutput(FiabCoreBaseModel):
+    # use this when there is no output whatsoever -- this stops *any* expansion of the block
     pass
 
 
-BlockInstanceOutput = XarrayOutput | RawOutput | NoOutput
+BlockInstanceOutput = QubedOutput | RawOutput | NoOutput
 
 ActionLookup = dict[BlockInstanceId, Action]
