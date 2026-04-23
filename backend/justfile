@@ -2,3 +2,6 @@ val:
     uv run ty check
     uv run pytest -n4 tests/unit
     uv run pytest tests/integration
+
+dev:
+    uv run python -m forecastbox.entrypoint.main
