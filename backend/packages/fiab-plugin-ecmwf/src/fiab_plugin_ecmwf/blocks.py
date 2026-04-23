@@ -327,12 +327,12 @@ class MapPlotSink(Sink):
             description="Output image format",
             value_type="enum['png', 'pdf', 'svg']",
         ),
-        "groupby": BlockConfigurationOption(
-            title="Group By",
-            description="Dimension to create subplots over",
-            value_type="enum['valid_datetime', 'step', 'number', 'none']",
-        ),
         # Disabled for now
+        # "groupby": BlockConfigurationOption(
+        #     title="Group By",
+        #     description="Dimension to create subplots over",
+        #     value_type="enum['valid_datetime', 'step', 'number', 'none']",
+        # ),
         # "style_schema": BlockConfigurationOption(
         #     title="Style Schema",
         #     description="earthkit-plots schema identifier",
@@ -356,15 +356,16 @@ class MapPlotSink(Sink):
         if missing:
             return Either.error(f"params {missing} are not in the input parameters: {axes(input_dataset).get(PARAM_DIM, [])}")
 
-        groupby_value = block.configuration_values["groupby"]
-        if groupby_value not in ("valid_datetime", "step", "number", "none"):
-            return Either.error(
-                f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
-            )
-        if groupby_value != "none" and groupby_value not in dimensions(input_dataset):
-            return Either.error(
-                f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
-            )
+        # Disabled for now
+        # groupby_value = block.configuration_values["groupby"]
+        # if groupby_value not in ("valid_datetime", "step", "number", "none"):
+        #     return Either.error(
+        #         f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
+        #     )
+        # if groupby_value != "none" and groupby_value not in dimensions(input_dataset):
+        #     return Either.error(
+        #         f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
+        #     )
 
         return Either.ok(RawOutput(type_fqn=f"image/{block.configuration_values['format']}"))
 
@@ -378,10 +379,11 @@ class MapPlotSink(Sink):
         params = _get_item_list(block.configuration_values[PARAM_DIM], str, allow_empty=False).get_or_raise()
         selected = inputs[input_task].select({PARAM_DIM: params if len(params) > 1 else params[0]})
 
-        groupby = block.configuration_values["groupby"] or "valid_datetime"
+        # Disabled for now
+        # groupby = block.configuration_values["groupby"] or "valid_datetime"
 
-        if groupby != "none":
-            selected = selected.concatenate(groupby)
+        # if groupby != "none":
+        #     selected = selected.concatenate(groupby)
 
         action = selected.map(
             Payload(
@@ -389,7 +391,7 @@ class MapPlotSink(Sink):
                 kwargs={
                     "domain": block.configuration_values["domain"] or None,
                     "format": block.configuration_values["format"] or "png",
-                    "groupby": block.configuration_values["groupby"] or "valid_datetime",
+                    # "groupby": block.configuration_values["groupby"] or "valid_datetime",
                     # "style_schema": block.configuration_values["style_schema"] or "inbuilt://fiab",
                 },
             )

@@ -13,6 +13,17 @@ from fiab_core.tools.plugins import QubedPluginBuilder
 
 from fiab_plugin_ecmwf.anemoi.blocks import AnemoiSource, AnemoiTransform
 from fiab_plugin_ecmwf.blocks import EkdSource, EnsembleStatistics, MapPlotSink, TemporalStatistics, ZarrSink
+from fiab_plugin_ecmwf.dummy import (
+    EnsembleProbabilityTransform,
+    ExtremeIndexProduct,
+    FilterParam,
+    GRIBOutputSink,
+    InterpolationTransform,
+    MonthlyMeanTransform,
+    NetCDFOutputSink,
+    TropicalCycloneProduct,
+    WeeklyMeanTransform,
+)
 
 blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
     BlockFactoryId("ekdSource"): EkdSource(),
@@ -22,6 +33,15 @@ blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
     BlockFactoryId("anemoiSource"): AnemoiSource(),
     BlockFactoryId("anemoiTransform"): AnemoiTransform(),
     BlockFactoryId("mapPlotSink"): MapPlotSink(),
+    BlockFactoryId("netcdfOutput"): NetCDFOutputSink(),
+    BlockFactoryId("gribOutput"): GRIBOutputSink(),
+    BlockFactoryId("interpolation"): InterpolationTransform(),
+    BlockFactoryId("weeklyMean"): WeeklyMeanTransform(),
+    BlockFactoryId("monthlyMean"): MonthlyMeanTransform(),
+    BlockFactoryId("ensembleProbability"): EnsembleProbabilityTransform(),
+    BlockFactoryId("extremeIndex"): ExtremeIndexProduct(),
+    BlockFactoryId("tropicalCyclone"): TropicalCycloneProduct(),
+    BlockFactoryId("filterParam"): FilterParam(),
 }
 
 plugin = QubedPluginBuilder(block_builders=blocks).as_plugin()
