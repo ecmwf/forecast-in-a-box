@@ -27,8 +27,9 @@ def dummy_provider() -> Generator[None, None, None]:
                 disk_size_bytes=1234,
                 pip_package_constraints=[],
                 supported_platforms=["linux"],
-                output_characteristics=[],
                 input_characteristics=[],
+                output_qube={},
+                timestep="1h",
                 comment="A dummy comment",
             )
         }
