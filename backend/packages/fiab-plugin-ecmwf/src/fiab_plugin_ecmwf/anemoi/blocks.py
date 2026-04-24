@@ -47,7 +47,7 @@ class AnemoiBuilder:
     def _local_path(self) -> Path:
         return get_local_path(self.artifact_id)
 
-    def build(self, lead_time: int) -> Inference:  # type: ignore[reportReturnType]
+    def build(self, lead_time: int, input_source: str | None = None) -> Inference:  # type: ignore[reportReturnType]
         import functools
 
         class WrappedInference(Inference):
@@ -62,7 +62,7 @@ class AnemoiBuilder:
         return WrappedInference(
             ckpt=self._local_path(),
             lead_time=lead_time,
-            environment=get_environment(self.artifact_id),
+            environment=get_environment(self.artifact_id, input_source),
             metadata=get_metadata(self.artifact_id),
         )
 
@@ -117,7 +117,10 @@ class AnemoiSource(Source):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         configuration = block.configuration_values
 
-        inference = AnemoiBuilder(configuration["checkpoint"]).build(lead_time=int(configuration["lead_time"]))
+        inference = AnemoiBuilder(configuration["checkpoint"]).build(
+            lead_time=int(configuration["lead_time"]),
+            input_source=configuration["input_source"],
+        )
         action = inference.from_input(
             configuration["input_source"],
             date=configuration["base_time"],
