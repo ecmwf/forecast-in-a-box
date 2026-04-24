@@ -394,6 +394,7 @@ class MapPlotSink(Sink):
                     # "groupby": block.configuration_values["groupby"] or "valid_datetime",
                     # "style_schema": block.configuration_values["style_schema"] or "inbuilt://fiab",
                 },
+                metadata={"environment": ["earthkit-plots<1.0.0"]},
             )
         )
         return Either.ok(action)
