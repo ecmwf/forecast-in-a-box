@@ -40,11 +40,12 @@ jobs:
           mkdir packagesDist
           for e in $(ls -d packages/*) ; do 
               pushd $e
-              python -m build --installer uv .
-              mv dist/* ../../packagesDist
+              just build
+              if [ -d dist ] ; then mv dist/* ../../packagesDist ; fi
               popd
           done
           rm -rf packagesDist/fiab_mcp_server* # lets not be releasing this one just yet
+          rm -rf packagesDist/fiab_plugin_test* # not to be released
           twine check ./packagesDist/*
 
           # upload

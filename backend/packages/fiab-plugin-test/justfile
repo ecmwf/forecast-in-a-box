@@ -1,3 +1,6 @@
 val:
     uv run ty check
     uv run pytest
+
+build:
+    echo "automated publishes not assumed for test plugin"

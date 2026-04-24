@@ -1,3 +1,6 @@
 val:
     uv run ty check
     uv run pytest
+
+build:
+    python -m build --installer uv .
