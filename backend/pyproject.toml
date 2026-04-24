@@ -28,7 +28,6 @@ dependencies = [
   "apscheduler",
   "cloudpickle",
   "earthkit-workflows>=0.9.0",
-  "earthkit-workflows-pproc",
   "fastapi",
   "fastapi-users[oauth]",
   "fastapi-users-db-sqlalchemy",
@@ -37,28 +36,16 @@ dependencies = [
   "httpx-oauth",
   "jinja2",
   "orjson",
-  "pproc",
   "psutil",
   "pydantic-settings",
   "pyrsistent",
   "python-multipart",
-  "qubed",
   "starlette>=1.0", # NOTE we actually dont depend on starlette directly, only via fastapi/sse, but our code is already assuming 1.0+
   "sse-starlette",
   "toml",
   "uvicorn",
 ]
 
-optional-dependencies.all = [
-  "forecast-in-a-box[plots,thermo,dev]",
-]
-optional-dependencies.plots = [
-  "earthkit-plots>=0.3.5",
-  "earthkit-plots-default-styles>=0.1",
-]
-optional-dependencies.thermo = [
-  "thermofeel>=2.1.1",
-]
 urls."Source code" = "https://github.com/ecmwf/forecast-in-a-box"
 
 [dependency-groups]
@@ -111,9 +98,6 @@ plugins = "pydantic.mypy"
 
 
 [tool.uv.sources]
-# TODO remove pproc and ekw-pproc once released
-pproc = { git = "https://github.com/ecmwf/pproc" }
-earthkit-workflows-pproc = { git = "https://github.com/ecmwf/earthkit-workflows-pproc" }
 fiab-core = {workspace = true}
 fiab-plugin-demo = {workspace = true}
 fiab-mcp-server = {workspace = true}
