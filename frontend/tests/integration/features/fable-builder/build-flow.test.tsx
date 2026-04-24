@@ -67,7 +67,11 @@ function setupValidFableWithSink(): void {
 
 describe('Fable Builder Integration', () => {
   beforeEach(() => {
-    // Reset store state before each test
+    // Wipe persisted state from earlier tests: FableBuilderPage restores
+    // `fiab.fable.draft` on mount, and a stale draft makes the store start
+    // with a phantom block, causing `Object.keys(state.fable.blocks)[0]`
+    // to point at the wrong one.
+    localStorage.clear()
     useFableBuilderStore.getState().reset()
     vi.clearAllMocks()
   })

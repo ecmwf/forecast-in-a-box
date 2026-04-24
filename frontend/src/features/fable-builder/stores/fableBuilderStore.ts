@@ -121,6 +121,13 @@ interface FableBuilderState {
   setIsValidating: (validating: boolean) => void
   setSubmitDialogOpen: (open: boolean) => void
   markSaved: (id: string, version: number, name?: string) => void
+  /**
+   * Mark the current fable as submitted (one-off run or schedule created).
+   * Clears the dirty flag and bumps `lastSavedAt` so the draft-persistence
+   * hook wipes the localStorage draft — but leaves the fable on screen so
+   * the user can tweak and re-submit.
+   */
+  markSubmitted: () => void
   markDirty: () => void
   reset: () => void
 }
@@ -544,6 +551,7 @@ export const useFableBuilderStore = create<FableBuilderState>()(
             lastSavedAt: Date.now(),
             ...(name !== undefined && { fableName: name }),
           }),
+        markSubmitted: () => set({ isDirty: false, lastSavedAt: Date.now() }),
         markDirty: () => set({ isDirty: true }),
 
         reset: () => set(initialState),

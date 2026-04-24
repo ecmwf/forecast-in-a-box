@@ -148,6 +148,16 @@ function advanceProgress(key: string): number {
   return next
 }
 
+/**
+ * Reset handler-scoped state between tests. Without this, a download left
+ * mid-flight by test A will be seen by test B as "already in progress"
+ * instead of starting fresh at 0. Called from `tests/setup.ts` in a global
+ * `afterEach`.
+ */
+export function resetArtifactsHandlerState(): void {
+  ongoingDownloads.clear()
+}
+
 export const artifactsHandlers = [
   // GET /api/v1/artifacts/list_models
   http.get(API_ENDPOINTS.artifacts.listModels, async () => {

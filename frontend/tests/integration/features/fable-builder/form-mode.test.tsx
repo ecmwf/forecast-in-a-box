@@ -66,6 +66,9 @@ function setupValidFableWithSink(): void {
 
 describe('Fable Builder Form Mode', () => {
   beforeEach(() => {
+    // Wipe persisted state (see build-flow.test.tsx — stale fable drafts in
+    // localStorage get restored on mount and confuse single-block assertions).
+    localStorage.clear()
     useFableBuilderStore.getState().reset()
     // Switch to form mode before each test
     useFableBuilderStore.getState().setMode('form')

@@ -185,10 +185,12 @@ const seedExecutionsV2: Array<JobExecutionDetail> = [
 
 export function resetJobsState(): void {
   jobsState = {}
+  jobIdCounter = 100
   for (const job of seedJobs) {
     jobsState[job.id] = JSON.parse(JSON.stringify(job)) as MockJob
   }
   executionsState = {}
+  executionIdCounter = 200
   for (const exec of seedExecutionsV2) {
     executionsState[exec.run_id] = JSON.parse(
       JSON.stringify(exec),

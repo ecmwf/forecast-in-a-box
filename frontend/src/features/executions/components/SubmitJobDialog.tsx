@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { AlertCircle, Calendar, Loader2, Play, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from '@tanstack/react-router'
@@ -19,9 +19,11 @@ import type {
 import type { EnvironmentSpecification } from '@/api/types/job.types'
 import { showToast } from '@/lib/toast'
 import { createDefaultEnvironment } from '@/api/types/job.types'
-import { useFableRetrieve } from '@/api/hooks/useFable'
+import { useBlockCatalogue, useFableRetrieve } from '@/api/hooks/useFable'
+import { buildDefaultJobName } from '@/features/executions/utils/job-name'
 import { useSubmitFable } from '@/api/hooks/useJobs'
 import { useCreateSchedule } from '@/api/hooks/useSchedules'
+import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { CronExpressionInput } from '@/features/schedules/components/CronExpressionInput'
 import { EnvironmentConfig } from '@/features/executions/components/EnvironmentConfig'
 import {
@@ -35,6 +37,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumericInput } from '@/components/ui/numeric-input'
 import { Label } from '@/components/ui/label'
 import { useActivityStore } from '@/stores/activityStore'
 import { cn } from '@/lib/utils'
@@ -90,6 +93,16 @@ function SubmitJobForm({
   const navigate = useNavigate()
   const submitFable = useSubmitFable()
   const createSchedule = useCreateSchedule()
+  const markSubmitted = useFableBuilderStore((s) => s.markSubmitted)
+  const { data: catalogue } = useBlockCatalogue()
+
+  // Derive a sensible fallback name from the fable contents. Computed once
+  // when the dialog opens (the mount freezes `now`) so the placeholder stays
+  // stable while the user reads it.
+  const generatedName = useMemo(
+    () => buildDefaultJobName({ fable, catalogue, fableData }),
+    [fable, catalogue, fableData],
+  )
 
   const [mode, setMode] = useState<SubmitMode>('run')
   const [name, setName] = useState(() => fableData?.display_name || '')
@@ -154,8 +167,9 @@ function SubmitJobForm({
       finalTags.push(pendingTag)
     }
 
-    // Send null for empty name/description so backend marks source as "oneoff_execution"
-    const trimmedName = name.trim() || null
+    // Fall back to the config-derived name when the user didn't enter one,
+    // so submitted jobs are never titled "Untitled Job".
+    const trimmedName = name.trim() || generatedName
     const trimmedDescription = description.trim() || null
 
     try {
@@ -171,14 +185,18 @@ function SubmitJobForm({
       useActivityStore.getState().addTask({
         id: `job:${response.run_id}`,
         type: 'job',
-        label: trimmedName ?? `Job ${response.run_id.slice(0, 8)}`,
+        label: trimmedName || `Job ${response.run_id.slice(0, 8)}`,
         description: 'Submitted',
         status: 'active',
         startedAt: Date.now(),
         navigateTo: `/executions/${response.run_id}`,
       })
 
-      showToast.success(t('submit.title'), trimmedName ?? undefined)
+      showToast.success(t('submit.title'), trimmedName || undefined)
+
+      // The fable has been committed — wipe the localStorage draft so the
+      // builder doesn't resurrect it next time the user lands on /configure.
+      markSubmitted()
 
       onOpenChange(false)
       navigate({
@@ -211,6 +229,10 @@ function SubmitJobForm({
       })
 
       showToast.success(t('submit.scheduleCreated'), name.trim())
+
+      // Schedule created successfully — drop the draft so a return visit to
+      // /configure doesn't restore an already-scheduled fable as "unsaved".
+      markSubmitted()
 
       onOpenChange(false)
       navigate({ to: '/schedules' })
@@ -274,9 +296,7 @@ function SubmitJobForm({
           <Input
             id="submit-name"
             placeholder={
-              mode === 'run'
-                ? t('submit.namePlaceholderOptional')
-                : t('submit.namePlaceholder')
+              mode === 'run' ? generatedName : t('submit.namePlaceholder')
             }
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -343,10 +363,8 @@ function SubmitJobForm({
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="submit-max-delay">{t('submit.maxDelay')}</Label>
-              <Input
+              <NumericInput
                 id="submit-max-delay"
-                type="number"
-                min={0}
                 value={maxDelayHours}
                 onChange={(e) => setMaxDelayHours(Number(e.target.value))}
                 className="w-32"

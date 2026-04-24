@@ -34,8 +34,8 @@ interface SavedFableEntry {
   updated_at: string
 }
 
-const savedFablesState: Record<string, SavedFableEntry | undefined> =
-  Object.fromEntries(
+function seedSavedFables(): Record<string, SavedFableEntry | undefined> {
+  return Object.fromEntries(
     Object.entries(mockSavedFables).map(([id, entry]) => [
       id,
       {
@@ -45,10 +45,16 @@ const savedFablesState: Record<string, SavedFableEntry | undefined> =
       },
     ]),
   )
+}
+
+function seedFableVersions(): Record<string, number> {
+  return Object.fromEntries(Object.keys(mockSavedFables).map((id) => [id, 1]))
+}
+
+let savedFablesState: Record<string, SavedFableEntry | undefined> =
+  seedSavedFables()
 let fableIdCounter = 100
-const fableVersions: Record<string, number> = Object.fromEntries(
-  Object.keys(mockSavedFables).map((id) => [id, 1]),
-)
+let fableVersions: Record<string, number> = seedFableVersions()
 
 interface MockGlobalGlyph {
   global_glyph_id: string
@@ -61,8 +67,23 @@ interface MockGlobalGlyph {
   updated_at: string
 }
 
-const mockGlobalGlyphs: Array<MockGlobalGlyph> = []
+let mockGlobalGlyphs: Array<MockGlobalGlyph> = []
 let glyphIdCounter = 1
+
+/**
+ * Reset handler-scoped mutable state between tests. Without this, the fable ID
+ * counter, saved-fable records and global-glyph list persist across tests,
+ * causing assertions like `expect(fableId).toBeNull()` to intermittently fail
+ * when a previous test's `.create` response races against the next test's
+ * `beforeEach` reset. Called from `tests/setup.ts` in a global `afterEach`.
+ */
+export function resetFableHandlerState(): void {
+  savedFablesState = seedSavedFables()
+  fableVersions = seedFableVersions()
+  fableIdCounter = 100
+  mockGlobalGlyphs = []
+  glyphIdCounter = 1
+}
 
 const mockIntrinsicGlyphs = [
   {

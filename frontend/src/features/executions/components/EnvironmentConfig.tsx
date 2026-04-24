@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { NumericInput } from '@/components/ui/numeric-input'
 
 interface EnvironmentConfigProps {
   environment: EnvironmentSpecification
@@ -93,10 +94,8 @@ export function EnvironmentConfig({
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="env-hosts">{t('submit.hosts')}</Label>
-              <Input
+              <NumericInput
                 id="env-hosts"
-                type="number"
-                min={1}
                 placeholder={t('submit.hostsPlaceholder')}
                 value={environment.hosts ?? ''}
                 onChange={(e) => handleHostsChange(e.target.value)}
@@ -104,10 +103,8 @@ export function EnvironmentConfig({
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="env-workers">{t('submit.workersPerHost')}</Label>
-              <Input
+              <NumericInput
                 id="env-workers"
-                type="number"
-                min={1}
                 placeholder={t('submit.workersPerHostPlaceholder')}
                 value={environment.workers_per_host ?? ''}
                 onChange={(e) => handleWorkersChange(e.target.value)}

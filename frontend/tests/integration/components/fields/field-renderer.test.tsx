@@ -103,44 +103,99 @@ describe('FieldRenderer Integration', () => {
   })
 
   describe('Number field', () => {
-    it('renders a number input with step=1 for int', async () => {
+    it('renders a numeric input (inputMode=numeric) for int', async () => {
       const screen = await renderWithProviders(
-        <ControlledFieldRenderer valueType="int" initialValue="5" />,
+        <ControlledFieldRenderer
+          valueType="int"
+          initialValue="5"
+          label="IntField"
+        />,
       )
-      const input = screen.getByRole('spinbutton')
+      const input = screen.getByLabelText('IntField')
       await expect.element(input).toBeVisible()
-      await expect.element(input).toHaveAttribute('step', '1')
+      await expect.element(input).toHaveAttribute('inputmode', 'numeric')
     })
 
-    it('renders a number input with step=any for float', async () => {
+    it('renders a decimal input (inputMode=decimal) for float', async () => {
       const screen = await renderWithProviders(
-        <ControlledFieldRenderer valueType="float" initialValue="3.14" />,
+        <ControlledFieldRenderer
+          valueType="float"
+          initialValue="3.14"
+          label="FloatField"
+        />,
       )
-      const input = screen.getByRole('spinbutton')
+      const input = screen.getByLabelText('FloatField')
       await expect.element(input).toBeVisible()
-      await expect.element(input).toHaveAttribute('step', 'any')
+      await expect.element(input).toHaveAttribute('inputmode', 'decimal')
     })
 
     it('fires onChange on input', async () => {
       const screen = await renderWithProviders(
-        <ControlledFieldRenderer valueType="int" initialValue="0" />,
+        <ControlledFieldRenderer
+          valueType="int"
+          initialValue="0"
+          label="IntField"
+        />,
       )
-      const input = screen.getByRole('spinbutton')
+      const input = screen.getByLabelText('IntField')
       await input.fill('42')
       await expect
         .element(screen.getByTestId('current-value'))
         .toHaveTextContent('42')
     })
+
+    it('rejects non-numeric keystrokes on int fields', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer
+          valueType="int"
+          initialValue="7"
+          label="IntField"
+        />,
+      )
+      const input = screen.getByLabelText('IntField')
+      // Attempt to overwrite with a non-numeric string; controlled value snaps back.
+      await input.fill('abc')
+      await expect
+        .element(screen.getByTestId('current-value'))
+        .toHaveTextContent('7')
+    })
   })
 
   describe('DateTime field', () => {
-    it('renders datetime-local input for "datetime"', async () => {
+    it('renders a date + time pair for "datetime"', async () => {
       const screen = await renderWithProviders(
-        <ControlledFieldRenderer valueType="datetime" label="DateTime Field" />,
+        <ControlledFieldRenderer valueType="datetime" label="DateValue" />,
       )
-      const input = screen.getByLabelText('DateTime Field')
-      await expect.element(input).toBeVisible()
-      await expect.element(input).toHaveAttribute('type', 'datetime-local')
+      const dateInput = screen.getByLabelText('DateValue')
+      await expect.element(dateInput).toBeVisible()
+      await expect.element(dateInput).toHaveAttribute('type', 'date')
+      const timeInput = screen.getByLabelText('Time', { exact: true })
+      await expect.element(timeInput).toBeVisible()
+      await expect.element(timeInput).toHaveAttribute('type', 'time')
+    })
+
+    it('keeps the stored value empty and shows 00:00 as the time placeholder', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer valueType="datetime" label="DateValue" />,
+      )
+      // Field stays blank until the user picks a date, but the time half
+      // already shows 00:00 so they can see the default time that will be
+      // applied once they do.
+      const dateInput = screen.getByLabelText('DateValue')
+      await expect.element(dateInput).toHaveValue('')
+      const timeInput = screen.getByLabelText('Time', { exact: true })
+      await expect.element(timeInput).toHaveValue('00:00')
+    })
+
+    it('combines date + time into a datetime-local string on date pick', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer valueType="datetime" label="DateValue" />,
+      )
+      const dateInput = screen.getByLabelText('DateValue')
+      await dateInput.fill('2026-07-15')
+      await expect
+        .element(screen.getByTestId('current-value'))
+        .toHaveTextContent('2026-07-15T00:00')
     })
 
     it('renders date input for "date-iso8601"', async () => {
@@ -252,6 +307,20 @@ describe('FieldRenderer Integration', () => {
       await expect
         .element(screen.getByRole('button', { name: 'Remove foo' }))
         .not.toBeInTheDocument()
+    })
+
+    it('splits comma-separated input into separate items on Enter', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer valueType="list[str]" initialValue="" />,
+      )
+      const input = screen.getByPlaceholder('Add item...')
+      await input.fill('2t, msl')
+      await userEvent.keyboard('{Enter}')
+      // Stored value must be "2t,msl" (no space) so the backend's comma split
+      // yields clean tokens, not [" msl"].
+      await expect
+        .element(screen.getByTestId('current-value'))
+        .toHaveTextContent('2t,msl')
     })
   })
 

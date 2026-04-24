@@ -10,6 +10,7 @@
 
 import { GlyphFieldWrapper } from './GlyphFieldWrapper'
 import { InputGroupInput } from '@/components/ui/input-group'
+import { createNumericFilter } from '@/components/ui/numeric-input'
 
 export interface NumberFieldProps {
   id: string
@@ -32,6 +33,10 @@ export function NumberField({
   disabled,
   className,
 }: NumberFieldProps) {
+  const { inputMode, accepts } = createNumericFilter({
+    allowDecimal: !isInteger,
+    allowNegative: true,
+  })
   return (
     <GlyphFieldWrapper
       id={id}
@@ -44,10 +49,12 @@ export function NumberField({
     >
       <InputGroupInput
         id={id}
-        type="number"
-        step={isInteger ? '1' : 'any'}
+        type="text"
+        inputMode={inputMode}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          if (accepts(e.target.value)) onChange(e.target.value)
+        }}
         placeholder={placeholder}
         disabled={disabled}
       />
