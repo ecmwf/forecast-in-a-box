@@ -22,6 +22,7 @@ import {
 import { useServerTime } from '@/api/hooks/useSchedules'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { NumericInput } from '@/components/ui/numeric-input'
 import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
 
@@ -146,19 +147,13 @@ export function CronExpressionInput({
           {frequency !== 'hourly' && (
             <>
               <Label className="text-sm text-muted-foreground">at</Label>
-              <Input
-                type="number"
-                min={0}
-                max={23}
+              <NumericInput
                 value={localTime.hour}
                 onChange={(e) => handleHourChange(Number(e.target.value))}
                 className="w-20"
               />
               <span className="text-muted-foreground">:</span>
-              <Input
-                type="number"
-                min={0}
-                max={59}
+              <NumericInput
                 value={localTime.minute}
                 onChange={(e) => handleMinuteChange(Number(e.target.value))}
                 className="w-20"
@@ -171,10 +166,7 @@ export function CronExpressionInput({
           {frequency === 'hourly' && (
             <>
               <Label className="text-sm text-muted-foreground">at minute</Label>
-              <Input
-                type="number"
-                min={0}
-                max={59}
+              <NumericInput
                 value={localTime.minute}
                 onChange={(e) => handleMinuteChange(Number(e.target.value))}
                 className="w-20"

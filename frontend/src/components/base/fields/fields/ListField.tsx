@@ -24,6 +24,11 @@ export interface ListFieldProps {
   placeholder?: string
   disabled?: boolean
   className?: string
+  /**
+   * Item type the backend expects for entries. `'int'` rejects entries that
+   * aren't parseable integers and hints the keyboard to numeric.
+   */
+  itemType?: 'string' | 'int'
 }
 
 /**
@@ -44,6 +49,10 @@ function serializeListValue(items: Array<string>): string {
   return items.join(',')
 }
 
+export function isIntegerString(raw: string): boolean {
+  return /^-?\d+$/.test(raw)
+}
+
 export function ListField({
   id,
   configKey,
@@ -52,6 +61,7 @@ export function ListField({
   placeholder = 'Add item...',
   disabled,
   className,
+  itemType = 'string',
 }: ListFieldProps) {
   return (
     <GlyphFieldWrapper
@@ -69,6 +79,7 @@ export function ListField({
         onChange={onChange}
         placeholder={placeholder}
         disabled={disabled}
+        itemType={itemType}
       />
     </GlyphFieldWrapper>
   )
@@ -81,20 +92,37 @@ function ListFieldConcrete({
   placeholder = 'Add item...',
   disabled,
   className,
+  itemType = 'string',
 }: Omit<ListFieldProps, 'configKey'>) {
   const [inputValue, setInputValue] = useState('')
   const items = parseListValue(value)
 
   const addItem = useCallback(
     (newItem: string) => {
-      const trimmed = newItem.trim()
-      if (!trimmed || items.includes(trimmed)) return
+      // Split on commas so pasting or typing "a, b, c" produces three chips,
+      // not one chip whose stored value round-trips as " b"/" c" and fails
+      // backend validation (params split by "," without trimming).
+      const tokens = newItem
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+      if (tokens.length === 0) return
 
-      const newItems = [...items, trimmed]
-      onChange(serializeListValue(newItems))
+      const toAdd: Array<string> = []
+      for (const token of tokens) {
+        if (itemType === 'int' && !isIntegerString(token)) continue
+        if (items.includes(token) || toAdd.includes(token)) continue
+        toAdd.push(token)
+      }
+      if (toAdd.length === 0) {
+        setInputValue('')
+        return
+      }
+
+      onChange(serializeListValue([...items, ...toAdd]))
       setInputValue('')
     },
-    [items, onChange],
+    [items, itemType, onChange],
   )
 
   const removeItem = useCallback(
@@ -114,34 +142,39 @@ function ListFieldConcrete({
     }
   }
 
+  // Single flex-wrap row keeps badges and the input on the same line, so the
+  // GlyphFieldWrapper's inline-start `{}` toggle aligns with the content
+  // instead of floating between a badges row and an input row.
   return (
-    <div className={cn('space-y-2', className)}>
-      {items.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {items.map((item, index) => (
-            <Badge
-              key={`${item}-${index}`}
-              variant="secondary"
-              className="gap-1 pr-1"
-            >
-              {item}
-              {!disabled && (
-                <button
-                  type="button"
-                  onClick={() => removeItem(index)}
-                  className="ml-1 rounded-full p-0.5 transition-colors hover:bg-muted-foreground/20"
-                  aria-label={`Remove ${item}`}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </Badge>
-          ))}
-        </div>
+    <div
+      className={cn(
+        'flex min-w-0 flex-1 flex-wrap items-center gap-1.5 py-1',
+        className,
       )}
+    >
+      {items.map((item, index) => (
+        <Badge
+          key={`${item}-${index}`}
+          variant="secondary"
+          className="gap-1 pr-1"
+        >
+          {item}
+          {!disabled && (
+            <button
+              type="button"
+              onClick={() => removeItem(index)}
+              className="ml-1 rounded-full p-0.5 transition-colors hover:bg-muted-foreground/20"
+              aria-label={`Remove ${item}`}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </Badge>
+      ))}
       <InputGroupInput
         id={id}
         type="text"
+        inputMode={itemType === 'int' ? 'numeric' : undefined}
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
         onKeyDown={handleKeyDown}
@@ -152,6 +185,7 @@ function ListFieldConcrete({
         }}
         placeholder={placeholder}
         disabled={disabled}
+        className="h-7 min-w-[6rem] flex-1 !px-0"
       />
     </div>
   )

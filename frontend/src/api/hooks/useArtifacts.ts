@@ -46,6 +46,7 @@ import {
   listModels,
 } from '@/api/endpoints/artifacts'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
+import { createPollingTask } from '@/utils/polling'
 
 /** Polling interval for download progress (ms) */
 const DOWNLOAD_POLL_INTERVAL = 1_500
@@ -99,19 +100,6 @@ export interface DownloadProgress {
   /** 0-100 */
   progress: number
   status: string
-}
-
-/**
- * Wait for a delay, cancellable via AbortSignal.
- */
-function wait(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const id = setTimeout(resolve, ms)
-    signal?.addEventListener('abort', () => {
-      clearTimeout(id)
-      reject(new DOMException('Aborted', 'AbortError'))
-    })
-  })
 }
 
 // ---------------------------------------------------------------------------
@@ -202,24 +190,21 @@ async function startDownloadPolling(
     .setProgress(key, { compositeId, progress: 0, status: 'submitting' })
 
   try {
-    for (;;) {
-      controller.signal.throwIfAborted()
-
-      const response = await downloadModel(compositeId)
-      const progress = response.progress ?? 0
-      const status = response.status
-
-      useDownloadStore
-        .getState()
-        .setProgress(key, { compositeId, progress, status })
-
-      if (status === 'available') {
-        onComplete?.()
-        return response
-      }
-
-      await wait(DOWNLOAD_POLL_INTERVAL, controller.signal)
-    }
+    const response = await createPollingTask({
+      poll: () => downloadModel(compositeId),
+      until: (r) => r.status === 'available',
+      interval: DOWNLOAD_POLL_INTERVAL,
+      signal: controller.signal,
+      onProgress: (r) => {
+        useDownloadStore.getState().setProgress(key, {
+          compositeId,
+          progress: r.progress ?? 0,
+          status: r.status,
+        })
+      },
+    })
+    onComplete?.()
+    return response
   } finally {
     abortControllers.delete(key)
     removePendingDownload(key)

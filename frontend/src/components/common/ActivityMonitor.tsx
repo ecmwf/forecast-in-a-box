@@ -53,13 +53,16 @@ import {
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
+// Task-type icons share a single neutral pill color
+const NEUTRAL_BADGE_BG = 'bg-muted-foreground'
+
 const TYPE_CONFIG: Record<
   ActivityTaskType,
   { icon: typeof Bell; badgeColor: string }
 > = {
-  plugin: { icon: Blocks, badgeColor: 'bg-purple-500' },
-  download: { icon: Download, badgeColor: 'bg-blue-500' },
-  job: { icon: Play, badgeColor: 'bg-emerald-500' },
+  plugin: { icon: Blocks, badgeColor: NEUTRAL_BADGE_BG },
+  download: { icon: Download, badgeColor: NEUTRAL_BADGE_BG },
+  job: { icon: Play, badgeColor: NEUTRAL_BADGE_BG },
 }
 
 function matchesFilter(task: ActivityTask, needle: string): boolean {
@@ -106,14 +109,6 @@ export function ActivityMonitor() {
       ).length,
     [tasks],
   )
-  const hasFailed = useMemo(
-    () =>
-      Object.values(tasks).some(
-        (task) => task !== undefined && task.status === 'failed',
-      ),
-    [tasks],
-  )
-
   const totalVisible = ongoing.length + completed.length
   const totalStored = Object.values(tasks).filter(
     (task) => task !== undefined,
@@ -141,12 +136,7 @@ export function ActivityMonitor() {
       >
         <Bell className={cn('h-5 w-5', activeCount > 0 && 'animate-pulse')} />
         {activeCount > 0 && (
-          <span
-            className={cn(
-              'absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white',
-              hasFailed ? 'bg-destructive' : 'bg-primary',
-            )}
-          >
+          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-bold text-background">
             {activeCount}
           </span>
         )}
@@ -360,7 +350,7 @@ function ActivityTaskRow({
           task.progress != null && (
             <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
               <div
-                className="h-full rounded-full bg-blue-500 transition-all duration-300"
+                className="h-full rounded-full bg-foreground/70 transition-all duration-300"
                 style={{ width: `${task.progress}%` }}
               />
             </div>
@@ -408,6 +398,7 @@ function getStatusIcon(task: ActivityTask) {
 
 function getStatusColor(task: ActivityTask): string {
   if (task.status === 'completed') return 'bg-muted-foreground/50'
-  if (task.status === 'failed') return 'bg-destructive'
+  // Failed is conveyed by the AlertCircle icon, not a red pill.
+  if (task.status === 'failed') return NEUTRAL_BADGE_BG
   return TYPE_CONFIG[task.type].badgeColor
 }

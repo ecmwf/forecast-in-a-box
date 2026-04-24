@@ -65,6 +65,9 @@ function setupFableWithSource(): string {
 
 describe('Fable Builder Save & Load', () => {
   beforeEach(() => {
+    // Wipe persisted state (see build-flow.test.tsx — stale fable drafts in
+    // localStorage get restored on mount and confuse single-block assertions).
+    localStorage.clear()
     useFableBuilderStore.getState().reset()
     vi.clearAllMocks()
   })

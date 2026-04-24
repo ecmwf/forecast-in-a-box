@@ -22,18 +22,19 @@
  * - list[str] → tag input (badges with add/remove)
  * - list[int] → tag input (badges with add/remove)
  * - enum['a','b','c'] → select dropdown
+ * - optional[T] → same widget as T, with optional=true flag
  */
 
 export type ParsedValueType =
-  | { type: 'string' }
-  | { type: 'int' }
-  | { type: 'float' }
-  | { type: 'datetime' }
-  | { type: 'date' }
-  | { type: 'list'; itemType: 'string' }
-  | { type: 'list'; itemType: 'int' }
-  | { type: 'enum'; options: Array<string> }
-  | { type: 'unknown'; raw: string }
+  | { type: 'string'; optional?: boolean }
+  | { type: 'int'; optional?: boolean }
+  | { type: 'float'; optional?: boolean }
+  | { type: 'datetime'; optional?: boolean }
+  | { type: 'date'; optional?: boolean }
+  | { type: 'list'; itemType: 'string'; optional?: boolean }
+  | { type: 'list'; itemType: 'int'; optional?: boolean }
+  | { type: 'enum'; options: Array<string>; optional?: boolean }
+  | { type: 'unknown'; raw: string; optional?: boolean }
 
 /**
  * Parse a value_type string from the backend catalogue into a structured type
@@ -43,7 +44,17 @@ export function parseValueType(valueType: string | undefined): ParsedValueType {
     return { type: 'string' }
   }
 
-  const normalized = valueType.trim().toLowerCase()
+  const trimmed = valueType.trim()
+
+  // Optional wrapper: unwrap "optional[<inner>]" and mark the result optional.
+  // Recurses so optional[int], optional[list[int]], optional[enum[...]] all work.
+  const optionalMatch = trimmed.match(/^optional\[(.+)\]$/i)
+  if (optionalMatch) {
+    const inner = parseValueType(optionalMatch[1])
+    return { ...inner, optional: true }
+  }
+
+  const normalized = trimmed.toLowerCase()
 
   // Simple types
   if (normalized === 'str' || normalized === 'string') {
@@ -122,11 +133,14 @@ export function getDefaultValueForType(parsedType: ParsedValueType): string {
     case 'float':
       return '0.0'
     case 'datetime':
-      // Return current datetime in ISO format for datetime-local input
-      return new Date().toISOString().slice(0, 16)
+      // Default to today at local midnight so forecast base-times land on a
+      // round hour instead of whatever wall-clock second the form opened at.
+      // datetime-local expects local time without TZ — compose from local
+      // components rather than Date.toISOString() (which is UTC).
+      return `${todayLocalDate()}T00:00`
     case 'date':
-      // Return current date in YYYY-MM-DD format
-      return new Date().toISOString().slice(0, 10)
+      // Local date (YYYY-MM-DD), not UTC — see note above.
+      return todayLocalDate()
     case 'list':
       return ''
     case 'enum':
@@ -134,4 +148,12 @@ export function getDefaultValueForType(parsedType: ParsedValueType): string {
     case 'unknown':
       return ''
   }
+}
+
+function todayLocalDate(): string {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }

@@ -61,6 +61,16 @@ export function consumeCatalogueUnavailable(): boolean {
 }
 
 /**
+ * Reset handler-scoped state between tests. Without this, a queued 503
+ * token from test A's install/update mutation can unexpectedly fire on
+ * test B's first catalogue fetch. Called from `tests/setup.ts` in a
+ * global `afterEach`.
+ */
+export function resetPluginsHandlerState(): void {
+  catalogueUnavailableCount = 0
+}
+
+/**
  * Helper to create a Python repr format plugin key
  */
 function createPluginKey(store: string, local: string): string {

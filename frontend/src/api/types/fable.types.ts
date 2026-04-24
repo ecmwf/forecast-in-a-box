@@ -39,6 +39,7 @@ export const BlockConfigurationOptionSchema = z.object({
   title: z.string(),
   description: z.string(),
   value_type: z.string(),
+  default_value: z.string().nullable().optional(),
 })
 
 export type BlockConfigurationOption = z.infer<
@@ -532,8 +533,8 @@ export function createBlockInstance(
   factory: BlockFactory,
 ): BlockInstance {
   const configurationValues: Record<string, string> = {}
-  for (const key of Object.keys(factory.configuration_options)) {
-    configurationValues[key] = ''
+  for (const [key, option] of Object.entries(factory.configuration_options)) {
+    configurationValues[key] = option.default_value ?? ''
   }
 
   const inputIds: Record<string, string> = {}

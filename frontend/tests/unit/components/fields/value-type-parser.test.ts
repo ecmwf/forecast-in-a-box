@@ -136,6 +136,60 @@ describe('parseValueType', () => {
       expect(parseValueType('')).toEqual({ type: 'string' })
     })
   })
+
+  describe('optional types', () => {
+    it('parses optional[int] as int with optional flag', () => {
+      expect(parseValueType('optional[int]')).toEqual({
+        type: 'int',
+        optional: true,
+      })
+    })
+
+    it('parses optional[str] as string with optional flag', () => {
+      expect(parseValueType('optional[str]')).toEqual({
+        type: 'string',
+        optional: true,
+      })
+    })
+
+    it('parses optional[float] as float with optional flag', () => {
+      expect(parseValueType('optional[float]')).toEqual({
+        type: 'float',
+        optional: true,
+      })
+    })
+
+    it('is case-insensitive', () => {
+      expect(parseValueType('Optional[Int]')).toEqual({
+        type: 'int',
+        optional: true,
+      })
+    })
+
+    it('preserves inner details (list itemType) when wrapped', () => {
+      expect(parseValueType('optional[list[int]]')).toEqual({
+        type: 'list',
+        itemType: 'int',
+        optional: true,
+      })
+    })
+
+    it('preserves enum options when wrapped', () => {
+      expect(parseValueType("optional[enum['a','b']]")).toEqual({
+        type: 'enum',
+        options: ['a', 'b'],
+        optional: true,
+      })
+    })
+
+    it('marks unknown inner as optional unknown', () => {
+      expect(parseValueType('optional[weirdo]')).toEqual({
+        type: 'unknown',
+        raw: 'weirdo',
+        optional: true,
+      })
+    })
+  })
 })
 
 describe('getDefaultValueForType', () => {
@@ -151,16 +205,25 @@ describe('getDefaultValueForType', () => {
     expect(getDefaultValueForType({ type: 'float' })).toBe('0.0')
   })
 
-  it('returns ISO datetime string for datetime type', () => {
+  it('returns today at local midnight for datetime type', () => {
     const result = getDefaultValueForType({ type: 'datetime' })
-    // Should be a datetime-local compatible string (YYYY-MM-DDTHH:mm)
-    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
+    // datetime-local compatible: YYYY-MM-DDTHH:mm, time pinned to 00:00
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T00:00$/)
+    const today = new Date()
+    const y = today.getFullYear()
+    const m = String(today.getMonth() + 1).padStart(2, '0')
+    const d = String(today.getDate()).padStart(2, '0')
+    expect(result).toBe(`${y}-${m}-${d}T00:00`)
   })
 
-  it('returns ISO date string for date type', () => {
+  it('returns local today for date type', () => {
     const result = getDefaultValueForType({ type: 'date' })
-    // Should be a date string (YYYY-MM-DD)
     expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    const today = new Date()
+    const y = today.getFullYear()
+    const m = String(today.getMonth() + 1).padStart(2, '0')
+    const d = String(today.getDate()).padStart(2, '0')
+    expect(result).toBe(`${y}-${m}-${d}`)
   })
 
   it('returns empty string for list type', () => {

@@ -180,6 +180,7 @@ function renderField(
           placeholder={placeholder}
           disabled={disabled}
           className={className}
+          itemType={parsedType.itemType}
         />
       )
   }
