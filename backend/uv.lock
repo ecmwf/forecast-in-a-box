@@ -1619,7 +1619,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anemoi-inference", specifier = ">=0.10.1" },
+    { name = "anemoi-inference", specifier = "~=0.10" },
     { name = "anemoi-inference", marker = "extra == 'runtime'", specifier = ">=0.10.0" },
     { name = "earthkit", marker = "extra == 'runtime'", specifier = ">=0.13.2" },
     { name = "earthkit-data", marker = "extra == 'runtime'", specifier = ">=0.18.2" },

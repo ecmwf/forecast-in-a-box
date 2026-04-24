@@ -19,16 +19,14 @@ dynamic = [ "version" ]
 dependencies = [
     "fiab-core>=0.0.1,<1.0.0", # ~=0.0
     "earthkit-workflows>=0.9.0",
-    "earthkit-workflows-anemoi>=0.5.2",
-    "anemoi-inference~=0.10",
+    "earthkit-workflows-anemoi>=0.6.0",
 ]
 
 optional-dependencies.runtime = [
     "earthkit-data>=0.18.2",
     "earthkit>=0.13.2",
     "earthkit-plots>=0.3.5,<1.0",
-    "earthkit-plots-default-styles>=0.1",
-    "anemoi-inference>=0.10.0",
+    "earthkit-workflows-anemoi[runtime]",
 ]
 
 [dependency-groups]
