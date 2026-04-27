@@ -49,5 +49,6 @@ def registered_provider() -> Generator[None, None, None]:
         yield
 
 
-with dummy_provider():  # Configure the fiab_plugin_ecmwf.blocks module to use the dummy provider for testing
-    from fiab_plugin_ecmwf import blocks
+# Configure blocks module with dummy provider for unit tests
+with dummy_provider():
+    from fiab_plugin_ecmwf import blocks  # noqa: F401

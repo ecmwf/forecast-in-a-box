@@ -54,7 +54,7 @@ def get_model_output(composite_id: CompositeArtifactId, lead_time: int) -> Qubed
     from earthkit.data.utils.dates import to_timedelta
 
     lead_time_seconds = lead_time * 3600
-    model_step_seconds = to_timedelta(checkpoint.timestep).seconds
+    model_step_seconds = int(to_timedelta(checkpoint.timestep).total_seconds())
     steps = list(map(lambda x: x // 3600, range(model_step_seconds, lead_time_seconds + model_step_seconds, model_step_seconds)))
 
     qubeoutput = QubedOutput(dataqube=qube)
@@ -62,7 +62,7 @@ def get_model_output(composite_id: CompositeArtifactId, lead_time: int) -> Qubed
 
 
 def get_environment(composite_id: CompositeArtifactId) -> list[str]:
-    packages = get_available_checkpoints()[composite_id].pip_package_constraints
+    packages = list(get_available_checkpoints()[composite_id].pip_package_constraints)
 
     ekw_anemoi_version = importlib.metadata.version("earthkit-workflows-anemoi")
     if not "dev" in ekw_anemoi_version:
@@ -89,4 +89,7 @@ def validate_anemoi_block(block: BlockInstance) -> Either[QubedOutput, Error]:  
     except ValueError:
         return Either.error("Checkpoint must be a valid checkpoint identifier")
 
-    return Either.ok(get_model_output(composite_id, int(block.configuration_values["lead_time"])))
+    try:
+        return Either.ok(get_model_output(composite_id, int(block.configuration_values["lead_time"])))
+    except KeyError:
+        return Either.error(f"Unknown checkpoint: {checkpoint}")
