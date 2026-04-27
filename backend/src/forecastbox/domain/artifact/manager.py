@@ -209,7 +209,7 @@ def get_model_details(composite_id: CompositeArtifactId) -> MlModelDetail:
             disk_size_bytes=checkpoint.disk_size_bytes,
             pip_package_constraints=checkpoint.pip_package_constraints,
             supported_platforms=checkpoint.supported_platforms,
-            output_characteristics=checkpoint.output_characteristics,
+            output_characteristics=[str(checkpoint.output_qube)],  # TODO Add qubed to detail, and display properly in the frontend
             input_characteristics=checkpoint.input_characteristics,
             is_available=composite_id in ArtifactManager.locally_available,
         )
