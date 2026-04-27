@@ -44,7 +44,7 @@ class FakeArtifactRegistry(SimpleHTTPRequestHandler):
                     "disk_size_bytes": 1024,
                     "pip_package_constraints": ["torch>=2.0.0"],
                     "supported_platforms": ["linux", "macos"],
-                    "output_qube": ["test_output"],
+                    "output_qube": {"test": "qube"},
                     "input_characteristics": ["test_input"],
                     "timestep": "1h",
                 }
