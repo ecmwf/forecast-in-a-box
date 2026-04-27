@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 import earthkit.data as ekd
 
 if TYPE_CHECKING:
-    from earthkit.plots import Figure, Subplot
+    from earthkit.plots import Figure, Subplot  # type: ignore[unresolved-import]
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ def _configure_schema(style_schema: str) -> None:
     - ``package@path`` -- uses a named schema with a custom style library path
     - Any other string -- passed directly to ``schema.use()``
     """
-    from earthkit.plots.schemas import schema
+    from earthkit.plots.schemas import schema  # type: ignore[unresolved-import]
 
     if "@" in style_schema:
         schema.use(style_schema.split("@")[0])
@@ -77,9 +77,9 @@ def map_plot(
 
     Returns ``(image_bytes, mime_type)``.
     """
-    from earthkit.plots import Figure
-    from earthkit.plots.components import layouts
-    from earthkit.plots.utils import iter_utils
+    from earthkit.plots import Figure  # type: ignore[unresolved-import]
+    from earthkit.plots.components import layouts  # type: ignore[unresolved-import]
+    from earthkit.plots.utils import iter_utils  # type: ignore[unresolved-import]
 
     _configure_schema(style_schema)
 

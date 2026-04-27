@@ -54,7 +54,9 @@ def encode_result(result: ResultRetrievalResponse) -> tuple[bytes, str]:
             raise ValueError("Tuple result must contain exactly two elements: (bytes, mime_type)")
 
     try:
-        from earthkit.plots import Figure  # NOTE plots is an optional dependency -- import inside body allowed
+        from earthkit.plots import (
+            Figure,  # NOTE plots is an optional dependency -- import inside body allowed #type: ignore[unresolved-import]
+        )
 
         if isinstance(obj, Figure):
             buf = io.BytesIO()
