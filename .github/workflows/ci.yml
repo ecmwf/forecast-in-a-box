@@ -88,7 +88,7 @@ jobs:
           set -euo pipefail
           pushd backend
           export UV_FROZEN=1
-          uv sync --extra plots --python "${{ matrix.python_version }}" --all-packages
+          uv sync --extra runtime --python "${{ matrix.python_version }}" --all-packages
           uv run prek --all-files
           mkdir /tmp/tmpFiabHome
           # TODO utilize a proper static file build, instead of relying on integration tests index.html
@@ -120,7 +120,7 @@ jobs:
           set -euo pipefail
           pushd backend
           export UV_FROZEN=1
-          uv sync --extra plots --python "${{ matrix.python_version }}" --all-packages
+          uv sync --extra runtime --python "${{ matrix.python_version }}" --all-packages
           uv run prek --all-files
           mkdir /tmp/tmpFiabHome
           mkdir src/forecastbox/static && touch src/forecastbox/static/index.html # TODO replace with proper static file build

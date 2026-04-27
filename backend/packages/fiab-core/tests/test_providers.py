@@ -54,8 +54,10 @@ def test_get_checkpoint_lookup_returns_registered_result() -> None:
         disk_size_bytes=1024,
         pip_package_constraints=[],
         supported_platforms=["linux"],
-        output_characteristics=[],
         input_characteristics=[],
+        output_qube={},
+        timestep="1h",
+        comment="",
     )
     composite_id = CompositeArtifactId(artifact_store_id=ArtifactStoreId("s"), ml_model_checkpoint_id=MlModelCheckpointId("c"))
     catalog: CheckpointLookup = {composite_id: checkpoint}
@@ -78,8 +80,10 @@ def test_get_checkpoint_lookup_returns_current_value_of_mutable_source() -> None
         disk_size_bytes=0,
         pip_package_constraints=[],
         supported_platforms=[],
-        output_characteristics=[],
         input_characteristics=[],
+        output_qube={},
+        timestep="1h",
+        comment="",
     )
     catalog[CompositeArtifactId(artifact_store_id=ArtifactStoreId("s"), ml_model_checkpoint_id=MlModelCheckpointId("c"))] = checkpoint
     assert len(ArtifactsProvider.get_checkpoint_lookup()) == 1

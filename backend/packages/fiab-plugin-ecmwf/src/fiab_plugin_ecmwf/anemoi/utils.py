@@ -10,15 +10,14 @@
 import importlib.metadata
 import logging
 from pathlib import Path
-from typing import cast
 
-from anemoi.inference.metadata import Metadata as InferenceMetadata
-from anemoi.inference.metadata import MetadataFactory as InferenceMetadataFactory
 from cascade.low.func import Either
-from earthkit.workflows.plugins.anemoi.utils import expansion_qube_from_metadata
 from fiab_core.artifacts import ArtifactsProvider, CheckpointLookup, CompositeArtifactId
 from fiab_core.fable import BlockInstance, QubedOutput
 from fiab_core.plugin import Error
+from qubed import Qube
+
+from ..qubed_utils import expand
 
 logger = logging.getLogger(__name__)
 
@@ -48,26 +47,27 @@ def get_local_path(composite_id: CompositeArtifactId) -> Path:
     return Path(ArtifactsProvider.get_artifact_local_path(composite_id))
 
 
-def get_metadata(composite_id: CompositeArtifactId) -> InferenceMetadata:
+def get_model_output(composite_id: CompositeArtifactId, lead_time: int) -> QubedOutput:
     checkpoint = get_available_checkpoints()[composite_id]
-    return cast(InferenceMetadata, InferenceMetadataFactory(checkpoint.metadata))
+    qube = Qube.from_json(checkpoint.output_qube)
+
+    from earthkit.data.utils.dates import to_timedelta
+
+    lead_time_seconds = lead_time * 3600
+    model_step_seconds = int(to_timedelta(checkpoint.timestep).total_seconds())
+    steps = list(map(lambda x: x // 3600, range(model_step_seconds, lead_time_seconds + model_step_seconds, model_step_seconds)))
+
+    qubeoutput = QubedOutput(dataqube=qube)
+    return expand(qubeoutput, {"step": steps})
 
 
-INPUT_SOURCE_EXTRAS: dict[str, str] = {
-    "opendata": "anemoi-plugins-ecmwf-inference[opendata]",
-    "polytope": "anemoi-plugins-ecmwf-inference[polytope]",
-    "mars": "earthkit-data[mars]",
-}
-
-
-def get_environment(composite_id: CompositeArtifactId, input_source: str | None = None) -> list[str]:
-    packages = get_available_checkpoints()[composite_id].pip_package_constraints
-    if input_source in INPUT_SOURCE_EXTRAS:
-        packages.append(INPUT_SOURCE_EXTRAS[input_source])
+def get_environment(composite_id: CompositeArtifactId) -> list[str]:
+    packages = list(get_available_checkpoints()[composite_id].pip_package_constraints)
 
     ekw_anemoi_version = importlib.metadata.version("earthkit-workflows-anemoi")
     if not "dev" in ekw_anemoi_version:
         packages.append(f"earthkit-workflows-anemoi[runtime]=={importlib.metadata.version('earthkit-workflows-anemoi')}")
+
     return packages
 
 
@@ -90,10 +90,6 @@ def validate_anemoi_block(block: BlockInstance) -> Either[QubedOutput, Error]:  
         return Either.error("Checkpoint must be a valid checkpoint identifier")
 
     try:
-        metadata = get_metadata(composite_id)
+        return Either.ok(get_model_output(composite_id, int(block.configuration_values["lead_time"])))
     except KeyError:
         return Either.error(f"Unknown checkpoint: {checkpoint}")
-
-    lead_time = int(block.configuration_values["lead_time"])
-    qube = expansion_qube_from_metadata(metadata, lead_time)
-    return Either.ok(QubedOutput(dataqube=qube))

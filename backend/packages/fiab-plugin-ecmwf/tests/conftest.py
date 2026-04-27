@@ -27,8 +27,9 @@ def dummy_provider() -> Generator[None, None, None]:
                 disk_size_bytes=1234,
                 pip_package_constraints=[],
                 supported_platforms=["linux"],
-                output_characteristics=[],
                 input_characteristics=[],
+                output_qube={},
+                timestep="1h",
                 comment="A dummy comment",
             )
         }
@@ -48,5 +49,6 @@ def registered_provider() -> Generator[None, None, None]:
         yield
 
 
-with dummy_provider():  # Configure the fiab_plugin_ecmwf.blocks module to use the dummy provider for testing
-    from fiab_plugin_ecmwf import blocks
+# Configure blocks module with dummy provider for unit tests
+with dummy_provider():
+    from fiab_plugin_ecmwf import blocks  # noqa: F401

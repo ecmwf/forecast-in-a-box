@@ -32,9 +32,15 @@ from .utils import (
     get_checkpoint_enum_type,
     get_environment,
     get_local_path,
-    get_metadata,
+    get_model_output,
     validate_anemoi_block,
 )
+
+INPUT_SOURCE_EXTRAS: dict[str, list[str]] = {
+    "opendata": ["anemoi-plugins-ecmwf-inference[opendata]"],
+    "polytope": ["anemoi-plugins-ecmwf-inference[polytope]"],
+    "mars": ["earthkit-data[mars]"],
+}
 
 
 class AnemoiBuilder:
@@ -47,7 +53,7 @@ class AnemoiBuilder:
     def _local_path(self) -> Path:
         return get_local_path(self.artifact_id)
 
-    def build(self, lead_time: int) -> Inference:  # type: ignore[reportReturnType]
+    def build(self, lead_time: int, *, extra_environment: list[str] | None = None) -> Inference:  # type: ignore[reportReturnType]
         import functools
 
         class WrappedInference(Inference):
@@ -59,11 +65,14 @@ class AnemoiBuilder:
             def from_initial_conditions(s, *a: Any, **k: Any) -> Action:  # type: ignore[reportIncompatibleMethodOverride, reportSelfClsParameterName]
                 return super().from_initial_conditions(*a, **k, payload_metadata={"artifacts": [self.artifact_id]})
 
+        env = get_environment(self.artifact_id)
+        if extra_environment:
+            env.extend(extra_environment)
         return WrappedInference(
             ckpt=self._local_path(),
             lead_time=lead_time,
-            environment=get_environment(self.artifact_id),
-            metadata=get_metadata(self.artifact_id),
+            environment=env,
+            expansion_qube=get_model_output(self.artifact_id, lead_time=lead_time).dataqube,
         )
 
 
@@ -117,7 +126,9 @@ class AnemoiSource(Source):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         configuration = block.configuration_values
 
-        inference = AnemoiBuilder(configuration["checkpoint"]).build(lead_time=int(configuration["lead_time"]))
+        inference = AnemoiBuilder(configuration["checkpoint"]).build(
+            lead_time=int(configuration["lead_time"]), extra_environment=INPUT_SOURCE_EXTRAS.get(configuration["input_source"], [])
+        )
         action = inference.from_input(
             configuration["input_source"],
             date=configuration["base_time"],

@@ -61,15 +61,14 @@ class MlModelCheckpoint(FiabCoreBaseModel):
     supported_platforms: list[Platform] = Field(
         description="Platforms this model has been tested and verified on"
     )  # Question: or negate, ie, 'unsupported'?
-    # NOTE this is provisionary -- maybe we'd have a qubed, maybe a qubed<input> template, maybe nothing
-    output_characteristics: list[str] = Field(description="List of variables that the model produces")
+
     input_characteristics: list[str] = Field(
         description="List of config keys that this model exposes"
     )  # Question: do we want key-values, or just keys and the plugins define values?
     # Question: how would we capture memory requirements? May be tricky since technically its a function of config and backend
-    metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Additional metadata from the checkpoint, for anemoi this is the raw dump"
-    )
+
+    output_qube: dict[str, Any] = Field(description="Json Dump of the output qube structure, including variables, levels, but not step")
+    timestep: str = Field(description="Timestep of the model output, e.g. '1h', '6h'")
 
 
 CheckpointLookup = Mapping[CompositeArtifactId, MlModelCheckpoint]
