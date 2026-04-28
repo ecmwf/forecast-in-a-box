@@ -109,7 +109,11 @@ class QubedOutput(FiabCoreBaseModel):
 
 
 class RawOutput(FiabCoreBaseModel):
-    type_fqn: str  # most likely you want Any here
+    # use for final outputs that are not expected to be expanded by blocks except for
+    # some general purpose like 'dump to file'. If a browser could be capable of directly
+    # processing, ie, its a known media object, set the mime_type
+    type_fqn: str = "typing.Any"
+    mime_type: str = "application/octet-stream"
 
 
 class NoOutput(FiabCoreBaseModel):

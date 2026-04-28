@@ -30,12 +30,10 @@ def source_filesize(path: str) -> str:
     return str(pathlib.Path(path).stat().st_size)
 
 
-def sink_file(data: object, fname: str) -> str:
-    pathlib.Path(fname).write_text(str(data))
-
-    # TODO sadly important, otherwise cascade won't detect completion at the moment. Investigate
-    # why the default output injector doesnt seem to work
-    return "ok"
+def sink_file(data: object, fname: str) -> tuple[bytes, str]:
+    p = pathlib.Path(fname)
+    p.write_text(str(data))
+    return f"file://{p.absolute()}".encode("ascii"), "text/plain"
 
 
 def _png_chunk(chunk_type: bytes, data: bytes) -> bytes:

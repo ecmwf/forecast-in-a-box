@@ -286,7 +286,9 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
 
     builder = BlueprintBuilder(blocks=blocks)
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
-    assert len(response.json()["possible_expansions"]["sink_file"]) == 0
+    expected_expansion = [{"factory": "sink_file", "plugin": {"local": "single", "store": "localTest"}}]
+    # NOTE this looks odd but sink_file produces the url of the file, and that url is a text which can again be written to a file
+    assert response.json()["possible_expansions"]["sink_file"] == expected_expansion, "sink_file should expand only to sink_file"
     assert len(response.json()["block_errors"]) == 0
     glyphs_resp = backend_client_with_auth.get("/blueprint/glyphs/list", params={"glyph_type": "intrinsic"})
     assert glyphs_resp.is_success, glyphs_resp.text
@@ -890,14 +892,14 @@ def test_run_output_content(tmpdir: Any, backend_client_with_auth: httpx.Client)
         timeout=40.0 if sys.platform == "darwin" else None,
     )
     assert content_resp.is_success, content_resp.text
-    assert content_resp.headers.get("content-type", "").startswith("application/clpkl")
-    assert cloudpickle.loads(content_resp.content) == "ok"
+    assert content_resp.headers.get("content-type", "").startswith("text/plain")
+    assert content_resp.content.decode("ascii").startswith("file://")
 
     if sys.platform == "darwin":
         # Re-fetch without an extended timeout to confirm the import delay was a one-off
         content_resp2 = backend_client_with_auth.get("/run/outputContent", params={"run_id": run_id, "dataset_id": sink_file_task_id})
-        assert content_resp2.is_success, content_resp2.text
-        assert cloudpickle.loads(content_resp2.content) == "ok"
+        assert content_resp.headers.get("content-type", "").startswith("text/plain")
+        assert content_resp.content.decode("ascii").startswith("file://")
 
     image_resp = backend_client_with_auth.get(
         "/run/outputContent",
