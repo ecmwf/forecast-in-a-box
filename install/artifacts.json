@@ -24,10 +24,10 @@
             "display_description": "",
             "disk_size_bytes": 993937386,
             "pip_package_constraints": [
-                "anemoi.models==0.4.2",
+                "anemoi-models==0.4.2",
                 "torch>=2.6.0",
                 "torch_geometric==2.4.0",
-                "flash_attn==2.4"
+                "https://github.com/cathalobrien/get-flash-attn/releases/download/v0.1-alpha/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp310-cp310-linux_x86_64.whl"
             ],
             "supported_platforms": ["linux"],
             "input_characteristics": ["input_source", "lead_time", "base_time", "anemoi_kwargs"],
@@ -41,7 +41,7 @@
             "display_description": "",
             "disk_size_bytes": 993937386,
             "pip_package_constraints": [
-                "anemoi.models==0.4.2",
+                "anemoi-models==0.4.2",
                 "torch>=2.6.0",
                 "torch_geometric==2.4.0"
             ],
@@ -57,10 +57,10 @@
             "display_description": "",
             "disk_size_bytes": 921584533,
             "pip_package_constraints": [
-                "anemoi.models==0.6.0",
+                "anemoi-models==0.6.0",
                 "torch>=2.6.0",
                 "torch_geometric==2.4.0",
-                "flash_attn==2.4"
+                "https://github.com/cathalobrien/get-flash-attn/releases/download/v0.1-alpha/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp310-cp310-linux_x86_64.whl"
             ],
             "supported_platforms": ["linux"],
             "input_characteristics": ["input_source", "lead_time", "base_time", "ensemble_number", "anemoi_kwargs"],
@@ -74,7 +74,7 @@
             "display_description": "",
             "disk_size_bytes": 921584533,
             "pip_package_constraints": [
-                "anemoi.models==0.6.0",
+                "anemoi-models==0.6.0",
                 "torch>=2.6.0",
                 "torch_geometric==2.4.0"
             ],
