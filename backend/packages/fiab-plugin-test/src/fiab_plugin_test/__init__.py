@@ -141,9 +141,10 @@ def compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance
         checkpoint_str = instance.configuration_values["checkpoint"]
         artifact_id = CompositeArtifactId.from_str(checkpoint_str)
         local_path = ArtifactsProvider.get_artifact_local_path(artifact_id)
-        action = from_source(
-            Payload("fiab_plugin_test.runtime.source_filesize", kwargs={"path": str(local_path)}, metadata={"artifacts": [artifact_id]})
-        )  # type: ignore
+        payload = Payload(
+            "fiab_plugin_test.runtime.source_filesize", kwargs={"path": str(local_path)}, metadata={"artifacts": [artifact_id]}
+        )
+        action = from_source(payload)  # type: ignore
     elif instance.factory_id.factory == "transform_increment":
         a = lookup[instance.input_ids["a"]]
         amount = instance.configuration_values["amount"]
