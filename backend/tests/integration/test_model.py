@@ -2,7 +2,7 @@ from typing import Any
 
 import httpx
 
-from .conftest import fake_artifact_checkpoint_id, fake_artifact_registry_port, fake_artifact_store_id
+from .conftest import fake_artifact_registry_port, fake_artifact_store_id, test_model_artifact_id
 from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token, retry_until
 
 
@@ -39,13 +39,15 @@ def test_download_model(backend_client: httpx.Client) -> None:
     models = response.json()
     assert len(models) >= 4, f"Expected at least 4 models, got {len(models)}"
 
-    # Verify none are downloaded yet
+    # Verify none are downloaded yet (filter to only the original test_checkpoint* models)
     for model in models:
-        if model["composite_id"]["artifact_store_id"] == fake_artifact_store_id:
+        if model["composite_id"]["artifact_store_id"] == fake_artifact_store_id and model["composite_id"][
+            "ml_model_checkpoint_id"
+        ].startswith(test_model_artifact_id):
             assert model["is_available"] == False, f"Model {model['composite_id']['ml_model_checkpoint_id']} should not be downloaded yet"
 
     # Submit download for all 4 models in parallel
-    expected_checkpoints = {f"{fake_artifact_checkpoint_id}{e}" for e in range(4)}
+    expected_checkpoints = {f"{test_model_artifact_id}{e}" for e in range(4)}
     for checkpoint_id in expected_checkpoints:
         composite_id = {
             "artifact_store_id": fake_artifact_store_id,
@@ -72,11 +74,11 @@ def test_download_model(backend_client: httpx.Client) -> None:
     # Test model details endpoint for checkpoint0
     main_composite_id = {
         "artifact_store_id": fake_artifact_store_id,
-        "ml_model_checkpoint_id": f"{fake_artifact_checkpoint_id}0",
+        "ml_model_checkpoint_id": f"{test_model_artifact_id}0",
     }
     response = backend_client.post("/artifacts/model_details", json=main_composite_id).raise_for_status()
     details = response.json()
     assert details["composite_id"]["artifact_store_id"] == fake_artifact_store_id
-    assert details["composite_id"]["ml_model_checkpoint_id"] == f"{fake_artifact_checkpoint_id}0"
+    assert details["composite_id"]["ml_model_checkpoint_id"] == f"{test_model_artifact_id}0"
     assert details["display_name"] == "Test Model Checkpoint 0"
     assert details["is_available"] == True
