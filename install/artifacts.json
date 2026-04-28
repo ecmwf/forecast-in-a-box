@@ -45,7 +45,7 @@
                 "torch>=2.6.0",
                 "torch_geometric==2.4.0"
             ],
-            "supported_platforms": ["macos"],
+            "supported_platforms": ["linux","macos"],
             "input_characteristics": ["input_source", "lead_time", "base_time", "anemoi_kwargs"],
             "output_qube": {"key": "root", "values": {"type": "enum", "dtype": "str", "values": ["root"]}, "metadata": {}, "children": [{"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["pl"]}, "metadata": {"name": {"shape": [1, 2, 1], "dtype": "str", "values": ["pressure", "pressure"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["q", "t", "u", "v", "w", "z"]}, "metadata": {}, "children": [{"key": "level", "values": {"type": "enum", "dtype": "int64", "values": [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]}, "metadata": {}, "children": []}]}]}, {"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["sfc"]}, "metadata": {"name": {"shape": [1, 2, 1], "dtype": "str", "values": ["surface", "surface"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["100u", "100v", "10u", "10v", "2d", "2t", "cp", "hcc", "lcc", "mcc", "msl", "ro", "sf", "skt", "sp", "ssrd", "stl1", "stl2", "strd", "swvl1", "swvl2", "tcc", "tcw", "tp"]}, "metadata": {}, "children": []}]}]},
             "timestep": "6h"
@@ -78,7 +78,7 @@
                 "torch>=2.6.0",
                 "torch_geometric==2.4.0"
             ],
-            "supported_platforms": ["macos"],
+            "supported_platforms": ["linux","macos"],
             "input_characteristics": ["input_source", "lead_time", "base_time", "ensemble_number", "anemoi_kwargs"],
             "output_qube": {"key": "root", "values": {"type": "enum", "dtype": "str", "values": ["root"]}, "metadata": {}, "children": [{"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["pl"]}, "metadata": {"name": {"shape": [1, 2, 1], "dtype": "str", "values": ["pressure", "pressure"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["q", "t", "u", "v", "w", "z"]}, "metadata": {}, "children": [{"key": "level", "values": {"type": "enum", "dtype": "int64", "values": [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]}, "metadata": {}, "children": []}]}]}, {"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["sfc"]}, "metadata": {"name": {"shape": [1, 2, 1], "dtype": "str", "values": ["surface", "surface"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["100u", "100v", "10u", "10v", "2d", "2t", "cp", "hcc", "lcc", "mcc", "msl", "ro", "sf", "skt", "sp", "ssrd", "stl1", "stl2", "strd", "tcc", "tcw", "tp"]}, "metadata": {}, "children": []}]}]},
             "timestep": "6h"
