@@ -1,5 +1,6 @@
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action, Payload, from_source
+from fiab_core.artifacts import ArtifactsProvider, CompositeArtifactId
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
@@ -13,6 +14,18 @@ from fiab_core.fable import (
     RawOutput,
 )
 from fiab_core.plugin import Error, Plugin
+
+
+def _get_checkpoint_enum_type() -> str:
+    try:
+        available = ArtifactsProvider.get_checkpoint_lookup()
+    except Exception:
+        return "str"
+    if not available:
+        return "str"
+    values = ", ".join(f"'{CompositeArtifactId.to_str(k)}'" for k in available.keys())
+    return f"enum[{values}]"
+
 
 catalogue = BlockFactoryCatalogue(
     factories={
@@ -39,6 +52,19 @@ catalogue = BlockFactoryCatalogue(
             configuration_options={
                 "text": BlockConfigurationOption(title="", description="", value_type="str"),
                 "duration": BlockConfigurationOption(title="", description="", value_type="float"),
+            },
+            inputs=[],
+        ),
+        BlockFactoryId("source_filesize"): BlockFactory(
+            kind="source",
+            title="File Size Source",
+            description="Returns the size of the given checkpoint file as a string",
+            configuration_options={
+                "checkpoint": BlockConfigurationOption(
+                    title="Checkpoint",
+                    description="The checkpoint whose downloaded file size to report",
+                    value_type=_get_checkpoint_enum_type(),
+                ),
             },
             inputs=[],
         ),
@@ -81,7 +107,7 @@ catalogue = BlockFactoryCatalogue(
 def validator(instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
     if instance.factory_id.factory in ("sink_file", "sink_image"):
         return Either.ok(NoOutput())
-    elif instance.factory_id.factory in ("source_sleep", "source_text"):
+    elif instance.factory_id.factory in ("source_sleep", "source_text", "source_filesize"):
         return Either.ok(RawOutput(type_fqn="str"))
     else:
         return Either.ok(RawOutput(type_fqn="int"))
@@ -111,6 +137,13 @@ def compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance
         text = instance.configuration_values["text"]
         duration = float(instance.configuration_values["duration"])
         action = from_source(Payload("fiab_plugin_test.runtime.source_sleep", kwargs={"text": text, "duration": duration}))  # type: ignore
+    elif instance.factory_id.factory == "source_filesize":
+        checkpoint_str = instance.configuration_values["checkpoint"]
+        artifact_id = CompositeArtifactId.from_str(checkpoint_str)
+        local_path = ArtifactsProvider.get_artifact_local_path(artifact_id)
+        action = from_source(
+            Payload("fiab_plugin_test.runtime.source_filesize", kwargs={"path": str(local_path)}, metadata={"artifacts": [artifact_id]})
+        )  # type: ignore
     elif instance.factory_id.factory == "transform_increment":
         a = lookup[instance.input_ids["a"]]
         amount = instance.configuration_values["amount"]
