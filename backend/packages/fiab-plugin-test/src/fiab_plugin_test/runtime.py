@@ -26,6 +26,10 @@ def product_join(a: int, b: int) -> int:
     return a + b
 
 
+def source_filesize(path: str) -> str:
+    return str(pathlib.Path(path).stat().st_size)
+
+
 def sink_file(data: object, fname: str) -> str:
     pathlib.Path(fname).write_text(str(data))
 
