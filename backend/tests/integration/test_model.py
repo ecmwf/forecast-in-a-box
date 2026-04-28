@@ -2,7 +2,7 @@ from typing import Any
 
 import httpx
 
-from .conftest import fake_artifact_checkpoint_id, fake_artifact_registry_port, fake_artifact_store_id
+from .conftest import fake_artifact_checkpoint_id, fake_artifact_checkpoint_small_id, fake_artifact_registry_port, fake_artifact_store_id
 from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token, retry_until
 
 
@@ -39,9 +39,11 @@ def test_download_model(backend_client: httpx.Client) -> None:
     models = response.json()
     assert len(models) >= 4, f"Expected at least 4 models, got {len(models)}"
 
-    # Verify none are downloaded yet
+    # Verify none are downloaded yet (filter to only the original test_checkpoint* models)
     for model in models:
-        if model["composite_id"]["artifact_store_id"] == fake_artifact_store_id:
+        if model["composite_id"]["artifact_store_id"] == fake_artifact_store_id and model["composite_id"][
+            "ml_model_checkpoint_id"
+        ].startswith(fake_artifact_checkpoint_id):
             assert model["is_available"] == False, f"Model {model['composite_id']['ml_model_checkpoint_id']} should not be downloaded yet"
 
     # Submit download for all 4 models in parallel

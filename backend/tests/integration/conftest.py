@@ -23,6 +23,7 @@ from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_to
 fake_artifact_registry_port = 12001
 fake_artifact_store_id = "test_store"
 fake_artifact_checkpoint_id = "test_checkpoint"
+fake_artifact_checkpoint_small_id = "small_checkpoint"
 testPluginId = PluginCompositeIdReadable.from_str("localTest:single")
 
 
@@ -49,13 +50,39 @@ class FakeArtifactRegistry(SimpleHTTPRequestHandler):
                     "timestep": "1h",
                 }
 
+            small_artifact = {
+                "url": f"http://localhost:{fake_artifact_registry_port}/{fake_artifact_checkpoint_small_id}",
+                "display_name": "Small Test Checkpoint",
+                "display_author": "Test Author",
+                "display_description": "A small test checkpoint for artifact runtime dependency tests",
+                "comment": "",
+                "disk_size_bytes": 64,
+                "pip_package_constraints": [],
+                "supported_platforms": ["linux", "macos"],
+                "output_qube": {},
+                "input_characteristics": [],
+                "timestep": "1h",
+            }
+
             catalog = {
                 "display_name": "Test Artifact Store",
-                "artifacts": {f"{fake_artifact_checkpoint_id}{i}": make_artifact(i) for i in range(4)},
+                "artifacts": {
+                    **{f"{fake_artifact_checkpoint_id}{i}": make_artifact(i) for i in range(4)},
+                    fake_artifact_checkpoint_small_id: small_artifact,
+                },
             }
             import json
 
             self.wfile.write(json.dumps(catalog).encode("utf-8"))
+        elif self.path == f"/{fake_artifact_checkpoint_small_id}":
+            data = b"x" * 64
+            self.send_response(200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            self.wfile.flush()
+            print(f"artifact download done for {self.path}")
         elif self.path.startswith(f"/{fake_artifact_checkpoint_id}"):
             self.send_response(200)
             self.send_header("Content-Type", "application/octet-stream")
