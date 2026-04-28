@@ -106,7 +106,7 @@ def download_artifact(
         temp_path = Path(temp_file.name)
         temp_file.close()
 
-        with httpx.Client(follow_redirects=True) as client:
+        with httpx.Client(follow_redirects=True, timeout=300.0) as client:
             logger.debug(f"Starting download for {composite_id} from {checkpoint.url} to {temp_path}")
             with client.stream("GET", checkpoint.url) as response:
                 response.raise_for_status()

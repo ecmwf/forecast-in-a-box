@@ -66,7 +66,7 @@ def get_environment(composite_id: CompositeArtifactId) -> list[str]:
 
     ekw_anemoi_version = importlib.metadata.version("earthkit-workflows-anemoi")
     if not "dev" in ekw_anemoi_version:
-        packages.append(f"earthkit-workflows-anemoi[runtime]=={importlib.metadata.version('earthkit-workflows-anemoi')}")
+        packages.append(f"earthkit-workflows-anemoi[runtime-inference]=={importlib.metadata.version('earthkit-workflows-anemoi')}")
 
     return packages
 

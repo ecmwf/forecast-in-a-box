@@ -17,34 +17,68 @@
             "output_qube": {"key": "root", "values": {"type": "enum", "dtype": "str", "values": ["root"]}, "metadata": {}, "children": [{"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["pl"]}, "metadata": {"name": {"shape": [1, 1, 1], "dtype": "str", "values": ["pressure"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["q", "t", "u", "v", "w", "z"]}, "metadata": {}, "children": [{"key": "level", "values": {"type": "enum", "dtype": "int64", "values": [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]}, "metadata": {}, "children": []}]}]}, {"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["sfc"]}, "metadata": {"name": {"shape": [1, 1, 1], "dtype": "str", "values": ["surface"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["10u", "10v", "2d", "2t", "cp", "msl", "skt", "sp", "tcw", "tp"]}, "metadata": {}, "children": []}]}]},
             "timestep": "6h"
         },
-        "aifs-single-mse-1.1": {
+        "aifs-single-mse-1.1_w_flash_attn": {
             "url": "https://sites.ecmwf.int/repository/fiab/aifs/aifs-single-mse-1.1.ckpt",
             "display_name": "AIFS Single MSE 1.1",
             "display_author": "ECMWF",
             "display_description": "",
             "disk_size_bytes": 993937386,
             "pip_package_constraints": [
-                "anemoi.models==0.4.2",
+                "anemoi-models==0.4.2",
                 "torch>=2.6.0",
-                "torch_geometric==2.4.0"
+                "torch_geometric==2.4.0",
+                "https://github.com/cathalobrien/get-flash-attn/releases/download/v0.1-alpha/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp310-cp310-linux_x86_64.whl"
             ],
-            "supported_platforms": ["linux", "macos"],
+            "supported_platforms": ["linux"],
             "input_characteristics": ["input_source", "lead_time", "base_time", "anemoi_kwargs"],
             "output_qube": {"key": "root", "values": {"type": "enum", "dtype": "str", "values": ["root"]}, "metadata": {}, "children": [{"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["pl"]}, "metadata": {"name": {"shape": [1, 2, 1], "dtype": "str", "values": ["pressure", "pressure"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["q", "t", "u", "v", "w", "z"]}, "metadata": {}, "children": [{"key": "level", "values": {"type": "enum", "dtype": "int64", "values": [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]}, "metadata": {}, "children": []}]}]}, {"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["sfc"]}, "metadata": {"name": {"shape": [1, 2, 1], "dtype": "str", "values": ["surface", "surface"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["100u", "100v", "10u", "10v", "2d", "2t", "cp", "hcc", "lcc", "mcc", "msl", "ro", "sf", "skt", "sp", "ssrd", "stl1", "stl2", "strd", "swvl1", "swvl2", "tcc", "tcw", "tp"]}, "metadata": {}, "children": []}]}]},
             "timestep": "6h"
         },
-        "aifs-ens-crps-1.0": {
+        "aifs-single-mse-1.1_w_sdpa": {
+            "url": "https://sites.ecmwf.int/repository/fiab/aifs/aifs-single-mse-1.1_sdpa.ckpt",
+            "display_name": "AIFS Single MSE 1.1",
+            "display_author": "ECMWF",
+            "display_description": "",
+            "disk_size_bytes": 993937386,
+            "pip_package_constraints": [
+                "anemoi-models==0.4.2",
+                "torch>=2.6.0",
+                "torch_geometric==2.4.0"
+            ],
+            "supported_platforms": ["linux","macos"],
+            "input_characteristics": ["input_source", "lead_time", "base_time", "anemoi_kwargs"],
+            "output_qube": {"key": "root", "values": {"type": "enum", "dtype": "str", "values": ["root"]}, "metadata": {}, "children": [{"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["pl"]}, "metadata": {"name": {"shape": [1, 2, 1], "dtype": "str", "values": ["pressure", "pressure"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["q", "t", "u", "v", "w", "z"]}, "metadata": {}, "children": [{"key": "level", "values": {"type": "enum", "dtype": "int64", "values": [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]}, "metadata": {}, "children": []}]}]}, {"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["sfc"]}, "metadata": {"name": {"shape": [1, 2, 1], "dtype": "str", "values": ["surface", "surface"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["100u", "100v", "10u", "10v", "2d", "2t", "cp", "hcc", "lcc", "mcc", "msl", "ro", "sf", "skt", "sp", "ssrd", "stl1", "stl2", "strd", "swvl1", "swvl2", "tcc", "tcw", "tp"]}, "metadata": {}, "children": []}]}]},
+            "timestep": "6h"
+        },
+        "aifs-ens-crps-1.0_w_flash_attn": {
             "url": "https://sites.ecmwf.int/repository/fiab/aifs/aifs-ens-crps-1.0.ckpt",
             "display_name": "AIFS ENS CRPS 1.0",
             "display_author": "ECMWF",
             "display_description": "",
             "disk_size_bytes": 921584533,
             "pip_package_constraints": [
-                "anemoi.models==0.6.0",
+                "anemoi-models==0.6.0",
+                "torch>=2.6.0",
+                "torch_geometric==2.4.0",
+                "https://github.com/cathalobrien/get-flash-attn/releases/download/v0.1-alpha/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp310-cp310-linux_x86_64.whl"
+            ],
+            "supported_platforms": ["linux"],
+            "input_characteristics": ["input_source", "lead_time", "base_time", "ensemble_number", "anemoi_kwargs"],
+            "output_qube": {"key": "root", "values": {"type": "enum", "dtype": "str", "values": ["root"]}, "metadata": {}, "children": [{"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["pl"]}, "metadata": {"name": {"shape": [1, 2, 1], "dtype": "str", "values": ["pressure", "pressure"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["q", "t", "u", "v", "w", "z"]}, "metadata": {}, "children": [{"key": "level", "values": {"type": "enum", "dtype": "int64", "values": [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]}, "metadata": {}, "children": []}]}]}, {"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["sfc"]}, "metadata": {"name": {"shape": [1, 2, 1], "dtype": "str", "values": ["surface", "surface"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["100u", "100v", "10u", "10v", "2d", "2t", "cp", "hcc", "lcc", "mcc", "msl", "ro", "sf", "skt", "sp", "ssrd", "stl1", "stl2", "strd", "tcc", "tcw", "tp"]}, "metadata": {}, "children": []}]}]},
+            "timestep": "6h"
+        },
+        "aifs-ens-crps-1.0_w_sdpa": {
+            "url": "https://sites.ecmwf.int/repository/fiab/aifs/aifs-ens-crps-1.0_sdpa.ckpt",
+            "display_name": "AIFS ENS CRPS 1.0",
+            "display_author": "ECMWF",
+            "display_description": "",
+            "disk_size_bytes": 921584533,
+            "pip_package_constraints": [
+                "anemoi-models==0.6.0",
                 "torch>=2.6.0",
                 "torch_geometric==2.4.0"
             ],
-            "supported_platforms": ["linux", "macos"],
+            "supported_platforms": ["linux","macos"],
             "input_characteristics": ["input_source", "lead_time", "base_time", "ensemble_number", "anemoi_kwargs"],
             "output_qube": {"key": "root", "values": {"type": "enum", "dtype": "str", "values": ["root"]}, "metadata": {}, "children": [{"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["pl"]}, "metadata": {"name": {"shape": [1, 2, 1], "dtype": "str", "values": ["pressure", "pressure"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["q", "t", "u", "v", "w", "z"]}, "metadata": {}, "children": [{"key": "level", "values": {"type": "enum", "dtype": "int64", "values": [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]}, "metadata": {}, "children": []}]}]}, {"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["sfc"]}, "metadata": {"name": {"shape": [1, 2, 1], "dtype": "str", "values": ["surface", "surface"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["100u", "100v", "10u", "10v", "2d", "2t", "cp", "hcc", "lcc", "mcc", "msl", "ro", "sf", "skt", "sp", "ssrd", "stl1", "stl2", "strd", "tcc", "tcw", "tp"]}, "metadata": {}, "children": []}]}]},
             "timestep": "6h"
