@@ -36,7 +36,7 @@ from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSave
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs
 from forecastbox.routes.run import RunCreateResponse
 
-from .conftest import testPluginId
+from .conftest import fake_artifact_checkpoint_small_id, fake_artifact_store_id, testPluginId
 from .utils import compare_with_tolerance, retry_until
 
 
@@ -186,6 +186,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
         {"plugin": {"store": "localTest", "local": "single"}, "factory": "source_42"},
         {"plugin": {"store": "localTest", "local": "single"}, "factory": "source_text"},
         {"plugin": {"store": "localTest", "local": "single"}, "factory": "source_sleep"},
+        {"plugin": {"store": "localTest", "local": "single"}, "factory": "source_filesize"},
     ]
     assert response.json()["possible_expansions"] == {}
 
@@ -973,3 +974,75 @@ def test_gateway_restart_with_in_progress_job(backend_client_with_auth: httpx.Cl
         return None
 
     retry_until(poll_evicted, verify_evicted, attempts=30, sleep=1.0, error_msg=f"Run {run_id} never reached 'evicted from gateway'")
+
+
+def test_blueprint_artifact_execute(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
+    """Execute a blueprint whose source reads the size of a runtime-downloaded artifact checkpoint."""
+    # Verify that the small checkpoint has not been downloaded yet
+    response = backend_client_with_auth.get("/artifacts/list_models").raise_for_status()
+    models = response.json()
+    small_model = next(
+        (
+            m
+            for m in models
+            if m["composite_id"]["artifact_store_id"] == fake_artifact_store_id
+            and m["composite_id"]["ml_model_checkpoint_id"] == fake_artifact_checkpoint_small_id
+        ),
+        None,
+    )
+    assert small_model is not None, "Small test checkpoint not found in model list"
+    assert small_model["is_available"] == False, "Small checkpoint must not be downloaded before this test runs"
+
+    checkpoint_composite_id = f"{fake_artifact_store_id}:{fake_artifact_checkpoint_small_id}"
+
+    source_filesize = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_filesize")),
+        configuration_values={"checkpoint": checkpoint_composite_id},
+        input_ids={},
+    )
+    sink = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
+        configuration_values={"fname": f"{tmpdir}/filesize_${{runId}}.txt"},
+        input_ids={"data": BlockInstanceId("source_filesize")},
+    )
+    builder = BlueprintBuilder(
+        blocks={
+            BlockInstanceId("source_filesize"): source_filesize,
+            BlockInstanceId("sink_file"): sink,
+        }
+    )
+
+    # Validate blueprint via expand
+    expand_resp = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
+    assert expand_resp.is_success, expand_resp.text
+    block_errors = expand_resp.json().get("block_errors", {})
+    assert not block_errors, f"Blueprint validation errors: {block_errors}"
+    global_errors = expand_resp.json().get("global_errors", [])
+    assert not global_errors, f"Blueprint global errors: {global_errors}"
+
+    # Save and submit
+    save_resp = backend_client_with_auth.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
+    assert save_resp.is_success, save_resp.text
+    blueprint_id = save_resp.json()["blueprint_id"]
+
+    exec_resp = backend_client_with_auth.post("/run/create", json={"blueprint_id": blueprint_id})
+    assert exec_resp.is_success, exec_resp.text
+    run_id = RunCreateResponse(**exec_resp.json()).run_id
+
+    ensure_completed_v2(backend_client_with_auth, run_id, sleep=1, attempts=120)
+
+    # Verify the artifact was downloaded during the run
+    models_after = backend_client_with_auth.get("/artifacts/list_models").raise_for_status().json()
+    downloaded = next(
+        (
+            m
+            for m in models_after
+            if m["composite_id"]["artifact_store_id"] == fake_artifact_store_id
+            and m["composite_id"]["ml_model_checkpoint_id"] == fake_artifact_checkpoint_small_id
+        ),
+        None,
+    )
+    assert downloaded is not None and downloaded["is_available"] == True, "Small checkpoint should be available after run"
+
+    output = pathlib.Path(f"{tmpdir}/filesize_{run_id}.txt")
+    assert output.read_text() == "64", f"Expected file size 64, got: {output.read_text()}"
