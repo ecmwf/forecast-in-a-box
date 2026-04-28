@@ -22,8 +22,8 @@ from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_to
 
 fake_artifact_registry_port = 12001
 fake_artifact_store_id = "test_store"
-fake_artifact_checkpoint_id = "test_checkpoint"
-fake_artifact_checkpoint_small_id = "small_checkpoint"
+test_model_artifact_id = "test_models_checkpoint"
+test_blueprint_artifact_id = "test_blueprint_checkpoint"
 testPluginId = PluginCompositeIdReadable.from_str("localTest:single")
 
 
@@ -35,7 +35,7 @@ class FakeArtifactRegistry(SimpleHTTPRequestHandler):
             self.end_headers()
 
             def make_artifact(i: int) -> dict:
-                checkpoint_id = f"{fake_artifact_checkpoint_id}{i}"
+                checkpoint_id = f"{test_model_artifact_id}{i}"
                 return {
                     "url": f"http://localhost:{fake_artifact_registry_port}/{checkpoint_id}",
                     "display_name": f"Test Model Checkpoint {i}",
@@ -51,7 +51,7 @@ class FakeArtifactRegistry(SimpleHTTPRequestHandler):
                 }
 
             small_artifact = {
-                "url": f"http://localhost:{fake_artifact_registry_port}/{fake_artifact_checkpoint_small_id}",
+                "url": f"http://localhost:{fake_artifact_registry_port}/{test_blueprint_artifact_id}",
                 "display_name": "Small Test Checkpoint",
                 "display_author": "Test Author",
                 "display_description": "A small test checkpoint for artifact runtime dependency tests",
@@ -67,14 +67,14 @@ class FakeArtifactRegistry(SimpleHTTPRequestHandler):
             catalog = {
                 "display_name": "Test Artifact Store",
                 "artifacts": {
-                    **{f"{fake_artifact_checkpoint_id}{i}": make_artifact(i) for i in range(4)},
-                    fake_artifact_checkpoint_small_id: small_artifact,
+                    **{f"{test_model_artifact_id}{i}": make_artifact(i) for i in range(4)},
+                    test_blueprint_artifact_id: small_artifact,
                 },
             }
             import json
 
             self.wfile.write(json.dumps(catalog).encode("utf-8"))
-        elif self.path == f"/{fake_artifact_checkpoint_small_id}":
+        elif self.path == f"/{test_blueprint_artifact_id}":
             data = b"x" * 64
             self.send_response(200)
             self.send_header("Content-Type", "application/octet-stream")
@@ -82,8 +82,7 @@ class FakeArtifactRegistry(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(data)
             self.wfile.flush()
-            print(f"artifact download done for {self.path}")
-        elif self.path.startswith(f"/{fake_artifact_checkpoint_id}"):
+        elif self.path.startswith(f"/{test_model_artifact_id}"):
             self.send_response(200)
             self.send_header("Content-Type", "application/octet-stream")
             self.send_header("Transfer-Encoding", "chunked")
@@ -100,7 +99,6 @@ class FakeArtifactRegistry(SimpleHTTPRequestHandler):
                 self.wfile.flush()
             self.wfile.write(b"0\r\n\r\n")
             self.wfile.flush()
-            print(f"artifact download done for {self.path}")
         else:
             self.send_error(404, f"Not Found: {self.path}")
 

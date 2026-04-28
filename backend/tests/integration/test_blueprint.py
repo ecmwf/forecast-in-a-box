@@ -36,7 +36,7 @@ from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSave
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs
 from forecastbox.routes.run import RunCreateResponse
 
-from .conftest import fake_artifact_checkpoint_small_id, fake_artifact_store_id, testPluginId
+from .conftest import fake_artifact_store_id, test_blueprint_artifact_id, testPluginId
 from .utils import compare_with_tolerance, retry_until
 
 
@@ -986,14 +986,14 @@ def test_blueprint_artifact_execute(tmpdir: Any, backend_client_with_auth: httpx
             m
             for m in models
             if m["composite_id"]["artifact_store_id"] == fake_artifact_store_id
-            and m["composite_id"]["ml_model_checkpoint_id"] == fake_artifact_checkpoint_small_id
+            and m["composite_id"]["ml_model_checkpoint_id"] == test_blueprint_artifact_id
         ),
         None,
     )
     assert small_model is not None, "Small test checkpoint not found in model list"
     assert small_model["is_available"] == False, "Small checkpoint must not be downloaded before this test runs"
 
-    checkpoint_composite_id = f"{fake_artifact_store_id}:{fake_artifact_checkpoint_small_id}"
+    checkpoint_composite_id = f"{fake_artifact_store_id}:{test_blueprint_artifact_id}"
 
     source_filesize = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_filesize")),
@@ -1038,7 +1038,7 @@ def test_blueprint_artifact_execute(tmpdir: Any, backend_client_with_auth: httpx
             m
             for m in models_after
             if m["composite_id"]["artifact_store_id"] == fake_artifact_store_id
-            and m["composite_id"]["ml_model_checkpoint_id"] == fake_artifact_checkpoint_small_id
+            and m["composite_id"]["ml_model_checkpoint_id"] == test_blueprint_artifact_id
         ),
         None,
     )
