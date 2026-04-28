@@ -17,17 +17,12 @@ from fiab_core.plugin import Error, Plugin
 
 
 def _get_checkpoint_enum_type() -> str:
-    try:
-        available = ArtifactsProvider.get_checkpoint_lookup()
-    except Exception:
-        return "str"
-    if not available:
-        return "str"
+    available = ArtifactsProvider.get_checkpoint_lookup()
     values = ", ".join(f"'{CompositeArtifactId.to_str(k)}'" for k in available.keys())
     return f"enum[{values}]"
 
 
-catalogue = BlockFactoryCatalogue(
+catalogue = lambda: BlockFactoryCatalogue(
     factories={
         BlockFactoryId("source_42"): BlockFactory(
             kind="source",
@@ -165,4 +160,4 @@ def compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance
     return Either.ok(action)
 
 
-plugin = Plugin(catalogue=catalogue, validator=validator, expander=expander, compiler=compiler)
+plugin = lambda: Plugin(catalogue=catalogue(), validator=validator, expander=expander, compiler=compiler)

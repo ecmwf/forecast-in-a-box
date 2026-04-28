@@ -117,10 +117,14 @@ def load_single(plugin: PluginSettings) -> Plugin | str:
         errors.append(f"failed to import plugin {plugin.module_name}")
     elif not hasattr(plugin_impl, "plugin"):
         errors.append(f"plugin {plugin.module_name} does not have a `plugin` attribute")
-    elif not isinstance(getattr(plugin_impl, "plugin"), Plugin):
-        errors.append(f"plugin {plugin.module_name}'s `plugin` is not a Plugin")
-    else:
-        return getattr(plugin_impl, "plugin")
+    try:
+        maybe_plugin = getattr(plugin_impl, "plugin")()
+        if not isinstance(maybe_plugin, Plugin):
+            errors.append(f"plugin {plugin.module_name}'s `plugin()` does not give a Plugin")
+        else:
+            return maybe_plugin
+    except Exception as e:
+        errors.append("failed to invoke plugin(): {repr(e)}")
     return "\n".join(errors)
 
 
