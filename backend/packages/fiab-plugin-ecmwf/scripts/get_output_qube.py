@@ -12,8 +12,8 @@ from functools import lru_cache
 
 
 @lru_cache(maxsize=None)
-def open_checkpoint(checkpoint_path: str) -> "Checkpoint":
-    from anemoi.inference.checkpoint import Checkpoint
+def open_checkpoint(checkpoint_path: str) -> "Checkpoint":  # type: ignore
+    from anemoi.inference.checkpoint import Checkpoint  # type: ignore
 
     return Checkpoint(checkpoint_path)
 
