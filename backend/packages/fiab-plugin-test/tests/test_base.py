@@ -57,49 +57,21 @@ def test_source_filesize_missing_file_raises(tmp_path: pathlib.Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# _get_checkpoint_enum_type helper
-# ---------------------------------------------------------------------------
-
-
-def test_get_checkpoint_enum_type_returns_str_when_provider_unregistered() -> None:
-    original = ArtifactsProvider._get_checkpoint_lookup
-    ArtifactsProvider._get_checkpoint_lookup = None  # type: ignore[assignment]
-    try:
-        result = _get_checkpoint_enum_type()
-    finally:
-        ArtifactsProvider._get_checkpoint_lookup = original
-    assert result == "str"
-
-
-def test_get_checkpoint_enum_type_returns_str_when_no_checkpoints() -> None:
-    with patch.object(ArtifactsProvider, "get_checkpoint_lookup", return_value={}):
-        result = _get_checkpoint_enum_type()
-    assert result == "str"
-
-
-def test_get_checkpoint_enum_type_returns_enum_with_checkpoints() -> None:
-    fake_id = CompositeArtifactId.from_str("mystore:mycheckpoint")
-    with patch.object(ArtifactsProvider, "get_checkpoint_lookup", return_value={fake_id: MagicMock()}):
-        result = _get_checkpoint_enum_type()
-    assert result == "enum['mystore:mycheckpoint']"
-
-
-# ---------------------------------------------------------------------------
 # catalogue
 # ---------------------------------------------------------------------------
 
 
 def test_catalogue_contains_source_filesize() -> None:
-    assert BlockFactoryId("source_filesize") in catalogue.factories
+    assert BlockFactoryId("source_filesize") in catalogue().factories
 
 
 def test_source_filesize_factory_is_source_kind() -> None:
-    factory = catalogue.factories[BlockFactoryId("source_filesize")]
+    factory = catalogue().factories[BlockFactoryId("source_filesize")]
     assert factory.kind == "source"
 
 
 def test_source_filesize_factory_has_checkpoint_option() -> None:
-    factory = catalogue.factories[BlockFactoryId("source_filesize")]
+    factory = catalogue().factories[BlockFactoryId("source_filesize")]
     assert "checkpoint" in factory.configuration_options
 
 

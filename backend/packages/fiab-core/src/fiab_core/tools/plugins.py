@@ -1,4 +1,4 @@
-from typing import cast
+from typing import Callable, cast
 
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
@@ -43,7 +43,7 @@ class QubedPluginBuilder:
         factory = self.block_builders[block.factory_id.factory]
         return factory.compile(inputs, block_id, block)
 
-    def as_plugin(self) -> Plugin:
+    def as_plugin(self) -> Callable[[], Plugin]:
         def _generic_expand(block: BlockInstanceOutput) -> list[BlockFactoryId]:
             if isinstance(block, QubedOutput):
                 return self.expand(block)
@@ -58,7 +58,7 @@ class QubedPluginBuilder:
                 inputs_validated = cast(dict[str, QubedOutput], inputs)
                 return self.validate(block, inputs_validated)
 
-        return Plugin(
+        return lambda: Plugin(
             catalogue=BlockFactoryCatalogue(
                 factories={factory_id: factory.as_catalogue() for factory_id, factory in self.block_builders.items()}
             ),
