@@ -1,8 +1,22 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 pub struct BinaryPayload {
     pub content_type: Option<String>,
     pub bytes: bytes::Bytes,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RunOutputInfo {
+    pub mime_type: String,
+    pub original_block: String,
+    pub is_available: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RunOutputsWrapper {
+    pub outputs: HashMap<String, RunOutputInfo>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -17,6 +31,7 @@ pub struct RunDetailResponse {
     pub error: Option<String>,
     pub progress: Option<String>,
     pub cascade_job_id: Option<String>,
+    pub outputs: Option<RunOutputsWrapper>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

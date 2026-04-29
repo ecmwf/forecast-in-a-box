@@ -79,8 +79,8 @@ pub async fn run(client: &FiabClient, cmd: RunCmd, json: bool) -> Result<(), Cli
 
         RunCmd::OutputsList { run_id, attempt } => {
             let attempt_count = resolve_attempt(client, &run_id, attempt).await?;
-            let datasets = client.get_run_output_availability(&run_id, attempt_count).await?;
-            render::render_string_list(&datasets, json);
+            let detail = client.get_run(&run_id, attempt_count).await?;
+            render::render_run_outputs(&detail, json);
         }
 
         RunCmd::OutputsFetch { run_id, dataset_id, attempt, output, stdout } => {
