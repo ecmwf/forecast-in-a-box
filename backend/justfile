@@ -4,4 +4,9 @@ val:
     uv run pytest tests/integration
 
 dev:
-    uv run python -m forecastbox.entrypoint.main
+    #!/usr/bin/env bash
+    if [[ -z "$FIAB_ROOT" ]] ; then
+        if [[ ! -d .fiab ]] ; then mkdir -p .fiab/data_dir ; fi
+        echo "1761908420:d0.0.1" > .fiab/pylock.toml.timestamp
+    fi
+    FIAB_ROOT=.fiab uv run python -m forecastbox.entrypoint.main

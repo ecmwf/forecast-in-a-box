@@ -46,7 +46,10 @@ val:
         
     just -f backend/justfile -d backend val
 
+f2:
+    echo "f2"
+
 dev:
     #!/usr/bin/env bash
-     if [[ ! -d backend/src/forecastbox/static ]] ; then just fiabwheel ; fi
-     just -f backend/justfile -d backend dev
+    if [[ ! -d backend/src/forecastbox/static ]] ; then just fiabwheel ; fi
+    just -f backend/justfile -d backend dev
