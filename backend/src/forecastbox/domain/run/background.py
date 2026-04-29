@@ -21,8 +21,6 @@ import uuid
 from datetime import datetime
 from typing import cast
 
-from fiab_core.fable import BlockInstanceId
-
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.glyphs import global_db
 from forecastbox.domain.glyphs.global_db import GlyphResolutionBuckets
@@ -34,7 +32,7 @@ from forecastbox.domain.glyphs.resolution import (
     merge_glyph_values,
 )
 from forecastbox.domain.run import db
-from forecastbox.domain.run.cascade import ExecutionSpecification, RunOutputCharacteristic, RunOutputs, execute_cascade
+from forecastbox.domain.run.cascade import execute_cascade
 from forecastbox.domain.run.compile import compile_builder, resolve_intrinsic_glyph_values
 from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.types import RunId
@@ -100,7 +98,7 @@ def execute_background(
         relevant_glyphs_and_values = expand_glyph_values(all_glyphs_raw, roots=referenced_glyph_names)
         used_glyphs = {k: all_glyphs_raw[k] for k in relevant_glyphs_and_values.keys() if k not in PINNED_INTRINSIC_KEYS}
 
-        exec_spec = compile_builder(builder, relevant_glyphs_and_values)
+        exec_spec, run_outputs = compile_builder(builder, relevant_glyphs_and_values)
 
         persisted_context = compiler_runtime_context.model_copy(update={"glyphs": used_glyphs})
         run_async(
@@ -120,18 +118,6 @@ def execute_background(
             update_kwargs["status"] = "failed"
             update_kwargs["error"] = response.error[:255]
         else:
-            # ext_outputs was set as a side effect of execute_cascade
-            ext_outputs = exec_spec.job.job_instance.ext_outputs or []
-            # TODO -- to be changed later: populate mime_type and original_block from compiled builder
-            run_outputs = RunOutputs(
-                outputs={
-                    ds.task: RunOutputCharacteristic(
-                        mime_type="application/octet-stream",
-                        original_block=BlockInstanceId("unavailable"),  # type: ignore[invalid-argument-type]
-                    )
-                    for ds in ext_outputs
-                }
-            )
             update_kwargs["outputs"] = run_outputs.model_dump()
         run_async(db.update_run_runtime(run_id, attempt_count, **update_kwargs))
 

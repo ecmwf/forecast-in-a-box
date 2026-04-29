@@ -19,7 +19,6 @@ import numpy as np
 import xarray as xr
 from cascade.gateway.api import JobSpec, ResultRetrievalResponse, SubmitJobRequest, SubmitJobResponse, decoded_result
 from cascade.gateway.client import request_response
-from cascade.low import views
 from cascade.low.core import JobInstance, JobInstanceRich, TaskId
 from fiab_core.fable import BlockInstanceId
 from pydantic import Field
@@ -88,7 +87,6 @@ def encode_result(result: ResultRetrievalResponse) -> tuple[bytes, str]:
 
 class RunOutputCharacteristic(FiabBaseModel):
     mime_type: str = "application/octet-stream"
-    # TODO -- to be changed later: populate from the actual compiled block
     original_block: BlockInstanceId
 
 
@@ -99,8 +97,8 @@ class RunOutputs(FiabBaseModel):
 def execute_cascade(spec: ExecutionSpecification) -> SubmitJobResponse:
     """Convert spec to JobInstance and submit to cascade api.
 
-    Sets ``spec.job.job_instance.ext_outputs`` as a side effect; callers that need
-    the sink task IDs can read them from there after this call returns.
+    ``spec.job.job_instance.ext_outputs`` must already be set by the caller
+    (``compile_builder`` sets it as part of compilation).
     """
     runtime_artifacts = spec.environment.runtime_artifacts
     if runtime_artifacts:
@@ -134,9 +132,6 @@ def execute_cascade(spec: ExecutionSpecification) -> SubmitJobResponse:
                 time.sleep(1)
 
     job = spec.job.job_instance
-    sinks = views.sinks(job)
-    sinks = [s for s in sinks if not s.task.startswith("run_as_earthkit")]
-    job.ext_outputs = sinks
 
     environment = spec.environment
     hosts = min(config.cascade.max_hosts, environment.hosts or config.cascade.default_hosts)

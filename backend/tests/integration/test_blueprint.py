@@ -890,6 +890,14 @@ def test_run_output_content(tmpdir: Any, backend_client_with_auth: httpx.Client)
     assert len(sink_image_tasks) == 1, f"Expected exactly one sink_image task, got: {available_tasks}"
     sink_image_task_id = sink_image_tasks[0]
 
+    # Verify original_block points to the correct block instance IDs from the blueprint
+    assert output_entries[sink_file_task_id]["original_block"] == "my_sink"
+    assert output_entries[sink_image_task_id]["original_block"] == "my_image_sink"
+
+    # Verify declared mime_type matches the actual content-type returned by outputContent
+    assert output_entries[sink_file_task_id]["mime_type"] == "text/plain"
+    assert output_entries[sink_image_task_id]["mime_type"] == "image/png"
+
     content_resp = backend_client_with_auth.get(
         "/run/outputContent",
         params={"run_id": run_id, "dataset_id": sink_file_task_id},
@@ -897,6 +905,7 @@ def test_run_output_content(tmpdir: Any, backend_client_with_auth: httpx.Client)
         timeout=40.0 if sys.platform == "darwin" else None,
     )
     assert content_resp.is_success, content_resp.text
+    # The backend may add charset to text/plain; use startswith for robustness
     assert content_resp.headers.get("content-type", "").startswith("text/plain")
     assert content_resp.content.decode("ascii").startswith("file://")
 
