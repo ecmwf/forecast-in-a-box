@@ -25,7 +25,6 @@ import { isTerminalStatus } from '@/api/types/job.types'
 import {
   deleteJob,
   executeJob,
-  getJobAvailable,
   getJobStatus,
   getJobsStatus,
   headJobResultContentType,
@@ -38,7 +37,6 @@ export const jobKeys = {
   status: (jobId: string) => [...jobKeys.all, 'status', jobId] as const,
   list: (page: number, pageSize: number, status?: JobStatus) =>
     [...jobKeys.all, 'list', page, pageSize, status] as const,
-  available: (jobId: string) => [...jobKeys.all, 'available', jobId] as const,
   contentType: (jobId: string, datasetId: string) =>
     [...jobKeys.all, 'contentType', jobId, datasetId] as const,
 }
@@ -67,23 +65,6 @@ export function useJobsStatus(
     queryKey: jobKeys.list(page, pageSize, status),
     queryFn: () => getJobsStatus(page, pageSize, status),
     refetchInterval: 10000,
-    refetchOnWindowFocus: false,
-  })
-}
-
-export function useJobAvailable(
-  jobId: string | undefined,
-  jobStatus?: JobStatus,
-) {
-  return useQuery<Array<string>>({
-    queryKey: jobKeys.available(jobId ?? ''),
-    queryFn: () => getJobAvailable(jobId!),
-    enabled: !!jobId,
-    refetchInterval: () => {
-      if (!jobStatus) return 5000
-      if (isTerminalStatus(jobStatus)) return false
-      return 5000
-    },
     refetchOnWindowFocus: false,
   })
 }

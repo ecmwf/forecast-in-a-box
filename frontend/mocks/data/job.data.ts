@@ -13,25 +13,10 @@
  */
 
 import type {
-  ExecutionSpecification,
   JobExecuteRequest,
   JobExecuteResponse,
   JobExecutionDetail,
-  ProductToOutputId,
 } from '@/api/types/job.types'
-
-export interface MockJob {
-  id: string
-  status: {
-    progress: string
-    status: string
-    created_at: string | null
-    error: string | null
-  }
-  specification: ExecutionSpecification
-  outputs: Array<ProductToOutputId>
-  available: Array<string>
-}
 
 const now = new Date()
 const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000).toISOString()
@@ -40,99 +25,13 @@ const threeDaysAgo = new Date(
   now.getTime() - 3 * 24 * 60 * 60 * 1000,
 ).toISOString()
 
-const defaultSpec: ExecutionSpecification = {
-  job: {
-    job_type: 'raw_cascade_job',
-    job_instance: { tasks: {}, edges: [] },
-  },
-  environment: {
-    hosts: null,
-    workers_per_host: null,
-    environment_variables: {},
-    runtime_artifacts: [],
-  },
-  shared: false,
-}
-
-const seedJobs: Array<MockJob> = [
-  {
-    id: 'job-completed-001',
-    status: {
-      progress: '100',
-      status: 'completed',
-      created_at: threeDaysAgo,
-      error: null,
-    },
-    specification: defaultSpec,
-    outputs: [
-      {
-        product_name: 'temperature_map',
-        product_spec: { variable: '2t' },
-        output_ids: ['task-out-1', 'task-out-2'],
-      },
-      {
-        product_name: 'wind_map',
-        product_spec: { variable: '10u' },
-        output_ids: ['task-out-3'],
-      },
-    ],
-    available: ['task-out-1', 'task-out-2', 'task-out-3'],
-  },
-  {
-    id: 'job-running-002',
-    status: {
-      progress: '45',
-      status: 'running',
-      created_at: oneHourAgo,
-      error: null,
-    },
-    specification: defaultSpec,
-    outputs: [
-      {
-        product_name: 'precipitation_forecast',
-        product_spec: { variable: 'tp' },
-        output_ids: ['task-out-4'],
-      },
-    ],
-    available: [],
-  },
-  {
-    id: 'job-errored-003',
-    status: {
-      progress: '62',
-      status: 'failed',
-      created_at: twoHoursAgo,
-      error: 'Worker process exited with code 137 (OOM killed)',
-    },
-    specification: defaultSpec,
-    outputs: [],
-    available: [],
-  },
-  {
-    id: 'job-submitted-004',
-    status: {
-      progress: '0',
-      status: 'submitted',
-      created_at: now.toISOString(),
-      error: null,
-    },
-    specification: defaultSpec,
-    outputs: [],
-    available: [],
-  },
-]
-
-let jobIdCounter = 100
-
-let jobsState: Record<string, MockJob> = {}
-
 // ─── Execution mock state ─────────────────────────────────────────────────
 
 let executionIdCounter = 200
 
 let executionsState: Record<string, JobExecutionDetail> = {}
 
-const seedExecutionsV2: Array<JobExecutionDetail> = [
+const seedExecutions: Array<JobExecutionDetail> = [
   {
     run_id: 'job-completed-001',
     attempt_count: 1,
@@ -144,6 +43,25 @@ const seedExecutionsV2: Array<JobExecutionDetail> = [
     error: null,
     progress: '100',
     cascade_job_id: 'cascade-001',
+    outputs: {
+      outputs: {
+        'task-out-1': {
+          mime_type: 'image/png',
+          original_block: 'sink_temperature_map',
+          is_available: true,
+        },
+        'task-out-2': {
+          mime_type: 'image/png',
+          original_block: 'sink_temperature_map',
+          is_available: true,
+        },
+        'task-out-3': {
+          mime_type: 'image/png',
+          original_block: 'sink_wind_map',
+          is_available: true,
+        },
+      },
+    },
   },
   {
     run_id: 'job-running-002',
@@ -156,6 +74,15 @@ const seedExecutionsV2: Array<JobExecutionDetail> = [
     error: null,
     progress: '45',
     cascade_job_id: 'cascade-002',
+    outputs: {
+      outputs: {
+        'task-out-4': {
+          mime_type: 'image/png',
+          original_block: 'sink_precipitation',
+          is_available: false,
+        },
+      },
+    },
   },
   {
     run_id: 'job-errored-003',
@@ -168,6 +95,9 @@ const seedExecutionsV2: Array<JobExecutionDetail> = [
     error: 'Worker process exited with code 137 (OOM killed)',
     progress: '62',
     cascade_job_id: 'cascade-003',
+    outputs: {
+      outputs: {},
+    },
   },
   {
     run_id: 'job-submitted-004',
@@ -180,18 +110,14 @@ const seedExecutionsV2: Array<JobExecutionDetail> = [
     error: null,
     progress: '0',
     cascade_job_id: null,
+    outputs: null,
   },
 ]
 
 export function resetJobsState(): void {
-  jobsState = {}
-  jobIdCounter = 100
-  for (const job of seedJobs) {
-    jobsState[job.id] = JSON.parse(JSON.stringify(job)) as MockJob
-  }
   executionsState = {}
   executionIdCounter = 200
-  for (const exec of seedExecutionsV2) {
+  for (const exec of seedExecutions) {
     executionsState[exec.run_id] = JSON.parse(
       JSON.stringify(exec),
     ) as JobExecutionDetail
@@ -199,40 +125,6 @@ export function resetJobsState(): void {
 }
 
 resetJobsState()
-
-export function getAllJobs(): Array<MockJob> {
-  return Object.values(jobsState).sort((a, b) => {
-    const aTime = a.status.created_at
-      ? new Date(a.status.created_at).getTime()
-      : 0
-    const bTime = b.status.created_at
-      ? new Date(b.status.created_at).getTime()
-      : 0
-    return bTime - aTime
-  })
-}
-
-export function getJob(jobId: string): MockJob | undefined {
-  return jobsState[jobId]
-}
-
-export function addJob(spec: ExecutionSpecification): MockJob {
-  const id = `job-mock-${String(jobIdCounter++).padStart(3, '0')}`
-  const job: MockJob = {
-    id,
-    status: {
-      progress: '0',
-      status: 'submitted',
-      created_at: new Date().toISOString(),
-      error: null,
-    },
-    specification: spec,
-    outputs: [],
-    available: [],
-  }
-  jobsState[id] = job
-  return job
-}
 
 // ─── Execution accessors ──────────────────────────────────────────────────
 
@@ -262,16 +154,9 @@ export function addExecution(request: JobExecuteRequest): JobExecuteResponse {
     error: null,
     progress: '0',
     cascade_job_id: null,
+    outputs: null,
   }
   return { run_id, attempt_count: 1 }
-}
-
-export function deleteJob(jobId: string): boolean {
-  if (!(jobId in jobsState)) {
-    return false
-  }
-  delete jobsState[jobId]
-  return true
 }
 
 export function restartExecution(

@@ -153,8 +153,6 @@ export const API_ENDPOINTS = {
     get: `${API_PREFIX}/run/get`,
     /** POST - Restart an execution (body: { run_id, attempt_count }) */
     restart: `${API_PREFIX}/run/restart`,
-    /** GET - Get list of available output task IDs (query: run_id) */
-    outputAvailability: `${API_PREFIX}/run/outputAvailability`,
     /** GET - Get job result data by task ID (query: run_id, dataset_id) */
     outputContent: `${API_PREFIX}/run/outputContent`,
     /** GET - Download job logs as ZIP (query: run_id) */
