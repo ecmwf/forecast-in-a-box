@@ -11,7 +11,7 @@ import io
 import logging
 import time
 from pathlib import Path
-from typing import Any, Literal, Sequence
+from typing import Literal
 
 import cloudpickle
 import earthkit.data
@@ -85,14 +85,18 @@ def encode_result(result: ResultRetrievalResponse) -> tuple[bytes, str]:
     return cloudpickle.dumps(obj), "application/clpkl"
 
 
-class ProductToOutputId(FiabBaseModel):
-    product_name: str
-    product_spec: dict[str, Any]
-    output_ids: Sequence[str]
+class RunOutputCharacteristic(FiabBaseModel):
+    mime_type: str = "application/octet-stream"
+    # TODO -- to be changed later: populate from the actual compiled block
+    original_block: str
 
 
-def execute_cascade(spec: ExecutionSpecification) -> tuple[SubmitJobResponse, list[ProductToOutputId]]:
-    """Convert spec to JobInstance and submit to cascade api, returning response."""
+class RunOutputs(FiabBaseModel):
+    outputs: dict[str, RunOutputCharacteristic]
+
+
+def execute_cascade(spec: ExecutionSpecification) -> tuple[SubmitJobResponse, list[str]]:
+    """Convert spec to JobInstance and submit to cascade api, returning response and sink task IDs."""
     runtime_artifacts = spec.environment.runtime_artifacts
     if runtime_artifacts:
         missing_artifacts = [art for art in runtime_artifacts if art not in ArtifactManager.locally_available]
@@ -128,7 +132,7 @@ def execute_cascade(spec: ExecutionSpecification) -> tuple[SubmitJobResponse, li
     sinks = views.sinks(job)
     sinks = [s for s in sinks if not s.task.startswith("run_as_earthkit")]
     job.ext_outputs = sinks
-    product_to_id_mappings = [ProductToOutputId(product_name="All Outputs", product_spec={}, output_ids=[x.task for x in sinks])]
+    sink_task_ids = [s.task for s in sinks]
 
     environment = spec.environment
     hosts = min(config.cascade.max_hosts, environment.hosts or config.cascade.default_hosts)
@@ -149,4 +153,4 @@ def execute_cascade(spec: ExecutionSpecification) -> tuple[SubmitJobResponse, li
     except Exception as e:
         return SubmitJobResponse(job_id=None, error=repr(e)), []
 
-    return submit_job_response, product_to_id_mappings
+    return submit_job_response, sink_task_ids

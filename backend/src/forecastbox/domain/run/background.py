@@ -32,7 +32,7 @@ from forecastbox.domain.glyphs.resolution import (
     merge_glyph_values,
 )
 from forecastbox.domain.run import db
-from forecastbox.domain.run.cascade import ExecutionSpecification, execute_cascade
+from forecastbox.domain.run.cascade import ExecutionSpecification, RunOutputCharacteristic, RunOutputs, execute_cascade
 from forecastbox.domain.run.compile import compile_builder, resolve_intrinsic_glyph_values
 from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.types import RunId
@@ -110,7 +110,7 @@ def execute_background(
             )
         )
 
-        response, product_to_id_mappings = execute_cascade(exec_spec)
+        response, sink_task_ids = execute_cascade(exec_spec)
         cascade_job_id = response.job_id or str(uuid.uuid4())
 
         update_kwargs: dict[str, object] = {"cascade_job_id": cascade_job_id}
@@ -118,7 +118,17 @@ def execute_background(
             update_kwargs["status"] = "failed"
             update_kwargs["error"] = response.error[:255]
         else:
-            update_kwargs["outputs"] = [x.model_dump() for x in product_to_id_mappings]
+            # TODO -- to be changed later: populate mime_type and original_block from compiled builder
+            run_outputs = RunOutputs(
+                outputs={
+                    task_id: RunOutputCharacteristic(
+                        mime_type="application/octet-stream",
+                        original_block="unavailable",
+                    )
+                    for task_id in sink_task_ids
+                }
+            )
+            update_kwargs["outputs"] = run_outputs.model_dump()
         run_async(db.update_run_runtime(run_id, attempt_count, **update_kwargs))
 
     except Exception as e:

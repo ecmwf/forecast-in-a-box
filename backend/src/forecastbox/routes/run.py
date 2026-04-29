@@ -33,7 +33,7 @@ from fastapi.exceptions import HTTPException
 from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.run import db, service
-from forecastbox.domain.run.cascade import ProductToOutputId, encode_result
+from forecastbox.domain.run.cascade import RunOutputs, encode_result
 from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
 from forecastbox.domain.run.types import RunId
 from forecastbox.routes.gateway import Globals
@@ -78,6 +78,16 @@ class RunCreateResponse(FiabBaseModel):
     attempt_count: int
 
 
+class RunOutputDetail(FiabBaseModel):
+    mime_type: str
+    original_block: str
+    is_available: bool
+
+
+class RunOutputsResponse(FiabBaseModel):
+    outputs: dict[str, RunOutputDetail]
+
+
 class RunDetailResponse(FiabBaseModel):
     run_id: RunId
     attempt_count: int
@@ -89,6 +99,7 @@ class RunDetailResponse(FiabBaseModel):
     error: str | None = None
     progress: str | None = None
     cascade_job_id: str | None = None
+    outputs: RunOutputsResponse | None = None
 
 
 class RunListResponse(FiabBaseModel):
@@ -123,7 +134,7 @@ class RunDeleteRequest(FiabBaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
+def _to_run_detail(domain_detail: service.RunDetail, outputs: RunOutputsResponse | None = None) -> RunDetailResponse:
     return RunDetailResponse(
         run_id=domain_detail.run_id,
         attempt_count=domain_detail.attempt_count,
@@ -135,6 +146,7 @@ def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
         error=domain_detail.error,
         progress=domain_detail.progress,
         cascade_job_id=domain_detail.cascade_job_id,
+        outputs=outputs,
     )
 
 
@@ -252,7 +264,35 @@ async def get_run(
         raise HTTPException(status_code=404, detail=f"Run {spec.run_id!r} not found.")
     except RunAccessDenied:
         raise HTTPException(status_code=403, detail=f"Access denied to execution {spec.run_id!r}.")
-    return _to_run_detail(domain_detail)
+
+    outputs_response: RunOutputsResponse | None = None
+    raw_outputs = cast(dict | None, execution.outputs)
+    if raw_outputs is not None:
+        cascade_job_id = domain_detail.cascade_job_id
+        available_tasks: set[str] = set()
+        if cascade_job_id:
+            try:
+                job_id = JobId(cascade_job_id)
+                avail = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}")
+                avail = cast(api.JobProgressResponse, avail)
+                if job_id in avail.datasets:
+                    available_tasks = {x.task for x in avail.datasets[job_id]}
+            except Exception as e:
+                logger.warning(f"Failed to fetch output availability for run {spec.run_id!r}: {e}")
+
+        run_outputs = RunOutputs.model_validate(raw_outputs)
+        outputs_response = RunOutputsResponse(
+            outputs={
+                task_id: RunOutputDetail(
+                    mime_type=char.mime_type,
+                    original_block=char.original_block,
+                    is_available=task_id in available_tasks,
+                )
+                for task_id, char in run_outputs.outputs.items()
+            }
+        )
+
+    return _to_run_detail(domain_detail, outputs_response)
 
 
 @router.post("/delete")
@@ -333,21 +373,6 @@ async def restart_run(
 # ---------------------------------------------------------------------------
 # Further detail endpoints
 # ---------------------------------------------------------------------------
-
-
-@router.get("/outputAvailability")
-async def get_run_output_availability(
-    spec: Annotated[RunLookup, Depends()],
-    auth_context: AuthContext = Depends(get_auth_context),
-) -> list[TaskId]:
-    """Check which output tasks are available for a given execution."""
-    _, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
-    job_id = JobId(cascade_job_id)
-    response = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}")
-    response = cast(api.JobProgressResponse, response)
-    if job_id not in response.datasets:
-        raise HTTPException(status_code=404, detail=f"Job {cascade_job_id} not found in gateway.")
-    return [x.task for x in response.datasets[job_id]]
 
 
 @router.get("/outputContent")

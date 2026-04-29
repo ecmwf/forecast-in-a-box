@@ -388,9 +388,11 @@ def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Cl
     assert _time_parts_r[2] == "initial_value"
     assert _time_parts_r[3] == "local_glyph_value"
 
-    avail_resp = backend_client_with_auth.get("/run/outputAvailability", params={"run_id": run_id})
-    assert avail_resp.is_success, avail_resp.text
-    available_tasks = avail_resp.json()
+    get_resp = backend_client_with_auth.get("/run/get", params={"run_id": run_id})
+    assert get_resp.is_success, get_resp.text
+    run_detail = get_resp.json()
+    assert run_detail["outputs"] is not None
+    available_tasks = [task_id for task_id, char in run_detail["outputs"]["outputs"].items() if char["is_available"]]
     assert isinstance(available_tasks, list)
     assert len(available_tasks) > 0
 
@@ -869,9 +871,12 @@ def test_run_output_content(tmpdir: Any, backend_client_with_auth: httpx.Client)
 
     ensure_completed_v2(backend_client_with_auth, run_id, sleep=1, attempts=120)
 
-    avail_resp = backend_client_with_auth.get("/run/outputAvailability", params={"run_id": run_id})
-    assert avail_resp.is_success, avail_resp.text
-    available_tasks = avail_resp.json()
+    get_resp = backend_client_with_auth.get("/run/get", params={"run_id": run_id})
+    assert get_resp.is_success, get_resp.text
+    run_detail = get_resp.json()
+    assert run_detail["outputs"] is not None
+    output_entries = run_detail["outputs"]["outputs"]
+    available_tasks = [task_id for task_id, char in output_entries.items() if char["is_available"]]
     assert len(available_tasks) > 0
 
     # Cascade only exposes sink tasks as ext_outputs; our blueprint has two sinks.
