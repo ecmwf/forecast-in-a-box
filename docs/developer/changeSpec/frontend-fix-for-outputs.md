@@ -102,9 +102,10 @@ keys of `outputs.outputs`.
 
 ---
 
-## `GET /api/v1/run/list` (no change to shape, note on `outputs`)
+## `GET /api/v1/run/list` (shape updated)
 
-The list endpoint (`GET /api/v1/run/list`) returns `RunDetailResponse` objects.
-The `outputs` field on each item in the list is always `null` -- availability is
-not checked for list responses. Use `GET /api/v1/run/get` to obtain output details
-for a specific run.
+The list endpoint (`GET /api/v1/run/list`) returns `RunDetailResponse` objects with
+the same `outputs` field as `GET /api/v1/run/get`. Availability is determined by the
+same rules: `is_available` is `true` for all outputs of a completed run, `false` for
+all outputs of a failed run, and reflects live cascade gateway state for runs that are
+still in progress.

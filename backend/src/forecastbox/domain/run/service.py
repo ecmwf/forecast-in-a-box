@@ -30,6 +30,7 @@ from typing import cast
 
 from cascade.controller.report import JobId
 from cascade.gateway import api, client
+from cascade.low.core import TaskId
 from cascade.low.func import Either
 
 import forecastbox.domain.blueprint.db as blueprint_db
@@ -61,6 +62,8 @@ class RunDetail(FiabBaseModel):
     error: str | None = None
     progress: str | None = None
     cascade_job_id: str | None = None
+    available_task_ids: list[TaskId] | None = None
+    outputs: dict | None = None
 
 
 class ExecuteResult(FiabBaseModel):
@@ -164,6 +167,17 @@ async def poll_and_update(execution: Run) -> RunDetail:
     cascade_job_id = cast(str | None, execution.cascade_job_id)
     status = cast(str, execution.status)
 
+    # Derive available_task_ids from stored outputs without calling cascade for terminal states:
+    # completed → assume all outputs are available; failed → assume none are.
+    raw_outputs = cast(dict | None, execution.outputs)
+    available_task_ids: list[TaskId] | None
+    if status == "completed":
+        available_task_ids = [TaskId(k) for k in (raw_outputs or {}).get("outputs", {}).keys()]
+    elif status == "failed":
+        available_task_ids = []
+    else:
+        available_task_ids = None
+
     def _build(status_override: str | None = None, error_override: str | None = None, progress_override: str | None = None) -> RunDetail:
         return RunDetail(
             run_id=run_id,
@@ -176,26 +190,34 @@ async def poll_and_update(execution: Run) -> RunDetail:
             error=error_override if error_override is not None else cast(str | None, execution.error),
             progress=progress_override if progress_override is not None else cast(str | None, execution.progress),
             cascade_job_id=cascade_job_id,
+            available_task_ids=available_task_ids,
+            outputs=raw_outputs,
         )
 
     if status in ("submitted", "preparing", "running") and cascade_job_id:
+        job_id = JobId(cascade_job_id)
         try:
-            response = client.request_response(api.JobProgressRequest(job_ids=[JobId(cascade_job_id)]), f"{config.cascade.cascade_url}")
+            response = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}")
             response = cast(api.JobProgressResponse, response)
         except TimeoutError:
             return _build(status_override="unknown", error_override="failed to communicate with gateway")
         except Exception as e:
             return _build(status_override="unknown", error_override=f"internal cascade failure: {repr(e)}")
 
+        if job_id in response.datasets:
+            available_task_ids = [x.task for x in response.datasets[job_id]]
+
         if response.error:
             return _build(status_override="unknown", error_override=response.error)
 
-        jobprogress = response.progresses.get(JobId(cascade_job_id))
+        jobprogress = response.progresses.get(job_id)
         if jobprogress is None:
             await run_db.update_run_runtime(run_id, actual_attempt, status="failed", error="evicted from gateway")
+            available_task_ids = []
             return _build(status_override="failed", error_override="evicted from gateway")
         elif jobprogress.failure:
             await run_db.update_run_runtime(run_id, actual_attempt, status="failed", error=jobprogress.failure)
+            available_task_ids = []
             return _build(status_override="failed", error_override=jobprogress.failure)
         elif jobprogress.completed or jobprogress.pct == "100.00":
             await run_db.update_run_runtime(run_id, actual_attempt, status="completed", progress="100.00")

@@ -21,6 +21,8 @@ import uuid
 from datetime import datetime
 from typing import cast
 
+from fiab_core.fable import BlockInstanceId
+
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.glyphs import global_db
 from forecastbox.domain.glyphs.global_db import GlyphResolutionBuckets
@@ -110,7 +112,7 @@ def execute_background(
             )
         )
 
-        response, sink_task_ids = execute_cascade(exec_spec)
+        response = execute_cascade(exec_spec)
         cascade_job_id = response.job_id or str(uuid.uuid4())
 
         update_kwargs: dict[str, object] = {"cascade_job_id": cascade_job_id}
@@ -118,14 +120,16 @@ def execute_background(
             update_kwargs["status"] = "failed"
             update_kwargs["error"] = response.error[:255]
         else:
+            # ext_outputs was set as a side effect of execute_cascade
+            ext_outputs = exec_spec.job.job_instance.ext_outputs or []
             # TODO -- to be changed later: populate mime_type and original_block from compiled builder
             run_outputs = RunOutputs(
                 outputs={
-                    task_id: RunOutputCharacteristic(
+                    ds.task: RunOutputCharacteristic(
                         mime_type="application/octet-stream",
-                        original_block="unavailable",
+                        original_block=BlockInstanceId("unavailable"),  # type: ignore[invalid-argument-type]
                     )
-                    for task_id in sink_task_ids
+                    for ds in ext_outputs
                 }
             )
             update_kwargs["outputs"] = run_outputs.model_dump()
