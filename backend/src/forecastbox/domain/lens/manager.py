@@ -100,15 +100,20 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
             raise TimeoutError("Failed to acquire lens manager lock")
         LensInstanceManager.instances = LensInstanceManager.instances.set(instance_id, instance)
 
-    cmd = ["uv", "run", "gunicorn", "--bind", f"0.0.0.0:{port}", "skinnywms.wmssvr:application"]
-    env = {**os.environ, "SKINNYWMS_DATA_PATH": local_path}
-    process: subprocess.Popen[bytes] = subprocess.Popen(
-        cmd,
-        env=env,
-        start_new_session=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    failed: str | None = None
+    try:
+        cmd = ["uv", "run", "gunicorn", "--bind", f"127.0.0.1:{port}", "skinnywms.wmssvr:application"]
+        env = {**os.environ, "SKINNYWMS_DATA_PATH": local_path}
+        process: subprocess.Popen[bytes] = subprocess.Popen(
+            cmd,
+            env=env,
+            start_new_session=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception as e:
+        failed = repr(e)
+        logger.error(f"failed to start skinny wms: {failed}")
 
     with timed_acquire(LensInstanceManager.lock, timeout_acquire) as acquired:
         if not acquired:
@@ -119,6 +124,9 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
             shutdown_popen(process)
             FreePortsManager.release_port(port)
             raise RuntimeError(f"Lens instance {instance_id} was removed during startup")
+        if failed is not None:
+            FreePortsManager.release_port(port)
+            raise RuntimeError(f"Lens instance {instance_id} failed to start with {failed}")
         updated = LensInstance(
             process=process,
             lens_params=instance.lens_params,

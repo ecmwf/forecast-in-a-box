@@ -52,15 +52,18 @@ class NoFreePortsException(Exception):
     """Raised when no ports are available in the FreePortsManager pool."""
 
 
+# TODO utilize more across the codebase
 class FreePortsManager:
     """Manages a pool of ports available for assignment to external processes."""
 
+    # NOTE maybe a list would be better, and go cyclically -- should behave better wrt recyclation
     free_ports: set[int] = set(range(19000, 19100))
     lock: threading.Lock = threading.Lock()
 
     @staticmethod
     def claim_port() -> int:
         """Claim a free port from the pool. Raises NoFreePortsException if no ports are available."""
+        # TODO some simple bind test here, loop and return
         with timed_acquire(FreePortsManager.lock, 1) as acquired:
             if not acquired:
                 raise TimeoutError("FreePortsManager lock could not be acquired")
