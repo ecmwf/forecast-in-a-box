@@ -38,20 +38,22 @@ logger = logging.getLogger(__name__)
 GatewayProcess = NewType("GatewayProcess", BaseProcess)
 
 
-def cleanup_gw(process: GatewayProcess) -> None:
+def cleanup_gw(process: GatewayProcess | None) -> None:
     pass
 
 
-def kill_gw(process: GatewayProcess) -> None:
+def kill_gw(process: GatewayProcess | None) -> None:
     logger.debug("gateway shutdown message")
     m = api.ShutdownRequest()
     client.request_response(m, config.cascade.cascade_url, 4_000)
     logger.debug("gateway terminate and join")
-    process.terminate()
-    process.join(1)
-    if process.exitcode is None:
-        logger.debug("gateway kill")
-        process.kill()
+
+    if process is not None:
+        process.terminate()
+        process.join(1)
+        if process.exitcode is None:
+            logger.debug("gateway kill")
+            process.kill()
 
 
 def launch_cascade(cascade_url: str, log_base: str | None, max_concurrent_jobs: int | None) -> None:
@@ -112,20 +114,33 @@ async def start_gateway() -> str:
     return "started"
 
 
+def _check_gateway_running() -> tuple[bool, int | None]:
+    if "localhost" not in config.cascade.cascade_url:
+        m = api.JobProgressRequest(job_ids=[])
+        response = client.request_response(m, config.cascade.cascade_url)
+        return response.error is None, response.error  # type: ignore[reportAttributeAccessIssue]
+    return (
+        Globals.gateway is not None and Globals.gateway.exitcode is None,
+        Globals.gateway.exitcode if Globals.gateway is not None else None,
+    )
+
+
 @router.get("/status")
 async def get_status() -> str:
     """Get the status of the Cascade Gateway process."""
-    if Globals.gateway is None:
-        return "not started"
-    elif Globals.gateway.exitcode is not None:
-        return f"exited with {Globals.gateway.exitcode}"
+    status, exitcode = _check_gateway_running()
+    if not status:
+        logger.warning(f"gateway not running, exit code: {exitcode}")
+        return "not running"
     else:
         return StatusMessage.gateway_running
 
 
 @router.post("/kill")
 async def kill_gateway() -> str:
-    if Globals.gateway is None or Globals.gateway.exitcode is not None:
+    status, exitcode = _check_gateway_running()
+    if not status:
+        logger.warning(f"gateway not running, exit code: {exitcode}")
         return "not running"
     else:
         # TODO spawn as async task? This blocks... but we'd need to lock

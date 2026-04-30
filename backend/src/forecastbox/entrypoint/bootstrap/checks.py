@@ -58,10 +58,8 @@ def check_backend_ready(
     try:
         with httpx.Client() as client:
             _wait_for(client, config.api.local_url() + "/api/v1/status", attempts, _call_succ)
-            if spawn_gateway and "localhost" in config.cascade.cascade_url:
+            if spawn_gateway:
                 client.post(config.api.local_url() + "/api/v1/gateway/start").raise_for_status()
-            elif spawn_gateway:
-                logger.warning("configured to spawn gateway, but cascade url is not localhost -- skipping gateway startup")
             gw_check = lambda resp, _: resp.raise_for_status().text == f'"{StatusMessage.gateway_running}"'
             _wait_for(client, config.api.local_url() + "/api/v1/gateway/status", attempts, gw_check)
     except StartupError as e:

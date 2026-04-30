@@ -55,6 +55,8 @@ def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
         handle = ChildProcessGroup([])
         spawn_gateway = False
 
+    spawn_gateway = spawn_gateway and "localhost" in config.cascade.cascade_url
+
     check_backend_ready(config, handle, attempts, spawn_gateway)
     if should_install_default_plugin():
         install_default_plugins(config)
