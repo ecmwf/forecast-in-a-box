@@ -912,8 +912,8 @@ def test_run_output_content(tmpdir: Any, backend_client_with_auth: httpx.Client)
     if sys.platform == "darwin":
         # Re-fetch without an extended timeout to confirm the import delay was a one-off
         content_resp2 = backend_client_with_auth.get("/run/outputContent", params={"run_id": run_id, "dataset_id": sink_file_task_id})
-        assert content_resp.headers.get("content-type", "").startswith("text/plain")
-        assert content_resp.content.decode("ascii").startswith("file://")
+        assert content_resp2.headers.get("content-type", "").startswith("text/plain")
+        assert content_resp2.content.decode("ascii").startswith("file://")
 
     image_resp = backend_client_with_auth.get(
         "/run/outputContent",
