@@ -1,7 +1,7 @@
 FROM eccr.ecmwf.int/mars/stable-rocky9
 
 # 1. Install base packages
-RUN dnf install -y epel-release dnf-plugins-core firewalld iproute && \
+RUN dnf install -y epel-release dnf-plugins-core firewalld iproute gdal-devel libgfortran && \
     dnf clean all
 
 # Set the working directory in the container

@@ -13,8 +13,6 @@ services:
       - "8000:8000"
     environment:
       fiab__API__DATA_PATH: "/app/data_dir/"
-      fiab__API__MODEL_REPOSITORY: https://sites.ecmwf.int/repository/fiab/
-
       fiab__AUTH__PUBLIC_URL: ???
 
       ECMWF_API_URL: "https://api.ecmwf.int/v1"

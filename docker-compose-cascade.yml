@@ -14,9 +14,9 @@ services:
       dockerfile: Dockerfile
     entrypoint: "python -m cascade.gateway tcp://0.0.0.0:8067 --max_jobs 1"
     environment:
-      EARTHKIT_DATA_USER_CACHE_DIRECTORY: "/app/data_dir/user_cache"
-      EARTHKIT_DATA_MAXIMUM_CACHE_SIZE: "50GB"
+      EARTHKIT_DATA_USER_CACHE_DIRECTORY: /app/data_dir/earthkit_cache
       EARTHKIT_DATA_CACHE_POLICY: "user"
+
       ANEMOI_INFERENCE_NUM_CHUNKS: 4
     shm_size: '5gb'
     networks:
@@ -25,6 +25,7 @@ services:
       - "48165:48165"
     volumes:
       - data:/app/data_dir
+      - ~/fiab:/root/.fiab
       - ~/.ecmwfapirc:/root/.ecmwfapirc:ro
     deploy:
       resources:

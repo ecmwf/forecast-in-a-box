@@ -1,9 +1,12 @@
 # Use an official lightweight Python image as the base
 # 3.11 required by mir
-FROM python:3.11-slim
+FROM python:3.12-slim
 
-# Install system deps
 ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt update && \
+    apt install -y --no-install-recommends git curl libgdal-dev libgfortran5 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory in the container
 WORKDIR /app/cascade
