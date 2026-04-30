@@ -18,16 +18,16 @@ from pyrsistent import pmap
 
 from forecastbox.domain.lens.manager import (
     LensInstance,
+    LensInstanceDetail,
     LensInstanceId,
     LensInstanceManager,
-    LensStatus,
     _compute_status,
     get_status,
     list_instances,
-    shutdown_all_instances,
+    shutdown_all_lens_instances,
     stop_instance,
 )
-from forecastbox.utility.concurrent import FreePortsManager
+from forecastbox.utility.concurrent import FreePortsManager, NoFreePortsException
 
 
 @pytest.fixture(autouse=True)
@@ -91,7 +91,7 @@ class TestGetStatus:
         instance = _make_instance(process=None)
         LensInstanceManager.instances = pmap({iid: instance})
         result = get_status(iid)
-        assert isinstance(result, LensStatus)
+        assert isinstance(result, LensInstanceDetail)
         assert result.status == "starting"
 
 
@@ -185,7 +185,7 @@ class TestShutdownAllInstances:
             }
         )
         FreePortsManager.free_ports = set()
-        shutdown_all_instances()
+        shutdown_all_lens_instances()
         assert LensInstanceManager.instances == pmap()
 
     def test_continues_after_individual_failure(self) -> None:
@@ -209,7 +209,7 @@ class TestShutdownAllInstances:
             original_stop(iid)
 
         with patch("forecastbox.domain.lens.manager.stop_instance", side_effect=flaky_stop):
-            shutdown_all_instances()  # should not raise
+            shutdown_all_lens_instances()  # should not raise
 
 
 class TestFreePortsManager:
@@ -221,7 +221,7 @@ class TestFreePortsManager:
 
     def test_claim_raises_when_empty(self) -> None:
         FreePortsManager.free_ports = set()
-        with pytest.raises(KeyError):
+        with pytest.raises(NoFreePortsException):
             FreePortsManager.claim_port()
 
     def test_release_adds_port_back(self) -> None:

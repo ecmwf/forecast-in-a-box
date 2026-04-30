@@ -15,10 +15,12 @@ against Run outputs. Routes cover: start, status, stop, list, and supported lens
 """
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
 from forecastbox.domain.lens.manager import (
+    LensInstanceDetail,
     LensInstanceId,
     LensStatus,
     get_status,
@@ -26,6 +28,7 @@ from forecastbox.domain.lens.manager import (
     start_skinny_wms,
     stop_instance,
 )
+from forecastbox.utility.concurrent import NoFreePortsException
 from forecastbox.utility.pydantic import FiabBaseModel
 
 PREFIX = "/api/v1/lens"
@@ -38,7 +41,26 @@ router = APIRouter(
 )
 
 
-class LensDetail(FiabBaseModel):
+class LensInstanceDetailResponse(FiabBaseModel):
+    """API response model for a lens instance detail. Mirrors LensInstanceDetail fields
+    to decouple the public contract from internal domain refactoring."""
+
+    status: LensStatus
+    lens_name: str
+    lens_params: dict[str, Any]
+    ports: set[int]
+
+    @classmethod
+    def from_detail(cls, detail: LensInstanceDetail) -> "LensInstanceDetailResponse":
+        return cls(
+            status=detail.status,
+            lens_name=detail.lens_name,
+            lens_params=detail.lens_params,
+            ports=detail.ports,
+        )
+
+
+class SupportedLensDetail(FiabBaseModel):
     name: str
     route: str
     params: dict[str, str]
@@ -49,17 +71,17 @@ def start_skinny_wms_endpoint(local_path: str) -> LensInstanceId:
     """Start a skinnyWMS lens instance serving data from the given local path."""
     try:
         return start_skinny_wms(local_path)
-    except KeyError:
+    except NoFreePortsException:
         raise HTTPException(status_code=503, detail="No free ports available for a new lens instance")
     except TimeoutError:
         raise HTTPException(status_code=503, detail="Lens manager is busy")
 
 
 @router.get("/status")
-def get_lens_status(lens_instance_id: LensInstanceId) -> LensStatus:
+def get_lens_status(lens_instance_id: LensInstanceId) -> LensInstanceDetailResponse:
     """Get the status of a lens instance."""
     try:
-        return get_status(lens_instance_id)
+        return LensInstanceDetailResponse.from_detail(get_status(lens_instance_id))
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Lens instance {lens_instance_id!r} not found")
 
@@ -77,16 +99,16 @@ def stop_lens(lens_instance_id: LensInstanceId) -> str:
 
 
 @router.get("/list")
-def list_lenses() -> list[tuple[LensInstanceId, LensStatus]]:
+def list_lenses() -> list[tuple[LensInstanceId, LensInstanceDetailResponse]]:
     """List all active lens instances with their current status."""
-    return list_instances()
+    return [(iid, LensInstanceDetailResponse.from_detail(detail)) for iid, detail in list_instances()]
 
 
 @router.get("/supported")
-def list_supported_lenses() -> list[LensDetail]:
+def list_supported_lenses() -> list[SupportedLensDetail]:
     """List all supported lens types with their start route and parameters."""
     return [
-        LensDetail(
+        SupportedLensDetail(
             name="skinnyWMS",
             route=f"{PREFIX}/start/skinnyWMS",
             params={"local_path": "Absolute path to the data directory or file to serve"},

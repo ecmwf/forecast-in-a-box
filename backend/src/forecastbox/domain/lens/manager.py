@@ -28,21 +28,23 @@ from cascade.low.func import assert_never
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
-from forecastbox.utility.concurrent import FreePortsManager, shutdown_popen, timed_acquire
+from forecastbox.utility.concurrent import FreePortsManager, NoFreePortsException, shutdown_popen, timed_acquire
 from forecastbox.utility.pydantic import FiabBaseModel
 
 logger = logging.getLogger(__name__)
 
 LensInstanceId = NewType("LensInstanceId", str)
 LensName = Literal["skinnyWMS"]
+LensStatus = Literal["starting", "running", "terminated", "failed"]
 
 timeout_acquire = 1
 
 
-class LensStatus(FiabBaseModel):
-    status: Literal["starting", "running", "terminated", "failed"]
+class LensInstanceDetail(FiabBaseModel):
+    status: LensStatus
     lens_name: LensName
     lens_params: dict[str, Any]
+    ports: set[int]
 
 
 @dataclass
@@ -58,10 +60,11 @@ class LensInstanceManager:
     instances: PMap[LensInstanceId, LensInstance] = pmap()
 
 
-def _compute_status(instance: LensInstance) -> LensStatus:
+def _compute_status(instance: LensInstance) -> LensInstanceDetail:
+    status: LensStatus
     if instance.lens_name == "skinnyWMS":
         if instance.process is None:
-            status: Literal["starting", "running", "terminated", "failed"] = "starting"
+            status = "starting"
         elif instance.process.poll() is None:
             status = "running"
         elif instance.process.returncode == 0:
@@ -71,7 +74,7 @@ def _compute_status(instance: LensInstance) -> LensStatus:
     else:
         assert_never(instance.lens_name)
 
-    return LensStatus(status=status, lens_name=instance.lens_name, lens_params=instance.lens_params)
+    return LensInstanceDetail(status=status, lens_name=instance.lens_name, lens_params=instance.lens_params, ports=instance.ports)
 
 
 def start_skinny_wms(local_path: str) -> LensInstanceId:
@@ -127,7 +130,7 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
     return instance_id
 
 
-def get_status(instance_id: LensInstanceId) -> LensStatus:
+def get_status(instance_id: LensInstanceId) -> LensInstanceDetail:
     """Return the status of a lens instance. Raises KeyError if not found."""
     instance = LensInstanceManager.instances.get(instance_id)
     if instance is None:
@@ -135,7 +138,7 @@ def get_status(instance_id: LensInstanceId) -> LensStatus:
     return _compute_status(instance)
 
 
-def list_instances() -> list[tuple[LensInstanceId, LensStatus]]:
+def list_instances() -> list[tuple[LensInstanceId, LensInstanceDetail]]:
     """Return all lens instances with their current status. Lock-free read."""
     instances = LensInstanceManager.instances
     return [(iid, _compute_status(inst)) for iid, inst in instances.items()]
@@ -164,7 +167,7 @@ def stop_instance(instance_id: LensInstanceId) -> None:
                 FreePortsManager.release_port(port)
 
 
-def shutdown_all_instances() -> None:
+def shutdown_all_lens_instances() -> None:
     """Stop all running lens instances. Used during application shutdown."""
     instances = LensInstanceManager.instances
     for instance_id in list(instances.keys()):

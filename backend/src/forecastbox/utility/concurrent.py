@@ -48,6 +48,10 @@ def delayed_thread(future: Future[Any], fn: Callable[..., Any], args: Sequence[A
     return threading.Thread(target=_target)
 
 
+class NoFreePortsException(Exception):
+    """Raised when no ports are available in the FreePortsManager pool."""
+
+
 class FreePortsManager:
     """Manages a pool of ports available for assignment to external processes."""
 
@@ -56,14 +60,20 @@ class FreePortsManager:
 
     @staticmethod
     def claim_port() -> int:
-        """Claim a free port from the pool. Raises KeyError if no ports are available."""
-        with FreePortsManager.lock:
+        """Claim a free port from the pool. Raises NoFreePortsException if no ports are available."""
+        with timed_acquire(FreePortsManager.lock, 1) as acquired:
+            if not acquired:
+                raise TimeoutError("FreePortsManager lock could not be acquired")
+            if not FreePortsManager.free_ports:
+                raise NoFreePortsException("No free ports available in the pool")
             return FreePortsManager.free_ports.pop()
 
     @staticmethod
     def release_port(port: int) -> None:
         """Return a port to the pool."""
-        with FreePortsManager.lock:
+        with timed_acquire(FreePortsManager.lock, 1) as acquired:
+            if not acquired:
+                raise TimeoutError("FreePortsManager lock could not be acquired")
             FreePortsManager.free_ports.add(port)
 
 
@@ -80,7 +90,7 @@ def shutdown_correctly(process: BaseProcess) -> None:
         process.join(3)
 
 
-def shutdown_popen(process: "subprocess.Popen[bytes]") -> None:
+def shutdown_popen(process: subprocess.Popen[bytes]) -> None:
     """Gracefully shut down a subprocess.Popen (started with start_new_session=True): SIGINT group -> terminate -> kill."""
     if process.poll() is None:
         try:
