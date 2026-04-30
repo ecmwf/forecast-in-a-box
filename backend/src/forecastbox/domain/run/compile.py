@@ -72,7 +72,7 @@ def _get_artifacts_list(graph: Graph) -> list[CompositeArtifactId]:
 def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -> tuple[ExecutionSpecification, RunOutputs]:
     """Compile a BlueprintBuilder into an ExecutionSpecification and RunOutputs.
 
-    Raises ``ValueError`` if any block cannot be compiled. When ``glyph_values`` is
+    Raises ``ValueError`` if any block cannot be validated/compiled. When ``glyph_values`` is
     non-empty, ${glyph} patterns in configuration values are resolved before compilation.
 
     Sets ``job_instance.ext_outputs`` to the authoritative list of cascade external
@@ -96,18 +96,19 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
             raise ValueError(f"compile failed at {blockId=} with {result.e}")
         action_lookup[blockId] = result.t
 
-        # Validate to determine the block's output type (for sink mime_type derivation).
-        # Use only available upstream outputs; a missing upstream means the validator may
-        # receive an incomplete inputs dict, but sink validators typically ignore inputs.
+        # TODO we run validation again just to get the block outputs, to determine mime types
+        # This wasteful and redundant, ideally we'd return block output in the compile.
+        # At this stage the validation should pass, but we still approach it defensively
         validator_inputs = {
             input_name: block_outputs[source_id] for input_name, source_id in blockInstance.input_ids.items() if source_id in block_outputs
         }
         try:
             validated = plugin.validator(blockInstance, validator_inputs)
-            if validated.t is not None:
-                block_outputs[blockId] = validated.t
-        except Exception:
-            pass  # Validator failure does not abort compilation; provenance falls back to defaults
+            if validated.t is None:
+                raise ValueError(f"compile failed at {blockId=} with {validated.e}")
+            block_outputs[blockId] = validated.t
+        except Exception as e:
+            raise ValueError(f"compile failed at {blockId=} with {e}")
 
         block_factory = plugin.catalogue.factories[blockInstance.factory_id.factory]
         if block_factory.kind == "sink":
@@ -116,6 +117,7 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
             if not isinstance(block_output, NoOutput):
                 mime_type = block_output.mime_type if isinstance(block_output, RawOutput) else "application/octet-stream"
                 for node in sink_graph.sinks:
+                    # TODO this may not be relevant anymore -- verify on real workflows
                     if node.name.startswith("run_as_earthkit"):
                         continue
                     task_id = cast(TaskId, node.name)  # TODO hack -- expose a proper interface for the name→taskId conversion in cascade
@@ -125,11 +127,7 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
     graph = deduplicate_nodes(graph)
     job_instance = graph2job(graph)
 
-    # ext_outputs is derived from fable-level sink blocks (kind=="sink"), not from
-    # cascade's graph-theory sinks. A fable sink block may have cascade descendants
-    # (e.g. run_as_earthkit wrappers) and would not appear in views.sinks(), yet it
-    # must still be exposed as an external output.
-    job_instance.ext_outputs = [DatasetId(task=task_id, output="0") for task_id in sink_task_to_block]
+    job_instance.ext_outputs = [dataset_id for task_id in sink_task_to_block for dataset_id in job_instance.outputs_of(task_id)]
 
     run_outputs: dict[TaskId, RunOutputCharacteristic] = {
         task_id: RunOutputCharacteristic(original_block=block_id, mime_type=mime_type)
