@@ -73,7 +73,7 @@ def get_environment(composite_id: CompositeArtifactId) -> list[str]:
 
 def validate_anemoi_block(block: BlockInstance) -> Either[QubedOutput, Error]:  # type:ignore[invalid-argument] # semigroup
     """Validate common Anemoi block configuration, returning the base QubedOutput on success."""
-    if not isinstance(block.configuration_values["checkpoint"], str):
+    if not block.configuration_values["checkpoint"]:
         return Either.error("Checkpoint must be given")
 
     if not block.configuration_values["lead_time"].isdigit():  # type: ignore
