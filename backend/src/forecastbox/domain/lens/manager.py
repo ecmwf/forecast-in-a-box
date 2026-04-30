@@ -100,8 +100,8 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
             raise TimeoutError("Failed to acquire lens manager lock")
         LensInstanceManager.instances = LensInstanceManager.instances.set(instance_id, instance)
 
-    cmd = ["uv", "run", "skinny-wms", "--path", local_path]
-    env = {**os.environ, "SKINNYWMS_PORT": str(port), "SKINNYWMS_HOST": "127.0.0.1"}
+    cmd = ["uv", "run", "gunicorn", "--bind", f"0.0.0.0:{port}", "skinnywms.wmssvr:application"]
+    env = {**os.environ, "SKINNYWMS_DATA_PATH": local_path}
     process: subprocess.Popen[bytes] = subprocess.Popen(
         cmd,
         env=env,
