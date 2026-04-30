@@ -4,14 +4,13 @@
 """
 
 import logging
-import os
-import signal
 from dataclasses import dataclass
 from multiprocessing import connection
 from multiprocessing.process import BaseProcess
-from typing import cast
 
 import psutil
+
+from forecastbox.utility.concurrent import shutdown_correctly
 
 logger = logging.getLogger(__name__)
 
@@ -26,16 +25,7 @@ class ChildProcessGroup:
 
     def shutdown(self) -> None:
         for p in self.procs:
-            if p.is_alive():
-                # p.interrupt() # TODO after 3.14 add
-                os.kill(cast(int, p.pid), signal.SIGINT)
-                p.join(3)
-            if p.is_alive():
-                p.terminate()
-                p.join(3)
-            if p.is_alive():
-                p.kill()
-                p.join(3)
+            shutdown_correctly(p)
 
 
 def previous_cleanup() -> None:
