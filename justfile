@@ -1,11 +1,11 @@
 dbuild:
-    docker build -t fiab-be -f backend/Dockerfile backend
+    docker build -t forecast-in-a-box -f Dockerfile .
 
 drun-mongo:
     docker run --rm -it --network host mongo:8.0
 
 drun:
-    docker run --rm -it --network host --name fiab-be fiab-be
+    docker run --rm -it --network host --name forecast-in-a-box forecast-in-a-box
 
 fiabwheel:
     #!/usr/bin/env bash

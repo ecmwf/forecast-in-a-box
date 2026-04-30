@@ -2,120 +2,91 @@ You may want to consult the [c4 diagrams](./c4diagrams.md) to give you a better 
 
 After you are done with installation, you may want to visit [tuning and configuration](tuningAndConfiguration.md) as well.
 
-# Cluster/Cloud Setup
+# Standalone Setup
 
-TODO
+The recommended way to run Forecast-in-a-Box is via the self-bootstrapping launcher:
+
+```bash
+curl -LsSf https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/main/scripts/fiab.sh > fiab.sh
+chmod +x fiab.sh
+./fiab.sh
+```
+
+This handles uv, Python, dependencies, and launches both the backend and cascade automatically.
 
 # Docker Setup
-## Developer Setup, with Docker
 
-Installation:
+A single Docker image bundles the frontend, backend, and cascade gateway together.
+
+## Quick start
+
+```bash
+docker compose up --build
+```
+
+This uses `docker-compose.yml` with the Debian-based `Dockerfile`. Cascade runs in-process -- no GPU, no separate container. Suitable for development and CPU-only deployments.
+
+## With a separate GPU cascade worker
+
+For GPU-accelerated inference, run cascade as a separate container:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose-cascade.yml up --build
+```
+
+This overrides the backend to point at an external cascade container with GPU access. The cascade container uses the `cascade/Dockerfile`.
+
+## EWC (ECMWF Cloud) deployment
+
+For ECMWF internal deployments with MARS access:
+
+```bash
+docker compose -f docker-compose-ewc.yml up --build
+```
+
+Uses the Rocky-based `DockerfileMARSRocky` and always runs cascade as a separate container with MARS DHS configuration.
+
+## Using prebuilt images
+
+Replace the `build` section with `image` in the compose file:
+
+```yaml
+services:
+  forecast-in-a-box:
+    image: ghcr.io/ecmwf/forecast-in-a-box/forecast-in-a-box:v0.4.0
+```
+
+## Compose file summary
+
+| File | Base image | Cascade | Use case |
+|------|-----------|---------|----------|
+| `docker-compose.yml` | Debian | In-process | Development, CPU-only |
+| `+ docker-compose-cascade.yml` | Debian | Separate GPU container | GPU inference |
+| `docker-compose-ewc.yml` | Rocky/MARS | Separate GPU container | ECMWF Cloud |
+
+## Environment variables
+
+Set ECMWF API credentials before running:
+
+```bash
+export ECMWF_API_KEY=<your key>
+export ECMWF_API_EMAIL=<your email>
+```
+
+Get your keys from [ECMWF API Key Management](https://api.ecmwf.int/v1/key/).
+
+# Developer Setup
+
+See [backend development](../../backend/development.md) and [frontend guidelines](../../frontend/GUIDELINES.md).
+
 ```bash
 # backend
-uv venv --seed ./
-uv pip install ./backend[all]
+cd backend
+uv sync --extra runtime --all-packages
+just dev
 
 # frontend
 cd frontend
-npm install yarn
-```
-
-Running the server:
-```bash
-cd frontend
-yarn dev
-
-cd backend
-uvicorn forecastbox.entrypoint:app --reload --log-level info
-python -m cascade.gateway tcp://localhost:8067
-```
-
-## User Setup, with Docker-compose
-
-To use the prebuilt containers use the following docker-compose file, otherwise the default
-in the repo will build.
-
-```yaml
-name: FIAB
-services:
-
-  frontend:
-    container_name: fiab-frontend
-    image: ghcr.io/ecmwf/forecast-in-a-box/frontend:latest
-    ports:
-      - "3000:3000"
-    networks:
-      - fiab-network
-
-  backend:
-    container_name: fiab-backend
-    image: ghcr.io/ecmwf/forecast-in-a-box/backend:latest
-    volumes:
-      - data:/app/data_dir
-      - ~/.ssh:/root/.ssh:ro
-      - ~/.ecmwfapirc:/root/.ecmwfapirc:ro
-    ports:
-      - "8000:8000"
-    depends_on:
-      - db
-    environment:
-      API__API_URL: "http://backend:8000"
-      API__DATA_PATH: "/app/data_dir"
-      API__MODEL_REPOSITORY: "https://sites.ecmwf.int/repository/fiab"
-      CASCADE__CASCADE_URL: "tcp://cascade:8067"
-      DB__MONGODB_URI: "mongodb://db:27017"
-      DB__MONGODB_DATABASE: "fiab"
-
-      ECMWF_API_URL: "https://api.ecmwf.int/v1"
-      ECMWF_API_KEY: ${ECMWF_API_KEY}
-      ECMWF_API_EMAIL: ${ECMWF_API_EMAIL}
-
-      FIAB_INSTALL_TYPE: all
-    networks:
-      - fiab-network
-
-  cascade:
-    container_name: fiab-cascade
-    image: ghcr.io/ecmwf/forecast-in-a-box/cascade:latest
-    entrypoint: "python -m cascade.gateway tcp://0.0.0.0:8067"
-    networks:
-      - fiab-network
-    ports:
-      - "48165:48165"
-    shm_size: '5gb'
-    volumes:
-      - data:/app/data_dir
-      - ~/.ssh:/root/.ssh:ro
-      - ~/.ecmwfapirc:/root/.ecmwfapirc:ro
-
-    # Change depending on the GPU Resources available
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-
-  db:
-    container_name: fiab-db
-    image: mongo:8.0
-    networks:
-      - fiab-network
-
-networks:
-  fiab-network:
-    driver: bridge
-
-volumes:
-  data:
-
-```
-
-Set the ecmwf-api-client keys from [ECMWF API Key Management](https://api.ecmwf.int/v1/key/) as env vars.
-
-Then:
-
-```bash
-docker-compose up --build
+npm install
+npm run dev
 ```
