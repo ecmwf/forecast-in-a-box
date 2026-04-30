@@ -33,8 +33,7 @@ def make_block(factory: str, config: dict, input_ids: dict | None = None) -> Blo
 def mock_anemoi_utils() -> Generator[None, None, None]:
     """Patch get_metadata and expansion_qube so validate_anemoi_block can complete successfully."""
     with (
-        patch("fiab_plugin_ecmwf.anemoi.utils.get_metadata", return_value=MagicMock()),
-        patch("fiab_plugin_ecmwf.anemoi.utils.expansion_qube_from_metadata", return_value=DUMMY_QUBE),
+        patch("fiab_plugin_ecmwf.anemoi.utils.get_model_output", return_value=QubedOutput(dataqube=DUMMY_QUBE)),
     ):
         yield
 
