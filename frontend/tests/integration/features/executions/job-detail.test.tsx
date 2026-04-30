@@ -180,4 +180,26 @@ describe('ExecutionDetailPage Integration', () => {
         .toBeVisible()
     })
   })
+
+  describe('outputs panel', () => {
+    it('shows available output count for completed job with outputs', async () => {
+      const screen = await renderDetailPage('job-completed-001')
+      // job-completed-001 has 3 available outputs (task-out-1, task-out-2, task-out-3)
+      await expect.element(screen.getByText(/Generated: 3/)).toBeVisible()
+    })
+
+    it('shows no outputs message for running job with no available outputs', async () => {
+      const screen = await renderDetailPage('job-running-002')
+      await expect
+        .element(screen.getByText('No outputs available yet'))
+        .toBeVisible()
+    })
+
+    it('shows no outputs message for submitted job with null outputs', async () => {
+      const screen = await renderDetailPage('job-submitted-004')
+      await expect
+        .element(screen.getByText('No outputs available yet'))
+        .toBeVisible()
+    })
+  })
 })

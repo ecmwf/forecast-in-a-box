@@ -32,7 +32,7 @@ from forecastbox.domain.glyphs.resolution import (
     merge_glyph_values,
 )
 from forecastbox.domain.run import db
-from forecastbox.domain.run.cascade import ExecutionSpecification, execute_cascade
+from forecastbox.domain.run.cascade import execute_cascade
 from forecastbox.domain.run.compile import compile_builder, resolve_intrinsic_glyph_values
 from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.types import RunId
@@ -98,7 +98,7 @@ def execute_background(
         relevant_glyphs_and_values = expand_glyph_values(all_glyphs_raw, roots=referenced_glyph_names)
         used_glyphs = {k: all_glyphs_raw[k] for k in relevant_glyphs_and_values.keys() if k not in PINNED_INTRINSIC_KEYS}
 
-        exec_spec = compile_builder(builder, relevant_glyphs_and_values)
+        exec_spec, run_outputs = compile_builder(builder, relevant_glyphs_and_values)
 
         persisted_context = compiler_runtime_context.model_copy(update={"glyphs": used_glyphs})
         run_async(
@@ -110,7 +110,7 @@ def execute_background(
             )
         )
 
-        response, product_to_id_mappings = execute_cascade(exec_spec)
+        response = execute_cascade(exec_spec)
         cascade_job_id = response.job_id or str(uuid.uuid4())
 
         update_kwargs: dict[str, object] = {"cascade_job_id": cascade_job_id}
@@ -118,7 +118,7 @@ def execute_background(
             update_kwargs["status"] = "failed"
             update_kwargs["error"] = response.error[:255]
         else:
-            update_kwargs["outputs"] = [x.model_dump() for x in product_to_id_mappings]
+            update_kwargs["outputs"] = run_outputs.model_dump()
         run_async(db.update_run_runtime(run_id, attempt_count, **update_kwargs))
 
     except Exception as e:

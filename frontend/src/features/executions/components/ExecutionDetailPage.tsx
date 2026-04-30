@@ -208,7 +208,11 @@ export function ExecutionDetailPage() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="outputs">
-          <OutputsPanel jobId={jobId} status={jobData.status} />
+          <OutputsPanel
+            jobId={jobId}
+            status={jobData.status}
+            outputs={jobData.outputs}
+          />
         </TabsContent>
         <TabsContent value="logs">
           <LogsPanel jobId={jobId} status={jobData.status} />

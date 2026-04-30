@@ -63,20 +63,6 @@ impl FiabClient {
         Ok(())
     }
 
-    pub async fn get_run_output_availability(
-        &self,
-        run_id: &str,
-        attempt_count: u32,
-    ) -> Result<Vec<String>, FiabError> {
-        let resp = self
-            .execute(
-                self.get("/run/outputAvailability")
-                    .query(&[("run_id", run_id), ("attempt_count", &attempt_count.to_string())]),
-            )
-            .await?;
-        resp.json::<Vec<String>>().await.map_err(FiabError::Network)
-    }
-
     pub async fn get_run_output_content(
         &self,
         run_id: &str,

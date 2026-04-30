@@ -286,7 +286,9 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
 
     builder = BlueprintBuilder(blocks=blocks)
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
-    assert len(response.json()["possible_expansions"]["sink_file"]) == 0
+    expected_expansion = [{"factory": "sink_file", "plugin": {"local": "single", "store": "localTest"}}]
+    # NOTE this looks odd but sink_file produces the url of the file, and that url is a text which can again be written to a file
+    assert response.json()["possible_expansions"]["sink_file"] == expected_expansion, "sink_file should expand only to sink_file"
     assert len(response.json()["block_errors"]) == 0
     glyphs_resp = backend_client_with_auth.get("/blueprint/glyphs/list", params={"glyph_type": "intrinsic"})
     assert glyphs_resp.is_success, glyphs_resp.text
@@ -386,9 +388,11 @@ def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Cl
     assert _time_parts_r[2] == "initial_value"
     assert _time_parts_r[3] == "local_glyph_value"
 
-    avail_resp = backend_client_with_auth.get("/run/outputAvailability", params={"run_id": run_id})
-    assert avail_resp.is_success, avail_resp.text
-    available_tasks = avail_resp.json()
+    get_resp = backend_client_with_auth.get("/run/get", params={"run_id": run_id})
+    assert get_resp.is_success, get_resp.text
+    run_detail = get_resp.json()
+    assert run_detail["outputs"] is not None
+    available_tasks = [task_id for task_id, char in run_detail["outputs"]["outputs"].items() if char["is_available"]]
     assert isinstance(available_tasks, list)
     assert len(available_tasks) > 0
 
@@ -867,9 +871,12 @@ def test_run_output_content(tmpdir: Any, backend_client_with_auth: httpx.Client)
 
     ensure_completed_v2(backend_client_with_auth, run_id, sleep=1, attempts=120)
 
-    avail_resp = backend_client_with_auth.get("/run/outputAvailability", params={"run_id": run_id})
-    assert avail_resp.is_success, avail_resp.text
-    available_tasks = avail_resp.json()
+    get_resp = backend_client_with_auth.get("/run/get", params={"run_id": run_id})
+    assert get_resp.is_success, get_resp.text
+    run_detail = get_resp.json()
+    assert run_detail["outputs"] is not None
+    output_entries = run_detail["outputs"]["outputs"]
+    available_tasks = [task_id for task_id, char in output_entries.items() if char["is_available"]]
     assert len(available_tasks) > 0
 
     # Cascade only exposes sink tasks as ext_outputs; our blueprint has two sinks.
@@ -883,6 +890,14 @@ def test_run_output_content(tmpdir: Any, backend_client_with_auth: httpx.Client)
     assert len(sink_image_tasks) == 1, f"Expected exactly one sink_image task, got: {available_tasks}"
     sink_image_task_id = sink_image_tasks[0]
 
+    # Verify original_block points to the correct block instance IDs from the blueprint
+    assert output_entries[sink_file_task_id]["original_block"] == "my_sink"
+    assert output_entries[sink_image_task_id]["original_block"] == "my_image_sink"
+
+    # Verify declared mime_type matches the actual content-type returned by outputContent
+    assert output_entries[sink_file_task_id]["mime_type"] == "text/plain"
+    assert output_entries[sink_image_task_id]["mime_type"] == "image/png"
+
     content_resp = backend_client_with_auth.get(
         "/run/outputContent",
         params={"run_id": run_id, "dataset_id": sink_file_task_id},
@@ -890,14 +905,15 @@ def test_run_output_content(tmpdir: Any, backend_client_with_auth: httpx.Client)
         timeout=40.0 if sys.platform == "darwin" else None,
     )
     assert content_resp.is_success, content_resp.text
-    assert content_resp.headers.get("content-type", "").startswith("application/clpkl")
-    assert cloudpickle.loads(content_resp.content) == "ok"
+    # The backend may add charset to text/plain; use startswith for robustness
+    assert content_resp.headers.get("content-type", "").startswith("text/plain")
+    assert content_resp.content.decode("ascii").startswith("file://")
 
     if sys.platform == "darwin":
         # Re-fetch without an extended timeout to confirm the import delay was a one-off
         content_resp2 = backend_client_with_auth.get("/run/outputContent", params={"run_id": run_id, "dataset_id": sink_file_task_id})
-        assert content_resp2.is_success, content_resp2.text
-        assert cloudpickle.loads(content_resp2.content) == "ok"
+        assert content_resp2.headers.get("content-type", "").startswith("text/plain")
+        assert content_resp2.content.decode("ascii").startswith("file://")
 
     image_resp = backend_client_with_auth.get(
         "/run/outputContent",

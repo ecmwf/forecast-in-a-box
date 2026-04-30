@@ -1,6 +1,6 @@
 use comfy_table::{Cell, Table};
 use fiab_lib_client::models::{
-    run::RunDetailResponse,
+    run::{RunDetailResponse, RunOutputsWrapper},
     schedule::{NextRunResponse, ScheduleDetail},
     status::StatusResponse,
     workflow::WorkflowDetail,
@@ -91,6 +91,45 @@ pub fn render_run_detail(r: &RunDetailResponse, json: bool) {
     if let Some(ref c) = r.cascade_job_id {
         println!("cascade_job_id:    {}", c);
     }
+    if let Some(ref o) = r.outputs {
+        let total = o.outputs.len();
+        let available = o.outputs.values().filter(|v| v.is_available).count();
+        println!("outputs:           {}/{} available", available, total);
+    }
+}
+
+pub fn render_run_outputs(r: &RunDetailResponse, json: bool) {
+    if json {
+        let val = r.outputs.as_ref().map(|o| {
+            serde_json::to_value(o).unwrap()
+        }).unwrap_or(serde_json::Value::Null);
+        println!("{}", serde_json::to_string_pretty(&val).unwrap());
+        return;
+    }
+    match &r.outputs {
+        None => println!("No outputs yet (run not yet submitted to cascade)."),
+        Some(wrapper) => render_outputs_table(wrapper),
+    }
+}
+
+fn render_outputs_table(wrapper: &RunOutputsWrapper) {
+    if wrapper.outputs.is_empty() {
+        println!("No outputs.");
+        return;
+    }
+    let mut table = Table::new();
+    table.set_header(vec!["Task ID", "MIME Type", "Block", "Available"]);
+    let mut rows: Vec<_> = wrapper.outputs.iter().collect();
+    rows.sort_by_key(|(k, _)| k.as_str());
+    for (task_id, info) in rows {
+        table.add_row(vec![
+            Cell::new(task_id),
+            Cell::new(&info.mime_type),
+            Cell::new(&info.original_block),
+            Cell::new(if info.is_available { "yes" } else { "no" }),
+        ]);
+    }
+    println!("{table}");
 }
 
 pub fn render_schedule_list(schedules: &[ScheduleDetail], json: bool) {
@@ -155,15 +194,5 @@ pub fn render_next_run(r: &NextRunResponse, json: bool) {
                 println!("Unknown: {}", s);
             }
         }
-    }
-}
-
-pub fn render_string_list(items: &[String], json: bool) {
-    if json {
-        println!("{}", serde_json::to_string_pretty(items).unwrap());
-        return;
-    }
-    for item in items {
-        println!("{}", item);
     }
 }

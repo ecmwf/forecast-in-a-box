@@ -11,7 +11,7 @@ import io
 import logging
 import time
 from pathlib import Path
-from typing import Any, Literal, Sequence
+from typing import Literal
 
 import cloudpickle
 import earthkit.data
@@ -19,8 +19,8 @@ import numpy as np
 import xarray as xr
 from cascade.gateway.api import JobSpec, ResultRetrievalResponse, SubmitJobRequest, SubmitJobResponse, decoded_result
 from cascade.gateway.client import request_response
-from cascade.low import views
-from cascade.low.core import JobInstance, JobInstanceRich
+from cascade.low.core import JobInstance, JobInstanceRich, TaskId
+from fiab_core.fable import BlockInstanceId
 from pydantic import Field
 
 from forecastbox.domain.artifact.manager import ArtifactManager, submit_artifact_download
@@ -85,14 +85,21 @@ def encode_result(result: ResultRetrievalResponse) -> tuple[bytes, str]:
     return cloudpickle.dumps(obj), "application/clpkl"
 
 
-class ProductToOutputId(FiabBaseModel):
-    product_name: str
-    product_spec: dict[str, Any]
-    output_ids: Sequence[str]
+class RunOutputCharacteristic(FiabBaseModel):
+    mime_type: str = "application/octet-stream"
+    original_block: BlockInstanceId
 
 
-def execute_cascade(spec: ExecutionSpecification) -> tuple[SubmitJobResponse, list[ProductToOutputId]]:
-    """Convert spec to JobInstance and submit to cascade api, returning response."""
+class RunOutputs(FiabBaseModel):
+    outputs: dict[TaskId, RunOutputCharacteristic]
+
+
+def execute_cascade(spec: ExecutionSpecification) -> SubmitJobResponse:
+    """Convert spec to JobInstance and submit to cascade api.
+
+    ``spec.job.job_instance.ext_outputs`` must already be set by the caller
+    (``compile_builder`` sets it as part of compilation).
+    """
     runtime_artifacts = spec.environment.runtime_artifacts
     if runtime_artifacts:
         missing_artifacts = [art for art in runtime_artifacts if art not in ArtifactManager.locally_available]
@@ -103,7 +110,7 @@ def execute_cascade(spec: ExecutionSpecification) -> tuple[SubmitJobResponse, li
             if result.e:
                 error_msg = f"Failed to submit download for {artifact_id}: {result.e}"
                 logger.error(error_msg)
-                return SubmitJobResponse(job_id=None, error=error_msg), []
+                return SubmitJobResponse(job_id=None, error=error_msg)
             download_ids.append(artifact_id)
 
         if download_ids:
@@ -120,15 +127,11 @@ def execute_cascade(spec: ExecutionSpecification) -> tuple[SubmitJobResponse, li
                 if time.time() - start_time > max_wait_seconds:
                     error_msg = "Timeout waiting for runtime artifacts to download"
                     logger.error(error_msg)
-                    return SubmitJobResponse(job_id=None, error=error_msg), []
+                    return SubmitJobResponse(job_id=None, error=error_msg)
 
                 time.sleep(1)
 
     job = spec.job.job_instance
-    sinks = views.sinks(job)
-    sinks = [s for s in sinks if not s.task.startswith("run_as_earthkit")]
-    job.ext_outputs = sinks
-    product_to_id_mappings = [ProductToOutputId(product_name="All Outputs", product_spec={}, output_ids=[x.task for x in sinks])]
 
     environment = spec.environment
     hosts = min(config.cascade.max_hosts, environment.hosts or config.cascade.default_hosts)
@@ -147,6 +150,6 @@ def execute_cascade(spec: ExecutionSpecification) -> tuple[SubmitJobResponse, li
     try:
         submit_job_response: SubmitJobResponse = request_response(r, f"{config.cascade.cascade_url}")  # type: ignore
     except Exception as e:
-        return SubmitJobResponse(job_id=None, error=repr(e)), []
+        return SubmitJobResponse(job_id=None, error=repr(e))
 
-    return submit_job_response, product_to_id_mappings
+    return submit_job_response

@@ -8,13 +8,10 @@
  * does it submit to any jurisdiction.
  */
 
-import { useEffect, useRef } from 'react'
 import { Package } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useQueryClient } from '@tanstack/react-query'
-import type { JobStatus } from '@/api/types/job.types'
+import type { JobStatus, RunOutputs } from '@/api/types/job.types'
 import { isTerminalStatus } from '@/api/types/job.types'
-import { jobKeys, useJobAvailable } from '@/api/hooks/useJobs'
 import { OutputCard } from '@/features/executions/components/OutputCard'
 import { P } from '@/components/base/typography'
 import { Card } from '@/components/ui/card'
@@ -22,28 +19,19 @@ import { Card } from '@/components/ui/card'
 interface OutputsPanelProps {
   jobId: string
   status: JobStatus
+  outputs: RunOutputs | null
 }
 
-export function OutputsPanel({ jobId, status }: OutputsPanelProps) {
+export function OutputsPanel({ jobId, status, outputs }: OutputsPanelProps) {
   const { t } = useTranslation('executions')
-  const { data: availableIds } = useJobAvailable(jobId, status)
-  const queryClient = useQueryClient()
 
-  // The polling loop stops the moment status turns terminal, so the last
-  // poll can still be an empty list if outputs hadn't been published yet.
-  // Force a final refetch on the transition so the user doesn't need to
-  // reload the page to see completed outputs.
-  const prevStatusRef = useRef(status)
-  useEffect(() => {
-    const wasNonTerminal = !isTerminalStatus(prevStatusRef.current)
-    const nowTerminal = isTerminalStatus(status)
-    if (wasNonTerminal && nowTerminal) {
-      queryClient.invalidateQueries({ queryKey: jobKeys.available(jobId) })
-    }
-    prevStatusRef.current = status
-  }, [status, jobId, queryClient])
+  const availableIds = outputs
+    ? Object.entries(outputs.outputs)
+        .filter(([, meta]) => meta.is_available)
+        .map(([taskId]) => taskId)
+    : []
 
-  const hasResults = availableIds && availableIds.length > 0
+  const hasResults = availableIds.length > 0
   const isRunning = !isTerminalStatus(status)
 
   if (!hasResults) {

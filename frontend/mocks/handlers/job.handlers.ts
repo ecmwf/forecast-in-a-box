@@ -19,7 +19,6 @@ import {
   deleteExecution,
   getAllExecutions,
   getExecution,
-  getJob,
   restartExecution,
 } from '../data/job.data'
 import type { JobExecuteRequest, JobStatus } from '@/api/types/job.types'
@@ -113,32 +112,6 @@ export const jobHandlers = [
     }
 
     return HttpResponse.json(result)
-  }),
-
-  http.get(API_ENDPOINTS.job.outputAvailability, async ({ request }) => {
-    await delay(150)
-
-    const url = new URL(request.url)
-    const executionId = url.searchParams.get('run_id')
-
-    if (!executionId) {
-      return HttpResponse.json(
-        { detail: 'Missing run_id parameter' },
-        { status: 400 },
-      )
-    }
-
-    const exec = getExecution(executionId)
-
-    if (!exec) {
-      return HttpResponse.json(
-        { detail: 'Execution not found' },
-        { status: 404 },
-      )
-    }
-
-    const job = getJob(executionId)
-    return HttpResponse.json(job?.available ?? [])
   }),
 
   http.get(API_ENDPOINTS.job.outputContent, async ({ request }) => {

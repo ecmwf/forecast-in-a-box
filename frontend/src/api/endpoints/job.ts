@@ -12,7 +12,6 @@
  * Job & Execution API Endpoints
  */
 
-import { z } from 'zod'
 import type {
   JobExecuteRequest,
   JobExecuteResponse,
@@ -81,13 +80,6 @@ export async function getJobStatus(runId: string): Promise<JobExecutionDetail> {
   return apiClient.get(API_ENDPOINTS.job.get, {
     params: { run_id: runId },
     schema: JobExecutionDetailSchema,
-  })
-}
-
-export async function getJobAvailable(runId: string): Promise<Array<string>> {
-  return apiClient.get(API_ENDPOINTS.job.outputAvailability, {
-    params: { run_id: runId },
-    schema: z.array(z.string()),
   })
 }
 

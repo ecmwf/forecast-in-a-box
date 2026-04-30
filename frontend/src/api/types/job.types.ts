@@ -40,6 +40,18 @@ export const JobExecuteResponseSchema = z.object({
   attempt_count: z.number(),
 })
 
+/** routes/run.py: RunOutputMetadata */
+export const RunOutputMetadataSchema = z.object({
+  mime_type: z.string(),
+  original_block: z.string(),
+  is_available: z.boolean(),
+})
+
+/** routes/run.py: RunOutputs */
+export const RunOutputsSchema = z.object({
+  outputs: z.record(z.string(), RunOutputMetadataSchema),
+})
+
 /** routes/run.py: JobExecutionDetail (status narrowed from str to known values) */
 export const JobExecutionDetailSchema = z.object({
   run_id: z.string(),
@@ -52,6 +64,7 @@ export const JobExecutionDetailSchema = z.object({
   error: z.string().nullable(),
   progress: z.string().nullable(),
   cascade_job_id: z.string().nullable(),
+  outputs: RunOutputsSchema.nullable(),
 })
 
 /** routes/run.py: JobExecutionList */
@@ -107,6 +120,8 @@ export function isTerminalStatus(status: JobStatus): boolean {
 
 export type ProductToOutputId = z.infer<typeof ProductToOutputIdSchema>
 export type JobExecuteResponse = z.infer<typeof JobExecuteResponseSchema>
+export type RunOutputMetadata = z.infer<typeof RunOutputMetadataSchema>
+export type RunOutputs = z.infer<typeof RunOutputsSchema>
 export type JobExecutionDetail = z.infer<typeof JobExecutionDetailSchema>
 export type JobExecutionList = z.infer<typeof JobExecutionListSchema>
 export type EnvironmentSpecification = z.infer<
