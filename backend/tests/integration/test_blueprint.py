@@ -653,6 +653,31 @@ def test_blueprint_composite_glyph_expand(tmpdir: Any, backend_client_with_auth:
     assert len(cyclic_data["global_errors"]) > 0
     assert any("circular" in err.lower() or "cycle" in err.lower() for err in cyclic_data["global_errors"])
 
+    # A local glyph whose value contains a jinja filter expression referencing an intrinsic
+    # glyph must be fully evaluated via expand_glyph_values (regression test for the
+    # fix that extended expand_glyph_values to handle jinja expressions, not just plain ${var}).
+    glyphs_resp2 = backend_client_with_auth.get("/blueprint/glyphs/list", params={"glyph_type": "intrinsic"})
+    assert glyphs_resp2.is_success, glyphs_resp2.text
+    submit_example = next(g["valueExample"] for g in glyphs_resp2.json()["glyphs"] if g["name"] == "submitDatetime")
+    # floor_day of the example value: strip time component
+    expected_floored = submit_example[:10] + " 00:00:00"
+    source_jinja = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_text")),
+        configuration_values={"text": "${jinjaFilterGlyph}"},
+        input_ids={},
+    )
+    builder_jinja = BlueprintBuilder(
+        blocks={BlockInstanceId("source_jinja"): source_jinja},
+        local_glyphs={"jinjaFilterGlyph": "${submitDatetime | floor_day}"},
+    )
+    response_jinja = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder_jinja.model_dump())
+    assert response_jinja.is_success, response_jinja.text
+    jinja_data = response_jinja.json()
+    assert len(jinja_data["global_errors"]) == 0, jinja_data["global_errors"]
+    assert len(jinja_data["block_errors"]) == 0, jinja_data["block_errors"]
+    resolved_jinja = jinja_data["resolved_configuration_options"]["source_jinja"]["text"]
+    assert resolved_jinja == expected_floored, f"Expected {expected_floored!r}, got {resolved_jinja!r}"
+
 
 def test_blueprint_jinja_interpolation_expand(backend_client_with_auth: httpx.Client) -> None:
     """Jinja interpolation is validated and resolved via the /expand endpoint.

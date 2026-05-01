@@ -258,6 +258,63 @@ def test_expand_roots_none_equivalent_to_no_roots() -> None:
 
 
 # ---------------------------------------------------------------------------
+# expand_glyph_values — jinja expression support (bug fix regression tests)
+# ---------------------------------------------------------------------------
+
+
+def test_expand_glyph_with_jinja_filter() -> None:
+    """A glyph value containing a jinja filter expression is fully evaluated.
+
+    Previously, expand_glyph_values used a regex that only matched ${word} and
+    skipped ${submitDatetime | floor_day}, leaving the raw string in the map.
+    """
+    glyphs = {"submitDatetime": "2024-01-15 06:00:00", "myDate": "${submitDatetime | floor_day}"}
+    result = expand_glyph_values(glyphs)
+    assert result["myDate"] == "2024-01-15 00:00:00"
+
+
+def test_expand_nested_glyph_with_jinja_filter() -> None:
+    """Transitive expansion works when an intermediate glyph contains a jinja filter."""
+    glyphs = {
+        "submitDatetime": "2024-01-15 06:00:00",
+        "baseDate": "${submitDatetime | floor_day}",
+        "path": "${baseDate}/output",
+    }
+    result = expand_glyph_values(glyphs)
+    assert result["baseDate"] == "2024-01-15 00:00:00"
+    assert result["path"] == "2024-01-15 00:00:00/output"
+
+
+def test_expand_glyph_with_mixed_known_filter_and_unknown() -> None:
+    """A glyph value mixing a jinja filter on a known ref with an unknown ref.
+
+    The known filter is evaluated; the unknown ref placeholder survives so the
+    downstream block-level validation can report it.
+    """
+    glyphs = {"submitDatetime": "2024-01-15 06:00:00", "mixed": "${submitDatetime | floor_day}/${missing}"}
+    result = expand_glyph_values(glyphs)
+    assert result["mixed"] == "2024-01-15 00:00:00/${missing}"
+
+
+def test_expand_glyph_filter_on_unknown_ref_kept_as_is() -> None:
+    """When a jinja filter is applied to an unknown ref, the value is kept unchanged.
+
+    Rendering would fail (floor_day on a placeholder string), so we fall back to
+    the original value rather than surfacing a cryptic render error.
+    """
+    glyphs = {"myDate": "${unknownGlyph | floor_day}"}
+    result = expand_glyph_values(glyphs)
+    assert result["myDate"] == "${unknownGlyph | floor_day}"
+
+
+def test_expand_glyph_chained_datetime_filters() -> None:
+    """Chained filters on a known datetime glyph are fully evaluated."""
+    glyphs = {"submitDatetime": "2024-01-15 06:30:00", "rounded": "${submitDatetime | add_days(1) | floor_day}"}
+    result = expand_glyph_values(glyphs)
+    assert result["rounded"] == "2024-01-16 00:00:00"
+
+
+# ---------------------------------------------------------------------------
 # extract_glyphs — jinja2 expression syntax
 # ---------------------------------------------------------------------------
 

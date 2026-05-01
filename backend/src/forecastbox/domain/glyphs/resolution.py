@@ -10,7 +10,6 @@
 """Core parsing and resolution of ${glyph} interpolation in BlockInstance configuration values."""
 
 import datetime as dt
-import re
 from dataclasses import dataclass
 
 from cascade.low.func import Either
@@ -18,9 +17,6 @@ from fiab_core.fable import BlockInstance
 
 from forecastbox.domain.glyphs.exceptions import GlyphCircularReferenceError
 from forecastbox.domain.glyphs.jinja_interpolation import extract_glyph_names, render_expression
-
-# Used only by expand_glyph_values for simple ${varname} chain detection and substitution.
-_GLYPH_PATTERN = re.compile(r"\$\{(\w+)\}")
 
 PINNED_INTRINSIC_KEYS: frozenset[str] = frozenset({"startDatetime", "attemptCount"})
 """Intrinsic glyph keys that are always forced to their fresh intrinsic value in each attempt,
@@ -62,7 +58,7 @@ def extract_glyphs(blockInstance: BlockInstance) -> Either[ExtractedGlyphs, list
         if result.t:
             glyphs.update(result.t)
             glyphed_options.add(key)
-        elif _GLYPH_PATTERN.search(value) or "${" in value:
+        elif "${" in value:
             # The value contains ${...} but all names are jinja globals/filters, not glyph variables.
             # Still mark it as glyphed so its rendered result appears in resolved_configuration_options.
             glyphed_options.add(key)
@@ -138,21 +134,42 @@ def expand_glyph_values(glyph_values: dict[str, str], roots: set[str] | None = N
         if key in memo:
             return memo[key]
         value = source[key]
-        if not _GLYPH_PATTERN.search(value):
+
+        # Use AST-based parsing to find all referenced glyph names, including inside jinja
+        # filter expressions like ${submitDatetime | floor_day}.
+        refs_result = extract_glyph_names(value)
+        if refs_result.e is not None or not refs_result.t:
+            # Malformed expression or no glyph references — keep value as-is.
             memo[key] = value
             return value
+
+        refs = refs_result.t
         visiting = visiting | {key}
 
-        def substitute(m: re.Match[str]) -> str:
-            ref = m.group(1)
-            if ref not in source:
-                return m.group(0)
+        for ref in refs & source.keys():
             if ref in visiting:
                 cycle_path = " -> ".join(sorted(visiting)) + f" -> {ref}"
                 raise GlyphCircularReferenceError(f"Circular glyph reference detected: {cycle_path}")
-            return _expand(ref, visiting)
 
-        expanded = _GLYPH_PATTERN.sub(substitute, value)
+        # Build the jinja context:
+        # - known refs are recursively expanded to their final values,
+        # - unknown refs are mapped to "${ref}" so they survive in the output string
+        #   and can be surfaced as errors by the downstream block-level validation.
+        sub_glyphs: dict[str, str] = {}
+        for ref in refs:
+            if ref in source:
+                sub_glyphs[ref] = _expand(ref, visiting)
+            else:
+                sub_glyphs[ref] = f"${{{ref}}}"
+
+        try:
+            expanded = render_expression(value, sub_glyphs)
+        except Exception:
+            # Rendering can fail when a jinja filter is applied to an unknown-ref
+            # placeholder string (e.g. floor_day on "${unknownGlyph}"). Fall back to
+            # keeping the original value so downstream validation can surface the error.
+            expanded = value
+
         memo[key] = expanded
         return expanded
 
