@@ -58,4 +58,4 @@ if __name__ == "__main__":
     else:
         raise ValueError(f"start failure: {backend.exitcode}")
 
-    check_backend_ready(config, handle)
+    check_backend_ready(config, handle, config.cascade.spawn_gateway)

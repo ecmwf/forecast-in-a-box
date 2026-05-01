@@ -48,14 +48,12 @@ def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
         backend = get_context("forkserver").Process(target=launch_backend)
         backend.start()
         handle = ChildProcessGroup([backend])
-        spawn_gateway = True
+        spawn_gateway = config.cascade.spawn_gateway
     else:
         if not forecastbox.entrypoint.bootstrap.service.is_running():
             raise ValueError("configured to use service, but is not running!")
         handle = ChildProcessGroup([])
         spawn_gateway = False
-
-    spawn_gateway = spawn_gateway and "localhost" in config.cascade.cascade_url
 
     check_backend_ready(config, handle, attempts, spawn_gateway)
     if should_install_default_plugin():
