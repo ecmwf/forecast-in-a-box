@@ -18,10 +18,11 @@ jobs:
     timeout-minutes: 30
     strategy:
       matrix:
-        image:
-          - backend
-          - frontend
-          - cascade
+        variant:
+          - dockerfile: Dockerfile
+            suffix: ""
+          # - dockerfile: DockerfileMARSRocky
+          #   suffix: "-rocky"
         registry: ["ghcr", "eccr"]
     steps:
       - name: Free Disk Space Before Build
@@ -54,41 +55,33 @@ jobs:
       - name: Set env variables
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            export TAG=${{ github.event.inputs.tag }}
+            TAG=${{ github.event.inputs.tag }}
           else
-            export TAG=${GITHUB_REF_NAME}
+            TAG=${GITHUB_REF_NAME}
           fi
           echo "TAG=$TAG" >> $GITHUB_ENV
-          echo "IMAGE_NAME=${{ matrix.image }}" >> $GITHUB_ENV
+
+          SUFFIX="${{ matrix.variant.suffix }}"
           if [[ "${{ matrix.registry }}" == "ghcr" ]]; then
-            echo "REPO_IMAGE=ghcr.io/${{ github.repository }}/${{ matrix.image }}:$TAG" >> $GITHUB_ENV
+            echo "REPO_IMAGE=ghcr.io/${{ github.repository }}/forecast-in-a-box${SUFFIX}:$TAG" >> $GITHUB_ENV
           else
-            echo "REPO_IMAGE=eccr.ecmwf.int/forecast-in-a-box/${{ matrix.image }}:$TAG" >> $GITHUB_ENV
+            echo "REPO_IMAGE=eccr.ecmwf.int/forecast-in-a-box/forecast-in-a-box${SUFFIX}:$TAG" >> $GITHUB_ENV
           fi
 
       - name: Build image
         run: |
-          echo "Building image: $IMAGE_NAME - with tag: ${TAG}"
-          if [[ "${{ matrix.registry }}" == "ghcr" ]]; then
-            docker compose build --build-arg TAG=${TAG} $IMAGE_NAME
-          else
-            docker compose -f docker-compose-ewc.yml build --build-arg TAG=${TAG} $IMAGE_NAME
-          fi
-        env:
-          TAG: ${{ env.TAG }}
-          IMAGE_NAME: ${{ env.IMAGE_NAME }}
-          REPO_IMAGE: ${{ env.REPO_IMAGE }}
+          echo "Building ${{ matrix.variant.dockerfile }} with tag: ${TAG}"
+          docker build -t forecast-in-a-box -f ${{ matrix.variant.dockerfile }} .
 
       - name: Tag image
         run: |
-          docker tag fiab-$IMAGE_NAME $REPO_IMAGE
+          docker tag forecast-in-a-box $REPO_IMAGE
         env:
-          IMAGE_NAME: ${{ env.IMAGE_NAME }}
           REPO_IMAGE: ${{ env.REPO_IMAGE }}
 
       - name: Push image
         run: |
           echo "Pushing image: $REPO_IMAGE"
-          docker push $REPO_IMAGE # TODO enable once tested
+          docker push $REPO_IMAGE
         env:
           REPO_IMAGE: ${{ env.REPO_IMAGE }}

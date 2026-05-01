@@ -245,6 +245,11 @@ class CascadeSettings(FiabBaseModel):
     """Max number of workers per host for Cascade."""
     cascade_url: str = "tcp://localhost:8067"
     """Base URL for the Cascade API."""
+    spawn_gateway: bool = True
+    """Whether the backend should spawn a gateway or assume it is provided externally"""
+    # TODO remove the spawn_gateway setting -- instead, base it on whether cascade_url is provided.
+    # But that needs refactoring of the code to provide the cascade_url dynamically in case of a local spawn,
+    # and utilization of the FreePortsManager etc
     log_collection_max_size: int = 1000
     """Maximum size of the log collection for Cascade."""
     venv_temp_dir: str = "/tmp"

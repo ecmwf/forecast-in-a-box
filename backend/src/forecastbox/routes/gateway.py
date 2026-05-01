@@ -47,6 +47,7 @@ def kill_gw(process: GatewayProcess) -> None:
     m = api.ShutdownRequest()
     client.request_response(m, config.cascade.cascade_url, 4_000)
     logger.debug("gateway terminate and join")
+
     process.terminate()
     process.join(1)
     if process.exitcode is None:
@@ -88,6 +89,8 @@ router = APIRouter(
 
 @router.post("/start")
 async def start_gateway() -> str:
+    if not config.cascade.spawn_gateway:
+        raise HTTPException(400, "This instance does not manage the gateway")
     if Globals.logs_directory is None:
         Globals.logs_directory = TemporaryDirectory(prefix="fiabLogs")
         logger.debug(f"logging base is at {Globals.logs_directory.name}")
@@ -115,7 +118,9 @@ async def start_gateway() -> str:
 @router.get("/status")
 async def get_status() -> str:
     """Get the status of the Cascade Gateway process."""
-    if Globals.gateway is None:
+    if not config.cascade.spawn_gateway:
+        return "not managed"
+    elif Globals.gateway is None:
         return "not started"
     elif Globals.gateway.exitcode is not None:
         return f"exited with {Globals.gateway.exitcode}"
@@ -125,8 +130,10 @@ async def get_status() -> str:
 
 @router.post("/kill")
 async def kill_gateway() -> str:
+    if not config.cascade.spawn_gateway:
+        raise HTTPException(400, "This instance does not manage the gateway")
     if Globals.gateway is None or Globals.gateway.exitcode is not None:
-        return "not running"
+        raise HTTPException(400, "Gateway is not running")
     else:
         # TODO spawn as async task? This blocks... but we'd need to lock
         kill_gw(Globals.gateway)

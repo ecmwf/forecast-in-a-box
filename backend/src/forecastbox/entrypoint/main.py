@@ -48,7 +48,7 @@ def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
         backend = get_context("forkserver").Process(target=launch_backend)
         backend.start()
         handle = ChildProcessGroup([backend])
-        spawn_gateway = True
+        spawn_gateway = config.cascade.spawn_gateway
     else:
         if not forecastbox.entrypoint.bootstrap.service.is_running():
             raise ValueError("configured to use service, but is not running!")

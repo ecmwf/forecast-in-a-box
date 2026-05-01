@@ -1,0 +1,36 @@
+name: FIAB
+# Override: run cascade as a separate GPU container instead of in-process
+# Usage: docker compose -f docker-compose.yml -f docker-compose-cascade.yml up
+services:
+  forecast-in-a-box:
+    environment:
+      fiab__CASCADE__CASCADE_URL: "tcp://cascade:8067"
+
+  cascade:
+    restart: unless-stopped
+    container_name: fiab-cascade
+    build:
+      context: ./cascade
+      dockerfile: Dockerfile
+    entrypoint: "python -m cascade.gateway tcp://0.0.0.0:8067 --max_jobs 1"
+    environment:
+      EARTHKIT_DATA_USER_CACHE_DIRECTORY: /app/data_dir/earthkit_cache
+      EARTHKIT_DATA_CACHE_POLICY: "user"
+
+      ANEMOI_INFERENCE_NUM_CHUNKS: 4
+    shm_size: '5gb'
+    networks:
+      - network
+    ports:
+      - "48165:48165"
+    volumes:
+      - data:/app/data_dir
+      - ~/fiab:/root/.fiab
+      - ~/.ecmwfapirc:/root/.ecmwfapirc:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

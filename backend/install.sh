@@ -1,6 +1,6 @@
 set -euo pipefail
 
-if [ ! -d /app/.venv ] ; then uv venv --seed /app/.venv --python 3.11 ; fi
+if [ ! -d /app/.venv ] ; then uv venv --seed /app/.venv --python 3.12 ; fi
 
 # Install Forecast-in-a-Box
 
@@ -10,5 +10,5 @@ echo "graft static" > MANIFEST.in
 uv pip install --link-mode=copy --prerelease allow ./[all]
 uv pip install --link-mode=copy coptrs
 
-# Prepare the home directory for the sqlite etc
-mkdir ~/.fiab
+# Prepare the home directory
+mkdir -p ~/.fiab
