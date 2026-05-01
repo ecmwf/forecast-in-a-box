@@ -41,6 +41,7 @@ INPUT_SOURCE_EXTRAS: dict[str, list[str]] = {
     "polytope": ["anemoi-plugins-ecmwf-inference[polytope]"],
     "mars": ["earthkit-data[mars]"],
 }
+INPUT_SOURCE_CONFIGURATION_OPTIONS = {"polytope": {"collection": "initial-conditions"}}
 
 
 class AnemoiBuilder:
@@ -68,6 +69,7 @@ class AnemoiBuilder:
         env = get_environment(self.artifact_id)
         if extra_environment:
             env.extend(extra_environment)
+
         return WrappedInference(
             ckpt=self._local_path(),
             lead_time=lead_time,
@@ -129,8 +131,12 @@ class AnemoiSource(Source):
         inference = AnemoiBuilder(configuration["checkpoint"]).build(
             lead_time=int(configuration["lead_time"]), extra_environment=INPUT_SOURCE_EXTRAS.get(configuration["input_source"], [])
         )
+        input_source = configuration["input_source"]
+        if input_source in INPUT_SOURCE_CONFIGURATION_OPTIONS and not isinstance(input_source, dict):
+            input_source = {input_source: INPUT_SOURCE_CONFIGURATION_OPTIONS[input_source]}
+
         action = inference.from_input(
-            configuration["input_source"],
+            input_source,
             date=configuration["base_time"],
             ensemble_members=int(configuration.get("ensemble_members") or 1),
         )
