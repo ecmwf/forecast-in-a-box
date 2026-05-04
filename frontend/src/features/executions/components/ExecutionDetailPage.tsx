@@ -14,8 +14,8 @@
  * Job detail page with status header, execution canvas, and tabbed panels.
  */
 
-import { useState } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { useCallback, useState } from 'react'
+import { ArrowLeft, FileJson, Package, ScrollText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { ExecutionCanvas } from './ExecutionCanvas'
@@ -44,6 +44,10 @@ export function ExecutionDetailPage() {
   const { jobId } = useParams({ from: '/_authenticated/executions/$jobId' })
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('outputs')
+  const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null)
+  const handleToolbarRef = useCallback((node: HTMLDivElement | null) => {
+    setToolbarSlot(node)
+  }, [])
 
   const statusQuery = useJobStatus(jobId)
   const restartMutation = useRestartJob()
@@ -143,14 +147,17 @@ export function ExecutionDetailPage() {
   return (
     <div
       className={cn(
-        'mx-auto space-y-8 px-4 py-8 sm:px-6 lg:px-8',
+        // min-h reserves space for chrome (banner ~40, header ~64, footer ~120
+        // plus paddings) so the row inside can grow via flex-1 without
+        // overflowing on smaller viewports.
+        'mx-auto flex min-h-[calc(100vh-15rem)] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8',
         layoutMode === 'boxed' ? 'max-w-7xl' : 'max-w-none',
       )}
     >
       <Button
         variant="outline"
         size="sm"
-        className="gap-1.5"
+        className="gap-1.5 self-start"
         nativeButton={false}
         render={<Link to="/executions" />}
       >
@@ -182,45 +189,70 @@ export function ExecutionDetailPage() {
         />
       )}
 
-      {fableData?.builder && catalogue ? (
-        <ExecutionCanvas
-          fable={fableData.builder}
-          catalogue={catalogue}
-          status={jobData.status}
-        />
-      ) : (
-        <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-12 text-center">
-          <P className="font-medium text-muted-foreground">
-            {t('detail.graphUnavailable')}
-          </P>
-          <P className="text-muted-foreground">
-            {t('detail.graphUnavailableDescription')}
-          </P>
+      {/* Wide-screen split: at >=1440px the canvas and the tabs panel sit
+          side-by-side as equal columns, both stretching to the same height
+          (whichever side is taller dictates). Below 1440px we revert to the
+          stacked layout. */}
+      <div className="flex flex-1 flex-col gap-8 min-[1440px]:flex-row min-[1440px]:gap-6">
+        <div className="min-[1440px]:flex min-[1440px]:min-w-0 min-[1440px]:flex-1 min-[1440px]:flex-col">
+          {fableData?.builder && catalogue ? (
+            <ExecutionCanvas
+              fable={fableData.builder}
+              catalogue={catalogue}
+              status={jobData.status}
+            />
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-12 text-center">
+              <P className="font-medium text-muted-foreground">
+                {t('detail.graphUnavailable')}
+              </P>
+              <P className="text-muted-foreground">
+                {t('detail.graphUnavailableDescription')}
+              </P>
+            </div>
+          )}
         </div>
-      )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="outputs">{t('tabs.outputs')}</TabsTrigger>
-          <TabsTrigger value="logs">{t('tabs.logs')}</TabsTrigger>
-          <TabsTrigger value="specification">
-            {t('tabs.specification')}
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="outputs">
-          <OutputsPanel
-            jobId={jobId}
-            status={jobData.status}
-            outputs={jobData.outputs}
-          />
-        </TabsContent>
-        <TabsContent value="logs">
-          <LogsPanel jobId={jobId} status={jobData.status} />
-        </TabsContent>
-        <TabsContent value="specification">
-          <SpecificationPanel fableSnapshot={fableData?.builder} />
-        </TabsContent>
-      </Tabs>
+        <div className="min-[1440px]:min-w-0 min-[1440px]:flex-1">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="outputs">
+                <Package className="h-4 w-4" />
+                {t('tabs.outputs')}
+              </TabsTrigger>
+              <TabsTrigger value="logs">
+                <ScrollText className="h-4 w-4" />
+                {t('tabs.logs')}
+              </TabsTrigger>
+              <TabsTrigger value="specification">
+                <FileJson className="h-4 w-4" />
+                {t('tabs.specification')}
+              </TabsTrigger>
+            </TabsList>
+            <div
+              ref={handleToolbarRef}
+              className={cn(
+                'mt-3 flex items-center gap-3',
+                activeTab !== 'outputs' && 'hidden',
+              )}
+            />
+            <TabsContent value="outputs">
+              <OutputsPanel
+                jobId={jobId}
+                status={jobData.status}
+                outputs={jobData.outputs}
+                toolbarSlot={toolbarSlot}
+              />
+            </TabsContent>
+            <TabsContent value="logs">
+              <LogsPanel jobId={jobId} status={jobData.status} />
+            </TabsContent>
+            <TabsContent value="specification">
+              <SpecificationPanel fableSnapshot={fableData?.builder} />
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
     </div>
   )
 }

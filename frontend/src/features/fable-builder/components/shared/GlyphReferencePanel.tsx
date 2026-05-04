@@ -39,6 +39,7 @@ import { useGlyphFunctions } from '@/api/hooks/useFable'
 import { useAllGlyphs } from '@/features/fable-builder/hooks/useAllGlyphs'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { GlyphFormDialog } from '@/features/glyphs/components/GlyphFormDialog'
+import { isValidGlyphKey } from '@/features/glyphs/utils/validate-key'
 import { showToast } from '@/lib/toast'
 import { P } from '@/components/base/typography'
 import {
@@ -433,15 +434,23 @@ function LocalGlyphSection({
     setEditValue('')
   }
 
+  const trimmedNewKey = newKey.trim()
+  // Only flag the user once they've started typing — empty input shouldn't
+  // light up red the moment the row appears.
+  const newKeyInvalid = trimmedNewKey !== '' && !isValidGlyphKey(trimmedNewKey)
+
   function handleAdd() {
     const key = newKey.trim()
     const value = newValue.trim()
-    if (key && value) {
-      setLocalGlyph(key, value)
-      setNewKey('')
-      setNewValue('')
-      setIsAdding(false)
+    if (!key || !value) return
+    if (!isValidGlyphKey(key)) {
+      showToast.error(t('panel.localKeyInvalid'))
+      return
     }
+    setLocalGlyph(key, value)
+    setNewKey('')
+    setNewValue('')
+    setIsAdding(false)
   }
 
   function handleCancelAdd() {
@@ -537,45 +546,58 @@ function LocalGlyphSection({
               )}
 
           {isAdding ? (
-            <div className="flex items-center gap-1.5 px-3 py-1">
-              <input
-                type="text"
-                value={newKey}
-                onChange={(e) => setNewKey(e.target.value)}
-                placeholder={t('panel.localKeyPlaceholder')}
-                className="w-20 shrink-0 rounded border border-border bg-background px-1.5 py-0.5 font-mono text-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleAdd()
-                  if (e.key === 'Escape') handleCancelAdd()
-                }}
-              />
-              <input
-                type="text"
-                value={newValue}
-                onChange={(e) => setNewValue(e.target.value)}
-                placeholder={t('panel.localValuePlaceholder')}
-                className="min-w-0 flex-1 rounded border border-border bg-background px-1.5 py-0.5 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleAdd()
-                  if (e.key === 'Escape') handleCancelAdd()
-                }}
-              />
-              <button
-                type="button"
-                onClick={handleAdd}
-                disabled={!newKey.trim() || !newValue.trim()}
-                className="shrink-0 text-muted-foreground hover:text-foreground disabled:opacity-40"
-              >
-                <Check className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={handleCancelAdd}
-                className="shrink-0 text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+            <div className="px-3 py-1">
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={newKey}
+                  onChange={(e) => setNewKey(e.target.value)}
+                  placeholder={t('panel.localKeyPlaceholder')}
+                  aria-invalid={newKeyInvalid || undefined}
+                  className={cn(
+                    'w-20 shrink-0 rounded border bg-background px-1.5 py-0.5 font-mono text-sm focus:ring-1 focus:outline-none',
+                    newKeyInvalid
+                      ? 'border-destructive focus:ring-destructive'
+                      : 'border-border focus:ring-ring',
+                  )}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAdd()
+                    if (e.key === 'Escape') handleCancelAdd()
+                  }}
+                />
+                <input
+                  type="text"
+                  value={newValue}
+                  onChange={(e) => setNewValue(e.target.value)}
+                  placeholder={t('panel.localValuePlaceholder')}
+                  className="min-w-0 flex-1 rounded border border-border bg-background px-1.5 py-0.5 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAdd()
+                    if (e.key === 'Escape') handleCancelAdd()
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleAdd}
+                  disabled={!newKey.trim() || !newValue.trim() || newKeyInvalid}
+                  className="shrink-0 text-muted-foreground hover:text-foreground disabled:opacity-40"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelAdd}
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {newKeyInvalid ? (
+                <P className="mt-1 text-xs text-destructive">
+                  {t('panel.localKeyInvalid')}
+                </P>
+              ) : null}
             </div>
           ) : (
             <button

@@ -8,14 +8,15 @@
  * does it submit to any jurisdiction.
  */
 
+import { LayoutDashboard, Play, SlidersHorizontal } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 
 const navItems = [
-  { to: '/dashboard', labelKey: 'nav.overview' },
-  { to: '/configure', labelKey: 'nav.configuration' },
-  { to: '/executions', labelKey: 'nav.executions' },
+  { to: '/dashboard', labelKey: 'nav.overview', Icon: LayoutDashboard },
+  { to: '/configure', labelKey: 'nav.configuration', Icon: SlidersHorizontal },
+  { to: '/executions', labelKey: 'nav.executions', Icon: Play },
 ] as const
 
 export function NavToggle() {
@@ -26,13 +27,13 @@ export function NavToggle() {
       aria-label={t('nav.label')}
       className="inline-flex h-9 items-center gap-1 rounded-lg bg-muted p-1"
     >
-      {navItems.map(({ to, labelKey }) => (
+      {navItems.map(({ to, labelKey, Icon }) => (
         <Link
           key={to}
           to={to}
           activeOptions={{ includeSearch: false }}
           className={cn(
-            'rounded-md px-3 py-1 text-sm font-medium text-muted-foreground transition-colors',
+            'inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium text-muted-foreground transition-colors',
             'hover:bg-background/50',
             'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
           )}
@@ -42,6 +43,7 @@ export function NavToggle() {
             'aria-current': 'page',
           }}
         >
+          <Icon className="h-4 w-4" />
           {t(labelKey)}
         </Link>
       ))}

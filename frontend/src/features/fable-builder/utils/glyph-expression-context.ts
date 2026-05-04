@@ -47,6 +47,7 @@ const NONE: GlyphContext = {
 
 const isWordStart = (c: string): boolean => /[a-zA-Z_]/.test(c)
 const isWordChar = (c: string): boolean => /[a-zA-Z0-9_]/.test(c)
+const isDigit = (c: string): boolean => c >= '0' && c <= '9'
 const isOperator = (c: string): boolean => '+-*/=<>'.includes(c)
 
 /**
@@ -139,6 +140,20 @@ export function parseGlyphContext(text: string, cursor: number): GlyphContext {
     }
 
     if (c === '$' && text[i + 1] === '{') return NONE
+
+    if (isDigit(c)) {
+      // Numeric literal (e.g. `sub_days(2)` or `add_hours(2.5)`). Behaves like
+      // a value token: consumes the digits + optional fractional part, then
+      // closes the frame so a following `|`, `,`, etc. re-opens classification.
+      if (top().kind === 'closed') return NONE
+      while (i < cursor && isDigit(text[i])) i++
+      if (i + 1 < cursor && text[i] === '.' && isDigit(text[i + 1])) {
+        i++
+        while (i < cursor && isDigit(text[i])) i++
+      }
+      top().kind = 'closed'
+      continue
+    }
 
     if (c === '|') {
       top().kind = 'filter'

@@ -21,8 +21,30 @@ import {
   getExecution,
   restartExecution,
 } from '../data/job.data'
-import type { JobExecuteRequest, JobStatus } from '@/api/types/job.types'
+import type {
+  JobExecuteRequest,
+  JobExecutionDetail,
+  JobStatus,
+  RunOutputMetadata,
+} from '@/api/types/job.types'
 import { API_ENDPOINTS } from '@/api/endpoints'
+
+type JobExecutionDetailWire = Omit<JobExecutionDetail, 'outputs'> & {
+  outputs: { outputs: Record<string, RunOutputMetadata> } | null
+}
+
+/**
+ * Backend wraps the outputs map in `{ outputs: ... }` on the wire (mirrors
+ * Pydantic's RunOutputsResponse). Mock seed data lives in the parsed flat
+ * shape (`Record<string, RunOutputMetadata>`); this helper re-wraps at the
+ * MSW boundary so the FE's Zod parse round-trips correctly.
+ */
+function toWireDetail(detail: JobExecutionDetail): JobExecutionDetailWire {
+  return {
+    ...detail,
+    outputs: detail.outputs === null ? null : { outputs: detail.outputs },
+  }
+}
 
 export const jobHandlers = [
   http.post(API_ENDPOINTS.job.create, async ({ request }) => {
@@ -61,7 +83,7 @@ export const jobHandlers = [
     const pageExecutions = executions.slice(start, start + pageSize)
 
     return HttpResponse.json({
-      runs: pageExecutions,
+      runs: pageExecutions.map(toWireDetail),
       total,
       page,
       page_size: pageSize,
@@ -91,7 +113,7 @@ export const jobHandlers = [
       )
     }
 
-    return HttpResponse.json(exec)
+    return HttpResponse.json(toWireDetail(exec))
   }),
 
   http.post(API_ENDPOINTS.job.restart, async ({ request }) => {

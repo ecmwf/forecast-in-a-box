@@ -31,7 +31,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
     <>
       {children}
       <Toaster
-        position="top-right"
+        position="bottom-right"
         richColors
         closeButton
         duration={5000}

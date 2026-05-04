@@ -80,7 +80,31 @@
     "noOutputsRunning": "Outputs will appear here as they are generated.",
     "view": "View",
     "download": "Download",
-    "inspect": "Inspect"
+    "inspect": "Inspect",
+    "actions": {
+      "view": "View",
+      "download": "Download",
+      "copyImage": "Copy to clipboard"
+    },
+    "filter": {
+      "allMimes": "All"
+    },
+    "noMatch": "No outputs match the current filter.",
+    "viewer": {
+      "zoomHint": "Wheel to zoom · Drag to pan · Shift+drag to zoom into a region",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "resetZoom": "Reset zoom",
+      "pageOfTotal": "{{page}} / {{total}}",
+      "pdfPageCount_one": "{{count}} page",
+      "pdfPageCount_other": "{{count}} pages"
+    },
+    "adapters": {
+      "generic": { "label": "File" },
+      "image-raster": { "label": "Image" },
+      "image-vector": { "label": "SVG" },
+      "pdf": { "label": "PDF" }
+    }
   },
   "logs": {
     "title": "Gateway Log",

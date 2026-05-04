@@ -8,67 +8,30 @@
  * does it submit to any jurisdiction.
  */
 
-import { Package } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
 import type { JobStatus, RunOutputs } from '@/api/types/job.types'
-import { isTerminalStatus } from '@/api/types/job.types'
-import { OutputCard } from '@/features/executions/components/OutputCard'
-import { P } from '@/components/base/typography'
-import { Card } from '@/components/ui/card'
+import { OutputsView } from '@/features/executions/outputs/OutputsView'
 
 interface OutputsPanelProps {
   jobId: string
   status: JobStatus
   outputs: RunOutputs | null
+  /** DOM node to portal the toolbar into. Lifted out of the panel so the
+   * filter row can sit alongside the parent's tab triggers. */
+  toolbarSlot?: HTMLElement | null
 }
 
-export function OutputsPanel({ jobId, status, outputs }: OutputsPanelProps) {
-  const { t } = useTranslation('executions')
-
-  const availableIds = outputs
-    ? Object.entries(outputs.outputs)
-        .filter(([, meta]) => meta.is_available)
-        .map(([taskId]) => taskId)
-    : []
-
-  const hasResults = availableIds.length > 0
-  const isRunning = !isTerminalStatus(status)
-
-  if (!hasResults) {
-    return (
-      <Card className="overflow-hidden">
-        <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
-          <Package className="h-10 w-10 text-muted-foreground" />
-          <P className="font-medium text-muted-foreground">
-            {t('outputs.noOutputs')}
-          </P>
-          {isRunning && (
-            <P className="text-muted-foreground">
-              {t('outputs.noOutputsRunning')}
-            </P>
-          )}
-        </div>
-      </Card>
-    )
-  }
-
+export function OutputsPanel({
+  jobId,
+  status,
+  outputs,
+  toolbarSlot,
+}: OutputsPanelProps) {
   return (
-    <Card className="overflow-hidden">
-      <div className="space-y-3 p-6">
-        <P className="text-muted-foreground">
-          {t('outputs.generated')}: {availableIds.length}
-        </P>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-          {availableIds.map((taskId) => (
-            <OutputCard
-              key={taskId}
-              jobId={jobId}
-              taskId={taskId}
-              productName={taskId}
-            />
-          ))}
-        </div>
-      </div>
-    </Card>
+    <OutputsView
+      jobId={jobId}
+      status={status}
+      outputs={outputs}
+      toolbarSlot={toolbarSlot}
+    />
   )
 }

@@ -17,6 +17,7 @@
 
 import {
   ArrowLeft,
+  Clock,
   Download,
   ExternalLink,
   HardDrive,
@@ -26,11 +27,12 @@ import {
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { ArtifactStatusBadge } from './ArtifactStatusBadge'
+import { QubeTree } from './QubeTree'
 import type {
   CompositeArtifactId,
   MlModelDetail,
 } from '@/api/types/artifacts.types'
-import { formatBytes } from '@/api/types/artifacts.types'
+import { formatBytes, isStructuredQube } from '@/api/types/artifacts.types'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -96,6 +98,12 @@ export function ArtifactDetailPage({
                 {platform}
               </span>
             ))}
+            {detail.timestep ? (
+              <span className="inline-flex items-center gap-1.5 rounded bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground">
+                <Clock className="h-3.5 w-3.5" />
+                {t('detail.timestep')}: {detail.timestep}
+              </span>
+            ) : null}
           </div>
         </div>
         <div className="flex gap-2">
@@ -191,12 +199,21 @@ export function ArtifactDetailPage({
         )}
       </div>
 
-      {/* Output Characteristics */}
+      {/* Output Structure (qube or legacy list) — backend may return either
+          shape under output_characteristics during the consolidation rollout. */}
       <div>
         <H2 className="mb-3 text-lg font-semibold">
-          {t('detail.outputCharacteristics')}
+          {t('detail.outputStructure')}
         </H2>
-        <CharacteristicsCard data={detail.output_characteristics} />
+        {isStructuredQube(detail.output_characteristics) ? (
+          <QubeTree node={detail.output_characteristics} />
+        ) : detail.output_characteristics.length > 0 ? (
+          <CharacteristicsCard data={detail.output_characteristics} />
+        ) : (
+          <P className="text-sm text-muted-foreground">
+            {t('detail.outputStructurePending')}
+          </P>
+        )}
       </div>
 
       {/* Input Characteristics */}

@@ -29,7 +29,11 @@ import {
   createRoute,
   createRouter,
 } from '@tanstack/react-router'
-import { resetJobsState } from '@tests/../mocks/data/job.data'
+import {
+  injectMockExecution,
+  mixedAvailabilityExecution,
+  resetJobsState,
+} from '@tests/../mocks/data/job.data'
 import type { AuthContextValue } from '@/features/auth/AuthContext'
 import { AuthContext } from '@/features/auth/AuthContext'
 import { ExecutionDetailPage } from '@/features/executions/components/ExecutionDetailPage'
@@ -199,6 +203,18 @@ describe('ExecutionDetailPage Integration', () => {
       const screen = await renderDetailPage('job-submitted-004')
       await expect
         .element(screen.getByText('No outputs available yet'))
+        .toBeVisible()
+    })
+
+    it('renders only is_available outputs in a mixed payload', async () => {
+      injectMockExecution(mixedAvailabilityExecution)
+      const screen = await renderDetailPage('job-mixed-005')
+      // job-mixed-005 has 1 available + 1 unavailable.
+      await expect.element(screen.getByText(/Generated: 1/)).toBeVisible()
+      // sink_available appears as both the group header and the card title;
+      // .first() asserts presence without strict-mode tripping over both.
+      await expect
+        .element(screen.getByText('sink_available').first())
         .toBeVisible()
     })
   })
