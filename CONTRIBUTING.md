@@ -30,11 +30,14 @@ We can't guarantee a response timeline, but we do read them.
 
 ## Why Is the Repo Public?
 
-We believe in building in the open. A public repo doesn't necessarily mean open contribution — it means open visibility. We want the community to be able to see what we're working on, learn from the code, and follow our progress.
+We believe in building in the open. A public repo doesn't necessarily mean open contribution — it means open visibility. We want the community to be able to see what we're working on, learn from the code, modify locally and experiment, and follow our progress.
 
 ## Will This Change?
 
 Possibly. If we open up to external contributions in the future, we'll update this document with full guidelines, a code of conduct, and a CLA if needed. Watch the repo or check back here for updates.
+
+This project is primarily developed using agentic coding tools -- thus even in the future, we will prefer contributions in the form of the prompt, instead of agent-generated code. 
+But attaching an agent-generated PoC to the prompt as a demonstration is welcome and economical.
 
 ## Questions?
 
