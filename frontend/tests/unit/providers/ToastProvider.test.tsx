@@ -68,7 +68,7 @@ describe('ToastProvider', () => {
     )
 
     const toaster = screen.getByTestId('toaster')
-    expect(toaster.element().getAttribute('data-position')).toBe('top-right')
+    expect(toaster.element().getAttribute('data-position')).toBe('bottom-right')
   })
 
   it('configures Toaster with richColors enabled', async () => {

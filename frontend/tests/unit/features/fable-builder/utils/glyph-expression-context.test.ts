@@ -121,6 +121,42 @@ describe('parseGlyphContext', () => {
     })
   })
 
+  describe('numeric literals', () => {
+    it('classifies a pipe after a numeric-arg filter as filter', () => {
+      // Regression: `sub_days(2)` used to bail the parser out on the `2`,
+      // making the second pipe never reopen autocomplete.
+      expect(ctx('${submitDatetime | sub_days(2) | ‸')).toMatchObject({
+        kind: 'filter',
+        prefix: '',
+      })
+    })
+
+    it('captures a partial second filter after a numeric-arg first filter', () => {
+      const result = ctx('${submitDatetime | sub_days(2) | floor‸')
+      expect(result.kind).toBe('filter')
+      expect(result.prefix).toBe('floor')
+    })
+
+    it('handles decimal literals inside function args', () => {
+      expect(ctx('${func(2.5) | ‸')).toMatchObject({
+        kind: 'filter',
+        prefix: '',
+      })
+    })
+
+    it('handles multiple numeric args separated by commas', () => {
+      expect(ctx('${func(1, 2, ‸')).toMatchObject({
+        kind: 'value',
+        prefix: '',
+      })
+    })
+
+    it('treats a bare numeric literal as a closed value', () => {
+      // `${42 ` — number alone with a trailing space; nothing to suggest.
+      expect(ctx('${42 ‸')).toMatchObject({ kind: 'none' })
+    })
+  })
+
   describe('string literals', () => {
     it('returns none when the cursor sits inside a single-quoted string', () => {
       expect(ctx('${func("hello, ‸')).toMatchObject({ kind: 'none' })

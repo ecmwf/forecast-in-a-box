@@ -27,8 +27,184 @@ import type {
   CompositeArtifactId,
   MlModelDetail,
   MlModelOverview,
+  QubeNode,
 } from '@/api/types/artifacts.types'
 import { API_ENDPOINTS } from '@/api/endpoints'
+
+/**
+ * Build a realistic qube fixture mirroring the shape served by the backend
+ * for an AIFS-style model: one `pl` branch with parameters × pressure levels,
+ * and one `sfc` branch with surface parameters and no further dimensions.
+ */
+function buildAifsQube({
+  pressureParams,
+  pressureLevels,
+  surfaceParams,
+}: {
+  pressureParams: Array<string>
+  pressureLevels: Array<number>
+  surfaceParams: Array<string>
+}): QubeNode {
+  return {
+    key: 'root',
+    values: { type: 'enum', dtype: 'str', values: ['root'] },
+    metadata: {},
+    children: [
+      {
+        key: 'levtype',
+        values: { type: 'enum', dtype: 'str', values: ['pl'] },
+        metadata: {
+          name: { shape: [1, 1, 1], dtype: 'str', values: ['pressure'] },
+        },
+        children: [
+          {
+            key: 'param',
+            values: { type: 'enum', dtype: 'str', values: pressureParams },
+            metadata: {},
+            children: [
+              {
+                key: 'level',
+                values: {
+                  type: 'enum',
+                  dtype: 'int64',
+                  values: pressureLevels,
+                },
+                metadata: {},
+                children: [],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        key: 'levtype',
+        values: { type: 'enum', dtype: 'str', values: ['sfc'] },
+        metadata: {
+          name: { shape: [1, 1, 1], dtype: 'str', values: ['surface'] },
+        },
+        children: [
+          {
+            key: 'param',
+            values: { type: 'enum', dtype: 'str', values: surfaceParams },
+            metadata: {},
+            children: [],
+          },
+        ],
+      },
+    ],
+  }
+}
+
+const STANDARD_PRESSURE_LEVELS = [
+  50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000,
+]
+const STANDARD_PRESSURE_PARAMS = ['q', 't', 'u', 'v', 'w', 'z']
+const STANDARD_SURFACE_PARAMS = [
+  '10u',
+  '10v',
+  '2d',
+  '2t',
+  'cp',
+  'msl',
+  'skt',
+  'sp',
+  'tcw',
+  'tp',
+]
+const EXTENDED_SURFACE_PARAMS = [
+  '100u',
+  '100v',
+  '10u',
+  '10v',
+  '2d',
+  '2t',
+  'cp',
+  'hcc',
+  'lcc',
+  'mcc',
+  'msl',
+  'ro',
+  'sf',
+  'skt',
+  'sp',
+  'ssrd',
+  'stl1',
+  'stl2',
+  'strd',
+  'swvl1',
+  'swvl2',
+  'tcc',
+  'tcw',
+  'tp',
+]
+
+/**
+ * Build a non-AIFS qube fixture mirroring the canonical compressed-tree
+ * example from the qubed docs (class → expver → param). Routes the renderer
+ * to the generic compressed-tree view rather than the matrix.
+ */
+function buildGenericQube(): QubeNode {
+  return {
+    key: 'root',
+    values: { type: 'enum', dtype: 'str', values: ['root'] },
+    metadata: {},
+    children: [
+      {
+        key: 'class',
+        values: { type: 'enum', dtype: 'str', values: ['od'] },
+        metadata: {},
+        children: [
+          {
+            key: 'expver',
+            values: { type: 'enum', dtype: 'str', values: ['0001', '0002'] },
+            metadata: {},
+            children: [
+              {
+                key: 'param',
+                values: { type: 'enum', dtype: 'int64', values: [1, 2] },
+                metadata: {},
+                children: [],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        key: 'class',
+        values: { type: 'enum', dtype: 'str', values: ['rd'] },
+        metadata: {},
+        children: [
+          {
+            key: 'expver',
+            values: { type: 'enum', dtype: 'str', values: ['0001'] },
+            metadata: {},
+            children: [
+              {
+                key: 'param',
+                values: { type: 'enum', dtype: 'int64', values: [1, 2, 3] },
+                metadata: {},
+                children: [],
+              },
+            ],
+          },
+          {
+            key: 'expver',
+            values: { type: 'enum', dtype: 'str', values: ['0002'] },
+            metadata: {},
+            children: [
+              {
+                key: 'param',
+                values: { type: 'enum', dtype: 'int64', values: [1, 2] },
+                metadata: {},
+                children: [],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  }
+}
 
 const mockModels: Array<MlModelDetail> = [
   {
@@ -45,52 +221,86 @@ const mockModels: Array<MlModelDetail> = [
       'ECMWF Artificial Intelligence Forecasting System (AIFS) single model for medium-range weather prediction.',
     url: 'https://www.ecmwf.int/en/forecasts/documentation-and-support',
     pip_package_constraints: ['torch>=2.0.0', 'numpy>=1.24.0'],
-    output_characteristics: ['temperature', 'wind_speed', 'pressure'],
+    output_characteristics: buildAifsQube({
+      pressureParams: STANDARD_PRESSURE_PARAMS,
+      pressureLevels: STANDARD_PRESSURE_LEVELS,
+      surfaceParams: STANDARD_SURFACE_PARAMS,
+    }),
     input_characteristics: [
-      'temperature',
-      'wind_speed',
-      'pressure',
-      'humidity',
+      'input_source',
+      'lead_time',
+      'base_time',
+      'anemoi_kwargs',
     ],
+    timestep: '6h',
   },
   {
     composite_id: {
       artifact_store_id: 'ecmwf',
-      ml_model_checkpoint_id: 'aifs-ensemble-v0.1.0',
+      ml_model_checkpoint_id: 'aifs-single-mse-1.1_w_sdpa',
     },
-    display_name: 'AIFS Ensemble',
+    display_name: 'AIFS Single MSE 1.1',
     display_author: 'ECMWF',
-    disk_size_bytes: 4_294_967_296,
-    supported_platforms: ['cuda'],
+    disk_size_bytes: 993_937_386,
+    supported_platforms: ['linux', 'macos'],
     is_available: false,
     display_description:
-      'ECMWF AIFS ensemble model for probabilistic weather forecasting with multiple ensemble members.',
-    url: 'https://www.ecmwf.int/en/forecasts/documentation-and-support',
-    pip_package_constraints: ['torch>=2.0.0', 'numpy>=1.24.0'],
-    output_characteristics: ['temperature', 'wind_speed', 'pressure'],
-    input_characteristics: [
-      'temperature',
-      'wind_speed',
-      'pressure',
-      'humidity',
+      'ECMWF AIFS single MSE 1.1 model with scaled-dot-product attention for medium-range weather forecasting.',
+    url: 'https://sites.ecmwf.int/repository/fiab/aifs/aifs-single-mse-1.1_sdpa.ckpt',
+    pip_package_constraints: [
+      'anemoi-models==0.4.2',
+      'torch>=2.6.0',
+      'torch_geometric==2.4.0',
     ],
+    output_characteristics: buildAifsQube({
+      pressureParams: STANDARD_PRESSURE_PARAMS,
+      pressureLevels: STANDARD_PRESSURE_LEVELS,
+      surfaceParams: EXTENDED_SURFACE_PARAMS,
+    }),
+    input_characteristics: [
+      'input_source',
+      'lead_time',
+      'base_time',
+      'anemoi_kwargs',
+    ],
+    timestep: '6h',
   },
   {
     composite_id: {
       artifact_store_id: 'ecmwf',
-      ml_model_checkpoint_id: 'aifs-crps-v0.1.0',
+      ml_model_checkpoint_id: 'aifs-ens-crps-1.0_w_sdpa',
     },
-    display_name: 'AIFS CRPS',
+    display_name: 'AIFS ENS CRPS 1.0',
     display_author: 'ECMWF',
-    disk_size_bytes: 1_073_741_824,
-    supported_platforms: ['cpu', 'cuda'],
+    disk_size_bytes: 921_584_533,
+    supported_platforms: ['linux', 'macos'],
     is_available: true,
     display_description:
-      'ECMWF AIFS model trained with Continuous Ranked Probability Score for calibrated probabilistic forecasts.',
-    url: 'https://www.ecmwf.int/en/forecasts/documentation-and-support',
-    pip_package_constraints: ['torch>=2.0.0', 'numpy>=1.24.0'],
-    output_characteristics: ['geopotential', 'temperature', 'humidity', 'wind'],
-    input_characteristics: ['geopotential', 'temperature', 'humidity', 'wind'],
+      'ECMWF AIFS ensemble CRPS-trained model with scaled-dot-product attention for probabilistic forecasts.',
+    url: 'https://sites.ecmwf.int/repository/fiab/aifs/aifs-ens-crps-1.0_sdpa.ckpt',
+    pip_package_constraints: [
+      'anemoi-models==0.6.0',
+      'torch>=2.6.0',
+      'torch_geometric==2.4.0',
+    ],
+    // Legacy list[str] shape — exercises the back-compat render path until
+    // the backend update propagates everywhere.
+    output_characteristics: [
+      '2t',
+      '10u',
+      '10v',
+      'msl',
+      'tp',
+      't @ 1000/850/700/500/250 hPa',
+    ],
+    input_characteristics: [
+      'input_source',
+      'lead_time',
+      'base_time',
+      'ensemble_number',
+      'anemoi_kwargs',
+    ],
+    timestep: '6h',
   },
   {
     composite_id: {
@@ -106,8 +316,15 @@ const mockModels: Array<MlModelDetail> = [
       'ECMWF AIFS large ensemble model for operational probabilistic weather forecasting at scale.',
     url: 'https://www.ecmwf.int/en/forecasts/documentation-and-support',
     pip_package_constraints: ['torch>=2.0.0', 'numpy>=1.24.0'],
-    output_characteristics: ['temperature', 'wind', 'pressure', 'humidity'],
-    input_characteristics: ['temperature', 'wind', 'pressure', 'humidity'],
+    // Non-AIFS-shaped qube — exercises the generic compressed-tree dispatch.
+    output_characteristics: buildGenericQube(),
+    input_characteristics: [
+      'input_source',
+      'lead_time',
+      'base_time',
+      'ensemble_number',
+      'anemoi_kwargs',
+    ],
   },
 ]
 
@@ -170,6 +387,7 @@ export const artifactsHandlers = [
         pip_package_constraints,
         output_characteristics,
         input_characteristics,
+        timestep,
         ...overview
       }) => overview,
     )

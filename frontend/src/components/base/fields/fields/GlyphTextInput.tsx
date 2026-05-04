@@ -23,7 +23,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { GlyphContext } from '@/features/fable-builder/utils/glyph-expression-context'
-import type { AutocompleteCandidate } from '@/features/fable-builder/components/shared/GlyphAutocomplete'
+import type {
+  AutocompleteCandidate,
+  GlyphAutocompleteHandle,
+} from '@/features/fable-builder/components/shared/GlyphAutocomplete'
 import { Input } from '@/components/ui/input'
 import { InputGroupInput } from '@/components/ui/input-group'
 import { useGlyphContext } from '@/features/fable-builder/context/GlyphContext'
@@ -63,6 +66,7 @@ export function GlyphTextInput({
   const helperFunctions = helperFunctionsResponse?.functions ?? []
 
   const inputRef = useRef<HTMLInputElement>(null)
+  const autocompleteRef = useRef<GlyphAutocompleteHandle>(null)
   const [context, setContext] = useState<GlyphContext | null>(null)
 
   const hasAnyCandidates = variables.length > 0 || helperFunctions.length > 0
@@ -112,6 +116,17 @@ export function GlyphTextInput({
       recomputeContext(value, pos)
     },
     [value, recomputeContext],
+  )
+
+  // Route keys to the autocomplete first so they're consumed before any
+  // default (form submit, caret motion).
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (autocompleteRef.current?.handleKeyDown(e)) {
+        e.preventDefault()
+      }
+    },
+    [],
   )
 
   // Build the candidate set for the current context kind. Variables and
@@ -200,6 +215,7 @@ export function GlyphTextInput({
     type: 'text' as const,
     value,
     onChange: handleChange,
+    onKeyDown: handleKeyDown,
     onKeyUp: handleKeyUp,
     onBlur: handleBlur,
     placeholder,
@@ -212,6 +228,7 @@ export function GlyphTextInput({
   const autocompleteDropdown = context !== null && (
     <div className="absolute top-full right-0 left-0 z-50 mt-1">
       <GlyphAutocomplete
+        ref={autocompleteRef}
         candidates={candidates}
         filter={context.prefix}
         contextKind={context.kind === 'filter' ? 'filter' : 'value'}

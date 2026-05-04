@@ -9,8 +9,16 @@
  */
 
 import { createFileRoute } from '@tanstack/react-router'
+import { z } from 'zod'
 import { ExecutionDetailPage } from '@/features/executions/components/ExecutionDetailPage'
+
+/** Search params for the execution detail page. `mimes` is a comma-joined
+ * list of active filter chips on the Outputs tab; missing/empty = "All". */
+const searchSchema = z.object({
+  mimes: z.string().optional(),
+})
 
 export const Route = createFileRoute('/_authenticated/executions/$jobId')({
   component: ExecutionDetailPage,
+  validateSearch: searchSchema,
 })

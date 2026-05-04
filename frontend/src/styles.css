@@ -192,6 +192,20 @@
 }
 
 /*
+ * Beam-flow animation for the running edges in the execution canvas.
+ * Drives stroke-dashoffset on a path with pathLength=100 so a short dash
+ * appears to flow from source to target.
+ */
+@keyframes beam-flow {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+
+/*
  * Respect the user's OS-level motion preference. Disables page-wide
  * CSS transitions, animations, scroll behaviour, and scroll-linked
  * animations when `prefers-reduced-motion: reduce` is set. Components

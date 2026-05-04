@@ -27,13 +27,6 @@ export const JobStatusSchema = z.enum([
   'unknown',
 ])
 
-/** routes/run.py: ProductToOutputId */
-export const ProductToOutputIdSchema = z.object({
-  product_name: z.string(),
-  product_spec: z.record(z.string(), z.unknown()),
-  output_ids: z.array(z.string()),
-})
-
 /** routes/run.py: JobExecuteResponse */
 export const JobExecuteResponseSchema = z.object({
   run_id: z.string(),
@@ -47,10 +40,13 @@ export const RunOutputMetadataSchema = z.object({
   is_available: z.boolean(),
 })
 
-/** routes/run.py: RunOutputs */
-export const RunOutputsSchema = z.object({
-  outputs: z.record(z.string(), RunOutputMetadataSchema),
-})
+/** routes/run.py: RunOutputsResponse — backend wraps the dict in `{ outputs: ... }`;
+ * we flatten on parse so consumers can access `details.outputs[taskId]` directly. */
+export const RunOutputsSchema = z
+  .object({
+    outputs: z.record(z.string(), RunOutputMetadataSchema),
+  })
+  .transform((wrapper) => wrapper.outputs)
 
 /** routes/run.py: JobExecutionDetail (status narrowed from str to known values) */
 export const JobExecutionDetailSchema = z.object({
@@ -118,7 +114,6 @@ export function isTerminalStatus(status: JobStatus): boolean {
   return TERMINAL_STATUSES.has(status)
 }
 
-export type ProductToOutputId = z.infer<typeof ProductToOutputIdSchema>
 export type JobExecuteResponse = z.infer<typeof JobExecuteResponseSchema>
 export type RunOutputMetadata = z.infer<typeof RunOutputMetadataSchema>
 export type RunOutputs = z.infer<typeof RunOutputsSchema>

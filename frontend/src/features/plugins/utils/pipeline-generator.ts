@@ -243,6 +243,7 @@ const KNOWN_FIELD_DEFAULTS: Record<string, string> = {
   // Common numeric fields (as strings)
   lead_time: '24',
   ensemble_members: '4',
+  ensemble_number: '4',
 }
 
 /**

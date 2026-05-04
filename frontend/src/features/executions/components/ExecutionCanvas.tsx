@@ -39,6 +39,7 @@ import {
   fableToNodes,
 } from '@/features/fable-builder/utils/fable-to-graph'
 import { layoutNodes } from '@/features/fable-builder/utils/layout-blocks'
+import { BeamEdge } from '@/features/executions/components/BeamEdge'
 import { ExecutionNode } from '@/features/executions/components/ExecutionNode'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -62,6 +63,10 @@ const nodeTypes: Record<string, typeof ExecutionNode> = {
   sinkBlock: ExecutionNode,
 }
 
+const edgeTypes = {
+  beam: BeamEdge,
+}
+
 function ExecutionCanvasInner({
   fable,
   catalogue,
@@ -83,27 +88,44 @@ function ExecutionCanvasInner({
     })
   }, [showConfig, fitView])
 
-  const { layoutedNodes, edges } = useMemo(() => {
+  const isRunning = status === 'running'
+
+  const { layoutedNodes, edges, canvasHeight } = useMemo(() => {
     const nodes = fableToNodes(fable, catalogue)
     const edgeList = fableToEdges(fable, catalogue)
-    const laid = layoutNodes(nodes, edgeList, { direction: 'LR' })
+    // The execution node renders compact (~110px tall when collapsed); dagre's
+    // default nodeHeight=200 + nodeSpacingY=100 over-reserves vertical room.
+    const laid = layoutNodes(nodes, edgeList, {
+      direction: 'LR',
+      nodeHeight: 110,
+      nodeSpacingY: 40,
+    })
     const remapped = edgeList.map((e) => ({
       ...e,
-      type: 'smoothstep' as const,
+      // While running: custom beam edge with a flowing dash over a static
+      // track. Otherwise: the default smoothstep edge.
+      type: isRunning ? ('beam' as const) : ('smoothstep' as const),
+      animated: false,
+      style: undefined,
     }))
-    return { layoutedNodes: laid, edges: remapped }
-  }, [fable, catalogue])
+    return {
+      layoutedNodes: laid,
+      edges: remapped,
+      canvasHeight: computeCanvasHeight(laid),
+    }
+  }, [fable, catalogue, isRunning])
 
   return (
     <ShowConfigContext value={showConfig}>
       <div
+        style={{ minHeight: `${canvasHeight}px` }}
         className={cn(
-          'relative h-[300px] overflow-hidden rounded-lg border',
-          status === 'running' &&
-            'border-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.3)]',
-          status === 'failed' &&
-            'border-red-400 shadow-[0_0_12px_rgba(239,68,68,0.3)]',
-          status === 'completed' && 'border-green-400',
+          'relative h-full min-h-0 flex-1 overflow-hidden rounded-lg',
+          // No border — the dotted background already provides framing.
+          // Status feedback comes from a soft glow halo only.
+          status === 'running' && 'shadow-[0_0_12px_rgba(251,191,36,0.3)]',
+          status === 'failed' && 'shadow-[0_0_12px_rgba(239,68,68,0.3)]',
+          status === 'completed' && 'shadow-[0_0_12px_rgba(34,197,94,0.25)]',
         )}
       >
         {status === 'running' && (
@@ -116,12 +138,14 @@ function ExecutionCanvasInner({
           nodes={layoutedNodes}
           edges={edges}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable={false}
           panOnDrag={true}
           zoomOnScroll={true}
           fitView={true}
+          fitViewOptions={{ padding: 0.15 }}
           proOptions={{ hideAttribution: true }}
         >
           <Background
@@ -165,4 +189,36 @@ export function ExecutionCanvas(props: ExecutionCanvasProps) {
       <ExecutionCanvasInner {...props} />
     </ReactFlowProvider>
   )
+}
+
+const MIN_CANVAS_HEIGHT = 280
+const MAX_CANVAS_HEIGHT = 520
+/** Padding above + below the laid-out nodes so the Show-config / minimap /
+ * controls overlays don't clip the top/bottom rows. */
+const VERTICAL_CHROME_PADDING = 96
+
+interface PositionedNode {
+  position: { x: number; y: number }
+  measured?: { width?: number; height?: number }
+  width?: number
+  height?: number
+}
+
+/**
+ * Compute a viewport height that fits the laid-out node bbox. Falls back
+ * to MIN_CANVAS_HEIGHT for empty / tiny graphs and clamps at
+ * MAX_CANVAS_HEIGHT so a runaway graph doesn't take over the page.
+ */
+function computeCanvasHeight(nodes: ReadonlyArray<PositionedNode>): number {
+  if (nodes.length === 0) return MIN_CANVAS_HEIGHT
+  let maxBottom = 0
+  for (const node of nodes) {
+    // dagre sets `width`/`height` on the node; fall back to a sensible
+    // default if the layout step skipped a node for any reason.
+    const h = node.measured?.height ?? node.height ?? 130
+    const bottom = node.position.y + h
+    if (bottom > maxBottom) maxBottom = bottom
+  }
+  const total = maxBottom + VERTICAL_CHROME_PADDING
+  return Math.max(MIN_CANVAS_HEIGHT, Math.min(MAX_CANVAS_HEIGHT, total))
 }

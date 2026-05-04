@@ -24,6 +24,16 @@ const NODE_TYPE_TO_KIND: Record<string, BlockKind> = {
   sinkBlock: 'sink',
 }
 
+/**
+ * Vertical centre of the node's header row, in pixels from the top of the
+ * node. Keeping handles pinned here means they line up horizontally across
+ * nodes regardless of how tall the optional config block makes the body —
+ * which is what makes a `smoothstep` edge collapse to a straight line.
+ */
+const HANDLE_Y_PX = 32
+/** Vertical spacing between adjacent handles on a multi-input target. */
+const MULTI_HANDLE_GAP_PX = 12
+
 export const ExecutionNode = memo(function ({ data, type }: NodeProps) {
   const nodeData = data as FableNodeData
   const showConfig = useShowConfig()
@@ -44,29 +54,32 @@ export const ExecutionNode = memo(function ({ data, type }: NodeProps) {
         showConfig && configEntries.length > 0 ? 'w-[200px]' : 'w-[140px]',
       )}
     >
-      {inputNames.map((inputName, i) => (
-        <Handle
-          key={inputName}
-          type="target"
-          position={Position.Left}
-          id={inputName}
-          className="h-2! w-2! border! border-border! bg-muted-foreground/40!"
-          style={{
-            top:
-              inputNames.length === 1
-                ? '50%'
-                : `${((i + 1) / (inputNames.length + 1)) * 100}%`,
-            transform: 'translateY(-50%)',
-          }}
-        />
-      ))}
+      {inputNames.map((inputName, i) => {
+        const offset =
+          inputNames.length === 1
+            ? 0
+            : (i - (inputNames.length - 1) / 2) * MULTI_HANDLE_GAP_PX
+        return (
+          <Handle
+            key={inputName}
+            type="target"
+            position={Position.Left}
+            id={inputName}
+            className="h-2! w-2! border! border-border! bg-muted-foreground/40!"
+            style={{
+              top: `${HANDLE_Y_PX + offset}px`,
+              transform: 'translateY(-50%)',
+            }}
+          />
+        )
+      })}
 
       <Handle
         type="source"
         position={Position.Right}
         id="output"
         className="h-2! w-2! border! border-border! bg-muted-foreground/40!"
-        style={{ top: '50%', transform: 'translateY(-50%)' }}
+        style={{ top: `${HANDLE_Y_PX}px`, transform: 'translateY(-50%)' }}
       />
 
       <div className={cn('h-1 rounded-t-lg', kindMeta.topBarColor)} />

@@ -44,22 +44,20 @@ const seedExecutions: Array<JobExecutionDetail> = [
     progress: '100',
     cascade_job_id: 'cascade-001',
     outputs: {
-      outputs: {
-        'task-out-1': {
-          mime_type: 'image/png',
-          original_block: 'sink_temperature_map',
-          is_available: true,
-        },
-        'task-out-2': {
-          mime_type: 'image/png',
-          original_block: 'sink_temperature_map',
-          is_available: true,
-        },
-        'task-out-3': {
-          mime_type: 'image/png',
-          original_block: 'sink_wind_map',
-          is_available: true,
-        },
+      'task-out-1': {
+        mime_type: 'image/png',
+        original_block: 'sink_temperature_map',
+        is_available: true,
+      },
+      'task-out-2': {
+        mime_type: 'image/png',
+        original_block: 'sink_temperature_map',
+        is_available: true,
+      },
+      'task-out-3': {
+        mime_type: 'image/png',
+        original_block: 'sink_wind_map',
+        is_available: true,
       },
     },
   },
@@ -75,12 +73,10 @@ const seedExecutions: Array<JobExecutionDetail> = [
     progress: '45',
     cascade_job_id: 'cascade-002',
     outputs: {
-      outputs: {
-        'task-out-4': {
-          mime_type: 'image/png',
-          original_block: 'sink_precipitation',
-          is_available: false,
-        },
+      'task-out-4': {
+        mime_type: 'image/png',
+        original_block: 'sink_precipitation',
+        is_available: false,
       },
     },
   },
@@ -95,9 +91,7 @@ const seedExecutions: Array<JobExecutionDetail> = [
     error: 'Worker process exited with code 137 (OOM killed)',
     progress: '62',
     cascade_job_id: 'cascade-003',
-    outputs: {
-      outputs: {},
-    },
+    outputs: {},
   },
   {
     run_id: 'job-submitted-004',
@@ -113,6 +107,34 @@ const seedExecutions: Array<JobExecutionDetail> = [
     outputs: null,
   },
 ]
+
+/** Test-only fixture for the mixed-availability filter case. Not added to
+ * the default seed — inject it via {@link injectMockExecution} from the test
+ * that needs it, so other seed-dependent tests stay deterministic. */
+export const mixedAvailabilityExecution: JobExecutionDetail = {
+  run_id: 'job-mixed-005',
+  attempt_count: 1,
+  status: 'preparing',
+  created_at: oneHourAgo,
+  updated_at: oneHourAgo,
+  blueprint_id: 'def-005',
+  blueprint_version: 1,
+  error: null,
+  progress: '70',
+  cascade_job_id: 'cascade-005',
+  outputs: {
+    'task-out-5a': {
+      mime_type: 'image/png',
+      original_block: 'sink_available',
+      is_available: true,
+    },
+    'task-out-5b': {
+      mime_type: 'image/png',
+      original_block: 'sink_pending',
+      is_available: false,
+    },
+  },
+}
 
 export function resetJobsState(): void {
   executionsState = {}
@@ -178,6 +200,31 @@ export function restartExecution(
 export function deleteExecution(executionId: string): boolean {
   if (!(executionId in executionsState)) return false
   delete executionsState[executionId]
+  return true
+}
+
+/** Add an execution to the mock state. Intended for tests that need a
+ * specific fixture without adding it to the default seed. */
+export function injectMockExecution(detail: JobExecutionDetail): void {
+  executionsState[detail.run_id] = JSON.parse(
+    JSON.stringify(detail),
+  ) as JobExecutionDetail
+}
+
+/** Flip the `is_available` flag on a single output in the mock state.
+ * Useful for hand-testing the "outputs trickling in" flow against running jobs. */
+export function setMockOutputAvailable(
+  executionId: string,
+  taskId: string,
+  isAvailable: boolean,
+): boolean {
+  // The record lookups are statically typed as the value type (no
+  // `noUncheckedIndexedAccess`), so cast to surface the runtime undefined.
+  const exec = executionsState[executionId] as JobExecutionDetail | undefined
+  if (!exec?.outputs) return false
+  const meta = exec.outputs[taskId] as { is_available: boolean } | undefined
+  if (!meta) return false
+  meta.is_available = isAvailable
   return true
 }
 

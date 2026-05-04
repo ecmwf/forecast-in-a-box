@@ -279,7 +279,7 @@ export function FableBuilderPage({
     <GlyphProvider>
       <div
         className="flex min-w-0 flex-col"
-        style={{ height: 'calc(100vh - 60px)' }}
+        style={{ height: 'calc(100vh - 7rem)' }}
       >
         <FableBuilderHeader fableId={fableId} catalogue={catalogue} />
 

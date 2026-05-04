@@ -14,12 +14,13 @@
  * Dialog for creating or editing a global glyph.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AlertCircle, HelpCircle, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { GlyphDetail } from '@/api/types/fable.types'
 import { useCreateGlobalGlyph } from '@/api/hooks/useFable'
 import { useAuth } from '@/features/auth/AuthContext'
+import { isValidGlyphKey } from '@/features/glyphs/utils/validate-key'
 import { useUser } from '@/hooks/useUser'
 import { showToast } from '@/lib/toast'
 import {
@@ -70,6 +71,19 @@ export function GlyphFormDialog({
 
   const createGlyph = useCreateGlobalGlyph()
 
+  // The dialog is permanently mounted by the parent, so the useState
+  // initializers above only run once. Sync local state whenever the dialog
+  // is (re)opened, so editing a row populates the form with that row's
+  // current values (not a stale empty string from first mount).
+  useEffect(() => {
+    if (!open) return
+    setKey(editGlyph?.name ?? '')
+    setValue(editGlyph?.valueExample ?? '')
+    setIsPublic(false)
+    setOverriddable(null)
+    setError(null)
+  }, [open, editGlyph])
+
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) {
       setKey('')
@@ -89,6 +103,14 @@ export function GlyphFormDialog({
     setOverriddable(next ? false : null)
   }
 
+  const trimmedKeyForValidation = key.trim()
+  // Skip the format check while editing — the key field is read-only there
+  // and we don't want to surface a hint about a key the user can't change.
+  const keyFormatInvalid =
+    !isEditing &&
+    trimmedKeyForValidation !== '' &&
+    !isValidGlyphKey(trimmedKeyForValidation)
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -97,6 +119,10 @@ export function GlyphFormDialog({
     const trimmedValue = value.trim()
 
     if (!trimmedKey || !trimmedValue) return
+    if (!isEditing && !isValidGlyphKey(trimmedKey)) {
+      setError(t('form.keyInvalid'))
+      return
+    }
 
     try {
       await createGlyph.mutateAsync({
@@ -143,8 +169,15 @@ export function GlyphFormDialog({
               onChange={(e) => setKey(e.target.value)}
               placeholder={t('form.keyPlaceholder')}
               disabled={isEditing}
+              aria-invalid={keyFormatInvalid || undefined}
             />
-            <P className="text-sm text-muted-foreground">{t('form.keyHelp')}</P>
+            {keyFormatInvalid ? (
+              <P className="text-sm text-destructive">{t('form.keyInvalid')}</P>
+            ) : (
+              <P className="text-sm text-muted-foreground">
+                {t('form.keyHelp')}
+              </P>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -221,7 +254,12 @@ export function GlyphFormDialog({
             </Button>
             <Button
               type="submit"
-              disabled={!key.trim() || !value.trim() || createGlyph.isPending}
+              disabled={
+                !key.trim() ||
+                !value.trim() ||
+                keyFormatInvalid ||
+                createGlyph.isPending
+              }
             >
               {createGlyph.isPending ? (
                 <>

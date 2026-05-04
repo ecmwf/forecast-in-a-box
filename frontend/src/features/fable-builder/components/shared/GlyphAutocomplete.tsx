@@ -17,7 +17,14 @@
  * position. Supports keyboard navigation (arrow keys + Enter / Escape).
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
@@ -50,6 +57,14 @@ interface GlyphAutocompleteProps {
   onClose: () => void
 }
 
+/** Parent forwards keys via this handle so they're handled before any
+ * form-submit default. Returns true if the key was consumed. */
+export interface GlyphAutocompleteHandle {
+  handleKeyDown: (
+    e: KeyboardEvent | React.KeyboardEvent<HTMLElement>,
+  ) => boolean
+}
+
 const VALUE_SECTION_ORDER: ReadonlyArray<AutocompleteSource> = [
   'local',
   'global',
@@ -58,13 +73,13 @@ const VALUE_SECTION_ORDER: ReadonlyArray<AutocompleteSource> = [
 ]
 const FILTER_SECTION_ORDER: ReadonlyArray<AutocompleteSource> = ['filter']
 
-export function GlyphAutocomplete({
-  candidates,
-  filter,
-  contextKind,
-  onSelect,
-  onClose,
-}: GlyphAutocompleteProps) {
+export const GlyphAutocomplete = forwardRef<
+  GlyphAutocompleteHandle,
+  GlyphAutocompleteProps
+>(function GlyphAutocompleteInner(
+  { candidates, filter, contextKind, onSelect, onClose },
+  ref,
+) {
   const { t } = useTranslation('glyphs')
   const [activeIndex, setActiveIndex] = useState(0)
   const listRef = useRef<HTMLDivElement>(null)
@@ -101,26 +116,36 @@ export function GlyphAutocomplete({
     setActiveIndex(0)
   }, [filter, contextKind])
 
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        setActiveIndex((i) => Math.min(i + 1, allItems.length - 1))
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        setActiveIndex((i) => Math.max(i - 1, 0))
-      } else if (e.key === 'Enter' && allItems.length > 0) {
-        e.preventDefault()
-        onSelect(allItems[activeIndex])
-      } else if (e.key === 'Escape') {
-        e.preventDefault()
-        onClose()
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [allItems, activeIndex, onSelect, onClose])
+  useImperativeHandle(
+    ref,
+    () => ({
+      handleKeyDown(e) {
+        if (e.key === 'ArrowDown') {
+          setActiveIndex((i) => Math.min(i + 1, allItems.length - 1))
+          return true
+        }
+        if (e.key === 'ArrowUp') {
+          setActiveIndex((i) => Math.max(i - 1, 0))
+          return true
+        }
+        // Tab accepts in addition to Enter; Shift+Tab is left alone so
+        // backward focus navigation still works.
+        if (
+          (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) &&
+          allItems.length > 0
+        ) {
+          onSelect(allItems[activeIndex])
+          return true
+        }
+        if (e.key === 'Escape') {
+          onClose()
+          return true
+        }
+        return false
+      },
+    }),
+    [allItems, activeIndex, onSelect, onClose],
+  )
 
   // Scroll active item into view
   useEffect(() => {
@@ -171,7 +196,7 @@ export function GlyphAutocomplete({
       })}
     </div>
   )
-}
+})
 
 function AutocompleteItem({
   candidate,
