@@ -5,7 +5,7 @@ from fiab_core.artifacts import ArtifactResolved, ArtifactsProvider, CompositeAr
 @pytest.fixture(scope="session", autouse=True)
 def register_artifacts_provider() -> None:
     fake_id = CompositeArtifactId.from_str("mystore:mycheckpoint")
-    ArtifactsProvider.register_get_checkpoint_lookup(
+    ArtifactsProvider.register_get_artifacts_lookup(
         lambda: {
             fake_id: ArtifactResolved(
                 artifact_type="MlModelCheckpoint",

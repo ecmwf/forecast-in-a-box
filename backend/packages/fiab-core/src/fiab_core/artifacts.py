@@ -82,7 +82,7 @@ class ArtifactResolved:
     local_compatibility_detail: str | None
 
 
-CheckpointLookup = Mapping[CompositeArtifactId, ArtifactResolved]
+ArtifactsLookup = Mapping[CompositeArtifactId, ArtifactResolved]
 
 
 class ArtifactsProvider:
@@ -93,20 +93,20 @@ class ArtifactsProvider:
     Raises RuntimeError if a method is called before its implementation is registered.
     """
 
-    _get_checkpoint_lookup: Callable[[], CheckpointLookup] | None = None
+    _get_artifacts_lookup: Callable[[], ArtifactsLookup] | None = None
     _get_artifact_local_path: Callable[[CompositeArtifactId], Path] | None = None
 
     @classmethod
-    def register_get_checkpoint_lookup(cls, fn: Callable[[], CheckpointLookup]) -> None:
-        """Register the get_checkpoint_lookup implementation."""
-        cls._get_checkpoint_lookup = fn
+    def register_get_artifacts_lookup(cls, fn: Callable[[], ArtifactsLookup]) -> None:
+        """Register the get_artifacts_lookup implementation."""
+        cls._get_artifacts_lookup = fn
 
     @classmethod
-    def get_checkpoint_lookup(cls) -> CheckpointLookup:
-        """Return a mapping of all known CompositeArtifactId to MlModelCheckpoint."""
-        if cls._get_checkpoint_lookup is None:
-            raise RuntimeError("ArtifactsProvider.get_checkpoint_lookup has not been registered")
-        return cls._get_checkpoint_lookup()
+    def get_artifacts_lookup(cls) -> ArtifactsLookup:
+        """Return a mapping of all known CompositeArtifactId to ArtifactResolved."""
+        if cls._get_artifacts_lookup is None:
+            raise RuntimeError("ArtifactsProvider.get_artifacts_lookup has not been registered")
+        return cls._get_artifacts_lookup()
 
     @classmethod
     def register_get_artifact_local_path(cls, fn: Callable[[CompositeArtifactId], Path]) -> None:

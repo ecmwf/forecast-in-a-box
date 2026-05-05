@@ -17,7 +17,7 @@ from fiab_core.artifacts import ArtifactResolved, ArtifactsProvider, CompositeAr
 
 @contextlib.contextmanager
 def dummy_provider() -> Generator[None, None, None]:
-    ArtifactsProvider.register_get_checkpoint_lookup(
+    ArtifactsProvider.register_get_artifacts_lookup(
         lambda: {
             CompositeArtifactId.from_str("dummy_store:dummy_ckpt"): ArtifactResolved(
                 artifact_type="MlModelCheckpoint",
@@ -43,7 +43,7 @@ def dummy_provider() -> Generator[None, None, None]:
         lambda composite_id: Path(f"/local/path/for/{CompositeArtifactId.to_str(composite_id)}")
     )
     yield
-    ArtifactsProvider._get_checkpoint_lookup = None
+    ArtifactsProvider._get_artifacts_lookup = None
     ArtifactsProvider._get_artifact_local_path = None
 
 
