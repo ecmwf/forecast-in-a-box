@@ -63,6 +63,8 @@ def execute_background(
     moment this function actually begins executing (i.e. ``current_time()``).
     """
 
+    logger.debug(f"starting background compilation of {run_id=}")
+
     def run_async(coro: object) -> object:  # type: ignore[type-arg]
         return asyncio.run_coroutine_threadsafe(coro, loop).result()  # type: ignore[arg-type]
 
@@ -110,6 +112,7 @@ def execute_background(
             )
         )
 
+        logger.debug(f"starting background submission of {run_id=}")
         response = execute_cascade(exec_spec)
         cascade_job_id = response.job_id or str(uuid.uuid4())
 
@@ -123,4 +126,5 @@ def execute_background(
 
     except Exception as e:
         logger.exception(f"execute_background failed for run {run_id!r} attempt {attempt_count}: {e}")
+        logger.debug(f"updating background data of {run_id=}")
         run_async(db.update_run_runtime(run_id, attempt_count, status="failed", error=repr(e)[:255]))
