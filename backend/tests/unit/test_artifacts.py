@@ -138,15 +138,15 @@ def test_get_artifacts_catalog(sample_artifact_stores_config: Any, sample_checkp
     store1_data = {
         "display_name": "Store 1",
         "artifacts": {
-            "model1": sample_checkpoint.model_dump(),
-            "model2": sample_checkpoint.model_dump(),
+            "model1": {"artifact_type": "MlModelCheckpoint", "store_info": sample_checkpoint.model_dump()},
+            "model2": {"artifact_type": "MlModelCheckpoint", "store_info": sample_checkpoint.model_dump()},
         },
     }
 
     store2_data = {
         "display_name": "Store 2",
         "artifacts": {
-            "model3": sample_checkpoint.model_dump(),
+            "model3": {"artifact_type": "MlModelCheckpoint", "store_info": sample_checkpoint.model_dump()},
         },
     }
 
@@ -209,7 +209,7 @@ def test_get_artifacts_catalog_from_local_file(tmpdir_path: Path, sample_checkpo
     store_data = {
         "display_name": "Local Store",
         "artifacts": {
-            "local_model": sample_checkpoint.model_dump(),
+            "local_model": {"artifact_type": "MlModelCheckpoint", "store_info": sample_checkpoint.model_dump()},
         },
     }
 

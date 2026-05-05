@@ -42,12 +42,14 @@ def get_artifacts_catalog(artifact_stores_config: ArtifactStoresConfig) -> Artif
                 raw = fetch_content(store_config.url, client)
                 store_data = json.loads(raw)
                 artifacts = store_data.get("artifacts", {})
-                for checkpoint_id, checkpoint_data in artifacts.items():
-                    composite_id = CompositeArtifactId(artifact_store_id=store_id, artifact_local_id=ArtifactLocalId(checkpoint_id))
+                for artifact_id, artifact_data in artifacts.items():
+                    composite_id = CompositeArtifactId(artifact_store_id=store_id, artifact_local_id=ArtifactLocalId(artifact_id))
+                    artifact_type = artifact_data["artifact_type"]
+                    store_info_data = artifact_data["store_info"]
                     # TODO set compatibility information
                     catalog[composite_id] = ArtifactResolved(
-                        artifact_type="MlModelCheckpoint",
-                        store_info=MlModelCheckpoint(**checkpoint_data),
+                        artifact_type=artifact_type,
+                        store_info=MlModelCheckpoint(**store_info_data),
                         is_locally_compatible=True,
                         local_compatibility_detail=None,
                     )
