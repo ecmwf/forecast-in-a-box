@@ -210,13 +210,15 @@ const mockModels: Array<MlModelDetail> = [
   {
     composite_id: {
       artifact_store_id: 'ecmwf',
-      ml_model_checkpoint_id: 'aifs-single-v0.2.1',
+      artifact_local_id: 'aifs-single-v0.2.1',
     },
     display_name: 'AIFS Single',
     display_author: 'ECMWF',
     disk_size_bytes: 2_147_483_648,
     supported_platforms: ['cpu', 'cuda'],
     is_available: true,
+    is_locally_compatible: true,
+    local_compatibility_detail: null,
     display_description:
       'ECMWF Artificial Intelligence Forecasting System (AIFS) single model for medium-range weather prediction.',
     url: 'https://www.ecmwf.int/en/forecasts/documentation-and-support',
@@ -237,13 +239,15 @@ const mockModels: Array<MlModelDetail> = [
   {
     composite_id: {
       artifact_store_id: 'ecmwf',
-      ml_model_checkpoint_id: 'aifs-single-mse-1.1_w_sdpa',
+      artifact_local_id: 'aifs-single-mse-1.1_w_sdpa',
     },
     display_name: 'AIFS Single MSE 1.1',
     display_author: 'ECMWF',
     disk_size_bytes: 993_937_386,
     supported_platforms: ['linux', 'macos'],
     is_available: false,
+    is_locally_compatible: false,
+    local_compatibility_detail: 'Required CUDA driver version >= 12.0 not found.',
     display_description:
       'ECMWF AIFS single MSE 1.1 model with scaled-dot-product attention for medium-range weather forecasting.',
     url: 'https://sites.ecmwf.int/repository/fiab/aifs/aifs-single-mse-1.1_sdpa.ckpt',
@@ -268,13 +272,15 @@ const mockModels: Array<MlModelDetail> = [
   {
     composite_id: {
       artifact_store_id: 'ecmwf',
-      ml_model_checkpoint_id: 'aifs-ens-crps-1.0_w_sdpa',
+      artifact_local_id: 'aifs-ens-crps-1.0_w_sdpa',
     },
     display_name: 'AIFS ENS CRPS 1.0',
     display_author: 'ECMWF',
     disk_size_bytes: 921_584_533,
     supported_platforms: ['linux', 'macos'],
     is_available: true,
+    is_locally_compatible: true,
+    local_compatibility_detail: null,
     display_description:
       'ECMWF AIFS ensemble CRPS-trained model with scaled-dot-product attention for probabilistic forecasts.',
     url: 'https://sites.ecmwf.int/repository/fiab/aifs/aifs-ens-crps-1.0_sdpa.ckpt',
@@ -305,13 +311,15 @@ const mockModels: Array<MlModelDetail> = [
   {
     composite_id: {
       artifact_store_id: 'ecmwf',
-      ml_model_checkpoint_id: 'aifs-ens-v0.3.0',
+      artifact_local_id: 'aifs-ens-v0.3.0',
     },
     display_name: 'AIFS ENS',
     display_author: 'ECMWF',
     disk_size_bytes: 3_221_225_472,
     supported_platforms: ['cuda'],
     is_available: false,
+    is_locally_compatible: false,
+    local_compatibility_detail: 'No compatible GPU detected on this host.',
     display_description:
       'ECMWF AIFS large ensemble model for operational probabilistic weather forecasting at scale.',
     url: 'https://www.ecmwf.int/en/forecasts/documentation-and-support',
@@ -329,19 +337,19 @@ const mockModels: Array<MlModelDetail> = [
 ]
 
 function artifactKey(id: CompositeArtifactId): string {
-  return `${id.artifact_store_id}::${id.ml_model_checkpoint_id}`
+  return `${id.artifact_store_id}::${id.artifact_local_id}`
 }
 
 /** Mimic Python's str(CompositeArtifactId(...)) repr format used by the backend */
 function compositeIdStr(id: CompositeArtifactId): string {
-  return `CompositeArtifactId(artifact_store_id='${id.artifact_store_id}', ml_model_checkpoint_id='${id.ml_model_checkpoint_id}')`
+  return `CompositeArtifactId(artifact_store_id='${id.artifact_store_id}', artifact_local_id='${id.artifact_local_id}')`
 }
 
 function findModel(id: CompositeArtifactId) {
   return mockModels.find(
     (m) =>
       m.composite_id.artifact_store_id === id.artifact_store_id &&
-      m.composite_id.ml_model_checkpoint_id === id.ml_model_checkpoint_id,
+      m.composite_id.artifact_local_id === id.artifact_local_id,
   )
 }
 

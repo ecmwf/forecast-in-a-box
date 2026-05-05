@@ -61,6 +61,11 @@
     "qubeParamCount_one": "{{count}} param",
     "qubeParamCount_other": "{{count}} params"
   },
+  "compatibility": {
+    "compatible": "Compatible",
+    "notCompatible": "Not compatible",
+    "notCompatibleDetail": "Not compatible: {{detail}}"
+  },
   "emptyState": {
     "title": "No models found",
     "description": "Try adjusting your search or filter criteria.",
