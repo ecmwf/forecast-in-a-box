@@ -28,7 +28,7 @@ from cascade.low.func import Either
 from pyrsistent import pmap, pset
 from pyrsistent.typing import PMap, PSet
 
-from forecastbox.domain.artifact.base import ArtifactCatalog, CompositeArtifactId, MlModelCheckpoint, MlModelDetail, MlModelOverview
+from forecastbox.domain.artifact.base import ArtifactCatalog, CompositeArtifactId, MlModelDetail, MlModelOverview
 from forecastbox.domain.artifact.io import delete_artifact, download_artifact, get_artifacts_catalog, list_local_storage
 from forecastbox.utility.concurrent import timed_acquire
 from forecastbox.utility.config import config
@@ -178,7 +178,8 @@ def list_models() -> list[MlModelOverview]:
             raise TimeoutError
 
         overviews = []
-        for composite_id, checkpoint in ArtifactManager.catalog.items():
+        for composite_id, artifact in ArtifactManager.catalog.items():
+            checkpoint = artifact.store_info
             overview = MlModelOverview(
                 composite_id=composite_id,
                 display_name=checkpoint.display_name,
@@ -186,6 +187,8 @@ def list_models() -> list[MlModelOverview]:
                 disk_size_bytes=checkpoint.disk_size_bytes,
                 supported_platforms=checkpoint.supported_platforms,
                 is_available=composite_id in ArtifactManager.locally_available,
+                is_locally_compatible=artifact.is_locally_compatible,
+                local_compatibility_detail=artifact.local_compatibility_detail,
             )
             overviews.append(overview)
 
@@ -198,7 +201,8 @@ def get_model_details(composite_id: CompositeArtifactId) -> MlModelDetail:
         if not result:
             raise TimeoutError
 
-        checkpoint = ArtifactManager.catalog[composite_id]
+        artifact = ArtifactManager.catalog[composite_id]
+        checkpoint = artifact.store_info
 
         detail = MlModelDetail(
             composite_id=composite_id,
@@ -212,6 +216,8 @@ def get_model_details(composite_id: CompositeArtifactId) -> MlModelDetail:
             output_characteristics=[str(checkpoint.output_qube)],  # TODO Add qubed to detail, and display properly in the frontend
             input_characteristics=checkpoint.input_characteristics,
             is_available=composite_id in ArtifactManager.locally_available,
+            is_locally_compatible=artifact.is_locally_compatible,
+            local_compatibility_detail=artifact.local_compatibility_detail,
         )
 
         return detail

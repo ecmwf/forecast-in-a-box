@@ -17,7 +17,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 from cascade.low.exceptions import CascadeInternalError
-from fiab_core.artifacts import ArtifactStoreId, MlModelCheckpoint, MlModelCheckpointId
+from fiab_core.artifacts import ArtifactLocalId, ArtifactResolved, ArtifactStoreId, MlModelCheckpoint
 from pyrsistent import pmap
 
 from forecastbox.domain.artifact.base import (
@@ -52,6 +52,17 @@ def sample_checkpoint() -> MlModelCheckpoint:
 
 
 @pytest.fixture
+def sample_artifact(sample_checkpoint: MlModelCheckpoint) -> ArtifactResolved:
+    """Sample ArtifactResolved wrapping sample_checkpoint, locally compatible"""
+    return ArtifactResolved(
+        artifact_type="MlModelCheckpoint",
+        store_info=sample_checkpoint,
+        is_locally_compatible=True,
+        local_compatibility_detail=None,
+    )
+
+
+@pytest.fixture
 def sample_artifact_stores_config() -> ArtifactStoresConfig:
     """Sample artifact stores configuration"""
     return {
@@ -75,9 +86,9 @@ def tmpdir_path() -> Generator[Path, None, None]:
 
 def test_composite_artifact_id() -> None:
     """Test CompositeArtifactId creation and hashing"""
-    id1 = CompositeArtifactId(artifact_store_id=ArtifactStoreId("store1"), ml_model_checkpoint_id=MlModelCheckpointId("model1"))
-    id2 = CompositeArtifactId(artifact_store_id=ArtifactStoreId("store1"), ml_model_checkpoint_id=MlModelCheckpointId("model1"))
-    id3 = CompositeArtifactId(artifact_store_id=ArtifactStoreId("store1"), ml_model_checkpoint_id=MlModelCheckpointId("model2"))
+    id1 = CompositeArtifactId(artifact_store_id=ArtifactStoreId("store1"), artifact_local_id=ArtifactLocalId("model1"))
+    id2 = CompositeArtifactId(artifact_store_id=ArtifactStoreId("store1"), artifact_local_id=ArtifactLocalId("model1"))
+    id3 = CompositeArtifactId(artifact_store_id=ArtifactStoreId("store1"), artifact_local_id=ArtifactLocalId("model2"))
 
     assert id1 == id2
     assert id1 != id3
@@ -93,7 +104,7 @@ def test_composite_artifact_id_from_str_round_trip() -> None:
     """Test CompositeArtifactId.from_str / to_str round-trip"""
     from fiab_core.artifacts import CompositeArtifactId as CoreCompositeArtifactId
 
-    original = CoreCompositeArtifactId(artifact_store_id=ArtifactStoreId("my_store"), ml_model_checkpoint_id=MlModelCheckpointId("my_ckpt"))
+    original = CoreCompositeArtifactId(artifact_store_id=ArtifactStoreId("my_store"), artifact_local_id=ArtifactLocalId("my_ckpt"))
     serialised = CoreCompositeArtifactId.to_str(original)
     assert serialised == "my_store:my_ckpt"
 
@@ -107,7 +118,7 @@ def test_composite_artifact_id_from_str_with_colon_in_checkpoint() -> None:
 
     parsed = CoreCompositeArtifactId.from_str("store:ckpt:extra")
     assert parsed.artifact_store_id == "store"
-    assert parsed.ml_model_checkpoint_id == "ckpt:extra"
+    assert parsed.artifact_local_id == "ckpt:extra"
 
 
 def test_composite_artifact_id_from_str_missing_colon() -> None:
@@ -155,13 +166,17 @@ def test_get_artifacts_catalog(sample_artifact_stores_config: Any, sample_checkp
         catalog = get_artifacts_catalog(sample_artifact_stores_config)
 
         assert len(catalog) == 3
-        assert CompositeArtifactId(ArtifactStoreId("store1"), MlModelCheckpointId("model1")) in catalog
-        assert CompositeArtifactId(ArtifactStoreId("store1"), MlModelCheckpointId("model2")) in catalog
-        assert CompositeArtifactId(ArtifactStoreId("store2"), MlModelCheckpointId("model3")) in catalog
+        assert CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1")) in catalog
+        assert CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model2")) in catalog
+        assert CompositeArtifactId(ArtifactStoreId("store2"), ArtifactLocalId("model3")) in catalog
 
-        for composite_id, checkpoint in catalog.items():
-            assert isinstance(checkpoint, MlModelCheckpoint)
-            assert checkpoint.display_name == "Test Model"
+        for composite_id, artifact in catalog.items():
+            assert isinstance(artifact, ArtifactResolved)
+            assert artifact.artifact_type == "MlModelCheckpoint"
+            assert isinstance(artifact.store_info, MlModelCheckpoint)
+            assert artifact.store_info.display_name == "Test Model"
+            assert artifact.is_locally_compatible is True
+            assert artifact.local_compatibility_detail is None
 
 
 def test_get_artifacts_catalog_with_error(sample_artifact_stores_config: Any) -> None:
@@ -211,16 +226,18 @@ def test_get_artifacts_catalog_from_local_file(tmpdir_path: Path, sample_checkpo
     catalog = get_artifacts_catalog(config)
 
     assert len(catalog) == 1
-    composite_id = CompositeArtifactId(ArtifactStoreId("local_store"), MlModelCheckpointId("local_model"))
+    composite_id = CompositeArtifactId(ArtifactStoreId("local_store"), ArtifactLocalId("local_model"))
     assert composite_id in catalog
-    assert catalog[composite_id].display_name == "Test Model"
+    assert catalog[composite_id].store_info.display_name == "Test Model"
+    assert catalog[composite_id].is_locally_compatible is True
+    assert catalog[composite_id].local_compatibility_detail is None
 
 
-def test_list_local_storage_empty(tmpdir_path: Path, sample_checkpoint: Any) -> None:
+def test_list_local_storage_empty(tmpdir_path: Path, sample_artifact: Any) -> None:
     """Test list_local_storage with no artifacts"""
     catalog: ArtifactCatalog = pmap(
         {
-            CompositeArtifactId(ArtifactStoreId("store1"), MlModelCheckpointId("model1")): sample_checkpoint,
+            CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1")): sample_artifact,
         }
     )
 
@@ -228,11 +245,11 @@ def test_list_local_storage_empty(tmpdir_path: Path, sample_checkpoint: Any) -> 
     assert result == []
 
 
-def test_list_local_storage_nonexistent_dir(tmpdir_path: Path, sample_checkpoint: Any) -> None:
+def test_list_local_storage_nonexistent_dir(tmpdir_path: Path, sample_artifact: Any) -> None:
     """Test list_local_storage with nonexistent artifacts directory"""
     catalog: ArtifactCatalog = pmap(
         {
-            CompositeArtifactId(ArtifactStoreId("store1"), MlModelCheckpointId("model1")): sample_checkpoint,
+            CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1")): sample_artifact,
         }
     )
 
@@ -241,13 +258,13 @@ def test_list_local_storage_nonexistent_dir(tmpdir_path: Path, sample_checkpoint
     assert result == []
 
 
-def test_list_local_storage_with_artifacts(tmpdir_path: Path, sample_checkpoint: Any) -> None:
+def test_list_local_storage_with_artifacts(tmpdir_path: Path, sample_artifact: Any) -> None:
     """Test list_local_storage with existing artifacts as files"""
     catalog: ArtifactCatalog = pmap(
         {
-            CompositeArtifactId(ArtifactStoreId("store1"), MlModelCheckpointId("model1.ckpt")): sample_checkpoint,
-            CompositeArtifactId(ArtifactStoreId("store1"), MlModelCheckpointId("model2.ckpt")): sample_checkpoint,
-            CompositeArtifactId(ArtifactStoreId("store2"), MlModelCheckpointId("model3.ckpt")): sample_checkpoint,
+            CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt")): sample_artifact,
+            CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model2.ckpt")): sample_artifact,
+            CompositeArtifactId(ArtifactStoreId("store2"), ArtifactLocalId("model3.ckpt")): sample_artifact,
         }
     )
 
@@ -265,16 +282,16 @@ def test_list_local_storage_with_artifacts(tmpdir_path: Path, sample_checkpoint:
     result = list_local_storage(catalog, tmpdir_path)
 
     assert len(result) == 3
-    assert CompositeArtifactId(ArtifactStoreId("store1"), MlModelCheckpointId("model1.ckpt")) in result
-    assert CompositeArtifactId(ArtifactStoreId("store1"), MlModelCheckpointId("model2.ckpt")) in result
-    assert CompositeArtifactId(ArtifactStoreId("store2"), MlModelCheckpointId("model3.ckpt")) in result
+    assert CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt")) in result
+    assert CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model2.ckpt")) in result
+    assert CompositeArtifactId(ArtifactStoreId("store2"), ArtifactLocalId("model3.ckpt")) in result
 
 
-def test_list_local_storage_with_unknown_store(tmpdir_path: Path, sample_checkpoint: Any) -> None:
+def test_list_local_storage_with_unknown_store(tmpdir_path: Path, sample_artifact: Any) -> None:
     """Test list_local_storage with unknown store directory"""
     catalog: ArtifactCatalog = pmap(
         {
-            CompositeArtifactId(ArtifactStoreId("store1"), MlModelCheckpointId("model1.ckpt")): sample_checkpoint,
+            CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt")): sample_artifact,
         }
     )
 
@@ -291,14 +308,14 @@ def test_list_local_storage_with_unknown_store(tmpdir_path: Path, sample_checkpo
     result = list_local_storage(catalog, tmpdir_path)
 
     assert len(result) == 1
-    assert CompositeArtifactId(ArtifactStoreId("store1"), MlModelCheckpointId("model1.ckpt")) in result
+    assert CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt")) in result
 
 
-def test_list_local_storage_with_unknown_checkpoint(tmpdir_path: Path, sample_checkpoint: Any) -> None:
+def test_list_local_storage_with_unknown_checkpoint(tmpdir_path: Path, sample_artifact: Any) -> None:
     """Test list_local_storage with unknown checkpoint in known store"""
     catalog: ArtifactCatalog = pmap(
         {
-            CompositeArtifactId(ArtifactStoreId("store1"), MlModelCheckpointId("model1.ckpt")): sample_checkpoint,
+            CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt")): sample_artifact,
         }
     )
 
@@ -313,12 +330,12 @@ def test_list_local_storage_with_unknown_checkpoint(tmpdir_path: Path, sample_ch
     result = list_local_storage(catalog, tmpdir_path)
 
     assert len(result) == 1
-    assert CompositeArtifactId(ArtifactStoreId("store1"), MlModelCheckpointId("model1.ckpt")) in result
+    assert CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt")) in result
 
 
 def test_get_artifact_local_path(tmpdir_path: Path) -> None:
     """Test get_artifact_local_path returns correct path"""
-    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), MlModelCheckpointId("model1.ckpt"))
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
     path = get_artifact_local_path(composite_id, tmpdir_path)
 
     expected = tmpdir_path / "artifacts" / "store1" / "model1.ckpt"
@@ -327,7 +344,7 @@ def test_get_artifact_local_path(tmpdir_path: Path) -> None:
 
 def test_get_artifact_local_path_with_string_dir(tmpdir_path: Path) -> None:
     """Test get_artifact_local_path with Path directory path"""
-    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), MlModelCheckpointId("model1.ckpt"))
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
     path = get_artifact_local_path(composite_id, tmpdir_path)
 
     expected = tmpdir_path / "artifacts" / "store1" / "model1.ckpt"
@@ -338,12 +355,12 @@ def test_get_artifact_local_path_invalid_characters() -> None:
     """Test get_artifact_local_path raises on invalid path characters"""
     tmpdir = Path("/tmp")
     invalid_ids = [
-        CompositeArtifactId(ArtifactStoreId("../etc"), MlModelCheckpointId("model1.ckpt")),
-        CompositeArtifactId(ArtifactStoreId("store1"), MlModelCheckpointId("../../../etc/passwd")),
-        CompositeArtifactId(ArtifactStoreId("store/sub"), MlModelCheckpointId("model1.ckpt")),
-        CompositeArtifactId(ArtifactStoreId("store1"), MlModelCheckpointId("model/sub")),
-        CompositeArtifactId(ArtifactStoreId("store\\sub"), MlModelCheckpointId("model1.ckpt")),
-        CompositeArtifactId(ArtifactStoreId("store1"), MlModelCheckpointId("model\x00")),
+        CompositeArtifactId(ArtifactStoreId("../etc"), ArtifactLocalId("model1.ckpt")),
+        CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("../../../etc/passwd")),
+        CompositeArtifactId(ArtifactStoreId("store/sub"), ArtifactLocalId("model1.ckpt")),
+        CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model/sub")),
+        CompositeArtifactId(ArtifactStoreId("store\\sub"), ArtifactLocalId("model1.ckpt")),
+        CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model\x00")),
     ]
 
     for invalid_id in invalid_ids:
@@ -351,9 +368,9 @@ def test_get_artifact_local_path_invalid_characters() -> None:
             get_artifact_local_path(invalid_id, tmpdir)
 
 
-def test_download_artifact_success(tmpdir_path: Path, sample_checkpoint: Any) -> None:
+def test_download_artifact_success(tmpdir_path: Path, sample_artifact: Any) -> None:
     """Test successful artifact download"""
-    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), MlModelCheckpointId("model1.ckpt"))
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
 
     mock_content = b"fake checkpoint data"
 
@@ -368,7 +385,7 @@ def test_download_artifact_success(tmpdir_path: Path, sample_checkpoint: Any) ->
         mock_client.stream.return_value.__enter__.return_value = mock_response
         mock_client_class.return_value = mock_client
 
-        download_artifact(composite_id, sample_checkpoint, tmpdir_path)
+        download_artifact(composite_id, sample_artifact, tmpdir_path)
 
         # Verify the file was downloaded
         artifact_path = get_artifact_local_path(composite_id, tmpdir_path)
@@ -377,9 +394,9 @@ def test_download_artifact_success(tmpdir_path: Path, sample_checkpoint: Any) ->
         assert artifact_path.read_bytes() == mock_content
 
 
-def test_download_artifact_creates_directory(tmpdir_path: Path, sample_checkpoint: Any) -> None:
+def test_download_artifact_creates_directory(tmpdir_path: Path, sample_artifact: Any) -> None:
     """Test download_artifact creates necessary parent directory"""
-    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), MlModelCheckpointId("model1.ckpt"))
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
 
     mock_content = b"fake checkpoint data"
 
@@ -394,7 +411,7 @@ def test_download_artifact_creates_directory(tmpdir_path: Path, sample_checkpoin
         mock_client.stream.return_value.__enter__.return_value = mock_response
         mock_client_class.return_value = mock_client
 
-        download_artifact(composite_id, sample_checkpoint, tmpdir_path)
+        download_artifact(composite_id, sample_artifact, tmpdir_path)
 
         artifact_path = get_artifact_local_path(composite_id, tmpdir_path)
         assert artifact_path.exists()
@@ -402,9 +419,9 @@ def test_download_artifact_creates_directory(tmpdir_path: Path, sample_checkpoin
         assert artifact_path.parent.is_dir()
 
 
-def test_download_artifact_http_error(tmpdir_path: Path, sample_checkpoint: Any) -> None:
+def test_download_artifact_http_error(tmpdir_path: Path, sample_artifact: Any) -> None:
     """Test download_artifact handles HTTP errors"""
-    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), MlModelCheckpointId("model1.ckpt"))
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
 
     with patch("httpx.Client") as mock_client_class:
         mock_client = MagicMock()
@@ -416,12 +433,12 @@ def test_download_artifact_http_error(tmpdir_path: Path, sample_checkpoint: Any)
         mock_client_class.return_value = mock_client
 
         with pytest.raises(httpx.HTTPStatusError):
-            download_artifact(composite_id, sample_checkpoint, tmpdir_path)
+            download_artifact(composite_id, sample_artifact, tmpdir_path)
 
 
-def test_download_artifact_chunked_download(tmpdir_path: Path, sample_checkpoint: Any) -> None:
+def test_download_artifact_chunked_download(tmpdir_path: Path, sample_artifact: Any) -> None:
     """Test download_artifact handles chunked downloads"""
-    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), MlModelCheckpointId("model1.ckpt"))
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
 
     # Simulate chunked download
     chunk1 = b"chunk1"
@@ -440,7 +457,7 @@ def test_download_artifact_chunked_download(tmpdir_path: Path, sample_checkpoint
         mock_client.stream.return_value.__enter__.return_value = mock_response
         mock_client_class.return_value = mock_client
 
-        download_artifact(composite_id, sample_checkpoint, tmpdir_path)
+        download_artifact(composite_id, sample_artifact, tmpdir_path)
 
         # Verify all chunks were written
         artifact_path = get_artifact_local_path(composite_id, tmpdir_path)

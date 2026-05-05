@@ -33,7 +33,7 @@ class CompositeArtifactId:
     """Composite identifier for an artifact combining store and local IDs"""
 
     artifact_store_id: ArtifactStoreId
-    artifcat_local_id: ArtifactLocalId
+    artifact_local_id: ArtifactLocalId
 
     @classmethod
     def from_str(cls, v: str) -> Self:

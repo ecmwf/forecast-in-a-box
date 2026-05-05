@@ -12,25 +12,30 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-from fiab_core.artifacts import ArtifactsProvider, CompositeArtifactId, MlModelCheckpoint
+from fiab_core.artifacts import ArtifactResolved, ArtifactsProvider, CompositeArtifactId, MlModelCheckpoint
 
 
 @contextlib.contextmanager
 def dummy_provider() -> Generator[None, None, None]:
     ArtifactsProvider.register_get_checkpoint_lookup(
         lambda: {
-            CompositeArtifactId.from_str("dummy_store:dummy_ckpt"): MlModelCheckpoint(
-                url="http://example.com/dummy_checkpoint",
-                display_name="Dummy Checkpoint",
-                display_author="Author",
-                display_description="A dummy checkpoint for testing",
-                disk_size_bytes=1234,
-                pip_package_constraints=[],
-                supported_platforms=["linux"],
-                input_characteristics=[],
-                output_qube={},
-                timestep="1h",
-                comment="A dummy comment",
+            CompositeArtifactId.from_str("dummy_store:dummy_ckpt"): ArtifactResolved(
+                artifact_type="MlModelCheckpoint",
+                store_info=MlModelCheckpoint(
+                    url="http://example.com/dummy_checkpoint",
+                    display_name="Dummy Checkpoint",
+                    display_author="Author",
+                    display_description="A dummy checkpoint for testing",
+                    disk_size_bytes=1234,
+                    pip_package_constraints=[],
+                    supported_platforms=["linux"],
+                    input_characteristics=[],
+                    output_qube={},
+                    timestep="1h",
+                    comment="A dummy comment",
+                ),
+                is_locally_compatible=True,
+                local_compatibility_detail=None,
             )
         }
     )

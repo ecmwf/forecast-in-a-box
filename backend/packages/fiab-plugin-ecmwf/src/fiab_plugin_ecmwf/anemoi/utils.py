@@ -24,11 +24,7 @@ logger = logging.getLogger(__name__)
 
 def get_available_checkpoints() -> CheckpointLookup:
     all_checkpoints: CheckpointLookup = ArtifactsProvider.get_checkpoint_lookup()
-    return {
-        composite_id: checkpoint
-        for composite_id, checkpoint in all_checkpoints.items()
-        # TODO: Add filtering here
-    }
+    return {composite_id: artifact for composite_id, artifact in all_checkpoints.items() if artifact.is_locally_compatible}
 
 
 def get_checkpoint_enum_type() -> str:
@@ -48,7 +44,7 @@ def get_local_path(composite_id: CompositeArtifactId) -> Path:
 
 
 def get_model_output(composite_id: CompositeArtifactId, lead_time: int) -> QubedOutput:
-    checkpoint = get_available_checkpoints()[composite_id]
+    checkpoint = get_available_checkpoints()[composite_id].store_info
     qube = Qube.from_json(checkpoint.output_qube)
 
     from earthkit.data.utils.dates import to_timedelta
@@ -62,7 +58,7 @@ def get_model_output(composite_id: CompositeArtifactId, lead_time: int) -> Qubed
 
 
 def get_environment(composite_id: CompositeArtifactId) -> list[str]:
-    packages = list(get_available_checkpoints()[composite_id].pip_package_constraints)
+    packages = list(get_available_checkpoints()[composite_id].store_info.pip_package_constraints)
 
     ekw_anemoi_version = importlib.metadata.version("earthkit-workflows-anemoi")
     if not "dev" in ekw_anemoi_version:

@@ -22,7 +22,7 @@ from pathlib import Path
 
 import httpx
 from cascade.low.func import assert_never
-from fiab_core.artifacts import ArtifactStoreId, MlModelCheckpoint, MlModelCheckpointId
+from fiab_core.artifacts import ArtifactLocalId, ArtifactResolved, ArtifactStoreId, MlModelCheckpoint
 from pyrsistent import pmap
 
 from forecastbox.domain.artifact.base import ArtifactCatalog, CompositeArtifactId, artifacts_subdir, get_artifact_local_path
@@ -43,8 +43,14 @@ def get_artifacts_catalog(artifact_stores_config: ArtifactStoresConfig) -> Artif
                 store_data = json.loads(raw)
                 artifacts = store_data.get("artifacts", {})
                 for checkpoint_id, checkpoint_data in artifacts.items():
-                    composite_id = CompositeArtifactId(artifact_store_id=store_id, ml_model_checkpoint_id=checkpoint_id)
-                    catalog[composite_id] = MlModelCheckpoint(**checkpoint_data)
+                    composite_id = CompositeArtifactId(artifact_store_id=store_id, artifact_local_id=ArtifactLocalId(checkpoint_id))
+                    # TODO set compatibility information
+                    catalog[composite_id] = ArtifactResolved(
+                        artifact_type="MlModelCheckpoint",
+                        store_info=MlModelCheckpoint(**checkpoint_data),
+                        is_locally_compatible=True,
+                        local_compatibility_detail=None,
+                    )
                     logger.debug(f"Loaded artifact {composite_id} from store {store_id}")
             else:
                 assert_never(store_config.method)
@@ -80,7 +86,7 @@ def list_local_storage(artifacts_catalog: ArtifactCatalog, data_dir: Path) -> li
 
             checkpoint_id = checkpoint_item.name
             composite_id = CompositeArtifactId(
-                artifact_store_id=ArtifactStoreId(store_id), ml_model_checkpoint_id=MlModelCheckpointId(checkpoint_id)
+                artifact_store_id=ArtifactStoreId(store_id), artifact_local_id=ArtifactLocalId(checkpoint_id)
             )
 
             if composite_id in artifacts_catalog:
@@ -93,11 +99,12 @@ def list_local_storage(artifacts_catalog: ArtifactCatalog, data_dir: Path) -> li
 
 def download_artifact(
     composite_id: CompositeArtifactId,
-    checkpoint: MlModelCheckpoint,
+    artifact: ArtifactResolved,
     data_dir: Path,
     progress_callback: Callable[[int], None] | None = None,
 ) -> None:
     """Download an artifact from its remote URL to local storage, raising httpx.HTTPError if download fails."""
+    checkpoint = artifact.store_info
     artifact_path = get_artifact_local_path(composite_id, data_dir)
     artifact_path.parent.mkdir(parents=True, exist_ok=True)
 
