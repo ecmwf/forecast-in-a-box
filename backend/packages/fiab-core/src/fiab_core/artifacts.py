@@ -23,27 +23,28 @@ from fiab_core.pydantic_utils import FiabCoreBaseModel
 # NOTE we may eventually fine-grain this with like cuda versions or architecture etc, form a hierarchy, etc. Or maybe not and this will be enough.
 Platform = Literal["macos", "linux"]
 
-MlModelCheckpointId = NewType("MlModelCheckpointId", str)
+ArtifactLocalId = NewType("ArtifactLocalId", str)
 ArtifactStoreId = NewType("ArtifactStoreId", str)
+ArtifactType = Literal["MlModelCheckpoint"]
 
 
 @dataclass(frozen=True, eq=True, slots=True)
 class CompositeArtifactId:
-    """Composite identifier for an artifact combining store and checkpoint IDs"""
+    """Composite identifier for an artifact combining store and local IDs"""
 
     artifact_store_id: ArtifactStoreId
-    ml_model_checkpoint_id: MlModelCheckpointId
+    artifcat_local_id: ArtifactLocalId
 
     @classmethod
     def from_str(cls, v: str) -> Self:
         if not ":" in v:
             raise ValueError(f"must be of the form artifact_store_id:ml_model_checkpoint_id, got {v}")
-        artifact_store_id, ml_model_checkpoint_id = v.split(":", 1)
-        return cls(artifact_store_id=ArtifactStoreId(artifact_store_id), ml_model_checkpoint_id=MlModelCheckpointId(ml_model_checkpoint_id))
+        artifact_store_id, artifact_local_id = v.split(":", 1)
+        return cls(artifact_store_id=ArtifactStoreId(artifact_store_id), artifact_local_id=ArtifactLocalId(artifact_local_id))
 
     @staticmethod
     def to_str(k: Self) -> str:
-        return f"{k.artifact_store_id}:{k.ml_model_checkpoint_id}"
+        return f"{k.artifact_store_id}:{k.artifact_local_id}"
 
 
 class MlModelCheckpoint(FiabCoreBaseModel):
@@ -71,7 +72,17 @@ class MlModelCheckpoint(FiabCoreBaseModel):
     timestep: str = Field(description="Timestep of the model output, e.g. '1h', '6h'")
 
 
-CheckpointLookup = Mapping[CompositeArtifactId, MlModelCheckpoint]
+@dataclass
+class ArtifactResolved:
+    """A combination of info from the store and locally gathered compatibility information"""
+
+    artifact_type: ArtifactType  # determines the store_info class
+    store_info: MlModelCheckpoint  # NOTE this will eventually be a union
+    is_locally_compatible: bool
+    local_compatibility_detail: str | None
+
+
+CheckpointLookup = Mapping[CompositeArtifactId, ArtifactResolved]
 
 
 class ArtifactsProvider:
