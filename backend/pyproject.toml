@@ -27,7 +27,7 @@ dependencies = [
   "aiosqlite",
   "apscheduler",
   "cloudpickle",
-  "earthkit-workflows>=0.9.0",
+  "earthkit-workflows>=0.10.0,<1.0.0",
   "fastapi",
   "fastapi-users[oauth]",
   "fastapi-users-db-sqlalchemy",

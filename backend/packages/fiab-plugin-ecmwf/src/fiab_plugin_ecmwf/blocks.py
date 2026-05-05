@@ -299,8 +299,13 @@ class ZarrSink(Sink):
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
+
         action = inputs[input_task].map(
-            Payload("fiab_plugin_ecmwf.runtime.sinks.write_zarr", kwargs={"path": block.configuration_values["path"]})
+            Payload(
+                "fiab_plugin_ecmwf.runtime.sinks.write_zarr",
+                kwargs={"path": block.configuration_values["path"]},
+                metadata={"environment": ["zarr"]},
+            )
         )
         return Either.ok(action)
 

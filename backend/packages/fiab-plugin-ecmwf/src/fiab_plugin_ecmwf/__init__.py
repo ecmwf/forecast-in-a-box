@@ -24,4 +24,4 @@ blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
     BlockFactoryId("mapPlotSink"): MapPlotSink(),
 }
 
-plugin = QubedPluginBuilder(block_builders=blocks).as_plugin()
+plugin = QubedPluginBuilder(block_builders=blocks, base_environment=["fiab-plugin-ecmwf"]).as_plugin()

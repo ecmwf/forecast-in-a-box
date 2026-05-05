@@ -35,4 +35,4 @@ blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
     BlockFactoryId("filterParam"): FilterParam(),
 }
 
-plugin = QubedPluginBuilder(block_builders=blocks).as_plugin()
+plugin = QubedPluginBuilder(block_builders=blocks, base_environment=["fiab-plugin-demo"]).as_plugin()
