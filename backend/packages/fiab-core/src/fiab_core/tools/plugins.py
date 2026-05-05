@@ -1,7 +1,9 @@
+import importlib.metadata
+import os
 from typing import Callable, cast
 
 from cascade.low.func import Either
-from earthkit.workflows.fluent import Action
+from earthkit.workflows.fluent import Action, PayloadBuildingContext
 
 from fiab_core.fable import (
     ActionLookup,
@@ -16,9 +18,24 @@ from fiab_core.plugin import Error, Plugin
 from fiab_core.tools.blocks import QubedBlockBuilder
 
 
+def _detect_editable_install(distname: str) -> str:
+    """If the distname's install is detected to be editable,
+     we propagate it as editable command, otherwise we return
+    unchanged"""
+    # NOTE this doesnt work well for python 3.13, but since its a developer util we are ok
+    distribution = importlib.metadata.distribution(distname)
+    if hasattr(distribution, "origin"):
+        origin = distribution.origin
+        if hasattr(origin, "url") and isinstance(origin.url, str) and origin.url.startswith("file://"):
+            # NOTE this doesnt work well for non-std layout but again we can restrict to only that
+            return "-e " + origin.url[len("file://") :]
+    return distname
+
+
 class QubedPluginBuilder:
-    def __init__(self, block_builders: dict[BlockFactoryId, QubedBlockBuilder]) -> None:
+    def __init__(self, block_builders: dict[BlockFactoryId, QubedBlockBuilder], base_environment: list[str]) -> None:
         self.block_builders = block_builders
+        self.base_environment = [_detect_editable_install(e) for e in base_environment]
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         """Given a block instance corresponding to this plugin's Factory and its inputs, either provide error or determine what it outputs"""
@@ -40,8 +57,9 @@ class QubedPluginBuilder:
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         """Given a cascade builder and a block instance corresponding to this plugin's Factory, either update the builder with corresponding tasks or provide error"""
-        factory = self.block_builders[block.factory_id.factory]
-        return factory.compile(inputs, block_id, block)
+        with PayloadBuildingContext(environment=self.base_environment):
+            factory = self.block_builders[block.factory_id.factory]
+            return factory.compile(inputs, block_id, block)
 
     def as_plugin(self) -> Callable[[], Plugin]:
         def _generic_expand(block: BlockInstanceOutput) -> list[BlockFactoryId]:

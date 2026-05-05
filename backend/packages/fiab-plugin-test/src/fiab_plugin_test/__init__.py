@@ -1,5 +1,7 @@
+import pathlib
+
 from cascade.low.func import Either
-from earthkit.workflows.fluent import Action, Payload, from_source
+from earthkit.workflows.fluent import Action, Payload, PayloadBuildingContext, from_source
 from fiab_core.artifacts import ArtifactsProvider, CompositeArtifactId
 from fiab_core.fable import (
     ActionLookup,
@@ -127,41 +129,42 @@ def expander(output: BlockInstanceOutput) -> list[BlockFactoryId]:
 
 
 def compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
-    if instance.factory_id.factory == "source_42":
-        action = from_source(Payload("fiab_plugin_test.runtime.source_42"))  # type: ignore
-    elif instance.factory_id.factory == "source_text":
-        text = instance.configuration_values["text"]
-        action = from_source(Payload("fiab_plugin_test.runtime.source_text", kwargs={"text": text}))  # type: ignore
-    elif instance.factory_id.factory == "source_sleep":
-        text = instance.configuration_values["text"]
-        duration = float(instance.configuration_values["duration"])
-        action = from_source(Payload("fiab_plugin_test.runtime.source_sleep", kwargs={"text": text, "duration": duration}))  # type: ignore
-    elif instance.factory_id.factory == "source_filesize":
-        checkpoint_str = instance.configuration_values["checkpoint"]
-        artifact_id = CompositeArtifactId.from_str(checkpoint_str)
-        local_path = ArtifactsProvider.get_artifact_local_path(artifact_id)
-        payload = Payload(
-            "fiab_plugin_test.runtime.source_filesize", kwargs={"path": str(local_path)}, metadata={"artifacts": [artifact_id]}
-        )
-        action = from_source(payload)  # type: ignore
-    elif instance.factory_id.factory == "transform_increment":
-        a = lookup[instance.input_ids["a"]]
-        amount = instance.configuration_values["amount"]
-        action = a.map(Payload("fiab_plugin_test.runtime.transform_increment", kwargs={"amount": int(amount)}))  # type: ignore
-    elif instance.factory_id.factory == "product_join":
-        a = lookup[instance.input_ids["a"]]
-        b = lookup[instance.input_ids["b"]]
-        action = a.join(b, dim="inputs").reduce(Payload("fiab_plugin_test.runtime.product_join"))  # type: ignore
-    elif instance.factory_id.factory == "sink_file":
-        data = lookup[instance.input_ids["data"]]
-        fname = instance.configuration_values["fname"]
-        action = data.map(Payload("fiab_plugin_test.runtime.sink_file", kwargs={"fname": fname}))  # type: ignore
-    elif instance.factory_id.factory == "sink_image":
-        data = lookup[instance.input_ids["data"]]
-        action = data.map(Payload("fiab_plugin_test.runtime.sink_image"))  # type: ignore
-    else:
-        raise TypeError(instance.factory_id.factory)
-    return Either.ok(action)
+    with PayloadBuildingContext(environment=[f"-e {pathlib.Path(__file__).parent.parent.parent}"]):
+        if instance.factory_id.factory == "source_42":
+            action = from_source(Payload("fiab_plugin_test.runtime.source_42"))  # type: ignore
+        elif instance.factory_id.factory == "source_text":
+            text = instance.configuration_values["text"]
+            action = from_source(Payload("fiab_plugin_test.runtime.source_text", kwargs={"text": text}))  # type: ignore
+        elif instance.factory_id.factory == "source_sleep":
+            text = instance.configuration_values["text"]
+            duration = float(instance.configuration_values["duration"])
+            action = from_source(Payload("fiab_plugin_test.runtime.source_sleep", kwargs={"text": text, "duration": duration}))  # type: ignore
+        elif instance.factory_id.factory == "source_filesize":
+            checkpoint_str = instance.configuration_values["checkpoint"]
+            artifact_id = CompositeArtifactId.from_str(checkpoint_str)
+            local_path = ArtifactsProvider.get_artifact_local_path(artifact_id)
+            payload = Payload(
+                "fiab_plugin_test.runtime.source_filesize", kwargs={"path": str(local_path)}, metadata={"artifacts": [artifact_id]}
+            )
+            action = from_source(payload)  # type: ignore
+        elif instance.factory_id.factory == "transform_increment":
+            a = lookup[instance.input_ids["a"]]
+            amount = instance.configuration_values["amount"]
+            action = a.map(Payload("fiab_plugin_test.runtime.transform_increment", kwargs={"amount": int(amount)}))  # type: ignore
+        elif instance.factory_id.factory == "product_join":
+            a = lookup[instance.input_ids["a"]]
+            b = lookup[instance.input_ids["b"]]
+            action = a.join(b, dim="inputs").reduce(Payload("fiab_plugin_test.runtime.product_join"))  # type: ignore
+        elif instance.factory_id.factory == "sink_file":
+            data = lookup[instance.input_ids["data"]]
+            fname = instance.configuration_values["fname"]
+            action = data.map(Payload("fiab_plugin_test.runtime.sink_file", kwargs={"fname": fname}))  # type: ignore
+        elif instance.factory_id.factory == "sink_image":
+            data = lookup[instance.input_ids["data"]]
+            action = data.map(Payload("fiab_plugin_test.runtime.sink_image"))  # type: ignore
+        else:
+            raise TypeError(instance.factory_id.factory)
+        return Either.ok(action)
 
 
 plugin = lambda: Plugin(catalogue=catalogue(), validator=validator, expander=expander, compiler=compiler)

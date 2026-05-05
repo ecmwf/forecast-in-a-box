@@ -98,6 +98,7 @@ async def execute(
     database layer.  Experiment metadata is stored on the row when provided and
     preserved on restart.
     """
+    logger.debug(f"starting blueprint execution {blueprint.blueprint_id}")
     if not blueprint.builder:
         return Either.error(f"Blueprint {blueprint.blueprint_id!r} has no compilable blocks")
 
@@ -116,6 +117,7 @@ async def execute(
     )
 
     loop = asyncio.get_running_loop()
+    logger.debug(f"submitting blueprint execution {blueprint.blueprint_id}")
     loop.run_in_executor(
         None,
         execute_background,
