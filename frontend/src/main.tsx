@@ -25,6 +25,20 @@ import { setupGlobalErrorHandlers } from '@/lib/globalErrorHandler'
 
 setupGlobalErrorHandlers()
 
+// If a dynamically-imported chunk 404s (typically: user has a stale
+// index.html during a deploy), reload to pick up the fresh index.html
+// and matching chunk hashes. sessionStorage prevents an infinite reload loop
+// if the failure persists on the new bundle too.
+window.addEventListener('vite:preloadError', (event) => {
+  if (sessionStorage.getItem('vite:preload-reload')) return
+  sessionStorage.setItem('vite:preload-reload', String(Date.now()))
+  event.preventDefault()
+  window.location.reload()
+})
+window.addEventListener('load', () => {
+  sessionStorage.removeItem('vite:preload-reload')
+})
+
 // Create a new router instance
 const router = createRouter({
   routeTree,
