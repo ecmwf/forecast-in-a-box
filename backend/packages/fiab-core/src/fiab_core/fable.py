@@ -32,6 +32,9 @@ class BlockConfigurationOption(FiabCoreBaseModel):
     # TODO do we want Literal instead of str for values? Probably `str` since this will need to be parsed anyway
     # TODO do we prefer nesting or flattening for complex config? Ideally we support both, its just about the type system
     default_value: str | None = None
+    """Used by the frontend to inject the default value"""
+    is_advanced: bool = False
+    """Used by the frontend to optionally hide the setting unless advanced. Do not set if no default provided / None not valid"""
 
 
 BlockKind = Literal["source", "transform", "product", "sink"]
