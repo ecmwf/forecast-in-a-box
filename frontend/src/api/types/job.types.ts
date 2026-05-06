@@ -75,7 +75,7 @@ export const JobExecutionListSchema = z.object({
 /** fiab_core/artifacts.py: CompositeArtifactId */
 export const CompositeArtifactIdSchema = z.object({
   artifact_store_id: z.string(),
-  ml_model_checkpoint_id: z.string(),
+  artifact_local_id: z.string(),
 })
 
 /** domain/blueprint/cascade.py: EnvironmentSpecification */

@@ -1027,7 +1027,7 @@ def test_blueprint_artifact_execute(tmpdir: Any, backend_client_with_auth: httpx
             m
             for m in models
             if m["composite_id"]["artifact_store_id"] == fake_artifact_store_id
-            and m["composite_id"]["ml_model_checkpoint_id"] == test_blueprint_artifact_id
+            and m["composite_id"]["artifact_local_id"] == test_blueprint_artifact_id
         ),
         None,
     )
@@ -1079,7 +1079,7 @@ def test_blueprint_artifact_execute(tmpdir: Any, backend_client_with_auth: httpx
             m
             for m in models_after
             if m["composite_id"]["artifact_store_id"] == fake_artifact_store_id
-            and m["composite_id"]["ml_model_checkpoint_id"] == test_blueprint_artifact_id
+            and m["composite_id"]["artifact_local_id"] == test_blueprint_artifact_id
         ),
         None,
     )

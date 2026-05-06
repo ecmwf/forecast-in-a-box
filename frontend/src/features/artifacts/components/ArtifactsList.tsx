@@ -77,8 +77,8 @@ export function ArtifactsList({
           const isDeleting =
             deletingId !== undefined &&
             deletingId.artifact_store_id === artifact.id.artifact_store_id &&
-            deletingId.ml_model_checkpoint_id ===
-              artifact.id.ml_model_checkpoint_id
+            deletingId.artifact_local_id ===
+              artifact.id.artifact_local_id
 
           return (
             <ArtifactCard
@@ -114,8 +114,8 @@ export function ArtifactsList({
           const isDeleting =
             deletingId !== undefined &&
             deletingId.artifact_store_id === artifact.id.artifact_store_id &&
-            deletingId.ml_model_checkpoint_id ===
-              artifact.id.ml_model_checkpoint_id
+            deletingId.artifact_local_id ===
+              artifact.id.artifact_local_id
 
           return (
             <ArtifactRow

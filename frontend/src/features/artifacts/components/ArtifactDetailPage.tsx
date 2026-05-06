@@ -104,6 +104,21 @@ export function ArtifactDetailPage({
                 {t('detail.timestep')}: {detail.timestep}
               </span>
             ) : null}
+            <span
+              className={
+                detail.is_locally_compatible
+                  ? 'inline-flex items-center rounded bg-green-100 px-2 py-0.5 text-sm font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                  : 'inline-flex items-center rounded bg-yellow-100 px-2 py-0.5 text-sm font-medium text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+              }
+            >
+              {detail.is_locally_compatible
+                ? t('compatibility.compatible')
+                : detail.local_compatibility_detail
+                  ? t('compatibility.notCompatibleDetail', {
+                      detail: detail.local_compatibility_detail,
+                    })
+                  : t('compatibility.notCompatible')}
+            </span>
           </div>
         </div>
         <div className="flex gap-2">

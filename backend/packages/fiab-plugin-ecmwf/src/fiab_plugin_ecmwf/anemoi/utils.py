@@ -12,7 +12,7 @@ import logging
 from pathlib import Path
 
 from cascade.low.func import Either
-from fiab_core.artifacts import ArtifactsProvider, CheckpointLookup, CompositeArtifactId
+from fiab_core.artifacts import ArtifactsProvider, CompositeArtifactId, MlModelCheckpoint
 from fiab_core.fable import BlockInstance, QubedOutput
 from fiab_core.plugin import Error
 from qubed import Qube
@@ -22,12 +22,12 @@ from ..qubed_utils import expand
 logger = logging.getLogger(__name__)
 
 
-def get_available_checkpoints() -> CheckpointLookup:
-    all_checkpoints: CheckpointLookup = ArtifactsProvider.get_checkpoint_lookup()
+def get_available_checkpoints() -> dict[CompositeArtifactId, MlModelCheckpoint]:
+    all_artifacts = ArtifactsProvider.get_artifacts_lookup()
     return {
-        composite_id: checkpoint
-        for composite_id, checkpoint in all_checkpoints.items()
-        # TODO: Add filtering here
+        composite_id: artifact.store_info
+        for composite_id, artifact in all_artifacts.items()
+        if artifact.artifact_type == "MlModelCheckpoint" and artifact.is_locally_compatible
     }
 
 

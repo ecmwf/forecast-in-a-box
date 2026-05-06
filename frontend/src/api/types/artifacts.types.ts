@@ -18,35 +18,35 @@
 import { z } from 'zod'
 
 /**
- * Composite artifact ID - identifies a model by store and checkpoint
+ * Composite artifact ID - identifies a model by store and local artifact id
  */
 export const CompositeArtifactIdSchema = z.object({
   artifact_store_id: z.string(),
-  ml_model_checkpoint_id: z.string(),
+  artifact_local_id: z.string(),
 })
 
 export type CompositeArtifactId = z.infer<typeof CompositeArtifactIdSchema>
 
 /**
  * Encode a CompositeArtifactId for use in URL path segments.
- * Format: "storeId--checkpointId"
+ * Format: "storeId--localId"
  */
 export function encodeArtifactId(id: CompositeArtifactId): string {
-  return `${id.artifact_store_id}--${id.ml_model_checkpoint_id}`
+  return `${id.artifact_store_id}--${id.artifact_local_id}`
 }
 
 /**
  * Decode a URL path segment back to a CompositeArtifactId.
- * Expects "storeId--checkpointId" format.
+ * Expects "storeId--localId" format.
  */
 export function decodeArtifactId(encoded: string): CompositeArtifactId {
   const separatorIndex = encoded.indexOf('--')
   if (separatorIndex === -1) {
-    return { artifact_store_id: encoded, ml_model_checkpoint_id: '' }
+    return { artifact_store_id: encoded, artifact_local_id: '' }
   }
   return {
     artifact_store_id: encoded.slice(0, separatorIndex),
-    ml_model_checkpoint_id: encoded.slice(separatorIndex + 2),
+    artifact_local_id: encoded.slice(separatorIndex + 2),
   }
 }
 
@@ -60,6 +60,8 @@ export const MlModelOverviewSchema = z.object({
   disk_size_bytes: z.number(),
   supported_platforms: z.array(z.string()),
   is_available: z.boolean(),
+  is_locally_compatible: z.boolean(),
+  local_compatibility_detail: z.string().nullable(),
 })
 
 export type MlModelOverview = z.infer<typeof MlModelOverviewSchema>
@@ -172,6 +174,8 @@ export interface ArtifactInfo {
   diskSizeBytes: number
   platforms: Array<string>
   isAvailable: boolean
+  isLocallyCompatible: boolean
+  localCompatibilityDetail: string | null
 }
 
 /**
@@ -187,5 +191,7 @@ export function toArtifactInfo(model: MlModelOverview): ArtifactInfo {
     diskSizeBytes: model.disk_size_bytes,
     platforms: model.supported_platforms,
     isAvailable: model.is_available,
+    isLocallyCompatible: model.is_locally_compatible,
+    localCompatibilityDetail: model.local_compatibility_detail,
   }
 }

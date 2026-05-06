@@ -19,7 +19,7 @@ from fiab_core.plugin import Error, Plugin
 
 
 def _get_checkpoint_enum_type() -> str:
-    available = ArtifactsProvider.get_checkpoint_lookup()
+    available = ArtifactsProvider.get_artifacts_lookup()
     values = ", ".join(f"'{CompositeArtifactId.to_str(k)}'" for k in available.keys())
     return f"enum[{values}]"
 
