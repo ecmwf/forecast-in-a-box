@@ -19,13 +19,15 @@ import shutil
 import tempfile
 from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 import httpx
 from cascade.low.func import assert_never
-from fiab_core.artifacts import ArtifactLocalId, ArtifactResolved, ArtifactStoreId, MlModelCheckpoint
+from fiab_core.artifacts import ArtifactLocalId, ArtifactResolved, ArtifactStoreId, ArtifactType, MlModelCheckpoint
 from pyrsistent import pmap
 
 from forecastbox.domain.artifact.base import ArtifactCatalog, CompositeArtifactId, artifacts_subdir, get_artifact_local_path
+from forecastbox.domain.artifact.compatibility import get_model_checkpoint_compatibility, get_platform_info
 from forecastbox.utility.config import ArtifactStoresConfig
 from forecastbox.utility.httpx import fetch_content
 
@@ -35,6 +37,7 @@ logger = logging.getLogger(__name__)
 def get_artifacts_catalog(artifact_stores_config: ArtifactStoresConfig) -> ArtifactCatalog:
     """Query each artifact store and return a composed catalog of all available artifacts."""
     catalog = {}
+    platform_info = get_platform_info()
 
     with httpx.Client(follow_redirects=True) as client:
         for store_id, store_config in artifact_stores_config.items():
@@ -44,14 +47,19 @@ def get_artifacts_catalog(artifact_stores_config: ArtifactStoresConfig) -> Artif
                 artifacts = store_data.get("artifacts", {})
                 for artifact_id, artifact_data in artifacts.items():
                     composite_id = CompositeArtifactId(artifact_store_id=store_id, artifact_local_id=ArtifactLocalId(artifact_id))
-                    artifact_type = artifact_data["artifact_type"]
+                    artifact_type = cast(ArtifactType, artifact_data["artifact_type"])
                     store_info_data = artifact_data["store_info"]
-                    # TODO set compatibility information
+                    if artifact_type == "MlModelCheckpoint":
+                        store_info = MlModelCheckpoint(**store_info_data)
+                        is_locally_compatible, local_compatibility_detail = get_model_checkpoint_compatibility(store_info, platform_info)
+                    else:
+                        assert_never(artifact_type)
+
                     catalog[composite_id] = ArtifactResolved(
                         artifact_type=artifact_type,
-                        store_info=MlModelCheckpoint(**store_info_data),
-                        is_locally_compatible=True,
-                        local_compatibility_detail=None,
+                        store_info=store_info,
+                        is_locally_compatible=is_locally_compatible,
+                        local_compatibility_detail=local_compatibility_detail,
                     )
                     logger.debug(f"Loaded artifact {composite_id} from store {store_id}")
             else:

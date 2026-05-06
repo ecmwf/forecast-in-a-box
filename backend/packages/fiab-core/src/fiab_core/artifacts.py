@@ -56,6 +56,9 @@ class MlModelCheckpoint(FiabCoreBaseModel):
     display_description: str = Field(description="Additional info about the model")
     comment: str = Field("", description="Additional internal data at the store level")
     disk_size_bytes: int = Field(description="Physical storage footprint of the checkpoint")
+    minimum_gpu_memory_mib: int | None = Field(
+        default=None, description="If this model *requires* gpu, then what is the minimum realistic size in MiB"
+    )
     pip_package_constraints: list[str] = Field(
         description="Pip-compatible constraints for requisite python packages such as torch or anemoi-inference"
     )
