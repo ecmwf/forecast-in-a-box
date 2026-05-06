@@ -97,6 +97,11 @@ filterwarnings = [
 [tool.mypy]
 plugins = "pydantic.mypy"
 
+[tool.uv]
+environments = [
+    "sys_platform == 'darwin'",
+    "sys_platform == 'linux'",
+]
 
 [tool.uv.sources]
 fiab-core = {workspace = true}
