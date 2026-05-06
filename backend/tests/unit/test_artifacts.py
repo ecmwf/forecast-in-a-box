@@ -43,7 +43,7 @@ def sample_checkpoint() -> MlModelCheckpoint:
         display_description="Test Description",
         disk_size_bytes=1024,
         pip_package_constraints=["torch>=2.0"],
-        supported_platforms=["linux"],
+        supported_platforms=["linux", "macos"],
         input_characteristics=["input_source"],
         output_qube={},
         timestep="1h",
