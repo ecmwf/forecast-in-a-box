@@ -26,9 +26,9 @@ import type {
   FableValidationExpansion,
   GlobalGlyphPostRequest,
   GlobalGlyphResponse,
-  IntrinsicGlyphItem,
   GlyphFunctionsResponse,
   GlyphListResponse,
+  IntrinsicGlyphItem,
 } from '@/api/types/fable.types'
 import { apiClient } from '@/api/client'
 import { API_ENDPOINTS } from '@/api/endpoints'

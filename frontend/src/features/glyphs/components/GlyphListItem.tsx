@@ -57,9 +57,7 @@ export function GlyphListItem({ glyph, onEdit }: GlyphListItemProps) {
               {t('creator.label')} {creatorLabel}
             </span>
           </div>
-          <P className="line-clamp-1 text-muted-foreground">
-            {glyph.value}
-          </P>
+          <P className="line-clamp-1 text-muted-foreground">{glyph.value}</P>
         </div>
 
         <div className="mt-2 flex w-full items-center justify-end sm:mt-0 sm:w-auto">

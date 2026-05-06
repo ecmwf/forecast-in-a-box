@@ -357,7 +357,8 @@ export const fableHandlers = [
       ...g,
     }))
 
-    let combined: Array<(typeof intrinsicItems)[0] | (typeof globalItems)[0]> = []
+    let combined: Array<(typeof intrinsicItems)[0] | (typeof globalItems)[0]> =
+      []
 
     if (!glyphType || glyphType === 'intrinsic') {
       combined = [...combined, ...intrinsicItems]

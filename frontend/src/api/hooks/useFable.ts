@@ -25,9 +25,9 @@ import type {
   FableValidationExpansion,
   GlobalGlyphPostRequest,
   GlobalGlyphResponse,
-  IntrinsicGlyphItem,
   GlyphFunctionsResponse,
   GlyphListResponse,
+  IntrinsicGlyphItem,
   PluginBlockFactoryId,
 } from '@/api/types/fable.types'
 import {

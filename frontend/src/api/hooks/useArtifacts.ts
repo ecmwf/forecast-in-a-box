@@ -89,8 +89,7 @@ export function useArtifactDetail(compositeId: CompositeArtifactId) {
     queryKey: artifactKeys.detail(compositeId),
     queryFn: () => getModelDetails(compositeId),
     staleTime: 60 * 1000,
-    enabled:
-      !!compositeId.artifact_store_id && !!compositeId.artifact_local_id,
+    enabled: !!compositeId.artifact_store_id && !!compositeId.artifact_local_id,
   })
 }
 
