@@ -26,7 +26,7 @@ import type {
   FableValidationExpansion,
   GlobalGlyphPostRequest,
   GlobalGlyphResponse,
-  GlyphDetail,
+  IntrinsicGlyphItem,
   GlyphFunctionsResponse,
   GlyphListResponse,
 } from '@/api/types/fable.types'
@@ -144,7 +144,7 @@ export async function deleteBlueprint(
 /**
  * List available intrinsic glyphs for ${glyph} interpolation in block configs
  */
-export async function getAvailableGlyphs(): Promise<Array<GlyphDetail>> {
+export async function getAvailableGlyphs(): Promise<Array<IntrinsicGlyphItem>> {
   const response: GlyphListResponse = await apiClient.get(
     API_ENDPOINTS.fable.glyphsList,
     {
@@ -152,7 +152,9 @@ export async function getAvailableGlyphs(): Promise<Array<GlyphDetail>> {
       schema: GlyphListResponseSchema,
     },
   )
-  return response.glyphs
+  return response.glyphs.filter(
+    (g): g is IntrinsicGlyphItem => g.glyph_type === 'intrinsic',
+  )
 }
 
 /**
@@ -189,13 +191,10 @@ export async function createGlobalGlyph(
 }
 
 /**
- * Get a global glyph by ID
+ * Delete a global glyph by ID
  */
-export async function getGlobalGlyph(
-  globalGlyphId: string,
-): Promise<GlobalGlyphResponse> {
-  return apiClient.get(API_ENDPOINTS.fable.glyphsGlobalGet, {
-    params: { global_glyph_id: globalGlyphId },
-    schema: GlobalGlyphResponseSchema,
+export async function deleteGlobalGlyph(globalGlyphId: string): Promise<void> {
+  return apiClient.post(API_ENDPOINTS.fable.glyphsGlobalDelete, {
+    global_glyph_id: globalGlyphId,
   })
 }

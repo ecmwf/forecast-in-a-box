@@ -47,12 +47,9 @@ export function useAllGlyphs(localGlyphs?: Record<string, string>): {
 
     if (globalData?.glyphs) {
       for (const g of globalData.glyphs) {
-        result.push({
-          name: g.name,
-          displayName: g.display_name,
-          valueExample: g.valueExample,
-          type: 'global',
-        })
+        if (g.glyph_type === 'global') {
+          result.push({ name: g.key, displayName: g.key, valueExample: g.value, type: 'global' })
+        }
       }
     }
 

@@ -77,8 +77,8 @@ export const API_ENDPOINTS = {
     glyphsFunctions: `${API_PREFIX}/blueprint/glyphs/functions`,
     /** POST - Create or update a global glyph */
     glyphsGlobalPost: `${API_PREFIX}/blueprint/glyphs/global/post`,
-    /** GET - Get a global glyph by ID */
-    glyphsGlobalGet: `${API_PREFIX}/blueprint/glyphs/global/get`,
+    /** POST - Delete a global glyph by ID */
+    glyphsGlobalDelete: `${API_PREFIX}/blueprint/glyphs/global/delete`,
   },
 
   /**

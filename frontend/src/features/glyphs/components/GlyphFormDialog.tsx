@@ -17,7 +17,7 @@
 import { useEffect, useState } from 'react'
 import { AlertCircle, HelpCircle, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { GlyphDetail } from '@/api/types/fable.types'
+import type { GlobalGlyphItem } from '@/api/types/fable.types'
 import { useCreateGlobalGlyph } from '@/api/hooks/useFable'
 import { useAuth } from '@/features/auth/AuthContext'
 import { isValidGlyphKey } from '@/features/glyphs/utils/validate-key'
@@ -47,7 +47,7 @@ import { P } from '@/components/base/typography'
 interface GlyphFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  editGlyph?: GlyphDetail
+  editGlyph?: GlobalGlyphItem
 }
 
 export function GlyphFormDialog({
@@ -62,8 +62,8 @@ export function GlyphFormDialog({
   const isAdmin = authType === 'anonymous' || (user?.is_superuser ?? false)
   const isEditing = !!editGlyph
 
-  const [key, setKey] = useState(editGlyph?.name ?? '')
-  const [value, setValue] = useState(editGlyph?.valueExample ?? '')
+  const [key, setKey] = useState(editGlyph?.key ?? '')
+  const [value, setValue] = useState(editGlyph?.value ?? '')
   const [isPublic, setIsPublic] = useState(false)
   // null when public is off; concrete boolean when public is on (backend rule).
   const [overriddable, setOverriddable] = useState<boolean | null>(null)
@@ -77,8 +77,8 @@ export function GlyphFormDialog({
   // current values (not a stale empty string from first mount).
   useEffect(() => {
     if (!open) return
-    setKey(editGlyph?.name ?? '')
-    setValue(editGlyph?.valueExample ?? '')
+    setKey(editGlyph?.key ?? '')
+    setValue(editGlyph?.value ?? '')
     setIsPublic(false)
     setOverriddable(null)
     setError(null)

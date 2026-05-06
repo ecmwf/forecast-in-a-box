@@ -342,30 +342,42 @@ export const fableHandlers = [
   http.get(API_ENDPOINTS.fable.glyphsList, async ({ request }) => {
     await delay(200)
     const url = new URL(request.url)
-    const glyphType = url.searchParams.get('glyph_type') ?? 'intrinsic'
-
-    if (glyphType === 'intrinsic') {
-      return HttpResponse.json({
-        glyphs: mockIntrinsicGlyphs,
-        total: mockIntrinsicGlyphs.length,
-        page: 1,
-        page_size: mockIntrinsicGlyphs.length,
-      })
-    }
-
-    // global
+    const glyphType = url.searchParams.get('glyph_type')
+    const glyphKey = url.searchParams.get('glyph_key')
     const page = Number(url.searchParams.get('page') ?? '1')
     const pageSize = Number(url.searchParams.get('page_size') ?? '50')
+
+    const intrinsicItems = mockIntrinsicGlyphs.map((g) => ({
+      glyph_type: 'intrinsic' as const,
+      ...g,
+    }))
+
+    const globalItems = mockGlobalGlyphs.map((g) => ({
+      glyph_type: 'global' as const,
+      ...g,
+    }))
+
+    let combined: Array<(typeof intrinsicItems)[0] | (typeof globalItems)[0]> = []
+
+    if (!glyphType || glyphType === 'intrinsic') {
+      combined = [...combined, ...intrinsicItems]
+    }
+    if (!glyphType || glyphType === 'global') {
+      combined = [...combined, ...globalItems]
+    }
+
+    if (glyphKey) {
+      combined = combined.filter((g) =>
+        g.glyph_type === 'intrinsic' ? g.name === glyphKey : g.key === glyphKey,
+      )
+    }
+
     const start = (page - 1) * pageSize
-    const slice = mockGlobalGlyphs.slice(start, start + pageSize)
+    const slice = combined.slice(start, start + pageSize)
+
     return HttpResponse.json({
-      glyphs: slice.map((g) => ({
-        name: g.key,
-        display_name: g.key,
-        valueExample: g.value,
-        created_by: g.created_by,
-      })),
-      total: mockGlobalGlyphs.length,
+      glyphs: slice,
+      total: combined.length,
       page,
       page_size: pageSize,
     })
@@ -411,7 +423,7 @@ export const fableHandlers = [
       existing.public = isPublic
       existing.overriddable = overriddable
       existing.updated_at = now
-      return HttpResponse.json(existing)
+      return HttpResponse.json({ glyph_type: 'global', ...existing })
     }
 
     const newGlyph: MockGlobalGlyph = {
@@ -425,21 +437,23 @@ export const fableHandlers = [
       updated_at: now,
     }
     mockGlobalGlyphs.push(newGlyph)
-    return HttpResponse.json(newGlyph)
+    return HttpResponse.json({ glyph_type: 'global', ...newGlyph })
   }),
 
-  http.get(API_ENDPOINTS.fable.glyphsGlobalGet, async ({ request }) => {
+  http.post(API_ENDPOINTS.fable.glyphsGlobalDelete, async ({ request }) => {
     await delay(200)
-    const url = new URL(request.url)
-    const id = url.searchParams.get('global_glyph_id')
-    const glyph = mockGlobalGlyphs.find((g) => g.global_glyph_id === id)
-    if (!glyph) {
+    const body = (await request.json()) as { global_glyph_id: string }
+    const index = mockGlobalGlyphs.findIndex(
+      (g) => g.global_glyph_id === body.global_glyph_id,
+    )
+    if (index === -1) {
       return HttpResponse.json(
-        { detail: `GlobalGlyph '${id}' not found.` },
+        { detail: `GlobalGlyph '${body.global_glyph_id}' not found.` },
         { status: 404 },
       )
     }
-    return HttpResponse.json(glyph)
+    mockGlobalGlyphs.splice(index, 1)
+    return new HttpResponse(null, { status: 204 })
   }),
 
   http.get(API_ENDPOINTS.fable.get, async ({ request }) => {

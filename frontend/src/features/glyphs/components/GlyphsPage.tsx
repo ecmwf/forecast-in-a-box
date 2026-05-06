@@ -17,7 +17,7 @@
 import { useState } from 'react'
 import { Braces, ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { GlyphDetail } from '@/api/types/fable.types'
+import type { GlobalGlyphItem } from '@/api/types/fable.types'
 import { useListGlobalGlyphs } from '@/api/hooks/useFable'
 import { GlyphFormDialog } from '@/features/glyphs/components/GlyphFormDialog'
 import { GlyphListItem } from '@/features/glyphs/components/GlyphListItem'
@@ -40,7 +40,7 @@ export function GlyphsPage() {
   const [page, setPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editGlyph, setEditGlyph] = useState<GlyphDetail | undefined>()
+  const [editGlyph, setEditGlyph] = useState<GlobalGlyphItem | undefined>()
 
   const { data, isLoading, isError, error } = useListGlobalGlyphs(
     page,
@@ -52,7 +52,7 @@ export function GlyphsPage() {
     setDialogOpen(true)
   }
 
-  function handleEdit(glyph: GlyphDetail) {
+  function handleEdit(glyph: GlobalGlyphItem) {
     setEditGlyph(glyph)
     setDialogOpen(true)
   }
@@ -90,7 +90,9 @@ export function GlyphsPage() {
     )
   }
 
-  const glyphs = data?.glyphs ?? []
+  const glyphs = (data?.glyphs ?? []).filter(
+    (g): g is GlobalGlyphItem => g.glyph_type === 'global',
+  )
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE))
 
   let filteredGlyphs = glyphs
@@ -98,8 +100,8 @@ export function GlyphsPage() {
     const query = searchQuery.toLowerCase()
     filteredGlyphs = glyphs.filter(
       (g) =>
-        g.name.toLowerCase().includes(query) ||
-        g.valueExample.toLowerCase().includes(query),
+        g.key.toLowerCase().includes(query) ||
+        g.value.toLowerCase().includes(query),
     )
   }
 
@@ -144,7 +146,7 @@ export function GlyphsPage() {
           {filteredGlyphs.length > 0 ? (
             filteredGlyphs.map((glyph) => (
               <GlyphListItem
-                key={`${glyph.created_by}:${glyph.name}`}
+                key={`${glyph.created_by}:${glyph.key}`}
                 glyph={glyph}
                 onEdit={handleEdit}
               />

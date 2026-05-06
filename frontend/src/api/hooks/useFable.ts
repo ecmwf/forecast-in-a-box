@@ -25,7 +25,7 @@ import type {
   FableValidationExpansion,
   GlobalGlyphPostRequest,
   GlobalGlyphResponse,
-  GlyphDetail,
+  IntrinsicGlyphItem,
   GlyphFunctionsResponse,
   GlyphListResponse,
   PluginBlockFactoryId,
@@ -33,10 +33,10 @@ import type {
 import {
   createGlobalGlyph,
   deleteBlueprint,
+  deleteGlobalGlyph,
   expandFable,
   getAvailableGlyphs,
   getCatalogue,
-  getGlobalGlyph,
   listBlueprints,
   listGlobalGlyphs,
   listGlyphFunctions,
@@ -253,7 +253,7 @@ export function useDeleteBlueprint() {
  * Intrinsic glyphs are static (e.g., runId, submitDatetime), so we cache aggressively.
  */
 export function useAvailableGlyphs() {
-  return useQuery<Array<GlyphDetail>>({
+  return useQuery<Array<IntrinsicGlyphItem>>({
     queryKey: fableKeys.glyphs(),
     queryFn: getAvailableGlyphs,
     staleTime: 30 * 60 * 1000, // 30 minutes — intrinsic glyphs change rarely
@@ -286,17 +286,6 @@ export function useListGlobalGlyphs(page: number = 1, pageSize: number = 50) {
 }
 
 /**
- * Get a single global glyph by ID
- */
-export function useGlobalGlyph(globalGlyphId: string | null | undefined) {
-  return useQuery<GlobalGlyphResponse>({
-    queryKey: fableKeys.globalGlyph(globalGlyphId ?? ''),
-    queryFn: () => getGlobalGlyph(globalGlyphId!),
-    enabled: !!globalGlyphId,
-  })
-}
-
-/**
  * Create or update a global glyph
  */
 export function useCreateGlobalGlyph() {
@@ -308,6 +297,20 @@ export function useCreateGlobalGlyph() {
       queryClient.invalidateQueries({
         queryKey: fableKeys.globalGlyphsBase(),
       })
+    },
+  })
+}
+
+/**
+ * Delete a global glyph by ID
+ */
+export function useDeleteGlobalGlyph() {
+  const queryClient = useQueryClient()
+
+  return useMutation<void, Error, string>({
+    mutationFn: deleteGlobalGlyph,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: fableKeys.globalGlyphsBase() })
     },
   })
 }
