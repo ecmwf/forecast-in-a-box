@@ -38,9 +38,10 @@ clean:
 
 val:
     #!/usr/bin/env bash
-    for d in $(ls backend/packages) ; do
-        if [[ -f $d/justfile ]] ; then
-            just -f $d/justfile -d $d val
+    pkgLoc=backend/packages
+    for d in $(ls $pkgLoc) ; do
+        if [[ -f $pkgLoc/$d/justfile ]] ; then
+            just -f $pkgLoc/$d/justfile -d $pkgLoc/$d val
         fi
     done
         
