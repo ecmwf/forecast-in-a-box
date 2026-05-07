@@ -13,6 +13,7 @@ Base definitions pertaining to artifacts such as ml model checkpoints
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from fiab_core.artifacts import ArtifactResolved, CompositeArtifactId, Platform
 from pyrsistent.typing import PMap
@@ -44,7 +45,7 @@ class MlModelDetail:
     disk_size_bytes: int
     pip_package_constraints: list[str]
     supported_platforms: list[Platform]
-    output_characteristics: list[str]
+    output_characteristics: dict[str, Any]
     input_characteristics: list[str]
     is_available: bool
     is_locally_compatible: bool
