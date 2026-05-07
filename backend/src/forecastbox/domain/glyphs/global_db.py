@@ -14,7 +14,7 @@ import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from sqlalchemy import Select, func, or_, select, update
+from sqlalchemy import Select, delete, func, or_, select, update
 
 import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.domain.glyphs.types import GlobalGlyphId
@@ -109,11 +109,14 @@ async def get_global_glyph(global_glyph_id: GlobalGlyphId, auth_context: AuthCon
     return await querySingle(query, _jobs_module.async_session_maker)
 
 
-async def list_global_glyphs(auth_context: AuthContext, offset: int = 0, limit: int | None = None) -> Iterable[GlobalGlyph]:
+async def list_global_glyphs(
+    auth_context: AuthContext, offset: int = 0, limit: int | None = None, key: str | None = None
+) -> Iterable[GlobalGlyph]:
     """Return GlobalGlyphs visible to the caller, ordered by key, with optional paging.
 
     Admins see all glyphs.  Non-admins see their own glyphs plus all public glyphs.
     Multiple rows for the same key (from different owners) may appear.
+    When ``key`` is given, only glyphs whose key matches exactly are returned.
     """
 
     async def function(i: int) -> list[GlobalGlyph]:
@@ -122,6 +125,8 @@ async def list_global_glyphs(auth_context: AuthContext, offset: int = 0, limit: 
                 select(GlobalGlyph).order_by(GlobalGlyph.key).offset(offset),
                 auth_context,
             )
+            if key is not None:
+                query = query.where(GlobalGlyph.key == key)
             if limit is not None:
                 query = query.limit(limit)
             result = await session.execute(query)
@@ -130,12 +135,17 @@ async def list_global_glyphs(auth_context: AuthContext, offset: int = 0, limit: 
     return await dbRetry(function)
 
 
-async def count_global_glyphs(auth_context: AuthContext) -> int:
-    """Return the total number of GlobalGlyphs visible to the caller."""
+async def count_global_glyphs(auth_context: AuthContext, key: str | None = None) -> int:
+    """Return the total number of GlobalGlyphs visible to the caller.
+
+    When ``key`` is given, only glyphs whose key matches exactly are counted.
+    """
 
     async def function(i: int) -> int:
         async with _jobs_module.async_session_maker() as session:
             query = _visibility_filter(select(func.count()).select_from(GlobalGlyph), auth_context)
+            if key is not None:
+                query = query.where(GlobalGlyph.key == key)
             result = await session.execute(query)
             return result.scalar() or 0
 
@@ -180,5 +190,39 @@ async def get_glyphs_for_resolution(auth_context: AuthContext) -> GlyphResolutio
                 user_own=user_own,
                 public_nonoverridable=pub_nonoverridable,
             )
+
+    return await dbRetry(function)
+
+
+async def delete_global_glyph(global_glyph_id: GlobalGlyphId, auth_context: AuthContext) -> GlobalGlyph | None:
+    """Delete a GlobalGlyph by id if the caller is allowed to do so.
+
+    Returns the deleted row on success, or ``None`` if the glyph does not exist
+    or is not visible to the caller.  Callers must check the returned value and
+    raise an appropriate HTTP error when it is ``None``.
+
+    The caller must own the glyph (``created_by == auth_context.user_id``) or
+    be an admin; visibility is checked via ``_visibility_filter`` and ownership
+    is enforced via ``auth_context.allowed``.
+    """
+
+    async def function(i: int) -> GlobalGlyph | None:
+        async with _jobs_module.async_session_maker() as session:
+            # Fetch with visibility filter so non-admins cannot see (and thus
+            # cannot attempt to delete) glyphs that are not visible to them.
+            query = _visibility_filter(
+                select(GlobalGlyph).where(GlobalGlyph.global_glyph_id == global_glyph_id),
+                auth_context,
+            )
+            result = await session.execute(query)
+            row: GlobalGlyph | None = result.scalar_one_or_none()
+            if row is None:
+                return None
+            if not auth_context.allowed(str(row.created_by)):
+                # Visible but not owned — caller is not admin and not the owner.
+                return None
+            await session.execute(delete(GlobalGlyph).where(GlobalGlyph.global_glyph_id == global_glyph_id))
+            await session.commit()
+            return row
 
     return await dbRetry(function)

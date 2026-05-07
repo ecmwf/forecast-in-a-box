@@ -247,7 +247,8 @@ const mockModels: Array<MlModelDetail> = [
     supported_platforms: ['linux', 'macos'],
     is_available: false,
     is_locally_compatible: false,
-    local_compatibility_detail: 'Required CUDA driver version >= 12.0 not found.',
+    local_compatibility_detail:
+      'Required CUDA driver version >= 12.0 not found.',
     display_description:
       'ECMWF AIFS single MSE 1.1 model with scaled-dot-product attention for medium-range weather forecasting.',
     url: 'https://sites.ecmwf.int/repository/fiab/aifs/aifs-single-mse-1.1_sdpa.ckpt',

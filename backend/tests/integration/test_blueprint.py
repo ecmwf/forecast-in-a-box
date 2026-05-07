@@ -296,6 +296,13 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     expected_run_id = run_id_glyph["valueExample"]
     assert response.json()["resolved_configuration_options"]["sink_file"]["fname"] == f"{tmpdir}/output{expected_run_id}.main.txt"
 
+    # Clean up the global glyph created in this test
+    del_resp = backend_client_with_auth.post(
+        "/blueprint/glyphs/global/delete",
+        json={"global_glyph_id": post_resp.json()["global_glyph_id"]},
+    )
+    assert del_resp.is_success, del_resp.text
+
 
 def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
     # Set the global glyph that the builder's source_time block references
@@ -404,6 +411,13 @@ def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Cl
         expected_log_count = 9
         assert len(zf.namelist()) == expected_log_count or os.getenv("FIAB_LOGSTDOUT", "nay") == "yea"
 
+    # Clean up: delete the global glyph created in this test
+    del_resp = backend_client_with_auth.post(
+        "/blueprint/glyphs/global/delete",
+        json={"global_glyph_id": post_resp.json()["global_glyph_id"]},
+    )
+    assert del_resp.is_success, del_resp.text
+
 
 def test_submit_job_v2_execute_missing_blueprint_id(backend_client_with_auth: httpx.Client) -> None:
     """Omitting blueprint_id (required field) returns 422."""
@@ -431,7 +445,8 @@ def test_submit_job_v2_restart_not_found(backend_client_with_auth: httpx.Client)
 
 
 def test_list_available_glyphs(backend_client_with_auth: httpx.Client) -> None:
-    """The glyphs/list endpoint returns exactly the set of AvailableIntrinsicGlyphs when glyph_type=intrinsic."""
+    """The glyphs/list endpoint returns intrinsic and global glyphs with correct shape."""
+    # Filter to intrinsic only
     response = backend_client_with_auth.get("/blueprint/glyphs/list", params={"glyph_type": "intrinsic"})
     assert response.is_success, response.text
     data = response.json()
@@ -441,6 +456,7 @@ def test_list_available_glyphs(backend_client_with_auth: httpx.Client) -> None:
     expected_names = set(get_args(AvailableIntrinsicGlyphs))
     assert returned_names == expected_names
     for item in data["glyphs"]:
+        assert item["glyph_type"] == "intrinsic"
         assert "display_name" in item
         assert "valueExample" in item
         assert item["display_name"]
@@ -463,20 +479,22 @@ def test_list_available_glyphs(backend_client_with_auth: httpx.Client) -> None:
     assert posted["key"] == "listGlyphsGlobalGlyph"
     assert posted["value"] == "list_test_value"
     assert "global_glyph_id" in posted
+    assert posted["glyph_type"] == "global"
 
     global_resp2 = backend_client_with_auth.get("/blueprint/glyphs/list", params={"glyph_type": "global"})
     assert global_resp2.is_success, global_resp2.text
     global_data2 = global_resp2.json()
     assert global_data2["total"] == initial_total + 1
-    names = {item["name"] for item in global_data2["glyphs"]}
-    assert "listGlyphsGlobalGlyph" in names
+    keys = {item["key"] for item in global_data2["glyphs"]}
+    assert "listGlyphsGlobalGlyph" in keys
+    for item in global_data2["glyphs"]:
+        assert item["glyph_type"] == "global"
 
-    get_resp = backend_client_with_auth.get("/blueprint/glyphs/global/get", params={"global_glyph_id": posted["global_glyph_id"]})
-    assert get_resp.is_success, get_resp.text
-    fetched = get_resp.json()
-    assert fetched["key"] == "listGlyphsGlobalGlyph"
-    assert fetched["value"] == "list_test_value"
-    assert fetched["global_glyph_id"] == posted["global_glyph_id"]
+    # Retrieve by key filter via list endpoint (replaces the old GET by id)
+    key_resp = backend_client_with_auth.get("/blueprint/glyphs/list", params={"glyph_key": "listGlyphsGlobalGlyph"})
+    assert key_resp.is_success, key_resp.text
+    key_data = key_resp.json()
+    assert any(g["key"] == "listGlyphsGlobalGlyph" and g["global_glyph_id"] == posted["global_glyph_id"] for g in key_data["glyphs"])
 
     # Non-admin users must not be able to create public global glyphs
     public_resp = backend_client_with_auth.post(
@@ -484,6 +502,13 @@ def test_list_available_glyphs(backend_client_with_auth: httpx.Client) -> None:
         json={"key": "shouldBeRejected", "value": "v", "public": True, "overriddable": True},
     )
     assert public_resp.status_code == 403
+
+    # Clean up: delete the glyph created in this test
+    delete_resp = backend_client_with_auth.post(
+        "/blueprint/glyphs/global/delete",
+        json={"global_glyph_id": posted["global_glyph_id"]},
+    )
+    assert delete_resp.is_success, delete_resp.text
 
 
 def test_list_glyph_functions(backend_client_with_auth: httpx.Client) -> None:
@@ -678,6 +703,13 @@ def test_blueprint_composite_glyph_expand(tmpdir: Any, backend_client_with_auth:
     resolved_jinja = jinja_data["resolved_configuration_options"]["source_jinja"]["text"]
     assert resolved_jinja == expected_floored, f"Expected {expected_floored!r}, got {resolved_jinja!r}"
 
+    # Clean up the global glyph created in this test
+    del_resp = backend_client_with_auth.post(
+        "/blueprint/glyphs/global/delete",
+        json={"global_glyph_id": post_resp.json()["global_glyph_id"]},
+    )
+    assert del_resp.is_success, del_resp.text
+
 
 def test_blueprint_jinja_interpolation_expand(backend_client_with_auth: httpx.Client) -> None:
     """Jinja interpolation is validated and resolved via the /expand endpoint.
@@ -764,6 +796,13 @@ def test_blueprint_composite_glyph_execute(tmpdir: Any, backend_client_with_auth
     # Content must be "exec_global/<run_id>"
     assert content == f"exec_global/{run_id}", f"Unexpected output: {content!r}"
     output.unlink()
+
+    # Clean up the global glyph created in this test
+    del_resp = backend_client_with_auth.post(
+        "/blueprint/glyphs/global/delete",
+        json={"global_glyph_id": post_resp.json()["global_glyph_id"]},
+    )
+    assert del_resp.is_success, del_resp.text
 
 
 # ---------------------------------------------------------------------------

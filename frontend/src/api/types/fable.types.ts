@@ -101,22 +101,51 @@ export const FableBuilderV1Schema = z.object({
 export type FableBuilderV1 = z.infer<typeof FableBuilderV1Schema>
 
 /**
- * Intrinsic glyph available for ${glyph} interpolation in block configuration values.
- * Returned by GET /api/v1/blueprint/glyphs/list?glyph_type=intrinsic
+ * Intrinsic glyph item from GET /api/v1/blueprint/glyphs/list?glyph_type=intrinsic
  */
-export const GlyphDetailSchema = z.object({
+export const IntrinsicGlyphItemSchema = z.object({
+  glyph_type: z.literal('intrinsic'),
   name: z.string(),
   display_name: z.string(),
   valueExample: z.string(),
-  /** "intrinsic" for intrinsic glyphs; owner id (or passthrough sentinel "user") otherwise. */
   created_by: z.string(),
 })
 
-export type GlyphDetail = z.infer<typeof GlyphDetailSchema>
+export type IntrinsicGlyphItem = z.infer<typeof IntrinsicGlyphItemSchema>
+
+/**
+ * Global glyph item from GET /api/v1/blueprint/glyphs/list?glyph_type=global
+ */
+export const GlobalGlyphItemSchema = z.object({
+  glyph_type: z.literal('global'),
+  global_glyph_id: z.string(),
+  key: z.string(),
+  value: z.string(),
+  public: z.boolean(),
+  overriddable: z.boolean().nullable(),
+  created_by: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+})
+
+export type GlobalGlyphItem = z.infer<typeof GlobalGlyphItemSchema>
+
+/** Discriminated union of glyph list items */
+export const GlyphListItemSchema = z.discriminatedUnion('glyph_type', [
+  IntrinsicGlyphItemSchema,
+  GlobalGlyphItemSchema,
+])
+
+export type GlyphListItem = z.infer<typeof GlyphListItemSchema>
+
+/**
+ * @deprecated Use IntrinsicGlyphItem for intrinsic glyphs or GlobalGlyphItem for global glyphs.
+ */
+export type GlyphDetail = IntrinsicGlyphItem
 
 /** Paginated response from GET /api/v1/blueprint/glyphs/list */
 export const GlyphListResponseSchema = z.object({
-  glyphs: z.array(GlyphDetailSchema),
+  glyphs: z.array(GlyphListItemSchema),
   total: z.number(),
   page: z.number(),
   page_size: z.number(),
@@ -140,6 +169,7 @@ export interface GlobalGlyphPostRequest {
 
 /** Response from global glyph endpoints */
 export const GlobalGlyphResponseSchema = z.object({
+  glyph_type: z.literal('global'),
   global_glyph_id: z.string(),
   key: z.string(),
   value: z.string(),

@@ -16,14 +16,14 @@
 
 import { Braces, Pencil } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { GlyphDetail } from '@/api/types/fable.types'
+import type { GlobalGlyphItem } from '@/api/types/fable.types'
 import { Button } from '@/components/ui/button'
 import { P } from '@/components/base/typography'
 import { useUser } from '@/hooks/useUser'
 
 interface GlyphListItemProps {
-  glyph: GlyphDetail
-  onEdit: (glyph: GlyphDetail) => void
+  glyph: GlobalGlyphItem
+  onEdit: (glyph: GlobalGlyphItem) => void
 }
 
 const PASSTHROUGH_USER_ID = 'user'
@@ -33,9 +33,7 @@ export function GlyphListItem({ glyph, onEdit }: GlyphListItemProps) {
   const { data: user } = useUser()
 
   let creatorLabel: string
-  if (glyph.created_by === 'intrinsic') {
-    creatorLabel = t('creator.intrinsic')
-  } else if (glyph.created_by === PASSTHROUGH_USER_ID) {
+  if (glyph.created_by === PASSTHROUGH_USER_ID) {
     creatorLabel = t('creator.passthrough')
   } else if (user?.id && glyph.created_by === user.id) {
     creatorLabel = t('creator.you')
@@ -53,15 +51,13 @@ export function GlyphListItem({ glyph, onEdit }: GlyphListItemProps) {
         <div className="grow">
           <div className="mb-1 flex items-center gap-2">
             <code className="rounded bg-muted px-2 py-0.5 font-mono text-sm font-medium">
-              {'${' + glyph.name + '}'}
+              {'${' + glyph.key + '}'}
             </code>
             <span className="truncate text-xs text-muted-foreground italic">
               {t('creator.label')} {creatorLabel}
             </span>
           </div>
-          <P className="line-clamp-1 text-muted-foreground">
-            {glyph.valueExample}
-          </P>
+          <P className="line-clamp-1 text-muted-foreground">{glyph.value}</P>
         </div>
 
         <div className="mt-2 flex w-full items-center justify-end sm:mt-0 sm:w-auto">
