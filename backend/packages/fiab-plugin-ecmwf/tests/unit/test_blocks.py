@@ -23,6 +23,7 @@ from fiab_core.fable import (
 from fiab_plugin_ecmwf.blocks import (
     EkdSource,
     EnsembleStatistics,
+    GribSink,
     MapPlotSink,
     TemporalStatistics,
     ZarrSink,
@@ -93,6 +94,17 @@ def zarr_sink_configuration() -> BlockInstance:
         input_ids={"dataset": BlockInstanceId("source_output")},
         configuration_values={
             "path": "/path/to/output.zarr",
+        },
+    )
+
+
+@pytest.fixture
+def grib_sink_configuration() -> BlockInstance:
+    return BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="GribSink"),  # type: ignore
+        input_ids={"dataset": BlockInstanceId("source_output")},
+        configuration_values={
+            "path": "/path/to/output.grib2",
         },
     )
 
@@ -270,6 +282,60 @@ class TestZarrSink:
         assert block.intersect(other=temporal_output)  # type: ignore[arg-type]
         output = block.validate(  # type: ignore[assignment]
             block=zarr_sink_configuration,
+            inputs={"dataset": temporal_output},  # type: ignore[dict-item]
+        ).get_or_raise()
+        assert isinstance(output, NoOutput)
+
+
+class TestGribSink:
+    def test_from_ekdsource(self, grib_sink_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
+        block = GribSink()
+
+        assert block.intersect(other=ekdsource_output)  # type: ignore[arg-type]
+        output = block.validate(  # type: ignore[assignment]
+            block=grib_sink_configuration,
+            inputs={"dataset": ekdsource_output},  # type: ignore[dict-item]
+        ).get_or_raise()
+        assert isinstance(output, NoOutput)
+
+    def test_from_ensemble_statistics(
+        self,
+        grib_sink_configuration: BlockInstance,
+        ensemble_statistics_configuration: BlockInstance,
+        ekdsource_output: QubedOutput,
+    ) -> None:
+        ensemble_block = EnsembleStatistics()
+        ensemble_output = ensemble_block.validate(  # type: ignore[assignment]
+            block=ensemble_statistics_configuration,
+            inputs={"dataset": ekdsource_output},  # type: ignore[dict-item]
+        ).get_or_raise()
+
+        block = GribSink()
+
+        assert block.intersect(other=ensemble_output)  # type: ignore[arg-type]
+        output = block.validate(  # type: ignore[assignment]
+            block=grib_sink_configuration,
+            inputs={"dataset": ensemble_output},  # type: ignore[dict-item]
+        ).get_or_raise()
+        assert isinstance(output, NoOutput)
+
+    def test_from_temporal_statistics(
+        self,
+        grib_sink_configuration: BlockInstance,
+        temporal_statistics_configuration: BlockInstance,
+        ekdsource_output: QubedOutput,
+    ) -> None:
+        temporal_block = TemporalStatistics()
+        temporal_output = temporal_block.validate(  # type: ignore[assignment]
+            block=temporal_statistics_configuration,
+            inputs={"dataset": ekdsource_output},  # type: ignore[dict-item]
+        ).get_or_raise()
+
+        block = GribSink()
+
+        assert block.intersect(other=temporal_output)  # type: ignore[arg-type]
+        output = block.validate(  # type: ignore[assignment]
+            block=grib_sink_configuration,
             inputs={"dataset": temporal_output},  # type: ignore[dict-item]
         ).get_or_raise()
         assert isinstance(output, NoOutput)

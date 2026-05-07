@@ -313,6 +313,41 @@ class ZarrSink(Sink):
         return bool(dimensions(other))
 
 
+class GribSink(Sink):
+    title: str = "GRIB Sink"
+    description: str = "Write dataset to a GRIB file on the local filesystem"
+    configuration_options: dict[str, BlockConfigurationOption] = {
+        "path": BlockConfigurationOption(
+            title="GRIB Path",
+            description="Filesystem path where the GRIB file should be written",
+            value_type="str",
+        )
+    }
+    inputs: list[str] = ["dataset"]
+
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        return Either.ok(NoOutput())
+
+    def compile(
+        self,
+        inputs: ActionLookup,
+        block_id: BlockInstanceId,
+        block: BlockInstance,
+    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_task = block.input_ids["dataset"]
+
+        action = inputs[input_task].map(
+            Payload(
+                "fiab_plugin_ecmwf.runtime.sinks.write_grib",
+                kwargs={"path": block.configuration_values["path"]},
+            )
+        )
+        return Either.ok(action)
+
+    def intersect(self, other: QubedOutput) -> bool:
+        return bool(dimensions(other))
+
+
 class MapPlotSink(Sink):
     title: str = "Map Plot"
     description: str = "Render a geographic map using earthkit-plots"
