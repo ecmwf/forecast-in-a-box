@@ -38,6 +38,7 @@ from fiab_plugin_ecmwf.blocks import (
     STEP,
     EkdSource,
     EnsembleStatistics,
+    GribSink,
     MapPlotSink,
     SelectDimension,
     TemporalStatistics,
@@ -219,6 +220,17 @@ def zarr_sink_configuration() -> BlockInstance:
             ),
         ),
         ZarrSink.configuration_options,
+    )
+
+
+@pytest.fixture
+def grib_sink_configuration() -> BlockInstance:
+    return BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="GribSink"),  # type: ignore
+        input_ids={"dataset": BlockInstanceId("source_output")},
+        configuration_values={
+            "path": "/path/to/output.grib2",
+        },
     )
 
 
@@ -623,6 +635,59 @@ class TestSelectMembers:
 
 def test_anemoi_catalogue_value_types_are_canonical(registered_provider: None) -> None:
     assert get_checkpoint_enum_type() == "enumClosed['dummy_store:dummy_ckpt']"
+
+class TestGribSink:
+    def test_from_ekdsource(self, grib_sink_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
+        block = GribSink()
+
+        assert block.intersect(other=ekdsource_output)  # type: ignore[arg-type]
+        output = block.validate(  # type: ignore[assignment]
+            block=grib_sink_configuration,
+            inputs={"dataset": ekdsource_output},  # type: ignore[dict-item]
+        ).get_or_raise()
+        assert isinstance(output, NoOutput)
+
+    def test_from_ensemble_statistics(
+        self,
+        grib_sink_configuration: BlockInstance,
+        ensemble_statistics_configuration: BlockInstance,
+        ekdsource_output: QubedOutput,
+    ) -> None:
+        ensemble_block = EnsembleStatistics()
+        ensemble_output = ensemble_block.validate(  # type: ignore[assignment]
+            block=ensemble_statistics_configuration,
+            inputs={"dataset": ekdsource_output},  # type: ignore[dict-item]
+        ).get_or_raise()
+
+        block = GribSink()
+
+        assert block.intersect(other=ensemble_output)  # type: ignore[arg-type]
+        output = block.validate(  # type: ignore[assignment]
+            block=grib_sink_configuration,
+            inputs={"dataset": ensemble_output},  # type: ignore[dict-item]
+        ).get_or_raise()
+        assert isinstance(output, NoOutput)
+
+    def test_from_temporal_statistics(
+        self,
+        grib_sink_configuration: BlockInstance,
+        temporal_statistics_configuration: BlockInstance,
+        ekdsource_output: QubedOutput,
+    ) -> None:
+        temporal_block = TemporalStatistics()
+        temporal_output = temporal_block.validate(  # type: ignore[assignment]
+            block=temporal_statistics_configuration,
+            inputs={"dataset": ekdsource_output},  # type: ignore[dict-item]
+        ).get_or_raise()
+
+        block = GribSink()
+
+        assert block.intersect(other=temporal_output)  # type: ignore[arg-type]
+        output = block.validate(  # type: ignore[assignment]
+            block=grib_sink_configuration,
+            inputs={"dataset": temporal_output},  # type: ignore[dict-item]
+        ).get_or_raise()
+        assert isinstance(output, NoOutput)
 
 
 class TestMapPlotSink:

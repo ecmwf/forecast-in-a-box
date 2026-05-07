@@ -22,6 +22,7 @@ from fiab_plugin_ecmwf.blocks import (
     SelectDimension,
     TemporalStatistics,
     ZarrSink,
+    GribSink,
 )
 
 blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
@@ -44,6 +45,7 @@ blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
         selection_label="members",
     ),
     BlockFactoryId("zarrSink"): ZarrSink(),
+    BlockFactoryId("gribSink"): GribSink(),
     BlockFactoryId("anemoiSource"): AnemoiSource(),
     BlockFactoryId("anemoiTransform"): AnemoiTransform(),
     BlockFactoryId("mapPlotSink"): MapPlotSink(),
