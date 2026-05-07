@@ -16,6 +16,7 @@ Before the `validate` and `compile`, the backend manipulates the configuration v
     * if the type validation fails, the plugin is *not* called at all, and only the type errors are collected and provided to the caller
     * if a value is *missing*: for validation, this does not cause an issue -- the plugin's validate should do best effort to validate, but should not fail. For compilation, the plugin is *not* called at all as if the validation failed
     * if `None` is a genuinely acceptable value, the plugin must encode it differently
+      * _or_ we could add a ConfigurationOption field `allow_none` which the backend would obey -- but I would prefer not to do so, it seems a complication. None is a None.
     * if the plugin provides a `default`, the frontend is responsible to inject it
     * the frontend is expected to provide a warning to the user if a configuration value is missing
 
@@ -27,6 +28,12 @@ The plugin authors are expected to utilize enumOpen only, and an unavailable che
 Comment on `glyphs`: basically independent of this.
 On the backend, glyphs are completely resolved _before_ the type validation and parsing is considered.
 On the frontend, an expression with a glyph is not expected to be type validated or provide tab completion.
+However, we would make a change to how we treat unresolvable expressions due to a missing glyph -- we will make it similar to "missing configuration option":
+1. During validation, this option is not provided to the plugin as if the user did not fill it, and the plugin can still validate. And instead of reporting missing glyphs via errors, we report them via `resolved_configuration_options`.
+2. During compilation, it is a hard fail.
+
+The frontend can then treat missing glyph like a soft warning, which causes no big concern when saving a preset.
+A malformed expression is _still_ an error with a hard stop like before -- this is similar to type conversion failure above.
 
 Comment on `client_type_understanding`: we will create a test suite, something like a 3-column CSV, with first column being literal value, second column being input to python eval, third column input to javascript eval. Each implementation can then test itself.
 
