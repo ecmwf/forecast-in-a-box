@@ -18,6 +18,7 @@ from fiab_core.fable import (
     RawOutput,
 )
 from fiab_core.plugin import Error, Plugin
+from fiab_core.types import FableType
 
 TEXT = ConfigurationOptionId("text")
 DURATION = ConfigurationOptionId("duration")
@@ -120,7 +121,10 @@ def expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
     if isinstance(output, RawOutput):
         if output.type_fqn == "int":
             return [
-                BlockExpansion(factory=BlockFactoryId("transform_increment")),
+                BlockExpansion(
+                    factory=BlockFactoryId("transform_increment"),
+                    restrictions={AMOUNT: FableType.parse("enumClosed[1,2,3]")},
+                ),
                 BlockExpansion(factory=BlockFactoryId("product_join")),
                 BlockExpansion(factory=BlockFactoryId("sink_file")),
                 BlockExpansion(factory=BlockFactoryId("sink_image")),

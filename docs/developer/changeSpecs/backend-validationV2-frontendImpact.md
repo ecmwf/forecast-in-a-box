@@ -185,29 +185,36 @@ Affected route:
 
 - `PUT /blueprint/expand`
 
-Task 7 should add at least one integration-test-visible example where `configuration_option_restrictions` is non-empty.
+When expanding a `source_42` (int-producing) block, the `transform_increment` expansion now
+carries a non-empty `restrictions` map. The `amount` configuration option is restricted to
+`enumClosed[1,2,3]` to demonstrate the full backend-to-route flow.
 
-Example after task 7:
+Example after task 7 (the `source_42` block expands to `transform_increment` with a restriction):
 
 ```json
 {
   "possible_expansions": {
-    "source_weather": [
+    "source_42": [
       {
-        "block_factory_id": {
-          "plugin": {"store": "local", "local": "test"},
-          "factory": "map_plot"
-        },
-        "configuration_option_restrictions": {
-          "param": "enumClosed['2t']"
+        "plugin": {"store": "localTest", "local": "single"},
+        "factory": "transform_increment",
+        "restrictions": {
+          "amount": "enumClosed[1,2,3]"
         }
+      },
+      {
+        "plugin": {"store": "localTest", "local": "single"},
+        "factory": "product_join",
+        "restrictions": {}
       }
     ]
   }
 }
 ```
 
-The concrete factory ids and type strings should be updated by the implementation PR.
+Note: the field names used in the actual route response are `plugin`, `factory`, and `restrictions`
+(not the proposed `block_factory_id` / `configuration_option_restrictions` from the task 6 draft above).
+The task 6 section above should be treated as superseded by these actual names.
 
 ## Task 8: Missing glyph warnings
 
