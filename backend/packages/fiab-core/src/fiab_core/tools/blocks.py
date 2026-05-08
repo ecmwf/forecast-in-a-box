@@ -9,7 +9,7 @@
 
 import abc
 from datetime import date, datetime
-from typing import Any, TypeVar
+from typing import TypeVar
 
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
@@ -28,7 +28,7 @@ from fiab_core.fable import (
     QubedOutput,
 )
 from fiab_core.plugin import Error
-from fiab_core.types import ClosedEnumType, DatetimeType, DateType, FableType, FloatType, IntType, ListType, OpenEnumType, StringType
+from fiab_core.types import ClosedEnumType, DatetimeType, DateType, FloatType, IntType, ListType, OpenEnumType, StringType
 
 
 class BlockInstanceConfigurationError(ValueError):
@@ -60,73 +60,62 @@ class BlockInstanceRich(BlockInstance):
             )
         return option_id, option
 
-    def _get_raw_value(self, option_id: ConfigurationOptionId, default: T | None) -> Any:
+    def _get_raw_value(self, option_id: ConfigurationOptionId) -> object:
         if option_id in self.configuration_values:
             return self.configuration_values[option_id]
-        if default is not None:
-            return default
         raise BlockInstanceConfigurationError(
             f"Configuration option {option_id!r} is missing for block factory {self.factory_id.factory!r}"
         )
 
-    def config_as_str(self, key: str | ConfigurationOptionId, default: str | None = None) -> str:
+    def config_as_str(self, key: str | ConfigurationOptionId) -> str:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.parsed_value_type, (StringType, ClosedEnumType, OpenEnumType)):
             raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} has type {option.value_type!r}, not str")
-        raw_value = self._get_raw_value(option_id, default)
+        raw_value = self._get_raw_value(option_id)
         if isinstance(raw_value, str):
             return raw_value
         raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected str, got {type(raw_value).__name__}")
 
-    def config_as_int(self, key: str | ConfigurationOptionId, default: int | None = None) -> int:
+    def config_as_int(self, key: str | ConfigurationOptionId) -> int:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.parsed_value_type, IntType):
             raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} has type {option.value_type!r}, not int")
-        raw_value = self._get_raw_value(option_id, default)
+        raw_value = self._get_raw_value(option_id)
         if type(raw_value) is int:
             return raw_value
-        if isinstance(raw_value, str):
-            return option.parsed_value_type.validate_convert(raw_value)
         raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected int, got {type(raw_value).__name__}")
 
-    def config_as_float(self, key: str | ConfigurationOptionId, default: float | None = None) -> float:
+    def config_as_float(self, key: str | ConfigurationOptionId) -> float:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.parsed_value_type, FloatType):
             raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} has type {option.value_type!r}, not float")
-        raw_value = self._get_raw_value(option_id, default)
+        raw_value = self._get_raw_value(option_id)
         if type(raw_value) is float:
             return raw_value
-        if isinstance(raw_value, str):
-            return option.parsed_value_type.validate_convert(raw_value)
         raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected float, got {type(raw_value).__name__}")
 
-    def config_as_date(self, key: str | ConfigurationOptionId, default: date | None = None) -> date:
+    def config_as_date(self, key: str | ConfigurationOptionId) -> date:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.parsed_value_type, DateType):
             raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} has type {option.value_type!r}, not date")
-        raw_value = self._get_raw_value(option_id, default)
+        raw_value = self._get_raw_value(option_id)
         if type(raw_value) is date:
             return raw_value
-        if isinstance(raw_value, str):
-            return option.parsed_value_type.validate_convert(raw_value)
         raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected date, got {type(raw_value).__name__}")
 
-    def config_as_datetime(self, key: str | ConfigurationOptionId, default: datetime | None = None) -> datetime:
+    def config_as_datetime(self, key: str | ConfigurationOptionId) -> datetime:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.parsed_value_type, DatetimeType):
             raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} has type {option.value_type!r}, not datetime")
-        raw_value = self._get_raw_value(option_id, default)
+        raw_value = self._get_raw_value(option_id)
         if type(raw_value) is datetime:
             return raw_value
-        if isinstance(raw_value, str):
-            return option.parsed_value_type.validate_convert(raw_value)
         raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected datetime, got {type(raw_value).__name__}")
 
     def config_as_list(
         self,
         key: str | ConfigurationOptionId,
         item_type: type[T],
-        default: list[T] | None = None,
         *,
         allow_empty: bool = True,
     ) -> list[T]:
@@ -135,16 +124,12 @@ class BlockInstanceRich(BlockInstance):
             raise BlockInstanceConfigurationError(
                 f"Configuration option {option_id!r} has type {option.value_type!r}, not list[{item_type.__name__}]"
             )
-        raw_value = self._get_raw_value(option_id, default)
-        if isinstance(raw_value, str):
-            value = option.parsed_value_type.validate_convert(raw_value)
-        elif isinstance(raw_value, list):
-            value = raw_value
-        else:
+        raw_value = self._get_raw_value(option_id)
+        if not isinstance(raw_value, list):
             raise BlockInstanceConfigurationError(
                 f"Configuration option {option_id!r} expected list[{item_type.__name__}], got {type(raw_value).__name__}"
             )
-        if not value and not allow_empty:
+        if not raw_value and not allow_empty:
             raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} cannot be empty")
         expected_item_types = {
             str: (StringType, ClosedEnumType, OpenEnumType),
@@ -159,11 +144,11 @@ class BlockInstanceRich(BlockInstance):
             raise BlockInstanceConfigurationError(
                 f"Configuration option {option_id!r} has type {option.value_type!r}, not list[{item_type.__name__}]"
             )
-        if any(type(item) is not item_type for item in value):
+        if any(type(item) is not item_type for item in raw_value):
             raise BlockInstanceConfigurationError(
-                f"Configuration option {option_id!r} expected list[{item_type.__name__}], got {[type(item).__name__ for item in value]!r}"
+                f"Configuration option {option_id!r} expected list[{item_type.__name__}], got {[type(item).__name__ for item in raw_value]!r}"
             )
-        return value
+        return raw_value
 
 
 class QubedBlockBuilder(abc.ABC):

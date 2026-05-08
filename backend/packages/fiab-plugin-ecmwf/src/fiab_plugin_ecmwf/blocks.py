@@ -8,7 +8,6 @@
 # nor does it submit to any jurisdiction.
 
 import logging
-from typing import cast
 
 import numpy as np
 from cascade.low.func import Either
@@ -104,9 +103,9 @@ class EkdSource(Source):
     inputs: list[str] = []
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        param = block.config_as_list(PARAM_DIM, str, default=cast(list[str], IFS_REQUEST["param"]))
-        step = block.config_as_list(ConfigurationOptionId("step"), int, default=cast(list[int], IFS_REQUEST["step"]))
-        number = block.config_as_list(ConfigurationOptionId("number"), int, default=cast(list[int], IFS_REQUEST["number"]))
+        param = block.config_as_list(PARAM_DIM, str, allow_empty=False)
+        step = block.config_as_list("step", int)
+        number = block.config_as_list("number", int)
 
         output = QubedOutput(
             dataqube=Qube.from_datacube(
@@ -125,9 +124,9 @@ class EkdSource(Source):
         block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
-        param = block.config_as_list(PARAM_DIM, str, default=cast(list[str], IFS_REQUEST["param"]))
-        step = block.config_as_list(ConfigurationOptionId("step"), int, default=cast(list[int], IFS_REQUEST["step"]))
-        number = block.config_as_list(ConfigurationOptionId("number"), int, default=cast(list[int], IFS_REQUEST["number"]))
+        param = block.config_as_list(PARAM_DIM, str, allow_empty=False)
+        step = block.config_as_list("step", int)
+        number = block.config_as_list("number", int)
 
         action = (
             from_source(
@@ -381,7 +380,7 @@ class MapPlotSink(Sink):
                 "fiab_plugin_ecmwf.runtime.plots.map_plot",
                 kwargs={
                     "domain": block.config_as_str(DOMAIN) or None,
-                    "format": block.config_as_str(FORMAT) or "png",
+                    "format": block.config_as_str(FORMAT),
                     # "groupby": block.configuration_values["groupby"] or "valid_datetime",
                     # "style_schema": block.configuration_values["style_schema"] or "inbuilt://fiab",
                 },

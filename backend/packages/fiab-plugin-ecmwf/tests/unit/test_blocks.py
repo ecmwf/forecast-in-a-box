@@ -8,6 +8,8 @@
 # nor does it submit to any jurisdiction.
 
 
+from datetime import date
+
 import pytest
 from fiab_core.fable import (
     BlockFactoryId,
@@ -18,6 +20,9 @@ from fiab_core.fable import (
     PluginCompositeId,
     QubedOutput,
     RawOutput,
+)
+from fiab_core.fable import (
+    BlockInstance as BlockInstanceBase,
 )
 from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
 
@@ -32,16 +37,28 @@ from fiab_plugin_ecmwf.blocks import (
 from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains
 
 
-def _config(values: dict[str, str]) -> dict[ConfigurationOptionId, str]:
+def _config(values: dict[str, object]) -> dict[ConfigurationOptionId, object]:
     return {ConfigurationOptionId(key): value for key, value in values.items()}
 
 
 @pytest.fixture
 def dummy_blockinstance() -> BlockInstance:
-    return BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="dummy"),  # type: ignore
-        input_ids={},
-        configuration_values={},
+    return BlockInstance.from_block(
+        BlockInstanceBase(
+            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="dummy"),  # type: ignore
+            input_ids={},
+            configuration_values=_config(
+                {
+                    "source": "ecmwf-open-data",
+                    "date": date(2024, 1, 1),
+                    "expver": "1",
+                    "param": ["2t", "msl"],
+                    "step": [0, 6, 12],
+                    "number": [1, 2, 3, 4, 5],
+                }
+            ),
+        ),
+        EkdSource.configuration_options,
     )
 
 
@@ -52,16 +69,22 @@ def dummy_blockinstance_output() -> QubedOutput:
 
 @pytest.fixture
 def ekdsource_configuration() -> BlockInstance:
-    return BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="EkdSource"),  # type: ignore
-        input_ids={},
-        configuration_values=_config(
-            {
-                "source": "ecmwf-open-data",
-                "date": "2024-01-01",
-                "expver": "1",
-            }
+    return BlockInstance.from_block(
+        BlockInstanceBase(
+            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="EkdSource"),  # type: ignore
+            input_ids={},
+            configuration_values=_config(
+                {
+                    "source": "ecmwf-open-data",
+                    "date": date(2024, 1, 1),
+                    "expver": "1",
+                    "step": [0, 6, 12],
+                    "number": [1, 2, 3, 4, 5],
+                    "param": ["2t", "msl"],
+                }
+            ),
         ),
+        EkdSource.configuration_options,
     )
 
 
@@ -72,59 +95,71 @@ def ekdsource_output(dummy_blockinstance: BlockInstance) -> QubedOutput:
 
 @pytest.fixture
 def ensemble_statistics_configuration() -> BlockInstance:
-    return BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="EnsembleStatistics"),  # type: ignore
-        input_ids={"dataset": BlockInstanceId("source_output")},
-        configuration_values=_config(
-            {
-                "param": "2t",
-                "statistic": "mean",
-            }
+    return BlockInstance.from_block(
+        BlockInstanceBase(
+            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="EnsembleStatistics"),  # type: ignore
+            input_ids={"dataset": BlockInstanceId("source_output")},
+            configuration_values=_config(
+                {
+                    "param": "2t",
+                    "statistic": "mean",
+                }
+            ),
         ),
+        EnsembleStatistics.configuration_options,
     )
 
 
 @pytest.fixture
 def temporal_statistics_configuration() -> BlockInstance:
-    return BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="TemporalStatistics"),  # type: ignore
-        input_ids={"dataset": BlockInstanceId("source_output")},
-        configuration_values=_config(
-            {
-                "param": "2t",
-                "statistic": "mean",
-            }
+    return BlockInstance.from_block(
+        BlockInstanceBase(
+            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="TemporalStatistics"),  # type: ignore
+            input_ids={"dataset": BlockInstanceId("source_output")},
+            configuration_values=_config(
+                {
+                    "param": "2t",
+                    "statistic": "mean",
+                }
+            ),
         ),
+        TemporalStatistics.configuration_options,
     )
 
 
 @pytest.fixture
 def zarr_sink_configuration() -> BlockInstance:
-    return BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="ZarrSink"),  # type: ignore
-        input_ids={"dataset": BlockInstanceId("source_output")},
-        configuration_values=_config(
-            {
-                "path": "/path/to/output.zarr",
-            }
+    return BlockInstance.from_block(
+        BlockInstanceBase(
+            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="ZarrSink"),  # type: ignore
+            input_ids={"dataset": BlockInstanceId("source_output")},
+            configuration_values=_config(
+                {
+                    "path": "/path/to/output.zarr",
+                }
+            ),
         ),
+        ZarrSink.configuration_options,
     )
 
 
 @pytest.fixture
 def map_plot_sink_configuration() -> BlockInstance:
-    return BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="MapPlotSink"),  # type: ignore
-        input_ids={"dataset": BlockInstanceId("source_output")},
-        configuration_values=_config(
-            {
-                "param": "2t",
-                "domain": "global",
-                "format": "png",
-                "groupby": "step",
-                "style_schema": "inbuilt://fiab",
-            }
+    return BlockInstance.from_block(
+        BlockInstanceBase(
+            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="MapPlotSink"),  # type: ignore
+            input_ids={"dataset": BlockInstanceId("source_output")},
+            configuration_values=_config(
+                {
+                    "param": ["2t"],
+                    "domain": "global",
+                    "format": "png",
+                    "groupby": "step",
+                    "style_schema": "inbuilt://fiab",
+                }
+            ),
         ),
+        MapPlotSink.configuration_options,
     )
 
 
@@ -329,36 +364,42 @@ class TestMapPlotSink:
 
     def test_validate_multi_param(self, ekdsource_output: QubedOutput) -> None:
         block = MapPlotSink()
-        config = BlockInstance(
-            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),
-            input_ids={"dataset": BlockInstanceId("source_output")},
-            configuration_values=_config(
-                {
-                    "param": "2t,msl",
-                    "domain": "global",
-                    "format": "png",
-                    "groupby": "none",
-                    "style_schema": "inbuilt://fiab",
-                }
+        config = BlockInstance.from_block(
+            BlockInstanceBase(
+                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),  # type: ignore
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config(
+                    {
+                        "param": ["2t", "msl"],
+                        "domain": "global",
+                        "format": "png",
+                        "groupby": "none",
+                        "style_schema": "inbuilt://fiab",
+                    }
+                ),
             ),
+            MapPlotSink.configuration_options,
         )
         output = block.validate(block=config, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
         assert isinstance(output, RawOutput)
 
     def test_validate_missing_param(self, ekdsource_output: QubedOutput) -> None:
         block = MapPlotSink()
-        config = BlockInstance(
-            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),
-            input_ids={"dataset": BlockInstanceId("source_output")},
-            configuration_values=_config(
-                {
-                    "param": "nonexistent",
-                    "domain": "global",
-                    "format": "png",
-                    "groupby": "none",
-                    "style_schema": "inbuilt://fiab",
-                }
+        config = BlockInstance.from_block(
+            BlockInstanceBase(
+                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),  # type: ignore
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config(
+                    {
+                        "param": ["nonexistent"],
+                        "domain": "global",
+                        "format": "png",
+                        "groupby": "none",
+                        "style_schema": "inbuilt://fiab",
+                    }
+                ),
             ),
+            MapPlotSink.configuration_options,
         )
         result = block.validate(block=config, inputs={"dataset": ekdsource_output})  # type: ignore[dict-item]
         with pytest.raises(Exception, match="params \\['nonexistent'\\] are not in the input parameters"):
@@ -366,18 +407,21 @@ class TestMapPlotSink:
 
     def test_validate_partial_missing_params(self, ekdsource_output: QubedOutput) -> None:
         block = MapPlotSink()
-        config = BlockInstance(
-            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),
-            input_ids={"dataset": BlockInstanceId("source_output")},
-            configuration_values=_config(
-                {
-                    "param": "2t,nonexistent",
-                    "domain": "global",
-                    "format": "png",
-                    "groupby": "none",
-                    "style_schema": "inbuilt://fiab",
-                }
+        config = BlockInstance.from_block(
+            BlockInstanceBase(
+                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),  # type: ignore
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config(
+                    {
+                        "param": ["2t", "nonexistent"],
+                        "domain": "global",
+                        "format": "png",
+                        "groupby": "none",
+                        "style_schema": "inbuilt://fiab",
+                    }
+                ),
             ),
+            MapPlotSink.configuration_options,
         )
         result = block.validate(block=config, inputs={"dataset": ekdsource_output})  # type: ignore[dict-item]
         with pytest.raises(Exception, match="params \\['nonexistent'\\] are not in the input parameters"):

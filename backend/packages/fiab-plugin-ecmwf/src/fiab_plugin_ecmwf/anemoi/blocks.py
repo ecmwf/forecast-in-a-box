@@ -113,11 +113,14 @@ class AnemoiSource(Source):
     }
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        ensemble_members = block.config_as_int("ensemble_members")
+        if ensemble_members < 1:
+            return Either.error("Ensemble members must be an int and positive")
+
         result = validate_anemoi_block(block)
         if result.e or not result.t:
             return Either.error(result.e)
 
-        ensemble_members = block.config_as_int(ConfigurationOptionId("ensemble_members"), default=1)
         qubed_instance = expand(result.t, {"number": range(1, ensemble_members + 1)})
         return Either.ok(qubed_instance)
 
@@ -127,10 +130,10 @@ class AnemoiSource(Source):
         block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
-        checkpoint = block.config_as_str(ConfigurationOptionId("checkpoint"))
-        lead_time = block.config_as_int(ConfigurationOptionId("lead_time"))
-        input_source = block.config_as_str(ConfigurationOptionId("input_source"))
-        ensemble_members = block.config_as_int(ConfigurationOptionId("ensemble_members"), default=1)
+        checkpoint = block.config_as_str("checkpoint")
+        lead_time = block.config_as_int("lead_time")
+        input_source = block.config_as_str("input_source")
+        ensemble_members = block.config_as_int("ensemble_members")
 
         inference = AnemoiBuilder(checkpoint).build(lead_time=lead_time, extra_environment=INPUT_SOURCE_EXTRAS.get(input_source, []))
         if input_source in INPUT_SOURCE_CONFIGURATION_OPTIONS and not isinstance(input_source, dict):
@@ -138,7 +141,7 @@ class AnemoiSource(Source):
 
         action = inference.from_input(
             input_source,
-            date=block.config_as_datetime(ConfigurationOptionId("base_time")),
+            date=block.config_as_datetime("base_time"),
             ensemble_members=ensemble_members,
         )
         return Either.ok(action)
@@ -181,8 +184,8 @@ class AnemoiTransform(Transform):
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
-        checkpoint = block.config_as_str(ConfigurationOptionId("checkpoint"))
-        lead_time = block.config_as_int(ConfigurationOptionId("lead_time"))
+        checkpoint = block.config_as_str("checkpoint")
+        lead_time = block.config_as_int("lead_time")
 
         inference = AnemoiBuilder(checkpoint).build(lead_time=lead_time)
         action = inference.from_initial_conditions(
