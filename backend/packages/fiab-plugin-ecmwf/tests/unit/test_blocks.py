@@ -11,7 +11,6 @@
 import pytest
 from fiab_core.fable import (
     BlockFactoryId,
-    BlockInstance,
     BlockInstanceId,
     ConfigurationOptionId,
     NoOutput,
@@ -20,6 +19,7 @@ from fiab_core.fable import (
     QubedOutput,
     RawOutput,
 )
+from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
 
 from fiab_plugin_ecmwf.anemoi.utils import get_checkpoint_enum_type
 from fiab_plugin_ecmwf.blocks import (

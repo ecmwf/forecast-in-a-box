@@ -8,7 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 import logging
-from typing import TypeVar
+from typing import cast
 
 import numpy as np
 from cascade.low.func import Either
@@ -16,7 +16,6 @@ from earthkit.workflows.fluent import Action, Payload, from_source
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
-    BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
     ConfigurationOptionId,
@@ -25,6 +24,7 @@ from fiab_core.fable import (
     RawOutput,
 )
 from fiab_core.plugin import Error
+from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
 from fiab_core.tools.blocks import Product, Sink, Source
 from qubed import Qube
 
@@ -65,22 +65,6 @@ STEP_DIM = "step"
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar("T")
-
-
-def _get_item_list(raw: str | list, item_type: type[T], *, allow_empty: bool = True) -> Either[list[T], Error]:  # type:ignore[invalid-argument] # semigroup
-    if isinstance(raw, list):
-        split = raw
-    else:
-        split = raw.split(",")
-
-    if not raw:
-        return Either.ok([]) if allow_empty else Either.error(f"Empty list of {item_type.__name__}")
-    try:
-        return Either.ok(list(map(item_type, split)))
-    except ValueError:
-        return Either.error(f"Invalid list of {item_type.__name__}: '{raw}'")
-
 
 class EkdSource(Source):
     title: str = "Earthkit Data Source"
@@ -120,19 +104,16 @@ class EkdSource(Source):
     inputs: list[str] = []
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        param = _get_item_list(block.configuration_values.get(PARAM_DIM) or IFS_REQUEST["param"], str)
-        step = _get_item_list(block.configuration_values.get(ConfigurationOptionId("step")) or IFS_REQUEST["step"], int)
-        number = _get_item_list(block.configuration_values.get(ConfigurationOptionId("number")) or IFS_REQUEST["number"], int)
-
-        if any(map(lambda x: x.e is not None, [param, step, number])):
-            return Either.error(f"Invalid configuration: {param.e}, {step.e}, {number.e}")
+        param = block.config_as_list(PARAM_DIM, str, default=cast(list[str], IFS_REQUEST["param"]))
+        step = block.config_as_list(ConfigurationOptionId("step"), int, default=cast(list[int], IFS_REQUEST["step"]))
+        number = block.config_as_list(ConfigurationOptionId("number"), int, default=cast(list[int], IFS_REQUEST["number"]))
 
         output = QubedOutput(
             dataqube=Qube.from_datacube(
                 {
-                    PARAM_DIM: param.get_or_raise(),
-                    ENSEMBLE_DIM: number.get_or_raise(),
-                    STEP_DIM: step.get_or_raise(),
+                    PARAM_DIM: param,
+                    ENSEMBLE_DIM: number,
+                    STEP_DIM: step,
                 }
             )
         )
@@ -144,11 +125,9 @@ class EkdSource(Source):
         block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
-        param = _get_item_list(block.configuration_values.get(PARAM_DIM) or IFS_REQUEST["param"], str).get_or_raise()
-        step = _get_item_list(block.configuration_values.get(ConfigurationOptionId("step")) or IFS_REQUEST["step"], int).get_or_raise()
-        number = _get_item_list(
-            block.configuration_values.get(ConfigurationOptionId("number")) or IFS_REQUEST["number"], int
-        ).get_or_raise()
+        param = block.config_as_list(PARAM_DIM, str, default=cast(list[str], IFS_REQUEST["param"]))
+        step = block.config_as_list(ConfigurationOptionId("step"), int, default=cast(list[int], IFS_REQUEST["step"]))
+        number = block.config_as_list(ConfigurationOptionId("number"), int, default=cast(list[int], IFS_REQUEST["number"]))
 
         action = (
             from_source(
@@ -156,12 +135,12 @@ class EkdSource(Source):
                     [
                         Payload(
                             "fiab_plugin_ecmwf.runtime.source.earthkit_source",
-                            [block.configuration_values[SOURCE]],
+                            [block.config_as_str(SOURCE)],
                             {
                                 "request": {
                                     **IFS_REQUEST,
-                                    "date": block.configuration_values[DATE],
-                                    "expver": block.configuration_values[EXPVER],
+                                    "date": block.config_as_date(DATE).isoformat(),
+                                    "expver": block.config_as_str(EXPVER),
                                     PARAM_DIM: p,
                                     ENSEMBLE_DIM: number,
                                     STEP_DIM: step,
@@ -208,7 +187,7 @@ class EnsembleStatistics(Product):
             actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
             return Either.error(f"Unsupported input type for 'dataset': expected QubedOutput, got {actual_type}")
 
-        param = block.configuration_values[PARAM_DIM]
+        param = block.config_as_str(PARAM_DIM)
         if not contains(input_dataset, {PARAM_DIM: param}):
             return Either.error(f"param {param} is not in the input parameters: {axes(input_dataset).get(PARAM_DIM, [])}")
 
@@ -223,8 +202,8 @@ class EnsembleStatistics(Product):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
         input_task_action = inputs[input_task]
-        stat = block.configuration_values[STATISTIC]
-        param = input_task_action.select({PARAM_DIM: block.configuration_values[PARAM_DIM]})
+        stat = block.config_as_str(STATISTIC)
+        param = input_task_action.select({PARAM_DIM: block.config_as_str(PARAM_DIM)})
         if stat == "mean":
             action = param.mean(dim=ENSEMBLE_DIM)
         elif stat == "std":
@@ -256,7 +235,7 @@ class TemporalStatistics(Product):
             actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
             return Either.error(f"Unsupported input type for 'dataset': expected QubedOutput, got {actual_type}")
 
-        param = block.configuration_values[PARAM_DIM]
+        param = block.config_as_str(PARAM_DIM)
         if not contains(input_dataset, {PARAM_DIM: param}):
             return Either.error(f"param {param} is not in the input parameters: {axes(input_dataset).get(PARAM_DIM, [])}")
         output = coxpand(input_dataset, [PARAM_DIM, STEP_DIM], {PARAM_DIM: [param]})
@@ -270,8 +249,8 @@ class TemporalStatistics(Product):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
         input_task_action = inputs[input_task]
-        stat = block.configuration_values[STATISTIC]
-        param = input_task_action.select({PARAM_DIM: block.configuration_values[PARAM_DIM]})
+        stat = block.config_as_str(STATISTIC)
+        param = input_task_action.select({PARAM_DIM: block.config_as_str(PARAM_DIM)})
         if stat == "mean":
             action = param.mean(dim=STEP_DIM)
         elif stat == "std":
@@ -314,7 +293,7 @@ class ZarrSink(Sink):
         action = inputs[input_task].map(
             Payload(
                 "fiab_plugin_ecmwf.runtime.sinks.write_zarr",
-                kwargs={"path": block.configuration_values[PATH]},
+                kwargs={"path": block.config_as_str(PATH)},
                 metadata={"environment": ["zarr"]},
             )
         )
@@ -363,11 +342,7 @@ class MapPlotSink(Sink):
             actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
             return Either.error(f"Unsupported input type for 'dataset': expected QubedOutput, got {actual_type}")
 
-        params = _get_item_list(block.configuration_values[PARAM_DIM], str, allow_empty=False)
-        if any(map(lambda x: x.e is not None, [params])):
-            return Either.error(f"Invalid configuration: {params.e}")
-
-        params = params.get_or_raise()
+        params = block.config_as_list(PARAM_DIM, str, allow_empty=False)
         missing = [p for p in params if not contains(input_dataset, {PARAM_DIM: p})]
         if missing:
             return Either.error(f"params {missing} are not in the input parameters: {axes(input_dataset).get(PARAM_DIM, [])}")
@@ -383,7 +358,7 @@ class MapPlotSink(Sink):
         #         f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
         #     )
 
-        return Either.ok(RawOutput(type_fqn=f"image/{block.configuration_values[FORMAT]}"))
+        return Either.ok(RawOutput(type_fqn=f"image/{block.config_as_str(FORMAT)}"))
 
     def compile(
         self,
@@ -392,7 +367,7 @@ class MapPlotSink(Sink):
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
-        params = _get_item_list(block.configuration_values[PARAM_DIM], str, allow_empty=False).get_or_raise()
+        params = block.config_as_list(PARAM_DIM, str, allow_empty=False)
         selected = inputs[input_task].select({PARAM_DIM: params if len(params) > 1 else params[0]})
 
         # Disabled for now
@@ -405,8 +380,8 @@ class MapPlotSink(Sink):
             Payload(
                 "fiab_plugin_ecmwf.runtime.plots.map_plot",
                 kwargs={
-                    "domain": block.configuration_values[DOMAIN] or None,
-                    "format": block.configuration_values[FORMAT] or "png",
+                    "domain": block.config_as_str(DOMAIN) or None,
+                    "format": block.config_as_str(FORMAT) or "png",
                     # "groupby": block.configuration_values["groupby"] or "valid_datetime",
                     # "style_schema": block.configuration_values["style_schema"] or "inbuilt://fiab",
                 },

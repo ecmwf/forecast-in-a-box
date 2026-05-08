@@ -11,7 +11,8 @@ from collections.abc import Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fiab_core.fable import BlockInstance, ConfigurationOptionId, PluginBlockFactoryId, PluginCompositeId, QubedOutput
+from fiab_core.fable import ConfigurationOptionId, PluginBlockFactoryId, PluginCompositeId, QubedOutput
+from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
 from qubed import Qube
 
 from fiab_plugin_ecmwf.anemoi.blocks import AnemoiSource, AnemoiTransform

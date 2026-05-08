@@ -13,8 +13,9 @@ from pathlib import Path
 
 from cascade.low.func import Either
 from fiab_core.artifacts import ArtifactsProvider, CompositeArtifactId, MlModelCheckpoint
-from fiab_core.fable import BlockInstance, ConfigurationOptionId, QubedOutput
+from fiab_core.fable import ConfigurationOptionId, QubedOutput
 from fiab_core.plugin import Error
+from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
 from qubed import Qube
 
 from ..qubed_utils import expand
@@ -73,17 +74,21 @@ def get_environment(composite_id: CompositeArtifactId) -> list[str]:
 
 def validate_anemoi_block(block: BlockInstance) -> Either[QubedOutput, Error]:  # type:ignore[invalid-argument] # semigroup
     """Validate common Anemoi block configuration, returning the base QubedOutput on success."""
-    checkpoint = block.configuration_values[ConfigurationOptionId("checkpoint")]
-    lead_time = block.configuration_values[ConfigurationOptionId("lead_time")]
-    ensemble_members = block.configuration_values.get(ConfigurationOptionId("ensemble_members"))
-
-    if not isinstance(checkpoint, str) or not checkpoint:
+    try:
+        checkpoint = block.config_as_str(ConfigurationOptionId("checkpoint"))
+    except ValueError:
         return Either.error("Checkpoint must be given")
 
-    if not isinstance(lead_time, int) or lead_time < 0:
+    try:
+        lead_time = block.config_as_int(ConfigurationOptionId("lead_time"))
+    except ValueError:
         return Either.error("Lead time must be a non-negative integer")
 
-    if ensemble_members is not None and (not isinstance(ensemble_members, int) or ensemble_members < 1):
+    try:
+        ensemble_members = block.config_as_int(ConfigurationOptionId("ensemble_members"), default=1)
+        if ensemble_members < 1:
+            return Either.error("Ensemble members must be an int and positive")
+    except ValueError:
         return Either.error("Ensemble members must be an int and positive")
 
     try:

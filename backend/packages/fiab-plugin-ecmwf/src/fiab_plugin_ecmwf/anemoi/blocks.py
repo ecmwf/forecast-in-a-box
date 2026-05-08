@@ -18,13 +18,13 @@ from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
-    BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
     ConfigurationOptionId,
     QubedOutput,
 )
 from fiab_core.plugin import Error
+from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
 from fiab_core.tools.blocks import Source, Transform
 
 from fiab_plugin_ecmwf.qubed_utils import axes, contains, dimensions, expand
@@ -117,8 +117,7 @@ class AnemoiSource(Source):
         if result.e or not result.t:
             return Either.error(result.e)
 
-        ensemble_members_raw = block.configuration_values.get(ConfigurationOptionId("ensemble_members"))
-        ensemble_members = ensemble_members_raw if isinstance(ensemble_members_raw, int) else 1
+        ensemble_members = block.config_as_int(ConfigurationOptionId("ensemble_members"), default=1)
         qubed_instance = expand(result.t, {"number": range(1, ensemble_members + 1)})
         return Either.ok(qubed_instance)
 
@@ -128,30 +127,18 @@ class AnemoiSource(Source):
         block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
-        configuration = block.configuration_values
-        checkpoint = configuration[ConfigurationOptionId("checkpoint")]
-        lead_time = configuration[ConfigurationOptionId("lead_time")]
-        input_source = configuration[ConfigurationOptionId("input_source")]
-        ensemble_members_raw = configuration.get(ConfigurationOptionId("ensemble_members"))
-        ensemble_members = ensemble_members_raw if isinstance(ensemble_members_raw, int) else 1
+        checkpoint = block.config_as_str(ConfigurationOptionId("checkpoint"))
+        lead_time = block.config_as_int(ConfigurationOptionId("lead_time"))
+        input_source = block.config_as_str(ConfigurationOptionId("input_source"))
+        ensemble_members = block.config_as_int(ConfigurationOptionId("ensemble_members"), default=1)
 
-        if not isinstance(checkpoint, str):
-            return Either.error(f"Expected checkpoint to be str, got {type(checkpoint).__name__}")
-        if not isinstance(lead_time, int):
-            return Either.error(f"Expected lead_time to be int, got {type(lead_time).__name__}")
-        if not isinstance(input_source, str):
-            return Either.error(f"Expected input_source to be str, got {type(input_source).__name__}")
-
-        inference = AnemoiBuilder(checkpoint).build(
-            lead_time=lead_time,
-            extra_environment=INPUT_SOURCE_EXTRAS.get(input_source, []),
-        )
+        inference = AnemoiBuilder(checkpoint).build(lead_time=lead_time, extra_environment=INPUT_SOURCE_EXTRAS.get(input_source, []))
         if input_source in INPUT_SOURCE_CONFIGURATION_OPTIONS and not isinstance(input_source, dict):
             input_source = {input_source: INPUT_SOURCE_CONFIGURATION_OPTIONS[input_source]}
 
         action = inference.from_input(
             input_source,
-            date=configuration[ConfigurationOptionId("base_time")],
+            date=block.config_as_datetime(ConfigurationOptionId("base_time")),
             ensemble_members=ensemble_members,
         )
         return Either.ok(action)
@@ -194,12 +181,8 @@ class AnemoiTransform(Transform):
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
-        checkpoint = block.configuration_values[ConfigurationOptionId("checkpoint")]
-        lead_time = block.configuration_values[ConfigurationOptionId("lead_time")]
-        if not isinstance(checkpoint, str):
-            return Either.error(f"Expected checkpoint to be str, got {type(checkpoint).__name__}")
-        if not isinstance(lead_time, int):
-            return Either.error(f"Expected lead_time to be int, got {type(lead_time).__name__}")
+        checkpoint = block.config_as_str(ConfigurationOptionId("checkpoint"))
+        lead_time = block.config_as_int(ConfigurationOptionId("lead_time"))
 
         inference = AnemoiBuilder(checkpoint).build(lead_time=lead_time)
         action = inference.from_initial_conditions(
