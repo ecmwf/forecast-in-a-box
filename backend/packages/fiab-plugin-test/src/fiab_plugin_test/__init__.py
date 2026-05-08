@@ -12,10 +12,17 @@ from fiab_core.fable import (
     BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
+    ConfigurationOptionId,
     NoOutput,
     RawOutput,
 )
 from fiab_core.plugin import Error, Plugin
+
+TEXT = ConfigurationOptionId("text")
+DURATION = ConfigurationOptionId("duration")
+CHECKPOINT = ConfigurationOptionId("checkpoint")
+AMOUNT = ConfigurationOptionId("amount")
+FNAME = ConfigurationOptionId("fname")
 
 
 def _get_checkpoint_enum_type() -> str:
@@ -37,9 +44,7 @@ catalogue = lambda: BlockFactoryCatalogue(
             kind="source",
             title="Source Text",
             description="Returns the input text",
-            configuration_options={
-                "text": BlockConfigurationOption(title="", description="", value_type="str"),
-            },
+            configuration_options={TEXT: BlockConfigurationOption(title="", description="", value_type="str")},
             inputs=[],
         ),
         BlockFactoryId("source_sleep"): BlockFactory(
@@ -47,8 +52,8 @@ catalogue = lambda: BlockFactoryCatalogue(
             title="Source Sleep",
             description="Sleeps for a duration, then retuns the input text",
             configuration_options={
-                "text": BlockConfigurationOption(title="", description="", value_type="str"),
-                "duration": BlockConfigurationOption(title="", description="", value_type="float"),
+                TEXT: BlockConfigurationOption(title="", description="", value_type="str"),
+                DURATION: BlockConfigurationOption(title="", description="", value_type="float"),
             },
             inputs=[],
         ),
@@ -57,7 +62,7 @@ catalogue = lambda: BlockFactoryCatalogue(
             title="File Size Source",
             description="Returns the size of the given checkpoint file as a string",
             configuration_options={
-                "checkpoint": BlockConfigurationOption(
+                CHECKPOINT: BlockConfigurationOption(
                     title="Checkpoint",
                     description="The checkpoint whose downloaded file size to report",
                     value_type=_get_checkpoint_enum_type(),
@@ -69,9 +74,7 @@ catalogue = lambda: BlockFactoryCatalogue(
             kind="transform",
             title="Increment",
             description="Adds the amount to the input",
-            configuration_options={
-                "amount": BlockConfigurationOption(title="", description="", value_type="int"),
-            },
+            configuration_options={AMOUNT: BlockConfigurationOption(title="", description="", value_type="int")},
             inputs=["a"],
         ),
         BlockFactoryId("product_join"): BlockFactory(
@@ -85,9 +88,7 @@ catalogue = lambda: BlockFactoryCatalogue(
             kind="sink",
             title="File",
             description="Saves the input to a file",
-            configuration_options={
-                "fname": BlockConfigurationOption(title="", description="", value_type="str"),
-            },
+            configuration_options={FNAME: BlockConfigurationOption(title="", description="", value_type="str")},
             inputs=["data"],
         ),
         BlockFactoryId("sink_image"): BlockFactory(
@@ -133,14 +134,14 @@ def compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance
         if instance.factory_id.factory == "source_42":
             action = from_source(Payload("fiab_plugin_test.runtime.source_42"))  # type: ignore
         elif instance.factory_id.factory == "source_text":
-            text = instance.configuration_values["text"]
+            text = instance.configuration_values[TEXT]
             action = from_source(Payload("fiab_plugin_test.runtime.source_text", kwargs={"text": text}))  # type: ignore
         elif instance.factory_id.factory == "source_sleep":
-            text = instance.configuration_values["text"]
-            duration = float(instance.configuration_values["duration"])
+            text = instance.configuration_values[TEXT]
+            duration = float(instance.configuration_values[DURATION])
             action = from_source(Payload("fiab_plugin_test.runtime.source_sleep", kwargs={"text": text, "duration": duration}))  # type: ignore
         elif instance.factory_id.factory == "source_filesize":
-            checkpoint_str = instance.configuration_values["checkpoint"]
+            checkpoint_str = instance.configuration_values[CHECKPOINT]
             artifact_id = CompositeArtifactId.from_str(checkpoint_str)
             local_path = ArtifactsProvider.get_artifact_local_path(artifact_id)
             payload = Payload(
@@ -149,7 +150,7 @@ def compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance
             action = from_source(payload)  # type: ignore
         elif instance.factory_id.factory == "transform_increment":
             a = lookup[instance.input_ids["a"]]
-            amount = instance.configuration_values["amount"]
+            amount = instance.configuration_values[AMOUNT]
             action = a.map(Payload("fiab_plugin_test.runtime.transform_increment", kwargs={"amount": int(amount)}))  # type: ignore
         elif instance.factory_id.factory == "product_join":
             a = lookup[instance.input_ids["a"]]
@@ -157,7 +158,7 @@ def compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance
             action = a.join(b, dim="inputs").reduce(Payload("fiab_plugin_test.runtime.product_join"))  # type: ignore
         elif instance.factory_id.factory == "sink_file":
             data = lookup[instance.input_ids["data"]]
-            fname = instance.configuration_values["fname"]
+            fname = instance.configuration_values[FNAME]
             action = data.map(Payload("fiab_plugin_test.runtime.sink_file", kwargs={"fname": fname}))  # type: ignore
         elif instance.factory_id.factory == "sink_image":
             data = lookup[instance.input_ids["data"]]

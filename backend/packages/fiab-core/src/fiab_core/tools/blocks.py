@@ -20,6 +20,7 @@ from fiab_core.fable import (
     BlockInstanceId,
     BlockInstanceOutput,
     BlockKind,
+    ConfigurationOptionId,
     QubedOutput,
 )
 from fiab_core.plugin import Error
@@ -29,7 +30,7 @@ class QubedBlockBuilder(abc.ABC):
     kind: BlockKind
     title: str
     description: str
-    configuration_options: dict[str, BlockConfigurationOption]
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption]
     inputs: list[str]
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup

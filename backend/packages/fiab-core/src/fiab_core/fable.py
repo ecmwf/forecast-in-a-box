@@ -37,6 +37,9 @@ class BlockConfigurationOption(FiabCoreBaseModel):
     """Used by the frontend to optionally hide the setting unless advanced. Do not set if no default provided / None not valid"""
 
 
+ConfigurationOptionId = NewType("ConfigurationOptionId", str)
+
+
 BlockKind = Literal["source", "transform", "product", "sink"]
 
 
@@ -50,7 +53,7 @@ class BlockFactory(FiabCoreBaseModel):
     """How to display in the catalogue listing / partial fable"""
     description: str
     """Extended detail for the user"""
-    configuration_options: dict[str, BlockConfigurationOption]
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption]
     """A key-value of config-option-key, config-option"""
     inputs: list[str]
     """A list of input names, such as 'initial conditions' or 'forecast', for the purpose of description/configuration"""
@@ -98,7 +101,7 @@ class BlockInstance(FiabCoreBaseModel):
     """As produced by BlockFactory *by the client* -- basically the configuration/inputs values"""
 
     factory_id: PluginBlockFactoryId
-    configuration_values: dict[str, str]
+    configuration_values: dict[ConfigurationOptionId, str]
     """Keys come frome factory's `configuration_options`, values are serialized actual configuration values"""
     input_ids: dict[str, BlockInstanceId]
     """Keys come from factory's `inputs`, values are other blocks in the (partial) fable"""

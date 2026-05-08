@@ -12,7 +12,15 @@
 import datetime as dt
 
 import pytest
-from fiab_core.fable import BlockFactoryId, BlockInstance, PluginBlockFactoryId, PluginCompositeId, PluginId, PluginStoreId
+from fiab_core.fable import (
+    BlockFactoryId,
+    BlockInstance,
+    ConfigurationOptionId,
+    PluginBlockFactoryId,
+    PluginCompositeId,
+    PluginId,
+    PluginStoreId,
+)
 
 from forecastbox.domain.glyphs.exceptions import GlyphCircularReferenceError
 from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, expand_glyph_values, extract_glyphs, resolve_configurations, value_dt2str
@@ -24,9 +32,17 @@ def _block(config: dict[str, str]) -> BlockInstance:
             plugin=PluginCompositeId(store=PluginStoreId("test"), local=PluginId("test")),
             factory=BlockFactoryId("test_factory"),
         ),
-        configuration_values=config,
+        configuration_values={ConfigurationOptionId(key): value for key, value in config.items()},
         input_ids={},
     )
+
+
+def _value(block: BlockInstance, key: str) -> str:
+    return block.configuration_values[ConfigurationOptionId(key)]
+
+
+def _cid(key: str) -> ConfigurationOptionId:
+    return ConfigurationOptionId(key)
 
 
 # ---------------------------------------------------------------------------
@@ -45,35 +61,35 @@ def test_extract_glyphs_single() -> None:
     block = _block({"key": "${myVar}"})
     result = extract_glyphs(block)
     assert result.e is None
-    assert result.t == ExtractedGlyphs(glyphs={"myVar"}, glyphed_options={"key"})
+    assert result.t == ExtractedGlyphs(glyphs={"myVar"}, glyphed_options={_cid("key")})
 
 
 def test_extract_glyphs_multiple_in_one_value() -> None:
     block = _block({"key": "${var1}_${var2}"})
     result = extract_glyphs(block)
     assert result.e is None
-    assert result.t == ExtractedGlyphs(glyphs={"var1", "var2"}, glyphed_options={"key"})
+    assert result.t == ExtractedGlyphs(glyphs={"var1", "var2"}, glyphed_options={_cid("key")})
 
 
 def test_extract_glyphs_across_multiple_keys() -> None:
     block = _block({"key1": "${var1}", "key2": "${var2}"})
     result = extract_glyphs(block)
     assert result.e is None
-    assert result.t == ExtractedGlyphs(glyphs={"var1", "var2"}, glyphed_options={"key1", "key2"})
+    assert result.t == ExtractedGlyphs(glyphs={"var1", "var2"}, glyphed_options={_cid("key1"), _cid("key2")})
 
 
 def test_extract_glyphs_deduplicates() -> None:
     block = _block({"a": "${runId}", "b": "prefix_${runId}_suffix"})
     result = extract_glyphs(block)
     assert result.e is None
-    assert result.t == ExtractedGlyphs(glyphs={"runId"}, glyphed_options={"a", "b"})
+    assert result.t == ExtractedGlyphs(glyphs={"runId"}, glyphed_options={_cid("a"), _cid("b")})
 
 
 def test_extract_glyphs_mixed_plain_and_template() -> None:
     block = _block({"a": "static", "b": "${dynamic}"})
     result = extract_glyphs(block)
     assert result.e is None
-    assert result.t == ExtractedGlyphs(glyphs={"dynamic"}, glyphed_options={"b"})
+    assert result.t == ExtractedGlyphs(glyphs={"dynamic"}, glyphed_options={_cid("b")})
 
 
 # ---------------------------------------------------------------------------
@@ -84,33 +100,33 @@ def test_extract_glyphs_mixed_plain_and_template() -> None:
 def test_resolve_configurations_full_substitution() -> None:
     block = _block({"key": "${myVar}"})
     resolve_configurations(block, {"myVar": "hello"})
-    assert block.configuration_values["key"] == "hello"
+    assert _value(block, "key") == "hello"
 
 
 def test_resolve_configurations_partial_substitution() -> None:
     block = _block({"key": "prefix_${myVar}_suffix"})
     resolve_configurations(block, {"myVar": "world"})
-    assert block.configuration_values["key"] == "prefix_world_suffix"
+    assert _value(block, "key") == "prefix_world_suffix"
 
 
 def test_resolve_configurations_multiple_glyphs_in_value() -> None:
     block = _block({"key": "${a}_${b}"})
     resolve_configurations(block, {"a": "hello", "b": "world"})
-    assert block.configuration_values["key"] == "hello_world"
+    assert _value(block, "key") == "hello_world"
 
 
 def test_resolve_configurations_multiple_keys() -> None:
     block = _block({"k1": "${x}", "k2": "static", "k3": "${y}"})
     resolve_configurations(block, {"x": "X_VAL", "y": "Y_VAL"})
-    assert block.configuration_values["k1"] == "X_VAL"
-    assert block.configuration_values["k2"] == "static"
-    assert block.configuration_values["k3"] == "Y_VAL"
+    assert _value(block, "k1") == "X_VAL"
+    assert _value(block, "k2") == "static"
+    assert _value(block, "k3") == "Y_VAL"
 
 
 def test_resolve_configurations_no_templates_unchanged() -> None:
     block = _block({"key": "plain_value"})
     resolve_configurations(block, {"runId": "abc"})
-    assert block.configuration_values["key"] == "plain_value"
+    assert _value(block, "key") == "plain_value"
 
 
 def test_resolve_configurations_mutates_in_place() -> None:
@@ -118,7 +134,7 @@ def test_resolve_configurations_mutates_in_place() -> None:
     original_dict = block.configuration_values
     resolve_configurations(block, {"var": "resolved"})
     assert block.configuration_values is original_dict
-    assert block.configuration_values["key"] == "resolved"
+    assert _value(block, "key") == "resolved"
 
 
 # ---------------------------------------------------------------------------
@@ -324,21 +340,21 @@ def test_extract_glyphs_datetime_filter_expression() -> None:
     block = _block({"key": "${submitDatetime | add_days(1)}"})
     result = extract_glyphs(block)
     assert result.e is None
-    assert result.t == ExtractedGlyphs(glyphs={"submitDatetime"}, glyphed_options={"key"})
+    assert result.t == ExtractedGlyphs(glyphs={"submitDatetime"}, glyphed_options={_cid("key")})
 
 
 def test_extract_glyphs_chained_filters() -> None:
     block = _block({"key": "${submitDatetime | add_days(1) | floor_day}"})
     result = extract_glyphs(block)
     assert result.e is None
-    assert result.t == ExtractedGlyphs(glyphs={"submitDatetime"}, glyphed_options={"key"})
+    assert result.t == ExtractedGlyphs(glyphs={"submitDatetime"}, glyphed_options={_cid("key")})
 
 
 def test_extract_glyphs_string_filters() -> None:
     block = _block({"key": "${myParam | upper}"})
     result = extract_glyphs(block)
     assert result.e is None
-    assert result.t == ExtractedGlyphs(glyphs={"myParam"}, glyphed_options={"key"})
+    assert result.t == ExtractedGlyphs(glyphs={"myParam"}, glyphed_options={_cid("key")})
 
 
 def test_extract_glyphs_excludes_globals() -> None:
@@ -346,7 +362,7 @@ def test_extract_glyphs_excludes_globals() -> None:
     block = _block({"key": "${submitDatetime + timedelta(days=1)}"})
     result = extract_glyphs(block)
     assert result.e is None
-    assert result.t == ExtractedGlyphs(glyphs={"submitDatetime"}, glyphed_options={"key"})
+    assert result.t == ExtractedGlyphs(glyphs={"submitDatetime"}, glyphed_options={_cid("key")})
 
 
 def test_extract_glyphs_pure_arithmetic_no_variables() -> None:
@@ -356,14 +372,14 @@ def test_extract_glyphs_pure_arithmetic_no_variables() -> None:
     block = _block({"key": "${42 ** 10}"})
     result = extract_glyphs(block)
     assert result.e is None
-    assert result.t == ExtractedGlyphs(glyphs=set(), glyphed_options={"key"})
+    assert result.t == ExtractedGlyphs(glyphs=set(), glyphed_options={_cid("key")})
 
 
 def test_extract_glyphs_multiple_variables_in_expression() -> None:
     block = _block({"key": "${a + b | floor_day}"})
     result = extract_glyphs(block)
     assert result.e is None
-    assert result.t == ExtractedGlyphs(glyphs={"a", "b"}, glyphed_options={"key"})
+    assert result.t == ExtractedGlyphs(glyphs={"a", "b"}, glyphed_options={_cid("key")})
 
 
 def test_extract_glyphs_malformed_expression_returns_error() -> None:
@@ -385,89 +401,89 @@ _GLYPHS = {"submitDatetime": _DT}
 def test_resolve_add_days() -> None:
     block = _block({"key": "${submitDatetime | add_days(1)}"})
     resolve_configurations(block, _GLYPHS)
-    assert block.configuration_values["key"] == "2024-01-16 06:00:00"
+    assert _value(block, "key") == "2024-01-16 06:00:00"
 
 
 def test_resolve_sub_days() -> None:
     block = _block({"key": "${submitDatetime | sub_days(2)}"})
     resolve_configurations(block, _GLYPHS)
-    assert block.configuration_values["key"] == "2024-01-13 06:00:00"
+    assert _value(block, "key") == "2024-01-13 06:00:00"
 
 
 def test_resolve_add_hours() -> None:
     block = _block({"key": "${submitDatetime | add_hours(6)}"})
     resolve_configurations(block, _GLYPHS)
-    assert block.configuration_values["key"] == "2024-01-15 12:00:00"
+    assert _value(block, "key") == "2024-01-15 12:00:00"
 
 
 def test_resolve_floor_day() -> None:
     block = _block({"key": "${submitDatetime | floor_day}"})
     resolve_configurations(block, {"submitDatetime": "2024-01-15 06:30:00"})
-    assert block.configuration_values["key"] == "2024-01-15 00:00:00"
+    assert _value(block, "key") == "2024-01-15 00:00:00"
 
 
 def test_resolve_floor_hour() -> None:
     block = _block({"key": "${submitDatetime | floor_hour}"})
     resolve_configurations(block, {"submitDatetime": "2024-01-15 06:45:00"})
-    assert block.configuration_values["key"] == "2024-01-15 06:00:00"
+    assert _value(block, "key") == "2024-01-15 06:00:00"
 
 
 def test_resolve_chained_datetime_filters() -> None:
     block = _block({"key": "${submitDatetime | add_days(1) | floor_day}"})
     resolve_configurations(block, {"submitDatetime": "2024-01-15 14:30:00"})
-    assert block.configuration_values["key"] == "2024-01-16 00:00:00"
+    assert _value(block, "key") == "2024-01-16 00:00:00"
 
 
 def test_resolve_timedelta_global() -> None:
     block = _block({"key": "${submitDatetime + timedelta(days=1)}"})
     resolve_configurations(block, _GLYPHS)
-    assert block.configuration_values["key"] == "2024-01-16 06:00:00"
+    assert _value(block, "key") == "2024-01-16 06:00:00"
 
 
 def test_resolve_string_upper() -> None:
     block = _block({"key": "${myParam | upper}"})
     resolve_configurations(block, {"myParam": "hello_world"})
-    assert block.configuration_values["key"] == "HELLO_WORLD"
+    assert _value(block, "key") == "HELLO_WORLD"
 
 
 def test_resolve_string_lower() -> None:
     block = _block({"key": "${myParam | lower}"})
     resolve_configurations(block, {"myParam": "Hello"})
-    assert block.configuration_values["key"] == "hello"
+    assert _value(block, "key") == "hello"
 
 
 def test_resolve_string_split_first() -> None:
     block = _block({"key": "${myParam | split('_') | first}"})
     resolve_configurations(block, {"myParam": "hello_world"})
-    assert block.configuration_values["key"] == "hello"
+    assert _value(block, "key") == "hello"
 
 
 def test_resolve_string_replace() -> None:
     block = _block({"key": "${myParam | replace('_', '-')}"})
     resolve_configurations(block, {"myParam": "hello_world"})
-    assert block.configuration_values["key"] == "hello-world"
+    assert _value(block, "key") == "hello-world"
 
 
 def test_resolve_arithmetic_expression() -> None:
     block = _block({"key": "${x | int * 2 + 1}"})
     resolve_configurations(block, {"x": "7"})
-    assert block.configuration_values["key"] == "15"
+    assert _value(block, "key") == "15"
 
 
 def test_resolve_pure_arithmetic_literal() -> None:
     block = _block({"key": "${42 ** 2}"})
     resolve_configurations(block, {})
-    assert block.configuration_values["key"] == "1764"
+    assert _value(block, "key") == "1764"
 
 
 def test_resolve_date_like_string_not_coerced() -> None:
     """A date-only string ('2024-01-15') must be passed through as-is without coercion."""
     block = _block({"key": "${myDate}"})
     resolve_configurations(block, {"myDate": "2024-01-15"})
-    assert block.configuration_values["key"] == "2024-01-15"
+    assert _value(block, "key") == "2024-01-15"
 
 
 def test_resolve_mixed_literal_and_expression() -> None:
     block = _block({"key": "prefix_${submitDatetime | floor_day}_suffix"})
     resolve_configurations(block, _GLYPHS)
-    assert block.configuration_values["key"] == "prefix_2024-01-15 00:00:00_suffix"
+    assert _value(block, "key") == "prefix_2024-01-15 00:00:00_suffix"

@@ -13,6 +13,7 @@ from fiab_core.fable import (
     BlockFactoryId,
     BlockInstance,
     BlockInstanceId,
+    ConfigurationOptionId,
     NoOutput,
     PluginBlockFactoryId,
     PluginCompositeId,
@@ -28,6 +29,10 @@ from fiab_plugin_ecmwf.blocks import (
     ZarrSink,
 )
 from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains
+
+
+def _config(values: dict[str, str]) -> dict[ConfigurationOptionId, str]:
+    return {ConfigurationOptionId(key): value for key, value in values.items()}
 
 
 @pytest.fixture
@@ -49,11 +54,13 @@ def ekdsource_configuration() -> BlockInstance:
     return BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="EkdSource"),  # type: ignore
         input_ids={},
-        configuration_values={
-            "source": "ecmwf-open-data",
-            "date": "2024-01-01",
-            "expver": "1",
-        },
+        configuration_values=_config(
+            {
+                "source": "ecmwf-open-data",
+                "date": "2024-01-01",
+                "expver": "1",
+            }
+        ),
     )
 
 
@@ -67,10 +74,12 @@ def ensemble_statistics_configuration() -> BlockInstance:
     return BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="EnsembleStatistics"),  # type: ignore
         input_ids={"dataset": BlockInstanceId("source_output")},
-        configuration_values={
-            "param": "2t",
-            "statistic": "mean",
-        },
+        configuration_values=_config(
+            {
+                "param": "2t",
+                "statistic": "mean",
+            }
+        ),
     )
 
 
@@ -79,10 +88,12 @@ def temporal_statistics_configuration() -> BlockInstance:
     return BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="TemporalStatistics"),  # type: ignore
         input_ids={"dataset": BlockInstanceId("source_output")},
-        configuration_values={
-            "param": "2t",
-            "statistic": "mean",
-        },
+        configuration_values=_config(
+            {
+                "param": "2t",
+                "statistic": "mean",
+            }
+        ),
     )
 
 
@@ -91,9 +102,11 @@ def zarr_sink_configuration() -> BlockInstance:
     return BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="ZarrSink"),  # type: ignore
         input_ids={"dataset": BlockInstanceId("source_output")},
-        configuration_values={
-            "path": "/path/to/output.zarr",
-        },
+        configuration_values=_config(
+            {
+                "path": "/path/to/output.zarr",
+            }
+        ),
     )
 
 
@@ -102,13 +115,15 @@ def map_plot_sink_configuration() -> BlockInstance:
     return BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="MapPlotSink"),  # type: ignore
         input_ids={"dataset": BlockInstanceId("source_output")},
-        configuration_values={
-            "param": "2t",
-            "domain": "global",
-            "format": "png",
-            "groupby": "step",
-            "style_schema": "inbuilt://fiab",
-        },
+        configuration_values=_config(
+            {
+                "param": "2t",
+                "domain": "global",
+                "format": "png",
+                "groupby": "step",
+                "style_schema": "inbuilt://fiab",
+            }
+        ),
     )
 
 
@@ -299,13 +314,15 @@ class TestMapPlotSink:
         config = BlockInstance(
             factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),
             input_ids={"dataset": BlockInstanceId("source_output")},
-            configuration_values={
-                "param": "2t,msl",
-                "domain": "global",
-                "format": "png",
-                "groupby": "none",
-                "style_schema": "inbuilt://fiab",
-            },
+            configuration_values=_config(
+                {
+                    "param": "2t,msl",
+                    "domain": "global",
+                    "format": "png",
+                    "groupby": "none",
+                    "style_schema": "inbuilt://fiab",
+                }
+            ),
         )
         output = block.validate(block=config, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
         assert isinstance(output, RawOutput)
@@ -315,13 +332,15 @@ class TestMapPlotSink:
         config = BlockInstance(
             factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),
             input_ids={"dataset": BlockInstanceId("source_output")},
-            configuration_values={
-                "param": "nonexistent",
-                "domain": "global",
-                "format": "png",
-                "groupby": "none",
-                "style_schema": "inbuilt://fiab",
-            },
+            configuration_values=_config(
+                {
+                    "param": "nonexistent",
+                    "domain": "global",
+                    "format": "png",
+                    "groupby": "none",
+                    "style_schema": "inbuilt://fiab",
+                }
+            ),
         )
         result = block.validate(block=config, inputs={"dataset": ekdsource_output})  # type: ignore[dict-item]
         with pytest.raises(Exception, match="params \\['nonexistent'\\] are not in the input parameters"):
@@ -332,13 +351,15 @@ class TestMapPlotSink:
         config = BlockInstance(
             factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),
             input_ids={"dataset": BlockInstanceId("source_output")},
-            configuration_values={
-                "param": "2t,nonexistent",
-                "domain": "global",
-                "format": "png",
-                "groupby": "none",
-                "style_schema": "inbuilt://fiab",
-            },
+            configuration_values=_config(
+                {
+                    "param": "2t,nonexistent",
+                    "domain": "global",
+                    "format": "png",
+                    "groupby": "none",
+                    "style_schema": "inbuilt://fiab",
+                }
+            ),
         )
         result = block.validate(block=config, inputs={"dataset": ekdsource_output})  # type: ignore[dict-item]
         with pytest.raises(Exception, match="params \\['nonexistent'\\] are not in the input parameters"):

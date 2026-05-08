@@ -11,7 +11,7 @@ from collections.abc import Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fiab_core.fable import BlockInstance, PluginBlockFactoryId, PluginCompositeId, QubedOutput
+from fiab_core.fable import BlockInstance, ConfigurationOptionId, PluginBlockFactoryId, PluginCompositeId, QubedOutput
 from qubed import Qube
 
 from fiab_plugin_ecmwf.anemoi.blocks import AnemoiSource, AnemoiTransform
@@ -21,11 +21,15 @@ DUMMY_CHECKPOINT = "dummy_store:dummy_ckpt"
 DUMMY_QUBE = Qube.from_datacube({"step": [6, 12, 18, 24]})
 
 
+def _config(values: dict[str, str]) -> dict[ConfigurationOptionId, str]:
+    return {ConfigurationOptionId(key): value for key, value in values.items()}
+
+
 def make_block(factory: str, config: dict, input_ids: dict | None = None) -> BlockInstance:
     return BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=factory),  # type: ignore
         input_ids=input_ids or {},
-        configuration_values=config,
+        configuration_values=_config(config),
     )
 
 

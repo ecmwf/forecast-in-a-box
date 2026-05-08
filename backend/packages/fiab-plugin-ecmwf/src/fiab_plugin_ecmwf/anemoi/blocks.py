@@ -21,6 +21,7 @@ from fiab_core.fable import (
     BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
+    ConfigurationOptionId,
     QubedOutput,
 )
 from fiab_core.plugin import Error
@@ -83,28 +84,28 @@ class AnemoiSource(Source):
     description: str = "Get a forecast from an Anemoi checkpoint, initialised from a source."
     inputs: list[str] = []
 
-    configuration_options: dict[str, BlockConfigurationOption] = {
-        "checkpoint": BlockConfigurationOption(
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
+        ConfigurationOptionId("checkpoint"): BlockConfigurationOption(
             title="Anemoi Checkpoint",
             description="Anemoi checkpoint name",
             value_type=get_checkpoint_enum_type(),
         ),
-        "input_source": BlockConfigurationOption(
+        ConfigurationOptionId("input_source"): BlockConfigurationOption(
             title="Input Source",
             description="Source of the initial conditions",
             value_type="enum['mars', 'opendata', 'polytope']",
         ),
-        "lead_time": BlockConfigurationOption(
+        ConfigurationOptionId("lead_time"): BlockConfigurationOption(
             title="Lead time",
             description="Lead time of the forecast",
             value_type="int",
         ),
-        "base_time": BlockConfigurationOption(
+        ConfigurationOptionId("base_time"): BlockConfigurationOption(
             title="Base time",
             description="Base time of the forecast",
             value_type="datetime",
         ),
-        "ensemble_members": BlockConfigurationOption(
+        ConfigurationOptionId("ensemble_members"): BlockConfigurationOption(
             title="Ensemble Members",
             description="Number of ensemble members, default is 1.",
             value_type="optional[int]",
@@ -116,7 +117,7 @@ class AnemoiSource(Source):
         if result.e or not result.t:
             return Either.error(result.e)
 
-        ensemble_members = int(block.configuration_values.get("ensemble_members") or 1)
+        ensemble_members = int(block.configuration_values.get(ConfigurationOptionId("ensemble_members")) or 1)
         qubed_instance = expand(result.t, {"number": range(1, ensemble_members + 1)})
         return Either.ok(qubed_instance)
 
@@ -128,17 +129,18 @@ class AnemoiSource(Source):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         configuration = block.configuration_values
 
-        inference = AnemoiBuilder(configuration["checkpoint"]).build(
-            lead_time=int(configuration["lead_time"]), extra_environment=INPUT_SOURCE_EXTRAS.get(configuration["input_source"], [])
+        inference = AnemoiBuilder(configuration[ConfigurationOptionId("checkpoint")]).build(
+            lead_time=int(configuration[ConfigurationOptionId("lead_time")]),
+            extra_environment=INPUT_SOURCE_EXTRAS.get(configuration[ConfigurationOptionId("input_source")], []),
         )
-        input_source = configuration["input_source"]
+        input_source = configuration[ConfigurationOptionId("input_source")]
         if input_source in INPUT_SOURCE_CONFIGURATION_OPTIONS and not isinstance(input_source, dict):
             input_source = {input_source: INPUT_SOURCE_CONFIGURATION_OPTIONS[input_source]}
 
         action = inference.from_input(
             input_source,
-            date=configuration["base_time"],
-            ensemble_members=int(configuration.get("ensemble_members") or 1),
+            date=configuration[ConfigurationOptionId("base_time")],
+            ensemble_members=int(configuration.get(ConfigurationOptionId("ensemble_members")) or 1),
         )
         return Either.ok(action)
 
@@ -148,13 +150,13 @@ class AnemoiTransform(Transform):
     description: str = "Initialise an Anemoi model from an existing datasource"
     inputs: list[str] = ["dataset"]
 
-    configuration_options: dict[str, BlockConfigurationOption] = {
-        "checkpoint": BlockConfigurationOption(
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
+        ConfigurationOptionId("checkpoint"): BlockConfigurationOption(
             title="Anemoi Checkpoint",
             description="Anemoi checkpoint name",
             value_type=get_checkpoint_enum_type(),
         ),
-        "lead_time": BlockConfigurationOption(
+        ConfigurationOptionId("lead_time"): BlockConfigurationOption(
             title="Lead time",
             description="Lead time of the forecast",
             value_type="int",
@@ -180,7 +182,9 @@ class AnemoiTransform(Transform):
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
-        inference = AnemoiBuilder(block.configuration_values["checkpoint"]).build(lead_time=int(block.configuration_values["lead_time"]))
+        inference = AnemoiBuilder(block.configuration_values[ConfigurationOptionId("checkpoint")]).build(
+            lead_time=int(block.configuration_values[ConfigurationOptionId("lead_time")])
+        )
         action = inference.from_initial_conditions(
             inputs[input_task],
         )

@@ -19,6 +19,7 @@ from fiab_core.fable import (
     BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
+    ConfigurationOptionId,
     NoOutput,
     QubedOutput,
     RawOutput,
@@ -28,6 +29,15 @@ from fiab_core.tools.blocks import Product, Sink, Source
 from qubed import Qube
 
 from .qubed_utils import axes, contains, coxpand, dimensions
+
+SOURCE = ConfigurationOptionId("source")
+DATE = ConfigurationOptionId("date")
+EXPVER = ConfigurationOptionId("expver")
+PARAM_DIM = ConfigurationOptionId("param")
+STATISTIC = ConfigurationOptionId("statistic")
+PATH = ConfigurationOptionId("path")
+DOMAIN = ConfigurationOptionId("domain")
+FORMAT = ConfigurationOptionId("format")
 
 IFS_REQUEST = {
     "class": "od",
@@ -50,7 +60,6 @@ IFS_REQUEST = {
     "type": "pf",
     "number": list(range(1, 6)),
 }
-PARAM_DIM = "param"
 ENSEMBLE_DIM = "number"
 STEP_DIM = "step"
 
@@ -76,33 +85,33 @@ def _get_item_list(raw: str | list, item_type: type[T], *, allow_empty: bool = T
 class EkdSource(Source):
     title: str = "Earthkit Data Source"
     description: str = "Fetch data from mars or ecmwf open data"
-    configuration_options: dict[str, BlockConfigurationOption] = {
-        "source": BlockConfigurationOption(
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
+        SOURCE: BlockConfigurationOption(
             title="Source",
             description="Top level source for earthkit data",
             value_type="enum['mars', 'ecmwf-open-data']",
         ),
-        "date": BlockConfigurationOption(
+        DATE: BlockConfigurationOption(
             title="Date",
             description="The date dimension of the data",
             value_type="date-iso8601",
         ),
-        "expver": BlockConfigurationOption(
+        EXPVER: BlockConfigurationOption(
             title="Expver",
             description="The expver value of the forecast",
             value_type="str",
         ),
-        "param": BlockConfigurationOption(
+        PARAM_DIM: BlockConfigurationOption(
             title="Parameters",
             description="Parameters to select and plot (e.g. '2t', 'msl')",
             value_type="list[str]",
         ),
-        "step": BlockConfigurationOption(
+        ConfigurationOptionId("step"): BlockConfigurationOption(
             title="Steps",
             description="Forecast steps to select (e.g. '0,6,12,...')",
             value_type="list[int]",
         ),
-        "number": BlockConfigurationOption(
+        ConfigurationOptionId("number"): BlockConfigurationOption(
             title="Ensemble Members",
             description="Ensemble members to select (e.g. '1,2,3,...')",
             value_type="list[int]",
@@ -111,9 +120,9 @@ class EkdSource(Source):
     inputs: list[str] = []
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        param = _get_item_list(block.configuration_values.get("param") or IFS_REQUEST["param"], str)
-        step = _get_item_list(block.configuration_values.get("step") or IFS_REQUEST["step"], int)
-        number = _get_item_list(block.configuration_values.get("number") or IFS_REQUEST["number"], int)
+        param = _get_item_list(block.configuration_values.get(PARAM_DIM) or IFS_REQUEST["param"], str)
+        step = _get_item_list(block.configuration_values.get(ConfigurationOptionId("step")) or IFS_REQUEST["step"], int)
+        number = _get_item_list(block.configuration_values.get(ConfigurationOptionId("number")) or IFS_REQUEST["number"], int)
 
         if any(map(lambda x: x.e is not None, [param, step, number])):
             return Either.error(f"Invalid configuration: {param.e}, {step.e}, {number.e}")
@@ -135,9 +144,11 @@ class EkdSource(Source):
         block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
-        param = _get_item_list(block.configuration_values.get("param") or IFS_REQUEST["param"], str).get_or_raise()
-        step = _get_item_list(block.configuration_values.get("step") or IFS_REQUEST["step"], int).get_or_raise()
-        number = _get_item_list(block.configuration_values.get("number") or IFS_REQUEST["number"], int).get_or_raise()
+        param = _get_item_list(block.configuration_values.get(PARAM_DIM) or IFS_REQUEST["param"], str).get_or_raise()
+        step = _get_item_list(block.configuration_values.get(ConfigurationOptionId("step")) or IFS_REQUEST["step"], int).get_or_raise()
+        number = _get_item_list(
+            block.configuration_values.get(ConfigurationOptionId("number")) or IFS_REQUEST["number"], int
+        ).get_or_raise()
 
         action = (
             from_source(
@@ -145,12 +156,12 @@ class EkdSource(Source):
                     [
                         Payload(
                             "fiab_plugin_ecmwf.runtime.source.earthkit_source",
-                            [block.configuration_values["source"]],
+                            [block.configuration_values[SOURCE]],
                             {
                                 "request": {
                                     **IFS_REQUEST,
-                                    "date": block.configuration_values["date"],
-                                    "expver": block.configuration_values["expver"],
+                                    "date": block.configuration_values[DATE],
+                                    "expver": block.configuration_values[EXPVER],
                                     PARAM_DIM: p,
                                     ENSEMBLE_DIM: number,
                                     STEP_DIM: step,
@@ -181,9 +192,9 @@ class EkdSource(Source):
 class EnsembleStatistics(Product):
     title: str = "Ensemble Statistics"
     description: str = "Computes ensemble mean or standard deviation"
-    configuration_options: dict[str, BlockConfigurationOption] = {
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
         PARAM_DIM: BlockConfigurationOption(title="Parameter", description="Parameter name like '2t'", value_type="str"),
-        "statistic": BlockConfigurationOption(
+        STATISTIC: BlockConfigurationOption(
             title="Statistic",
             description="Statistic to compute over the ensemble",
             value_type="enum['mean', 'std']",
@@ -212,7 +223,7 @@ class EnsembleStatistics(Product):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
         input_task_action = inputs[input_task]
-        stat = block.configuration_values["statistic"]
+        stat = block.configuration_values[STATISTIC]
         param = input_task_action.select({PARAM_DIM: block.configuration_values[PARAM_DIM]})
         if stat == "mean":
             action = param.mean(dim=ENSEMBLE_DIM)
@@ -229,9 +240,9 @@ class EnsembleStatistics(Product):
 class TemporalStatistics(Product):
     title: str = "Temporal Statistics"
     description: str = "Computes temporal statistics"
-    configuration_options: dict[str, BlockConfigurationOption] = {
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
         PARAM_DIM: BlockConfigurationOption(title=PARAM_DIM, description="Param name like '2t'", value_type="str"),
-        "statistic": BlockConfigurationOption(
+        STATISTIC: BlockConfigurationOption(
             title="Statistic",
             description="Statistic to compute over steps",
             value_type="enum['mean', 'std', 'min', 'max']",
@@ -259,7 +270,7 @@ class TemporalStatistics(Product):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
         input_task_action = inputs[input_task]
-        stat = block.configuration_values["statistic"]
+        stat = block.configuration_values[STATISTIC]
         param = input_task_action.select({PARAM_DIM: block.configuration_values[PARAM_DIM]})
         if stat == "mean":
             action = param.mean(dim=STEP_DIM)
@@ -280,8 +291,8 @@ class TemporalStatistics(Product):
 class ZarrSink(Sink):
     title: str = "Zarr Sink"
     description: str = "Write dataset to a zarr on the local filesystem"
-    configuration_options: dict[str, BlockConfigurationOption] = {
-        "path": BlockConfigurationOption(
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
+        PATH: BlockConfigurationOption(
             title="Zarr Path",
             description="Filesystem path where the zarr should be written",
             value_type="str",
@@ -303,7 +314,7 @@ class ZarrSink(Sink):
         action = inputs[input_task].map(
             Payload(
                 "fiab_plugin_ecmwf.runtime.sinks.write_zarr",
-                kwargs={"path": block.configuration_values["path"]},
+                kwargs={"path": block.configuration_values[PATH]},
                 metadata={"environment": ["zarr"]},
             )
         )
@@ -316,18 +327,18 @@ class ZarrSink(Sink):
 class MapPlotSink(Sink):
     title: str = "Map Plot"
     description: str = "Render a geographic map using earthkit-plots"
-    configuration_options: dict[str, BlockConfigurationOption] = {
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
         PARAM_DIM: BlockConfigurationOption(
             title="Parameters",
             description="Parameters to select and plot (e.g. '2t', 'msl')",
             value_type="list[str]",
         ),
-        "domain": BlockConfigurationOption(
+        DOMAIN: BlockConfigurationOption(
             title="Domain",
             description="Geographic domain: global, europe, or a named region",
             value_type="str",
         ),
-        "format": BlockConfigurationOption(
+        FORMAT: BlockConfigurationOption(
             title="Format",
             description="Output image format",
             value_type="enum['png', 'pdf', 'svg']",
@@ -372,7 +383,7 @@ class MapPlotSink(Sink):
         #         f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
         #     )
 
-        return Either.ok(RawOutput(type_fqn=f"image/{block.configuration_values['format']}"))
+        return Either.ok(RawOutput(type_fqn=f"image/{block.configuration_values[FORMAT]}"))
 
     def compile(
         self,
@@ -394,8 +405,8 @@ class MapPlotSink(Sink):
             Payload(
                 "fiab_plugin_ecmwf.runtime.plots.map_plot",
                 kwargs={
-                    "domain": block.configuration_values["domain"] or None,
-                    "format": block.configuration_values["format"] or "png",
+                    "domain": block.configuration_values[DOMAIN] or None,
+                    "format": block.configuration_values[FORMAT] or "png",
                     # "groupby": block.configuration_values["groupby"] or "valid_datetime",
                     # "style_schema": block.configuration_values["style_schema"] or "inbuilt://fiab",
                 },

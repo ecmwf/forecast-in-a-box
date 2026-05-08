@@ -30,6 +30,7 @@ from fiab_core.fable import (
     BlockInstance,
     BlockInstanceId,
     BlockKind,
+    ConfigurationOptionId,
     NoOutput,
     PluginBlockFactoryId,
 )
@@ -84,7 +85,7 @@ class BlueprintValidationExpansion(FiabBaseModel):
     block_errors: dict[BlockInstanceId, list[str]]
     possible_sources: list[PluginBlockFactoryId]
     possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]]
-    resolved_configuration_options: dict[BlockInstanceId, dict[str, str]] = {}
+    resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
 
 
 class BlueprintSaveCommand(FiabBaseModel):
@@ -133,7 +134,7 @@ async def validate_expand(
         ]
     )
     possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]] = {}
-    resolved_configuration_options: dict[BlockInstanceId, dict[str, str]] = {}
+    resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
     block_errors: dict[BlockInstanceId, list[str]] = defaultdict(list)
     outputs = {}
 

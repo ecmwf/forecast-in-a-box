@@ -13,7 +13,7 @@ import datetime as dt
 from dataclasses import dataclass
 
 from cascade.low.func import Either
-from fiab_core.fable import BlockInstance
+from fiab_core.fable import BlockInstance, ConfigurationOptionId
 
 from forecastbox.domain.glyphs.exceptions import GlyphCircularReferenceError
 from forecastbox.domain.glyphs.jinja_interpolation import extract_glyph_names, render_expression
@@ -28,7 +28,7 @@ so that restarts always reflect the new attempt's own start time and attempt cou
 class ExtractedGlyphs:
     glyphs: set[str]
     """All glyph names referenced across all configuration_values."""
-    glyphed_options: set[str]
+    glyphed_options: set[ConfigurationOptionId]
     """Keys from configuration_values that contain at least one glyph reference."""
 
 
@@ -48,7 +48,7 @@ def extract_glyphs(blockInstance: BlockInstance) -> Either[ExtractedGlyphs, list
     list of error messages if any configuration value contains a malformed expression.
     """
     glyphs: set[str] = set()
-    glyphed_options: set[str] = set()
+    glyphed_options: set[ConfigurationOptionId] = set()
     errors: list[str] = []
     for key, value in blockInstance.configuration_values.items():
         result = extract_glyph_names(value)

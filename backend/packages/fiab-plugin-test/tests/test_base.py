@@ -17,6 +17,7 @@ from fiab_core.fable import (
     BlockFactoryId,
     BlockInstance,
     BlockInstanceId,
+    ConfigurationOptionId,
     PluginBlockFactoryId,
     PluginCompositeId,
     PluginId,
@@ -72,7 +73,7 @@ def test_source_filesize_factory_is_source_kind() -> None:
 
 def test_source_filesize_factory_has_checkpoint_option() -> None:
     factory = catalogue().factories[BlockFactoryId("source_filesize")]
-    assert "checkpoint" in factory.configuration_options
+    assert ConfigurationOptionId("checkpoint") in factory.configuration_options
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +86,7 @@ _FAKE_PLUGIN_ID = PluginCompositeId(store=PluginStoreId("s"), local=PluginId("l"
 def _make_instance(factory: str, config: dict) -> BlockInstance:
     return BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=_FAKE_PLUGIN_ID, factory=BlockFactoryId(factory)),
-        configuration_values=config,
+        configuration_values={ConfigurationOptionId(key): value for key, value in config.items()},
         input_ids={},
     )
 

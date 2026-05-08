@@ -30,7 +30,7 @@ from typing import Annotated, Literal, cast
 from cascade.low.func import assert_never
 from fastapi import APIRouter, Depends, status
 from fastapi.exceptions import HTTPException
-from fiab_core.fable import BlockFactoryCatalogue, BlockInstanceId, PluginBlockFactoryId, PluginCompositeId
+from fiab_core.fable import BlockFactoryCatalogue, BlockInstanceId, ConfigurationOptionId, PluginBlockFactoryId, PluginCompositeId
 
 from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint import db, service
@@ -142,7 +142,7 @@ class BlueprintValidationExpansionResponse(FiabBaseModel):
     block_errors: dict[BlockInstanceId, list[str]]
     possible_sources: list[PluginBlockFactoryId]
     possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]]
-    resolved_configuration_options: dict[BlockInstanceId, dict[str, str]]
+    resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]]
 
 
 GlyphType = Literal["intrinsic", "global"]
