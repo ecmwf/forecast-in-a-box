@@ -15,11 +15,12 @@ import abc
 from typing import Any, Literal, NewType
 
 from earthkit.workflows.fluent import Action
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, PrivateAttr, model_validator
 from qubed import Qube
 from typing_extensions import Self
 
 from fiab_core.pydantic_utils import FiabCoreBaseModel
+from fiab_core.types import FableType, NotFableType
 
 
 class BlockConfigurationOption(FiabCoreBaseModel):
@@ -35,6 +36,20 @@ class BlockConfigurationOption(FiabCoreBaseModel):
     """Used by the frontend to inject the default value"""
     is_advanced: bool = False
     """Used by the frontend to optionally hide the setting unless advanced. Do not set if no default provided / None not valid"""
+
+    _value_type: FableType = PrivateAttr()
+
+    @model_validator(mode="after")
+    def _validate_and_cache_value_type(self) -> Self:
+        try:
+            self._value_type = FableType.parse(self.value_type)
+        except NotFableType as exc:
+            raise ValueError(str(exc)) from exc
+        return self
+
+    @property
+    def parsed_value_type(self) -> FableType:
+        return self._value_type
 
 
 ConfigurationOptionId = NewType("ConfigurationOptionId", str)
