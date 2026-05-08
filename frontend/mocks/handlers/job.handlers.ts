@@ -32,12 +32,10 @@ import { API_ENDPOINTS } from '@/api/endpoints'
 
 type StoredOutputDetailWire = { path: string; is_available: boolean }
 type JobExecutionDetailWire = Omit<JobExecutionDetail, 'outputs'> & {
-  outputs:
-    | {
-        outputs: Record<string, RunOutputMetadata>
-        stored_outputs: Record<string, StoredOutputDetailWire>
-      }
-    | null
+  outputs: {
+    outputs: Record<string, RunOutputMetadata>
+    stored_outputs: Record<string, StoredOutputDetailWire>
+  } | null
 }
 
 /**

@@ -168,6 +168,23 @@ export const API_ENDPOINTS = {
   },
 
   /**
+   * Lens (inspection-tool launcher) endpoints. Lenses run on dynamic ports
+   * and are addressed via a server-side instance id.
+   */
+  lens: {
+    /** POST - Start a SkinnyWMS lens (query: local_path) */
+    startSkinnyWms: `${API_PREFIX}/lens/start/skinnyWMS`,
+    /** GET - Get lens instance status (query: lens_instance_id) */
+    status: `${API_PREFIX}/lens/status`,
+    /** DELETE - Stop and remove an instance (query: lens_instance_id) */
+    stop: `${API_PREFIX}/lens/stop`,
+    /** GET - List all active lens instances */
+    list: `${API_PREFIX}/lens/list`,
+    /** GET - List supported lens types */
+    supported: `${API_PREFIX}/lens/supported`,
+  },
+
+  /**
    * Schedule management endpoints
    */
   schedule: {

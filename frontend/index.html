@@ -8,7 +8,15 @@
     <meta name="description" content="Forecast-In-A-Box" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self'; font-src 'self';"
+      content="
+        default-src 'self';
+        script-src 'self';
+        style-src 'self' 'unsafe-inline';
+        img-src 'self' data: blob: https://basemaps.cartocdn.com http://localhost:* http://127.0.0.1:*;
+        connect-src 'self' http://localhost:* http://127.0.0.1:*;
+        frame-src 'self';
+        font-src 'self';
+      "
     />
     <link rel="apple-touch-icon" href="/logo192.png" />
     <link rel="manifest" href="/manifest.json" />
