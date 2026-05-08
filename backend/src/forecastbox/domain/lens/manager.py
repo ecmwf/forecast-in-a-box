@@ -18,7 +18,9 @@ Pyrsistent immutable structures allow safe lock-free reads.
 
 import logging
 import os
+import shutil
 import subprocess
+import tempfile
 import threading
 import uuid
 from dataclasses import dataclass
@@ -53,6 +55,10 @@ class LensInstance:
     lens_params: dict[str, Any]
     lens_name: LensName
     ports: set[int]
+    # Per-instance temp directory containing a symlink to the user-supplied file,
+    # set when local_path is a single file (SkinnyWMS only accepts a directory).
+    # `None` when local_path is already a directory. Removed on stop.
+    staging_dir: str | None = None
 
 
 class LensInstanceManager:
@@ -100,10 +106,38 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
             raise TimeoutError("Failed to acquire lens manager lock")
         LensInstanceManager.instances = LensInstanceManager.instances.set(instance_id, instance)
 
+    # SkinnyWMS only accepts a directory as SKINNYWMS_DATA_PATH. If the caller
+    # supplied a single file (e.g. a GRIB written by GribSink), stage it inside
+    # a private temp directory so SkinnyWMS sees just that one file — and we
+    # don't expose siblings (other runs' files in the same output dir) to the
+    # WMS server. Symlink avoids copying the data.
+    staging_dir: str | None = None
+    if os.path.isfile(local_path):
+        staging_dir = tempfile.mkdtemp(prefix="fiab-lens-stage-")
+        os.symlink(local_path, os.path.join(staging_dir, os.path.basename(local_path)))
+        data_path = staging_dir
+    else:
+        data_path = local_path
+
     failed: str | None = None
     try:
-        cmd = ["uv", "run", "gunicorn", "--bind", f"127.0.0.1:{port}", "skinnywms.wmssvr:application"]
-        env = {**os.environ, "SKINNYWMS_DATA_PATH": local_path}
+        cmd = [
+            "uv",
+            "run",
+            "gunicorn",
+            "--bind",
+            f"127.0.0.1:{port}",
+            "skinnywms.wmssvr:application",
+        ]
+        env = {
+            **os.environ,
+            "SKINNYWMS_DATA_PATH": data_path,
+            # Browser-based clients (our React WMS viewer + crossOrigin tile
+            # requests) need CORS on every endpoint. SkinnyWMS honours this
+            # env var via flask-cors with `r"/*"` resource matching, which
+            # covers /wms, /legend, and static assets uniformly.
+            "SKINNYWMS_CORS_ORIGINS": "*",
+        }
         process: subprocess.Popen[bytes] = subprocess.Popen(
             cmd,
             env=env,
@@ -115,23 +149,31 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
         failed = repr(e)
         logger.error(f"failed to start skinny wms: {failed}")
 
+    def _drop_staging() -> None:
+        if staging_dir is not None:
+            shutil.rmtree(staging_dir, ignore_errors=True)
+
     with timed_acquire(LensInstanceManager.lock, timeout_acquire) as acquired:
         if not acquired:
             shutdown_popen(process)
             FreePortsManager.release_port(port)
+            _drop_staging()
             raise TimeoutError("Failed to acquire lens manager lock for update")
         if instance_id not in LensInstanceManager.instances:
             shutdown_popen(process)
             FreePortsManager.release_port(port)
+            _drop_staging()
             raise RuntimeError(f"Lens instance {instance_id} was removed during startup")
         if failed is not None:
             FreePortsManager.release_port(port)
+            _drop_staging()
             raise RuntimeError(f"Lens instance {instance_id} failed to start with {failed}")
         updated = LensInstance(
             process=process,
             lens_params=instance.lens_params,
             lens_name=instance.lens_name,
             ports=instance.ports,
+            staging_dir=staging_dir,
         )
         LensInstanceManager.instances = LensInstanceManager.instances.set(instance_id, updated)
 
@@ -173,6 +215,8 @@ def stop_instance(instance_id: LensInstanceId) -> None:
         if instance is not None:
             for port in instance.ports:
                 FreePortsManager.release_port(port)
+            if instance.staging_dir is not None:
+                shutil.rmtree(instance.staging_dir, ignore_errors=True)
 
 
 def shutdown_all_lens_instances() -> None:
