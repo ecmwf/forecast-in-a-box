@@ -8,7 +8,7 @@ Add a `FableType` class in the `fiab_core.types` submodule and unit-test its `va
 
 - Add `backend/packages/fiab-core/src/fiab_core/types.py`.
 - Implement parsing and strict validation for the agreed type syntax.
-- Expose a `validate_convert` method or function that accepts a serialized configuration value and either returns the converted value or raises/returns a clear validation error according to the pattern chosen in the implementation.
+- Expose a `validate_convert` method or function that accepts `Any` and either returns the converted value or raises/returns a clear validation error according to the pattern chosen in the implementation.
 - Add focused unit tests in `fiab-core` for conversion behavior.
 
 The type set should cover the proposal:
@@ -24,11 +24,17 @@ The type set should cover the proposal:
 
 ## Constraints
 
-- The implementation must choose and document the canonical string syntax before plugin migration. Current code uses values such as `enum[...]`, `date-iso8601`, `datetime`, `optional[int]`, and `list[int]`; the proposal mentions `enumClosed[...]` and `enumOpen[...]`.
-- Date and datetime formats must be single, deterministic formats. If ISO formats are chosen, document the exact accepted shape.
+- The canonical syntax for closed enums is `enumClosed[...]`; the canonical syntax for open enums is `enumOpen[...]`.
+- The canonical date type is `date`, not `date-iso8601`.
+- `datetime` remains the canonical datetime type.
+- `list[int]` and other `list[FableType]` expressions are legitimate.
+- Optional types such as `optional[int]` are not part of the type system.
+- `validate_convert` must check internally that the provided value is a string and raise `TypeError` otherwise. This supports the later `BlockInstance.configuration_values: dict[str, Any]` widening while keeping conversion inputs strict.
+- Date and datetime formats must be single, deterministic ISO formats, documented in the type docstrings.
 - For `str` and open enum, conversion should be a no-op except for validation that the type expression itself is valid.
 - For closed enum, conversion should keep the original string but validate membership.
 - For list types, tests should cover valid lists, invalid item conversion, empty input behavior, and whitespace behavior.
+- Tests should cover non-string input to `validate_convert`.
 - Error messages should be useful to callers but tests should avoid over-specifying incidental wording unless the project already does so.
 
 ## Non-goals
@@ -42,4 +48,3 @@ The type set should cover the proposal:
 ## Frontend impact note
 
 This task should normally have no frontend-visible impact. If the implementation exposes generated docs or schemas that include `FableType`, update `backend-validationV2-frontendImpact.md`.
-

@@ -24,7 +24,7 @@ Affected route:
 
 - `GET /blueprint/catalogue`
 
-The value of `configuration_options.*.value_type` may change to the canonical `FableType` syntax selected by the implementation. If compatibility aliases are used, examples here should reflect what the route actually returns.
+The value of `configuration_options.*.value_type` changes to the canonical `FableType` syntax. Catalogue-level backward compatibility is not required.
 
 Example before:
 
@@ -38,7 +38,7 @@ Example before:
 }
 ```
 
-Example after, if the canonical closed enum syntax is used:
+Example after:
 
 ```json
 {
@@ -51,6 +51,17 @@ Example after, if the canonical closed enum syntax is used:
 ```
 
 The implementation PR should replace this example if a different canonical syntax is chosen.
+
+Other required catalogue migrations:
+
+| Before | After |
+| --- | --- |
+| `enum[...]` | `enumClosed[...]` |
+| `date-iso8601` | `date` |
+| `optional[int]` | `int` |
+| `list[int]` | unchanged |
+
+The task 3 implementation PR must replace or extend this section with exact examples from the changed catalogues.
 
 ## Task 4: Backend conversion
 
@@ -234,4 +245,3 @@ Example after:
 ```
 
 Malformed glyph expressions remain hard errors and should still be shown through `block_errors`.
-

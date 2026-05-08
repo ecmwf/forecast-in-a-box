@@ -29,6 +29,12 @@ The user story includes `client_type_understanding`: frontend-side validation an
 
 The staged backend tasks deliberately do not require reading or modifying the frontend codebase. Frontend-visible backend changes are documented in `backend-validationV2-frontendImpact.md` so frontend work can be planned separately.
 
+## Blueprint readiness metadata
+
+Task 5 deliberately allows validation and blueprint persistence to accept incomplete blueprints when the only issue is missing configuration values. Task 8 similarly allows validation to proceed when configuration values reference missing glyphs.
+
+A future persistence-level metadata flag should record whether a saved blueprint is ready for compilation, meaning it has no missing configuration options and no missing glyphs. That metadata is not part of tasks 1 through 8.
+
 ## Plugin-wide missing-value resilience
 
 Task 5 changes backend validation so missing configuration values are omitted before plugin validation, but it explicitly does not require every plugin to gracefully handle the missing values. If important plugin validators still crash or produce poor warnings for incomplete blocks, that cleanup should be handled separately.
@@ -47,5 +53,4 @@ Such validation should remain plugin-owned.
 
 ## None and optional semantics
 
-The proposal says `None` should not be a normal accepted value and suggests not adding `allow_none`. Existing plugin declarations include at least one `optional[int]`, so the staged implementation must make a practical migration decision. A full optional/null contract is not otherwise addressed by tasks 1 through 8.
-
+The proposal says `None` should not be a normal accepted value and suggests not adding `allow_none`. Existing plugin declarations that currently use `optional[int]` should be exposed as `int` during task 3. Any remaining internal plugin handling of missing values or `None` is not otherwise addressed by tasks 1 through 8.

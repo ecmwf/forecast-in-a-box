@@ -37,25 +37,10 @@ The guiding sequence is:
 - Preserve compilation as the strict path: missing values, unknown glyphs, malformed glyphs, and type conversion errors must block compilation.
 - Preserve malformed glyph expressions as hard validation errors; only unknown glyph references become soft validation warnings in task 8.
 
-## Concerns and doubts to resolve during review
+## Review decisions folded into task specs
 
-### FableType syntax compatibility
-
-The proposal mentions `enumClosed[...]` and `enumOpen[...]`, while current plugins use `enum[...]`, `date-iso8601`, `datetime`, `optional[int]`, and list syntax such as `list[int]`. The task breakdown assumes the implementation should choose and document one canonical syntax, with any compatibility aliases handled deliberately. If backward compatibility for existing catalogues is required during the migration window, that should be explicit.
-
-### `optional[int]` is not in the proposed type system
-
-`fiab-plugin-ecmwf` currently declares `optional[int]` for `ensemble_members`. The original spec says `None` should not be a normal acceptable value and does not list optional types. The migration task should decide whether this becomes an ordinary `int` with frontend/default behavior, a temporary compatibility alias, or a rejected type.
-
-### Converted values conflict with current `BlockInstance` typing
-
-`BlockInstance.configuration_values` is currently `dict[str, str]`. After task 4 the backend will pass parsed values such as `int`, `float`, `date`, `datetime`, and lists to plugins. This likely requires widening the internal type, creating an internal converted block model, or using a separate converted configuration mapping. The task should avoid unsafe casts that hide the contract change.
-
-### Validation vs create/update semantics
-
-The current `/blueprint/create` and `/blueprint/update` routes call validation and reject any returned `block_errors`. Task 5 makes missing configuration values non-errors during validation. That means incomplete blueprints may become saveable through these existing routes unless another strict path is added. This appears aligned with the `prevalidate` user story, but it is a behavior change and should be reviewed explicitly.
-
-### Expand restriction shape at the HTTP boundary
-
-The core plugin method can return local `BlockExpansion` values with local `BlockFactoryId`, but `/blueprint/expand` currently returns `PluginBlockFactoryId` values so the frontend can identify the owning plugin. Task 6 needs a route-level serialized shape that keeps plugin identity and adds restrictions without making the response ambiguous.
-
+- Canonical catalogue migration starts with `enum[...]` to `enumClosed[...]`, `date-iso8601` to `date`, `optional[int]` to `int`, and keeps `list[int]` valid.
+- Catalogue-level backward compatibility is not required; the task 3 worker must document final catalogue changes in `backend-validationV2-frontendImpact.md`.
+- `BlockInstance.configuration_values` should be widened to `dict[str, Any]`; `validate_convert` should accept `Any`, check that input is a string, and raise `TypeError` otherwise.
+- Saving incomplete blueprints after task 5 is accepted behavior for this work. A future blueprint metadata flag for "ready for compilation" is tracked in leftovers.
+- Core `BlockExpansion` contains a local `BlockFactoryId`; `domain.blueprint.service` must convert that to a route/domain response shape containing `PluginBlockFactoryId`, matching the existing expansion aggregation pattern.

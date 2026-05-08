@@ -13,6 +13,7 @@ During compilation, missing configuration values remain a hard failure and the p
 - Preserve strict compilation behavior in `forecastbox.domain.run.compile.compile_builder`: missing required configuration values should fail before plugin compilation.
 - Keep existing extra-configuration handling.
 - Keep existing type-conversion failure behavior from task 4.
+- Accept that `/blueprint/create` and `/blueprint/update` may now save incomplete blueprints when the only issue is missing configuration values. This is aligned with the prevalidation/draft user story for this staged work.
 
 ## Constraints
 
@@ -28,8 +29,8 @@ During compilation, missing configuration values remain a hard failure and the p
 - No new warning field for missing configuration values.
 - No plugin-wide defensive refactor.
 - No unknown glyph changes.
+- No blueprint persistence metadata flag for "ready for compilation"; that is tracked as future work in `backend-validationV2-impl-99-leftovers.md`.
 
 ## Frontend impact note
 
 This task changes validation semantics for `PUT /blueprint/expand`, `POST /blueprint/create`, and `POST /blueprint/update`. Update `backend-validationV2-frontendImpact.md` if the exact behavior differs from the examples there.
-

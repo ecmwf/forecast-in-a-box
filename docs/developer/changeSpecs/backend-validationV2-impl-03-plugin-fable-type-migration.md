@@ -12,6 +12,7 @@ After this task, plugins should still receive string configuration values exactl
 - Update `fiab-plugin-ecmwf` catalogue values.
 - Update any helper-generated enum type strings, such as checkpoint enum helpers.
 - Update any tests that assert exact catalogue type strings, if present.
+- Update `backend-validationV2-frontendImpact.md` with exact before/after catalogue examples after the migration is implemented.
 
 ## Constraints
 
@@ -19,8 +20,11 @@ After this task, plugins should still receive string configuration values exactl
 - Do not call `validate_convert` in the backend.
 - Do not remove plugin-side string parsing such as `int(...)`, `float(...)`, or list parsing helpers.
 - Do not make assumptions that `BlockInstance.configuration_values` contains converted values.
-- Treat the current `optional[int]` declaration explicitly. If optional types are not part of the canonical type system, replace it with a supported type and preserve the current defaulting behavior in plugin code until task 4.
-- Keep aliases or compatibility behavior deliberate. If the implementation continues accepting old syntax, document whether that is temporary or permanent.
+- Migrate current `enum[...]` declarations to `enumClosed[...]`.
+- Migrate current `date-iso8601` declarations to `date`; the ISO format belongs in `FableType` documentation, not in the type name.
+- Migrate the current `optional[int]` declaration to `int`. Do not solve the plugin's internal `None`/missing handling in this task.
+- Keep existing `list[int]` and other `list[...]` declarations when they already match the canonical syntax.
+- Do not preserve backward compatibility for old catalogue strings at the catalogue level.
 
 ## Non-goals
 
@@ -30,5 +34,4 @@ After this task, plugins should still receive string configuration values exactl
 
 ## Frontend impact note
 
-This task may change `value_type` strings returned by `GET /blueprint/catalogue`. Update `backend-validationV2-frontendImpact.md` with exact before/after examples from the final implementation.
-
+This task changes `value_type` strings returned by `GET /blueprint/catalogue`. Update `backend-validationV2-frontendImpact.md` with exact before/after examples from the final implementation.

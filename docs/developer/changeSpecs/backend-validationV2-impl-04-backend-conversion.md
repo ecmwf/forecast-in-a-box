@@ -12,6 +12,7 @@ Do not change missing-option handling in this task.
 - Use that helper in `forecastbox.domain.blueprint.service.validate_expand` before calling `plugin.validator`.
 - Use the same conversion behavior in `forecastbox.domain.run.compile.compile_builder` before calling `plugin.compiler` and before the defensive validator call used to derive outputs.
 - Ensure type conversion failures prevent the plugin validator/compiler from being called for that block.
+- Widen `BlockInstance.configuration_values` to `dict[str, Any]`.
 - Migrate `fiab-plugin-test` and `fiab-plugin-ecmwf` validation/compile code to consume converted values.
 
 ## Constraints
@@ -20,7 +21,9 @@ Do not change missing-option handling in this task.
 - Extra configuration values should continue to be reported according to existing behavior.
 - Glyph resolution must still happen before type conversion.
 - Conversion must not mutate the caller's blueprint unexpectedly when the route is validation-only. Follow existing copy/mutation behavior carefully.
-- Avoid unsafe typing shortcuts. If `BlockInstance.configuration_values` remains externally serialized as strings, introduce a clear internal converted representation or widen the type intentionally.
+- Widening `BlockInstance.configuration_values` to `dict[str, Any]` is the intended simple approach for this task. Keep external request/response compatibility by ensuring raw API input still accepts serialized strings before conversion.
+- `FableType.validate_convert` should accept `Any` but must raise `TypeError` when the value is not a string; backend conversion should only call it on raw serialized values.
+- Avoid unsafe casts that hide converted-value typing issues.
 - Plugin code should not keep redundant parsing for values the backend now converts, except where a default/fallback path still receives a plugin-owned literal.
 - Existing integration tests, especially `backend/tests/integration/test_blueprint.py`, should continue to cover the main behavior.
 
@@ -35,4 +38,3 @@ Do not change missing-option handling in this task.
 ## Frontend impact note
 
 This task can change validation error timing and wording. Update `backend-validationV2-frontendImpact.md` if the final API response examples differ from the placeholder examples there.
-
