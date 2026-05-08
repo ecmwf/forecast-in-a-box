@@ -5,7 +5,7 @@ Workers should update this file with a short completion note when a task is done
 | Task | Status | Completion note |
 | --- | --- | --- |
 | 1. ConfigurationOptionId | Done | Completed in commit 2d6a1f24 (`Add ConfigurationOptionId typing`). |
-| 2. FableType | Not started | |
+| 2. FableType | Done | Implemented FableType with full support for str, int, float, date, datetime, enumClosed, enumOpen, and list types with comprehensive unit tests. |
 | 3. Plugin FableType migration | Not started | |
 | 4. Backend conversion | Not started | |
 | 5. Missing values during validation | Not started | |
