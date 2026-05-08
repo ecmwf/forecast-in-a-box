@@ -93,7 +93,7 @@ class AnemoiSource(Source):
         ConfigurationOptionId("input_source"): BlockConfigurationOption(
             title="Input Source",
             description="Source of the initial conditions",
-            value_type="enum['mars', 'opendata', 'polytope']",
+            value_type="enumClosed['mars', 'opendata', 'polytope']",
         ),
         ConfigurationOptionId("lead_time"): BlockConfigurationOption(
             title="Lead time",
@@ -108,7 +108,7 @@ class AnemoiSource(Source):
         ConfigurationOptionId("ensemble_members"): BlockConfigurationOption(
             title="Ensemble Members",
             description="Number of ensemble members, default is 1.",
-            value_type="optional[int]",
+            value_type="int",
         ),
     }
 

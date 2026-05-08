@@ -50,18 +50,20 @@ Example after:
 }
 ```
 
-The implementation PR should replace this example if a different canonical syntax is chosen.
+Exact catalogue migrations in this implementation:
 
-Other required catalogue migrations:
+| Catalogue field | Before | After |
+| --- | --- | --- |
+| `fiab-plugin-test.source_filesize.checkpoint` | `enum['mystore:mycheckpoint']` | `enumClosed['mystore:mycheckpoint']` |
+| `fiab-plugin-ecmwf.EkdSource.source` | `enum['mars', 'ecmwf-open-data']` | `enumClosed['mars', 'ecmwf-open-data']` |
+| `fiab-plugin-ecmwf.EkdSource.date` | `date-iso8601` | `date` |
+| `fiab-plugin-ecmwf.AnemoiSource.input_source` | `enum['mars', 'opendata', 'polytope']` | `enumClosed['mars', 'opendata', 'polytope']` |
+| `fiab-plugin-ecmwf.AnemoiSource.ensemble_members` | `optional[int]` | `int` |
+| `fiab-plugin-ecmwf.EnsembleStatistics.statistic` | `enum['mean', 'std']` | `enumClosed['mean', 'std']` |
+| `fiab-plugin-ecmwf.TemporalStatistics.statistic` | `enum['mean', 'std', 'min', 'max']` | `enumClosed['mean', 'std', 'min', 'max']` |
+| `fiab-plugin-ecmwf.MapPlotSink.format` | `enum['png', 'pdf', 'svg']` | `enumClosed['png', 'pdf', 'svg']` |
 
-| Before | After |
-| --- | --- |
-| `enum[...]` | `enumClosed[...]` |
-| `date-iso8601` | `date` |
-| `optional[int]` | `int` |
-| `list[int]` | unchanged |
-
-The task 3 implementation PR must replace or extend this section with exact examples from the changed catalogues.
+`list[int]` remains unchanged.
 
 ## Task 4: Backend conversion
 

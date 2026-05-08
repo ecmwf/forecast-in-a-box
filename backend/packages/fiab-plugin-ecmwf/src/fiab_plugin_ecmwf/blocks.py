@@ -89,12 +89,12 @@ class EkdSource(Source):
         SOURCE: BlockConfigurationOption(
             title="Source",
             description="Top level source for earthkit data",
-            value_type="enum['mars', 'ecmwf-open-data']",
+            value_type="enumClosed['mars', 'ecmwf-open-data']",
         ),
         DATE: BlockConfigurationOption(
             title="Date",
             description="The date dimension of the data",
-            value_type="date-iso8601",
+            value_type="date",
         ),
         EXPVER: BlockConfigurationOption(
             title="Expver",
@@ -197,7 +197,7 @@ class EnsembleStatistics(Product):
         STATISTIC: BlockConfigurationOption(
             title="Statistic",
             description="Statistic to compute over the ensemble",
-            value_type="enum['mean', 'std']",
+            value_type="enumClosed['mean', 'std']",
         ),
     }
     inputs: list[str] = ["dataset"]
@@ -245,7 +245,7 @@ class TemporalStatistics(Product):
         STATISTIC: BlockConfigurationOption(
             title="Statistic",
             description="Statistic to compute over steps",
-            value_type="enum['mean', 'std', 'min', 'max']",
+            value_type="enumClosed['mean', 'std', 'min', 'max']",
         ),
     }
     inputs: list[str] = ["dataset"]
@@ -341,7 +341,7 @@ class MapPlotSink(Sink):
         FORMAT: BlockConfigurationOption(
             title="Format",
             description="Output image format",
-            value_type="enum['png', 'pdf', 'svg']",
+            value_type="enumClosed['png', 'pdf', 'svg']",
         ),
         # Disabled for now
         # "groupby": BlockConfigurationOption(

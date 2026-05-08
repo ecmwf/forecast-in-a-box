@@ -40,7 +40,7 @@ def get_checkpoint_enum_type() -> str:
     if not available_checkpoints:
         return "str"
     values = ", ".join(f"'{CompositeArtifactId.to_str(k)}'" for k in available_checkpoints.keys())
-    return f"enum[{values}]"
+    return f"enumClosed[{values}]"
 
 
 def get_local_path(composite_id: CompositeArtifactId) -> Path:

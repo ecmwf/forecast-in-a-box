@@ -76,6 +76,11 @@ def test_source_filesize_factory_has_checkpoint_option() -> None:
     assert ConfigurationOptionId("checkpoint") in factory.configuration_options
 
 
+def test_source_filesize_factory_uses_closed_enum_checkpoint_type() -> None:
+    factory = catalogue().factories[BlockFactoryId("source_filesize")]
+    assert factory.configuration_options[ConfigurationOptionId("checkpoint")].value_type == "enumClosed['mystore:mycheckpoint']"
+
+
 # ---------------------------------------------------------------------------
 # validator
 # ---------------------------------------------------------------------------

@@ -21,6 +21,7 @@ from fiab_core.fable import (
     RawOutput,
 )
 
+from fiab_plugin_ecmwf.anemoi.utils import get_checkpoint_enum_type
 from fiab_plugin_ecmwf.blocks import (
     EkdSource,
     EnsembleStatistics,
@@ -137,8 +138,15 @@ class TestEkdSource:
         assert output.dataqube is not None
         assert contains(output, "param")
 
+    def test_catalogue_value_types_are_canonical(self) -> None:
+        assert EkdSource.configuration_options[ConfigurationOptionId("source")].value_type == "enumClosed['mars', 'ecmwf-open-data']"
+        assert EkdSource.configuration_options[ConfigurationOptionId("date")].value_type == "date"
+
 
 class TestEnsembleStatistics:
+    def test_catalogue_value_type_is_canonical(self) -> None:
+        assert EnsembleStatistics.configuration_options[ConfigurationOptionId("statistic")].value_type == "enumClosed['mean', 'std']"
+
     def test_from_ekdsource(self, ensemble_statistics_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
         block = EnsembleStatistics()
 
@@ -188,6 +196,12 @@ class TestEnsembleStatistics:
 
 
 class TestTemporalStatistics:
+    def test_catalogue_value_type_is_canonical(self) -> None:
+        assert (
+            TemporalStatistics.configuration_options[ConfigurationOptionId("statistic")].value_type
+            == "enumClosed['mean', 'std', 'min', 'max']"
+        )
+
     def test_from_ekdsource(self, temporal_statistics_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
         block = TemporalStatistics()
 
@@ -288,6 +302,10 @@ class TestZarrSink:
             inputs={"dataset": temporal_output},  # type: ignore[dict-item]
         ).get_or_raise()
         assert isinstance(output, NoOutput)
+
+
+def test_anemoi_catalogue_value_types_are_canonical(registered_provider: None) -> None:
+    assert get_checkpoint_enum_type() == "enumClosed['dummy_store:dummy_ckpt']"
 
 
 class TestMapPlotSink:
