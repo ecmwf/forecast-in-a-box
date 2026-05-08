@@ -1,6 +1,5 @@
 from typing import Any
 
-import pytest
 from fiab_core.fable import (
     BlockConfigurationOption,
     BlockFactory,
@@ -11,7 +10,7 @@ from fiab_core.fable import (
     PluginCompositeId,
 )
 
-from forecastbox.domain.blueprint.configuration_values import ConfigurationConversionError, convert_known_configuration_values
+from forecastbox.domain.blueprint.configuration_values import convert_known_configuration_values
 
 AMOUNT = ConfigurationOptionId("amount")
 TEXT = ConfigurationOptionId("text")
@@ -42,19 +41,21 @@ def test_convert_known_configuration_values_converts_declared_options() -> None:
     block = _make_block({AMOUNT: "7", TEXT: "hello", ConfigurationOptionId("extra"): "ignored"})
     factory = _make_factory()
 
-    convert_known_configuration_values(block, factory)
+    converted = convert_known_configuration_values(block, factory)
 
-    assert block.configuration_values[AMOUNT] == 7
-    assert block.configuration_values[TEXT] == "hello"
-    assert block.configuration_values[ConfigurationOptionId("extra")] == "ignored"
+    assert converted.t is not None
+    assert converted.t[AMOUNT] == 7
+    assert converted.t[TEXT] == "hello"
+    assert converted.t[ConfigurationOptionId("extra")] == "ignored"
 
 
 def test_convert_known_configuration_values_keeps_original_values_on_failure() -> None:
     block = _make_block({AMOUNT: "not_int", TEXT: "hello"})
     factory = _make_factory()
 
-    with pytest.raises(ConfigurationConversionError, match="expected int"):
-        convert_known_configuration_values(block, factory)
+    converted = convert_known_configuration_values(block, factory)
+    assert converted.e is not None
+    assert any("expected int" in err for err in converted.e)
 
     assert block.configuration_values[AMOUNT] == "not_int"
     assert block.configuration_values[TEXT] == "hello"

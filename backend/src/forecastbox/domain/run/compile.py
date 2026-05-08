@@ -20,7 +20,7 @@ from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import BlockInstanceId, BlockInstanceOutput, NoOutput, RawOutput
 
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
-from forecastbox.domain.blueprint.configuration_values import ConfigurationConversionError, convert_known_configuration_values
+from forecastbox.domain.blueprint.configuration_values import convert_known_configuration_values
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples
 from forecastbox.domain.glyphs.resolution import merge_glyph_values, resolve_configurations, value_dt2str
@@ -93,10 +93,10 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
             raise ValueError(f"plugin for {blockId=} not found: {blockInstance.factory_id.plugin}")
         block_factory = plugin.catalogue.factories[blockInstance.factory_id.factory]
         resolve_configurations(blockInstance, glyph_values)
-        try:
-            convert_known_configuration_values(blockInstance, block_factory)
-        except ConfigurationConversionError as exc:
-            raise ValueError(f"compile failed at {blockId=} with {exc}") from exc
+        converted_values = convert_known_configuration_values(blockInstance, block_factory)
+        if converted_values.t is None:
+            raise ValueError(f"compile failed at {blockId=} with {converted_values.e}")
+        blockInstance.configuration_values = converted_values.t
         result = plugin.compiler(action_lookup, blockId, blockInstance)
         if result.t is None:
             raise ValueError(f"compile failed at {blockId=} with {result.e}")

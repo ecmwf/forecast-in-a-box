@@ -7,25 +7,19 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from dataclasses import dataclass
+from typing import Any
 
+from cascade.low.func import Either
 from fiab_core.fable import BlockFactory, BlockInstance, ConfigurationOptionId
 from fiab_core.types import WrongType
 
 
-@dataclass(frozen=True, eq=True, slots=True)
-class ConfigurationConversionError(ValueError):
-    option_id: ConfigurationOptionId
-    expected_type: str
-    cause: str
-
-    def __str__(self) -> str:
-        return f"Invalid value for configuration option {self.option_id!r}: expected {self.expected_type}. {self.cause}"
-
-
-def convert_known_configuration_values(block_instance: BlockInstance, block_factory: BlockFactory) -> None:
+def convert_known_configuration_values(
+    block_instance: BlockInstance, block_factory: BlockFactory
+) -> Either[dict[ConfigurationOptionId, Any], list[str]]:  # type:ignore[invalid-type-arguments] # semigroup
     """Validate and convert known block configuration values against the factory declaration."""
     converted = dict(block_instance.configuration_values)
+    errors: list[str] = []
     for option_id, option in block_factory.configuration_options.items():
         if option_id not in block_instance.configuration_values:
             continue
@@ -33,9 +27,7 @@ def convert_known_configuration_values(block_instance: BlockInstance, block_fact
         try:
             converted[option_id] = option.parsed_value_type.validate_convert(raw_value)
         except (TypeError, WrongType) as exc:
-            raise ConfigurationConversionError(
-                option_id=option_id,
-                expected_type=option.value_type,
-                cause=str(exc),
-            ) from exc
-    block_instance.configuration_values = converted
+            errors.append(f"Invalid value for configuration option {option_id!r}: expected {option.value_type}. {exc}")
+    if errors:
+        return Either.error(errors)
+    return Either.ok(converted)

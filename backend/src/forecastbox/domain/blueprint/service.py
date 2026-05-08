@@ -37,7 +37,7 @@ from fiab_core.fable import (
 
 from forecastbox.domain.blueprint import db
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
-from forecastbox.domain.blueprint.configuration_values import ConfigurationConversionError, convert_known_configuration_values
+from forecastbox.domain.blueprint.configuration_values import convert_known_configuration_values
 from forecastbox.domain.blueprint.db import upsert_blueprint
 from forecastbox.domain.blueprint.exceptions import BlueprintNotFound
 from forecastbox.domain.blueprint.types import BlueprintId
@@ -218,12 +218,12 @@ async def validate_expand(
         # We dont want to return resolutions of nested glyphs, just the top levels. For this reason
         # we need to run the extraction twice, not just once after the substitution
         resolved_configuration_options[blockId] = {k: blockInstance.configuration_values[k] for k in extracted.glyphed_options}
-        try:
-            convert_known_configuration_values(blockInstance, blockFactory)
-        except ConfigurationConversionError as exc:
-            block_errors[blockId] += [str(exc)]
+        converted_values = convert_known_configuration_values(blockInstance, blockFactory)
+        if converted_values.t is None:
+            block_errors[blockId] += converted_values.e
             invalidable.add(blockId)
             continue
+        blockInstance.configuration_values = converted_values.t
 
         if any(source_id in invalidable for source_id in blockInstance.input_ids.values()):
             invalidable.add(blockId)
