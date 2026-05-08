@@ -94,6 +94,9 @@ def compile_builder(
     # Maps sink block ids to mime type used in RunOutputs (only relevant for external outputs).
     block_to_mime: dict[BlockInstanceId, str] = {}
     sink_tasks: set[TaskId] = set()
+    # Sinks that write to a filesystem path (Zarr, GRIB, NetCDF…) — block_id → path
+    stored_outputs: dict[BlockInstanceId, str] = {}
+    _STORED_PATH_KEYS = ("path", "dir")
 
     for blockId in topological_order(blueprint.blocks.items(), lambda block: block.input_ids.values()):
         blockInstance = blueprint.blocks[blockId]
@@ -142,6 +145,12 @@ def compile_builder(
             if not isinstance(block_output, NoOutput):
                 block_to_mime[blockId] = block_output.mime_type if isinstance(block_output, RawOutput) else "application/octet-stream"
 
+            for key in _STORED_PATH_KEYS:
+                value = blockInstance.configuration_values.get(key)
+                if isinstance(value, str) and value.strip():
+                    stored_outputs[blockId] = value
+                    break
+
             graph += block_graph
 
     graph = deduplicate_nodes(graph)
@@ -173,4 +182,8 @@ def compile_builder(
     else:
         environment = EnvironmentSpecification(runtime_artifacts=graph_artifacts)
     compilation_detail = CompilationDetail(task_detail=task_detail)
-    return ExecutionSpecification(job=job, environment=environment), RunOutputs(outputs=run_outputs), compilation_detail
+    return (
+        ExecutionSpecification(job=job, environment=environment),
+        RunOutputs(outputs=run_outputs, stored_outputs=stored_outputs),
+        compilation_detail,
+    )

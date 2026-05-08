@@ -30,20 +30,32 @@ import type {
 } from '@/api/types/job.types'
 import { API_ENDPOINTS } from '@/api/endpoints'
 
+type StoredOutputDetailWire = { path: string; is_available: boolean }
 type JobExecutionDetailWire = Omit<JobExecutionDetail, 'outputs'> & {
-  outputs: { outputs: Record<string, RunOutputMetadata> } | null
+  outputs:
+    | {
+        outputs: Record<string, RunOutputMetadata>
+        stored_outputs: Record<string, StoredOutputDetailWire>
+      }
+    | null
 }
 
 /**
- * Backend wraps the outputs map in `{ outputs: ... }` on the wire (mirrors
- * Pydantic's RunOutputsResponse). Mock seed data lives in the parsed flat
- * shape (`Record<string, RunOutputMetadata>`); this helper re-wraps at the
- * MSW boundary so the FE's Zod parse round-trips correctly.
+ * Backend wraps the outputs maps in `{ outputs, stored_outputs }` on the wire
+ * (mirrors Pydantic's RunOutputsResponse). Mock seed data lives in the parsed
+ * flat shape (`{ byTask, stored }`); this helper re-shapes at the MSW boundary
+ * so the FE's Zod parse round-trips correctly.
  */
 function toWireDetail(detail: JobExecutionDetail): JobExecutionDetailWire {
   return {
     ...detail,
-    outputs: detail.outputs === null ? null : { outputs: detail.outputs },
+    outputs:
+      detail.outputs === null
+        ? null
+        : {
+            outputs: detail.outputs.byTask,
+            stored_outputs: detail.outputs.stored,
+          },
   }
 }
 
@@ -207,7 +219,9 @@ export const jobHandlers = [
       )
     }
     // Cast to surface runtime undefined (no noUncheckedIndexedAccess).
-    const stored = exec.outputs[datasetId] as RunOutputMetadata | undefined
+    const stored = exec.outputs.byTask[datasetId] as
+      | RunOutputMetadata
+      | undefined
     if (!stored) {
       return HttpResponse.json(
         {

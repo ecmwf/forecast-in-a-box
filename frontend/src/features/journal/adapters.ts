@@ -125,7 +125,7 @@ export function runDetailToViewModel({
     blueprint,
     catalogue,
     isBookmarked,
-    producedOutputs: run.outputs ? Object.keys(run.outputs).length : 0,
+    producedOutputs: run.outputs ? Object.keys(run.outputs.byTask).length : 0,
   })
 }
 

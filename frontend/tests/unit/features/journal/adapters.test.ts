@@ -121,21 +121,24 @@ describe('runDetailToViewModel', () => {
       run: {
         ...baseRun,
         outputs: {
-          'task-a': {
-            mime_type: 'image/png',
-            original_block: 'o1',
-            is_available: true,
+          byTask: {
+            'task-a': {
+              mime_type: 'image/png',
+              original_block: 'o1',
+              is_available: true,
+            },
+            'task-b': {
+              mime_type: 'image/png',
+              original_block: 'o1',
+              is_available: true,
+            },
+            'task-c': {
+              mime_type: 'application/pdf',
+              original_block: 'o2',
+              is_available: true,
+            },
           },
-          'task-b': {
-            mime_type: 'image/png',
-            original_block: 'o1',
-            is_available: true,
-          },
-          'task-c': {
-            mime_type: 'application/pdf',
-            original_block: 'o2',
-            is_available: true,
-          },
+          stored: {},
         },
       },
       blueprint,

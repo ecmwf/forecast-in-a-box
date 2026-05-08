@@ -45,21 +45,24 @@ const seedExecutions: Array<JobExecutionDetail> = [
     progress: '100',
     cascade_job_id: 'cascade-001',
     outputs: {
-      'task-out-1': {
-        mime_type: 'image/png',
-        original_block: 'sink_temperature_map',
-        is_available: true,
+      byTask: {
+        'task-out-1': {
+          mime_type: 'image/png',
+          original_block: 'sink_temperature_map',
+          is_available: true,
+        },
+        'task-out-2': {
+          mime_type: 'application/pdf',
+          original_block: 'sink_temperature_map',
+          is_available: true,
+        },
+        'task-out-3': {
+          mime_type: 'image/svg+xml',
+          original_block: 'sink_wind_map',
+          is_available: true,
+        },
       },
-      'task-out-2': {
-        mime_type: 'application/pdf',
-        original_block: 'sink_temperature_map',
-        is_available: true,
-      },
-      'task-out-3': {
-        mime_type: 'image/svg+xml',
-        original_block: 'sink_wind_map',
-        is_available: true,
-      },
+      stored: {},
     },
     // Cache is popped on terminal status; both arrays come back null.
     completed_block_ids: null,
@@ -77,11 +80,14 @@ const seedExecutions: Array<JobExecutionDetail> = [
     progress: '45',
     cascade_job_id: 'cascade-002',
     outputs: {
-      'task-out-4': {
-        mime_type: 'image/png',
-        original_block: 'sink_precipitation',
-        is_available: false,
+      byTask: {
+        'task-out-4': {
+          mime_type: 'image/png',
+          original_block: 'sink_precipitation',
+          is_available: false,
+        },
       },
+      stored: {},
     },
     completed_block_ids: ['block_source_1'],
     planned_block_ids: ['block_source_1', 'block_product_1', 'block_sink_1'],
@@ -97,7 +103,7 @@ const seedExecutions: Array<JobExecutionDetail> = [
     error: 'Worker process exited with code 137 (OOM killed)',
     progress: '62',
     cascade_job_id: 'cascade-003',
-    outputs: {},
+    outputs: { byTask: {}, stored: {} },
     completed_block_ids: null,
     planned_block_ids: null,
   },
@@ -131,16 +137,19 @@ export const mixedAvailabilityExecution: JobExecutionDetail = {
   progress: '70',
   cascade_job_id: 'cascade-005',
   outputs: {
-    'task-out-5a': {
-      mime_type: 'image/png',
-      original_block: 'sink_available',
-      is_available: true,
+    byTask: {
+      'task-out-5a': {
+        mime_type: 'image/png',
+        original_block: 'sink_available',
+        is_available: true,
+      },
+      'task-out-5b': {
+        mime_type: 'image/png',
+        original_block: 'sink_pending',
+        is_available: false,
+      },
     },
-    'task-out-5b': {
-      mime_type: 'image/png',
-      original_block: 'sink_pending',
-      is_available: false,
-    },
+    stored: {},
   },
 }
 
@@ -160,11 +169,14 @@ export const opaqueMimeExecution: JobExecutionDetail = {
   progress: '100',
   cascade_job_id: 'cascade-006',
   outputs: {
-    'task-out-6': {
-      mime_type: 'application/octet-stream',
-      original_block: 'sink_opaque',
-      is_available: true,
+    byTask: {
+      'task-out-6': {
+        mime_type: 'application/octet-stream',
+        original_block: 'sink_opaque',
+        is_available: true,
+      },
     },
+    stored: {},
   },
   completed_block_ids: null,
   planned_block_ids: null,
@@ -276,7 +288,9 @@ export function setMockOutputAvailable(
   // `noUncheckedIndexedAccess`), so cast to surface the runtime undefined.
   const exec = executionsState[executionId] as JobExecutionDetail | undefined
   if (!exec?.outputs) return false
-  const meta = exec.outputs[taskId] as { is_available: boolean } | undefined
+  const meta = exec.outputs.byTask[taskId] as
+    | { is_available: boolean }
+    | undefined
   if (!meta) return false
   meta.is_available = isAvailable
   return true

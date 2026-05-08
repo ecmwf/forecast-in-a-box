@@ -88,7 +88,7 @@ export function OutputsView({
    * the grouped views. */
   const items = useMemo<Array<OutputItem>>(() => {
     if (!outputs) return []
-    const list = Object.entries(outputs).map(([taskId, meta]) => ({
+    const list = Object.entries(outputs.byTask).map(([taskId, meta]) => ({
       jobId,
       taskId,
       mimeType: meta.mime_type,

@@ -85,8 +85,14 @@ class RunOutputDetail(FiabBaseModel):
     is_available: bool
 
 
+class StoredOutputDetail(FiabBaseModel):
+    path: str
+    is_available: bool
+
+
 class RunOutputsResponse(FiabBaseModel):
     outputs: dict[TaskId, RunOutputDetail]
+    stored_outputs: dict[BlockInstanceId, StoredOutputDetail] = {}
 
 
 class RunDetailResponse(FiabBaseModel):
@@ -165,7 +171,14 @@ def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
                     is_available=task_id in available,
                 )
                 for task_id, char in run_outputs.outputs.items()
-            }
+            },
+            stored_outputs={
+                block_id: StoredOutputDetail(
+                    path=path,
+                    is_available=os.path.exists(path),
+                )
+                for block_id, path in run_outputs.stored_outputs.items()
+            },
         )
     maybe_list = lambda s: list(s) if s is not None else None
     return RunDetailResponse(
