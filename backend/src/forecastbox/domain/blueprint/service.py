@@ -89,6 +89,7 @@ class BlueprintValidationExpansion(FiabBaseModel):
     possible_sources: list[PluginBlockFactoryId]
     possible_expansions: dict[BlockInstanceId, list[PluginBlockExpansion]]
     resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
+    missing_glyphs: dict[BlockInstanceId, dict[ConfigurationOptionId, list[str]]] = {}
 
 
 class BlueprintSaveCommand(FiabBaseModel):
@@ -139,6 +140,7 @@ async def validate_expand(
     possible_expansions: dict[BlockInstanceId, list[PluginBlockExpansion]] = {}
     resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
     block_errors: dict[BlockInstanceId, list[str]] = defaultdict(list)
+    missing_glyphs_result: dict[BlockInstanceId, dict[ConfigurationOptionId, list[str]]] = {}
     outputs = {}
 
     intrinsic_values = cast(dict[str, str], get_values_and_examples())
@@ -194,9 +196,21 @@ async def validate_expand(
         extracted = cast(ExtractedGlyphs, extract_result.t)
         unknown_glyphs = extracted.glyphs - available_glyphs
         if unknown_glyphs:
-            block_errors[blockId] += [f"Unknown glyphs referenced: {unknown_glyphs}"]
-            invalidable.add(blockId)
-            continue
+            # Soft path: omit options referencing unknown glyphs and record them,
+            # rather than failing the whole block.
+            option_glyph_map = resolution.extract_glyphs_per_option(blockInstance)
+            for opt_id, opt_glyphs in option_glyph_map.items():
+                opt_unknown = opt_glyphs & unknown_glyphs
+                if opt_unknown:
+                    missing_glyphs_result.setdefault(blockId, {})[opt_id] = sorted(opt_unknown)
+                    del blockInstance.configuration_values[opt_id]
+            # Re-extract after removing affected options to get an accurate extracted state.
+            extract_result = resolution.extract_glyphs(blockInstance)
+            if extract_result.e is not None:
+                block_errors[blockId] += extract_result.e
+                invalidable.add(blockId)
+                continue
+            extracted = cast(ExtractedGlyphs, extract_result.t)
         try:
             resolution.resolve_configurations(blockInstance, all_glyphs)
         except Exception as exc:
@@ -209,12 +223,20 @@ async def validate_expand(
         extract_after = resolution.extract_glyphs(blockInstance)
         nested_unknowns = cast(ExtractedGlyphs, extract_after.t).glyphs
         if nested_unknowns:
-            block_errors[blockId] += [f"Unknown glyphs referenced: {nested_unknowns}"]
-            invalidable.add(blockId)
-            continue
+            # Soft path: omit options with unresolved nested glyph references.
+            option_glyph_map_after = resolution.extract_glyphs_per_option(blockInstance)
+            for opt_id, opt_glyphs in option_glyph_map_after.items():
+                opt_nested = opt_glyphs & nested_unknowns
+                if opt_nested:
+                    block_opts = missing_glyphs_result.setdefault(blockId, {})
+                    existing = set(block_opts.get(opt_id, []))
+                    block_opts[opt_id] = sorted(existing | opt_nested)
+                    del blockInstance.configuration_values[opt_id]
         # We dont want to return resolutions of nested glyphs, just the top levels. For this reason
         # we need to run the extraction twice, not just once after the substitution
-        resolved_configuration_options[blockId] = {k: blockInstance.configuration_values[k] for k in extracted.glyphed_options}
+        resolved_configuration_options[blockId] = {
+            k: blockInstance.configuration_values[k] for k in extracted.glyphed_options if k in blockInstance.configuration_values
+        }
         converted_values = convert_known_configuration_values(blockInstance, blockFactory)
         if converted_values.t is None:
             block_errors[blockId] += converted_values.e
@@ -263,6 +285,7 @@ async def validate_expand(
         resolved_configuration_options=resolved_configuration_options,
         block_errors=block_errors,
         global_errors=global_errors,
+        missing_glyphs=missing_glyphs_result,
     )
 
 

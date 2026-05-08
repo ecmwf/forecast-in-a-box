@@ -11,7 +11,7 @@ Workers should update this file with a short completion note when a task is done
 | 5. Missing values during validation | Done | Missing configuration values are now omitted during validation (`expand`, `create`, `update`), while compilation fails early with explicit missing-option errors. |
 | 6. BlockExpansion contract | Done | Added BlockExpansion and ConfigurationOptionRestriction types to core; updated plugin Expander contract to return list[BlockExpansion]; modified backend expand aggregation to include restrictions in response; updated test plugin and integration tests. |
 | 7. Test plugin restrictions | Done | Added enumClosed[1,2,3] restriction on `amount` in test plugin expander; updated integration test assertions and added test_blueprint_expand_restrictions. |
-| 8. Missing glyph warnings | Not started | |
+| 8. Missing glyph warnings | Done | Added `missing_glyphs` field to `BlueprintValidationExpansion` and route response; unknown glyph references now produce soft warnings (per-option omission) instead of hard `block_errors`; updated integration tests. |
 | 99. Leftovers | Not started | |
 
 ## Notes for workers

@@ -150,6 +150,7 @@ class BlueprintValidationExpansionResponse(FiabBaseModel):
     possible_sources: list[PluginBlockFactoryId]
     possible_expansions: dict[BlockInstanceId, list[PluginBlockExpansion]]
     resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]]
+    missing_glyphs: dict[BlockInstanceId, dict[ConfigurationOptionId, list[str]]] = {}
 
 
 GlyphType = Literal["intrinsic", "global"]
@@ -397,6 +398,7 @@ async def expand_blueprint(
         possible_sources=result.possible_sources,
         possible_expansions=result.possible_expansions,
         resolved_configuration_options=result.resolved_configuration_options,
+        missing_glyphs=result.missing_glyphs,
     )
 
 

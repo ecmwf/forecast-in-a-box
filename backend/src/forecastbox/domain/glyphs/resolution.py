@@ -9,6 +9,12 @@
 
 """Core parsing and resolution of ${glyph} interpolation in BlockInstance configuration values."""
 
+# TODO this module is not exactly coherent in terms of architecture -- its coupling
+# to validate_expand and to compile is rather high and ad-hoc-ish. It would be better
+# to expose a smaller set of functions, ideally one for expr2value and one for glyphs2glyph
+# (maybe each in its module), with a better contract, eg a dataclass with
+# (resolution, error, missing), etc
+
 import datetime as dt
 from dataclasses import dataclass
 
@@ -65,6 +71,24 @@ def extract_glyphs(blockInstance: BlockInstance) -> Either[ExtractedGlyphs, list
     if errors:
         return Either.error(errors)
     return Either.ok(ExtractedGlyphs(glyphs=glyphs, glyphed_options=glyphed_options))
+
+
+def extract_glyphs_per_option(blockInstance: BlockInstance) -> dict[ConfigurationOptionId, set[str]]:
+    """Return a mapping from each option id to the set of glyph names it references.
+
+    Only includes options that contain at least one glyph reference.
+    Malformed expressions are silently skipped; use ``extract_glyphs`` for error detection.
+    """
+    result: dict[ConfigurationOptionId, set[str]] = {}
+    for key, value in blockInstance.configuration_values.items():
+        if not isinstance(value, str):
+            raise TypeError(f"expected {key=}'s value to be a string, gotten {type(value)}")
+        r = extract_glyph_names(value)
+        if r.t is not None:
+            result[key] = r.t
+        else:
+            raise ValueError(f"not expected glyph parsing to fail at this time, {r.e}")
+    return result
 
 
 def resolve_configurations(blockInstance: BlockInstance, glyph_values: dict[str, str]) -> None:

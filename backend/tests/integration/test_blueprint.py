@@ -18,6 +18,11 @@ possibly subject of changes, and their failure may be a legitimate behavioral
 change (such as change of return error code).
 """
 
+# TODO this file has grown too huge, we should start splitting it. In particular,
+# lot of things tests just the expand endpoint -- which however can be tested as
+# a unit test because there is no real side effects. We would just need to fake
+# the global glyph database
+
 import io
 import os
 import pathlib
@@ -241,7 +246,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
         configuration_values={},
         input_ids={"a": BlockInstanceId("transform_increment"), "b": BlockInstanceId("source_42")},
     )
-    # Using an unknown glyph should fail validation
+    # Using an unknown glyph should not fail validation — it should be reported in missing_glyphs
     sink_file_bad = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
         configuration_values=_config({"fname": f"{tmpdir}/output${{blueprintExpandGlobalGlyph}}.main.txt"}),
@@ -252,9 +257,10 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
 
     builder = BlueprintBuilder(blocks=blocks)
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
-    assert "sink_file" in response.json()["block_errors"]
+    assert "sink_file" not in response.json()["block_errors"]
+    assert response.json()["missing_glyphs"]["sink_file"]["fname"] == ["blueprintExpandGlobalGlyph"]
 
-    # After posting blueprintExpandGlobalGlyph as a global glyph, the same blueprint should pass validation
+    # After posting blueprintExpandGlobalGlyph as a global glyph, missing_glyphs should be empty
     post_resp = backend_client_with_auth.post(
         "/blueprint/glyphs/global/post",
         json={"key": "blueprintExpandGlobalGlyph", "value": "test_expand_value"},
@@ -264,6 +270,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert "sink_file" not in response.json()["block_errors"]
     assert len(response.json()["block_errors"]) == 0
+    assert response.json()["missing_glyphs"] == {}
     assert response.json()["resolved_configuration_options"]["sink_file"]["fname"] == f"{tmpdir}/outputtest_expand_value.main.txt"
 
     # A builder with an intrinsic name used as a local glyph key should fail validation
@@ -341,7 +348,74 @@ def test_blueprint_expand_restrictions(backend_client_with_auth: httpx.Client) -
     )
 
 
-def test_blueprint_basic_execute(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
+def test_blueprint_expand_missing_glyph_warnings(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
+    """Unknown glyph references produce missing_glyph warnings, not block_errors.
+
+    Covers:
+    - A block with a single option referencing one unknown glyph: missing_glyphs is populated
+      for that option, block_errors is not.
+    - After the missing glyph is registered as a global glyph, missing_glyphs clears.
+    - A block with two options where only one references an unknown glyph: the other option
+      is still validated normally.
+    - Malformed glyph expressions (syntax errors) remain hard block_errors.
+    """
+    source_42 = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_42")),
+        configuration_values={},
+        input_ids={},
+    )
+    # sink_file with fname referencing a missing glyph
+    sink_file = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
+        configuration_values=_config({"fname": f"{tmpdir}/output_${{missingRoot}}.txt"}),
+        input_ids={"data": BlockInstanceId("source_42")},
+    )
+    builder = BlueprintBuilder(blocks={BlockInstanceId("source_42"): source_42, BlockInstanceId("sink_file"): sink_file})
+    response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
+    assert response.is_success, response.text
+    data = response.json()
+
+    # Unknown glyph → missing_glyphs entry, not a block_error
+    assert "sink_file" not in data["block_errors"]
+    assert data["missing_glyphs"]["sink_file"]["fname"] == ["missingRoot"]
+    # Other blocks remain unaffected
+    assert "source_42" not in data["block_errors"]
+    assert "source_42" not in data["missing_glyphs"]
+
+    # Register the missing glyph and verify the warning clears
+    post_resp = backend_client_with_auth.post(
+        "/blueprint/glyphs/global/post",
+        json={"key": "missingRoot", "value": "resolved_root"},
+    )
+    assert post_resp.is_success, post_resp.text
+    response2 = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
+    assert response2.is_success, response2.text
+    data2 = response2.json()
+    assert data2["missing_glyphs"] == {}
+    assert data2["block_errors"] == {}
+    assert data2["resolved_configuration_options"]["sink_file"]["fname"] == f"{tmpdir}/output_resolved_root.txt"
+
+    # Clean up
+    del_resp = backend_client_with_auth.post(
+        "/blueprint/glyphs/global/delete",
+        json={"global_glyph_id": post_resp.json()["global_glyph_id"]},
+    )
+    assert del_resp.is_success, del_resp.text
+
+    # Malformed expression remains a hard block_error
+    sink_file_malformed = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
+        configuration_values=_config({"fname": "${x |}"}),
+        input_ids={"data": BlockInstanceId("source_42")},
+    )
+    builder_malformed = BlueprintBuilder(
+        blocks={BlockInstanceId("source_42"): source_42, BlockInstanceId("sink_file"): sink_file_malformed}
+    )
+    response_malformed = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder_malformed.model_dump())
+    assert response_malformed.is_success, response_malformed.text
+    data_malformed = response_malformed.json()
+    assert "sink_file" in data_malformed["block_errors"]
+
     # Set the global glyph that the builder's source_time block references
     post_resp = backend_client_with_auth.post(
         "/blueprint/glyphs/global/post",
@@ -631,7 +705,7 @@ def test_blueprint_expand_failure_03(backend_client_with_auth: httpx.Client) -> 
     assert "bad_source" in block_errors
     assert "bad_transform" in block_errors
 
-    # we now verify that the validation of transform happens in some form, despite parent being invalid
+    # we now verify that the missing-glyph warning for transform is reported, despite parent being invalid
     bad_transform2 = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("transform_increment")),
         configuration_values=_config({"amount": "${nonExistentGlyph}"}),
@@ -642,8 +716,9 @@ def test_blueprint_expand_failure_03(backend_client_with_auth: httpx.Client) -> 
     assert response.is_success, response.text
     block_errors = response.json()["block_errors"]
     assert "bad_source" in block_errors
-    assert "bad_transform" in block_errors
-    assert "nonExistentGlyph" in ";".join(block_errors["bad_transform"])
+    missing_glyphs = response.json()["missing_glyphs"]
+    assert "bad_transform" in missing_glyphs
+    assert missing_glyphs["bad_transform"]["amount"] == ["nonExistentGlyph"]
 
 
 def test_blueprint_expand_failure_04_invalid_configuration_type(backend_client_with_auth: httpx.Client) -> None:
@@ -764,7 +839,7 @@ def test_blueprint_composite_glyph_expand(tmpdir: Any, backend_client_with_auth:
     resolved_text = data["resolved_configuration_options"]["source_text"]["text"]
     assert resolved_text == f"global_part/{run_id_example}", f"Unexpected: {resolved_text!r}"
 
-    # A local glyph that references an unknown glyph must surface as a block_error,
+    # A local glyph that references an unknown glyph surfaces as a missing_glyph warning,
     # even though the composite glyph key itself is known.
     sink_file_missing = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
@@ -778,8 +853,9 @@ def test_blueprint_composite_glyph_expand(tmpdir: Any, backend_client_with_auth:
     response_nested = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder_nested_unknown.model_dump())
     assert response_nested.is_success, response_nested.text
     nested_data = response_nested.json()
-    assert "source_text" in nested_data["block_errors"]
-    assert any("notDefinedAnywhere" in err for err in nested_data["block_errors"]["source_text"])
+    assert "source_text" not in nested_data["block_errors"]
+    assert "source_text" in nested_data["missing_glyphs"]
+    assert nested_data["missing_glyphs"]["source_text"]["text"] == ["notDefinedAnywhere"]
 
     # A builder with a circular glyph reference must report a global_error
     builder_cyclic = BlueprintBuilder(
@@ -838,7 +914,7 @@ def test_blueprint_jinja_interpolation_expand(backend_client_with_auth: httpx.Cl
       resolved value appears in resolved_configuration_options.
     """
     # Malformed: hyphens make `this-is-no-filter` parsed as subtraction; the resulting "glyph"
-    # names (is, no, filter) are unknown, so the block gets an error entry.
+    # names (is, no, filter) are unknown, so the block gets a missing_glyph entry.
     source_malformed = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_text")),
         configuration_values=_config({"text": "${startDatetime | this-is-no-filter}"}),
@@ -848,8 +924,8 @@ def test_blueprint_jinja_interpolation_expand(backend_client_with_auth: httpx.Cl
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder_malformed.model_dump())
     assert response.is_success, response.text
     data = response.json()
-    assert "source_text" in data["block_errors"], f"Expected block error for malformed jinja: {data}"
-    assert any("Unknown glyphs referenced" in err for err in data["block_errors"]["source_text"])
+    assert "source_text" not in data["block_errors"], f"Expected no block error, got: {data['block_errors']}"
+    assert "source_text" in data["missing_glyphs"], f"Expected missing_glyphs entry for unknown glyph names: {data}"
 
     # Well-formed: pure jinja arithmetic using registered globals (datetime, timedelta) and filter (floor_day).
     # Parentheses are required because Jinja2's | (filter) has higher precedence than +.
