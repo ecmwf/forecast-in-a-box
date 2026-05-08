@@ -313,6 +313,11 @@ class TestFableTypeParse:
         assert isinstance(t, ClosedEnumType)
         assert t.validate_convert("a") == "a"
 
+    def test_parse_enum_with_quoted_items(self) -> None:
+        t = FableType.parse("enumClosed['a', 'b', 'c']")
+        assert isinstance(t, ClosedEnumType)
+        assert t.validate_convert("b") == "b"
+
 
 class TestValidateConvertIntegration:
     """Integration tests for validate_convert with various types"""

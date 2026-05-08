@@ -116,7 +116,7 @@ class BlockInstance(FiabCoreBaseModel):
     """As produced by BlockFactory *by the client* -- basically the configuration/inputs values"""
 
     factory_id: PluginBlockFactoryId
-    configuration_values: dict[ConfigurationOptionId, str]
+    configuration_values: dict[ConfigurationOptionId, Any]
     """Keys come frome factory's `configuration_options`, values are serialized actual configuration values"""
     input_ids: dict[str, BlockInstanceId]
     """Keys come from factory's `inputs`, values are other blocks in the (partial) fable"""

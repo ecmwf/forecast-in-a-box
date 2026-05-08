@@ -615,6 +615,26 @@ def test_blueprint_expand_failure_03(backend_client_with_auth: httpx.Client) -> 
     assert "nonExistentGlyph" in ";".join(block_errors["bad_transform"])
 
 
+def test_blueprint_expand_failure_04_invalid_configuration_type(backend_client_with_auth: httpx.Client) -> None:
+    """Type conversion errors are reported by backend validation before plugin validation."""
+    source_42 = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_42")),
+        configuration_values={},
+        input_ids={},
+    )
+    bad_transform = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("transform_increment")),
+        configuration_values=_config({"amount": "not_an_int"}),
+        input_ids={"a": BlockInstanceId("source_42")},
+    )
+    builder = BlueprintBuilder(blocks={BlockInstanceId("source_42"): source_42, BlockInstanceId("bad_transform"): bad_transform})
+    response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
+    assert response.is_success, response.text
+    block_errors = response.json()["block_errors"]
+    assert "bad_transform" in block_errors
+    assert any("Invalid value for configuration option 'amount': expected int" in message for message in block_errors["bad_transform"])
+
+
 def test_blueprint_composite_glyph_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
     """A local glyph value that references other glyphs is expanded end-to-end.
 

@@ -20,6 +20,7 @@ from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import BlockInstanceId, BlockInstanceOutput, NoOutput, RawOutput
 
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
+from forecastbox.domain.blueprint.configuration_values import ConfigurationConversionError, convert_known_configuration_values
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples
 from forecastbox.domain.glyphs.resolution import merge_glyph_values, resolve_configurations, value_dt2str
@@ -90,7 +91,12 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
         plugin = plugins.get(blockInstance.factory_id.plugin, None)
         if not plugin:
             raise ValueError(f"plugin for {blockId=} not found: {blockInstance.factory_id.plugin}")
+        block_factory = plugin.catalogue.factories[blockInstance.factory_id.factory]
         resolve_configurations(blockInstance, glyph_values)
+        try:
+            convert_known_configuration_values(blockInstance, block_factory)
+        except ConfigurationConversionError as exc:
+            raise ValueError(f"compile failed at {blockId=} with {exc}") from exc
         result = plugin.compiler(action_lookup, blockId, blockInstance)
         if result.t is None:
             raise ValueError(f"compile failed at {blockId=} with {result.e}")
@@ -110,7 +116,6 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
         except Exception as e:
             raise ValueError(f"compile failed at {blockId=} with {e}")
 
-        block_factory = plugin.catalogue.factories[blockInstance.factory_id.factory]
         if block_factory.kind == "sink":
             sink_graph = action_lookup[blockId].graph()
             block_output = block_outputs.get(blockId)

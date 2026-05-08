@@ -25,7 +25,7 @@ class NotFableType(Exception):
     """Raised when a type expression cannot be parsed."""
 
 
-class NotStringInput(Exception):
+class NotStringInput(TypeError):
     """Raised when validate_convert receives a non-string input."""
 
 
@@ -71,14 +71,14 @@ class FableType(ABC):
 
         if type_expr.startswith("enumClosed[") and type_expr.endswith("]"):
             items_str = type_expr[11:-1]
-            items = [item.strip() for item in items_str.split(",") if item.strip()]
+            items = [_normalize_enum_item(item) for item in items_str.split(",") if item.strip()]
             if not items:
                 raise NotFableType("enumClosed must contain at least one item")
             return ClosedEnumType(items)
 
         if type_expr.startswith("enumOpen[") and type_expr.endswith("]"):
             items_str = type_expr[9:-1]
-            items = [item.strip() for item in items_str.split(",") if item.strip()]
+            items = [_normalize_enum_item(item) for item in items_str.split(",") if item.strip()]
             if not items:
                 raise NotFableType("enumOpen must contain at least one item")
             return OpenEnumType(items)
@@ -95,6 +95,13 @@ class FableType(ABC):
             "Expected one of: str, int, float, date, datetime, "
             "enumClosed[...], enumOpen[...], list[...]"
         )
+
+
+def _normalize_enum_item(item: str) -> str:
+    item = item.strip()
+    if len(item) >= 2 and item[0] == item[-1] and item[0] in ("'", '"'):
+        return item[1:-1]
+    return item
 
 
 class StringType(FableType):

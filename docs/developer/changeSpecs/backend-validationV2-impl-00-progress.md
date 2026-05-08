@@ -7,7 +7,7 @@ Workers should update this file with a short completion note when a task is done
 | 1. ConfigurationOptionId | Done | Completed in commit 2d6a1f24 (`Add ConfigurationOptionId typing`). |
 | 2. FableType | Done | Implemented FableType with full support for str, int, float, date, datetime, enumClosed, enumOpen, and list types with comprehensive unit tests. |
 | 3. Plugin FableType migration | Done | Migrated plugin catalogue `value_type` strings to canonical `FableType` syntax and verified the affected plugin tests. |
-| 4. Backend conversion | Not started | |
+| 4. Backend conversion | Done | Added backend-side `FableType.validate_convert` before plugin validate/compile, widened block config values to `Any`, and migrated affected plugin parsing to consume converted values. |
 | 5. Missing values during validation | Not started | |
 | 6. BlockExpansion contract | Not started | |
 | 7. Test plugin restrictions | Not started | |

@@ -135,13 +135,21 @@ def compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance
             action = from_source(Payload("fiab_plugin_test.runtime.source_42"))  # type: ignore
         elif instance.factory_id.factory == "source_text":
             text = instance.configuration_values[TEXT]
+            if not isinstance(text, str):
+                return Either.error(f"Invalid type for {TEXT!r}: expected str, got {type(text).__name__}")
             action = from_source(Payload("fiab_plugin_test.runtime.source_text", kwargs={"text": text}))  # type: ignore
         elif instance.factory_id.factory == "source_sleep":
             text = instance.configuration_values[TEXT]
-            duration = float(instance.configuration_values[DURATION])
+            duration = instance.configuration_values[DURATION]
+            if not isinstance(text, str):
+                return Either.error(f"Invalid type for {TEXT!r}: expected str, got {type(text).__name__}")
+            if not isinstance(duration, float):
+                return Either.error(f"Invalid type for {DURATION!r}: expected float, got {type(duration).__name__}")
             action = from_source(Payload("fiab_plugin_test.runtime.source_sleep", kwargs={"text": text, "duration": duration}))  # type: ignore
         elif instance.factory_id.factory == "source_filesize":
             checkpoint_str = instance.configuration_values[CHECKPOINT]
+            if not isinstance(checkpoint_str, str):
+                return Either.error(f"Invalid type for {CHECKPOINT!r}: expected str, got {type(checkpoint_str).__name__}")
             artifact_id = CompositeArtifactId.from_str(checkpoint_str)
             local_path = ArtifactsProvider.get_artifact_local_path(artifact_id)
             payload = Payload(
@@ -151,7 +159,9 @@ def compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance
         elif instance.factory_id.factory == "transform_increment":
             a = lookup[instance.input_ids["a"]]
             amount = instance.configuration_values[AMOUNT]
-            action = a.map(Payload("fiab_plugin_test.runtime.transform_increment", kwargs={"amount": int(amount)}))  # type: ignore
+            if not isinstance(amount, int):
+                return Either.error(f"Invalid type for {AMOUNT!r}: expected int, got {type(amount).__name__}")
+            action = a.map(Payload("fiab_plugin_test.runtime.transform_increment", kwargs={"amount": amount}))  # type: ignore
         elif instance.factory_id.factory == "product_join":
             a = lookup[instance.input_ids["a"]]
             b = lookup[instance.input_ids["b"]]
@@ -159,6 +169,8 @@ def compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance
         elif instance.factory_id.factory == "sink_file":
             data = lookup[instance.input_ids["data"]]
             fname = instance.configuration_values[FNAME]
+            if not isinstance(fname, str):
+                return Either.error(f"Invalid type for {FNAME!r}: expected str, got {type(fname).__name__}")
             action = data.map(Payload("fiab_plugin_test.runtime.sink_file", kwargs={"fname": fname}))  # type: ignore
         elif instance.factory_id.factory == "sink_image":
             data = lookup[instance.input_ids["data"]]

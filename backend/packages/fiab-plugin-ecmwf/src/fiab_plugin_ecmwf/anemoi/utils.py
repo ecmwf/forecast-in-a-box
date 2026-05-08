@@ -73,23 +73,25 @@ def get_environment(composite_id: CompositeArtifactId) -> list[str]:
 
 def validate_anemoi_block(block: BlockInstance) -> Either[QubedOutput, Error]:  # type:ignore[invalid-argument] # semigroup
     """Validate common Anemoi block configuration, returning the base QubedOutput on success."""
-    if not block.configuration_values[ConfigurationOptionId("checkpoint")]:
+    checkpoint = block.configuration_values[ConfigurationOptionId("checkpoint")]
+    lead_time = block.configuration_values[ConfigurationOptionId("lead_time")]
+    ensemble_members = block.configuration_values.get(ConfigurationOptionId("ensemble_members"))
+
+    if not isinstance(checkpoint, str) or not checkpoint:
         return Either.error("Checkpoint must be given")
 
-    if not block.configuration_values[ConfigurationOptionId("lead_time")].isdigit():  # type: ignore
+    if not isinstance(lead_time, int) or lead_time < 0:
         return Either.error("Lead time must be a non-negative integer")
 
-    ensemble_members = block.configuration_values.get(ConfigurationOptionId("ensemble_members"))
-    if ensemble_members is not None and (not ensemble_members.isdigit() or int(ensemble_members) < 1):  # type: ignore
+    if ensemble_members is not None and (not isinstance(ensemble_members, int) or ensemble_members < 1):
         return Either.error("Ensemble members must be an int and positive")
 
-    checkpoint = block.configuration_values[ConfigurationOptionId("checkpoint")]
     try:
         composite_id = CompositeArtifactId.from_str(checkpoint)
     except ValueError:
         return Either.error("Checkpoint must be a valid checkpoint identifier")
 
     try:
-        return Either.ok(get_model_output(composite_id, int(block.configuration_values[ConfigurationOptionId("lead_time")])))
+        return Either.ok(get_model_output(composite_id, lead_time))
     except KeyError:
         return Either.error(f"Unknown checkpoint: {checkpoint}")
