@@ -92,6 +92,9 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
         if not plugin:
             raise ValueError(f"plugin for {blockId=} not found: {blockInstance.factory_id.plugin}")
         block_factory = plugin.catalogue.factories[blockInstance.factory_id.factory]
+        missing_config = sorted(block_factory.configuration_options.keys() - blockInstance.configuration_values.keys())
+        if missing_config:
+            raise ValueError(f"compile failed at {blockId=} with missing configuration options: {missing_config}")
         resolve_configurations(blockInstance, glyph_values)
         converted_values = convert_known_configuration_values(blockInstance, block_factory)
         if converted_values.t is None:

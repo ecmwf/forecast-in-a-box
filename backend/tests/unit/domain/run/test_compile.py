@@ -1,4 +1,27 @@
+import pytest
+from cascade.low.func import Either
+from earthkit.workflows.fluent import Action
+from fiab_core.fable import (
+    ActionLookup,
+    BlockConfigurationOption,
+    BlockFactory,
+    BlockFactoryCatalogue,
+    BlockFactoryId,
+    BlockInstance,
+    BlockInstanceId,
+    BlockInstanceOutput,
+    ConfigurationOptionId,
+    NoOutput,
+    PluginBlockFactoryId,
+    PluginCompositeId,
+)
+from fiab_core.plugin import Plugin
+from pyrsistent import pmap
+
+from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.glyphs.resolution import merge_glyph_values
+from forecastbox.domain.plugin.manager import PluginManager
+from forecastbox.domain.run.compile import compile_builder
 
 # ---------------------------------------------------------------------------
 # merge_glyph_values
@@ -105,3 +128,57 @@ def test_merge_glyph_values_resolution_order() -> None:
     assert merge_glyph_values({}, {key: "a"}, {key: "b"}, {}, {key: "c"}, {})[key] == "c"
     assert merge_glyph_values({}, {key: "a"}, {key: "b"}, {key: "d"}, {key: "c"}, {})[key] == "d"
     assert merge_glyph_values({}, {key: "a"}, {key: "b"}, {key: "d"}, {key: "c"}, {key: "e"})[key] == "e"
+
+
+def test_compile_builder_fails_missing_config_before_plugin_compile(monkeypatch: pytest.MonkeyPatch) -> None:
+    plugin_id = PluginCompositeId.from_str("local:test")
+    factory_id = BlockFactoryId("source_requires_amount")
+    option_id = ConfigurationOptionId("amount")
+    compiler_called = False
+
+    def _compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance) -> Either[Action, str]:  # type:ignore[invalid-type-arguments] # semigroup
+        nonlocal compiler_called
+        del lookup, bid, instance
+        compiler_called = True
+        return Either.error("should not be called")
+
+    def _validator(instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, str]:  # type:ignore[invalid-type-arguments] # semigroup
+        del instance, inputs
+        return Either.ok(NoOutput())
+
+    def _expander(output: BlockInstanceOutput) -> list[BlockFactoryId]:
+        del output
+        return []
+
+    plugin = Plugin(
+        catalogue=BlockFactoryCatalogue(
+            factories={
+                factory_id: BlockFactory(
+                    kind="source",
+                    title="",
+                    description="",
+                    configuration_options={
+                        option_id: BlockConfigurationOption(title="", description="", value_type="int"),
+                    },
+                    inputs=[],
+                )
+            }
+        ),
+        validator=_validator,
+        expander=_expander,
+        compiler=_compiler,
+    )
+    monkeypatch.setattr(PluginManager, "plugins", pmap({plugin_id: plugin}))
+    blueprint = BlueprintBuilder(
+        blocks={
+            BlockInstanceId("source_requires_amount"): BlockInstance(
+                factory_id=PluginBlockFactoryId(plugin=plugin_id, factory=factory_id),
+                configuration_values={},
+                input_ids={},
+            )
+        }
+    )
+
+    with pytest.raises(ValueError, match="missing configuration options"):
+        compile_builder(blueprint, {})
+    assert not compiler_called

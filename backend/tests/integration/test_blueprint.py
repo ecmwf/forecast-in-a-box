@@ -635,6 +635,63 @@ def test_blueprint_expand_failure_04_invalid_configuration_type(backend_client_w
     assert any("Invalid value for configuration option 'amount': expected int" in message for message in block_errors["bad_transform"])
 
 
+def test_blueprint_expand_missing_configuration_is_not_error(backend_client_with_auth: httpx.Client) -> None:
+    """Missing values are omitted during validation instead of producing hard errors."""
+    source_42 = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_42")),
+        configuration_values={},
+        input_ids={},
+    )
+    transform_missing_amount = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("transform_increment")),
+        configuration_values={},
+        input_ids={"a": BlockInstanceId("source_42")},
+    )
+    builder = BlueprintBuilder(
+        blocks={
+            BlockInstanceId("source_42"): source_42,
+            BlockInstanceId("transform_missing_amount"): transform_missing_amount,
+        }
+    )
+    response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
+    assert response.is_success, response.text
+    block_errors = response.json()["block_errors"]
+    assert "transform_missing_amount" not in block_errors
+
+
+def test_blueprint_create_and_update_allow_missing_configuration_values(backend_client_with_auth: httpx.Client) -> None:
+    """Draft blueprints with missing config can be saved, but compilation stays strict."""
+    source_42 = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_42")),
+        configuration_values={},
+        input_ids={},
+    )
+    transform_missing_amount = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("transform_increment")),
+        configuration_values={},
+        input_ids={"a": BlockInstanceId("source_42")},
+    )
+    builder = BlueprintBuilder(
+        blocks={
+            BlockInstanceId("source_42"): source_42,
+            BlockInstanceId("transform_missing_amount"): transform_missing_amount,
+        }
+    )
+
+    create_response = backend_client_with_auth.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
+    assert create_response.is_success, create_response.text
+    saved = create_response.json()
+    update_response = backend_client_with_auth.post(
+        "/blueprint/update",
+        json={
+            **BlueprintSaveCommand(builder=builder).model_dump(),
+            "blueprint_id": saved["blueprint_id"],
+            "version": saved["version"],
+        },
+    )
+    assert update_response.is_success, update_response.text
+
+
 def test_blueprint_composite_glyph_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
     """A local glyph value that references other glyphs is expanded end-to-end.
 

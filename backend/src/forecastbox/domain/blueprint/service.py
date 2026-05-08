@@ -184,11 +184,6 @@ async def validate_expand(
         extraConfig = blockInstance.configuration_values.keys() - blockFactory.configuration_options.keys()
         if extraConfig:
             block_errors[blockId] += [f"Block contains extra config: {extraConfig}"]
-        missingConfig = blockFactory.configuration_options.keys() - blockInstance.configuration_values.keys()
-        if missingConfig:
-            # TODO most likely disable this, we would inject defaults at the compile level
-            block_errors[blockId] += [f"Block contains missing config: {missingConfig}"]
-
         extract_result = resolution.extract_glyphs(blockInstance)
         if extract_result.e is not None:
             block_errors[blockId] += extract_result.e
