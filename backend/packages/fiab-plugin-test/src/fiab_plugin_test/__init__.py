@@ -6,6 +6,7 @@ from fiab_core.artifacts import ArtifactsProvider, CompositeArtifactId
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
+    BlockExpansion,
     BlockFactory,
     BlockFactoryCatalogue,
     BlockFactoryId,
@@ -115,17 +116,17 @@ def validator(instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -
         raise TypeError(f"unexpected factory {instance.factory_id.factory}")
 
 
-def expander(output: BlockInstanceOutput) -> list[BlockFactoryId]:
+def expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
     if isinstance(output, RawOutput):
         if output.type_fqn == "int":
             return [
-                BlockFactoryId("transform_increment"),
-                BlockFactoryId("product_join"),
-                BlockFactoryId("sink_file"),
-                BlockFactoryId("sink_image"),
+                BlockExpansion(factory=BlockFactoryId("transform_increment")),
+                BlockExpansion(factory=BlockFactoryId("product_join")),
+                BlockExpansion(factory=BlockFactoryId("sink_file")),
+                BlockExpansion(factory=BlockFactoryId("sink_image")),
             ]
         if output.type_fqn == "str":
-            return [BlockFactoryId("sink_file")]
+            return [BlockExpansion(factory=BlockFactoryId("sink_file"))]
     return []
 
 

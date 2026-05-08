@@ -112,6 +112,39 @@ class BlockFactoryCatalogue(FiabCoreBaseModel):
     factories: dict[BlockFactoryId, BlockFactory]
 
 
+ConfigurationOptionRestriction = dict[ConfigurationOptionId, FableType]
+"""Mapping from configuration option id to its FableType restriction"""
+
+
+class BlockExpansion(FiabCoreBaseModel):
+    """Expansion of a block with potential restrictions on configuration options.
+
+    Plugin expanders return BlockExpansion objects describing which blocks can
+    expand the output of a given block, and what configuration restrictions apply
+    to those expansions.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    factory: BlockFactoryId
+    """The local factory id within the plugin"""
+    restrictions: ConfigurationOptionRestriction = Field(default_factory=dict)
+    """Restrictions on configuration options for this expansion"""
+
+
+class PluginBlockExpansion(FiabCoreBaseModel):
+    """Expansion result as returned to clients, combining plugin identity with restrictions.
+
+    This is the service-level representation sent to API consumers, containing
+    the full PluginBlockFactoryId and serialized restriction types.
+    """
+
+    plugin: PluginCompositeId
+    factory: BlockFactoryId
+    restrictions: dict[ConfigurationOptionId, str] = Field(default_factory=dict)
+    """Serialized FableType restrictions (e.g., 'int', 'enumClosed[a,b]')"""
+
+
 class BlockInstance(FiabCoreBaseModel):
     """As produced by BlockFactory *by the client* -- basically the configuration/inputs values"""
 

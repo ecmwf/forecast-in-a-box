@@ -45,6 +45,10 @@ class FableType(ABC):
         - ValueError for validation failures (e.g., invalid format, enum membership)
         """
 
+    @abstractmethod
+    def serialize(self) -> str:
+        """Serialize this type to a string expression that can be parsed back via FableType.parse()."""
+
     @staticmethod
     def parse(type_expr: str) -> "FableType":
         """Parse a type expression string into a FableType instance.
@@ -112,6 +116,9 @@ class StringType(FableType):
             raise NotStringInput(f"Expected string, got {type(value).__name__}")
         return value
 
+    def serialize(self) -> str:
+        return "str"
+
 
 class IntType(FableType):
     """The integer type. Converts string to int."""
@@ -123,6 +130,9 @@ class IntType(FableType):
             return int(value)
         except ValueError:
             raise WrongType(f"Cannot convert {value!r} to int")
+
+    def serialize(self) -> str:
+        return "int"
 
 
 class FloatType(FableType):
@@ -136,6 +146,9 @@ class FloatType(FableType):
         except ValueError:
             raise WrongType(f"Cannot convert {value!r} to float")
 
+    def serialize(self) -> str:
+        return "float"
+
 
 class DateType(FableType):
     """The date type. Converts ISO 8601 date string (YYYY-MM-DD) to datetime.date."""
@@ -147,6 +160,9 @@ class DateType(FableType):
             return datetime.strptime(value, "%Y-%m-%d").date()
         except ValueError:
             raise WrongType(f"Cannot parse {value!r} as date (expected ISO 8601 format: YYYY-MM-DD)")
+
+    def serialize(self) -> str:
+        return "date"
 
 
 class DatetimeType(FableType):
@@ -172,6 +188,9 @@ class DatetimeType(FableType):
 
         raise WrongType(f"Cannot parse {value!r} as datetime (expected ISO 8601 format)")
 
+    def serialize(self) -> str:
+        return "datetime"
+
 
 class ClosedEnumType(FableType):
     """Closed enumeration type. Validates membership in the enum; conversion is a no-op."""
@@ -187,6 +206,10 @@ class ClosedEnumType(FableType):
             raise WrongType(f"{value!r} is not a valid option. Valid options are: {', '.join(self.items)}")
         return value
 
+    def serialize(self) -> str:
+        items_str = ",".join(self.items)
+        return f"enumClosed[{items_str}]"
+
 
 class OpenEnumType(FableType):
     """Open enumeration type. Accepts any string value; conversion is a no-op."""
@@ -198,6 +221,10 @@ class OpenEnumType(FableType):
         if not isinstance(value, str):
             raise NotStringInput(f"Expected string, got {type(value).__name__}")
         return value
+
+    def serialize(self) -> str:
+        items_str = ",".join(self.items)
+        return f"enumOpen[{items_str}]"
 
 
 class ListType(FableType):
@@ -223,3 +250,6 @@ class ListType(FableType):
                 raise WrongType(f"Error converting list item at index {i} ({item!r}): {e}")
 
         return result
+
+    def serialize(self) -> str:
+        return f"list[{self.item_type.serialize()}]"

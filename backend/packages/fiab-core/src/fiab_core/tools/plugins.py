@@ -7,6 +7,7 @@ from earthkit.workflows.fluent import Action, PayloadBuildingContext
 
 from fiab_core.fable import (
     ActionLookup,
+    BlockExpansion,
     BlockFactoryCatalogue,
     BlockFactoryId,
     BlockInstance,
@@ -46,12 +47,12 @@ class QubedPluginBuilder:
         except BlockInstanceConfigurationError as exc:
             return Either.error(str(exc))
 
-    def expand(self, block: QubedOutput) -> list[BlockFactoryId]:
+    def expand(self, block: QubedOutput) -> list[BlockExpansion]:
         """Given a block instance output (including from other plugin), provide which block factories from this plugin can expand it"""
-        expansions: list[BlockFactoryId] = []
+        expansions: list[BlockExpansion] = []
         for factory_id, factory in self.block_builders.items():
             if factory.intersect(block):
-                expansions.append(factory_id)
+                expansions.append(BlockExpansion(factory=factory_id))
         return expansions
 
     def compile(
@@ -70,7 +71,7 @@ class QubedPluginBuilder:
                 return Either.error(str(exc))
 
     def as_plugin(self) -> Callable[[], Plugin]:
-        def _generic_expand(block: BlockInstanceOutput) -> list[BlockFactoryId]:
+        def _generic_expand(block: BlockInstanceOutput) -> list[BlockExpansion]:
             if isinstance(block, QubedOutput):
                 return self.expand(block)
             else:

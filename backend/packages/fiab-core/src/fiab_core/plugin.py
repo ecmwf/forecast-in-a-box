@@ -19,8 +19,8 @@ from earthkit.workflows.fluent import Action
 
 from fiab_core.fable import (
     ActionLookup,
+    BlockExpansion,
     BlockFactoryCatalogue,
-    BlockFactoryId,
     BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
@@ -30,7 +30,7 @@ Error = str
 Validator = Callable[[BlockInstance, dict[str, BlockInstanceOutput]], Either[BlockInstanceOutput, Error]]  # type:ignore[invalid-argument] # semigroup
 """Given a block instance corresponding to this plugin's Factory and its inputs, either provide error or determine what it outputs"""
 
-Expander = Callable[[BlockInstanceOutput], list[BlockFactoryId]]
+Expander = Callable[[BlockInstanceOutput], list[BlockExpansion]]
 """Given a block instance output (including from other plugin), provide which block factories from this plugin can expand it"""
 
 Compiler = Callable[

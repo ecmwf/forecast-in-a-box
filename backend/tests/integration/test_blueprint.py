@@ -206,10 +206,10 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert response.json()["possible_expansions"] == {
         "source_42": [
-            {"plugin": {"store": "localTest", "local": "single"}, "factory": "transform_increment"},
-            {"plugin": {"store": "localTest", "local": "single"}, "factory": "product_join"},
-            {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_file"},
-            {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_image"},
+            {"plugin": {"store": "localTest", "local": "single"}, "factory": "transform_increment", "restrictions": {}},
+            {"plugin": {"store": "localTest", "local": "single"}, "factory": "product_join", "restrictions": {}},
+            {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_file", "restrictions": {}},
+            {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_image", "restrictions": {}},
         ]
     }
 
@@ -222,10 +222,10 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     builder = BlueprintBuilder(blocks=blocks)
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert response.json()["possible_expansions"]["transform_increment"] == [
-        {"plugin": {"store": "localTest", "local": "single"}, "factory": "transform_increment"},
-        {"plugin": {"store": "localTest", "local": "single"}, "factory": "product_join"},
-        {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_file"},
-        {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_image"},
+        {"plugin": {"store": "localTest", "local": "single"}, "factory": "transform_increment", "restrictions": {}},
+        {"plugin": {"store": "localTest", "local": "single"}, "factory": "product_join", "restrictions": {}},
+        {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_file", "restrictions": {}},
+        {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_image", "restrictions": {}},
     ]
 
     product_join = BlockInstance(
@@ -292,7 +292,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
 
     builder = BlueprintBuilder(blocks=blocks)
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
-    expected_expansion = [{"factory": "sink_file", "plugin": {"local": "single", "store": "localTest"}}]
+    expected_expansion = [{"factory": "sink_file", "plugin": {"local": "single", "store": "localTest"}, "restrictions": {}}]
     # NOTE this looks odd but sink_file produces the url of the file, and that url is a text which can again be written to a file
     assert response.json()["possible_expansions"]["sink_file"] == expected_expansion, "sink_file should expand only to sink_file"
     assert len(response.json()["block_errors"]) == 0

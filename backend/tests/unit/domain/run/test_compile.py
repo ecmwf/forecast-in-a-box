@@ -4,6 +4,7 @@ from earthkit.workflows.fluent import Action
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
+    BlockExpansion,
     BlockFactory,
     BlockFactoryCatalogue,
     BlockFactoryId,
@@ -146,7 +147,7 @@ def test_compile_builder_fails_missing_config_before_plugin_compile(monkeypatch:
         del instance, inputs
         return Either.ok(NoOutput())
 
-    def _expander(output: BlockInstanceOutput) -> list[BlockFactoryId]:
+    def _expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
         del output
         return []
 

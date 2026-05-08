@@ -26,12 +26,14 @@ from itertools import groupby
 from typing import cast
 
 from fiab_core.fable import (
+    BlockExpansion,
     BlockFactoryId,
     BlockInstance,
     BlockInstanceId,
     BlockKind,
     ConfigurationOptionId,
     NoOutput,
+    PluginBlockExpansion,
     PluginBlockFactoryId,
 )
 
@@ -85,7 +87,7 @@ class BlueprintValidationExpansion(FiabBaseModel):
     global_errors: list[str]
     block_errors: dict[BlockInstanceId, list[str]]
     possible_sources: list[PluginBlockFactoryId]
-    possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]]
+    possible_expansions: dict[BlockInstanceId, list[PluginBlockExpansion]]
     resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
 
 
@@ -134,7 +136,7 @@ async def validate_expand(
             if block_factory.kind == "source" and not block_factory.inputs
         ]
     )
-    possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]] = {}
+    possible_expansions: dict[BlockInstanceId, list[PluginBlockExpansion]] = {}
     resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
     block_errors: dict[BlockInstanceId, list[str]] = defaultdict(list)
     outputs = {}
@@ -235,9 +237,13 @@ async def validate_expand(
         if not validate_only:
             possible_expansions[blockId] = (
                 [
-                    PluginBlockFactoryId(plugin=any_plugin_id, factory=block_factory_id)
+                    PluginBlockExpansion(
+                        plugin=any_plugin_id,
+                        factory=expansion.factory,
+                        restrictions={k: v.serialize() for k, v in expansion.restrictions.items()},
+                    )
                     for any_plugin_id, any_plugin in plugins.items()
-                    for block_factory_id in any_plugin.expander(output_or_error.t)
+                    for expansion in any_plugin.expander(output_or_error.t)
                 ]
                 if not isinstance(output_or_error.t, NoOutput)
                 else []

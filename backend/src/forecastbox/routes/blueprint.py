@@ -30,7 +30,14 @@ from typing import Annotated, Literal, cast
 from cascade.low.func import assert_never
 from fastapi import APIRouter, Depends, status
 from fastapi.exceptions import HTTPException
-from fiab_core.fable import BlockFactoryCatalogue, BlockInstanceId, ConfigurationOptionId, PluginBlockFactoryId, PluginCompositeId
+from fiab_core.fable import (
+    BlockFactoryCatalogue,
+    BlockInstanceId,
+    ConfigurationOptionId,
+    PluginBlockExpansion,
+    PluginBlockFactoryId,
+    PluginCompositeId,
+)
 
 from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint import db, service
@@ -141,7 +148,7 @@ class BlueprintValidationExpansionResponse(FiabBaseModel):
     global_errors: list[str]
     block_errors: dict[BlockInstanceId, list[str]]
     possible_sources: list[PluginBlockFactoryId]
-    possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]]
+    possible_expansions: dict[BlockInstanceId, list[PluginBlockExpansion]]
     resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]]
 
 
