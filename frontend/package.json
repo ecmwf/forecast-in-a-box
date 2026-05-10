@@ -46,6 +46,7 @@
     "lucide-react": "^1.16.0",
     "lz-string": "^1.5.0",
     "ol": "^10.9.0",
+    "ol-mapbox-style": "^13.4.1",
     "pdfjs-dist": "^5.7.284",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

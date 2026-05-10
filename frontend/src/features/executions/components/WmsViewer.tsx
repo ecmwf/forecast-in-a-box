@@ -66,9 +66,11 @@ import OlMap from 'ol/Map'
 import View from 'ol/View'
 import ImageLayer from 'ol/layer/Image'
 import TileLayer from 'ol/layer/Tile'
+import VectorTileLayer from 'ol/layer/VectorTile'
 import ImageWMS from 'ol/source/ImageWMS'
 import XYZ from 'ol/source/XYZ'
 import { fromLonLat, toLonLat, transformExtent } from 'ol/proj'
+import { applyStyle as applyMapboxStyle } from 'ol-mapbox-style'
 import {
   expandTimeSteps,
   groupLayers,
@@ -77,6 +79,7 @@ import {
   rebaseLensUrl,
   uniquePressureLevels,
 } from './wms-capabilities'
+import type VectorTileSource from 'ol/source/VectorTile'
 import type MapBrowserEvent from 'ol/MapBrowserEvent'
 import type {
   LayerGroup,
@@ -106,19 +109,82 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('WmsViewer')
 
-const BASEMAP_TILES = 'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'
-const BASEMAP_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+type BasemapOption =
+  | {
+      type: 'raster'
+      id: string
+      label: string
+      url: string
+      attribution: string
+      tilePixelRatio: number
+    }
+  | {
+      type: 'vector'
+      id: string
+      label: string
+      // Mapbox-style JSON URL; ol-mapbox-style fetches it, builds the
+      // source from its `sources` block, and applies styling.
+      styleUrl: string
+    }
+
+const BASEMAPS: ReadonlyArray<BasemapOption> = [
+  {
+    type: 'vector',
+    id: 'carto-positron-vector',
+    label: 'Carto Positron (Vector)',
+    styleUrl: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+  },
+  {
+    type: 'raster',
+    id: 'carto-positron',
+    label: 'Carto Positron',
+    url: 'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    tilePixelRatio: 1,
+  },
+]
+const DEFAULT_BASEMAP_ID = BASEMAPS[0].id
 const DEFAULT_LAYER_OPACITY = 0.85
 
-// Constrain the view to the standard Web Mercator world extent (the
-// projection asymptotes at ±85.0511°, which is what most tile services
-// publish to). Prevents the user from panning into empty space beyond
-// the basemap's coverage.
+// Standard Web Mercator world extent (projection asymptotes at ±85.0511°);
+// constrains panning to the basemap's coverage.
 const WEB_MERCATOR_EXTENT: [number, number, number, number] = [
   ...fromLonLat([-180, -85.0511]),
   ...fromLonLat([180, 85.0511]),
 ] as [number, number, number, number]
+
+// Initial fit target — full longitude, latitude biased north so Antarctica
+// is cropped and Scandinavia gets proper screen real estate. "Fit to
+// globe" toolbar button overrides with the full WMS bbox.
+const INITIAL_VIEW_BBOX_WGS84: [number, number, number, number] = [
+  -180, -55, 180, 85,
+]
+
+type BasemapLayer = TileLayer<XYZ> | VectorTileLayer
+
+function makeBasemapLayer(opt: BasemapOption): BasemapLayer {
+  if (opt.type === 'raster') {
+    const source = new XYZ({
+      url: opt.url,
+      attributions: opt.attribution,
+      // crossOrigin: required so canvas.toBlob (download/copy) doesn't
+      // taint. wrapX: false because ImageWMS overlays don't wrap, and a
+      // wrapping basemap would visually diverge from them.
+      crossOrigin: 'anonymous',
+      wrapX: false,
+      tilePixelRatio: opt.tilePixelRatio,
+    })
+    return new TileLayer({ source })
+  }
+  // Vector tiles via Mapbox-style JSON. declutter: true prevents label
+  // overlap at low zoom.
+  const layer = new VectorTileLayer<VectorTileSource>({ declutter: true })
+  applyMapboxStyle(layer, opt.styleUrl).catch((err) =>
+    log.error('Failed to apply vector basemap style', { error: err }),
+  )
+  return layer
+}
 
 interface WmsViewerProps {
   /** Absolute base URL of the lens, e.g. `http://127.0.0.1:51234`. */
@@ -141,6 +207,7 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
   const fittedRef = useRef(false)
   const bboxRef = useRef<[number, number, number, number] | null>(null)
   const managedRef = useRef<Map<string, ManagedLayer>>(new Map())
+  const basemapLayerRef = useRef<BasemapLayer | null>(null)
 
   const [layers, setLayers] = useState<Array<ParsedLayer>>([])
   const [bbox, setBbox] = useState<[number, number, number, number] | null>(
@@ -157,11 +224,8 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
   )
   const [masterOpacity, setMasterOpacity] = useState(1)
 
-  // Live tile-load counter — incremented on each source's `tileloadstart`,
-  // decremented on `tileloadend`/`tileloaderror`. When > 0, the toolbar
-  // shows a spinner so the user knows fresh tiles are still in flight.
-  // Clamped at 0 because canceled tiles can occasionally swallow the end
-  // event without firing loaderror.
+  // Tile-load counter drives the toolbar spinner. Clamped at 0 because
+  // canceled tiles can swallow the end event.
   const [tilesLoadingCount, setTilesLoadingCount] = useState(0)
   const tilesLoading = tilesLoadingCount > 0
   const incLoading = useCallback(() => setTilesLoadingCount((c) => c + 1), [])
@@ -233,46 +297,48 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
     if (!force && fittedRef.current) return
     const size = map.getSize()
     if (!size || size[0] < 1 || size[1] < 1) return
-    const target = bboxRef.current
-    if (!target) return
+    // Forced = "Fit to globe" button → full WMS bbox; unforced (initial
+    // auto-fit) → Europe-centric default. Falls back to the default if
+    // the WMS bbox isn't known yet.
+    const targetWgs84 =
+      force && bboxRef.current ? bboxRef.current : INITIAL_VIEW_BBOX_WGS84
     fittedRef.current = true
     const view = map.getView()
-    const extent = transformExtent(target, 'EPSG:4326', view.getProjection())
+    const extent = transformExtent(
+      targetWgs84,
+      'EPSG:4326',
+      view.getProjection(),
+    )
     view.fit(extent, { padding: [40, 40, 40, 40] })
   }, [])
+
+  const [basemapId, setBasemapId] = useState<string>(DEFAULT_BASEMAP_ID)
+  const previousBasemapIdRef = useRef<string>(DEFAULT_BASEMAP_ID)
 
   useLayoutEffect(() => {
     const container = containerRef.current
     if (!container) return
-    const basemapSource = new XYZ({
-      url: BASEMAP_TILES,
-      attributions: BASEMAP_ATTRIBUTION,
-      // Required so OL can composite the basemap onto the export
-      // canvas without tainting it (download / clipboard copy use
-      // canvas.toBlob, which fails on tainted canvases).
-      crossOrigin: 'anonymous',
-      // Don't repeat the basemap past the date line. ImageWMS overlays
-      // are single-image and don't wrap, so leaving the basemap wrapping
-      // makes the two diverge visually (basemap shows two world copies,
-      // WMS data only on one) — exactly the "stripes on one side" bug.
-      wrapX: false,
-    })
-    basemapSource.on('tileloadstart', incLoading)
-    basemapSource.on('tileloadend', decLoading)
-    basemapSource.on('tileloaderror', decLoading)
-    const basemap = new TileLayer({ source: basemapSource })
+    // Mount with default basemap; swap effect below adopts user choice.
+    const basemap = makeBasemapLayer(BASEMAPS[0])
+    const source = basemap.getSource()
+    source?.on('tileloadstart', incLoading)
+    source?.on('tileloadend', decLoading)
+    source?.on('tileloaderror', decLoading)
+    basemapLayerRef.current = basemap
     const map = new OlMap({
       target: container,
       layers: [basemap],
       view: new View({
-        center: [0, 0],
-        zoom: 2,
+        // Pre-fit framing on Europe — avoids a [0,0] world flash before
+        // tryFit() runs.
+        center: fromLonLat([12, 50]),
+        zoom: 3,
         projection: 'EPSG:3857',
+        // smoothExtentConstraint: false keeps pans strictly within the
+        // world; without it, slight overshoot makes SkinnyWMS return
+        // stretched-stripe images for out-of-bounds BBOXes.
         extent: WEB_MERCATOR_EXTENT,
-        // Allow zooming below the standard "1 tile = world" so a wide
-        // viewport (e.g., the bottom drawer) can fit the full globe with
-        // breathing room — without this, fit() is capped at zoom 0.
-        minZoom: -2,
+        smoothExtentConstraint: false,
         constrainResolution: false,
       }),
     })
@@ -299,13 +365,31 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
     tryFit()
   }, [bbox, tryFit])
 
+  // -------- Basemap swap --------
+  // Full layer replacement (not setSource) because raster (TileLayer) and
+  // vector (VectorTileLayer) basemaps are different OL layer types.
+  useEffect(() => {
+    const map = mapRef.current
+    const oldLayer = basemapLayerRef.current
+    if (!map || !oldLayer) return
+    if (previousBasemapIdRef.current === basemapId) return
+    previousBasemapIdRef.current = basemapId
+    const opt = BASEMAPS.find((b) => b.id === basemapId) ?? BASEMAPS[0]
+    const newLayer = makeBasemapLayer(opt)
+    const source = newLayer.getSource()
+    source?.on('tileloadstart', incLoading)
+    source?.on('tileloadend', decLoading)
+    source?.on('tileloaderror', decLoading)
+    map.removeLayer(oldLayer)
+    map.getLayers().insertAt(0, newLayer)
+    basemapLayerRef.current = newLayer
+  }, [basemapId, incLoading, decLoading])
+
   // -------- WMS layer rendering --------
-  // One ImageLayer (single-image WMS) per active layer; z-index reflects
-  // array position (index 0 = topmost, drawn last). Effective opacity =
-  // master × per-layer. Single-image mode means OL keeps the previous image
-  // on screen until the new one is fully decoded, then swaps atomically —
-  // crucial for time-slider scrubbing because TileWMS would paint each of
-  // the ~24 viewport tiles asynchronously and produce a visible sweep.
+  // One ImageLayer per active layer. Single-image mode (vs. TileWMS) so
+  // OL atomically swaps to the new image when params change — avoids the
+  // staggered per-tile sweep that flickers during time-slider scrubbing.
+  // Index 0 = topmost; effective opacity = master × per-layer.
 
   useEffect(() => {
     const map = mapRef.current
@@ -337,14 +421,10 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
         existing.layer.setOpacity(effectiveOpacity)
         existing.layer.setZIndex(z)
       } else {
-        // hidpi: false is critical on retina/HiDPI displays. With the default
-        // (true), OL doubles the GetMap request to 2× the viewport size to
-        // look sharp. Magics renders wind barbs, contour widths and isobar
-        // labels at a fixed *source-pixel* size, so doubling the source
-        // canvas halves their on-screen size — exactly the "tiny barbs on
-        // retina" symptom. ratio: 1 disables the default 1.5× oversampling
-        // that ImageWMS uses for slack on small pans, since we want the
-        // smallest possible request and the cleanest cache key.
+        // hidpi: false keeps Magics-rendered symbols (wind barbs, contour
+        // widths, isobar labels) at full visual size on retina — the
+        // default 2× DPI request halves them. ratio: 1 disables the 1.5×
+        // pan-slack oversampling for cleaner cache keys.
         const source = new ImageWMS({
           url: `${baseUrl}/wms`,
           params,
@@ -384,15 +464,10 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
   ])
 
   // -------- Time-step prefetch --------
-  // When the user enables the "Preload time steps" toggle, warm the browser
-  // HTTP cache by firing image requests for every (time-aware active layer
-  // × time step × visible tile). The active source uses an identical config
-  // (hidpi: false, serverType: mapserver, same projection), so OL will hit
-  // cache when the user scrubs. Skips re-running on `timeIndex` changes by
-  // design — fetching everything covers the current step anyway.
-
-  // Time-step prefetch toggle. Default off — it's bandwidth-heavy and most
-  // users only scrub once they've zeroed in.
+  // Warms the browser HTTP cache for every (time-aware active layer ×
+  // time step) at the current viewport. Same source config as the visible
+  // layer, so URLs match and OL hits cache when the user scrubs.
+  // Default off — bandwidth-heavy.
   const [preloadTimeSteps, setPreloadTimeSteps] = useState(false)
 
   useEffect(() => {
@@ -404,18 +479,11 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
       .filter((l): l is ParsedLayer => !!l && !!l.time && l.styles.length > 0)
     if (timeAwareActive.length === 0) return
 
-    // Wrapped in an object so TS-ESLint's flow analysis sees mutability
-    // (a plain `let` flag tripped the no-unnecessary-condition rule on
-    // the post-await check below).
+    // Object-wrapped so TS-ESLint sees mutability across the await below.
     const state = { cancelled: false }
     const hiddenLayers: Array<ImageLayer<ImageWMS>> = []
 
-    // Each (layer × step) gets a hidden ImageLayer briefly attached to the
-    // map. OL builds the GetMap URL deterministically from its config, so
-    // the URL matches what the visible source will request when the user
-    // scrubs to that step → browser cache hit. We tear the hidden layer
-    // down as soon as its image loads (or errors out) so the map stays
-    // visually clean.
+    // Hidden ImageLayer per (layer × step), torn down once loaded.
     const prefetchOne = (layer: ParsedLayer, step: string) =>
       new Promise<void>((resolve) => {
         if (state.cancelled) return resolve()
@@ -746,6 +814,45 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
           >
             <Globe2 className="h-4 w-4" />
           </Button>
+          <Popover>
+            <PopoverTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  title={t('lens.basemap')}
+                  aria-label={t('lens.basemap')}
+                />
+              }
+            >
+              <Layers className="h-4 w-4" />
+            </PopoverTrigger>
+            <PopoverContent side="bottom" align="end" className="w-56 p-1">
+              <P className="px-2 pt-1 pb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                {t('lens.basemap')}
+              </P>
+              <div className="flex flex-col">
+                {BASEMAPS.map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => setBasemapId(b.id)}
+                    aria-pressed={b.id === basemapId}
+                    className={cn(
+                      'flex items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent',
+                      b.id === basemapId && 'bg-accent font-medium',
+                    )}
+                  >
+                    <span>{b.label}</span>
+                    {b.id === basemapId && (
+                      <span className="text-xs text-muted-foreground">✓</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
           {showSidebars && activeOrder.length > 0 && (
             <>
               <Button

@@ -255,6 +255,7 @@
     "preloadTimeSteps": "Preload time steps",
     "preloadTimeStepsHelp": "Fetch every time step of every active layer in the background, so the time slider scrubs without stutter. Triggers when toggled on and after layer changes — pan or zoom and re-toggle if you want fresh prefetch for a new view. Bandwidth-heavy: skip on metered connections.",
     "loadingTiles": "Loading map tiles…",
+    "basemap": "Basemap",
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar",
     "surfaceParameters": "Surface (sfc)",
