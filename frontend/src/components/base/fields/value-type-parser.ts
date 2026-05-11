@@ -22,6 +22,7 @@
  * - list[str] → tag input (badges with add/remove)
  * - list[int] → tag input (badges with add/remove)
  * - enum['a','b','c'] → select dropdown
+ * - enumClosed['a','b','c'] → select dropdown
  * - optional[T] → same widget as T, with optional=true flag
  */
 
@@ -91,8 +92,8 @@ export function parseValueType(valueType: string | undefined): ParsedValueType {
     return { type: 'unknown', raw: valueType }
   }
 
-  // Enum type: enum['a','b','c'] or enum["a","b","c"]
-  const enumMatch = valueType.match(/^enum\[(.+)\]$/i)
+  // Enum type: enum[...] / enumClosed[...] with single or double quotes
+  const enumMatch = valueType.match(/^(?:enum|enumClosed)\[(.+)\]$/i)
   if (enumMatch) {
     const optionsStr = enumMatch[1]
     const options = parseEnumOptions(optionsStr)

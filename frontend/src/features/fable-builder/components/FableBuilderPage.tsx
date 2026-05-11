@@ -226,9 +226,11 @@ export function FableBuilderPage({
 
   useEffect(() => {
     if (validationResult) {
-      setValidationState(toValidationState(validationResult))
+      setValidationState(
+        toValidationState(validationResult, debouncedFable, catalogue),
+      )
     }
-  }, [validationResult, setValidationState])
+  }, [catalogue, debouncedFable, validationResult, setValidationState])
 
   if (catalogueLoading || (fableId && fableLoading)) {
     return (

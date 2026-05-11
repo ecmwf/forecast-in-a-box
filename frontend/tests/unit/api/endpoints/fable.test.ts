@@ -111,7 +111,16 @@ describe('expandFable', () => {
       global_errors: [],
       block_errors: {},
       possible_sources: [],
-      possible_expansions: {},
+      possible_expansions: {
+        'block-1': [
+          {
+            plugin: { store: 'ecmwf', local: 'core' },
+            factory: 'model',
+            restrictions: {},
+          },
+        ],
+      },
+      missing_glyphs: {},
     }
 
     worker.use(
@@ -135,7 +144,16 @@ describe('expandFable', () => {
           global_errors: [],
           block_errors: {},
           possible_sources: [],
-          possible_expansions: {},
+          possible_expansions: {
+            'block-1': [
+              {
+                plugin: { store: 'ecmwf', local: 'core' },
+                factory: 'model',
+                restrictions: { param1: "enumClosed['value1','value2']" },
+              },
+            ],
+          },
+          missing_glyphs: {},
         })
       }),
     )
