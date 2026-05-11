@@ -57,6 +57,7 @@ Exact catalogue migrations in this implementation:
 | `fiab-plugin-test.source_filesize.checkpoint` | `enum['mystore:mycheckpoint']` | `enumClosed['mystore:mycheckpoint']` |
 | `fiab-plugin-ecmwf.EkdSource.source` | `enum['mars', 'ecmwf-open-data']` | `enumClosed['mars', 'ecmwf-open-data']` |
 | `fiab-plugin-ecmwf.EkdSource.date` | `date-iso8601` | `date` |
+| `fiab-plugin-ecmwf.AnemoiSource.checkpoint` | `enum['<checkpoint ids>']` | `enumClosed['<checkpoint ids>']` |
 | `fiab-plugin-ecmwf.AnemoiSource.input_source` | `enum['mars', 'opendata', 'polytope']` | `enumClosed['mars', 'opendata', 'polytope']` |
 | `fiab-plugin-ecmwf.AnemoiSource.ensemble_members` | `optional[int]` | `int` |
 | `fiab-plugin-ecmwf.EnsembleStatistics.statistic` | `enum['mean', 'std']` | `enumClosed['mean', 'std']` |
@@ -100,6 +101,8 @@ Example after:
 
 The exact message is implementation-defined; the frontend should not parse the text.
 
+*Unplanned:* values are now converted from strings only. Clients that send non-string JSON values in `configuration_values` (for example, numeric JSON literals instead of `"1"`) now get conversion/type errors during backend validation.
+
 ## Task 5: Missing values during validation
 
 Expected frontend impact: validation semantics change, no new field.
@@ -140,7 +143,7 @@ Affected route:
 
 - `PUT /blueprint/expand`
 
-`possible_expansions` should continue to be keyed by block instance id, but each expansion item should include both the target block factory and configuration option restrictions.
+`possible_expansions` continues to be keyed by block instance id. Each expansion item now includes plugin id, factory id, and restrictions.
 
 Example before:
 
@@ -164,18 +167,14 @@ Example after:
   "possible_expansions": {
     "source_42": [
       {
-        "block_factory_id": {
-          "plugin": {"store": "local", "local": "test"},
-          "factory": "transform_increment"
-        },
-        "configuration_option_restrictions": {}
+        "plugin": {"store": "local", "local": "test"},
+        "factory": "transform_increment",
+        "restrictions": {}
       }
     ]
   }
 }
 ```
-
-The field names are proposed, not final. The implementation PR for task 6 must update this section with the actual serialized names.
 
 ## Task 7: Test plugin restrictions
 
@@ -212,9 +211,7 @@ Example after task 7 (the `source_42` block expands to `transform_increment` wit
 }
 ```
 
-Note: the field names used in the actual route response are `plugin`, `factory`, and `restrictions`
-(not the proposed `block_factory_id` / `configuration_option_restrictions` from the task 6 draft above).
-The task 6 section above should be treated as superseded by these actual names.
+The response field names are `plugin`, `factory`, and `restrictions`.
 
 ## Task 8: Missing glyph warnings
 
@@ -254,3 +251,5 @@ Example after:
 ```
 
 Malformed glyph expressions remain hard errors and should still be shown through `block_errors`.
+
+Because unknown glyph references are now soft validation warnings, `POST /blueprint/create` and `POST /blueprint/update` no longer reject those cases via `block_errors`. Those endpoints currently do not return `missing_glyphs`, so this warning detail is only surfaced by `PUT /blueprint/expand`.
