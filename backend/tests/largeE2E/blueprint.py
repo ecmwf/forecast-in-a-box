@@ -4,13 +4,26 @@ import time
 from datetime import datetime, timedelta
 
 import httpx
-from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId, PluginBlockFactoryId, PluginCompositeId, PluginId, PluginStoreId
+from fiab_core.fable import (
+    BlockFactoryId,
+    BlockInstance,
+    BlockInstanceId,
+    ConfigurationOptionId,
+    PluginBlockFactoryId,
+    PluginCompositeId,
+    PluginId,
+    PluginStoreId,
+)
 
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.run.cascade import ExecutionSpecification, RawCascadeJob
 from forecastbox.entrypoint.main import launch_all
 from forecastbox.utility.config import FIABConfig
+
+
+def _config(values: dict[str, str]) -> dict[ConfigurationOptionId, str]:
+    return {ConfigurationOptionId(key): value for key, value in values.items()}
 
 
 def ensure_completed(backend_client: httpx.Client, job_id: str, sleep: float = 0.5, attempts: int = 20) -> None:
@@ -58,28 +71,30 @@ if __name__ == "__main__":
             blocks: dict[BlockInstanceId, BlockInstance] = {
                 BlockInstanceId("source1"): BlockInstance(
                     factory_id=PluginBlockFactoryId(plugin=pluginId, factory=BlockFactoryId("ekdSource")),
-                    configuration_values={
-                        "source": "ecmwf-open-data",
-                        "date": (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"),
-                        "expver": "0001",
-                    },
+                    configuration_values=_config(
+                        {
+                            "source": "ecmwf-open-data",
+                            "date": (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"),
+                            "expver": "0001",
+                        }
+                    ),
                     input_ids={},
                 ),
                 BlockInstanceId("temporalMean"): BlockInstance(
                     factory_id=PluginBlockFactoryId(plugin=pluginId, factory=BlockFactoryId("temporalStatistics")),
-                    configuration_values={"param": "2t", "statistic": "mean"},
+                    configuration_values=_config({"param": "2t", "statistic": "mean"}),
                     input_ids={"dataset": BlockInstanceId("source1")},
                 ),
             }
             for statistic in ["mean", "std"]:
                 block = BlockInstance(
                     factory_id=PluginBlockFactoryId(plugin=pluginId, factory=BlockFactoryId("ensembleStatistics")),
-                    configuration_values={"param": "2t", "statistic": statistic},
+                    configuration_values=_config({"param": "2t", "statistic": statistic}),
                     input_ids={"dataset": BlockInstanceId("temporalMean")},
                 )
                 sink = BlockInstance(
                     factory_id=PluginBlockFactoryId(plugin=pluginId, factory=BlockFactoryId("zarrSink")),
-                    configuration_values={"path": f"{tmpdir}/output{statistic.capitalize()}.zarr"},
+                    configuration_values=_config({"path": f"{tmpdir}/output{statistic.capitalize()}.zarr"}),
                     input_ids={"dataset": BlockInstanceId(f"ensemble{statistic.capitalize()}")},
                 )
                 blocks[BlockInstanceId(f"ensemble{statistic.capitalize()}")] = block

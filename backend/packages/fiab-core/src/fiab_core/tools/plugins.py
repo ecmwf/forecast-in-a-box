@@ -7,6 +7,7 @@ from earthkit.workflows.fluent import Action, PayloadBuildingContext
 
 from fiab_core.fable import (
     ActionLookup,
+    BlockExpansion,
     BlockFactoryCatalogue,
     BlockFactoryId,
     BlockInstance,
@@ -15,7 +16,7 @@ from fiab_core.fable import (
     QubedOutput,
 )
 from fiab_core.plugin import Error, Plugin
-from fiab_core.tools.blocks import QubedBlockBuilder
+from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich, QubedBlockBuilder
 
 
 def _detect_editable_install(distname: str) -> str:
@@ -40,14 +41,18 @@ class QubedPluginBuilder:
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         """Given a block instance corresponding to this plugin's Factory and its inputs, either provide error or determine what it outputs"""
         factory = self.block_builders[block.factory_id.factory]
-        return factory.validate(block, inputs)
+        rich_block = BlockInstanceRich.from_block(block, factory.configuration_options)
+        try:
+            return factory.validate(rich_block, inputs)
+        except BlockInstanceConfigurationError as exc:
+            return Either.error(str(exc))
 
-    def expand(self, block: QubedOutput) -> list[BlockFactoryId]:
+    def expand(self, block: QubedOutput) -> list[BlockExpansion]:
         """Given a block instance output (including from other plugin), provide which block factories from this plugin can expand it"""
-        expansions: list[BlockFactoryId] = []
+        expansions: list[BlockExpansion] = []
         for factory_id, factory in self.block_builders.items():
             if factory.intersect(block):
-                expansions.append(factory_id)
+                expansions.append(BlockExpansion(factory=factory_id))
         return expansions
 
     def compile(
@@ -59,10 +64,14 @@ class QubedPluginBuilder:
         """Given a cascade builder and a block instance corresponding to this plugin's Factory, either update the builder with corresponding tasks or provide error"""
         with PayloadBuildingContext(environment=self.base_environment):
             factory = self.block_builders[block.factory_id.factory]
-            return factory.compile(inputs, block_id, block)
+            rich_block = BlockInstanceRich.from_block(block, factory.configuration_options)
+            try:
+                return factory.compile(inputs, block_id, rich_block)
+            except BlockInstanceConfigurationError as exc:
+                return Either.error(str(exc))
 
     def as_plugin(self) -> Callable[[], Plugin]:
-        def _generic_expand(block: BlockInstanceOutput) -> list[BlockFactoryId]:
+        def _generic_expand(block: BlockInstanceOutput) -> list[BlockExpansion]:
             if isinstance(block, QubedOutput):
                 return self.expand(block)
             else:

@@ -65,7 +65,16 @@ const mockExpansion = {
   global_errors: [],
   block_errors: {},
   possible_sources: [],
-  possible_expansions: {},
+  possible_expansions: {
+    'block-1': [
+      {
+        plugin: { store: 'ecmwf', local: 'core-plugin' },
+        factory: 'model',
+        restrictions: {},
+      },
+    ],
+  },
+  missing_glyphs: {},
 }
 
 function createTestQueryClient() {

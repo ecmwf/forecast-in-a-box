@@ -9,11 +9,17 @@
 
 """Core parsing and resolution of ${glyph} interpolation in BlockInstance configuration values."""
 
+# TODO this module is not exactly coherent in terms of architecture -- its coupling
+# to validate_expand and to compile is rather high and ad-hoc-ish. It would be better
+# to expose a smaller set of functions, ideally one for expr2value and one for glyphs2glyph
+# (maybe each in its module), with a better contract, eg a dataclass with
+# (resolution, error, missing), etc
+
 import datetime as dt
 from dataclasses import dataclass
 
 from cascade.low.func import Either
-from fiab_core.fable import BlockInstance
+from fiab_core.fable import BlockInstance, ConfigurationOptionId
 
 from forecastbox.domain.glyphs.exceptions import GlyphCircularReferenceError
 from forecastbox.domain.glyphs.jinja_interpolation import extract_glyph_names, render_expression
@@ -28,7 +34,7 @@ so that restarts always reflect the new attempt's own start time and attempt cou
 class ExtractedGlyphs:
     glyphs: set[str]
     """All glyph names referenced across all configuration_values."""
-    glyphed_options: set[str]
+    glyphed_options: set[ConfigurationOptionId]
     """Keys from configuration_values that contain at least one glyph reference."""
 
 
@@ -48,7 +54,7 @@ def extract_glyphs(blockInstance: BlockInstance) -> Either[ExtractedGlyphs, list
     list of error messages if any configuration value contains a malformed expression.
     """
     glyphs: set[str] = set()
-    glyphed_options: set[str] = set()
+    glyphed_options: set[ConfigurationOptionId] = set()
     errors: list[str] = []
     for key, value in blockInstance.configuration_values.items():
         result = extract_glyph_names(value)
@@ -65,6 +71,24 @@ def extract_glyphs(blockInstance: BlockInstance) -> Either[ExtractedGlyphs, list
     if errors:
         return Either.error(errors)
     return Either.ok(ExtractedGlyphs(glyphs=glyphs, glyphed_options=glyphed_options))
+
+
+def extract_glyphs_per_option(blockInstance: BlockInstance) -> dict[ConfigurationOptionId, set[str]]:
+    """Return a mapping from each option id to the set of glyph names it references.
+
+    Only includes options that contain at least one glyph reference.
+    Malformed expressions are silently skipped; use ``extract_glyphs`` for error detection.
+    """
+    result: dict[ConfigurationOptionId, set[str]] = {}
+    for key, value in blockInstance.configuration_values.items():
+        if not isinstance(value, str):
+            raise TypeError(f"expected {key=}'s value to be a string, gotten {type(value)}")
+        r = extract_glyph_names(value)
+        if r.t is not None:
+            result[key] = r.t
+        else:
+            raise ValueError(f"not expected glyph parsing to fail at this time, {r.e}")
+    return result
 
 
 def resolve_configurations(blockInstance: BlockInstance, glyph_values: dict[str, str]) -> None:

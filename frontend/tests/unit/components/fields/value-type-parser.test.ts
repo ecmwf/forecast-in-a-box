@@ -101,6 +101,13 @@ describe('parseValueType', () => {
         options: ['only'],
       })
     })
+
+    it('parses enumClosed options', () => {
+      expect(parseValueType("enumClosed['mars','ecmwf-open-data']")).toEqual({
+        type: 'enum',
+        options: ['mars', 'ecmwf-open-data'],
+      })
+    })
   })
 
   describe('whitespace and case handling', () => {
@@ -178,6 +185,14 @@ describe('parseValueType', () => {
       expect(parseValueType("optional[enum['a','b']]")).toEqual({
         type: 'enum',
         options: ['a', 'b'],
+        optional: true,
+      })
+    })
+
+    it('preserves enumClosed options when wrapped', () => {
+      expect(parseValueType("optional[enumClosed['mean','std']]")).toEqual({
+        type: 'enum',
+        options: ['mean', 'std'],
         optional: true,
       })
     })

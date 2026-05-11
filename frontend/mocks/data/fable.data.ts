@@ -19,6 +19,7 @@
  */
 
 import type {
+  BlockExpansion,
   BlockFactory,
   BlockFactoryCatalogue,
   FableBuilderV1,
@@ -53,12 +54,12 @@ export const mockCatalogue: BlockFactoryCatalogue = {
           source: {
             title: 'Source',
             description: 'Top level source for earthkit data',
-            value_type: "enum['mars', 'ecmwf-open-data']",
+            value_type: "enumClosed['mars', 'ecmwf-open-data']",
           },
           date: {
             title: 'Date',
             description: 'The date dimension of the data',
-            value_type: 'date-iso8601',
+            value_type: 'date',
           },
           expver: {
             title: 'Expver',
@@ -81,7 +82,7 @@ export const mockCatalogue: BlockFactoryCatalogue = {
           statistic: {
             title: 'Statistic',
             description: 'Statistic to compute over the ensemble',
-            value_type: "enum['mean', 'std']",
+            value_type: "enumClosed['mean', 'std']",
           },
         },
         inputs: ['dataset'],
@@ -99,7 +100,7 @@ export const mockCatalogue: BlockFactoryCatalogue = {
           statistic: {
             title: 'Statistic',
             description: 'Statistic to compute over steps',
-            value_type: "enum['mean', 'std', 'min', 'max']",
+            value_type: "enumClosed['mean', 'std', 'min', 'max']",
           },
         },
         inputs: ['dataset'],
@@ -282,28 +283,35 @@ export function calculateExpansion(fable: FableBuilderV1): {
   global_errors: Array<string>
   block_errors: Record<string, Array<string>>
   possible_sources: Array<PluginBlockFactoryId>
-  possible_expansions: Record<string, Array<PluginBlockFactoryId>>
+  possible_expansions: Record<string, Array<BlockExpansion>>
+  missing_glyphs: Record<string, Record<string, Array<string>>>
 } {
   const block_errors: Record<string, Array<string>> = {}
-  const possible_expansions: Record<string, Array<PluginBlockFactoryId>> = {}
+  const possible_expansions: Record<string, Array<BlockExpansion>> = {}
 
   // Available blocks by kind (using new PluginCompositeId format)
   // Only ecmwf-base plugin is loaded
   const sourceBlocks: Array<PluginBlockFactoryId> = [
     { plugin: pluginId('ecmwf', 'ecmwf-base'), factory: 'ekdSource' },
   ]
-  const productBlocks: Array<PluginBlockFactoryId> = [
+  const productBlocks: Array<BlockExpansion> = [
     {
       plugin: pluginId('ecmwf', 'ecmwf-base'),
       factory: 'ensembleStatistics',
+      restrictions: {},
     },
     {
       plugin: pluginId('ecmwf', 'ecmwf-base'),
       factory: 'temporalStatistics',
+      restrictions: {},
     },
   ]
-  const sinkBlocks: Array<PluginBlockFactoryId> = [
-    { plugin: pluginId('ecmwf', 'ecmwf-base'), factory: 'zarrSink' },
+  const sinkBlocks: Array<BlockExpansion> = [
+    {
+      plugin: pluginId('ecmwf', 'ecmwf-base'),
+      factory: 'zarrSink',
+      restrictions: {},
+    },
   ]
 
   for (const [blockId, instance] of Object.entries(fable.blocks)) {
@@ -317,14 +325,6 @@ export function calculateExpansion(fable: FableBuilderV1): {
       )
       block_errors[blockId] = errors
       continue
-    }
-
-    // Check for missing required config
-    for (const configKey of Object.keys(factory.configuration_options)) {
-      const value = instance.configuration_values[configKey]
-      if (!value || value.trim() === '') {
-        errors.push(`Missing required configuration: ${configKey}`)
-      }
     }
 
     // Check for missing inputs
@@ -355,5 +355,6 @@ export function calculateExpansion(fable: FableBuilderV1): {
     block_errors,
     possible_sources: sourceBlocks,
     possible_expansions,
+    missing_glyphs: {},
   }
 }

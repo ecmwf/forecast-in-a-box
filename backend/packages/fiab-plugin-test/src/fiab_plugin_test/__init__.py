@@ -6,22 +6,31 @@ from fiab_core.artifacts import ArtifactsProvider, CompositeArtifactId
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
+    BlockExpansion,
     BlockFactory,
     BlockFactoryCatalogue,
     BlockFactoryId,
     BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
+    ConfigurationOptionId,
     NoOutput,
     RawOutput,
 )
 from fiab_core.plugin import Error, Plugin
+from fiab_core.types import FableType
+
+TEXT = ConfigurationOptionId("text")
+DURATION = ConfigurationOptionId("duration")
+CHECKPOINT = ConfigurationOptionId("checkpoint")
+AMOUNT = ConfigurationOptionId("amount")
+FNAME = ConfigurationOptionId("fname")
 
 
 def _get_checkpoint_enum_type() -> str:
     available = ArtifactsProvider.get_artifacts_lookup()
     values = ", ".join(f"'{CompositeArtifactId.to_str(k)}'" for k in available.keys())
-    return f"enum[{values}]"
+    return f"enumClosed[{values}]"
 
 
 catalogue = lambda: BlockFactoryCatalogue(
@@ -37,9 +46,7 @@ catalogue = lambda: BlockFactoryCatalogue(
             kind="source",
             title="Source Text",
             description="Returns the input text",
-            configuration_options={
-                "text": BlockConfigurationOption(title="", description="", value_type="str"),
-            },
+            configuration_options={TEXT: BlockConfigurationOption(title="", description="", value_type="str")},
             inputs=[],
         ),
         BlockFactoryId("source_sleep"): BlockFactory(
@@ -47,8 +54,8 @@ catalogue = lambda: BlockFactoryCatalogue(
             title="Source Sleep",
             description="Sleeps for a duration, then retuns the input text",
             configuration_options={
-                "text": BlockConfigurationOption(title="", description="", value_type="str"),
-                "duration": BlockConfigurationOption(title="", description="", value_type="float"),
+                TEXT: BlockConfigurationOption(title="", description="", value_type="str"),
+                DURATION: BlockConfigurationOption(title="", description="", value_type="float"),
             },
             inputs=[],
         ),
@@ -57,7 +64,7 @@ catalogue = lambda: BlockFactoryCatalogue(
             title="File Size Source",
             description="Returns the size of the given checkpoint file as a string",
             configuration_options={
-                "checkpoint": BlockConfigurationOption(
+                CHECKPOINT: BlockConfigurationOption(
                     title="Checkpoint",
                     description="The checkpoint whose downloaded file size to report",
                     value_type=_get_checkpoint_enum_type(),
@@ -69,9 +76,7 @@ catalogue = lambda: BlockFactoryCatalogue(
             kind="transform",
             title="Increment",
             description="Adds the amount to the input",
-            configuration_options={
-                "amount": BlockConfigurationOption(title="", description="", value_type="int"),
-            },
+            configuration_options={AMOUNT: BlockConfigurationOption(title="", description="", value_type="int")},
             inputs=["a"],
         ),
         BlockFactoryId("product_join"): BlockFactory(
@@ -85,9 +90,7 @@ catalogue = lambda: BlockFactoryCatalogue(
             kind="sink",
             title="File",
             description="Saves the input to a file",
-            configuration_options={
-                "fname": BlockConfigurationOption(title="", description="", value_type="str"),
-            },
+            configuration_options={FNAME: BlockConfigurationOption(title="", description="", value_type="str")},
             inputs=["data"],
         ),
         BlockFactoryId("sink_image"): BlockFactory(
@@ -114,17 +117,20 @@ def validator(instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -
         raise TypeError(f"unexpected factory {instance.factory_id.factory}")
 
 
-def expander(output: BlockInstanceOutput) -> list[BlockFactoryId]:
+def expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
     if isinstance(output, RawOutput):
         if output.type_fqn == "int":
             return [
-                BlockFactoryId("transform_increment"),
-                BlockFactoryId("product_join"),
-                BlockFactoryId("sink_file"),
-                BlockFactoryId("sink_image"),
+                BlockExpansion(
+                    factory=BlockFactoryId("transform_increment"),
+                    restrictions={AMOUNT: FableType.parse("enumClosed[1,2,3]")},
+                ),
+                BlockExpansion(factory=BlockFactoryId("product_join")),
+                BlockExpansion(factory=BlockFactoryId("sink_file")),
+                BlockExpansion(factory=BlockFactoryId("sink_image")),
             ]
         if output.type_fqn == "str":
-            return [BlockFactoryId("sink_file")]
+            return [BlockExpansion(factory=BlockFactoryId("sink_file"))]
     return []
 
 
@@ -133,14 +139,22 @@ def compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance
         if instance.factory_id.factory == "source_42":
             action = from_source(Payload("fiab_plugin_test.runtime.source_42"))  # type: ignore
         elif instance.factory_id.factory == "source_text":
-            text = instance.configuration_values["text"]
+            text = instance.configuration_values[TEXT]
+            if not isinstance(text, str):
+                return Either.error(f"Invalid type for {TEXT!r}: expected str, got {type(text).__name__}")
             action = from_source(Payload("fiab_plugin_test.runtime.source_text", kwargs={"text": text}))  # type: ignore
         elif instance.factory_id.factory == "source_sleep":
-            text = instance.configuration_values["text"]
-            duration = float(instance.configuration_values["duration"])
+            text = instance.configuration_values[TEXT]
+            duration = instance.configuration_values[DURATION]
+            if not isinstance(text, str):
+                return Either.error(f"Invalid type for {TEXT!r}: expected str, got {type(text).__name__}")
+            if not isinstance(duration, float):
+                return Either.error(f"Invalid type for {DURATION!r}: expected float, got {type(duration).__name__}")
             action = from_source(Payload("fiab_plugin_test.runtime.source_sleep", kwargs={"text": text, "duration": duration}))  # type: ignore
         elif instance.factory_id.factory == "source_filesize":
-            checkpoint_str = instance.configuration_values["checkpoint"]
+            checkpoint_str = instance.configuration_values[CHECKPOINT]
+            if not isinstance(checkpoint_str, str):
+                return Either.error(f"Invalid type for {CHECKPOINT!r}: expected str, got {type(checkpoint_str).__name__}")
             artifact_id = CompositeArtifactId.from_str(checkpoint_str)
             local_path = ArtifactsProvider.get_artifact_local_path(artifact_id)
             payload = Payload(
@@ -149,15 +163,19 @@ def compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance
             action = from_source(payload)  # type: ignore
         elif instance.factory_id.factory == "transform_increment":
             a = lookup[instance.input_ids["a"]]
-            amount = instance.configuration_values["amount"]
-            action = a.map(Payload("fiab_plugin_test.runtime.transform_increment", kwargs={"amount": int(amount)}))  # type: ignore
+            amount = instance.configuration_values[AMOUNT]
+            if not isinstance(amount, int):
+                return Either.error(f"Invalid type for {AMOUNT!r}: expected int, got {type(amount).__name__}")
+            action = a.map(Payload("fiab_plugin_test.runtime.transform_increment", kwargs={"amount": amount}))  # type: ignore
         elif instance.factory_id.factory == "product_join":
             a = lookup[instance.input_ids["a"]]
             b = lookup[instance.input_ids["b"]]
             action = a.join(b, dim="inputs").reduce(Payload("fiab_plugin_test.runtime.product_join"))  # type: ignore
         elif instance.factory_id.factory == "sink_file":
             data = lookup[instance.input_ids["data"]]
-            fname = instance.configuration_values["fname"]
+            fname = instance.configuration_values[FNAME]
+            if not isinstance(fname, str):
+                return Either.error(f"Invalid type for {FNAME!r}: expected str, got {type(fname).__name__}")
             action = data.map(Payload("fiab_plugin_test.runtime.sink_file", kwargs={"fname": fname}))  # type: ignore
         elif instance.factory_id.factory == "sink_image":
             data = lookup[instance.input_ids["data"]]

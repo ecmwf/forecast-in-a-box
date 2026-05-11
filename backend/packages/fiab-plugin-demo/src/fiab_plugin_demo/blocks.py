@@ -15,15 +15,19 @@ from fiab_core.fable import (
     BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
+    ConfigurationOptionId,
     NoOutput,
     QubedOutput,
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import Product, Sink, Transform
 
+DIR = ConfigurationOptionId("dir")
+PARAM = ConfigurationOptionId("param")
+
 
 class _DemoTransform(Transform):
-    configuration_options: dict[str, BlockConfigurationOption] = {}
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {}
     inputs: list[str] = ["dataset"]
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
@@ -45,7 +49,7 @@ class _DemoTransform(Transform):
 
 
 class _DemoProduct(Product):
-    configuration_options: dict[str, BlockConfigurationOption] = {}
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {}
     inputs: list[str] = ["dataset"]
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
@@ -67,7 +71,7 @@ class _DemoProduct(Product):
 
 
 class _DemoSink(Sink):
-    configuration_options: dict[str, BlockConfigurationOption] = {}
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {}
     inputs: list[str] = ["dataset"]
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
@@ -90,8 +94,8 @@ class _DemoSink(Sink):
 class NetCDFOutputSink(_DemoSink):
     title: str = "NetCDF Output"
     description: str = "Placeholder sink for writing dataset output as NetCDF."
-    configuration_options: dict[str, BlockConfigurationOption] = {
-        "dir": BlockConfigurationOption(
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
+        DIR: BlockConfigurationOption(
             title="Directory",
             description="Output directory (e.g. '/path/to/output')",
             value_type="str",
@@ -102,8 +106,8 @@ class NetCDFOutputSink(_DemoSink):
 class GRIBOutputSink(_DemoSink):
     title: str = "GRIB Output"
     description: str = "Placeholder sink for writing dataset output as GRIB."
-    configuration_options: dict[str, BlockConfigurationOption] = {
-        "dir": BlockConfigurationOption(
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
+        DIR: BlockConfigurationOption(
             title="Directory",
             description="Output directory (e.g. '/path/to/output')",
             value_type="str",
@@ -114,8 +118,8 @@ class GRIBOutputSink(_DemoSink):
 class FilterParam(_DemoTransform):
     title: str = "Filter Parameters"
     description: str = "Placeholder transform for selecting specific parameters."
-    configuration_options: dict[str, BlockConfigurationOption] = {
-        "param": BlockConfigurationOption(
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
+        PARAM: BlockConfigurationOption(
             title="Parameters",
             description="Parameters to select and plot (e.g. '2t', 'msl')",
             value_type="list[str]",
@@ -126,8 +130,8 @@ class FilterParam(_DemoTransform):
 class InterpolationTransform(_DemoTransform):
     title: str = "Interpolation"
     description: str = "Placeholder transform for interpolating datasets."
-    configuration_options: dict[str, BlockConfigurationOption] = {
-        "param": BlockConfigurationOption(
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
+        PARAM: BlockConfigurationOption(
             title="Grid",
             description="GridSpec to interpolate",
             value_type="str",

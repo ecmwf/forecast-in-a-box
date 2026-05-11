@@ -26,16 +26,20 @@ from itertools import groupby
 from typing import cast
 
 from fiab_core.fable import (
+    BlockExpansion,
     BlockFactoryId,
     BlockInstance,
     BlockInstanceId,
     BlockKind,
+    ConfigurationOptionId,
     NoOutput,
+    PluginBlockExpansion,
     PluginBlockFactoryId,
 )
 
 from forecastbox.domain.blueprint import db
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
+from forecastbox.domain.blueprint.configuration_values import convert_known_configuration_values
 from forecastbox.domain.blueprint.db import upsert_blueprint
 from forecastbox.domain.blueprint.exceptions import BlueprintNotFound
 from forecastbox.domain.blueprint.types import BlueprintId
@@ -83,8 +87,9 @@ class BlueprintValidationExpansion(FiabBaseModel):
     global_errors: list[str]
     block_errors: dict[BlockInstanceId, list[str]]
     possible_sources: list[PluginBlockFactoryId]
-    possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]]
-    resolved_configuration_options: dict[BlockInstanceId, dict[str, str]] = {}
+    possible_expansions: dict[BlockInstanceId, list[PluginBlockExpansion]]
+    resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
+    missing_glyphs: dict[BlockInstanceId, dict[ConfigurationOptionId, list[str]]] = {}
 
 
 class BlueprintSaveCommand(FiabBaseModel):
@@ -132,9 +137,10 @@ async def validate_expand(
             if block_factory.kind == "source" and not block_factory.inputs
         ]
     )
-    possible_expansions: dict[BlockInstanceId, list[PluginBlockFactoryId]] = {}
-    resolved_configuration_options: dict[BlockInstanceId, dict[str, str]] = {}
+    possible_expansions: dict[BlockInstanceId, list[PluginBlockExpansion]] = {}
+    resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
     block_errors: dict[BlockInstanceId, list[str]] = defaultdict(list)
+    missing_glyphs_result: dict[BlockInstanceId, dict[ConfigurationOptionId, list[str]]] = {}
     outputs = {}
 
     intrinsic_values = cast(dict[str, str], get_values_and_examples())
@@ -182,11 +188,6 @@ async def validate_expand(
         extraConfig = blockInstance.configuration_values.keys() - blockFactory.configuration_options.keys()
         if extraConfig:
             block_errors[blockId] += [f"Block contains extra config: {extraConfig}"]
-        missingConfig = blockFactory.configuration_options.keys() - blockInstance.configuration_values.keys()
-        if missingConfig:
-            # TODO most likely disable this, we would inject defaults at the compile level
-            block_errors[blockId] += [f"Block contains missing config: {missingConfig}"]
-
         extract_result = resolution.extract_glyphs(blockInstance)
         if extract_result.e is not None:
             block_errors[blockId] += extract_result.e
@@ -195,9 +196,21 @@ async def validate_expand(
         extracted = cast(ExtractedGlyphs, extract_result.t)
         unknown_glyphs = extracted.glyphs - available_glyphs
         if unknown_glyphs:
-            block_errors[blockId] += [f"Unknown glyphs referenced: {unknown_glyphs}"]
-            invalidable.add(blockId)
-            continue
+            # Soft path: omit options referencing unknown glyphs and record them,
+            # rather than failing the whole block.
+            option_glyph_map = resolution.extract_glyphs_per_option(blockInstance)
+            for opt_id, opt_glyphs in option_glyph_map.items():
+                opt_unknown = opt_glyphs & unknown_glyphs
+                if opt_unknown:
+                    missing_glyphs_result.setdefault(blockId, {})[opt_id] = sorted(opt_unknown)
+                    del blockInstance.configuration_values[opt_id]
+            # Re-extract after removing affected options to get an accurate extracted state.
+            extract_result = resolution.extract_glyphs(blockInstance)
+            if extract_result.e is not None:
+                block_errors[blockId] += extract_result.e
+                invalidable.add(blockId)
+                continue
+            extracted = cast(ExtractedGlyphs, extract_result.t)
         try:
             resolution.resolve_configurations(blockInstance, all_glyphs)
         except Exception as exc:
@@ -210,12 +223,26 @@ async def validate_expand(
         extract_after = resolution.extract_glyphs(blockInstance)
         nested_unknowns = cast(ExtractedGlyphs, extract_after.t).glyphs
         if nested_unknowns:
-            block_errors[blockId] += [f"Unknown glyphs referenced: {nested_unknowns}"]
-            invalidable.add(blockId)
-            continue
+            # Soft path: omit options with unresolved nested glyph references.
+            option_glyph_map_after = resolution.extract_glyphs_per_option(blockInstance)
+            for opt_id, opt_glyphs in option_glyph_map_after.items():
+                opt_nested = opt_glyphs & nested_unknowns
+                if opt_nested:
+                    block_opts = missing_glyphs_result.setdefault(blockId, {})
+                    existing = set(block_opts.get(opt_id, []))
+                    block_opts[opt_id] = sorted(existing | opt_nested)
+                    del blockInstance.configuration_values[opt_id]
         # We dont want to return resolutions of nested glyphs, just the top levels. For this reason
         # we need to run the extraction twice, not just once after the substitution
-        resolved_configuration_options[blockId] = {k: blockInstance.configuration_values[k] for k in extracted.glyphed_options}
+        resolved_configuration_options[blockId] = {
+            k: blockInstance.configuration_values[k] for k in extracted.glyphed_options if k in blockInstance.configuration_values
+        }
+        converted_values = convert_known_configuration_values(blockInstance, blockFactory)
+        if converted_values.t is None:
+            block_errors[blockId] += converted_values.e
+            invalidable.add(blockId)
+            continue
+        blockInstance.configuration_values = converted_values.t
 
         if any(source_id in invalidable for source_id in blockInstance.input_ids.values()):
             invalidable.add(blockId)
@@ -232,9 +259,13 @@ async def validate_expand(
         if not validate_only:
             possible_expansions[blockId] = (
                 [
-                    PluginBlockFactoryId(plugin=any_plugin_id, factory=block_factory_id)
+                    PluginBlockExpansion(
+                        plugin=any_plugin_id,
+                        factory=expansion.factory,
+                        restrictions={k: v.serialize() for k, v in expansion.restrictions.items()},
+                    )
                     for any_plugin_id, any_plugin in plugins.items()
-                    for block_factory_id in any_plugin.expander(output_or_error.t)
+                    for expansion in any_plugin.expander(output_or_error.t)
                 ]
                 if not isinstance(output_or_error.t, NoOutput)
                 else []
@@ -254,6 +285,7 @@ async def validate_expand(
         resolved_configuration_options=resolved_configuration_options,
         block_errors=block_errors,
         global_errors=global_errors,
+        missing_glyphs=missing_glyphs_result,
     )
 
 

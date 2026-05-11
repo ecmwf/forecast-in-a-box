@@ -35,6 +35,19 @@ export const PluginBlockFactoryIdSchema = z.object({
 
 export type PluginBlockFactoryId = z.infer<typeof PluginBlockFactoryIdSchema>
 
+/**
+ * Expansion item from PUT /blueprint/expand.
+ *
+ * Backend now includes per-option restrictions in addition to plugin+factory.
+ */
+export const BlockExpansionSchema = z.object({
+  plugin: PluginCompositeIdSchema,
+  factory: z.string(),
+  restrictions: z.record(z.string(), z.string()).optional().default({}),
+})
+
+export type BlockExpansion = z.infer<typeof BlockExpansionSchema>
+
 export const BlockConfigurationOptionSchema = z.object({
   title: z.string(),
   description: z.string(),
@@ -204,12 +217,13 @@ export const FableValidationExpansionSchema = z.object({
   global_errors: z.array(z.string()),
   block_errors: z.record(z.string(), z.array(z.string())),
   possible_sources: z.array(PluginBlockFactoryIdSchema),
-  possible_expansions: z.record(
-    z.string(),
-    z.array(PluginBlockFactoryIdSchema),
-  ),
+  possible_expansions: z.record(z.string(), z.array(BlockExpansionSchema)),
   resolved_configuration_options: z
     .record(z.string(), z.record(z.string(), z.string()))
+    .optional()
+    .default({}),
+  missing_glyphs: z
+    .record(z.string(), z.record(z.string(), z.array(z.string())))
     .optional()
     .default({}),
 })
@@ -598,27 +612,28 @@ export function getBlocksByKind(
 
 export function toValidationState(
   expansion: FableValidationExpansion,
+  fable?: FableBuilderV1,
+  catalogue?: BlockFactoryCatalogue,
 ): FableValidationState {
   const blockStates: Record<BlockInstanceId, BlockValidationState> = {}
+  const missingRequiredByBlock =
+    fable && catalogue ? getMissingRequiredConfigErrors(fable, catalogue) : {}
+  const allBlockIds = new Set<string>([
+    ...Object.keys(expansion.block_errors),
+    ...Object.keys(expansion.possible_expansions),
+    ...Object.keys(missingRequiredByBlock),
+  ])
 
-  for (const [blockId, errors] of Object.entries(expansion.block_errors)) {
+  for (const blockId of allBlockIds) {
+    const backendErrors = expansion.block_errors[blockId] ?? []
+    const missingErrors = missingRequiredByBlock[blockId] ?? []
+    const errors = [...backendErrors, ...missingErrors]
     blockStates[blockId] = {
       errors,
       hasErrors: errors.length > 0,
-      possibleExpansions: expansion.possible_expansions[blockId] ?? [],
-    }
-  }
-
-  for (const [blockId, expansions] of Object.entries(
-    expansion.possible_expansions,
-  )) {
-    // Only add blocks that weren't already added from block_errors
-    if (!(blockId in blockStates)) {
-      blockStates[blockId] = {
-        errors: [],
-        hasErrors: false,
-        possibleExpansions: expansions,
-      }
+      possibleExpansions: toPluginFactoryIds(
+        expansion.possible_expansions[blockId] ?? [],
+      ),
     }
   }
 
@@ -633,4 +648,57 @@ export function toValidationState(
     possibleSources: expansion.possible_sources,
     resolvedConfigurationOptions: expansion.resolved_configuration_options,
   }
+}
+
+function toPluginFactoryIds(
+  expansions: ReadonlyArray<BlockExpansion>,
+): Array<PluginBlockFactoryId> {
+  return expansions.map((expansion) => ({
+    plugin: expansion.plugin,
+    factory: expansion.factory,
+  }))
+}
+
+function isOptionalValueType(valueType: string): boolean {
+  return /^optional\[(.+)\]$/i.test(valueType.trim())
+}
+
+function toPythonStringSet(items: ReadonlyArray<string>): string {
+  return `{${items.map((item) => `'${item}'`).join(', ')}}`
+}
+
+function getMissingRequiredConfigErrors(
+  fable: FableBuilderV1,
+  catalogue: BlockFactoryCatalogue,
+): Record<BlockInstanceId, Array<string>> {
+  const missingByBlock: Record<BlockInstanceId, Array<string>> = {}
+
+  for (const [blockId, block] of Object.entries(fable.blocks)) {
+    const factory = getFactory(catalogue, block.factory_id)
+    if (!factory) continue
+
+    const missingKeys = Object.entries(factory.configuration_options)
+      .filter(([configKey, option]) => {
+        if (isOptionalValueType(option.value_type)) return false
+        if (
+          !Object.prototype.hasOwnProperty.call(
+            block.configuration_values,
+            configKey,
+          )
+        ) {
+          return true
+        }
+        return block.configuration_values[configKey].trim() === ''
+      })
+      .map(([configKey]) => configKey)
+      .sort()
+
+    if (missingKeys.length > 0) {
+      missingByBlock[blockId] = [
+        `Block contains missing config: ${toPythonStringSet(missingKeys)}`,
+      ]
+    }
+  }
+
+  return missingByBlock
 }

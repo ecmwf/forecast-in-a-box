@@ -15,11 +15,12 @@ import abc
 from typing import Any, Literal, NewType
 
 from earthkit.workflows.fluent import Action
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, PrivateAttr, model_validator
 from qubed import Qube
 from typing_extensions import Self
 
 from fiab_core.pydantic_utils import FiabCoreBaseModel
+from fiab_core.types import FableType, NotFableType
 
 
 class BlockConfigurationOption(FiabCoreBaseModel):
@@ -36,6 +37,23 @@ class BlockConfigurationOption(FiabCoreBaseModel):
     is_advanced: bool = False
     """Used by the frontend to optionally hide the setting unless advanced. Do not set if no default provided / None not valid"""
 
+    _value_type: FableType = PrivateAttr()
+
+    @model_validator(mode="after")
+    def _validate_and_cache_value_type(self) -> Self:
+        try:
+            self._value_type = FableType.parse(self.value_type)
+        except NotFableType as exc:
+            raise ValueError(str(exc)) from exc
+        return self
+
+    @property
+    def parsed_value_type(self) -> FableType:
+        return self._value_type
+
+
+ConfigurationOptionId = NewType("ConfigurationOptionId", str)
+
 
 BlockKind = Literal["source", "transform", "product", "sink"]
 
@@ -50,7 +68,7 @@ class BlockFactory(FiabCoreBaseModel):
     """How to display in the catalogue listing / partial fable"""
     description: str
     """Extended detail for the user"""
-    configuration_options: dict[str, BlockConfigurationOption]
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption]
     """A key-value of config-option-key, config-option"""
     inputs: list[str]
     """A list of input names, such as 'initial conditions' or 'forecast', for the purpose of description/configuration"""
@@ -94,12 +112,46 @@ class BlockFactoryCatalogue(FiabCoreBaseModel):
     factories: dict[BlockFactoryId, BlockFactory]
 
 
+ConfigurationOptionRestriction = dict[ConfigurationOptionId, FableType]
+"""Mapping from configuration option id to its FableType restriction"""
+
+
+class BlockExpansion(FiabCoreBaseModel):
+    """Expansion of a block with potential restrictions on configuration options.
+
+    Plugin expanders return BlockExpansion objects describing which blocks can
+    expand the output of a given block, and what configuration restrictions apply
+    to those expansions.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    factory: BlockFactoryId
+    """The local factory id within the plugin"""
+    restrictions: ConfigurationOptionRestriction = Field(default_factory=dict)
+    """Restrictions on configuration options for this expansion"""
+
+
+class PluginBlockExpansion(FiabCoreBaseModel):
+    """Expansion result as returned to clients, combining plugin identity with restrictions.
+
+    This is the service-level representation sent to API consumers, containing
+    the full PluginBlockFactoryId and serialized restriction types.
+    """
+
+    plugin: PluginCompositeId
+    factory: BlockFactoryId
+    restrictions: dict[ConfigurationOptionId, str] = Field(default_factory=dict)
+    """Serialized FableType restrictions (e.g., 'int', 'enumClosed[a,b]')"""
+
+
 class BlockInstance(FiabCoreBaseModel):
     """As produced by BlockFactory *by the client* -- basically the configuration/inputs values"""
 
     factory_id: PluginBlockFactoryId
-    configuration_values: dict[str, str]
-    """Keys come frome factory's `configuration_options`, values are serialized actual configuration values"""
+    # TODO separe into two classes with BlockInstanceRequest containing str, to improve the backend codebase typing etc
+    configuration_values: dict[ConfigurationOptionId, Any]
+    """Keys come frome factory's `configuration_options`, values are either str-serialized (frontend2backend) or deserialized (backend2plugin)"""
     input_ids: dict[str, BlockInstanceId]
     """Keys come from factory's `inputs`, values are other blocks in the (partial) fable"""
 

@@ -17,7 +17,7 @@ import time
 from typing import Any
 
 import httpx
-from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId, PluginBlockFactoryId
+from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId, ConfigurationOptionId, PluginBlockFactoryId
 
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.blueprint.service import BlueprintSaveCommand as BlueprintSaveRequest
@@ -33,6 +33,11 @@ from .utils import (
     retry_until,
     scheduling_endpoint_with_retries,
 )
+
+
+def _config(values: dict[str, str]) -> dict[ConfigurationOptionId, str]:
+    return {ConfigurationOptionId(key): value for key, value in values.items()}
+
 
 # *** helpers **
 
@@ -75,7 +80,7 @@ def _save_full_blueprint(client: httpx.Client, output_path: str, time_output_pat
     )
     transform_increment = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("transform_increment")),
-        configuration_values={"amount": "1"},
+        configuration_values=_config({"amount": "1"}),
         input_ids={"a": BlockInstanceId("source_42")},
     )
     product_join = BlockInstance(
@@ -85,17 +90,17 @@ def _save_full_blueprint(client: httpx.Client, output_path: str, time_output_pat
     )
     sink_file = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
-        configuration_values={"fname": output_path},
+        configuration_values=_config({"fname": output_path}),
         input_ids={"data": BlockInstanceId("product_join")},
     )
     source_time = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_text")),
-        configuration_values={"text": "${submitDatetime};${startDatetime}"},
+        configuration_values=_config({"text": "${submitDatetime};${startDatetime}"}),
         input_ids={},
     )
     sink_time = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
-        configuration_values={"fname": time_output_path},
+        configuration_values=_config({"fname": time_output_path}),
         input_ids={"data": BlockInstanceId("source_time")},
     )
     builder = BlueprintBuilder(

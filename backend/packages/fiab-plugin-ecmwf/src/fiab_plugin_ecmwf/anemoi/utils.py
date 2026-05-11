@@ -13,8 +13,9 @@ from pathlib import Path
 
 from cascade.low.func import Either
 from fiab_core.artifacts import ArtifactsProvider, CompositeArtifactId, MlModelCheckpoint
-from fiab_core.fable import BlockInstance, QubedOutput
+from fiab_core.fable import QubedOutput
 from fiab_core.plugin import Error
+from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
 from qubed import Qube
 
 from ..qubed_utils import expand
@@ -40,7 +41,7 @@ def get_checkpoint_enum_type() -> str:
     if not available_checkpoints:
         return "str"
     values = ", ".join(f"'{CompositeArtifactId.to_str(k)}'" for k in available_checkpoints.keys())
-    return f"enum[{values}]"
+    return f"enumClosed[{values}]"
 
 
 def get_local_path(composite_id: CompositeArtifactId) -> Path:
@@ -73,23 +74,18 @@ def get_environment(composite_id: CompositeArtifactId) -> list[str]:
 
 def validate_anemoi_block(block: BlockInstance) -> Either[QubedOutput, Error]:  # type:ignore[invalid-argument] # semigroup
     """Validate common Anemoi block configuration, returning the base QubedOutput on success."""
-    if not block.configuration_values["checkpoint"]:
-        return Either.error("Checkpoint must be given")
+    checkpoint = block.config_as_str("checkpoint")
+    lead_time = block.config_as_int("lead_time")
 
-    if not block.configuration_values["lead_time"].isdigit():  # type: ignore
+    if lead_time < 0:
         return Either.error("Lead time must be a non-negative integer")
 
-    ensemble_members = block.configuration_values.get("ensemble_members")
-    if ensemble_members is not None and (not ensemble_members.isdigit() or int(ensemble_members) < 1):  # type: ignore
-        return Either.error("Ensemble members must be an int and positive")
-
-    checkpoint = block.configuration_values["checkpoint"]
     try:
         composite_id = CompositeArtifactId.from_str(checkpoint)
     except ValueError:
         return Either.error("Checkpoint must be a valid checkpoint identifier")
 
     try:
-        return Either.ok(get_model_output(composite_id, int(block.configuration_values["lead_time"])))
+        return Either.ok(get_model_output(composite_id, lead_time))
     except KeyError:
         return Either.error(f"Unknown checkpoint: {checkpoint}")
