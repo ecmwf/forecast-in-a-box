@@ -518,8 +518,8 @@ def test_blueprint_expand_missing_glyph_warnings(tmpdir: Any, backend_client_wit
     assert logs_resp.is_success, logs_resp.text
     assert "zip" in logs_resp.headers["content-type"]
     with zipfile.ZipFile(io.BytesIO(logs_resp.content), "r") as zf:
-        # NOTE dbEntity, gwState, gateway, controller, host0, host0.dsr, host0.shm, host0.w1, host0.w2
-        expected_log_count = 9
+        # NOTE dbEntity, gwState, gateway, controller, host0, host0.dsr, host0.shm, (host0.w1, host0.w2) x (logs, stdout, stderr)
+        expected_log_count = 13
         assert len(zf.namelist()) == expected_log_count or os.getenv("FIAB_LOGSTDOUT", "nay") == "yea"
 
     # Clean up: delete the global glyph created in this test
