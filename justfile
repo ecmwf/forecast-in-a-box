@@ -38,6 +38,7 @@ clean:
 
 val:
     #!/usr/bin/env bash
+    set -euo pipefail
     pkgLoc=backend/packages
     for d in $(ls $pkgLoc) ; do
         if [[ -f $pkgLoc/$d/justfile ]] ; then
