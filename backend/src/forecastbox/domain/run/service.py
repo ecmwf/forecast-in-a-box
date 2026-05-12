@@ -64,6 +64,8 @@ class RunDetail(FiabBaseModel):
     cascade_job_id: str | None = None
     available_task_ids: list[TaskId] | None = None
     outputs: dict | None = None
+    completed_task_ids: dict[JobId, list[TaskId]] | None = None
+    planned_task_ids: dict[JobId, list[TaskId]] | None = None
 
 
 class ExecuteResult(FiabBaseModel):
@@ -162,7 +164,7 @@ async def restart_run(run_id: RunId, auth_context: AuthContext) -> Either[Execut
     )
 
 
-async def poll_and_update(execution: Run) -> RunDetail:
+async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunDetail:
     """Poll cascade for a Run's status, update db if changed, and return current detail."""
     run_id = RunId(str(execution.run_id))  # ty:ignore[invalid-argument-type]
     actual_attempt = cast(int, execution.attempt_count)
@@ -180,7 +182,13 @@ async def poll_and_update(execution: Run) -> RunDetail:
     else:
         available_task_ids = None
 
-    def _build(status_override: str | None = None, error_override: str | None = None, progress_override: str | None = None) -> RunDetail:
+    def _build(
+        status_override: str | None = None,
+        error_override: str | None = None,
+        progress_override: str | None = None,
+        completed_task_ids: dict[JobId, list[TaskId]] | None = None,
+        planned_task_ids: dict[JobId, list[TaskId]] | None = None,
+    ) -> RunDetail:
         return RunDetail(
             run_id=run_id,
             attempt_count=actual_attempt,
@@ -194,12 +202,17 @@ async def poll_and_update(execution: Run) -> RunDetail:
             cascade_job_id=cascade_job_id,
             available_task_ids=available_task_ids,
             outputs=raw_outputs,
+            completed_task_ids=completed_task_ids,
+            planned_task_ids=planned_task_ids,
         )
 
     if status in ("submitted", "preparing", "running") and cascade_job_id:
         job_id = JobId(cascade_job_id)
         try:
-            response = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}")
+            response = client.request_response(
+                api.JobProgressRequest(job_ids=[job_id], detailed_report=detailed_report),
+                f"{config.cascade.cascade_url}",
+            )
             response = cast(api.JobProgressResponse, response)
         except TimeoutError:
             return _build(status_override="unknown", error_override="failed to communicate with gateway")
@@ -212,6 +225,8 @@ async def poll_and_update(execution: Run) -> RunDetail:
         if response.error:
             return _build(status_override="unknown", error_override=response.error)
 
+        completed_task_ids = response.completed_task_ids if detailed_report else None
+        planned_task_ids = response.planned_task_ids if detailed_report else None
         jobprogress = response.progresses.get(job_id)
         if jobprogress is None:
             await run_db.update_run_runtime(run_id, actual_attempt, status="failed", error="evicted from gateway")
@@ -226,6 +241,11 @@ async def poll_and_update(execution: Run) -> RunDetail:
             return _build(status_override="completed", progress_override="100.00")
         else:
             await run_db.update_run_runtime(run_id, actual_attempt, status="running", progress=jobprogress.pct)
-            return _build(status_override="running", progress_override=jobprogress.pct)
+            return _build(
+                status_override="running",
+                progress_override=jobprogress.pct,
+                completed_task_ids=completed_task_ids,
+                planned_task_ids=planned_task_ids,
+            )
 
     return _build()

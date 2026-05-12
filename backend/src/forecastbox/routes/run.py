@@ -101,6 +101,8 @@ class RunDetailResponse(FiabBaseModel):
     progress: str | None = None
     cascade_job_id: str | None = None
     outputs: RunOutputsResponse | None = None
+    completed_task_ids: dict[JobId, list[TaskId]] | None = None
+    planned_task_ids: dict[JobId, list[TaskId]] | None = None
 
 
 class RunListResponse(FiabBaseModel):
@@ -162,6 +164,8 @@ def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
         progress=domain_detail.progress,
         cascade_job_id=domain_detail.cascade_job_id,
         outputs=outputs_response,
+        completed_task_ids=domain_detail.completed_task_ids,
+        planned_task_ids=domain_detail.planned_task_ids,
     )
 
 
@@ -274,7 +278,7 @@ async def get_run(
 ) -> RunDetailResponse:
     try:
         execution = await db.get_run(spec.run_id, spec.attempt_count, auth_context=auth_context)
-        domain_detail = await service.poll_and_update(execution)
+        domain_detail = await service.poll_and_update(execution, detailed_report=True)
     except RunNotFound:
         raise HTTPException(status_code=404, detail=f"Run {spec.run_id!r} not found.")
     except RunAccessDenied:
