@@ -136,9 +136,10 @@ export function BlockInstanceCard({
 
   const hasErrors = blockValidation?.hasErrors ?? false
   const errors = blockValidation?.errors ?? []
+  const missingGlyphs = blockValidation?.missingGlyphs ?? {}
   const mappedErrors = useMemo(
-    () => mapBlockErrorsToFields(errors, instance.configuration_values),
-    [errors, instance.configuration_values],
+    () => mapBlockErrorsToFields(errors, missingGlyphs),
+    [errors, missingGlyphs],
   )
 
   if (!factory) {

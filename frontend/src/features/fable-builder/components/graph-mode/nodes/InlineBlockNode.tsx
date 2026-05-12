@@ -126,9 +126,10 @@ export const InlineBlockNode = memo(function ({
   const configOptions = Object.entries(factory.configuration_options)
   const inputs = factory.inputs
 
+  const missingGlyphs = blockValidation?.missingGlyphs ?? {}
   const mappedErrors = useMemo(
-    () => mapBlockErrorsToFields(errors, instance.configuration_values),
-    [errors, instance.configuration_values],
+    () => mapBlockErrorsToFields(errors, missingGlyphs),
+    [errors, missingGlyphs],
   )
 
   return (

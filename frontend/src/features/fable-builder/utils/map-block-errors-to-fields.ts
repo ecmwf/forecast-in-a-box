@@ -10,15 +10,11 @@
 
 /**
  * Best-effort mapping from backend block-level error strings to individual
- * config keys. The backend currently returns block errors as flat strings
- * (see backend/src/forecastbox/domain/blueprint/service.py), so the frontend
- * parses known message shapes to provide per-field UI highlights.
+ * config keys. The backend returns block errors as flat strings, so the
+ * frontend parses known message shapes to provide per-field UI highlights.
+ * Unknown-glyph references arrive structured (not as strings) and are
+ * attributed via the optional `missingGlyphs` parameter.
  */
-
-import {
-  containsGlyphs,
-  extractGlyphKey,
-} from '@/features/fable-builder/utils/glyph-display'
 
 export interface MappedBlockErrors {
   /** Field-level errors keyed by configuration option key. */
@@ -26,8 +22,6 @@ export interface MappedBlockErrors {
   /** Errors that could not be attributed to a specific field. */
   unmapped: Array<string>
 }
-
-const GLYPH_PATTERN = /\$\{(\w+)\}/g
 
 /**
  * Parse a Python-style set-of-strings literal like `{'foo', 'bar'}` into
@@ -50,19 +44,6 @@ function parsePythonStringSet(input: string): Set<string> | null {
   return names.size > 0 ? names : null
 }
 
-/**
- * Return the set of glyph names referenced inside a config value
- * (e.g. `${runId}-foo` → {"runId"}).
- */
-function referencedGlyphs(value: string): Set<string> {
-  const names = new Set<string>()
-  if (!containsGlyphs(value)) return names
-  for (const match of value.matchAll(GLYPH_PATTERN)) {
-    names.add(extractGlyphKey(match[0]))
-  }
-  return names
-}
-
 function pushError(
   out: Record<string, Array<string>>,
   configKey: string,
@@ -77,49 +58,24 @@ function pushError(
 }
 
 /**
- * Map block-level backend errors onto specific configuration keys.
+ * Map block-level backend errors and structured missing glyphs onto specific
+ * configuration keys.
  *
- * Recognised message shapes:
- * - "Unknown glyphs referenced: {'foo', 'bar'}" — each unknown glyph is
- *   attached to every config key whose value references it.
- * - "Block contains extra config: {'foo', 'bar'}" — attached as "Unknown
- *   configuration key" to each listed key.
- * - "Block contains missing config: {'foo', 'bar'}" — attached as
- *   "Missing required value" to each listed key.
+ * Recognised `errors` shapes (Python-set literals):
+ * - "Block contains extra config: {...}" → "Unknown configuration key"
+ * - "Block contains missing config: {...}" → "Missing required value"
  *
- * Everything else is returned as `unmapped`.
+ * `missingGlyphs[configKey] = [name, ...]` → "Unknown glyph: ${name}" per name.
+ * Anything else in `errors` is returned as `unmapped`.
  */
 export function mapBlockErrorsToFields(
   errors: ReadonlyArray<string>,
-  configurationValues: Record<string, string>,
+  missingGlyphs: Record<string, ReadonlyArray<string>> = {},
 ): MappedBlockErrors {
   const byConfigKey: Record<string, Array<string>> = {}
   const unmapped: Array<string> = []
 
   for (const error of errors) {
-    const unknownGlyphs = error.match(/^Unknown glyphs referenced:\s*(.+)$/)
-    if (unknownGlyphs) {
-      const set = parsePythonStringSet(unknownGlyphs[1])
-      if (!set || set.size === 0) {
-        unmapped.push(error)
-        continue
-      }
-      let attributed = false
-      for (const [configKey, value] of Object.entries(configurationValues)) {
-        const refs = referencedGlyphs(value)
-        for (const name of refs) {
-          if (set.has(name)) {
-            pushError(byConfigKey, configKey, `Unknown glyph: \${${name}}`)
-            attributed = true
-          }
-        }
-      }
-      if (!attributed) {
-        unmapped.push(error)
-      }
-      continue
-    }
-
     const extraConfig = error.match(/^Block contains extra config:\s*(.+)$/)
     if (extraConfig) {
       const set = parsePythonStringSet(extraConfig[1])
@@ -147,6 +103,12 @@ export function mapBlockErrorsToFields(
     }
 
     unmapped.push(error)
+  }
+
+  for (const [configKey, glyphNames] of Object.entries(missingGlyphs)) {
+    for (const name of glyphNames) {
+      pushError(byConfigKey, configKey, `Unknown glyph: \${${name}}`)
+    }
   }
 
   return { byConfigKey, unmapped }

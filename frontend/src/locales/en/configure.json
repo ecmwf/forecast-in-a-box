@@ -17,5 +17,10 @@
     "saveAsNew": "Save as New",
     "update": "Update",
     "save": "Save"
+  },
+  "errors": {
+    "more": "(+{{count}} more)",
+    "expandAriaLabel": "Show all {{count}} errors",
+    "collapseAriaLabel": "Collapse errors"
   }
 }
