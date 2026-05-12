@@ -55,7 +55,7 @@ def test_plugin_catalogue_contains_all_demo_blocks() -> None:
 
 
 def test_plugin_expands_qubed_output_to_all_demo_blocks(dummy_output: QubedOutput) -> None:
-    assert set(plugin().expander(dummy_output)) == EXPECTED_FACTORY_IDS
+    assert set(expansion.factory for expansion in plugin().expander(dummy_output)) == EXPECTED_FACTORY_IDS
 
 
 @pytest.mark.parametrize(
