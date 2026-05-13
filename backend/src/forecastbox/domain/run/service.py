@@ -32,6 +32,7 @@ from cascade.controller.report import JobId
 from cascade.gateway import api, client
 from cascade.low.core import TaskId
 from cascade.low.func import Either
+from fiab_core.fable import BlockInstanceId
 
 import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.run.db as run_db
@@ -44,6 +45,7 @@ from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import Blueprint, Run
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
+from forecastbox.utility.memcache import get as get_memcache
 from forecastbox.utility.pydantic import FiabBaseModel
 
 logger = logging.getLogger(__name__)
@@ -64,8 +66,8 @@ class RunDetail(FiabBaseModel):
     cascade_job_id: str | None = None
     available_task_ids: list[TaskId] | None = None
     outputs: dict | None = None
-    completed_task_ids: dict[JobId, list[TaskId]] | None = None
-    planned_task_ids: dict[JobId, list[TaskId]] | None = None
+    completed_task_ids: dict[JobId, list[BlockInstanceId]] | None = None
+    planned_task_ids: dict[JobId, list[BlockInstanceId]] | None = None
 
 
 class ExecuteResult(FiabBaseModel):
@@ -182,12 +184,23 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
     else:
         available_task_ids = None
 
+    def _translate_task_ids(
+        task_ids_by_job: dict[JobId, list[TaskId]] | None,
+        task_to_block: dict[TaskId, BlockInstanceId] | None,
+    ) -> dict[JobId, list[BlockInstanceId]] | None:
+        if task_ids_by_job is None or task_to_block is None:
+            return None
+        translated: dict[JobId, list[BlockInstanceId]] = {}
+        for job_id, task_ids in task_ids_by_job.items():
+            translated[job_id] = [task_to_block[task_id] for task_id in task_ids if task_id in task_to_block]
+        return translated
+
     def _build(
         status_override: str | None = None,
         error_override: str | None = None,
         progress_override: str | None = None,
-        completed_task_ids: dict[JobId, list[TaskId]] | None = None,
-        planned_task_ids: dict[JobId, list[TaskId]] | None = None,
+        completed_task_ids: dict[JobId, list[BlockInstanceId]] | None = None,
+        planned_task_ids: dict[JobId, list[BlockInstanceId]] | None = None,
     ) -> RunDetail:
         return RunDetail(
             run_id=run_id,
@@ -206,11 +219,33 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
             planned_task_ids=planned_task_ids,
         )
 
-    if status in ("submitted", "preparing", "running") and cascade_job_id:
+    if status == "completed" and cascade_job_id and detailed_report:
         job_id = JobId(cascade_job_id)
         try:
+            task_to_block = cast(dict[TaskId, BlockInstanceId], get_memcache(job_id, dict))
+            completed_blocks = sorted(set(task_to_block.values()))
+            return _build(
+                completed_task_ids={job_id: completed_blocks},
+                planned_task_ids={job_id: []},
+            )
+        except (KeyError, TypeError):
+            return _build(error_override="unable to provide completed/planned tasks")
+
+    if status in ("submitted", "preparing", "running") and cascade_job_id:
+        job_id = JobId(cascade_job_id)
+        warning_error: str | None = None
+        use_detailed_report = detailed_report and status == "running"
+        task_to_block: dict[TaskId, BlockInstanceId] | None = None
+        if use_detailed_report:
+            try:
+                task_to_block = cast(dict[TaskId, BlockInstanceId], get_memcache(job_id, dict))
+            except (KeyError, TypeError):
+                use_detailed_report = False
+                warning_error = "unable to provide completed/planned tasks"
+
+        try:
             response = client.request_response(
-                api.JobProgressRequest(job_ids=[job_id], detailed_report=detailed_report),
+                api.JobProgressRequest(job_ids=[job_id], detailed_report=use_detailed_report),
                 f"{config.cascade.cascade_url}",
             )
             response = cast(api.JobProgressResponse, response)
@@ -225,8 +260,8 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
         if response.error:
             return _build(status_override="unknown", error_override=response.error)
 
-        completed_task_ids = response.completed_task_ids if detailed_report else None
-        planned_task_ids = response.planned_task_ids if detailed_report else None
+        completed_task_ids = _translate_task_ids(response.completed_task_ids, task_to_block) if use_detailed_report else None
+        planned_task_ids = _translate_task_ids(response.planned_task_ids, task_to_block) if use_detailed_report else None
         jobprogress = response.progresses.get(job_id)
         if jobprogress is None:
             await run_db.update_run_runtime(run_id, actual_attempt, status="failed", error="evicted from gateway")
@@ -243,6 +278,7 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
             await run_db.update_run_runtime(run_id, actual_attempt, status="running", progress=jobprogress.pct)
             return _build(
                 status_override="running",
+                error_override=warning_error,
                 progress_override=jobprogress.pct,
                 completed_task_ids=completed_task_ids,
                 planned_task_ids=planned_task_ids,

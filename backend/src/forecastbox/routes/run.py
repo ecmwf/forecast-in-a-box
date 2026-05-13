@@ -101,8 +101,8 @@ class RunDetailResponse(FiabBaseModel):
     progress: str | None = None
     cascade_job_id: str | None = None
     outputs: RunOutputsResponse | None = None
-    completed_task_ids: dict[JobId, list[TaskId]] | None = None
-    planned_task_ids: dict[JobId, list[TaskId]] | None = None
+    completed_task_ids: dict[JobId, list[BlockInstanceId]] | None = None
+    planned_task_ids: dict[JobId, list[BlockInstanceId]] | None = None
 
 
 class RunListResponse(FiabBaseModel):

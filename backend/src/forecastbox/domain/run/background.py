@@ -21,6 +21,10 @@ import uuid
 from datetime import datetime
 from typing import cast
 
+from cascade.controller.report import JobId
+from cascade.low.core import TaskId
+from fiab_core.fable import BlockInstanceId
+
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.glyphs import global_db
 from forecastbox.domain.glyphs.global_db import GlyphResolutionBuckets
@@ -38,6 +42,7 @@ from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import Blueprint
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.memcache import insert as memcache_insert
 from forecastbox.utility.time import current_time
 
 logger = logging.getLogger(__name__)
@@ -100,7 +105,7 @@ def execute_background(
         relevant_glyphs_and_values = expand_glyph_values(all_glyphs_raw, roots=referenced_glyph_names)
         used_glyphs = {k: all_glyphs_raw[k] for k in relevant_glyphs_and_values.keys() if k not in PINNED_INTRINSIC_KEYS}
 
-        exec_spec, run_outputs = compile_builder(builder, relevant_glyphs_and_values)
+        exec_spec, run_outputs, task_to_block = compile_builder(builder, relevant_glyphs_and_values)
 
         persisted_context = compiler_runtime_context.model_copy(update={"glyphs": used_glyphs})
         run_async(
@@ -115,6 +120,14 @@ def execute_background(
         logger.debug(f"starting background submission of {run_id=}")
         response = execute_cascade(exec_spec)
         cascade_job_id = response.job_id or str(uuid.uuid4())
+        if response.job_id:
+            try:
+                memcache_insert(
+                    JobId(response.job_id),
+                    cast(dict[TaskId, BlockInstanceId], task_to_block),
+                )
+            except Exception as e:
+                logger.warning(f"failed to cache task-to-block mapping for {run_id=}, {attempt_count=}: {repr(e)}")
 
         update_kwargs: dict[str, object] = {"cascade_job_id": cascade_job_id}
         if response.error:
