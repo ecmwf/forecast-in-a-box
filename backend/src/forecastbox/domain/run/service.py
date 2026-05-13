@@ -66,8 +66,8 @@ class RunDetail(FiabBaseModel):
     cascade_job_id: str | None = None
     available_task_ids: list[TaskId] | None = None
     outputs: dict | None = None
-    completed_task_ids: dict[JobId, list[BlockInstanceId]] | None = None
-    planned_task_ids: dict[JobId, list[BlockInstanceId]] | None = None
+    completed_task_ids: list[BlockInstanceId] | None = None
+    planned_task_ids: list[BlockInstanceId] | None = None
 
 
 class ExecuteResult(FiabBaseModel):
@@ -187,20 +187,18 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
     def _translate_task_ids(
         task_ids_by_job: dict[JobId, list[TaskId]] | None,
         task_to_block: dict[TaskId, BlockInstanceId] | None,
-    ) -> dict[JobId, list[BlockInstanceId]] | None:
+        job_id: JobId,
+    ) -> list[BlockInstanceId] | None:
         if task_ids_by_job is None or task_to_block is None:
             return None
-        translated: dict[JobId, list[BlockInstanceId]] = {}
-        for job_id, task_ids in task_ids_by_job.items():
-            translated[job_id] = [task_to_block[task_id] for task_id in task_ids]
-        return translated
+        return [task_to_block[task_id] for task_id in task_ids_by_job[job_id]]
 
     def _build(
         status_override: str | None = None,
         error_override: str | None = None,
         progress_override: str | None = None,
-        completed_task_ids: dict[JobId, list[BlockInstanceId]] | None = None,
-        planned_task_ids: dict[JobId, list[BlockInstanceId]] | None = None,
+        completed_task_ids: list[BlockInstanceId] | None = None,
+        planned_task_ids: list[BlockInstanceId] | None = None,
     ) -> RunDetail:
         return RunDetail(
             run_id=run_id,
@@ -220,7 +218,7 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
         )
 
     if status == "completed" and cascade_job_id and detailed_report:
-        return _build(completed_task_ids={}, planned_task_ids={})
+        return _build(completed_task_ids=[], planned_task_ids=[])
 
     if status in ("submitted", "preparing", "running") and cascade_job_id:
         job_id = JobId(cascade_job_id)
@@ -250,8 +248,8 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
         if response.error:
             return _build(status_override="unknown", error_override=response.error)
 
-        completed_task_ids = _translate_task_ids(response.completed_task_ids, task_to_block) if detailed_report else None
-        planned_task_ids = _translate_task_ids(response.planned_task_ids, task_to_block) if detailed_report else None
+        completed_task_ids = _translate_task_ids(response.completed_task_ids, task_to_block, job_id) if detailed_report else None
+        planned_task_ids = _translate_task_ids(response.planned_task_ids, task_to_block, job_id) if detailed_report else None
         jobprogress = response.progresses.get(job_id)
         if jobprogress is None:
             await run_db.update_run_runtime(run_id, actual_attempt, status="failed", error="evicted from gateway")

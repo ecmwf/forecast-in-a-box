@@ -119,10 +119,6 @@ def execute_background(
         logger.debug(f"starting background submission of {run_id=}")
         response = execute_cascade(exec_spec)
         if response.job_id is not None:
-            update_kwargs: dict[str, object] = {
-                "cascade_job_id": response.job_id,
-                "outputs": run_outputs.model_dump(),
-            }
             try:
                 memcache_insert(
                     run_id,
@@ -130,12 +126,11 @@ def execute_background(
                 )
             except TooLargeEntry as e:
                 logger.warning(f"failed to cache task-to-block mapping for {run_id=}, {attempt_count=}: {repr(e)}")
-            run_async(db.update_run_runtime(run_id, attempt_count, **update_kwargs))
+            (run_async(db.update_run_runtime(run_id, attempt_count, cascade_job_id=response.job_id, outputs=run_outputs.model_dump())),)
         else:
             error = (response.error or "no error provided by cascade")[:255]
             run_async(db.update_run_runtime(run_id, attempt_count, status="failed", error=error))
-
     except Exception as e:
-        logger.exception(f"execute_background failed for run {run_id!r} attempt {attempt_count}: {e}")
+        logger.exception(f"execute_background failed for run {run_id!r} attempt {attempt_count}: {repr(e)}")
         logger.debug(f"updating background data of {run_id=}")
         run_async(db.update_run_runtime(run_id, attempt_count, status="failed", error=repr(e)[:255]))
