@@ -116,6 +116,28 @@ async def test_poll_and_update_disables_detailed_report_when_cache_misses() -> N
 
 
 @pytest.mark.asyncio
+async def test_poll_and_update_returns_empty_detailed_fields_for_completed_runs() -> None:
+    execution = SimpleNamespace(
+        run_id="run-1",
+        attempt_count=1,
+        status="completed",
+        created_at="2026-05-12T00:00:00",
+        updated_at="2026-05-12T00:00:00",
+        blueprint_id="bp-1",
+        blueprint_version=1,
+        error=None,
+        progress="100.00",
+        cascade_job_id="job-1",
+        outputs={"outputs": {"task-a": {"mime_type": "application/json", "original_block": "block-a"}}},
+    )
+
+    detail = await run_service.poll_and_update(cast(Run, execution), detailed_report=True)
+
+    assert detail.completed_task_ids == {}
+    assert detail.planned_task_ids == {}
+
+
+@pytest.mark.asyncio
 async def test_get_run_asks_for_detailed_report_while_list_runs_does_not() -> None:
     execution = SimpleNamespace(
         run_id="run-1",

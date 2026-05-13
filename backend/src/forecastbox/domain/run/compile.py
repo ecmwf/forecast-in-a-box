@@ -124,21 +124,17 @@ def compile_builder(
         except Exception as e:
             raise ValueError(f"compile failed at {blockId=} with {e}")
 
-        block_graph = action_lookup[blockId].graph()
-        for node in block_graph.sinks:
-            # TODO this may not be relevant anymore -- verify on real workflows
-            if node.name.startswith("run_as_earthkit"):
-                continue
-            task_id = cast(TaskId, node.name)  # TODO hack -- expose a proper interface for the name→taskId conversion in cascade
-            task_to_block[task_id] = blockId
-            if block_factory.kind == "sink":
-                sink_tasks.add(task_id)
-
-        block_output = block_outputs.get(blockId)
-        if not isinstance(block_output, NoOutput):
-            block_to_mime[blockId] = block_output.mime_type if isinstance(block_output, RawOutput) else "application/octet-stream"
-
         if block_factory.kind == "sink":
+            block_graph = action_lookup[blockId].graph()
+            for node in block_graph.nodes():
+                task_id = cast(TaskId, node.name)  # TODO hack -- expose a proper interface for the name→taskId conversion in cascade
+                task_to_block[task_id] = blockId
+            sink_tasks.update(cast(TaskId, node.name) for node in block_graph.sinks)
+
+            block_output = block_outputs.get(blockId)
+            if not isinstance(block_output, NoOutput):
+                block_to_mime[blockId] = block_output.mime_type if isinstance(block_output, RawOutput) else "application/octet-stream"
+
             graph += block_graph
 
     graph = deduplicate_nodes(graph)
@@ -147,15 +143,14 @@ def compile_builder(
     sink_task_ids = sorted(sink_tasks)
     job_instance.ext_outputs = [dataset_id for task_id in sink_task_ids for dataset_id in job_instance.outputs_of(task_id)]
 
-    run_outputs: dict[TaskId, RunOutputCharacteristic] = {}
-    for task_id in sink_task_ids:
-        block_id = task_to_block.get(task_id)
-        if block_id is None:
-            continue
-        run_outputs[task_id] = RunOutputCharacteristic(
+    run_outputs: dict[TaskId, RunOutputCharacteristic] = {
+        task_id: RunOutputCharacteristic(
             original_block=block_id,
             mime_type=block_to_mime.get(block_id, "application/octet-stream"),
         )
+        for task_id in sink_task_ids
+        for block_id in [task_to_block[task_id]]
+    }
 
     job = RawCascadeJob(job_type="raw_cascade_job", job_instance=job_instance)
 

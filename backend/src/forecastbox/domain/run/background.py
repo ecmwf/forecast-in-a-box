@@ -42,6 +42,7 @@ from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import Blueprint
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.memcache import TooLargeEntry
 from forecastbox.utility.memcache import insert as memcache_insert
 from forecastbox.utility.time import current_time
 
@@ -126,7 +127,7 @@ def execute_background(
                     JobId(response.job_id),
                     cast(dict[TaskId, BlockInstanceId], task_to_block),
                 )
-            except Exception as e:
+            except TooLargeEntry as e:
                 logger.warning(f"failed to cache task-to-block mapping for {run_id=}, {attempt_count=}: {repr(e)}")
 
         update_kwargs: dict[str, object] = {"cascade_job_id": cascade_job_id}

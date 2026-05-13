@@ -60,5 +60,5 @@ def test_insert_evicts_lru_tail(fresh_cache: memcache._MemoryCache) -> None:
 
 def test_insert_rejects_oversized_value(fresh_cache: memcache._MemoryCache) -> None:
     fresh_cache.max_size = 1
-    with pytest.raises(ValueError):
+    with pytest.raises(memcache.TooLargeEntry):
         memcache.insert("k", {"payload": "x" * 10})

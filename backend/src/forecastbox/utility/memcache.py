@@ -21,6 +21,10 @@ from pyrsistent.typing import PMap
 T = TypeVar("T")
 
 
+class TooLargeEntry(ValueError):
+    """Raised when a single cache entry exceeds cache capacity."""
+
+
 def _deep_sizeof(value: Any, seen: set[int] | None = None) -> int:
     if seen is None:
         seen = set()
@@ -89,7 +93,7 @@ _CACHE = _MemoryCache()
 def insert(key: Any, value: Any) -> None:
     entry_size = _deep_sizeof((key, value))
     if entry_size > _CACHE.max_size:
-        raise ValueError(f"value is too large for cache capacity: {entry_size} > {_CACHE.max_size}")
+        raise TooLargeEntry(f"value is too large for cache capacity: {entry_size} > {_CACHE.max_size}")
 
     with _CACHE.lock:
         if key in _CACHE.lookup:
@@ -97,7 +101,7 @@ def insert(key: Any, value: Any) -> None:
 
         while _CACHE.current_size + entry_size > _CACHE.max_size:
             if not _CACHE.lru:
-                raise ValueError("cache eviction failed: no entries left but capacity is still exceeded")
+                raise RuntimeError("cache eviction failed: no entries left but capacity is still exceeded")
             evict_key = _CACHE.lru[-1]
             _CACHE._remove_key(evict_key)
 
