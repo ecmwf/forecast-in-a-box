@@ -70,7 +70,9 @@ def _get_artifacts_list(graph: Graph) -> list[CompositeArtifactId]:
     return list(artifacts)
 
 
-def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -> tuple[ExecutionSpecification, RunOutputs]:
+def compile_builder(
+    blueprint: BlueprintBuilder, glyph_values: dict[str, str]
+) -> tuple[ExecutionSpecification, RunOutputs, dict[TaskId, BlockInstanceId]]:
     """Compile a BlueprintBuilder into an ExecutionSpecification and RunOutputs.
 
     Raises ``ValueError`` if any block cannot be validated/compiled. When ``glyph_values`` is
@@ -83,8 +85,11 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
     plugins = PluginManager.plugins
     action_lookup = {}
     block_outputs: dict[BlockInstanceId, BlockInstanceOutput] = {}
-    # Maps cascade TaskId (node.name) → (originating BlockInstanceId, mime_type)
-    sink_task_to_block: dict[TaskId, tuple[BlockInstanceId, str]] = {}
+    # Maps any produced cascade TaskId (node.name) → originating BlockInstanceId.
+    task_to_block: dict[TaskId, BlockInstanceId] = {}
+    # Maps sink block ids to mime type used in RunOutputs (only relevant for external outputs).
+    block_to_mime: dict[BlockInstanceId, str] = {}
+    sink_tasks: set[TaskId] = set()
 
     for blockId in topological_order(blueprint.blocks.items(), lambda block: block.input_ids.values()):
         blockInstance = blueprint.blocks[blockId]
@@ -120,26 +125,33 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
             raise ValueError(f"compile failed at {blockId=} with {e}")
 
         if block_factory.kind == "sink":
-            sink_graph = action_lookup[blockId].graph()
+            block_graph = action_lookup[blockId].graph()
+            for node in block_graph.nodes():
+                task_id = cast(TaskId, node.name)  # TODO hack -- expose a proper interface for the name→taskId conversion in cascade
+                task_to_block[task_id] = blockId
+            sink_tasks.update(
+                cast(TaskId, node.name)
+                for node in block_graph.sinks  # TODO hack -- expose a proper interface for the name→taskId conversion in cascade
+                if not node.name.startswith("run_as_earthkit")  # TODO this may not be relevant anymore -- verify on real workflows
+            )
+
             block_output = block_outputs.get(blockId)
             if not isinstance(block_output, NoOutput):
-                mime_type = block_output.mime_type if isinstance(block_output, RawOutput) else "application/octet-stream"
-                for node in sink_graph.sinks:
-                    # TODO this may not be relevant anymore -- verify on real workflows
-                    if node.name.startswith("run_as_earthkit"):
-                        continue
-                    task_id = cast(TaskId, node.name)  # TODO hack -- expose a proper interface for the name→taskId conversion in cascade
-                    sink_task_to_block[task_id] = (blockId, mime_type)
-            graph += sink_graph
+                block_to_mime[blockId] = block_output.mime_type if isinstance(block_output, RawOutput) else "application/octet-stream"
+
+            graph += block_graph
 
     graph = deduplicate_nodes(graph)
     job_instance = graph2job(graph)
 
-    job_instance.ext_outputs = [dataset_id for task_id in sink_task_to_block for dataset_id in job_instance.outputs_of(task_id)]
+    job_instance.ext_outputs = [dataset_id for task_id in sink_tasks for dataset_id in job_instance.outputs_of(task_id)]
 
     run_outputs: dict[TaskId, RunOutputCharacteristic] = {
-        task_id: RunOutputCharacteristic(original_block=block_id, mime_type=mime_type)
-        for task_id, (block_id, mime_type) in sink_task_to_block.items()
+        task_id: RunOutputCharacteristic(
+            original_block=task_to_block[task_id],
+            mime_type=block_to_mime[task_to_block[task_id]],
+        )
+        for task_id in sink_tasks
     }
 
     job = RawCascadeJob(job_type="raw_cascade_job", job_instance=job_instance)
@@ -150,4 +162,4 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
         environment = blueprint.environment.model_copy(update={"runtime_artifacts": merged_artifacts})
     else:
         environment = EnvironmentSpecification(runtime_artifacts=graph_artifacts)
-    return ExecutionSpecification(job=job, environment=environment), RunOutputs(outputs=run_outputs)
+    return ExecutionSpecification(job=job, environment=environment), RunOutputs(outputs=run_outputs), task_to_block

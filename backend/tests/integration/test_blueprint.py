@@ -513,6 +513,8 @@ def test_blueprint_expand_missing_glyph_warnings(tmpdir: Any, backend_client_wit
     available_tasks = [task_id for task_id, char in run_detail["outputs"]["outputs"].items() if char["is_available"]]
     assert isinstance(available_tasks, list)
     assert len(available_tasks) > 0
+    assert run_detail["planned_block_ids"] == []
+    assert run_detail["completed_block_ids"] == []
 
     logs_resp = backend_client_with_auth.get("/run/logs", params={"run_id": run_id})
     assert logs_resp.is_success, logs_resp.text

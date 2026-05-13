@@ -32,6 +32,7 @@ from cascade.controller.report import JobId
 from cascade.gateway import api, client
 from cascade.low.core import TaskId
 from cascade.low.func import Either
+from fiab_core.fable import BlockInstanceId
 
 import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.run.db as run_db
@@ -44,6 +45,7 @@ from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import Blueprint, Run
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
+from forecastbox.utility.memcache import get as get_memcache
 from forecastbox.utility.pydantic import FiabBaseModel
 
 logger = logging.getLogger(__name__)
@@ -64,6 +66,8 @@ class RunDetail(FiabBaseModel):
     cascade_job_id: str | None = None
     available_task_ids: list[TaskId] | None = None
     outputs: dict | None = None
+    completed_block_ids: set[BlockInstanceId] | None = None
+    planned_block_ids: set[BlockInstanceId] | None = None
 
 
 class ExecuteResult(FiabBaseModel):
@@ -162,7 +166,7 @@ async def restart_run(run_id: RunId, auth_context: AuthContext) -> Either[Execut
     )
 
 
-async def poll_and_update(execution: Run) -> RunDetail:
+async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunDetail:
     """Poll cascade for a Run's status, update db if changed, and return current detail."""
     run_id = RunId(str(execution.run_id))  # ty:ignore[invalid-argument-type]
     actual_attempt = cast(int, execution.attempt_count)
@@ -180,7 +184,22 @@ async def poll_and_update(execution: Run) -> RunDetail:
     else:
         available_task_ids = None
 
-    def _build(status_override: str | None = None, error_override: str | None = None, progress_override: str | None = None) -> RunDetail:
+    def _translate_task_ids(
+        task_ids_by_job: dict[JobId, list[TaskId]] | None,
+        task_to_block: dict[TaskId, BlockInstanceId] | None,
+        job_id: JobId,
+    ) -> set[BlockInstanceId] | None:
+        if task_ids_by_job is None or task_to_block is None:
+            return None
+        return {task_to_block[task_id] for task_id in task_ids_by_job[job_id]}
+
+    def _build(
+        status_override: str | None = None,
+        error_override: str | None = None,
+        progress_override: str | None = None,
+        completed_block_ids: set[BlockInstanceId] | None = None,
+        planned_block_ids: set[BlockInstanceId] | None = None,
+    ) -> RunDetail:
         return RunDetail(
             run_id=run_id,
             attempt_count=actual_attempt,
@@ -194,12 +213,29 @@ async def poll_and_update(execution: Run) -> RunDetail:
             cascade_job_id=cascade_job_id,
             available_task_ids=available_task_ids,
             outputs=raw_outputs,
+            completed_block_ids=completed_block_ids,
+            planned_block_ids=planned_block_ids,
         )
+
+    if status == "completed" and cascade_job_id and detailed_report:
+        return _build(completed_block_ids=set(), planned_block_ids=set())
 
     if status in ("submitted", "preparing", "running") and cascade_job_id:
         job_id = JobId(cascade_job_id)
+        warning_error: str | None = None
+        task_to_block: dict[TaskId, BlockInstanceId] | None = None
+        if detailed_report:
+            try:
+                task_to_block = cast(dict[TaskId, BlockInstanceId], get_memcache(run_id, dict))
+            except (KeyError, TypeError):
+                detailed_report = False
+                warning_error = "unable to provide completed/planned tasks"
+
         try:
-            response = client.request_response(api.JobProgressRequest(job_ids=[job_id]), f"{config.cascade.cascade_url}")
+            response = client.request_response(
+                api.JobProgressRequest(job_ids=[job_id], detailed_report=detailed_report),
+                f"{config.cascade.cascade_url}",
+            )
             response = cast(api.JobProgressResponse, response)
         except TimeoutError:
             return _build(status_override="unknown", error_override="failed to communicate with gateway")
@@ -212,6 +248,19 @@ async def poll_and_update(execution: Run) -> RunDetail:
         if response.error:
             return _build(status_override="unknown", error_override=response.error)
 
+        # NOTE we should check more carefuly in the None branch -- the job_id may not be part of the response
+        # if the job has not started yet -- but we should verify that in the status, etc
+        if task_to_block is not None and response.planned_task_ids is not None and job_id in response.planned_task_ids:
+            # any block that has a task planned is a planned block
+            planned_block_ids = {task_to_block[task_id] for task_id in response.planned_task_ids[job_id]}
+        else:
+            planned_block_ids = None
+        if task_to_block is not None and response.completed_task_ids is not None and job_id in response.completed_task_ids:
+            # any block that has all tasks completed is a completed block
+            uncompleted_task_to_block = {k: v for k, v in task_to_block.items() if k not in response.completed_task_ids[job_id]}
+            completed_block_ids = set(task_to_block.values()) - set(uncompleted_task_to_block.values())
+        else:
+            completed_block_ids = None
         jobprogress = response.progresses.get(job_id)
         if jobprogress is None:
             await run_db.update_run_runtime(run_id, actual_attempt, status="failed", error="evicted from gateway")
@@ -226,6 +275,12 @@ async def poll_and_update(execution: Run) -> RunDetail:
             return _build(status_override="completed", progress_override="100.00")
         else:
             await run_db.update_run_runtime(run_id, actual_attempt, status="running", progress=jobprogress.pct)
-            return _build(status_override="running", progress_override=jobprogress.pct)
+            return _build(
+                status_override="running",
+                error_override=warning_error,
+                progress_override=jobprogress.pct,
+                completed_block_ids=completed_block_ids,
+                planned_block_ids=planned_block_ids,
+            )
 
     return _build()
