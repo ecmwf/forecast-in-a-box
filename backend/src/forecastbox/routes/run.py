@@ -101,8 +101,8 @@ class RunDetailResponse(FiabBaseModel):
     progress: str | None = None
     cascade_job_id: str | None = None
     outputs: RunOutputsResponse | None = None
-    completed_task_ids: list[BlockInstanceId] | None = None
-    planned_task_ids: list[BlockInstanceId] | None = None
+    completed_block_ids: list[BlockInstanceId] | None = None
+    planned_block_ids: list[BlockInstanceId] | None = None
 
 
 class RunListResponse(FiabBaseModel):
@@ -152,6 +152,7 @@ def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
                 for task_id, char in run_outputs.outputs.items()
             }
         )
+    maybe_list = lambda s: list(s) if s is not None else None
     return RunDetailResponse(
         run_id=domain_detail.run_id,
         attempt_count=domain_detail.attempt_count,
@@ -164,8 +165,8 @@ def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
         progress=domain_detail.progress,
         cascade_job_id=domain_detail.cascade_job_id,
         outputs=outputs_response,
-        completed_task_ids=domain_detail.completed_task_ids,
-        planned_task_ids=domain_detail.planned_task_ids,
+        completed_block_ids=maybe_list(domain_detail.completed_block_ids),
+        planned_block_ids=maybe_list(domain_detail.planned_block_ids),
     )
 
 

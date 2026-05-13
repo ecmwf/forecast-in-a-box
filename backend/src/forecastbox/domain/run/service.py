@@ -66,8 +66,8 @@ class RunDetail(FiabBaseModel):
     cascade_job_id: str | None = None
     available_task_ids: list[TaskId] | None = None
     outputs: dict | None = None
-    completed_task_ids: list[BlockInstanceId] | None = None
-    planned_task_ids: list[BlockInstanceId] | None = None
+    completed_block_ids: set[BlockInstanceId] | None = None
+    planned_block_ids: set[BlockInstanceId] | None = None
 
 
 class ExecuteResult(FiabBaseModel):
@@ -188,17 +188,17 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
         task_ids_by_job: dict[JobId, list[TaskId]] | None,
         task_to_block: dict[TaskId, BlockInstanceId] | None,
         job_id: JobId,
-    ) -> list[BlockInstanceId] | None:
+    ) -> set[BlockInstanceId] | None:
         if task_ids_by_job is None or task_to_block is None:
             return None
-        return [task_to_block[task_id] for task_id in task_ids_by_job[job_id]]
+        return {task_to_block[task_id] for task_id in task_ids_by_job[job_id]}
 
     def _build(
         status_override: str | None = None,
         error_override: str | None = None,
         progress_override: str | None = None,
-        completed_task_ids: list[BlockInstanceId] | None = None,
-        planned_task_ids: list[BlockInstanceId] | None = None,
+        completed_block_ids: set[BlockInstanceId] | None = None,
+        planned_block_ids: set[BlockInstanceId] | None = None,
     ) -> RunDetail:
         return RunDetail(
             run_id=run_id,
@@ -213,12 +213,12 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
             cascade_job_id=cascade_job_id,
             available_task_ids=available_task_ids,
             outputs=raw_outputs,
-            completed_task_ids=completed_task_ids,
-            planned_task_ids=planned_task_ids,
+            completed_block_ids=completed_block_ids,
+            planned_block_ids=planned_block_ids,
         )
 
     if status == "completed" and cascade_job_id and detailed_report:
-        return _build(completed_task_ids=[], planned_task_ids=[])
+        return _build(completed_block_ids=set(), planned_block_ids=set())
 
     if status in ("submitted", "preparing", "running") and cascade_job_id:
         job_id = JobId(cascade_job_id)
@@ -248,8 +248,19 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
         if response.error:
             return _build(status_override="unknown", error_override=response.error)
 
-        completed_task_ids = _translate_task_ids(response.completed_task_ids, task_to_block, job_id) if detailed_report else None
-        planned_task_ids = _translate_task_ids(response.planned_task_ids, task_to_block, job_id) if detailed_report else None
+        # NOTE we should check more carefuly in the None branch -- the job_id may not be part of the response
+        # if the job has not started yet -- but we should verify that in the status, etc
+        if task_to_block is not None and response.planned_task_ids is not None and job_id in response.planned_task_ids:
+            # any block that has a task planned is a planned block
+            planned_block_ids = {task_to_block[task_id] for task_id in response.planned_task_ids[job_id]}
+        else:
+            planned_block_ids = None
+        if task_to_block is not None and response.completed_task_ids is not None and job_id in response.completed_task_ids:
+            # any block that has all tasks completed is a completed block
+            uncompleted_task_to_block = {k: v for k, v in task_to_block.items() if k not in response.completed_task_ids[job_id]}
+            completed_block_ids = set(task_to_block.values()) - set(uncompleted_task_to_block.values())
+        else:
+            completed_block_ids = None
         jobprogress = response.progresses.get(job_id)
         if jobprogress is None:
             await run_db.update_run_runtime(run_id, actual_attempt, status="failed", error="evicted from gateway")
@@ -268,8 +279,8 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
                 status_override="running",
                 error_override=warning_error,
                 progress_override=jobprogress.pct,
-                completed_task_ids=completed_task_ids,
-                planned_task_ids=planned_task_ids,
+                completed_block_ids=completed_block_ids,
+                planned_block_ids=planned_block_ids,
             )
 
     return _build()
