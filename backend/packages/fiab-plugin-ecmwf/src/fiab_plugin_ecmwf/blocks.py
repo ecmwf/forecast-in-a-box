@@ -488,17 +488,16 @@ class MapPlotSink(Sink):
             description="Output image format",
             value_type="enumClosed['png', 'pdf', 'svg']",
         ),
-        # Disabled for now
-        # "groupby": BlockConfigurationOption(
-        #     title="Group By",
-        #     description="Dimension to create subplots over",
-        #     value_type="enum['valid_datetime', 'step', 'number', 'none']",
-        # ),
-        # "style_schema": BlockConfigurationOption(
-        #     title="Style Schema",
-        #     description="earthkit-plots schema identifier",
-        #     value_type="str",
-        # ),
+        "groupby": BlockConfigurationOption(
+            title="Group By",
+            description="Dimension to create subplots over",
+            value_type="enumClosed['valid_datetime', 'step', 'number', 'none']",
+        ),
+        "style_schema": BlockConfigurationOption(
+            title="Style Schema",
+            description="earthkit-plots schema identifier",
+            value_type="str",
+        ),
     }
     inputs: list[str] = ["dataset"]
 
@@ -513,16 +512,15 @@ class MapPlotSink(Sink):
         if missing:
             return Either.error(f"params {missing} are not in the input parameters: {axes(input_dataset).get(PARAM, [])}")
 
-        # Disabled for now
-        # groupby_value = block.configuration_values["groupby"]
-        # if groupby_value not in ("valid_datetime", "step", "number", "none"):
-        #     return Either.error(
-        #         f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
-        #     )
-        # if groupby_value != "none" and groupby_value not in dimensions(input_dataset):
-        #     return Either.error(
-        #         f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
-        #     )
+        groupby_value = block.configuration_values["groupby"]
+        if groupby_value not in ("valid_datetime", "step", "number", "none"):
+            return Either.error(
+                f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
+            )
+        if groupby_value != "none" and groupby_value not in dimensions(input_dataset):
+            return Either.error(
+                f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
+            )
 
         fmt = block.config_as_str(FORMAT)
         mime_type = PLOT_FORMAT_TO_MIME.get(fmt)
@@ -540,11 +538,10 @@ class MapPlotSink(Sink):
         params = block.config_as_list(PARAM, str, allow_empty=False)
         selected = inputs[input_task].select({PARAM: params if len(params) > 1 else params[0]})
 
-        # Disabled for now
-        # groupby = block.configuration_values["groupby"] or "valid_datetime"
+        groupby = block.configuration_values["groupby"] or "valid_datetime"
 
-        # if groupby != "none":
-        #     selected = selected.concatenate(groupby)
+        if groupby != "none":
+            selected = selected.combine_branches(dim=groupby).flatten(keep_dims=[groupby])
 
         action = selected.map(
             Payload(
@@ -552,8 +549,8 @@ class MapPlotSink(Sink):
                 kwargs={
                     "domain": block.config_as_str(DOMAIN) or None,
                     "format": block.config_as_str(FORMAT),
-                    # "groupby": block.configuration_values["groupby"] or "valid_datetime",
-                    # "style_schema": block.configuration_values["style_schema"] or "inbuilt://fiab",
+                    "groupby": block.configuration_values["groupby"] or "valid_datetime",
+                    "style_schema": block.configuration_values["style_schema"] or "inbuilt://fiab",
                 },
                 metadata={"environment": ["earthkit-plots<1.0.0", "earthkit-regrid<1.0.0"]},
             )
