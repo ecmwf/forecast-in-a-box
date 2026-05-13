@@ -228,7 +228,7 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
         task_to_block: dict[TaskId, BlockInstanceId] | None = None
         if detailed_report:
             try:
-                task_to_block = cast(dict[TaskId, BlockInstanceId], get_memcache(job_id, dict))
+                task_to_block = cast(dict[TaskId, BlockInstanceId], get_memcache(run_id, dict))
             except (KeyError, TypeError):
                 detailed_report = False
                 warning_error = "unable to provide completed/planned tasks"

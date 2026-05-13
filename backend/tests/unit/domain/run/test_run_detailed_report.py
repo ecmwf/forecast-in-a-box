@@ -67,13 +67,14 @@ async def test_poll_and_update_requests_detailed_report_and_translates_to_block_
 
     with (
         patch("forecastbox.domain.run.service.client.request_response", return_value=response) as mock_request,
-        patch("forecastbox.domain.run.service.get_memcache", return_value=task_to_block),
+        patch("forecastbox.domain.run.service.get_memcache", return_value=task_to_block) as mock_get_memcache,
         patch("forecastbox.domain.run.service.run_db.update_run_runtime", new=AsyncMock()),
     ):
         detail = await run_service.poll_and_update(cast(Run, execution), detailed_report=True)
 
     request = mock_request.call_args.args[0]
     assert request.detailed_report is True
+    assert mock_get_memcache.call_args.args[0] == RunId("run-1")
     assert detail.completed_task_ids == {JobId("job-1"): [BlockInstanceId("block-a")]}
     assert detail.planned_task_ids == {JobId("job-1"): [BlockInstanceId("block-b")]}
 
@@ -103,13 +104,14 @@ async def test_poll_and_update_disables_detailed_report_when_cache_misses() -> N
 
     with (
         patch("forecastbox.domain.run.service.client.request_response", return_value=response) as mock_request,
-        patch("forecastbox.domain.run.service.get_memcache", side_effect=KeyError("missing")),
+        patch("forecastbox.domain.run.service.get_memcache", side_effect=KeyError("missing")) as mock_get_memcache,
         patch("forecastbox.domain.run.service.run_db.update_run_runtime", new=AsyncMock()),
     ):
         detail = await run_service.poll_and_update(cast(Run, execution), detailed_report=True)
 
     request = mock_request.call_args.args[0]
     assert request.detailed_report is False
+    assert mock_get_memcache.call_args.args[0] == RunId("run-1")
     assert detail.error == "unable to provide completed/planned tasks"
     assert detail.completed_task_ids is None
     assert detail.planned_task_ids is None

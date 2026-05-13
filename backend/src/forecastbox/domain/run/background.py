@@ -17,11 +17,9 @@ Async database calls are dispatched back to the event loop via
 
 import asyncio
 import logging
-import uuid
 from datetime import datetime
 from typing import cast
 
-from cascade.controller.report import JobId
 from cascade.low.core import TaskId
 from fiab_core.fable import BlockInstanceId
 
@@ -120,23 +118,22 @@ def execute_background(
 
         logger.debug(f"starting background submission of {run_id=}")
         response = execute_cascade(exec_spec)
-        cascade_job_id = response.job_id or str(uuid.uuid4())
-        if response.job_id:
+        if response.job_id is not None:
+            update_kwargs: dict[str, object] = {
+                "cascade_job_id": response.job_id,
+                "outputs": run_outputs.model_dump(),
+            }
             try:
                 memcache_insert(
-                    JobId(response.job_id),
-                    cast(dict[TaskId, BlockInstanceId], task_to_block),
+                    run_id,
+                    task_to_block,
                 )
             except TooLargeEntry as e:
                 logger.warning(f"failed to cache task-to-block mapping for {run_id=}, {attempt_count=}: {repr(e)}")
-
-        update_kwargs: dict[str, object] = {"cascade_job_id": cascade_job_id}
-        if response.error:
-            update_kwargs["status"] = "failed"
-            update_kwargs["error"] = response.error[:255]
+            run_async(db.update_run_runtime(run_id, attempt_count, **update_kwargs))
         else:
-            update_kwargs["outputs"] = run_outputs.model_dump()
-        run_async(db.update_run_runtime(run_id, attempt_count, **update_kwargs))
+            error = (response.error or "no error provided by cascade")[:255]
+            run_async(db.update_run_runtime(run_id, attempt_count, status="failed", error=error))
 
     except Exception as e:
         logger.exception(f"execute_background failed for run {run_id!r} attempt {attempt_count}: {e}")
