@@ -9,6 +9,7 @@
 
 """Backend-global size-limited in-memory cache."""
 
+import logging
 import sys
 import threading
 from collections.abc import Mapping, Sequence
@@ -19,6 +20,8 @@ from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
 T = TypeVar("T")
+
+logger = logging.getLogger(__name__)
 
 
 class TooLargeEntry(ValueError):
@@ -78,13 +81,14 @@ class _MemoryCache:
         self.current_size = 0
 
     def _remove_key(self, key: Any) -> None:
-        value_size = self.sizes.get(key)
-        if value_size is not None:
+        try:
+            value_size = self.sizes[key]
             self.current_size -= value_size
             self.sizes = self.sizes.remove(key)
-        self.lookup = self.lookup.remove(key)
-        if key in self.lru:
+            self.lookup = self.lookup.remove(key)
             self.lru.remove(key)
+        except Exception as e:
+            logger.warning(f"failure during cache removal of {key}, cache may be inconsistent! {repr(e)}")
 
 
 _CACHE = _MemoryCache()
@@ -111,11 +115,15 @@ def insert(key: Any, value: Any) -> None:
         _CACHE.current_size += entry_size
 
 
-def pop(key: Any) -> Any:
-    with _CACHE.lock:
-        value = _CACHE.lookup[key]
-        _CACHE._remove_key(key)
-        return value
+def pop(key: Any) -> Any | None:
+    if key in _CACHE.lookup:
+        with _CACHE.lock:
+            if key in _CACHE.lookup:
+                value = _CACHE.lookup[key]
+                _CACHE._remove_key(key)
+                return value
+            else:
+                return None
 
 
 def get(key: Any, value_type: type[T]) -> T:

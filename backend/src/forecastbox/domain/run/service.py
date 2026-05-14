@@ -46,6 +46,7 @@ from forecastbox.schemata.jobs import Blueprint, Run
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
 from forecastbox.utility.memcache import get as get_memcache
+from forecastbox.utility.memcache import pop as pop_memcache
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import value_dt2str
 
@@ -218,10 +219,7 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
             planned_block_ids=planned_block_ids,
         )
 
-    if status == "completed" and cascade_job_id and detailed_report:
-        return _build(completed_block_ids=set(), planned_block_ids=set())
-
-    if status in ("submitted", "preparing", "running") and cascade_job_id:
+    if status in ("submitted", "preparing", "running", "unknown") and cascade_job_id:
         job_id = JobId(cascade_job_id)
         warning_error: str | None = None
         task_to_block: dict[TaskId, BlockInstanceId] | None = None
@@ -266,13 +264,16 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
         if jobprogress is None:
             await run_db.update_run_runtime(run_id, actual_attempt, status="failed", error="evicted from gateway")
             available_task_ids = []
+            pop_memcache(run_id)
             return _build(status_override="failed", error_override="evicted from gateway")
         elif jobprogress.failure:
             await run_db.update_run_runtime(run_id, actual_attempt, status="failed", error=jobprogress.failure)
             available_task_ids = []
+            pop_memcache(run_id)
             return _build(status_override="failed", error_override=jobprogress.failure)
         elif jobprogress.completed or jobprogress.pct == "100.00":
             await run_db.update_run_runtime(run_id, actual_attempt, status="completed", progress="100.00")
+            pop_memcache(run_id)
             return _build(status_override="completed", progress_override="100.00")
         else:
             await run_db.update_run_runtime(run_id, actual_attempt, status="running", progress=jobprogress.pct)
