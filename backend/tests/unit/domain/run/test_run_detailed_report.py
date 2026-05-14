@@ -136,8 +136,8 @@ async def test_poll_and_update_returns_empty_detailed_fields_for_completed_runs(
 
     detail = await run_service.poll_and_update(cast(Run, execution), detailed_report=True)
 
-    assert detail.completed_block_ids == set()
-    assert detail.planned_block_ids == set()
+    assert detail.completed_block_ids == None
+    assert detail.planned_block_ids == None
 
 
 @pytest.mark.asyncio
