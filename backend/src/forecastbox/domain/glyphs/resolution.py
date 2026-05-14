@@ -38,14 +38,6 @@ class ExtractedGlyphs:
     """Keys from configuration_values that contain at least one glyph reference."""
 
 
-def value_dt2str(value: dt.datetime) -> str:
-    """Convert a datetime to the canonical string format used for all runtime glyphs.
-
-    To ensure that all runtime glyphs are stringified the same way.
-    """
-    return value.strftime("%Y-%m-%d %H:%M:%S")
-
-
 def extract_glyphs(blockInstance: BlockInstance) -> Either[ExtractedGlyphs, list[str]]:  # type: ignore[invalid-argument]
     """Extract all ${...} references from the blockInstance's configuration_values.
 

@@ -1,3 +1,4 @@
+import datetime as dt
 from types import SimpleNamespace
 from typing import cast
 from unittest.mock import AsyncMock, patch
@@ -44,8 +45,8 @@ async def test_poll_and_update_requests_detailed_report_and_translates_to_block_
         run_id="run-1",
         attempt_count=1,
         status="running",
-        created_at="2026-05-12T00:00:00",
-        updated_at="2026-05-12T00:00:00",
+        created_at=dt.datetime.strptime("2026-05-12T00:00:00", "%Y-%m-%dT%H:%M:%S"),
+        updated_at=dt.datetime.strptime("2026-05-12T00:00:00", "%Y-%m-%dT%H:%M:%S"),
         blueprint_id="bp-1",
         blueprint_version=1,
         error=None,
@@ -85,8 +86,8 @@ async def test_poll_and_update_disables_detailed_report_when_cache_misses() -> N
         run_id="run-1",
         attempt_count=1,
         status="running",
-        created_at="2026-05-12T00:00:00",
-        updated_at="2026-05-12T00:00:00",
+        created_at=dt.datetime.strptime("2026-05-12T00:00:00", "%Y-%m-%dT%H:%M:%S"),
+        updated_at=dt.datetime.strptime("2026-05-12T00:00:00", "%Y-%m-%dT%H:%M:%S"),
         blueprint_id="bp-1",
         blueprint_version=1,
         error=None,
@@ -123,8 +124,8 @@ async def test_poll_and_update_returns_empty_detailed_fields_for_completed_runs(
         run_id="run-1",
         attempt_count=1,
         status="completed",
-        created_at="2026-05-12T00:00:00",
-        updated_at="2026-05-12T00:00:00",
+        created_at=dt.datetime.strptime("2026-05-12T00:00:00", "%Y-%m-%dT%H:%M:%S"),
+        updated_at=dt.datetime.strptime("2026-05-12T00:00:00", "%Y-%m-%dT%H:%M:%S"),
         blueprint_id="bp-1",
         blueprint_version=1,
         error=None,
@@ -145,8 +146,8 @@ async def test_get_run_asks_for_detailed_report_while_list_runs_does_not() -> No
         run_id="run-1",
         attempt_count=1,
         status="running",
-        created_at="2026-05-12T00:00:00",
-        updated_at="2026-05-12T00:00:00",
+        created_at=dt.datetime.strptime("2026-05-12T00:00:00", "%Y-%m-%dT%H:%M:%S"),
+        updated_at=dt.datetime.strptime("2026-05-12T00:00:00", "%Y-%m-%dT%H:%M:%S"),
         blueprint_id="bp-1",
         blueprint_version=1,
         error=None,

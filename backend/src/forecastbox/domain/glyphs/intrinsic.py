@@ -13,8 +13,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from forecastbox.domain.glyphs.resolution import value_dt2str
-from forecastbox.utility.time import current_time
+from forecastbox.utility.time import current_time, value_dt2str
 
 # fmt: off
 AvailableIntrinsicGlyphs = Literal[

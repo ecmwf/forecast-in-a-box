@@ -47,6 +47,7 @@ from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
 from forecastbox.utility.memcache import get as get_memcache
 from forecastbox.utility.pydantic import FiabBaseModel
+from forecastbox.utility.time import value_dt2str
 
 logger = logging.getLogger(__name__)
 
@@ -204,8 +205,8 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
             run_id=run_id,
             attempt_count=actual_attempt,
             status=status_override or status,
-            created_at=str(execution.created_at),
-            updated_at=str(execution.updated_at),
+            created_at=value_dt2str(execution.created_at),
+            updated_at=value_dt2str(execution.updated_at),
             blueprint_id=BlueprintId(str(execution.blueprint_id)),  # ty:ignore[invalid-argument-type]
             blueprint_version=cast(int, execution.blueprint_version),
             error=error_override if error_override is not None else cast(str | None, execution.error),

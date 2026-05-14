@@ -23,7 +23,8 @@ from fiab_core.fable import (
 )
 
 from forecastbox.domain.glyphs.exceptions import GlyphCircularReferenceError
-from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, expand_glyph_values, extract_glyphs, resolve_configurations, value_dt2str
+from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, expand_glyph_values, extract_glyphs, resolve_configurations
+from forecastbox.utility.time import value_dt2str
 
 
 def _block(config: dict[str, str]) -> BlockInstance:
@@ -144,12 +145,12 @@ def test_resolve_configurations_mutates_in_place() -> None:
 
 def test_value_dt2str_format() -> None:
     d = dt.datetime(2026, 3, 15, 12, 5, 9)
-    assert value_dt2str(d) == "2026-03-15 12:05:09"
+    assert value_dt2str(d) == "2026-03-15T12:05:09"
 
 
 def test_value_dt2str_midnight() -> None:
     d = dt.datetime(2026, 1, 1, 0, 0, 0)
-    assert value_dt2str(d) == "2026-01-01 00:00:00"
+    assert value_dt2str(d) == "2026-01-01T00:00:00"
 
 
 # ---------------------------------------------------------------------------
@@ -284,21 +285,21 @@ def test_expand_glyph_with_jinja_filter() -> None:
     Previously, expand_glyph_values used a regex that only matched ${word} and
     skipped ${submitDatetime | floor_day}, leaving the raw string in the map.
     """
-    glyphs = {"submitDatetime": "2024-01-15 06:00:00", "myDate": "${submitDatetime | floor_day}"}
+    glyphs = {"submitDatetime": "2024-01-15T06:00:00", "myDate": "${submitDatetime | floor_day}"}
     result = expand_glyph_values(glyphs)
-    assert result["myDate"] == "2024-01-15 00:00:00"
+    assert result["myDate"] == "2024-01-15T00:00:00"
 
 
 def test_expand_nested_glyph_with_jinja_filter() -> None:
     """Transitive expansion works when an intermediate glyph contains a jinja filter."""
     glyphs = {
-        "submitDatetime": "2024-01-15 06:00:00",
+        "submitDatetime": "2024-01-15T06:00:00",
         "baseDate": "${submitDatetime | floor_day}",
         "path": "${baseDate}/output",
     }
     result = expand_glyph_values(glyphs)
-    assert result["baseDate"] == "2024-01-15 00:00:00"
-    assert result["path"] == "2024-01-15 00:00:00/output"
+    assert result["baseDate"] == "2024-01-15T00:00:00"
+    assert result["path"] == "2024-01-15T00:00:00/output"
 
 
 def test_expand_glyph_with_mixed_known_filter_and_unknown() -> None:
@@ -307,9 +308,9 @@ def test_expand_glyph_with_mixed_known_filter_and_unknown() -> None:
     The known filter is evaluated; the unknown ref placeholder survives so the
     downstream block-level validation can report it.
     """
-    glyphs = {"submitDatetime": "2024-01-15 06:00:00", "mixed": "${submitDatetime | floor_day}/${missing}"}
+    glyphs = {"submitDatetime": "2024-01-15T06:00:00", "mixed": "${submitDatetime | floor_day}/${missing}"}
     result = expand_glyph_values(glyphs)
-    assert result["mixed"] == "2024-01-15 00:00:00/${missing}"
+    assert result["mixed"] == "2024-01-15T00:00:00/${missing}"
 
 
 def test_expand_glyph_filter_on_unknown_ref_kept_as_is() -> None:
@@ -325,9 +326,9 @@ def test_expand_glyph_filter_on_unknown_ref_kept_as_is() -> None:
 
 def test_expand_glyph_chained_datetime_filters() -> None:
     """Chained filters on a known datetime glyph are fully evaluated."""
-    glyphs = {"submitDatetime": "2024-01-15 06:30:00", "rounded": "${submitDatetime | add_days(1) | floor_day}"}
+    glyphs = {"submitDatetime": "2024-01-15T06:30:00", "rounded": "${submitDatetime | add_days(1) | floor_day}"}
     result = expand_glyph_values(glyphs)
-    assert result["rounded"] == "2024-01-16 00:00:00"
+    assert result["rounded"] == "2024-01-16T00:00:00"
 
 
 # ---------------------------------------------------------------------------
@@ -394,50 +395,50 @@ def test_extract_glyphs_malformed_expression_returns_error() -> None:
 # resolve_configurations — jinja2 datetime filters
 # ---------------------------------------------------------------------------
 
-_DT = "2024-01-15 06:00:00"
+_DT = "2024-01-15T06:00:00"
 _GLYPHS = {"submitDatetime": _DT}
 
 
 def test_resolve_add_days() -> None:
     block = _block({"key": "${submitDatetime | add_days(1)}"})
     resolve_configurations(block, _GLYPHS)
-    assert _value(block, "key") == "2024-01-16 06:00:00"
+    assert _value(block, "key") == "2024-01-16T06:00:00"
 
 
 def test_resolve_sub_days() -> None:
     block = _block({"key": "${submitDatetime | sub_days(2)}"})
     resolve_configurations(block, _GLYPHS)
-    assert _value(block, "key") == "2024-01-13 06:00:00"
+    assert _value(block, "key") == "2024-01-13T06:00:00"
 
 
 def test_resolve_add_hours() -> None:
     block = _block({"key": "${submitDatetime | add_hours(6)}"})
     resolve_configurations(block, _GLYPHS)
-    assert _value(block, "key") == "2024-01-15 12:00:00"
+    assert _value(block, "key") == "2024-01-15T12:00:00"
 
 
 def test_resolve_floor_day() -> None:
     block = _block({"key": "${submitDatetime | floor_day}"})
-    resolve_configurations(block, {"submitDatetime": "2024-01-15 06:30:00"})
-    assert _value(block, "key") == "2024-01-15 00:00:00"
+    resolve_configurations(block, {"submitDatetime": "2024-01-15T06:30:00"})
+    assert _value(block, "key") == "2024-01-15T00:00:00"
 
 
 def test_resolve_floor_hour() -> None:
     block = _block({"key": "${submitDatetime | floor_hour}"})
-    resolve_configurations(block, {"submitDatetime": "2024-01-15 06:45:00"})
-    assert _value(block, "key") == "2024-01-15 06:00:00"
+    resolve_configurations(block, {"submitDatetime": "2024-01-15T06:45:00"})
+    assert _value(block, "key") == "2024-01-15T06:00:00"
 
 
 def test_resolve_chained_datetime_filters() -> None:
     block = _block({"key": "${submitDatetime | add_days(1) | floor_day}"})
-    resolve_configurations(block, {"submitDatetime": "2024-01-15 14:30:00"})
-    assert _value(block, "key") == "2024-01-16 00:00:00"
+    resolve_configurations(block, {"submitDatetime": "2024-01-15T14:30:00"})
+    assert _value(block, "key") == "2024-01-16T00:00:00"
 
 
 def test_resolve_timedelta_global() -> None:
     block = _block({"key": "${submitDatetime + timedelta(days=1)}"})
     resolve_configurations(block, _GLYPHS)
-    assert _value(block, "key") == "2024-01-16 06:00:00"
+    assert _value(block, "key") == "2024-01-16T06:00:00"
 
 
 def test_resolve_string_upper() -> None:
@@ -486,4 +487,4 @@ def test_resolve_date_like_string_not_coerced() -> None:
 def test_resolve_mixed_literal_and_expression() -> None:
     block = _block({"key": "prefix_${submitDatetime | floor_day}_suffix"})
     resolve_configurations(block, _GLYPHS)
-    assert _value(block, "key") == "prefix_2024-01-15 00:00:00_suffix"
+    assert _value(block, "key") == "prefix_2024-01-15T00:00:00_suffix"

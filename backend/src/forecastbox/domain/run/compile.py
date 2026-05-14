@@ -23,11 +23,12 @@ from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.configuration_values import convert_known_configuration_values
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples
-from forecastbox.domain.glyphs.resolution import merge_glyph_values, resolve_configurations, value_dt2str
+from forecastbox.domain.glyphs.resolution import merge_glyph_values, resolve_configurations
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.domain.run.cascade import ExecutionSpecification, RawCascadeJob, RunOutputCharacteristic, RunOutputs
 from forecastbox.domain.run.types import RunId
 from forecastbox.utility.graph import topological_order
+from forecastbox.utility.time import value_dt2str
 
 
 def resolve_intrinsic_glyph_values(

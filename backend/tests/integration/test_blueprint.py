@@ -877,7 +877,7 @@ def test_blueprint_composite_glyph_expand(tmpdir: Any, backend_client_with_auth:
     assert glyphs_resp2.is_success, glyphs_resp2.text
     submit_example = next(g["valueExample"] for g in glyphs_resp2.json()["glyphs"] if g["name"] == "submitDatetime")
     # floor_day of the example value: strip time component
-    expected_floored = submit_example[:10] + " 00:00:00"
+    expected_floored = submit_example[:10] + "T00:00:00"
     source_jinja = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_text")),
         configuration_values=_config({"text": "${jinjaFilterGlyph}"}),
@@ -931,7 +931,7 @@ def test_blueprint_jinja_interpolation_expand(backend_client_with_auth: httpx.Cl
 
     # Well-formed: pure jinja arithmetic using registered globals (datetime, timedelta) and filter (floor_day).
     # Parentheses are required because Jinja2's | (filter) has higher precedence than +.
-    # (datetime(2024, 1, 15) + timedelta(days=1)) | floor_day = 2024-01-16 00:00:00
+    # (datetime(2024, 1, 15) + timedelta(days=1)) | floor_day = 2024-01-16T00:00:00
     source_wellformed = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_text")),
         configuration_values=_config({"text": "${(datetime(2024, 1, 15) + timedelta(days=1)) | floor_day}"}),
@@ -943,7 +943,7 @@ def test_blueprint_jinja_interpolation_expand(backend_client_with_auth: httpx.Cl
     data = response.json()
     assert len(data["block_errors"]) == 0, data["block_errors"]
     resolved = data["resolved_configuration_options"]["source_text"]["text"]
-    assert resolved == "2024-01-16 00:00:00", f"Unexpected resolved value: {resolved!r}"
+    assert resolved == "2024-01-16T00:00:00", f"Unexpected resolved value: {resolved!r}"
 
 
 def test_blueprint_composite_glyph_execute(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
