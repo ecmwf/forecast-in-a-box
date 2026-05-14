@@ -56,6 +56,7 @@ import {
   PinOff,
   Play,
   Plus,
+  RefreshCw,
   Search,
   SwatchBook,
   X,
@@ -262,32 +263,55 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
 
   // -------- Capabilities fetch --------
 
+  // Lens `running` status precedes WMS-port readiness; retry hides the race.
+  // `retryNonce` re-triggers the effect on manual retry.
+  const [retryNonce, setRetryNonce] = useState(0)
+  const [retrying, setRetrying] = useState(false)
+
   useEffect(() => {
-    const state = { cancelled: false }
+    const ac = new AbortController()
+    const delaysMs = [300, 600, 1200, 2400, 4800]
+    setError(null)
+    setLoadingLayers(true)
+    setRetrying(false)
     void (async () => {
-      try {
-        const res = await fetch(
-          `${baseUrl}/wms?service=WMS&version=1.3.0&request=GetCapabilities`,
-        )
-        if (!res.ok) throw new Error(`GetCapabilities ${res.status}`)
-        const xml = await res.text()
-        if (state.cancelled) return
-        const parsed = parseCapabilities(xml)
-        setLayers(parsed.layers)
-        setBbox(parsed.bbox)
-      } catch (err) {
-        log.error('Failed to fetch WMS capabilities', { error: err })
-        if (!state.cancelled) {
-          setError(err instanceof Error ? err.message : String(err))
+      let lastErr: unknown
+      for (let attempt = 0; attempt <= delaysMs.length; attempt++) {
+        if (ac.signal.aborted) return
+        try {
+          const res = await fetch(
+            `${baseUrl}/wms?service=WMS&version=1.3.0&request=GetCapabilities`,
+            { signal: ac.signal },
+          )
+          if (!res.ok) throw new Error(`GetCapabilities ${res.status}`)
+          const xml = await res.text()
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- aborted by cleanup
+          if (ac.signal.aborted) return
+          const parsed = parseCapabilities(xml)
+          setLayers(parsed.layers)
+          setBbox(parsed.bbox)
+          setLoadingLayers(false)
+          setRetrying(false)
+          return
+        } catch (err) {
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- aborted by cleanup
+          if (ac.signal.aborted) return
+          lastErr = err
+          if (attempt === delaysMs.length) break
+          setRetrying(true)
+          await new Promise((r) => setTimeout(r, delaysMs[attempt]))
         }
-      } finally {
-        if (!state.cancelled) setLoadingLayers(false)
       }
+      if (ac.signal.aborted) return
+      log.error('Failed to fetch WMS capabilities', { error: lastErr })
+      setError(lastErr instanceof Error ? lastErr.message : String(lastErr))
+      setLoadingLayers(false)
+      setRetrying(false)
     })()
-    return () => {
-      state.cancelled = true
-    }
-  }, [baseUrl])
+    return () => ac.abort()
+  }, [baseUrl, retryNonce])
+
+  const onRetryCapabilities = useCallback(() => setRetryNonce((n) => n + 1), [])
 
   // -------- OL setup + lifecycle --------
 
@@ -747,8 +771,23 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
   return (
     <div className="relative flex min-h-0 w-full flex-1 overflow-hidden">
       {error && (
-        <div className="absolute inset-x-0 top-0 z-20 bg-destructive/15 px-4 py-2 text-sm text-destructive">
-          {error}
+        <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-3 bg-destructive/15 px-4 py-2 text-sm text-destructive">
+          <span className="truncate">{error}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRetryCapabilities}
+            className="h-7 shrink-0 gap-1.5"
+          >
+            <RefreshCw className="h-3 w-3" />
+            {t('lens.retry')}
+          </Button>
+        </div>
+      )}
+      {retrying && !error && (
+        <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-muted/80 px-4 py-2 text-sm text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          <span>{t('lens.retrying')}</span>
         </div>
       )}
 
