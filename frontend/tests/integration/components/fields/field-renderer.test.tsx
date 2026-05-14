@@ -187,7 +187,7 @@ describe('FieldRenderer Integration', () => {
       await expect.element(timeInput).toHaveValue('00:00')
     })
 
-    it('combines date + time into a datetime-local string on date pick', async () => {
+    it('combines date + time into an ISO 8601 string with seconds on date pick', async () => {
       const screen = await renderWithProviders(
         <ControlledFieldRenderer valueType="datetime" label="DateValue" />,
       )
@@ -195,7 +195,7 @@ describe('FieldRenderer Integration', () => {
       await dateInput.fill('2026-07-15')
       await expect
         .element(screen.getByTestId('current-value'))
-        .toHaveTextContent('2026-07-15T00:00')
+        .toHaveTextContent('2026-07-15T00:00:00')
     })
 
     it('renders date input for "date-iso8601"', async () => {

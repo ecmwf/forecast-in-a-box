@@ -106,13 +106,18 @@ function DateAndTimeInputs({
   const { date, time } = splitDatetime(value)
   const displayedTime = time || DEFAULT_TIME
 
+  // Time picker emits HH:MM; backend requires HH:MM:SS.
+  function composeIso(d: string, hhmm: string): string {
+    return `${d}T${hhmm}:00`
+  }
+
   function handleDateChange(nextDate: string) {
     if (!nextDate) {
       // Clearing the date clears the whole value; the stored form is all-or-nothing.
       onChange('')
       return
     }
-    onChange(`${nextDate}T${time || DEFAULT_TIME}`)
+    onChange(composeIso(nextDate, time || DEFAULT_TIME))
   }
 
   function handleTimeChange(nextTime: string) {
@@ -120,7 +125,7 @@ function DateAndTimeInputs({
     // If the user picks a time before a date, default the date to today so
     // the time they just typed doesn't silently revert on re-render.
     const effectiveDate = date || todayLocalISO()
-    onChange(`${effectiveDate}T${effective}`)
+    onChange(composeIso(effectiveDate, effective))
   }
 
   return (

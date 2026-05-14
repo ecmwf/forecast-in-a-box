@@ -81,6 +81,48 @@ describe('toValidationState', () => {
     expect(result.blockStates.b1.hasErrors).toBe(true)
   })
 
+  it('exposes structured missing_glyphs per block and marks the block as invalid', () => {
+    const expansion: FableValidationExpansion = {
+      global_errors: [],
+      block_errors: {},
+      possible_sources: [],
+      possible_expansions: {},
+      resolved_configuration_options: {},
+      missing_glyphs: {
+        sink_file: {
+          fname: ['missingRoot'],
+          suffix: ['missingRoot', 'env'],
+        },
+      },
+    }
+
+    const result = toValidationState(expansion)
+
+    expect(result.blockStates.sink_file.missingGlyphs).toEqual({
+      fname: ['missingRoot'],
+      suffix: ['missingRoot', 'env'],
+    })
+    expect(result.blockStates.sink_file.errors).toEqual([])
+    expect(result.blockStates.sink_file.hasErrors).toBe(true)
+    expect(result.isValid).toBe(false)
+  })
+
+  it('treats empty missing_glyphs entries as no warnings', () => {
+    const expansion: FableValidationExpansion = {
+      global_errors: [],
+      block_errors: {},
+      possible_sources: [],
+      possible_expansions: {},
+      resolved_configuration_options: {},
+      missing_glyphs: { sink_file: {} },
+    }
+
+    const result = toValidationState(expansion)
+
+    expect(result.blockStates.sink_file.missingGlyphs).toEqual({})
+    expect(result.blockStates.sink_file.hasErrors).toBe(false)
+  })
+
   it('maps expansion items with restrictions to factory IDs for existing UI flows', () => {
     const expansion: FableValidationExpansion = {
       global_errors: [],

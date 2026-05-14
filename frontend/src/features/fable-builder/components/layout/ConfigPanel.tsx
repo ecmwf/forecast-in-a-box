@@ -68,6 +68,12 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
         null)
       : null,
   )
+  const missingGlyphs = useFableBuilderStore((state) =>
+    state.selectedBlockId
+      ? (state.validationState?.blockStates[state.selectedBlockId]
+          ?.missingGlyphs ?? null)
+      : null,
+  )
   const selectBlock = useFableBuilderStore((state) => state.selectBlock)
   const updateBlockConfig = useFableBuilderStore(
     (state) => state.updateBlockConfig,
@@ -121,10 +127,9 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
 
   // Hook must be called unconditionally — guard inside rather than early-
   // returning above it.
-  const configurationValues = selectedBlock?.configuration_values
   const mappedErrors = useMemo(
-    () => mapBlockErrorsToFields(blockErrors ?? [], configurationValues ?? {}),
-    [blockErrors, configurationValues],
+    () => mapBlockErrorsToFields(blockErrors ?? [], missingGlyphs ?? {}),
+    [blockErrors, missingGlyphs],
   )
 
   if (!selectedBlock || !factory) {

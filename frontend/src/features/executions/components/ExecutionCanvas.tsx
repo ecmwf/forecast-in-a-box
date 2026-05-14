@@ -73,7 +73,7 @@ function ExecutionCanvasInner({
   status,
 }: ExecutionCanvasProps) {
   const { t } = useTranslation('executions')
-  const [showConfig, setShowConfig] = useState(false)
+  const [showConfig, setShowConfig] = useState(true)
   const { fitView } = useReactFlow()
   const isInitialRender = useRef(true)
 

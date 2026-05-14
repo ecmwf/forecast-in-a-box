@@ -321,6 +321,8 @@ export interface BlockValidationState {
   errors: Array<string>
   hasErrors: boolean
   possibleExpansions: Array<PluginBlockFactoryId>
+  /** Unknown glyph names per option, from /blueprint/expand. */
+  missingGlyphs: Record<string, Array<string>>
 }
 
 export interface FableValidationState {
@@ -622,18 +624,24 @@ export function toValidationState(
     ...Object.keys(expansion.block_errors),
     ...Object.keys(expansion.possible_expansions),
     ...Object.keys(missingRequiredByBlock),
+    ...Object.keys(expansion.missing_glyphs),
   ])
 
   for (const blockId of allBlockIds) {
     const backendErrors = expansion.block_errors[blockId] ?? []
     const missingErrors = missingRequiredByBlock[blockId] ?? []
     const errors = [...backendErrors, ...missingErrors]
+    const missingGlyphs = expansion.missing_glyphs[blockId] ?? {}
+    const hasMissingGlyphs = Object.values(missingGlyphs).some(
+      (names) => names.length > 0,
+    )
     blockStates[blockId] = {
       errors,
-      hasErrors: errors.length > 0,
+      hasErrors: errors.length > 0 || hasMissingGlyphs,
       possibleExpansions: toPluginFactoryIds(
         expansion.possible_expansions[blockId] ?? [],
       ),
+      missingGlyphs,
     }
   }
 
