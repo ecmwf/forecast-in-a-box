@@ -27,7 +27,8 @@ from jinja2.sandbox import SandboxedEnvironment
 
 # Only the canonical backend datetime format is auto-coerced; other date-like strings
 # (e.g. "2024-01-15") are intentionally kept as strings to avoid silent format changes.
-_CANONICAL_DATETIME_FMT = "%Y-%m-%d %H:%M:%S"
+# We use the simple ISO 8601 format.
+_CANONICAL_DATETIME_FMT = "%Y-%m-%dT%H:%M:%S"
 
 
 def _try_parse_datetime(value: str) -> datetime | str:

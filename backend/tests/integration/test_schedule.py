@@ -23,8 +23,8 @@ from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.blueprint.service import BlueprintSaveCommand as BlueprintSaveRequest
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
-from forecastbox.domain.glyphs.resolution import value_dt2str
 from forecastbox.routes.experiment import ExperimentCreateRequest, ExperimentUpdateRequest
+from forecastbox.utility.time import value_dt2str
 
 from .conftest import testPluginId
 from .utils import (

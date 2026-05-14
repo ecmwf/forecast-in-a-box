@@ -11,6 +11,8 @@
 
 from datetime import datetime, timedelta
 
+from sqlalchemy import Column
+
 
 def current_time() -> datetime:
     """Return the current time used for scheduling decisions or submit time derivation."""
@@ -18,3 +20,8 @@ def current_time() -> datetime:
     # *Not* used for internal liveness measurement etc. Primarily to ensure the same timezone
     # etc are being used.
     return datetime.now()
+
+
+def value_dt2str(value: datetime | Column) -> str:
+    """Convert a datetime to the canonical string format used for all client-exposed serialization."""
+    return value.strftime("%Y-%m-%dT%H:%M:%S")
