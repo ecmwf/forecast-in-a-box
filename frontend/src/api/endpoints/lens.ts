@@ -68,17 +68,11 @@ export async function listSupportedLenses(): Promise<
   })
 }
 
-/**
- * Build the absolute base URL of a running lens instance from its port.
- * Lens binds on the same host as the FIAB backend; falls through to
- * `window.location` for same-origin deployments.
- */
+/** Lens binds to 127.0.0.1:<port> in the pod — route WMS through the backend proxy. */
 export function buildLensBaseUrl(port: number): string {
   const backendBase = getBackendBaseUrl()
-  const source = backendBase
-    ? new URL(backendBase)
-    : new URL(window.location.href)
-  return `${source.protocol}//${source.hostname}:${port}`
+  const base = backendBase || window.location.origin
+  return `${base.replace(/\/$/, '')}/api/v1/lens/proxy/${port}`
 }
 
 /**

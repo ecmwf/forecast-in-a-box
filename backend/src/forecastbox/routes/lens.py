@@ -21,11 +21,14 @@ import logging
 import pathlib
 from typing import Any, Self
 
-from fastapi import APIRouter, HTTPException
+import httpx
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import Response
 
 from forecastbox.domain.lens.manager import (
     LensInstanceDetail,
     LensInstanceId,
+    LensInstanceManager,
     LensStatus,
     get_status,
     list_instances,
@@ -119,6 +122,29 @@ def stop_lens(lens_instance_id: LensInstanceId) -> str:
 def list_lenses() -> list[LensInstanceDetailResponse]:
     """List all active lens instances with their current status."""
     return [LensInstanceDetailResponse.from_detail(iid, detail) for iid, detail in list_instances()]
+
+
+# A SkinnyWMS lens binds gunicorn to 127.0.0.1:<port> on the backend pod, which
+# is unreachable from the browser. Browsers reach the backend at port 8000
+# only, so proxy WMS traffic through the backend's own host. The port must
+# belong to an active lens to avoid being used as a generic localhost-port
+# probe.
+@router.api_route("/proxy/{port}/{path:path}", methods=["GET", "HEAD"])
+async def lens_proxy(port: int, path: str, request: Request) -> Response:
+    known_ports = {p for _, inst in LensInstanceManager.instances.items() for p in inst.ports}
+    if port not in known_ports:
+        raise HTTPException(status_code=404, detail=f"Port {port} does not belong to any active lens")
+    upstream = f"http://127.0.0.1:{port}/{path}"
+    if request.url.query:
+        upstream = f"{upstream}?{request.url.query}"
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        try:
+            resp = await client.request(request.method, upstream)
+        except httpx.RequestError as exc:
+            raise HTTPException(status_code=502, detail=f"Lens upstream error: {exc!r}")
+    excluded = {"content-encoding", "content-length", "transfer-encoding", "connection"}
+    headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
+    return Response(content=resp.content, status_code=resp.status_code, headers=headers, media_type=resp.headers.get("content-type"))
 
 
 @router.get("/supported")
