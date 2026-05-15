@@ -28,6 +28,7 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  Command as CommandRoot,
   CommandShortcut,
 } from '@/components/ui/command'
 import { useCommandStore } from '@/stores/commandStore'
@@ -57,36 +58,38 @@ export function CommandPalette() {
 
   return (
     <CommandDialog open={isOpen} onOpenChange={setOpen}>
-      <CommandInput placeholder="Type a command or search..." />
-      <CommandList>
-        <CommandEmpty>No results found.</CommandEmpty>
+      <CommandRoot>
+        <CommandInput placeholder="Type a command or search..." />
+        <CommandList>
+          <CommandEmpty>No results found.</CommandEmpty>
 
-        {groupedCommands.map((group) => (
-          <CommandGroup key={group.category} heading={group.category}>
-            {group.commands.map((command) => (
-              <CommandItem
-                key={command.id}
-                value={command.id}
-                keywords={command.keywords}
-                onSelect={() => handleSelect(command)}
-              >
-                {command.icon}
-                <div className="flex flex-col gap-0.5">
-                  <span>{command.label}</span>
-                  {command.description && (
-                    <span className="text-xs text-muted-foreground">
-                      {command.description}
-                    </span>
+          {groupedCommands.map((group) => (
+            <CommandGroup key={group.category} heading={group.category}>
+              {group.commands.map((command) => (
+                <CommandItem
+                  key={command.id}
+                  value={command.id}
+                  keywords={command.keywords}
+                  onSelect={() => handleSelect(command)}
+                >
+                  {command.icon}
+                  <div className="flex flex-col gap-0.5">
+                    <span>{command.label}</span>
+                    {command.description && (
+                      <span className="text-xs text-muted-foreground">
+                        {command.description}
+                      </span>
+                    )}
+                  </div>
+                  {command.shortcut && (
+                    <CommandShortcut>{command.shortcut}</CommandShortcut>
                   )}
-                </div>
-                {command.shortcut && (
-                  <CommandShortcut>{command.shortcut}</CommandShortcut>
-                )}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        ))}
-      </CommandList>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          ))}
+        </CommandList>
+      </CommandRoot>
     </CommandDialog>
   )
 }

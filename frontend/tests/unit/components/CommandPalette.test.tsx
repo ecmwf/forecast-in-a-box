@@ -47,6 +47,21 @@ describe('CommandPalette', () => {
       .not.toBeInTheDocument()
   })
 
+  it('renders without crashing when open', async () => {
+    useCommandStore.getState().setOpen(true)
+
+    const screen = await renderWithRouter(
+      <HotkeysProvider>
+        <CommandPalette />
+      </HotkeysProvider>,
+    )
+
+    // The command input must render once the palette is open
+    await expect
+      .element(screen.getByPlaceholder('Type a command or search...'))
+      .toBeInTheDocument()
+  })
+
   it('store starts closed and can toggle', () => {
     expect(useCommandStore.getState().isOpen).toBe(false)
 
