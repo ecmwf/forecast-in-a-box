@@ -25,6 +25,7 @@ import type {
   BlockInstanceId,
   PluginBlockFactoryId,
 } from '@/api/types/fable.types'
+import { useFieldErrorMessages } from '@/features/fable-builder/hooks/useFieldErrorMessages'
 import {
   useBlockValidation,
   useFableBuilderStore,
@@ -137,9 +138,10 @@ export function BlockInstanceCard({
   const hasErrors = blockValidation?.hasErrors ?? false
   const errors = blockValidation?.errors ?? []
   const missingGlyphs = blockValidation?.missingGlyphs ?? {}
+  const fieldErrorMessages = useFieldErrorMessages()
   const mappedErrors = useMemo(
-    () => mapBlockErrorsToFields(errors, missingGlyphs),
-    [errors, missingGlyphs],
+    () => mapBlockErrorsToFields(errors, missingGlyphs, fieldErrorMessages),
+    [errors, missingGlyphs, fieldErrorMessages],
   )
 
   if (!factory) {

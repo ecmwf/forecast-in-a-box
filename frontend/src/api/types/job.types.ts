@@ -48,7 +48,9 @@ export const RunOutputsSchema = z
   })
   .transform((wrapper) => wrapper.outputs)
 
-/** routes/run.py: JobExecutionDetail (status narrowed from str to known values) */
+/** routes/run.py: JobExecutionDetail. `*_block_ids` are only set on
+ * /run/get and clear to `null` on terminal status, so both `null` and
+ * `undefined` are valid wire shapes. */
 export const JobExecutionDetailSchema = z.object({
   run_id: z.string(),
   attempt_count: z.number(),
@@ -61,6 +63,8 @@ export const JobExecutionDetailSchema = z.object({
   progress: z.string().nullable(),
   cascade_job_id: z.string().nullable(),
   outputs: RunOutputsSchema.nullable(),
+  completed_block_ids: z.array(z.string()).nullable().optional(),
+  planned_block_ids: z.array(z.string()).nullable().optional(),
 })
 
 /** routes/run.py: JobExecutionList */

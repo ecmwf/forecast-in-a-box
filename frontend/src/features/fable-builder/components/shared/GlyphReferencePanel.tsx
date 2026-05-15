@@ -175,6 +175,28 @@ export function GlyphReferencePanel({ className }: { className?: string }) {
         title={t('panel.global')}
         open={globalOpen}
         onToggle={() => setGlobalOpen(!globalOpen)}
+        action={
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  aria-label={t('panel.addGlobal')}
+                  onClick={() => {
+                    setGlobalOpen(true)
+                    setCreateGlobalOpen(true)
+                  }}
+                  className="shrink-0 rounded p-1 text-primary hover:bg-primary/10"
+                />
+              }
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {t('panel.addGlobal')}
+            </TooltipContent>
+          </Tooltip>
+        }
       >
         {globalGlyphs.length > 0 ? (
           globalGlyphs.map((g) => (
@@ -187,14 +209,7 @@ export function GlyphReferencePanel({ className }: { className?: string }) {
           ))
         ) : (
           <div className="px-3 pb-2 text-sm text-muted-foreground">
-            {t('panel.noGlobal')}{' '}
-            <button
-              type="button"
-              onClick={() => setCreateGlobalOpen(true)}
-              className="text-primary hover:underline"
-            >
-              {t('panel.createOne')}
-            </button>
+            {t('panel.noGlobal')}
           </div>
         )}
       </GlyphSection>
@@ -362,27 +377,33 @@ function GlyphSection({
   title,
   open,
   onToggle,
+  action,
   children,
 }: {
   title: string
   open: boolean
   onToggle: () => void
+  /** Right-aligned slot on the header row (typically a `+` add button). */
+  action?: React.ReactNode
   children: React.ReactNode
 }) {
   return (
     <div className="border-t border-border/50">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center gap-1.5 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-      >
-        {open ? (
-          <ChevronDown className="h-3.5 w-3.5" />
-        ) : (
-          <ChevronRight className="h-3.5 w-3.5" />
-        )}
-        {title}
-      </button>
+      <div className="flex w-full items-center gap-1.5 px-3 py-2 text-sm font-medium text-muted-foreground">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex flex-1 items-center gap-1.5 text-left hover:text-foreground"
+        >
+          {open ? (
+            <ChevronDown className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5" />
+          )}
+          {title}
+        </button>
+        {action}
+      </div>
       {open && <div className="space-y-0.5 pb-2">{children}</div>}
     </div>
   )
@@ -461,11 +482,11 @@ function LocalGlyphSection({
 
   return (
     <div className="border-t border-border/50">
-      <div className="flex w-full items-center gap-1.5 px-3 py-2">
+      <div className="flex w-full items-center gap-1.5 px-3 py-2 text-sm font-medium text-muted-foreground">
         <button
           type="button"
           onClick={onToggle}
-          className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+          className="flex items-center gap-1.5 hover:text-foreground"
         >
           {open ? (
             <ChevronDown className="h-3.5 w-3.5" />
@@ -488,6 +509,24 @@ function LocalGlyphSection({
           <TooltipContent side="bottom" className="max-w-64">
             {tooltip}
           </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <button
+                type="button"
+                aria-label={t('panel.addLocal')}
+                onClick={() => {
+                  if (!open) onToggle()
+                  setIsAdding(true)
+                }}
+                className="ml-auto shrink-0 rounded p-1 text-primary hover:bg-primary/10"
+              />
+            }
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{t('panel.addLocal')}</TooltipContent>
         </Tooltip>
       </div>
       {open && (
@@ -599,16 +638,7 @@ function LocalGlyphSection({
                 </P>
               ) : null}
             </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setIsAdding(true)}
-              className="flex w-full items-center gap-1.5 px-3 py-1 text-sm text-muted-foreground hover:text-foreground"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              {t('panel.addLocal')}
-            </button>
-          )}
+          ) : null}
         </div>
       )}
     </div>

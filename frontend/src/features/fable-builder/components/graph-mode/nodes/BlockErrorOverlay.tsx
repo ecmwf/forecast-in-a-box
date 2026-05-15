@@ -38,10 +38,10 @@ export function BlockErrorOverlay({
   return (
     <Alert
       variant="destructive"
-      className="nodrag absolute top-full right-0 left-0 z-10 mt-1 gap-1 px-2 py-1.5 text-xs shadow-md"
+      className="nodrag absolute top-full right-0 left-0 z-10 mt-1 gap-1 px-2 py-1.5 shadow-md"
     >
       <AlertCircle className="h-3 w-3" />
-      <AlertDescription className="text-xs">
+      <AlertDescription>
         {expanded ? (
           <ul className="m-0 list-disc space-y-0.5 pl-4">
             {errors.map((error, index) => (

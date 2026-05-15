@@ -22,5 +22,10 @@
     "more": "(+{{count}} more)",
     "expandAriaLabel": "Show all {{count}} errors",
     "collapseAriaLabel": "Collapse errors"
+  },
+  "fieldErrors": {
+    "unknownConfigKey": "Unknown configuration key",
+    "missingRequiredValue": "Missing required value",
+    "unknownGlyph": "Unknown glyph: {{glyph}}"
   }
 }

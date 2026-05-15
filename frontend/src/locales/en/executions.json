@@ -21,6 +21,9 @@
     "failed": "Failed",
     "unknown": "Unknown"
   },
+  "progress": {
+    "blocksComplete": "{{completed}}/{{total}} blocks"
+  },
   "tabs": {
     "outputs": "Outputs",
     "logs": "Logs",
@@ -76,6 +79,7 @@
   },
   "outputs": {
     "generated": "Generated",
+    "pending": "Pending",
     "noOutputs": "No outputs available yet",
     "noOutputsRunning": "Outputs will appear here as they are generated.",
     "view": "View",
@@ -88,6 +92,17 @@
     },
     "filter": {
       "allMimes": "All"
+    },
+    "groupBy": {
+      "label": "Group by",
+      "none": "None",
+      "block": "Block",
+      "mime": "Content type",
+      "blockAndMime": "Block + content type"
+    },
+    "sections": {
+      "unknownBlock": "Unknown block",
+      "unknownMime": "Unknown content type"
     },
     "noMatch": "No outputs match the current filter.",
     "viewer": {

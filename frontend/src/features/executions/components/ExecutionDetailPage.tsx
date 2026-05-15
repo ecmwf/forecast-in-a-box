@@ -39,6 +39,13 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('ExecutionDetailPage')
 
+// Wide-screen layout: each column claims half the row and scrolls
+// independently via its TabsContent.
+const WIDE_COLUMN =
+  'min-[1440px]:flex min-[1440px]:h-full min-[1440px]:min-w-0 min-[1440px]:flex-1 min-[1440px]:flex-col'
+const WIDE_TAB_CONTENT =
+  'min-[1440px]:min-h-0 min-[1440px]:flex-1 min-[1440px]:overflow-y-auto'
+
 export function ExecutionDetailPage() {
   const { t } = useTranslation('executions')
   const { jobId } = useParams({ from: '/_authenticated/executions/$jobId' })
@@ -147,10 +154,9 @@ export function ExecutionDetailPage() {
   return (
     <div
       className={cn(
-        // min-h reserves space for chrome (banner ~40, header ~64, footer ~120
-        // plus paddings) so the row inside can grow via flex-1 without
-        // overflowing on smaller viewports.
-        'mx-auto flex min-h-[calc(100vh-15rem)] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8',
+        // Underscores in arbitrary values emit spaces; `calc(100vh-15rem)`
+        // (no spaces) is invalid CSS and silently discarded.
+        'mx-auto flex min-h-[calc(100vh_-_15rem)] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8',
         layoutMode === 'boxed' ? 'max-w-7xl' : 'max-w-none',
       )}
     >
@@ -175,8 +181,11 @@ export function ExecutionDetailPage() {
         error={jobData.error}
         onRestart={handleRestart}
         onDelete={handleDelete}
+        onEditConfig={canEditConfig ? handleEditConfig : undefined}
         isRestartPending={restartMutation.isPending}
         isDeletePending={deleteMutation.isPending}
+        completedBlockCount={jobData.completed_block_ids?.length ?? null}
+        plannedBlockCount={jobData.planned_block_ids?.length ?? null}
       />
 
       {jobData.status === 'failed' && jobData.error && (
@@ -189,17 +198,25 @@ export function ExecutionDetailPage() {
         />
       )}
 
-      {/* Wide-screen split: at >=1440px the canvas and the tabs panel sit
-          side-by-side as equal columns, both stretching to the same height
-          (whichever side is taller dictates). Below 1440px we revert to the
-          stacked layout. */}
-      <div className="flex flex-1 flex-col gap-8 min-[1440px]:flex-row min-[1440px]:gap-6">
-        <div className="min-[1440px]:flex min-[1440px]:min-w-0 min-[1440px]:flex-1 min-[1440px]:flex-col">
+      {/* Wide: side-by-side, pinned to viewport height with independent
+          column scroll. Narrow: stacked single-document scroll. */}
+      <div
+        className={cn(
+          'flex flex-1 flex-col gap-8',
+          // Wide: pin to viewport minus chrome (~17rem). flex-none cancels
+          // the inherited flex-1 so the explicit height is honoured.
+          'min-[1440px]:h-[calc(100vh_-_17rem)] min-[1440px]:flex-row',
+          'min-[1440px]:flex-none min-[1440px]:gap-6 min-[1440px]:overflow-hidden',
+        )}
+      >
+        <div className={WIDE_COLUMN}>
           {fableData?.builder && catalogue ? (
             <ExecutionCanvas
               fable={fableData.builder}
               catalogue={catalogue}
               status={jobData.status}
+              completedBlockIds={jobData.completed_block_ids}
+              plannedBlockIds={jobData.planned_block_ids}
             />
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-12 text-center">
@@ -213,9 +230,15 @@ export function ExecutionDetailPage() {
           )}
         </div>
 
-        <div className="min-[1440px]:min-w-0 min-[1440px]:flex-1">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-3">
+        <div className={WIDE_COLUMN}>
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="min-[1440px]:flex min-[1440px]:h-full min-[1440px]:min-h-0 min-[1440px]:flex-col"
+          >
+            {/* Sticky for the mobile single-scroll layout; no-op at wide.
+                Default `bg-muted` is the sticky background — don't override. */}
+            <TabsList className="sticky top-0 z-10 grid w-full shrink-0 grid-cols-3">
               <TabsTrigger value="outputs">
                 <Package className="h-4 w-4" />
                 {t('tabs.outputs')}
@@ -232,22 +255,24 @@ export function ExecutionDetailPage() {
             <div
               ref={handleToolbarRef}
               className={cn(
-                'mt-3 flex items-center gap-3',
+                'sticky top-12 z-10 mt-3 flex shrink-0 items-center gap-3 bg-background',
                 activeTab !== 'outputs' && 'hidden',
               )}
             />
-            <TabsContent value="outputs">
+            <TabsContent value="outputs" className={WIDE_TAB_CONTENT}>
               <OutputsPanel
                 jobId={jobId}
                 status={jobData.status}
                 outputs={jobData.outputs}
+                completedBlockIds={jobData.completed_block_ids}
+                plannedBlockIds={jobData.planned_block_ids}
                 toolbarSlot={toolbarSlot}
               />
             </TabsContent>
-            <TabsContent value="logs">
+            <TabsContent value="logs" className={WIDE_TAB_CONTENT}>
               <LogsPanel jobId={jobId} status={jobData.status} />
             </TabsContent>
-            <TabsContent value="specification">
+            <TabsContent value="specification" className={WIDE_TAB_CONTENT}>
               <SpecificationPanel fableSnapshot={fableData?.builder} />
             </TabsContent>
           </Tabs>

@@ -60,6 +60,9 @@ const seedExecutions: Array<JobExecutionDetail> = [
         is_available: true,
       },
     },
+    // Cache is popped on terminal status; both arrays come back null.
+    completed_block_ids: null,
+    planned_block_ids: null,
   },
   {
     run_id: 'job-running-002',
@@ -79,6 +82,8 @@ const seedExecutions: Array<JobExecutionDetail> = [
         is_available: false,
       },
     },
+    completed_block_ids: ['block_source_1'],
+    planned_block_ids: ['block_source_1', 'block_product_1', 'block_sink_1'],
   },
   {
     run_id: 'job-errored-003',
@@ -92,6 +97,8 @@ const seedExecutions: Array<JobExecutionDetail> = [
     progress: '62',
     cascade_job_id: 'cascade-003',
     outputs: {},
+    completed_block_ids: null,
+    planned_block_ids: null,
   },
   {
     run_id: 'job-submitted-004',
@@ -193,6 +200,8 @@ export function restartExecution(
     status: 'submitted',
     progress: '0',
     updated_at: new Date().toISOString(),
+    completed_block_ids: null,
+    planned_block_ids: null,
   }
   return { run_id: executionId, attempt_count }
 }

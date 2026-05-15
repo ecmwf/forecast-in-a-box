@@ -148,7 +148,7 @@ export function LogsPanel({ jobId, status }: LogsPanelProps) {
           <div
             ref={containerRef}
             onScroll={handleScroll}
-            className="max-h-[400px] overflow-y-auto rounded-lg border bg-muted/30 p-3 font-mono text-sm"
+            className="max-h-[60dvh] overflow-y-auto rounded-lg border bg-muted/30 p-3 font-mono text-sm min-[1440px]:max-h-none min-[1440px]:flex-1"
           >
             {filteredLines.length === 0 ? (
               <P className="text-muted-foreground">{t('outputs.noOutputs')}</P>

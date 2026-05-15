@@ -23,6 +23,13 @@ export interface MappedBlockErrors {
   unmapped: Array<string>
 }
 
+/** Pre-translated messages — callers resolve via i18next so this util stays pure. */
+export interface FieldErrorMessages {
+  unknownConfigKey: string
+  missingRequiredValue: string
+  unknownGlyph: (name: string) => string
+}
+
 /**
  * Parse a Python-style set-of-strings literal like `{'foo', 'bar'}` into
  * a Set<string>. Returns null if parsing fails.
@@ -62,15 +69,16 @@ function pushError(
  * configuration keys.
  *
  * Recognised `errors` shapes (Python-set literals):
- * - "Block contains extra config: {...}" → "Unknown configuration key"
- * - "Block contains missing config: {...}" → "Missing required value"
+ * - "Block contains extra config: {...}" → messages.unknownConfigKey
+ * - "Block contains missing config: {...}" → messages.missingRequiredValue
  *
- * `missingGlyphs[configKey] = [name, ...]` → "Unknown glyph: ${name}" per name.
+ * `missingGlyphs[configKey] = [name, ...]` → messages.unknownGlyph(name) per name.
  * Anything else in `errors` is returned as `unmapped`.
  */
 export function mapBlockErrorsToFields(
   errors: ReadonlyArray<string>,
-  missingGlyphs: Record<string, ReadonlyArray<string>> = {},
+  missingGlyphs: Record<string, ReadonlyArray<string>>,
+  messages: FieldErrorMessages,
 ): MappedBlockErrors {
   const byConfigKey: Record<string, Array<string>> = {}
   const unmapped: Array<string> = []
@@ -84,7 +92,7 @@ export function mapBlockErrorsToFields(
         continue
       }
       for (const key of set) {
-        pushError(byConfigKey, key, 'Unknown configuration key')
+        pushError(byConfigKey, key, messages.unknownConfigKey)
       }
       continue
     }
@@ -97,7 +105,7 @@ export function mapBlockErrorsToFields(
         continue
       }
       for (const key of set) {
-        pushError(byConfigKey, key, 'Missing required value')
+        pushError(byConfigKey, key, messages.missingRequiredValue)
       }
       continue
     }
@@ -107,7 +115,7 @@ export function mapBlockErrorsToFields(
 
   for (const [configKey, glyphNames] of Object.entries(missingGlyphs)) {
     for (const name of glyphNames) {
-      pushError(byConfigKey, configKey, `Unknown glyph: \${${name}}`)
+      pushError(byConfigKey, configKey, messages.unknownGlyph(name))
     }
   }
 

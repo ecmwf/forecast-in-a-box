@@ -66,8 +66,16 @@ export function PdfThumbnail({ item }: ThumbnailProps) {
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- mutated by cleanup
         if (state.cancelled || !canvas) return
         const viewport = page.getViewport({ scale: 1 })
-        const targetWidth = canvas.parentElement?.clientWidth ?? 240
-        const scale = targetWidth / viewport.width
+        // Fit within both parent dimensions so portrait pages don't overflow
+        // the aspect-video container (which would otherwise produce
+        // asymmetric whitespace on the side).
+        const parent = canvas.parentElement
+        const targetWidth = parent?.clientWidth ?? 240
+        const targetHeight = parent?.clientHeight ?? 135
+        const scale = Math.min(
+          targetWidth / viewport.width,
+          targetHeight / viewport.height,
+        )
         const scaled = page.getViewport({ scale })
         canvas.width = scaled.width
         canvas.height = scaled.height

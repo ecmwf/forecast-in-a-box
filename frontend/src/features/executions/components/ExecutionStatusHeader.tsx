@@ -8,15 +8,11 @@
  * does it submit to any jurisdiction.
  */
 
-/**
- * ExecutionStatusHeader Component
- *
- * Status header with name, badge, progress bar, and action buttons.
- */
+/** Status header: name, badge, elapsed timer, progress bar, action menu. */
 
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { MoreVertical, Pencil, RotateCcw, Trash2 } from 'lucide-react'
+import { MoreVertical, RotateCcw, Settings2, Trash2 } from 'lucide-react'
 import type { JobStatus } from '@/api/types/job.types'
 import { isTerminalStatus } from '@/api/types/job.types'
 import {
@@ -54,9 +50,13 @@ interface ExecutionStatusHeaderProps {
   error: string | null
   onRestart: () => void
   onDelete: () => void
-  onEdit?: () => void
+  /** Open the fable's source configuration in the builder. */
+  onEditConfig?: () => void
   isRestartPending: boolean
   isDeletePending: boolean
+  /** Subtext hidden when planned is null/undefined/empty. */
+  completedBlockCount?: number | null
+  plannedBlockCount?: number | null
 }
 
 function formatElapsed(ms: number): string {
@@ -146,32 +146,27 @@ export function ExecutionStatusHeader({
   createdAt,
   onRestart,
   onDelete,
-  onEdit,
+  onEditConfig,
   isRestartPending,
   isDeletePending,
+  completedBlockCount,
+  plannedBlockCount,
 }: ExecutionStatusHeaderProps) {
   const { t } = useTranslation('executions')
   const terminal = isTerminalStatus(status)
   const elapsed = useElapsedTime(createdAt, terminal)
 
   const progressPercent = parseFloat(progress) || 0
+  const showBlockCount =
+    typeof plannedBlockCount === 'number' &&
+    plannedBlockCount > 0 &&
+    typeof completedBlockCount === 'number'
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <H2 className="text-2xl font-bold">{name}</H2>
-            {onEdit && (
-              <button
-                type="button"
-                onClick={onEdit}
-                className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                <Pencil className="h-4 w-4" />
-              </button>
-            )}
-          </div>
+          <H2 className="text-2xl font-bold">{name}</H2>
           {description && (
             <P className="line-clamp-2 text-muted-foreground">{description}</P>
           )}
@@ -194,6 +189,15 @@ export function ExecutionStatusHeader({
             </span>
           )}
 
+          {showBlockCount && (
+            <span className="text-sm text-muted-foreground">
+              {t('progress.blocksComplete', {
+                completed: completedBlockCount,
+                total: plannedBlockCount,
+              })}
+            </span>
+          )}
+
           {(status === 'completed' || status === 'failed') && (
             <RestartDialog
               onRestart={onRestart}
@@ -208,7 +212,16 @@ export function ExecutionStatusHeader({
               >
                 <MoreVertical className="h-5 w-5" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="w-auto min-w-fit">
+                {onEditConfig && (
+                  <DropdownMenuItem
+                    onClick={onEditConfig}
+                    className="whitespace-nowrap"
+                  >
+                    <Settings2 className="mr-2 h-4 w-4" />
+                    {t('actions.editConfiguration')}
+                  </DropdownMenuItem>
+                )}
                 <AlertDialogTrigger
                   nativeButton={false}
                   render={

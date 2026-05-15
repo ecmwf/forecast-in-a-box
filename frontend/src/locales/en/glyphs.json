@@ -75,7 +75,7 @@
     "createOne": "Create one",
     "addGlobal": "Add global variable",
     "manageAll": "Manage all",
-    "addLocal": "Add",
+    "addLocal": "Add local variable",
     "localKeyPlaceholder": "key",
     "localKeyInvalid": "Use letters, digits and underscores only — no hyphens, spaces or other characters.",
     "localValuePlaceholder": "value",

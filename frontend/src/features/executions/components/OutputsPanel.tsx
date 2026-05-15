@@ -15,8 +15,11 @@ interface OutputsPanelProps {
   jobId: string
   status: JobStatus
   outputs: RunOutputs | null
-  /** DOM node to portal the toolbar into. Lifted out of the panel so the
-   * filter row can sit alongside the parent's tab triggers. */
+  /** Drive skeleton highlights for blocks currently being processed. */
+  completedBlockIds?: ReadonlyArray<string> | null
+  /** Used to show block-level skeletons before any outputs payload arrives. */
+  plannedBlockIds?: ReadonlyArray<string> | null
+  /** Portal target so the filter row can sit alongside the parent's tabs. */
   toolbarSlot?: HTMLElement | null
 }
 
@@ -24,6 +27,8 @@ export function OutputsPanel({
   jobId,
   status,
   outputs,
+  completedBlockIds,
+  plannedBlockIds,
   toolbarSlot,
 }: OutputsPanelProps) {
   return (
@@ -31,6 +36,8 @@ export function OutputsPanel({
       jobId={jobId}
       status={status}
       outputs={outputs}
+      completedBlockIds={completedBlockIds}
+      plannedBlockIds={plannedBlockIds}
       toolbarSlot={toolbarSlot}
     />
   )

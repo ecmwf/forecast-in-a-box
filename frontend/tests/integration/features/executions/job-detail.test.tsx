@@ -192,11 +192,11 @@ describe('ExecutionDetailPage Integration', () => {
       await expect.element(screen.getByText(/Generated: 3/)).toBeVisible()
     })
 
-    it('shows no outputs message for running job with no available outputs', async () => {
+    it('shows pending count for running job with unavailable outputs', async () => {
       const screen = await renderDetailPage('job-running-002')
-      await expect
-        .element(screen.getByText('No outputs available yet'))
-        .toBeVisible()
+      // job-running-002 has 1 unavailable output → skeleton card + pending counter.
+      await expect.element(screen.getByText(/Pending: 1/)).toBeVisible()
+      await expect.element(screen.getByText(/Generated: 0/)).toBeVisible()
     })
 
     it('shows no outputs message for submitted job with null outputs', async () => {
