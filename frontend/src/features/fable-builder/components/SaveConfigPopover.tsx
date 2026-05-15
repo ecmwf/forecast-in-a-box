@@ -64,11 +64,9 @@ export function BlockSummaryBadges({
 }) {
   return (
     <div className={className ?? 'flex flex-wrap gap-1.5'}>
-      {BLOCK_KIND_ORDER.filter(
-        (kind) => summary[kind as keyof FableBlockSummary] > 0,
-      ).map((kind) => {
+      {BLOCK_KIND_ORDER.filter((kind) => summary[kind] > 0).map((kind) => {
         const meta = BLOCK_KIND_METADATA[kind]
-        const count = summary[kind as keyof FableBlockSummary]
+        const count = summary[kind]
         return (
           <Badge key={kind} variant="outline" className="gap-1.5 text-xs">
             <span

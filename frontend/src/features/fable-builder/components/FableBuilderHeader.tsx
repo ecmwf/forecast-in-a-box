@@ -161,7 +161,7 @@ export function FableBuilderHeader({
           parsed &&
           typeof parsed === 'object' &&
           'blocks' in parsed &&
-          typeof (parsed as { blocks: unknown }).blocks === 'object'
+          typeof parsed.blocks === 'object'
         ) {
           setFable(parsed as FableBuilderV1, null)
           showToast.success('Configuration loaded')

@@ -143,7 +143,7 @@ export const useActivityStore = create<ActivityState>()(
             Object.entries(state.tasks).filter(
               ([, task]) => task !== undefined && task.status !== 'active',
             ),
-          ) as Partial<Record<string, ActivityTask>>,
+          ),
         }),
       },
     ),

@@ -122,11 +122,7 @@ export const useConfigStore = create<ConfigState & ConfigActions>()(
       storage: createJSONStorage(() => localStorage),
       migrate: (persistedState, _version) => {
         // Future migrations go here
-        return persistedState as {
-          config: AppConfig | null
-          source: ConfigSource | null
-          lastLoaded: number | null
-        }
+        return persistedState
       },
       // Only persist the config itself, not the loading/error states
       partialize: (state) => ({

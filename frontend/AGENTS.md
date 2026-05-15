@@ -61,7 +61,7 @@ Frontend UI for **Forecast-in-a-Box** (FIAB), a portable ML-based weather foreca
 | Category  | Technology                                    |
 | --------- | --------------------------------------------- |
 | Framework | React 19 + TypeScript (strict)                |
-| Build     | Vite 7                                        |
+| Build     | Vite 8                                        |
 | State     | Zustand (client) + TanStack Query v5 (server) |
 | Routing   | TanStack Router (file-based)                  |
 | Styling   | Tailwind CSS v4 (CSS-based config)            |

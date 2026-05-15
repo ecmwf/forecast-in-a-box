@@ -10,7 +10,6 @@
 
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import type { $ZodIssue } from 'zod/v4/core'
 import { ValidationError, formatZodError, parseOrThrow } from '@/utils/zod'
 
 describe('ValidationError', () => {
@@ -21,7 +20,7 @@ describe('ValidationError', () => {
         expected: 'string',
         path: ['name'],
         message: 'Expected string, received number',
-      } as $ZodIssue,
+      },
     ])
 
     const error = new ValidationError('Test error', zodError)
@@ -48,7 +47,7 @@ describe('formatZodError', () => {
         expected: 'string',
         path: ['name'],
         message: 'Expected string',
-      } as $ZodIssue,
+      },
     ])
 
     expect(formatZodError(zodError)).toBe('name: Expected string')
@@ -61,7 +60,7 @@ describe('formatZodError', () => {
         expected: 'string',
         path: [],
         message: 'Invalid input',
-      } as $ZodIssue,
+      },
     ])
 
     expect(formatZodError(zodError)).toBe('Invalid input')
@@ -74,7 +73,7 @@ describe('formatZodError', () => {
         expected: 'string',
         path: ['user', 'profile', 'name'],
         message: 'Invalid',
-      } as $ZodIssue,
+      },
     ])
 
     expect(formatZodError(zodError)).toBe('user.profile.name: Invalid')
@@ -87,13 +86,13 @@ describe('formatZodError', () => {
         expected: 'string',
         path: ['name'],
         message: 'Expected string',
-      } as $ZodIssue,
+      },
       {
         code: 'invalid_type',
         expected: 'number',
         path: ['age'],
         message: 'Expected number',
-      } as $ZodIssue,
+      },
     ])
 
     expect(formatZodError(zodError)).toBe(

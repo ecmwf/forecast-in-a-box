@@ -157,7 +157,7 @@ export const FableEdgeComponent = memo(function ({
   targetPosition,
   data,
   selected,
-}: EdgeProps) {
+}: EdgeProps<FableEdge>) {
   const edgeStyle = useFableBuilderStore((state) => state.edgeStyle)
 
   const [edgePath, labelX, labelY] = getEdgePath({
@@ -170,7 +170,7 @@ export const FableEdgeComponent = memo(function ({
     targetPosition,
   })
 
-  const inputName = (data as FableEdgeData | undefined)?.inputName
+  const inputName = data?.inputName
   const labelTransform = `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`
 
   return (

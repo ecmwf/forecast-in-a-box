@@ -134,10 +134,7 @@ export function useFableValidation(
   fable: FableBuilderV1 | null,
   enabled: boolean = true,
 ) {
-  const stableFable = useMemo(
-    () => fable ?? ({ blocks: {} } as FableBuilderV1),
-    [fable],
-  )
+  const stableFable = useMemo(() => fable ?? { blocks: {} }, [fable])
 
   const hasBlocks = fable !== null && Object.keys(fable.blocks).length > 0
 
