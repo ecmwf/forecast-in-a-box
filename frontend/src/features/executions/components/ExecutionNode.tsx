@@ -10,11 +10,16 @@
 
 import { memo } from 'react'
 import { Handle, Position } from '@xyflow/react'
+import { CheckCircle2, Loader2 } from 'lucide-react'
 import type { NodeProps } from '@xyflow/react'
 import type { FableNodeData } from '@/features/fable-builder/utils/fable-to-graph'
 import type { BlockKind } from '@/api/types/fable.types'
 import { BLOCK_KIND_METADATA, getBlockKindIcon } from '@/api/types/fable.types'
-import { useShowConfig } from '@/features/executions/components/ExecutionCanvas'
+import {
+  useBlockProgress,
+  useShowConfig,
+} from '@/features/executions/components/ExecutionCanvas'
+import { useIsBlockHovered } from '@/features/executions/stores/executionHoverStore'
 import { cn } from '@/lib/utils'
 
 const NODE_TYPE_TO_KIND: Record<string, BlockKind> = {
@@ -37,9 +42,20 @@ const MULTI_HANDLE_GAP_PX = 12
 export const ExecutionNode = memo(function ({ data, type }: NodeProps) {
   const nodeData = data as FableNodeData
   const showConfig = useShowConfig()
+  const { completedSet, runningSet, plannedSet } = useBlockProgress()
+  const isHovered = useIsBlockHovered(nodeData.instanceId)
   const kind = NODE_TYPE_TO_KIND[type] ?? 'source'
   const kindMeta = BLOCK_KIND_METADATA[kind]
   const Icon = getBlockKindIcon(kind)
+
+  const isCompleted = completedSet.has(nodeData.instanceId)
+  const isRunning = runningSet.has(nodeData.instanceId)
+  // Only dim when the backend confirmed a plan that excludes this node.
+  const isPlannedIdle =
+    plannedSet.size > 0 &&
+    plannedSet.has(nodeData.instanceId) &&
+    !isCompleted &&
+    !isRunning
 
   const inputNames = Object.keys(nodeData.instance.input_ids)
   const configEntries = Object.entries(
@@ -50,8 +66,12 @@ export const ExecutionNode = memo(function ({ data, type }: NodeProps) {
   return (
     <div
       className={cn(
-        'relative rounded-lg border bg-card shadow-sm',
+        'relative rounded-lg border bg-card shadow-sm transition-colors',
         showConfig && configEntries.length > 0 ? 'w-[200px]' : 'w-[140px]',
+        isCompleted && 'border-l-2 border-l-emerald-500',
+        isRunning && 'animate-pulse border-amber-500',
+        isPlannedIdle && 'opacity-60',
+        isHovered && 'bg-primary/10',
       )}
     >
       {inputNames.map((inputName, i) => {
@@ -74,19 +94,28 @@ export const ExecutionNode = memo(function ({ data, type }: NodeProps) {
         )
       })}
 
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="output"
-        className="h-2! w-2! border! border-border! bg-muted-foreground/40!"
-        style={{ top: `${HANDLE_Y_PX}px`, transform: 'translateY(-50%)' }}
-      />
+      {/* Sinks have no downstream — hide the source handle for them. */}
+      {kind !== 'sink' && (
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="output"
+          className="h-2! w-2! border! border-border! bg-muted-foreground/40!"
+          style={{ top: `${HANDLE_Y_PX}px`, transform: 'translateY(-50%)' }}
+        />
+      )}
 
       <div className={cn('h-1 rounded-t-lg', kindMeta.topBarColor)} />
       <div className="space-y-1 p-2.5">
         <div className="flex items-center gap-1.5">
           <Icon className={cn('h-3.5 w-3.5 shrink-0', kindMeta.color)} />
           <span className="truncate text-sm font-medium">{nodeData.label}</span>
+          {isCompleted && (
+            <CheckCircle2 className="ml-auto h-3.5 w-3.5 shrink-0 text-emerald-500" />
+          )}
+          {isRunning && (
+            <Loader2 className="ml-auto h-3.5 w-3.5 shrink-0 animate-spin text-amber-500" />
+          )}
         </div>
         <span className="text-sm text-muted-foreground">{kindMeta.label}</span>
       </div>

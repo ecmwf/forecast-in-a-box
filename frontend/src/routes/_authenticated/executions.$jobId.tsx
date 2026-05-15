@@ -12,10 +12,13 @@ import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { ExecutionDetailPage } from '@/features/executions/components/ExecutionDetailPage'
 
-/** Search params for the execution detail page. `mimes` is a comma-joined
- * list of active filter chips on the Outputs tab; missing/empty = "All". */
+/** Search params for the execution detail page.
+ * - `mimes` is a comma-joined list of active filter chips on the Outputs tab;
+ *   missing/empty = "All".
+ * - `groupBy` controls how the Outputs grid is sectioned. Missing = flat. */
 const searchSchema = z.object({
   mimes: z.string().optional(),
+  groupBy: z.enum(['block', 'mime', 'block-and-mime']).optional(),
 })
 
 export const Route = createFileRoute('/_authenticated/executions/$jobId')({

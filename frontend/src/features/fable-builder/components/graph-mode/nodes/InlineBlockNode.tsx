@@ -17,6 +17,7 @@ import type { FableNodeData } from '@/features/fable-builder/utils/fable-to-grap
 import type { BlockFactory, BlockInstance } from '@/api/types/fable.types'
 import { BlockErrorOverlay } from '@/features/fable-builder/components/graph-mode/nodes/BlockErrorOverlay'
 import { AddNodeButton } from '@/features/fable-builder/components/graph-mode/AddNodeButton'
+import { useFieldErrorMessages } from '@/features/fable-builder/hooks/useFieldErrorMessages'
 import { useNodeDimensions } from '@/features/fable-builder/hooks/useNodeDimensions'
 import {
   useBlockValidation,
@@ -127,9 +128,10 @@ export const InlineBlockNode = memo(function ({
   const inputs = factory.inputs
 
   const missingGlyphs = blockValidation?.missingGlyphs ?? {}
+  const fieldErrorMessages = useFieldErrorMessages()
   const mappedErrors = useMemo(
-    () => mapBlockErrorsToFields(errors, missingGlyphs),
-    [errors, missingGlyphs],
+    () => mapBlockErrorsToFields(errors, missingGlyphs, fieldErrorMessages),
+    [errors, missingGlyphs, fieldErrorMessages],
   )
 
   return (

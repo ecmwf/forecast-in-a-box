@@ -11,6 +11,7 @@
 import { useMemo } from 'react'
 import { AlertCircle, Link2, Trash2, X } from 'lucide-react'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
+import { useFieldErrorMessages } from '@/features/fable-builder/hooks/useFieldErrorMessages'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import {
   BLOCK_KIND_METADATA,
@@ -125,11 +126,17 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
     selectBlock(null)
   }
 
+  const fieldErrorMessages = useFieldErrorMessages()
   // Hook must be called unconditionally — guard inside rather than early-
   // returning above it.
   const mappedErrors = useMemo(
-    () => mapBlockErrorsToFields(blockErrors ?? [], missingGlyphs ?? {}),
-    [blockErrors, missingGlyphs],
+    () =>
+      mapBlockErrorsToFields(
+        blockErrors ?? [],
+        missingGlyphs ?? {},
+        fieldErrorMessages,
+      ),
+    [blockErrors, missingGlyphs, fieldErrorMessages],
   )
 
   if (!selectedBlock || !factory) {
