@@ -82,6 +82,7 @@ export function navigationCommands(navigate: NavigateFn): Array<Command> {
       icon: <Home className="h-4 w-4" />,
       category: 'Navigation',
       keywords: ['home', 'dashboard', 'main'],
+      hotkey: ['G', 'D'],
       action: () => navigate({ to: '/dashboard' }),
     },
     {
@@ -91,6 +92,7 @@ export function navigationCommands(navigate: NavigateFn): Array<Command> {
       icon: <Wrench className="h-4 w-4" />,
       category: 'Navigation',
       keywords: ['configure', 'fable', 'builder', 'new'],
+      hotkey: ['G', 'C'],
       action: () => navigate({ to: '/configure' }),
     },
     {
@@ -100,6 +102,7 @@ export function navigationCommands(navigate: NavigateFn): Array<Command> {
       icon: <History className="h-4 w-4" />,
       category: 'Navigation',
       keywords: ['executions', 'history', 'past', 'runs', 'journal', 'jobs'],
+      hotkey: ['G', 'E'],
       action: () => navigate({ to: '/executions' }),
     },
     {
@@ -109,6 +112,7 @@ export function navigationCommands(navigate: NavigateFn): Array<Command> {
       icon: <Settings className="h-4 w-4" />,
       category: 'Navigation',
       keywords: ['admin', 'settings', 'plugins', 'models'],
+      hotkey: ['G', 'A'],
       action: () => navigate({ to: '/admin' }),
     },
   ]
