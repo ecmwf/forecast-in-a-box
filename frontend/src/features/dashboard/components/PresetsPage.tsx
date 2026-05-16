@@ -45,6 +45,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { useUiStore } from '@/stores/uiStore'
+import { stripSystemTags } from '@/lib/system-tags'
 import { cn } from '@/lib/utils'
 
 function RenamePopover({
@@ -80,7 +81,7 @@ function RenamePopover({
       fableVersion: fableData.version,
       display_name: trimmed,
       display_description: comments.trim(),
-      tags: fableData.tags,
+      tags: stripSystemTags(fableData.tags),
     })
     setOpen(false)
   }

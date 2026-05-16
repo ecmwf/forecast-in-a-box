@@ -25,6 +25,7 @@ import { useFableRetrieve, useUpsertFable } from '@/api/hooks/useFable'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { showToast } from '@/lib/toast'
 import { formatInZone, getAppTimeZone } from '@/lib/datetime'
+import { stripSystemTags } from '@/lib/system-tags'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -174,7 +175,7 @@ export function SaveConfigPopover({
           t('configure:save.defaultTitle', generateDefaultTitleParts()),
       )
       setComments(fableData?.display_description || '')
-      setTags(fableData?.tags ? [...fableData.tags] : [])
+      setTags(stripSystemTags(fableData?.tags))
       setTagInput('')
     }
     if (isControlled) {

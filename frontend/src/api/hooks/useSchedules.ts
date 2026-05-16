@@ -36,6 +36,7 @@ import { ApiClientError } from '@/api/client'
 import { QUERY_CONSTANTS } from '@/utils/constants'
 import { upsertFable } from '@/api/endpoints/fable'
 import { useAppTimeZone } from '@/lib/datetime'
+import { withOneoffTag } from '@/lib/system-tags'
 
 export const scheduleKeys = {
   all: ['schedules'] as const,
@@ -235,7 +236,9 @@ export function useCreateSchedule() {
         builder: fable,
         display_name: name,
         display_description: description,
-        tags,
+        // The blueprint backs an execution, not a preset — mark it out of the
+        // presets list. The schedule entity itself keeps plain tags (below).
+        tags: withOneoffTag(tags),
         parent_id: fableId ?? undefined,
       })
 

@@ -27,6 +27,7 @@ import {
 } from '@/api/types/fable.types'
 import { getStatusBarColor } from '@/features/executions/utils/job-status'
 import { P } from '@/components/base/typography'
+import { stripSystemTags } from '@/lib/system-tags'
 import { cn } from '@/lib/utils'
 
 interface JobListItemProps {
@@ -48,7 +49,7 @@ export function JobListItem({ jobId, status, fableId }: JobListItemProps) {
 
   const truncatedId = jobId.length > 12 ? `${jobId.slice(0, 12)}...` : jobId
   const displayName = fableData?.display_name || t('detail.untitledJob')
-  const tags = fableData?.tags ?? []
+  const tags = stripSystemTags(fableData?.tags)
 
   return (
     <div className="p-6 transition-colors hover:bg-muted/50">

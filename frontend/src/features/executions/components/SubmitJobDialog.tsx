@@ -40,6 +40,7 @@ import { Input } from '@/components/ui/input'
 import { NumericInput } from '@/components/ui/numeric-input'
 import { Label } from '@/components/ui/label'
 import { useActivityStore } from '@/stores/activityStore'
+import { stripSystemTags } from '@/lib/system-tags'
 import { cn } from '@/lib/utils'
 
 type SubmitMode = 'run' | 'schedule'
@@ -110,7 +111,7 @@ function SubmitJobForm({
     () => fableData?.display_description || '',
   )
   const [tags, setTags] = useState<Array<string>>(() =>
-    fableData?.tags ? [...fableData.tags] : [],
+    stripSystemTags(fableData?.tags),
   )
   const [tagInput, setTagInput] = useState('')
   const [environment, setEnvironment] = useState<EnvironmentSpecification>(

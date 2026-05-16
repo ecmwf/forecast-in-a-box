@@ -13,6 +13,7 @@ import type { BlueprintListItem } from '@/api/types/fable.types'
 import { useDeleteBlueprint, useListBlueprints } from '@/api/hooks/useFable'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
+import { isOneoffBlueprint, stripSystemTags } from '@/lib/system-tags'
 
 /** localStorage only stores favourite flags — everything else comes from the backend */
 type FavouritesStore = Record<string, boolean>
@@ -38,23 +39,31 @@ export function useConfigPresets() {
   const presets = useMemo<Array<PresetEntry>>(() => {
     if (!data?.blueprints) return []
 
-    return data.blueprints
-      .map(
-        (bp: BlueprintListItem): PresetEntry => ({
-          blueprintId: bp.blueprint_id,
-          displayName: bp.display_name,
-          displayDescription: bp.display_description,
-          tags: bp.tags ?? [],
-          version: bp.version,
-          isFavourite: !!favourites[bp.blueprint_id],
-        }),
-      )
-      .sort((a, b) => {
-        // Favourites first
-        if (a.isFavourite && !b.isFavourite) return -1
-        if (!a.isFavourite && b.isFavourite) return 1
-        return 0
-      })
+    return (
+      data.blueprints
+        // Keep only explicitly-saved configs — drop plugin templates and the
+        // blueprints auto-created by run/schedule submissions.
+        .filter(
+          (bp: BlueprintListItem) =>
+            bp.source === 'user_defined' && !isOneoffBlueprint(bp.tags),
+        )
+        .map(
+          (bp: BlueprintListItem): PresetEntry => ({
+            blueprintId: bp.blueprint_id,
+            displayName: bp.display_name,
+            displayDescription: bp.display_description,
+            tags: stripSystemTags(bp.tags),
+            version: bp.version,
+            isFavourite: !!favourites[bp.blueprint_id],
+          }),
+        )
+        .sort((a, b) => {
+          // Favourites first
+          if (a.isFavourite && !b.isFavourite) return -1
+          if (!a.isFavourite && b.isFavourite) return 1
+          return 0
+        })
+    )
   }, [data, favourites])
 
   function deletePreset(blueprintId: string, version: number) {

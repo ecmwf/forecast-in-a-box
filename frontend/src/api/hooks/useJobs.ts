@@ -31,6 +31,7 @@ import {
   restartJob,
 } from '@/api/endpoints/job'
 import { upsertFable } from '@/api/endpoints/fable'
+import { withOneoffTag } from '@/lib/system-tags'
 
 export const jobKeys = {
   all: ['jobs'] as const,
@@ -130,7 +131,8 @@ export function useSubmitFable() {
         builder: fable,
         display_name: name,
         display_description: description,
-        tags,
+        // Mark the blueprint as a one-off run — keeps it out of saved presets.
+        tags: withOneoffTag(tags),
         parent_id: fableId ?? undefined,
       })
 
