@@ -11,10 +11,18 @@
 /**
  * Cron Expression Utilities
  *
- * Pure utility functions for converting between cron expressions and human-readable formats.
- * All time inputs/outputs face the user in their local timezone.
- * Cron expressions are stored in server time.
+ * Pure utility functions for converting between cron expressions and
+ * human-readable formats. Time inputs/outputs face the user in the application
+ * timezone; cron expressions are stored in server time.
  */
+
+import {
+  formatInZone,
+  nowPartsInZone,
+  timeZoneOffsetLabel,
+  todayInZone,
+  zonedNaiveToInstant,
+} from '@/lib/datetime'
 
 export type CronFrequency = 'hourly' | 'daily' | 'weekly' | 'custom'
 
@@ -36,43 +44,55 @@ export interface CronPreset {
 }
 
 /**
- * Convert server hour:minute to the client's local equivalent using the offset.
- * offsetMs = (server time parsed as local) - (actual epoch), so:
- * local = server-parsed - offset
+ * Convert a server-time hour:minute to its application-timezone equivalent.
+ *
+ * `offsetMs` is (server wall clock − browser wall clock), so `ref − offsetMs`
+ * is the instant whose server wall clock is `hour:minute`; that instant is then
+ * projected into `timeZone`. The reference date is "today", so the result can
+ * be off by an hour for part of the year when the server and app timezones
+ * observe DST differently — an accepted approximation, since a cron hour:minute
+ * is a recurring wall-clock time rather than a fixed instant.
  */
 export function serverHourMinuteToLocal(
   hour: number,
   minute: number,
   offsetMs: number,
+  timeZone: string,
 ): { hour: number; minute: number } {
   const ref = new Date()
   ref.setHours(hour, minute, 0, 0)
-  const local = new Date(ref.getTime() - offsetMs)
-  return { hour: local.getHours(), minute: local.getMinutes() }
+  const instant = new Date(ref.getTime() - offsetMs)
+  const parts = nowPartsInZone(timeZone, instant)
+  return { hour: parts.hour, minute: parts.minute }
 }
 
 /**
- * Convert local hour:minute back to server time using the offset.
- * Inverse of serverHourMinuteToLocal.
+ * Convert an application-timezone hour:minute back to server time — the strict
+ * inverse of `serverHourMinuteToLocal`.
  */
 export function localHourMinuteToServer(
   hour: number,
   minute: number,
   offsetMs: number,
+  timeZone: string,
 ): { hour: number; minute: number } {
-  const ref = new Date()
-  ref.setHours(hour, minute, 0, 0)
-  const server = new Date(ref.getTime() + offsetMs)
+  const instant = zonedNaiveToInstant(
+    `${todayInZone(timeZone)}T${formatHourMinute(hour, minute)}:00`,
+    timeZone,
+  )
+  const server = new Date(instant.getTime() + offsetMs)
   return { hour: server.getHours(), minute: server.getMinutes() }
 }
 
 /**
- * Convert a cron expression to a human-readable string in local time.
- * Falls back to raw expression for complex patterns.
+ * Convert a cron expression to a human-readable string in the application
+ * timezone. Falls back to the raw expression for complex patterns, and to a
+ * "(server time)" suffix when the server offset is not yet known.
  */
 export function cronToHumanReadable(
   cronExpr: string,
-  offsetMs?: number | null,
+  offsetMs: number | null | undefined,
+  timeZone: string,
 ): string {
   const parsed = parseCronForUI(cronExpr)
   if (!parsed) return cronExpr
@@ -88,10 +108,11 @@ export function cronToHumanReadable(
           parsed.hour,
           parsed.minute,
           offsetMs,
+          timeZone,
         )
-        return `Every day at ${formatTime(local.hour, local.minute)} ${getLocalTimezone()}`
+        return `Every day at ${formatHourMinute(local.hour, local.minute)} ${timeZoneOffsetLabel(timeZone)}`
       }
-      return `Every day at ${formatTime(parsed.hour, parsed.minute)} (server time)`
+      return `Every day at ${formatHourMinute(parsed.hour, parsed.minute)} (server time)`
     }
     case 'weekly': {
       if (offsetMs != null) {
@@ -99,10 +120,11 @@ export function cronToHumanReadable(
           parsed.hour,
           parsed.minute,
           offsetMs,
+          timeZone,
         )
-        return `Every ${DAY_NAMES[parsed.dayOfWeek]} at ${formatTime(local.hour, local.minute)} ${getLocalTimezone()}`
+        return `Every ${DAY_NAMES[parsed.dayOfWeek]} at ${formatHourMinute(local.hour, local.minute)} ${timeZoneOffsetLabel(timeZone)}`
       }
-      return `Every ${DAY_NAMES[parsed.dayOfWeek]} at ${formatTime(parsed.hour, parsed.minute)} (server time)`
+      return `Every ${DAY_NAMES[parsed.dayOfWeek]} at ${formatHourMinute(parsed.hour, parsed.minute)} (server time)`
     }
     default:
       return cronExpr
@@ -167,37 +189,21 @@ export function parseCronForUI(cronExpr: string): CronPreset | null {
   return { frequency: 'weekly', hour, minute, dayOfWeek }
 }
 
-function formatTime(hour: number, minute: number): string {
+function formatHourMinute(hour: number, minute: number): string {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
 }
 
 /**
- * Format a Date as a locale string with the UTC-offset timezone label.
- * e.g. "26/03/2026, 14:20 UTC+7" instead of browser's "GMT+7"
+ * Format a Date in the application timezone with the UTC-offset label,
+ * e.g. "26/03/2026, 14:20 UTC+7".
  */
 export function formatLocalDateTime(
   date: Date,
+  timeZone: string,
   opts?: { includeSeconds?: boolean },
 ): string {
-  const formatted = date.toLocaleString(undefined, {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    ...(opts?.includeSeconds ? { second: '2-digit' } : {}),
-  })
-  return `${formatted} ${getLocalTimezone()}`
-}
-
-/** Get the short timezone name for the client in UTC offset format (e.g. "UTC+7", "UTC-5") */
-export function getLocalTimezone(): string {
-  const offsetMin = new Date().getTimezoneOffset()
-  if (offsetMin === 0) return 'UTC'
-  const sign = offsetMin < 0 ? '+' : '-'
-  const absHours = Math.floor(Math.abs(offsetMin) / 60)
-  const absMinutes = Math.abs(offsetMin) % 60
-  return absMinutes === 0
-    ? `UTC${sign}${absHours}`
-    : `UTC${sign}${absHours}:${String(absMinutes).padStart(2, '0')}`
+  const pattern = opts?.includeSeconds
+    ? 'dd/MM/yyyy, HH:mm:ss'
+    : 'dd/MM/yyyy, HH:mm'
+  return `${formatInZone(date, timeZone, pattern)} ${timeZoneOffsetLabel(timeZone)}`
 }

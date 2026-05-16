@@ -53,6 +53,10 @@ interface UiState {
   artifactsViewMode: AdminViewMode
   setArtifactsViewMode: (mode: AdminViewMode) => void
 
+  // Application timezone (IANA id) — governs all date/time entry and display.
+  timeZone: string
+  setTimeZone: (timeZone: string) => void
+
   // Reset store
   reset: () => void
 }
@@ -67,6 +71,7 @@ const initialState = {
   pluginsViewMode: 'table' as AdminViewMode,
   modelsViewMode: 'table' as AdminViewMode,
   artifactsViewMode: 'table' as AdminViewMode,
+  timeZone: 'UTC',
 }
 
 export const useUiStore = create<UiState>()(
@@ -110,6 +115,9 @@ export const useUiStore = create<UiState>()(
         setPluginsViewMode: (pluginsViewMode) => set({ pluginsViewMode }),
         setModelsViewMode: (modelsViewMode) => set({ modelsViewMode }),
         setArtifactsViewMode: (artifactsViewMode) => set({ artifactsViewMode }),
+
+        // Application timezone management
+        setTimeZone: (timeZone) => set({ timeZone }),
 
         // Reset to initial state
         reset: () => set(initialState),
@@ -158,6 +166,11 @@ export const useUiStore = create<UiState>()(
             state.artifactsViewMode = 'table'
           }
 
+          // Migration from v5 to v6: Add application timezone (default UTC)
+          if (version < 6) {
+            state.timeZone = 'UTC'
+          }
+
           return state as {
             theme: Theme
             layoutMode: LayoutMode
@@ -166,6 +179,7 @@ export const useUiStore = create<UiState>()(
             pluginsViewMode: AdminViewMode
             modelsViewMode: AdminViewMode
             artifactsViewMode: AdminViewMode
+            timeZone: string
           }
         },
         partialize: (state) => ({
@@ -176,6 +190,7 @@ export const useUiStore = create<UiState>()(
           pluginsViewMode: state.pluginsViewMode,
           modelsViewMode: state.modelsViewMode,
           artifactsViewMode: state.artifactsViewMode,
+          timeZone: state.timeZone,
         }),
       },
     ),

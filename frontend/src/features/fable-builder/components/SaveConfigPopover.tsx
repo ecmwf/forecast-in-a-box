@@ -24,6 +24,7 @@ import { ApiClientError } from '@/api/client'
 import { useFableRetrieve, useUpsertFable } from '@/api/hooks/useFable'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { showToast } from '@/lib/toast'
+import { formatInZone, getAppTimeZone } from '@/lib/datetime'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -83,9 +84,10 @@ export function BlockSummaryBadges({
 
 function generateDefaultTitleParts(): { date: string; time: string } {
   const now = new Date()
+  const timeZone = getAppTimeZone()
   return {
-    date: now.toISOString().split('T')[0],
-    time: now.toTimeString().slice(0, 5),
+    date: formatInZone(now, timeZone, 'yyyy-MM-dd'),
+    time: formatInZone(now, timeZone, 'HH:mm'),
   }
 }
 

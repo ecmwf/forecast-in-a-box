@@ -30,6 +30,7 @@ import type {
   FableRetrieveResponse,
 } from '@/api/types/fable.types'
 import { getFactory } from '@/api/types/fable.types'
+import { convertNaive, formatInZone, getAppTimeZone } from '@/lib/datetime'
 
 // Matches either a full datetime-local (`YYYY-MM-DDTHH:MM`) or a bare date
 // (`YYYY-MM-DD`) at the start of the string. Good enough to pick out
@@ -38,18 +39,16 @@ const DATE_LIKE = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2})?/
 
 const MAX_LENGTH = 72
 
-function pad2(n: number): string {
-  return String(n).padStart(2, '0')
-}
-
 function formatTimestampLabel(now: Date): string {
-  const yyyy = now.getFullYear()
-  return `${yyyy}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())} ${pad2(now.getHours())}:${pad2(now.getMinutes())}`
+  return formatInZone(now, getAppTimeZone(), 'yyyy-MM-dd HH:mm')
 }
 
 function extractDateOnly(raw: string): string {
   const match = raw.match(DATE_LIKE)
-  return match ? match[0].slice(0, 10) : raw
+  if (!match) return raw
+  // A datetime config value is canonical UTC — show its date in the app
+  // timezone. A bare calendar date passes through convertNaive unchanged.
+  return convertNaive(match[0], 'UTC', getAppTimeZone()).slice(0, 10)
 }
 
 function firstDatetimeConfigValue(blocks: Array<BlockInstance>): string | null {

@@ -133,6 +133,20 @@ tests/                   # Unit, integration, E2E tests
 - **No barrel files (`index.ts`)** — always import directly from the source file (e.g. `@/components/common/LoadingSpinner`, not `@/components/common`)
 - **Path aliases:** `@/*` → `./src/*`, `@tests/*` → `./tests/*`
 
+## Dates & timezones
+
+A user-settable **application timezone** lives in `uiStore.timeZone` (default
+`UTC`). Forecast date/times are stored and transmitted as **canonical naive UTC**
+(`YYYY-MM-DDTHH:MM:SS`) — the forecast pipeline (anemoi, map plots) is UTC
+end-to-end. The application timezone is a **presentation layer**; conversion
+happens only at the entry/display boundary.
+
+- `src/lib/datetime.ts` is the single source of truth for timezone handling.
+  Components use the reactive `useAppTimeZone()`; plain modules (which cannot
+  call hooks) use the `getAppTimeZone()` snapshot. `convertNaive()` re-expresses
+  a naive datetime string between zones.
+- The **backend must run in UTC** (`TZ=UTC`).
+
 ## API Layer
 
 All endpoint paths live in `src/api/endpoints.ts`. Hooks use TanStack Query with Zod validation:
@@ -159,9 +173,9 @@ Use `showToast` from `@/lib/toast` for user notifications. Let TanStack Query ha
 
 | Layer | Location             | Tool             | Files |
 | ----- | -------------------- | ---------------- | ----- |
-| Unit  | `tests/unit/`        | Vitest           | 40    |
-| Integ | `tests/integration/` | Vitest + MSW     | 16    |
-| E2E   | `tests/e2e/`         | Playwright + MSW | 7     |
+| Unit  | `tests/unit/`        | Vitest           | 42    |
+| Integ | `tests/integration/` | Vitest + MSW     | 19    |
+| E2E   | `tests/e2e/`         | Playwright + MSW | 8     |
 
 Two Playwright configs: `playwright.config.ts` (MSW-mocked) and `playwright.config.stack.ts` (real backend). All E2E tests must work against both.
 

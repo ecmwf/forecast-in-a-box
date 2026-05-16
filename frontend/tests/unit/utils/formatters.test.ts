@@ -22,7 +22,7 @@ import {
 
 describe('formatDate', () => {
   it('formats Date object', () => {
-    const date = new Date('2024-01-15T12:00:00')
+    const date = new Date('2024-01-15T12:00:00Z')
     const result = formatDate(date)
     expect(result).toMatch(/2024|1\/15|15/)
   })
@@ -41,23 +41,30 @@ describe('formatDate', () => {
 
 describe('formatTime', () => {
   it('formats Date object to time string', () => {
-    const date = new Date('2024-01-15T14:30:00')
+    const date = new Date('2024-01-15T14:30:00Z')
     const result = formatTime(date)
     expect(result).toMatch(/14:30|2:30/)
   })
 
   it('formats string date to time', () => {
-    const result = formatTime('2024-01-15T09:15:00')
+    const result = formatTime('2024-01-15T09:15:00Z')
     expect(result).toMatch(/9:15|09:15/)
   })
 })
 
 describe('formatDateTime', () => {
   it('formats Date object to date-time string', () => {
-    const date = new Date('2024-01-15T14:30:00')
+    const date = new Date('2024-01-15T14:30:00Z')
     const result = formatDateTime(date)
     expect(result).toMatch(/2024/)
     expect(result).toMatch(/14:30|2:30/)
+  })
+
+  it('renders the same instant differently per timezone', () => {
+    const instant = new Date('2024-01-15T20:00:00Z')
+    expect(formatDateTime(instant, 'UTC')).not.toBe(
+      formatDateTime(instant, 'Asia/Tokyo'),
+    )
   })
 })
 

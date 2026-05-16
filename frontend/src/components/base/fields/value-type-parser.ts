@@ -26,6 +26,8 @@
  * - optional[T] → same widget as T, with optional=true flag
  */
 
+import { getAppTimeZone, todayInZone } from '@/lib/datetime'
+
 export type ParsedValueType =
   | { type: 'string'; optional?: boolean }
   | { type: 'int'; optional?: boolean }
@@ -134,14 +136,11 @@ export function getDefaultValueForType(parsedType: ParsedValueType): string {
     case 'float':
       return '0.0'
     case 'datetime':
-      // Default to today at local midnight so forecast base-times land on a
-      // round hour instead of whatever wall-clock second the form opened at.
-      // datetime-local expects local time without TZ — compose from local
-      // components rather than Date.toISOString() (which is UTC).
-      return `${todayLocalDate()}T00:00`
+      // Canonical value is naive UTC — default to today's 00:00 UTC (00z run).
+      return `${todayInZone('UTC')}T00:00:00`
     case 'date':
-      // Local date (YYYY-MM-DD), not UTC — see note above.
-      return todayLocalDate()
+      // A calendar date has no instant; use "today" in the app timezone.
+      return todayInZone(getAppTimeZone())
     case 'list':
       return ''
     case 'enum':
@@ -149,12 +148,4 @@ export function getDefaultValueForType(parsedType: ParsedValueType): string {
     case 'unknown':
       return ''
   }
-}
-
-function todayLocalDate(): string {
-  const now = new Date()
-  const y = now.getFullYear()
-  const m = String(now.getMonth() + 1).padStart(2, '0')
-  const d = String(now.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
 }

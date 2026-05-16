@@ -47,7 +47,7 @@ export function ScheduleListItem({
 }: ScheduleListItemProps) {
   const { t } = useTranslation('schedules')
   const updateSchedule = useUpdateSchedule()
-  const { offsetMs, serverTimeToLocal } = useServerTime()
+  const { offsetMs, serverTimeToLocal, timeZone } = useServerTime()
 
   const createdAt = schedule.created_at
     ? formatDistanceToNow(serverTimeToLocal(schedule.created_at), {
@@ -63,7 +63,7 @@ export function ScheduleListItem({
     `${t('detail.untitledSchedule')} ${scheduleId.slice(0, 8)}`
 
   const cronDescription = schedule.cron_expr
-    ? cronToHumanReadable(schedule.cron_expr, offsetMs)
+    ? cronToHumanReadable(schedule.cron_expr, offsetMs, timeZone)
     : null
 
   async function handleToggleEnabled() {

@@ -14,12 +14,12 @@ import type { CronFrequency } from '@/features/schedules/utils/cron'
 import {
   cronToHumanReadable,
   frequencyToCron,
-  getLocalTimezone,
   localHourMinuteToServer,
   parseCronForUI,
   serverHourMinuteToLocal,
 } from '@/features/schedules/utils/cron'
 import { useServerTime } from '@/api/hooks/useSchedules'
+import { timeZoneOffsetLabel } from '@/lib/datetime'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NumericInput } from '@/components/ui/numeric-input'
@@ -53,7 +53,7 @@ export function CronExpressionInput({
   onChange,
 }: CronExpressionInputProps) {
   const { t } = useTranslation('executions')
-  const { offsetMs } = useServerTime()
+  const { offsetMs, timeZone } = useServerTime()
   const parsed = parseCronForUI(value)
 
   const [frequency, setFrequency] = useState<CronFrequency>(
@@ -68,7 +68,7 @@ export function CronExpressionInput({
   const serverMinute = parsed?.minute ?? 0
   const localTime =
     offsetMs != null
-      ? serverHourMinuteToLocal(serverHour, serverMinute, offsetMs)
+      ? serverHourMinuteToLocal(serverHour, serverMinute, offsetMs, timeZone)
       : { hour: serverHour, minute: serverMinute }
 
   /** Convert local hour/minute to server time and emit the cron expression */
@@ -80,7 +80,7 @@ export function CronExpressionInput({
   ) {
     if (freq === 'custom') return
     if (offsetMs != null && freq !== 'hourly') {
-      const server = localHourMinuteToServer(lHour, lMinute, offsetMs)
+      const server = localHourMinuteToServer(lHour, lMinute, offsetMs, timeZone)
       onChange(frequencyToCron(freq, server.hour, server.minute, day))
     } else {
       onChange(frequencyToCron(freq, lHour, lMinute, day))
@@ -159,7 +159,7 @@ export function CronExpressionInput({
                 className="w-20"
               />
               <span className="text-sm text-muted-foreground">
-                {getLocalTimezone()}
+                {timeZoneOffsetLabel(timeZone)}
               </span>
             </>
           )}
@@ -200,7 +200,7 @@ export function CronExpressionInput({
 
       {/* Human-readable preview */}
       <P className="text-sm text-muted-foreground">
-        {cronToHumanReadable(value, offsetMs)}
+        {cronToHumanReadable(value, offsetMs, timeZone)}
       </P>
     </div>
   )

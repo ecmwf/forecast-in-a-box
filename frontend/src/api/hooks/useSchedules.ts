@@ -35,6 +35,7 @@ import {
 import { ApiClientError } from '@/api/client'
 import { QUERY_CONSTANTS } from '@/utils/constants'
 import { upsertFable } from '@/api/endpoints/fable'
+import { useAppTimeZone } from '@/lib/datetime'
 
 export const scheduleKeys = {
   all: ['schedules'] as const,
@@ -184,6 +185,8 @@ export function useServerTime() {
     refetchOnWindowFocus: false,
   })
 
+  const timeZone = useAppTimeZone()
+
   const serverTimeToLocal = useCallback(
     (serverTimeStr: string, { roundMinute = false } = {}): Date => {
       const parsed = parseServerTime(serverTimeStr)
@@ -196,24 +199,11 @@ export function useServerTime() {
     [offsetMs],
   )
 
-  const serverHourMinuteToLocal = useCallback(
-    (hour: number, minute: number): { hour: number; minute: number } => {
-      if (offsetMs == null) return { hour, minute }
-      // Build a reference date with the given server hour/minute
-      const ref = new Date()
-      ref.setHours(hour, minute, 0, 0)
-      // ref is now interpreted as client-local; adjust by offset to get true local time
-      const local = new Date(ref.getTime() - offsetMs)
-      return { hour: local.getHours(), minute: local.getMinutes() }
-    },
-    [offsetMs],
-  )
-
   return {
     offsetMs: offsetMs ?? null,
     isLoaded: offsetMs != null,
     serverTimeToLocal,
-    serverHourMinuteToLocal,
+    timeZone,
   }
 }
 

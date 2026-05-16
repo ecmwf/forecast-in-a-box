@@ -107,7 +107,7 @@ export function ScheduleDetailPage() {
   const updateSchedule = useUpdateSchedule()
   const { data: catalogue } = useBlockCatalogue()
   const { data: fableBuilder } = useFable(schedule?.blueprint_id)
-  const { offsetMs, serverTimeToLocal } = useServerTime()
+  const { offsetMs, serverTimeToLocal, timeZone } = useServerTime()
 
   if (isLoading) {
     return (
@@ -142,7 +142,7 @@ export function ScheduleDetailPage() {
     `${t('detail.untitledSchedule')} ${scheduleId.slice(0, 8)}`
 
   const cronDescription = schedule.cron_expr
-    ? cronToHumanReadable(schedule.cron_expr, offsetMs)
+    ? cronToHumanReadable(schedule.cron_expr, offsetMs, timeZone)
     : null
 
   async function handleToggleEnabled(newEnabled?: boolean) {
@@ -276,6 +276,7 @@ export function ScheduleDetailPage() {
               {nextRun
                 ? formatLocalDateTime(
                     serverTimeToLocal(nextRun, { roundMinute: true }),
+                    timeZone,
                   )
                 : '-'}
             </span>
@@ -361,6 +362,7 @@ export function ScheduleDetailPage() {
                               run.created_at,
                             { roundMinute: true },
                           ),
+                          timeZone,
                         )}
                       </span>
                     </div>

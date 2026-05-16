@@ -31,6 +31,7 @@ import type {
 } from '@/api/types/fable.types'
 import { getBlocksByKind } from '@/api/types/fable.types'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
+import { formatInZone, getAppTimeZone } from '@/lib/datetime'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
 import {
@@ -120,7 +121,11 @@ export function FableBuilderHeader({
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      const date = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+      const date = formatInZone(
+        new Date(),
+        getAppTimeZone(),
+        "yyyy-MM-dd'T'HH-mm-ss",
+      )
       a.download = `${fableName.replace(/\s+/g, '_').toLowerCase()}_${date}_config.json`
       document.body.appendChild(a)
       a.click()

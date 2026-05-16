@@ -15,11 +15,13 @@
  * help button, and settings dropdown menu
  */
 
+import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import {
   Blocks,
   Cloud,
   FileText,
+  Globe,
   HelpCircle,
   Layout,
   LogOut,
@@ -48,8 +50,16 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Logo } from '@/components/common/Logo'
 import { ActivityMonitor } from '@/components/common/ActivityMonitor'
+import { TimeZoneSelect } from '@/components/common/TimeZoneSelect'
 import { NavToggle } from '@/components/layout/NavToggle'
 import { StatusDetailsPopover } from '@/components/common/StatusDetailsPopover'
 import { StatusIndicator } from '@/components/common/StatusIndicator'
@@ -58,6 +68,7 @@ import { cn } from '@/lib/utils'
 import { useUser } from '@/hooks/useUser'
 import { useStatus } from '@/api/hooks/useStatus'
 import { useUiStore } from '@/stores/uiStore'
+import { timeZoneOffsetLabel, useAppTimeZone } from '@/lib/datetime'
 
 export function AuthenticatedHeader() {
   const { data: user } = useUser()
@@ -69,6 +80,9 @@ export function AuthenticatedHeader() {
   const setLayoutMode = useUiStore((state) => state.setLayoutMode)
   const dashboardVariant = useUiStore((state) => state.dashboardVariant)
   const setDashboardVariant = useUiStore((state) => state.setDashboardVariant)
+  const setTimeZone = useUiStore((state) => state.setTimeZone)
+  const timeZone = useAppTimeZone()
+  const [tzDialogOpen, setTzDialogOpen] = useState(false)
 
   const isAuthenticated = authType === 'authenticated'
   const isSuperuser = user?.is_superuser ?? false
@@ -246,6 +260,13 @@ export function AuthenticatedHeader() {
                     </DropdownMenuSubContent>
                   </DropdownMenuPortal>
                 </DropdownMenuSub>
+                <DropdownMenuItem onClick={() => setTzDialogOpen(true)}>
+                  <Globe className="mr-2 h-4 w-4" />
+                  Timezone
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {timeZoneOffsetLabel(timeZone)}
+                  </span>
+                </DropdownMenuItem>
               </DropdownMenuGroup>
 
               <DropdownMenuSeparator />
@@ -311,6 +332,25 @@ export function AuthenticatedHeader() {
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <Dialog open={tzDialogOpen} onOpenChange={setTzDialogOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Application timezone</DialogTitle>
+                <DialogDescription>
+                  All dates and times — including forecast base times — are
+                  shown and entered in this timezone. Defaults to UTC.
+                </DialogDescription>
+              </DialogHeader>
+              <TimeZoneSelect
+                value={timeZone}
+                onChange={(tz) => {
+                  setTimeZone(tz)
+                  setTzDialogOpen(false)
+                }}
+              />
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 

@@ -8,11 +8,12 @@
  * does it submit to any jurisdiction.
  */
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   getDefaultValueForType,
   parseValueType,
 } from '@/components/base/fields/value-type-parser'
+import { useUiStore } from '@/stores/uiStore'
 
 describe('parseValueType', () => {
   describe('simple types', () => {
@@ -208,6 +209,11 @@ describe('parseValueType', () => {
 })
 
 describe('getDefaultValueForType', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    useUiStore.getState().reset()
+  })
+
   it('returns empty string for string type', () => {
     expect(getDefaultValueForType({ type: 'string' })).toBe('')
   })
@@ -220,25 +226,31 @@ describe('getDefaultValueForType', () => {
     expect(getDefaultValueForType({ type: 'float' })).toBe('0.0')
   })
 
-  it('returns today at local midnight for datetime type', () => {
-    const result = getDefaultValueForType({ type: 'datetime' })
-    // datetime-local compatible: YYYY-MM-DDTHH:mm, time pinned to 00:00
-    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T00:00$/)
-    const today = new Date()
-    const y = today.getFullYear()
-    const m = String(today.getMonth() + 1).padStart(2, '0')
-    const d = String(today.getDate()).padStart(2, '0')
-    expect(result).toBe(`${y}-${m}-${d}T00:00`)
+  it('returns today at 00:00 UTC for datetime type', () => {
+    vi.useFakeTimers()
+    // 23:30 UTC — a later calendar date in many browser timezones.
+    vi.setSystemTime(new Date('2026-05-15T23:30:00Z'))
+    expect(getDefaultValueForType({ type: 'datetime' })).toBe(
+      '2026-05-15T00:00:00',
+    )
   })
 
-  it('returns local today for date type', () => {
-    const result = getDefaultValueForType({ type: 'date' })
-    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/)
-    const today = new Date()
-    const y = today.getFullYear()
-    const m = String(today.getMonth() + 1).padStart(2, '0')
-    const d = String(today.getDate()).padStart(2, '0')
-    expect(result).toBe(`${y}-${m}-${d}`)
+  it('keeps the datetime default in UTC regardless of the app timezone', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-15T23:30:00Z'))
+    useUiStore.setState({ timeZone: 'Asia/Tokyo' })
+    expect(getDefaultValueForType({ type: 'datetime' })).toBe(
+      '2026-05-15T00:00:00',
+    )
+  })
+
+  it('returns today in the app timezone for date type', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-15T23:30:00Z'))
+    useUiStore.setState({ timeZone: 'UTC' })
+    expect(getDefaultValueForType({ type: 'date' })).toBe('2026-05-15')
+    useUiStore.setState({ timeZone: 'Asia/Tokyo' }) // +9h -> next calendar day
+    expect(getDefaultValueForType({ type: 'date' })).toBe('2026-05-16')
   })
 
   it('returns empty string for list type', () => {
