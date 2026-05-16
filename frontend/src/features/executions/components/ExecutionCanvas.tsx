@@ -193,7 +193,7 @@ function ExecutionCanvasInner({
             // Narrow: inline `height` is the authority (React Flow needs a
             // definite height, not just `min-height`). Wide: `!h-full`
             // overrides it so the canvas fills the bounded column.
-            'min-[1440px]:!h-full min-[1440px]:min-h-0 min-[1440px]:flex-1',
+            'min-[1280px]:!h-full min-[1280px]:min-h-0 min-[1280px]:flex-1',
             // No border — the dotted background already provides framing.
             // Status feedback comes from a soft glow halo only.
             status === 'running' && 'shadow-[0_0_12px_rgba(251,191,36,0.3)]',

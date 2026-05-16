@@ -42,9 +42,9 @@ const log = createLogger('ExecutionDetailPage')
 // Wide-screen layout: each column claims half the row and scrolls
 // independently via its TabsContent.
 const WIDE_COLUMN =
-  'min-[1440px]:flex min-[1440px]:h-full min-[1440px]:min-w-0 min-[1440px]:flex-1 min-[1440px]:flex-col'
+  'min-[1280px]:flex min-[1280px]:h-full min-[1280px]:min-w-0 min-[1280px]:flex-1 min-[1280px]:flex-col'
 const WIDE_TAB_CONTENT =
-  'min-[1440px]:min-h-0 min-[1440px]:flex-1 min-[1440px]:overflow-y-auto'
+  'min-[1280px]:min-h-0 min-[1280px]:flex-1 min-[1280px]:overflow-y-auto'
 
 export function ExecutionDetailPage() {
   const { t } = useTranslation('executions')
@@ -205,8 +205,8 @@ export function ExecutionDetailPage() {
           'flex flex-1 flex-col gap-8',
           // Wide: pin to viewport minus chrome (~17rem). flex-none cancels
           // the inherited flex-1 so the explicit height is honoured.
-          'min-[1440px]:h-[calc(100vh_-_17rem)] min-[1440px]:flex-row',
-          'min-[1440px]:flex-none min-[1440px]:gap-6 min-[1440px]:overflow-hidden',
+          'min-[1280px]:h-[calc(100vh_-_17rem)] min-[1280px]:flex-row',
+          'min-[1280px]:flex-none min-[1280px]:gap-6 min-[1280px]:overflow-hidden',
         )}
       >
         <div className={WIDE_COLUMN}>
@@ -234,7 +234,7 @@ export function ExecutionDetailPage() {
           <Tabs
             value={activeTab}
             onValueChange={setActiveTab}
-            className="min-[1440px]:flex min-[1440px]:h-full min-[1440px]:min-h-0 min-[1440px]:flex-col"
+            className="min-[1280px]:flex min-[1280px]:h-full min-[1280px]:min-h-0 min-[1280px]:flex-col"
           >
             {/* Sticky for the mobile single-scroll layout; no-op at wide.
                 Default `bg-muted` is the sticky background — don't override. */}

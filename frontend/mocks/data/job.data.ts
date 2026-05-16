@@ -143,6 +143,32 @@ export const mixedAvailabilityExecution: JobExecutionDetail = {
   },
 }
 
+/** Test-only fixture: an available output whose wire mime is the opaque
+ * `application/octet-stream` cascade uses for raw bytes. Its real type is
+ * knowable only by sniffing the content — covers the sniff-then-filter path.
+ * Inject it via {@link injectMockExecution}. */
+export const opaqueMimeExecution: JobExecutionDetail = {
+  run_id: 'job-opaque-006',
+  attempt_count: 1,
+  status: 'completed',
+  created_at: oneHourAgo,
+  updated_at: oneHourAgo,
+  blueprint_id: 'def-006',
+  blueprint_version: 1,
+  error: null,
+  progress: '100',
+  cascade_job_id: 'cascade-006',
+  outputs: {
+    'task-out-6': {
+      mime_type: 'application/octet-stream',
+      original_block: 'sink_opaque',
+      is_available: true,
+    },
+  },
+  completed_block_ids: null,
+  planned_block_ids: null,
+}
+
 export function resetJobsState(): void {
   executionsState = {}
   executionIdCounter = 200
