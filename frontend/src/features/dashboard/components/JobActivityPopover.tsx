@@ -18,13 +18,7 @@ import { Link } from '@tanstack/react-router'
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import type { ReactNode } from 'react'
 import { useJobStatusCounts } from '@/api/hooks/useJobStatusCounts'
-import {
-  Popover,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from '@/components/ui/popover'
+import { SummaryPopover } from '@/components/common/SummaryPopover'
 
 /** Months of history shown in the bar chart. */
 const MONTHS = 6
@@ -71,57 +65,18 @@ export function JobActivityPopover({
   }, [runs])
 
   return (
-    <Popover>
-      <PopoverTrigger
-        render={<button type="button" className="h-full cursor-pointer" />}
-      >
-        {children}
-      </PopoverTrigger>
-      <PopoverContent align={align} side={side} className="w-80">
-        <PopoverHeader>
-          <PopoverTitle className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-primary" />
-            {t('welcome.activity.title')}
-          </PopoverTitle>
-        </PopoverHeader>
-
-        <p className="mb-2 text-sm text-muted-foreground">
-          {t('welcome.activity.summary', { count: recentTotal })}
-        </p>
-
-        <div className="h-36 w-full text-muted-foreground">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={data}
-              margin={{ top: 4, right: 4, bottom: 0, left: 4 }}
-            >
-              <XAxis
-                dataKey="month"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={6}
-                tick={{ fontSize: 11, fill: 'currentColor' }}
-              />
-              <Tooltip
-                cursor={{ fill: 'var(--muted)' }}
-                contentStyle={{
-                  borderRadius: '0.5rem',
-                  border: '1px solid var(--border)',
-                  background: 'var(--popover)',
-                  color: 'var(--popover-foreground)',
-                  fontSize: '0.75rem',
-                }}
-              />
-              <Bar
-                dataKey="count"
-                name={t('welcome.activity.title')}
-                fill="#10b981"
-                radius={[4, 4, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
+    <SummaryPopover
+      trigger={children}
+      align={align}
+      side={side}
+      contentClassName="w-80"
+      title={
+        <>
+          <TrendingUp className="h-4 w-4 text-primary" />
+          {t('welcome.activity.title')}
+        </>
+      }
+      footer={
         <div className="mt-2 border-t pt-2">
           <Link
             to="/executions"
@@ -131,7 +86,44 @@ export function JobActivityPopover({
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
-      </PopoverContent>
-    </Popover>
+      }
+    >
+      <p className="mb-2 text-sm text-muted-foreground">
+        {t('welcome.activity.summary', { count: recentTotal })}
+      </p>
+
+      <div className="h-36 w-full text-muted-foreground">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={data}
+            margin={{ top: 4, right: 4, bottom: 0, left: 4 }}
+          >
+            <XAxis
+              dataKey="month"
+              tickLine={false}
+              axisLine={false}
+              tickMargin={6}
+              tick={{ fontSize: 11, fill: 'currentColor' }}
+            />
+            <Tooltip
+              cursor={{ fill: 'var(--muted)' }}
+              contentStyle={{
+                borderRadius: '0.5rem',
+                border: '1px solid var(--border)',
+                background: 'var(--popover)',
+                color: 'var(--popover-foreground)',
+                fontSize: '0.75rem',
+              }}
+            />
+            <Bar
+              dataKey="count"
+              name={t('welcome.activity.title')}
+              fill="#10b981"
+              radius={[4, 4, 0, 0]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </SummaryPopover>
   )
 }

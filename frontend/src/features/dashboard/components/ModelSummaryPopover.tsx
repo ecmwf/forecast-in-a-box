@@ -22,13 +22,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { useArtifacts } from '@/api/hooks/useArtifacts'
-import {
-  Popover,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from '@/components/ui/popover'
+import { SummaryPopover } from '@/components/common/SummaryPopover'
 
 interface ModelSummaryPopoverProps {
   children: ReactNode
@@ -84,46 +78,20 @@ export function ModelSummaryPopover({
   }, [artifacts])
 
   return (
-    <Popover>
-      <PopoverTrigger
-        render={<button type="button" className="h-full cursor-pointer" />}
-      >
-        {children}
-      </PopoverTrigger>
-      <PopoverContent align={align} side={side} className="w-64">
-        <PopoverHeader>
-          <PopoverTitle>
-            <Link
-              to="/admin/artifacts"
-              className="flex items-center gap-2 transition-colors hover:text-primary"
-            >
-              <Box className="h-4 w-4 text-primary" />
-              {t('welcome.stats.availableModels')}
-            </Link>
-          </PopoverTitle>
-        </PopoverHeader>
-
-        <div className="space-y-1">
-          <ModelRow
-            icon={<CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
-            label={t('welcome.models.readyToUse')}
-            count={summary.readyToUse}
-            isLoading={isLoading}
-          />
-          <ModelRow
-            icon={<AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
-            label={t('welcome.models.incompatible')}
-            count={summary.incompatible}
-            isLoading={isLoading}
-          />
-          <ModelRow
-            icon={<Download className="h-3.5 w-3.5 text-muted-foreground" />}
-            label={t('welcome.models.notDownloaded')}
-            count={summary.notDownloaded}
-            isLoading={isLoading}
-          />
-        </div>
-
+    <SummaryPopover
+      trigger={children}
+      align={align}
+      side={side}
+      title={
+        <Link
+          to="/admin/artifacts"
+          className="flex items-center gap-2 transition-colors hover:text-primary"
+        >
+          <Box className="h-4 w-4 text-primary" />
+          {t('welcome.stats.availableModels')}
+        </Link>
+      }
+      footer={
         <div className="space-y-2 border-t pt-2">
           <div className="flex items-center justify-between px-2">
             <span className="text-sm font-medium">
@@ -141,7 +109,28 @@ export function ModelSummaryPopover({
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
-      </PopoverContent>
-    </Popover>
+      }
+    >
+      <div className="space-y-1">
+        <ModelRow
+          icon={<CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
+          label={t('welcome.models.readyToUse')}
+          count={summary.readyToUse}
+          isLoading={isLoading}
+        />
+        <ModelRow
+          icon={<AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
+          label={t('welcome.models.incompatible')}
+          count={summary.incompatible}
+          isLoading={isLoading}
+        />
+        <ModelRow
+          icon={<Download className="h-3.5 w-3.5 text-muted-foreground" />}
+          label={t('welcome.models.notDownloaded')}
+          count={summary.notDownloaded}
+          isLoading={isLoading}
+        />
+      </div>
+    </SummaryPopover>
   )
 }

@@ -21,14 +21,8 @@ import type { ReactNode } from 'react'
 import type { JobStatus } from '@/api/types/job.types'
 import { useJobStatusCounts } from '@/api/hooks/useJobStatusCounts'
 import { getJobStatusVariant } from '@/features/executions/utils/job-status'
+import { SummaryPopover } from '@/components/common/SummaryPopover'
 import { Button } from '@/components/ui/button'
-import {
-  Popover,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 
 interface JobStatusDetailsPopoverProps {
@@ -116,57 +110,31 @@ export function JobStatusDetailsPopover({
   }
 
   return (
-    <Popover>
-      <PopoverTrigger
-        render={<button type="button" className="h-full cursor-pointer" />}
-      >
-        {children}
-      </PopoverTrigger>
-      <PopoverContent align={align} side={side} className="w-64">
-        <PopoverHeader>
-          <div className="flex items-center justify-between">
-            <PopoverTitle>
-              <Link
-                to="/executions"
-                className="flex items-center gap-2 transition-colors hover:text-primary"
-              >
-                <Clock className="h-4 w-4 text-primary" />
-                {t('welcome.stats.executionStatus')}
-              </Link>
-            </PopoverTitle>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => refetch()}
-              disabled={isFetching}
-              className="h-6 w-6"
-            >
-              <RefreshCw
-                className={cn('h-3 w-3', isFetching && 'animate-spin')}
-              />
-            </Button>
-          </div>
-        </PopoverHeader>
-
-        <div className="space-y-1">
-          {isLoading
-            ? PRIMARY_STATUSES.map((status) => (
-                <StatusRow key={status} status={status} count={0} isLoading />
-              ))
-            : visibleStatuses.map((status) => (
-                <StatusRow
-                  key={status}
-                  status={status}
-                  count={counts[status]}
-                  runId={
-                    status === 'running'
-                      ? (runningRunId ?? undefined)
-                      : undefined
-                  }
-                />
-              ))}
-        </div>
-
+    <SummaryPopover
+      trigger={children}
+      align={align}
+      side={side}
+      title={
+        <Link
+          to="/executions"
+          className="flex items-center gap-2 transition-colors hover:text-primary"
+        >
+          <Clock className="h-4 w-4 text-primary" />
+          {t('welcome.stats.executionStatus')}
+        </Link>
+      }
+      headerAction={
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="h-6 w-6"
+        >
+          <RefreshCw className={cn('h-3 w-3', isFetching && 'animate-spin')} />
+        </Button>
+      }
+      footer={
         <div className="space-y-2 border-t pt-2">
           <div className="flex items-center justify-between px-2">
             <span className="text-sm font-medium">
@@ -184,7 +152,24 @@ export function JobStatusDetailsPopover({
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
-      </PopoverContent>
-    </Popover>
+      }
+    >
+      <div className="space-y-1">
+        {isLoading
+          ? PRIMARY_STATUSES.map((status) => (
+              <StatusRow key={status} status={status} count={0} isLoading />
+            ))
+          : visibleStatuses.map((status) => (
+              <StatusRow
+                key={status}
+                status={status}
+                count={counts[status]}
+                runId={
+                  status === 'running' ? (runningRunId ?? undefined) : undefined
+                }
+              />
+            ))}
+      </div>
+    </SummaryPopover>
   )
 }

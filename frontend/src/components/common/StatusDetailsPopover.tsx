@@ -20,14 +20,8 @@ import type { ReactNode } from 'react'
 import type { ComponentStatus, StatusComponent } from '@/types/status.types'
 import { STATUS_COMPONENTS } from '@/types/status.types'
 import { useStatus } from '@/api/hooks/useStatus'
+import { SummaryPopover } from '@/components/common/SummaryPopover'
 import { Button } from '@/components/ui/button'
-import {
-  Popover,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 
 interface StatusDetailsPopoverProps {
@@ -149,57 +143,50 @@ export function StatusDetailsPopover({
   const showLoading = isLoading && componentDetails.length === 0
 
   return (
-    <Popover>
-      <PopoverTrigger
-        render={<button type="button" className="h-full cursor-pointer" />}
-      >
-        {children}
-      </PopoverTrigger>
-      <PopoverContent align={align} side={side} className="w-64">
-        <PopoverHeader>
-          <div className="flex items-center justify-between">
-            <PopoverTitle className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-primary" />
-              {t('status.title')}
-            </PopoverTitle>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => refetch()}
-              disabled={isFetching}
-              className="h-6 w-6"
-            >
-              <RefreshCw
-                className={cn('h-3 w-3', isFetching && 'animate-spin')}
-              />
-            </Button>
-          </div>
-        </PopoverHeader>
-
-        {/* Component Status List */}
-        <div className="space-y-1">
-          {showLoading
-            ? STATUS_COMPONENTS.map((component) => (
-                <ComponentRow key={component} component={component} isLoading />
-              ))
-            : componentDetails.map(({ component, status }) => (
-                <ComponentRow
-                  key={component}
-                  component={component}
-                  status={status}
-                />
-              ))}
-        </div>
-
-        {/* Version */}
-        {version && (
+    <SummaryPopover
+      trigger={children}
+      align={align}
+      side={side}
+      title={
+        <>
+          <Activity className="h-4 w-4 text-primary" />
+          {t('status.title')}
+        </>
+      }
+      headerAction={
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="h-6 w-6"
+        >
+          <RefreshCw className={cn('h-3 w-3', isFetching && 'animate-spin')} />
+        </Button>
+      }
+      footer={
+        version ? (
           <div className="border-t pt-2 text-center">
             <span className="font-mono text-sm text-muted-foreground">
               {version}
             </span>
           </div>
-        )}
-      </PopoverContent>
-    </Popover>
+        ) : undefined
+      }
+    >
+      <div className="space-y-1">
+        {showLoading
+          ? STATUS_COMPONENTS.map((component) => (
+              <ComponentRow key={component} component={component} isLoading />
+            ))
+          : componentDetails.map(({ component, status }) => (
+              <ComponentRow
+                key={component}
+                component={component}
+                status={status}
+              />
+            ))}
+      </div>
+    </SummaryPopover>
   )
 }
