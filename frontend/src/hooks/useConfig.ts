@@ -93,7 +93,7 @@ export function useLoginEndpoint(): string | null {
 /**
  * Get backend base URL
  *
- * This is a build-time environment variable set via VITE_BACKEND_BASE_URL
+ * This is a build-time environment variable set via VITE_API_BASE_URL
  *
  * @returns Backend base URL (e.g., '/api' or 'http://127.0.0.1:8000/api')
  */

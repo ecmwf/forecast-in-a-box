@@ -35,7 +35,7 @@ function RootComponent() {
   const backendBaseUrl = useBackendBaseUrl()
   const environment = useEnvironment()
 
-  // Sync language between configStore, globalStore, and i18next
+  // Sync language between configStore and i18next
   useLanguageSync()
 
   // Log configuration in debug mode

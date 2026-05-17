@@ -171,7 +171,6 @@ export function NodeControls({
   const showChild = childOptions.length > 0 || existingChildren.length > 0
   const showSibling = siblingOptions.length > 0 || existingSiblings.length > 0
 
-  // Always show controls for all nodes
   const containerClass = 'absolute inset-0 pointer-events-none'
 
   return (

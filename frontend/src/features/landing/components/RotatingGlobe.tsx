@@ -54,7 +54,7 @@ const processCoastlines = (data: CoastlineData): Array<ProcessedPath> => {
         })
       })
     } else {
-      // Handle simple LineString (not provided in your example, but just in case)
+      // Simple LineString — the path is its first coordinate array
       paths.push({
         coords: geometry.coordinates[0],
         properties,

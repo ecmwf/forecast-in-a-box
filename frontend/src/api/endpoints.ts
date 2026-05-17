@@ -15,8 +15,8 @@
  * constants instead of hardcoding paths.
  *
  * Key conventions:
- * - `API_ENDPOINTS`: For production code - static paths or functions for dynamic paths
- * - `API_PATTERNS`: For MSW mock handlers - uses `:param` syntax for path matching
+ * - `API_ENDPOINTS`: For production code - all static paths
+ * - `API_PATTERNS`: For MSW mock handlers - currently all static paths
  *
  * @see AGENTS.md for documentation on API endpoint conventions
  */
@@ -32,19 +32,16 @@ export const API_VERSION = 'v1'
 export const API_PREFIX = `/api/${API_VERSION}`
 
 /**
- * All API endpoint paths for production code
+ * All API endpoint paths for production code.
  *
- * Static endpoints are strings, dynamic endpoints are functions.
+ * Every path is a static string; dynamic values travel as query params
+ * or request bodies, never as path segments.
  *
  * Usage:
  * ```typescript
  * import { API_ENDPOINTS } from '@/api/endpoints'
  *
- * // Static endpoint
  * apiClient.get(API_ENDPOINTS.status)
- *
- * // Dynamic endpoint
- * apiClient.get(API_ENDPOINTS.job.list)
  * ```
  */
 export const API_ENDPOINTS = {
@@ -71,7 +68,7 @@ export const API_ENDPOINTS = {
     list: `${API_PREFIX}/blueprint/list`,
     /** POST - Delete a fable definition */
     delete: `${API_PREFIX}/blueprint/delete`,
-    /** GET - List available intrinsic glyphs for ${glyph} interpolation in block configs */
+    /** GET - List glyphs available for ${glyph} interpolation (query: glyph_type intrinsic|global) */
     glyphsList: `${API_PREFIX}/blueprint/glyphs/list`,
     /** GET - List custom Jinja filters/globals available in glyph expressions */
     glyphsFunctions: `${API_PREFIX}/blueprint/glyphs/functions`,
@@ -153,7 +150,7 @@ export const API_ENDPOINTS = {
     get: `${API_PREFIX}/run/get`,
     /** POST - Restart an execution (body: { run_id, attempt_count }) */
     restart: `${API_PREFIX}/run/restart`,
-    /** GET - Get job result data by task ID (query: run_id, dataset_id) */
+    /** GET - Get a single output's content (query: run_id, dataset_id) */
     outputContent: `${API_PREFIX}/run/outputContent`,
     /** GET - Download job logs as ZIP (query: run_id) */
     logs: `${API_PREFIX}/run/logs`,
@@ -199,18 +196,8 @@ export const API_ENDPOINTS = {
 /**
  * Path patterns for MSW mock handlers
  *
- * These use `:param` syntax for dynamic route matching.
- * Only needed for endpoints with path parameters.
- *
- * Usage in mock handlers:
- * ```typescript
- * import { API_PATTERNS } from '@/api/endpoints'
- *
- * http.get(API_PATTERNS.artifacts.listModels, async ({ request }) => {
- *   const { jobId } = params
- *   // ...
- * })
- * ```
+ * All patterns are currently static paths — IDs travel in the request body,
+ * so no `:param` route matching is needed.
  */
 export const API_PATTERNS = {
   /**

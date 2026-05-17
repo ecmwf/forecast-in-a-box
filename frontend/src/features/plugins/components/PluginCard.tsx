@@ -89,7 +89,7 @@ export function PluginCard({
   // Show error state
   const hasError = plugin.status === 'errored'
 
-  // PyPI URL for available plugins
+  // PyPI URL derived from the pip source, when one exists
   const pypiUrl = getPyPIUrl(plugin.pipSource)
 
   return (

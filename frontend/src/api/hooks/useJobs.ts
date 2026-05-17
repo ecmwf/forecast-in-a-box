@@ -71,8 +71,8 @@ export function useJobsStatus(
 }
 
 /**
- * Probe the MIME type of a single output via a HEAD request.
- * Lightweight (no body transfer); cached so repeat mounts don't re-probe.
+ * Probe the MIME type of a single output without downloading the body.
+ * Cached so repeat mounts don't re-probe.
  */
 export function useJobContentType(
   jobId: string | undefined,

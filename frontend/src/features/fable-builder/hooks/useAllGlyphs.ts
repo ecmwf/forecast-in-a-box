@@ -9,7 +9,7 @@
  */
 
 /**
- * Hook that merges intrinsic and global glyphs into a single typed list.
+ * Hook that merges intrinsic, global, and local glyphs into a single typed list.
  */
 
 import { useMemo } from 'react'

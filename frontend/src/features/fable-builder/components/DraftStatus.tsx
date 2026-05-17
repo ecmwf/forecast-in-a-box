@@ -9,7 +9,7 @@
  */
 
 /**
- * Figma-style subtle status line reporting on the LOCAL draft autosave only.
+ * Subtle status line reporting on the LOCAL draft autosave only.
  *
  *   - isDirty && draftWritePending → "Saving draft…"
  *   - isDirty && !draftWritePending → "Draft saved"

@@ -216,7 +216,7 @@ test.describe('Fable Builder - Form Mode', () => {
       await buttonsToClick.first().click()
       await page.waitForTimeout(1000)
 
-      // Should show "Unsaved" badge in header
+      // Should show the draft-status badge in the header
       const unsavedBadge = page.getByText(/saving draft|draft saved/i)
       if (
         await unsavedBadge
@@ -473,13 +473,13 @@ test.describe('Fable Builder - Save & Load', () => {
             await saveAction.click()
             await page.waitForTimeout(2000)
 
-            // Unsaved badge should disappear
+            // Draft-status badge should disappear
             const unsavedBadge = page.getByText(/saving draft|draft saved/i)
             const isUnsavedVisible = await unsavedBadge
               .first()
               .isVisible({ timeout: 2000 })
               .catch(() => false)
-            // After save, unsaved should not be visible
+            // After save, the draft badge should not be visible
             if (!isUnsavedVisible) {
               expect(isUnsavedVisible).toBe(false)
             }
@@ -522,7 +522,7 @@ test.describe('Fable Builder - Save & Load', () => {
         await paletteButtons.nth(1).click()
         await page.waitForTimeout(1000)
 
-        // Unsaved badge should reappear
+        // Draft-status badge should reappear
         const unsavedBadge = page.getByText(/saving draft|draft saved/i)
         if (
           await unsavedBadge

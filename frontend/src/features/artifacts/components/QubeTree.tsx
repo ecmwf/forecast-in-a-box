@@ -55,8 +55,8 @@ interface MatrixSection {
   /** Parameters in the order they appear in the qube. */
   params: Array<string>
   /**
-   * Levels in altitude-ascending order (high pressure first → low pressure
-   * last). null if the branch has no level dimension (e.g. surface).
+   * Distinct level values, numerically ascending; the matrix view re-sorts
+   * them for display. null if the branch has no level dimension (e.g. surface).
    */
   levels: Array<number> | null
   /** Set of "param|level" strings for fast presence lookup. */

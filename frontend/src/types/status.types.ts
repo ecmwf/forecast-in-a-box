@@ -42,7 +42,7 @@ export function normalizePluginStatus(raw: string): ComponentStatus {
  */
 export function getPluginStatusError(raw: string): string | null {
   if (raw.startsWith('failure')) {
-    // Strip "failure: " or "failure getting status" prefix for display
+    // Strip the leading "failure"/"failure:" token, keeping the rest for display
     const msg = raw.replace(/^failure:?\s*/, '').trim()
     return msg || 'Unknown plugin error'
   }

@@ -14,10 +14,10 @@
  * Tests the tag pill input behavior in the SubmitRunDialog:
  * - Comma creates a tag pill
  * - Enter creates a tag pill
- * - Backspace removes last tag when input is empty
- * - Duplicate tags are ignored
  * - Spaces within tags are preserved
- * - Tags render as pills with X buttons
+ * - Multiple tags from comma-separated input
+ * - Duplicate tags are ignored
+ * - Empty tags from leading commas are ignored
  */
 
 import { useState } from 'react'

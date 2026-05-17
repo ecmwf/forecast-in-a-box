@@ -11,8 +11,7 @@
 /**
  * PluginDetailPage Component
  *
- * Full-page view of plugin details with block factories grid,
- * replacing the previous PluginDetailsSheet sidebar.
+ * Full-page view of plugin details with block factories grid.
  */
 
 import { ArrowLeft, Search } from 'lucide-react'

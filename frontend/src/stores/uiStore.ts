@@ -45,7 +45,7 @@ interface UiState {
   panelShadow: PanelShadow
   setPanelShadow: (shadow: PanelShadow) => void
 
-  // Admin view modes (adjustable via initial state, not UI toggle)
+  // Admin view modes (table/card toggle on the plugins and artifacts pages)
   pluginsViewMode: AdminViewMode
   setPluginsViewMode: (mode: AdminViewMode) => void
   modelsViewMode: AdminViewMode

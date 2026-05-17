@@ -16,7 +16,7 @@
  * component so `useHotkeySequence` is always called unconditionally (Rules of
  * Hooks). Renders no DOM.
  *
- * `@tanstack/hotkeys` ignores single-key sequences while a text input is
+ * `@tanstack/react-hotkeys` ignores single-key sequences while a text input is
  * focused, so these never fire mid-typing — including inside the command
  * palette's search field.
  */

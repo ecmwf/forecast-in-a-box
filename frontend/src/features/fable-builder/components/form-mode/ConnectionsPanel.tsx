@@ -142,7 +142,7 @@ function ConnectionsPanelContent({
     validationState,
   ])
 
-  // Compute all siblings (blocks of same kind not in the pipeline)
+  // Index every block by kind, for the node-control navigation lists.
   const allBlocksByKind = useMemo(() => {
     const result: Record<
       BlockKind,
