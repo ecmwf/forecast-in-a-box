@@ -2,6 +2,7 @@
   "welcome": {
     "title": "Welcome back, {{name}}",
     "titleAnonymous": "Welcome back",
+    "userFallback": "User",
     "stats": {
       "systemStatus": "System Status",
       "checking": "Checking...",
@@ -60,6 +61,7 @@
   "gettingStarted": {
     "title": "Getting Started Presets",
     "subtitle": "Choose how to start your forecast configuration",
+    "recommended": "Recommended",
     "quickStart": {
       "title": "Quick Start",
       "description": "Start with optimised defaults using the ECMWF plugin blocks and run immediately.",
@@ -153,5 +155,19 @@
   "notification": {
     "newModels": "New models and model versions have been published in the",
     "registryLink": "ECMWF registry"
+  },
+  "mock": {
+    "models": {
+      "aifs": "AIFS",
+      "metNorwayMl": "MetNorway-ML",
+      "aicon": "AICON",
+      "neuralForecastModel": "Neural Forecast Model"
+    },
+    "topics": {
+      "extremeWeather": "Best practices for extreme weather forecasting",
+      "modelAccuracy": "Comparing forecast model accuracy",
+      "optimizingRuntime": "Tips for optimizing forecast runtime",
+      "regionalModels": "Regional model recommendations"
+    }
   }
 }

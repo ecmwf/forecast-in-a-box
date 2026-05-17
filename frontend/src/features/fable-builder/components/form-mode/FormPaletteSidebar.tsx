@@ -9,6 +9,7 @@
  */
 
 import { Plus } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { BlockPalette } from '../layout/BlockPalette'
 import { PanelToggleHandle } from '../layout/PanelToggleHandle'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
@@ -33,6 +34,7 @@ interface FormPaletteSidebarProps {
  * - Mobile: Sheet (drawer) with floating button trigger
  */
 export function FormPaletteSidebar({ catalogue }: FormPaletteSidebarProps) {
+  const { t } = useTranslation('configure')
   const isPaletteOpen = useFableBuilderStore((state) => state.isPaletteOpen)
   const togglePalette = useFableBuilderStore((state) => state.togglePalette)
   const isMobilePaletteOpen = useFableBuilderStore(
@@ -71,7 +73,11 @@ export function FormPaletteSidebar({ catalogue }: FormPaletteSidebarProps) {
           isOpen={isPaletteOpen}
           onToggle={togglePalette}
           position="left"
-          label={isPaletteOpen ? 'Hide block palette' : 'Show block palette'}
+          label={
+            isPaletteOpen
+              ? t('layout.hideBlockPalette')
+              : t('layout.showBlockPalette')
+          }
         />
       </div>
 
@@ -91,7 +97,7 @@ export function FormPaletteSidebar({ catalogue }: FormPaletteSidebarProps) {
           </SheetTrigger>
           <SheetContent side="left" className="w-[85vw] max-w-sm p-0">
             <SheetHeader className="sr-only">
-              <SheetTitle>Add Block</SheetTitle>
+              <SheetTitle>{t('mobile.addBlock')}</SheetTitle>
             </SheetHeader>
             <div className="h-full">
               <BlockPalette catalogue={catalogue} />

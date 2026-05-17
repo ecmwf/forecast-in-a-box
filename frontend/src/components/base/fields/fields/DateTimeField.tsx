@@ -9,6 +9,7 @@
  */
 
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { GlyphFieldWrapper } from './GlyphFieldWrapper'
 import { InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import {
@@ -109,6 +110,7 @@ function DateAndTimeInputs({
   onChange: (value: string) => void
   disabled?: boolean
 }) {
+  const { t } = useTranslation('common')
   const timeZone = useAppTimeZone()
   const { date, time } = useMemo(
     () => splitDatetime(convertNaive(value, 'UTC', timeZone)),
@@ -152,7 +154,7 @@ function DateAndTimeInputs({
         value={displayedTime}
         onChange={(e) => handleTimeChange(e.target.value)}
         disabled={disabled}
-        aria-label="Time"
+        aria-label={t('dateTimeField.timeLabel')}
       />
       <InputGroupAddon align="inline-end">
         <Tooltip>
@@ -166,7 +168,9 @@ function DateAndTimeInputs({
           >
             {timeZoneOffsetLabel(timeZone)}
           </TooltipTrigger>
-          <TooltipContent side="top">Times are in {timeZone}</TooltipContent>
+          <TooltipContent side="top">
+            {t('dateTimeField.timezoneTooltip', { timeZone })}
+          </TooltipContent>
         </Tooltip>
       </InputGroupAddon>
     </>

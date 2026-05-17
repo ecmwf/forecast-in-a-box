@@ -92,8 +92,9 @@ export function PluginRow({
           <div className="mt-1 flex flex-wrap items-center gap-2">
             {plugin.version && (
               <span className="font-mono text-sm text-muted-foreground">
-                v{plugin.version}
-                {updatedTimeAgo && <> · Updated {updatedTimeAgo}</>}
+                {t('item.version', { version: plugin.version })}
+                {updatedTimeAgo &&
+                  t('row.updatedAgoSuffix', { time: updatedTimeAgo })}
               </span>
             )}
             {plugin.capabilities.length > 0 && (
@@ -149,7 +150,7 @@ export function PluginRow({
             render={
               <button
                 className="p-1 text-muted-foreground transition-colors hover:text-foreground"
-                aria-label="More options"
+                aria-label={t('row.moreOptions')}
               />
             }
           >

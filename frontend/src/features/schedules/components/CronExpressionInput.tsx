@@ -31,21 +31,38 @@ interface CronExpressionInputProps {
   onChange: (cron: string) => void
 }
 
-const FREQUENCY_OPTIONS: Array<{ value: CronFrequency; label: string }> = [
-  { value: 'hourly', label: 'Every hour' },
-  { value: 'daily', label: 'Every day' },
-  { value: 'weekly', label: 'Every week' },
-  { value: 'custom', label: 'Custom' },
+const FREQUENCY_OPTIONS: Array<{
+  value: CronFrequency
+  labelKey:
+    | 'cron.frequency.hourly'
+    | 'cron.frequency.daily'
+    | 'cron.frequency.weekly'
+    | 'cron.frequency.custom'
+}> = [
+  { value: 'hourly', labelKey: 'cron.frequency.hourly' },
+  { value: 'daily', labelKey: 'cron.frequency.daily' },
+  { value: 'weekly', labelKey: 'cron.frequency.weekly' },
+  { value: 'custom', labelKey: 'cron.frequency.custom' },
 ]
 
-const DAY_OPTIONS = [
-  { value: 0, label: 'Sunday' },
-  { value: 1, label: 'Monday' },
-  { value: 2, label: 'Tuesday' },
-  { value: 3, label: 'Wednesday' },
-  { value: 4, label: 'Thursday' },
-  { value: 5, label: 'Friday' },
-  { value: 6, label: 'Saturday' },
+const DAY_OPTIONS: Array<{
+  value: number
+  labelKey:
+    | 'cron.days.sunday'
+    | 'cron.days.monday'
+    | 'cron.days.tuesday'
+    | 'cron.days.wednesday'
+    | 'cron.days.thursday'
+    | 'cron.days.friday'
+    | 'cron.days.saturday'
+}> = [
+  { value: 0, labelKey: 'cron.days.sunday' },
+  { value: 1, labelKey: 'cron.days.monday' },
+  { value: 2, labelKey: 'cron.days.tuesday' },
+  { value: 3, labelKey: 'cron.days.wednesday' },
+  { value: 4, labelKey: 'cron.days.thursday' },
+  { value: 5, labelKey: 'cron.days.friday' },
+  { value: 6, labelKey: 'cron.days.saturday' },
 ]
 
 export function CronExpressionInput({
@@ -123,7 +140,7 @@ export function CronExpressionInput({
                 : 'text-muted-foreground hover:bg-muted',
             )}
           >
-            {option.label}
+            {t(option.labelKey)}
           </button>
         ))}
       </div>
@@ -139,14 +156,16 @@ export function CronExpressionInput({
             >
               {DAY_OPTIONS.map((day) => (
                 <option key={day.value} value={day.value}>
-                  {day.label}
+                  {t(day.labelKey)}
                 </option>
               ))}
             </select>
           )}
           {frequency !== 'hourly' && (
             <>
-              <Label className="text-sm text-muted-foreground">at</Label>
+              <Label className="text-sm text-muted-foreground">
+                {t('cron.at')}
+              </Label>
               <NumericInput
                 value={localTime.hour}
                 onChange={(e) => handleHourChange(Number(e.target.value))}
@@ -165,7 +184,9 @@ export function CronExpressionInput({
           )}
           {frequency === 'hourly' && (
             <>
-              <Label className="text-sm text-muted-foreground">at minute</Label>
+              <Label className="text-sm text-muted-foreground">
+                {t('cron.atMinute')}
+              </Label>
               <NumericInput
                 value={localTime.minute}
                 onChange={(e) => handleMinuteChange(Number(e.target.value))}
@@ -183,7 +204,7 @@ export function CronExpressionInput({
           onClick={() => setShowRaw(!showRaw)}
           className="text-sm text-muted-foreground underline"
         >
-          {showRaw ? 'Hide' : 'Show'} cron expression
+          {showRaw ? t('cron.hideExpression') : t('cron.showExpression')}
         </button>
         {(showRaw || frequency === 'custom') && (
           <Input

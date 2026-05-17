@@ -332,7 +332,7 @@ describe('Fable Builder Save & Load', () => {
       expect(Object.keys(state.fable.blocks)).toHaveLength(0)
       expect(state.fableId).toBeNull()
       expect(state.isDirty).toBe(false)
-      expect(state.fableName).toBe('Untitled Configuration')
+      expect(state.fableName).toBe('')
 
       // Should show the empty hint
       await expect

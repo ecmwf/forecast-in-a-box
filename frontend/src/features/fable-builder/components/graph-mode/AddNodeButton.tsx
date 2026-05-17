@@ -10,6 +10,7 @@
 
 import { memo, useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import type {
   BlockFactory,
@@ -64,6 +65,7 @@ export const AddNodeButton = memo(function ({
   hasErrors = false,
   hasDownstream = false,
 }: AddNodeButtonProps) {
+  const { t } = useTranslation('configure')
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
 
@@ -184,7 +186,7 @@ export const AddNodeButton = memo(function ({
       >
         <div className="border-b p-2">
           <Input
-            placeholder="Search blocks..."
+            placeholder={t('addNode.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-8"
@@ -194,7 +196,7 @@ export const AddNodeButton = memo(function ({
         <div className="max-h-64 overflow-y-auto p-1">
           {Object.keys(groupedFactories).length === 0 ? (
             <div className="py-4 text-center text-sm text-muted-foreground">
-              No blocks found
+              {t('addNode.noBlocksFound')}
             </div>
           ) : (
             Object.entries(groupedFactories).map(([kind, factories]) => {

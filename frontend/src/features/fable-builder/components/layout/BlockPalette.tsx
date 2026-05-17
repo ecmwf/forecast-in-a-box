@@ -10,6 +10,7 @@
 
 import { useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, Plus, Search } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type {
   BlockFactory,
   BlockFactoryCatalogue,
@@ -40,6 +41,7 @@ interface BlockPaletteProps {
 }
 
 export function BlockPalette({ catalogue }: BlockPaletteProps) {
+  const { t } = useTranslation('configure')
   const [searchQuery, setSearchQuery] = useState('')
   const [openSections, setOpenSections] = useState<Set<BlockKind>>(
     new Set(BLOCK_KIND_ORDER),
@@ -139,12 +141,12 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-border p-4">
-        <H2 className="mb-3 text-sm font-semibold">Block Palette</H2>
+        <H2 className="mb-3 text-sm font-semibold">{t('palette.title')}</H2>
         <div className="relative">
           <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Search blocks..."
+            placeholder={t('palette.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="h-9 pl-9"
@@ -212,8 +214,8 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
                         )}
                         title={
                           !isAvailable
-                            ? 'Not available at this step'
-                            : `Add ${factory.title}`
+                            ? t('palette.notAvailableAtStep')
+                            : t('palette.addBlock', { title: factory.title })
                         }
                       >
                         <div
@@ -246,7 +248,9 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
 
                   {factories.length === 0 && !searchQuery && (
                     <P className="px-2 py-2 text-muted-foreground">
-                      No {metadata.label.toLowerCase()} blocks available
+                      {t('palette.noBlocksAvailable', {
+                        kind: metadata.label.toLowerCase(),
+                      })}
                     </P>
                   )}
                 </div>
@@ -259,10 +263,10 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
       <div className="border-t border-border bg-muted/30 p-3">
         <P className="text-center text-muted-foreground">
           {isValidating
-            ? 'Loading available blocks...'
+            ? t('palette.loadingBlocks')
             : Object.keys(fable.blocks).length === 0
-              ? 'Click a source to get started'
-              : 'Click to add blocks'}
+              ? t('palette.clickSourceToStart')
+              : t('palette.clickToAdd')}
         </P>
       </div>
     </div>

@@ -16,6 +16,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import i18n from 'i18next'
 import { createLogger } from '@/lib/logger'
 import { showToast } from '@/lib/toast'
 
@@ -69,7 +70,7 @@ export function useLocalStorage<T>(
     } catch (error) {
       log.error(`Error setting localStorage key "${key}":`, error)
       showToast.error(
-        'Failed to save setting',
+        i18n.t('errors:toast.saveSettingFailed'),
         error instanceof Error ? error.message : String(error),
       )
     }
@@ -84,7 +85,7 @@ export function useLocalStorage<T>(
         } catch (error) {
           log.error(`Error parsing localStorage change for "${key}":`, error)
           showToast.warning(
-            'Failed to sync setting across tabs',
+            i18n.t('errors:toast.syncSettingFailed'),
             error instanceof Error ? error.message : String(error),
           )
         }

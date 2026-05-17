@@ -15,6 +15,7 @@
  */
 
 import { createFileRoute } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { useBlockCatalogue } from '@/api/hooks/useFable'
 import { usePlugins } from '@/api/hooks/usePlugins'
 import { decodePluginId, toPluginDisplayId } from '@/api/types/plugins.types'
@@ -28,6 +29,7 @@ export const Route = createFileRoute('/_authenticated/admin/plugins/$pluginId')(
 )
 
 function PluginDetailRoute() {
+  const { t } = useTranslation('plugins')
   const { pluginId } = Route.useParams()
   const compositeId = decodePluginId(pluginId)
   const displayId = toPluginDisplayId(compositeId)
@@ -48,7 +50,7 @@ function PluginDetailRoute() {
   if (!plugin) {
     return (
       <div className="flex min-h-[400px] items-center justify-center text-muted-foreground">
-        Plugin not found: {displayId}
+        {t('detail.notFound', { id: displayId })}
       </div>
     )
   }

@@ -12,38 +12,52 @@
  * Mock data for dashboard components
  */
 
+/** i18n key (dashboard namespace) for a mock model name. */
+type ModelNameKey =
+  | 'mock.models.aifs'
+  | 'mock.models.metNorwayMl'
+  | 'mock.models.aicon'
+  | 'mock.models.neuralForecastModel'
+
+/** i18n key (dashboard namespace) for a mock forum-topic title. */
+type ForumTopicKey =
+  | 'mock.topics.extremeWeather'
+  | 'mock.topics.modelAccuracy'
+  | 'mock.topics.optimizingRuntime'
+  | 'mock.topics.regionalModels'
+
 export interface ModelInfo {
-  name: string
+  nameKey: ModelNameKey
   version: string
   releasedAt: string
   isNew?: boolean
 }
 
 export interface ForumTopic {
-  title: string
+  titleKey: ForumTopicKey
   author: string
   postedAt: string
 }
 
 export const mockModels: Array<ModelInfo> = [
   {
-    name: 'AIFS',
+    nameKey: 'mock.models.aifs',
     version: 'v2.1',
     releasedAt: '3 days ago',
     isNew: true,
   },
   {
-    name: 'MetNorway-ML',
+    nameKey: 'mock.models.metNorwayMl',
     version: 'v1.8',
     releasedAt: '1 week ago',
   },
   {
-    name: 'AICON',
+    nameKey: 'mock.models.aicon',
     version: 'v2.5',
     releasedAt: '3 weeks ago',
   },
   {
-    name: 'Neural Forecast Model',
+    nameKey: 'mock.models.neuralForecastModel',
     version: 'v3.0',
     releasedAt: '2 weeks ago',
   },
@@ -51,22 +65,22 @@ export const mockModels: Array<ModelInfo> = [
 
 export const mockForumTopics: Array<ForumTopic> = [
   {
-    title: 'Best practices for extreme weather forecasting',
+    titleKey: 'mock.topics.extremeWeather',
     author: '@weatherpro',
     postedAt: '2h ago',
   },
   {
-    title: 'Comparing forecast model accuracy',
+    titleKey: 'mock.topics.modelAccuracy',
     author: '@mlweather',
     postedAt: '5h ago',
   },
   {
-    title: 'Tips for optimizing forecast runtime',
+    titleKey: 'mock.topics.optimizingRuntime',
     author: '@fastforecast',
     postedAt: '1d ago',
   },
   {
-    title: 'Regional model recommendations',
+    titleKey: 'mock.topics.regionalModels',
     author: '@euroweather',
     postedAt: '2d ago',
   },

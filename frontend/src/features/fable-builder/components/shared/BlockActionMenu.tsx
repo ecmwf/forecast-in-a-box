@@ -11,6 +11,7 @@
 /** Block "more actions" menu — shared by the graph node and the form-mode card. */
 
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Bookmark, Copy, CopyPlus, MoreHorizontal } from 'lucide-react'
 import type { MouseEvent } from 'react'
 import type { BlockInstanceId } from '@/api/types/fable.types'
@@ -39,6 +40,7 @@ export function BlockActionMenu({
   triggerClassName,
   stopPropagation,
 }: BlockActionMenuProps) {
+  const { t } = useTranslation('configure')
   const [open, setOpen] = useState(false)
   const duplicateBlock = useFableBuilderStore((state) => state.duplicateBlock)
   const duplicateBlockWithChildren = useFableBuilderStore(
@@ -77,27 +79,21 @@ export function BlockActionMenu({
           onClick={() => run(() => duplicateBlock(instanceId))}
         >
           <Copy className="h-4 w-4" />
-          Duplicate
+          {t('blockActions.duplicate')}
         </button>
         <button
           className={ITEM_CLASS}
           onClick={() => run(() => duplicateBlockWithChildren(instanceId))}
         >
           <CopyPlus className="h-4 w-4" />
-          Duplicate with children
+          {t('blockActions.duplicateWithChildren')}
         </button>
         <button
           className={ITEM_CLASS}
-          onClick={() =>
-            run(() =>
-              alert(
-                'Coming soon: Saving configurations as presets will be available soon.',
-              ),
-            )
-          }
+          onClick={() => run(() => alert(t('blockActions.comingSoonPreset')))}
         >
           <Bookmark className="h-4 w-4" />
-          Save config as preset
+          {t('blockActions.saveAsPreset')}
         </button>
       </PopoverContent>
     </Popover>

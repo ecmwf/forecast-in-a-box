@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Autocomplete } from '@base-ui/react/autocomplete'
+import { useTranslation } from 'react-i18next'
 
 import { SearchIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -25,8 +26,8 @@ const Command = Autocomplete.Root
 const CommandCollection = Autocomplete.Collection
 
 function CommandDialog({
-  title = 'Command Palette',
-  description = 'Search for a command to run...',
+  title,
+  description,
   className,
   showCloseButton = false,
   children,
@@ -38,6 +39,7 @@ function CommandDialog({
   showCloseButton?: boolean
   children: React.ReactNode
 }) {
+  const { t } = useTranslation('common')
   return (
     <Dialog {...props}>
       <DialogContent
@@ -48,8 +50,10 @@ function CommandDialog({
         showCloseButton={showCloseButton}
       >
         <DialogHeader className="sr-only">
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          <DialogTitle>{title ?? t('commandPalette.title')}</DialogTitle>
+          <DialogDescription>
+            {description ?? t('commandPalette.description')}
+          </DialogDescription>
         </DialogHeader>
         {children}
       </DialogContent>
@@ -194,6 +198,7 @@ function CommandShortcut({
 
 /** Bottom hint bar making the palette's own keyboard controls explicit. */
 function CommandFooter({ className }: { className?: string }) {
+  const { t } = useTranslation('common')
   return (
     <div
       data-slot="command-footer"
@@ -205,15 +210,15 @@ function CommandFooter({ className }: { className?: string }) {
       <span className="flex items-center gap-1">
         <Kbd>↑</Kbd>
         <Kbd>↓</Kbd>
-        navigate
+        {t('commandPalette.navigate')}
       </span>
       <span className="flex items-center gap-1">
         <Kbd>↵</Kbd>
-        select
+        {t('commandPalette.select')}
       </span>
       <span className="flex items-center gap-1">
-        <Kbd>Esc</Kbd>
-        close
+        <Kbd>{t('commandPalette.esc')}</Kbd>
+        {t('commandPalette.close')}
       </span>
     </div>
   )

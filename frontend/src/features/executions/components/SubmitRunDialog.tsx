@@ -142,8 +142,12 @@ function SubmitRunForm({
       useActivityStore.getState().addTask({
         id: `job:${response.run_id}`,
         type: 'job',
-        label: trimmedName || `Job ${response.run_id.slice(0, 8)}`,
-        description: 'Submitted',
+        label:
+          trimmedName ||
+          t('activity.jobFallbackLabel', {
+            id: response.run_id.slice(0, 8),
+          }),
+        description: t('activity.submitted'),
         status: 'active',
         startedAt: Date.now(),
         navigateTo: `/executions/${response.run_id}`,

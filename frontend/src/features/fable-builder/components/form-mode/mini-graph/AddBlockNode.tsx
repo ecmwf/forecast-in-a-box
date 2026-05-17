@@ -11,6 +11,7 @@
 import { memo } from 'react'
 import { Handle, Position } from '@xyflow/react'
 import { Plus } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { Node, NodeProps } from '@xyflow/react'
 import type { BlockKind, PluginBlockFactoryId } from '@/api/types/fable.types'
 import { BLOCK_KIND_METADATA } from '@/api/types/fable.types'
@@ -45,6 +46,7 @@ export type AddBlockNodeType = Node<AddBlockNodeData>
 export const AddBlockNode = memo(function ({
   data,
 }: NodeProps<AddBlockNodeType>) {
+  const { t } = useTranslation('configure')
   const { kind, addOptions, onAddBlock } = data
 
   const metadata = BLOCK_KIND_METADATA[kind]
@@ -72,7 +74,9 @@ export const AddBlockNode = memo(function ({
           )}
         >
           <Plus className="h-3.5 w-3.5" />
-          <span className="text-xs">Add {metadata.label}</span>
+          <span className="text-xs">
+            {t('addBlockNode.addKind', { label: metadata.label })}
+          </span>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           {addOptions.map((option) => (

@@ -204,7 +204,7 @@ function RunCanvasInner({
           {status === 'running' && (
             <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-sm font-medium text-amber-700">
               <Loader2 className="h-3 w-3 animate-spin" />
-              Running...
+              {t('detail.running')}
             </div>
           )}
           <ReactFlow

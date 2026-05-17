@@ -141,7 +141,7 @@ export default function PdfViewer({ item, adapter, onClose }: ViewerProps) {
           <div className="ml-auto flex items-center gap-1">
             <button
               type="button"
-              aria-label="Previous page"
+              aria-label={t('outputs.viewer.previousPage')}
               className={headerBtn}
               onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
               disabled={pageNumber <= 1}
@@ -156,7 +156,7 @@ export default function PdfViewer({ item, adapter, onClose }: ViewerProps) {
             </span>
             <button
               type="button"
-              aria-label="Next page"
+              aria-label={t('outputs.viewer.nextPage')}
               className={headerBtn}
               onClick={() =>
                 setPageNumber((p) => Math.min(totalPages || p, p + 1))
@@ -170,7 +170,7 @@ export default function PdfViewer({ item, adapter, onClose }: ViewerProps) {
           <div className="flex items-center gap-1">
             <button
               type="button"
-              aria-label="Zoom out"
+              aria-label={t('outputs.viewer.zoomOut')}
               className={headerBtn}
               onClick={zoomOut}
             >
@@ -181,7 +181,7 @@ export default function PdfViewer({ item, adapter, onClose }: ViewerProps) {
             </span>
             <button
               type="button"
-              aria-label="Zoom in"
+              aria-label={t('outputs.viewer.zoomIn')}
               className={headerBtn}
               onClick={zoomIn}
             >
@@ -201,7 +201,7 @@ export default function PdfViewer({ item, adapter, onClose }: ViewerProps) {
           </button>
           <button
             type="button"
-            aria-label="Close"
+            aria-label={t('outputs.viewer.close')}
             className={headerBtn}
             onClick={onClose}
           >

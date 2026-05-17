@@ -132,38 +132,45 @@ interface FableBuilderState {
   reset: () => void
 }
 
-const initialState = {
-  fable: createEmptyFable(),
-  fableId: null,
-  fableVersion: null,
-  fableName: 'Untitled Configuration',
-  mode: 'graph' as BuilderMode,
-  step: 'edit' as BuilderStep,
-  selectedBlockId: null,
-  isPaletteOpen: true,
-  isConfigPanelOpen: true,
-  isMobilePaletteOpen: false,
-  isMobileConfigOpen: false,
-  isMiniMapOpen: true,
-  fitViewTrigger: 0,
-  edgeStyle: 'bezier' as EdgeStyle,
-  autoLayout: true,
-  layoutDirection: getDefaultLayoutDirection(),
-  nodesLocked: true,
-  validationState: null,
-  isValidating: false,
-  lastValidatedAt: null,
-  isDirty: false,
-  lastSavedAt: null,
-  draftWritePending: false,
-  submitDialogOpen: false,
+/**
+ * Builds the store's initial state. A function (not a module-scope const) so
+ * each call — including `reset()` — yields a fresh object graph.
+ */
+function createInitialState() {
+  return {
+    fable: createEmptyFable(),
+    fableId: null,
+    fableVersion: null,
+    // Blank by default; FableBuilderHeader renders a translated placeholder.
+    fableName: '',
+    mode: 'graph' as BuilderMode,
+    step: 'edit' as BuilderStep,
+    selectedBlockId: null,
+    isPaletteOpen: true,
+    isConfigPanelOpen: true,
+    isMobilePaletteOpen: false,
+    isMobileConfigOpen: false,
+    isMiniMapOpen: true,
+    fitViewTrigger: 0,
+    edgeStyle: 'bezier' as EdgeStyle,
+    autoLayout: true,
+    layoutDirection: getDefaultLayoutDirection(),
+    nodesLocked: true,
+    validationState: null,
+    isValidating: false,
+    lastValidatedAt: null,
+    isDirty: false,
+    lastSavedAt: null,
+    draftWritePending: false,
+    submitDialogOpen: false,
+  }
 }
 
 export const useFableBuilderStore = create<FableBuilderState>()(
   devtools(
     persist(
       (set, get) => ({
-        ...initialState,
+        ...createInitialState(),
 
         setFable: (fable, id = null) =>
           set({
@@ -180,7 +187,7 @@ export const useFableBuilderStore = create<FableBuilderState>()(
 
         newFable: () =>
           set({
-            ...initialState,
+            ...createInitialState(),
             mode: get().mode,
             isPaletteOpen: get().isPaletteOpen,
             isConfigPanelOpen: get().isConfigPanelOpen,
@@ -554,7 +561,7 @@ export const useFableBuilderStore = create<FableBuilderState>()(
         markSubmitted: () => set({ isDirty: false, lastSavedAt: Date.now() }),
         markDirty: () => set({ isDirty: true }),
 
-        reset: () => set(initialState),
+        reset: () => set(createInitialState()),
       }),
       {
         name: STORAGE_KEYS.stores.fableBuilder,

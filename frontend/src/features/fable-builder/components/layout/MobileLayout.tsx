@@ -9,6 +9,7 @@
  */
 
 import { Plus } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { BlockPalette } from './BlockPalette'
 import { ConfigPanel } from './ConfigPanel'
 import type { ReactNode } from 'react'
@@ -33,6 +34,7 @@ export function MobileLayout({
   catalogue,
   canvas,
 }: MobileLayoutProps): ReactNode {
+  const { t } = useTranslation('configure')
   const isMobilePaletteOpen = useFableBuilderStore(
     (state) => state.isMobilePaletteOpen,
   )
@@ -69,7 +71,7 @@ export function MobileLayout({
           </SheetTrigger>
           <SheetContent side="left" className="w-[85vw] max-w-sm p-0">
             <SheetHeader className="sr-only">
-              <SheetTitle>Add Block</SheetTitle>
+              <SheetTitle>{t('mobile.addBlock')}</SheetTitle>
             </SheetHeader>
             <div className="h-full">
               <BlockPalette catalogue={catalogue} />
@@ -82,7 +84,7 @@ export function MobileLayout({
       {blockCount > 0 && (
         <div className="absolute top-4 right-4">
           <div className="rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium shadow-lg">
-            {blockCount} blocks
+            {t('mobile.blockCountPlural', { count: blockCount })}
           </div>
         </div>
       )}
@@ -91,7 +93,7 @@ export function MobileLayout({
       <Sheet open={isMobileConfigOpen} onOpenChange={setMobileConfigOpen}>
         <SheetContent side="right" className="w-[85vw] max-w-sm p-0">
           <SheetHeader className="sr-only">
-            <SheetTitle>Block Configuration</SheetTitle>
+            <SheetTitle>{t('mobile.blockConfiguration')}</SheetTitle>
           </SheetHeader>
           <div className="h-full">
             <ConfigPanel catalogue={catalogue} />

@@ -15,6 +15,7 @@
  */
 
 import { createFileRoute } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { decodeArtifactId } from '@/api/types/artifacts.types'
 import {
   useArtifactDetail,
@@ -31,6 +32,7 @@ export const Route = createFileRoute(
 })
 
 function ArtifactDetailRoute() {
+  const { t } = useTranslation('artifacts')
   const { artifactId } = Route.useParams()
   const compositeId = decodeArtifactId(artifactId)
 
@@ -49,7 +51,7 @@ function ArtifactDetailRoute() {
   if (!detail) {
     return (
       <div className="flex min-h-[400px] items-center justify-center text-muted-foreground">
-        Model not found: {artifactId}
+        {t('detail.notFound', { id: artifactId })}
       </div>
     )
   }

@@ -81,18 +81,18 @@ export function BlockFactoryCard({
           <div className="mt-2 flex flex-wrap gap-2 text-sm text-muted-foreground">
             {configKeys.length > 0 && (
               <span>
-                {configKeys.length} config{' '}
-                {configKeys.length === 1 ? 'option' : 'options'}
+                {t('blockFactory.configOptions', {
+                  count: configKeys.length,
+                })}
               </span>
             )}
             {hasInputs && (
               <span>
-                {factory.inputs.length} input
-                {factory.inputs.length === 1 ? '' : 's'}
+                {t('blockFactory.inputs', { count: factory.inputs.length })}
               </span>
             )}
             {configKeys.length === 0 && !hasInputs && (
-              <span>No configuration required</span>
+              <span>{t('blockFactory.noConfigRequired')}</span>
             )}
           </div>
         </div>

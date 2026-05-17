@@ -11,6 +11,7 @@
 import { memo, useMemo } from 'react'
 import { Handle, Position } from '@xyflow/react'
 import { Settings, Trash2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import type { Node, NodeProps } from '@xyflow/react'
 import type { FableNodeData } from '@/features/fable-builder/utils/fable-to-graph'
@@ -56,6 +57,7 @@ export const BlockNode = memo(function ({
   data,
   selected,
 }: NodeProps<FableNode>) {
+  const { t } = useTranslation('configure')
   const { factory, instance, catalogue } = data
   const metadata = BLOCK_KIND_METADATA[factory.kind]
   const IconComponent = getBlockKindIcon(factory.kind)
@@ -158,7 +160,7 @@ export const BlockNode = memo(function ({
               size="icon"
               className="nodrag h-7 w-7 text-muted-foreground hover:text-primary md:hidden"
               onClick={handleOpenConfig}
-              aria-label="Configure block"
+              aria-label={t('blockNode.configureBlock')}
             >
               <Settings className="h-4 w-4" />
             </Button>
@@ -178,16 +180,17 @@ export const BlockNode = memo(function ({
               </AlertDialogTrigger>
               <AlertDialogContent onClick={(e) => e.stopPropagation()}>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Block</AlertDialogTitle>
+                  <AlertDialogTitle>
+                    {t('blockNode.deleteBlock')}
+                  </AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to delete "{factory.title}" and all
-                    connected downstream blocks? This action cannot be undone.
+                    {t('blockNode.deleteConfirm', { title: factory.title })}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel>{t('blockNode.cancel')}</AlertDialogCancel>
                   <AlertDialogAction onClick={handleDelete}>
-                    Delete
+                    {t('blockNode.delete')}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -248,7 +251,7 @@ export const BlockNode = memo(function ({
             })}
             {remainingConfigCount > 0 && (
               <span className="rounded-md border bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground">
-                +{remainingConfigCount} more
+                {t('blockNode.moreCount', { count: remainingConfigCount })}
               </span>
             )}
           </div>
@@ -289,7 +292,7 @@ export const BlockNode = memo(function ({
             type="source"
             position={outputPosition}
             id="output"
-            title="Output"
+            title={t('blockNode.outputHandle')}
             className={cn(
               'h-5! w-5! rounded-full! border-4! bg-card!',
               'border-foreground/30!',

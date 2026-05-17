@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from 'react'
 import { Plus } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { BlockInstanceCard } from './BlockInstanceCard'
 import type {
   BlockFactoryCatalogue,
@@ -46,6 +47,7 @@ export function BlockTabs({
   onBlockClick,
   onAddBlock,
 }: BlockTabsProps) {
+  const { t } = useTranslation('configure')
   // Use first block as default if none selected or selection not in list
   const defaultTab =
     blocks.find((b) => b.id === selectedBlockId)?.id || blocks[0]?.id || ''
@@ -68,7 +70,7 @@ export function BlockTabs({
       <TabsList className="w-full flex-wrap justify-start">
         {blocks.map(({ id, factoryId }) => {
           const factory = getFactory(catalogue, factoryId)
-          const title = factory?.title || 'Block'
+          const title = factory?.title || t('blockTabs.fallbackTitle')
           // Truncate long titles
           const displayTitle =
             title.length > 16 ? title.slice(0, 15) + '…' : title

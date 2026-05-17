@@ -43,10 +43,10 @@ export function CommunityNewsCard({ variant, shadow }: CommunityNewsCardProps) {
           </H3>
           <div className="flex-1 space-y-4">
             {mockModels.map((model) => (
-              <div key={`${model.name}-${model.version}`}>
+              <div key={`${model.nameKey}-${model.version}`}>
                 <div className="flex items-start justify-between">
                   <H4 className="text-sm font-medium">
-                    {model.name} {model.version}
+                    {t(model.nameKey)} {model.version}
                   </H4>
                   {model.isNew && (
                     <Badge
@@ -82,9 +82,9 @@ export function CommunityNewsCard({ variant, shadow }: CommunityNewsCardProps) {
           </H3>
           <div className="flex-1 space-y-4">
             {mockForumTopics.map((topic) => (
-              <div key={topic.title}>
+              <div key={topic.titleKey}>
                 <H4 className="text-sm leading-snug font-medium">
-                  {topic.title}
+                  {t(topic.titleKey)}
                 </H4>
                 <P className="mt-0.5 text-muted-foreground">
                   {t('community.postedBy', {

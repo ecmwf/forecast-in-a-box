@@ -56,7 +56,7 @@ export function RunErrorBanner({
     } catch (err) {
       log.error('Failed to download logs', { jobId, error: err })
       showToast.error(
-        err instanceof Error ? err.message : 'Failed to download logs',
+        err instanceof Error ? err.message : t('actions.downloadLogsFailed'),
       )
     }
   }

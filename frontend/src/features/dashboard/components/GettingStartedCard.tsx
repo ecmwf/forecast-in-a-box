@@ -14,6 +14,7 @@
  * Individual card for getting started options
  */
 
+import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
 import { H3, P } from '@/components/base/typography'
 import {
@@ -48,6 +49,7 @@ export function GettingStartedCard({
   borderColor = 'border-border hover:border-blue-400',
   onClick,
 }: GettingStartedCardProps) {
+  const { t } = useTranslation('dashboard')
   const card = (
     <div
       role="button"
@@ -67,7 +69,7 @@ export function GettingStartedCard({
     >
       {isRecommended && (
         <div className="absolute top-4 right-4 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
-          Recommended
+          {t('gettingStarted.recommended')}
         </div>
       )}
 

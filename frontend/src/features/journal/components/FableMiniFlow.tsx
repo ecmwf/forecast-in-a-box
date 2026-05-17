@@ -14,6 +14,7 @@
  */
 
 import { useId, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { BlockKind, FableBuilderV1 } from '@/api/types/fable.types'
 import { useBlockCatalogue } from '@/api/hooks/useFable'
 import {
@@ -65,6 +66,7 @@ export function FableMiniFlow({
   builder: FableBuilderV1
   className?: string
 }) {
+  const { t } = useTranslation('journal')
   const { data: catalogue } = useBlockCatalogue()
   const arrowId = useId()
   const monochrome = useUiStore((state) => state.journalFlowMonochrome)
@@ -106,7 +108,7 @@ export function FableMiniFlow({
       preserveAspectRatio="xMidYMin meet"
       className={cn('block h-auto max-h-28 max-w-full', className)}
       role="img"
-      aria-label="Configuration block flow"
+      aria-label={t('flow.label')}
     >
       <defs>
         <marker

@@ -76,8 +76,12 @@ export function RunDetailPage() {
           useActivityStore.getState().addTask({
             id: `job:${jobId}`,
             type: 'job',
-            label: fableData?.display_name ?? `Job ${jobId.slice(0, 8)}`,
-            description: `Restarting (attempt ${jobData!.attempt_count + 1})`,
+            label:
+              fableData?.display_name ??
+              t('activity.jobFallbackLabel', { id: jobId.slice(0, 8) }),
+            description: t('activity.restarting', {
+              attempt: jobData!.attempt_count + 1,
+            }),
             status: 'active',
             startedAt: Date.now(),
             navigateTo: `/executions/${jobId}`,

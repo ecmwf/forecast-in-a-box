@@ -8,22 +8,24 @@
  * does it submit to any jurisdiction.
  */
 
+import { useTranslation } from 'react-i18next'
 import { H2, P } from '@/components/base/typography'
 
 export function Dag() {
+  const { t } = useTranslation('landing')
   return (
     <section>
       <div className="_border-x _border-b relative mx-auto max-w-7xl px-3 pt-24 pb-10 md:pt-16 md:pb-20">
         <div className="mx-auto mb-12 max-w-xl text-center text-balance md:mb-16">
-          <H2 className="border-0 pb-0 text-4xl">Dynamic Product Execution</H2>
-          <P className="mt-4">From anemoi to pproc, all in the box.</P>
+          <H2 className="border-0 pb-0 text-4xl">{t('dag.title')}</H2>
+          <P className="mt-4">{t('dag.subtitle')}</P>
         </div>
         <iframe
           src="/dag/example.html"
           width="100%"
           height="620px"
           style={{ border: 'none' }}
-          title="Dynamic Product Execution"
+          title={t('dag.title')}
           // Security: Restrict iframe capabilities
           sandbox="allow-scripts allow-same-origin"
           referrerPolicy="strict-origin-when-cross-origin"

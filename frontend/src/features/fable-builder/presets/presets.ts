@@ -11,6 +11,7 @@
 import type { FableBuilderV1 } from '@/api/types/fable.types'
 import type { PluginCompositeId } from '@/api/types/plugins.types'
 import { getAppTimeZone, todayInZone } from '@/lib/datetime'
+import i18n from '@/lib/i18n'
 
 export type PresetId = 'quick-start' | 'standard' | 'custom-model' | 'dataset'
 
@@ -36,8 +37,8 @@ function today(): string {
 function quickStartPreset(): FablePreset {
   return {
     id: 'quick-start',
-    name: 'Quick Start',
-    description: 'Ready to run with optimized defaults',
+    name: i18n.t('configure:presets.quickStartName'),
+    description: i18n.t('configure:presets.quickStartDescription'),
     fable: {
       blocks: {
         source_1: {
@@ -85,8 +86,8 @@ function quickStartPreset(): FablePreset {
 function standardPreset(): FablePreset {
   return {
     id: 'standard',
-    name: 'Standard Forecast',
-    description: 'Standard forecast data pipeline',
+    name: i18n.t('configure:presets.standardName'),
+    description: i18n.t('configure:presets.standardDescription'),
     fable: {
       blocks: {
         source_1: {
@@ -109,8 +110,8 @@ function standardPreset(): FablePreset {
 function customModelPreset(): FablePreset {
   return {
     id: 'custom-model',
-    name: 'Custom Forecast',
-    description: 'Start with empty canvas for full customization',
+    name: i18n.t('configure:presets.customModelName'),
+    description: i18n.t('configure:presets.customModelDescription'),
     fable: {
       blocks: {},
     },
@@ -120,8 +121,8 @@ function customModelPreset(): FablePreset {
 function datasetPreset(): FablePreset {
   return {
     id: 'dataset',
-    name: 'Open Data Forecast',
-    description: 'Start with ECMWF open data as source',
+    name: i18n.t('configure:presets.datasetName'),
+    description: i18n.t('configure:presets.datasetDescription'),
     fable: {
       blocks: {
         source_1: {

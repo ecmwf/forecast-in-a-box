@@ -8,6 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
+import { useTranslation } from 'react-i18next'
 import { GlyphFieldWrapper } from './GlyphFieldWrapper'
 import {
   Select,
@@ -35,17 +36,19 @@ export function EnumField({
   value,
   onChange,
   options,
-  placeholder = 'Select an option...',
+  placeholder,
   disabled,
   className,
 }: EnumFieldProps) {
+  const { t } = useTranslation('common')
+  const resolvedPlaceholder = placeholder ?? t('field.selectPlaceholder')
   return (
     <GlyphFieldWrapper
       id={id}
       configKey={configKey}
       value={value}
       onChange={onChange}
-      placeholder={placeholder}
+      placeholder={resolvedPlaceholder}
       disabled={disabled}
       className={className}
       allowGlyphMode={false}
@@ -56,7 +59,7 @@ export function EnumField({
         disabled={disabled}
       >
         <SelectTrigger id={id} className={cn('w-full', className)}>
-          <SelectValue placeholder={placeholder} />
+          <SelectValue placeholder={resolvedPlaceholder} />
         </SelectTrigger>
         <SelectContent>
           {options.map((option) => (

@@ -32,6 +32,10 @@
     "untagged": "Untagged",
     "unscheduled": "Unscheduled"
   },
+  "flow": {
+    "label": "Configuration block flow"
+  },
+  "scheduleFallback": "Schedule {{id}}",
   "facet": {
     "model": "Model",
     "output": "Output",

@@ -65,6 +65,7 @@ export function BlockSummaryBadges({
   summary: FableBlockSummary
   className?: string
 }) {
+  const { t } = useTranslation('configure')
   return (
     <div className={className ?? 'flex flex-wrap gap-1.5'}>
       {BLOCK_KIND_ORDER.filter((kind) => summary[kind] > 0).map((kind) => {
@@ -75,8 +76,10 @@ export function BlockSummaryBadges({
             <span
               className={`inline-block h-2 w-2 rounded-full ${meta.topBarColor}`}
             />
-            {count} {meta.label.toLowerCase()}
-            {count !== 1 ? 's' : ''}
+            {t('blockSummaryBadge', {
+              count,
+              kind: meta.label.toLowerCase(),
+            })}
           </Badge>
         )
       })}

@@ -23,17 +23,19 @@ import {
   todayInZone,
   zonedNaiveToInstant,
 } from '@/lib/datetime'
+import i18n from '@/lib/i18n'
 
 export type CronFrequency = 'hourly' | 'daily' | 'weekly' | 'custom'
 
-const DAY_NAMES = [
-  'Sunday',
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
+/** Day-of-week index (0 = Sunday) → `executions` translation key. */
+const DAY_NAME_KEYS = [
+  'cron.days.sunday',
+  'cron.days.monday',
+  'cron.days.tuesday',
+  'cron.days.wednesday',
+  'cron.days.thursday',
+  'cron.days.friday',
+  'cron.days.saturday',
 ] as const
 
 export interface CronPreset {
@@ -100,8 +102,10 @@ export function cronToHumanReadable(
   switch (parsed.frequency) {
     case 'hourly':
       return parsed.minute === 0
-        ? 'Every hour'
-        : `Every hour at minute ${String(parsed.minute).padStart(2, '0')}`
+        ? i18n.t('executions:cron.humanReadable.everyHour')
+        : i18n.t('executions:cron.humanReadable.everyHourAtMinute', {
+            minute: String(parsed.minute).padStart(2, '0'),
+          })
     case 'daily': {
       if (offsetMs != null) {
         const local = serverHourMinuteToLocal(
@@ -110,9 +114,14 @@ export function cronToHumanReadable(
           offsetMs,
           timeZone,
         )
-        return `Every day at ${formatHourMinute(local.hour, local.minute)} ${timeZoneOffsetLabel(timeZone)}`
+        return i18n.t('executions:cron.humanReadable.everyDayAt', {
+          time: formatHourMinute(local.hour, local.minute),
+          zone: timeZoneOffsetLabel(timeZone),
+        })
       }
-      return `Every day at ${formatHourMinute(parsed.hour, parsed.minute)} (server time)`
+      return i18n.t('executions:cron.humanReadable.everyDayAtServerTime', {
+        time: formatHourMinute(parsed.hour, parsed.minute),
+      })
     }
     case 'weekly': {
       if (offsetMs != null) {
@@ -122,9 +131,19 @@ export function cronToHumanReadable(
           offsetMs,
           timeZone,
         )
-        return `Every ${DAY_NAMES[parsed.dayOfWeek]} at ${formatHourMinute(local.hour, local.minute)} ${timeZoneOffsetLabel(timeZone)}`
+        return i18n.t('executions:cron.humanReadable.everyDayOfWeekAt', {
+          day: i18n.t(`executions:${DAY_NAME_KEYS[parsed.dayOfWeek]}`),
+          time: formatHourMinute(local.hour, local.minute),
+          zone: timeZoneOffsetLabel(timeZone),
+        })
       }
-      return `Every ${DAY_NAMES[parsed.dayOfWeek]} at ${formatHourMinute(parsed.hour, parsed.minute)} (server time)`
+      return i18n.t(
+        'executions:cron.humanReadable.everyDayOfWeekAtServerTime',
+        {
+          day: i18n.t(`executions:${DAY_NAME_KEYS[parsed.dayOfWeek]}`),
+          time: formatHourMinute(parsed.hour, parsed.minute),
+        },
+      )
     }
     default:
       return cronExpr

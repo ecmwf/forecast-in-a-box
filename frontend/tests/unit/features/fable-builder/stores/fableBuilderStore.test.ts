@@ -69,10 +69,9 @@ describe('useFableBuilderStore', () => {
       expect(useFableBuilderStore.getState().fableId).toBeNull()
     })
 
-    it('has default fableName', () => {
-      expect(useFableBuilderStore.getState().fableName).toBe(
-        'Untitled Configuration',
-      )
+    it('has an empty default fableName', () => {
+      // Blank by default; the UI renders a translated placeholder instead.
+      expect(useFableBuilderStore.getState().fableName).toBe('')
     })
 
     it('has graph mode by default', () => {

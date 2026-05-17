@@ -11,6 +11,7 @@
 import { Copy } from 'lucide-react'
 import type { ActionContext, OutputAction, OutputItem } from '../types'
 import { getJobResult } from '@/api/endpoints/job'
+import i18n from '@/lib/i18n'
 import { createLogger } from '@/lib/logger'
 import { showToast } from '@/lib/toast'
 
@@ -28,7 +29,7 @@ async function runCopyImage(
     if (ctx.resolvedAdapter.id === 'image-vector') {
       const text = await blob.text()
       await navigator.clipboard.writeText(text)
-      showToast.success('SVG source copied')
+      showToast.success(i18n.t('executions:outputs.copy.svgSuccess'))
       return
     }
     // Raster: tag the blob explicitly as image/png — even if the wire blob's
@@ -38,14 +39,14 @@ async function runCopyImage(
     await navigator.clipboard.write([
       new ClipboardItem({ 'image/png': tagged }),
     ])
-    showToast.success('Image copied')
+    showToast.success(i18n.t('executions:outputs.copy.imageSuccess'))
   } catch (err) {
     log.error('Failed to copy image', {
       taskId: item.taskId,
       mime: item.mimeType,
       error: err,
     })
-    showToast.error('Could not copy image')
+    showToast.error(i18n.t('executions:outputs.copy.error'))
   }
 }
 

@@ -22,10 +22,12 @@
  */
 
 import { Check, Loader2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { cn } from '@/lib/utils'
 
 export function DraftStatus({ className }: { className?: string }) {
+  const { t } = useTranslation('configure')
   const isDirty = useFableBuilderStore((s) => s.isDirty)
   const draftWritePending = useFableBuilderStore((s) => s.draftWritePending)
 
@@ -41,12 +43,12 @@ export function DraftStatus({ className }: { className?: string }) {
       {draftWritePending ? (
         <>
           <Loader2 className="h-3 w-3 animate-spin" />
-          Saving draft…
+          {t('draft.saving')}
         </>
       ) : (
         <>
           <Check className="h-3 w-3" />
-          Draft saved
+          {t('draft.saved')}
         </>
       )}
     </span>

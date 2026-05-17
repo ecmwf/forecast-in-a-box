@@ -12,6 +12,7 @@
 
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import {
   Blocks,
   Cloud,
@@ -79,6 +80,7 @@ export function AuthenticatedHeader() {
   const setTimeZone = useUiStore((state) => state.setTimeZone)
   const timeZone = useAppTimeZone()
   const [tzDialogOpen, setTzDialogOpen] = useState(false)
+  const { t } = useTranslation('common')
 
   const isAuthenticated = authType === 'authenticated'
   const isSuperuser = user?.is_superuser ?? false
@@ -102,11 +104,11 @@ export function AuthenticatedHeader() {
           <Link
             to="/dashboard"
             className="flex min-w-0 items-center gap-2 sm:gap-3"
-            aria-label="Dashboard"
+            aria-label={t('userMenu.dashboard')}
           >
             <Logo />
             <span className="hidden truncate text-base font-semibold tracking-tight md:block md:text-xl">
-              Forecast-in-a-Box
+              {t('appName')}
             </span>
           </Link>
         </div>
@@ -137,7 +139,7 @@ export function AuthenticatedHeader() {
             variant="ghost"
             size="icon"
             className="text-muted-foreground"
-            aria-label="Help"
+            aria-label={t('userMenu.help')}
           >
             <HelpCircle className="h-5 w-5" />
           </Button>
@@ -150,7 +152,7 @@ export function AuthenticatedHeader() {
                   variant="ghost"
                   size="icon"
                   className="text-muted-foreground"
-                  aria-label="Settings"
+                  aria-label={t('userMenu.settings')}
                 />
               }
             >
@@ -164,7 +166,8 @@ export function AuthenticatedHeader() {
                     <DropdownMenuLabel className="font-normal">
                       <div className="flex flex-col space-y-1">
                         <P className="leading-none font-medium">
-                          {user.email.split('@')[0] || 'User'}
+                          {user.email.split('@')[0] ||
+                            t('userMenu.userFallback')}
                         </P>
                         <P className="leading-none text-muted-foreground">
                           {user.email}
@@ -178,7 +181,7 @@ export function AuthenticatedHeader() {
 
               {/* View Group */}
               <DropdownMenuGroup>
-                <DropdownMenuLabel>View</DropdownMenuLabel>
+                <DropdownMenuLabel>{t('userMenu.view')}</DropdownMenuLabel>
                 <DropdownMenuItem
                   onClick={() =>
                     setLayoutMode(layoutMode === 'boxed' ? 'fluid' : 'boxed')
@@ -187,19 +190,19 @@ export function AuthenticatedHeader() {
                   {layoutMode === 'boxed' ? (
                     <>
                       <Maximize2 className="mr-2 h-4 w-4" />
-                      Fluid Layout
+                      {t('userMenu.fluidLayout')}
                     </>
                   ) : (
                     <>
                       <Minimize2 className="mr-2 h-4 w-4" />
-                      Boxed Layout
+                      {t('userMenu.boxedLayout')}
                     </>
                   )}
                 </DropdownMenuItem>
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>
                     <Sun className="mr-2 h-4 w-4" />
-                    Theme
+                    {t('userMenu.theme')}
                   </DropdownMenuSubTrigger>
                   <DropdownMenuPortal>
                     <DropdownMenuSubContent>
@@ -211,15 +214,15 @@ export function AuthenticatedHeader() {
                       >
                         <DropdownMenuRadioItem value="light">
                           <Sun className="mr-2 h-4 w-4" />
-                          Light
+                          {t('userMenu.themeLight')}
                         </DropdownMenuRadioItem>
                         <DropdownMenuRadioItem value="dark">
                           <Moon className="mr-2 h-4 w-4" />
-                          Dark
+                          {t('userMenu.themeDark')}
                         </DropdownMenuRadioItem>
                         <DropdownMenuRadioItem value="system">
                           <Monitor className="mr-2 h-4 w-4" />
-                          System
+                          {t('userMenu.themeSystem')}
                         </DropdownMenuRadioItem>
                       </DropdownMenuRadioGroup>
                     </DropdownMenuSubContent>
@@ -228,7 +231,7 @@ export function AuthenticatedHeader() {
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>
                     <Layout className="mr-2 h-4 w-4" />
-                    Card Style
+                    {t('userMenu.cardStyle')}
                   </DropdownMenuSubTrigger>
                   <DropdownMenuPortal>
                     <DropdownMenuSubContent>
@@ -241,16 +244,16 @@ export function AuthenticatedHeader() {
                         }
                       >
                         <DropdownMenuRadioItem value="default">
-                          Default
+                          {t('userMenu.cardDefault')}
                         </DropdownMenuRadioItem>
                         <DropdownMenuRadioItem value="flat">
-                          Flat
+                          {t('userMenu.cardFlat')}
                         </DropdownMenuRadioItem>
                         <DropdownMenuRadioItem value="modern">
-                          Modern
+                          {t('userMenu.cardModern')}
                         </DropdownMenuRadioItem>
                         <DropdownMenuRadioItem value="gradient">
-                          Gradient
+                          {t('userMenu.cardGradient')}
                         </DropdownMenuRadioItem>
                       </DropdownMenuRadioGroup>
                     </DropdownMenuSubContent>
@@ -258,7 +261,7 @@ export function AuthenticatedHeader() {
                 </DropdownMenuSub>
                 <DropdownMenuItem onClick={() => setTzDialogOpen(true)}>
                   <Globe className="mr-2 h-4 w-4" />
-                  Timezone
+                  {t('userMenu.timezone')}
                   <span className="ml-auto text-xs text-muted-foreground">
                     {timeZoneOffsetLabel(timeZone)}
                   </span>
@@ -271,11 +274,11 @@ export function AuthenticatedHeader() {
               <DropdownMenuGroup>
                 <DropdownMenuItem>
                   <HelpCircle className="mr-2 h-4 w-4" />
-                  Help & Support
+                  {t('userMenu.helpSupport')}
                 </DropdownMenuItem>
                 <DropdownMenuItem>
                   <FileText className="mr-2 h-4 w-4" />
-                  Documentation
+                  {t('userMenu.documentation')}
                 </DropdownMenuItem>
               </DropdownMenuGroup>
 
@@ -284,14 +287,16 @@ export function AuthenticatedHeader() {
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
-                    <DropdownMenuLabel>Account</DropdownMenuLabel>
+                    <DropdownMenuLabel>
+                      {t('userMenu.account')}
+                    </DropdownMenuLabel>
                     <DropdownMenuItem>
                       <User className="mr-2 h-4 w-4" />
-                      Profile
+                      {t('userMenu.profile')}
                     </DropdownMenuItem>
                     <DropdownMenuItem>
                       <Settings className="mr-2 h-4 w-4" />
-                      Settings
+                      {t('userMenu.settings')}
                     </DropdownMenuItem>
                   </DropdownMenuGroup>
                 </>
@@ -302,18 +307,20 @@ export function AuthenticatedHeader() {
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
-                    <DropdownMenuLabel>Administration</DropdownMenuLabel>
+                    <DropdownMenuLabel>
+                      {t('userMenu.administration')}
+                    </DropdownMenuLabel>
                     <DropdownMenuItem render={<Link to="/admin/plugins" />}>
                       <Blocks className="mr-2 h-4 w-4" />
-                      Plugins
+                      {t('userMenu.plugins')}
                     </DropdownMenuItem>
                     <DropdownMenuItem render={<Link to="/admin/artifacts" />}>
                       <Cloud className="mr-2 h-4 w-4" />
-                      Artifacts
+                      {t('userMenu.artifacts')}
                     </DropdownMenuItem>
                     <DropdownMenuItem render={<Link to="/admin/variables" />}>
                       <Variable className="mr-2 h-4 w-4" />
-                      Global Variables
+                      {t('userMenu.globalVariables')}
                     </DropdownMenuItem>
                   </DropdownMenuGroup>
                 </>
@@ -327,7 +334,7 @@ export function AuthenticatedHeader() {
                   className="text-destructive focus:text-destructive"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
-                  Sign Out
+                  {t('userMenu.signOut')}
                 </DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
@@ -336,10 +343,9 @@ export function AuthenticatedHeader() {
           <Dialog open={tzDialogOpen} onOpenChange={setTzDialogOpen}>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Application timezone</DialogTitle>
+                <DialogTitle>{t('userMenu.timezoneDialogTitle')}</DialogTitle>
                 <DialogDescription>
-                  All dates and times — including forecast base times — are
-                  shown and entered in this timezone. Defaults to UTC.
+                  {t('userMenu.timezoneDialogDescription')}
                 </DialogDescription>
               </DialogHeader>
               <TimeZoneSelect

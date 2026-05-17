@@ -24,6 +24,7 @@
  */
 
 import { useEffect, useRef } from 'react'
+import i18n from 'i18next'
 import { useArtifacts, useDownloadModel } from '@/api/hooks/useArtifacts'
 import { useJobsStatus } from '@/api/hooks/useJobs'
 import { isTerminalStatus } from '@/api/types/job.types'
@@ -54,8 +55,8 @@ function useCollectDownloads() {
       const progress = dl.progress
       const description =
         dl.status === 'submitting'
-          ? 'Starting download...'
-          : `Downloading ${progress}%`
+          ? i18n.t('common:activity.downloadStarting')
+          : i18n.t('common:activity.downloadProgress', { progress })
 
       const existing = tasks[id]
       if (existing) {
@@ -82,7 +83,7 @@ function useCollectDownloads() {
         if (task && task.status === 'active') {
           updateTask(id, {
             status: 'completed',
-            description: 'Download complete',
+            description: i18n.t('common:activity.downloadComplete'),
             progress: 100,
             completedAt: Date.now(),
           })
@@ -106,7 +107,9 @@ function useCollectJobs() {
 
     for (const job of data.runs) {
       const id = `job:${job.run_id}`
-      const label = `Job ${job.run_id.slice(0, 8)}`
+      const label = i18n.t('common:activity.jobLabel', {
+        id: job.run_id.slice(0, 8),
+      })
       const isTerminal = isTerminalStatus(job.status)
 
       const existingTask = tasks[id]
@@ -117,8 +120,10 @@ function useCollectJobs() {
             status: job.status === 'completed' ? 'completed' : 'failed',
             description:
               job.status === 'completed'
-                ? 'Completed'
-                : `Failed: ${job.error ?? 'Unknown error'}`,
+                ? i18n.t('common:activity.jobCompleted')
+                : i18n.t('common:activity.jobFailed', {
+                    error: job.error ?? i18n.t('common:activity.unknownError'),
+                  }),
             completedAt: Date.now(),
           })
         } else if (!isTerminal) {

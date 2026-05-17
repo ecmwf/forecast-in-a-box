@@ -15,6 +15,7 @@
  */
 
 import { Component } from 'react'
+import i18n from 'i18next'
 import type { ReactNode } from 'react'
 import { P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
@@ -98,25 +99,24 @@ export class ErrorBoundary extends Component<
           <Card className="max-w-md">
             <CardHeader>
               <CardTitle className="text-destructive">
-                Something went wrong
+                {i18n.t('errors:boundary.title')}
               </CardTitle>
               <CardDescription>
-                An unexpected error occurred. Please try refreshing the page.
+                {i18n.t('errors:boundary.description')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-lg bg-muted p-3">
                 <P className="font-mono text-muted-foreground">
-                  An unexpected error occurred. If the problem persists, please
-                  contact support.
+                  {i18n.t('errors:boundary.details')}
                 </P>
               </div>
               <div className="flex gap-2">
                 <Button onClick={this.handleReset} variant="outline">
-                  Try Again
+                  {i18n.t('errors:boundary.tryAgain')}
                 </Button>
                 <Button onClick={() => window.location.reload()}>
-                  Refresh Page
+                  {i18n.t('errors:boundary.refreshPage')}
                 </Button>
               </div>
             </CardContent>

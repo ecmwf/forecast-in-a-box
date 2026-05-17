@@ -10,6 +10,7 @@
 
 import { useMemo } from 'react'
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -21,6 +22,7 @@ interface ValidationStatusProps {
 }
 
 export function ValidationStatusBadge({ className }: { className?: string }) {
+  const { t } = useTranslation('configure')
   const validationState = useFableBuilderStore((state) => state.validationState)
   const isValidating = useFableBuilderStore((state) => state.isValidating)
 
@@ -28,7 +30,7 @@ export function ValidationStatusBadge({ className }: { className?: string }) {
     return (
       <Badge variant="secondary" className={cn('gap-1', className)}>
         <Loader2 className="h-3 w-3 animate-spin" />
-        Validating
+        {t('validationStatus.validating')}
       </Badge>
     )
   }
@@ -49,7 +51,7 @@ export function ValidationStatusBadge({ className }: { className?: string }) {
         className={cn('gap-1 border-green-200 text-green-600', className)}
       >
         <CheckCircle2 className="h-3 w-3" />
-        Valid
+        {t('validationStatus.valid')}
       </Badge>
     )
   }
@@ -57,7 +59,7 @@ export function ValidationStatusBadge({ className }: { className?: string }) {
   return (
     <Badge variant="destructive" className={cn('gap-1', className)}>
       <AlertCircle className="h-3 w-3" />
-      Has errors
+      {t('validationStatus.hasErrors')}
     </Badge>
   )
 }
@@ -66,6 +68,7 @@ export function ValidationStatus({
   compact = false,
   className,
 }: ValidationStatusProps) {
+  const { t } = useTranslation('configure')
   const validationState = useFableBuilderStore((state) => state.validationState)
   const isValidating = useFableBuilderStore((state) => state.isValidating)
 
@@ -93,7 +96,9 @@ export function ValidationStatus({
         )}
       >
         <Loader2 className="h-4 w-4 animate-spin" />
-        <span className="text-sm">Validating configuration...</span>
+        <span className="text-sm">
+          {t('validationStatus.validatingConfiguration')}
+        </span>
       </div>
     )
   }
@@ -106,7 +111,7 @@ export function ValidationStatus({
     if (compact) {
       return (
         <div className={cn('text-sm text-destructive', className)}>
-          Has errors
+          {t('validationStatus.hasErrors')}
         </div>
       )
     }
@@ -116,7 +121,7 @@ export function ValidationStatus({
   return (
     <Alert variant="destructive" className={className}>
       <AlertCircle className="h-4 w-4" />
-      <AlertTitle>Configuration Issues</AlertTitle>
+      <AlertTitle>{t('validationStatus.configurationIssues')}</AlertTitle>
       <AlertDescription>
         <ul className="mt-2 list-disc space-y-1 pl-4">
           {errorSummary.globalErrors.map((error, index) => (

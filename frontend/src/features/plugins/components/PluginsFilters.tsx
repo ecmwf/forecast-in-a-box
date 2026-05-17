@@ -132,7 +132,7 @@ export function PluginsFilters({
             size="icon"
             className="h-9 w-9 rounded-r-none"
             onClick={() => setViewMode('table')}
-            aria-label="Table view"
+            aria-label={t('viewToggle.table')}
           >
             <List className="h-4 w-4" />
           </Button>
@@ -141,7 +141,7 @@ export function PluginsFilters({
             size="icon"
             className="h-9 w-9 rounded-l-none border-l"
             onClick={() => setViewMode('card')}
-            aria-label="Card view"
+            aria-label={t('viewToggle.card')}
           >
             <LayoutGrid className="h-4 w-4" />
           </Button>

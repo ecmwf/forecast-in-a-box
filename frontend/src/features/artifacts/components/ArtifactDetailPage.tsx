@@ -102,7 +102,7 @@ export function ArtifactDetailPage({
             {detail.timestep ? (
               <span className="inline-flex items-center gap-1.5 rounded bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground">
                 <Clock className="h-3.5 w-3.5" />
-                {t('detail.timestep')}: {detail.timestep}
+                {t('detail.timestep', { value: detail.timestep })}
               </span>
             ) : null}
             <span
@@ -138,7 +138,7 @@ export function ArtifactDetailPage({
               }
             >
               <ExternalLink className="mr-1 h-4 w-4" />
-              URL
+              {t('detail.url')}
             </Button>
           )}
           {detail.is_available && !isDownloading ? (

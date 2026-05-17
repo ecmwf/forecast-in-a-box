@@ -8,6 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
+import i18n from 'i18next'
 import { createLogger } from './logger'
 import { showToast } from './toast'
 
@@ -23,7 +24,7 @@ function extractErrorMessage(reason: unknown): string {
   if (typeof reason === 'string') {
     return reason
   }
-  return 'An unexpected error occurred'
+  return i18n.t('errors:toast.unexpected')
 }
 
 /**
@@ -53,8 +54,8 @@ export function setupGlobalErrorHandlers(): void {
     })
 
     showToast.error(
-      'An unexpected error occurred',
-      'Please try refreshing the page',
+      i18n.t('errors:toast.unexpected'),
+      i18n.t('errors:toast.unexpectedHint'),
     )
 
     // Return false to allow default browser error handling (e.g., DevTools logging)

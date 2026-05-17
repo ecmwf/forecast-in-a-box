@@ -31,6 +31,7 @@ import type {
 } from '@/api/types/fable.types'
 import { getFactory } from '@/api/types/fable.types'
 import { convertNaive, formatInZone, getAppTimeZone } from '@/lib/datetime'
+import i18n from '@/lib/i18n'
 
 // Matches either a full datetime-local (`YYYY-MM-DDTHH:MM`) or a bare date
 // (`YYYY-MM-DD`) at the start of the string. Good enough to pick out
@@ -85,7 +86,7 @@ export function buildDefaultJobName({
 
   const blocks = Object.values(fable.blocks)
   if (!catalogue || blocks.length === 0) {
-    return `Run · ${timestamp}`
+    return `${i18n.t('executions:defaultName.run')} · ${timestamp}`
   }
 
   let sourceTitle: string | undefined
@@ -105,7 +106,7 @@ export function buildDefaultJobName({
     (part): part is string => Boolean(part),
   )
   if (parts.length === 0) {
-    return `Run · ${timestamp}`
+    return `${i18n.t('executions:defaultName.run')} · ${timestamp}`
   }
   return truncate(parts.join(' · '))
 }

@@ -254,7 +254,7 @@ export default function ImageViewer({ item, adapter, onClose }: ViewerProps) {
           </button>
           <button
             type="button"
-            aria-label="Close"
+            aria-label={t('outputs.viewer.close')}
             className={headerBtn}
             onClick={onClose}
           >

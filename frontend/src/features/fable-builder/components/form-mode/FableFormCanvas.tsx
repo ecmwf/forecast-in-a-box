@@ -10,6 +10,7 @@
 
 import { useMemo, useState } from 'react'
 import { ArrowRight, Check, Plus } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { BlockInstanceCard } from './BlockInstanceCard'
 import { BlockTabs } from './BlockTabs'
 import { FormPaletteSidebar } from './FormPaletteSidebar'
@@ -49,6 +50,7 @@ type FormStep = 'source' | 'transform' | 'product' | 'sink'
 const STEP_ORDER: Array<FormStep> = ['source', 'transform', 'product', 'sink']
 
 export function FableFormCanvas({ catalogue }: FableFormCanvasProps) {
+  const { t } = useTranslation('configure')
   const [currentStep, setCurrentStep] = useState<FormStep>('source')
 
   const fable = useFableBuilderStore((state) => state.fable)
@@ -271,14 +273,14 @@ export function FableFormCanvas({ catalogue }: FableFormCanvasProps) {
               disabled={STEP_ORDER.indexOf(currentStep) === 0}
               className="w-full sm:w-auto"
             >
-              Previous Step
+              {t('formCanvas.previousStep')}
             </Button>
             <Button
               onClick={handleNextStep}
               disabled={!canAdvance}
               className="w-full sm:w-auto"
             >
-              Next Step
+              {t('formCanvas.nextStep')}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
@@ -298,7 +300,11 @@ export function FableFormCanvas({ catalogue }: FableFormCanvasProps) {
                           />
                         </div>
                         <div>
-                          <CardTitle>{metadata.label}s</CardTitle>
+                          <CardTitle>
+                            {t('formCanvas.stepHeading', {
+                              label: metadata.label,
+                            })}
+                          </CardTitle>
                           <CardDescription>
                             {metadata.description}
                           </CardDescription>
@@ -348,8 +354,16 @@ export function FableFormCanvas({ catalogue }: FableFormCanvasProps) {
                 <div className="border-t pt-4">
                   <P className="mb-3 text-muted-foreground">
                     {blocksByKind[currentStep].length === 0
-                      ? `Select a ${BLOCK_KIND_METADATA[currentStep].label.toLowerCase()} to get started:`
-                      : `Add another ${BLOCK_KIND_METADATA[currentStep].label.toLowerCase()}:`}
+                      ? t('formCanvas.selectToStart', {
+                          kind: BLOCK_KIND_METADATA[
+                            currentStep
+                          ].label.toLowerCase(),
+                        })
+                      : t('formCanvas.addAnother', {
+                          kind: BLOCK_KIND_METADATA[
+                            currentStep
+                          ].label.toLowerCase(),
+                        })}
                   </P>
                   <div className="grid gap-2">
                     {availableFactories.map(({ factoryId, factory }) => {
@@ -390,8 +404,12 @@ export function FableFormCanvas({ catalogue }: FableFormCanvasProps) {
                   <div className="py-8 text-center text-muted-foreground">
                     <P>
                       {currentStep === 'source'
-                        ? 'Loading available sources...'
-                        : `Complete the previous step to see available ${BLOCK_KIND_METADATA[currentStep].label.toLowerCase()}s.`}
+                        ? t('formCanvas.loadingSources')
+                        : t('formCanvas.completePreviousStep', {
+                            kind: BLOCK_KIND_METADATA[
+                              currentStep
+                            ].label.toLowerCase(),
+                          })}
                     </P>
                   </div>
                 )}

@@ -218,9 +218,9 @@ function PluginsPage() {
     trackPluginOp(
       compositeId,
       {
-        active: 'Installing',
-        success: 'Installed',
-        failure: 'Install failed',
+        active: t('activity.installing'),
+        success: t('activity.installed'),
+        failure: t('activity.installFailed'),
       },
       installPlugin,
     )
@@ -230,9 +230,9 @@ function PluginsPage() {
     trackPluginOp(
       compositeId,
       {
-        active: 'Uninstalling',
-        success: 'Uninstalled',
-        failure: 'Uninstall failed',
+        active: t('activity.uninstalling'),
+        success: t('activity.uninstalled'),
+        failure: t('activity.uninstallFailed'),
       },
       uninstallPlugin,
     )
@@ -241,7 +241,11 @@ function PluginsPage() {
   const handleUpdate = (compositeId: PluginCompositeId) => {
     trackPluginOp(
       compositeId,
-      { active: 'Updating', success: 'Updated', failure: 'Update failed' },
+      {
+        active: t('activity.updating'),
+        success: t('activity.updated'),
+        failure: t('activity.updateFailed'),
+      },
       updatePlugin,
     )
   }

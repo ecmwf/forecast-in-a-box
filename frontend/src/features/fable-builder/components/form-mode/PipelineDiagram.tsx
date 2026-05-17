@@ -9,6 +9,7 @@
  */
 
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import type {
   BlockFactoryCatalogue,
   BlockInstanceId,
@@ -72,6 +73,7 @@ export function PipelineDiagram({
   onBlockClick,
   selectedBlockId,
 }: PipelineDiagramProps) {
+  const { t } = useTranslation('configure')
   const fable = useFableBuilderStore((state) => state.fable)
 
   // Compute diagram layout
@@ -170,7 +172,7 @@ export function PipelineDiagram({
   if (nodes.length === 0) {
     return (
       <div className="flex h-full items-center justify-center p-4 text-center text-sm text-muted-foreground">
-        Add blocks to see the pipeline topology
+        {t('pipeline.topologyPlaceholder')}
       </div>
     )
   }

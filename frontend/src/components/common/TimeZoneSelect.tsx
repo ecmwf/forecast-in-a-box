@@ -17,6 +17,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Check, Search } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Input } from '@/components/ui/input'
 import { listTimeZones, timeZoneOffsetLabel } from '@/lib/datetime'
 import { cn } from '@/lib/utils'
@@ -46,6 +47,7 @@ export function TimeZoneSelect({
   onChange,
   className,
 }: TimeZoneSelectProps) {
+  const { t } = useTranslation('common')
   const baseId = useId()
   const [query, setQuery] = useState('')
   const [highlighted, setHighlighted] = useState(0)
@@ -117,21 +119,21 @@ export function TimeZoneSelect({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Search timezone…"
+          placeholder={t('timezone.searchPlaceholder')}
           className="pl-8"
-          aria-label="Search timezone"
+          aria-label={t('timezone.searchLabel')}
         />
       </div>
       <div
         ref={listRef}
         id={`${baseId}-list`}
         role="listbox"
-        aria-label="Timezones"
+        aria-label={t('timezone.listLabel')}
         className="max-h-80 overflow-y-auto rounded-md border border-border"
       >
         {items.length === 0 ? (
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-            No timezone found.
+            {t('timezone.empty')}
           </p>
         ) : (
           items.map((tz, index) => (
@@ -163,7 +165,7 @@ export function TimeZoneSelect({
                 {prettyName(tz)}
                 {tz === browserTz && (
                   <span className="ml-1.5 text-xs text-muted-foreground">
-                    · Browser
+                    {t('timezone.browser')}
                   </span>
                 )}
               </span>

@@ -43,13 +43,14 @@ import { H2 } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
 import { useUser } from '@/hooks/useUser'
 
-function getUserDisplayName(email?: string): string {
-  if (!email) return 'User'
+/** Derive a display first name from an email, or null when none can be extracted. */
+function getUserDisplayName(email?: string): string | null {
+  if (!email) return null
   // Extract name from email (e.g., "john.doe@example.com" -> "John")
   const localPart = email.split('@')[0]
-  if (!localPart) return 'User'
+  if (!localPart) return null
   const firstName = localPart.split('.')[0]
-  if (!firstName) return 'User'
+  if (!firstName) return null
   return firstName.charAt(0).toUpperCase() + firstName.slice(1)
 }
 
@@ -120,7 +121,8 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
   const { artifacts } = useArtifacts()
 
   const isAnonymous = authType === 'anonymous'
-  const displayName = getUserDisplayName(user?.email)
+  const displayName =
+    getUserDisplayName(user?.email) ?? t('welcome.userFallback')
   const trend = forecastTrend(runs)
   const downloadedModels = artifacts.filter((a) => a.isAvailable).length
   const totalModels = artifacts.length

@@ -8,6 +8,7 @@
     "untitledJob": "Untitled Job",
     "showConfig": "Show config",
     "hideConfig": "Hide config",
+    "running": "Running...",
     "graphUnavailable": "Graph visualisation unavailable",
     "graphUnavailableDescription": "The pipeline graph is not available for this job.",
     "specUnavailable": "Specification not available",
@@ -39,8 +40,17 @@
     "save": "Save",
     "editConfiguration": "Edit Configuration",
     "downloadLogs": "Download Full Logs",
+    "downloadLogsFailed": "Failed to download logs",
     "confirmRestart": "This will re-execute the job with the same specification. Continue?",
     "confirmDelete": "This will permanently delete this job and its results. This action cannot be undone."
+  },
+  "activity": {
+    "jobFallbackLabel": "Job {{id}}",
+    "submitted": "Submitted",
+    "restarting": "Restarting (attempt {{attempt}})"
+  },
+  "defaultName": {
+    "run": "Run"
   },
   "submit": {
     "title": "Submit Forecast Job",
@@ -77,6 +87,35 @@
     "serverTime": "(server time)",
     "localEquivalent": "→ {{time}}"
   },
+  "cron": {
+    "frequency": {
+      "hourly": "Every hour",
+      "daily": "Every day",
+      "weekly": "Every week",
+      "custom": "Custom"
+    },
+    "days": {
+      "sunday": "Sunday",
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday"
+    },
+    "at": "at",
+    "atMinute": "at minute",
+    "showExpression": "Show cron expression",
+    "hideExpression": "Hide cron expression",
+    "humanReadable": {
+      "everyHour": "Every hour",
+      "everyHourAtMinute": "Every hour at minute {{minute}}",
+      "everyDayAt": "Every day at {{time}} {{zone}}",
+      "everyDayAtServerTime": "Every day at {{time}} (server time)",
+      "everyDayOfWeekAt": "Every {{day}} at {{time}} {{zone}}",
+      "everyDayOfWeekAtServerTime": "Every {{day}} at {{time}} (server time)"
+    }
+  },
   "outputs": {
     "generated": "Generated",
     "pending": "Pending",
@@ -89,6 +128,11 @@
       "view": "View",
       "download": "Download",
       "copyImage": "Copy to clipboard"
+    },
+    "copy": {
+      "svgSuccess": "SVG source copied",
+      "imageSuccess": "Image copied",
+      "error": "Could not copy image"
     },
     "filter": {
       "allMimes": "All"
@@ -110,6 +154,9 @@
       "zoomIn": "Zoom in",
       "zoomOut": "Zoom out",
       "resetZoom": "Reset zoom",
+      "close": "Close",
+      "previousPage": "Previous page",
+      "nextPage": "Next page",
       "pageOfTotal": "{{page}} / {{total}}",
       "pdfPageCount_one": "{{count}} page",
       "pdfPageCount_other": "{{count}} pages"

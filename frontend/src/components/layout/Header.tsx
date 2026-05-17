@@ -11,20 +11,22 @@
 import { Menu, X } from 'lucide-react'
 import React, { useEffect } from 'react'
 import { Link } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils.ts'
 import { useMedia } from '@/hooks/useMedia.ts'
 import { useAuth } from '@/features/auth/AuthContext.tsx'
 import { Logo } from '@/components/common/Logo.tsx'
 
-const menuItems = [{ name: 'About', to: '/about' }]
-const mobileLinks = [{ name: 'About', to: '/about' }]
+const menuItems = [{ nameKey: 'header.about', to: '/about' }] as const
+const mobileLinks = [{ nameKey: 'header.about', to: '/about' }] as const
 
 export const Header = () => {
   const { isAuthenticated, authType, signIn, signOut } = useAuth()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
   const [isScrolled, setIsScrolled] = React.useState(false)
   const isLarge = useMedia('(min-width: 64rem)')
+  const { t } = useTranslation('common')
 
   useEffect(() => {
     const handleScroll = () => {
@@ -66,16 +68,20 @@ export const Header = () => {
             <div className="flex justify-between gap-8 max-lg:h-14 max-lg:w-full max-lg:border-b max-lg:border-foreground/5">
               <Link
                 to="/"
-                aria-label="home"
+                aria-label={t('header.home')}
                 className="flex items-center gap-2"
               >
                 <Logo />
-                <span className="text-lg font-semibold">Forecast-in-a-Box</span>
+                <span className="text-lg font-semibold">{t('appName')}</span>
               </Link>
 
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                aria-label={isMobileMenuOpen ? 'Close Menu' : 'Open Menu'}
+                aria-label={
+                  isMobileMenuOpen
+                    ? t('header.closeMenu')
+                    : t('header.openMenu')
+                }
                 className="relative z-20 -m-2.5 -mr-3 block cursor-pointer p-2.5 lg:hidden"
               >
                 <Menu className="m-auto size-5 duration-200 in-data-[state=active]:scale-0 in-data-[state=active]:rotate-180 in-data-[state=active]:opacity-0" />
@@ -93,7 +99,7 @@ export const Header = () => {
                           to={item.to}
                           className="block text-muted-foreground duration-150 hover:text-accent-foreground"
                         >
-                          <span>{item.name}</span>
+                          <span>{t(item.nameKey)}</span>
                         </Link>
                       </li>
                     ))}
@@ -103,21 +109,16 @@ export const Header = () => {
             )}
             {!isLarge && isMobileMenuOpen && (
               <nav className="w-full [--color-muted:--alpha(var(--color-foreground)/5%)]">
-                {mobileLinks.map((link) => {
-                  if (link.name && link.to) {
-                    return (
-                      <Link
-                        key={link.to}
-                        to={link.to}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className="group relative block py-4 text-lg"
-                      >
-                        {link.name}
-                      </Link>
-                    )
-                  }
-                  return null
-                })}
+                {mobileLinks.map((link) => (
+                  <Link
+                    key={link.to}
+                    to={link.to}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="group relative block py-4 text-lg"
+                  >
+                    {t(link.nameKey)}
+                  </Link>
+                ))}
               </nav>
             )}
 
@@ -130,7 +131,7 @@ export const Header = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => signOut()}
-                      render={<span>Logout</span>}
+                      render={<span>{t('header.logout')}</span>}
                       nativeButton={false}
                     />
                   ) : (
@@ -139,13 +140,13 @@ export const Header = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => signIn()}
-                        render={<span>Login</span>}
+                        render={<span>{t('header.login')}</span>}
                         nativeButton={false}
                       />
                       <Button
                         size="sm"
                         onClick={() => signIn()}
-                        render={<span>Get Started</span>}
+                        render={<span>{t('header.getStarted')}</span>}
                         nativeButton={false}
                       />
                     </>

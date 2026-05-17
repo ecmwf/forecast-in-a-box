@@ -8,14 +8,16 @@
  * does it submit to any jurisdiction.
  */
 
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 
 export const Logo = ({ className }: { className?: string }) => {
+  const { t } = useTranslation('common')
   return (
     <div className={cn('flex items-center gap-2', className)}>
       <img
         src="/logos/fiab.png"
-        alt="Forecast In a Box Logo"
+        alt={t('logoAlt')}
         className="-my-8 h-12 w-auto"
       />
     </div>

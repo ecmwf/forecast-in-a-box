@@ -13,6 +13,7 @@
  */
 
 import { z } from 'zod'
+import i18n from 'i18next'
 
 // ---------------------------------------------------------------------------
 // Schemas — must match backend models in routes/run.py
@@ -145,14 +146,46 @@ export function createDefaultEnvironment(): EnvironmentSpecification {
   }
 }
 
+// `label` is a getter so it resolves through i18next on access (at render),
+// keeping this module free of the i18n initialisation side-effect.
 export const JOB_STATUS_META: Record<
   JobStatus,
   { label: string; color: string }
 > = {
-  submitted: { label: 'Submitted', color: 'blue' },
-  preparing: { label: 'Preparing', color: 'blue' },
-  running: { label: 'Running', color: 'amber' },
-  completed: { label: 'Completed', color: 'green' },
-  failed: { label: 'Failed', color: 'red' },
-  unknown: { label: 'Unknown', color: 'gray' },
-} as const
+  submitted: {
+    get label() {
+      return i18n.t('executions:status.submitted')
+    },
+    color: 'blue',
+  },
+  preparing: {
+    get label() {
+      return i18n.t('executions:status.preparing')
+    },
+    color: 'blue',
+  },
+  running: {
+    get label() {
+      return i18n.t('executions:status.running')
+    },
+    color: 'amber',
+  },
+  completed: {
+    get label() {
+      return i18n.t('executions:status.completed')
+    },
+    color: 'green',
+  },
+  failed: {
+    get label() {
+      return i18n.t('executions:status.failed')
+    },
+    color: 'red',
+  },
+  unknown: {
+    get label() {
+      return i18n.t('executions:status.unknown')
+    },
+    color: 'gray',
+  },
+}

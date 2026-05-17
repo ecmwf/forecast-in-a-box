@@ -10,6 +10,7 @@
 
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { P } from '@/components/base/typography'
 import { FiabStackSection } from '@/features/landing/components/FiabStackSection.tsx'
 import { IntroGlobeSection } from '@/features/landing/components/IntroGlobeSection.tsx'
@@ -27,6 +28,7 @@ export const Route = createFileRoute('/')({
 })
 
 function Index() {
+  const { t } = useTranslation('common')
   const { isAuthenticated, isLoading } = useAuth()
   const navigate = useNavigate()
 
@@ -62,7 +64,7 @@ function Index() {
           <div className="mb-4">
             <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent motion-reduce:animate-[spin_1.5s_linear_infinite]" />
           </div>
-          <P className="text-muted-foreground">Loading...</P>
+          <P className="text-muted-foreground">{t('loading')}</P>
         </div>
       </div>
     )

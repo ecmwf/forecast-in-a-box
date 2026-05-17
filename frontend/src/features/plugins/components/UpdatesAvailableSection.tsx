@@ -62,7 +62,7 @@ export function UpdatesAvailableSection({
                   <div className="flex items-center gap-2">
                     <H4 className="font-semibold">{plugin.name}</H4>
                     <span className="rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-sm font-bold text-amber-800 dark:border-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                      UPDATE v{plugin.latestVersion}
+                      {t('updateBadge', { version: plugin.latestVersion })}
                     </span>
                   </div>
                   <P className="line-clamp-1 text-muted-foreground">

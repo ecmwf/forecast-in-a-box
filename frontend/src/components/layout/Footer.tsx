@@ -9,6 +9,7 @@
  */
 
 import { Link } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { useStatus } from '@/api/hooks/useStatus'
 import { StatusDetailsPopover } from '@/components/common/StatusDetailsPopover'
 import { StatusIndicator } from '@/components/common/StatusIndicator'
@@ -21,38 +22,39 @@ import { useUiStore } from '@/stores/uiStore'
 const partnerLogos = [
   {
     src: '/logos/ecmwf.svg',
-    alt: 'ECMWF',
+    altKey: 'footer.logoEcmwf',
     href: 'https://www.ecmwf.int/',
     className: 'h-9',
   },
   {
     src: '/logos/destination_earth_logo.svg',
-    alt: 'Destination Earth',
+    altKey: 'footer.logoDestinationEarth',
     href: 'https://destination-earth.eu',
     className: 'h-8',
   },
   {
     src: '/logos/wmo.svg',
-    alt: 'World Meteorological Organization',
+    altKey: 'footer.logoWmo',
     href: 'https://wmo.int',
     className: 'h-14',
   },
-]
+] as const
 
 const links = [
   {
-    title: 'Help',
+    titleKey: 'footer.help',
     href: '/about', // TODO: Create dedicated help page
   },
   {
-    title: 'About',
+    titleKey: 'footer.about',
     href: '/about',
   },
-]
+] as const
 
 export function Footer() {
   const { trafficLightStatus, isLoading } = useStatus()
   const layoutMode = useUiStore((state) => state.layoutMode)
+  const { t } = useTranslation('common')
 
   return (
     <footer
@@ -68,7 +70,7 @@ export function Footer() {
         <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-8 py-10 md:justify-between">
           {partnerLogos.map((logo) => (
             <a
-              key={logo.alt}
+              key={logo.altKey}
               href={logo.href}
               target="_blank"
               rel="noopener noreferrer"
@@ -76,7 +78,7 @@ export function Footer() {
             >
               <img
                 src={logo.src}
-                alt={logo.alt}
+                alt={t(logo.altKey)}
                 className={cn('block w-auto', logo.className)}
               />
             </a>
@@ -87,30 +89,28 @@ export function Footer() {
           {links.map((link) =>
             isExternalUrl(link.href) ? (
               <a
-                key={link.title}
+                key={link.titleKey}
                 href={link.href}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block text-white/70 duration-150 hover:text-white"
               >
-                <span>{link.title}</span>
+                <span>{t(link.titleKey)}</span>
               </a>
             ) : (
               <Link
-                key={link.title}
+                key={link.titleKey}
                 to={link.href}
                 className="block text-white/70 duration-150 hover:text-white"
               >
-                <span>{link.title}</span>
+                <span>{t(link.titleKey)}</span>
               </Link>
             ),
           )}
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-white/10 py-6">
-          <span className="text-sm text-white/60">
-            © European Centre for Medium-Range Weather Forecasts
-          </span>
+          <span className="text-sm text-white/60">{t('footer.copyright')}</span>
           {!isLoading && (
             <StatusDetailsPopover side="top">
               <StatusIndicator

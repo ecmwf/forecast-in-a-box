@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from 'react'
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
 import { cn } from '@/lib/utils'
@@ -21,6 +22,7 @@ interface PipelineSidebarProps {
 }
 
 export function PipelineSidebar({ children }: PipelineSidebarProps) {
+  const { t } = useTranslation('configure')
   const [isOpen, setIsOpen] = useState(() => {
     if (typeof window === 'undefined') return true
     const stored = localStorage.getItem(STORAGE_KEY)
@@ -60,7 +62,9 @@ export function PipelineSidebar({ children }: PipelineSidebarProps) {
           {isOpen && (
             <div className="flex h-full flex-col overflow-hidden">
               <div className="flex shrink-0 items-center justify-between border-b px-3 py-2">
-                <span className="text-sm font-medium">Pipeline Structure</span>
+                <span className="text-sm font-medium">
+                  {t('pipeline.structure')}
+                </span>
               </div>
               <div className="flex-1 overflow-auto p-2">{children}</div>
             </div>
@@ -80,7 +84,9 @@ export function PipelineSidebar({ children }: PipelineSidebarProps) {
             onClick={toggleOpen}
             className="flex w-full items-center justify-between px-4 py-3"
           >
-            <span className="text-sm font-medium">Pipeline Structure</span>
+            <span className="text-sm font-medium">
+              {t('pipeline.structure')}
+            </span>
             {isOpen ? (
               <ChevronDown className="h-4 w-4" />
             ) : (

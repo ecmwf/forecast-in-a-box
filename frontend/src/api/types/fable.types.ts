@@ -10,6 +10,7 @@
 
 import { Cloud, Cog, Download, Shuffle } from 'lucide-react'
 import { z } from 'zod'
+import i18n from 'i18next'
 import { EnvironmentSpecificationSchema } from './job.types'
 import {
   PluginCompositeIdSchema,
@@ -358,11 +359,17 @@ export const BLOCK_KIND_ORDER: Array<BlockKind> = [
   'sink',
 ]
 
+// `label`/`description` are getters so they resolve through i18next on access
+// (at render), keeping this module free of the i18n initialisation side-effect.
 export const BLOCK_KIND_METADATA: Record<BlockKind, BlockKindMetadata> = {
   source: {
     kind: 'source',
-    label: 'Source',
-    description: 'Data sources like forecasts and initial conditions',
+    get label() {
+      return i18n.t('configure:blockKind.source.label')
+    },
+    get description() {
+      return i18n.t('configure:blockKind.source.description')
+    },
     color: 'text-blue-500',
     bgColor: 'bg-blue-50 dark:bg-blue-950',
     borderColor: 'border-blue-200 dark:border-blue-800',
@@ -372,8 +379,12 @@ export const BLOCK_KIND_METADATA: Record<BlockKind, BlockKindMetadata> = {
   },
   transform: {
     kind: 'transform',
-    label: 'Transform',
-    description: 'Transform and process data',
+    get label() {
+      return i18n.t('configure:blockKind.transform.label')
+    },
+    get description() {
+      return i18n.t('configure:blockKind.transform.description')
+    },
     color: 'text-amber-500',
     bgColor: 'bg-amber-50 dark:bg-amber-950',
     borderColor: 'border-amber-200 dark:border-amber-800',
@@ -383,8 +394,12 @@ export const BLOCK_KIND_METADATA: Record<BlockKind, BlockKindMetadata> = {
   },
   product: {
     kind: 'product',
-    label: 'Product',
-    description: 'Compute derived products from data',
+    get label() {
+      return i18n.t('configure:blockKind.product.label')
+    },
+    get description() {
+      return i18n.t('configure:blockKind.product.description')
+    },
     color: 'text-purple-500',
     bgColor: 'bg-purple-50 dark:bg-purple-950',
     borderColor: 'border-purple-200 dark:border-purple-800',
@@ -394,8 +409,12 @@ export const BLOCK_KIND_METADATA: Record<BlockKind, BlockKindMetadata> = {
   },
   sink: {
     kind: 'sink',
-    label: 'Output',
-    description: 'Store or visualize results',
+    get label() {
+      return i18n.t('configure:blockKind.sink.label')
+    },
+    get description() {
+      return i18n.t('configure:blockKind.sink.description')
+    },
     color: 'text-emerald-500',
     bgColor: 'bg-emerald-50 dark:bg-emerald-950',
     borderColor: 'border-emerald-200 dark:border-emerald-800',

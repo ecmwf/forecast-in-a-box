@@ -187,14 +187,14 @@ export function PluginCard({
         {plugin.version ? (
           // Installed plugin: show installed version
           <span className="inline-flex items-center gap-1.5 rounded bg-muted px-2 py-0.5 font-mono text-sm font-medium text-muted-foreground">
-            v{plugin.version}
+            {t('item.version', { version: plugin.version })}
           </span>
         ) : (
           // Available plugin: show latest version (hide if unknown)
           plugin.latestVersion &&
           plugin.latestVersion !== 'unknown' && (
             <span className="inline-flex items-center gap-1.5 rounded bg-muted px-2 py-0.5 font-mono text-sm font-medium text-muted-foreground">
-              v{plugin.latestVersion}
+              {t('item.version', { version: plugin.latestVersion })}
             </span>
           )
         )}
@@ -202,12 +202,12 @@ export function PluginCard({
           plugin.version &&
           plugin.latestVersion !== plugin.version && (
             <span className="inline-flex items-center gap-1.5 rounded bg-amber-100 px-2 py-0.5 font-mono text-sm font-medium text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
-              → v{plugin.latestVersion}
+              {t('card.versionArrow', { version: plugin.latestVersion })}
             </span>
           )}
         {updatedTimeAgo && (
           <span className="text-sm text-muted-foreground">
-            Updated {updatedTimeAgo}
+            {t('card.updatedAgo', { time: updatedTimeAgo })}
           </span>
         )}
       </div>

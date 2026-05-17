@@ -18,6 +18,7 @@
  * - Optional Zod validation for runtime type safety
  */
 
+import i18n from 'i18next'
 import type { ApiError, RequestConfig } from '@/types/api.types'
 import { getBackendBaseUrl } from '@/utils/env'
 import { parseOrThrow } from '@/utils/zod'
@@ -172,7 +173,7 @@ async function request<T>(
     // Handle network errors
     if (error instanceof TypeError) {
       throw new ApiClientError(
-        'Network error: Unable to reach the API server',
+        i18n.t('errors:network.apiUnreachable'),
         undefined,
         'NETWORK_ERROR',
         error,
@@ -181,7 +182,7 @@ async function request<T>(
 
     // Handle other errors
     throw new ApiClientError(
-      error instanceof Error ? error.message : 'An unknown error occurred',
+      error instanceof Error ? error.message : i18n.t('errors:unknown'),
       undefined,
       'UNKNOWN_ERROR',
       error,

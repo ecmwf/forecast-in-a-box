@@ -10,6 +10,7 @@
 
 import { useCallback, useState } from 'react'
 import { X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { GlyphFieldWrapper } from './GlyphFieldWrapper'
 import type { KeyboardEvent } from 'react'
 import { Badge } from '@/components/ui/badge'
@@ -58,18 +59,20 @@ export function ListField({
   configKey,
   value,
   onChange,
-  placeholder = 'Add item...',
+  placeholder,
   disabled,
   className,
   itemType = 'string',
 }: ListFieldProps) {
+  const { t } = useTranslation('common')
+  const resolvedPlaceholder = placeholder ?? t('field.addItemPlaceholder')
   return (
     <GlyphFieldWrapper
       id={id}
       configKey={configKey}
       value={value}
       onChange={onChange}
-      placeholder={placeholder}
+      placeholder={resolvedPlaceholder}
       disabled={disabled}
       className={className}
     >
@@ -77,7 +80,7 @@ export function ListField({
         id={id}
         value={value}
         onChange={onChange}
-        placeholder={placeholder}
+        placeholder={resolvedPlaceholder}
         disabled={disabled}
         itemType={itemType}
       />
@@ -89,11 +92,13 @@ function ListFieldConcrete({
   id,
   value,
   onChange,
-  placeholder = 'Add item...',
+  placeholder,
   disabled,
   className,
   itemType = 'string',
 }: Omit<ListFieldProps, 'configKey'>) {
+  const { t } = useTranslation('common')
+  const resolvedPlaceholder = placeholder ?? t('field.addItemPlaceholder')
   const [inputValue, setInputValue] = useState('')
   const items = parseListValue(value)
 
@@ -164,7 +169,7 @@ function ListFieldConcrete({
               type="button"
               onClick={() => removeItem(index)}
               className="ml-1 rounded-full p-0.5 transition-colors hover:bg-muted-foreground/20"
-              aria-label={`Remove ${item}`}
+              aria-label={t('removeTag', { tag: item })}
             >
               <X className="h-3 w-3" />
             </button>
@@ -183,7 +188,7 @@ function ListFieldConcrete({
             addItem(inputValue)
           }
         }}
-        placeholder={placeholder}
+        placeholder={resolvedPlaceholder}
         disabled={disabled}
         className="h-7 min-w-[6rem] flex-1 !px-0"
       />

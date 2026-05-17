@@ -10,6 +10,7 @@
 
 import { Link } from '@tanstack/react-router'
 import { X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn, isExternalUrl } from '@/lib/utils'
 
 export interface NotificationBannerProps {
@@ -43,6 +44,7 @@ export function NotificationBanner({
   onDismiss,
   className,
 }: NotificationBannerProps) {
+  const { t } = useTranslation('common')
   return (
     <div
       className={cn(
@@ -82,7 +84,7 @@ export function NotificationBanner({
         <button
           onClick={onDismiss}
           className="absolute top-1/2 right-3 -translate-y-1/2 rounded-md p-1.5 transition-opacity hover:bg-black/5 hover:opacity-70 sm:right-4 dark:hover:bg-white/10"
-          aria-label="Dismiss notification"
+          aria-label={t('notificationBanner.dismiss')}
         >
           <X className="h-4 w-4" />
         </button>

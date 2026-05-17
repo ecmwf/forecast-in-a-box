@@ -10,6 +10,7 @@
 
 import { useMemo } from 'react'
 import { useQueries } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import type { JobExecutionDetail } from '@/api/types/job.types'
 import type { FableRetrieveResponse } from '@/api/types/fable.types'
 import type { ForecastRunViewModel } from '@/features/journal/types'
@@ -34,6 +35,7 @@ export function useForecastRuns(runs: ReadonlyArray<JobExecutionDetail>): {
   runs: Array<ForecastRunViewModel>
   toggleBookmark: (runId: string) => void
 } {
+  const { t } = useTranslation('journal')
   const { data: catalogue } = useBlockCatalogue()
   const { data: blueprintList } = useListBlueprints(1, 50)
   const { data: scheduleList } = useSchedules(1, 100)
@@ -61,11 +63,13 @@ export function useForecastRuns(runs: ReadonlyArray<JobExecutionDetail>): {
       byBlueprint.set(
         schedule.blueprint_id,
         schedule.display_name?.trim() ||
-          `Schedule ${schedule.experiment_id.slice(0, 8)}`,
+          t('scheduleFallback', {
+            id: schedule.experiment_id.slice(0, 8),
+          }),
       )
     }
     return byBlueprint
-  }, [scheduleList])
+  }, [scheduleList, t])
 
   const blueprintIds = useMemo(
     () => [...new Set(runs.map((run) => run.blueprint_id))],

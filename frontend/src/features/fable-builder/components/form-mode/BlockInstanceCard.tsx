@@ -18,6 +18,7 @@ import {
   CopyPlus,
   Trash2,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { ConnectionsPanel } from './ConnectionsPanel'
 import type {
   BlockFactoryCatalogue,
@@ -87,6 +88,7 @@ export function BlockInstanceCard({
   onAddConnectedBlock,
   onBlockClick,
 }: BlockInstanceCardProps) {
+  const { t } = useTranslation('configure')
   const [isExpanded, setIsExpanded] = useState(true)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
@@ -166,7 +168,7 @@ export function BlockInstanceCard({
                     {hasErrors && (
                       <Badge variant="destructive" className="gap-1 text-sm">
                         <AlertCircle className="h-3 w-3" />
-                        Has errors
+                        {t('blockInstance.hasErrors')}
                       </Badge>
                     )}
                   </div>
@@ -207,7 +209,9 @@ export function BlockInstanceCard({
             <CardContent className="border-t px-4 py-3">
               {factory.inputs.length > 0 && (
                 <div className="mb-4 border-b pb-4">
-                  <P className="mb-3 font-medium">Input Connections</P>
+                  <P className="mb-3 font-medium">
+                    {t('connections.inputConnections')}
+                  </P>
                   <div className="space-y-3">
                     {factory.inputs.map((inputName) => {
                       const connectedTo = instance.input_ids[inputName]
@@ -221,7 +225,7 @@ export function BlockInstanceCard({
                       // Compute display value for the Select
                       const displayValue = connectedFactory
                         ? connectedFactory.title
-                        : 'Select source...'
+                        : t('connections.selectSource')
 
                       return (
                         <div key={inputName} className="space-y-1.5">
@@ -258,7 +262,9 @@ export function BlockInstanceCard({
                                 )
                               ) : (
                                 <div className="p-2 text-sm text-muted-foreground">
-                                  No compatible sources available
+                                  {t(
+                                    'connections.noCompatibleSourcesAvailable',
+                                  )}
                                 </div>
                               )}
                             </SelectContent>
@@ -296,7 +302,7 @@ export function BlockInstanceCard({
                 </BlockValidationProvider>
               ) : (
                 <P className="py-2 text-center text-muted-foreground">
-                  No configuration options
+                  {t('connections.noConfigOptions')}
                 </P>
               )}
             </CardContent>
@@ -318,25 +324,21 @@ export function BlockInstanceCard({
           className="gap-2"
         >
           <Copy className="h-4 w-4" />
-          Duplicate
+          {t('blockActions.duplicate')}
         </ContextMenuItem>
         <ContextMenuItem
           onClick={() => duplicateBlockWithChildren(instanceId)}
           className="gap-2"
         >
           <CopyPlus className="h-4 w-4" />
-          Duplicate with children
+          {t('blockActions.duplicateWithChildren')}
         </ContextMenuItem>
         <ContextMenuItem
-          onClick={() =>
-            alert(
-              'Coming soon: Saving configurations as presets will be available soon.',
-            )
-          }
+          onClick={() => alert(t('blockActions.comingSoonPreset'))}
           className="gap-2"
         >
           <Bookmark className="h-4 w-4" />
-          Save config as preset
+          {t('blockActions.saveAsPreset')}
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem
@@ -345,7 +347,7 @@ export function BlockInstanceCard({
           className="gap-2"
         >
           <Trash2 className="h-4 w-4" />
-          Delete block
+          {t('blockActions.deleteBlock')}
         </ContextMenuItem>
       </ContextMenuContent>
 
@@ -353,16 +355,17 @@ export function BlockInstanceCard({
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Block</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t('blockInstance.deleteBlock')}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{factory.title}"? This action
-              cannot be undone.
+              {t('blockInstance.deleteConfirm', { title: factory.title })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('blockInstance.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={() => removeBlock(instanceId)}>
-              Delete
+              {t('blockInstance.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

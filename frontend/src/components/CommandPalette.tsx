@@ -19,6 +19,7 @@
 import { useMemo, useRef } from 'react'
 import { formatForDisplay, useHotkey } from '@tanstack/react-hotkeys'
 import { useNavigate } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import type { Command, CommandCategory } from '@/commands/registry'
 import { groupCommandsByCategory } from '@/commands/registry'
 import { navigationCommands } from '@/commands/navigationCommands'
@@ -65,6 +66,13 @@ function commandFilter(command: Command, query: string): boolean {
 export function CommandPalette() {
   const navigate = useNavigate()
   const { isOpen, setOpen } = useCommandStore()
+  const { t } = useTranslation('common')
+
+  // Category headings are union values used for grouping; map them to labels.
+  const categoryLabels: Record<CommandCategory, string> = {
+    'Getting Started': t('commands.categoryGettingStarted'),
+    Navigation: t('commands.categoryNavigation'),
+  }
 
   // Tracks the highlighted command so Tab can confirm it, mirroring Enter.
   const highlightedCommand = useRef<Command | undefined>(undefined)
@@ -107,7 +115,7 @@ export function CommandPalette() {
         }}
       >
         <CommandInput
-          placeholder="Type a command or search..."
+          placeholder={t('commandPalette.placeholder')}
           onKeyDown={(event) => {
             // Tab confirms the highlighted command, mirroring Enter.
             if (event.key === 'Tab' && highlightedCommand.current) {
@@ -116,11 +124,13 @@ export function CommandPalette() {
             }
           }}
         />
-        <CommandEmpty>No results found.</CommandEmpty>
+        <CommandEmpty>{t('commandPalette.empty')}</CommandEmpty>
         <CommandList>
           {(group: CommandPaletteGroup) => (
             <CommandGroup key={group.value} items={group.items}>
-              <CommandGroupLabel>{group.value}</CommandGroupLabel>
+              <CommandGroupLabel>
+                {categoryLabels[group.value]}
+              </CommandGroupLabel>
               <CommandCollection>
                 {(command: Command) => (
                   <CommandItem
