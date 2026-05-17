@@ -23,7 +23,6 @@ import {
 import '@xyflow/react/dist/style.css'
 import { FableEdgeComponent } from './FableEdge'
 import { BlockNode } from './nodes/BlockNode'
-import { InlineBlockNode } from './nodes/InlineBlockNode'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import type {
   Connection,
@@ -53,10 +52,6 @@ const nodeTypes: NodeTypes = {
   transformBlock: BlockNode,
   productBlock: BlockNode,
   sinkBlock: BlockNode,
-  sourceBlockInline: InlineBlockNode,
-  transformBlockInline: InlineBlockNode,
-  productBlockInline: InlineBlockNode,
-  sinkBlockInline: InlineBlockNode,
 }
 
 const edgeTypes: EdgeTypes = {
@@ -269,8 +264,8 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
     [selectBlock],
   )
 
-  // Clicking empty canvas intentionally does NOT deselect the node (Blender
-  // pattern). The sidebar stays with the last-selected node's config. To
+  // Clicking empty canvas intentionally does NOT deselect the node
+  // The sidebar stays with the last-selected node's config. To
   // deselect, use the X button in the ConfigPanel header.
 
   return (

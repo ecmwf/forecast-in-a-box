@@ -9,25 +9,17 @@
  */
 
 /**
- * Per-block validation state shared with the field renderers — field-level
- * errors and the backend-resolved config map. Provided by the builder layout
- * components (ConfigPanel, BlockInstanceCard, InlineBlockNode), consumed by
- * GlyphFieldWrapper / GlyphTextInput.
+ * Per-block validation state — field-level errors and the backend-resolved
+ * config map — shared between the builder's block components and field renderers.
  */
 
 import { createContext, useContext, useMemo } from 'react'
 import type { ReactNode } from 'react'
 
 interface BlockValidation {
-  /**
-   * Field-level errors keyed by config option key; `null` when the block is
-   * valid or its errors can't be attributed to a field (shown block-level).
-   */
+  /** Field-level errors keyed by config option key; null when none. */
   fieldErrors: Record<string, Array<string>> | null
-  /**
-   * Backend-resolved config map (`/blueprint/expand`); `null` when unresolved.
-   * Backend is the sole source of truth — a missing value renders no preview.
-   */
+  /** Backend-resolved config map (`/blueprint/expand`); null when unresolved. */
   resolvedConfig: Record<string, string> | null
 }
 

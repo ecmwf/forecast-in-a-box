@@ -19,6 +19,7 @@ import type { ParsedQuery } from '@/features/journal/facets/facet-types'
 import { useSchedules } from '@/api/hooks/useSchedules'
 import { FacetSearchBar } from '@/features/journal/facets/FacetSearchBar'
 import { addToken, parseQuery } from '@/features/journal/facets/parse-query'
+import { applyFacetQuery } from '@/features/journal/facets/apply-facet-query'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorPanel } from '@/components/common/ErrorPanel'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
@@ -37,47 +38,25 @@ type EnabledFilter = 'all' | 'enabled' | 'disabled'
 const ENABLED_FILTERS: Array<EnabledFilter> = ['all', 'enabled', 'disabled']
 
 /**
- * Apply a faceted search query to the schedule list. Schedules only carry
- * `tag` facets; any other token is folded into the free-text match.
+ * Apply a faceted search query to the schedule list. Schedules only understand
+ * `tag` facets; other tokens fold into the free-text match.
  */
 function filterSchedules(
   schedules: ReadonlyArray<ScheduleDefinitionResponse>,
   query: ParsedQuery,
 ): Array<ScheduleDefinitionResponse> {
-  let result = [...schedules]
-
-  // tag tokens: OR within the key.
-  const tagValues = query.tokens
-    .filter((token) => token.key === 'tag')
-    .map((token) => token.value.toLowerCase())
-  if (tagValues.length > 0) {
-    result = result.filter((schedule) =>
-      tagValues.some((value) =>
-        (schedule.tags ?? []).some((tag) => tag.toLowerCase().includes(value)),
+  return applyFacetQuery(schedules, query, {
+    supportedKeys: ['tag'],
+    matchFacet: (schedule, _key, value) =>
+      (schedule.tags ?? []).some((tag) =>
+        tag.toLowerCase().includes(value.toLowerCase()),
       ),
-    )
-  }
-
-  const text = [
-    query.text,
-    ...query.tokens
-      .filter((token) => token.key !== 'tag')
-      .map((token) => token.value),
-  ]
-    .join(' ')
-    .trim()
-    .toLowerCase()
-  if (text) {
-    result = result.filter(
-      (schedule) =>
-        (schedule.display_name ?? '').toLowerCase().includes(text) ||
-        (schedule.display_description ?? '').toLowerCase().includes(text) ||
-        schedule.experiment_id.toLowerCase().includes(text) ||
-        (schedule.tags ?? []).some((tag) => tag.toLowerCase().includes(text)),
-    )
-  }
-
-  return result
+    matchText: (schedule, text) =>
+      (schedule.display_name ?? '').toLowerCase().includes(text) ||
+      (schedule.display_description ?? '').toLowerCase().includes(text) ||
+      schedule.experiment_id.toLowerCase().includes(text) ||
+      (schedule.tags ?? []).some((tag) => tag.toLowerCase().includes(text)),
+  })
 }
 
 export function ScheduleListPage() {

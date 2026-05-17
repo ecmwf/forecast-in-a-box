@@ -26,9 +26,8 @@ import { useEffect, useRef } from 'react'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
-import { createLogger } from '@/lib/logger'
+import { readStorageJson, removeStorage, writeStorageJson } from '@/lib/storage'
 
-const log = createLogger('useDraftPersistence')
 const DRAFT_KEY = STORAGE_KEYS.fable.draft
 const DEBOUNCE_MS = 2000
 
@@ -45,32 +44,15 @@ export interface FableDraft {
 // ---------------------------------------------------------------------------
 
 function writeDraft(draft: FableDraft): void {
-  try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
-  } catch (err) {
-    // localStorage full, disabled, or unavailable — drop the draft. Logged
-    // at warn so developers can spot quota/storage issues in the console.
-    log.warn('Failed to persist fable draft', err)
-  }
+  writeStorageJson(DRAFT_KEY, draft)
 }
 
 export function readDraft(): FableDraft | null {
-  try {
-    const raw = localStorage.getItem(DRAFT_KEY)
-    if (!raw) return null
-    return JSON.parse(raw) as FableDraft
-  } catch (err) {
-    log.warn('Failed to read fable draft (likely corrupt JSON)', err)
-    return null
-  }
+  return readStorageJson<FableDraft>(DRAFT_KEY)
 }
 
 export function clearDraft(): void {
-  try {
-    localStorage.removeItem(DRAFT_KEY)
-  } catch (err) {
-    log.warn('Failed to clear fable draft', err)
-  }
+  removeStorage(DRAFT_KEY)
 }
 
 // ---------------------------------------------------------------------------

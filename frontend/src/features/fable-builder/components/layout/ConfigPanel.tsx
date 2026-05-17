@@ -215,7 +215,7 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
           >
             <div className="space-y-3">
               <div className="text-sm font-medium">Configuration</div>
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {configOptions.map(([key, option]) => (
                   <FieldRenderer
                     key={key}

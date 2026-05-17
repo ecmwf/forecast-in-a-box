@@ -27,6 +27,7 @@ import { JournalChip } from '@/features/journal/components/JournalChip'
 import { RunMetadataDialog } from '@/features/journal/components/RunMetadataDialog'
 import { FacetSearchBar } from '@/features/journal/facets/FacetSearchBar'
 import { addToken, parseQuery } from '@/features/journal/facets/parse-query'
+import { applyFacetQuery } from '@/features/journal/facets/apply-facet-query'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { PageHeader } from '@/components/common/PageHeader'
@@ -223,45 +224,26 @@ function matchesPresetFacet(
   return preset.tags.some((tag) => tag.toLowerCase().includes(needle))
 }
 
-/**
- * Apply the All/Bookmarked tab plus a faceted search query to the preset list.
- * Facets OR within a key, AND across keys; free text matches name, description,
- * blueprint id, model and tags. Mirrors `filterRuns`.
- */
+/** Apply the All/Bookmarked tab plus a faceted search query to the preset list. */
 function filterPresets(
   presets: ReadonlyArray<PresetEntry>,
   filter: PresetFilter,
   query: ParsedQuery,
 ): Array<PresetEntry> {
-  let result = presets.filter((preset) =>
+  const byTab = presets.filter((preset) =>
     filter === 'bookmarked' ? preset.isFavourite : true,
   )
 
-  const valuesByKey = new Map<FacetKey, Array<string>>()
-  for (const token of query.tokens) {
-    const values = valuesByKey.get(token.key) ?? []
-    values.push(token.value)
-    valuesByKey.set(token.key, values)
-  }
-  for (const [key, values] of valuesByKey) {
-    result = result.filter((preset) =>
-      values.some((value) => matchesPresetFacet(preset, key, value)),
-    )
-  }
-
-  const text = query.text.trim().toLowerCase()
-  if (text) {
-    result = result.filter(
-      (preset) =>
-        (preset.displayName ?? '').toLowerCase().includes(text) ||
-        (preset.displayDescription ?? '').toLowerCase().includes(text) ||
-        preset.blueprintId.toLowerCase().includes(text) ||
-        (preset.modelLabel?.toLowerCase().includes(text) ?? false) ||
-        preset.tags.some((tag) => tag.toLowerCase().includes(text)),
-    )
-  }
-
-  return result
+  return applyFacetQuery(byTab, query, {
+    supportedKeys: ['model', 'output', 'tag'],
+    matchFacet: matchesPresetFacet,
+    matchText: (preset, text) =>
+      (preset.displayName ?? '').toLowerCase().includes(text) ||
+      (preset.displayDescription ?? '').toLowerCase().includes(text) ||
+      preset.blueprintId.toLowerCase().includes(text) ||
+      (preset.modelLabel?.toLowerCase().includes(text) ?? false) ||
+      preset.tags.some((tag) => tag.toLowerCase().includes(text)),
+  })
 }
 
 export function PresetsPage() {

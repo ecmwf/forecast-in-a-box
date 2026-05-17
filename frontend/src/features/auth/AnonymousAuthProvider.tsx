@@ -26,6 +26,7 @@ import type { ReactNode } from 'react'
 import type { AuthContextValue } from './AuthContext.tsx'
 import { createLogger } from '@/lib/logger'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
+import { readStorage, removeStorage, writeStorage } from '@/lib/storage'
 
 const log = createLogger('AnonymousAuth')
 
@@ -38,7 +39,7 @@ interface AnonymousAuthProviderProps {
  */
 function getOrCreateAnonymousUserId(): string {
   // Try to get existing ID from localStorage
-  const existingId = localStorage.getItem(STORAGE_KEYS.auth.anonymousId)
+  const existingId = readStorage(STORAGE_KEYS.auth.anonymousId)
 
   if (existingId) {
     return existingId
@@ -46,7 +47,7 @@ function getOrCreateAnonymousUserId(): string {
 
   // Generate new UUID
   const newId = uuidv4()
-  localStorage.setItem(STORAGE_KEYS.auth.anonymousId, newId)
+  writeStorage(STORAGE_KEYS.auth.anonymousId, newId)
   log.info('Generated new anonymous ID:', newId)
   return newId
 }
@@ -75,7 +76,7 @@ export function AnonymousAuthProvider({
 
   const signOut = () => {
     // Clear the stored UUID and generate a new one
-    localStorage.removeItem(STORAGE_KEYS.auth.anonymousId)
+    removeStorage(STORAGE_KEYS.auth.anonymousId)
     getOrCreateAnonymousUserId()
     log.info('Signed out - new anonymous ID generated')
 

@@ -320,7 +320,7 @@ export function BlockInstanceCard({
                   resolvedConfig={resolvedConfigForBlock}
                   fieldErrors={mappedErrors.byConfigKey}
                 >
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     {Object.entries(factory.configuration_options).map(
                       ([key, option]) => (
                         <FieldRenderer
