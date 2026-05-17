@@ -11,15 +11,7 @@
 /** The standalone Configuration Presets page — search, filter and manage saved presets. */
 
 import { useMemo, useState } from 'react'
-import {
-  Bookmark,
-  ChevronLeft,
-  ChevronRight,
-  MoreVertical,
-  Pencil,
-  Star,
-  Trash2,
-} from 'lucide-react'
+import { Bookmark, MoreVertical, Pencil, Star, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
 import { useConfigPresets } from '../hooks/useConfigPresets'
@@ -35,8 +27,11 @@ import { JournalChip } from '@/features/journal/components/JournalChip'
 import { RunMetadataDialog } from '@/features/journal/components/RunMetadataDialog'
 import { FacetSearchBar } from '@/features/journal/facets/FacetSearchBar'
 import { addToken, parseQuery } from '@/features/journal/facets/parse-query'
+import { EmptyState } from '@/components/common/EmptyState'
+import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { PageHeader } from '@/components/common/PageHeader'
-import { H2, P } from '@/components/base/typography'
+import { Pagination } from '@/components/common/Pagination'
+import { H2 } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
@@ -271,7 +266,6 @@ function filterPresets(
 
 export function PresetsPage() {
   const { t } = useTranslation(['dashboard', 'journal'])
-  const layoutMode = useUiStore((state) => state.layoutMode)
   const dashboardVariant = useUiStore((state) => state.dashboardVariant)
   const panelShadow = useUiStore((state) => state.panelShadow)
   const showFlow = useUiStore((state) => state.journalShowFlow)
@@ -296,12 +290,7 @@ export function PresetsPage() {
   )
 
   return (
-    <div
-      className={cn(
-        'mx-auto space-y-8 px-4 py-8 sm:px-6 lg:px-8',
-        layoutMode === 'boxed' ? 'max-w-7xl' : 'max-w-none',
-      )}
-    >
+    <ListPageContainer>
       <PageHeader
         title={t('presets.page.title')}
         description={t('presets.page.description')}
@@ -386,53 +375,23 @@ export function PresetsPage() {
                 }}
               />
             ))
+          ) : query || filter !== 'all' ? (
+            <EmptyState icon={Bookmark} title={t('presets.empty.filtered')} />
           ) : (
-            <div className="flex flex-col items-center gap-2 p-12 text-center text-muted-foreground">
-              <Bookmark className="h-8 w-8" />
-              {query || filter !== 'all' ? (
-                <P>{t('presets.empty.filtered')}</P>
-              ) : (
-                <>
-                  <P className="font-medium">{t('presets.empty.title')}</P>
-                  <P className="text-sm">{t('presets.empty.description')}</P>
-                </>
-              )}
-            </div>
+            <EmptyState
+              icon={Bookmark}
+              title={t('presets.empty.title')}
+              description={t('presets.empty.description')}
+            />
           )}
         </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="border-t border-border p-4 text-center">
-            <div className="flex items-center justify-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                <ChevronLeft className="mr-1 h-4 w-4" />
-                {t('presets.pagination.previous')}
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                {t('presets.pagination.page', {
-                  current: page,
-                  total: totalPages,
-                })}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                {t('presets.pagination.next')}
-                <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+        />
       </Card>
-    </div>
+    </ListPageContainer>
   )
 }

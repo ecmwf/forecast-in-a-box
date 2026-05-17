@@ -11,7 +11,7 @@
 /** The schedules list — enabled/disabled tabs, faceted search and pagination. */
 
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, Clock } from 'lucide-react'
+import { Clock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ScheduleListItem } from './ScheduleListItem'
 import type { ScheduleDefinitionResponse } from '@/api/types/schedule.types'
@@ -19,10 +19,13 @@ import type { ParsedQuery } from '@/features/journal/facets/facet-types'
 import { useSchedules } from '@/api/hooks/useSchedules'
 import { FacetSearchBar } from '@/features/journal/facets/FacetSearchBar'
 import { addToken, parseQuery } from '@/features/journal/facets/parse-query'
+import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorPanel } from '@/components/common/ErrorPanel'
+import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
-import { H2, P } from '@/components/base/typography'
-import { Button } from '@/components/ui/button'
+import { Pagination } from '@/components/common/Pagination'
+import { H2 } from '@/components/base/typography'
 import { Card } from '@/components/ui/card'
 import { useUiStore } from '@/stores/uiStore'
 import { cn } from '@/lib/utils'
@@ -79,7 +82,6 @@ function filterSchedules(
 
 export function ScheduleListPage() {
   const { t } = useTranslation('schedules')
-  const layoutMode = useUiStore((state) => state.layoutMode)
   const dashboardVariant = useUiStore((state) => state.dashboardVariant)
   const panelShadow = useUiStore((state) => state.panelShadow)
   const [page, setPage] = useState(1)
@@ -95,14 +97,9 @@ export function ScheduleListPage() {
     queryEnabled,
   )
 
-  const containerClass = cn(
-    'mx-auto space-y-8 px-4 py-8 sm:px-6 lg:px-8',
-    layoutMode === 'boxed' ? 'max-w-7xl' : 'max-w-none',
-  )
-
   if (isLoading) {
     return (
-      <div className={containerClass}>
+      <ListPageContainer>
         <PageHeader
           title={t('page.title')}
           description={t('page.description')}
@@ -110,21 +107,19 @@ export function ScheduleListPage() {
         <div className="flex justify-center py-12">
           <LoadingSpinner text={t('list.loading')} />
         </div>
-      </div>
+      </ListPageContainer>
     )
   }
 
   if (isError) {
     return (
-      <div className={containerClass}>
+      <ListPageContainer>
         <PageHeader
           title={t('page.title')}
           description={t('page.description')}
         />
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-6 text-center">
-          <P className="text-destructive">{error.message}</P>
-        </div>
-      </div>
+        <ErrorPanel message={error.message} />
+      </ListPageContainer>
     )
   }
 
@@ -136,7 +131,7 @@ export function ScheduleListPage() {
   const totalPages = data?.total_pages ?? 1
 
   return (
-    <div className={containerClass}>
+    <ListPageContainer>
       <PageHeader title={t('page.title')} description={t('page.description')} />
 
       <Card
@@ -187,44 +182,20 @@ export function ScheduleListPage() {
               />
             ))
           ) : (
-            <div className="flex flex-col items-center gap-3 p-12 text-center text-muted-foreground">
-              <Clock className="h-10 w-10 text-muted-foreground/50" />
-              <div>
-                <P className="font-medium">{t('empty.title')}</P>
-                <P className="text-sm">{t('empty.description')}</P>
-              </div>
-            </div>
+            <EmptyState
+              icon={Clock}
+              title={t('empty.title')}
+              description={t('empty.description')}
+            />
           )}
         </div>
 
-        {totalPages > 1 && (
-          <div className="border-t border-border p-4 text-center">
-            <div className="flex items-center justify-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                <ChevronLeft className="mr-1 h-4 w-4" />
-                {t('pagination.previous')}
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                {t('pagination.page', { current: page, total: totalPages })}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                {t('pagination.next')}
-                <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+        />
       </Card>
-    </div>
+    </ListPageContainer>
   )
 }

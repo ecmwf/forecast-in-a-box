@@ -15,6 +15,7 @@
  */
 
 import type { ReactNode } from 'react'
+import { STATUS_BADGE_VARIANTS } from '@/components/common/StatusBadge'
 import { cn } from '@/lib/utils'
 
 interface StatCardProps {
@@ -35,10 +36,10 @@ export function StatCard({
   className,
 }: StatCardProps) {
   const statusDotColors = {
-    success: 'bg-emerald-500',
-    warning: 'bg-amber-500',
-    error: 'bg-red-500',
-    info: 'bg-blue-500 animate-pulse',
+    success: STATUS_BADGE_VARIANTS.active.dotClass,
+    warning: STATUS_BADGE_VARIANTS.warning.dotClass,
+    error: STATUS_BADGE_VARIANTS.error.dotClass,
+    info: cn(STATUS_BADGE_VARIANTS.available.dotClass, 'animate-pulse'),
   }
 
   return (

@@ -43,7 +43,7 @@ vi.mock('@/providers/QueryProvider', () => ({
   },
 }))
 
-vi.mock('@/providers/AuthProvider', () => ({
+vi.mock('@/features/auth/AuthProvider', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => {
     renderOrder.push('AuthProvider')
     return <div data-testid="auth-provider">{children}</div>

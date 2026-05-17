@@ -19,8 +19,8 @@ import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import type { JobStatus } from '@/api/types/job.types'
-import { JOB_STATUS_META } from '@/api/types/job.types'
 import { useJobStatusCounts } from '@/api/hooks/useJobStatusCounts'
+import { getJobStatusVariant } from '@/features/executions/utils/job-status'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -35,15 +35,6 @@ interface JobStatusDetailsPopoverProps {
   children: ReactNode
   align?: 'start' | 'center' | 'end'
   side?: 'top' | 'bottom' | 'left' | 'right'
-}
-
-const statusDotColors: Record<string, string> = {
-  blue: 'bg-blue-500',
-  amber: 'bg-amber-500',
-  green: 'bg-emerald-500',
-  red: 'bg-red-500',
-  orange: 'bg-orange-500',
-  gray: 'bg-gray-400',
 }
 
 /** Statuses always shown regardless of count */
@@ -64,8 +55,8 @@ interface StatusRowProps {
 }
 
 function StatusRow({ status, count, isLoading, runId }: StatusRowProps) {
-  const meta = JOB_STATUS_META[status]
-  const dotColor = statusDotColors[meta.color] ?? 'bg-gray-400'
+  const variant = getJobStatusVariant(status)
+  const dotColor = variant.dotClass
   const rowClass =
     'flex items-center justify-between rounded-md px-2 py-1.5 transition-colors hover:bg-muted/50'
 
@@ -79,7 +70,7 @@ function StatusRow({ status, count, isLoading, runId }: StatusRowProps) {
             status === 'running' && count > 0 && 'animate-pulse',
           )}
         />
-        <span className="text-sm">{meta.label}</span>
+        <span className="text-sm">{variant.label}</span>
       </div>
       <div className="flex items-center gap-1.5">
         {isLoading ? (

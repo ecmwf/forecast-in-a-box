@@ -54,5 +54,10 @@
     "scheduler": "Scheduler",
     "refresh": "Refresh Status",
     "lastUpdated": "Last updated"
+  },
+  "pagination": {
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page {{current}} of {{total}}"
   }
 }

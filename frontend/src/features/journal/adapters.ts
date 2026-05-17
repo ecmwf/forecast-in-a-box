@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-import type { JobExecutionDetail } from '@/api/types/job.types'
+import type { JobExecutionDetail, JobStatus } from '@/api/types/job.types'
 import type { ScheduleRunResponse } from '@/api/types/schedule.types'
 import type {
   BlockFactoryCatalogue,
@@ -54,6 +54,52 @@ export function deriveSinkKinds(
   return [...new Set(titles)]
 }
 
+/** Fields shared by both run sources. */
+interface RunViewModelCore {
+  runId: string
+  attemptCount: number
+  status: JobStatus
+  createdAt: string
+  /** 0–100; 0 for schedule runs. */
+  progress: number
+  blueprintId: string
+  /** Undefined until the blueprint query resolves. */
+  blueprint: FableRetrieveResponse | undefined
+  catalogue: BlockFactoryCatalogue | undefined
+  isBookmarked: boolean
+  /** Produced-artifact count; 0 falls back to the sink-block count. */
+  producedOutputs: number
+}
+
+/** Build the shared view model — both adapters funnel through here. */
+function buildRunViewModel(core: RunViewModelCore): ForecastRunViewModel {
+  const builder = core.blueprint?.builder
+  const catalogue = core.catalogue
+  const canDeriveBlocks = builder !== undefined && catalogue !== undefined
+  const sinkCount = canDeriveBlocks
+    ? getBlocksByKind(builder, catalogue, 'sink').length
+    : 0
+
+  return {
+    runId: core.runId,
+    attemptCount: core.attemptCount,
+    displayName: core.blueprint?.display_name?.trim() ?? '',
+    displayDescription: core.blueprint?.display_description?.trim() || null,
+    status: core.status,
+    progress: core.progress,
+    createdAt: core.createdAt,
+    modelLabel: canDeriveBlocks ? deriveModelLabel(builder, catalogue) : null,
+    outputCount: core.producedOutputs || sinkCount,
+    outputKinds: canDeriveBlocks ? deriveSinkKinds(builder, catalogue) : [],
+    tags: stripSystemTags(core.blueprint?.tags),
+    blueprintId: core.blueprintId,
+    // useForecastRuns overrides these once the schedule/preset lists resolve.
+    fromPreset: false,
+    scheduleName: null,
+    isBookmarked: core.isBookmarked,
+  }
+}
+
 interface RunDetailToViewModelInput {
   run: JobExecutionDetail
   /** Undefined until the blueprint query resolves. */
@@ -69,33 +115,18 @@ export function runDetailToViewModel({
   catalogue,
   isBookmarked,
 }: RunDetailToViewModelInput): ForecastRunViewModel {
-  const builder = blueprint?.builder
-  const canDeriveBlocks = builder !== undefined && catalogue !== undefined
-  // Prefer the count of artifacts the run produced; fall back to the
-  // configuration's sink-block count before any outputs exist.
-  const producedOutputs = run.outputs ? Object.keys(run.outputs).length : 0
-  const sinkCount = canDeriveBlocks
-    ? getBlocksByKind(builder, catalogue, 'sink').length
-    : 0
-
-  return {
+  return buildRunViewModel({
     runId: run.run_id,
     attemptCount: run.attempt_count,
-    displayName: blueprint?.display_name?.trim() ?? '',
-    displayDescription: blueprint?.display_description?.trim() || null,
     status: run.status,
-    progress: parseProgress(run.progress),
     createdAt: run.created_at,
-    modelLabel: canDeriveBlocks ? deriveModelLabel(builder, catalogue) : null,
-    outputCount: producedOutputs || sinkCount,
-    outputKinds: canDeriveBlocks ? deriveSinkKinds(builder, catalogue) : [],
-    tags: stripSystemTags(blueprint?.tags),
+    progress: parseProgress(run.progress),
     blueprintId: run.blueprint_id,
-    // useForecastRuns overrides these once the schedule/preset lists resolve.
-    fromPreset: false,
-    scheduleName: null,
+    blueprint,
+    catalogue,
     isBookmarked,
-  }
+    producedOutputs: run.outputs ? Object.keys(run.outputs).length : 0,
+  })
 }
 
 interface ScheduleRunToViewModelInput {
@@ -118,25 +149,16 @@ export function scheduleRunToViewModel({
   catalogue,
   isBookmarked,
 }: ScheduleRunToViewModelInput): ForecastRunViewModel {
-  const builder = blueprint?.builder
-  const canDeriveBlocks = builder !== undefined && catalogue !== undefined
-  return {
+  return buildRunViewModel({
     runId: run.run_id,
     attemptCount: run.attempt_count,
-    displayName: blueprint?.display_name?.trim() ?? '',
-    displayDescription: blueprint?.display_description?.trim() || null,
     status: run.status,
-    progress: 0,
     createdAt: run.created_at,
-    modelLabel: canDeriveBlocks ? deriveModelLabel(builder, catalogue) : null,
-    outputCount: canDeriveBlocks
-      ? getBlocksByKind(builder, catalogue, 'sink').length
-      : 0,
-    outputKinds: canDeriveBlocks ? deriveSinkKinds(builder, catalogue) : [],
-    tags: stripSystemTags(blueprint?.tags),
+    progress: 0,
     blueprintId,
-    fromPreset: false,
-    scheduleName: null,
+    blueprint,
+    catalogue,
     isBookmarked,
-  }
+    producedOutputs: 0,
+  })
 }

@@ -17,6 +17,7 @@
  */
 
 import { useMemo, useState } from 'react'
+import { RefreshCw } from 'lucide-react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import type { ArtifactInfo } from '@/api/types/artifacts.types'
@@ -27,12 +28,13 @@ import {
   useDownloadModel,
 } from '@/api/hooks/useArtifacts'
 import { H3 } from '@/components/base/typography'
+import { Button } from '@/components/ui/button'
+import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { PageHeader } from '@/components/common/PageHeader'
 import { ArtifactsFilters } from '@/features/artifacts/components/ArtifactsFilters'
 import { ArtifactsList } from '@/features/artifacts/components/ArtifactsList'
-import { ArtifactsPageHeader } from '@/features/artifacts/components/ArtifactsPageHeader'
 import { AvailableModelsSection } from '@/features/artifacts/components/AvailableModelsSection'
-import { cn } from '@/lib/utils'
 import { useUiStore } from '@/stores/uiStore'
 
 export const Route = createFileRoute('/_authenticated/admin/artifacts/')({
@@ -42,7 +44,6 @@ export const Route = createFileRoute('/_authenticated/admin/artifacts/')({
 function ArtifactsPage() {
   const { t } = useTranslation('artifacts')
   const navigate = useNavigate()
-  const layoutMode = useUiStore((state) => state.layoutMode)
   const dashboardVariant = useUiStore((state) => state.dashboardVariant)
   const panelShadow = useUiStore((state) => state.panelShadow)
   const artifactsViewMode = useUiStore((state) => state.artifactsViewMode)
@@ -99,14 +100,17 @@ function ArtifactsPage() {
   }
 
   return (
-    <div
-      className={cn(
-        'mx-auto space-y-8 px-4 py-8 sm:px-6 lg:px-8',
-        layoutMode === 'boxed' ? 'max-w-7xl' : 'max-w-none',
-      )}
-    >
-      {/* Page Header */}
-      <ArtifactsPageHeader onRefresh={handleRefresh} />
+    <ListPageContainer>
+      <PageHeader
+        title={t('title')}
+        description={t('subtitle')}
+        actions={
+          <Button variant="outline" onClick={handleRefresh}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            {t('actions.refresh')}
+          </Button>
+        }
+      />
 
       {/* Search & View Mode */}
       <ArtifactsFilters
@@ -149,6 +153,6 @@ function ArtifactsPage() {
         variant={dashboardVariant}
         shadow={panelShadow}
       />
-    </div>
+    </ListPageContainer>
   )
 }

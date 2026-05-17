@@ -28,7 +28,7 @@ import type {
   DashboardVariant,
   PanelShadow,
 } from '@/stores/uiStore'
-import { H3, P } from '@/components/base/typography'
+import { EmptyState } from '@/components/common/EmptyState'
 import { Card } from '@/components/ui/card'
 import { useMedia } from '@/hooks/useMedia'
 
@@ -59,13 +59,11 @@ export function ArtifactsList({
 
   if (artifacts.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <Package className="mb-4 h-16 w-16 text-muted-foreground/50" />
-        <H3 className="mb-2 text-lg font-semibold">{t('emptyState.title')}</H3>
-        <P className="max-w-md text-muted-foreground">
-          {t('emptyState.description')}
-        </P>
-      </div>
+      <EmptyState
+        icon={Package}
+        title={t('emptyState.title')}
+        description={t('emptyState.description')}
+      />
     )
   }
 

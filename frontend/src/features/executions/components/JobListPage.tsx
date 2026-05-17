@@ -11,7 +11,6 @@
 /** The /executions page — the full, paginated Forecast Journal. */
 
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getRouteApi } from '@tanstack/react-router'
 import type { RunFilter } from '@/features/journal/types'
@@ -22,11 +21,11 @@ import { filterRuns } from '@/features/journal/utils/filter-runs'
 import { addToken, parseQuery } from '@/features/journal/facets/parse-query'
 import { ForecastRunList } from '@/features/journal/components/ForecastRunList'
 import { ForecastRunSearchHeader } from '@/features/journal/components/ForecastRunSearchHeader'
+import { ErrorPanel } from '@/components/common/ErrorPanel'
+import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { PageHeader } from '@/components/common/PageHeader'
-import { P } from '@/components/base/typography'
-import { Button } from '@/components/ui/button'
+import { Pagination } from '@/components/common/Pagination'
 import { useUiStore } from '@/stores/uiStore'
-import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 10
 
@@ -43,7 +42,6 @@ const route = getRouteApi('/_authenticated/executions/')
 
 export function JobListPage() {
   const { t } = useTranslation('executions')
-  const layoutMode = useUiStore((state) => state.layoutMode)
   const dashboardVariant = useUiStore((state) => state.dashboardVariant)
   const panelShadow = useUiStore((state) => state.panelShadow)
   const [page, setPage] = useState(1)
@@ -84,27 +82,20 @@ export function JobListPage() {
     [runs, activeFilter, query],
   )
 
-  const containerClass = cn(
-    'mx-auto space-y-8 px-4 py-8 sm:px-6 lg:px-8',
-    layoutMode === 'boxed' ? 'max-w-7xl' : 'max-w-none',
-  )
-
   if (isError) {
     return (
-      <div className={containerClass}>
+      <ListPageContainer>
         <PageHeader
           title={t('page.title')}
           description={t('page.description')}
         />
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-6 text-center">
-          <P className="text-destructive">{error.message}</P>
-        </div>
-      </div>
+        <ErrorPanel message={error.message} />
+      </ListPageContainer>
     )
   }
 
   return (
-    <div className={containerClass}>
+    <ListPageContainer>
       <PageHeader title={t('page.title')} description={t('page.description')} />
 
       <ForecastRunList
@@ -132,35 +123,13 @@ export function JobListPage() {
           />
         }
         footer={
-          totalPages > 1 ? (
-            <div className="border-t border-border p-4 text-center">
-              <div className="flex items-center justify-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  <ChevronLeft className="mr-1 h-4 w-4" />
-                  {t('pagination.previous')}
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  {t('pagination.page', { current: page, total: totalPages })}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  {t('pagination.next')}
-                  <ChevronRight className="ml-1 h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          ) : null
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
         }
       />
-    </div>
+    </ListPageContainer>
   )
 }

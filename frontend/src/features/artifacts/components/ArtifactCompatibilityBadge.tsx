@@ -41,8 +41,8 @@ export function ArtifactCompatibilityBadge({
       className={cn(
         'inline-flex items-center rounded px-2 py-0.5 text-sm font-medium',
         isLocallyCompatible
-          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-          : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
+          : 'bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
         className,
       )}
     >
