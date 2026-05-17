@@ -59,14 +59,18 @@ interface StatusRowProps {
   status: JobStatus
   count: number
   isLoading?: boolean
+  /** When set, the row links directly to this run's detail page. */
+  runId?: string
 }
 
-function StatusRow({ status, count, isLoading }: StatusRowProps) {
+function StatusRow({ status, count, isLoading, runId }: StatusRowProps) {
   const meta = JOB_STATUS_META[status]
   const dotColor = statusDotColors[meta.color] ?? 'bg-gray-400'
+  const rowClass =
+    'flex items-center justify-between rounded-md px-2 py-1.5 transition-colors hover:bg-muted/50'
 
-  return (
-    <div className="flex items-center justify-between rounded-md px-2 py-1.5 transition-colors hover:bg-muted/50">
+  const content = (
+    <>
       <div className="flex items-center gap-2">
         <span
           className={cn(
@@ -83,9 +87,24 @@ function StatusRow({ status, count, isLoading }: StatusRowProps) {
         ) : (
           <span className="text-sm font-medium tabular-nums">{count}</span>
         )}
+        {runId && <ArrowRight className="h-3 w-3 text-muted-foreground" />}
       </div>
-    </div>
+    </>
   )
+
+  // A lone running run links straight to its detail page.
+  if (runId) {
+    return (
+      <Link
+        to="/executions/$jobId"
+        params={{ jobId: runId }}
+        className={rowClass}
+      >
+        {content}
+      </Link>
+    )
+  }
+  return <div className={rowClass}>{content}</div>
 }
 
 export function JobStatusDetailsPopover({
@@ -94,7 +113,8 @@ export function JobStatusDetailsPopover({
   side = 'bottom',
 }: JobStatusDetailsPopoverProps) {
   const { t } = useTranslation('dashboard')
-  const { counts, total, isLoading, isFetching, refetch } = useJobStatusCounts()
+  const { counts, total, runningRunId, isLoading, isFetching, refetch } =
+    useJobStatusCounts()
 
   // Determine which statuses to show: primary ones always, others only if count > 0
   const visibleStatuses: Array<JobStatus> = [...PRIMARY_STATUSES]
@@ -114,9 +134,14 @@ export function JobStatusDetailsPopover({
       <PopoverContent align={align} side={side} className="w-64">
         <PopoverHeader>
           <div className="flex items-center justify-between">
-            <PopoverTitle className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-primary" />
-              {t('welcome.stats.executionStatus')}
+            <PopoverTitle>
+              <Link
+                to="/executions"
+                className="flex items-center gap-2 transition-colors hover:text-primary"
+              >
+                <Clock className="h-4 w-4 text-primary" />
+                {t('welcome.stats.executionStatus')}
+              </Link>
             </PopoverTitle>
             <Button
               variant="ghost"
@@ -142,6 +167,11 @@ export function JobStatusDetailsPopover({
                   key={status}
                   status={status}
                   count={counts[status]}
+                  runId={
+                    status === 'running'
+                      ? (runningRunId ?? undefined)
+                      : undefined
+                  }
                 />
               ))}
         </div>

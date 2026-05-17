@@ -35,6 +35,8 @@ export function useJobStatusCounts() {
   }
 
   let total = 0
+  let runningProgressSum = 0
+  let lastRunningRunId: string | null = null
 
   if (query.data) {
     for (const exec of query.data.runs) {
@@ -42,14 +44,27 @@ export function useJobStatusCounts() {
       if (status in counts) {
         counts[status]++
       }
+      if (status === 'running') {
+        const value = parseFloat(exec.progress ?? '') || 0
+        runningProgressSum += Math.min(Math.max(value, 0), 100)
+        lastRunningRunId = exec.run_id
+      }
       total++
     }
   }
 
+  // Mean progress (0–100) across every running forecast.
+  const runningProgress =
+    counts.running > 0 ? runningProgressSum / counts.running : 0
+
   return {
     counts,
     total,
+    runs: query.data?.runs ?? [],
     runningCount: counts.running,
+    runningProgress,
+    // The sole running run's id — for a direct link (null unless exactly one).
+    runningRunId: counts.running === 1 ? lastRunningRunId : null,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     refetch: query.refetch,
