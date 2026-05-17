@@ -23,17 +23,17 @@ import { SummaryPopover } from '@/components/common/SummaryPopover'
 /** Months of history shown in the bar chart. */
 const MONTHS = 6
 
-interface JobActivityPopoverProps {
+interface RunActivityPopoverProps {
   children: ReactNode
   align?: 'start' | 'center' | 'end'
   side?: 'top' | 'bottom' | 'left' | 'right'
 }
 
-export function JobActivityPopover({
+export function RunActivityPopover({
   children,
   align = 'start',
   side = 'bottom',
-}: JobActivityPopoverProps) {
+}: RunActivityPopoverProps) {
   const { t } = useTranslation('dashboard')
   const { runs } = useJobStatusCounts()
 

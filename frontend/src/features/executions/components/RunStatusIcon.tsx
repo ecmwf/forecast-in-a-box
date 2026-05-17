@@ -9,7 +9,7 @@
  */
 
 /**
- * JobStatusIcon Component
+ * RunStatusIcon Component
  *
  * Shared status icon for job execution status display.
  */
@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 import type { JobStatus } from '@/api/types/job.types'
 
-export function JobStatusIcon({ status }: { status: JobStatus }) {
+export function RunStatusIcon({ status }: { status: JobStatus }) {
   switch (status) {
     case 'submitted':
     case 'preparing':

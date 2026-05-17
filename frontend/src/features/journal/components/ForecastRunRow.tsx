@@ -18,7 +18,7 @@ import type { ForecastRunViewModel } from '@/features/journal/types'
 import type { FacetToken } from '@/features/journal/facets/facet-types'
 import { useFableRetrieve } from '@/api/hooks/useFable'
 import { useServerTime } from '@/api/hooks/useSchedules'
-import { JobStatusIcon } from '@/features/executions/components/JobStatusIcon'
+import { RunStatusIcon } from '@/features/executions/components/RunStatusIcon'
 import { getStatusBarColor } from '@/features/executions/utils/job-status'
 import { AttemptHistory } from '@/features/journal/components/AttemptHistory'
 import { FableMiniFlow } from '@/features/journal/components/FableMiniFlow'
@@ -67,7 +67,7 @@ export function ForecastRunRow({
       <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
         {/* Status */}
         <div className="mt-1 shrink-0 sm:mt-0">
-          <JobStatusIcon status={run.status} />
+          <RunStatusIcon status={run.status} />
         </div>
 
         {/* Details */}

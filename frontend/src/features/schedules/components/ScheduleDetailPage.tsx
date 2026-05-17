@@ -42,7 +42,7 @@ import {
   formatLocalDateTime,
 } from '@/features/schedules/utils/cron'
 import { EditScheduleDialog } from '@/features/schedules/components/EditScheduleDialog'
-import { ExecutionCanvas } from '@/features/executions/components/ExecutionCanvas'
+import { RunCanvas } from '@/features/executions/components/RunCanvas'
 import { StatCard } from '@/features/dashboard/components/StatCard'
 import { scheduleRunToViewModel } from '@/features/journal/adapters'
 import { filterRuns } from '@/features/journal/utils/filter-runs'
@@ -241,7 +241,7 @@ export function ScheduleDetailPage() {
 
       {/* Configuration overview */}
       {blueprint && catalogue && (
-        <ExecutionCanvas fable={blueprint.builder} catalogue={catalogue} />
+        <RunCanvas fable={blueprint.builder} catalogue={catalogue} />
       )}
 
       {/* Runs — rendered through the shared Forecast Journal */}

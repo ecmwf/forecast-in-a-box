@@ -41,7 +41,7 @@ import {
 } from '@/features/fable-builder/utils/fable-to-graph'
 import { layoutNodes } from '@/features/fable-builder/utils/layout-blocks'
 import { BeamEdge } from '@/features/executions/components/BeamEdge'
-import { ExecutionNode } from '@/features/executions/components/ExecutionNode'
+import { RunNode } from '@/features/executions/components/RunNode'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -70,7 +70,7 @@ export function useBlockProgress(): BlockProgressInfo {
   return useContext(BlockProgressContext)
 }
 
-interface ExecutionCanvasProps {
+interface RunCanvasProps {
   fable: FableBuilderV1
   catalogue: BlockFactoryCatalogue
   status?: JobStatus
@@ -79,24 +79,24 @@ interface ExecutionCanvasProps {
   plannedBlockIds?: ReadonlyArray<BlockInstanceId> | null
 }
 
-const nodeTypes: Record<string, typeof ExecutionNode> = {
-  sourceBlock: ExecutionNode,
-  transformBlock: ExecutionNode,
-  productBlock: ExecutionNode,
-  sinkBlock: ExecutionNode,
+const nodeTypes: Record<string, typeof RunNode> = {
+  sourceBlock: RunNode,
+  transformBlock: RunNode,
+  productBlock: RunNode,
+  sinkBlock: RunNode,
 }
 
 const edgeTypes = {
   beam: BeamEdge,
 }
 
-function ExecutionCanvasInner({
+function RunCanvasInner({
   fable,
   catalogue,
   status,
   completedBlockIds,
   plannedBlockIds,
-}: ExecutionCanvasProps) {
+}: RunCanvasProps) {
   const { t } = useTranslation('executions')
   const [showConfig, setShowConfig] = useState(true)
   const { fitView } = useReactFlow()
@@ -257,10 +257,10 @@ function ExecutionCanvasInner({
   )
 }
 
-export function ExecutionCanvas(props: ExecutionCanvasProps) {
+export function RunCanvas(props: RunCanvasProps) {
   return (
     <ReactFlowProvider>
-      <ExecutionCanvasInner {...props} />
+      <RunCanvasInner {...props} />
     </ReactFlowProvider>
   )
 }

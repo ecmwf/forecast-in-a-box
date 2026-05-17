@@ -125,7 +125,7 @@ function useCollectJobs() {
           updateTask(id, { description: capitalize(job.status) })
         }
       } else if (!isTerminal) {
-        // Add new active job (only if not already added by SubmitJobDialog)
+        // Add new active job (only if not already added by SubmitRunDialog)
         addTask({
           id,
           type: 'job',

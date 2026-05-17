@@ -40,7 +40,7 @@ const EXECUTIONS_FILTERS: ReadonlyArray<RunFilter> = [
 
 const route = getRouteApi('/_authenticated/executions/')
 
-export function JobListPage() {
+export function RunListPage() {
   const { t } = useTranslation('executions')
   const dashboardVariant = useUiStore((state) => state.dashboardVariant)
   const panelShadow = useUiStore((state) => state.panelShadow)

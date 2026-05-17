@@ -9,7 +9,7 @@
  */
 
 /**
- * ExecutionErrorBanner Component
+ * RunErrorBanner Component
  *
  * Error banner with actions to download logs, restart, or edit configuration.
  */
@@ -23,9 +23,9 @@ import { downloadJobLogs } from '@/api/endpoints/job'
 import { createLogger } from '@/lib/logger'
 import { showToast } from '@/lib/toast'
 
-const log = createLogger('ExecutionErrorBanner')
+const log = createLogger('RunErrorBanner')
 
-interface ExecutionErrorBannerProps {
+interface RunErrorBannerProps {
   error: string
   jobId: string
   onRestart: () => void
@@ -33,13 +33,13 @@ interface ExecutionErrorBannerProps {
   canEditConfig: boolean
 }
 
-export function ExecutionErrorBanner({
+export function RunErrorBanner({
   error,
   jobId,
   onRestart,
   onEditConfig,
   canEditConfig,
-}: ExecutionErrorBannerProps) {
+}: RunErrorBannerProps) {
   const { t } = useTranslation('executions')
 
   const handleDownloadLogs = async () => {

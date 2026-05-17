@@ -19,7 +19,7 @@ import {
 import { ConfigSummaryCard } from './ConfigSummaryCard'
 import type { BlockFactoryCatalogue, BlockKind } from '@/api/types/fable.types'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
-import { SubmitJobDialog } from '@/features/executions/components/SubmitJobDialog'
+import { SubmitRunDialog } from '@/features/executions/components/SubmitRunDialog'
 import { H2, P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import {
@@ -227,7 +227,7 @@ export function ReviewStep({ catalogue }: ReviewStepProps) {
           </CardContent>
         </Card>
 
-        <SubmitJobDialog
+        <SubmitRunDialog
           open={submitDialogOpen}
           onOpenChange={setSubmitDialogOpen}
           fable={fable}

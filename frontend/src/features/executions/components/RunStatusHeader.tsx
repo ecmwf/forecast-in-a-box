@@ -46,7 +46,7 @@ import {
 import { H2, P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
 
-interface ExecutionStatusHeaderProps {
+interface RunStatusHeaderProps {
   jobId: string
   name: string
   description?: string
@@ -145,7 +145,7 @@ function RestartDialog({
   )
 }
 
-export function ExecutionStatusHeader({
+export function RunStatusHeader({
   jobId,
   name,
   description,
@@ -160,7 +160,7 @@ export function ExecutionStatusHeader({
   isDeletePending,
   completedBlockCount,
   plannedBlockCount,
-}: ExecutionStatusHeaderProps) {
+}: RunStatusHeaderProps) {
   const { t } = useTranslation(['executions', 'journal'])
   const terminal = isTerminalStatus(status)
   const elapsed = useElapsedTime(createdAt, terminal)

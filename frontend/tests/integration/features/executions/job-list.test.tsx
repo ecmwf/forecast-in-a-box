@@ -9,7 +9,7 @@
  */
 
 /**
- * JobListPage Integration Tests — the /executions page against the /run/list
+ * RunListPage Integration Tests — the /executions page against the /run/list
  * API: rendering, status filtering, search, per-run status links.
  */
 
@@ -30,7 +30,7 @@ import { z } from 'zod'
 import { resetJobsState } from '@tests/../mocks/data/job.data'
 import type { AuthContextValue } from '@/features/auth/AuthContext'
 import { AuthContext } from '@/features/auth/AuthContext'
-import { JobListPage } from '@/features/executions/components/JobListPage'
+import { RunListPage } from '@/features/executions/components/RunListPage'
 import i18n from '@/lib/i18n'
 
 vi.mock('@/hooks/useMedia', () => ({
@@ -45,7 +45,7 @@ const anonymousAuth: AuthContextValue = {
   signOut: () => Promise.resolve(),
 }
 
-// Mirrors the real /executions search schema so validateSearch matches what JobListPage reads.
+// Mirrors the real /executions search schema so validateSearch matches what RunListPage reads.
 const searchSchema = z.object({
   q: z.string().optional(),
   status: z
@@ -73,14 +73,14 @@ function renderJobList() {
     path: '/executions',
     component: () => <Outlet />,
   })
-  // Index route id `/_authenticated/executions/` — matches JobListPage's getRouteApi call.
+  // Index route id `/_authenticated/executions/` — matches RunListPage's getRouteApi call.
   const listRoute = createRoute({
     getParentRoute: () => executionsRoute,
     path: '/',
     validateSearch: searchSchema,
     component: () => (
       <AuthContext.Provider value={anonymousAuth}>
-        <JobListPage />
+        <RunListPage />
       </AuthContext.Provider>
     ),
   })
@@ -104,7 +104,7 @@ function renderJobList() {
 
 // Run-id chips truncate to runId.slice(0, 12) + "...", e.g. job-completed-001 → #job-complete...
 
-describe('JobListPage Integration', () => {
+describe('RunListPage Integration', () => {
   beforeEach(() => {
     localStorage.clear()
     resetJobsState()

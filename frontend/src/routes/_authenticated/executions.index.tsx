@@ -10,7 +10,7 @@
 
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { JobListPage } from '@/features/executions/components/JobListPage'
+import { RunListPage } from '@/features/executions/components/RunListPage'
 
 /** Journal URL state — search, status tab, grouping. Each omitted at its default to keep a bare /executions clean. */
 const searchSchema = z.object({
@@ -22,6 +22,6 @@ const searchSchema = z.object({
 })
 
 export const Route = createFileRoute('/_authenticated/executions/')({
-  component: JobListPage,
+  component: RunListPage,
   validateSearch: searchSchema,
 })

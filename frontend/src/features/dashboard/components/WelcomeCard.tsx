@@ -27,8 +27,8 @@ import {
 import { useTranslation } from 'react-i18next'
 import { StatCard } from './StatCard'
 import { QuickActionButton } from './QuickActionButton'
-import { JobActivityPopover } from './JobActivityPopover'
-import { JobStatusDetailsPopover } from './JobStatusDetailsPopover'
+import { RunActivityPopover } from './RunActivityPopover'
+import { RunStatusDetailsPopover } from './RunStatusDetailsPopover'
 import { ModelSummaryPopover } from './ModelSummaryPopover'
 import type { ReactNode } from 'react'
 import type { TrafficLightStatus } from '@/types/status.types'
@@ -186,7 +186,7 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
           </StatusDetailsPopover>
 
           {/* Currently Active */}
-          <JobStatusDetailsPopover align="start">
+          <RunStatusDetailsPopover align="start">
             <StatCard
               label={activeStatus.label}
               icon={<Clock className="h-4 w-4" />}
@@ -220,7 +220,7 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
               subtext={t('welcome.stats.activeForecasts')}
               className="cursor-pointer transition-colors hover:bg-muted/80"
             />
-          </JobStatusDetailsPopover>
+          </RunStatusDetailsPopover>
 
           {/* Available Models */}
           <ModelSummaryPopover align="start">
@@ -241,7 +241,7 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
           </ModelSummaryPopover>
 
           {/* Total Forecasts */}
-          <JobActivityPopover align="start">
+          <RunActivityPopover align="start">
             <StatCard
               label={t('welcome.stats.totalForecasts')}
               icon={<TrendingUp className="h-4 w-4" />}
@@ -277,7 +277,7 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
               subtext={t('welcome.stats.thisMonth')}
               className="cursor-pointer transition-colors hover:bg-muted/80"
             />
-          </JobActivityPopover>
+          </RunActivityPopover>
         </div>
       </CardContent>
 

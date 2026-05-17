@@ -9,7 +9,7 @@
  */
 
 /**
- * ExecutionDetailPage Component
+ * RunDetailPage Component
  *
  * Job detail page with status header, execution canvas, and tabbed panels.
  */
@@ -18,9 +18,9 @@ import { useCallback, useState } from 'react'
 import { ArrowLeft, FileJson, Package, ScrollText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
-import { ExecutionCanvas } from './ExecutionCanvas'
-import { ExecutionErrorBanner } from './ExecutionErrorBanner'
-import { ExecutionStatusHeader } from './ExecutionStatusHeader'
+import { RunCanvas } from './RunCanvas'
+import { RunErrorBanner } from './RunErrorBanner'
+import { RunStatusHeader } from './RunStatusHeader'
 import { LogsPanel } from './LogsPanel'
 import { OutputsPanel } from './OutputsPanel'
 import { SpecificationPanel } from './SpecificationPanel'
@@ -38,7 +38,7 @@ import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
 import { createLogger } from '@/lib/logger'
 
-const log = createLogger('ExecutionDetailPage')
+const log = createLogger('RunDetailPage')
 
 // Wide-screen layout: each column claims half the row and scrolls
 // independently via its TabsContent.
@@ -47,7 +47,7 @@ const WIDE_COLUMN =
 const WIDE_TAB_CONTENT =
   'min-[1280px]:min-h-0 min-[1280px]:flex-1 min-[1280px]:overflow-y-auto'
 
-export function ExecutionDetailPage() {
+export function RunDetailPage() {
   const { t } = useTranslation('executions')
   const { jobId } = useParams({ from: '/_authenticated/executions/$jobId' })
   const navigate = useNavigate()
@@ -162,7 +162,7 @@ export function ExecutionDetailPage() {
         layoutMode === 'boxed' ? 'max-w-7xl' : 'max-w-none',
       )}
     >
-      <ExecutionStatusHeader
+      <RunStatusHeader
         jobId={jobId}
         name={jobName}
         description={fableData?.display_description ?? undefined}
@@ -181,7 +181,7 @@ export function ExecutionDetailPage() {
       />
 
       {jobData.status === 'failed' && jobData.error && (
-        <ExecutionErrorBanner
+        <RunErrorBanner
           error={jobData.error}
           jobId={jobId}
           onRestart={handleRestart}
@@ -203,7 +203,7 @@ export function ExecutionDetailPage() {
       >
         <div className={WIDE_COLUMN}>
           {fableData?.builder && catalogue ? (
-            <ExecutionCanvas
+            <RunCanvas
               fable={fableData.builder}
               catalogue={catalogue}
               status={jobData.status}

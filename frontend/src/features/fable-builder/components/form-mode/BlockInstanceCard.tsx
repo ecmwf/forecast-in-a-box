@@ -16,7 +16,6 @@ import {
   ChevronUp,
   Copy,
   CopyPlus,
-  MoreHorizontal,
   Trash2,
 } from 'lucide-react'
 import { ConnectionsPanel } from './ConnectionsPanel'
@@ -55,11 +54,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
+import { BlockActionMenu } from '@/features/fable-builder/components/shared/BlockActionMenu'
 import {
   Select,
   SelectContent,
@@ -93,7 +88,6 @@ export function BlockInstanceCard({
   onBlockClick,
 }: BlockInstanceCardProps) {
   const [isExpanded, setIsExpanded] = useState(true)
-  const [menuOpen, setMenuOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   const fable = useFableBuilderStore((state) => state.fable)
@@ -201,49 +195,10 @@ export function BlockInstanceCard({
                   <Trash2 className="h-4 w-4" />
                 </Button>
 
-                <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-                  <PopoverTrigger
-                    render={
-                      <Button variant="ghost" size="icon" className="h-8 w-8" />
-                    }
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </PopoverTrigger>
-                  <PopoverContent className="w-48 p-1" align="end">
-                    <button
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent"
-                      onClick={() => {
-                        duplicateBlock(instanceId)
-                        setMenuOpen(false)
-                      }}
-                    >
-                      <Copy className="h-4 w-4" />
-                      Duplicate
-                    </button>
-                    <button
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent"
-                      onClick={() => {
-                        duplicateBlockWithChildren(instanceId)
-                        setMenuOpen(false)
-                      }}
-                    >
-                      <CopyPlus className="h-4 w-4" />
-                      Duplicate with children
-                    </button>
-                    <button
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent"
-                      onClick={() => {
-                        alert(
-                          'Coming soon: Saving configurations as presets will be available soon.',
-                        )
-                        setMenuOpen(false)
-                      }}
-                    >
-                      <Bookmark className="h-4 w-4" />
-                      Save config as preset
-                    </button>
-                  </PopoverContent>
-                </Popover>
+                <BlockActionMenu
+                  instanceId={instanceId}
+                  triggerClassName="h-8 w-8"
+                />
               </div>
             </div>
           </CardHeader>
@@ -320,7 +275,7 @@ export function BlockInstanceCard({
                   resolvedConfig={resolvedConfigForBlock}
                   fieldErrors={mappedErrors.byConfigKey}
                 >
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     {Object.entries(factory.configuration_options).map(
                       ([key, option]) => (
                         <FieldRenderer

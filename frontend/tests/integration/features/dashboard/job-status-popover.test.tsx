@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { worker } from '@tests/../mocks/browser'
 import { renderWithRouter } from '@tests/utils/render'
 import type { JobExecutionList } from '@/api/types/job.types'
-import { JobStatusDetailsPopover } from '@/features/dashboard/components/JobStatusDetailsPopover'
+import { RunStatusDetailsPopover } from '@/features/dashboard/components/RunStatusDetailsPopover'
 import { API_ENDPOINTS } from '@/api/endpoints'
 
 vi.mock('@/utils/env', () => ({
@@ -94,7 +94,7 @@ const mockJobsResponse: JobExecutionList = {
   total_pages: 1,
 }
 
-describe('JobStatusDetailsPopover', () => {
+describe('RunStatusDetailsPopover', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     worker.use(
@@ -110,9 +110,9 @@ describe('JobStatusDetailsPopover', () => {
 
   it('shows running count in the trigger card', async () => {
     const screen = await renderWithRouter(
-      <JobStatusDetailsPopover>
+      <RunStatusDetailsPopover>
         <div data-testid="trigger">Trigger</div>
-      </JobStatusDetailsPopover>,
+      </RunStatusDetailsPopover>,
     )
 
     await expect.element(screen.getByTestId('trigger')).toBeVisible()
@@ -120,9 +120,9 @@ describe('JobStatusDetailsPopover', () => {
 
   it('opens popover with status rows when clicked', async () => {
     const screen = await renderWithRouter(
-      <JobStatusDetailsPopover>
+      <RunStatusDetailsPopover>
         <div data-testid="trigger">Trigger</div>
-      </JobStatusDetailsPopover>,
+      </RunStatusDetailsPopover>,
     )
 
     await screen.getByTestId('trigger').click()
@@ -136,9 +136,9 @@ describe('JobStatusDetailsPopover', () => {
 
   it('shows correct counts for each status', async () => {
     const screen = await renderWithRouter(
-      <JobStatusDetailsPopover>
+      <RunStatusDetailsPopover>
         <div data-testid="trigger">Trigger</div>
-      </JobStatusDetailsPopover>,
+      </RunStatusDetailsPopover>,
     )
 
     await screen.getByTestId('trigger').click()
@@ -152,9 +152,9 @@ describe('JobStatusDetailsPopover', () => {
 
   it('shows refresh button', async () => {
     const screen = await renderWithRouter(
-      <JobStatusDetailsPopover>
+      <RunStatusDetailsPopover>
         <div data-testid="trigger">Trigger</div>
-      </JobStatusDetailsPopover>,
+      </RunStatusDetailsPopover>,
     )
 
     await screen.getByTestId('trigger').click()

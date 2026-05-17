@@ -8,16 +8,9 @@
  * does it submit to any jurisdiction.
  */
 
-import { memo, useMemo, useState } from 'react'
+import { memo, useMemo } from 'react'
 import { Handle, Position } from '@xyflow/react'
-import {
-  Bookmark,
-  Copy,
-  CopyPlus,
-  MoreHorizontal,
-  Settings,
-  Trash2,
-} from 'lucide-react'
+import { Settings, Trash2 } from 'lucide-react'
 
 import type { Node, NodeProps } from '@xyflow/react'
 import type { FableNodeData } from '@/features/fable-builder/utils/fable-to-graph'
@@ -41,11 +34,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
+import { BlockActionMenu } from '@/features/fable-builder/components/shared/BlockActionMenu'
 import { BlockErrorOverlay } from '@/features/fable-builder/components/graph-mode/nodes/BlockErrorOverlay'
 import { parseGlyphSegments } from '@/features/fable-builder/utils/glyph-display'
 import { cn } from '@/lib/utils'
@@ -72,7 +61,6 @@ export const BlockNode = memo(function ({
   const IconComponent = getBlockKindIcon(factory.kind)
 
   const containerRef = useNodeDimensions(id)
-  const [menuOpen, setMenuOpen] = useState(false)
 
   const selectedBlockId = useFableBuilderStore((state) => state.selectedBlockId)
   const selectBlock = useFableBuilderStore((state) => state.selectBlock)
@@ -80,10 +68,6 @@ export const BlockNode = memo(function ({
   const layoutDirection = useFableBuilderStore((state) => state.layoutDirection)
   const removeBlockCascade = useFableBuilderStore(
     (state) => state.removeBlockCascade,
-  )
-  const duplicateBlock = useFableBuilderStore((state) => state.duplicateBlock)
-  const duplicateBlockWithChildren = useFableBuilderStore(
-    (state) => state.duplicateBlockWithChildren,
   )
   const openMobileConfig = useFableBuilderStore(
     (state) => state.openMobileConfig,
@@ -115,23 +99,6 @@ export const BlockNode = memo(function ({
 
   function handleDelete(): void {
     removeBlockCascade(id)
-  }
-
-  function handleDuplicate(): void {
-    duplicateBlock(id)
-    setMenuOpen(false)
-  }
-
-  function handleDuplicateWithChildren(): void {
-    duplicateBlockWithChildren(id)
-    setMenuOpen(false)
-  }
-
-  function handleSaveAsPreset(): void {
-    alert(
-      'Coming soon: Saving configurations as presets will be available soon.',
-    )
-    setMenuOpen(false)
   }
 
   function handleOpenConfig(e: React.MouseEvent): void {
@@ -226,47 +193,11 @@ export const BlockNode = memo(function ({
               </AlertDialogContent>
             </AlertDialog>
 
-            <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-              <PopoverTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="nodrag h-7 w-7 text-muted-foreground hover:text-foreground"
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                }
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </PopoverTrigger>
-              <PopoverContent
-                className="w-48 p-1"
-                align="end"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent"
-                  onClick={handleDuplicate}
-                >
-                  <Copy className="h-4 w-4" />
-                  Duplicate
-                </button>
-                <button
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent"
-                  onClick={handleDuplicateWithChildren}
-                >
-                  <CopyPlus className="h-4 w-4" />
-                  Duplicate with children
-                </button>
-                <button
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent"
-                  onClick={handleSaveAsPreset}
-                >
-                  <Bookmark className="h-4 w-4" />
-                  Save config as preset
-                </button>
-              </PopoverContent>
-            </Popover>
+            <BlockActionMenu
+              instanceId={id}
+              triggerClassName="nodrag h-7 w-7"
+              stopPropagation
+            />
           </div>
         </div>
 

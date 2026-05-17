@@ -18,7 +18,7 @@ import { BLOCK_KIND_METADATA, getBlockKindIcon } from '@/api/types/fable.types'
 import {
   useBlockProgress,
   useShowConfig,
-} from '@/features/executions/components/ExecutionCanvas'
+} from '@/features/executions/components/RunCanvas'
 import { useIsBlockHovered } from '@/features/executions/stores/executionHoverStore'
 import { cn } from '@/lib/utils'
 
@@ -39,7 +39,7 @@ const HANDLE_Y_PX = 32
 /** Vertical spacing between adjacent handles on a multi-input target. */
 const MULTI_HANDLE_GAP_PX = 12
 
-export const ExecutionNode = memo(function ({ data, type }: NodeProps) {
+export const RunNode = memo(function ({ data, type }: NodeProps) {
   const nodeData = data as FableNodeData
   const showConfig = useShowConfig()
   const { completedSet, runningSet, plannedSet } = useBlockProgress()

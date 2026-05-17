@@ -9,7 +9,7 @@
  */
 
 /**
- * JobStatusDetailsPopover Component
+ * RunStatusDetailsPopover Component
  *
  * Shows job status breakdown in a popover (mirrors StatusDetailsPopover pattern)
  */
@@ -25,7 +25,7 @@ import { SummaryPopover } from '@/components/common/SummaryPopover'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-interface JobStatusDetailsPopoverProps {
+interface RunStatusDetailsPopoverProps {
   children: ReactNode
   align?: 'start' | 'center' | 'end'
   side?: 'top' | 'bottom' | 'left' | 'right'
@@ -92,11 +92,11 @@ function StatusRow({ status, count, isLoading, runId }: StatusRowProps) {
   return <div className={rowClass}>{content}</div>
 }
 
-export function JobStatusDetailsPopover({
+export function RunStatusDetailsPopover({
   children,
   align = 'end',
   side = 'bottom',
-}: JobStatusDetailsPopoverProps) {
+}: RunStatusDetailsPopoverProps) {
   const { t } = useTranslation('dashboard')
   const { counts, total, runningRunId, isLoading, isFetching, refetch } =
     useJobStatusCounts()

@@ -9,7 +9,7 @@
  */
 
 /**
- * ExecutionDetailPage Integration Tests
+ * RunDetailPage Integration Tests
  *
  * Tests the execution detail page with MSW-mocked API:
  * - Renders job status header with name, status badge, progress bar
@@ -37,7 +37,7 @@ import {
 } from '@tests/../mocks/data/job.data'
 import type { AuthContextValue } from '@/features/auth/AuthContext'
 import { AuthContext } from '@/features/auth/AuthContext'
-import { ExecutionDetailPage } from '@/features/executions/components/ExecutionDetailPage'
+import { RunDetailPage } from '@/features/executions/components/RunDetailPage'
 import i18n from '@/lib/i18n'
 
 vi.mock('@/hooks/useMedia', () => ({
@@ -74,7 +74,7 @@ function renderDetailPage(jobId: string, search = '') {
     path: '/executions/$jobId',
     component: () => (
       <AuthContext.Provider value={anonymousAuth}>
-        <ExecutionDetailPage />
+        <RunDetailPage />
       </AuthContext.Provider>
     ),
   })
@@ -98,7 +98,7 @@ function renderDetailPage(jobId: string, search = '') {
   )
 }
 
-describe('ExecutionDetailPage Integration', () => {
+describe('RunDetailPage Integration', () => {
   beforeEach(() => {
     resetJobsState()
   })

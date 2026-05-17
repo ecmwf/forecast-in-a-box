@@ -44,7 +44,7 @@ import { cn } from '@/lib/utils'
 
 type SubmitMode = 'run' | 'schedule'
 
-interface SubmitJobDialogProps {
+interface SubmitRunDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   fable: FableBuilderV1
@@ -52,19 +52,19 @@ interface SubmitJobDialogProps {
   fableId: string | null
 }
 
-export function SubmitJobDialog({
+export function SubmitRunDialog({
   open,
   onOpenChange,
   fable,
   fableId,
-}: SubmitJobDialogProps) {
+}: SubmitRunDialogProps) {
   const { data: fableData } = useFableRetrieve(fableId)
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         {open && (
-          <SubmitJobForm
+          <SubmitRunForm
             onOpenChange={onOpenChange}
             fable={fable}
             fableId={fableId}
@@ -76,19 +76,19 @@ export function SubmitJobDialog({
   )
 }
 
-interface SubmitJobFormProps {
+interface SubmitRunFormProps {
   onOpenChange: (open: boolean) => void
   fable: FableBuilderV1
   fableId: string | null
   fableData: FableRetrieveResponse | undefined
 }
 
-function SubmitJobForm({
+function SubmitRunForm({
   onOpenChange,
   fable,
   fableId,
   fableData,
-}: SubmitJobFormProps) {
+}: SubmitRunFormProps) {
   const { t } = useTranslation('executions')
   const navigate = useNavigate()
   const submitFable = useSubmitFable()
