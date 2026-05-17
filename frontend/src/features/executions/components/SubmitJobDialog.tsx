@@ -9,7 +9,7 @@
  */
 
 import { useMemo, useState } from 'react'
-import { AlertCircle, Calendar, Loader2, Play, X } from 'lucide-react'
+import { AlertCircle, Calendar, Loader2, Play } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from '@tanstack/react-router'
 import type {
@@ -34,7 +34,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
+import { TagInput } from '@/components/common/TagInput'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -112,7 +112,6 @@ function SubmitJobForm({
   const [tags, setTags] = useState<Array<string>>(() =>
     stripSystemTags(fableData?.tags),
   )
-  const [tagInput, setTagInput] = useState('')
   const [environment, setEnvironment] = useState<EnvironmentSpecification>(
     createDefaultEnvironment,
   )
@@ -122,50 +121,8 @@ function SubmitJobForm({
   const [cronExpr, setCronExpr] = useState('0 6 * * *')
   const [maxDelayHours, setMaxDelayHours] = useState(2)
 
-  function addTag(value: string) {
-    const trimmed = value.trim()
-    if (trimmed && !tags.includes(trimmed)) {
-      setTags([...tags, trimmed])
-    }
-  }
-
-  function handleTagChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const value = e.target.value
-    if (value.includes(',')) {
-      const parts = value.split(',')
-      // All parts except the last become tags; the last stays in input
-      for (const part of parts.slice(0, -1)) {
-        addTag(part)
-      }
-      setTagInput(parts[parts.length - 1])
-    } else {
-      setTagInput(value)
-    }
-  }
-
-  function handleTagKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      addTag(tagInput)
-      setTagInput('')
-    }
-    if (e.key === 'Backspace' && !tagInput && tags.length > 0) {
-      setTags(tags.slice(0, -1))
-    }
-  }
-
-  function handleRemoveTag(tag: string) {
-    setTags(tags.filter((existing) => existing !== tag))
-  }
-
   async function handleSubmitRun() {
     setError(null)
-
-    const finalTags = [...tags]
-    const pendingTag = tagInput.trim()
-    if (pendingTag && !finalTags.includes(pendingTag)) {
-      finalTags.push(pendingTag)
-    }
 
     // Fall back to the config-derived name when the user didn't enter one,
     // so submitted jobs are never titled "Untitled Job".
@@ -177,7 +134,7 @@ function SubmitJobForm({
         fable,
         name: trimmedName,
         description: trimmedDescription,
-        tags: finalTags,
+        tags,
         fableId,
         environment,
       })
@@ -211,18 +168,12 @@ function SubmitJobForm({
   async function handleCreateSchedule() {
     setError(null)
 
-    const finalTags = [...tags]
-    const pendingTag = tagInput.trim()
-    if (pendingTag && !finalTags.includes(pendingTag)) {
-      finalTags.push(pendingTag)
-    }
-
     try {
       await createSchedule.mutateAsync({
         fable,
         name: name.trim(),
         description: description.trim(),
-        tags: finalTags,
+        tags,
         fableId,
         cronExpr,
         maxAcceptableDelayHours: maxDelayHours,
@@ -322,38 +273,16 @@ function SubmitJobForm({
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="submit-tags">{t('submit.tags')}</Label>
-          <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border border-input bg-transparent px-3 py-1.5 shadow-xs transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 dark:bg-input/30">
-            {tags.map((tag) => (
-              <Badge
-                key={tag}
-                variant="secondary"
-                className="shrink-0 gap-1 py-0.5"
-              >
-                {tag}
-                <button
-                  type="button"
-                  onClick={() => handleRemoveTag(tag)}
-                  className="ml-0.5 rounded-full hover:bg-destructive/10 hover:text-destructive"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            ))}
-            <input
-              id="submit-tags"
-              placeholder={
-                tags.length === 0
-                  ? mode === 'run'
-                    ? t('submit.tagsPlaceholderOptional')
-                    : t('submit.tagsPlaceholder')
-                  : ''
-              }
-              value={tagInput}
-              onChange={handleTagChange}
-              onKeyDown={handleTagKeyDown}
-              className="min-w-20 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            />
-          </div>
+          <TagInput
+            id="submit-tags"
+            tags={tags}
+            onTagsChange={setTags}
+            placeholder={
+              mode === 'run'
+                ? t('submit.tagsPlaceholderOptional')
+                : t('submit.tagsPlaceholder')
+            }
+          />
         </div>
 
         {/* Schedule-specific fields */}

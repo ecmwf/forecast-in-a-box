@@ -11,9 +11,8 @@
 /** Dialog to edit a run blueprint's metadata — name, description, user tags. */
 
 import { useEffect, useState } from 'react'
-import { Loader2, X } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { KeyboardEvent } from 'react'
 import type { FableRetrieveResponse } from '@/api/types/fable.types'
 import { useUpsertFable } from '@/api/hooks/useFable'
 import {
@@ -22,7 +21,7 @@ import {
   withOneoffTag,
 } from '@/lib/system-tags'
 import { showToast } from '@/lib/toast'
-import { Badge } from '@/components/ui/badge'
+import { TagInput } from '@/components/common/TagInput'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -54,7 +53,6 @@ export function RunMetadataDialog({
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [tags, setTags] = useState<Array<string>>([])
-  const [tagDraft, setTagDraft] = useState('')
 
   // Seed the form from the blueprint each time the dialog opens.
   useEffect(() => {
@@ -62,45 +60,11 @@ export function RunMetadataDialog({
       setName(blueprint.display_name ?? '')
       setDescription(blueprint.display_description ?? '')
       setTags(stripSystemTags(blueprint.tags))
-      setTagDraft('')
     }
   }, [open, blueprint])
 
-  function addTag(value: string) {
-    const trimmed = value.trim()
-    if (!trimmed) return
-    // Functional update so a comma-split loop adds every part, not just the last.
-    setTags((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]))
-  }
-
-  /** A comma (typed or pasted) commits every part but the last. */
-  function handleTagChange(value: string) {
-    if (!value.includes(',')) {
-      setTagDraft(value)
-      return
-    }
-    const parts = value.split(',')
-    for (const part of parts.slice(0, -1)) addTag(part)
-    setTagDraft(parts[parts.length - 1] ?? '')
-  }
-
-  function handleTagKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      addTag(tagDraft)
-      setTagDraft('')
-    } else if (event.key === 'Backspace' && !tagDraft && tags.length > 0) {
-      setTags(tags.slice(0, -1))
-    }
-  }
-
   async function handleSave() {
     if (!blueprint) return
-    const trimmedDraft = tagDraft.trim()
-    const finalTags =
-      trimmedDraft && !tags.includes(trimmedDraft)
-        ? [...tags, trimmedDraft]
-        : tags
     try {
       await upsertFable.mutateAsync({
         fable: blueprint.builder,
@@ -108,10 +72,9 @@ export function RunMetadataDialog({
         fableVersion: blueprint.version,
         display_name: name.trim() || (blueprint.display_name ?? ''),
         display_description: description.trim(),
-        // Keep the one-off marker — editing details must not promote a run to a preset.
-        tags: isOneoffBlueprint(blueprint.tags)
-          ? withOneoffTag(finalTags)
-          : finalTags,
+        // Keep the one-off marker — editing details must not promote a run
+        // to a preset (that is the explicit "Save as preset" action).
+        tags: isOneoffBlueprint(blueprint.tags) ? withOneoffTag(tags) : tags,
       })
       onOpenChange(false)
       showToast.success(t('toast.metadataSaved'))
@@ -163,31 +126,12 @@ export function RunMetadataDialog({
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="run-meta-tags">{t('metadata.tagsLabel')}</Label>
-            <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border border-input bg-transparent px-3 py-1.5 shadow-xs focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50">
-              {tags.map((tag) => (
-                <Badge key={tag} variant="secondary" className="gap-1 pr-1">
-                  {tag}
-                  <button
-                    type="button"
-                    onClick={() => setTags(tags.filter((x) => x !== tag))}
-                    aria-label={`${t('metadata.tagsLabel')}: ${tag}`}
-                    className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-muted-foreground/20"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-              <input
-                id="run-meta-tags"
-                value={tagDraft}
-                onChange={(event) => handleTagChange(event.target.value)}
-                onKeyDown={handleTagKeyDown}
-                placeholder={
-                  tags.length === 0 ? t('metadata.tagsPlaceholder') : ''
-                }
-                className="min-w-24 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-              />
-            </div>
+            <TagInput
+              id="run-meta-tags"
+              tags={tags}
+              onTagsChange={setTags}
+              placeholder={t('metadata.tagsPlaceholder')}
+            />
           </div>
 
           <DialogFooter>

@@ -15,6 +15,7 @@
   "search": "Search",
   "filter": "Filter",
   "clear": "Clear",
+  "removeTag": "Remove {{tag}}",
   "yes": "Yes",
   "no": "No",
   "activity": {
