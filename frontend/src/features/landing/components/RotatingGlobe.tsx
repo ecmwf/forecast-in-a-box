@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { CanvasTexture, MeshBasicMaterial } from 'three'
 import type { GlobeMethods } from 'react-globe.gl'
 import { useSpriteSheetAnimation } from '@/features/landing/hooks/useSpriteSheetAnimation'
-import coastlinesHigh from '@/features/landing/data/coastlines-low.json'
+import coastlinesLow from '@/features/landing/data/coastlines-low.json'
 
 const defaultPOV = { lat: 52, lng: 16, altitude: 1.4 }
 
@@ -75,7 +75,7 @@ const RotatingGlobe = () => {
     fps: FPS,
   })
 
-  const coastlines = useMemo(() => processCoastlines(coastlinesHigh), [])
+  const coastlines = useMemo(() => processCoastlines(coastlinesLow), [])
 
   const globeMaterial = useMemo(() => {
     if (!isAnimationReady || !canvasRef.current)

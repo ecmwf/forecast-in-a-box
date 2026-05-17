@@ -287,8 +287,8 @@ export function FableBuilderPage({
       >
         <FableBuilderHeader fableId={fableId} catalogue={catalogue} />
 
-        {/* Absolute so toggling the banner doesn't shift the canvas — closed
-            but semantically broken expressions still 500. */}
+        {/* Wrapper is relative so the validation banner overlays absolutely —
+            toggling it must not shift the canvas. */}
         <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
           {validationError && (
             <Alert

@@ -149,7 +149,6 @@ export interface NodeControlsProps {
     direction: ControlDirection,
   ) => void
   onNavigate: (blockId: BlockInstanceId) => void
-  isCurrentBlock?: boolean
 }
 
 /**

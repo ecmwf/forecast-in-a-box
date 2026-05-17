@@ -33,19 +33,14 @@ interface StatusDetailsPopoverProps {
   side?: 'top' | 'bottom' | 'left' | 'right'
 }
 
-/**
- * Get a human-readable label for a component
- */
-function getComponentLabel(component: StatusComponent): string {
-  const labels: Record<StatusComponent, string> = {
-    api: 'API Server',
-    cascade: 'Cascade',
-    ecmwf: 'ECMWF Data',
-    scheduler: 'Scheduler',
-    plugins: 'Plugins',
-  }
-  return labels[component]
-}
+/** i18n keys (common namespace) for each component's display label. */
+const componentLabelKeys = {
+  api: 'status.apiServer',
+  cascade: 'status.cascade',
+  ecmwf: 'status.ecmwfData',
+  scheduler: 'status.scheduler',
+  plugins: 'status.plugins',
+} as const satisfies Record<StatusComponent, string>
 
 /**
  * Get icon for a component
@@ -73,11 +68,12 @@ const statusTextColors: Record<ComponentStatus, string> = {
   off: 'text-muted-foreground',
 }
 
-const statusLabels: Record<ComponentStatus, string> = {
-  up: 'Online',
-  down: 'Offline',
-  off: 'Disabled',
-}
+/** i18n keys (common namespace) for each status state. */
+const statusLabelKeys = {
+  up: 'status.componentUp',
+  down: 'status.componentDown',
+  off: 'status.componentOff',
+} as const satisfies Record<ComponentStatus, string>
 
 interface ComponentRowProps {
   component: StatusComponent
@@ -89,6 +85,7 @@ interface ComponentRowProps {
  * Renders a single component status row
  */
 function ComponentRow({ component, status, isLoading }: ComponentRowProps) {
+  const { t } = useTranslation('common')
   const isActive = status ? status !== 'off' : true
 
   return (
@@ -103,7 +100,7 @@ function ComponentRow({ component, status, isLoading }: ComponentRowProps) {
         <span className="text-muted-foreground">
           {getComponentIcon(component)}
         </span>
-        <span className="text-sm">{getComponentLabel(component)}</span>
+        <span className="text-sm">{t(componentLabelKeys[component])}</span>
       </div>
       <div className="flex items-center gap-1.5">
         {isLoading ? (
@@ -121,7 +118,7 @@ function ComponentRow({ component, status, isLoading }: ComponentRowProps) {
               )}
             />
             <span className={cn('text-sm', statusTextColors[status])}>
-              {statusLabels[status]}
+              {t(statusLabelKeys[status])}
             </span>
           </>
         ) : null}

@@ -413,7 +413,7 @@ describe('GlyphFieldWrapper Integration', () => {
   })
 
   describe('Field-level validation errors', () => {
-    it('renders inline error message for the field when FieldErrorsContext has entries', async () => {
+    it('renders inline error message for the field when field errors are present', async () => {
       const screen = await renderWithProviders(
         <ControlledStringField
           initialValue="${runtd}"
@@ -425,7 +425,7 @@ describe('GlyphFieldWrapper Integration', () => {
         .toBeVisible()
     })
 
-    it('does not render an error when FieldErrorsContext is null', async () => {
+    it('does not render an error when there are no field errors', async () => {
       const screen = await renderWithProviders(
         <ControlledStringField initialValue="${runtd}" />,
       )

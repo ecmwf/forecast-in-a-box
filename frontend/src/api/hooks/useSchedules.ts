@@ -151,14 +151,6 @@ export function useDeleteSchedule() {
 }
 
 /**
- * Fetches the scheduler's current time and computes the offset from the client clock.
- *
- * The offset lets us translate naive datetime strings returned by the server
- * (which are in the server's local timezone) into correct client-local Dates.
- *
- * Formula: correctEpoch = new Date(serverTimeStr).getTime() - offsetMs
- */
-/**
  * Parse a naive datetime string from the backend.
  *
  * The backend's current_scheduling_time() uses datetime.now() which returns
@@ -170,6 +162,14 @@ function parseServerTime(dateStr: string): number {
   return new Date(dateStr.trim()).getTime()
 }
 
+/**
+ * Fetches the scheduler's current time and computes the offset from the client clock.
+ *
+ * The offset lets us translate naive datetime strings returned by the server
+ * (which are in the server's local timezone) into correct client-local Dates.
+ *
+ * Formula: correctEpoch = new Date(serverTimeStr).getTime() - offsetMs
+ */
 export function useServerTime() {
   const { data: offsetMs } = useQuery<number>({
     queryKey: scheduleKeys.serverTime,

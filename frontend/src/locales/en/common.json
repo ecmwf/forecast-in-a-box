@@ -63,6 +63,7 @@
     "cascade": "Cascade",
     "ecmwfData": "ECMWF Data",
     "scheduler": "Scheduler",
+    "plugins": "Plugins",
     "refresh": "Refresh Status",
     "lastUpdated": "Last updated"
   },

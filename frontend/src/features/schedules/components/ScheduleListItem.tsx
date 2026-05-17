@@ -174,7 +174,7 @@ export function ScheduleListItem({
             {t('actions.viewRuns')}
           </Button>
 
-          {/* Enable/disable toggle — was a secondary-menu item. */}
+          {/* Enable/disable toggle */}
           <Switch
             checked={schedule.enabled}
             onCheckedChange={(checked) => handleToggleEnabled(checked)}
