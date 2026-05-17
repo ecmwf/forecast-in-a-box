@@ -12,7 +12,13 @@
 
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { MoreVertical, RotateCcw, Settings2, Trash2 } from 'lucide-react'
+import {
+  MoreVertical,
+  Pencil,
+  RotateCcw,
+  Settings2,
+  Trash2,
+} from 'lucide-react'
 import type { JobStatus } from '@/api/types/job.types'
 import { isTerminalStatus } from '@/api/types/job.types'
 import {
@@ -52,6 +58,8 @@ interface ExecutionStatusHeaderProps {
   onDelete: () => void
   /** Open the fable's source configuration in the builder. */
   onEditConfig?: () => void
+  /** Open the run-metadata edit dialog (name, description, tags). */
+  onEditMetadata?: () => void
   isRestartPending: boolean
   isDeletePending: boolean
   /** Subtext hidden when planned is null/undefined/empty. */
@@ -147,12 +155,13 @@ export function ExecutionStatusHeader({
   onRestart,
   onDelete,
   onEditConfig,
+  onEditMetadata,
   isRestartPending,
   isDeletePending,
   completedBlockCount,
   plannedBlockCount,
 }: ExecutionStatusHeaderProps) {
-  const { t } = useTranslation('executions')
+  const { t } = useTranslation(['executions', 'journal'])
   const terminal = isTerminalStatus(status)
   const elapsed = useElapsedTime(createdAt, terminal)
 
@@ -166,7 +175,20 @@ export function ExecutionStatusHeader({
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
-          <H2 className="text-2xl font-bold">{name}</H2>
+          <div className="flex items-center gap-2">
+            <H2 className="text-2xl font-bold">{name}</H2>
+            {onEditMetadata && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={onEditMetadata}
+                aria-label={t('journal:item.editMetadata')}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
           {description && (
             <P className="line-clamp-2 text-muted-foreground">{description}</P>
           )}
@@ -205,6 +227,19 @@ export function ExecutionStatusHeader({
             />
           )}
 
+          {/* Surfaced as a button where there's room; in the menu otherwise. */}
+          {onEditConfig && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onEditConfig}
+              className="hidden lg:inline-flex"
+            >
+              <Settings2 className="mr-1.5 h-4 w-4" />
+              {t('actions.editConfiguration')}
+            </Button>
+          )}
+
           <AlertDialog>
             <DropdownMenu>
               <DropdownMenuTrigger
@@ -213,10 +248,11 @@ export function ExecutionStatusHeader({
                 <MoreVertical className="h-5 w-5" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-auto min-w-fit">
+                {/* Hidden at lg+, where it is shown as a button instead. */}
                 {onEditConfig && (
                   <DropdownMenuItem
                     onClick={onEditConfig}
-                    className="whitespace-nowrap"
+                    className="whitespace-nowrap lg:hidden"
                   >
                     <Settings2 className="mr-2 h-4 w-4" />
                     {t('actions.editConfiguration')}

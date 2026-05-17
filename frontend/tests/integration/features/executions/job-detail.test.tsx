@@ -104,11 +104,6 @@ describe('ExecutionDetailPage Integration', () => {
   })
 
   describe('rendering', () => {
-    it('renders the back link', async () => {
-      const screen = await renderDetailPage('job-completed-001')
-      await expect.element(screen.getByText('Executions')).toBeVisible()
-    })
-
     it('renders the job ID in the header', async () => {
       const screen = await renderDetailPage('job-completed-001')
       await expect.element(screen.getByText('job-completed-001')).toBeVisible()

@@ -24,6 +24,7 @@ import { ExecutionStatusHeader } from './ExecutionStatusHeader'
 import { LogsPanel } from './LogsPanel'
 import { OutputsPanel } from './OutputsPanel'
 import { SpecificationPanel } from './SpecificationPanel'
+import { RunMetadataDialog } from '@/features/journal/components/RunMetadataDialog'
 import { showToast } from '@/lib/toast'
 import { ApiClientError } from '@/api/client'
 import { useBlockCatalogue, useFableRetrieve } from '@/api/hooks/useFable'
@@ -51,6 +52,7 @@ export function ExecutionDetailPage() {
   const { jobId } = useParams({ from: '/_authenticated/executions/$jobId' })
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('outputs')
+  const [metadataOpen, setMetadataOpen] = useState(false)
   const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null)
   const handleToolbarRef = useCallback((node: HTMLDivElement | null) => {
     setToolbarSlot(node)
@@ -160,17 +162,6 @@ export function ExecutionDetailPage() {
         layoutMode === 'boxed' ? 'max-w-7xl' : 'max-w-none',
       )}
     >
-      <Button
-        variant="outline"
-        size="sm"
-        className="gap-1.5 self-start"
-        nativeButton={false}
-        render={<Link to="/executions" />}
-      >
-        <ArrowLeft className="h-4 w-4" />
-        {t('detail.backLink')}
-      </Button>
-
       <ExecutionStatusHeader
         jobId={jobId}
         name={jobName}
@@ -182,6 +173,7 @@ export function ExecutionDetailPage() {
         onRestart={handleRestart}
         onDelete={handleDelete}
         onEditConfig={canEditConfig ? handleEditConfig : undefined}
+        onEditMetadata={() => setMetadataOpen(true)}
         isRestartPending={restartMutation.isPending}
         isDeletePending={deleteMutation.isPending}
         completedBlockCount={jobData.completed_block_ids?.length ?? null}
@@ -278,6 +270,12 @@ export function ExecutionDetailPage() {
           </Tabs>
         </div>
       </div>
+
+      <RunMetadataDialog
+        blueprint={fableData}
+        open={metadataOpen}
+        onOpenChange={setMetadataOpen}
+      />
     </div>
   )
 }

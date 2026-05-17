@@ -8,12 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-/**
- * AuthenticatedHeader Component
- *
- * Header for authenticated pages with system status,
- * help button, and settings dropdown menu
- */
+/** Header for authenticated pages: system status, help, and settings menu. */
 
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
@@ -97,31 +92,31 @@ export function AuthenticatedHeader() {
     <header className="sticky top-0 z-30 border-b border-border bg-card">
       <div
         className={cn(
-          'relative flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8',
+          'flex h-16 items-center gap-2 px-4 sm:gap-4 sm:px-6 lg:px-8',
           layoutMode === 'boxed' && 'mx-auto max-w-7xl',
         )}
       >
-        {/* Logo */}
-        <div className="flex items-center gap-3">
+        {/* Logo — flex-1 balances the actions so the nav stays centred. */}
+        <div className="flex min-w-0 flex-1 items-center">
           <Link
             to="/dashboard"
-            className="flex items-center gap-2 sm:gap-3"
+            className="flex min-w-0 items-center gap-2 sm:gap-3"
             aria-label="Dashboard"
           >
             <Logo />
-            <span className="hidden text-base font-semibold tracking-tight md:inline md:text-xl">
+            <span className="hidden truncate text-base font-semibold tracking-tight md:block md:text-xl">
               Forecast-in-a-Box
             </span>
           </Link>
         </div>
 
-        {/* NavToggle (center) - hidden on mobile */}
-        <div className="absolute top-1/2 left-1/2 hidden -translate-x-1/2 -translate-y-1/2 md:flex">
+        {/* Section nav — in flow so it can't overlap; shown at lg+. */}
+        <div className="hidden shrink-0 lg:flex">
           <NavToggle />
         </div>
 
         {/* Right side - Status, Help, Settings */}
-        <div className="flex items-center gap-3 text-muted-foreground">
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-3 text-muted-foreground">
           {/* System Status Badge - only show label when there's an issue */}
           <StatusDetailsPopover>
             <StatusIndicator
@@ -354,9 +349,11 @@ export function AuthenticatedHeader() {
         </div>
       </div>
 
-      {/* NavToggle strip - visible only on mobile */}
-      <div className="flex justify-center border-t border-border py-1.5 md:hidden">
-        <NavToggle />
+      {/* Nav strip — shown below the bar until the centred nav fits (lg+); scrolls when cramped. */}
+      <div className="overflow-x-auto border-t border-border lg:hidden">
+        <div className="flex w-fit min-w-full justify-center px-4 py-1.5">
+          <NavToggle />
+        </div>
       </div>
     </header>
   )
