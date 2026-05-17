@@ -24,7 +24,7 @@ import { buildDefaultJobName } from '@/features/executions/utils/job-name'
 import { useSubmitFable } from '@/api/hooks/useJobs'
 import { useCreateSchedule } from '@/api/hooks/useSchedules'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
-import { CronExpressionInput } from '@/features/schedules/components/CronExpressionInput'
+import { ScheduleFields } from '@/features/schedules/components/ScheduleFields'
 import { EnvironmentConfig } from '@/features/executions/components/EnvironmentConfig'
 import {
   AlertDialog,
@@ -37,7 +37,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { NumericInput } from '@/components/ui/numeric-input'
 import { Label } from '@/components/ui/label'
 import { useActivityStore } from '@/stores/activityStore'
 import { stripSystemTags } from '@/lib/system-tags'
@@ -359,22 +358,12 @@ function SubmitJobForm({
 
         {/* Schedule-specific fields */}
         {mode === 'schedule' && (
-          <>
-            <CronExpressionInput value={cronExpr} onChange={setCronExpr} />
-
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="submit-max-delay">{t('submit.maxDelay')}</Label>
-              <NumericInput
-                id="submit-max-delay"
-                value={maxDelayHours}
-                onChange={(e) => setMaxDelayHours(Number(e.target.value))}
-                className="w-32"
-              />
-              <p className="text-sm text-muted-foreground">
-                {t('submit.maxDelayHelp')}
-              </p>
-            </div>
-          </>
+          <ScheduleFields
+            cronExpr={cronExpr}
+            onCronChange={setCronExpr}
+            maxDelayHours={maxDelayHours}
+            onMaxDelayChange={setMaxDelayHours}
+          />
         )}
 
         <EnvironmentConfig

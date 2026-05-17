@@ -25,21 +25,6 @@ export interface ForumTopic {
   postedAt: string
 }
 
-export type ForecastStatus = 'running' | 'completed' | 'failed'
-
-export interface ForecastJob {
-  id: string
-  name: string
-  model: string
-  startedAt: string
-  productCount: number
-  status: ForecastStatus
-  progress?: number
-  tags: Array<string>
-  isScheduled?: boolean
-  isBookmarked?: boolean
-}
-
 export const mockModels: Array<ModelInfo> = [
   {
     name: 'AIFS',
@@ -84,73 +69,6 @@ export const mockForumTopics: Array<ForumTopic> = [
     title: 'Regional model recommendations',
     author: '@euroweather',
     postedAt: '2d ago',
-  },
-]
-
-export const mockForecastJobs: Array<ForecastJob> = [
-  {
-    id: 'a3f7c2d',
-    name: 'Europe Weather - 72h',
-    model: 'AIFS Global',
-    startedAt: '2025-10-02 09:30',
-    productCount: 4,
-    status: 'running',
-    progress: 65,
-    tags: ['high-priority', 'wind-analysis'],
-    isBookmarked: false,
-  },
-  {
-    id: '8k9m2p1',
-    name: 'North America - 120h',
-    model: 'IFS ENS',
-    startedAt: '2025-10-02 08:15',
-    productCount: 6,
-    status: 'completed',
-    tags: ['production', 'daily-forecast'],
-    isScheduled: true,
-    isBookmarked: false,
-  },
-  {
-    id: 'f2d8a1c',
-    name: 'Asia Pacific - 48h',
-    model: 'COSMO Alpine',
-    startedAt: '2025-10-01 14:20',
-    productCount: 3,
-    status: 'completed',
-    tags: ['research', 'temperature'],
-    isBookmarked: false,
-  },
-  {
-    id: 'b7k3n9x',
-    name: 'Global Forecast - 240h',
-    model: 'AIFS Global',
-    startedAt: '2025-10-01 11:00',
-    productCount: 8,
-    status: 'failed',
-    tags: ['high-priority', 'emergency'],
-    isBookmarked: false,
-  },
-  {
-    id: 'c5m8q4r',
-    name: 'Mediterranean Sea - 96h',
-    model: 'AIFS Global',
-    startedAt: '2025-10-01 09:45',
-    productCount: 5,
-    status: 'completed',
-    tags: ['marine', 'operational'],
-    isScheduled: true,
-    isBookmarked: false,
-  },
-  {
-    id: 'd1p6v2w',
-    name: 'Arctic Region - 168h',
-    model: 'AIFS Global',
-    startedAt: '2025-10-02 10:15',
-    productCount: 4,
-    status: 'running',
-    progress: 23,
-    tags: ['climate', 'ice-analysis'],
-    isBookmarked: false,
   },
 ]
 

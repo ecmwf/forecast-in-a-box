@@ -59,6 +59,14 @@ export const STORAGE_KEYS = {
   },
 
   /**
+   * Forecast-run storage keys (direct localStorage)
+   */
+  runs: {
+    /** Bookmarked run ids (keyed by run_id) */
+    bookmarks: 'fiab.runs.bookmarks',
+  },
+
+  /**
    * Artifact-related storage keys (direct localStorage)
    */
   artifacts: {

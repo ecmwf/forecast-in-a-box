@@ -27,6 +27,18 @@
       "totalJobs": "Total",
       "noActiveJobs": "No active jobs"
     },
+    "activity": {
+      "title": "Forecast activity",
+      "summary_one": "{{count}} forecast in the last 6 months",
+      "summary_other": "{{count}} forecasts in the last 6 months"
+    },
+    "models": {
+      "readyToUse": "Ready to use",
+      "incompatible": "Not compatible",
+      "notDownloaded": "Not downloaded",
+      "total": "Total models",
+      "manage": "Manage models"
+    },
     "actions": {
       "managePlugins": "Manage Plugins",
       "manageSources": "Manage Sources",

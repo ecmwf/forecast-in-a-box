@@ -45,6 +45,12 @@ vi.mock('@/lib/toast', () => ({
   },
 }))
 
+// The API layer is stubbed here, so collapse useConfigPresets' useQueries join to an empty result.
+vi.mock('@tanstack/react-query', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>()
+  return { ...actual, useQueries: () => [] }
+})
+
 // Three explicitly-saved configs — the baseline visible set.
 const DEFAULT_BLUEPRINTS: Array<BlueprintListItem> = [
   {
@@ -97,6 +103,7 @@ vi.mock('@/api/hooks/useFable', () => ({
     mutate: mockDeleteBlueprint,
     isPending: false,
   }),
+  useBlockCatalogue: () => ({ data: undefined }),
   fableKeys: {
     all: ['fable'] as const,
     blueprints: () => ['fable', 'blueprints'] as const,

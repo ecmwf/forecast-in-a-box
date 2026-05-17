@@ -57,6 +57,14 @@ interface UiState {
   timeZone: string
   setTimeZone: (timeZone: string) => void
 
+  // Forecast Journal: show the block-flow preview on run/preset rows.
+  journalShowFlow: boolean
+  setJournalShowFlow: (value: boolean) => void
+
+  // Temporary: render mini-flow previews in monochrome (to be removed).
+  journalFlowMonochrome: boolean
+  setJournalFlowMonochrome: (value: boolean) => void
+
   // Reset store
   reset: () => void
 }
@@ -72,6 +80,8 @@ const initialState = {
   modelsViewMode: 'table' as AdminViewMode,
   artifactsViewMode: 'table' as AdminViewMode,
   timeZone: 'UTC',
+  journalShowFlow: false,
+  journalFlowMonochrome: false,
 }
 
 export const useUiStore = create<UiState>()(
@@ -118,6 +128,11 @@ export const useUiStore = create<UiState>()(
 
         // Application timezone management
         setTimeZone: (timeZone) => set({ timeZone }),
+
+        // Forecast Journal flow preview (session-only — not persisted)
+        setJournalShowFlow: (journalShowFlow) => set({ journalShowFlow }),
+        setJournalFlowMonochrome: (journalFlowMonochrome) =>
+          set({ journalFlowMonochrome }),
 
         // Reset to initial state
         reset: () => set(initialState),

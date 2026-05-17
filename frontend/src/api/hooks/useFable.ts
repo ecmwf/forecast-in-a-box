@@ -51,6 +51,8 @@ import { QUERY_CONSTANTS } from '@/utils/constants'
 export const fableKeys = {
   all: ['fable'] as const,
   catalogue: () => [...fableKeys.all, 'catalogue'] as const,
+  // Prefix shared by every paginated blueprint-list query — invalidate to refresh all of them.
+  blueprintsBase: () => [...fableKeys.all, 'blueprints'] as const,
   blueprints: (page?: number, pageSize?: number) =>
     [...fableKeys.all, 'blueprints', page, pageSize] as const,
   detail: (id: string) => [...fableKeys.all, 'detail', id] as const,
@@ -223,7 +225,7 @@ export function useUpsertFable() {
         queryKey: fableKeys.detail(result.blueprint_id),
       })
       queryClient.invalidateQueries({
-        queryKey: fableKeys.blueprints(),
+        queryKey: fableKeys.blueprintsBase(),
       })
     },
   })
@@ -239,7 +241,7 @@ export function useDeleteBlueprint() {
         queryKey: fableKeys.detail(variables.blueprint_id),
       })
       queryClient.invalidateQueries({
-        queryKey: fableKeys.blueprints(),
+        queryKey: fableKeys.blueprintsBase(),
       })
     },
   })

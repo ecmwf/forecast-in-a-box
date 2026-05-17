@@ -19,6 +19,7 @@
 
 import { HttpResponse, http } from 'msw'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { userEvent } from 'vitest/browser'
 import { renderWithRouter } from '@tests/utils/render'
 import { worker } from '@tests/test-extend'
 import type { BlueprintListItem } from '@/api/types/fable.types'
@@ -209,7 +210,9 @@ describe('PresetsPage', () => {
 
     const screen = await renderWithRouter(<PresetsPage />)
 
-    const searchInput = screen.getByPlaceholder('Search presets...')
+    const searchInput = screen.getByPlaceholder(
+      'Search or filter, e.g. tag:production',
+    )
     await expect.element(searchInput).toBeVisible()
   })
 
@@ -218,8 +221,11 @@ describe('PresetsPage', () => {
 
     const screen = await renderWithRouter(<PresetsPage />)
 
-    const searchInput = screen.getByPlaceholder('Search presets...')
+    const searchInput = screen.getByPlaceholder(
+      'Search or filter, e.g. tag:production',
+    )
     await searchInput.fill('nonexistent query')
+    await userEvent.keyboard('{Enter}')
 
     await expect
       .element(screen.getByText('No presets match your search.'))

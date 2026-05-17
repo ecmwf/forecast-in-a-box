@@ -47,3 +47,10 @@ export function withOneoffTag(
   const base = tags ? [...tags] : []
   return base.includes(ONEOFF_TAG) ? base : [...base, ONEOFF_TAG]
 }
+
+/** Drop the one-off marker — promotes a one-off run blueprint to a saved preset. */
+export function withoutOneoffTag(
+  tags: ReadonlyArray<string> | null | undefined,
+): Array<string> {
+  return tags ? tags.filter((tag) => tag !== ONEOFF_TAG) : []
+}

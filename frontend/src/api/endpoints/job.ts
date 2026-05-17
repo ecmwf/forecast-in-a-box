@@ -76,9 +76,16 @@ function buildHeaders(): HeadersInit {
   return headers
 }
 
-export async function getJobStatus(runId: string): Promise<JobExecutionDetail> {
+export async function getJobStatus(
+  runId: string,
+  attemptCount?: number,
+): Promise<JobExecutionDetail> {
+  const params: Record<string, string | number> = { run_id: runId }
+  if (attemptCount != null) {
+    params.attempt_count = attemptCount
+  }
   return apiClient.get(API_ENDPOINTS.job.get, {
-    params: { run_id: runId },
+    params,
     schema: JobExecutionDetailSchema,
   })
 }

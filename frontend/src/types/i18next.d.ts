@@ -27,6 +27,7 @@ import type executionsEN from '@/locales/en/executions.json'
 import type schedulesEN from '@/locales/en/schedules.json'
 import type configureEN from '@/locales/en/configure.json'
 import type glyphsEN from '@/locales/en/glyphs.json'
+import type journalEN from '@/locales/en/journal.json'
 
 declare module 'i18next' {
   interface CustomTypeOptions {
@@ -45,6 +46,7 @@ declare module 'i18next' {
       schedules: typeof schedulesEN
       configure: typeof configureEN
       glyphs: typeof glyphsEN
+      journal: typeof journalEN
     }
   }
 }

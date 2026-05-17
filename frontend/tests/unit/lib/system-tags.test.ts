@@ -22,6 +22,7 @@ import {
   isOneoffBlueprint,
   stripSystemTags,
   withOneoffTag,
+  withoutOneoffTag,
 } from '@/lib/system-tags'
 
 describe('system-tags', () => {
@@ -79,6 +80,21 @@ describe('system-tags', () => {
       const input = ['a']
       withOneoffTag(input)
       expect(input).toEqual(['a'])
+    })
+  })
+
+  describe('withoutOneoffTag', () => {
+    it('removes the marker, preserving user tags in order', () => {
+      expect(withoutOneoffTag(['a', ONEOFF_TAG, 'b'])).toEqual(['a', 'b'])
+    })
+
+    it('is a no-op when the marker is absent', () => {
+      expect(withoutOneoffTag(['a', 'b'])).toEqual(['a', 'b'])
+    })
+
+    it('handles null and undefined', () => {
+      expect(withoutOneoffTag(null)).toEqual([])
+      expect(withoutOneoffTag(undefined)).toEqual([])
     })
   })
 })
