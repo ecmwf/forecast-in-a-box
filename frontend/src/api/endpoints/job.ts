@@ -27,7 +27,7 @@ import {
 import { ApiClientError, apiClient } from '@/api/client'
 import { API_ENDPOINTS } from '@/api/endpoints'
 import { getBackendBaseUrl } from '@/utils/env'
-import { STORAGE_KEYS } from '@/lib/storage-keys'
+import { readAnonymousId } from '@/lib/anonymous-id'
 
 export async function executeJob(
   request: JobExecuteRequest,
@@ -69,7 +69,8 @@ function buildFullUrl(path: string, params?: Record<string, string>): string {
 
 function buildHeaders(): HeadersInit {
   const headers: HeadersInit = {}
-  const anonymousId = localStorage.getItem(STORAGE_KEYS.auth.anonymousId)
+  // Same validated read as apiClient.
+  const anonymousId = readAnonymousId()
   if (anonymousId) {
     headers['X-Anonymous-ID'] = anonymousId
   }

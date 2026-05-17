@@ -27,6 +27,7 @@ import {
   Settings,
   Sun,
   User,
+  Variable,
 } from 'lucide-react'
 import { P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
@@ -309,6 +310,10 @@ export function AuthenticatedHeader() {
                     <DropdownMenuItem render={<Link to="/admin/artifacts" />}>
                       <Cloud className="mr-2 h-4 w-4" />
                       Artifacts
+                    </DropdownMenuItem>
+                    <DropdownMenuItem render={<Link to="/admin/variables" />}>
+                      <Variable className="mr-2 h-4 w-4" />
+                      Global Variables
                     </DropdownMenuItem>
                   </DropdownMenuGroup>
                 </>

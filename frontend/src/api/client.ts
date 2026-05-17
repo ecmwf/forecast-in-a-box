@@ -21,7 +21,7 @@
 import type { ApiError, RequestConfig } from '@/types/api.types'
 import { getBackendBaseUrl } from '@/utils/env'
 import { parseOrThrow } from '@/utils/zod'
-import { STORAGE_KEYS } from '@/lib/storage-keys'
+import { readAnonymousId } from '@/lib/anonymous-id'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('ApiClient')
@@ -85,14 +85,9 @@ async function request<T>(
     ...headers,
   }
 
-  // Add X-Anonymous-ID header if anonymous ID exists in localStorage
-  const anonymousId = localStorage.getItem(STORAGE_KEYS.auth.anonymousId)
-  if (
-    anonymousId &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      anonymousId,
-    )
-  ) {
+  // readAnonymousId yields the stored ID only if it is a valid UUID.
+  const anonymousId = readAnonymousId()
+  if (anonymousId) {
     requestHeaders['X-Anonymous-ID'] = anonymousId
   }
 
@@ -102,6 +97,8 @@ async function request<T>(
       headers: requestHeaders,
       body: body ? JSON.stringify(body) : undefined,
       credentials: 'include', // Include session cookies
+      // Fail closed on 3xx — a cross-origin redirect leaks X-Anonymous-ID.
+      redirect: 'error',
     })
 
     // Handle non-200 responses

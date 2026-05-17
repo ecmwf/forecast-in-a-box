@@ -10,6 +10,7 @@
 
 import { AlertCircle } from 'lucide-react'
 import type {
+  BlockConfigurationOption,
   BlockFactoryCatalogue,
   BlockInstanceId,
 } from '@/api/types/fable.types'
@@ -85,14 +86,17 @@ export function ConfigSummaryCard({
       {configuredValues.length > 0 && (
         <div className="space-y-1">
           {configuredValues.map(([key, value]) => {
-            const option = factory.configuration_options[key]
+            // The key may be absent at runtime; cast to surface undefined.
+            const option = factory.configuration_options[key] as
+              | BlockConfigurationOption
+              | undefined
             return (
               <div
                 key={key}
                 className="flex items-center justify-between text-sm"
               >
                 <span className="text-muted-foreground">
-                  {option.title || key}:
+                  {option?.title || key}:
                 </span>
                 <span className="font-mono text-sm">{value}</span>
               </div>

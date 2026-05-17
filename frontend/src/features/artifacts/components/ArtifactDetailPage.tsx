@@ -39,6 +39,7 @@ import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
 import { H1, H2, P } from '@/components/base/typography'
+import { isHttpUrl } from '@/utils/url'
 
 export interface ArtifactDetailPageProps {
   detail: MlModelDetail
@@ -122,7 +123,8 @@ export function ArtifactDetailPage({
           </div>
         </div>
         <div className="flex gap-2">
-          {detail.url && (
+          {/* http(s) only — blocks javascript: XSS. */}
+          {detail.url && isHttpUrl(detail.url) && (
             <Button
               variant="outline"
               size="sm"

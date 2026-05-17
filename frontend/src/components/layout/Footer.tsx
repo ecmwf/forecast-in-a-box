@@ -15,15 +15,31 @@ import { StatusIndicator } from '@/components/common/StatusIndicator'
 import { cn, isExternalUrl } from '@/lib/utils'
 import { useUiStore } from '@/stores/uiStore'
 
-const links = [
+// Partner logos for the footer band. The SVGs are white-fill, so the footer
+// keeps a fixed navy background regardless of theme; per-logo heights balance
+// the wide ECMWF/DestinE wordmarks against the taller WMO emblem.
+const partnerLogos = [
   {
-    title: 'ECMWF',
+    src: '/logos/ecmwf.svg',
+    alt: 'ECMWF',
     href: 'https://www.ecmwf.int/',
+    className: 'h-9',
   },
   {
-    title: 'Destination Earth',
+    src: '/logos/destination_earth_logo.svg',
+    alt: 'Destination Earth',
     href: 'https://destination-earth.eu',
+    className: 'h-8',
   },
+  {
+    src: '/logos/wmo.svg',
+    alt: 'World Meteorological Organization',
+    href: 'https://wmo.int',
+    className: 'h-14',
+  },
+]
+
+const links = [
   {
     title: 'Help',
     href: '/about', // TODO: Create dedicated help page
@@ -41,15 +57,33 @@ export function Footer() {
   return (
     <footer
       role="contentinfo"
-      className="border-t border-border bg-muted/50 pt-8 sm:pt-12"
+      className="bg-[#0e1f44] text-white dark:bg-[#0c1730]"
     >
       <div
         className={cn(
-          'space-y-8 px-6',
+          'px-6',
           layoutMode === 'boxed' ? 'mx-auto max-w-5xl' : 'mx-auto max-w-7xl',
         )}
       >
-        <div className="flex flex-wrap justify-center gap-6 text-sm">
+        <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-8 py-10 md:justify-between">
+          {partnerLogos.map((logo) => (
+            <a
+              key={logo.alt}
+              href={logo.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-sm opacity-90 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
+            >
+              <img
+                src={logo.src}
+                alt={logo.alt}
+                className={cn('block w-auto', logo.className)}
+              />
+            </a>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap justify-center gap-6 border-t border-white/10 py-6 text-sm">
           {links.map((link) =>
             isExternalUrl(link.href) ? (
               <a
@@ -57,7 +91,7 @@ export function Footer() {
                 href={link.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block text-foreground/70 duration-150 hover:text-foreground"
+                className="block text-white/70 duration-150 hover:text-white"
               >
                 <span>{link.title}</span>
               </a>
@@ -65,7 +99,7 @@ export function Footer() {
               <Link
                 key={link.title}
                 to={link.href}
-                className="block text-foreground/70 duration-150 hover:text-foreground"
+                className="block text-white/70 duration-150 hover:text-white"
               >
                 <span>{link.title}</span>
               </Link>
@@ -73,9 +107,9 @@ export function Footer() {
           )}
         </div>
 
-        <div className="flex flex-wrap justify-between gap-4 border-t border-border py-6">
-          <span className="text-sm text-muted-foreground">
-            © European Centre for Medium-Range Weather Forecasts{' '}
+        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-white/10 py-6">
+          <span className="text-sm text-white/60">
+            © European Centre for Medium-Range Weather Forecasts
           </span>
           {!isLoading && (
             <StatusDetailsPopover side="top">
