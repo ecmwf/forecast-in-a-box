@@ -43,8 +43,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { GlyphReferencePanel } from '@/features/fable-builder/components/shared/GlyphReferencePanel'
-import { ResolvedConfigContext } from '@/features/fable-builder/context/ResolvedConfigContext'
-import { FieldErrorsContext } from '@/features/fable-builder/context/FieldErrorsContext'
+import { BlockValidationProvider } from '@/features/fable-builder/context/BlockValidationContext'
 import { mapBlockErrorsToFields } from '@/features/fable-builder/utils/map-block-errors-to-fields'
 import { cn } from '@/lib/utils'
 
@@ -210,32 +209,33 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
         )}
 
         {configOptions.length > 0 && (
-          <ResolvedConfigContext.Provider value={resolvedConfigForBlock}>
-            <FieldErrorsContext.Provider value={mappedErrors.byConfigKey}>
-              <div className="space-y-3">
-                <div className="text-sm font-medium">Configuration</div>
-                <div className="space-y-4">
-                  {configOptions.map(([key, option]) => (
-                    <FieldRenderer
-                      key={key}
-                      id={`config-${key}`}
-                      configKey={key}
-                      valueType={option.value_type}
-                      value={selectedBlock.configuration_values[key] || ''}
-                      onChange={(value) => handleConfigChange(key, value)}
-                      label={option.title || key}
-                      description={option.description}
-                      inputClassName="h-9"
-                    />
-                  ))}
-                </div>
-                {/* mt-10 reserves clearance for the last field's absolute
+          <BlockValidationProvider
+            resolvedConfig={resolvedConfigForBlock}
+            fieldErrors={mappedErrors.byConfigKey}
+          >
+            <div className="space-y-3">
+              <div className="text-sm font-medium">Configuration</div>
+              <div className="space-y-4">
+                {configOptions.map(([key, option]) => (
+                  <FieldRenderer
+                    key={key}
+                    id={`config-${key}`}
+                    configKey={key}
+                    valueType={option.value_type}
+                    value={selectedBlock.configuration_values[key] || ''}
+                    onChange={(value) => handleConfigChange(key, value)}
+                    label={option.title || key}
+                    description={option.description}
+                    inputClassName="h-9"
+                  />
+                ))}
+              </div>
+              {/* mt-10 reserves clearance for the last field's absolute
                     preview/nudge/error stack so they don't overlap the
                     reference panel. */}
-                <GlyphReferencePanel className="mt-10" />
-              </div>
-            </FieldErrorsContext.Provider>
-          </ResolvedConfigContext.Provider>
+              <GlyphReferencePanel className="mt-10" />
+            </div>
+          </BlockValidationProvider>
         )}
 
         {configOptions.length === 0 && inputs.length === 0 && (

@@ -21,8 +21,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { renderWithProviders } from '@tests/utils/render'
 import { DateTimeField } from '@/components/base/fields/fields/DateTimeField'
 import { GlyphContext } from '@/features/fable-builder/context/GlyphContext'
-import { ResolvedConfigContext } from '@/features/fable-builder/context/ResolvedConfigContext'
-import { FieldErrorsContext } from '@/features/fable-builder/context/FieldErrorsContext'
+import { BlockValidationProvider } from '@/features/fable-builder/context/BlockValidationContext'
 import { useUiStore } from '@/stores/uiStore'
 
 function ControlledDateTime({
@@ -35,24 +34,22 @@ function ControlledDateTime({
   const [value, setValue] = useState(initialValue)
   return (
     <GlyphContext.Provider value={[]}>
-      <ResolvedConfigContext.Provider value={null}>
-        <FieldErrorsContext.Provider value={null}>
-          <DateTimeField
-            id="base-time"
-            configKey="base_time"
-            value={value}
-            onChange={setValue}
-            isDateOnly={isDateOnly}
-          />
-          <span data-testid="value">{value}</span>
-          <button
-            type="button"
-            onClick={() => useUiStore.getState().setTimeZone('Europe/Berlin')}
-          >
-            switch to Berlin
-          </button>
-        </FieldErrorsContext.Provider>
-      </ResolvedConfigContext.Provider>
+      <BlockValidationProvider resolvedConfig={null} fieldErrors={null}>
+        <DateTimeField
+          id="base-time"
+          configKey="base_time"
+          value={value}
+          onChange={setValue}
+          isDateOnly={isDateOnly}
+        />
+        <span data-testid="value">{value}</span>
+        <button
+          type="button"
+          onClick={() => useUiStore.getState().setTimeZone('Europe/Berlin')}
+        >
+          switch to Berlin
+        </button>
+      </BlockValidationProvider>
     </GlyphContext.Provider>
   )
 }

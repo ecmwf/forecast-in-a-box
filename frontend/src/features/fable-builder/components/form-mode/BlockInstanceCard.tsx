@@ -33,8 +33,7 @@ import {
 import { P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import { FieldRenderer } from '@/components/base/fields/FieldRenderer'
-import { ResolvedConfigContext } from '@/features/fable-builder/context/ResolvedConfigContext'
-import { FieldErrorsContext } from '@/features/fable-builder/context/FieldErrorsContext'
+import { BlockValidationProvider } from '@/features/fable-builder/context/BlockValidationContext'
 import { mapBlockErrorsToFields } from '@/features/fable-builder/utils/map-block-errors-to-fields'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import {
@@ -317,28 +316,29 @@ export function BlockInstanceCard({
               )}
 
               {Object.keys(factory.configuration_options).length > 0 ? (
-                <ResolvedConfigContext.Provider value={resolvedConfigForBlock}>
-                  <FieldErrorsContext.Provider value={mappedErrors.byConfigKey}>
-                    <div className="space-y-4">
-                      {Object.entries(factory.configuration_options).map(
-                        ([key, option]) => (
-                          <FieldRenderer
-                            key={key}
-                            id={`${instanceId}-${key}`}
-                            configKey={key}
-                            valueType={option.value_type}
-                            value={instance.configuration_values[key] ?? ''}
-                            onChange={(value) =>
-                              updateBlockConfig(instanceId, key, value)
-                            }
-                            label={option.title}
-                            description={option.description}
-                          />
-                        ),
-                      )}
-                    </div>
-                  </FieldErrorsContext.Provider>
-                </ResolvedConfigContext.Provider>
+                <BlockValidationProvider
+                  resolvedConfig={resolvedConfigForBlock}
+                  fieldErrors={mappedErrors.byConfigKey}
+                >
+                  <div className="space-y-4">
+                    {Object.entries(factory.configuration_options).map(
+                      ([key, option]) => (
+                        <FieldRenderer
+                          key={key}
+                          id={`${instanceId}-${key}`}
+                          configKey={key}
+                          valueType={option.value_type}
+                          value={instance.configuration_values[key] ?? ''}
+                          onChange={(value) =>
+                            updateBlockConfig(instanceId, key, value)
+                          }
+                          label={option.title}
+                          description={option.description}
+                        />
+                      ),
+                    )}
+                  </div>
+                </BlockValidationProvider>
               ) : (
                 <P className="py-2 text-center text-muted-foreground">
                   No configuration options

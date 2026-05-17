@@ -39,8 +39,10 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { useGlyphContext } from '@/features/fable-builder/context/GlyphContext'
-import { useResolvedConfig } from '@/features/fable-builder/context/ResolvedConfigContext'
-import { useFieldErrors } from '@/features/fable-builder/context/FieldErrorsContext'
+import {
+  useFieldErrors,
+  useResolvedConfig,
+} from '@/features/fable-builder/context/BlockValidationContext'
 import { containsGlyphs } from '@/features/fable-builder/utils/glyph-display'
 import {
   applyFloorDay,

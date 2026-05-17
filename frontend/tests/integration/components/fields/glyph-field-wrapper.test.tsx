@@ -30,8 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { GlyphContext } from '@/features/fable-builder/context/GlyphContext'
-import { ResolvedConfigContext } from '@/features/fable-builder/context/ResolvedConfigContext'
-import { FieldErrorsContext } from '@/features/fable-builder/context/FieldErrorsContext'
+import { BlockValidationProvider } from '@/features/fable-builder/context/BlockValidationContext'
 
 // ---------------------------------------------------------------------------
 // Test data
@@ -75,11 +74,12 @@ function WithGlyphs({
 }) {
   return (
     <GlyphContext.Provider value={glyphs}>
-      <ResolvedConfigContext.Provider value={resolvedConfig}>
-        <FieldErrorsContext.Provider value={fieldErrors}>
-          {children}
-        </FieldErrorsContext.Provider>
-      </ResolvedConfigContext.Provider>
+      <BlockValidationProvider
+        resolvedConfig={resolvedConfig}
+        fieldErrors={fieldErrors}
+      >
+        {children}
+      </BlockValidationProvider>
     </GlyphContext.Provider>
   )
 }

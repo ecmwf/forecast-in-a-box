@@ -41,8 +41,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { FieldRenderer } from '@/components/base/fields/FieldRenderer'
-import { ResolvedConfigContext } from '@/features/fable-builder/context/ResolvedConfigContext'
-import { FieldErrorsContext } from '@/features/fable-builder/context/FieldErrorsContext'
+import { BlockValidationProvider } from '@/features/fable-builder/context/BlockValidationContext'
 import { mapBlockErrorsToFields } from '@/features/fable-builder/utils/map-block-errors-to-fields'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -275,36 +274,37 @@ export const InlineBlockNode = memo(function ({
         )}
 
         {configOptions.length > 0 && (
-          <ResolvedConfigContext.Provider
-            value={validationState?.resolvedConfigurationOptions[id] ?? null}
+          <BlockValidationProvider
+            resolvedConfig={
+              validationState?.resolvedConfigurationOptions[id] ?? null
+            }
+            fieldErrors={mappedErrors.byConfigKey}
           >
-            <FieldErrorsContext.Provider value={mappedErrors.byConfigKey}>
-              <div className="space-y-3">
-                {inputs.length > 0 && <Separator />}
-                <div className="text-sm font-medium text-muted-foreground">
-                  Configuration
-                </div>
-                {configOptions.map(([key, option]) => (
-                  <div
-                    key={key}
-                    className="nodrag space-y-1"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <FieldRenderer
-                      id={`config-${id}-${key}`}
-                      configKey={key}
-                      valueType={option.value_type}
-                      value={instance.configuration_values[key] || ''}
-                      onChange={(value) => updateBlockConfig(id, key, value)}
-                      label={option.title || key}
-                      description={option.description}
-                      inputClassName="h-8 text-sm"
-                    />
-                  </div>
-                ))}
+            <div className="space-y-3">
+              {inputs.length > 0 && <Separator />}
+              <div className="text-sm font-medium text-muted-foreground">
+                Configuration
               </div>
-            </FieldErrorsContext.Provider>
-          </ResolvedConfigContext.Provider>
+              {configOptions.map(([key, option]) => (
+                <div
+                  key={key}
+                  className="nodrag space-y-1"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FieldRenderer
+                    id={`config-${id}-${key}`}
+                    configKey={key}
+                    valueType={option.value_type}
+                    value={instance.configuration_values[key] || ''}
+                    onChange={(value) => updateBlockConfig(id, key, value)}
+                    label={option.title || key}
+                    description={option.description}
+                    inputClassName="h-8 text-sm"
+                  />
+                </div>
+              ))}
+            </div>
+          </BlockValidationProvider>
         )}
       </div>
       <BlockErrorOverlay errors={errors} />
