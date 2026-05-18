@@ -488,12 +488,12 @@ class MapPlotSink(Sink):
             description="Output image format",
             value_type="enumClosed['png', 'pdf', 'svg']",
         ),
-        "groupby": BlockConfigurationOption(
+        ConfigurationOptionId("groupby"): BlockConfigurationOption(
             title="Group By",
             description="Dimension to create subplots over",
             value_type="enumClosed['valid_datetime', 'step', 'number', 'none']",
         ),
-        "style_schema": BlockConfigurationOption(
+        ConfigurationOptionId("style_schema"): BlockConfigurationOption(
             title="Style Schema",
             description="earthkit-plots schema identifier",
             value_type="str",
@@ -512,7 +512,7 @@ class MapPlotSink(Sink):
         if missing:
             return Either.error(f"params {missing} are not in the input parameters: {axes(input_dataset).get(PARAM, [])}")
 
-        groupby_value = block.configuration_values["groupby"]
+        groupby_value = block.config_as_str("groupby")
         if groupby_value not in ("valid_datetime", "step", "number", "none"):
             return Either.error(
                 f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
@@ -539,10 +539,12 @@ class MapPlotSink(Sink):
         merged = inputs[input_task].combine_branches(dim=PARAM, force=True)
         selected = merged.select({PARAM: params if len(params) > 1 else params[0]})
 
-        groupby = block.configuration_values["groupby"] or "valid_datetime"
+        groupby = block.config_as_str("groupby")
 
         if groupby != "none":
             selected = selected.flatten(keep_dims=[groupby])
+        else:
+            groupby = None
 
         action = selected.map(
             Payload(
@@ -550,8 +552,8 @@ class MapPlotSink(Sink):
                 kwargs={
                     "domain": block.config_as_str(DOMAIN) or None,
                     "format": block.config_as_str(FORMAT),
-                    "groupby": block.configuration_values["groupby"] or "valid_datetime",
-                    "style_schema": block.configuration_values["style_schema"] or "inbuilt://fiab",
+                    "groupby": groupby,
+                    "style_schema": block.config_as_str("style_schema") or "inbuilt://fiab",
                 },
                 metadata={"environment": ["earthkit-plots<1.0.0", "earthkit-regrid<1.0.0"]},
             )
