@@ -78,6 +78,7 @@ import {
   parseCapabilities,
   partitionGroups,
   rebaseLensUrl,
+  skinnyWmsBasemap,
   uniquePressureLevels,
 } from './wms-capabilities'
 import type VectorTileSource from 'ol/source/VectorTile'
@@ -110,7 +111,8 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('WmsViewer')
 
-type BasemapOption =
+// External web basemaps (Carto); the SkinnyWMS native basemap is separate.
+type ExternalBasemapOption =
   | {
       type: 'raster'
       id: string
@@ -128,7 +130,16 @@ type BasemapOption =
       styleUrl: string
     }
 
-const BASEMAPS: ReadonlyArray<BasemapOption> = [
+// SkinnyWMS's own map — `background` as the base, borders overlaid.
+interface SkinnyWmsBasemapOption {
+  type: 'skinnywms'
+  id: string
+  label: string
+}
+
+type BasemapOption = ExternalBasemapOption | SkinnyWmsBasemapOption
+
+const BASEMAPS: ReadonlyArray<ExternalBasemapOption> = [
   {
     type: 'vector',
     id: 'carto-positron-vector',
@@ -145,8 +156,18 @@ const BASEMAPS: ReadonlyArray<BasemapOption> = [
     tilePixelRatio: 1,
   },
 ]
+
+// Fixed identity; the actual layers come from the lens capabilities.
+const SKINNYWMS_BASEMAP: SkinnyWmsBasemapOption = {
+  type: 'skinnywms',
+  id: 'skinnywms-native',
+  label: 'SkinnyWMS (native)',
+}
+
 const DEFAULT_BASEMAP_ID = BASEMAPS[0].id
 const DEFAULT_LAYER_OPACITY = 0.85
+// SkinnyWMS border overlay sits above every data layer (which use z 1…N).
+const REFERENCE_OVERLAY_Z = 1000
 
 // Standard Web Mercator world extent (projection asymptotes at ±85.0511°);
 // constrains panning to the basemap's coverage.
@@ -162,9 +183,10 @@ const INITIAL_VIEW_BBOX_WGS84: [number, number, number, number] = [
   -180, -55, 180, 85,
 ]
 
-type BasemapLayer = TileLayer<XYZ> | VectorTileLayer
+type ExternalBasemapLayer = TileLayer<XYZ> | VectorTileLayer
+type BasemapLayer = ExternalBasemapLayer | ImageLayer<ImageWMS>
 
-function makeBasemapLayer(opt: BasemapOption): BasemapLayer {
+function makeBasemapLayer(opt: ExternalBasemapOption): ExternalBasemapLayer {
   if (opt.type === 'raster') {
     const source = new XYZ({
       url: opt.url,
@@ -185,6 +207,29 @@ function makeBasemapLayer(opt: BasemapOption): BasemapLayer {
     log.error('Failed to apply vector basemap style', { error: err }),
   )
   return layer
+}
+
+// SkinnyWMS's `background` layer as a basemap — ImageWMS, like the data layers.
+function makeSkinnyWmsBasemap(
+  baseUrl: string,
+  backgroundLayerName: string,
+): ImageLayer<ImageWMS> {
+  const source = new ImageWMS({
+    url: `${baseUrl}/wms`,
+    params: {
+      LAYERS: backgroundLayerName,
+      STYLES: '',
+      FORMAT: 'image/png',
+      // Opaque — it's the base layer.
+      TRANSPARENT: 'FALSE',
+    },
+    // hidpi/ratio mirror the data layers (see their ImageWMS for why).
+    serverType: 'mapserver',
+    crossOrigin: 'anonymous',
+    hidpi: false,
+    ratio: 1,
+  })
+  return new ImageLayer({ source })
 }
 
 interface WmsViewerProps {
@@ -211,6 +256,9 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
   const basemapLayerRef = useRef<BasemapLayer | null>(null)
 
   const [layers, setLayers] = useState<Array<ParsedLayer>>([])
+  const [decorationLayers, setDecorationLayers] = useState<Array<ParsedLayer>>(
+    [],
+  )
   const [bbox, setBbox] = useState<[number, number, number, number] | null>(
     null,
   )
@@ -289,6 +337,7 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
           if (ac.signal.aborted) return
           const parsed = parseCapabilities(xml)
           setLayers(parsed.layers)
+          setDecorationLayers(parsed.decorationLayers)
           setBbox(parsed.bbox)
           setLoadingLayers(false)
           setRetrying(false)
@@ -338,6 +387,18 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
 
   const [basemapId, setBasemapId] = useState<string>(DEFAULT_BASEMAP_ID)
   const previousBasemapIdRef = useRef<string>(DEFAULT_BASEMAP_ID)
+
+  // SkinnyWMS decoration layers, split into base map + reference layers.
+  const skinnyBasemap = useMemo(
+    () => skinnyWmsBasemap(decorationLayers),
+    [decorationLayers],
+  )
+  // Offer the SkinnyWMS basemap only once a `background` layer is advertised.
+  const availableBasemaps = useMemo<ReadonlyArray<BasemapOption>>(
+    () =>
+      skinnyBasemap.background ? [...BASEMAPS, SKINNYWMS_BASEMAP] : BASEMAPS,
+    [skinnyBasemap.background],
+  )
 
   useLayoutEffect(() => {
     const container = containerRef.current
@@ -390,24 +451,77 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
   }, [bbox, tryFit])
 
   // -------- Basemap swap --------
-  // Full layer replacement (not setSource) because raster (TileLayer) and
-  // vector (VectorTileLayer) basemaps are different OL layer types.
+  // Full layer replacement (not setSource) — the basemap types differ.
   useEffect(() => {
     const map = mapRef.current
     const oldLayer = basemapLayerRef.current
     if (!map || !oldLayer) return
     if (previousBasemapIdRef.current === basemapId) return
     previousBasemapIdRef.current = basemapId
-    const opt = BASEMAPS.find((b) => b.id === basemapId) ?? BASEMAPS[0]
-    const newLayer = makeBasemapLayer(opt)
-    const source = newLayer.getSource()
-    source?.on('tileloadstart', incLoading)
-    source?.on('tileloadend', decLoading)
-    source?.on('tileloaderror', decLoading)
+    const opt = availableBasemaps.find((b) => b.id === basemapId) ?? BASEMAPS[0]
+    let newLayer: BasemapLayer
+    if (opt.type === 'skinnywms' && skinnyBasemap.background) {
+      const skinny = makeSkinnyWmsBasemap(
+        baseUrl,
+        skinnyBasemap.background.name,
+      )
+      const source = skinny.getSource()
+      source?.on('imageloadstart', incLoading)
+      source?.on('imageloadend', decLoading)
+      source?.on('imageloaderror', decLoading)
+      newLayer = skinny
+    } else {
+      // Carto basemap — or skinnywms with no background, which falls back.
+      const external = opt.type === 'skinnywms' ? BASEMAPS[0] : opt
+      const tiled = makeBasemapLayer(external)
+      const source = tiled.getSource()
+      source?.on('tileloadstart', incLoading)
+      source?.on('tileloadend', decLoading)
+      source?.on('tileloaderror', decLoading)
+      newLayer = tiled
+    }
     map.removeLayer(oldLayer)
     map.getLayers().insertAt(0, newLayer)
     basemapLayerRef.current = newLayer
-  }, [basemapId, incLoading, decLoading])
+  }, [
+    basemapId,
+    availableBasemaps,
+    skinnyBasemap.background,
+    baseUrl,
+    incLoading,
+    decLoading,
+  ])
+
+  // -------- SkinnyWMS reference overlay --------
+  // Coastline/border layers over the data while the SkinnyWMS basemap is
+  // active. Tied to the basemap choice — no separate toggle.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    if (basemapId !== SKINNYWMS_BASEMAP.id) return
+    if (skinnyBasemap.reference.length === 0) return
+    const source = new ImageWMS({
+      url: `${baseUrl}/wms`,
+      params: {
+        LAYERS: skinnyBasemap.reference.map((l) => l.name).join(','),
+        STYLES: '',
+        FORMAT: 'image/png',
+        TRANSPARENT: 'TRUE',
+      },
+      serverType: 'mapserver',
+      crossOrigin: 'anonymous',
+      hidpi: false,
+      ratio: 1,
+    })
+    source.on('imageloadstart', incLoading)
+    source.on('imageloadend', decLoading)
+    source.on('imageloaderror', decLoading)
+    const overlay = new ImageLayer({ source, zIndex: REFERENCE_OVERLAY_Z })
+    map.addLayer(overlay)
+    return () => {
+      map.removeLayer(overlay)
+    }
+  }, [basemapId, skinnyBasemap.reference, baseUrl, incLoading, decLoading])
 
   // -------- WMS layer rendering --------
   // One ImageLayer per active layer. Single-image mode (vs. TileWMS) so
@@ -872,7 +986,7 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
                 {t('lens.basemap')}
               </P>
               <div className="flex flex-col">
-                {BASEMAPS.map((b) => (
+                {availableBasemaps.map((b) => (
                   <button
                     key={b.id}
                     type="button"

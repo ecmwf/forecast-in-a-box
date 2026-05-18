@@ -37,6 +37,9 @@ export interface ParsedLayer {
 
 export interface ParsedCapabilities {
   layers: Array<ParsedLayer>
+  /** SkinnyWMS decoration layers (background, coastlines, borders…), excluded
+   * from the parameter grid — see {@link skinnyWmsBasemap}. */
+  decorationLayers: Array<ParsedLayer>
   /** [minLon, minLat, maxLon, maxLat] in WGS84 (EPSG:4326). */
   bbox: [number, number, number, number]
   supportsGetFeatureInfo: boolean
@@ -69,11 +72,55 @@ const DECORATION_LAYER_KEYS = new Set([
   'us-states',
 ])
 
-function isDecorationLayer(layer: ParsedLayer): boolean {
+/** The decoration-layer key a layer matches (by name or normalised title),
+ * or null if it's a real data parameter. */
+function decorationKeyOf(layer: ParsedLayer): string | null {
   const nameKey = layer.name.toLowerCase()
-  if (DECORATION_LAYER_KEYS.has(nameKey)) return true
+  if (DECORATION_LAYER_KEYS.has(nameKey)) return nameKey
   const titleKey = layer.title.toLowerCase().trim().replace(/\s+/g, '_')
-  return DECORATION_LAYER_KEYS.has(titleKey)
+  return DECORATION_LAYER_KEYS.has(titleKey) ? titleKey : null
+}
+
+function isDecorationLayer(layer: ParsedLayer): boolean {
+  return decorationKeyOf(layer) !== null
+}
+
+/** Line-style decoration layers — safe to draw on top of data, unlike the
+ * `background` base or area fills (land/ocean), which would hide it. */
+const REFERENCE_LAYER_KEYS = new Set([
+  'foreground',
+  'boundaries',
+  'coastlines',
+  'countries',
+  'rivers',
+  'graticule',
+  'us_states',
+  'us-states',
+])
+
+/** SkinnyWMS decoration layers split for use as a native basemap. */
+export interface SkinnyWmsBasemap {
+  /** Opaque base map (ocean/land shading); null if not advertised. */
+  background: ParsedLayer | null
+  /** Coastlines/borders/grid — drawn on top of the data. */
+  reference: Array<ParsedLayer>
+}
+
+/** Split decoration layers into a native basemap: the opaque `background`
+ * plus line-style reference layers. Area fills are dropped (they'd hide data). */
+export function skinnyWmsBasemap(
+  decorationLayers: ReadonlyArray<ParsedLayer>,
+): SkinnyWmsBasemap {
+  let background: ParsedLayer | null = null
+  const reference: Array<ParsedLayer> = []
+  for (const layer of decorationLayers) {
+    const key = decorationKeyOf(layer)
+    if (key === 'background') background = layer
+    else if (key !== null && REFERENCE_LAYER_KEYS.has(key)) {
+      reference.push(layer)
+    }
+  }
+  return { background, reference }
 }
 
 /**
@@ -97,9 +144,13 @@ export function parseCapabilities(xml: string): ParsedCapabilities {
 
   const collected: Array<ParsedLayer> = []
   if (root) collectLeafLayers(root, collected)
-  const layers = collected.filter((l) => !isDecorationLayer(l))
+  const layers: Array<ParsedLayer> = []
+  const decorationLayers: Array<ParsedLayer> = []
+  for (const layer of collected) {
+    ;(isDecorationLayer(layer) ? decorationLayers : layers).push(layer)
+  }
 
-  return { layers, bbox, supportsGetFeatureInfo }
+  return { layers, decorationLayers, bbox, supportsGetFeatureInfo }
 }
 
 function collectLeafLayers(el: Element, out: Array<ParsedLayer>): void {
