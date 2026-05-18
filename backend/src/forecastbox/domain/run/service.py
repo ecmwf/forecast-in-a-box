@@ -30,7 +30,7 @@ from typing import cast
 
 from cascade.controller.report import JobId
 from cascade.gateway import api, client
-from cascade.low.core import TaskId
+from cascade.low.core import DatasetId, TaskId
 from cascade.low.func import Either
 from fiab_core.fable import BlockInstanceId
 
@@ -39,6 +39,7 @@ import forecastbox.domain.run.db as run_db
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.background import execute_background
+from forecastbox.domain.run.cascade import RunOutputs
 from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.exceptions import RunNotFound
 from forecastbox.domain.run.types import RunId
@@ -79,6 +80,24 @@ class ExecuteResult(FiabBaseModel):
     """Logical execution id (Run.id)."""
     attempt_count: int
     """Attempt number; always 1 on a fresh execution."""
+
+
+def get_mime_of_output(execution: Run, dataset_id: DatasetId) -> Either[str, str]:  # ty: ignore[invalid-type-arguments]
+    """Return the declared mime type for a run output task."""
+    raw_outputs = cast(dict | None, execution.outputs)
+    if raw_outputs is None:
+        return Either.error(f"Run {execution.run_id!r} has no recorded outputs yet")
+
+    try:
+        outputs = RunOutputs.model_validate(raw_outputs)
+    except Exception as e:
+        return Either.error(f"Run {execution.run_id!r} has invalid output metadata: {e!r}")
+
+    task_id = dataset_id.task
+    characteristic = outputs.outputs.get(task_id)
+    if characteristic is None:
+        return Either.error(f"Output {task_id!r} not found for run {execution.run_id!r}")
+    return Either.ok(characteristic.mime_type)
 
 
 async def get_blueprint_for_execution(blueprint_id: BlueprintId, blueprint_version: int | None) -> Blueprint | None:

@@ -374,20 +374,22 @@ async def get_run_output_content(
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> Response:
     """Retrieve the result of a specific output task, encoded as bytes."""
-    _, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
+    execution, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
+    dataset = DatasetId(task=TaskId(dataset_id), output="0")
+    mime_result = service.get_mime_of_output(execution, dataset)
+    if mime_result.t is None:
+        raise HTTPException(500, f"Result mime lookup failed: {mime_result.e}")
     response = client.request_response(
-        api.ResultRetrievalRequest(job_id=JobId(cascade_job_id), dataset_id=DatasetId(task=TaskId(dataset_id), output="0")),
+        api.ResultRetrievalRequest(job_id=JobId(cascade_job_id), dataset_id=dataset),
         f"{config.cascade.cascade_url}",
     )
     response = cast(api.ResultRetrievalResponse, response)
     if response.error:
         raise HTTPException(500, f"Result retrieval failed: {response.error}")
-    try:
-        bytez, media_type = encode_result(response)
-    except Exception as e:
-        logger.exception("decoding failure")
-        raise HTTPException(500, f"Result decoding failed: {repr(e)}")
-    return Response(bytez, media_type=media_type)
+    encoded = encode_result(response, mime_result.t)
+    if encoded.t is None:
+        raise HTTPException(500, f"Result decoding failed: {encoded.e}")
+    return Response(encoded.t, media_type=mime_result.t)
 
 
 @router.get("/logs")
