@@ -14,7 +14,7 @@ import { Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Node, NodeProps } from '@xyflow/react'
 import type { BlockKind, PluginBlockFactoryId } from '@/api/types/fable.types'
-import { BLOCK_KIND_METADATA } from '@/api/types/fable.types'
+import { BLOCK_KIND_METADATA, factoryIdToKey } from '@/api/types/fable.types'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -81,7 +81,7 @@ export const AddBlockNode = memo(function ({
         <DropdownMenuContent>
           {addOptions.map((option) => (
             <DropdownMenuItem
-              key={`${option.factoryId.plugin.store}/${option.factoryId.plugin.local}:${option.factoryId.factory}`}
+              key={factoryIdToKey(option.factoryId)}
               onClick={() => onAddBlock(option.factoryId)}
             >
               {option.title}

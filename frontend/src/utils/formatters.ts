@@ -56,40 +56,6 @@ export function formatDateTime(
 }
 
 /**
- * Format a date as a relative time string (e.g. "2 hours ago"). Relative time
- * is timezone-independent; `timeZone` only affects the >30-day date fallback.
- */
-export function formatRelativeTime(
-  date: Date | string | number,
-  timeZone: string = getAppTimeZone(),
-): string {
-  const d = toDate(date)
-  const now = new Date()
-  const diffInSeconds = Math.floor((now.getTime() - d.getTime()) / 1000)
-
-  if (diffInSeconds < 60) {
-    return 'just now'
-  }
-
-  const diffInMinutes = Math.floor(diffInSeconds / 60)
-  if (diffInMinutes < 60) {
-    return `${diffInMinutes} minute${diffInMinutes === 1 ? '' : 's'} ago`
-  }
-
-  const diffInHours = Math.floor(diffInMinutes / 60)
-  if (diffInHours < 24) {
-    return `${diffInHours} hour${diffInHours === 1 ? '' : 's'} ago`
-  }
-
-  const diffInDays = Math.floor(diffInHours / 24)
-  if (diffInDays < 30) {
-    return `${diffInDays} day${diffInDays === 1 ? '' : 's'} ago`
-  }
-
-  return formatDate(d, timeZone)
-}
-
-/**
  * Component hook returning date formatters bound to the app timezone. The
  * returned functions update when the user changes the timezone.
  */
@@ -120,26 +86,4 @@ export function truncate(str: string, maxLength: number): string {
 export function capitalize(str: string): string {
   if (!str) return ''
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
-}
-
-/**
- * Format a number with thousand separators
- */
-export function formatNumber(num: number): string {
-  return num.toLocaleString()
-}
-
-/**
- * Format bytes to human-readable size
- */
-export function formatBytes(bytes: number, decimals = 2): string {
-  if (bytes === 0) return '0 Bytes'
-
-  const k = 1024
-  const dm = decimals < 0 ? 0 : decimals
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB']
-
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`
 }

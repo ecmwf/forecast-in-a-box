@@ -91,19 +91,6 @@ export const EnvironmentSpecificationSchema = z.object({
   runtime_artifacts: z.array(CompositeArtifactIdSchema).default([]),
 })
 
-/** routes/run.py: RawCascadeJob */
-const RawCascadeJobSchema = z.object({
-  job_type: z.literal('raw_cascade_job'),
-  job_instance: z.unknown(),
-})
-
-/** routes/run.py: ExecutionSpecification */
-export const ExecutionSpecificationSchema = z.object({
-  job: RawCascadeJobSchema,
-  environment: EnvironmentSpecificationSchema,
-  shared: z.boolean(),
-})
-
 // ---------------------------------------------------------------------------
 // Types (derived from schemas)
 // ---------------------------------------------------------------------------
@@ -126,9 +113,6 @@ export type JobExecutionDetail = z.infer<typeof JobExecutionDetailSchema>
 export type JobExecutionList = z.infer<typeof JobExecutionListSchema>
 export type EnvironmentSpecification = z.infer<
   typeof EnvironmentSpecificationSchema
->
-export type ExecutionSpecification = z.infer<
-  typeof ExecutionSpecificationSchema
 >
 
 /** POST /run/create request (not validated — outbound only) */

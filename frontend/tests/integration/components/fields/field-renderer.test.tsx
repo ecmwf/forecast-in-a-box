@@ -19,10 +19,7 @@ import { useState } from 'react'
 import { userEvent } from 'vitest/browser'
 import { describe, expect, it } from 'vitest'
 import { renderWithProviders } from '@tests/utils/render'
-import {
-  FieldRenderer,
-  InlineFieldRenderer,
-} from '@/components/base/fields/FieldRenderer'
+import { FieldRenderer } from '@/components/base/fields/FieldRenderer'
 
 /**
  * Controlled wrapper to capture onChange values
@@ -321,23 +318,6 @@ describe('FieldRenderer Integration', () => {
       await expect
         .element(screen.getByTestId('current-value'))
         .toHaveTextContent('2t,msl')
-    })
-  })
-
-  describe('InlineFieldRenderer', () => {
-    it('renders field without label wrapper', async () => {
-      const screen = await renderWithProviders(
-        <InlineFieldRenderer
-          id="inline-test"
-          configKey="inline-test"
-          valueType="str"
-          value="hello"
-          onChange={() => {}}
-        />,
-      )
-      const input = screen.getByRole('textbox')
-      await expect.element(input).toBeVisible()
-      await expect.element(input).toHaveValue('hello')
     })
   })
 

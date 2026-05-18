@@ -25,7 +25,8 @@ const log = createLogger('AuthAPI')
 
 /**
  * Validate that an authorization URL is safe to redirect to.
- * Rejects non-HTTPS URLs and javascript: protocol to prevent phishing and XSS.
+ * Requires the https: protocol — this rejects javascript:, http: and any
+ * other scheme, guarding against phishing and XSS.
  */
 function isValidAuthorizationUrl(url: string): boolean {
   try {

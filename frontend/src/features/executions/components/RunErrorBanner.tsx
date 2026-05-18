@@ -21,6 +21,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { downloadJobLogs } from '@/api/endpoints/job'
 import { createLogger } from '@/lib/logger'
+import { downloadBlob } from '@/lib/download-blob'
 import { showToast } from '@/lib/toast'
 
 const log = createLogger('RunErrorBanner')
@@ -45,14 +46,7 @@ export function RunErrorBanner({
   const handleDownloadLogs = async () => {
     try {
       const blob = await downloadJobLogs(jobId)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `job-${jobId}-logs.zip`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, `job-${jobId}-logs.zip`)
     } catch (err) {
       log.error('Failed to download logs', { jobId, error: err })
       showToast.error(

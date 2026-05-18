@@ -62,42 +62,60 @@ export function clearDraft(): void {
 export function useDraftPersistence(): void {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Debounced write: subscribe to store changes
+  // Debounced write: subscribe only to the draft-relevant slices so the
+  // listener doesn't run on every unrelated UI state change (panels, mode, …).
   useEffect(() => {
-    const unsub = useFableBuilderStore.subscribe((state, prevState) => {
-      // Clear draft immediately on save
-      if (state.lastSavedAt !== prevState.lastSavedAt) {
-        clearDraft()
-        if (timerRef.current) {
-          clearTimeout(timerRef.current)
-          timerRef.current = null
+    const unsub = useFableBuilderStore.subscribe(
+      (state) => ({
+        fable: state.fable,
+        fableName: state.fableName,
+        isDirty: state.isDirty,
+        lastSavedAt: state.lastSavedAt,
+      }),
+      (selected, prevSelected) => {
+        // Clear draft immediately on save
+        if (selected.lastSavedAt !== prevSelected.lastSavedAt) {
+          clearDraft()
+          if (timerRef.current) {
+            clearTimeout(timerRef.current)
+            timerRef.current = null
+          }
+          useFableBuilderStore.setState({ draftWritePending: false })
+          return
         }
-        useFableBuilderStore.setState({ draftWritePending: false })
-        return
-      }
 
-      // Only persist when dirty and fable data actually changed
-      if (!state.isDirty) return
-      if (
-        state.fable === prevState.fable &&
-        state.fableName === prevState.fableName
-      )
-        return
+        // Only persist when dirty and fable data actually changed
+        if (!selected.isDirty) return
+        if (
+          selected.fable === prevSelected.fable &&
+          selected.fableName === prevSelected.fableName
+        )
+          return
 
-      if (timerRef.current) clearTimeout(timerRef.current)
-      useFableBuilderStore.setState({ draftWritePending: true })
-      timerRef.current = setTimeout(() => {
-        writeDraft({
-          fable: state.fable,
-          fableId: state.fableId,
-          fableName: state.fableName,
-          fableVersion: state.fableVersion,
-          savedAt: Date.now(),
-        })
-        timerRef.current = null
-        useFableBuilderStore.setState({ draftWritePending: false })
-      }, DEBOUNCE_MS)
-    })
+        if (timerRef.current) clearTimeout(timerRef.current)
+        useFableBuilderStore.setState({ draftWritePending: true })
+        timerRef.current = setTimeout(() => {
+          const { fable, fableId, fableName, fableVersion } =
+            useFableBuilderStore.getState()
+          writeDraft({
+            fable,
+            fableId,
+            fableName,
+            fableVersion,
+            savedAt: Date.now(),
+          })
+          timerRef.current = null
+          useFableBuilderStore.setState({ draftWritePending: false })
+        }, DEBOUNCE_MS)
+      },
+      {
+        equalityFn: (a, b) =>
+          a.fable === b.fable &&
+          a.fableName === b.fableName &&
+          a.isDirty === b.isDirty &&
+          a.lastSavedAt === b.lastSavedAt,
+      },
+    )
 
     return () => {
       unsub()

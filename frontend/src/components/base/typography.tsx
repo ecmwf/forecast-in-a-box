@@ -26,8 +26,6 @@ const typographyVariants = cva('text-foreground', {
       h3: 'scroll-m-20 text-lg font-semibold tracking-tight',
       h4: 'scroll-m-20 text-base font-semibold tracking-tight',
       p: 'text-sm',
-      blockquote: 'mt-6 border-l-2 pl-6 italic',
-      list: 'my-6 ml-6 list-disc [&>li]:mt-2',
       lead: 'text-xl text-muted-foreground',
       large: 'text-lg font-semibold',
       small: 'text-sm font-medium leading-none',
@@ -163,30 +161,6 @@ export function P({
   )
 }
 
-export function Blockquote({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLQuoteElement>) {
-  return (
-    <blockquote
-      className={cn(typographyVariants({ variant: 'blockquote' }), className)}
-      {...props}
-    />
-  )
-}
-
-export function List({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLUListElement>) {
-  return (
-    <ul
-      className={cn(typographyVariants({ variant: 'list' }), className)}
-      {...props}
-    />
-  )
-}
-
 /**
  * SPECIAL CASE: LINK COMPONENT
  * Handles external vs internal links automatically while using the CVA style.
@@ -243,4 +217,4 @@ export function Link({
   )
 }
 
-export { Typography, typographyVariants, linkVariants }
+export { Typography }

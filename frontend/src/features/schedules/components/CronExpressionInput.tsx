@@ -12,6 +12,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { CronFrequency } from '@/features/schedules/utils/cron'
 import {
+  DAY_NAME_KEYS,
   cronToHumanReadable,
   frequencyToCron,
   localHourMinuteToServer,
@@ -45,25 +46,12 @@ const FREQUENCY_OPTIONS: Array<{
   { value: 'custom', labelKey: 'cron.frequency.custom' },
 ]
 
-const DAY_OPTIONS: Array<{
-  value: number
-  labelKey:
-    | 'cron.days.sunday'
-    | 'cron.days.monday'
-    | 'cron.days.tuesday'
-    | 'cron.days.wednesday'
-    | 'cron.days.thursday'
-    | 'cron.days.friday'
-    | 'cron.days.saturday'
-}> = [
-  { value: 0, labelKey: 'cron.days.sunday' },
-  { value: 1, labelKey: 'cron.days.monday' },
-  { value: 2, labelKey: 'cron.days.tuesday' },
-  { value: 3, labelKey: 'cron.days.wednesday' },
-  { value: 4, labelKey: 'cron.days.thursday' },
-  { value: 5, labelKey: 'cron.days.friday' },
-  { value: 6, labelKey: 'cron.days.saturday' },
-]
+// Day-of-week index is the cron `dayOfWeek` value (0 = Sunday); labels reuse
+// the shared DAY_NAME_KEYS so the two day-name lists cannot drift apart.
+const DAY_OPTIONS = DAY_NAME_KEYS.map((labelKey, value) => ({
+  value,
+  labelKey,
+}))
 
 export function CronExpressionInput({
   value,

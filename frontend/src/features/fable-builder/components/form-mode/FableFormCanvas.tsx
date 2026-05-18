@@ -16,6 +16,7 @@ import { BlockTabs } from './BlockTabs'
 import { FormPaletteSidebar } from './FormPaletteSidebar'
 import { PipelineDiagram } from './PipelineDiagram'
 import { PipelineSidebar } from './PipelineSidebar'
+import type { ControlDirection } from './mini-graph/NodeControls'
 import type {
   BlockFactoryCatalogue,
   BlockInstanceId,
@@ -171,21 +172,37 @@ export function FableFormCanvas({ catalogue }: FableFormCanvasProps) {
     }
   }
 
-  // Add a new block and connect it to a source block
+  // Add a new block and wire it relative to an anchor block.
+  // `direction` decides which way the connection runs:
+  // - 'parent'        → the new block feeds the anchor (anchor.input ← new)
+  // - 'child'/'sibling'/default → the anchor feeds the new block (new.input ← anchor)
   const handleAddConnectedBlock = (
     factoryId: PluginBlockFactoryId,
-    sourceBlockId: BlockInstanceId,
+    anchorBlockId: BlockInstanceId,
+    direction: ControlDirection = 'child',
   ) => {
     const factory = getFactory(catalogue, factoryId)
-    if (factory) {
-      const newBlockId = addBlock(factoryId, factory)
-      // Connect the first input of the new block to the source
-      if (factory.inputs.length > 0) {
-        connectBlocks(newBlockId, factory.inputs[0], sourceBlockId)
+    if (!factory) return
+
+    const newBlockId = addBlock(factoryId, factory)
+
+    if (direction === 'parent') {
+      // New block is upstream: connect it into the anchor's first input.
+      const anchor =
+        anchorBlockId in fable.blocks ? fable.blocks[anchorBlockId] : undefined
+      const anchorFactory = anchor
+        ? getFactory(catalogue, anchor.factory_id)
+        : undefined
+      if (anchorFactory && anchorFactory.inputs.length > 0) {
+        connectBlocks(anchorBlockId, anchorFactory.inputs[0], newBlockId)
       }
-      // Navigate to the new block's step
-      setCurrentStep(factory.kind)
+    } else if (factory.inputs.length > 0) {
+      // New block is downstream: connect the anchor into its first input.
+      connectBlocks(newBlockId, factory.inputs[0], anchorBlockId)
     }
+
+    // Navigate to the new block's step
+    setCurrentStep(factory.kind)
   }
 
   // Handle clicking on a block from within a card (downstream connection click)

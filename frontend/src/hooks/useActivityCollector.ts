@@ -29,6 +29,7 @@ import { useArtifacts, useDownloadModel } from '@/api/hooks/useArtifacts'
 import { useJobsStatus } from '@/api/hooks/useJobs'
 import { isTerminalStatus } from '@/api/types/job.types'
 import { useActivityStore } from '@/stores/activityStore'
+import { capitalize } from '@/utils/formatters'
 
 /**
  * Sync model downloads from the download store into the activity store.
@@ -143,10 +144,6 @@ function useCollectJobs() {
       }
     }
   }, [data])
-}
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 /**

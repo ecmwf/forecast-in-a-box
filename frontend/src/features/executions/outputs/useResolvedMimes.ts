@@ -9,10 +9,11 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { GENERIC_ADAPTER, resolveAdapter } from './registry'
 import { hasSnifferFor, maxSnifferBytes, runSniffers } from './sniffers'
+import { fetchJobResultHead } from './useJobResult'
 import type { OutputItem } from './types'
-import { getJobResult } from '@/api/endpoints/job'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('useResolvedMimes')
@@ -45,6 +46,7 @@ export function needsSniff(item: OutputItem): boolean {
 export function useResolvedMimes(
   items: ReadonlyArray<OutputItem>,
 ): Record<string, string> {
+  const queryClient = useQueryClient()
   const [resolvedMimes, setResolvedMimes] = useState<Record<string, string>>({})
   // taskIds already sniffed — survives the `items` identity churn of a
   // polling running-job query so each output is fetched exactly once.
@@ -63,9 +65,13 @@ export function useResolvedMimes(
       void (async () => {
         let effective = item.mimeType
         try {
-          const { blob } = await getJobResult(item.jobId, item.taskId)
-          const head = new Uint8Array(
-            await blob.slice(0, headBytes).arrayBuffer(),
+          // Range-bounded fetch: only the leading magic bytes, never the
+          // whole (potentially multi-gigabyte) payload.
+          const head = await fetchJobResultHead(
+            queryClient,
+            item.jobId,
+            item.taskId,
+            headBytes,
           )
           effective = runSniffers(item.mimeType, head) ?? item.mimeType
         } catch (err) {
@@ -75,7 +81,7 @@ export function useResolvedMimes(
         }
       })()
     }
-  }, [items])
+  }, [items, queryClient])
 
   return resolvedMimes
 }

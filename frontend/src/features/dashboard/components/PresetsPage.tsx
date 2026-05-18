@@ -10,7 +10,7 @@
 
 /** The standalone Configuration Presets page — search, filter and manage saved presets. */
 
-import { useMemo, useState } from 'react'
+import { memo, useCallback, useDeferredValue, useMemo, useState } from 'react'
 import { Bookmark, MoreVertical, Pencil, Star, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
@@ -45,8 +45,11 @@ import { Switch } from '@/components/ui/switch'
 import { useUiStore } from '@/stores/uiStore'
 import { cn } from '@/lib/utils'
 
-/** One preset row — mirrors the Forecast Journal row layout for consistency. */
-function PresetRow({
+/**
+ * One preset row — mirrors the Forecast Journal row layout for consistency.
+ * Memoised so a keystroke in the search box only re-renders changed rows.
+ */
+const PresetRow = memo(function ({
   preset,
   onDelete,
   onToggleFavourite,
@@ -200,7 +203,7 @@ function PresetRow({
       />
     </div>
   )
-}
+})
 
 const PAGE_SIZE = 10
 
@@ -260,15 +263,24 @@ export function PresetsPage() {
   const [filter, setFilter] = useState<PresetFilter>('all')
   const [page, setPage] = useState(1)
 
+  // Defer filtering so typing in the search box stays responsive on long lists.
+  const deferredQuery = useDeferredValue(query)
   const filteredPresets = useMemo(
-    () => filterPresets(presets, filter, parseQuery(query)),
-    [presets, filter, query],
+    () => filterPresets(presets, filter, parseQuery(deferredQuery)),
+    [presets, filter, deferredQuery],
   )
 
+  const handleAddFacet = useCallback((token: FacetToken) => {
+    setQuery((current) => addToken(current, token))
+    setPage(1)
+  }, [])
+
   const totalPages = Math.max(1, Math.ceil(filteredPresets.length / PAGE_SIZE))
+  // Clamp: a delete (or any list shrink) can leave `page` past the last page.
+  const currentPage = Math.min(page, totalPages)
   const paginatedPresets = filteredPresets.slice(
-    (page - 1) * PAGE_SIZE,
-    page * PAGE_SIZE,
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
   )
 
   return (
@@ -296,7 +308,7 @@ export function PresetsPage() {
                 aria-label={t('journal:flowToggle')}
               />
             </div>
-            {/* Temporary: monochrome mini-flow toggle (to be removed). */}
+            {/* Monochrome mini-flow toggle. */}
             {showFlow && (
               <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                 <span>{t('journal:flowMonochrome')}</span>
@@ -351,10 +363,7 @@ export function PresetsPage() {
                 preset={preset}
                 onDelete={deletePreset}
                 onToggleFavourite={toggleFavourite}
-                onAddFacet={(token) => {
-                  setQuery((current) => addToken(current, token))
-                  setPage(1)
-                }}
+                onAddFacet={handleAddFacet}
               />
             ))
           ) : query || filter !== 'all' ? (
@@ -369,7 +378,7 @@ export function PresetsPage() {
         </div>
 
         <Pagination
-          page={page}
+          page={currentPage}
           totalPages={totalPages}
           onPageChange={setPage}
         />

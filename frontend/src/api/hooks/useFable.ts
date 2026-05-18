@@ -93,42 +93,39 @@ export function useBlockCatalogue(language?: string) {
   })
 }
 
+/** Query key shared by useFable and useFableRetrieve — one request per fable. */
+const fableRetrieveKey = (fableId: string | null | undefined) =>
+  [...fableKeys.detail(fableId ?? ''), 'full'] as const
+
+/** Don't retry 4xx (e.g. 404 not found) — only retry server errors. */
+function retryRetrieve(failureCount: number, error: Error): boolean {
+  if (error instanceof ApiClientError && error.status && error.status < 500)
+    return false
+  return failureCount < QUERY_CONSTANTS.RETRY.MINIMAL
+}
+
+/**
+ * Retrieve a fable's builder. Shares one query (and one network request) with
+ * useFableRetrieve via a common query key + `select`.
+ */
 export function useFable(fableId: string | null | undefined) {
-  return useQuery<FableBuilderV1>({
-    queryKey: fableKeys.detail(fableId ?? ''),
-    queryFn: async () => {
-      const response = await retrieveFable(fableId!)
-      return response.builder
-    },
+  return useQuery<FableRetrieveResponse, Error, FableBuilderV1>({
+    queryKey: fableRetrieveKey(fableId),
+    queryFn: () => retrieveFable(fableId!),
+    select: (response) => response.builder,
     enabled: !!fableId,
-    staleTime: 30 * 1000, // 30 seconds
-    // Don't retry 4xx errors (e.g. 404 not found) — only retry server errors
-    retry: (failureCount, error) => {
-      if (error instanceof ApiClientError && error.status && error.status < 500)
-        return false
-      return failureCount < QUERY_CONSTANTS.RETRY.MINIMAL
-    },
+    staleTime: Infinity,
+    retry: retryRetrieve,
   })
 }
 
 export function useFableRetrieve(fableId: string | null | undefined) {
   return useQuery<FableRetrieveResponse>({
-    queryKey: [...fableKeys.detail(fableId ?? ''), 'full'],
+    queryKey: fableRetrieveKey(fableId),
     queryFn: () => retrieveFable(fableId!),
     enabled: !!fableId,
     staleTime: Infinity,
-    // Don't retry 4xx errors (e.g. 404 not found) — only retry server errors
-    retry: (failureCount, error) => {
-      if (error instanceof ApiClientError && error.status && error.status < 500)
-        return false
-      return failureCount < QUERY_CONSTANTS.RETRY.MINIMAL
-    },
-  })
-}
-
-export function useExpandFable() {
-  return useMutation<FableValidationExpansion, Error, FableBuilderV1>({
-    mutationFn: expandFable,
+    retry: retryRetrieve,
   })
 }
 

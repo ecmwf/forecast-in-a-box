@@ -28,6 +28,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { create } from 'zustand'
+import i18n from 'i18next'
 import type {
   ArtifactInfo,
   CompositeArtifactId,
@@ -47,9 +48,27 @@ import {
 } from '@/api/endpoints/artifacts'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
 import { createPollingTask } from '@/utils/polling'
+import { createLogger } from '@/lib/logger'
+import { showToast } from '@/lib/toast'
+
+const log = createLogger('useArtifacts')
 
 /** Polling interval for download progress (ms) */
 const DOWNLOAD_POLL_INTERVAL = 1_500
+
+/**
+ * Handle a rejection from a download polling loop. AbortError is expected
+ * (the user cancelled or navigated away) and is ignored; anything else is a
+ * genuine failure — surface it to the user and log it.
+ */
+function handleDownloadError(error: unknown) {
+  if (error instanceof DOMException && error.name === 'AbortError') return
+  log.error('Model download failed', error)
+  showToast.error(
+    i18n.t('artifacts:actions.downloadFailed'),
+    error instanceof Error ? error.message : undefined,
+  )
+}
 
 /** Query keys for artifacts */
 export const artifactKeys = {
@@ -212,15 +231,14 @@ async function startDownloadPolling(
 }
 
 /**
- * Hook to download a model with polling until completion.
+ * Download action callbacks (start / cancel).
  *
- * Download polling runs at module level and survives SPA navigation.
- * Pending download IDs are persisted to localStorage so that polling
- * resumes automatically after a full page refresh.
+ * Subscribes to *no* store slice, so a consumer that only triggers downloads
+ * never re-renders on a progress tick. Also resumes any pending downloads on
+ * first mount.
  */
-export function useDownloadModel() {
+export function useDownloadActions() {
   const queryClient = useQueryClient()
-  const downloads = useDownloadStore((state) => state.downloads)
   const hasResumed = useRef(false)
 
   // On first mount, resume polling for any downloads that were in progress
@@ -240,9 +258,7 @@ export function useDownloadModel() {
         queryClient.invalidateQueries({
           queryKey: artifactKeys.detail(compositeId),
         })
-      }).catch(() => {
-        // AbortError or network error — ignore
-      })
+      }).catch(handleDownloadError)
     }
   }, [queryClient])
 
@@ -253,12 +269,50 @@ export function useDownloadModel() {
         queryClient.invalidateQueries({
           queryKey: artifactKeys.detail(compositeId),
         })
-      }).catch(() => {
-        // AbortError is expected when cancelling — ignore
-      })
+      }).catch(handleDownloadError)
     },
     [queryClient],
   )
+
+  const cancel = useCallback((compositeId: CompositeArtifactId) => {
+    const key = encodeArtifactId(compositeId)
+    abortControllers.get(key)?.abort()
+  }, [])
+
+  return { mutate, cancel }
+}
+
+/**
+ * Progress of a single in-flight download.
+ *
+ * Subscribes to *only* this model's store entry, so a progress tick for an
+ * unrelated download does not re-render the consumer.
+ */
+export function useDownloadProgress(compositeId: CompositeArtifactId) {
+  const key = encodeArtifactId(compositeId)
+  const entry = useDownloadStore((state) =>
+    key in state.downloads ? state.downloads[key] : undefined,
+  )
+  return {
+    isDownloading: entry !== undefined,
+    progress: entry?.progress,
+  }
+}
+
+/**
+ * Hook to download a model with polling until completion.
+ *
+ * Download polling runs at module level and survives SPA navigation.
+ * Pending download IDs are persisted to localStorage so that polling
+ * resumes automatically after a full page refresh.
+ *
+ * Returns the *whole* downloads map — consumers that need only one model's
+ * progress should prefer `useDownloadProgress`, and action-only consumers
+ * `useDownloadActions`, to avoid re-rendering on every progress tick.
+ */
+export function useDownloadModel() {
+  const { mutate, cancel } = useDownloadActions()
+  const downloads = useDownloadStore((state) => state.downloads)
 
   const isDownloading = useCallback(
     (compositeId: CompositeArtifactId): boolean => {
@@ -275,11 +329,6 @@ export function useDownloadModel() {
     },
     [downloads],
   )
-
-  const cancel = useCallback((compositeId: CompositeArtifactId) => {
-    const key = encodeArtifactId(compositeId)
-    abortControllers.get(key)?.abort()
-  }, [])
 
   return {
     mutate,

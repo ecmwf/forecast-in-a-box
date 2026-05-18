@@ -17,7 +17,6 @@
 import { authHandlers } from './auth.handlers'
 import { configHandlers } from './config.handlers'
 import { fableHandlers } from './fable.handlers'
-import { gatewayHandlers } from './gateway.handlers'
 import { jobHandlers } from './job.handlers'
 import { pluginsHandlers } from './plugins.handlers'
 import { artifactsHandlers } from './artifacts.handlers'
@@ -29,7 +28,6 @@ export const handlers = [
   ...authHandlers,
   ...configHandlers,
   ...fableHandlers,
-  ...gatewayHandlers,
   ...jobHandlers,
   ...pluginsHandlers,
   ...artifactsHandlers,

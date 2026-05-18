@@ -9,10 +9,11 @@
  */
 
 import { Copy } from 'lucide-react'
+import { fetchJobResultBlob } from '../useJobResult'
 import type { ActionContext, OutputAction, OutputItem } from '../types'
-import { getJobResult } from '@/api/endpoints/job'
 import i18n from '@/lib/i18n'
 import { createLogger } from '@/lib/logger'
+import { queryClient } from '@/lib/queryClient'
 import { showToast } from '@/lib/toast'
 
 const log = createLogger('OutputAction.copyImage')
@@ -22,7 +23,12 @@ async function runCopyImage(
   ctx: ActionContext,
 ): Promise<void> {
   try {
-    const { blob } = await getJobResult(item.jobId, item.taskId)
+    // Shared cache — reuses the blob if a viewer or thumbnail already loaded it.
+    const { blob } = await fetchJobResultBlob(
+      queryClient,
+      item.jobId,
+      item.taskId,
+    )
     // SVG: copy source as text. ClipboardItem(`image/svg+xml`) is rejected by
     // most browsers (Chrome restricts clipboard MIMEs to a small allowlist),
     // and SVG-as-text is what users actually want for editors and notebooks.

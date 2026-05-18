@@ -28,6 +28,7 @@ import { Card } from '@/components/ui/card'
 import { H3, P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
 import { createLogger } from '@/lib/logger'
+import { downloadBlob } from '@/lib/download-blob'
 import { showToast } from '@/lib/toast'
 
 const log = createLogger('LogsPanel')
@@ -101,14 +102,7 @@ export function LogsPanel({ jobId, status }: LogsPanelProps) {
   const handleDownloadLogs = useCallback(async () => {
     try {
       const blob = await downloadJobLogs(jobId)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `logs-${jobId}.zip`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, `logs-${jobId}.zip`)
     } catch (err) {
       log.error('Failed to download logs', { jobId, error: err })
       showToast.error(err instanceof Error ? err.message : String(err))

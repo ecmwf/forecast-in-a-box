@@ -68,8 +68,10 @@
     "lastUpdated": "Last updated"
   },
   "pagination": {
+    "first": "First page",
     "previous": "Previous",
     "next": "Next",
+    "last": "Last page",
     "page": "Page {{current}} of {{total}}"
   },
   "splash": {

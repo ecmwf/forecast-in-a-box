@@ -49,7 +49,7 @@ const KIND_STYLE: Record<BlockKind, { rect: string; text: string }> = {
   },
 }
 
-/** Temporary: neutral node styling for the monochrome toggle (to be removed). */
+/** Neutral node styling for the monochrome toggle. */
 const MONO_STYLE = {
   rect: 'fill-slate-100 stroke-slate-300 dark:fill-slate-800 dark:stroke-slate-600',
   text: 'fill-slate-600 dark:fill-slate-300',

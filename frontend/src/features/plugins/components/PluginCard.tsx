@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { getPyPIUrl } from '../utils/plugin-url'
 import { CapabilityBadges } from './CapabilityBadges'
 import { PluginIcon } from './PluginIcon'
 import { PluginStatusBadge } from './PluginStatusBadge'
@@ -54,15 +55,6 @@ interface PluginCardProps {
   isInstalling?: boolean
   variant?: DashboardVariant
   shadow?: PanelShadow
-}
-
-/**
- * Get PyPI URL for a plugin from its pip source
- */
-function getPyPIUrl(pipSource: string | null): string | null {
-  if (!pipSource) return null
-  const packageName = pipSource.split('/').pop()?.replace('.git', '')
-  return packageName ? `https://pypi.org/project/${packageName}` : null
 }
 
 export function PluginCard({

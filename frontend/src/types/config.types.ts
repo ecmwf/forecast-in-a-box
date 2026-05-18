@@ -104,30 +104,3 @@ export interface ConfigActions {
   /** Set error state */
   setError: (error: Error | null) => void
 }
-
-/**
- * ========================================
- * API RESPONSE SCHEMA
- * ========================================
- */
-export const apiConfigResponseSchema = appConfigSchema
-
-export type ApiConfigResponse = z.infer<typeof apiConfigResponseSchema>
-
-/**
- * ========================================
- * HELPER TYPES
- * ========================================
- */
-
-/**
- * Deep partial type for config overrides
- */
-export type DeepPartial<T> = {
-  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P]
-}
-
-/**
- * Config update type - allows partial updates
- */
-export type ConfigUpdate = DeepPartial<AppConfig>

@@ -55,7 +55,7 @@ function resetSharedState(): void {
 
   // Zustand stores that tests write to
   useFableBuilderStore.getState().reset()
-  useCommandStore.getState().reset()
+  useCommandStore.setState({ isOpen: false })
   useUiStore.getState().reset()
   useStatusStore.getState().reset()
   useConfigStore.getState().resetConfig()

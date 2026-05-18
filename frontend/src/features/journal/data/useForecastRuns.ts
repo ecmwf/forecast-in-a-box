@@ -8,9 +8,10 @@
  * does it submit to any jurisdiction.
  */
 
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useQueries } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import type { UseQueryResult } from '@tanstack/react-query'
 import type { JobExecutionDetail } from '@/api/types/job.types'
 import type { FableRetrieveResponse } from '@/api/types/fable.types'
 import type { ForecastRunViewModel } from '@/features/journal/types'
@@ -39,7 +40,7 @@ export function useForecastRuns(runs: ReadonlyArray<JobExecutionDetail>): {
   const { data: catalogue } = useBlockCatalogue()
   const { data: blueprintList } = useListBlueprints(1, 50)
   const { data: scheduleList } = useSchedules(1, 100)
-  const { isBookmarked, toggleBookmark } = useRunFavourites()
+  const { bookmarks, toggleBookmark } = useRunFavourites()
 
   // Saved-preset ids — used to flag runs whose config was forked from one.
   const presetIds = useMemo(
@@ -76,7 +77,23 @@ export function useForecastRuns(runs: ReadonlyArray<JobExecutionDetail>): {
     [runs],
   )
 
-  const blueprintQueries = useQueries({
+  // `combine` keeps the joined Map referentially stable across re-renders that
+  // don't change query results — so the memoised view models below keep their
+  // identity (and ForecastRunRow can stay memoised). It must itself be stable,
+  // or TanStack re-runs it (and rebuilds the Map) on every render.
+  const combineBlueprints = useCallback(
+    (results: Array<UseQueryResult<FableRetrieveResponse, Error>>) => {
+      const map = new Map<string, FableRetrieveResponse>()
+      results.forEach((result, index) => {
+        const id = blueprintIds[index]
+        if (result.data) map.set(id, result.data)
+      })
+      return map
+    },
+    [blueprintIds],
+  )
+
+  const blueprintsById = useQueries({
     queries: blueprintIds.map((id) => ({
       queryKey: [...fableKeys.detail(id), 'full'],
       queryFn: () => retrieveFable(id),
@@ -89,30 +106,35 @@ export function useForecastRuns(runs: ReadonlyArray<JobExecutionDetail>): {
           ? false
           : failureCount < 2,
     })),
+    combine: combineBlueprints,
   })
 
-  // One page of runs: cheap to rebuild each render, so no memo over the unstable useQueries result.
-  const blueprintsById = new Map<string, FableRetrieveResponse>()
-  blueprintIds.forEach((id, index) => {
-    const data = blueprintQueries[index]?.data
-    if (data) blueprintsById.set(id, data)
-  })
-
-  const viewModels = runs.map((run) => {
-    const blueprint = blueprintsById.get(run.blueprint_id)
-    const vm = runDetailToViewModel({
-      run,
-      blueprint,
+  const viewModels = useMemo(
+    () =>
+      runs.map((run) => {
+        const blueprint = blueprintsById.get(run.blueprint_id)
+        const vm = runDetailToViewModel({
+          run,
+          blueprint,
+          catalogue,
+          isBookmarked: run.run_id in bookmarks,
+        })
+        const parentId = blueprint?.parent_id
+        return {
+          ...vm,
+          fromPreset: parentId != null && presetIds.has(parentId),
+          scheduleName: scheduleNameByBlueprint.get(run.blueprint_id) ?? null,
+        }
+      }),
+    [
+      runs,
+      blueprintsById,
       catalogue,
-      isBookmarked: isBookmarked(run.run_id),
-    })
-    const parentId = blueprint?.parent_id
-    return {
-      ...vm,
-      fromPreset: parentId != null && presetIds.has(parentId),
-      scheduleName: scheduleNameByBlueprint.get(run.blueprint_id) ?? null,
-    }
-  })
+      bookmarks,
+      presetIds,
+      scheduleNameByBlueprint,
+    ],
+  )
 
   return { runs: viewModels, toggleBookmark }
 }

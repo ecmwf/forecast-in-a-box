@@ -28,7 +28,7 @@ import i18n from '@/lib/i18n'
 export type CronFrequency = 'hourly' | 'daily' | 'weekly' | 'custom'
 
 /** Day-of-week index (0 = Sunday) → `executions` translation key. */
-const DAY_NAME_KEYS = [
+export const DAY_NAME_KEYS = [
   'cron.days.sunday',
   'cron.days.monday',
   'cron.days.tuesday',

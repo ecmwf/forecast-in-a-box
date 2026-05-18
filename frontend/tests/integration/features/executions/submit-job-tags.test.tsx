@@ -38,7 +38,6 @@ function TestHarness() {
       open={open}
       onOpenChange={setOpen}
       fable={createEmptyFable()}
-      fableName="Test"
       fableId={null}
     />
   )

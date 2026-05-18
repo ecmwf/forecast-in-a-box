@@ -13,7 +13,6 @@ import { z } from 'zod'
 import {
   decodeStateFromURL,
   encodeStateToURL,
-  getCompressionStats,
   isStateTooLarge,
 } from '@/lib/url-state'
 
@@ -164,55 +163,6 @@ describe('isStateTooLarge', () => {
     // Test just over threshold
     const largeEncoded = 'a'.repeat(1801)
     expect(isStateTooLarge(largeEncoded)).toBe(true)
-  })
-})
-
-describe('getCompressionStats', () => {
-  it('returns original and compressed sizes', () => {
-    const state = { name: 'test', value: 42 }
-    const stats = getCompressionStats(state)
-
-    expect(stats.originalSize).toBeGreaterThan(0)
-    expect(stats.compressedSize).toBeGreaterThan(0)
-    expect(typeof stats.ratio).toBe('number')
-  })
-
-  it('calculates correct original size', () => {
-    const state = { name: 'test' }
-    const stats = getCompressionStats(state)
-
-    expect(stats.originalSize).toBe(JSON.stringify(state).length)
-  })
-
-  it('calculates correct compressed size', () => {
-    const state = { name: 'test' }
-    const stats = getCompressionStats(state)
-    const encoded = encodeStateToURL(state)
-
-    expect(stats.compressedSize).toBe(encoded.length)
-  })
-
-  it('calculates compression ratio', () => {
-    const state = { name: 'test' }
-    const stats = getCompressionStats(state)
-
-    expect(stats.ratio).toBe(stats.compressedSize / stats.originalSize)
-  })
-
-  it('shows compression benefit for repetitive data', () => {
-    const repetitiveState = {
-      items: Array(100)
-        .fill(0)
-        .map(() => ({
-          type: 'item',
-          status: 'active',
-          category: 'default',
-        })),
-    }
-    const stats = getCompressionStats(repetitiveState)
-
-    // LZ compression should be effective for repetitive data
-    expect(stats.ratio).toBeLessThan(1)
   })
 })
 

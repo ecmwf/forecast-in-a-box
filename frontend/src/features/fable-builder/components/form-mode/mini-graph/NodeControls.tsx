@@ -15,6 +15,7 @@ import type {
   BlockKind,
   PluginBlockFactoryId,
 } from '@/api/types/fable.types'
+import { factoryIdToKey } from '@/api/types/fable.types'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -103,7 +104,7 @@ function NodeControlButton({
               </DropdownMenuLabel>
               {addOptions.map((option) => (
                 <DropdownMenuItem
-                  key={`${option.factoryId.plugin.store}/${option.factoryId.plugin.local}:${option.factoryId.factory}`}
+                  key={factoryIdToKey(option.factoryId)}
                   onClick={() => onAddBlock(option.factoryId, direction)}
                 >
                   {option.title}

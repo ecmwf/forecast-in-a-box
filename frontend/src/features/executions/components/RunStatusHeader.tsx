@@ -53,7 +53,6 @@ interface RunStatusHeaderProps {
   status: JobStatus
   progress: string
   createdAt: string | null
-  error: string | null
   onRestart: () => void
   onDelete: () => void
   /** Open the fable's source configuration in the builder. */

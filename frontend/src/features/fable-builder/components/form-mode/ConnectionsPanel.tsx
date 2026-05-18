@@ -38,7 +38,8 @@ interface ConnectionsPanelProps {
   onBlockClick?: (blockId: BlockInstanceId) => void
   onAddConnectedBlock?: (
     factoryId: PluginBlockFactoryId,
-    sourceBlockId: BlockInstanceId,
+    anchorBlockId: BlockInstanceId,
+    direction?: ControlDirection,
   ) => void
 }
 
@@ -176,8 +177,10 @@ function ConnectionsPanelContent({
   )
 
   const handleAddBlock = useCallback(
-    (factoryId: PluginBlockFactoryId, _direction: ControlDirection) => {
-      onAddConnectedBlock?.(factoryId, instanceId)
+    (factoryId: PluginBlockFactoryId, direction: ControlDirection) => {
+      // Thread `direction` so an "add parent" control wires the new block
+      // upstream of the anchor rather than always creating a downstream child.
+      onAddConnectedBlock?.(factoryId, instanceId, direction)
     },
     [onAddConnectedBlock, instanceId],
   )
@@ -222,19 +225,13 @@ function ConnectionsPanelContent({
       // Sibling options: same kind addOptions
       const siblingOptions = stageData[block.kind].addOptions
 
-      // Existing blocks for navigation
-      const connectedIds = new Set(allBlocks.map((b) => b.id))
-
-      const existingParents = parentKinds.flatMap((kind) =>
-        allBlocksByKind[kind].filter(
-          (b) => !connectedIds.has(b.id) || b.id !== block.id,
-        ),
+      // Existing blocks for navigation — every kind except this block itself.
+      const existingParents = parentKinds.flatMap(
+        (kind) => allBlocksByKind[kind],
       )
 
-      const existingChildren = childKinds.flatMap((kind) =>
-        allBlocksByKind[kind].filter(
-          (b) => !connectedIds.has(b.id) || b.id !== block.id,
-        ),
+      const existingChildren = childKinds.flatMap(
+        (kind) => allBlocksByKind[kind],
       )
 
       const existingSiblings = allBlocksByKind[block.kind].filter(
@@ -287,6 +284,14 @@ function ConnectionsPanelContent({
       const hasAddOptions = stageData[kind].addOptions.length > 0
 
       if (!hasBlocksInStage && hasAddOptions && kind !== thisBlockKind) {
+        // A stage earlier than this block's kind adds an upstream parent;
+        // a later stage adds a downstream child.
+        const stageDirection: ControlDirection =
+          thisBlockKind &&
+          BLOCK_KIND_ORDER.indexOf(kind) <
+            BLOCK_KIND_ORDER.indexOf(thisBlockKind)
+            ? 'parent'
+            : 'child'
         nodeList.push({
           id: `add-${kind}`,
           type: 'addBlock',
@@ -298,7 +303,7 @@ function ConnectionsPanelContent({
             kind,
             addOptions: stageData[kind].addOptions,
             onAddBlock: (factoryId: PluginBlockFactoryId) => {
-              onAddConnectedBlock?.(factoryId, instanceId)
+              onAddConnectedBlock?.(factoryId, instanceId, stageDirection)
             },
           },
         })

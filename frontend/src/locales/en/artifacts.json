@@ -8,7 +8,8 @@
     "cancelDownload": "Cancel",
     "delete": "Delete",
     "viewDetails": "View Details",
-    "backToArtifacts": "Back to Models"
+    "backToArtifacts": "Back to Models",
+    "downloadFailed": "Model download failed"
   },
   "filters": {
     "searchPlaceholder": "Search models by name or author..."

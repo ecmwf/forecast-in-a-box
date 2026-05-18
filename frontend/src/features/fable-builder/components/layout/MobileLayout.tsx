@@ -84,7 +84,7 @@ export function MobileLayout({
       {blockCount > 0 && (
         <div className="absolute top-4 right-4">
           <div className="rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium shadow-lg">
-            {t('mobile.blockCountPlural', { count: blockCount })}
+            {t('blockCount', { count: blockCount })}
           </div>
         </div>
       )}

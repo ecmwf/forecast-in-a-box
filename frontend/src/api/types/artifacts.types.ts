@@ -138,7 +138,7 @@ export const MlModelListSchema = z.array(MlModelOverviewSchema)
  * Download/delete response
  *
  * Note: The backend returns composite_id as a Python repr string
- * (e.g. "CompositeArtifactId(artifact_store_id='x', ml_model_checkpoint_id='y')")
+ * (e.g. "CompositeArtifactId(artifact_store_id='x', artifact_local_id='y')")
  * via str(), not as a JSON object. We accept it as a string here.
  */
 export const ArtifactActionResponseSchema = z.object({

@@ -44,13 +44,6 @@ export function parsePluginKey(key: string): PluginCompositeId {
 }
 
 /**
- * Convert a PluginCompositeId to the API key format
- */
-export function toPluginKey(id: PluginCompositeId): string {
-  return `store='${id.store}' local='${id.local}'`
-}
-
-/**
  * Convert a PluginCompositeId to a display-friendly string
  */
 export function toPluginDisplayId(id: PluginCompositeId): string {

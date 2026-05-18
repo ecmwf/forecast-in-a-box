@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-import { memo, useMemo } from 'react'
+import { memo } from 'react'
 import { Handle, Position } from '@xyflow/react'
 import { Settings, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -58,13 +58,12 @@ export const BlockNode = memo(function ({
   selected,
 }: NodeProps<FableNode>) {
   const { t } = useTranslation('configure')
-  const { factory, instance, catalogue } = data
+  const { factory, instance, catalogue, hasDownstream } = data
   const metadata = BLOCK_KIND_METADATA[factory.kind]
   const IconComponent = getBlockKindIcon(factory.kind)
 
   const containerRef = useNodeDimensions(id)
 
-  const selectedBlockId = useFableBuilderStore((state) => state.selectedBlockId)
   const selectBlock = useFableBuilderStore((state) => state.selectBlock)
   const validationState = useFableBuilderStore((state) => state.validationState)
   const layoutDirection = useFableBuilderStore((state) => state.layoutDirection)
@@ -80,20 +79,14 @@ export const BlockNode = memo(function ({
   const outputPosition = OUTPUT_POSITIONS[layoutDirection]
   const isHorizontalLayout = layoutDirection === 'LR'
 
-  const fable = useFableBuilderStore((state) => state.fable)
-
-  const isSelected = selected || selectedBlockId === id
+  // React Flow drives selection via the `selected` prop, so the node never
+  // subscribes to `selectedBlockId` — that would re-render every node on any
+  // selection change.
+  const isSelected = selected
   const hasErrors = blockValidation?.hasErrors ?? false
   const errors = blockValidation?.errors ?? []
   const possibleExpansions =
     validationState?.blockStates[id]?.possibleExpansions ?? []
-  const hasDownstream = useMemo(
-    () =>
-      Object.values(fable.blocks).some((block) =>
-        Object.values(block.input_ids).includes(id),
-      ),
-    [fable.blocks, id],
-  )
 
   function handleClick(): void {
     selectBlock(id)
@@ -108,12 +101,14 @@ export const BlockNode = memo(function ({
     openMobileConfig(id)
   }
 
-  const configSummary = Object.entries(instance.configuration_values)
-    .filter(([, value]) => value)
-    .slice(0, 3)
+  const configuredEntries = Object.entries(
+    instance.configuration_values,
+  ).filter(([, value]) => value)
+  const configSummary = configuredEntries.slice(0, 3)
 
-  const configValueCount = Object.keys(instance.configuration_values).length
-  const remainingConfigCount = configValueCount - 3
+  // Count only configured (non-empty) values — empty keys aren't shown as
+  // badges, so they must not inflate the "+N more" count.
+  const remainingConfigCount = configuredEntries.length - configSummary.length
 
   return (
     <div

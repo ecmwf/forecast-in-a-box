@@ -34,8 +34,12 @@ const NAIVE_DATETIME_RE =
 
 // ── App timezone accessors ───────────────────────────────────────────────
 
-/** Validity cache — keyed by zone string, bounded by the IANA zone set. */
-const timeZoneValidity = new Map<string, boolean>()
+/**
+ * Validity cache — keyed by zone string, bounded by the IANA zone set.
+ * Pre-seeded with the default zone so the common case taken by
+ * `useAppTimeZone`'s selector never constructs an `Intl.DateTimeFormat`.
+ */
+const timeZoneValidity = new Map<string, boolean>([['UTC', true]])
 
 /**
  * True if `tz` is an IANA identifier the runtime accepts. Cached per zone:

@@ -14,9 +14,8 @@
  * All API endpoint paths are defined here. Import and use these
  * constants instead of hardcoding paths.
  *
- * Key conventions:
- * - `API_ENDPOINTS`: For production code - all static paths
- * - `API_PATTERNS`: For MSW mock handlers - currently all static paths
+ * Every path is a static string; dynamic values travel as query params or
+ * request bodies, never as path segments.
  *
  * @see AGENTS.md for documentation on API endpoint conventions
  */
@@ -162,8 +161,6 @@ export const API_ENDPOINTS = {
    * Gateway endpoints
    */
   gateway: {
-    /** GET - Get gateway status */
-    status: `${API_PREFIX}/gateway/status`,
     /** GET - Stream gateway logs (SSE) */
     logs: `${API_PREFIX}/gateway/logs`,
   },
@@ -188,37 +185,5 @@ export const API_ENDPOINTS = {
     nextRun: `${API_PREFIX}/experiment/runs/next`,
     /** GET - Get the scheduler's current time */
     currentTime: `${API_PREFIX}/experiment/operational/scheduler/current_time`,
-    /** POST - Restart the scheduler thread */
-    restart: `${API_PREFIX}/experiment/operational/scheduler/restart`,
-  },
-} as const
-
-/**
- * Path patterns for MSW mock handlers
- *
- * All patterns are currently static paths — IDs travel in the request body,
- * so no `:param` route matching is needed.
- */
-export const API_PATTERNS = {
-  /**
-   * Artifacts patterns - all use static paths (IDs in request body)
-   */
-  artifacts: {
-    listModels: `${API_PREFIX}/artifacts/list_models`,
-    modelDetails: `${API_PREFIX}/artifacts/model_details`,
-    downloadModel: `${API_PREFIX}/artifacts/download_model`,
-    deleteModel: `${API_PREFIX}/artifacts/delete_model`,
-  },
-  /**
-   * Plugin patterns - all use static paths now (no path params)
-   * Plugin ID is sent in request body, not URL.
-   */
-  plugin: {
-    status: `${API_PREFIX}/plugin/status`,
-    details: `${API_PREFIX}/plugin/details`,
-    install: `${API_PREFIX}/plugin/install`,
-    uninstall: `${API_PREFIX}/plugin/uninstall`,
-    update: `${API_PREFIX}/plugin/update`,
-    modifyEnabled: `${API_PREFIX}/plugin/modifyEnabled`,
   },
 } as const

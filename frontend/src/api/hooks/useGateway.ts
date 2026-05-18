@@ -25,6 +25,12 @@ export interface LogLine {
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected'
 
+/**
+ * Max log lines kept in memory. The gateway log stream is unbounded, so we
+ * retain only the most recent lines — older ones drop off the front.
+ */
+const MAX_LOG_LINES = 2000
+
 export function useGatewayLogs(enabled: boolean = true) {
   const [logs, setLogs] = useState<Array<LogLine>>([])
   const [connectionStatus, setConnectionStatus] =
@@ -66,7 +72,12 @@ export function useGatewayLogs(enabled: boolean = true) {
         text,
         timestamp: Date.now(),
       }
-      setLogs((prev) => [...prev, line])
+      setLogs((prev) => {
+        const next = [...prev, line]
+        return next.length > MAX_LOG_LINES
+          ? next.slice(next.length - MAX_LOG_LINES)
+          : next
+      })
     }
 
     eventSource.onerror = () => {

@@ -61,6 +61,9 @@ export function useURLStateSync({
       if (encoded === lastEncodedRef.current) return
 
       lastEncodedRef.current = encoded
+      // Guard the synchronous `navigate` so the fable-watch effect can't
+      // re-react to a route change this write itself causes. Cleared right
+      // after — `updateURL` only runs once the debounce has already settled.
       isUpdatingURLRef.current = true
 
       if (isStateTooLarge(encoded)) {
@@ -75,9 +78,7 @@ export function useURLStateSync({
         replace: true,
       })
 
-      requestAnimationFrame(() => {
-        isUpdatingURLRef.current = false
-      })
+      isUpdatingURLRef.current = false
     },
     [navigate],
   )

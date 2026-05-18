@@ -23,23 +23,13 @@ interface CommandState {
   isOpen: boolean
   /** Set the open state */
   setOpen: (open: boolean) => void
-  /** Toggle the open state */
-  toggle: () => void
-  /** Reset to initial state */
-  reset: () => void
-}
-
-const initialState = {
-  isOpen: false,
 }
 
 export const useCommandStore = create<CommandState>()(
   devtools(
     (set) => ({
-      ...initialState,
+      isOpen: false,
       setOpen: (isOpen) => set({ isOpen }),
-      toggle: () => set((state) => ({ isOpen: !state.isOpen })),
-      reset: () => set(initialState),
     }),
     { name: 'CommandStore' },
   ),

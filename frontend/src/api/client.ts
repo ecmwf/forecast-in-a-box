@@ -47,8 +47,11 @@ export class ApiClientError extends Error {
  *
  * API paths include /api/v1/ prefix (e.g., '/api/v1/status').
  * Base URL is either empty (same-origin) or absolute (remote backend).
+ *
+ * Exported so direct-fetch callers (e.g. blob downloads in endpoints/job.ts)
+ * resolve URLs identically to the apiClient.
  */
-function buildUrl(
+export function buildUrl(
   path: string,
   params?: Record<string, string | number | boolean>,
 ): string {

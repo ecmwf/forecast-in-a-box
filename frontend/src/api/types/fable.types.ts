@@ -152,11 +152,6 @@ export const GlyphListItemSchema = z.discriminatedUnion('glyph_type', [
 
 export type GlyphListItem = z.infer<typeof GlyphListItemSchema>
 
-/**
- * @deprecated Use IntrinsicGlyphItem for intrinsic glyphs or GlobalGlyphItem for global glyphs.
- */
-export type GlyphDetail = IntrinsicGlyphItem
-
 /** Paginated response from GET /api/v1/blueprint/glyphs/list */
 export const GlyphListResponseSchema = z.object({
   glyphs: z.array(GlyphListItemSchema),
@@ -232,18 +227,6 @@ export const FableValidationExpansionSchema = z.object({
 export type FableValidationExpansion = z.infer<
   typeof FableValidationExpansionSchema
 >
-
-export const SavedFableSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  fable: FableBuilderV1Schema,
-  tags: z.array(z.string()),
-  created_at: z.string(),
-  updated_at: z.string(),
-  user_id: z.string().optional(),
-})
-
-export type SavedFable = z.infer<typeof SavedFableSchema>
 
 export const FableUpsertResponseSchema = z.object({
   blueprint_id: z.string(),
@@ -486,32 +469,6 @@ export function getFactory(
  */
 export function factoryIdToKey(id: PluginBlockFactoryId): string {
   return `${pluginIdToDisplayKey(id.plugin)}:${id.factory}`
-}
-
-/**
- * Parse a string key back to PluginBlockFactoryId
- * Key format: "store/local:factory"
- */
-export function keyToFactoryId(key: string): PluginBlockFactoryId {
-  const colonIndex = key.lastIndexOf(':')
-  if (colonIndex === -1) {
-    throw new Error(`Invalid factory key format: ${key}`)
-  }
-  const pluginPart = key.substring(0, colonIndex)
-  const factory = key.substring(colonIndex + 1)
-
-  // Parse "store/local" format
-  const slashIndex = pluginPart.indexOf('/')
-  if (slashIndex === -1) {
-    throw new Error(`Invalid plugin ID format in key: ${key}`)
-  }
-  const store = pluginPart.substring(0, slashIndex)
-  const local = pluginPart.substring(slashIndex + 1)
-
-  return {
-    plugin: { store, local },
-    factory,
-  }
 }
 
 /**

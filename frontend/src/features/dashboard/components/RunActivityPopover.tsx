@@ -10,15 +10,18 @@
 
 /** Monthly forecast-activity bar chart shown from the "Total Forecasts" stat card. */
 
-import { useMemo } from 'react'
+import { Suspense, lazy, useMemo } from 'react'
 import { format } from 'date-fns'
 import { ArrowRight, TrendingUp } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import type { ReactNode } from 'react'
 import { useJobStatusCounts } from '@/api/hooks/useJobStatusCounts'
+import { useServerTime } from '@/api/hooks/useSchedules'
 import { SummaryPopover } from '@/components/common/SummaryPopover'
+
+// Keep `recharts` out of the dashboard chunk — only fetched when the popover opens.
+const RunActivityChart = lazy(() => import('./RunActivityChart'))
 
 /** Months of history shown in the bar chart. */
 const MONTHS = 6
@@ -36,6 +39,7 @@ export function RunActivityPopover({
 }: RunActivityPopoverProps) {
   const { t } = useTranslation('dashboard')
   const { runs } = useJobStatusCounts()
+  const { serverTimeToLocal } = useServerTime()
 
   const { data, recentTotal } = useMemo(() => {
     const now = new Date()
@@ -54,7 +58,8 @@ export function RunActivityPopover({
     const byKey = new Map(buckets.map((bucket) => [bucket.key, bucket]))
     let total = 0
     for (const run of runs) {
-      const date = new Date(run.created_at)
+      // created_at is naive server-local — correct it before bucketing.
+      const date = serverTimeToLocal(run.created_at)
       const bucket = byKey.get(`${date.getFullYear()}-${date.getMonth()}`)
       if (bucket) {
         bucket.count += 1
@@ -62,7 +67,7 @@ export function RunActivityPopover({
       }
     }
     return { data: buckets, recentTotal: total }
-  }, [runs])
+  }, [runs, serverTimeToLocal])
 
   return (
     <SummaryPopover
@@ -92,38 +97,16 @@ export function RunActivityPopover({
         {t('welcome.activity.summary', { count: recentTotal })}
       </p>
 
-      <div className="h-36 w-full text-muted-foreground">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={data}
-            margin={{ top: 4, right: 4, bottom: 0, left: 4 }}
-          >
-            <XAxis
-              dataKey="month"
-              tickLine={false}
-              axisLine={false}
-              tickMargin={6}
-              tick={{ fontSize: 11, fill: 'currentColor' }}
-            />
-            <Tooltip
-              cursor={{ fill: 'var(--muted)' }}
-              contentStyle={{
-                borderRadius: '0.5rem',
-                border: '1px solid var(--border)',
-                background: 'var(--popover)',
-                color: 'var(--popover-foreground)',
-                fontSize: '0.75rem',
-              }}
-            />
-            <Bar
-              dataKey="count"
-              name={t('welcome.activity.title')}
-              fill="#10b981"
-              radius={[4, 4, 0, 0]}
-            />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      <Suspense
+        fallback={
+          <div className="h-36 w-full animate-pulse rounded bg-muted" />
+        }
+      >
+        <RunActivityChart
+          data={data}
+          seriesName={t('welcome.activity.title')}
+        />
+      </Suspense>
     </SummaryPopover>
   )
 }

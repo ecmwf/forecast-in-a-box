@@ -15,7 +15,7 @@
  * Provides type-safe storage with JSON serialization.
  */
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import i18n from 'i18next'
 import { createLogger } from '@/lib/logger'
 import { showToast } from '@/lib/toast'
@@ -54,27 +54,29 @@ export function useLocalStorage<T>(
     }
   })
 
-  // Return a wrapped version of useState's setter function that
-  // persists the new value to localStorage.
-  const setValue = (value: T | ((val: T) => T)) => {
-    try {
-      // Allow value to be a function so we have same API as useState
-      const valueToStore =
-        value instanceof Function ? value(storedValue) : value
-      // Save state
-      setStoredValue(valueToStore)
-      // Save to local storage
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(key, JSON.stringify(valueToStore))
-      }
-    } catch (error) {
-      log.error(`Error setting localStorage key "${key}":`, error)
-      showToast.error(
-        i18n.t('errors:toast.saveSettingFailed'),
-        error instanceof Error ? error.message : String(error),
-      )
-    }
-  }
+  // Stable setter that persists to localStorage. The functional-update form
+  // resolves against the updater's live `prev`, so successive calls before a
+  // re-render don't read a stale value.
+  const setValue = useCallback(
+    (value: T | ((val: T) => T)) => {
+      setStoredValue((prev) => {
+        const valueToStore = value instanceof Function ? value(prev) : value
+        try {
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem(key, JSON.stringify(valueToStore))
+          }
+        } catch (error) {
+          log.error(`Error setting localStorage key "${key}":`, error)
+          showToast.error(
+            i18n.t('errors:toast.saveSettingFailed'),
+            error instanceof Error ? error.message : String(error),
+          )
+        }
+        return valueToStore
+      })
+    },
+    [key],
+  )
 
   // Listen for changes in other tabs/windows
   useEffect(() => {

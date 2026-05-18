@@ -170,7 +170,7 @@ describe('System Status', () => {
         </AuthContext.Provider>,
       )
 
-      // StatusIndicator uses getTrafficLightLabel which returns "All Systems Normal" for green
+      // StatusIndicator renders the "All Systems Normal" label for green status
       await expect.element(screen.getByText('All Systems Normal')).toBeVisible()
     })
 

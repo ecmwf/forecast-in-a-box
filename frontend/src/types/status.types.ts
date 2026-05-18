@@ -78,20 +78,10 @@ export const statusResponseSchema = z.object({
 })
 
 /**
- * Zod schema for individual service status
- */
-export const serviceStatusSchema = z.object({
-  name: z.string(),
-  status: statusValueSchema,
-  label: z.string(),
-})
-
-/**
  * TypeScript types inferred from Zod schemas
  */
 export type StatusValue = z.infer<typeof statusValueSchema>
 export type StatusResponse = z.infer<typeof statusResponseSchema>
-export type ServiceStatus = z.infer<typeof serviceStatusSchema>
 
 /**
  * Component names in the status response (excluding version)
@@ -150,18 +140,19 @@ export function computeTrafficLightStatus(
 }
 
 /**
- * Get the label for a traffic light status
+ * i18n key (status namespace) for a traffic-light status label.
+ * Resolve with `t()` at the call site — this module cannot call hooks.
  */
-export function getTrafficLightLabel(status: TrafficLightStatus): string {
+export function getTrafficLightLabelKey(status: TrafficLightStatus) {
   switch (status) {
     case 'unknown':
-      return 'Checking...'
+      return 'trafficLight.unknown'
     case 'green':
-      return 'All Systems Normal'
+      return 'trafficLight.green'
     case 'orange':
-      return 'Partial Outage'
+      return 'trafficLight.orange'
     case 'red':
-      return 'System Outage'
+      return 'trafficLight.red'
   }
 }
 

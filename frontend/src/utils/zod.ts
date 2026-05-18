@@ -33,7 +33,7 @@ export class ValidationError extends Error {
 /**
  * Format Zod errors into user-friendly messages
  */
-export function formatZodError(error: z.ZodError): string {
+function formatZodError(error: z.ZodError): string {
   return error.issues
     .map((err: $ZodIssue) => {
       const path = err.path.join('.')

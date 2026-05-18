@@ -8,16 +8,11 @@
  * does it submit to any jurisdiction.
  */
 
-/**
- * MSW Handlers for Gateway API
- */
+/** Helpers for deriving external links from a plugin's metadata. */
 
-import { HttpResponse, delay, http } from 'msw'
-import { API_ENDPOINTS } from '@/api/endpoints'
-
-export const gatewayHandlers = [
-  http.get(API_ENDPOINTS.gateway.status, async () => {
-    await delay(200)
-    return HttpResponse.json('running')
-  }),
-]
+/** PyPI project URL for a plugin, derived from its pip source; null when none. */
+export function getPyPIUrl(pipSource: string | null): string | null {
+  if (!pipSource) return null
+  const packageName = pipSource.split('/').pop()?.replace('.git', '')
+  return packageName ? `https://pypi.org/project/${packageName}` : null
+}

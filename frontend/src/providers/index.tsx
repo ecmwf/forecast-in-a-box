@@ -49,10 +49,3 @@ export function AppProviders({ children }: AppProvidersProps) {
     </I18nProvider>
   )
 }
-
-// Export individual providers for flexibility
-export { QueryProvider } from './QueryProvider'
-export { AuthProvider } from '@/features/auth/AuthProvider'
-export { I18nProvider } from './I18nProvider'
-export { ThemeProvider } from './ThemeProvider'
-export { ToastProvider } from './ToastProvider'

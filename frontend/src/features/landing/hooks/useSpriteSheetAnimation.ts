@@ -17,6 +17,8 @@ interface SpriteSheetAnimationOptions {
   totalFrames: number
   columns: number
   fps?: number
+  /** Called inside the rAF tick whenever a new frame has been drawn. */
+  onFrameRendered?: () => void
 }
 
 export const useSpriteSheetAnimation = ({
@@ -26,14 +28,25 @@ export const useSpriteSheetAnimation = ({
   totalFrames,
   columns,
   fps = 40,
+  onFrameRendered,
 }: SpriteSheetAnimationOptions) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isReady, setIsReady] = useState(false)
+
+  // Keep the callback in a ref so a changing identity does not restart the loop.
+  const onFrameRenderedRef = useRef(onFrameRendered)
+  useEffect(() => {
+    onFrameRenderedRef.current = onFrameRendered
+  }, [onFrameRendered])
 
   useEffect(() => {
     const canvas = canvasRef.current
     const ctx = canvas?.getContext('2d')
     if (!ctx) return
+
+    // Hoisted to effect scope so the cleanup below can cancel the loop even
+    // if the component unmounts before the image has finished loading.
+    let animationFrameId: number | undefined
 
     const img = new Image()
     img.src = spriteSheetUrl
@@ -42,7 +55,6 @@ export const useSpriteSheetAnimation = ({
 
       let frameIndex = 0
       let lastTime = 0
-      let animationFrameId: number
       const frameDuration = 1000 / fps
 
       const animate = (currentTime: number) => {
@@ -68,10 +80,15 @@ export const useSpriteSheetAnimation = ({
             frameHeight,
           )
           frameIndex = (frameIndex + 1) % totalFrames
+          onFrameRenderedRef.current?.()
         }
       }
       animate(0)
-      return () => cancelAnimationFrame(animationFrameId)
+    }
+
+    return () => {
+      img.onload = null
+      if (animationFrameId !== undefined) cancelAnimationFrame(animationFrameId)
     }
   }, [spriteSheetUrl, frameWidth, frameHeight, totalFrames, columns, fps])
 

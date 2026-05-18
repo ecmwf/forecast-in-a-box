@@ -158,10 +158,10 @@
   },
   "mock": {
     "models": {
-      "aifs": "AIFS",
+      "aifs": "AIFS Single",
       "metNorwayMl": "MetNorway-ML",
       "aicon": "AICON",
-      "neuralForecastModel": "Neural Forecast Model"
+      "aifsEns": "AIFS ENS"
     },
     "topics": {
       "extremeWeather": "Best practices for extreme weather forecasting",

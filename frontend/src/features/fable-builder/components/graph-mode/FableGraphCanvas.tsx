@@ -72,6 +72,7 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   const fitViewTrigger = useFableBuilderStore((state) => state.fitViewTrigger)
   const connectBlocks = useFableBuilderStore((state) => state.connectBlocks)
   const selectBlock = useFableBuilderStore((state) => state.selectBlock)
+  const selectedBlockId = useFableBuilderStore((state) => state.selectedBlockId)
 
   const { fitView, setViewport, getNodesBounds } = useReactFlow()
 
@@ -79,6 +80,11 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
   const containerRef = useRef<HTMLDivElement>(null)
+  // Current selection mirrored into a ref so the layout effect can re-apply
+  // it on a block-driven rebuild without depending on it (which would force a
+  // full re-layout on every selection change).
+  const selectedBlockIdRef = useRef(selectedBlockId)
+  selectedBlockIdRef.current = selectedBlockId
   const prevBlocksRef = useRef<typeof fable.blocks | null>(null)
   const prevAutoLayoutRef = useRef(autoLayout)
   const prevLayoutDirectionRef = useRef(layoutDirection)
@@ -171,7 +177,15 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
     }
     lastBlockCountRef.current = currentBlockCount
 
-    setNodes(layouted)
+    // Preserve the current selection — `fableToGraph` builds nodes without a
+    // `selected` flag, so re-apply it here for the same-commit rebuild.
+    setNodes(
+      layouted.map((node) =>
+        node.id === selectedBlockIdRef.current
+          ? { ...node, selected: true }
+          : node,
+      ),
+    )
     setEdges(newEdges)
   }, [fable, catalogue, autoLayout, layoutDirection, setNodes, setEdges])
 
@@ -232,6 +246,21 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
       fitView({ padding: 0.3, maxZoom: 1 })
     }
   }, [fitViewTrigger, fitView])
+
+  // Reflect the store's selected block onto React Flow's `selected` node flag.
+  // BlockNode reads only that prop, so a selection change re-renders just the
+  // previously- and newly-selected nodes instead of every node on the canvas.
+  useEffect(() => {
+    setNodes((nds) => {
+      const next = nds.map((node) => {
+        const shouldSelect = node.id === selectedBlockId
+        return node.selected === shouldSelect
+          ? node
+          : { ...node, selected: shouldSelect }
+      })
+      return next.some((node, i) => node !== nds[i]) ? next : nds
+    })
+  }, [selectedBlockId, setNodes])
 
   const onConnect = useCallback(
     (connection: Connection) => {

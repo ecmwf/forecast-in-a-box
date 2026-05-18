@@ -125,14 +125,3 @@ export function parseGlyphSegments(value: string): Array<GlyphSegment> {
 export function containsGlyphs(value: string): boolean {
   return findGlyphSpans(value).length > 0
 }
-
-/**
- * Extract the inner expression from a `${...}` reference.
- *
- * For a plain reference like `${runId}` this is the variable name; for a
- * Jinja expression like `${var | sub_days(2)}` it's the full body. Callers
- * that need just the leading variable name should parse further.
- */
-export function extractGlyphKey(ref: string): string {
-  return ref.slice(2, -1)
-}

@@ -43,7 +43,9 @@ function Index() {
 
       if (storedRedirect && isValidInternalRedirect(storedRedirect)) {
         log.info('Redirecting to stored location:', storedRedirect)
-        navigate({ to: storedRedirect })
+        // replace: drop the landing page from history so Back does not
+        // re-trigger this redirect (history trap).
+        navigate({ to: storedRedirect, replace: true })
         return
       }
       if (storedRedirect) {
@@ -51,7 +53,7 @@ function Index() {
       }
 
       log.info('Redirecting to /dashboard')
-      navigate({ to: '/dashboard' })
+      navigate({ to: '/dashboard', replace: true })
     }
   }, [isLoading, isAuthenticated, navigate])
 

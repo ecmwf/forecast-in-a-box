@@ -57,6 +57,30 @@ export default defineConfig(({ mode }) => {
                 name: 'query',
                 test: /node_modules[\\/]@tanstack[\\/]react-query[\\/]/,
               },
+              // Heavy shared libs — carve into dedicated chunks so they are
+              // not duplicated into / bundled with individual route chunks.
+              {
+                name: 'charts',
+                test: /node_modules[\\/](recharts|d3-[^\\/]+|victory-vendor)[\\/]/,
+              },
+              {
+                name: 'flow',
+                test: /node_modules[\\/](@xyflow[\\/]react|@dagrejs[\\/][^\\/]+)[\\/]/,
+              },
+              {
+                name: 'three',
+                test: /node_modules[\\/]three[\\/]/,
+              },
+              {
+                name: 'datefns',
+                test: /node_modules[\\/]date-fns[\\/]/,
+              },
+              // i18n namespace JSON — split out so translation strings load
+              // as their own chunk instead of inflating the main bundle.
+              {
+                name: 'locales',
+                test: /[\\/]src[\\/]locales[\\/]/,
+              },
             ],
           },
         },

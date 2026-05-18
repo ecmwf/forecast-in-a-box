@@ -43,7 +43,7 @@ export interface PresetEntry {
 }
 
 export function useConfigPresets() {
-  const { data, isLoading, isError } = useListBlueprints(1, 50)
+  const { data, isLoading } = useListBlueprints(1, 50)
   const deleteMutation = useDeleteBlueprint()
   const { data: catalogue } = useBlockCatalogue()
 
@@ -98,6 +98,8 @@ export function useConfigPresets() {
       })
   }, [presetBlueprints, builders, catalogue, favourites])
 
+  // Functional setFavourites updates keep these callbacks stable (favourites is
+  // not in the closure) so memoised preset rows don't re-render on every render.
   function deletePreset(blueprintId: string, version: number) {
     deleteMutation.mutate({ blueprint_id: blueprintId, version })
     // Clean up favourite flag
@@ -120,7 +122,5 @@ export function useConfigPresets() {
     toggleFavourite,
     hasPresets,
     isLoading,
-    isError,
-    isDeleting: deleteMutation.isPending,
   }
 }

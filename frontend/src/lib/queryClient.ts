@@ -42,8 +42,9 @@ const queryCache = new QueryCache({
       return
     }
 
-    // Only show toast for queries that had data before (user-initiated refetches)
-    // This avoids showing toasts for initial loads that might have their own error UI
+    // Only show a toast once the query already has data (a refetch or a query
+    // backed by placeholderData), so initial loads can surface errors in their
+    // own UI without a duplicate toast.
     if (query.state.data !== undefined) {
       showToast.error(
         i18n.t('errors:toast.refreshFailed'),

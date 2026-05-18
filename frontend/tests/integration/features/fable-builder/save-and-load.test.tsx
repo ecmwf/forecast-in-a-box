@@ -59,7 +59,7 @@ function setupFableWithSource(): string {
     },
   })
   // Mark as dirty so save button is relevant
-  store.markDirty()
+  useFableBuilderStore.setState({ isDirty: true })
   return 'source1'
 }
 

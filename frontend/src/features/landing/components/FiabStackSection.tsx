@@ -18,9 +18,9 @@ export function FiabStackSection() {
   const { t } = useTranslation('landing')
   return (
     <section>
-      <div className="_border-b relative mx-auto max-w-7xl border-x px-3 pt-24 pb-10 md:pt-16 md:pb-20">
+      <div className="relative mx-auto max-w-7xl border-x px-3 pt-24 pb-10 md:pt-16 md:pb-20">
         <div className="grid max-md:divide-y md:grid-cols-2 md:divide-x">
-          <div className="_grid _grid-rows-subgrid _pb-12 row-span-2 gap-8 md:pr-12">
+          <div className="row-span-2 gap-8 md:pr-12">
             <div className="flex h-full items-center">
               <P className="mx-auto max-w-xl text-balance">
                 <Trans
@@ -47,7 +47,7 @@ export function FiabStackSection() {
               </P>
             </div>
           </div>
-          <div className="_pb-12 row-span-2 grid grid-rows-subgrid gap-8 max-md:pt-12 md:pl-12">
+          <div className="row-span-2 grid grid-rows-subgrid gap-8 max-md:pt-12 md:pl-12">
             <H3 className="border-0 pb-0 text-balance">
               {t('stack.poweredBy')}
             </H3>

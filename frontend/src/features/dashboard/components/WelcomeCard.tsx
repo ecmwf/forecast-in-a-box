@@ -36,6 +36,7 @@ import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
 import { useArtifacts } from '@/api/hooks/useArtifacts'
 import { useStatus } from '@/api/hooks/useStatus'
 import { useJobStatusCounts } from '@/api/hooks/useJobStatusCounts'
+import { useServerTime } from '@/api/hooks/useSchedules'
 import { StatusDetailsPopover } from '@/components/common/StatusDetailsPopover'
 import { Card, CardContent } from '@/components/ui/card'
 import { useAuth } from '@/features/auth/AuthContext'
@@ -54,9 +55,14 @@ function getUserDisplayName(email?: string): string | null {
   return firstName.charAt(0).toUpperCase() + firstName.slice(1)
 }
 
-/** Month-over-month change in forecast count; null when last month had none. */
+/**
+ * Month-over-month change in forecast count; null when last month had none.
+ *
+ * `created_at` is naive server-local — `toLocalDate` corrects it before bucketing.
+ */
 function forecastTrend(
   runs: ReadonlyArray<{ created_at: string }>,
+  toLocalDate: (serverTimeStr: string) => Date,
 ): number | null {
   const now = new Date()
   const monthKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}`
@@ -65,7 +71,7 @@ function forecastTrend(
   let thisMonth = 0
   let lastMonth = 0
   for (const run of runs) {
-    const key = monthKey(new Date(run.created_at))
+    const key = monthKey(toLocalDate(run.created_at))
     if (key === thisKey) thisMonth += 1
     else if (key === lastKey) lastMonth += 1
   }
@@ -92,6 +98,7 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
   const { data: user } = useUser()
   const { t } = useTranslation('dashboard')
   const { trafficLightStatus } = useStatus()
+  const { serverTimeToLocal } = useServerTime()
   const {
     counts,
     total,
@@ -123,7 +130,7 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
   const isAnonymous = authType === 'anonymous'
   const displayName =
     getUserDisplayName(user?.email) ?? t('welcome.userFallback')
-  const trend = forecastTrend(runs)
+  const trend = forecastTrend(runs, serverTimeToLocal)
   const downloadedModels = artifacts.filter((a) => a.isAvailable).length
   const totalModels = artifacts.length
 

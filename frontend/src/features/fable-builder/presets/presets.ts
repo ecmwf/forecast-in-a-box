@@ -156,7 +156,3 @@ const PRESET_BUILDERS: Record<PresetId, () => FablePreset> = {
 export function getPreset(id: PresetId): FablePreset | undefined {
   return PRESET_BUILDERS[id]()
 }
-
-export function getPresetIds(): Array<PresetId> {
-  return Object.keys(PRESET_BUILDERS) as Array<PresetId>
-}

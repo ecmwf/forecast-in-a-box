@@ -17,7 +17,7 @@ type ModelNameKey =
   | 'mock.models.aifs'
   | 'mock.models.metNorwayMl'
   | 'mock.models.aicon'
-  | 'mock.models.neuralForecastModel'
+  | 'mock.models.aifsEns'
 
 /** i18n key (dashboard namespace) for a mock forum-topic title. */
 type ForumTopicKey =
@@ -42,7 +42,7 @@ export interface ForumTopic {
 export const mockModels: Array<ModelInfo> = [
   {
     nameKey: 'mock.models.aifs',
-    version: 'v2.1',
+    version: 'v2',
     releasedAt: '3 days ago',
     isNew: true,
   },
@@ -57,8 +57,8 @@ export const mockModels: Array<ModelInfo> = [
     releasedAt: '3 weeks ago',
   },
   {
-    nameKey: 'mock.models.neuralForecastModel',
-    version: 'v3.0',
+    nameKey: 'mock.models.aifsEns',
+    version: 'v2',
     releasedAt: '2 weeks ago',
   },
 ]
@@ -85,21 +85,3 @@ export const mockForumTopics: Array<ForumTopic> = [
     postedAt: '2d ago',
   },
 ]
-
-export interface DashboardStats {
-  systemStatus: 'ok' | 'warning' | 'error'
-  runningForecasts: number
-  availableModels: number
-  totalModels: number
-  totalForecasts: number
-  forecastTrend: number // percentage change
-}
-
-export const mockDashboardStats: DashboardStats = {
-  systemStatus: 'ok',
-  runningForecasts: 2,
-  availableModels: 8,
-  totalModels: 12,
-  totalForecasts: 1247,
-  forecastTrend: 12,
-}

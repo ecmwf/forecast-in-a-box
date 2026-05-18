@@ -61,7 +61,7 @@ export function ForecastRunSearchHeader({
             aria-label={t('flowToggle')}
           />
         </div>
-        {/* Temporary: monochrome mini-flow toggle (to be removed). */}
+        {/* Monochrome mini-flow toggle. */}
         {showFlow && (
           <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
             <span>{t('flowMonochrome')}</span>

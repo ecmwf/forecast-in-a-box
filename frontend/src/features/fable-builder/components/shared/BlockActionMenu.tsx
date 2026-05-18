@@ -16,6 +16,7 @@ import { Bookmark, Copy, CopyPlus, MoreHorizontal } from 'lucide-react'
 import type { MouseEvent } from 'react'
 import type { BlockInstanceId } from '@/api/types/fable.types'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
+import { showToast } from '@/lib/toast'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -90,7 +91,9 @@ export function BlockActionMenu({
         </button>
         <button
           className={ITEM_CLASS}
-          onClick={() => run(() => alert(t('blockActions.comingSoonPreset')))}
+          onClick={() =>
+            run(() => showToast.info(t('blockActions.comingSoonPreset')))
+          }
         >
           <Bookmark className="h-4 w-4" />
           {t('blockActions.saveAsPreset')}

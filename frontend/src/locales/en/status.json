@@ -19,5 +19,11 @@
     "down": "DOWN",
     "off": "OFF"
   },
+  "trafficLight": {
+    "unknown": "Checking...",
+    "green": "All Systems Normal",
+    "orange": "Partial Outage",
+    "red": "System Outage"
+  },
   "version": "Version"
 }

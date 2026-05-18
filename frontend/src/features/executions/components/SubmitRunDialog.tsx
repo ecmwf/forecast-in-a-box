@@ -48,7 +48,6 @@ interface SubmitRunDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   fable: FableBuilderV1
-  fableName: string
   fableId: string | null
 }
 

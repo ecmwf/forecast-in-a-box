@@ -9,7 +9,7 @@
  */
 
 import ReactGlobe from 'react-globe.gl'
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { CanvasTexture, MeshBasicMaterial } from 'three'
 import type { GlobeMethods } from 'react-globe.gl'
 import { useSpriteSheetAnimation } from '@/features/landing/hooks/useSpriteSheetAnimation'
@@ -17,9 +17,10 @@ import coastlinesLow from '@/features/landing/data/coastlines-low.json'
 
 const defaultPOV = { lat: 52, lng: 16, altitude: 1.4 }
 
-const FRAME_WIDTH = 600 // Adjust based on your image dimensions
+// Sprite-sheet geometry — must match era5/sprite_sheet.png.
+const FRAME_WIDTH = 600
 const FRAME_HEIGHT = 300
-const COLUMNS = 20 // Matches the number of columns in the sprite sheet
+const COLUMNS = 20
 const TOTAL_FRAMES = 280
 const FPS = 40
 
@@ -42,30 +43,33 @@ interface ProcessedPath {
   properties: Record<string, unknown>
 }
 
+// The coastlines dataset contains only MultiLineString geometries: each entry
+// in `coordinates` is a separate line segment used directly as a globe path.
 const processCoastlines = (data: CoastlineData): Array<ProcessedPath> => {
   const paths: Array<ProcessedPath> = []
   data.features.forEach(({ geometry, properties }) => {
-    if (geometry.type === 'MultiLineString') {
-      // For MultiLineString, each array inside coordinates is a separate line segment
-      geometry.coordinates.forEach((segment) => {
-        paths.push({
-          coords: segment, // Directly use the segment without further flattening
-          properties,
-        })
-      })
-    } else {
-      // Simple LineString — the path is its first coordinate array
-      paths.push({
-        coords: geometry.coordinates[0],
-        properties,
-      })
-    }
+    geometry.coordinates.forEach((segment) => {
+      paths.push({ coords: segment, properties })
+    })
   })
   return paths
 }
 
 const RotatingGlobe = () => {
   const globeEl = useRef<GlobeMethods | undefined>(undefined)
+
+  // Holds the current globe material so the rAF frame callback (whose identity
+  // is stable inside the animation hook) always reads the latest texture.
+  const globeMaterialRef = useRef<MeshBasicMaterial | null>(null)
+
+  // Flag the canvas texture as dirty inside the same rAF tick that drew the
+  // new frame — keeps the texture in step with the animation without a
+  // second, uncoordinated timer.
+  const handleFrameRendered = useCallback(() => {
+    const map = globeMaterialRef.current?.map
+    if (map) map.needsUpdate = true
+  }, [])
+
   const { canvasRef, isAnimationReady } = useSpriteSheetAnimation({
     spriteSheetUrl: './era5/sprite_sheet.png',
     frameWidth: FRAME_WIDTH,
@@ -73,6 +77,7 @@ const RotatingGlobe = () => {
     totalFrames: TOTAL_FRAMES,
     columns: COLUMNS,
     fps: FPS,
+    onFrameRendered: handleFrameRendered,
   })
 
   const coastlines = useMemo(() => processCoastlines(coastlinesLow), [])
@@ -87,6 +92,8 @@ const RotatingGlobe = () => {
     return new MeshBasicMaterial({ map: texture, color: '#ffffff' })
   }, [isAnimationReady, canvasRef])
 
+  globeMaterialRef.current = globeMaterial
+
   const onGlobeReady = useCallback(() => {
     const globe = globeEl.current
     if (!globe) return
@@ -98,20 +105,6 @@ const RotatingGlobe = () => {
 
     globe.pointOfView(defaultPOV)
   }, [])
-
-  useEffect(() => {
-    if (!isAnimationReady) return
-
-    // This interval ensures the texture on the globe is updated
-    // as the canvas is being drawn on by the animation hook.
-    const interval = setInterval(() => {
-      if (globeMaterial.map) {
-        globeMaterial.map.needsUpdate = true
-      }
-    }, 1000 / FPS)
-
-    return () => clearInterval(interval)
-  }, [isAnimationReady, globeMaterial])
 
   return (
     <>

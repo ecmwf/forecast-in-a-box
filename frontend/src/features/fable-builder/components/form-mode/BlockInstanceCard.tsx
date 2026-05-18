@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ConnectionsPanel } from './ConnectionsPanel'
+import type { ControlDirection } from './mini-graph/NodeControls'
 import type {
   BlockFactoryCatalogue,
   BlockInstanceId,
@@ -35,6 +36,7 @@ import { Button } from '@/components/ui/button'
 import { FieldRenderer } from '@/components/base/fields/FieldRenderer'
 import { BlockValidationProvider } from '@/features/fable-builder/context/BlockValidationContext'
 import { mapBlockErrorsToFields } from '@/features/fable-builder/utils/map-block-errors-to-fields'
+import { showToast } from '@/lib/toast'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import {
   ContextMenu,
@@ -76,7 +78,8 @@ interface BlockInstanceCardProps {
   isSelected?: boolean
   onAddConnectedBlock?: (
     factoryId: PluginBlockFactoryId,
-    sourceBlockId: BlockInstanceId,
+    anchorBlockId: BlockInstanceId,
+    direction?: ControlDirection,
   ) => void
   onBlockClick?: (blockId: BlockInstanceId) => void
 }
@@ -334,7 +337,7 @@ export function BlockInstanceCard({
           {t('blockActions.duplicateWithChildren')}
         </ContextMenuItem>
         <ContextMenuItem
-          onClick={() => alert(t('blockActions.comingSoonPreset'))}
+          onClick={() => showToast.info(t('blockActions.comingSoonPreset'))}
           className="gap-2"
         >
           <Bookmark className="h-4 w-4" />

@@ -10,12 +10,14 @@
 
 /** Dashboard widget: the most recent runs. The full list lives at /executions. */
 
-import { useMemo, useState } from 'react'
+import { useCallback, useDeferredValue, useMemo, useState } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
 import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
 import type { RunFilter } from '@/features/journal/types'
 import type { GroupBy } from '@/features/journal/grouping/group-runs'
+import type { FacetToken } from '@/features/journal/facets/facet-types'
 import { useJobsStatus } from '@/api/hooks/useJobs'
 import { useForecastRuns } from '@/features/journal/data/useForecastRuns'
 import { filterRuns } from '@/features/journal/utils/filter-runs'
@@ -48,9 +50,16 @@ export function ForecastJournal({ variant, shadow }: ForecastJournalProps) {
   const { data, isLoading } = useJobsStatus(1, DASHBOARD_RUN_COUNT)
   const { runs, toggleBookmark } = useForecastRuns(data?.runs ?? [])
 
+  // Defer filtering so typing in the search box stays responsive on long lists.
+  const deferredQuery = useDeferredValue(query)
   const filtered = useMemo(
-    () => filterRuns(runs, activeFilter, parseQuery(query)),
-    [runs, activeFilter, query],
+    () => filterRuns(runs, activeFilter, parseQuery(deferredQuery)),
+    [runs, activeFilter, deferredQuery],
+  )
+
+  const handleAddFacet = useCallback(
+    (token: FacetToken) => setQuery((prev) => addToken(prev, token)),
+    [],
   )
 
   return (
@@ -59,7 +68,7 @@ export function ForecastJournal({ variant, shadow }: ForecastJournalProps) {
       isLoading={isLoading}
       groupBy={groupBy}
       onToggleBookmark={toggleBookmark}
-      onAddFacet={(token) => setQuery((prev) => addToken(prev, token))}
+      onAddFacet={handleAddFacet}
       variant={variant}
       shadow={shadow}
       header={
@@ -78,9 +87,10 @@ export function ForecastJournal({ variant, shadow }: ForecastJournalProps) {
         <div className="border-t border-border p-4 text-center">
           <Link
             to="/executions"
-            className="text-sm font-medium text-primary hover:underline"
+            className="inline-flex items-center text-sm font-medium text-primary hover:underline"
           >
             {t('viewAll')}
+            <ChevronRight className="ml-0.5 h-3 w-3" />
           </Link>
         </div>
       }

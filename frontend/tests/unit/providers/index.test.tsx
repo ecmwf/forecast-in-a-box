@@ -10,14 +10,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
-import {
-  AppProviders,
-  AuthProvider,
-  I18nProvider,
-  QueryProvider,
-  ThemeProvider,
-  ToastProvider,
-} from '@/providers'
+import { AppProviders } from '@/providers'
 
 // Mock all individual providers to track render order
 const renderOrder: Array<string> = []
@@ -119,37 +112,5 @@ describe('AppProviders', () => {
     expect(queryProvider.element().contains(authProvider.element())).toBe(true)
     expect(authProvider.element().contains(toastProvider.element())).toBe(true)
     expect(toastProvider.element().contains(child.element())).toBe(true)
-  })
-})
-
-describe('Provider exports', () => {
-  it('exports AuthProvider', () => {
-    expect(AuthProvider).toBeDefined()
-    expect(typeof AuthProvider).toBe('function')
-  })
-
-  it('exports I18nProvider', () => {
-    expect(I18nProvider).toBeDefined()
-    expect(typeof I18nProvider).toBe('function')
-  })
-
-  it('exports QueryProvider', () => {
-    expect(QueryProvider).toBeDefined()
-    expect(typeof QueryProvider).toBe('function')
-  })
-
-  it('exports ThemeProvider', () => {
-    expect(ThemeProvider).toBeDefined()
-    expect(typeof ThemeProvider).toBe('function')
-  })
-
-  it('exports ToastProvider', () => {
-    expect(ToastProvider).toBeDefined()
-    expect(typeof ToastProvider).toBe('function')
-  })
-
-  it('exports AppProviders', () => {
-    expect(AppProviders).toBeDefined()
-    expect(typeof AppProviders).toBe('function')
   })
 })

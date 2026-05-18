@@ -13,7 +13,7 @@ import { useCommandStore } from '@/stores/commandStore'
 
 describe('commandStore', () => {
   beforeEach(() => {
-    useCommandStore.getState().reset()
+    useCommandStore.setState({ isOpen: false })
   })
 
   describe('initial state', () => {
@@ -31,38 +31,6 @@ describe('commandStore', () => {
     it('closes the palette', () => {
       useCommandStore.getState().setOpen(true)
       useCommandStore.getState().setOpen(false)
-      expect(useCommandStore.getState().isOpen).toBe(false)
-    })
-  })
-
-  describe('toggle', () => {
-    it('toggles palette from closed to open', () => {
-      useCommandStore.getState().toggle()
-      expect(useCommandStore.getState().isOpen).toBe(true)
-    })
-
-    it('toggles palette from open to closed', () => {
-      useCommandStore.getState().setOpen(true)
-      useCommandStore.getState().toggle()
-      expect(useCommandStore.getState().isOpen).toBe(false)
-    })
-
-    it('toggles palette multiple times', () => {
-      useCommandStore.getState().toggle()
-      expect(useCommandStore.getState().isOpen).toBe(true)
-
-      useCommandStore.getState().toggle()
-      expect(useCommandStore.getState().isOpen).toBe(false)
-
-      useCommandStore.getState().toggle()
-      expect(useCommandStore.getState().isOpen).toBe(true)
-    })
-  })
-
-  describe('reset', () => {
-    it('resets to initial state', () => {
-      useCommandStore.getState().setOpen(true)
-      useCommandStore.getState().reset()
       expect(useCommandStore.getState().isOpen).toBe(false)
     })
   })

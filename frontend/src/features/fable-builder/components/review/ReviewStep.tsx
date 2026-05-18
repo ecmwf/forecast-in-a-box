@@ -46,7 +46,6 @@ interface ReviewStepProps {
 export function ReviewStep({ catalogue }: ReviewStepProps) {
   const { t } = useTranslation('configure')
   const fable = useFableBuilderStore((state) => state.fable)
-  const fableName = useFableBuilderStore((state) => state.fableName)
   const fableId = useFableBuilderStore((state) => state.fableId)
   const validationState = useFableBuilderStore((state) => state.validationState)
   const isValidating = useFableBuilderStore((state) => state.isValidating)
@@ -232,7 +231,6 @@ export function ReviewStep({ catalogue }: ReviewStepProps) {
           open={submitDialogOpen}
           onOpenChange={setSubmitDialogOpen}
           fable={fable}
-          fableName={fableName}
           fableId={fableId}
         />
       </div>

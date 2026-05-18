@@ -8,9 +8,14 @@
  * does it submit to any jurisdiction.
  */
 
-/** Prev/Next pager. Renders nothing for a single page. */
+/** First/Prev/Next/Last pager. Renders nothing for a single page. */
 
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 
@@ -28,13 +33,26 @@ export function Pagination({
   const { t } = useTranslation('common')
   if (totalPages <= 1) return null
 
+  const atStart = page <= 1
+  const atEnd = page >= totalPages
+
   return (
     <div className="border-t border-border p-4 text-center">
       <div className="flex items-center justify-center gap-2">
+        {/* First/Last are icon-only — the aria-label is their accessible name. */}
         <Button
           variant="outline"
           size="sm"
-          disabled={page <= 1}
+          disabled={atStart}
+          onClick={() => onPageChange(1)}
+          aria-label={t('pagination.first')}
+        >
+          <ChevronsLeft className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={atStart}
           onClick={() => onPageChange(page - 1)}
         >
           <ChevronLeft className="mr-1 h-4 w-4" />
@@ -46,11 +64,20 @@ export function Pagination({
         <Button
           variant="outline"
           size="sm"
-          disabled={page >= totalPages}
+          disabled={atEnd}
           onClick={() => onPageChange(page + 1)}
         >
           {t('pagination.next')}
           <ChevronRight className="ml-1 h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={atEnd}
+          onClick={() => onPageChange(totalPages)}
+          aria-label={t('pagination.last')}
+        >
+          <ChevronsRight className="h-4 w-4" />
         </Button>
       </div>
     </div>

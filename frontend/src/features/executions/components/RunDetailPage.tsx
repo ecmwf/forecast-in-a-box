@@ -173,7 +173,6 @@ export function RunDetailPage() {
         status={jobData.status}
         progress={jobData.progress ?? '0'}
         createdAt={jobData.created_at}
-        error={jobData.error}
         onRestart={handleRestart}
         onDelete={handleDelete}
         onEditConfig={canEditConfig ? handleEditConfig : undefined}

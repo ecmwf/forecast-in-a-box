@@ -33,6 +33,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/features/auth/AuthContext'
 import { getCurrentUser } from '@/api/endpoints/users'
+import { ApiClientError } from '@/api/client'
 import { QUERY_CONSTANTS } from '@/utils/constants'
 
 /**
@@ -49,9 +50,13 @@ export function useUser() {
     // Only fetch if using real authentication (not anonymous)
     enabled: isAuthenticated && authType === 'authenticated',
     retry: (failureCount, error) => {
-      // Don't retry 401/403 errors
-      if (error instanceof Error && error.message.includes('401')) return false
-      if (error instanceof Error && error.message.includes('403')) return false
+      // Don't retry 401/403 — the structured status, not a string match.
+      if (
+        error instanceof ApiClientError &&
+        (error.status === 401 || error.status === 403)
+      ) {
+        return false
+      }
       return failureCount < QUERY_CONSTANTS.RETRY.MINIMAL
     },
     staleTime: 5 * 60 * 1000, // Cache user for 5 minutes

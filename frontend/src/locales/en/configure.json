@@ -97,8 +97,7 @@
   },
   "mobile": {
     "addBlock": "Add Block",
-    "blockConfiguration": "Block Configuration",
-    "blockCountPlural": "{{count}} blocks"
+    "blockConfiguration": "Block Configuration"
   },
   "configPanel": {
     "selectBlock": "Select a block to configure",

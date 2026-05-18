@@ -10,7 +10,7 @@
 
 /** One run row in the Forecast Journal — shared by the dashboard and /executions. */
 
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { Bookmark, CalendarClock, Pencil, Star } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
@@ -36,7 +36,11 @@ interface ForecastRunRowProps {
   onAddFacet?: (token: FacetToken) => void
 }
 
-export function ForecastRunRow({
+/**
+ * Memoised so a keystroke in the journal search (which rebuilds the filtered
+ * list) only re-renders rows whose `run`/callbacks actually changed.
+ */
+export const ForecastRunRow = memo(function ({
   run,
   onToggleBookmark,
   onAddFacet,
@@ -195,7 +199,7 @@ export function ForecastRunRow({
       />
     </div>
   )
-}
+})
 
 /** Progress bar while running, otherwise a status link. */
 function RunAction({ run }: { run: ForecastRunViewModel }) {

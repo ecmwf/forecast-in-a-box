@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useUser } from '@/hooks/useUser'
+import { ApiClientError } from '@/api/client'
 
 // Mock useAuth
 const mockUseAuth = vi.fn()
@@ -98,8 +99,10 @@ describe('useUser', () => {
     })
 
     it('handles fetch error', async () => {
-      // Use 401 error to avoid custom retry logic in the hook
-      mockGetCurrentUser.mockRejectedValue(new Error('401 Network error'))
+      // Use a 401 ApiClientError to avoid custom retry logic in the hook
+      mockGetCurrentUser.mockRejectedValue(
+        new ApiClientError('Network error', 401),
+      )
 
       const { result } = renderHook(() => useUser(), {
         wrapper: createWrapper(),
@@ -145,7 +148,9 @@ describe('useUser', () => {
     })
 
     it('does not retry on 401 error', async () => {
-      mockGetCurrentUser.mockRejectedValue(new Error('401 Unauthorized'))
+      mockGetCurrentUser.mockRejectedValue(
+        new ApiClientError('Unauthorized', 401),
+      )
 
       const { result } = renderHook(() => useUser(), {
         wrapper: createWrapper(),
@@ -160,7 +165,7 @@ describe('useUser', () => {
     })
 
     it('does not retry on 403 error', async () => {
-      mockGetCurrentUser.mockRejectedValue(new Error('403 Forbidden'))
+      mockGetCurrentUser.mockRejectedValue(new ApiClientError('Forbidden', 403))
 
       const { result } = renderHook(() => useUser(), {
         wrapper: createWrapper(),

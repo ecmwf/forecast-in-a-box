@@ -17,6 +17,7 @@
 import { formatDistanceToNow } from 'date-fns'
 import { AlertCircle, Eye, MoreVertical, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { getPyPIUrl } from '../utils/plugin-url'
 import { CapabilityBadges } from './CapabilityBadges'
 import { PluginIcon } from './PluginIcon'
 import type { PluginCompositeId, PluginInfo } from '@/api/types/plugins.types'
@@ -58,6 +59,7 @@ export function PluginRow({
     : null
 
   const hasError = plugin.status === 'errored'
+  const pypiUrl = getPyPIUrl(plugin.pipSource)
 
   return (
     <div
@@ -157,14 +159,10 @@ export function PluginRow({
             <MoreVertical className="h-5 w-5" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {plugin.pipSource && (
+            {pypiUrl && (
               <DropdownMenuItem
                 render={
-                  <a
-                    href={`https://pypi.org/project/${plugin.pipSource.split('/').pop()?.replace('.git', '')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  />
+                  <a href={pypiUrl} target="_blank" rel="noopener noreferrer" />
                 }
               >
                 {t('actions.viewOnPyPI')}
@@ -172,7 +170,7 @@ export function PluginRow({
             )}
             {plugin.isInstalled && (
               <>
-                {plugin.pipSource && <DropdownMenuSeparator />}
+                {pypiUrl && <DropdownMenuSeparator />}
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
                   onClick={() => onUninstall(plugin.id)}

@@ -64,9 +64,11 @@ export function GlyphFormDialog({
 
   const [key, setKey] = useState(editGlyph?.key ?? '')
   const [value, setValue] = useState(editGlyph?.value ?? '')
-  const [isPublic, setIsPublic] = useState(false)
+  const [isPublic, setIsPublic] = useState(editGlyph?.public ?? false)
   // null when public is off; concrete boolean when public is on (backend rule).
-  const [overriddable, setOverriddable] = useState<boolean | null>(null)
+  const [overriddable, setOverriddable] = useState<boolean | null>(
+    editGlyph?.overriddable ?? null,
+  )
   const [error, setError] = useState<string | null>(null)
 
   const createGlyph = useCreateGlobalGlyph()
@@ -74,13 +76,15 @@ export function GlyphFormDialog({
   // The dialog is permanently mounted by the parent, so the useState
   // initializers above only run once. Sync local state whenever the dialog
   // is (re)opened, so editing a row populates the form with that row's
-  // current values (not a stale empty string from first mount).
+  // current values (not a stale empty string from first mount). Seeding
+  // public/overriddable from editGlyph avoids silently demoting a public
+  // glyph to private on save.
   useEffect(() => {
     if (!open) return
     setKey(editGlyph?.key ?? '')
     setValue(editGlyph?.value ?? '')
-    setIsPublic(false)
-    setOverriddable(null)
+    setIsPublic(editGlyph?.public ?? false)
+    setOverriddable(editGlyph?.overriddable ?? null)
     setError(null)
   }, [open, editGlyph])
 

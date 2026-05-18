@@ -81,7 +81,8 @@ export function parseValueType(valueType: string | undefined): ParsedValueType {
   }
 
   // List type: list[str] or list[int]
-  const listMatch = valueType.match(/^list\[(\w+)\]$/i)
+  // Match the trimmed string so leading/trailing whitespace does not fall through.
+  const listMatch = trimmed.match(/^list\[(\w+)\]$/i)
   if (listMatch) {
     const itemType = listMatch[1].toLowerCase()
     if (itemType === 'str' || itemType === 'string') {
@@ -91,11 +92,11 @@ export function parseValueType(valueType: string | undefined): ParsedValueType {
       return { type: 'list', itemType: 'int' }
     }
     // For now, only support list[str] and list[int]
-    return { type: 'unknown', raw: valueType }
+    return { type: 'unknown', raw: trimmed }
   }
 
   // Enum type: enum[...] / enumClosed[...] with single or double quotes
-  const enumMatch = valueType.match(/^(?:enum|enumClosed)\[(.+)\]$/i)
+  const enumMatch = trimmed.match(/^(?:enum|enumClosed)\[(.+)\]$/i)
   if (enumMatch) {
     const optionsStr = enumMatch[1]
     const options = parseEnumOptions(optionsStr)
@@ -104,7 +105,7 @@ export function parseValueType(valueType: string | undefined): ParsedValueType {
     }
   }
 
-  return { type: 'unknown', raw: valueType }
+  return { type: 'unknown', raw: trimmed }
 }
 
 /**

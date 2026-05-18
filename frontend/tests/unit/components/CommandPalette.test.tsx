@@ -221,13 +221,13 @@ describe('CommandPalette', () => {
     expect(useCommandStore.getState().isOpen).toBe(true)
   })
 
-  it('store starts closed and can toggle', () => {
+  it('store starts closed and can be opened and closed', () => {
     expect(useCommandStore.getState().isOpen).toBe(false)
 
     useCommandStore.getState().setOpen(true)
     expect(useCommandStore.getState().isOpen).toBe(true)
 
-    useCommandStore.getState().toggle()
+    useCommandStore.getState().setOpen(false)
     expect(useCommandStore.getState().isOpen).toBe(false)
   })
 })

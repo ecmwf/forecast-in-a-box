@@ -38,5 +38,5 @@ export function useRunFavourites() {
     return runId in bookmarks
   }
 
-  return { isBookmarked, toggleBookmark }
+  return { bookmarks, isBookmarked, toggleBookmark }
 }

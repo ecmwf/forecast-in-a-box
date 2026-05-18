@@ -52,11 +52,10 @@ export function ScheduleListItem({
   const { offsetMs, serverTimeToLocal, timeZone } = useServerTime()
   const [editOpen, setEditOpen] = useState(false)
 
-  const createdAt = schedule.created_at
-    ? formatDistanceToNow(serverTimeToLocal(schedule.created_at), {
-        addSuffix: true,
-      })
-    : null
+  const createdAt = formatDistanceToNow(
+    serverTimeToLocal(schedule.created_at),
+    { addSuffix: true },
+  )
 
   const truncatedId =
     scheduleId.length > 12 ? `${scheduleId.slice(0, 12)}...` : scheduleId
@@ -143,7 +142,8 @@ export function ScheduleListItem({
           )}
           <div className="mb-2 text-sm text-muted-foreground">
             {cronDescription}
-            {createdAt && <> · {createdAt}</>}
+            {' · '}
+            {createdAt}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded border border-border bg-muted px-2 py-0.5 font-mono text-sm text-muted-foreground">
