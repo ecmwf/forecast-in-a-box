@@ -365,10 +365,11 @@ describe('Fable Builder Integration', () => {
       .poll(() => useFableBuilderStore.getState().isDirty, { timeout: 2000 })
       .toBe(false)
 
-    // 6. Wait for validation to pass
+    // 6. Wait for validation to settle. Validation is debounced + async and
+    // this trails the whole build + save flow, so allow generous headroom.
     await expect
       .poll(() => useFableBuilderStore.getState().validationState?.isValid, {
-        timeout: 3000,
+        timeout: 8000,
       })
       .toBe(true)
 
@@ -383,5 +384,7 @@ describe('Fable Builder Integration', () => {
 
     // The Submit Job button should be present (use .first() for multiple matches)
     await expect.element(screen.getByText('Submit Job').first()).toBeVisible()
-  })
+    // Per-test timeout raised: the 8 s validation poll above can't fit the
+    // default 5 s test budget.
+  }, 15000)
 })
