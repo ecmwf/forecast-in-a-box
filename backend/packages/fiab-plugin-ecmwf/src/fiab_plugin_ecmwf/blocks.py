@@ -536,12 +536,13 @@ class MapPlotSink(Sink):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
         params = block.config_as_list(PARAM, str, allow_empty=False)
-        selected = inputs[input_task].select({PARAM: params if len(params) > 1 else params[0]})
+        merged = inputs[input_task].combine_branches(dim=PARAM, force=True)
+        selected = merged.select({PARAM: params if len(params) > 1 else params[0]})
 
         groupby = block.configuration_values["groupby"] or "valid_datetime"
 
         if groupby != "none":
-            selected = selected.combine_branches(dim=groupby).flatten(keep_dims=[groupby])
+            selected = selected.flatten(keep_dims=[groupby])
 
         action = selected.map(
             Payload(
