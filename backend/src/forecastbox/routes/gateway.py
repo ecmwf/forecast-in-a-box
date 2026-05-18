@@ -59,7 +59,7 @@ def launch_cascade(cascade_url: str, log_base: str | None, max_concurrent_jobs: 
     loggingConfig = LoggingConfig(path_base=log_base, formatter="line")
 
     try:
-        main_enp(url=cascade_url, loggingConfig=loggingConfig, max_jobs=max_concurrent_jobs)
+        main_enp(url=cascade_url, loggingConfig=loggingConfig, max_concurrent_jobs=max_concurrent_jobs)
     except KeyboardInterrupt:
         pass  # no need to spew stacktrace to log
 
