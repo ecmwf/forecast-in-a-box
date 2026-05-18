@@ -336,7 +336,7 @@ describe('Fable Builder Save & Load', () => {
 
       // Should show the empty hint
       await expect
-        .element(screen.getByText('Click a source to get started'))
+        .element(screen.getByText('Click or drag a source to get started'))
         .toBeVisible()
     })
   })

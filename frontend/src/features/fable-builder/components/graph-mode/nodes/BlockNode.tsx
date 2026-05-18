@@ -10,7 +10,7 @@
 
 import { memo } from 'react'
 import { Handle, Position } from '@xyflow/react'
-import { Settings, Trash2 } from 'lucide-react'
+import { Plus, Settings, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import type { Node, NodeProps } from '@xyflow/react'
@@ -58,7 +58,7 @@ export const BlockNode = memo(function ({
   selected,
 }: NodeProps<FableNode>) {
   const { t } = useTranslation('configure')
-  const { factory, instance, catalogue, hasDownstream } = data
+  const { factory, instance, catalogue } = data
   const metadata = BLOCK_KIND_METADATA[factory.kind]
   const IconComponent = getBlockKindIcon(factory.kind)
 
@@ -67,6 +67,7 @@ export const BlockNode = memo(function ({
   const selectBlock = useFableBuilderStore((state) => state.selectBlock)
   const validationState = useFableBuilderStore((state) => state.validationState)
   const layoutDirection = useFableBuilderStore((state) => state.layoutDirection)
+  const draggedFactory = useFableBuilderStore((state) => state.draggedFactory)
   const removeBlockCascade = useFableBuilderStore(
     (state) => state.removeBlockCascade,
   )
@@ -78,6 +79,12 @@ export const BlockNode = memo(function ({
   const inputPosition = INPUT_POSITIONS[layoutDirection]
   const outputPosition = OUTPUT_POSITIONS[layoutDirection]
   const isHorizontalLayout = layoutDirection === 'LR'
+
+  // Handles a dragged palette block can connect to — highlighted during a drag.
+  const inputHandleDroppable =
+    draggedFactory !== null && draggedFactory.factory.kind !== 'sink'
+  const outputHandleDroppable =
+    draggedFactory !== null && draggedFactory.factory.inputs.length > 0
 
   // React Flow drives selection via the `selected` prop, so the node never
   // subscribes to `selectedBlockId` — that would re-render every node on any
@@ -271,6 +278,7 @@ export const BlockNode = memo(function ({
               inputPosition === Position.Bottom && 'top-auto! -bottom-2.5!',
               'border-foreground/30!',
               'transition-all hover:scale-110',
+              inputHandleDroppable && 'dnd-droppable',
             )}
             style={
               isHorizontalLayout
@@ -282,34 +290,42 @@ export const BlockNode = memo(function ({
       })}
 
       {factory.kind !== 'sink' && (
-        <>
+        <AddNodeButton
+          sourceBlockId={id}
+          possibleExpansions={possibleExpansions}
+          catalogue={catalogue}
+        >
+          {/* Output handle doubles as the add-block control: click opens the
+              menu, drag draws a connection. */}
           <Handle
             type="source"
             position={outputPosition}
             id="output"
             title={t('blockNode.outputHandle')}
+            onClick={(e) => e.stopPropagation()}
             className={cn(
-              'h-5! w-5! rounded-full! border-4! bg-card!',
-              'border-foreground/30!',
+              'flex! h-5! w-5! cursor-pointer! items-center justify-center rounded-full! border-4! bg-card!',
+              'border-foreground/30! hover:border-primary!',
               isHorizontalLayout ? '-right-2.5!' : '-bottom-2.5!',
               outputPosition === Position.Left && 'right-auto! -left-2.5!',
               outputPosition === Position.Top && '-top-2.5! bottom-auto!',
               'transition-all hover:scale-110',
+              outputHandleDroppable && 'dnd-droppable',
             )}
             style={
               isHorizontalLayout
                 ? { top: '50%', transform: 'translateY(-50%)' }
                 : { left: '50%', transform: 'translateX(-50%)' }
             }
-          />
-          <AddNodeButton
-            sourceBlockId={id}
-            possibleExpansions={possibleExpansions}
-            hasErrors={hasErrors}
-            hasDownstream={hasDownstream}
-            catalogue={catalogue}
-          />
-        </>
+          >
+            <Plus
+              className={cn(
+                'h-2.5 w-2.5',
+                hasErrors ? 'text-destructive' : 'text-muted-foreground',
+              )}
+            />
+          </Handle>
+        </AddNodeButton>
       )}
     </div>
   )

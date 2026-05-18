@@ -31,6 +31,12 @@ export type BuilderStep = 'edit' | 'review'
 export type EdgeStyle = 'bezier' | 'smoothstep' | 'step'
 export type { LayoutDirection } from '@/features/fable-builder/utils/layout-blocks'
 
+/** A block factory being dragged from the palette onto the canvas. */
+export interface DraggedFactory {
+  id: PluginBlockFactoryId
+  factory: BlockFactory
+}
+
 /**
  * Gets the default layout direction based on screen aspect ratio.
  * Landscape screens (width > height) use left-to-right (LR).
@@ -95,6 +101,8 @@ interface FableBuilderState {
    *  `useDraftPersistence`; read by the DraftStatus indicator. */
   draftWritePending: boolean
   submitDialogOpen: boolean
+  /** Palette block being dragged onto the canvas; null when idle. Not persisted. */
+  draggedFactory: DraggedFactory | null
 
   setFable: (fable: FableBuilderV1, id?: string | null) => void
   setFableName: (name: string) => void
@@ -146,6 +154,7 @@ interface FableBuilderState {
   setValidationState: (state: FableValidationState | null) => void
   setIsValidating: (validating: boolean) => void
   setSubmitDialogOpen: (open: boolean) => void
+  setDraggedFactory: (dragged: DraggedFactory | null) => void
   markSaved: (id: string, version: number, name?: string) => void
   /**
    * Mark the current fable as submitted (one-off run or schedule created).
@@ -177,7 +186,8 @@ function createInitialState() {
     isMobileConfigOpen: false,
     isMiniMapOpen: true,
     fitViewTrigger: 0,
-    edgeStyle: 'bezier' as EdgeStyle,
+    // Orthogonal by default, matching the execution details page.
+    edgeStyle: 'smoothstep' as EdgeStyle,
     autoLayout: true,
     layoutDirection: getDefaultLayoutDirection(),
     nodesLocked: true,
@@ -188,6 +198,7 @@ function createInitialState() {
     lastSavedAt: null,
     draftWritePending: false,
     submitDialogOpen: false,
+    draggedFactory: null,
   }
 }
 
@@ -510,6 +521,7 @@ export const useFableBuilderStore = create<FableBuilderState>()(
           }),
         setIsValidating: (validating) => set({ isValidating: validating }),
         setSubmitDialogOpen: (open) => set({ submitDialogOpen: open }),
+        setDraggedFactory: (dragged) => set({ draggedFactory: dragged }),
 
         markSaved: (id, version, name) =>
           set({

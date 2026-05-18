@@ -87,11 +87,11 @@ describe('Fable Builder Integration', () => {
       .element(screen.getByText('Source', { exact: true }))
       .toBeVisible()
 
-    // With empty fable, the hint text should say "Click a source to get started"
+    // With empty fable, the hint text should say "Click or drag a source to get started"
     // Note: For empty fables, validationState stays null (validation only runs when blocks exist)
     // When validationState is null, all factories are available by default
     await expect
-      .element(screen.getByText('Click a source to get started'))
+      .element(screen.getByText('Click or drag a source to get started'))
       .toBeVisible()
 
     // Verify source block buttons are visible and enabled (available by default when no validationState)

@@ -23,6 +23,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import { FableEdgeComponent } from './FableEdge'
 import { BlockNode } from './nodes/BlockNode'
+import { BlockDragPreview } from './BlockDragPreview'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import type {
   Connection,
@@ -33,12 +34,14 @@ import type {
 } from '@xyflow/react'
 import type { NodeDimensions } from '@/features/fable-builder/utils/layout-blocks'
 import type { FableNode } from './nodes/BlockNode'
+import { getFactory } from '@/api/types/fable.types'
 import {
   layoutNodes,
   needsLayout,
 } from '@/features/fable-builder/utils/layout-blocks'
 import { fableToGraph } from '@/features/fable-builder/utils/fable-to-graph'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
+import { useSidebarBlockDrop } from '@/features/fable-builder/hooks/useSidebarBlockDrop'
 import { useDebouncedCallback } from '@/hooks/useDebounce'
 import { useMedia } from '@/hooks/useMedia'
 import { useUiStore } from '@/stores/uiStore'
@@ -75,6 +78,7 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   const selectedBlockId = useFableBuilderStore((state) => state.selectedBlockId)
 
   const { fitView, setViewport, getNodesBounds } = useReactFlow()
+  const { onDragOver, onDrop } = useSidebarBlockDrop(catalogue)
 
   const [nodes, setNodes, onNodesChangeInternal] = useNodesState<FableNode>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
@@ -95,6 +99,19 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   // growing/shrinking while the user types), which would otherwise jostle
   // the whole graph.
   const measuredNodesRef = useRef<Set<string>>(new Set())
+
+  // Measured node sizes in a ref, so the layout effect lays out with real
+  // heights (→ aligned handles, straight edges) without depending on `nodes`.
+  const nodeDimensionsRef = useRef<NodeDimensions>({})
+  nodeDimensionsRef.current = nodes.reduce<NodeDimensions>((acc, node) => {
+    if (node.measured?.width && node.measured.height) {
+      acc[node.id] = {
+        width: node.measured.width,
+        height: node.measured.height,
+      }
+    }
+    return acc
+  }, {})
 
   // Debounced re-layout function that uses measured node dimensions
   const debouncedRelayout = useDebouncedCallback(() => {
@@ -165,7 +182,12 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
 
     const shouldLayout = autoLayout || needsLayout(newNodes)
     const layouted = shouldLayout
-      ? layoutNodes(newNodes, newEdges, { direction: layoutDirection })
+      ? layoutNodes(
+          newNodes,
+          newEdges,
+          { direction: layoutDirection },
+          nodeDimensionsRef.current,
+        )
       : newNodes
 
     // Detect preset load: going from 0 blocks to multiple blocks
@@ -271,19 +293,26 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
           connection.source,
         )
 
+        // Label the optimistic edge only for multi-input targets (cf. fableToEdges).
+        const targetFactory = getFactory(
+          catalogue,
+          fable.blocks[connection.target].factory_id,
+        )
+        const showLabel = (targetFactory?.inputs.length ?? 0) > 1
+
         setEdges((eds) =>
           addEdge(
             {
               ...connection,
               type: 'fableEdge',
-              data: { inputName: connection.targetHandle },
+              data: { inputName: connection.targetHandle, showLabel },
             },
             eds,
           ),
         )
       }
     },
-    [connectBlocks, setEdges],
+    [connectBlocks, setEdges, fable, catalogue],
   )
 
   const onNodeClick = useCallback(
@@ -306,6 +335,8 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         nodesDraggable={!nodesLocked}
@@ -331,6 +362,7 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
           />
         )}
       </ReactFlow>
+      <BlockDragPreview />
     </div>
   )
 }

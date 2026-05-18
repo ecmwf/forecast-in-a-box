@@ -24,9 +24,6 @@ export interface FableNodeData extends Record<string, unknown> {
   factory: BlockFactory
   label: string
   catalogue: BlockFactoryCatalogue
-  /** Whether at least one other block consumes this block's output. Precomputed
-   *  here so BlockNode never has to subscribe to the whole `fable` state. */
-  hasDownstream: boolean
 }
 
 const NODE_TYPE_MAP: Record<string, string> = {
@@ -48,23 +45,11 @@ function getNodeType(kind: string): string {
  */
 const nodeDataCache = new Map<BlockInstanceId, FableNodeData>()
 
-/** Set of instanceIds with a downstream consumer in the current fable. */
-function computeDownstreamSources(fable: FableBuilderV1): Set<BlockInstanceId> {
-  const sources = new Set<BlockInstanceId>()
-  for (const instance of Object.values(fable.blocks)) {
-    for (const sourceId of Object.values(instance.input_ids)) {
-      if (sourceId) sources.add(sourceId)
-    }
-  }
-  return sources
-}
-
 export function fableToNodes(
   fable: FableBuilderV1,
   catalogue: BlockFactoryCatalogue,
 ): Array<Node<FableNodeData>> {
   const nodes: Array<Node<FableNodeData>> = []
-  const downstreamSources = computeDownstreamSources(fable)
   const liveIds = new Set<BlockInstanceId>()
 
   for (const [instanceId, instance] of Object.entries(fable.blocks)) {
@@ -72,14 +57,12 @@ export function fableToNodes(
     if (!factory) continue
     liveIds.add(instanceId)
 
-    const hasDownstream = downstreamSources.has(instanceId)
     const cached = nodeDataCache.get(instanceId)
     const data: FableNodeData =
       cached &&
       cached.instance === instance &&
       cached.factory === factory &&
-      cached.catalogue === catalogue &&
-      cached.hasDownstream === hasDownstream
+      cached.catalogue === catalogue
         ? cached
         : {
             instanceId,
@@ -87,7 +70,6 @@ export function fableToNodes(
             factory,
             label: factory.title,
             catalogue,
-            hasDownstream,
           }
     nodeDataCache.set(instanceId, data)
 
@@ -109,13 +91,18 @@ export function fableToNodes(
 
 export function fableToEdges(
   fable: FableBuilderV1,
-  // Unused — kept so cross-feature call sites (RunCanvas, FableMiniFlow) and
-  // their tests keep type-checking; edges derive purely from `input_ids`.
-  _catalogue?: BlockFactoryCatalogue,
+  // Flags edges into multi-input blocks; optional for cross-feature callers.
+  catalogue?: BlockFactoryCatalogue,
 ): Array<Edge> {
   const edges: Array<Edge> = []
 
   for (const [targetId, instance] of Object.entries(fable.blocks)) {
+    const targetFactory = catalogue
+      ? getFactory(catalogue, instance.factory_id)
+      : undefined
+    // Only multi-input blocks need a per-edge label to tell their inputs apart.
+    const showLabel = (targetFactory?.inputs.length ?? 0) > 1
+
     for (const [inputName, sourceId] of Object.entries(instance.input_ids)) {
       if (!sourceId) continue
 
@@ -126,7 +113,7 @@ export function fableToEdges(
         sourceHandle: 'output',
         targetHandle: inputName,
         type: 'fableEdge',
-        data: { inputName },
+        data: { inputName, showLabel },
       })
     }
   }

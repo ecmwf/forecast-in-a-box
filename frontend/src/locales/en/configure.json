@@ -118,8 +118,8 @@
     "notAvailableAtStep": "Not available at this step",
     "addBlock": "Add {{title}}",
     "loadingBlocks": "Loading available blocks...",
-    "clickSourceToStart": "Click a source to get started",
-    "clickToAdd": "Click to add blocks"
+    "clickSourceToStart": "Click or drag a source to get started",
+    "clickToAdd": "Click or drag blocks onto the canvas"
   },
   "pipeline": {
     "structure": "Pipeline Structure",

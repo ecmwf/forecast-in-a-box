@@ -36,6 +36,11 @@ import {
 } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
 
+// Transparent image used to suppress the browser's default drag ghost.
+const EMPTY_DRAG_IMAGE = new Image()
+EMPTY_DRAG_IMAGE.src =
+  'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+
 interface BlockPaletteProps {
   catalogue: BlockFactoryCatalogue
 }
@@ -47,6 +52,9 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
     new Set(BLOCK_KIND_ORDER),
   )
   const addBlock = useFableBuilderStore((state) => state.addBlock)
+  const setDraggedFactory = useFableBuilderStore(
+    (state) => state.setDraggedFactory,
+  )
   const fable = useFableBuilderStore((state) => state.fable)
   const validationState = useFableBuilderStore((state) => state.validationState)
   const isValidating = useFableBuilderStore((state) => state.isValidating)
@@ -73,7 +81,9 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
         allExpansions.add(factoryIdToKey(expansion))
       }
     }
-    return allExpansions
+    // No expansions (e.g. a block has errors) → keep every block available
+    // instead of greying the palette. Mirrors AddNodeButton's fallback.
+    return allExpansions.size > 0 ? allExpansions : null
   }, [validationState, blockCount])
 
   const groupedFactories = useMemo(() => {
@@ -136,6 +146,19 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
     factory: BlockFactory,
   ): void {
     addBlock(factoryId, factory)
+  }
+
+  function handleDragStart(
+    e: React.DragEvent,
+    factoryId: PluginBlockFactoryId,
+    factory: BlockFactory,
+  ): void {
+    setDraggedFactory({ id: factoryId, factory })
+    e.dataTransfer.effectAllowed = 'copy'
+    // Some browsers require a data payload for the drag to start.
+    e.dataTransfer.setData('text/plain', factory.title)
+    // Hide the browser's default ghost — <BlockDragPreview> renders our own.
+    e.dataTransfer.setDragImage(EMPTY_DRAG_IMAGE, 0, 0)
   }
 
   return (
@@ -202,14 +225,17 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
                     return (
                       <button
                         key={factoryIdToKey(id)}
+                        draggable={canInteract}
                         onClick={() =>
                           canInteract && handleAddBlock(id, factory)
                         }
+                        onDragStart={(e) => handleDragStart(e, id, factory)}
+                        onDragEnd={() => setDraggedFactory(null)}
                         disabled={!canInteract}
                         className={cn(
                           'group flex w-full items-center gap-2 rounded-md border border-transparent p-2 text-left transition-all',
                           canInteract &&
-                            'cursor-pointer hover:border-border hover:bg-muted/50',
+                            'cursor-grab hover:border-border hover:bg-muted/50',
                           !isAvailable && 'cursor-not-allowed opacity-40',
                         )}
                         title={
