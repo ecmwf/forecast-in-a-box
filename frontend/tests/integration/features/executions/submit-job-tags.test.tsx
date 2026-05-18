@@ -11,20 +11,20 @@
 /**
  * Tag Input Integration Tests
  *
- * Tests the tag pill input behavior in the SubmitJobDialog:
+ * Tests the tag pill input behavior in the SubmitRunDialog:
  * - Comma creates a tag pill
  * - Enter creates a tag pill
- * - Backspace removes last tag when input is empty
- * - Duplicate tags are ignored
  * - Spaces within tags are preserved
- * - Tags render as pills with X buttons
+ * - Multiple tags from comma-separated input
+ * - Duplicate tags are ignored
+ * - Empty tags from leading commas are ignored
  */
 
 import { useState } from 'react'
 import { userEvent } from 'vitest/browser'
 import { describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@tests/utils/render'
-import { SubmitJobDialog } from '@/features/executions/components/SubmitJobDialog'
+import { SubmitRunDialog } from '@/features/executions/components/SubmitRunDialog'
 import { createEmptyFable } from '@/api/types/fable.types'
 
 vi.mock('@/hooks/useMedia', () => ({
@@ -34,17 +34,16 @@ vi.mock('@/hooks/useMedia', () => ({
 function TestHarness() {
   const [open, setOpen] = useState(true)
   return (
-    <SubmitJobDialog
+    <SubmitRunDialog
       open={open}
       onOpenChange={setOpen}
       fable={createEmptyFable()}
-      fableName="Test"
       fableId={null}
     />
   )
 }
 
-describe('SubmitJobDialog Tag Input', () => {
+describe('SubmitRunDialog Tag Input', () => {
   it('creates a tag pill when comma is typed', async () => {
     const screen = await renderWithProviders(<TestHarness />)
 

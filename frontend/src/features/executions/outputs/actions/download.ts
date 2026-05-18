@@ -9,9 +9,11 @@
  */
 
 import { Download } from 'lucide-react'
+import { fetchJobResultBlob } from '../useJobResult'
 import type { ActionContext, OutputAction, OutputItem } from '../types'
-import { getJobResult } from '@/api/endpoints/job'
 import { createLogger } from '@/lib/logger'
+import { downloadBlob } from '@/lib/download-blob'
+import { queryClient } from '@/lib/queryClient'
 import { showToast } from '@/lib/toast'
 
 const log = createLogger('OutputAction.download')
@@ -21,15 +23,13 @@ async function runDownload(
   ctx: ActionContext,
 ): Promise<void> {
   try {
-    const { blob } = await getJobResult(item.jobId, item.taskId)
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${item.originalBlock}.${ctx.resolvedAdapter.extension}`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    // Shared cache — reuses the blob if a viewer or thumbnail already loaded it.
+    const { blob } = await fetchJobResultBlob(
+      queryClient,
+      item.jobId,
+      item.taskId,
+    )
+    downloadBlob(blob, `${item.originalBlock}.${ctx.resolvedAdapter.extension}`)
   } catch (err) {
     log.error('Failed to download output', {
       jobId: item.jobId,

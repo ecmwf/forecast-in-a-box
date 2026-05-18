@@ -10,7 +10,7 @@
 
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Loader2, Save, X } from 'lucide-react'
+import { Loader2, Save } from 'lucide-react'
 import type {
   BlockFactoryCatalogue,
   FableBuilderV1,
@@ -24,6 +24,9 @@ import { ApiClientError } from '@/api/client'
 import { useFableRetrieve, useUpsertFable } from '@/api/hooks/useFable'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { showToast } from '@/lib/toast'
+import { formatInZone, getAppTimeZone } from '@/lib/datetime'
+import { stripSystemTags } from '@/lib/system-tags'
+import { TagInput } from '@/components/common/TagInput'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -62,20 +65,21 @@ export function BlockSummaryBadges({
   summary: FableBlockSummary
   className?: string
 }) {
+  const { t } = useTranslation('configure')
   return (
     <div className={className ?? 'flex flex-wrap gap-1.5'}>
-      {BLOCK_KIND_ORDER.filter(
-        (kind) => summary[kind as keyof FableBlockSummary] > 0,
-      ).map((kind) => {
+      {BLOCK_KIND_ORDER.filter((kind) => summary[kind] > 0).map((kind) => {
         const meta = BLOCK_KIND_METADATA[kind]
-        const count = summary[kind as keyof FableBlockSummary]
+        const count = summary[kind]
         return (
           <Badge key={kind} variant="outline" className="gap-1.5 text-xs">
             <span
               className={`inline-block h-2 w-2 rounded-full ${meta.topBarColor}`}
             />
-            {count} {meta.label.toLowerCase()}
-            {count !== 1 ? 's' : ''}
+            {t('blockSummaryBadge', {
+              count,
+              kind: meta.label.toLowerCase(),
+            })}
           </Badge>
         )
       })}
@@ -85,9 +89,10 @@ export function BlockSummaryBadges({
 
 function generateDefaultTitleParts(): { date: string; time: string } {
   const now = new Date()
+  const timeZone = getAppTimeZone()
   return {
-    date: now.toISOString().split('T')[0],
-    time: now.toTimeString().slice(0, 5),
+    date: formatInZone(now, timeZone, 'yyyy-MM-dd'),
+    time: formatInZone(now, timeZone, 'HH:mm'),
   }
 }
 
@@ -128,44 +133,8 @@ export function SaveConfigPopover({
   const [title, setTitle] = useState(generateDefaultTitle)
   const [comments, setComments] = useState('')
   const [tags, setTags] = useState<Array<string>>([])
-  const [tagInput, setTagInput] = useState('')
 
   const summary = computeBlockSummary(fable, catalogue)
-
-  function addTag(value: string) {
-    const trimmed = value.trim()
-    if (trimmed && !tags.includes(trimmed)) {
-      setTags([...tags, trimmed])
-    }
-  }
-
-  function handleTagChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const value = e.target.value
-    if (value.includes(',')) {
-      const parts = value.split(',')
-      for (const part of parts.slice(0, -1)) {
-        addTag(part)
-      }
-      setTagInput(parts[parts.length - 1])
-    } else {
-      setTagInput(value)
-    }
-  }
-
-  function handleTagKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' && tagInput.trim()) {
-      e.preventDefault()
-      addTag(tagInput)
-      setTagInput('')
-    }
-    if (e.key === 'Backspace' && !tagInput && tags.length > 0) {
-      setTags(tags.slice(0, -1))
-    }
-  }
-
-  function handleRemoveTag(tag: string) {
-    setTags(tags.filter((existing) => existing !== tag))
-  }
 
   function handleOpenChange(nextOpen: boolean) {
     if (nextOpen) {
@@ -174,8 +143,7 @@ export function SaveConfigPopover({
           t('configure:save.defaultTitle', generateDefaultTitleParts()),
       )
       setComments(fableData?.display_description || '')
-      setTags(fableData?.tags ? [...fableData.tags] : [])
-      setTagInput('')
+      setTags(stripSystemTags(fableData?.tags))
     }
     if (isControlled) {
       onOpenChange?.(nextOpen)
@@ -190,12 +158,6 @@ export function SaveConfigPopover({
       const displayTitle =
         title.trim() ||
         t('configure:save.defaultTitle', generateDefaultTitleParts())
-      // Include any pending text in the input as a final tag
-      const finalTags = [...tags]
-      const pendingTag = tagInput.trim()
-      if (pendingTag && !finalTags.includes(pendingTag)) {
-        finalTags.push(pendingTag)
-      }
       const result = await upsertFable.mutateAsync({
         fable,
         // Update: pass ID + version for in-place update
@@ -207,7 +169,7 @@ export function SaveConfigPopover({
         parentId: asCopy ? (effectiveFableId ?? undefined) : undefined,
         display_name: displayTitle,
         display_description: comments.trim(),
-        tags: finalTags,
+        tags,
       })
 
       markSaved(result.blueprint_id, result.version, displayTitle)
@@ -318,34 +280,12 @@ export function SaveConfigPopover({
             <Label htmlFor="save-config-tags">
               {t('configure:save.tagsLabel')}
             </Label>
-            <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border border-input bg-transparent px-3 py-1.5 shadow-xs transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 dark:bg-input/30">
-              {tags.map((tag) => (
-                <Badge
-                  key={tag}
-                  variant="secondary"
-                  className="shrink-0 gap-1 py-0.5"
-                >
-                  {tag}
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveTag(tag)}
-                    className="ml-0.5 rounded-full hover:bg-destructive/10 hover:text-destructive"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-              <input
-                id="save-config-tags"
-                placeholder={
-                  tags.length === 0 ? t('configure:save.tagsPlaceholder') : ''
-                }
-                value={tagInput}
-                onChange={handleTagChange}
-                onKeyDown={handleTagKeyDown}
-                className="min-w-20 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-              />
-            </div>
+            <TagInput
+              id="save-config-tags"
+              tags={tags}
+              onTagsChange={setTags}
+              placeholder={t('configure:save.tagsPlaceholder')}
+            />
           </div>
 
           {/* Actions */}

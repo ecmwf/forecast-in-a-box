@@ -11,6 +11,7 @@
 import { HotkeysProvider } from '@tanstack/react-hotkeys'
 import { Outlet, createRootRoute } from '@tanstack/react-router'
 import { Suspense, lazy, useEffect } from 'react'
+import { GlobalCommandShortcuts } from '@/components/GlobalCommandShortcuts'
 import {
   useBackendBaseUrl,
   useConfig,
@@ -34,7 +35,7 @@ function RootComponent() {
   const backendBaseUrl = useBackendBaseUrl()
   const environment = useEnvironment()
 
-  // Sync language between configStore, globalStore, and i18next
+  // Sync language between configStore and i18next
   useLanguageSync()
 
   // Log configuration in debug mode
@@ -56,6 +57,8 @@ function RootComponent() {
     <HotkeysProvider>
       {/* Header and Footer are rendered by individual layouts */}
       <Outlet />
+      {/* App-wide keyboard shortcuts (g-prefixed sequences) */}
+      <GlobalCommandShortcuts />
       {/* Global command palette (⌘K / Ctrl+K) */}
       <Suspense fallback={null}>
         <CommandPalette />

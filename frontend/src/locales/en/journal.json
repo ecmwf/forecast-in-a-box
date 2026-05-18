@@ -1,0 +1,102 @@
+{
+  "title": "Forecast Journal",
+  "searchPlaceholder": "Search or filter, e.g. tag:production",
+  "empty": "No forecasts found matching your criteria.",
+  "viewAll": "View all",
+  "clearFilters": "Clear filters",
+  "flowToggle": "Flow preview",
+  "flowMonochrome": "Monochrome",
+  "filters": {
+    "label": "Filter by status",
+    "all": "All",
+    "submitted": "Submitted",
+    "running": "Running",
+    "completed": "Completed",
+    "failed": "Failed",
+    "bookmarked": "Bookmarked"
+  },
+  "groupBy": {
+    "label": "Group by",
+    "none": "None",
+    "date": "Date",
+    "schedule": "Schedule",
+    "tag": "Tag"
+  },
+  "dateGroup": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "week": "Earlier this week",
+    "older": "Older"
+  },
+  "group": {
+    "untagged": "Untagged",
+    "unscheduled": "Unscheduled"
+  },
+  "flow": {
+    "label": "Configuration block flow"
+  },
+  "scheduleFallback": "Schedule {{id}}",
+  "facet": {
+    "model": "Model",
+    "output": "Output",
+    "tag": "Tag"
+  },
+  "attempts": {
+    "label": "{{count}} attempts",
+    "attempt": "Attempt {{number}}"
+  },
+  "status": {
+    "submitted": "Submitted",
+    "preparing": "Preparing",
+    "running": "Running",
+    "completed": "Completed",
+    "failed": "Failed",
+    "unknown": "Unknown"
+  },
+  "item": {
+    "started": "Started: {{time}}",
+    "outputs_one": "{{count}} output",
+    "outputs_other": "{{count}} outputs",
+    "untitled": "Untitled forecast",
+    "viewResults": "View Results",
+    "viewError": "View Error",
+    "inspect": "Inspect",
+    "bookmark": "Bookmark",
+    "removeBookmark": "Remove bookmark",
+    "editConfig": "Edit configuration",
+    "editMetadata": "Edit run details",
+    "saveAsPreset": "Save as preset",
+    "removeFromPreset": "Remove from presets",
+    "delete": "Delete",
+    "preset": "Preset",
+    "scheduled": "Scheduled",
+    "moreOptions": "More options"
+  },
+  "metadata": {
+    "title": "Edit run details",
+    "description": "Update the name, description and tags of this run's configuration.",
+    "nameLabel": "Name",
+    "namePlaceholder": "Forecast name",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Optional description",
+    "tagsLabel": "Tags",
+    "tagsPlaceholder": "Add a tag…",
+    "cancel": "Cancel",
+    "save": "Save changes"
+  },
+  "deleteRun": {
+    "title": "Delete this run?",
+    "description": "This permanently deletes the execution and its outputs. This cannot be undone.",
+    "cancel": "Cancel",
+    "confirm": "Delete run"
+  },
+  "toast": {
+    "metadataSaved": "Run details updated",
+    "metadataFailed": "Could not update run details",
+    "savedAsPreset": "Saved as a configuration preset",
+    "removedFromPreset": "Removed from configuration presets",
+    "presetFailed": "Could not update preset",
+    "runDeleted": "Run deleted",
+    "deleteFailed": "Could not delete run"
+  }
+}

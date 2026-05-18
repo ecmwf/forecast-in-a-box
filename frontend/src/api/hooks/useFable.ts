@@ -51,6 +51,8 @@ import { QUERY_CONSTANTS } from '@/utils/constants'
 export const fableKeys = {
   all: ['fable'] as const,
   catalogue: () => [...fableKeys.all, 'catalogue'] as const,
+  // Prefix shared by every paginated blueprint-list query — invalidate to refresh all of them.
+  blueprintsBase: () => [...fableKeys.all, 'blueprints'] as const,
   blueprints: (page?: number, pageSize?: number) =>
     [...fableKeys.all, 'blueprints', page, pageSize] as const,
   detail: (id: string) => [...fableKeys.all, 'detail', id] as const,
@@ -91,42 +93,39 @@ export function useBlockCatalogue(language?: string) {
   })
 }
 
+/** Query key shared by useFable and useFableRetrieve — one request per fable. */
+const fableRetrieveKey = (fableId: string | null | undefined) =>
+  [...fableKeys.detail(fableId ?? ''), 'full'] as const
+
+/** Don't retry 4xx (e.g. 404 not found) — only retry server errors. */
+function retryRetrieve(failureCount: number, error: Error): boolean {
+  if (error instanceof ApiClientError && error.status && error.status < 500)
+    return false
+  return failureCount < QUERY_CONSTANTS.RETRY.MINIMAL
+}
+
+/**
+ * Retrieve a fable's builder. Shares one query (and one network request) with
+ * useFableRetrieve via a common query key + `select`.
+ */
 export function useFable(fableId: string | null | undefined) {
-  return useQuery<FableBuilderV1>({
-    queryKey: fableKeys.detail(fableId ?? ''),
-    queryFn: async () => {
-      const response = await retrieveFable(fableId!)
-      return response.builder
-    },
+  return useQuery<FableRetrieveResponse, Error, FableBuilderV1>({
+    queryKey: fableRetrieveKey(fableId),
+    queryFn: () => retrieveFable(fableId!),
+    select: (response) => response.builder,
     enabled: !!fableId,
-    staleTime: 30 * 1000, // 30 seconds
-    // Don't retry 4xx errors (e.g. 404 not found) — only retry server errors
-    retry: (failureCount, error) => {
-      if (error instanceof ApiClientError && error.status && error.status < 500)
-        return false
-      return failureCount < QUERY_CONSTANTS.RETRY.MINIMAL
-    },
+    staleTime: Infinity,
+    retry: retryRetrieve,
   })
 }
 
 export function useFableRetrieve(fableId: string | null | undefined) {
   return useQuery<FableRetrieveResponse>({
-    queryKey: [...fableKeys.detail(fableId ?? ''), 'full'],
+    queryKey: fableRetrieveKey(fableId),
     queryFn: () => retrieveFable(fableId!),
     enabled: !!fableId,
     staleTime: Infinity,
-    // Don't retry 4xx errors (e.g. 404 not found) — only retry server errors
-    retry: (failureCount, error) => {
-      if (error instanceof ApiClientError && error.status && error.status < 500)
-        return false
-      return failureCount < QUERY_CONSTANTS.RETRY.MINIMAL
-    },
-  })
-}
-
-export function useExpandFable() {
-  return useMutation<FableValidationExpansion, Error, FableBuilderV1>({
-    mutationFn: expandFable,
+    retry: retryRetrieve,
   })
 }
 
@@ -134,10 +133,7 @@ export function useFableValidation(
   fable: FableBuilderV1 | null,
   enabled: boolean = true,
 ) {
-  const stableFable = useMemo(
-    () => fable ?? ({ blocks: {} } as FableBuilderV1),
-    [fable],
-  )
+  const stableFable = useMemo(() => fable ?? { blocks: {} }, [fable])
 
   const hasBlocks = fable !== null && Object.keys(fable.blocks).length > 0
 
@@ -226,7 +222,7 @@ export function useUpsertFable() {
         queryKey: fableKeys.detail(result.blueprint_id),
       })
       queryClient.invalidateQueries({
-        queryKey: fableKeys.blueprints(),
+        queryKey: fableKeys.blueprintsBase(),
       })
     },
   })
@@ -242,7 +238,7 @@ export function useDeleteBlueprint() {
         queryKey: fableKeys.detail(variables.blueprint_id),
       })
       queryClient.invalidateQueries({
-        queryKey: fableKeys.blueprints(),
+        queryKey: fableKeys.blueprintsBase(),
       })
     },
   })

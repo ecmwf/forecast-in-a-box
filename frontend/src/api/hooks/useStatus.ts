@@ -13,13 +13,14 @@
  * TanStack Query hook for fetching system status
  */
 
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import type { StatusResponse, TrafficLightStatus } from '@/types/status.types'
 import {
   computeTrafficLightStatus,
   getComponentStatusDetails,
-  getTrafficLightLabel,
+  getTrafficLightLabelKey,
 } from '@/types/status.types'
 import { fetchStatus } from '@/api/endpoints/status'
 import { useStatusStore } from '@/features/status/stores/statusStore'
@@ -58,6 +59,7 @@ export interface StatusData {
  * Returns computed traffic light status and component details
  */
 export function useStatus() {
+  const { t } = useTranslation('status')
   const setStatus = useStatusStore((state) => state.setStatus)
 
   const query = useQuery<StatusResponse>({
@@ -70,10 +72,13 @@ export function useStatus() {
     refetchOnWindowFocus: true,
   })
 
-  // Update Zustand store when data changes
-  if (query.data) {
-    setStatus(query.data)
-  }
+  // Mirror query data into the Zustand store. Runs in an effect (not the
+  // render body) so we never write to a store while rendering.
+  useEffect(() => {
+    if (query.data) {
+      setStatus(query.data)
+    }
+  }, [query.data, setStatus])
 
   // Compute derived status data
   const statusData: StatusData = useMemo(() => {
@@ -81,14 +86,14 @@ export function useStatus() {
     return {
       status: query.data,
       trafficLightStatus,
-      trafficLightLabel: getTrafficLightLabel(trafficLightStatus),
+      trafficLightLabel: t(getTrafficLightLabelKey(trafficLightStatus)),
       componentDetails: getComponentStatusDetails(query.data),
       isAllUp: trafficLightStatus === 'green',
       isAllDown: trafficLightStatus === 'red',
       isPartialOutage: trafficLightStatus === 'orange',
       version: query.data?.version,
     }
-  }, [query.data])
+  }, [query.data, t])
 
   return {
     // Query state

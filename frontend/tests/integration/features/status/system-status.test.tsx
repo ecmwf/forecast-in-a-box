@@ -37,6 +37,7 @@ import { WelcomeCard } from '@/features/dashboard/components/WelcomeCard'
 import { Footer } from '@/components/layout/Footer'
 import { StatusDetailsPopover } from '@/components/common/StatusDetailsPopover'
 import { useStatusStore } from '@/features/status/stores/statusStore'
+import { STORAGE_KEYS } from '@/lib/storage-keys'
 
 // Mock useMedia to simulate desktop layout
 vi.mock('@/hooks/useMedia', () => ({
@@ -57,7 +58,7 @@ const anonymousAuth: AuthContextValue = {
 describe('System Status', () => {
   beforeEach(() => {
     localStorage.clear()
-    localStorage.setItem('fiab-anonymous-id', 'test-anon-id')
+    localStorage.setItem(STORAGE_KEYS.auth.anonymousId, 'test-anon-id')
     act(() => useStatusStore.getState().reset())
   })
 
@@ -169,7 +170,7 @@ describe('System Status', () => {
         </AuthContext.Provider>,
       )
 
-      // StatusIndicator uses getTrafficLightLabel which returns "All Systems Normal" for green
+      // StatusIndicator renders the "All Systems Normal" label for green status
       await expect.element(screen.getByText('All Systems Normal')).toBeVisible()
     })
 

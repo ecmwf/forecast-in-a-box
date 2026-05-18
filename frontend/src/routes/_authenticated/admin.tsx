@@ -22,6 +22,7 @@ import { getCurrentUser } from '@/api/endpoints/users'
 import { queryClient } from '@/lib/queryClient'
 import { showToast } from '@/lib/toast'
 import { createLogger } from '@/lib/logger'
+import i18n from '@/lib/i18n'
 
 const log = createLogger('AdminRoute')
 
@@ -47,7 +48,7 @@ export const Route = createFileRoute('/_authenticated/admin')({
       })
     } catch (error) {
       log.error('Failed to verify admin access:', error)
-      showToast.error('Could not verify admin access. Please try again.')
+      showToast.error(i18n.t('plugins:admin.verifyAccessError'))
       throw redirect({ to: '/dashboard' })
     }
 

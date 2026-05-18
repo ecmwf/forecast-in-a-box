@@ -16,11 +16,11 @@
  */
 
 import { QueryProvider } from './QueryProvider'
-import { AuthProvider } from './AuthProvider'
 import { I18nProvider } from './I18nProvider'
 import { ThemeProvider } from './ThemeProvider'
 import { ToastProvider } from './ToastProvider'
 import type { ReactNode } from 'react'
+import { AuthProvider } from '@/features/auth/AuthProvider'
 
 interface AppProvidersProps {
   children: ReactNode
@@ -49,10 +49,3 @@ export function AppProviders({ children }: AppProvidersProps) {
     </I18nProvider>
   )
 }
-
-// Export individual providers for flexibility
-export { QueryProvider } from './QueryProvider'
-export { AuthProvider } from './AuthProvider'
-export { I18nProvider } from './I18nProvider'
-export { ThemeProvider } from './ThemeProvider'
-export { ToastProvider } from './ToastProvider'

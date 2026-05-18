@@ -9,7 +9,7 @@
  */
 
 /**
- * Notification Center
+ * ActivityMonitor
  *
  * Header icon with badge showing active long-running tasks. Click to open a
  * popover with a filterable list split into Ongoing and Completed sections.

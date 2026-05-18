@@ -16,10 +16,11 @@ import {
   ChevronUp,
   Copy,
   CopyPlus,
-  MoreHorizontal,
   Trash2,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { ConnectionsPanel } from './ConnectionsPanel'
+import type { ControlDirection } from './mini-graph/NodeControls'
 import type {
   BlockFactoryCatalogue,
   BlockInstanceId,
@@ -33,9 +34,9 @@ import {
 import { P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import { FieldRenderer } from '@/components/base/fields/FieldRenderer'
-import { ResolvedConfigContext } from '@/features/fable-builder/context/ResolvedConfigContext'
-import { FieldErrorsContext } from '@/features/fable-builder/context/FieldErrorsContext'
+import { BlockValidationProvider } from '@/features/fable-builder/context/BlockValidationContext'
 import { mapBlockErrorsToFields } from '@/features/fable-builder/utils/map-block-errors-to-fields'
+import { showToast } from '@/lib/toast'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import {
   ContextMenu,
@@ -56,11 +57,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
+import { BlockActionMenu } from '@/features/fable-builder/components/shared/BlockActionMenu'
 import {
   Select,
   SelectContent,
@@ -81,7 +78,8 @@ interface BlockInstanceCardProps {
   isSelected?: boolean
   onAddConnectedBlock?: (
     factoryId: PluginBlockFactoryId,
-    sourceBlockId: BlockInstanceId,
+    anchorBlockId: BlockInstanceId,
+    direction?: ControlDirection,
   ) => void
   onBlockClick?: (blockId: BlockInstanceId) => void
 }
@@ -93,8 +91,8 @@ export function BlockInstanceCard({
   onAddConnectedBlock,
   onBlockClick,
 }: BlockInstanceCardProps) {
+  const { t } = useTranslation('configure')
   const [isExpanded, setIsExpanded] = useState(true)
-  const [menuOpen, setMenuOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   const fable = useFableBuilderStore((state) => state.fable)
@@ -173,7 +171,7 @@ export function BlockInstanceCard({
                     {hasErrors && (
                       <Badge variant="destructive" className="gap-1 text-sm">
                         <AlertCircle className="h-3 w-3" />
-                        Has errors
+                        {t('blockInstance.hasErrors')}
                       </Badge>
                     )}
                   </div>
@@ -202,49 +200,10 @@ export function BlockInstanceCard({
                   <Trash2 className="h-4 w-4" />
                 </Button>
 
-                <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-                  <PopoverTrigger
-                    render={
-                      <Button variant="ghost" size="icon" className="h-8 w-8" />
-                    }
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </PopoverTrigger>
-                  <PopoverContent className="w-48 p-1" align="end">
-                    <button
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent"
-                      onClick={() => {
-                        duplicateBlock(instanceId)
-                        setMenuOpen(false)
-                      }}
-                    >
-                      <Copy className="h-4 w-4" />
-                      Duplicate
-                    </button>
-                    <button
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent"
-                      onClick={() => {
-                        duplicateBlockWithChildren(instanceId)
-                        setMenuOpen(false)
-                      }}
-                    >
-                      <CopyPlus className="h-4 w-4" />
-                      Duplicate with children
-                    </button>
-                    <button
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent"
-                      onClick={() => {
-                        alert(
-                          'Coming soon: Saving configurations as presets will be available soon.',
-                        )
-                        setMenuOpen(false)
-                      }}
-                    >
-                      <Bookmark className="h-4 w-4" />
-                      Save config as preset
-                    </button>
-                  </PopoverContent>
-                </Popover>
+                <BlockActionMenu
+                  instanceId={instanceId}
+                  triggerClassName="h-8 w-8"
+                />
               </div>
             </div>
           </CardHeader>
@@ -253,7 +212,9 @@ export function BlockInstanceCard({
             <CardContent className="border-t px-4 py-3">
               {factory.inputs.length > 0 && (
                 <div className="mb-4 border-b pb-4">
-                  <P className="mb-3 font-medium">Input Connections</P>
+                  <P className="mb-3 font-medium">
+                    {t('connections.inputConnections')}
+                  </P>
                   <div className="space-y-3">
                     {factory.inputs.map((inputName) => {
                       const connectedTo = instance.input_ids[inputName]
@@ -267,7 +228,7 @@ export function BlockInstanceCard({
                       // Compute display value for the Select
                       const displayValue = connectedFactory
                         ? connectedFactory.title
-                        : 'Select source...'
+                        : t('connections.selectSource')
 
                       return (
                         <div key={inputName} className="space-y-1.5">
@@ -304,7 +265,9 @@ export function BlockInstanceCard({
                                 )
                               ) : (
                                 <div className="p-2 text-sm text-muted-foreground">
-                                  No compatible sources available
+                                  {t(
+                                    'connections.noCompatibleSourcesAvailable',
+                                  )}
                                 </div>
                               )}
                             </SelectContent>
@@ -317,31 +280,32 @@ export function BlockInstanceCard({
               )}
 
               {Object.keys(factory.configuration_options).length > 0 ? (
-                <ResolvedConfigContext.Provider value={resolvedConfigForBlock}>
-                  <FieldErrorsContext.Provider value={mappedErrors.byConfigKey}>
-                    <div className="space-y-4">
-                      {Object.entries(factory.configuration_options).map(
-                        ([key, option]) => (
-                          <FieldRenderer
-                            key={key}
-                            id={`${instanceId}-${key}`}
-                            configKey={key}
-                            valueType={option.value_type}
-                            value={instance.configuration_values[key] ?? ''}
-                            onChange={(value) =>
-                              updateBlockConfig(instanceId, key, value)
-                            }
-                            label={option.title}
-                            description={option.description}
-                          />
-                        ),
-                      )}
-                    </div>
-                  </FieldErrorsContext.Provider>
-                </ResolvedConfigContext.Provider>
+                <BlockValidationProvider
+                  resolvedConfig={resolvedConfigForBlock}
+                  fieldErrors={mappedErrors.byConfigKey}
+                >
+                  <div className="space-y-4">
+                    {Object.entries(factory.configuration_options).map(
+                      ([key, option]) => (
+                        <FieldRenderer
+                          key={key}
+                          id={`${instanceId}-${key}`}
+                          configKey={key}
+                          valueType={option.value_type}
+                          value={instance.configuration_values[key] ?? ''}
+                          onChange={(value) =>
+                            updateBlockConfig(instanceId, key, value)
+                          }
+                          label={option.title}
+                          description={option.description}
+                        />
+                      ),
+                    )}
+                  </div>
+                </BlockValidationProvider>
               ) : (
                 <P className="py-2 text-center text-muted-foreground">
-                  No configuration options
+                  {t('connections.noConfigOptions')}
                 </P>
               )}
             </CardContent>
@@ -363,25 +327,21 @@ export function BlockInstanceCard({
           className="gap-2"
         >
           <Copy className="h-4 w-4" />
-          Duplicate
+          {t('blockActions.duplicate')}
         </ContextMenuItem>
         <ContextMenuItem
           onClick={() => duplicateBlockWithChildren(instanceId)}
           className="gap-2"
         >
           <CopyPlus className="h-4 w-4" />
-          Duplicate with children
+          {t('blockActions.duplicateWithChildren')}
         </ContextMenuItem>
         <ContextMenuItem
-          onClick={() =>
-            alert(
-              'Coming soon: Saving configurations as presets will be available soon.',
-            )
-          }
+          onClick={() => showToast.info(t('blockActions.comingSoonPreset'))}
           className="gap-2"
         >
           <Bookmark className="h-4 w-4" />
-          Save config as preset
+          {t('blockActions.saveAsPreset')}
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem
@@ -390,7 +350,7 @@ export function BlockInstanceCard({
           className="gap-2"
         >
           <Trash2 className="h-4 w-4" />
-          Delete block
+          {t('blockActions.deleteBlock')}
         </ContextMenuItem>
       </ContextMenuContent>
 
@@ -398,16 +358,17 @@ export function BlockInstanceCard({
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Block</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t('blockInstance.deleteBlock')}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{factory.title}"? This action
-              cannot be undone.
+              {t('blockInstance.deleteConfirm', { title: factory.title })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('blockInstance.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={() => removeBlock(instanceId)}>
-              Delete
+              {t('blockInstance.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

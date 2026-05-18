@@ -8,16 +8,10 @@
  * does it submit to any jurisdiction.
  */
 
-import { memo, useMemo, useState } from 'react'
+import { memo } from 'react'
 import { Handle, Position } from '@xyflow/react'
-import {
-  Bookmark,
-  Copy,
-  CopyPlus,
-  MoreHorizontal,
-  Settings,
-  Trash2,
-} from 'lucide-react'
+import { Plus, Settings, Trash2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import type { Node, NodeProps } from '@xyflow/react'
 import type { FableNodeData } from '@/features/fable-builder/utils/fable-to-graph'
@@ -41,11 +35,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
+import { BlockActionMenu } from '@/features/fable-builder/components/shared/BlockActionMenu'
 import { BlockErrorOverlay } from '@/features/fable-builder/components/graph-mode/nodes/BlockErrorOverlay'
 import { parseGlyphSegments } from '@/features/fable-builder/utils/glyph-display'
 import { cn } from '@/lib/utils'
@@ -67,23 +57,19 @@ export const BlockNode = memo(function ({
   data,
   selected,
 }: NodeProps<FableNode>) {
+  const { t } = useTranslation('configure')
   const { factory, instance, catalogue } = data
   const metadata = BLOCK_KIND_METADATA[factory.kind]
   const IconComponent = getBlockKindIcon(factory.kind)
 
   const containerRef = useNodeDimensions(id)
-  const [menuOpen, setMenuOpen] = useState(false)
 
-  const selectedBlockId = useFableBuilderStore((state) => state.selectedBlockId)
   const selectBlock = useFableBuilderStore((state) => state.selectBlock)
   const validationState = useFableBuilderStore((state) => state.validationState)
   const layoutDirection = useFableBuilderStore((state) => state.layoutDirection)
+  const draggedFactory = useFableBuilderStore((state) => state.draggedFactory)
   const removeBlockCascade = useFableBuilderStore(
     (state) => state.removeBlockCascade,
-  )
-  const duplicateBlock = useFableBuilderStore((state) => state.duplicateBlock)
-  const duplicateBlockWithChildren = useFableBuilderStore(
-    (state) => state.duplicateBlockWithChildren,
   )
   const openMobileConfig = useFableBuilderStore(
     (state) => state.openMobileConfig,
@@ -94,20 +80,20 @@ export const BlockNode = memo(function ({
   const outputPosition = OUTPUT_POSITIONS[layoutDirection]
   const isHorizontalLayout = layoutDirection === 'LR'
 
-  const fable = useFableBuilderStore((state) => state.fable)
+  // Handles a dragged palette block can connect to — highlighted during a drag.
+  const inputHandleDroppable =
+    draggedFactory !== null && draggedFactory.factory.kind !== 'sink'
+  const outputHandleDroppable =
+    draggedFactory !== null && draggedFactory.factory.inputs.length > 0
 
-  const isSelected = selected || selectedBlockId === id
+  // React Flow drives selection via the `selected` prop, so the node never
+  // subscribes to `selectedBlockId` — that would re-render every node on any
+  // selection change.
+  const isSelected = selected
   const hasErrors = blockValidation?.hasErrors ?? false
   const errors = blockValidation?.errors ?? []
   const possibleExpansions =
     validationState?.blockStates[id]?.possibleExpansions ?? []
-  const hasDownstream = useMemo(
-    () =>
-      Object.values(fable.blocks).some((block) =>
-        Object.values(block.input_ids).includes(id),
-      ),
-    [fable.blocks, id],
-  )
 
   function handleClick(): void {
     selectBlock(id)
@@ -117,34 +103,19 @@ export const BlockNode = memo(function ({
     removeBlockCascade(id)
   }
 
-  function handleDuplicate(): void {
-    duplicateBlock(id)
-    setMenuOpen(false)
-  }
-
-  function handleDuplicateWithChildren(): void {
-    duplicateBlockWithChildren(id)
-    setMenuOpen(false)
-  }
-
-  function handleSaveAsPreset(): void {
-    alert(
-      'Coming soon: Saving configurations as presets will be available soon.',
-    )
-    setMenuOpen(false)
-  }
-
   function handleOpenConfig(e: React.MouseEvent): void {
     e.stopPropagation()
     openMobileConfig(id)
   }
 
-  const configSummary = Object.entries(instance.configuration_values)
-    .filter(([, value]) => value)
-    .slice(0, 3)
+  const configuredEntries = Object.entries(
+    instance.configuration_values,
+  ).filter(([, value]) => value)
+  const configSummary = configuredEntries.slice(0, 3)
 
-  const configValueCount = Object.keys(instance.configuration_values).length
-  const remainingConfigCount = configValueCount - 3
+  // Count only configured (non-empty) values — empty keys aren't shown as
+  // badges, so they must not inflate the "+N more" count.
+  const remainingConfigCount = configuredEntries.length - configSummary.length
 
   return (
     <div
@@ -191,7 +162,7 @@ export const BlockNode = memo(function ({
               size="icon"
               className="nodrag h-7 w-7 text-muted-foreground hover:text-primary md:hidden"
               onClick={handleOpenConfig}
-              aria-label="Configure block"
+              aria-label={t('blockNode.configureBlock')}
             >
               <Settings className="h-4 w-4" />
             </Button>
@@ -211,62 +182,27 @@ export const BlockNode = memo(function ({
               </AlertDialogTrigger>
               <AlertDialogContent onClick={(e) => e.stopPropagation()}>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Block</AlertDialogTitle>
+                  <AlertDialogTitle>
+                    {t('blockNode.deleteBlock')}
+                  </AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to delete "{factory.title}" and all
-                    connected downstream blocks? This action cannot be undone.
+                    {t('blockNode.deleteConfirm', { title: factory.title })}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel>{t('blockNode.cancel')}</AlertDialogCancel>
                   <AlertDialogAction onClick={handleDelete}>
-                    Delete
+                    {t('blockNode.delete')}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
 
-            <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-              <PopoverTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="nodrag h-7 w-7 text-muted-foreground hover:text-foreground"
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                }
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </PopoverTrigger>
-              <PopoverContent
-                className="w-48 p-1"
-                align="end"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent"
-                  onClick={handleDuplicate}
-                >
-                  <Copy className="h-4 w-4" />
-                  Duplicate
-                </button>
-                <button
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent"
-                  onClick={handleDuplicateWithChildren}
-                >
-                  <CopyPlus className="h-4 w-4" />
-                  Duplicate with children
-                </button>
-                <button
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent"
-                  onClick={handleSaveAsPreset}
-                >
-                  <Bookmark className="h-4 w-4" />
-                  Save config as preset
-                </button>
-              </PopoverContent>
-            </Popover>
+            <BlockActionMenu
+              instanceId={id}
+              triggerClassName="nodrag h-7 w-7"
+              stopPropagation
+            />
           </div>
         </div>
 
@@ -317,7 +253,7 @@ export const BlockNode = memo(function ({
             })}
             {remainingConfigCount > 0 && (
               <span className="rounded-md border bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground">
-                +{remainingConfigCount} more
+                {t('blockNode.moreCount', { count: remainingConfigCount })}
               </span>
             )}
           </div>
@@ -342,6 +278,7 @@ export const BlockNode = memo(function ({
               inputPosition === Position.Bottom && 'top-auto! -bottom-2.5!',
               'border-foreground/30!',
               'transition-all hover:scale-110',
+              inputHandleDroppable && 'dnd-droppable',
             )}
             style={
               isHorizontalLayout
@@ -353,34 +290,42 @@ export const BlockNode = memo(function ({
       })}
 
       {factory.kind !== 'sink' && (
-        <>
+        <AddNodeButton
+          sourceBlockId={id}
+          possibleExpansions={possibleExpansions}
+          catalogue={catalogue}
+        >
+          {/* Output handle doubles as the add-block control: click opens the
+              menu, drag draws a connection. */}
           <Handle
             type="source"
             position={outputPosition}
             id="output"
-            title="Output"
+            title={t('blockNode.outputHandle')}
+            onClick={(e) => e.stopPropagation()}
             className={cn(
-              'h-5! w-5! rounded-full! border-4! bg-card!',
-              'border-foreground/30!',
+              'flex! h-5! w-5! cursor-pointer! items-center justify-center rounded-full! border-4! bg-card!',
+              'border-foreground/30! hover:border-primary!',
               isHorizontalLayout ? '-right-2.5!' : '-bottom-2.5!',
               outputPosition === Position.Left && 'right-auto! -left-2.5!',
               outputPosition === Position.Top && '-top-2.5! bottom-auto!',
               'transition-all hover:scale-110',
+              outputHandleDroppable && 'dnd-droppable',
             )}
             style={
               isHorizontalLayout
                 ? { top: '50%', transform: 'translateY(-50%)' }
                 : { left: '50%', transform: 'translateX(-50%)' }
             }
-          />
-          <AddNodeButton
-            sourceBlockId={id}
-            possibleExpansions={possibleExpansions}
-            hasErrors={hasErrors}
-            hasDownstream={hasDownstream}
-            catalogue={catalogue}
-          />
-        </>
+          >
+            <Plus
+              className={cn(
+                'h-2.5 w-2.5',
+                hasErrors ? 'text-destructive' : 'text-muted-foreground',
+              )}
+            />
+          </Handle>
+        </AddNodeButton>
       )}
     </div>
   )

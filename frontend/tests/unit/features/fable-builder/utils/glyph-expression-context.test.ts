@@ -158,7 +158,7 @@ describe('parseGlyphContext', () => {
   })
 
   describe('string literals', () => {
-    it('returns none when the cursor sits inside a single-quoted string', () => {
+    it('returns none when the cursor sits inside a double-quoted string', () => {
       expect(ctx('${func("hello, ‸')).toMatchObject({ kind: 'none' })
     })
 

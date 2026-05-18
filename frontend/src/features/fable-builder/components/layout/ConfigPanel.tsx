@@ -10,6 +10,7 @@
 
 import { useMemo } from 'react'
 import { AlertCircle, Link2, Trash2, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import { useFieldErrorMessages } from '@/features/fable-builder/hooks/useFieldErrorMessages'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
@@ -43,8 +44,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { GlyphReferencePanel } from '@/features/fable-builder/components/shared/GlyphReferencePanel'
-import { ResolvedConfigContext } from '@/features/fable-builder/context/ResolvedConfigContext'
-import { FieldErrorsContext } from '@/features/fable-builder/context/FieldErrorsContext'
+import { BlockValidationProvider } from '@/features/fable-builder/context/BlockValidationContext'
 import { mapBlockErrorsToFields } from '@/features/fable-builder/utils/map-block-errors-to-fields'
 import { cn } from '@/lib/utils'
 
@@ -53,6 +53,7 @@ interface ConfigPanelProps {
 }
 
 export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
+  const { t } = useTranslation('configure')
   // Use individual selectors to avoid creating new objects on every render
   const selectedBlockId = useFableBuilderStore((state) => state.selectedBlockId)
   const fable = useFableBuilderStore((state) => state.fable)
@@ -144,7 +145,7 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
       <div className="flex h-full flex-col items-center justify-center p-6 text-center">
         <div className="text-muted-foreground">
           <AlertCircle className="mx-auto mb-3 h-10 w-10 opacity-50" />
-          <P>Select a block to configure</P>
+          <P>{t('configPanel.selectBlock')}</P>
         </div>
       </div>
     )
@@ -192,7 +193,7 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-sm font-medium">
               <Link2 className="h-4 w-4" />
-              Input Connections
+              {t('configPanel.inputConnections')}
             </div>
             <div className="space-y-3">
               {inputs.map((inputName) => (
@@ -210,37 +211,40 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
         )}
 
         {configOptions.length > 0 && (
-          <ResolvedConfigContext.Provider value={resolvedConfigForBlock}>
-            <FieldErrorsContext.Provider value={mappedErrors.byConfigKey}>
-              <div className="space-y-3">
-                <div className="text-sm font-medium">Configuration</div>
-                <div className="space-y-4">
-                  {configOptions.map(([key, option]) => (
-                    <FieldRenderer
-                      key={key}
-                      id={`config-${key}`}
-                      configKey={key}
-                      valueType={option.value_type}
-                      value={selectedBlock.configuration_values[key] || ''}
-                      onChange={(value) => handleConfigChange(key, value)}
-                      label={option.title || key}
-                      description={option.description}
-                      inputClassName="h-9"
-                    />
-                  ))}
-                </div>
-                {/* mt-10 reserves clearance for the last field's absolute
+          <BlockValidationProvider
+            resolvedConfig={resolvedConfigForBlock}
+            fieldErrors={mappedErrors.byConfigKey}
+          >
+            <div className="space-y-3">
+              <div className="text-sm font-medium">
+                {t('configPanel.configuration')}
+              </div>
+              <div className="space-y-4">
+                {configOptions.map(([key, option]) => (
+                  <FieldRenderer
+                    key={key}
+                    id={`config-${key}`}
+                    configKey={key}
+                    valueType={option.value_type}
+                    value={selectedBlock.configuration_values[key] || ''}
+                    onChange={(value) => handleConfigChange(key, value)}
+                    label={option.title || key}
+                    description={option.description}
+                    inputClassName="h-9"
+                  />
+                ))}
+              </div>
+              {/* mt-10 reserves clearance for the last field's absolute
                     preview/nudge/error stack so they don't overlap the
                     reference panel. */}
-                <GlyphReferencePanel className="mt-10" />
-              </div>
-            </FieldErrorsContext.Provider>
-          </ResolvedConfigContext.Provider>
+              <GlyphReferencePanel className="mt-10" />
+            </div>
+          </BlockValidationProvider>
         )}
 
         {configOptions.length === 0 && inputs.length === 0 && (
           <div className="py-4 text-center text-sm text-muted-foreground">
-            No configuration options
+            {t('configPanel.noConfigOptions')}
           </div>
         )}
       </div>
@@ -257,20 +261,21 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
             }
           >
             <Trash2 className="h-4 w-4" />
-            Delete Block
+            {t('configPanel.deleteBlock')}
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete Block</AlertDialogTitle>
+              <AlertDialogTitle>
+                {t('configPanel.deleteBlock')}
+              </AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to delete "{factory.title}"? This action
-                cannot be undone.
+                {t('configPanel.deleteConfirm', { title: factory.title })}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel>{t('configPanel.cancel')}</AlertDialogCancel>
               <AlertDialogAction onClick={handleDelete}>
-                Delete
+                {t('configPanel.delete')}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -298,10 +303,11 @@ function InputConnectionField({
   availableSources,
   onInputChange,
 }: InputConnectionFieldProps): React.ReactNode {
+  const { t } = useTranslation('configure')
   const displayValue = currentSourceId
     ? availableSources.find((s) => s.id === currentSourceId)?.factory?.title ||
       currentSourceId
-    : 'Select source...'
+    : t('configPanel.selectSource')
 
   return (
     <div className="space-y-1.5">
@@ -323,7 +329,7 @@ function InputConnectionField({
           ))}
           {availableSources.length === 0 && (
             <div className="p-2 text-sm text-muted-foreground">
-              No compatible sources
+              {t('configPanel.noCompatibleSources')}
             </div>
           )}
         </SelectContent>

@@ -15,6 +15,7 @@
  * - Welcome card with stats and quick actions
  * - Community news with latest models and forum topics
  * - Getting started section with configuration entry points
+ * - Saved configuration presets
  * - Forecast journal with job history
  */
 

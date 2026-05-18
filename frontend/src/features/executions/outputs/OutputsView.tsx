@@ -12,7 +12,7 @@
  * items, and a lazy viewer for the active selection. */
 
 import { Package } from 'lucide-react'
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearch } from '@tanstack/react-router'
@@ -21,7 +21,7 @@ import { MimeFilterChips } from './MimeFilterChips'
 import { OutputCard } from './OutputCard'
 import { resolveAdapter } from './registry'
 import { SkeletonOutputCard } from './SkeletonOutputCard'
-import { useResolvedAdapter } from './useResolvedAdapter'
+import { needsSniff, useResolvedMimes } from './useResolvedMimes'
 import type { JobStatus, RunOutputs } from '@/api/types/job.types'
 import type { OutputAdapter, OutputItem } from './types'
 import { isTerminalStatus } from '@/api/types/job.types'
@@ -48,6 +48,10 @@ registerFirstPartyAdapters()
 // so adding an option only requires touching this list and the i18n key map.
 const GROUP_BY_OPTIONS = ['none', 'block', 'mime', 'block-and-mime'] as const
 export type GroupBy = (typeof GROUP_BY_OPTIONS)[number]
+
+/** Responsive card track — shared by the output grid and the loading
+ * skeletons so both reflow identically. */
+const GRID_CLASS = 'grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3'
 
 interface OutputsViewProps {
   jobId: string
@@ -76,13 +80,6 @@ export function OutputsView({
     item: OutputItem
     adapter: OutputAdapter
   } | null>(null)
-  const [resolvedMimes, setResolvedMimes] = useState<Record<string, string>>({})
-
-  const handleResolved = useCallback((taskId: string, mime: string) => {
-    setResolvedMimes((prev) =>
-      prev[taskId] === mime ? prev : { ...prev, [taskId]: mime },
-    )
-  }, [])
 
   /** Default order: by block (alphabetic), available before pending within
    * the same block, taskId for stable tiebreak. Keeps items from the same
@@ -106,6 +103,10 @@ export function OutputsView({
     })
     return list
   }, [jobId, outputs])
+
+  /** Sniffer-promoted mimes for the whole list. Resolved here, not per card,
+   * so the filter can't hide an item before its real mime is known. */
+  const resolvedMimes = useResolvedMimes(items)
 
   /** Sniffer-promoted mime if available, else the wire mime. */
   const effectiveMime = useCallback(
@@ -174,6 +175,24 @@ export function OutputsView({
       isAvailable: false,
     }))
   }, [items.length, plannedBlockIds, jobId])
+
+  /** Distinct source blocks in the run. The group-by control only earns its
+   * place — and is only shown — when there's more than one. */
+  const distinctBlockCount = useMemo(() => {
+    const source = items.length > 0 ? items : blockSkeletons
+    return new Set(source.map((item) => item.originalBlock)).size
+  }, [items, blockSkeletons])
+
+  /** Available items still awaiting a sniff. A `?mimes=` filter can't decide
+   * them yet, so they stand in as skeletons rather than a premature empty
+   * state. */
+  const pendingSniffItems = useMemo(
+    () =>
+      items.filter(
+        (item) => needsSniff(item) && !(item.taskId in resolvedMimes),
+      ),
+    [items, resolvedMimes],
+  )
 
   /** Single filter pass over the unified list (or synthesised fallback).
    * Counts shown in the toolbar are derived from this same pass. */
@@ -260,7 +279,9 @@ export function OutputsView({
             onChange={setActiveMimes}
           />
         )}
-        <GroupBySelect value={groupBy} onChange={setGroupBy} />
+        {distinctBlockCount > 1 && (
+          <GroupBySelect value={groupBy} onChange={setGroupBy} />
+        )}
       </div>
     </div>
   )
@@ -276,9 +297,23 @@ export function OutputsView({
         {!toolbarSlot && toolbar}
 
         {visibleItems.length === 0 ? (
-          <P className="px-1 py-6 text-center text-sm text-muted-foreground">
-            {t('outputs.noMatch')}
-          </P>
+          // A `?mimes=` filter from the URL can match nothing until opaque
+          // items finish sniffing; show skeletons for those rather than a
+          // "no match" that a moment later turns out wrong.
+          pendingSniffItems.length > 0 ? (
+            <div className={GRID_CLASS}>
+              {pendingSniffItems.map((item) => (
+                <SkeletonOutputCard
+                  key={item.taskId}
+                  originalBlock={item.originalBlock}
+                />
+              ))}
+            </div>
+          ) : (
+            <P className="px-1 py-6 text-center text-sm text-muted-foreground">
+              {t('outputs.noMatch')}
+            </P>
+          )
         ) : (
           <GroupedGrid
             groupBy={groupBy}
@@ -286,7 +321,6 @@ export function OutputsView({
             runningBlockSet={runningBlockSet}
             effectiveMime={effectiveMime}
             onOpenViewer={(item, adapter) => setActiveViewer({ item, adapter })}
-            onResolved={handleResolved}
           />
         )}
       </div>
@@ -310,7 +344,6 @@ interface GroupedGridProps {
   runningBlockSet: ReadonlySet<string>
   effectiveMime: (item: OutputItem) => string
   onOpenViewer: (item: OutputItem, adapter: OutputAdapter) => void
-  onResolved: (taskId: string, mime: string) => void
 }
 
 function GroupedGrid({
@@ -319,15 +352,14 @@ function GroupedGrid({
   runningBlockSet,
   effectiveMime,
   onOpenViewer,
-  onResolved,
 }: GroupedGridProps) {
   if (groupBy === 'none') {
     return (
       <FlexGrid
         items={items}
         runningBlockSet={runningBlockSet}
+        effectiveMime={effectiveMime}
         onOpenViewer={onOpenViewer}
-        onResolved={onResolved}
       />
     )
   }
@@ -346,8 +378,8 @@ function GroupedGrid({
             <FlexGrid
               items={groupItems}
               runningBlockSet={runningBlockSet}
+              effectiveMime={effectiveMime}
               onOpenViewer={onOpenViewer}
-              onResolved={onResolved}
             />
           </Section>
         ))}
@@ -368,8 +400,8 @@ function GroupedGrid({
             <FlexGrid
               items={groupItems}
               runningBlockSet={runningBlockSet}
+              effectiveMime={effectiveMime}
               onOpenViewer={onOpenViewer}
-              onResolved={onResolved}
             />
           </Section>
         ))}
@@ -400,8 +432,8 @@ function GroupedGrid({
                   <FlexGrid
                     items={mimeItems}
                     runningBlockSet={runningBlockSet}
+                    effectiveMime={effectiveMime}
                     onOpenViewer={onOpenViewer}
-                    onResolved={onResolved}
                   />
                 </Subsection>
               ))}
@@ -416,25 +448,25 @@ function GroupedGrid({
 interface FlexGridProps {
   items: ReadonlyArray<OutputItem>
   runningBlockSet: ReadonlySet<string>
+  effectiveMime: (item: OutputItem) => string
   onOpenViewer: (item: OutputItem, adapter: OutputAdapter) => void
-  onResolved: (taskId: string, mime: string) => void
 }
 
 function FlexGrid({
   items,
   runningBlockSet,
+  effectiveMime,
   onOpenViewer,
-  onResolved,
 }: FlexGridProps) {
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3">
+    <div className={GRID_CLASS}>
       {items.map((item) => (
         <FlexGridItem
           key={item.taskId}
           item={item}
           isRunning={runningBlockSet.has(item.originalBlock)}
+          effectiveMime={effectiveMime}
           onOpenViewer={onOpenViewer}
-          onResolved={onResolved}
         />
       ))}
     </div>
@@ -445,13 +477,13 @@ function FlexGrid({
 function FlexGridItem({
   item,
   isRunning,
+  effectiveMime,
   onOpenViewer,
-  onResolved,
 }: {
   item: OutputItem
   isRunning: boolean
+  effectiveMime: (item: OutputItem) => string
   onOpenViewer: (item: OutputItem, adapter: OutputAdapter) => void
-  onResolved: (taskId: string, mime: string) => void
 }) {
   const isHovered = useIsBlockHovered(item.originalBlock)
   const handlers = useBlockHoverHandlers(item.originalBlock)
@@ -464,10 +496,10 @@ function FlexGridItem({
       )}
     >
       {item.isAvailable ? (
-        <OutputCardSlot
+        <OutputCard
           item={item}
+          adapter={resolveAdapter(effectiveMime(item))}
           onOpenViewer={onOpenViewer}
-          onResolved={onResolved}
         />
       ) : (
         <SkeletonOutputCard
@@ -582,33 +614,6 @@ function groupByI18nKey(
     case 'block-and-mime':
       return 'outputs.groupBy.blockAndMime'
   }
-}
-
-/** Per-item slot: resolves the (possibly sniff-promoted) adapter, reports
- * the resolved mime up so the parent can include it in chips/filter, and
- * renders an OutputCard. */
-function OutputCardSlot({
-  item,
-  onOpenViewer,
-  onResolved,
-}: {
-  item: OutputItem
-  onOpenViewer: (item: OutputItem, adapter: OutputAdapter) => void
-  onResolved: (taskId: string, mime: string) => void
-}) {
-  const { adapter, effectiveMime } = useResolvedAdapter(item)
-  useEffect(() => {
-    // Only report on sniffer promotion. The wire mime is already known to
-    // the parent via `item.mimeType` and reporting it on every remount can
-    // overwrite a previously-resolved mime (causing chips to flicker to
-    // "File" while the sniff re-runs after a filter toggle).
-    if (effectiveMime !== item.mimeType) {
-      onResolved(item.taskId, effectiveMime)
-    }
-  }, [item.taskId, item.mimeType, effectiveMime, onResolved])
-  return (
-    <OutputCard item={item} adapter={adapter} onOpenViewer={onOpenViewer} />
-  )
 }
 
 /**

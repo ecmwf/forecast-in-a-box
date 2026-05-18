@@ -95,9 +95,8 @@ export interface OutputAdapter {
 }
 
 /**
- * Sniffer hook for the rare case where the registered MIME type is wrong
- * and we need to peek at bytes to dispatch correctly. No first-party
- * sniffer is registered today; the interface is kept for future use.
+ * Sniffer hook for the case where the registered MIME type is wrong and we
+ * need to peek at bytes to dispatch correctly. See `firstPartySniffers.ts`.
  */
 export interface Sniffer {
   /** Only run when the item's mime is in this list. */

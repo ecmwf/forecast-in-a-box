@@ -39,8 +39,10 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { useGlyphContext } from '@/features/fable-builder/context/GlyphContext'
-import { useResolvedConfig } from '@/features/fable-builder/context/ResolvedConfigContext'
-import { useFieldErrors } from '@/features/fable-builder/context/FieldErrorsContext'
+import {
+  useFieldErrors,
+  useResolvedConfig,
+} from '@/features/fable-builder/context/BlockValidationContext'
 import { containsGlyphs } from '@/features/fable-builder/utils/glyph-display'
 import {
   applyFloorDay,
@@ -119,15 +121,13 @@ export function GlyphFieldWrapper({
     : null
 
   // No glyphs / glyph mode disabled → render children directly, only adding
-  // an error ring + absolute-positioned error text when the field is invalid.
+  // an error ring + inline error text when the field is invalid.
   if (!hasGlyphs || !allowGlyphMode) {
     if (!hasFieldError) return <>{children}</>
     return (
-      <div className="relative">
+      <div>
         <div className="rounded-md ring-1 ring-destructive">{children}</div>
-        <p className="pointer-events-none absolute top-full left-0 mt-0.5 truncate text-xs text-destructive">
-          {errorMessage}
-        </p>
+        <p className="mt-1 truncate text-xs text-destructive">{errorMessage}</p>
       </div>
     )
   }
@@ -231,9 +231,7 @@ export function GlyphFieldWrapper({
       </InputGroup>
 
       {errorMessage && (
-        <p className="pointer-events-none absolute top-full left-0 mt-0.5 truncate text-xs text-destructive">
-          {errorMessage}
-        </p>
+        <p className="mt-1 truncate text-xs text-destructive">{errorMessage}</p>
       )}
 
       {/* In-flow so visual order reads Input → Preview → Nudge. Validation

@@ -10,7 +10,9 @@
 
 import { useEffect, useState } from 'react'
 import { Plus } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { BlockInstanceCard } from './BlockInstanceCard'
+import type { ControlDirection } from './mini-graph/NodeControls'
 import type {
   BlockFactoryCatalogue,
   BlockInstanceId,
@@ -27,7 +29,8 @@ interface BlockTabsProps {
   onSelectBlock: (id: BlockInstanceId) => void
   onAddConnectedBlock: (
     factoryId: PluginBlockFactoryId,
-    sourceBlockId: BlockInstanceId,
+    anchorBlockId: BlockInstanceId,
+    direction?: ControlDirection,
   ) => void
   onBlockClick: (blockId: BlockInstanceId) => void
   onAddBlock?: () => void
@@ -46,17 +49,24 @@ export function BlockTabs({
   onBlockClick,
   onAddBlock,
 }: BlockTabsProps) {
+  const { t } = useTranslation('configure')
   // Use first block as default if none selected or selection not in list
   const defaultTab =
     blocks.find((b) => b.id === selectedBlockId)?.id || blocks[0]?.id || ''
   const [activeTab, setActiveTab] = useState<string>(defaultTab)
 
-  // Sync activeTab when selectedBlockId changes externally
+  // Sync activeTab when selectedBlockId changes externally, and keep it
+  // pointing at a live block — e.g. when the active tab's block is deleted
+  // while nothing is selected, fall back to the first block.
   useEffect(() => {
     if (selectedBlockId && blocks.some((b) => b.id === selectedBlockId)) {
       setActiveTab(selectedBlockId)
+      return
     }
-  }, [selectedBlockId, blocks])
+    if (blocks.length > 0 && !blocks.some((b) => b.id === activeTab)) {
+      setActiveTab(blocks[0].id)
+    }
+  }, [selectedBlockId, blocks, activeTab])
 
   const handleTabChange = (value: string) => {
     setActiveTab(value)
@@ -68,7 +78,7 @@ export function BlockTabs({
       <TabsList className="w-full flex-wrap justify-start">
         {blocks.map(({ id, factoryId }) => {
           const factory = getFactory(catalogue, factoryId)
-          const title = factory?.title || 'Block'
+          const title = factory?.title || t('blockTabs.fallbackTitle')
           // Truncate long titles
           const displayTitle =
             title.length > 16 ? title.slice(0, 15) + '…' : title

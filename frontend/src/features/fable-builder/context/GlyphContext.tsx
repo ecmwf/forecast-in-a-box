@@ -21,7 +21,7 @@ import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuild
 
 const EMPTY_GLYPHS: Record<string, string> = {}
 
-/** Exported for test use — wrap with `<TestGlyphProvider>` to inject test glyphs */
+/** Exported so tests can inject glyphs via `<GlyphContext.Provider>` directly. */
 export const GlyphContext = createContext<Array<GlyphInfo>>([])
 
 export function GlyphProvider({ children }: { children: ReactNode }) {

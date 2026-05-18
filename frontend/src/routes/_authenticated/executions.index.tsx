@@ -9,8 +9,19 @@
  */
 
 import { createFileRoute } from '@tanstack/react-router'
-import { JobListPage } from '@/features/executions/components/JobListPage'
+import { z } from 'zod'
+import { RunListPage } from '@/features/executions/components/RunListPage'
+
+/** Journal URL state — search, status tab, grouping. Each omitted at its default to keep a bare /executions clean. */
+const searchSchema = z.object({
+  q: z.string().optional(),
+  status: z
+    .enum(['all', 'submitted', 'running', 'completed', 'failed', 'bookmarked'])
+    .optional(),
+  group: z.enum(['none', 'date', 'schedule', 'tag']).optional(),
+})
 
 export const Route = createFileRoute('/_authenticated/executions/')({
-  component: JobListPage,
+  component: RunListPage,
+  validateSearch: searchSchema,
 })

@@ -9,7 +9,9 @@
  */
 
 import { AlertCircle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type {
+  BlockConfigurationOption,
   BlockFactoryCatalogue,
   BlockInstanceId,
 } from '@/api/types/fable.types'
@@ -30,6 +32,7 @@ export function ConfigSummaryCard({
   instanceId,
   catalogue,
 }: ConfigSummaryCardProps) {
+  const { t } = useTranslation('configure')
   const fable = useFableBuilderStore((state) => state.fable)
   const blockValidation = useBlockValidation(instanceId)
 
@@ -52,7 +55,10 @@ export function ConfigSummaryCard({
     .map(([inputName, sourceId]) => {
       const sourceBlock = fable.blocks[sourceId]
       const sourceFactory = getFactory(catalogue, sourceBlock.factory_id)
-      return { inputName, sourceTitle: sourceFactory?.title ?? 'Unknown' }
+      return {
+        inputName,
+        sourceTitle: sourceFactory?.title ?? t('configSummary.unknownSource'),
+      }
     })
 
   return (
@@ -85,14 +91,17 @@ export function ConfigSummaryCard({
       {configuredValues.length > 0 && (
         <div className="space-y-1">
           {configuredValues.map(([key, value]) => {
-            const option = factory.configuration_options[key]
+            // The key may be absent at runtime; cast to surface undefined.
+            const option = factory.configuration_options[key] as
+              | BlockConfigurationOption
+              | undefined
             return (
               <div
                 key={key}
                 className="flex items-center justify-between text-sm"
               >
                 <span className="text-muted-foreground">
-                  {option.title || key}:
+                  {option?.title || key}:
                 </span>
                 <span className="font-mono text-sm">{value}</span>
               </div>
@@ -120,7 +129,9 @@ export function ConfigSummaryCard({
       {configuredValues.length === 0 &&
         connectedInputs.length === 0 &&
         !hasErrors && (
-          <P className="text-muted-foreground">Default configuration</P>
+          <P className="text-muted-foreground">
+            {t('configSummary.defaultConfiguration')}
+          </P>
         )}
     </div>
   )

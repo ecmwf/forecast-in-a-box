@@ -16,8 +16,8 @@
 import { FileText } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useJobResultBlob } from '../useJobResult'
 import type { ThumbnailProps } from '../types'
-import { getJobResult } from '@/api/endpoints/job'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('PdfThumbnail')
@@ -45,17 +45,24 @@ export function PdfThumbnail({ item }: ThumbnailProps) {
     return () => observer.disconnect()
   }, [])
 
+  // Deferred until the card scrolls into view; shares the blob cache with the
+  // full PDF viewer for this same output.
+  const { data } = useJobResultBlob(
+    item.jobId,
+    item.taskId,
+    shouldRender && item.isAvailable,
+  )
+  const blob = data?.blob
+
   useEffect(() => {
-    if (!shouldRender || !item.isAvailable) return
+    if (!blob) return
     const state: { cancelled: boolean } = { cancelled: false }
     void (async () => {
       try {
         const { pdfjs } = await import('./pdfjs')
-        const { blob } = await getJobResult(item.jobId, item.taskId)
 
-        if (state.cancelled) return
         const buf = await blob.arrayBuffer()
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- mutated by cleanup
+
         if (state.cancelled) return
         const doc = await pdfjs.getDocument({ data: buf }).promise
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- mutated by cleanup
@@ -95,7 +102,7 @@ export function PdfThumbnail({ item }: ThumbnailProps) {
     return () => {
       state.cancelled = true
     }
-  }, [shouldRender, item.isAvailable, item.jobId, item.taskId])
+  }, [blob, item.taskId])
 
   return (
     <div

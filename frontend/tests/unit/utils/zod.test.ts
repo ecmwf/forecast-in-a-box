@@ -10,8 +10,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import type { $ZodIssue } from 'zod/v4/core'
-import { ValidationError, formatZodError, parseOrThrow } from '@/utils/zod'
+import { ValidationError, parseOrThrow } from '@/utils/zod'
 
 describe('ValidationError', () => {
   it('creates error with message and ZodError', () => {
@@ -21,7 +20,7 @@ describe('ValidationError', () => {
         expected: 'string',
         path: ['name'],
         message: 'Expected string, received number',
-      } as $ZodIssue,
+      },
     ])
 
     const error = new ValidationError('Test error', zodError)
@@ -37,68 +36,6 @@ describe('ValidationError', () => {
 
     expect(error).toBeInstanceOf(Error)
     expect(error).toBeInstanceOf(ValidationError)
-  })
-})
-
-describe('formatZodError', () => {
-  it('formats single error with path', () => {
-    const zodError = new z.ZodError([
-      {
-        code: 'invalid_type',
-        expected: 'string',
-        path: ['name'],
-        message: 'Expected string',
-      } as $ZodIssue,
-    ])
-
-    expect(formatZodError(zodError)).toBe('name: Expected string')
-  })
-
-  it('formats error without path', () => {
-    const zodError = new z.ZodError([
-      {
-        code: 'invalid_type',
-        expected: 'string',
-        path: [],
-        message: 'Invalid input',
-      } as $ZodIssue,
-    ])
-
-    expect(formatZodError(zodError)).toBe('Invalid input')
-  })
-
-  it('formats nested path with dots', () => {
-    const zodError = new z.ZodError([
-      {
-        code: 'invalid_type',
-        expected: 'string',
-        path: ['user', 'profile', 'name'],
-        message: 'Invalid',
-      } as $ZodIssue,
-    ])
-
-    expect(formatZodError(zodError)).toBe('user.profile.name: Invalid')
-  })
-
-  it('formats multiple errors with newlines', () => {
-    const zodError = new z.ZodError([
-      {
-        code: 'invalid_type',
-        expected: 'string',
-        path: ['name'],
-        message: 'Expected string',
-      } as $ZodIssue,
-      {
-        code: 'invalid_type',
-        expected: 'number',
-        path: ['age'],
-        message: 'Expected number',
-      } as $ZodIssue,
-    ])
-
-    expect(formatZodError(zodError)).toBe(
-      'name: Expected string\nage: Expected number',
-    )
   })
 })
 

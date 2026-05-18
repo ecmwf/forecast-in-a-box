@@ -109,7 +109,12 @@
   },
   "blockFactory": {
     "useInConfig": "Use {{kind}} in Configuration",
-    "sourceOnlyTooltip": "Configurations must start with a source block"
+    "sourceOnlyTooltip": "Configurations must start with a source block",
+    "configOptions_one": "{{count}} config option",
+    "configOptions_other": "{{count}} config options",
+    "inputs_one": "{{count}} input",
+    "inputs_other": "{{count}} inputs",
+    "noConfigRequired": "No configuration required"
   },
   "detail": {
     "backToPlugins": "Back to Plugins",
@@ -117,6 +122,38 @@
     "blockFactories": "Block Factories",
     "searchBlocks": "Search blocks...",
     "noMatchingBlocks": "No blocks match your search.",
-    "noBlocks": "This plugin does not provide any block factories."
+    "noBlocks": "This plugin does not provide any block factories.",
+    "loadingBlockFactories": "Loading block factories...",
+    "enableToViewBlockFactories": "Enable this plugin to view block factories.",
+    "installToViewBlockFactories": "Install this plugin to view block factories.",
+    "notFound": "Plugin not found: {{id}}",
+    "versionSuffix": " · v{{version}}"
+  },
+  "card": {
+    "updatedAgo": "Updated {{time}}",
+    "versionArrow": "→ v{{version}}"
+  },
+  "row": {
+    "moreOptions": "More options",
+    "updatedAgoSuffix": " · Updated {{time}}"
+  },
+  "updateBadge": "UPDATE v{{version}}",
+  "viewToggle": {
+    "table": "Table view",
+    "card": "Card view"
+  },
+  "activity": {
+    "installing": "Installing",
+    "installed": "Installed",
+    "installFailed": "Install failed",
+    "uninstalling": "Uninstalling",
+    "uninstalled": "Uninstalled",
+    "uninstallFailed": "Uninstall failed",
+    "updating": "Updating",
+    "updated": "Updated",
+    "updateFailed": "Update failed"
+  },
+  "admin": {
+    "verifyAccessError": "Could not verify admin access. Please try again."
   }
 }

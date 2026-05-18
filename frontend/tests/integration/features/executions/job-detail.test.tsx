@@ -9,7 +9,7 @@
  */
 
 /**
- * ExecutionDetailPage Integration Tests
+ * RunDetailPage Integration Tests
  *
  * Tests the execution detail page with MSW-mocked API:
  * - Renders job status header with name, status badge, progress bar
@@ -32,11 +32,12 @@ import {
 import {
   injectMockExecution,
   mixedAvailabilityExecution,
+  opaqueMimeExecution,
   resetJobsState,
 } from '@tests/../mocks/data/job.data'
 import type { AuthContextValue } from '@/features/auth/AuthContext'
 import { AuthContext } from '@/features/auth/AuthContext'
-import { ExecutionDetailPage } from '@/features/executions/components/ExecutionDetailPage'
+import { RunDetailPage } from '@/features/executions/components/RunDetailPage'
 import i18n from '@/lib/i18n'
 
 vi.mock('@/hooks/useMedia', () => ({
@@ -51,7 +52,7 @@ const anonymousAuth: AuthContextValue = {
   signOut: () => Promise.resolve(),
 }
 
-function renderDetailPage(jobId: string) {
+function renderDetailPage(jobId: string, search = '') {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false, gcTime: 0, staleTime: 0 },
@@ -73,7 +74,7 @@ function renderDetailPage(jobId: string) {
     path: '/executions/$jobId',
     component: () => (
       <AuthContext.Provider value={anonymousAuth}>
-        <ExecutionDetailPage />
+        <RunDetailPage />
       </AuthContext.Provider>
     ),
   })
@@ -84,7 +85,7 @@ function renderDetailPage(jobId: string) {
   const router = createRouter({
     routeTree,
     history: createMemoryHistory({
-      initialEntries: [`/executions/${jobId}`],
+      initialEntries: [`/executions/${jobId}${search}`],
     }),
   })
 
@@ -97,17 +98,12 @@ function renderDetailPage(jobId: string) {
   )
 }
 
-describe('ExecutionDetailPage Integration', () => {
+describe('RunDetailPage Integration', () => {
   beforeEach(() => {
     resetJobsState()
   })
 
   describe('rendering', () => {
-    it('renders the back link', async () => {
-      const screen = await renderDetailPage('job-completed-001')
-      await expect.element(screen.getByText('Executions')).toBeVisible()
-    })
-
     it('renders the job ID in the header', async () => {
       const screen = await renderDetailPage('job-completed-001')
       await expect.element(screen.getByText('job-completed-001')).toBeVisible()
@@ -216,6 +212,37 @@ describe('ExecutionDetailPage Integration', () => {
       await expect
         .element(screen.getByText('sink_available').first())
         .toBeVisible()
+    })
+
+    it('shows a sniff-promoted output through a URL mime filter', async () => {
+      // Regression: an output whose wire mime is opaque (resolvable only by
+      // sniffing its bytes) must still appear when the page loads with a
+      // matching `?mimes=` filter already set. The sniff has to run
+      // independently of the filter — otherwise the matching card is filtered
+      // out of the grid before it can ever be sniffed, leaving it empty.
+      injectMockExecution(opaqueMimeExecution)
+      const screen = await renderDetailPage(
+        'job-opaque-006',
+        '?mimes=image/png',
+      )
+      // The mock content endpoint serves PNG bytes → sniffed to image/png →
+      // matches the filter → the card renders as `<block>.<extension>`.
+      await expect.element(screen.getByText('sink_opaque.png')).toBeVisible()
+    })
+  })
+
+  describe('group-by control', () => {
+    it('shows the control when the run spans multiple blocks', async () => {
+      // job-completed-001 spans sink_temperature_map + sink_wind_map.
+      const screen = await renderDetailPage('job-completed-001')
+      await expect.element(screen.getByText('Group by')).toBeVisible()
+    })
+
+    it('hides the control for a single-block run', async () => {
+      // job-running-002 has one output in one block — nothing to group by.
+      const screen = await renderDetailPage('job-running-002')
+      await expect.element(screen.getByText(/Pending: 1/)).toBeVisible()
+      await expect.element(screen.getByText('Group by')).not.toBeInTheDocument()
     })
   })
 })

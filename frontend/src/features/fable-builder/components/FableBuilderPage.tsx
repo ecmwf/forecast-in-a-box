@@ -10,6 +10,7 @@
 
 import React, { useEffect, useMemo, useRef } from 'react'
 import { Link } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { AlertCircle, Package } from 'lucide-react'
 import { FableBuilderHeader } from './FableBuilderHeader'
 import { BlockPalette } from './layout/BlockPalette'
@@ -19,6 +20,7 @@ import { ThreeColumnLayout } from './layout/ThreeColumnLayout'
 import { FableGraphCanvas } from './graph-mode/FableGraphCanvas'
 import { FableFormCanvas } from './form-mode/FableFormCanvas'
 import { ReviewStep as ReviewStepComponent } from './review/ReviewStep'
+import type { TFunction } from 'i18next'
 import type { PresetId } from '@/features/fable-builder/presets/presets'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import { useURLStateSync } from '@/features/fable-builder/hooks/useURLStateSync'
@@ -52,7 +54,10 @@ import { showToast } from '@/lib/toast'
 /**
  * Extract a user-friendly error message from a validation error
  */
-function getValidationErrorMessage(error: Error): string {
+function getValidationErrorMessage(
+  error: Error,
+  t: TFunction<['configure', 'common']>,
+): string {
   // Check if it's an ApiClientError with details
   if (error instanceof ApiClientError) {
     const details = error.details
@@ -73,13 +78,10 @@ function getValidationErrorMessage(error: Error): string {
     }
     // Fall back to status-based message
     if (error.status === 422) {
-      return 'Invalid configuration. Please fill in all required fields.'
+      return t('page.validationError422')
     }
   }
-  return (
-    error.message ||
-    'Failed to validate configuration. Please check your block settings.'
-  )
+  return error.message || t('page.validationErrorGeneric')
 }
 
 interface FableBuilderPageProps {
@@ -93,6 +95,7 @@ export function FableBuilderPage({
   preset,
   encodedState,
 }: FableBuilderPageProps) {
+  const { t } = useTranslation(['configure', 'common'])
   const fable = useFableBuilderStore((state) => state.fable)
   const setFable = useFableBuilderStore((state) => state.setFable)
   const newFable = useFableBuilderStore((state) => state.newFable)
@@ -166,9 +169,12 @@ export function FableBuilderPage({
 
       if (draftMatchesRoute && Object.keys(draft.fable.blocks).length > 0) {
         const ago = Math.round((Date.now() - draft.savedAt) / 60_000)
-        const timeLabel = ago < 1 ? 'just now' : `${ago} min ago`
+        const timeLabel =
+          ago < 1
+            ? t('draftRestored.justNow')
+            : t('draftRestored.minutesAgo', { count: ago })
 
-        showToast.info(`Unsaved draft restored (${timeLabel})`, draft.fableName)
+        showToast.info(t('draftRestored.toast', { timeLabel }), draft.fableName)
         setFable(draft.fable, draft.fableId)
         if (draft.fableName) setFableName(draft.fableName)
         if (draft.fableVersion) {
@@ -217,7 +223,7 @@ export function FableBuilderPage({
       // URL state sync will handle this case
       initializedRef.current = true
     }
-  }, [fableId, existingFable, fableRetrieveData, preset, encodedState])
+  }, [fableId, existingFable, fableRetrieveData, preset, encodedState, t])
 
   // Sync React Query validation state → Zustand store for sibling components
   useEffect(() => {
@@ -246,21 +252,17 @@ export function FableBuilderPage({
     return (
       <div className="flex min-h-100 flex-col items-center justify-center gap-4">
         <P className="text-lg font-medium">
-          {isNotFound
-            ? 'The requested configuration was not found.'
-            : 'Failed to load configuration. Please try again later.'}
+          {isNotFound ? t('page.notFoundTitle') : t('page.loadFailedTitle')}
         </P>
         <P className="text-muted-foreground">
-          {isNotFound
-            ? 'It may have been deleted or the link is no longer valid.'
-            : fableError.message}
+          {isNotFound ? t('page.notFoundDescription') : fableError.message}
         </P>
         <Button
           variant="outline"
           nativeButton={false}
           render={<Link to="/dashboard" />}
         >
-          Back to Dashboard
+          {t('page.backToDashboard')}
         </Button>
       </div>
     )
@@ -269,9 +271,9 @@ export function FableBuilderPage({
   if (!catalogue) {
     return (
       <div className="flex min-h-100 flex-col items-center justify-center gap-4">
-        <P className="text-destructive">Failed to load block catalogue</P>
+        <P className="text-destructive">{t('page.catalogueLoadFailed')}</P>
         <Button variant="outline" onClick={() => refetchCatalogue()}>
-          Retry
+          {t('common:retry')}
         </Button>
       </div>
     )
@@ -285,8 +287,8 @@ export function FableBuilderPage({
       >
         <FableBuilderHeader fableId={fableId} catalogue={catalogue} />
 
-        {/* Absolute so toggling the banner doesn't shift the canvas — closed
-            but semantically broken expressions still 500. */}
+        {/* Wrapper is relative so the validation banner overlays absolutely —
+            toggling it must not shift the canvas. */}
         <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
           {validationError && (
             <Alert
@@ -294,9 +296,9 @@ export function FableBuilderPage({
               className="absolute top-2 right-4 left-4 z-10 shadow-lg"
             >
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Validation Error</AlertTitle>
+              <AlertTitle>{t('page.validationErrorTitle')}</AlertTitle>
               <AlertDescription>
-                {getValidationErrorMessage(validationError)}
+                {getValidationErrorMessage(validationError, t)}
               </AlertDescription>
             </Alert>
           )}
@@ -322,6 +324,7 @@ function EditStep({
   isDesktop,
   mode,
 }: EditStepProps): React.ReactNode {
+  const { t } = useTranslation('configure')
   const { authType } = useAuth()
   const { data: user } = useUser()
 
@@ -331,9 +334,9 @@ function EditStep({
       <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
         <Package className="h-12 w-12 text-muted-foreground" />
         <div className="max-w-md text-center">
-          <H2 className="text-lg font-semibold">No plugins enabled</H2>
+          <H2 className="text-lg font-semibold">{t('page.noPluginsTitle')}</H2>
           <P className="mt-1 text-muted-foreground">
-            At least one plugin must be enabled to use the Fable Builder.
+            {t('page.noPluginsDescription')}
           </P>
           {canManagePlugins && (
             <Button
@@ -342,7 +345,7 @@ function EditStep({
               nativeButton={false}
               render={<Link to="/admin/plugins" />}
             >
-              Manage Plugins
+              {t('page.managePlugins')}
             </Button>
           )}
         </div>

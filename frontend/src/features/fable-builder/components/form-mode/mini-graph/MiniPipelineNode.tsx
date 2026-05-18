@@ -150,7 +150,6 @@ export const MiniPipelineNode = memo(function ({
         existingSiblings={existingSiblings}
         onAddBlock={onAddBlock}
         onNavigate={onNavigate}
-        isCurrentBlock={isCurrentBlock}
       />
     </div>
   )

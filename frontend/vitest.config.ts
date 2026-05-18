@@ -23,6 +23,8 @@ export default mergeConfig(
         '@testing-library/react',
         'sonner',
         'lz-string',
+        'date-fns',
+        '@date-fns/tz',
       ],
     },
     test: {

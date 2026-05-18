@@ -32,7 +32,10 @@ export function OutputsPanel({
   toolbarSlot,
 }: OutputsPanelProps) {
   return (
+    // Remount per job so sniffed-mime and open-viewer state never leak across
+    // executions — task ids are only unique within a single job.
     <OutputsView
+      key={jobId}
       jobId={jobId}
       status={status}
       outputs={outputs}

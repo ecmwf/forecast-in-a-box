@@ -28,8 +28,6 @@
  *
  * @returns Backend API base URL (e.g., '' or 'http://localhost:8000')
  */
-import { createLogger } from '@/lib/logger'
-
 export function getBackendBaseUrl(): string {
   // Default to empty string if the env var is unset at runtime.
   return import.meta.env.VITE_API_BASE_URL || ''
@@ -77,22 +75,4 @@ export function isProduction(): boolean {
  */
 export function isDevelopment(): boolean {
   return import.meta.env.DEV
-}
-
-const log = createLogger('Environment')
-
-/**
- * Log environment configuration (for debugging)
- * Only logs in development or when debug is enabled
- */
-export function logEnvironmentConfig(): void {
-  if (isDevelopment() || isDebugEnabled()) {
-    log.debug('Build-Time Environment Configuration', {
-      backendBaseUrl: getBackendBaseUrl(),
-      debugMode: isDebugEnabled(),
-      environment: getEnvironment(),
-      production: isProduction(),
-      development: isDevelopment(),
-    })
-  }
 }

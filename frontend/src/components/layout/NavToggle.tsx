@@ -8,45 +8,94 @@
  * does it submit to any jurisdiction.
  */
 
-import { LayoutDashboard, Play, SlidersHorizontal } from 'lucide-react'
-import { Link } from '@tanstack/react-router'
+/**
+ * Primary section nav (Overview / Configuration / Executions). A fourth item
+ * for the open run appears on an execution detail page.
+ */
+
+import {
+  FileText,
+  LayoutDashboard,
+  Play,
+  SlidersHorizontal,
+} from 'lucide-react'
+import { Link, useParams } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
+import { useFableRetrieve } from '@/api/hooks/useFable'
+import { useJobStatus } from '@/api/hooks/useJobs'
 import { cn } from '@/lib/utils'
 
 const navItems = [
-  { to: '/dashboard', labelKey: 'nav.overview', Icon: LayoutDashboard },
-  { to: '/configure', labelKey: 'nav.configuration', Icon: SlidersHorizontal },
-  { to: '/executions', labelKey: 'nav.executions', Icon: Play },
+  {
+    to: '/dashboard',
+    labelKey: 'nav.overview',
+    Icon: LayoutDashboard,
+    exact: false,
+  },
+  {
+    to: '/configure',
+    labelKey: 'nav.configuration',
+    Icon: SlidersHorizontal,
+    exact: false,
+  },
+  // Exact: an open run highlights the run item, not this one — "Executions" stays a link to the list.
+  { to: '/executions', labelKey: 'nav.executions', Icon: Play, exact: true },
 ] as const
+
+const itemClass = cn(
+  'inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium text-muted-foreground transition-colors',
+  'hover:bg-background/50',
+  'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
+)
+
+const activeItemClass =
+  'bg-background text-foreground shadow-sm hover:bg-background'
+
+/** The fourth nav item — the execution run currently open. */
+function RunNavItem({ jobId }: { jobId: string }) {
+  const { data: jobData } = useJobStatus(jobId)
+  const { data: fableData } = useFableRetrieve(jobData?.blueprint_id)
+  const label = fableData?.display_name?.trim() || jobId.slice(0, 8)
+
+  return (
+    <Link
+      to="/executions/$jobId"
+      params={{ jobId }}
+      activeOptions={{ includeSearch: false }}
+      className={cn(itemClass, 'max-w-40')}
+      activeProps={{ className: activeItemClass, 'aria-current': 'page' }}
+    >
+      <FileText className="h-4 w-4 shrink-0" />
+      <span className="min-w-0 truncate" title={label}>
+        {label}
+      </span>
+    </Link>
+  )
+}
 
 export function NavToggle() {
   const { t } = useTranslation('common')
+  // `jobId` is only present on the /executions/$jobId route.
+  const { jobId } = useParams({ strict: false })
 
   return (
     <nav
       aria-label={t('nav.label')}
       className="inline-flex h-9 items-center gap-1 rounded-lg bg-muted p-1"
     >
-      {navItems.map(({ to, labelKey, Icon }) => (
+      {navItems.map(({ to, labelKey, Icon, exact }) => (
         <Link
           key={to}
           to={to}
-          activeOptions={{ includeSearch: false }}
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium text-muted-foreground transition-colors',
-            'hover:bg-background/50',
-            'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
-          )}
-          activeProps={{
-            className:
-              'bg-background text-foreground shadow-sm hover:bg-background',
-            'aria-current': 'page',
-          }}
+          activeOptions={{ includeSearch: false, exact }}
+          className={itemClass}
+          activeProps={{ className: activeItemClass, 'aria-current': 'page' }}
         >
           <Icon className="h-4 w-4" />
           {t(labelKey)}
         </Link>
       ))}
+      {jobId && <RunNavItem jobId={jobId} />}
     </nav>
   )
 }

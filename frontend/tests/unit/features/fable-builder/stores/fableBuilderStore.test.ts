@@ -12,10 +12,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import type { BlockFactory, FableBuilderV1 } from '@/api/types/fable.types'
 import {
-  useBlockCount,
   useFableBuilderStore,
   useHasBlocks,
-  useIsValid,
 } from '@/features/fable-builder/stores/fableBuilderStore'
 import { createEmptyFable } from '@/api/types/fable.types'
 
@@ -69,10 +67,9 @@ describe('useFableBuilderStore', () => {
       expect(useFableBuilderStore.getState().fableId).toBeNull()
     })
 
-    it('has default fableName', () => {
-      expect(useFableBuilderStore.getState().fableName).toBe(
-        'Untitled Configuration',
-      )
+    it('has an empty default fableName', () => {
+      // Blank by default; the UI renders a translated placeholder instead.
+      expect(useFableBuilderStore.getState().fableName).toBe('')
     })
 
     it('has graph mode by default', () => {
@@ -126,7 +123,7 @@ describe('useFableBuilderStore', () => {
     })
 
     it('resets isDirty to false', () => {
-      act(() => useFableBuilderStore.getState().markDirty())
+      act(() => useFableBuilderStore.setState({ isDirty: true }))
       act(() => useFableBuilderStore.getState().setFable(mockFable))
       expect(useFableBuilderStore.getState().isDirty).toBe(false)
     })
@@ -748,16 +745,11 @@ describe('useFableBuilderStore', () => {
 
   describe('save state', () => {
     it('markSaved sets fableId, fableVersion, and isDirty', () => {
-      act(() => useFableBuilderStore.getState().markDirty())
+      act(() => useFableBuilderStore.setState({ isDirty: true }))
       act(() => useFableBuilderStore.getState().markSaved('saved-id-123', 1))
       expect(useFableBuilderStore.getState().fableId).toBe('saved-id-123')
       expect(useFableBuilderStore.getState().fableVersion).toBe(1)
       expect(useFableBuilderStore.getState().isDirty).toBe(false)
-    })
-
-    it('markDirty sets isDirty', () => {
-      act(() => useFableBuilderStore.getState().markDirty())
-      expect(useFableBuilderStore.getState().isDirty).toBe(true)
     })
 
     it('markSubmitted clears isDirty and bumps lastSavedAt without touching fableId/version', () => {
@@ -802,19 +794,6 @@ describe('selector hooks', () => {
     act(() => useFableBuilderStore.getState().reset())
   })
 
-  describe('useBlockCount', () => {
-    it('returns 0 for empty fable', () => {
-      const { result } = renderHook(() => useBlockCount())
-      expect(result.current).toBe(0)
-    })
-
-    it('returns correct count', () => {
-      act(() => useFableBuilderStore.getState().setFable(mockFable))
-      const { result } = renderHook(() => useBlockCount())
-      expect(result.current).toBe(2)
-    })
-  })
-
   describe('useHasBlocks', () => {
     it('returns false for empty fable', () => {
       const { result } = renderHook(() => useHasBlocks())
@@ -825,41 +804,6 @@ describe('selector hooks', () => {
       act(() => useFableBuilderStore.getState().setFable(mockFable))
       const { result } = renderHook(() => useHasBlocks())
       expect(result.current).toBe(true)
-    })
-  })
-
-  describe('useIsValid', () => {
-    it('returns false when no validation state', () => {
-      const { result } = renderHook(() => useIsValid())
-      expect(result.current).toBe(false)
-    })
-
-    it('returns true when valid', () => {
-      act(() =>
-        useFableBuilderStore.getState().setValidationState({
-          isValid: true,
-          globalErrors: [],
-          blockStates: {},
-          possibleSources: [],
-          resolvedConfigurationOptions: {},
-        }),
-      )
-      const { result } = renderHook(() => useIsValid())
-      expect(result.current).toBe(true)
-    })
-
-    it('returns false when invalid', () => {
-      act(() =>
-        useFableBuilderStore.getState().setValidationState({
-          isValid: false,
-          globalErrors: ['Error'],
-          blockStates: {},
-          possibleSources: [],
-          resolvedConfigurationOptions: {},
-        }),
-      )
-      const { result } = renderHook(() => useIsValid())
-      expect(result.current).toBe(false)
     })
   })
 })

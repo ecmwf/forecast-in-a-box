@@ -12,14 +12,15 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { CronFrequency } from '@/features/schedules/utils/cron'
 import {
+  DAY_NAME_KEYS,
   cronToHumanReadable,
   frequencyToCron,
-  getLocalTimezone,
   localHourMinuteToServer,
   parseCronForUI,
   serverHourMinuteToLocal,
 } from '@/features/schedules/utils/cron'
 import { useServerTime } from '@/api/hooks/useSchedules'
+import { timeZoneOffsetLabel } from '@/lib/datetime'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NumericInput } from '@/components/ui/numeric-input'
@@ -31,29 +32,33 @@ interface CronExpressionInputProps {
   onChange: (cron: string) => void
 }
 
-const FREQUENCY_OPTIONS: Array<{ value: CronFrequency; label: string }> = [
-  { value: 'hourly', label: 'Every hour' },
-  { value: 'daily', label: 'Every day' },
-  { value: 'weekly', label: 'Every week' },
-  { value: 'custom', label: 'Custom' },
+const FREQUENCY_OPTIONS: Array<{
+  value: CronFrequency
+  labelKey:
+    | 'cron.frequency.hourly'
+    | 'cron.frequency.daily'
+    | 'cron.frequency.weekly'
+    | 'cron.frequency.custom'
+}> = [
+  { value: 'hourly', labelKey: 'cron.frequency.hourly' },
+  { value: 'daily', labelKey: 'cron.frequency.daily' },
+  { value: 'weekly', labelKey: 'cron.frequency.weekly' },
+  { value: 'custom', labelKey: 'cron.frequency.custom' },
 ]
 
-const DAY_OPTIONS = [
-  { value: 0, label: 'Sunday' },
-  { value: 1, label: 'Monday' },
-  { value: 2, label: 'Tuesday' },
-  { value: 3, label: 'Wednesday' },
-  { value: 4, label: 'Thursday' },
-  { value: 5, label: 'Friday' },
-  { value: 6, label: 'Saturday' },
-]
+// Day-of-week index is the cron `dayOfWeek` value (0 = Sunday); labels reuse
+// the shared DAY_NAME_KEYS so the two day-name lists cannot drift apart.
+const DAY_OPTIONS = DAY_NAME_KEYS.map((labelKey, value) => ({
+  value,
+  labelKey,
+}))
 
 export function CronExpressionInput({
   value,
   onChange,
 }: CronExpressionInputProps) {
   const { t } = useTranslation('executions')
-  const { offsetMs } = useServerTime()
+  const { offsetMs, timeZone } = useServerTime()
   const parsed = parseCronForUI(value)
 
   const [frequency, setFrequency] = useState<CronFrequency>(
@@ -68,7 +73,7 @@ export function CronExpressionInput({
   const serverMinute = parsed?.minute ?? 0
   const localTime =
     offsetMs != null
-      ? serverHourMinuteToLocal(serverHour, serverMinute, offsetMs)
+      ? serverHourMinuteToLocal(serverHour, serverMinute, offsetMs, timeZone)
       : { hour: serverHour, minute: serverMinute }
 
   /** Convert local hour/minute to server time and emit the cron expression */
@@ -80,7 +85,7 @@ export function CronExpressionInput({
   ) {
     if (freq === 'custom') return
     if (offsetMs != null && freq !== 'hourly') {
-      const server = localHourMinuteToServer(lHour, lMinute, offsetMs)
+      const server = localHourMinuteToServer(lHour, lMinute, offsetMs, timeZone)
       onChange(frequencyToCron(freq, server.hour, server.minute, day))
     } else {
       onChange(frequencyToCron(freq, lHour, lMinute, day))
@@ -123,7 +128,7 @@ export function CronExpressionInput({
                 : 'text-muted-foreground hover:bg-muted',
             )}
           >
-            {option.label}
+            {t(option.labelKey)}
           </button>
         ))}
       </div>
@@ -139,14 +144,16 @@ export function CronExpressionInput({
             >
               {DAY_OPTIONS.map((day) => (
                 <option key={day.value} value={day.value}>
-                  {day.label}
+                  {t(day.labelKey)}
                 </option>
               ))}
             </select>
           )}
           {frequency !== 'hourly' && (
             <>
-              <Label className="text-sm text-muted-foreground">at</Label>
+              <Label className="text-sm text-muted-foreground">
+                {t('cron.at')}
+              </Label>
               <NumericInput
                 value={localTime.hour}
                 onChange={(e) => handleHourChange(Number(e.target.value))}
@@ -159,13 +166,15 @@ export function CronExpressionInput({
                 className="w-20"
               />
               <span className="text-sm text-muted-foreground">
-                {getLocalTimezone()}
+                {timeZoneOffsetLabel(timeZone)}
               </span>
             </>
           )}
           {frequency === 'hourly' && (
             <>
-              <Label className="text-sm text-muted-foreground">at minute</Label>
+              <Label className="text-sm text-muted-foreground">
+                {t('cron.atMinute')}
+              </Label>
               <NumericInput
                 value={localTime.minute}
                 onChange={(e) => handleMinuteChange(Number(e.target.value))}
@@ -183,7 +192,7 @@ export function CronExpressionInput({
           onClick={() => setShowRaw(!showRaw)}
           className="text-sm text-muted-foreground underline"
         >
-          {showRaw ? 'Hide' : 'Show'} cron expression
+          {showRaw ? t('cron.hideExpression') : t('cron.showExpression')}
         </button>
         {(showRaw || frequency === 'custom') && (
           <Input
@@ -200,7 +209,7 @@ export function CronExpressionInput({
 
       {/* Human-readable preview */}
       <P className="text-sm text-muted-foreground">
-        {cronToHumanReadable(value, offsetMs)}
+        {cronToHumanReadable(value, offsetMs, timeZone)}
       </P>
     </div>
   )

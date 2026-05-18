@@ -11,8 +11,9 @@
 /// <reference types="vite/client" />
 
 /**
- * Type declarations for Vite environment variables
- * These are populated from .env files at build time
+ * Type declarations for `import.meta.env`.
+ * `VITE_*` keys come from `.env` files; `MODE`/`BASE_URL`/`PROD`/`DEV`/`SSR`
+ * are Vite built-ins.
  * See: https://vitejs.dev/guide/env-and-mode.html#env-files
  */
 

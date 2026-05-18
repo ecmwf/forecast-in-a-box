@@ -59,7 +59,7 @@ function setupFableWithSource(): string {
     },
   })
   // Mark as dirty so save button is relevant
-  store.markDirty()
+  useFableBuilderStore.setState({ isDirty: true })
   return 'source1'
 }
 
@@ -332,11 +332,11 @@ describe('Fable Builder Save & Load', () => {
       expect(Object.keys(state.fable.blocks)).toHaveLength(0)
       expect(state.fableId).toBeNull()
       expect(state.isDirty).toBe(false)
-      expect(state.fableName).toBe('Untitled Configuration')
+      expect(state.fableName).toBe('')
 
       // Should show the empty hint
       await expect
-        .element(screen.getByText('Click a source to get started'))
+        .element(screen.getByText('Click or drag a source to get started'))
         .toBeVisible()
     })
   })

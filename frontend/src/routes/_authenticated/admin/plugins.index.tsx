@@ -16,7 +16,7 @@
 
 import { useMemo, useState } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { PluginCompositeId, PluginInfo } from '@/api/types/plugins.types'
 import type {
@@ -36,14 +36,15 @@ import {
 import { useStatus } from '@/api/hooks/useStatus'
 import { encodePluginId } from '@/api/types/plugins.types'
 import { H3 } from '@/components/base/typography'
+import { Button } from '@/components/ui/button'
+import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { PageHeader } from '@/components/common/PageHeader'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { PluginsFilters } from '@/features/plugins/components/PluginsFilters'
 import { PluginsList } from '@/features/plugins/components/PluginsList'
-import { PluginsPageHeader } from '@/features/plugins/components/PluginsPageHeader'
 import { UninstalledPluginsSection } from '@/features/plugins/components/UninstalledPluginsSection'
 import { UpdatesAvailableSection } from '@/features/plugins/components/UpdatesAvailableSection'
-import { cn } from '@/lib/utils'
 import { useActivityStore } from '@/stores/activityStore'
 import { useUiStore } from '@/stores/uiStore'
 import { getPluginStatusError } from '@/types/status.types'
@@ -55,7 +56,6 @@ export const Route = createFileRoute('/_authenticated/admin/plugins/')({
 function PluginsPage() {
   const { t } = useTranslation('plugins')
   const navigate = useNavigate()
-  const layoutMode = useUiStore((state) => state.layoutMode)
   const dashboardVariant = useUiStore((state) => state.dashboardVariant)
   const panelShadow = useUiStore((state) => state.panelShadow)
   const pluginsViewMode = useUiStore((state) => state.pluginsViewMode)
@@ -218,9 +218,9 @@ function PluginsPage() {
     trackPluginOp(
       compositeId,
       {
-        active: 'Installing',
-        success: 'Installed',
-        failure: 'Install failed',
+        active: t('activity.installing'),
+        success: t('activity.installed'),
+        failure: t('activity.installFailed'),
       },
       installPlugin,
     )
@@ -230,9 +230,9 @@ function PluginsPage() {
     trackPluginOp(
       compositeId,
       {
-        active: 'Uninstalling',
-        success: 'Uninstalled',
-        failure: 'Uninstall failed',
+        active: t('activity.uninstalling'),
+        success: t('activity.uninstalled'),
+        failure: t('activity.uninstallFailed'),
       },
       uninstallPlugin,
     )
@@ -241,7 +241,11 @@ function PluginsPage() {
   const handleUpdate = (compositeId: PluginCompositeId) => {
     trackPluginOp(
       compositeId,
-      { active: 'Updating', success: 'Updated', failure: 'Update failed' },
+      {
+        active: t('activity.updating'),
+        success: t('activity.updated'),
+        failure: t('activity.updateFailed'),
+      },
       updatePlugin,
     )
   }
@@ -266,16 +270,22 @@ function PluginsPage() {
   }
 
   return (
-    <div
-      className={cn(
-        'mx-auto space-y-8 px-4 py-8 sm:px-6 lg:px-8',
-        layoutMode === 'boxed' ? 'max-w-7xl' : 'max-w-none',
-      )}
-    >
-      {/* Page Header */}
-      <PluginsPageHeader
-        onCheckUpdates={handleRefresh}
-        isCheckingUpdates={refreshPlugins.isPending}
+    <ListPageContainer>
+      <PageHeader
+        title={t('title')}
+        description={t('subtitle')}
+        actions={
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={refreshPlugins.isPending}
+          >
+            <RefreshCw
+              className={`mr-2 h-4 w-4 ${refreshPlugins.isPending ? 'animate-spin' : ''}`}
+            />
+            {t('actions.checkUpdates')}
+          </Button>
+        }
       />
 
       {/* Plugin System Error Banner */}
@@ -342,6 +352,6 @@ function PluginsPage() {
         variant={dashboardVariant}
         shadow={panelShadow}
       />
-    </div>
+    </ListPageContainer>
   )
 }

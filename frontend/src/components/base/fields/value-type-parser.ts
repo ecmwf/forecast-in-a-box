@@ -26,6 +26,8 @@
  * - optional[T] → same widget as T, with optional=true flag
  */
 
+import { getAppTimeZone, todayInZone } from '@/lib/datetime'
+
 export type ParsedValueType =
   | { type: 'string'; optional?: boolean }
   | { type: 'int'; optional?: boolean }
@@ -79,7 +81,8 @@ export function parseValueType(valueType: string | undefined): ParsedValueType {
   }
 
   // List type: list[str] or list[int]
-  const listMatch = valueType.match(/^list\[(\w+)\]$/i)
+  // Match the trimmed string so leading/trailing whitespace does not fall through.
+  const listMatch = trimmed.match(/^list\[(\w+)\]$/i)
   if (listMatch) {
     const itemType = listMatch[1].toLowerCase()
     if (itemType === 'str' || itemType === 'string') {
@@ -89,11 +92,11 @@ export function parseValueType(valueType: string | undefined): ParsedValueType {
       return { type: 'list', itemType: 'int' }
     }
     // For now, only support list[str] and list[int]
-    return { type: 'unknown', raw: valueType }
+    return { type: 'unknown', raw: trimmed }
   }
 
   // Enum type: enum[...] / enumClosed[...] with single or double quotes
-  const enumMatch = valueType.match(/^(?:enum|enumClosed)\[(.+)\]$/i)
+  const enumMatch = trimmed.match(/^(?:enum|enumClosed)\[(.+)\]$/i)
   if (enumMatch) {
     const optionsStr = enumMatch[1]
     const options = parseEnumOptions(optionsStr)
@@ -102,7 +105,7 @@ export function parseValueType(valueType: string | undefined): ParsedValueType {
     }
   }
 
-  return { type: 'unknown', raw: valueType }
+  return { type: 'unknown', raw: trimmed }
 }
 
 /**
@@ -134,14 +137,11 @@ export function getDefaultValueForType(parsedType: ParsedValueType): string {
     case 'float':
       return '0.0'
     case 'datetime':
-      // Default to today at local midnight so forecast base-times land on a
-      // round hour instead of whatever wall-clock second the form opened at.
-      // datetime-local expects local time without TZ — compose from local
-      // components rather than Date.toISOString() (which is UTC).
-      return `${todayLocalDate()}T00:00`
+      // Canonical value is naive UTC — default to today's 00:00 UTC (00z run).
+      return `${todayInZone('UTC')}T00:00:00`
     case 'date':
-      // Local date (YYYY-MM-DD), not UTC — see note above.
-      return todayLocalDate()
+      // A calendar date has no instant; use "today" in the app timezone.
+      return todayInZone(getAppTimeZone())
     case 'list':
       return ''
     case 'enum':
@@ -149,12 +149,4 @@ export function getDefaultValueForType(parsedType: ParsedValueType): string {
     case 'unknown':
       return ''
   }
-}
-
-function todayLocalDate(): string {
-  const now = new Date()
-  const y = now.getFullYear()
-  const m = String(now.getMonth() + 1).padStart(2, '0')
-  const d = String(now.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
 }

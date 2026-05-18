@@ -11,7 +11,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   containsGlyphs,
-  extractGlyphKey,
   findGlyphSpans,
   hasUnterminatedGlyph,
   parseGlyphSegments,
@@ -109,16 +108,6 @@ describe('parseGlyphSegments', () => {
       { text: '${func("a}b")}', isGlyph: true },
       { text: ' suffix', isGlyph: false },
     ])
-  })
-})
-
-describe('extractGlyphKey', () => {
-  it('returns the variable name for a plain reference', () => {
-    expect(extractGlyphKey('${runId}')).toBe('runId')
-  })
-
-  it('returns the full inner body for a Jinja expression', () => {
-    expect(extractGlyphKey('${var | sub_days(2)}')).toBe('var | sub_days(2)')
   })
 })
 

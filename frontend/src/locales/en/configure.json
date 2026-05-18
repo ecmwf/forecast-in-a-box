@@ -27,5 +27,229 @@
     "unknownConfigKey": "Unknown configuration key",
     "missingRequiredValue": "Missing required value",
     "unknownGlyph": "Unknown glyph: {{glyph}}"
+  },
+  "page": {
+    "notFoundTitle": "The requested configuration was not found.",
+    "loadFailedTitle": "Failed to load configuration. Please try again later.",
+    "notFoundDescription": "It may have been deleted or the link is no longer valid.",
+    "backToDashboard": "Back to Dashboard",
+    "catalogueLoadFailed": "Failed to load block catalogue",
+    "noPluginsTitle": "No plugins enabled",
+    "noPluginsDescription": "At least one plugin must be enabled to use the Fable Builder.",
+    "managePlugins": "Manage Plugins",
+    "validationErrorTitle": "Validation Error",
+    "validationError422": "Invalid configuration. Please fill in all required fields.",
+    "validationErrorGeneric": "Failed to validate configuration. Please check your block settings.",
+    "untitledConfiguration": "Untitled Configuration"
+  },
+  "header": {
+    "share": "Share",
+    "shareCopied": "Copied!",
+    "shareFailed": "Could not copy link to clipboard",
+    "graph": "Graph",
+    "form": "Form",
+    "exportConfig": "Export Config",
+    "loadConfig": "Load Config",
+    "exportFailed": "Failed to export config",
+    "configLoaded": "Configuration loaded",
+    "fileTooLargeTitle": "File too large",
+    "fileTooLargeDescription": "Configuration files must be smaller than 1 MB.",
+    "invalidConfigTitle": "Invalid config file",
+    "invalidConfigDescription": "File must contain a valid configuration with a \"blocks\" property.",
+    "parseFailed": "Failed to parse config file",
+    "readFailed": "Failed to read file",
+    "readUnknownError": "Unknown read error",
+    "reviewSubmit": "Review & Submit",
+    "backToEdit": "Back to Edit",
+    "submitJob": "Submit Job",
+    "reviewTooltipNoBlocks": "Add blocks to your configuration",
+    "reviewTooltipNoSink": "Add at least one output block",
+    "reviewTooltipInvalid": "Fix validation errors before submitting"
+  },
+  "blockCount_one": "{{count}} block",
+  "blockCount_other": "{{count}} blocks",
+  "blockSummaryBadge_one": "{{count}} {{kind}}",
+  "blockSummaryBadge_other": "{{count}} {{kind}}s",
+  "draft": {
+    "saving": "Saving draft…",
+    "saved": "Draft saved"
+  },
+  "validationStatus": {
+    "validating": "Validating",
+    "valid": "Valid",
+    "hasErrors": "Has errors",
+    "validatingConfiguration": "Validating configuration...",
+    "configurationIssues": "Configuration Issues"
+  },
+  "blockActions": {
+    "duplicate": "Duplicate",
+    "duplicateWithChildren": "Duplicate with children",
+    "saveAsPreset": "Save config as preset",
+    "deleteBlock": "Delete block",
+    "comingSoonPreset": "Coming soon: Saving configurations as presets will be available soon."
+  },
+  "layout": {
+    "resetSidebarWidth": "Reset sidebar width",
+    "hideBlockPalette": "Hide block palette",
+    "showBlockPalette": "Show block palette",
+    "hideConfigPanel": "Hide config panel",
+    "showConfigPanel": "Show config panel"
+  },
+  "mobile": {
+    "addBlock": "Add Block",
+    "blockConfiguration": "Block Configuration"
+  },
+  "configPanel": {
+    "selectBlock": "Select a block to configure",
+    "inputConnections": "Input Connections",
+    "configuration": "Configuration",
+    "noConfigOptions": "No configuration options",
+    "noCompatibleSources": "No compatible sources",
+    "selectSource": "Select source...",
+    "deleteBlock": "Delete Block",
+    "deleteConfirm": "Are you sure you want to delete \"{{title}}\"? This action cannot be undone.",
+    "cancel": "Cancel",
+    "delete": "Delete"
+  },
+  "palette": {
+    "title": "Block Palette",
+    "searchPlaceholder": "Search blocks...",
+    "noBlocksAvailable": "No {{kind}} blocks available",
+    "notAvailableAtStep": "Not available at this step",
+    "addBlock": "Add {{title}}",
+    "loadingBlocks": "Loading available blocks...",
+    "clickSourceToStart": "Click or drag a source to get started",
+    "clickToAdd": "Click or drag blocks onto the canvas"
+  },
+  "pipeline": {
+    "structure": "Pipeline Structure",
+    "topologyPlaceholder": "Add blocks to see the pipeline topology"
+  },
+  "formCanvas": {
+    "previousStep": "Previous Step",
+    "nextStep": "Next Step",
+    "stepHeading": "{{label}}s",
+    "selectToStart": "Select a {{kind}} to get started:",
+    "addAnother": "Add another {{kind}}:",
+    "loadingSources": "Loading available sources...",
+    "completePreviousStep": "Complete the previous step to see available {{kind}}s."
+  },
+  "connections": {
+    "pipelineFlow": "Pipeline Flow",
+    "inputCount_one": "{{count}} input",
+    "inputCount_other": "{{count}} inputs",
+    "outputCount_one": "{{count}} output",
+    "outputCount_other": "{{count}} outputs",
+    "noConnections": "No connections",
+    "notConnectedDownstream": "Not connected to any downstream block",
+    "inputConnections": "Input Connections",
+    "noCompatibleSourcesAvailable": "No compatible sources available",
+    "noConfigOptions": "No configuration options",
+    "selectSource": "Select source..."
+  },
+  "blockInstance": {
+    "hasErrors": "Has errors",
+    "deleteBlock": "Delete Block",
+    "deleteConfirm": "Are you sure you want to delete \"{{title}}\"? This action cannot be undone.",
+    "cancel": "Cancel",
+    "delete": "Delete"
+  },
+  "blockTabs": {
+    "fallbackTitle": "Block"
+  },
+  "addBlockNode": {
+    "addKind": "Add {{label}}"
+  },
+  "nodeControls": {
+    "addNew": "Add new {{direction}}",
+    "jumpToExisting": "Jump to existing",
+    "directionUpstream": "upstream",
+    "directionDownstream": "downstream"
+  },
+  "graphOptions": {
+    "ariaLabel": "Graph options",
+    "view": "View",
+    "tidyUp": "Tidy up configuration",
+    "unlockNodes": "Unlock nodes",
+    "lockNodes": "Lock nodes",
+    "showMinimap": "Show minimap",
+    "layout": "Layout",
+    "autoLayout": "Auto-layout",
+    "direction": "Direction",
+    "topToBottom": "↓ Top to Bottom",
+    "leftToRight": "→ Left to Right",
+    "edges": "Edges",
+    "style": "Style",
+    "curved": "Curved",
+    "rounded": "Rounded",
+    "orthogonal": "Orthogonal"
+  },
+  "addNode": {
+    "searchPlaceholder": "Search blocks...",
+    "noBlocksFound": "No blocks found"
+  },
+  "blockNode": {
+    "configureBlock": "Configure block",
+    "deleteBlock": "Delete Block",
+    "deleteConfirm": "Are you sure you want to delete \"{{title}}\" and all connected downstream blocks? This action cannot be undone.",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "moreCount": "+{{count}} more",
+    "outputHandle": "Output"
+  },
+  "review": {
+    "title": "Review Configuration",
+    "subtitle": "Review your forecast configuration before submitting.",
+    "validatingTitle": "Validating Configuration",
+    "validatingDescription": "Please wait while we validate your configuration...",
+    "hasErrorsTitle": "Configuration Has Errors",
+    "fixIssues": "Please fix the following issues before submitting:",
+    "blockLevelErrors_one": "{{count}} block-level error found.",
+    "blockLevelErrors_other": "{{count}} block-level errors found.",
+    "readyTitle": "Ready to Submit",
+    "readyDescription": "Your configuration is valid and ready to be submitted.",
+    "summaryTitle": "Configuration Summary",
+    "summaryDescription_one": "{{count}} block configured",
+    "summaryDescription_other": "{{count}} blocks configured",
+    "backToEdit": "Back to Edit",
+    "submitJob": "Submit Job",
+    "kindHeading": "{{label}}s"
+  },
+  "configSummary": {
+    "unknownSource": "Unknown",
+    "defaultConfiguration": "Default configuration"
+  },
+  "presets": {
+    "quickStartName": "Quick Start",
+    "quickStartDescription": "Ready to run with optimized defaults",
+    "standardName": "Standard Forecast",
+    "standardDescription": "Standard forecast data pipeline",
+    "customModelName": "Custom Forecast",
+    "customModelDescription": "Start with empty canvas for full customization",
+    "datasetName": "Open Data Forecast",
+    "datasetDescription": "Start with ECMWF open data as source"
+  },
+  "draftRestored": {
+    "justNow": "just now",
+    "minutesAgo": "{{count}} min ago",
+    "toast": "Unsaved draft restored ({{timeLabel}})"
+  },
+  "blockKind": {
+    "source": {
+      "label": "Source",
+      "description": "Data sources like forecasts and initial conditions"
+    },
+    "transform": {
+      "label": "Transform",
+      "description": "Transform and process data"
+    },
+    "product": {
+      "label": "Product",
+      "description": "Compute derived products from data"
+    },
+    "sink": {
+      "label": "Output",
+      "description": "Store or visualize results"
+    }
   }
 }

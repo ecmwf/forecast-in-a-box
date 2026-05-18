@@ -22,7 +22,6 @@ import {
   fableKeys,
   useBlockCatalogue,
   useBlockFactory,
-  useExpandFable,
   useFable,
   useFableValidation,
   useUpsertFable,
@@ -256,48 +255,6 @@ describe('useFable', () => {
       .element(screen.getByTestId('enabled'))
       .toHaveTextContent('idle')
     expect(fetchCalled).toBe(false)
-  })
-})
-
-describe('useExpandFable', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  afterEach(() => {
-    worker.resetHandlers()
-  })
-
-  it('expands fable successfully', async () => {
-    worker.use(
-      http.put(API_ENDPOINTS.fable.expand, () => {
-        return HttpResponse.json(mockExpansion)
-      }),
-    )
-
-    let mutationResult: ReturnType<typeof useExpandFable> | null = null
-
-    function TestComponent() {
-      const result = useExpandFable()
-      mutationResult = result
-      return (
-        <div>
-          <button data-testid="expand" onClick={() => result.mutate(mockFable)}>
-            Expand
-          </button>
-          <div data-testid="status">{result.status}</div>
-        </div>
-      )
-    }
-
-    const screen = await renderWithQueryClient(<TestComponent />)
-
-    await screen.getByTestId('expand').click()
-
-    await expect
-      .element(screen.getByTestId('status'))
-      .toHaveTextContent('success')
-    expect(mutationResult!.data!.global_errors).toEqual([])
   })
 })
 

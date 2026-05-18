@@ -12,6 +12,7 @@
  * useConfigPresets Hook Unit Tests
  *
  * Tests the preset data-access hook backed by the Blueprint list API:
+ * - Source filtering: only explicitly-saved (`user_defined`, non-one-off) configs
  * - Sorting: favourites first (from localStorage), then backend order
  * - deletePreset: calls backend delete + cleans up favourite flag
  * - toggleFavourite: toggles isFavourite in localStorage
@@ -20,9 +21,10 @@
 
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { BlueprintListResponse } from '@/api/types/fable.types'
+import type { BlueprintListItem } from '@/api/types/fable.types'
 import { useConfigPresets } from '@/features/dashboard/hooks/useConfigPresets'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
+import { ONEOFF_TAG } from '@/lib/system-tags'
 
 // Mock logger
 vi.mock('@/lib/logger', () => ({
@@ -43,46 +45,57 @@ vi.mock('@/lib/toast', () => ({
   },
 }))
 
-const mockListResponse: BlueprintListResponse = {
-  blueprints: [
-    {
-      blueprint_id: 'bp-001',
-      version: 1,
-      display_name: 'First Config',
-      display_description: 'Description 1',
-      tags: ['prod'],
-      source: null,
-      created_by: null,
-    },
-    {
-      blueprint_id: 'bp-002',
-      version: 2,
-      display_name: 'Second Config',
-      display_description: null,
-      tags: null,
-      source: null,
-      created_by: null,
-    },
-    {
-      blueprint_id: 'bp-003',
-      version: 1,
-      display_name: null,
-      display_description: null,
-      tags: ['test', 'europe'],
-      source: null,
-      created_by: null,
-    },
-  ],
-  total: 3,
-  page: 1,
-  page_size: 50,
-}
+// The API layer is stubbed here, so collapse useConfigPresets' useQueries join to an empty result.
+vi.mock('@tanstack/react-query', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>()
+  return { ...actual, useQueries: () => [] }
+})
+
+// Three explicitly-saved configs — the baseline visible set.
+const DEFAULT_BLUEPRINTS: Array<BlueprintListItem> = [
+  {
+    blueprint_id: 'bp-001',
+    version: 1,
+    display_name: 'First Config',
+    display_description: 'Description 1',
+    tags: ['prod'],
+    source: 'user_defined',
+    created_by: null,
+  },
+  {
+    blueprint_id: 'bp-002',
+    version: 2,
+    display_name: 'Second Config',
+    display_description: null,
+    tags: null,
+    source: 'user_defined',
+    created_by: null,
+  },
+  {
+    blueprint_id: 'bp-003',
+    version: 1,
+    display_name: null,
+    display_description: null,
+    tags: ['test', 'europe'],
+    source: 'user_defined',
+    created_by: null,
+  },
+]
+
+// Mutable so individual tests can vary what the mocked API returns.
+// Must be `mock`-prefixed to be referenced inside the vi.mock factory.
+let mockBlueprints: Array<BlueprintListItem> = DEFAULT_BLUEPRINTS
 
 const mockDeleteBlueprint = vi.fn()
 
 vi.mock('@/api/hooks/useFable', () => ({
   useListBlueprints: () => ({
-    data: mockListResponse,
+    data: {
+      blueprints: mockBlueprints,
+      total: mockBlueprints.length,
+      page: 1,
+      page_size: 50,
+    },
     isLoading: false,
     isError: false,
   }),
@@ -90,6 +103,7 @@ vi.mock('@/api/hooks/useFable', () => ({
     mutate: mockDeleteBlueprint,
     isPending: false,
   }),
+  useBlockCatalogue: () => ({ data: undefined }),
   fableKeys: {
     all: ['fable'] as const,
     blueprints: () => ['fable', 'blueprints'] as const,
@@ -108,6 +122,7 @@ describe('useConfigPresets', () => {
   beforeEach(() => {
     localStorage.clear()
     mockDeleteBlueprint.mockClear()
+    mockBlueprints = DEFAULT_BLUEPRINTS
   })
 
   describe('initialization', () => {
@@ -137,6 +152,71 @@ describe('useConfigPresets', () => {
         (p) => p.blueprintId === 'bp-002',
       )
       expect(second?.tags).toEqual([])
+    })
+  })
+
+  describe('source filtering', () => {
+    it('excludes blueprints created by a one-off run or schedule', () => {
+      mockBlueprints = [
+        ...DEFAULT_BLUEPRINTS,
+        {
+          blueprint_id: 'bp-run',
+          version: 1,
+          display_name: 'A One-off Run',
+          display_description: null,
+          tags: ['europe', ONEOFF_TAG],
+          source: 'user_defined',
+          created_by: null,
+        },
+      ]
+
+      const { result } = renderHook(() => useConfigPresets())
+
+      expect(result.current.presets).toHaveLength(3)
+      expect(result.current.presets.map((p) => p.blueprintId)).not.toContain(
+        'bp-run',
+      )
+    })
+
+    it('excludes plugin-template blueprints', () => {
+      mockBlueprints = [
+        ...DEFAULT_BLUEPRINTS,
+        {
+          blueprint_id: 'bp-tmpl',
+          version: 1,
+          display_name: 'Plugin Template',
+          display_description: null,
+          tags: null,
+          source: 'plugin_template',
+          created_by: null,
+        },
+      ]
+
+      const { result } = renderHook(() => useConfigPresets())
+
+      expect(result.current.presets).toHaveLength(3)
+      expect(result.current.presets.map((p) => p.blueprintId)).not.toContain(
+        'bp-tmpl',
+      )
+    })
+
+    it('hides the section when only one-off runs exist', () => {
+      mockBlueprints = [
+        {
+          blueprint_id: 'bp-run',
+          version: 1,
+          display_name: 'A One-off Run',
+          display_description: null,
+          tags: [ONEOFF_TAG],
+          source: 'user_defined',
+          created_by: null,
+        },
+      ]
+
+      const { result } = renderHook(() => useConfigPresets())
+
+      expect(result.current.presets).toHaveLength(0)
+      expect(result.current.hasPresets).toBe(false)
     })
   })
 

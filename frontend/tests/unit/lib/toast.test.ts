@@ -11,6 +11,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { toast } from 'sonner'
 import { showToast } from '@/lib/toast'
+// Initialise i18next so apiError's t() calls resolve to real strings.
+import '@/lib/i18n'
 
 // Mock sonner
 vi.mock('sonner', () => ({

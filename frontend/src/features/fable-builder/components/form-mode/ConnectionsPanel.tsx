@@ -17,6 +17,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { AlertTriangle, ChevronRight } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { AddBlockNode } from './mini-graph/AddBlockNode'
 import { MiniPipelineNode } from './mini-graph/MiniPipelineNode'
 import type { ControlDirection } from './mini-graph/NodeControls'
@@ -37,7 +38,8 @@ interface ConnectionsPanelProps {
   onBlockClick?: (blockId: BlockInstanceId) => void
   onAddConnectedBlock?: (
     factoryId: PluginBlockFactoryId,
-    sourceBlockId: BlockInstanceId,
+    anchorBlockId: BlockInstanceId,
+    direction?: ControlDirection,
   ) => void
 }
 
@@ -69,6 +71,7 @@ function ConnectionsPanelContent({
   onBlockClick,
   onAddConnectedBlock,
 }: ConnectionsPanelProps) {
+  const { t } = useTranslation('configure')
   // Default to expanded
   const [isExpanded, setIsExpanded] = useState(true)
 
@@ -140,7 +143,7 @@ function ConnectionsPanelContent({
     validationState,
   ])
 
-  // Compute all siblings (blocks of same kind not in the pipeline)
+  // Index every block by kind, for the node-control navigation lists.
   const allBlocksByKind = useMemo(() => {
     const result: Record<
       BlockKind,
@@ -174,8 +177,10 @@ function ConnectionsPanelContent({
   )
 
   const handleAddBlock = useCallback(
-    (factoryId: PluginBlockFactoryId, _direction: ControlDirection) => {
-      onAddConnectedBlock?.(factoryId, instanceId)
+    (factoryId: PluginBlockFactoryId, direction: ControlDirection) => {
+      // Thread `direction` so an "add parent" control wires the new block
+      // upstream of the anchor rather than always creating a downstream child.
+      onAddConnectedBlock?.(factoryId, instanceId, direction)
     },
     [onAddConnectedBlock, instanceId],
   )
@@ -220,19 +225,13 @@ function ConnectionsPanelContent({
       // Sibling options: same kind addOptions
       const siblingOptions = stageData[block.kind].addOptions
 
-      // Existing blocks for navigation
-      const connectedIds = new Set(allBlocks.map((b) => b.id))
-
-      const existingParents = parentKinds.flatMap((kind) =>
-        allBlocksByKind[kind].filter(
-          (b) => !connectedIds.has(b.id) || b.id !== block.id,
-        ),
+      // Existing blocks for navigation — every kind except this block itself.
+      const existingParents = parentKinds.flatMap(
+        (kind) => allBlocksByKind[kind],
       )
 
-      const existingChildren = childKinds.flatMap((kind) =>
-        allBlocksByKind[kind].filter(
-          (b) => !connectedIds.has(b.id) || b.id !== block.id,
-        ),
+      const existingChildren = childKinds.flatMap(
+        (kind) => allBlocksByKind[kind],
       )
 
       const existingSiblings = allBlocksByKind[block.kind].filter(
@@ -285,6 +284,14 @@ function ConnectionsPanelContent({
       const hasAddOptions = stageData[kind].addOptions.length > 0
 
       if (!hasBlocksInStage && hasAddOptions && kind !== thisBlockKind) {
+        // A stage earlier than this block's kind adds an upstream parent;
+        // a later stage adds a downstream child.
+        const stageDirection: ControlDirection =
+          thisBlockKind &&
+          BLOCK_KIND_ORDER.indexOf(kind) <
+            BLOCK_KIND_ORDER.indexOf(thisBlockKind)
+            ? 'parent'
+            : 'child'
         nodeList.push({
           id: `add-${kind}`,
           type: 'addBlock',
@@ -296,7 +303,7 @@ function ConnectionsPanelContent({
             kind,
             addOptions: stageData[kind].addOptions,
             onAddBlock: (factoryId: PluginBlockFactoryId) => {
-              onAddConnectedBlock?.(factoryId, instanceId)
+              onAddConnectedBlock?.(factoryId, instanceId, stageDirection)
             },
           },
         })
@@ -382,23 +389,25 @@ function ConnectionsPanelContent({
             isExpanded && 'rotate-90',
           )}
         />
-        <span className="text-sm font-medium">Pipeline Flow</span>
+        <span className="text-sm font-medium">
+          {t('connections.pipelineFlow')}
+        </span>
         {/* Summary badges when collapsed */}
         {!isExpanded && (
           <span className="ml-auto flex items-center gap-1 text-sm text-muted-foreground">
             {inputCount > 0 && (
               <span className="rounded bg-muted px-1.5 py-0.5">
-                {inputCount} input{inputCount !== 1 && 's'}
+                {t('connections.inputCount', { count: inputCount })}
               </span>
             )}
             {inputCount > 0 && outputCount > 0 && <span>→</span>}
             {outputCount > 0 && (
               <span className="rounded bg-muted px-1.5 py-0.5">
-                {outputCount} output{outputCount !== 1 && 's'}
+                {t('connections.outputCount', { count: outputCount })}
               </span>
             )}
             {inputCount === 0 && outputCount === 0 && (
-              <span className="italic">No connections</span>
+              <span className="italic">{t('connections.noConnections')}</span>
             )}
           </span>
         )}
@@ -411,7 +420,7 @@ function ConnectionsPanelContent({
             <div className="mb-3 flex items-center gap-2 rounded-md bg-amber-50 p-2 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
               <AlertTriangle className="h-4 w-4 shrink-0" />
               <span className="text-sm">
-                Not connected to any downstream block
+                {t('connections.notConnectedDownstream')}
               </span>
             </div>
           )}

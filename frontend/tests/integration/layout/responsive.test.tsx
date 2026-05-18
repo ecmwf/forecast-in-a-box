@@ -194,7 +194,7 @@ describe('Responsive Layout', () => {
       )
 
       await expect.element(screen.getByText('Forecast-in-a-Box')).toBeVisible()
-      await expect.element(screen.getByText('ECMWF')).toBeVisible()
+      await expect.element(screen.getByRole('contentinfo')).toBeVisible()
       await expect.element(screen.getByTestId('content')).toBeVisible()
     })
 

@@ -21,6 +21,7 @@ import {
   Upload,
 } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { ValidationStatusBadge } from './shared/ValidationStatus'
 import { DraftStatus } from './DraftStatus'
 import { GraphOptionsDropdown } from './graph-mode/GraphOptionsDropdown'
@@ -31,6 +32,7 @@ import type {
 } from '@/api/types/fable.types'
 import { getBlocksByKind } from '@/api/types/fable.types'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
+import { formatInZone, getAppTimeZone } from '@/lib/datetime'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
 import {
@@ -57,7 +59,10 @@ export function FableBuilderHeader({
   fableId,
   catalogue,
 }: FableBuilderHeaderProps) {
-  const [shareButtonText, setShareButtonText] = useState('Share')
+  const { t } = useTranslation('configure')
+  const [shareButtonText, setShareButtonText] = useState(() =>
+    t('header.share'),
+  )
   const [savePopoverOpen, setSavePopoverOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const shareTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -67,6 +72,8 @@ export function FableBuilderHeader({
   const mode = useFableBuilderStore((s) => s.mode)
   const step = useFableBuilderStore((s) => s.step)
   const fableName = useFableBuilderStore((s) => s.fableName)
+  // Fall back to a translated placeholder when the config is still unnamed.
+  const displayName = fableName || t('page.untitledConfiguration')
   const fable = useFableBuilderStore((s) => s.fable)
   const validationState = useFableBuilderStore((s) => s.validationState)
   const storeFableId = useFableBuilderStore((s) => s.fableId)
@@ -84,23 +91,23 @@ export function FableBuilderHeader({
   const canReview = isValid && hasSinkBlock
 
   const reviewTooltip = !hasBlocks
-    ? 'Add blocks to your configuration'
+    ? t('header.reviewTooltipNoBlocks')
     : !hasSinkBlock
-      ? 'Add at least one output block'
+      ? t('header.reviewTooltipNoSink')
       : !isValid
-        ? 'Fix validation errors before submitting'
+        ? t('header.reviewTooltipInvalid')
         : undefined
 
   async function handleShare(): Promise<void> {
     const ok = await copyToClipboard(window.location.href)
     if (!ok) {
-      showToast.error('Could not copy link to clipboard')
+      showToast.error(t('header.shareFailed'))
       return
     }
-    setShareButtonText('Copied!')
+    setShareButtonText(t('header.shareCopied'))
     clearTimeout(shareTimeoutRef.current)
     shareTimeoutRef.current = setTimeout(
-      () => setShareButtonText('Share'),
+      () => setShareButtonText(t('header.share')),
       2000,
     )
   }
@@ -120,15 +127,19 @@ export function FableBuilderHeader({
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      const date = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
-      a.download = `${fableName.replace(/\s+/g, '_').toLowerCase()}_${date}_config.json`
+      const date = formatInZone(
+        new Date(),
+        getAppTimeZone(),
+        "yyyy-MM-dd'T'HH-mm-ss",
+      )
+      a.download = `${displayName.replace(/\s+/g, '_').toLowerCase()}_${date}_config.json`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch (error) {
       showToast.error(
-        'Failed to export config',
+        t('header.exportFailed'),
         error instanceof Error ? error.message : String(error),
       )
     }
@@ -146,8 +157,8 @@ export function FableBuilderHeader({
     const MAX_CONFIG_SIZE = 1 * 1024 * 1024
     if (file.size > MAX_CONFIG_SIZE) {
       showToast.error(
-        'File too large',
-        'Configuration files must be smaller than 1 MB.',
+        t('header.fileTooLargeTitle'),
+        t('header.fileTooLargeDescription'),
       )
       return
     }
@@ -161,27 +172,27 @@ export function FableBuilderHeader({
           parsed &&
           typeof parsed === 'object' &&
           'blocks' in parsed &&
-          typeof (parsed as { blocks: unknown }).blocks === 'object'
+          typeof parsed.blocks === 'object'
         ) {
           setFable(parsed as FableBuilderV1, null)
-          showToast.success('Configuration loaded')
+          showToast.success(t('header.configLoaded'))
         } else {
           showToast.error(
-            'Invalid config file',
-            'File must contain a valid configuration with a "blocks" property.',
+            t('header.invalidConfigTitle'),
+            t('header.invalidConfigDescription'),
           )
         }
       } catch (error) {
         showToast.error(
-          'Failed to parse config file',
+          t('header.parseFailed'),
           error instanceof Error ? error.message : String(error),
         )
       }
     }
     reader.onerror = () => {
       showToast.error(
-        'Failed to read file',
-        reader.error?.message ?? 'Unknown read error',
+        t('header.readFailed'),
+        reader.error?.message ?? t('header.readUnknownError'),
       )
     }
     reader.readAsText(file)
@@ -214,13 +225,11 @@ export function FableBuilderHeader({
             <div className="min-w-0 overflow-hidden">
               <div className="flex min-w-0 items-center gap-2 overflow-hidden">
                 <H1 className="min-w-0 truncate text-lg font-semibold">
-                  {fableName}
+                  {displayName}
                 </H1>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>
-                  {blockCount} {blockCount === 1 ? 'block' : 'blocks'}
-                </span>
+                <span>{t('blockCount', { count: blockCount })}</span>
                 {hasBlocks && <ValidationStatusBadge />}
                 <DraftStatus className="hidden sm:inline-flex" />
               </div>
@@ -239,7 +248,9 @@ export function FableBuilderHeader({
                       className="gap-1.5 shadow-sm sm:gap-2"
                     >
                       <LayoutGrid className="h-4 w-4" />
-                      <span className="hidden sm:inline">Graph</span>
+                      <span className="hidden sm:inline">
+                        {t('header.graph')}
+                      </span>
                     </Button>
                     <GraphOptionsDropdown />
                   </ButtonGroup>
@@ -251,7 +262,9 @@ export function FableBuilderHeader({
                     className="gap-1.5 sm:gap-2"
                   >
                     <LayoutGrid className="h-4 w-4" />
-                    <span className="hidden sm:inline">Graph</span>
+                    <span className="hidden sm:inline">
+                      {t('header.graph')}
+                    </span>
                   </Button>
                 )}
                 <Button
@@ -264,7 +277,7 @@ export function FableBuilderHeader({
                   )}
                 >
                   <FileText className="h-4 w-4" />
-                  <span className="hidden sm:inline">Form</span>
+                  <span className="hidden sm:inline">{t('header.form')}</span>
                 </Button>
               </div>
             )}
@@ -311,12 +324,14 @@ export function FableBuilderHeader({
                         >
                           <Download className="mr-2 h-4 w-4 shrink-0" />
                           <span className="whitespace-nowrap">
-                            Export Config
+                            {t('header.exportConfig')}
                           </span>
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={handleLoadConfig}>
                           <Upload className="mr-2 h-4 w-4 shrink-0" />
-                          <span className="whitespace-nowrap">Load Config</span>
+                          <span className="whitespace-nowrap">
+                            {t('header.loadConfig')}
+                          </span>
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -331,7 +346,7 @@ export function FableBuilderHeader({
                         className="gap-2"
                       >
                         <Check className="h-4 w-4" />
-                        Review & Submit
+                        {t('header.reviewSubmit')}
                       </Button>
                     </TooltipTrigger>
                     {reviewTooltip && (
@@ -368,11 +383,15 @@ export function FableBuilderHeader({
                       disabled={!hasBlocks}
                     >
                       <Download className="mr-2 h-4 w-4 shrink-0" />
-                      <span className="whitespace-nowrap">Export Config</span>
+                      <span className="whitespace-nowrap">
+                        {t('header.exportConfig')}
+                      </span>
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleLoadConfig}>
                       <Upload className="mr-2 h-4 w-4 shrink-0" />
-                      <span className="whitespace-nowrap">Load Config</span>
+                      <span className="whitespace-nowrap">
+                        {t('header.loadConfig')}
+                      </span>
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setSavePopoverOpen(true)}
@@ -380,7 +399,9 @@ export function FableBuilderHeader({
                     >
                       <Save className="mr-2 h-4 w-4 shrink-0" />
                       <span className="whitespace-nowrap">
-                        {isExistingConfig ? 'Update Config' : 'Save Config'}
+                        {isExistingConfig
+                          ? t('save.triggerUpdate')
+                          : t('save.triggerSave')}
                       </span>
                     </DropdownMenuItem>
                     <DropdownMenuItem
@@ -388,7 +409,9 @@ export function FableBuilderHeader({
                       disabled={!canReview}
                     >
                       <Check className="mr-2 h-4 w-4 shrink-0" />
-                      <span className="whitespace-nowrap">Review & Submit</span>
+                      <span className="whitespace-nowrap">
+                        {t('header.reviewSubmit')}
+                      </span>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -411,7 +434,9 @@ export function FableBuilderHeader({
                   className="gap-2"
                 >
                   <ArrowLeft className="h-4 w-4" />
-                  <span className="hidden sm:inline">Back to Edit</span>
+                  <span className="hidden sm:inline">
+                    {t('header.backToEdit')}
+                  </span>
                 </Button>
 
                 <Button
@@ -421,7 +446,9 @@ export function FableBuilderHeader({
                   className="gap-2"
                 >
                   <Check className="h-4 w-4" />
-                  <span className="hidden sm:inline">Submit Job</span>
+                  <span className="hidden sm:inline">
+                    {t('header.submitJob')}
+                  </span>
                 </Button>
               </>
             )}

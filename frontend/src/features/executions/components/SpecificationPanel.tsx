@@ -114,7 +114,7 @@ export function SpecificationPanel({ fableSnapshot }: SpecificationPanelProps) {
 
   return (
     <Card className="overflow-hidden">
-      <div className="overflow-x-auto p-6 min-[1440px]:flex-1 min-[1440px]:overflow-auto">
+      <div className="overflow-x-auto p-6 min-[1280px]:flex-1 min-[1280px]:overflow-auto">
         <pre className="font-mono text-sm leading-relaxed">
           <code>
             {highlighted.map((segment, i) => (

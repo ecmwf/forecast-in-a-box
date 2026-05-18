@@ -23,61 +23,18 @@ import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuild
 
 export interface FableEdgeData extends Record<string, unknown> {
   inputName?: string
+  /** Render the input-name label — only set for edges into multi-input blocks. */
+  showLabel?: boolean
 }
 
 export type FableEdge = Edge<FableEdgeData, 'fableEdge'>
 
-// Fixed offset from source for horizontal segment - ensures all edges from same source align
-const TREE_EDGE_OFFSET = 50
-// Fallback offset for horizontal layouts (LR/RL)
-const STEP_EDGE_OFFSET = 50
+// Orthogonal edges draw straight (no jog) when their cross-axis gap is within
+// this many px; real fan-out/-in bends stay well above it.
+const STRAIGHT_THRESHOLD = 24
 
-/**
- * Creates a tree-style step path where the horizontal segment is at a fixed
- * offset from the source, ensuring all edges from the same source node align
- * at the same Y level for a symmetrical appearance.
- */
-function getTreeStepPath(
-  sourceX: number,
-  sourceY: number,
-  targetX: number,
-  targetY: number,
-  borderRadius = 0,
-): [string, number, number] {
-  // Use fixed offset from source for consistent alignment across all edges
-  const bendY = sourceY + TREE_EDGE_OFFSET
-
-  // Handle case where target is very close to source
-  if (targetY <= bendY + borderRadius * 2) {
-    // Fall back to direct path if not enough room
-    const midY = (sourceY + targetY) / 2
-    const path = `M ${sourceX} ${sourceY} L ${sourceX} ${midY} L ${targetX} ${midY} L ${targetX} ${targetY}`
-    return [path, (sourceX + targetX) / 2, midY]
-  }
-
-  // Create path: down from source -> horizontal to target X -> down to target
-  const path =
-    borderRadius > 0
-      ? // Rounded corners version
-        `M ${sourceX} ${sourceY}
-       L ${sourceX} ${bendY - borderRadius}
-       Q ${sourceX} ${bendY} ${sourceX + Math.sign(targetX - sourceX) * Math.min(borderRadius, Math.abs(targetX - sourceX) / 2)} ${bendY}
-       L ${targetX - Math.sign(targetX - sourceX) * Math.min(borderRadius, Math.abs(targetX - sourceX) / 2)} ${bendY}
-       Q ${targetX} ${bendY} ${targetX} ${bendY + borderRadius}
-       L ${targetX} ${targetY}`
-      : // Sharp corners version
-        `M ${sourceX} ${sourceY}
-       L ${sourceX} ${bendY}
-       L ${targetX} ${bendY}
-       L ${targetX} ${targetY}`
-
-  // Label position at the horizontal segment center
-  const labelX = (sourceX + targetX) / 2
-  const labelY = bendY
-
-  return [path, labelX, labelY]
-}
-
+/** SVG path for the active edge style. Orthogonal styles collapse to a straight
+ *  line when the endpoints are nearly aligned (see STRAIGHT_THRESHOLD). */
 function getEdgePath({
   type,
   sourceX,
@@ -94,57 +51,41 @@ function getEdgePath({
   targetY: number
   sourcePosition: Position
   targetPosition: Position
-}) {
-  switch (type) {
-    case 'bezier':
-      return getBezierPath({
-        sourceX,
-        sourceY,
-        targetX,
-        targetY,
-        sourcePosition,
-        targetPosition,
-      })
-
-    case 'smoothstep':
-      // Use tree-style path for vertical layouts (TB/BT)
-      if (
-        (sourcePosition === Position.Bottom &&
-          targetPosition === Position.Top) ||
-        (sourcePosition === Position.Top && targetPosition === Position.Bottom)
-      ) {
-        return getTreeStepPath(sourceX, sourceY, targetX, targetY, 8)
-      }
-      return getSmoothStepPath({
-        sourceX,
-        sourceY,
-        targetX,
-        targetY,
-        sourcePosition,
-        targetPosition,
-        offset: STEP_EDGE_OFFSET,
-      })
-
-    case 'step':
-      // Use tree-style path for vertical layouts (TB/BT)
-      if (
-        (sourcePosition === Position.Bottom &&
-          targetPosition === Position.Top) ||
-        (sourcePosition === Position.Top && targetPosition === Position.Bottom)
-      ) {
-        return getTreeStepPath(sourceX, sourceY, targetX, targetY, 0)
-      }
-      return getSmoothStepPath({
-        sourceX,
-        sourceY,
-        targetX,
-        targetY,
-        sourcePosition,
-        targetPosition,
-        borderRadius: 0,
-        offset: STEP_EDGE_OFFSET,
-      })
+}): [string, number, number] {
+  const params = {
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    sourcePosition,
+    targetPosition,
   }
+
+  if (type === 'bezier') {
+    const [path, labelX, labelY] = getBezierPath(params)
+    return [path, labelX, labelY]
+  }
+
+  // Horizontal flow (Left/Right handles) → cross-axis is Y; vertical flow → X.
+  const horizontalFlow =
+    sourcePosition === Position.Left || sourcePosition === Position.Right
+  const crossGap = horizontalFlow
+    ? Math.abs(sourceY - targetY)
+    : Math.abs(sourceX - targetX)
+
+  if (crossGap <= STRAIGHT_THRESHOLD) {
+    return [
+      `M ${sourceX},${sourceY} L ${targetX},${targetY}`,
+      (sourceX + targetX) / 2,
+      (sourceY + targetY) / 2,
+    ]
+  }
+
+  const [path, labelX, labelY] =
+    type === 'step'
+      ? getSmoothStepPath({ ...params, borderRadius: 0 })
+      : getSmoothStepPath(params)
+  return [path, labelX, labelY]
 }
 
 export const FableEdgeComponent = memo(function ({
@@ -157,7 +98,7 @@ export const FableEdgeComponent = memo(function ({
   targetPosition,
   data,
   selected,
-}: EdgeProps) {
+}: EdgeProps<FableEdge>) {
   const edgeStyle = useFableBuilderStore((state) => state.edgeStyle)
 
   const [edgePath, labelX, labelY] = getEdgePath({
@@ -170,7 +111,7 @@ export const FableEdgeComponent = memo(function ({
     targetPosition,
   })
 
-  const inputName = (data as FableEdgeData | undefined)?.inputName
+  const inputName = data?.inputName
   const labelTransform = `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`
 
   return (
@@ -180,11 +121,11 @@ export const FableEdgeComponent = memo(function ({
         path={edgePath}
         className={
           selected
-            ? 'stroke-primary stroke-[5px]'
-            : 'stroke-muted-foreground stroke-[4px]'
+            ? 'stroke-primary stroke-[3px]'
+            : 'stroke-muted-foreground stroke-2'
         }
       />
-      {inputName && (
+      {data?.showLabel && inputName && (
         <EdgeLabelRenderer>
           <div
             style={{

@@ -24,6 +24,8 @@
  */
 
 import { useMemo, useState } from 'react'
+import { RefreshCw } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithRouter } from '@tests/utils/render'
 import type { PluginCompositeId, PluginInfo } from '@/api/types/plugins.types'
@@ -40,10 +42,11 @@ import {
   useUninstallPlugin,
   useUpdatePlugin,
 } from '@/api/hooks/usePlugins'
+import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { PageHeader } from '@/components/common/PageHeader'
 import { PluginsFilters } from '@/features/plugins/components/PluginsFilters'
 import { PluginsList } from '@/features/plugins/components/PluginsList'
-import { PluginsPageHeader } from '@/features/plugins/components/PluginsPageHeader'
 import { UninstalledPluginsSection } from '@/features/plugins/components/UninstalledPluginsSection'
 import { UpdatesAvailableSection } from '@/features/plugins/components/UpdatesAvailableSection'
 
@@ -57,6 +60,7 @@ vi.mock('@/hooks/useMedia', () => ({
  * This allows us to test the full integration without accessing the route component
  */
 function TestPluginsPage() {
+  const { t } = useTranslation('plugins')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [capabilityFilter, setCapabilityFilter] =
@@ -194,9 +198,21 @@ function TestPluginsPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 px-4 py-8">
-      <PluginsPageHeader
-        onCheckUpdates={handleCheckUpdates}
-        isCheckingUpdates={refreshPlugins.isPending}
+      <PageHeader
+        title={t('title')}
+        description={t('subtitle')}
+        actions={
+          <Button
+            variant="outline"
+            onClick={handleCheckUpdates}
+            disabled={refreshPlugins.isPending}
+          >
+            <RefreshCw
+              className={`mr-2 h-4 w-4 ${refreshPlugins.isPending ? 'animate-spin' : ''}`}
+            />
+            {t('actions.checkUpdates')}
+          </Button>
+        }
       />
 
       <PluginsFilters

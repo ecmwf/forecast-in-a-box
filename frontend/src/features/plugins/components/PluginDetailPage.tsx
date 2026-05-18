@@ -11,8 +11,7 @@
 /**
  * PluginDetailPage Component
  *
- * Full-page view of plugin details with block factories grid,
- * replacing the previous PluginDetailsSheet sidebar.
+ * Full-page view of plugin details with block factories grid.
  */
 
 import { ArrowLeft, Search } from 'lucide-react'
@@ -140,7 +139,8 @@ export function PluginDetailPage({ plugin, catalogue }: PluginDetailPageProps) {
           <H1 className="text-2xl font-bold">{plugin.name}</H1>
           <P className="mt-1 text-muted-foreground">
             {plugin.author}
-            {plugin.version && ` · v${plugin.version}`}
+            {plugin.version &&
+              t('detail.versionSuffix', { version: plugin.version })}
           </P>
           <div className="mt-2">
             <PluginStatusBadge
@@ -218,13 +218,13 @@ export function PluginDetailPage({ plugin, catalogue }: PluginDetailPageProps) {
           )
         ) : plugin.isInstalled && plugin.isEnabled ? (
           <div className="py-8 text-center text-muted-foreground">
-            Loading block factories...
+            {t('detail.loadingBlockFactories')}
           </div>
         ) : (
           <div className="py-8 text-center text-muted-foreground">
             {plugin.isInstalled
-              ? 'Enable this plugin to view block factories.'
-              : 'Install this plugin to view block factories.'}
+              ? t('detail.enableToViewBlockFactories')
+              : t('detail.installToViewBlockFactories')}
           </div>
         )}
       </div>

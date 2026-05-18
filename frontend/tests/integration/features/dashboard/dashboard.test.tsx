@@ -28,6 +28,7 @@ import { GettingStartedSection } from '@/features/dashboard/components/GettingSt
 import { WelcomeCard } from '@/features/dashboard/components/WelcomeCard'
 import { AuthContext } from '@/features/auth/AuthContext'
 import { API_ENDPOINTS } from '@/api/endpoints'
+import { STORAGE_KEYS } from '@/lib/storage-keys'
 
 // Mock useMedia to simulate desktop layout
 vi.mock('@/hooks/useMedia', () => ({
@@ -48,7 +49,7 @@ const anonymousAuth: AuthContextValue = {
 describe('Dashboard', () => {
   beforeEach(() => {
     localStorage.clear()
-    localStorage.setItem('fiab-anonymous-id', 'test-anon-id')
+    localStorage.setItem(STORAGE_KEYS.auth.anonymousId, 'test-anon-id')
   })
 
   describe('WelcomeCard', () => {

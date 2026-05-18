@@ -14,6 +14,7 @@
  */
 
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
+import i18n from 'i18next'
 import { createLogger } from './logger'
 import { showToast } from './toast'
 import { ApiClientError } from '@/api/client'
@@ -35,18 +36,21 @@ const queryCache = new QueryCache({
     // Provide specific message for 403 errors (ownership enforcement)
     if (error instanceof ApiClientError && error.status === 403) {
       showToast.error(
-        'Access denied',
-        'You do not have permission to view this resource.',
+        i18n.t('errors:toast.accessDenied'),
+        i18n.t('errors:toast.accessDeniedView'),
       )
       return
     }
 
-    // Only show toast for queries that had data before (user-initiated refetches)
-    // This avoids showing toasts for initial loads that might have their own error UI
+    // Only show a toast once the query already has data (a refetch or a query
+    // backed by placeholderData), so initial loads can surface errors in their
+    // own UI without a duplicate toast.
     if (query.state.data !== undefined) {
       showToast.error(
-        'Failed to refresh data',
-        error instanceof Error ? error.message : 'Please try again',
+        i18n.t('errors:toast.refreshFailed'),
+        error instanceof Error
+          ? error.message
+          : i18n.t('errors:toast.tryAgain'),
       )
     }
   },
@@ -67,15 +71,15 @@ const mutationCache = new MutationCache({
     if (error instanceof ApiClientError) {
       if (error.status === 403) {
         showToast.error(
-          'Access denied',
-          'You do not have permission to perform this action.',
+          i18n.t('errors:toast.accessDenied'),
+          i18n.t('errors:toast.accessDeniedAction'),
         )
         return
       }
       if (error.status === 409) {
         showToast.error(
-          'Conflict',
-          'This item was modified elsewhere. Please refresh and try again.',
+          i18n.t('errors:toast.conflictTitle'),
+          i18n.t('errors:api.conflict'),
         )
         return
       }
@@ -83,8 +87,8 @@ const mutationCache = new MutationCache({
 
     // Show toast for all mutation failures since they represent user actions
     showToast.error(
-      'Operation failed',
-      error instanceof Error ? error.message : 'Please try again',
+      i18n.t('errors:toast.operationFailed'),
+      error instanceof Error ? error.message : i18n.t('errors:toast.tryAgain'),
     )
   },
 })

@@ -39,6 +39,7 @@ import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
 import { H1, H2, P } from '@/components/base/typography'
+import { isHttpUrl } from '@/utils/url'
 
 export interface ArtifactDetailPageProps {
   detail: MlModelDetail
@@ -101,7 +102,7 @@ export function ArtifactDetailPage({
             {detail.timestep ? (
               <span className="inline-flex items-center gap-1.5 rounded bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground">
                 <Clock className="h-3.5 w-3.5" />
-                {t('detail.timestep')}: {detail.timestep}
+                {t('detail.timestep', { value: detail.timestep })}
               </span>
             ) : null}
             <span
@@ -122,7 +123,8 @@ export function ArtifactDetailPage({
           </div>
         </div>
         <div className="flex gap-2">
-          {detail.url && (
+          {/* http(s) only — blocks javascript: XSS. */}
+          {detail.url && isHttpUrl(detail.url) && (
             <Button
               variant="outline"
               size="sm"
@@ -136,7 +138,7 @@ export function ArtifactDetailPage({
               }
             >
               <ExternalLink className="mr-1 h-4 w-4" />
-              URL
+              {t('detail.url')}
             </Button>
           )}
           {detail.is_available && !isDownloading ? (

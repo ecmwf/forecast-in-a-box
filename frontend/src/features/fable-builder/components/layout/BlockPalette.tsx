@@ -10,6 +10,7 @@
 
 import { useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, Plus, Search } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type {
   BlockFactory,
   BlockFactoryCatalogue,
@@ -35,16 +36,25 @@ import {
 } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
 
+// Transparent image used to suppress the browser's default drag ghost.
+const EMPTY_DRAG_IMAGE = new Image()
+EMPTY_DRAG_IMAGE.src =
+  'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+
 interface BlockPaletteProps {
   catalogue: BlockFactoryCatalogue
 }
 
 export function BlockPalette({ catalogue }: BlockPaletteProps) {
+  const { t } = useTranslation('configure')
   const [searchQuery, setSearchQuery] = useState('')
   const [openSections, setOpenSections] = useState<Set<BlockKind>>(
     new Set(BLOCK_KIND_ORDER),
   )
   const addBlock = useFableBuilderStore((state) => state.addBlock)
+  const setDraggedFactory = useFableBuilderStore(
+    (state) => state.setDraggedFactory,
+  )
   const fable = useFableBuilderStore((state) => state.fable)
   const validationState = useFableBuilderStore((state) => state.validationState)
   const isValidating = useFableBuilderStore((state) => state.isValidating)
@@ -71,7 +81,9 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
         allExpansions.add(factoryIdToKey(expansion))
       }
     }
-    return allExpansions
+    // No expansions (e.g. a block has errors) → keep every block available
+    // instead of greying the palette. Mirrors AddNodeButton's fallback.
+    return allExpansions.size > 0 ? allExpansions : null
   }, [validationState, blockCount])
 
   const groupedFactories = useMemo(() => {
@@ -136,15 +148,28 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
     addBlock(factoryId, factory)
   }
 
+  function handleDragStart(
+    e: React.DragEvent,
+    factoryId: PluginBlockFactoryId,
+    factory: BlockFactory,
+  ): void {
+    setDraggedFactory({ id: factoryId, factory })
+    e.dataTransfer.effectAllowed = 'copy'
+    // Some browsers require a data payload for the drag to start.
+    e.dataTransfer.setData('text/plain', factory.title)
+    // Hide the browser's default ghost — <BlockDragPreview> renders our own.
+    e.dataTransfer.setDragImage(EMPTY_DRAG_IMAGE, 0, 0)
+  }
+
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-border p-4">
-        <H2 className="mb-3 text-sm font-semibold">Block Palette</H2>
+        <H2 className="mb-3 text-sm font-semibold">{t('palette.title')}</H2>
         <div className="relative">
           <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Search blocks..."
+            placeholder={t('palette.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="h-9 pl-9"
@@ -200,20 +225,23 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
                     return (
                       <button
                         key={factoryIdToKey(id)}
+                        draggable={canInteract}
                         onClick={() =>
                           canInteract && handleAddBlock(id, factory)
                         }
+                        onDragStart={(e) => handleDragStart(e, id, factory)}
+                        onDragEnd={() => setDraggedFactory(null)}
                         disabled={!canInteract}
                         className={cn(
                           'group flex w-full items-center gap-2 rounded-md border border-transparent p-2 text-left transition-all',
                           canInteract &&
-                            'cursor-pointer hover:border-border hover:bg-muted/50',
+                            'cursor-grab hover:border-border hover:bg-muted/50',
                           !isAvailable && 'cursor-not-allowed opacity-40',
                         )}
                         title={
                           !isAvailable
-                            ? 'Not available at this step'
-                            : `Add ${factory.title}`
+                            ? t('palette.notAvailableAtStep')
+                            : t('palette.addBlock', { title: factory.title })
                         }
                       >
                         <div
@@ -246,7 +274,9 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
 
                   {factories.length === 0 && !searchQuery && (
                     <P className="px-2 py-2 text-muted-foreground">
-                      No {metadata.label.toLowerCase()} blocks available
+                      {t('palette.noBlocksAvailable', {
+                        kind: metadata.label.toLowerCase(),
+                      })}
                     </P>
                   )}
                 </div>
@@ -259,10 +289,10 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
       <div className="border-t border-border bg-muted/30 p-3">
         <P className="text-center text-muted-foreground">
           {isValidating
-            ? 'Loading available blocks...'
+            ? t('palette.loadingBlocks')
             : Object.keys(fable.blocks).length === 0
-              ? 'Click a source to get started'
-              : 'Click to add blocks'}
+              ? t('palette.clickSourceToStart')
+              : t('palette.clickToAdd')}
         </P>
       </div>
     </div>

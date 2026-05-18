@@ -10,6 +10,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useUiStore } from '@/stores/uiStore'
+import { STORAGE_KEYS } from '@/lib/storage-keys'
 
 describe('uiStore', () => {
   beforeEach(() => {
@@ -107,6 +108,64 @@ describe('uiStore', () => {
     it('sets artifacts view mode', () => {
       useUiStore.getState().setArtifactsViewMode('table')
       expect(useUiStore.getState().artifactsViewMode).toBe('table')
+    })
+  })
+
+  describe('timezone', () => {
+    it('defaults to UTC', () => {
+      expect(useUiStore.getState().timeZone).toBe('UTC')
+    })
+
+    it('sets the application timezone', () => {
+      useUiStore.getState().setTimeZone('Europe/Berlin')
+      expect(useUiStore.getState().timeZone).toBe('Europe/Berlin')
+    })
+
+    it('persists the timezone to localStorage', () => {
+      useUiStore.getState().setTimeZone('Asia/Tokyo')
+      const stored = JSON.parse(
+        localStorage.getItem(STORAGE_KEYS.stores.ui) ?? '{}',
+      )
+      expect(stored.state?.timeZone).toBe('Asia/Tokyo')
+    })
+
+    it('reset restores UTC', () => {
+      useUiStore.getState().setTimeZone('America/New_York')
+      useUiStore.getState().reset()
+      expect(useUiStore.getState().timeZone).toBe('UTC')
+    })
+  })
+
+  describe('timezone migration', () => {
+    it('back-fills timeZone to UTC for a pre-v6 (v5) persisted state', async () => {
+      localStorage.setItem(
+        STORAGE_KEYS.stores.ui,
+        JSON.stringify({
+          state: {
+            theme: 'dark',
+            layoutMode: 'boxed',
+            dashboardVariant: 'modern',
+            panelShadow: 'md',
+            pluginsViewMode: 'card',
+            modelsViewMode: 'card',
+            artifactsViewMode: 'card',
+          },
+          version: 5,
+        }),
+      )
+      await useUiStore.persist.rehydrate()
+      expect(useUiStore.getState().timeZone).toBe('UTC')
+      // Pre-existing persisted fields survive the migration.
+      expect(useUiStore.getState().theme).toBe('dark')
+    })
+
+    it('back-fills timeZone for an old v1 persisted state', async () => {
+      localStorage.setItem(
+        STORAGE_KEYS.stores.ui,
+        JSON.stringify({ state: { theme: 'light' }, version: 1 }),
+      )
+      await useUiStore.persist.rehydrate()
+      expect(useUiStore.getState().timeZone).toBe('UTC')
     })
   })
 

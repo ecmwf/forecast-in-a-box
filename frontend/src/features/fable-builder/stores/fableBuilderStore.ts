@@ -9,7 +9,7 @@
  */
 
 import { create } from 'zustand'
-import { devtools, persist } from 'zustand/middleware'
+import { devtools, persist, subscribeWithSelector } from 'zustand/middleware'
 import type {
   BlockFactory,
   BlockInstance,
@@ -31,14 +31,47 @@ export type BuilderStep = 'edit' | 'review'
 export type EdgeStyle = 'bezier' | 'smoothstep' | 'step'
 export type { LayoutDirection } from '@/features/fable-builder/utils/layout-blocks'
 
+/** A block factory being dragged from the palette onto the canvas. */
+export interface DraggedFactory {
+  id: PluginBlockFactoryId
+  factory: BlockFactory
+}
+
 /**
  * Gets the default layout direction based on screen aspect ratio.
  * Landscape screens (width > height) use left-to-right (LR).
  * Portrait screens (height >= width) use top-to-bottom (TB).
  */
 function getDefaultLayoutDirection(): LayoutDirection {
-  if (typeof window === 'undefined') return 'TB'
   return window.innerWidth > window.innerHeight ? 'LR' : 'TB'
+}
+
+/**
+ * Breadth-first walk of every block transitively downstream of `startId`
+ * (i.e. blocks that consume its output, directly or via intermediaries).
+ * Shared by `removeBlockCascade` and `duplicateBlockWithChildren`.
+ */
+function findDownstreamBlocks(
+  startId: BlockInstanceId,
+  blocks: Record<BlockInstanceId, BlockInstance>,
+): Set<BlockInstanceId> {
+  const downstream = new Set<BlockInstanceId>()
+  const queue = [startId]
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()!
+    for (const [blockId, block] of Object.entries(blocks)) {
+      if (downstream.has(blockId)) continue
+      const hasCurrentAsInput = Object.values(block.input_ids).some(
+        (sourceId) => sourceId === currentId,
+      )
+      if (hasCurrentAsInput) {
+        downstream.add(blockId)
+        queue.push(blockId)
+      }
+    }
+  }
+  return downstream
 }
 
 interface FableBuilderState {
@@ -68,6 +101,8 @@ interface FableBuilderState {
    *  `useDraftPersistence`; read by the DraftStatus indicator. */
   draftWritePending: boolean
   submitDialogOpen: boolean
+  /** Palette block being dragged onto the canvas; null when idle. Not persisted. */
+  draggedFactory: DraggedFactory | null
 
   setFable: (fable: FableBuilderV1, id?: string | null) => void
   setFableName: (name: string) => void
@@ -98,7 +133,6 @@ interface FableBuilderState {
   ) => void
   disconnectBlock: (targetBlockId: BlockInstanceId, inputName: string) => void
   selectBlock: (blockId: BlockInstanceId | null) => void
-  clearSelection: () => void
   setMode: (mode: BuilderMode) => void
   setStep: (step: BuilderStep) => void
   togglePalette: () => void
@@ -120,6 +154,7 @@ interface FableBuilderState {
   setValidationState: (state: FableValidationState | null) => void
   setIsValidating: (validating: boolean) => void
   setSubmitDialogOpen: (open: boolean) => void
+  setDraggedFactory: (dragged: DraggedFactory | null) => void
   markSaved: (id: string, version: number, name?: string) => void
   /**
    * Mark the current fable as submitted (one-off run or schedule created).
@@ -128,42 +163,53 @@ interface FableBuilderState {
    * the user can tweak and re-submit.
    */
   markSubmitted: () => void
-  markDirty: () => void
   reset: () => void
 }
 
-const initialState = {
-  fable: createEmptyFable(),
-  fableId: null,
-  fableVersion: null,
-  fableName: 'Untitled Configuration',
-  mode: 'graph' as BuilderMode,
-  step: 'edit' as BuilderStep,
-  selectedBlockId: null,
-  isPaletteOpen: true,
-  isConfigPanelOpen: true,
-  isMobilePaletteOpen: false,
-  isMobileConfigOpen: false,
-  isMiniMapOpen: true,
-  fitViewTrigger: 0,
-  edgeStyle: 'bezier' as EdgeStyle,
-  autoLayout: true,
-  layoutDirection: getDefaultLayoutDirection(),
-  nodesLocked: true,
-  validationState: null,
-  isValidating: false,
-  lastValidatedAt: null,
-  isDirty: false,
-  lastSavedAt: null,
-  draftWritePending: false,
-  submitDialogOpen: false,
+/**
+ * Builds the store's initial state. A function (not a module-scope const) so
+ * each call — including `reset()` — yields a fresh object graph.
+ */
+function createInitialState() {
+  return {
+    fable: createEmptyFable(),
+    fableId: null,
+    fableVersion: null,
+    // Blank by default; FableBuilderHeader renders a translated placeholder.
+    fableName: '',
+    mode: 'graph' as BuilderMode,
+    step: 'edit' as BuilderStep,
+    selectedBlockId: null,
+    isPaletteOpen: true,
+    isConfigPanelOpen: true,
+    isMobilePaletteOpen: false,
+    isMobileConfigOpen: false,
+    isMiniMapOpen: true,
+    fitViewTrigger: 0,
+    // Orthogonal by default, matching the execution details page.
+    edgeStyle: 'smoothstep' as EdgeStyle,
+    autoLayout: true,
+    layoutDirection: getDefaultLayoutDirection(),
+    nodesLocked: true,
+    validationState: null,
+    isValidating: false,
+    lastValidatedAt: null,
+    isDirty: false,
+    lastSavedAt: null,
+    draftWritePending: false,
+    submitDialogOpen: false,
+    draggedFactory: null,
+  }
 }
 
 export const useFableBuilderStore = create<FableBuilderState>()(
   devtools(
     persist(
-      (set, get) => ({
-        ...initialState,
+      // `subscribeWithSelector` lets useDraftPersistence subscribe to just the
+      // slices it cares about instead of running its dirty-check on every
+      // unrelated state change.
+      subscribeWithSelector((set, get) => ({
+        ...createInitialState(),
 
         setFable: (fable, id = null) =>
           set({
@@ -180,7 +226,7 @@ export const useFableBuilderStore = create<FableBuilderState>()(
 
         newFable: () =>
           set({
-            ...initialState,
+            ...createInitialState(),
             mode: get().mode,
             isPaletteOpen: get().isPaletteOpen,
             isConfigPanelOpen: get().isConfigPanelOpen,
@@ -208,51 +254,33 @@ export const useFableBuilderStore = create<FableBuilderState>()(
           return instanceId
         },
 
-        updateBlockConfig: (instanceId, configKey, value) => {
-          const { fable } = get()
-          const block = fable.blocks[instanceId]
+        // Single-key update is just a one-entry batch.
+        updateBlockConfig: (instanceId, configKey, value) =>
+          get().updateBlockConfigBatch(instanceId, { [configKey]: value }),
 
-          set({
-            fable: {
-              ...fable,
-              blocks: {
-                ...fable.blocks,
-                [instanceId]: {
-                  ...block,
-                  configuration_values: {
-                    ...block.configuration_values,
-                    [configKey]: value,
+        updateBlockConfigBatch: (instanceId, values) =>
+          // Functional update: reads the latest `state` so a rapid write burst
+          // can't read a stale `fable` and drop an earlier update.
+          set((state) => {
+            const block = state.fable.blocks[instanceId]
+            return {
+              fable: {
+                ...state.fable,
+                blocks: {
+                  ...state.fable.blocks,
+                  [instanceId]: {
+                    ...block,
+                    configuration_values: {
+                      ...block.configuration_values,
+                      ...values,
+                    },
                   },
                 },
               },
-            },
-            isDirty: true,
-            validationState: null,
-          })
-        },
-
-        updateBlockConfigBatch: (instanceId, values) => {
-          const { fable } = get()
-          const block = fable.blocks[instanceId]
-
-          set({
-            fable: {
-              ...fable,
-              blocks: {
-                ...fable.blocks,
-                [instanceId]: {
-                  ...block,
-                  configuration_values: {
-                    ...block.configuration_values,
-                    ...values,
-                  },
-                },
-              },
-            },
-            isDirty: true,
-            validationState: null,
-          })
-        },
+              isDirty: true,
+              validationState: null,
+            }
+          }),
 
         removeBlock: (instanceId) => {
           const { fable, selectedBlockId } = get()
@@ -282,29 +310,6 @@ export const useFableBuilderStore = create<FableBuilderState>()(
 
         removeBlockCascade: (instanceId) => {
           const { fable, selectedBlockId } = get()
-
-          const findDownstreamBlocks = (
-            startId: BlockInstanceId,
-            blocks: Record<BlockInstanceId, BlockInstance>,
-          ): Set<BlockInstanceId> => {
-            const downstream = new Set<BlockInstanceId>()
-            const queue = [startId]
-
-            while (queue.length > 0) {
-              const currentId = queue.shift()!
-              for (const [blockId, block] of Object.entries(blocks)) {
-                if (downstream.has(blockId)) continue
-                const hasCurrentAsInput = Object.values(block.input_ids).some(
-                  (sourceId) => sourceId === currentId,
-                )
-                if (hasCurrentAsInput) {
-                  downstream.add(blockId)
-                  queue.push(blockId)
-                }
-              }
-            }
-            return downstream
-          }
 
           const downstreamBlocks = findDownstreamBlocks(
             instanceId,
@@ -365,30 +370,6 @@ export const useFableBuilderStore = create<FableBuilderState>()(
 
         duplicateBlockWithChildren: (instanceId) => {
           const { fable } = get()
-
-          // Find all downstream blocks (same logic as removeBlockCascade)
-          const findDownstreamBlocks = (
-            startId: BlockInstanceId,
-            blocks: Record<BlockInstanceId, BlockInstance>,
-          ): Set<BlockInstanceId> => {
-            const downstream = new Set<BlockInstanceId>()
-            const queue = [startId]
-
-            while (queue.length > 0) {
-              const currentId = queue.shift()!
-              for (const [blockId, block] of Object.entries(blocks)) {
-                if (downstream.has(blockId)) continue
-                const hasCurrentAsInput = Object.values(block.input_ids).some(
-                  (sourceId) => sourceId === currentId,
-                )
-                if (hasCurrentAsInput) {
-                  downstream.add(blockId)
-                  queue.push(blockId)
-                }
-              }
-            }
-            return downstream
-          }
 
           const downstreamBlocks = findDownstreamBlocks(
             instanceId,
@@ -489,8 +470,6 @@ export const useFableBuilderStore = create<FableBuilderState>()(
             isConfigPanelOpen: true,
           }),
 
-        clearSelection: () => set({ selectedBlockId: null }),
-
         setMode: (mode) => set({ mode }),
         setStep: (step) => set({ step }),
         togglePalette: () =>
@@ -542,6 +521,7 @@ export const useFableBuilderStore = create<FableBuilderState>()(
           }),
         setIsValidating: (validating) => set({ isValidating: validating }),
         setSubmitDialogOpen: (open) => set({ submitDialogOpen: open }),
+        setDraggedFactory: (dragged) => set({ draggedFactory: dragged }),
 
         markSaved: (id, version, name) =>
           set({
@@ -552,10 +532,9 @@ export const useFableBuilderStore = create<FableBuilderState>()(
             ...(name !== undefined && { fableName: name }),
           }),
         markSubmitted: () => set({ isDirty: false, lastSavedAt: Date.now() }),
-        markDirty: () => set({ isDirty: true }),
 
-        reset: () => set(initialState),
-      }),
+        reset: () => set(createInitialState()),
+      })),
       {
         name: STORAGE_KEYS.stores.fableBuilder,
         version: STORE_VERSIONS.fableBuilder,
@@ -604,10 +583,6 @@ export function useBlockInstances(): Record<BlockInstanceId, BlockInstance> {
   return useFableBuilderStore((state) => state.fable.blocks)
 }
 
-export function useBlockCount(): number {
-  return useFableBuilderStore((state) => Object.keys(state.fable.blocks).length)
-}
-
 export function useHasBlocks(): boolean {
   return useFableBuilderStore(
     (state) => Object.keys(state.fable.blocks).length > 0,
@@ -619,10 +594,4 @@ export function useBlockValidation(blockId: BlockInstanceId) {
     if (!state.validationState) return null
     return state.validationState.blockStates[blockId] ?? null
   })
-}
-
-export function useIsValid(): boolean {
-  return useFableBuilderStore(
-    (state) => state.validationState?.isValid ?? false,
-  )
 }

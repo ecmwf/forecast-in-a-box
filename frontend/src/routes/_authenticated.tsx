@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { useConfigStore } from '@/stores/configStore'
 import { checkSession } from '@/api/endpoints/auth'
+import { readAnonymousId } from '@/lib/anonymous-id'
 import { createLogger } from '@/lib/logger'
 import { isValidInternalRedirect } from '@/lib/utils'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
@@ -41,7 +42,7 @@ function isLoggedOut(): boolean {
  * Check if user is authenticated in anonymous mode
  */
 function isAnonymousUser(): boolean {
-  return !!localStorage.getItem(STORAGE_KEYS.auth.anonymousId)
+  return readAnonymousId() !== null
 }
 
 /**

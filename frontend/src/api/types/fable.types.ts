@@ -10,6 +10,7 @@
 
 import { Cloud, Cog, Download, Shuffle } from 'lucide-react'
 import { z } from 'zod'
+import i18n from 'i18next'
 import { EnvironmentSpecificationSchema } from './job.types'
 import {
   PluginCompositeIdSchema,
@@ -151,11 +152,6 @@ export const GlyphListItemSchema = z.discriminatedUnion('glyph_type', [
 
 export type GlyphListItem = z.infer<typeof GlyphListItemSchema>
 
-/**
- * @deprecated Use IntrinsicGlyphItem for intrinsic glyphs or GlobalGlyphItem for global glyphs.
- */
-export type GlyphDetail = IntrinsicGlyphItem
-
 /** Paginated response from GET /api/v1/blueprint/glyphs/list */
 export const GlyphListResponseSchema = z.object({
   glyphs: z.array(GlyphListItemSchema),
@@ -231,18 +227,6 @@ export const FableValidationExpansionSchema = z.object({
 export type FableValidationExpansion = z.infer<
   typeof FableValidationExpansionSchema
 >
-
-export const SavedFableSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  fable: FableBuilderV1Schema,
-  tags: z.array(z.string()),
-  created_at: z.string(),
-  updated_at: z.string(),
-  user_id: z.string().optional(),
-})
-
-export type SavedFable = z.infer<typeof SavedFableSchema>
 
 export const FableUpsertResponseSchema = z.object({
   blueprint_id: z.string(),
@@ -358,11 +342,17 @@ export const BLOCK_KIND_ORDER: Array<BlockKind> = [
   'sink',
 ]
 
+// `label`/`description` are getters so they resolve through i18next on access
+// (at render), keeping this module free of the i18n initialisation side-effect.
 export const BLOCK_KIND_METADATA: Record<BlockKind, BlockKindMetadata> = {
   source: {
     kind: 'source',
-    label: 'Source',
-    description: 'Data sources like forecasts and initial conditions',
+    get label() {
+      return i18n.t('configure:blockKind.source.label')
+    },
+    get description() {
+      return i18n.t('configure:blockKind.source.description')
+    },
     color: 'text-blue-500',
     bgColor: 'bg-blue-50 dark:bg-blue-950',
     borderColor: 'border-blue-200 dark:border-blue-800',
@@ -372,8 +362,12 @@ export const BLOCK_KIND_METADATA: Record<BlockKind, BlockKindMetadata> = {
   },
   transform: {
     kind: 'transform',
-    label: 'Transform',
-    description: 'Transform and process data',
+    get label() {
+      return i18n.t('configure:blockKind.transform.label')
+    },
+    get description() {
+      return i18n.t('configure:blockKind.transform.description')
+    },
     color: 'text-amber-500',
     bgColor: 'bg-amber-50 dark:bg-amber-950',
     borderColor: 'border-amber-200 dark:border-amber-800',
@@ -383,8 +377,12 @@ export const BLOCK_KIND_METADATA: Record<BlockKind, BlockKindMetadata> = {
   },
   product: {
     kind: 'product',
-    label: 'Product',
-    description: 'Compute derived products from data',
+    get label() {
+      return i18n.t('configure:blockKind.product.label')
+    },
+    get description() {
+      return i18n.t('configure:blockKind.product.description')
+    },
     color: 'text-purple-500',
     bgColor: 'bg-purple-50 dark:bg-purple-950',
     borderColor: 'border-purple-200 dark:border-purple-800',
@@ -394,8 +392,12 @@ export const BLOCK_KIND_METADATA: Record<BlockKind, BlockKindMetadata> = {
   },
   sink: {
     kind: 'sink',
-    label: 'Output',
-    description: 'Store or visualize results',
+    get label() {
+      return i18n.t('configure:blockKind.sink.label')
+    },
+    get description() {
+      return i18n.t('configure:blockKind.sink.description')
+    },
     color: 'text-emerald-500',
     bgColor: 'bg-emerald-50 dark:bg-emerald-950',
     borderColor: 'border-emerald-200 dark:border-emerald-800',
@@ -467,32 +469,6 @@ export function getFactory(
  */
 export function factoryIdToKey(id: PluginBlockFactoryId): string {
   return `${pluginIdToDisplayKey(id.plugin)}:${id.factory}`
-}
-
-/**
- * Parse a string key back to PluginBlockFactoryId
- * Key format: "store/local:factory"
- */
-export function keyToFactoryId(key: string): PluginBlockFactoryId {
-  const colonIndex = key.lastIndexOf(':')
-  if (colonIndex === -1) {
-    throw new Error(`Invalid factory key format: ${key}`)
-  }
-  const pluginPart = key.substring(0, colonIndex)
-  const factory = key.substring(colonIndex + 1)
-
-  // Parse "store/local" format
-  const slashIndex = pluginPart.indexOf('/')
-  if (slashIndex === -1) {
-    throw new Error(`Invalid plugin ID format in key: ${key}`)
-  }
-  const store = pluginPart.substring(0, slashIndex)
-  const local = pluginPart.substring(slashIndex + 1)
-
-  return {
-    plugin: { store, local },
-    factory,
-  }
 }
 
 /**

@@ -12,12 +12,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Download, Maximize2, X, ZoomIn, ZoomOut } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { downloadAction } from '../actions/download'
+import { useJobResultBlob } from '../useJobResult'
+import { viewerHeaderBtn } from './viewerHeaderBtn'
 import type { ViewerProps } from '../types'
-import { getJobResult } from '@/api/endpoints/job'
-import { createLogger } from '@/lib/logger'
 import { showToast } from '@/lib/toast'
-
-const log = createLogger('ImageViewer')
 
 const MIN_SCALE = 0.25
 const MAX_SCALE = 32
@@ -48,30 +46,21 @@ export default function ImageViewer({ item, adapter, onClose }: ViewerProps) {
   const renderMime =
     adapter.id === 'image-vector' ? 'image/svg+xml' : 'image/png'
 
+  // Shared cache — the grid thumbnail for this same output reuses this blob.
+  const { data, error } = useJobResultBlob(item.jobId, item.taskId)
+  const blob = data?.blob
+
   useEffect(() => {
-    let revoked = false
-    let createdUrl: string | null = null
+    if (!blob) return
+    const tagged = new Blob([blob], { type: renderMime })
+    const createdUrl = URL.createObjectURL(tagged)
+    setBlobUrl(createdUrl)
+    return () => URL.revokeObjectURL(createdUrl)
+  }, [blob, renderMime])
 
-    getJobResult(item.jobId, item.taskId)
-      .then(({ blob }) => {
-        if (revoked) return
-        const tagged = new Blob([blob], { type: renderMime })
-        createdUrl = URL.createObjectURL(tagged)
-        setBlobUrl(createdUrl)
-      })
-      .catch((err) => {
-        log.error('Failed to fetch image', {
-          taskId: item.taskId,
-          error: err,
-        })
-        showToast.error(err instanceof Error ? err.message : String(err))
-      })
-
-    return () => {
-      revoked = true
-      if (createdUrl) URL.revokeObjectURL(createdUrl)
-    }
-  }, [item.jobId, item.taskId, renderMime])
+  useEffect(() => {
+    if (error) showToast.error(error.message)
+  }, [error])
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -216,7 +205,7 @@ export default function ImageViewer({ item, adapter, onClose }: ViewerProps) {
             <button
               type="button"
               aria-label={t('outputs.viewer.zoomOut')}
-              className={headerBtn}
+              className={viewerHeaderBtn}
               onClick={zoomOut}
             >
               <ZoomOut className="h-4 w-4" />
@@ -227,7 +216,7 @@ export default function ImageViewer({ item, adapter, onClose }: ViewerProps) {
             <button
               type="button"
               aria-label={t('outputs.viewer.zoomIn')}
-              className={headerBtn}
+              className={viewerHeaderBtn}
               onClick={zoomIn}
             >
               <ZoomIn className="h-4 w-4" />
@@ -235,7 +224,7 @@ export default function ImageViewer({ item, adapter, onClose }: ViewerProps) {
             <button
               type="button"
               aria-label={t('outputs.viewer.resetZoom')}
-              className={headerBtn}
+              className={viewerHeaderBtn}
               onClick={reset}
             >
               <Maximize2 className="h-4 w-4" />
@@ -245,7 +234,7 @@ export default function ImageViewer({ item, adapter, onClose }: ViewerProps) {
           <button
             type="button"
             aria-label={downloadAction.label(t)}
-            className={headerBtn}
+            className={viewerHeaderBtn}
             onClick={() =>
               void downloadAction.run(item, { resolvedAdapter: adapter })
             }
@@ -254,8 +243,8 @@ export default function ImageViewer({ item, adapter, onClose }: ViewerProps) {
           </button>
           <button
             type="button"
-            aria-label="Close"
-            className={headerBtn}
+            aria-label={t('outputs.viewer.close')}
+            className={viewerHeaderBtn}
             onClick={onClose}
           >
             <X className="h-4 w-4" />
@@ -308,9 +297,6 @@ export default function ImageViewer({ item, adapter, onClose }: ViewerProps) {
     </div>
   )
 }
-
-const headerBtn =
-  'inline-flex h-8 w-8 items-center justify-center rounded-md text-white/90 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30'
 
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v))

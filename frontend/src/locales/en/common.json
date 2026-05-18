@@ -15,8 +15,12 @@
   "search": "Search",
   "filter": "Filter",
   "clear": "Clear",
+  "removeTag": "Remove {{tag}}",
   "yes": "Yes",
   "no": "No",
+  "appName": "Forecast-in-a-Box",
+  "logoAlt": "Forecast In a Box Logo",
+  "spinnerLabel": "Loading",
   "activity": {
     "label": "Notification Center",
     "title": "Notification Center",
@@ -31,7 +35,14 @@
     "filterPlaceholder": "Filter notifications…",
     "noMatches": "No matches",
     "dismiss": "Dismiss",
-    "viewAll": "Open executions"
+    "viewAll": "Open executions",
+    "downloadStarting": "Starting download...",
+    "downloadProgress": "Downloading {{progress}}%",
+    "downloadComplete": "Download complete",
+    "jobLabel": "Job {{id}}",
+    "jobCompleted": "Completed",
+    "jobFailed": "Failed: {{error}}",
+    "unknownError": "Unknown error"
   },
   "nav": {
     "label": "Main navigation",
@@ -52,7 +63,133 @@
     "cascade": "Cascade",
     "ecmwfData": "ECMWF Data",
     "scheduler": "Scheduler",
+    "plugins": "Plugins",
     "refresh": "Refresh Status",
     "lastUpdated": "Last updated"
+  },
+  "pagination": {
+    "first": "First page",
+    "previous": "Previous",
+    "next": "Next",
+    "last": "Last page",
+    "page": "Page {{current}} of {{total}}"
+  },
+  "splash": {
+    "loading": "Loading configuration",
+    "loadingHint": "Please wait while we set up the application",
+    "errorTitle": "Configuration Error",
+    "errorIntro": "Failed to load application configuration:",
+    "errorHint": "If the problem persists, please contact support."
+  },
+  "header": {
+    "home": "home",
+    "about": "About",
+    "openMenu": "Open Menu",
+    "closeMenu": "Close Menu",
+    "login": "Login",
+    "logout": "Logout",
+    "getStarted": "Get Started"
+  },
+  "footer": {
+    "copyright": "© European Centre for Medium-Range Weather Forecasts",
+    "help": "Help",
+    "about": "About",
+    "logoEcmwf": "ECMWF",
+    "logoDestinationEarth": "Destination Earth",
+    "logoWmo": "World Meteorological Organization"
+  },
+  "userMenu": {
+    "dashboard": "Dashboard",
+    "help": "Help",
+    "settings": "Settings",
+    "view": "View",
+    "fluidLayout": "Fluid Layout",
+    "boxedLayout": "Boxed Layout",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "cardStyle": "Card Style",
+    "cardDefault": "Default",
+    "cardFlat": "Flat",
+    "cardModern": "Modern",
+    "cardGradient": "Gradient",
+    "timezone": "Timezone",
+    "helpSupport": "Help & Support",
+    "documentation": "Documentation",
+    "account": "Account",
+    "profile": "Profile",
+    "userFallback": "User",
+    "administration": "Administration",
+    "plugins": "Plugins",
+    "artifacts": "Artifacts",
+    "globalVariables": "Global Variables",
+    "signOut": "Sign Out",
+    "timezoneDialogTitle": "Application timezone",
+    "timezoneDialogDescription": "All dates and times — including forecast base times — are shown and entered in this timezone. Defaults to UTC."
+  },
+  "commandPalette": {
+    "title": "Command Palette",
+    "description": "Search for a command to run...",
+    "placeholder": "Type a command or search...",
+    "empty": "No results found.",
+    "navigate": "navigate",
+    "select": "select",
+    "close": "close",
+    "esc": "Esc"
+  },
+  "commands": {
+    "categoryGettingStarted": "Getting Started",
+    "categoryNavigation": "Navigation",
+    "quickStart": {
+      "label": "Quick Start",
+      "description": "Start with AIFS model preset"
+    },
+    "standard": {
+      "label": "Standard Forecast",
+      "description": "Choose model, 120h forecast"
+    },
+    "customModel": {
+      "label": "Custom Model Forecast",
+      "description": "Blank canvas, full control"
+    },
+    "dataset": {
+      "label": "Dataset Forecast",
+      "description": "Use AIFS data from external source"
+    },
+    "dashboard": {
+      "label": "Dashboard",
+      "description": "Go to dashboard"
+    },
+    "configure": {
+      "label": "Configure",
+      "description": "Create a new forecast configuration"
+    },
+    "executions": {
+      "label": "Executions",
+      "description": "Monitor forecast job executions"
+    },
+    "admin": {
+      "label": "Admin",
+      "description": "Manage plugins and models"
+    }
+  },
+  "timezone": {
+    "searchPlaceholder": "Search timezone…",
+    "searchLabel": "Search timezone",
+    "listLabel": "Timezones",
+    "empty": "No timezone found.",
+    "browser": "· Browser"
+  },
+  "dateTimeField": {
+    "timeLabel": "Time",
+    "timezoneTooltip": "Times are in {{timeZone}}"
+  },
+  "field": {
+    "selectPlaceholder": "Select an option...",
+    "addItemPlaceholder": "Add item..."
+  },
+  "notificationBanner": {
+    "dismiss": "Dismiss notification"
   }
 }

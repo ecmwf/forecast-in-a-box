@@ -9,6 +9,7 @@
  */
 
 import { Suspense, lazy } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { H1, Typography } from '@/components/base/typography'
 import { useAuth } from '@/features/auth/AuthContext'
@@ -19,6 +20,7 @@ const RotatingGlobe = lazy(
 )
 
 export function IntroGlobeSection() {
+  const { t } = useTranslation('landing')
   const { signIn } = useAuth()
   return (
     <section>
@@ -40,18 +42,14 @@ export function IntroGlobeSection() {
         <div className="relative mx-auto max-w-6xl">
           <div className="col-span-full pb-12 text-center lg:p-12">
             <H1 className="mx-auto max-w-4xl text-5xl font-medium text-balance max-lg:font-semibold md:text-6xl lg:text-7xl">
-              Product generation on the fly, for any Anemoi model
+              {t('intro.title')}
             </H1>
             <Typography
               variant="lead"
               as="p"
               className="mx-auto mt-6 mb-8 max-w-2xl text-balance max-md:mx-auto lg:text-xl"
             >
-              Forecast-in-a-Box reimagines how forecasts are produced and
-              delivered. Rather than relying on remote, data-intensive numerical
-              weather prediction pipelines, Forecast-in-a-Box distributes a
-              self-contained forecasting environment that users can install and
-              run anywhere.
+              {t('intro.description')}
             </Typography>
 
             <div className="flex justify-center gap-3">
@@ -59,7 +57,7 @@ export function IntroGlobeSection() {
                 size="lg"
                 className="border-transparent px-4 text-sm shadow-2xl shadow-indigo-900/40"
                 onClick={() => signIn()}
-                render={<span>Get Started</span>}
+                render={<span>{t('hero.getStarted')}</span>}
                 nativeButton={false}
               />
             </div>

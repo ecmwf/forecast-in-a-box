@@ -37,17 +37,3 @@ export function decodeStateFromURL<T>(
 export function isStateTooLarge(encoded: string): boolean {
   return encoded.length > MAX_SAFE_STATE_LENGTH
 }
-
-export function getCompressionStats<T>(state: T): {
-  originalSize: number
-  compressedSize: number
-  ratio: number
-} {
-  const json = JSON.stringify(state)
-  const compressed = encodeStateToURL(state)
-  return {
-    originalSize: json.length,
-    compressedSize: compressed.length,
-    ratio: compressed.length / json.length,
-  }
-}

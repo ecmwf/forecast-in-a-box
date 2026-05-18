@@ -10,11 +10,13 @@
 
 import { useMemo, useState } from 'react'
 import { ArrowRight, Check, Plus } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { BlockInstanceCard } from './BlockInstanceCard'
 import { BlockTabs } from './BlockTabs'
 import { FormPaletteSidebar } from './FormPaletteSidebar'
 import { PipelineDiagram } from './PipelineDiagram'
 import { PipelineSidebar } from './PipelineSidebar'
+import type { ControlDirection } from './mini-graph/NodeControls'
 import type {
   BlockFactoryCatalogue,
   BlockInstanceId,
@@ -49,6 +51,7 @@ type FormStep = 'source' | 'transform' | 'product' | 'sink'
 const STEP_ORDER: Array<FormStep> = ['source', 'transform', 'product', 'sink']
 
 export function FableFormCanvas({ catalogue }: FableFormCanvasProps) {
+  const { t } = useTranslation('configure')
   const [currentStep, setCurrentStep] = useState<FormStep>('source')
 
   const fable = useFableBuilderStore((state) => state.fable)
@@ -169,21 +172,37 @@ export function FableFormCanvas({ catalogue }: FableFormCanvasProps) {
     }
   }
 
-  // Add a new block and connect it to a source block
+  // Add a new block and wire it relative to an anchor block.
+  // `direction` decides which way the connection runs:
+  // - 'parent'        → the new block feeds the anchor (anchor.input ← new)
+  // - 'child'/'sibling'/default → the anchor feeds the new block (new.input ← anchor)
   const handleAddConnectedBlock = (
     factoryId: PluginBlockFactoryId,
-    sourceBlockId: BlockInstanceId,
+    anchorBlockId: BlockInstanceId,
+    direction: ControlDirection = 'child',
   ) => {
     const factory = getFactory(catalogue, factoryId)
-    if (factory) {
-      const newBlockId = addBlock(factoryId, factory)
-      // Connect the first input of the new block to the source
-      if (factory.inputs.length > 0) {
-        connectBlocks(newBlockId, factory.inputs[0], sourceBlockId)
+    if (!factory) return
+
+    const newBlockId = addBlock(factoryId, factory)
+
+    if (direction === 'parent') {
+      // New block is upstream: connect it into the anchor's first input.
+      const anchor =
+        anchorBlockId in fable.blocks ? fable.blocks[anchorBlockId] : undefined
+      const anchorFactory = anchor
+        ? getFactory(catalogue, anchor.factory_id)
+        : undefined
+      if (anchorFactory && anchorFactory.inputs.length > 0) {
+        connectBlocks(anchorBlockId, anchorFactory.inputs[0], newBlockId)
       }
-      // Navigate to the new block's step
-      setCurrentStep(factory.kind)
+    } else if (factory.inputs.length > 0) {
+      // New block is downstream: connect the anchor into its first input.
+      connectBlocks(newBlockId, factory.inputs[0], anchorBlockId)
     }
+
+    // Navigate to the new block's step
+    setCurrentStep(factory.kind)
   }
 
   // Handle clicking on a block from within a card (downstream connection click)
@@ -271,14 +290,14 @@ export function FableFormCanvas({ catalogue }: FableFormCanvasProps) {
               disabled={STEP_ORDER.indexOf(currentStep) === 0}
               className="w-full sm:w-auto"
             >
-              Previous Step
+              {t('formCanvas.previousStep')}
             </Button>
             <Button
               onClick={handleNextStep}
               disabled={!canAdvance}
               className="w-full sm:w-auto"
             >
-              Next Step
+              {t('formCanvas.nextStep')}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
@@ -298,7 +317,11 @@ export function FableFormCanvas({ catalogue }: FableFormCanvasProps) {
                           />
                         </div>
                         <div>
-                          <CardTitle>{metadata.label}s</CardTitle>
+                          <CardTitle>
+                            {t('formCanvas.stepHeading', {
+                              label: metadata.label,
+                            })}
+                          </CardTitle>
                           <CardDescription>
                             {metadata.description}
                           </CardDescription>
@@ -348,8 +371,16 @@ export function FableFormCanvas({ catalogue }: FableFormCanvasProps) {
                 <div className="border-t pt-4">
                   <P className="mb-3 text-muted-foreground">
                     {blocksByKind[currentStep].length === 0
-                      ? `Select a ${BLOCK_KIND_METADATA[currentStep].label.toLowerCase()} to get started:`
-                      : `Add another ${BLOCK_KIND_METADATA[currentStep].label.toLowerCase()}:`}
+                      ? t('formCanvas.selectToStart', {
+                          kind: BLOCK_KIND_METADATA[
+                            currentStep
+                          ].label.toLowerCase(),
+                        })
+                      : t('formCanvas.addAnother', {
+                          kind: BLOCK_KIND_METADATA[
+                            currentStep
+                          ].label.toLowerCase(),
+                        })}
                   </P>
                   <div className="grid gap-2">
                     {availableFactories.map(({ factoryId, factory }) => {
@@ -390,8 +421,12 @@ export function FableFormCanvas({ catalogue }: FableFormCanvasProps) {
                   <div className="py-8 text-center text-muted-foreground">
                     <P>
                       {currentStep === 'source'
-                        ? 'Loading available sources...'
-                        : `Complete the previous step to see available ${BLOCK_KIND_METADATA[currentStep].label.toLowerCase()}s.`}
+                        ? t('formCanvas.loadingSources')
+                        : t('formCanvas.completePreviousStep', {
+                            kind: BLOCK_KIND_METADATA[
+                              currentStep
+                            ].label.toLowerCase(),
+                          })}
                     </P>
                   </div>
                 )}

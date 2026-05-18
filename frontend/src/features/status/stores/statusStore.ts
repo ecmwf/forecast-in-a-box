@@ -24,7 +24,6 @@ interface StatusState {
 
   // Last updated timestamp
   lastUpdated: Date | null
-  setLastUpdated: (date: Date) => void
 
   // Reset store
   reset: () => void

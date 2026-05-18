@@ -16,6 +16,7 @@
 
 import { Download, HardDrive, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { ArtifactCompatibilityBadge } from './ArtifactCompatibilityBadge'
 import { ArtifactStatusBadge } from './ArtifactStatusBadge'
 import type {
   ArtifactInfo,
@@ -98,22 +99,7 @@ export function ArtifactCard({
             {platform}
           </span>
         ))}
-        <span
-          className={cn(
-            'inline-flex items-center rounded px-2 py-0.5 text-sm font-medium',
-            artifact.isLocallyCompatible
-              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-              : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-          )}
-        >
-          {artifact.isLocallyCompatible
-            ? t('compatibility.compatible')
-            : artifact.localCompatibilityDetail
-              ? t('compatibility.notCompatibleDetail', {
-                  detail: artifact.localCompatibilityDetail,
-                })
-              : t('compatibility.notCompatible')}
-        </span>
+        <ArtifactCompatibilityBadge artifact={artifact} />
       </div>
 
       {/* Download Progress Bar */}

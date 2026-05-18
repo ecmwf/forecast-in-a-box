@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { getPyPIUrl } from '../utils/plugin-url'
 import { CapabilityBadges } from './CapabilityBadges'
 import { PluginIcon } from './PluginIcon'
 import { PluginStatusBadge } from './PluginStatusBadge'
@@ -56,15 +57,6 @@ interface PluginCardProps {
   shadow?: PanelShadow
 }
 
-/**
- * Get PyPI URL for a plugin from its pip source
- */
-function getPyPIUrl(pipSource: string | null): string | null {
-  if (!pipSource) return null
-  const packageName = pipSource.split('/').pop()?.replace('.git', '')
-  return packageName ? `https://pypi.org/project/${packageName}` : null
-}
-
 export function PluginCard({
   plugin,
   onToggle,
@@ -89,7 +81,7 @@ export function PluginCard({
   // Show error state
   const hasError = plugin.status === 'errored'
 
-  // PyPI URL for available plugins
+  // PyPI URL derived from the pip source, when one exists
   const pypiUrl = getPyPIUrl(plugin.pipSource)
 
   return (
@@ -187,14 +179,14 @@ export function PluginCard({
         {plugin.version ? (
           // Installed plugin: show installed version
           <span className="inline-flex items-center gap-1.5 rounded bg-muted px-2 py-0.5 font-mono text-sm font-medium text-muted-foreground">
-            v{plugin.version}
+            {t('item.version', { version: plugin.version })}
           </span>
         ) : (
           // Available plugin: show latest version (hide if unknown)
           plugin.latestVersion &&
           plugin.latestVersion !== 'unknown' && (
             <span className="inline-flex items-center gap-1.5 rounded bg-muted px-2 py-0.5 font-mono text-sm font-medium text-muted-foreground">
-              v{plugin.latestVersion}
+              {t('item.version', { version: plugin.latestVersion })}
             </span>
           )
         )}
@@ -202,12 +194,12 @@ export function PluginCard({
           plugin.version &&
           plugin.latestVersion !== plugin.version && (
             <span className="inline-flex items-center gap-1.5 rounded bg-amber-100 px-2 py-0.5 font-mono text-sm font-medium text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
-              → v{plugin.latestVersion}
+              {t('card.versionArrow', { version: plugin.latestVersion })}
             </span>
           )}
         {updatedTimeAgo && (
           <span className="text-sm text-muted-foreground">
-            Updated {updatedTimeAgo}
+            {t('card.updatedAgo', { time: updatedTimeAgo })}
           </span>
         )}
       </div>

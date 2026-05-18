@@ -10,11 +10,8 @@
 
 import { ImageOff } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useJobResultBlob } from '../useJobResult'
 import type { ThumbnailProps } from '../types'
-import { getJobResult } from '@/api/endpoints/job'
-import { createLogger } from '@/lib/logger'
-
-const log = createLogger('ImageThumbnail')
 
 /** Resolve the MIME the browser should use to render the blob. The wire
  * Content-Type is unreliable (cascade may say `application/pickle` for raw
@@ -26,33 +23,23 @@ function browserImageMime(adapterId: string): string {
 
 export function ImageThumbnail({ item, adapter }: ThumbnailProps) {
   const [url, setUrl] = useState<string | null>(null)
-  const [errored, setErrored] = useState(false)
+  // Shared cache — the full viewer for this same output reuses this blob.
+  const { data, isError } = useJobResultBlob(
+    item.jobId,
+    item.taskId,
+    item.isAvailable,
+  )
+  const blob = data?.blob
 
   useEffect(() => {
-    if (!item.isAvailable) return
-    let revoked = false
-    let createdUrl: string | null = null
-    getJobResult(item.jobId, item.taskId)
-      .then(({ blob }) => {
-        if (revoked) return
-        const tagged = new Blob([blob], { type: browserImageMime(adapter.id) })
-        createdUrl = URL.createObjectURL(tagged)
-        setUrl(createdUrl)
-      })
-      .catch((err) => {
-        log.error('Failed to fetch image thumbnail', {
-          taskId: item.taskId,
-          error: err,
-        })
-        if (!revoked) setErrored(true)
-      })
-    return () => {
-      revoked = true
-      if (createdUrl) URL.revokeObjectURL(createdUrl)
-    }
-  }, [adapter.id, item.isAvailable, item.jobId, item.taskId])
+    if (!blob) return
+    const tagged = new Blob([blob], { type: browserImageMime(adapter.id) })
+    const createdUrl = URL.createObjectURL(tagged)
+    setUrl(createdUrl)
+    return () => URL.revokeObjectURL(createdUrl)
+  }, [adapter.id, blob])
 
-  if (errored) {
+  if (isError) {
     return (
       <div className="flex aspect-video items-center justify-center rounded bg-muted">
         <ImageOff className="h-8 w-8 text-muted-foreground" />

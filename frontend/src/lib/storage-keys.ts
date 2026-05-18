@@ -59,6 +59,14 @@ export const STORAGE_KEYS = {
   },
 
   /**
+   * Forecast-run storage keys (direct localStorage)
+   */
+  runs: {
+    /** Bookmarked run ids (keyed by run_id) */
+    bookmarks: 'fiab.runs.bookmarks',
+  },
+
+  /**
    * Artifact-related storage keys (direct localStorage)
    */
   artifacts: {
@@ -100,7 +108,7 @@ export const STORAGE_KEYS = {
  * ```
  */
 export const STORE_VERSIONS = {
-  ui: 5, // v5: Default artifacts view to table
+  ui: 6, // v6: Add application timezone preference
   config: 1,
   fableBuilder: 2, // v2: Removed configDisplayMode, added isMiniMapOpen
   activity: 1,

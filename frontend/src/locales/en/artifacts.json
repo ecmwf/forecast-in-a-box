@@ -8,10 +8,15 @@
     "cancelDownload": "Cancel",
     "delete": "Delete",
     "viewDetails": "View Details",
-    "backToArtifacts": "Back to Models"
+    "backToArtifacts": "Back to Models",
+    "downloadFailed": "Model download failed"
   },
   "filters": {
     "searchPlaceholder": "Search models by name or author..."
+  },
+  "viewToggle": {
+    "table": "Table view",
+    "card": "Card view"
   },
   "status": {
     "downloaded": "Downloaded",
@@ -43,7 +48,7 @@
     "diskSize": "Disk Size",
     "author": "Author",
     "url": "URL",
-    "timestep": "Timestep",
+    "timestep": "Timestep: {{value}}",
     "pipConstraints": "Pip Package Constraints",
     "outputCharacteristics": "Output Characteristics",
     "outputStructure": "Output Structure",
@@ -59,7 +64,10 @@
     "qubeAxisLevel": "level",
     "qubeMatrixSize": "{{paramCount}} params × {{levelCount}} levels · {{fieldCount}} fields",
     "qubeParamCount_one": "{{count}} param",
-    "qubeParamCount_other": "{{count}} params"
+    "qubeParamCount_other": "{{count}} params",
+    "qubeSectionTitle": "{{name}} levels ({{code}})",
+    "qubeLevelValue": "{{level}} hPa",
+    "notFound": "Model not found: {{id}}"
   },
   "compatibility": {
     "compatible": "Compatible",

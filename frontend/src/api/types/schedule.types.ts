@@ -51,7 +51,7 @@ export const CreateScheduleResponseSchema = z.object({
   experiment_id: z.string(),
 })
 
-/** routes/experiment.py: ScheduleRunResponse; status narrowed from str to known values) */
+/** routes/experiment.py: ScheduleRunResponse; status narrowed from str to known values */
 export const ScheduleRunResponseSchema = z.object({
   run_id: z.string(),
   attempt_count: z.number(),

@@ -27,6 +27,7 @@ import { AuthContext } from './AuthContext.tsx'
 import type { AuthContextValue } from './AuthContext.tsx'
 import { createLogger } from '@/lib/logger'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
+import { readStorage, removeStorage, writeStorage } from '@/lib/storage'
 import { checkSession, getAuthorizationUrl, logout } from '@/api/endpoints/auth'
 
 const log = createLogger('AuthenticatedAuthProvider')
@@ -58,8 +59,7 @@ export function AuthenticatedAuthProvider({
       // The actual security boundary is the server-side session invalidation
       // performed by the logout() call in signOut(). If this flag is tampered
       // with, the user may be re-authenticated, but no privilege escalation occurs.
-      const userLoggedOut =
-        localStorage.getItem(STORAGE_KEYS.auth.logoutFlag) === 'true'
+      const userLoggedOut = readStorage(STORAGE_KEYS.auth.logoutFlag) === 'true'
 
       if (userLoggedOut) {
         log.info('User previously logged out, staying logged out')
@@ -91,7 +91,7 @@ export function AuthenticatedAuthProvider({
   const signIn = async () => {
     try {
       // Clear logout flag - user is explicitly logging in
-      localStorage.removeItem(STORAGE_KEYS.auth.logoutFlag)
+      removeStorage(STORAGE_KEYS.auth.logoutFlag)
       log.info('Logout flag cleared, user is logging in')
 
       const authUrl = await getAuthorizationUrl(loginEndpoint)
@@ -112,7 +112,7 @@ export function AuthenticatedAuthProvider({
     await logout()
 
     // Set logout flag - prevents auto-login on redirect
-    localStorage.setItem(STORAGE_KEYS.auth.logoutFlag, 'true')
+    writeStorage(STORAGE_KEYS.auth.logoutFlag, 'true')
     log.info('Logout flag set - user will stay logged out')
 
     // Clear local authentication state

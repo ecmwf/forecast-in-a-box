@@ -56,7 +56,7 @@ export const AuthContext = createContext<AuthContextValue | undefined>(
  *
  * @example
  * ```typescript
- * const { user, isAuthenticated, signIn, signOut } = useAuth()
+ * const { isAuthenticated, signIn, signOut } = useAuth()
  * ```
  */
 export function useAuth(): AuthContextValue {

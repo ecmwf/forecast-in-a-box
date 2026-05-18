@@ -9,6 +9,7 @@
  */
 
 import { toast } from 'sonner'
+import i18n from 'i18next'
 
 /**
  * Toast notification utilities for user-facing messages.
@@ -52,11 +53,11 @@ export const showToast = {
    * Extracts message from Error object and optionally provides a retry button.
    */
   apiError: (error: Error, options?: { retry?: () => void }) => {
-    const message = error.message || 'An error occurred'
+    const message = error.message || i18n.t('errors:occurred')
     if (options?.retry) {
       toast.error(message, {
         action: {
-          label: 'Retry',
+          label: i18n.t('common:retry'),
           onClick: options.retry,
         },
       })

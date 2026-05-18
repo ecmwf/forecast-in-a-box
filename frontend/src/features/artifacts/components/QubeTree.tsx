@@ -27,6 +27,7 @@
 import { ChevronDown } from 'lucide-react'
 import { useId, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import type { QubeNode } from '@/api/types/artifacts.types'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -54,8 +55,8 @@ interface MatrixSection {
   /** Parameters in the order they appear in the qube. */
   params: Array<string>
   /**
-   * Levels in altitude-ascending order (high pressure first → low pressure
-   * last). null if the branch has no level dimension (e.g. surface).
+   * Distinct level values, numerically ascending; the matrix view re-sorts
+   * them for display. null if the branch has no level dimension (e.g. surface).
    */
   levels: Array<number> | null
   /** Set of "param|level" strings for fast presence lookup. */
@@ -107,7 +108,7 @@ function AifsMatrixView({
   className?: string
 }) {
   const { t } = useTranslation('artifacts')
-  const sections = useMemo(() => processQube(node), [node])
+  const sections = useMemo(() => processQube(node, t), [node, t])
   const hasMatrixSection = sections.some((s) => s.levels !== null)
 
   return (
@@ -312,9 +313,9 @@ function DimensionalMatrix({
   const cols = pivoted ? section.params : sortedLevels
 
   const formatRow = (value: number | string): string =>
-    pivoted ? formatLevel(value as number) : String(value)
+    pivoted ? formatLevel(value as number, t) : String(value)
   const formatCol = (value: number | string): string =>
-    pivoted ? String(value) : formatLevel(value as number)
+    pivoted ? String(value) : formatLevel(value as number, t)
 
   const isPresent = (row: number | string, col: number | string): boolean => {
     const param = pivoted ? col : row
@@ -381,8 +382,8 @@ function DimensionalMatrix({
           {cols.map((col, colIdx) => {
             const present = isPresent(row, col)
             const tooltip = pivoted
-              ? `${col} @ ${formatLevel(row as number)}`
-              : `${row} @ ${formatLevel(col as number)}`
+              ? `${col} @ ${formatLevel(row as number, t)}`
+              : `${row} @ ${formatLevel(col as number, t)}`
             const inRow = hover.row === rowIdx
             const inCol = hover.col === colIdx
             return (
@@ -444,7 +445,10 @@ function SurfaceList({ section }: { section: MatrixSection }) {
  * by visiting every leaf path — this correctly handles the case where
  * different params expose different level subsets.
  */
-function processQube(root: QubeNode): Array<MatrixSection> {
+function processQube(
+  root: QubeNode,
+  t: TFunction<'artifacts'>,
+): Array<MatrixSection> {
   return root.children.map((branch, idx) => {
     const levtype = branch.values.values.map(String).join(',') || branch.key
 
@@ -474,7 +478,7 @@ function processQube(root: QubeNode): Array<MatrixSection> {
     return {
       id: `${branch.key}-${branchSlug(branch)}-${idx}`,
       levtype,
-      title: sectionTitle(branch),
+      title: sectionTitle(branch, t),
       params,
       levels,
       presence,
@@ -504,10 +508,14 @@ function walkLeaves(
   }
 }
 
-function sectionTitle(branch: QubeNode): string {
+function sectionTitle(branch: QubeNode, t: TFunction<'artifacts'>): string {
   const name = readMetadataName(branch.metadata)
   const code = branch.values.values.map(String).join(', ')
-  if (name) return `${capitalize(name)} levels (${code.toUpperCase()})`
+  if (name)
+    return t('detail.qubeSectionTitle', {
+      name: capitalize(name),
+      code: code.toUpperCase(),
+    })
   return `${branch.key} = ${code}`
 }
 
@@ -529,7 +537,7 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
-function formatLevel(level: number): string {
+function formatLevel(level: number, t: TFunction<'artifacts'>): string {
   if (!Number.isFinite(level)) return String(level)
-  return `${level} hPa`
+  return t('detail.qubeLevelValue', { level })
 }

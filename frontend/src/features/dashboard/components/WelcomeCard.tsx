@@ -8,11 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-/**
- * WelcomeCard Component
- *
- * Welcome section with stats grid and quick action buttons
- */
+/** Welcome section with a stats grid and quick action buttons. */
 
 import {
   Activity,
@@ -24,21 +20,23 @@ import {
   Loader2,
   Puzzle,
   Settings2,
+  TrendingDown,
   TrendingUp,
   XCircle,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Link } from '@tanstack/react-router'
 import { StatCard } from './StatCard'
 import { QuickActionButton } from './QuickActionButton'
-import { JobStatusDetailsPopover } from './JobStatusDetailsPopover'
+import { RunActivityPopover } from './RunActivityPopover'
+import { RunStatusDetailsPopover } from './RunStatusDetailsPopover'
+import { ModelSummaryPopover } from './ModelSummaryPopover'
 import type { ReactNode } from 'react'
 import type { TrafficLightStatus } from '@/types/status.types'
 import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
-import { mockDashboardStats } from '@/features/dashboard/data/mockData'
 import { useArtifacts } from '@/api/hooks/useArtifacts'
 import { useStatus } from '@/api/hooks/useStatus'
 import { useJobStatusCounts } from '@/api/hooks/useJobStatusCounts'
+import { useServerTime } from '@/api/hooks/useSchedules'
 import { StatusDetailsPopover } from '@/components/common/StatusDetailsPopover'
 import { Card, CardContent } from '@/components/ui/card'
 import { useAuth } from '@/features/auth/AuthContext'
@@ -46,14 +44,40 @@ import { H2 } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
 import { useUser } from '@/hooks/useUser'
 
-function getUserDisplayName(email?: string): string {
-  if (!email) return 'User'
+/** Derive a display first name from an email, or null when none can be extracted. */
+function getUserDisplayName(email?: string): string | null {
+  if (!email) return null
   // Extract name from email (e.g., "john.doe@example.com" -> "John")
   const localPart = email.split('@')[0]
-  if (!localPart) return 'User'
+  if (!localPart) return null
   const firstName = localPart.split('.')[0]
-  if (!firstName) return 'User'
+  if (!firstName) return null
   return firstName.charAt(0).toUpperCase() + firstName.slice(1)
+}
+
+/**
+ * Month-over-month change in forecast count; null when last month had none.
+ *
+ * `created_at` is naive server-local — `toLocalDate` corrects it before bucketing.
+ */
+function forecastTrend(
+  runs: ReadonlyArray<{ created_at: string }>,
+  toLocalDate: (serverTimeStr: string) => Date,
+): number | null {
+  const now = new Date()
+  const monthKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}`
+  const thisKey = monthKey(now)
+  const lastKey = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1))
+  let thisMonth = 0
+  let lastMonth = 0
+  for (const run of runs) {
+    const key = monthKey(toLocalDate(run.created_at))
+    if (key === thisKey) thisMonth += 1
+    else if (key === lastKey) lastMonth += 1
+  }
+  return lastMonth === 0
+    ? null
+    : Math.round(((thisMonth - lastMonth) / lastMonth) * 100)
 }
 
 /** Status icon for each traffic light status */
@@ -74,7 +98,14 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
   const { data: user } = useUser()
   const { t } = useTranslation('dashboard')
   const { trafficLightStatus } = useStatus()
-  const { counts, isLoading: isJobCountLoading } = useJobStatusCounts()
+  const { serverTimeToLocal } = useServerTime()
+  const {
+    counts,
+    total,
+    runs,
+    runningProgress,
+    isLoading: isJobCountLoading,
+  } = useJobStatusCounts()
 
   // Show the most advanced active state: running > preparing > submitted
   const activeStatus =
@@ -97,8 +128,9 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
   const { artifacts } = useArtifacts()
 
   const isAnonymous = authType === 'anonymous'
-  const displayName = getUserDisplayName(user?.email)
-  const stats = mockDashboardStats
+  const displayName =
+    getUserDisplayName(user?.email) ?? t('welcome.userFallback')
+  const trend = forecastTrend(runs, serverTimeToLocal)
   const downloadedModels = artifacts.filter((a) => a.isAvailable).length
   const totalModels = artifacts.length
 
@@ -163,7 +195,7 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
           </StatusDetailsPopover>
 
           {/* Currently Active */}
-          <JobStatusDetailsPopover align="start">
+          <RunStatusDetailsPopover align="start">
             <StatCard
               label={activeStatus.label}
               icon={<Clock className="h-4 w-4" />}
@@ -179,15 +211,28 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
                   {activeStatus.count > 0 && (
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />
                   )}
+                  {counts.running > 0 && (
+                    <span className="flex grow items-center gap-2">
+                      <span className="text-xs font-semibold tabular-nums">
+                        {Math.round(runningProgress)}%
+                      </span>
+                      <span className="h-1.5 grow overflow-hidden rounded-full bg-muted">
+                        <span
+                          className="block h-full rounded-full bg-amber-500 transition-all"
+                          style={{ width: `${runningProgress}%` }}
+                        />
+                      </span>
+                    </span>
+                  )}
                 </>
               }
               subtext={t('welcome.stats.activeForecasts')}
               className="cursor-pointer transition-colors hover:bg-muted/80"
             />
-          </JobStatusDetailsPopover>
+          </RunStatusDetailsPopover>
 
           {/* Available Models */}
-          <Link to="/admin/artifacts" className="block">
+          <ModelSummaryPopover align="start">
             <StatCard
               label={t('welcome.stats.availableModels')}
               icon={<Box className="h-4 w-4" />}
@@ -202,24 +247,46 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
               subtext={t('welcome.stats.downloadedModels')}
               className="cursor-pointer transition-colors hover:bg-muted/80"
             />
-          </Link>
+          </ModelSummaryPopover>
 
           {/* Total Forecasts */}
-          <StatCard
-            label={t('welcome.stats.totalForecasts')}
-            icon={<TrendingUp className="h-4 w-4" />}
-            value={
-              <>
-                <span className="text-lg font-semibold">
-                  {stats.totalForecasts.toLocaleString()}
-                </span>
-                <span className="flex items-center text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                  <TrendingUp className="h-3.5 w-3.5" />+{stats.forecastTrend}%
-                </span>
-              </>
-            }
-            subtext={t('welcome.stats.thisMonth')}
-          />
+          <RunActivityPopover align="start">
+            <StatCard
+              label={t('welcome.stats.totalForecasts')}
+              icon={<TrendingUp className="h-4 w-4" />}
+              value={
+                <>
+                  {isJobCountLoading ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  ) : (
+                    <span className="text-lg font-semibold">
+                      {total.toLocaleString()}
+                    </span>
+                  )}
+                  {!isJobCountLoading && trend !== null && (
+                    <span
+                      className={cn(
+                        'flex items-center text-sm font-medium',
+                        trend >= 0
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-red-600 dark:text-red-400',
+                      )}
+                    >
+                      {trend >= 0 ? (
+                        <TrendingUp className="h-3.5 w-3.5" />
+                      ) : (
+                        <TrendingDown className="h-3.5 w-3.5" />
+                      )}
+                      {trend >= 0 ? '+' : ''}
+                      {trend}%
+                    </span>
+                  )}
+                </>
+              }
+              subtext={t('welcome.stats.thisMonth')}
+              className="cursor-pointer transition-colors hover:bg-muted/80"
+            />
+          </RunActivityPopover>
         </div>
       </CardContent>
 

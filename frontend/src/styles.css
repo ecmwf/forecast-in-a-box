@@ -270,3 +270,30 @@
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * Fable-builder palette drag-and-drop: compatible handles pulse
+ * (`.dnd-droppable`), the hovered one locks on (`.dnd-active`). box-shadow
+ * only — handles position themselves with an inline `transform`.
+ */
+@keyframes fable-handle-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px var(--fable-handle-glow);
+  }
+  50% {
+    box-shadow: 0 0 0 7px var(--fable-handle-glow);
+  }
+}
+
+.react-flow__handle.dnd-droppable {
+  --fable-handle-glow: color-mix(in oklch, var(--primary) 30%, transparent);
+  animation: fable-handle-pulse 1.4s ease-in-out infinite;
+}
+
+.react-flow__handle.dnd-active {
+  animation: none;
+  box-shadow:
+    0 0 0 5px color-mix(in oklch, var(--primary) 70%, transparent),
+    0 0 12px 3px color-mix(in oklch, var(--primary) 45%, transparent);
+}

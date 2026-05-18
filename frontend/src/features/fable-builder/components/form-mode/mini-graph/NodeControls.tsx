@@ -9,11 +9,13 @@
  */
 
 import { Plus } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type {
   BlockInstanceId,
   BlockKind,
   PluginBlockFactoryId,
 } from '@/api/types/fable.types'
+import { factoryIdToKey } from '@/api/types/fable.types'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,13 +59,16 @@ function NodeControlButton({
   onNavigate,
   kind,
 }: NodeControlButtonProps) {
+  const { t } = useTranslation('configure')
   const hasOptions = addOptions.length > 0 || existingBlocks.length > 0
 
   if (!hasOptions) return null
 
+  // `sibling` uses the raw block-kind discriminant ('source', 'transform', …)
+  // as the label, deliberately untranslated.
   const directionLabels: Record<ControlDirection, string> = {
-    parent: 'upstream',
-    child: 'downstream',
+    parent: t('nodeControls.directionUpstream'),
+    child: t('nodeControls.directionDownstream'),
     sibling: kind,
   }
 
@@ -93,11 +98,13 @@ function NodeControlButton({
           {addOptions.length > 0 && (
             <DropdownMenuGroup>
               <DropdownMenuLabel>
-                Add new {directionLabels[direction]}
+                {t('nodeControls.addNew', {
+                  direction: directionLabels[direction],
+                })}
               </DropdownMenuLabel>
               {addOptions.map((option) => (
                 <DropdownMenuItem
-                  key={`${option.factoryId.plugin.store}/${option.factoryId.plugin.local}:${option.factoryId.factory}`}
+                  key={factoryIdToKey(option.factoryId)}
                   onClick={() => onAddBlock(option.factoryId, direction)}
                 >
                   {option.title}
@@ -110,7 +117,9 @@ function NodeControlButton({
           )}
           {existingBlocks.length > 0 && (
             <DropdownMenuGroup>
-              <DropdownMenuLabel>Jump to existing</DropdownMenuLabel>
+              <DropdownMenuLabel>
+                {t('nodeControls.jumpToExisting')}
+              </DropdownMenuLabel>
               {existingBlocks.map((block) => (
                 <DropdownMenuItem
                   key={block.id}
@@ -141,7 +150,6 @@ export interface NodeControlsProps {
     direction: ControlDirection,
   ) => void
   onNavigate: (blockId: BlockInstanceId) => void
-  isCurrentBlock?: boolean
 }
 
 /**
@@ -163,7 +171,6 @@ export function NodeControls({
   const showChild = childOptions.length > 0 || existingChildren.length > 0
   const showSibling = siblingOptions.length > 0 || existingSiblings.length > 0
 
-  // Always show controls for all nodes
   const containerClass = 'absolute inset-0 pointer-events-none'
 
   return (

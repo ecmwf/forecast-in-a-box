@@ -10,34 +10,28 @@
 
 import { Link as RouterLink } from '@tanstack/react-router'
 import { ChevronRight } from 'lucide-react'
+import { Trans, useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button.tsx'
 import { H3, Link, P } from '@/components/base/typography.tsx'
 
 export function FiabStackSection() {
+  const { t } = useTranslation('landing')
   return (
     <section>
-      <div className="_border-b relative mx-auto max-w-7xl border-x px-3 pt-24 pb-10 md:pt-16 md:pb-20">
+      <div className="relative mx-auto max-w-7xl border-x px-3 pt-24 pb-10 md:pt-16 md:pb-20">
         <div className="grid max-md:divide-y md:grid-cols-2 md:divide-x">
-          <div className="_grid _grid-rows-subgrid _pb-12 row-span-2 gap-8 md:pr-12">
+          <div className="row-span-2 gap-8 md:pr-12">
             <div className="flex h-full items-center">
               <P className="mx-auto max-w-xl text-balance">
-                Forecast-in-a-Box integrates data access, model execution,
-                post-processing, and visualisation in one modular framework,
-                providing the same functionality as large- scale operational
-                systems at a fraction of the computational cost. Leveraging
-                recent progress in data-driven AI models, Forecast-in-a-Box
-                enables high-quality, local forecasts to be generated even on
-                commodity hardware — from desktops to HPC clusters and cloud
-                deployments. Developed within{' '}
-                <Link href="https://destination-earth.eu">
-                  Destination Earth
-                </Link>{' '}
-                and powered by the{' '}
-                <Link href="https://github.com/ecmwf/anemoi">Anemoi</Link> and{' '}
-                <Link href="https://earthkit.ecmwf.int">Earthkit</Link>{' '}
-                open-source libraries, Forecast-in-a-Box demonstrates a
-                sustainable, scalable path toward user-centred digital
-                forecasting services.
+                <Trans
+                  t={t}
+                  i18nKey="stack.paragraph"
+                  components={{
+                    destinE: <Link href="https://destination-earth.eu" />,
+                    anemoi: <Link href="https://github.com/ecmwf/anemoi" />,
+                    earthkit: <Link href="https://earthkit.ecmwf.int" />,
+                  }}
+                />
                 <Button
                   variant="secondary"
                   size="sm"
@@ -45,7 +39,7 @@ export function FiabStackSection() {
                   nativeButton={false}
                   render={
                     <RouterLink to="/about">
-                      <span>Learn More</span>
+                      <span>{t('hero.learnMore')}</span>
                       <ChevronRight className="size-2" />
                     </RouterLink>
                   }
@@ -53,15 +47,17 @@ export function FiabStackSection() {
               </P>
             </div>
           </div>
-          <div className="_pb-12 row-span-2 grid grid-rows-subgrid gap-8 max-md:pt-12 md:pl-12">
-            <H3 className="border-0 pb-0 text-balance">Powered by</H3>
+          <div className="row-span-2 grid grid-rows-subgrid gap-8 max-md:pt-12 md:pl-12">
+            <H3 className="border-0 pb-0 text-balance">
+              {t('stack.poweredBy')}
+            </H3>
             <div className="flex h-full items-center">
               <div className="relative grid w-full grid-cols-2 gap-x-3 gap-y-6 sm:gap-6 lg:grid-cols-2">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <img
                       src="/logos/packages/anemoi.webp"
-                      alt="Anemoi"
+                      alt={t('brand.anemoi')}
                       className="h-24"
                     />
                   </div>
@@ -70,15 +66,14 @@ export function FiabStackSection() {
                     underline={false}
                     color="muted"
                   >
-                    Open-source ML framework for developing, training, and
-                    deploying weather forecasting models
+                    {t('stack.anemoiDescription')}
                   </Link>
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <img
                       src="/logos/packages/earthkit-light.svg"
-                      alt="EarthKit"
+                      alt={t('brand.earthkit')}
                       className="h-24"
                     />
                   </div>
@@ -87,7 +82,7 @@ export function FiabStackSection() {
                     underline={false}
                     color="muted"
                   >
-                    Open-source tools for seamless earth science workflows
+                    {t('stack.earthkitDescription')}
                   </Link>
                 </div>
               </div>

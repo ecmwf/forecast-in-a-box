@@ -20,14 +20,8 @@ import type { ReactNode } from 'react'
 import type { ComponentStatus, StatusComponent } from '@/types/status.types'
 import { STATUS_COMPONENTS } from '@/types/status.types'
 import { useStatus } from '@/api/hooks/useStatus'
+import { SummaryPopover } from '@/components/common/SummaryPopover'
 import { Button } from '@/components/ui/button'
-import {
-  Popover,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 
 interface StatusDetailsPopoverProps {
@@ -39,19 +33,14 @@ interface StatusDetailsPopoverProps {
   side?: 'top' | 'bottom' | 'left' | 'right'
 }
 
-/**
- * Get a human-readable label for a component
- */
-function getComponentLabel(component: StatusComponent): string {
-  const labels: Record<StatusComponent, string> = {
-    api: 'API Server',
-    cascade: 'Cascade',
-    ecmwf: 'ECMWF Data',
-    scheduler: 'Scheduler',
-    plugins: 'Plugins',
-  }
-  return labels[component]
-}
+/** i18n keys (common namespace) for each component's display label. */
+const componentLabelKeys = {
+  api: 'status.apiServer',
+  cascade: 'status.cascade',
+  ecmwf: 'status.ecmwfData',
+  scheduler: 'status.scheduler',
+  plugins: 'status.plugins',
+} as const satisfies Record<StatusComponent, string>
 
 /**
  * Get icon for a component
@@ -79,11 +68,12 @@ const statusTextColors: Record<ComponentStatus, string> = {
   off: 'text-muted-foreground',
 }
 
-const statusLabels: Record<ComponentStatus, string> = {
-  up: 'Online',
-  down: 'Offline',
-  off: 'Disabled',
-}
+/** i18n keys (common namespace) for each status state. */
+const statusLabelKeys = {
+  up: 'status.componentUp',
+  down: 'status.componentDown',
+  off: 'status.componentOff',
+} as const satisfies Record<ComponentStatus, string>
 
 interface ComponentRowProps {
   component: StatusComponent
@@ -95,6 +85,7 @@ interface ComponentRowProps {
  * Renders a single component status row
  */
 function ComponentRow({ component, status, isLoading }: ComponentRowProps) {
+  const { t } = useTranslation('common')
   const isActive = status ? status !== 'off' : true
 
   return (
@@ -109,7 +100,7 @@ function ComponentRow({ component, status, isLoading }: ComponentRowProps) {
         <span className="text-muted-foreground">
           {getComponentIcon(component)}
         </span>
-        <span className="text-sm">{getComponentLabel(component)}</span>
+        <span className="text-sm">{t(componentLabelKeys[component])}</span>
       </div>
       <div className="flex items-center gap-1.5">
         {isLoading ? (
@@ -127,7 +118,7 @@ function ComponentRow({ component, status, isLoading }: ComponentRowProps) {
               )}
             />
             <span className={cn('text-sm', statusTextColors[status])}>
-              {statusLabels[status]}
+              {t(statusLabelKeys[status])}
             </span>
           </>
         ) : null}
@@ -149,57 +140,50 @@ export function StatusDetailsPopover({
   const showLoading = isLoading && componentDetails.length === 0
 
   return (
-    <Popover>
-      <PopoverTrigger
-        render={<button type="button" className="h-full cursor-pointer" />}
-      >
-        {children}
-      </PopoverTrigger>
-      <PopoverContent align={align} side={side} className="w-64">
-        <PopoverHeader>
-          <div className="flex items-center justify-between">
-            <PopoverTitle className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-primary" />
-              {t('status.title')}
-            </PopoverTitle>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => refetch()}
-              disabled={isFetching}
-              className="h-6 w-6"
-            >
-              <RefreshCw
-                className={cn('h-3 w-3', isFetching && 'animate-spin')}
-              />
-            </Button>
-          </div>
-        </PopoverHeader>
-
-        {/* Component Status List */}
-        <div className="space-y-1">
-          {showLoading
-            ? STATUS_COMPONENTS.map((component) => (
-                <ComponentRow key={component} component={component} isLoading />
-              ))
-            : componentDetails.map(({ component, status }) => (
-                <ComponentRow
-                  key={component}
-                  component={component}
-                  status={status}
-                />
-              ))}
-        </div>
-
-        {/* Version */}
-        {version && (
+    <SummaryPopover
+      trigger={children}
+      align={align}
+      side={side}
+      title={
+        <>
+          <Activity className="h-4 w-4 text-primary" />
+          {t('status.title')}
+        </>
+      }
+      headerAction={
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="h-6 w-6"
+        >
+          <RefreshCw className={cn('h-3 w-3', isFetching && 'animate-spin')} />
+        </Button>
+      }
+      footer={
+        version ? (
           <div className="border-t pt-2 text-center">
             <span className="font-mono text-sm text-muted-foreground">
               {version}
             </span>
           </div>
-        )}
-      </PopoverContent>
-    </Popover>
+        ) : undefined
+      }
+    >
+      <div className="space-y-1">
+        {showLoading
+          ? STATUS_COMPONENTS.map((component) => (
+              <ComponentRow key={component} component={component} isLoading />
+            ))
+          : componentDetails.map(({ component, status }) => (
+              <ComponentRow
+                key={component}
+                component={component}
+                status={status}
+              />
+            ))}
+      </div>
+    </SummaryPopover>
   )
 }

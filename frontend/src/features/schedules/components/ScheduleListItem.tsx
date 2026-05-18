@@ -14,46 +14,48 @@
  * A single schedule row in the schedules list.
  */
 
+import { useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
-import { Clock, Eye, MoreVertical, Pause, Play } from 'lucide-react'
+import { Clock, Eye, Pencil } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
 import type { ScheduleDefinitionResponse } from '@/api/types/schedule.types'
+import type { FacetToken } from '@/features/journal/facets/facet-types'
 import { showToast } from '@/lib/toast'
 import { useServerTime, useUpdateSchedule } from '@/api/hooks/useSchedules'
 import { cronToHumanReadable } from '@/features/schedules/utils/cron'
+import { EditScheduleDialog } from '@/features/schedules/components/EditScheduleDialog'
+import { JournalChip } from '@/features/journal/components/JournalChip'
 import {
   STATUS_BADGE_VARIANTS,
   StatusBadge,
 } from '@/components/common/StatusBadge'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { Switch } from '@/components/ui/switch'
 import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
 
 interface ScheduleListItemProps {
   scheduleId: string
   schedule: ScheduleDefinitionResponse
+  /** Clicking a tag chip adds it to the schedules search. */
+  onAddFacet: (token: FacetToken) => void
 }
 
 export function ScheduleListItem({
   scheduleId,
   schedule,
+  onAddFacet,
 }: ScheduleListItemProps) {
   const { t } = useTranslation('schedules')
   const updateSchedule = useUpdateSchedule()
-  const { offsetMs, serverTimeToLocal } = useServerTime()
+  const { offsetMs, serverTimeToLocal, timeZone } = useServerTime()
+  const [editOpen, setEditOpen] = useState(false)
 
-  const createdAt = schedule.created_at
-    ? formatDistanceToNow(serverTimeToLocal(schedule.created_at), {
-        addSuffix: true,
-      })
-    : null
+  const createdAt = formatDistanceToNow(
+    serverTimeToLocal(schedule.created_at),
+    { addSuffix: true },
+  )
 
   const truncatedId =
     scheduleId.length > 12 ? `${scheduleId.slice(0, 12)}...` : scheduleId
@@ -63,11 +65,10 @@ export function ScheduleListItem({
     `${t('detail.untitledSchedule')} ${scheduleId.slice(0, 8)}`
 
   const cronDescription = schedule.cron_expr
-    ? cronToHumanReadable(schedule.cron_expr, offsetMs)
+    ? cronToHumanReadable(schedule.cron_expr, offsetMs, timeZone)
     : null
 
-  async function handleToggleEnabled() {
-    const newEnabled = !schedule.enabled
+  async function handleToggleEnabled(newEnabled: boolean) {
     try {
       await updateSchedule.mutateAsync({
         experimentId: scheduleId,
@@ -85,7 +86,7 @@ export function ScheduleListItem({
   return (
     <div
       className={cn(
-        'p-6 transition-colors hover:bg-muted/50',
+        'group/row p-6 transition-colors hover:bg-muted/50',
         !schedule.enabled && 'opacity-60',
       )}
     >
@@ -124,6 +125,15 @@ export function ScheduleListItem({
                     }
               }
             />
+            {/* Reveal on row hover; always shown where hover is unavailable. */}
+            <button
+              type="button"
+              onClick={() => setEditOpen(true)}
+              aria-label={t('actions.editSchedule')}
+              className="shrink-0 text-muted-foreground opacity-0 transition-[color,opacity] group-focus-within/row:opacity-100 group-hover/row:opacity-100 hover:text-primary [@media(hover:none)]:opacity-100"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
           </div>
           {schedule.display_description && (
             <P className="mb-1 line-clamp-1 text-muted-foreground">
@@ -132,19 +142,20 @@ export function ScheduleListItem({
           )}
           <div className="mb-2 text-sm text-muted-foreground">
             {cronDescription}
-            {createdAt && <> · {createdAt}</>}
+            {' · '}
+            {createdAt}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="rounded border border-border bg-muted px-2 py-0.5 font-mono text-sm text-muted-foreground">
               #{truncatedId}
             </span>
             {schedule.tags?.map((tag) => (
-              <span
+              <JournalChip
                 key={tag}
-                className="rounded border border-border bg-card px-2 py-0.5 text-sm text-muted-foreground"
-              >
-                {tag}
-              </span>
+                label={tag}
+                variant="tag"
+                onClick={() => onAddFacet({ key: 'tag', value: tag })}
+              />
             ))}
           </div>
         </div>
@@ -160,35 +171,28 @@ export function ScheduleListItem({
             }
           >
             <Eye className="h-4 w-4" />
-            {t('actions.viewDetails')}
+            {t('actions.viewRuns')}
           </Button>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button variant="ghost" size="icon" className="h-8 w-8" />
-              }
-            >
-              <MoreVertical className="h-4 w-4" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleToggleEnabled}>
-                {schedule.enabled ? (
-                  <>
-                    <Pause className="mr-2 h-4 w-4" />
-                    {t('actions.disable')}
-                  </>
-                ) : (
-                  <>
-                    <Play className="mr-2 h-4 w-4" />
-                    {t('actions.enable')}
-                  </>
-                )}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Enable/disable toggle */}
+          <Switch
+            checked={schedule.enabled}
+            onCheckedChange={(checked) => handleToggleEnabled(checked)}
+            disabled={updateSchedule.isPending}
+            aria-label={
+              schedule.enabled ? t('actions.disable') : t('actions.enable')
+            }
+          />
         </div>
       </div>
+      <EditScheduleDialog
+        experimentId={scheduleId}
+        version={schedule.experiment_version}
+        cronExpr={schedule.cron_expr}
+        maxDelayHours={schedule.max_acceptable_delay_hours}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+      />
     </div>
   )
 }

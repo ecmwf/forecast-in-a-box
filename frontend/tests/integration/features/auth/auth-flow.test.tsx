@@ -97,8 +97,9 @@ describe('Auth Flow', () => {
     })
 
     it('persists anonymous ID across renders', async () => {
-      // Set up a pre-existing ID
-      localStorage.setItem(STORAGE_KEYS.auth.anonymousId, 'existing-id-123')
+      // Pre-existing ID must be a valid UUID — non-UUIDs are rejected.
+      const existingId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'
+      localStorage.setItem(STORAGE_KEYS.auth.anonymousId, existingId)
 
       const screen = await renderWithProviders(
         <AuthProvider>
@@ -111,7 +112,7 @@ describe('Auth Flow', () => {
         .toHaveTextContent('yes')
 
       expect(localStorage.getItem(STORAGE_KEYS.auth.anonymousId)).toBe(
-        'existing-id-123',
+        existingId,
       )
     })
   })

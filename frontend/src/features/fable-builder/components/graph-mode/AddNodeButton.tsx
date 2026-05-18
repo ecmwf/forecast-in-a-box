@@ -9,7 +9,7 @@
  */
 
 import { memo, useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import type {
   BlockFactory,
@@ -24,7 +24,6 @@ import {
   getBlockKindIcon,
   getFactory,
 } from '@/api/types/fable.types'
-import { Button } from '@/components/ui/button'
 import {
   Popover,
   PopoverContent,
@@ -37,17 +36,8 @@ interface AddNodeButtonProps {
   sourceBlockId: BlockInstanceId
   possibleExpansions: Array<PluginBlockFactoryId>
   catalogue: BlockFactoryCatalogue
-  /** When true, the button adopts the destructive color to signal errors on the parent node */
-  hasErrors?: boolean
-  /** When true, this block already has a downstream connection — hide the button */
-  hasDownstream?: boolean
-}
-
-const POSITION_CLASSES: Record<string, string> = {
-  TB: 'absolute -bottom-4 left-1/2 -translate-x-1/2',
-  LR: 'absolute -right-4 top-1/2 -translate-y-1/2',
-  BT: 'absolute -top-4 left-1/2 -translate-x-1/2',
-  RL: 'absolute -left-4 top-1/2 -translate-y-1/2',
+  /** The block's output `<Handle>` — it doubles as the add-menu trigger. */
+  children: React.ReactElement
 }
 
 const POPOVER_SIDE: Record<string, 'top' | 'bottom' | 'left' | 'right'> = {
@@ -57,13 +47,15 @@ const POPOVER_SIDE: Record<string, 'top' | 'bottom' | 'left' | 'right'> = {
   RL: 'left',
 }
 
+/** Wraps a block's output `<Handle>` with an add-downstream-block popover:
+ *  clicking the handle opens the menu, dragging it still draws a connection. */
 export const AddNodeButton = memo(function ({
   sourceBlockId,
   possibleExpansions,
   catalogue,
-  hasErrors = false,
-  hasDownstream = false,
+  children,
 }: AddNodeButtonProps) {
+  const { t } = useTranslation('configure')
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
 
@@ -147,34 +139,10 @@ export const AddNodeButton = memo(function ({
     setSearch('')
   }
 
-  // Once a downstream block is connected, the output Handle is enough —
-  // the plus button is only for adding the first downstream block.
-  if (hasDownstream) {
-    return null
-  }
-
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        render={
-          <Button
-            size="icon"
-            variant="outline"
-            className={cn(
-              POSITION_CLASSES[layoutDirection],
-              'h-7 w-7 rounded-full',
-              'border-2 bg-background shadow-md hover:bg-background',
-              hasErrors
-                ? 'border-destructive text-destructive hover:border-destructive/70'
-                : 'hover:border-primary hover:text-primary',
-              'nodrag nopan transition-all duration-200',
-            )}
-            onClick={(e) => e.stopPropagation()}
-          />
-        }
-      >
-        <Plus className="h-4 w-4" />
-      </PopoverTrigger>
+      {/* The trigger is the output `<Handle>` (a div), not a native button. */}
+      <PopoverTrigger nativeButton={false} render={children} />
       <PopoverContent
         className="w-72 p-0"
         side={POPOVER_SIDE[layoutDirection]}
@@ -184,7 +152,7 @@ export const AddNodeButton = memo(function ({
       >
         <div className="border-b p-2">
           <Input
-            placeholder="Search blocks..."
+            placeholder={t('addNode.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-8"
@@ -194,7 +162,7 @@ export const AddNodeButton = memo(function ({
         <div className="max-h-64 overflow-y-auto p-1">
           {Object.keys(groupedFactories).length === 0 ? (
             <div className="py-4 text-center text-sm text-muted-foreground">
-              No blocks found
+              {t('addNode.noBlocksFound')}
             </div>
           ) : (
             Object.entries(groupedFactories).map(([kind, factories]) => {

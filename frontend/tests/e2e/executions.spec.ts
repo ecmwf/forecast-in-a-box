@@ -73,7 +73,7 @@ test.describe('Executions List Page', () => {
   })
 
   test('job items display when executions exist', async ({ page }) => {
-    // Look for job ID pills (font-mono spans starting with #)
+    // Job ID pills render the run_id in a font-mono span
     const jobPills = page.locator('.font-mono')
     if (
       await jobPills

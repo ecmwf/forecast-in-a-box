@@ -23,7 +23,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import { FableEdgeComponent } from './FableEdge'
 import { BlockNode } from './nodes/BlockNode'
-import { InlineBlockNode } from './nodes/InlineBlockNode'
+import { BlockDragPreview } from './BlockDragPreview'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import type {
   Connection,
@@ -34,12 +34,14 @@ import type {
 } from '@xyflow/react'
 import type { NodeDimensions } from '@/features/fable-builder/utils/layout-blocks'
 import type { FableNode } from './nodes/BlockNode'
+import { getFactory } from '@/api/types/fable.types'
 import {
   layoutNodes,
   needsLayout,
 } from '@/features/fable-builder/utils/layout-blocks'
 import { fableToGraph } from '@/features/fable-builder/utils/fable-to-graph'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
+import { useSidebarBlockDrop } from '@/features/fable-builder/hooks/useSidebarBlockDrop'
 import { useDebouncedCallback } from '@/hooks/useDebounce'
 import { useMedia } from '@/hooks/useMedia'
 import { useUiStore } from '@/stores/uiStore'
@@ -53,10 +55,6 @@ const nodeTypes: NodeTypes = {
   transformBlock: BlockNode,
   productBlock: BlockNode,
   sinkBlock: BlockNode,
-  sourceBlockInline: InlineBlockNode,
-  transformBlockInline: InlineBlockNode,
-  productBlockInline: InlineBlockNode,
-  sinkBlockInline: InlineBlockNode,
 }
 
 const edgeTypes: EdgeTypes = {
@@ -77,13 +75,20 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   const fitViewTrigger = useFableBuilderStore((state) => state.fitViewTrigger)
   const connectBlocks = useFableBuilderStore((state) => state.connectBlocks)
   const selectBlock = useFableBuilderStore((state) => state.selectBlock)
+  const selectedBlockId = useFableBuilderStore((state) => state.selectedBlockId)
 
   const { fitView, setViewport, getNodesBounds } = useReactFlow()
+  const { onDragOver, onDrop } = useSidebarBlockDrop(catalogue)
 
   const [nodes, setNodes, onNodesChangeInternal] = useNodesState<FableNode>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
   const containerRef = useRef<HTMLDivElement>(null)
+  // Current selection mirrored into a ref so the layout effect can re-apply
+  // it on a block-driven rebuild without depending on it (which would force a
+  // full re-layout on every selection change).
+  const selectedBlockIdRef = useRef(selectedBlockId)
+  selectedBlockIdRef.current = selectedBlockId
   const prevBlocksRef = useRef<typeof fable.blocks | null>(null)
   const prevAutoLayoutRef = useRef(autoLayout)
   const prevLayoutDirectionRef = useRef(layoutDirection)
@@ -94,6 +99,19 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   // growing/shrinking while the user types), which would otherwise jostle
   // the whole graph.
   const measuredNodesRef = useRef<Set<string>>(new Set())
+
+  // Measured node sizes in a ref, so the layout effect lays out with real
+  // heights (→ aligned handles, straight edges) without depending on `nodes`.
+  const nodeDimensionsRef = useRef<NodeDimensions>({})
+  nodeDimensionsRef.current = nodes.reduce<NodeDimensions>((acc, node) => {
+    if (node.measured?.width && node.measured.height) {
+      acc[node.id] = {
+        width: node.measured.width,
+        height: node.measured.height,
+      }
+    }
+    return acc
+  }, {})
 
   // Debounced re-layout function that uses measured node dimensions
   const debouncedRelayout = useDebouncedCallback(() => {
@@ -164,7 +182,12 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
 
     const shouldLayout = autoLayout || needsLayout(newNodes)
     const layouted = shouldLayout
-      ? layoutNodes(newNodes, newEdges, { direction: layoutDirection })
+      ? layoutNodes(
+          newNodes,
+          newEdges,
+          { direction: layoutDirection },
+          nodeDimensionsRef.current,
+        )
       : newNodes
 
     // Detect preset load: going from 0 blocks to multiple blocks
@@ -176,7 +199,15 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
     }
     lastBlockCountRef.current = currentBlockCount
 
-    setNodes(layouted)
+    // Preserve the current selection — `fableToGraph` builds nodes without a
+    // `selected` flag, so re-apply it here for the same-commit rebuild.
+    setNodes(
+      layouted.map((node) =>
+        node.id === selectedBlockIdRef.current
+          ? { ...node, selected: true }
+          : node,
+      ),
+    )
     setEdges(newEdges)
   }, [fable, catalogue, autoLayout, layoutDirection, setNodes, setEdges])
 
@@ -238,6 +269,21 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
     }
   }, [fitViewTrigger, fitView])
 
+  // Reflect the store's selected block onto React Flow's `selected` node flag.
+  // BlockNode reads only that prop, so a selection change re-renders just the
+  // previously- and newly-selected nodes instead of every node on the canvas.
+  useEffect(() => {
+    setNodes((nds) => {
+      const next = nds.map((node) => {
+        const shouldSelect = node.id === selectedBlockId
+        return node.selected === shouldSelect
+          ? node
+          : { ...node, selected: shouldSelect }
+      })
+      return next.some((node, i) => node !== nds[i]) ? next : nds
+    })
+  }, [selectedBlockId, setNodes])
+
   const onConnect = useCallback(
     (connection: Connection) => {
       if (connection.source && connection.target && connection.targetHandle) {
@@ -247,19 +293,26 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
           connection.source,
         )
 
+        // Label the optimistic edge only for multi-input targets (cf. fableToEdges).
+        const targetFactory = getFactory(
+          catalogue,
+          fable.blocks[connection.target].factory_id,
+        )
+        const showLabel = (targetFactory?.inputs.length ?? 0) > 1
+
         setEdges((eds) =>
           addEdge(
             {
               ...connection,
               type: 'fableEdge',
-              data: { inputName: connection.targetHandle },
+              data: { inputName: connection.targetHandle, showLabel },
             },
             eds,
           ),
         )
       }
     },
-    [connectBlocks, setEdges],
+    [connectBlocks, setEdges, fable, catalogue],
   )
 
   const onNodeClick = useCallback(
@@ -269,8 +322,8 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
     [selectBlock],
   )
 
-  // Clicking empty canvas intentionally does NOT deselect the node (Blender
-  // pattern). The sidebar stays with the last-selected node's config. To
+  // Clicking empty canvas intentionally does NOT deselect the node
+  // The sidebar stays with the last-selected node's config. To
   // deselect, use the X button in the ConfigPanel header.
 
   return (
@@ -282,6 +335,8 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         nodesDraggable={!nodesLocked}
@@ -307,6 +362,7 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
           />
         )}
       </ReactFlow>
+      <BlockDragPreview />
     </div>
   )
 }

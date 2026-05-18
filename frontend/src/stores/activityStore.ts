@@ -53,6 +53,13 @@ const COMPLETED_CAP = 50
 function evictOldestCompleted(
   tasks: Partial<Record<string, ActivityTask>>,
 ): Partial<Record<string, ActivityTask>> {
+  // Fast path: with at most COMPLETED_CAP entries total there cannot be more
+  // than COMPLETED_CAP completed ones, so the filter+sort below is never
+  // needed. Skips that work on every addTask/updateTask (download-progress
+  // ticks) until the map actually grows past the cap.
+  const keys = Object.keys(tasks)
+  if (keys.length <= COMPLETED_CAP) return tasks
+
   const entries = Object.entries(tasks).filter(
     (entry): entry is [string, ActivityTask] => entry[1] !== undefined,
   )
@@ -143,7 +150,7 @@ export const useActivityStore = create<ActivityState>()(
             Object.entries(state.tasks).filter(
               ([, task]) => task !== undefined && task.status !== 'active',
             ),
-          ) as Partial<Record<string, ActivityTask>>,
+          ),
         }),
       },
     ),

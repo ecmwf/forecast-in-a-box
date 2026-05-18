@@ -16,6 +16,7 @@ import {
   Sparkles,
   Workflow,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type {
   EdgeStyle,
   LayoutDirection,
@@ -39,6 +40,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 
 export function GraphOptionsDropdown() {
+  const { t } = useTranslation('configure')
   const edgeStyle = useFableBuilderStore((s) => s.edgeStyle)
   const autoLayout = useFableBuilderStore((s) => s.autoLayout)
   const layoutDirection = useFableBuilderStore((s) => s.layoutDirection)
@@ -60,7 +62,7 @@ export function GraphOptionsDropdown() {
             variant="default"
             size="sm"
             className="h-8 w-8 p-0 shadow-sm"
-            aria-label="Graph options"
+            aria-label={t('graphOptions.ariaLabel')}
           />
         }
       >
@@ -68,7 +70,7 @@ export function GraphOptionsDropdown() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuGroup>
-          <DropdownMenuLabel>View</DropdownMenuLabel>
+          <DropdownMenuLabel>{t('graphOptions.view')}</DropdownMenuLabel>
           <DropdownMenuItem
             onClick={() => {
               // Force layout recalculation by enabling auto-layout if needed
@@ -80,36 +82,40 @@ export function GraphOptionsDropdown() {
             }}
           >
             <Sparkles />
-            Tidy up configuration
+            {t('graphOptions.tidyUp')}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setNodesLocked(!nodesLocked)}>
             {nodesLocked ? <Lock /> : <LockOpen />}
-            {nodesLocked ? 'Unlock nodes' : 'Lock nodes'}
+            {nodesLocked
+              ? t('graphOptions.unlockNodes')
+              : t('graphOptions.lockNodes')}
           </DropdownMenuItem>
           <DropdownMenuCheckboxItem
             checked={isMiniMapOpen}
             onCheckedChange={toggleMiniMap}
           >
             <Map />
-            Show minimap
+            {t('graphOptions.showMinimap')}
           </DropdownMenuCheckboxItem>
         </DropdownMenuGroup>
 
         <DropdownMenuSeparator />
 
         <DropdownMenuGroup>
-          <DropdownMenuLabel>Layout</DropdownMenuLabel>
+          <DropdownMenuLabel>{t('graphOptions.layout')}</DropdownMenuLabel>
           <DropdownMenuCheckboxItem
             checked={autoLayout}
             onCheckedChange={setAutoLayout}
           >
             <Workflow />
-            Auto-layout
+            {t('graphOptions.autoLayout')}
           </DropdownMenuCheckboxItem>
 
           {autoLayout && (
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger>Direction</DropdownMenuSubTrigger>
+              <DropdownMenuSubTrigger>
+                {t('graphOptions.direction')}
+              </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 <DropdownMenuRadioGroup
                   value={layoutDirection}
@@ -118,10 +124,10 @@ export function GraphOptionsDropdown() {
                   }
                 >
                   <DropdownMenuRadioItem value="TB">
-                    ↓ Top to Bottom
+                    {t('graphOptions.topToBottom')}
                   </DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="LR">
-                    → Left to Right
+                    {t('graphOptions.leftToRight')}
                   </DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
               </DropdownMenuSubContent>
@@ -132,22 +138,24 @@ export function GraphOptionsDropdown() {
         <DropdownMenuSeparator />
 
         <DropdownMenuGroup>
-          <DropdownMenuLabel>Edges</DropdownMenuLabel>
+          <DropdownMenuLabel>{t('graphOptions.edges')}</DropdownMenuLabel>
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger>Style</DropdownMenuSubTrigger>
+            <DropdownMenuSubTrigger>
+              {t('graphOptions.style')}
+            </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
               <DropdownMenuRadioGroup
                 value={edgeStyle}
                 onValueChange={(value) => setEdgeStyle(value as EdgeStyle)}
               >
                 <DropdownMenuRadioItem value="bezier">
-                  Curved
+                  {t('graphOptions.curved')}
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="smoothstep">
-                  Rounded
+                  {t('graphOptions.rounded')}
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="step">
-                  Orthogonal
+                  {t('graphOptions.orthogonal')}
                 </DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
             </DropdownMenuSubContent>

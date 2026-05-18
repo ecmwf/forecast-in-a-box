@@ -18,10 +18,11 @@
  * - Optional Zod validation for runtime type safety
  */
 
+import i18n from 'i18next'
 import type { ApiError, RequestConfig } from '@/types/api.types'
 import { getBackendBaseUrl } from '@/utils/env'
 import { parseOrThrow } from '@/utils/zod'
-import { STORAGE_KEYS } from '@/lib/storage-keys'
+import { readAnonymousId } from '@/lib/anonymous-id'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('ApiClient')
@@ -46,8 +47,11 @@ export class ApiClientError extends Error {
  *
  * API paths include /api/v1/ prefix (e.g., '/api/v1/status').
  * Base URL is either empty (same-origin) or absolute (remote backend).
+ *
+ * Exported so direct-fetch callers (e.g. blob downloads in endpoints/job.ts)
+ * resolve URLs identically to the apiClient.
  */
-function buildUrl(
+export function buildUrl(
   path: string,
   params?: Record<string, string | number | boolean>,
 ): string {
@@ -85,14 +89,9 @@ async function request<T>(
     ...headers,
   }
 
-  // Add X-Anonymous-ID header if anonymous ID exists in localStorage
-  const anonymousId = localStorage.getItem(STORAGE_KEYS.auth.anonymousId)
-  if (
-    anonymousId &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      anonymousId,
-    )
-  ) {
+  // readAnonymousId yields the stored ID only if it is a valid UUID.
+  const anonymousId = readAnonymousId()
+  if (anonymousId) {
     requestHeaders['X-Anonymous-ID'] = anonymousId
   }
 
@@ -102,6 +101,8 @@ async function request<T>(
       headers: requestHeaders,
       body: body ? JSON.stringify(body) : undefined,
       credentials: 'include', // Include session cookies
+      // Fail closed on 3xx — a cross-origin redirect leaks X-Anonymous-ID.
+      redirect: 'error',
     })
 
     // Handle non-200 responses
@@ -175,7 +176,7 @@ async function request<T>(
     // Handle network errors
     if (error instanceof TypeError) {
       throw new ApiClientError(
-        'Network error: Unable to reach the API server',
+        i18n.t('errors:network.apiUnreachable'),
         undefined,
         'NETWORK_ERROR',
         error,
@@ -184,7 +185,7 @@ async function request<T>(
 
     // Handle other errors
     throw new ApiClientError(
-      error instanceof Error ? error.message : 'An unknown error occurred',
+      error instanceof Error ? error.message : i18n.t('errors:unknown'),
       undefined,
       'UNKNOWN_ERROR',
       error,

@@ -30,8 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { GlyphContext } from '@/features/fable-builder/context/GlyphContext'
-import { ResolvedConfigContext } from '@/features/fable-builder/context/ResolvedConfigContext'
-import { FieldErrorsContext } from '@/features/fable-builder/context/FieldErrorsContext'
+import { BlockValidationProvider } from '@/features/fable-builder/context/BlockValidationContext'
 
 // ---------------------------------------------------------------------------
 // Test data
@@ -75,11 +74,12 @@ function WithGlyphs({
 }) {
   return (
     <GlyphContext.Provider value={glyphs}>
-      <ResolvedConfigContext.Provider value={resolvedConfig}>
-        <FieldErrorsContext.Provider value={fieldErrors}>
-          {children}
-        </FieldErrorsContext.Provider>
-      </ResolvedConfigContext.Provider>
+      <BlockValidationProvider
+        resolvedConfig={resolvedConfig}
+        fieldErrors={fieldErrors}
+      >
+        {children}
+      </BlockValidationProvider>
     </GlyphContext.Provider>
   )
 }
@@ -413,7 +413,7 @@ describe('GlyphFieldWrapper Integration', () => {
   })
 
   describe('Field-level validation errors', () => {
-    it('renders inline error message for the field when FieldErrorsContext has entries', async () => {
+    it('renders inline error message for the field when field errors are present', async () => {
       const screen = await renderWithProviders(
         <ControlledStringField
           initialValue="${runtd}"
@@ -425,7 +425,7 @@ describe('GlyphFieldWrapper Integration', () => {
         .toBeVisible()
     })
 
-    it('does not render an error when FieldErrorsContext is null', async () => {
+    it('does not render an error when there are no field errors', async () => {
       const screen = await renderWithProviders(
         <ControlledStringField initialValue="${runtd}" />,
       )

@@ -19,10 +19,11 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { downloadAction } from '../actions/download'
+import { useJobResultBlob } from '../useJobResult'
 import { pdfjs } from './pdfjs'
+import { viewerHeaderBtn } from './viewerHeaderBtn'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { ViewerProps } from '../types'
-import { getJobResult } from '@/api/endpoints/job'
 import { createLogger } from '@/lib/logger'
 import { showToast } from '@/lib/toast'
 
@@ -37,18 +38,24 @@ export default function PdfViewer({ item, adapter, onClose }: ViewerProps) {
   const [scale, setScale] = useState(1)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
+  // Shared cache — the grid thumbnail for this same output reuses this blob.
+  const { data, error } = useJobResultBlob(item.jobId, item.taskId)
+  const blob = data?.blob
+
   useEffect(() => {
+    if (error) showToast.error(error.message)
+  }, [error])
+
+  useEffect(() => {
+    if (!blob) return
     const state: { cancelled: boolean; loaded: PDFDocumentProxy | null } = {
       cancelled: false,
       loaded: null,
     }
     void (async () => {
       try {
-        const { blob } = await getJobResult(item.jobId, item.taskId)
-
-        if (state.cancelled) return
         const buf = await blob.arrayBuffer()
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- mutated by cleanup
+
         if (state.cancelled) return
         state.loaded = await pdfjs.getDocument({ data: buf }).promise
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- mutated by cleanup
@@ -69,7 +76,7 @@ export default function PdfViewer({ item, adapter, onClose }: ViewerProps) {
         void state.loaded.destroy()
       }
     }
-  }, [item.jobId, item.taskId])
+  }, [blob, item.taskId])
 
   useEffect(() => {
     if (!doc) return
@@ -116,12 +123,6 @@ export default function PdfViewer({ item, adapter, onClose }: ViewerProps) {
   )
   const totalPages = doc?.numPages ?? 0
 
-  // `text-foreground` flips with the theme; on a dark overlay the outline
-  // Button leaves icons invisible, so use a transparent ghost button with
-  // explicit white styling for header controls.
-  const headerBtn =
-    'inline-flex h-8 w-8 items-center justify-center rounded-md text-white/90 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30'
-
   return (
     <div
       role="dialog"
@@ -141,8 +142,8 @@ export default function PdfViewer({ item, adapter, onClose }: ViewerProps) {
           <div className="ml-auto flex items-center gap-1">
             <button
               type="button"
-              aria-label="Previous page"
-              className={headerBtn}
+              aria-label={t('outputs.viewer.previousPage')}
+              className={viewerHeaderBtn}
               onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
               disabled={pageNumber <= 1}
             >
@@ -156,8 +157,8 @@ export default function PdfViewer({ item, adapter, onClose }: ViewerProps) {
             </span>
             <button
               type="button"
-              aria-label="Next page"
-              className={headerBtn}
+              aria-label={t('outputs.viewer.nextPage')}
+              className={viewerHeaderBtn}
               onClick={() =>
                 setPageNumber((p) => Math.min(totalPages || p, p + 1))
               }
@@ -170,8 +171,8 @@ export default function PdfViewer({ item, adapter, onClose }: ViewerProps) {
           <div className="flex items-center gap-1">
             <button
               type="button"
-              aria-label="Zoom out"
-              className={headerBtn}
+              aria-label={t('outputs.viewer.zoomOut')}
+              className={viewerHeaderBtn}
               onClick={zoomOut}
             >
               <ZoomOut className="h-4 w-4" />
@@ -181,8 +182,8 @@ export default function PdfViewer({ item, adapter, onClose }: ViewerProps) {
             </span>
             <button
               type="button"
-              aria-label="Zoom in"
-              className={headerBtn}
+              aria-label={t('outputs.viewer.zoomIn')}
+              className={viewerHeaderBtn}
               onClick={zoomIn}
             >
               <ZoomIn className="h-4 w-4" />
@@ -192,7 +193,7 @@ export default function PdfViewer({ item, adapter, onClose }: ViewerProps) {
           <button
             type="button"
             aria-label={downloadAction.label(t)}
-            className={headerBtn}
+            className={viewerHeaderBtn}
             onClick={() =>
               void downloadAction.run(item, { resolvedAdapter: adapter })
             }
@@ -201,8 +202,8 @@ export default function PdfViewer({ item, adapter, onClose }: ViewerProps) {
           </button>
           <button
             type="button"
-            aria-label="Close"
-            className={headerBtn}
+            aria-label={t('outputs.viewer.close')}
+            className={viewerHeaderBtn}
             onClick={onClose}
           >
             <X className="h-4 w-4" />

@@ -78,9 +78,8 @@ const emptyQube: QubeNode = {
 }
 
 /**
- * Mirrors the canonical example from the qubed docs — a non-AIFS qube with
- * `class → expver → param` shape. Exercises the generic compressed-tree
- * dispatch path.
+ * A non-AIFS qube with `class → expver → foo` shape (no `param` dim, so it
+ * skips the matrix view). Exercises the generic compressed-tree dispatch path.
  */
 const genericQube: QubeNode = {
   key: 'root',

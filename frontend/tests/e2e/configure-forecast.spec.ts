@@ -216,7 +216,7 @@ test.describe('Fable Builder - Form Mode', () => {
       await buttonsToClick.first().click()
       await page.waitForTimeout(1000)
 
-      // Should show "Unsaved" badge in header
+      // Should show the draft-status badge in the header
       const unsavedBadge = page.getByText(/saving draft|draft saved/i)
       if (
         await unsavedBadge
@@ -317,24 +317,63 @@ test.describe('Fable Builder - Graph Mode', () => {
     }
   })
 
-  test('adds multiple blocks and verifies nodes appear', async ({ page }) => {
-    const paletteButtons = page.locator('button[title^="Add "]')
-    const buttonCount = await paletteButtons.count()
-
-    if (buttonCount >= 2) {
-      // Add first block (source)
-      await paletteButtons.first().click()
-      await page.waitForTimeout(1000)
-
-      // Add second block (try a different kind)
-      await paletteButtons.nth(1).click()
-      await page.waitForTimeout(1000)
-
-      // Should have at least 2 nodes
-      const nodes = page.locator('.react-flow__node')
-      const nodeCount = await nodes.count()
-      expect(nodeCount).toBeGreaterThanOrEqual(2)
+  test('graph renders a node for every block in a multi-block fable', async ({
+    page,
+  }) => {
+    // Seed a 3-block fable as a localStorage draft — FableBuilderPage restores
+    // it on mount. Deterministic: avoids adding blocks through the palette,
+    // whose availability is validation-driven and raced the catalogue
+    // round-trip, which made the old "add two blocks" flow flaky.
+    const draft = {
+      fable: {
+        blocks: {
+          block_source_1: {
+            factory_id: {
+              plugin: { store: 'ecmwf', local: 'ecmwf-base' },
+              factory: 'ekdSource',
+            },
+            configuration_values: {
+              source: 'mars',
+              date: '2024-01-15',
+              expver: '0001',
+            },
+            input_ids: {},
+          },
+          block_product_1: {
+            factory_id: {
+              plugin: { store: 'ecmwf', local: 'ecmwf-base' },
+              factory: 'ensembleStatistics',
+            },
+            configuration_values: { variable: '2t', statistic: 'mean' },
+            input_ids: { dataset: 'block_source_1' },
+          },
+          block_sink_1: {
+            factory_id: {
+              plugin: { store: 'ecmwf', local: 'ecmwf-base' },
+              factory: 'zarrSink',
+            },
+            configuration_values: {
+              path: '/data/output/european_temperature.zarr',
+            },
+            input_ids: { dataset: 'block_product_1' },
+          },
+        },
+      },
+      fableId: null,
+      fableName: 'European Temperature Forecast',
+      fableVersion: null,
+      savedAt: Date.now(),
     }
+    await page.addInitScript((value) => {
+      window.localStorage.setItem('fiab.fable.draft', value)
+    }, JSON.stringify(draft))
+
+    await navigateTo(page, '/configure')
+
+    // 3 blocks → 3 graph nodes.
+    await expect(page.locator('.react-flow__node')).toHaveCount(3, {
+      timeout: 15000,
+    })
   })
 
   test('switches between graph and form mode preserving state', async ({
@@ -473,13 +512,13 @@ test.describe('Fable Builder - Save & Load', () => {
             await saveAction.click()
             await page.waitForTimeout(2000)
 
-            // Unsaved badge should disappear
+            // Draft-status badge should disappear
             const unsavedBadge = page.getByText(/saving draft|draft saved/i)
             const isUnsavedVisible = await unsavedBadge
               .first()
               .isVisible({ timeout: 2000 })
               .catch(() => false)
-            // After save, unsaved should not be visible
+            // After save, the draft badge should not be visible
             if (!isUnsavedVisible) {
               expect(isUnsavedVisible).toBe(false)
             }
@@ -522,7 +561,7 @@ test.describe('Fable Builder - Save & Load', () => {
         await paletteButtons.nth(1).click()
         await page.waitForTimeout(1000)
 
-        // Unsaved badge should reappear
+        // Draft-status badge should reappear
         const unsavedBadge = page.getByText(/saving draft|draft saved/i)
         if (
           await unsavedBadge

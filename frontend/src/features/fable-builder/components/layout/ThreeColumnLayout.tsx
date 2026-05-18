@@ -10,6 +10,7 @@
 
 import { useCallback, useRef } from 'react'
 import { RotateCcw } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { PanelToggleHandle } from './PanelToggleHandle'
 import type { ReactNode } from 'react'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
@@ -72,6 +73,7 @@ export function ThreeColumnLayout({
   canvas,
   rightSidebar,
 }: ThreeColumnLayoutProps): ReactNode {
+  const { t } = useTranslation('configure')
   const isPaletteOpen = useFableBuilderStore((s) => s.isPaletteOpen)
   const isConfigPanelOpen = useFableBuilderStore((s) => s.isConfigPanelOpen)
   const togglePalette = useFableBuilderStore((s) => s.togglePalette)
@@ -128,13 +130,15 @@ export function ThreeColumnLayout({
                       e.stopPropagation()
                       resetLeftWidth()
                     }}
-                    aria-label="Reset sidebar width"
+                    aria-label={t('layout.resetSidebarWidth')}
                   />
                 }
               >
                 <RotateCcw className="h-2.5 w-2.5 text-muted-foreground" />
               </TooltipTrigger>
-              <TooltipContent side="right">Reset sidebar width</TooltipContent>
+              <TooltipContent side="right">
+                {t('layout.resetSidebarWidth')}
+              </TooltipContent>
             </Tooltip>
           </div>
         )}
@@ -142,7 +146,11 @@ export function ThreeColumnLayout({
           isOpen={isPaletteOpen}
           onToggle={togglePalette}
           position="left"
-          label={isPaletteOpen ? 'Hide block palette' : 'Show block palette'}
+          label={
+            isPaletteOpen
+              ? t('layout.hideBlockPalette')
+              : t('layout.showBlockPalette')
+          }
         />
       </div>
 
@@ -165,13 +173,15 @@ export function ThreeColumnLayout({
                       e.stopPropagation()
                       resetRightWidth()
                     }}
-                    aria-label="Reset sidebar width"
+                    aria-label={t('layout.resetSidebarWidth')}
                   />
                 }
               >
                 <RotateCcw className="h-2.5 w-2.5 text-muted-foreground" />
               </TooltipTrigger>
-              <TooltipContent side="left">Reset sidebar width</TooltipContent>
+              <TooltipContent side="left">
+                {t('layout.resetSidebarWidth')}
+              </TooltipContent>
             </Tooltip>
           </div>
         )}
@@ -179,7 +189,11 @@ export function ThreeColumnLayout({
           isOpen={isConfigPanelOpen}
           onToggle={toggleConfigPanel}
           position="right"
-          label={isConfigPanelOpen ? 'Hide config panel' : 'Show config panel'}
+          label={
+            isConfigPanelOpen
+              ? t('layout.hideConfigPanel')
+              : t('layout.showConfigPanel')
+          }
         />
       </div>
 

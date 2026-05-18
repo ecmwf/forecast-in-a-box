@@ -11,11 +11,8 @@
 /**
  * Language Synchronization Hook
  *
- * Synchronizes language between configStore (server config) and:
- * - globalStore (legacy locale storage)
- * - i18next (internationalization library)
- *
- * The source of truth is configStore.language (from server config).
+ * Pushes the language from configStore (server config) into i18next.
+ * configStore.language is the source of truth.
  */
 
 import { useEffect } from 'react'

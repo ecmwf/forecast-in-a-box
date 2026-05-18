@@ -15,6 +15,7 @@
  * Commands are organized by category and can be filtered by route context.
  */
 
+import type { HotkeySequence } from '@tanstack/react-hotkeys'
 import type { ReactNode } from 'react'
 
 /**
@@ -34,8 +35,8 @@ export interface Command {
   description?: string
   /** Optional icon */
   icon?: ReactNode
-  /** Optional keyboard shortcut display (e.g., "⌘K") */
-  shortcut?: string
+  /** Optional global keyboard shortcut, as a key sequence (e.g. ['G', 'D']) */
+  hotkey?: HotkeySequence
   /** Category for grouping */
   category: CommandCategory
   /** Search keywords/aliases */

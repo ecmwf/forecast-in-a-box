@@ -8,7 +8,6 @@
  * does it submit to any jurisdiction.
  */
 
-import { URL, fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import viteReact from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -40,20 +39,49 @@ export default defineConfig(({ mode }) => {
         : []),
     ],
     resolve: {
-      alias: {
-        '@': fileURLToPath(new URL('./src', import.meta.url)),
-        '@tests': fileURLToPath(new URL('./tests', import.meta.url)),
-      },
+      tsconfigPaths: true,
     },
     build: {
       sourcemap: false,
       chunkSizeWarningLimit: 500,
-      rollupOptions: {
+      rolldownOptions: {
         output: {
-          manualChunks: {
-            vendor: ['react', 'react-dom'],
-            router: ['@tanstack/react-router'],
-            query: ['@tanstack/react-query'],
+          codeSplitting: {
+            groups: [
+              { name: 'vendor', test: /node_modules[\\/]react(-dom)?[\\/]/ },
+              {
+                name: 'router',
+                test: /node_modules[\\/]@tanstack[\\/]react-router[\\/]/,
+              },
+              {
+                name: 'query',
+                test: /node_modules[\\/]@tanstack[\\/]react-query[\\/]/,
+              },
+              // Heavy shared libs — carve into dedicated chunks so they are
+              // not duplicated into / bundled with individual route chunks.
+              {
+                name: 'charts',
+                test: /node_modules[\\/](recharts|d3-[^\\/]+|victory-vendor)[\\/]/,
+              },
+              {
+                name: 'flow',
+                test: /node_modules[\\/](@xyflow[\\/]react|@dagrejs[\\/][^\\/]+)[\\/]/,
+              },
+              {
+                name: 'three',
+                test: /node_modules[\\/]three[\\/]/,
+              },
+              {
+                name: 'datefns',
+                test: /node_modules[\\/]date-fns[\\/]/,
+              },
+              // i18n namespace JSON — split out so translation strings load
+              // as their own chunk instead of inflating the main bundle.
+              {
+                name: 'locales',
+                test: /[\\/]src[\\/]locales[\\/]/,
+              },
+            ],
           },
         },
       },

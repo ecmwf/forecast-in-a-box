@@ -50,6 +50,9 @@
   "list": {
     "loading": "Loading schedules..."
   },
+  "errors": {
+    "scheduleNotFound": "Schedule not found"
+  },
   "pagination": {
     "previous": "Previous",
     "next": "Next",

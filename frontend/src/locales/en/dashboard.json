@@ -2,6 +2,7 @@
   "welcome": {
     "title": "Welcome back, {{name}}",
     "titleAnonymous": "Welcome back",
+    "userFallback": "User",
     "stats": {
       "systemStatus": "System Status",
       "checking": "Checking...",
@@ -27,6 +28,18 @@
       "totalJobs": "Total",
       "noActiveJobs": "No active jobs"
     },
+    "activity": {
+      "title": "Forecast activity",
+      "summary_one": "{{count}} forecast in the last 6 months",
+      "summary_other": "{{count}} forecasts in the last 6 months"
+    },
+    "models": {
+      "readyToUse": "Ready to use",
+      "incompatible": "Not compatible",
+      "notDownloaded": "Not downloaded",
+      "total": "Total models",
+      "manage": "Manage models"
+    },
     "actions": {
       "managePlugins": "Manage Plugins",
       "manageSources": "Manage Sources",
@@ -48,6 +61,7 @@
   "gettingStarted": {
     "title": "Getting Started Presets",
     "subtitle": "Choose how to start your forecast configuration",
+    "recommended": "Recommended",
     "quickStart": {
       "title": "Quick Start",
       "description": "Start with optimised defaults using the ECMWF plugin blocks and run immediately.",
@@ -141,5 +155,19 @@
   "notification": {
     "newModels": "New models and model versions have been published in the",
     "registryLink": "ECMWF registry"
+  },
+  "mock": {
+    "models": {
+      "aifs": "AIFS Single",
+      "metNorwayMl": "MetNorway-ML",
+      "aicon": "AICON",
+      "aifsEns": "AIFS ENS"
+    },
+    "topics": {
+      "extremeWeather": "Best practices for extreme weather forecasting",
+      "modelAccuracy": "Comparing forecast model accuracy",
+      "optimizingRuntime": "Tips for optimizing forecast runtime",
+      "regionalModels": "Regional model recommendations"
+    }
   }
 }
