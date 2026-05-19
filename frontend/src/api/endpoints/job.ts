@@ -24,7 +24,7 @@ import {
   JobExecutionDetailSchema,
   JobExecutionListSchema,
 } from '@/api/types/job.types'
-import { ApiClientError, apiClient, buildUrl } from '@/api/client'
+import { apiClient, apiErrorFromResponse, buildUrl } from '@/api/client'
 import { API_ENDPOINTS } from '@/api/endpoints'
 import { readAnonymousId } from '@/lib/anonymous-id'
 
@@ -90,9 +90,9 @@ export async function getJobResult(
   })
 
   if (!response.ok) {
-    throw new ApiClientError(
+    throw await apiErrorFromResponse(
+      response,
       `Failed to fetch result: ${response.statusText}`,
-      response.status,
     )
   }
 
@@ -126,9 +126,9 @@ export async function getJobResultHead(
   })
 
   if (!response.ok) {
-    throw new ApiClientError(
+    throw await apiErrorFromResponse(
+      response,
       `Failed to fetch result head: ${response.statusText}`,
-      response.status,
     )
   }
 
@@ -148,9 +148,9 @@ export async function downloadJobLogs(runId: string): Promise<Blob> {
   })
 
   if (!response.ok) {
-    throw new ApiClientError(
+    throw await apiErrorFromResponse(
+      response,
       `Failed to download logs: ${response.statusText}`,
-      response.status,
     )
   }
 

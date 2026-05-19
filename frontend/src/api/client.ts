@@ -73,6 +73,42 @@ export function buildUrl(
 }
 
 /**
+ * Build an ApiClientError from a failed Response, preferring the FastAPI
+ * `detail` body and falling back to `fallbackMessage`.
+ */
+export async function apiErrorFromResponse(
+  response: Response,
+  fallbackMessage: string,
+): Promise<ApiClientError> {
+  let message = fallbackMessage
+  let details: unknown
+
+  try {
+    const errorData = (await response.json()) as ApiError
+    // FastAPI errors are { detail }; our schema uses { message }.
+    const detail = (errorData as unknown as { detail?: unknown }).detail
+    if (typeof detail === 'string') {
+      message = errorData.message || detail || fallbackMessage
+    } else if (typeof detail === 'object' && detail !== null) {
+      message = errorData.message || fallbackMessage
+      details = detail
+    } else {
+      message = errorData.message || fallbackMessage
+    }
+    if (!details) details = errorData.details
+  } catch {
+    // Body absent or not JSON — keep the fallback message.
+  }
+
+  return new ApiClientError(
+    message,
+    response.status,
+    String(response.status),
+    details,
+  )
+}
+
+/**
  * Make an API request with optional Zod validation
  */
 async function request<T>(
@@ -107,34 +143,10 @@ async function request<T>(
 
     // Handle non-200 responses
     if (!response.ok) {
-      let errorMessage = `HTTP ${response.status}: ${response.statusText}`
-      let errorDetails: unknown
-
-      try {
-        const errorData = (await response.json()) as ApiError
-        // FastAPI returns errors as { detail: "..." } (string or object),
-        // our schema uses { message: "..." }
-        const detail = (errorData as unknown as { detail?: unknown }).detail
-        if (typeof detail === 'string') {
-          errorMessage = errorData.message || detail || errorMessage
-        } else if (typeof detail === 'object' && detail !== null) {
-          errorMessage = errorData.message || `HTTP ${response.status}`
-          errorDetails = detail
-        } else {
-          errorMessage = errorData.message || errorMessage
-        }
-        if (!errorDetails) errorDetails = errorData.details
-      } catch {
-        // If response is not JSON, use the status text
-      }
-
-      // Return early with error
       return Promise.reject(
-        new ApiClientError(
-          errorMessage,
-          response.status,
-          String(response.status),
-          errorDetails,
+        await apiErrorFromResponse(
+          response,
+          `HTTP ${response.status}: ${response.statusText}`,
         ),
       )
     }
