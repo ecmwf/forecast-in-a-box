@@ -9,6 +9,7 @@
 
 
 from datetime import date
+from unittest.mock import MagicMock
 
 import pytest
 from fiab_core.fable import (
@@ -25,12 +26,16 @@ from fiab_core.fable import (
     BlockInstance as BlockInstanceBase,
 )
 from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
+from qubed import Qube
 
+from fiab_plugin_ecmwf import plugin
 from fiab_plugin_ecmwf.anemoi.utils import get_checkpoint_enum_type
 from fiab_plugin_ecmwf.blocks import (
+    VARIABLE,
     EkdSource,
     EnsembleStatistics,
     MapPlotSink,
+    SelectVariable,
     TemporalStatistics,
     ZarrSink,
 )
@@ -124,6 +129,22 @@ def temporal_statistics_configuration() -> BlockInstance:
             ),
         ),
         TemporalStatistics.configuration_options,
+    )
+
+
+@pytest.fixture
+def select_variable_configuration() -> BlockInstance:
+    return BlockInstance.from_block(
+        BlockInstanceBase(
+            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="SelectVariable"),  # type: ignore
+            input_ids={"dataset": BlockInstanceId("source_output")},
+            configuration_values=_config(
+                {
+                    "variable": "2t",
+                }
+            ),
+        ),
+        SelectVariable.configuration_options,
     )
 
 
@@ -337,6 +358,51 @@ class TestZarrSink:
             inputs={"dataset": temporal_output},  # type: ignore[dict-item]
         ).get_or_raise()
         assert isinstance(output, NoOutput)
+
+
+class TestSelectVariable:
+    def test_catalogue_value_type_is_canonical(self) -> None:
+        assert SelectVariable.configuration_options[VARIABLE].value_type == "str"
+
+    def test_from_ekdsource(self, select_variable_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
+        block = SelectVariable()
+        assert block.intersect(other=ekdsource_output)  # type: ignore[arg-type]
+        output = block.validate(block=select_variable_configuration, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
+        assert isinstance(output, QubedOutput)
+        assert output.dataqube is not None
+        assert axes(output)["param"] == {"2t"}
+
+    def test_missing_variable(self, select_variable_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
+        block = SelectVariable()
+        config = select_variable_configuration.model_copy(update={"configuration_values": _config({"variable": "nonexistent"})})
+        result = block.validate(block=config, inputs={"dataset": ekdsource_output})  # type: ignore[dict-item]
+        with pytest.raises(Exception, match="variable nonexistent is not in the input parameters"):
+            result.get_or_raise()
+
+    def test_compile_calls_select(self, select_variable_configuration: BlockInstance) -> None:
+        block = SelectVariable()
+        input_action = MagicMock()
+        selected_action = MagicMock()
+        input_action.select.return_value = selected_action
+
+        result = block.compile(
+            inputs={BlockInstanceId("source_output"): input_action},  # type: ignore[dict-item]
+            block_id=BlockInstanceId("select_variable"),
+            block=select_variable_configuration,
+        )
+        assert result.t is selected_action
+        input_action.select.assert_called_once_with({ConfigurationOptionId("param"): "2t"})
+
+    def test_expander_adds_variable_restrictions(self, ekdsource_output: QubedOutput) -> None:
+        expansions = plugin().expander(ekdsource_output)
+        select_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("selectVariable"))
+        assert select_expansion.restrictions[VARIABLE].serialize() == "enumClosed[2t,msl]"
+
+    def test_expander_skips_restriction_for_non_string_axes(self) -> None:
+        output = QubedOutput(dataqube=Qube.from_datacube({"param": [1, 2]}))
+        expansions = plugin().expander(output)
+        select_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("selectVariable"))
+        assert select_expansion.restrictions == {}
 
 
 def test_anemoi_catalogue_value_types_are_canonical(registered_provider: None) -> None:
