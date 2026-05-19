@@ -228,9 +228,11 @@ def grib_sink_configuration() -> BlockInstance:
     return BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="GribSink"),  # type: ignore
         input_ids={"dataset": BlockInstanceId("source_output")},
-        configuration_values={
-            "path": "/path/to/output.grib2",
-        },
+        configuration_values=_config(
+            {
+                "path": "/path/to/output.grib2",
+            }
+        ),
     )
 
 
@@ -635,6 +637,7 @@ class TestSelectMembers:
 
 def test_anemoi_catalogue_value_types_are_canonical(registered_provider: None) -> None:
     assert get_checkpoint_enum_type() == "enumClosed['dummy_store:dummy_ckpt']"
+
 
 class TestGribSink:
     def test_from_ekdsource(self, grib_sink_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
