@@ -18,13 +18,15 @@ from fiab_core.fable import (
     BlockInstanceId,
     BlockInstanceOutput,
     ConfigurationOptionId,
+    ConfigurationOptionRestriction,
     NoOutput,
     QubedOutput,
     RawOutput,
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
-from fiab_core.tools.blocks import Product, Sink, Source
+from fiab_core.tools.blocks import Product, Sink, Source, Transform
+from fiab_core.types import ClosedEnumType
 from qubed import Qube
 
 from .qubed_utils import axes, contains, coxpand, dimensions
@@ -37,6 +39,7 @@ STATISTIC = ConfigurationOptionId("statistic")
 PATH = ConfigurationOptionId("path")
 DOMAIN = ConfigurationOptionId("domain")
 FORMAT = ConfigurationOptionId("format")
+VARIABLE = ConfigurationOptionId("variable")
 
 IFS_REQUEST = {
     "class": "od",
@@ -187,10 +190,7 @@ class EnsembleStatistics(Product):
     inputs: list[str] = ["dataset"]
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_dataset = inputs.get("dataset")
-        if not isinstance(input_dataset, QubedOutput):
-            actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
-            return Either.error(f"Unsupported input type for 'dataset': expected QubedOutput, got {actual_type}")
+        input_dataset = inputs["dataset"]
 
         param = block.config_as_str(PARAM_DIM)
         if not contains(input_dataset, {PARAM_DIM: param}):
@@ -235,10 +235,7 @@ class TemporalStatistics(Product):
     inputs: list[str] = ["dataset"]
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_dataset = inputs.get("dataset")
-        if not isinstance(input_dataset, QubedOutput):
-            actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
-            return Either.error(f"Unsupported input type for 'dataset': expected QubedOutput, got {actual_type}")
+        input_dataset = inputs["dataset"]
 
         param = block.config_as_str(PARAM_DIM)
         if not contains(input_dataset, {PARAM_DIM: param}):
@@ -306,6 +303,49 @@ class ZarrSink(Sink):
 
     def intersect(self, other: QubedOutput) -> bool:
         return bool(dimensions(other))
+
+
+class SelectVariable(Transform):
+    title: str = "Select Variable"
+    description: str = "Select one variable from the input dataset"
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
+        VARIABLE: BlockConfigurationOption(
+            title="Variable",
+            description="Variable to select from the dataset",
+            value_type="str",
+        )
+    }
+    inputs: list[str] = ["dataset"]
+
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_dataset = inputs.get("dataset")
+        if not isinstance(input_dataset, QubedOutput):
+            actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
+            return Either.error(f"Unsupported input type for 'dataset': expected QubedOutput, got {actual_type}")
+
+        variable = block.config_as_str(VARIABLE)
+        if not contains(input_dataset, {PARAM_DIM: variable}):
+            return Either.error(f"variable {variable} is not in the input parameters: {axes(input_dataset).get(PARAM_DIM, [])}")
+
+        output = coxpand(input_dataset, PARAM_DIM, {PARAM_DIM: [variable]})
+        return Either.ok(output)
+
+    def compile(
+        self,
+        inputs: ActionLookup,
+        block_id: BlockInstanceId,
+        block: BlockInstance,
+    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_task = block.input_ids["dataset"]
+        selected = inputs[input_task].select({PARAM_DIM: block.config_as_str(VARIABLE)})
+        return Either.ok(selected)
+
+    def restrictions(self, other: QubedOutput) -> ConfigurationOptionRestriction:
+        values = [value for value in axes(other).get(PARAM_DIM, set()) if isinstance(value, str)]
+        return {VARIABLE: ClosedEnumType(sorted(values))} if values else {}
+
+    def intersect(self, other: QubedOutput) -> bool:
+        return contains(other, PARAM_DIM)
 
 
 class MapPlotSink(Sink):

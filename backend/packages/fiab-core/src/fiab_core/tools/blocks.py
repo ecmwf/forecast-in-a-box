@@ -25,6 +25,7 @@ from fiab_core.fable import (
     BlockInstanceOutput,
     BlockKind,
     ConfigurationOptionId,
+    ConfigurationOptionRestriction,
     QubedOutput,
 )
 from fiab_core.plugin import Error
@@ -171,6 +172,9 @@ class QubedBlockBuilder(abc.ABC):
 
     def intersect(self, other: QubedOutput) -> bool:
         raise NotImplementedError
+
+    def restrictions(self, other: QubedOutput) -> ConfigurationOptionRestriction:
+        return {}
 
     def as_catalogue(self) -> BlockFactory:
         return BlockFactory(

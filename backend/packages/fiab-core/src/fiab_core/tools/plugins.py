@@ -52,7 +52,7 @@ class QubedPluginBuilder:
         expansions: list[BlockExpansion] = []
         for factory_id, factory in self.block_builders.items():
             if factory.intersect(block):
-                expansions.append(BlockExpansion(factory=factory_id))
+                expansions.append(BlockExpansion(factory=factory_id, restrictions=factory.restrictions(block)))
         return expansions
 
     def compile(

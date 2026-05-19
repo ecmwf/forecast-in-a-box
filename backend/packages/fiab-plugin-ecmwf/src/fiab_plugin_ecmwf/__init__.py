@@ -12,12 +12,13 @@ from fiab_core.tools.blocks import QubedBlockBuilder
 from fiab_core.tools.plugins import QubedPluginBuilder
 
 from fiab_plugin_ecmwf.anemoi.blocks import AnemoiSource, AnemoiTransform
-from fiab_plugin_ecmwf.blocks import EkdSource, EnsembleStatistics, MapPlotSink, TemporalStatistics, ZarrSink
+from fiab_plugin_ecmwf.blocks import EkdSource, EnsembleStatistics, MapPlotSink, SelectVariable, TemporalStatistics, ZarrSink
 
 blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
     BlockFactoryId("ekdSource"): EkdSource(),
     BlockFactoryId("ensembleStatistics"): EnsembleStatistics(),
     BlockFactoryId("temporalStatistics"): TemporalStatistics(),
+    BlockFactoryId("selectVariable"): SelectVariable(),
     BlockFactoryId("zarrSink"): ZarrSink(),
     BlockFactoryId("anemoiSource"): AnemoiSource(),
     BlockFactoryId("anemoiTransform"): AnemoiTransform(),
