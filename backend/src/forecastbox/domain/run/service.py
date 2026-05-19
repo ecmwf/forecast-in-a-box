@@ -245,10 +245,10 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
         if detailed_report:
             try:
                 compilation_detail = retrieve_compilation_detail(run_id)
-                task_to_block = compilation_detail.task_to_block
-            except (CompilationDetailNotFound, CompilationDetailCorrupted):
+                task_to_block = {task_id: td.block for task_id, td in compilation_detail.task_detail.items()}
+            except (CompilationDetailNotFound, CompilationDetailCorrupted) as e:
                 detailed_report = False
-                warning_error = "unable to provide completed/planned tasks"
+                warning_error = f"unable to provide completed/planned tasks: {repr(e)}"
 
         try:
             response = client.request_response(

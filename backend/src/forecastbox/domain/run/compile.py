@@ -10,7 +10,6 @@
 """Compilation of a BlueprintBuilder into an ExecutionSpecification."""
 
 from datetime import datetime
-from typing import cast
 
 from cascade.low.core import DatasetId, TaskId
 from cascade.low.func import assert_never
@@ -26,7 +25,7 @@ from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_va
 from forecastbox.domain.glyphs.resolution import merge_glyph_values, resolve_configurations
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.domain.run.cascade import ExecutionSpecification, RawCascadeJob, RunOutputCharacteristic, RunOutputs
-from forecastbox.domain.run.detail import CompilationDetail, TaskDetail, fluentNode_to_detail
+from forecastbox.domain.run.detail import CompilationDetail, TaskDetail, _fluentName_to_taskId, fluentNode_to_detail
 from forecastbox.domain.run.types import RunId
 from forecastbox.utility.graph import topological_order
 from forecastbox.utility.time import value_dt2str
@@ -87,8 +86,6 @@ def compile_builder(
     plugins = PluginManager.plugins
     action_lookup = {}
     block_outputs: dict[BlockInstanceId, BlockInstanceOutput] = {}
-    # Maps any produced cascade TaskId (node.name) → originating BlockInstanceId.
-    task_to_block: dict[TaskId, BlockInstanceId] = {}
     # Maps any produced cascade TaskId → TaskDetail.
     task_detail: dict[TaskId, TaskDetail] = {}
     # Maps sink block ids to mime type used in RunOutputs (only relevant for external outputs).
@@ -131,12 +128,11 @@ def compile_builder(
         if block_factory.kind == "sink":
             block_graph = action_lookup[blockId].graph()
             for node in block_graph.nodes():
-                task_id = cast(TaskId, node.name)  # TODO hack -- expose a proper interface for the name→taskId conversion in cascade
-                task_to_block[task_id] = blockId
-                task_detail[task_id] = fluentNode_to_detail(node, blockId)
+                task_id, detail = fluentNode_to_detail(node, blockId)
+                task_detail[task_id] = detail
             sink_tasks.update(
-                cast(TaskId, node.name)
-                for node in block_graph.sinks  # TODO hack -- expose a proper interface for the name→taskId conversion in cascade
+                _fluentName_to_taskId(node.name)
+                for node in block_graph.sinks
                 if not node.name.startswith("run_as_earthkit")  # TODO this may not be relevant anymore -- verify on real workflows
             )
 
@@ -153,8 +149,8 @@ def compile_builder(
 
     run_outputs: dict[TaskId, RunOutputCharacteristic] = {
         task_id: RunOutputCharacteristic(
-            original_block=task_to_block[task_id],
-            mime_type=block_to_mime[task_to_block[task_id]],
+            original_block=task_detail[task_id].block,
+            mime_type=block_to_mime[task_detail[task_id].block],
         )
         for task_id in sink_tasks
     }
@@ -167,5 +163,5 @@ def compile_builder(
         environment = blueprint.environment.model_copy(update={"runtime_artifacts": merged_artifacts})
     else:
         environment = EnvironmentSpecification(runtime_artifacts=graph_artifacts)
-    compilation_detail = CompilationDetail(task_to_block=task_to_block, task_detail=task_detail)
+    compilation_detail = CompilationDetail(task_detail=task_detail)
     return ExecutionSpecification(job=job, environment=environment), RunOutputs(outputs=run_outputs), compilation_detail

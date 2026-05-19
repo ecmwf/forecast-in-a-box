@@ -312,15 +312,9 @@ async def get_compilation_detail(
     """Return task-level compilation detail for a run.
 
     If ``block_id`` is provided, only tasks belonging to that block are returned.
-    Returns 404 if the run is not found or if no compilation detail is available
-    (e.g. the run has not yet been submitted, or the cache entry has expired).
+    Returns 404 if no compilation detail is available (e.g. run not yet submitted,
+    or cache entry expired).
     """
-    try:
-        await db.get_run(spec.run_id, spec.attempt_count, auth_context=auth_context)
-    except RunNotFound:
-        raise HTTPException(status_code=404, detail=f"Run {spec.run_id!r} not found.")
-    except RunAccessDenied:
-        raise HTTPException(status_code=403, detail=f"Access denied to execution {spec.run_id!r}.")
     try:
         detail = retrieve_compilation_detail(spec.run_id)
     except CompilationDetailNotFound:

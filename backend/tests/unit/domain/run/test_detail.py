@@ -17,6 +17,7 @@ from fiab_core.fable import BlockInstanceId
 from forecastbox.domain.run.detail import (
     CompilationDetail,
     TaskDetail,
+    _fluentName_to_taskId,
     fluentNode_to_detail,
     retrieve_compilation_detail,
     store_compilation_detail,
@@ -60,7 +61,8 @@ def _make_node(name: str, parent_names: list[str]) -> SimpleNamespace:
 def test_fluentNode_to_detail_source_node() -> None:
     """A source node has no inputs, so parents should be empty."""
     node = _make_node("source_42:abc123", [])
-    detail = fluentNode_to_detail(node, BlockInstanceId("my_block"))  # type: ignore[arg-type]
+    task_id, detail = fluentNode_to_detail(node, BlockInstanceId("my_block"))  # type: ignore[arg-type]
+    assert task_id == TaskId("source_42:abc123")
     assert detail.block == BlockInstanceId("my_block")
     assert detail.display_name == "source_42:abc123"
     assert detail.parents == []
@@ -69,7 +71,8 @@ def test_fluentNode_to_detail_source_node() -> None:
 def test_fluentNode_to_detail_sink_node_with_parent() -> None:
     """A sink node has one input whose parent name becomes its parent task_id."""
     node = _make_node("sink_file:def456", ["source_42:abc123"])
-    detail = fluentNode_to_detail(node, BlockInstanceId("sink_block"))  # type: ignore[arg-type]
+    task_id, detail = fluentNode_to_detail(node, BlockInstanceId("sink_block"))  # type: ignore[arg-type]
+    assert task_id == TaskId("sink_file:def456")
     assert detail.block == BlockInstanceId("sink_block")
     assert detail.display_name == "sink_file:def456"
     assert detail.parents == [TaskId("source_42:abc123")]
@@ -78,7 +81,7 @@ def test_fluentNode_to_detail_sink_node_with_parent() -> None:
 def test_fluentNode_to_detail_multiple_parents() -> None:
     """A node with multiple inputs gets all parent task_ids."""
     node = _make_node("join_node:ghi789", ["left:aaa", "right:bbb"])
-    detail = fluentNode_to_detail(node, BlockInstanceId("join_block"))  # type: ignore[arg-type]
+    _, detail = fluentNode_to_detail(node, BlockInstanceId("join_block"))  # type: ignore[arg-type]
     assert len(detail.parents) == 2
     assert TaskId("left:aaa") in detail.parents
     assert TaskId("right:bbb") in detail.parents
@@ -90,16 +93,13 @@ def test_fluentNode_to_detail_multiple_parents() -> None:
 
 
 def test_compilation_detail_defaults() -> None:
-    task_to_block = {TaskId("task-a"): BlockInstanceId("block-a")}
-    detail = CompilationDetail(task_to_block=task_to_block)
-    assert detail.task_to_block == task_to_block
+    detail = CompilationDetail()
     assert detail.task_detail == {}
 
 
 def test_compilation_detail_with_task_detail() -> None:
-    task_to_block = {TaskId("task-a"): BlockInstanceId("block-a")}
     task_detail = {TaskId("task-a"): TaskDetail(block=BlockInstanceId("block-a"), display_name="func:hash", parents=[])}
-    detail = CompilationDetail(task_to_block=task_to_block, task_detail=task_detail)
+    detail = CompilationDetail(task_detail=task_detail)
     assert detail.task_detail[TaskId("task-a")].display_name == "func:hash"
 
 
@@ -109,14 +109,14 @@ def test_compilation_detail_with_task_detail() -> None:
 
 
 def test_store_and_retrieve_round_trip() -> None:
-    run_id = RunId("test-run-id")
-    task_to_block = {TaskId("task-a"): BlockInstanceId("block-a")}
-    detail = CompilationDetail(task_to_block=task_to_block)
+    run_id = RunId("test-run-id-2")
+    task_detail = {TaskId("task-a"): TaskDetail(block=BlockInstanceId("block-a"), display_name="func:hash", parents=[])}
+    detail = CompilationDetail(task_detail=task_detail)
 
     store_compilation_detail(run_id, detail)
     retrieved = retrieve_compilation_detail(run_id)
 
-    assert retrieved.task_to_block == task_to_block
+    assert retrieved.task_detail == task_detail
 
 
 def test_retrieve_raises_not_found_for_missing_key() -> None:

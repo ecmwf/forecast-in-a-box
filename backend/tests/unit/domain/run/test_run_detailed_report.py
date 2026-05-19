@@ -10,7 +10,7 @@ from fiab_core.fable import BlockInstanceId
 
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.run import service as run_service
-from forecastbox.domain.run.detail import CompilationDetail
+from forecastbox.domain.run.detail import CompilationDetail, TaskDetail
 from forecastbox.domain.run.exceptions import CompilationDetailNotFound
 from forecastbox.domain.run.service import RunDetail
 from forecastbox.domain.run.types import RunId
@@ -63,11 +63,12 @@ async def test_poll_and_update_requests_detailed_report_and_translates_to_block_
         completed_task_ids={JobId("job-1"): [TaskId("task-a")]},
         planned_task_ids={JobId("job-1"): [TaskId("task-b")]},
     )
-    task_to_block = {
-        TaskId("task-a"): BlockInstanceId("block-a"),
-        TaskId("task-b"): BlockInstanceId("block-b"),
-    }
-    compilation_detail = CompilationDetail(task_to_block=task_to_block)
+    compilation_detail = CompilationDetail(
+        task_detail={
+            TaskId("task-a"): TaskDetail(block=BlockInstanceId("block-a"), display_name="func_a:hash", parents=[]),
+            TaskId("task-b"): TaskDetail(block=BlockInstanceId("block-b"), display_name="func_b:hash", parents=[]),
+        }
+    )
 
     with (
         patch("forecastbox.domain.run.service.client.request_response", return_value=response) as mock_request,
@@ -118,7 +119,7 @@ async def test_poll_and_update_disables_detailed_report_when_cache_misses() -> N
     request = mock_request.call_args.args[0]
     assert request.detailed_report is False
     assert mock_retrieve.call_args.args[0] == RunId("run-1")
-    assert detail.error == "unable to provide completed/planned tasks"
+    assert detail.error == "unable to provide completed/planned tasks: CompilationDetailNotFound('missing')"
     assert detail.completed_block_ids is None
     assert detail.planned_block_ids is None
 

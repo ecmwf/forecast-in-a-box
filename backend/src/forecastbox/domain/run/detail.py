@@ -31,22 +31,23 @@ class TaskDetail(FiabBaseModel):
 class CompilationDetail(FiabBaseModel):
     """Detail produced by compilation of a BlueprintBuilder."""
 
-    task_to_block: dict[TaskId, BlockInstanceId]
     task_detail: dict[TaskId, TaskDetail] = {}
 
 
-def fluentNode_to_detail(node: Node, block: BlockInstanceId) -> TaskDetail:
-    """Convert an earthkit.workflows Node to a TaskDetail.
+def _fluentName_to_taskId(name: str) -> TaskId:
+    """Convert an earthkit node name to a TaskId.
 
-    Parameters
-    ----------
-    node:
-        A graph node from an earthkit.workflows Action.
-    block:
-        The BlockInstanceId that owns this node.
+    Centralises the name→TaskId conversion, which is currently a positional hack
+    (node.name happens to equal the cascade TaskId string).
     """
-    parents = [TaskId(output.parent.name) for output in node.inputs.values()]
-    return TaskDetail(block=block, display_name=node.name, parents=parents)
+    return TaskId(name)
+
+
+def fluentNode_to_detail(node: Node, block: BlockInstanceId) -> tuple[TaskId, TaskDetail]:
+    """Convert an earthkit.workflows Node to a (TaskId, TaskDetail) pair."""
+    task_id = _fluentName_to_taskId(node.name)
+    parents = [_fluentName_to_taskId(output.parent.name) for output in node.inputs.values()]
+    return task_id, TaskDetail(block=block, display_name=node.name, parents=parents)
 
 
 def store_compilation_detail(run_id: RunId, compilation_detail: CompilationDetail) -> None:
