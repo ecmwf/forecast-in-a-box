@@ -20,3 +20,11 @@ class RunNotFound(Exception):
 
 class RunAccessDenied(Exception):
     """Raised when the actor lacks permission to read or mutate a Run."""
+
+
+class CompilationDetailNotFound(Exception):
+    """Raised when no cached CompilationDetail exists for the given run."""
+
+
+class CompilationDetailCorrupted(Exception):
+    """Raised when the cached CompilationDetail cannot be deserialized correctly."""

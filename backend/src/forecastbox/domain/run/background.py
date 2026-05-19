@@ -37,11 +37,11 @@ from forecastbox.domain.run import db
 from forecastbox.domain.run.cascade import execute_cascade
 from forecastbox.domain.run.compile import compile_builder, resolve_intrinsic_glyph_values
 from forecastbox.domain.run.db import CompilerRuntimeContext
+from forecastbox.domain.run.detail import store_compilation_detail
 from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import Blueprint
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.memcache import TooLargeEntry
-from forecastbox.utility.memcache import insert as memcache_insert
 from forecastbox.utility.time import current_time
 
 logger = logging.getLogger(__name__)
@@ -104,7 +104,7 @@ def execute_background(
         relevant_glyphs_and_values = expand_glyph_values(all_glyphs_raw, roots=referenced_glyph_names)
         used_glyphs = {k: all_glyphs_raw[k] for k in relevant_glyphs_and_values.keys() if k not in PINNED_INTRINSIC_KEYS}
 
-        exec_spec, run_outputs, task_to_block = compile_builder(builder, relevant_glyphs_and_values)
+        exec_spec, run_outputs, compilation_detail = compile_builder(builder, relevant_glyphs_and_values)
 
         persisted_context = compiler_runtime_context.model_copy(update={"glyphs": used_glyphs})
         run_async(
@@ -120,12 +120,12 @@ def execute_background(
         response = execute_cascade(exec_spec)
         if response.job_id is not None:
             try:
-                memcache_insert(
+                store_compilation_detail(
                     run_id,
-                    task_to_block,
+                    compilation_detail,
                 )
             except TooLargeEntry as e:
-                logger.warning(f"failed to cache task-to-block mapping for {run_id=}, {attempt_count=}: {repr(e)}")
+                logger.warning(f"failed to cache compilation detail for {run_id=}, {attempt_count=}: {repr(e)}")
             (run_async(db.update_run_runtime(run_id, attempt_count, cascade_job_id=response.job_id, outputs=run_outputs.model_dump())),)
         else:
             error = (response.error or "no error provided by cascade")[:255]
