@@ -9,6 +9,8 @@
 
 import logging
 from typing import Any, cast
+import os
+import re
 
 import numpy as np
 from cascade.low.func import Either
@@ -63,6 +65,13 @@ IFS_REQUEST = {
     "step": list(range(0, 61, 6)),
     "type": "pf",
     "number": list(range(1, 6)),
+}
+
+GRIB_ALIASES = {
+    "shortName": PARAM_DIM,
+    "paramId": PARAM_DIM,
+    "stepRange": "step",
+    "level": "levelist",
 }
 
 logger = logging.getLogger(__name__)
@@ -292,11 +301,17 @@ class ZarrSink(Sink):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
 
-        action = inputs[input_task].map(
-            Payload(
-                "fiab_plugin_ecmwf.runtime.sinks.write_zarr",
-                kwargs={"path": block.config_as_str(PATH)},
-                metadata={"environment": ["zarr"]},
+        action = (
+            inputs[input_task]
+            .combine_branches(dim=PARAM_DIM, force=True)
+            .flatten(new_dim="**temp**", reset_coords=True)
+            .concatenate(dim="**temp**")
+            .map(
+                Payload(
+                    "fiab_plugin_ecmwf.runtime.sinks.write_zarr",
+                    kwargs={"path": block.config_as_str(PATH)},
+                    metadata={"environment": ["zarr"]},
+                )
             )
         )
         return Either.ok(action)
@@ -392,8 +407,8 @@ class SelectDimension(Transform):
 class GribSink(Sink):
     title: str = "GRIB Sink"
     description: str = "Write dataset to a GRIB file on the local filesystem"
-    configuration_options: dict[str, BlockConfigurationOption] = {
-        "path": BlockConfigurationOption(
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
+        PATH: BlockConfigurationOption(
             title="GRIB Path",
             description="Filesystem path where the GRIB file should be written",
             value_type="str",
@@ -401,7 +416,23 @@ class GribSink(Sink):
     }
     inputs: list[str] = ["dataset"]
 
+    def _find_template_values(cls, path: str) -> list[str]:
+        return re.findall(r"\{(.*?)\}", path)
+
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_dataset = inputs.get("dataset")
+        if not isinstance(input_dataset, QubedOutput):
+            actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
+            return Either.error(f"Unsupported input type for 'dataset': expected QubedOutput, got {actual_type}")
+        path = block.config_as_str(PATH)
+        dirname = os.path.dirname(path)
+        if len(self._find_template_values(dirname)) != 0:
+            return Either.error(f"Invalid filepath: directory path can not contain template values")
+        path_dims = self._find_template_values(path)
+        if not all([contains(input_dataset, GRIB_ALIASES.get(dim, dim)) for dim in path_dims]):
+            return Either.error(
+                f"Invalid filename: template values in filename must be one of {set(GRIB_ALIASES.keys()).union(dimensions(input_dataset))}"
+            )
         return Either.ok(NoOutput())
 
     def compile(
@@ -411,11 +442,25 @@ class GribSink(Sink):
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
+        path_dims = self._find_template_values(block.config_as_str(PATH))
+        keep_dims = []
+        for dim in path_dims:
+            mapped_dim = GRIB_ALIASES.get(dim, dim)
+            if mapped_dim not in keep_dims:
+                keep_dims.append(mapped_dim)
+        action = inputs[input_task].flatten(new_dim="**temp**", keep_dims=keep_dims, reset_coords=True).concatenate(dim="**temp**")
+        try:
+            if PARAM_DIM in keep_dims:
+                action = action.combine_branches(dim=PARAM_DIM)
+            else:
+                action = action.combine_branches(dim="**temp**").concatenate(dim="**temp**")
+        except:
+            pass
 
-        action = inputs[input_task].map(
+        action = action.map(
             Payload(
                 "fiab_plugin_ecmwf.runtime.sinks.write_grib",
-                kwargs={"path": block.configuration_values["path"]},
+                kwargs={"path": block.config_as_str(PATH)},
             )
         )
         return Either.ok(action)

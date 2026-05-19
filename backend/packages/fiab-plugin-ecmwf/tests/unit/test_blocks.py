@@ -12,6 +12,7 @@ from datetime import date
 from unittest.mock import MagicMock
 
 import pytest
+from earthkit.workflows.fluent import Action
 from fiab_core.fable import (
     BlockFactoryId,
     BlockInstanceId,
@@ -126,6 +127,11 @@ def ekdsource_output(dummy_blockinstance: BlockInstance) -> QubedOutput:
 
 
 @pytest.fixture
+def ekdsource_action(dummy_blockinstance: BlockInstance) -> Action:
+    return EkdSource().compile(inputs={}, block_id=BlockInstanceId("source_output"), block=dummy_blockinstance).get_or_raise()
+
+
+@pytest.fixture
 def ensemble_statistics_configuration() -> BlockInstance:
     return BlockInstance.from_block(
         BlockInstanceBase(
@@ -225,14 +231,17 @@ def zarr_sink_configuration() -> BlockInstance:
 
 @pytest.fixture
 def grib_sink_configuration() -> BlockInstance:
-    return BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="GribSink"),  # type: ignore
-        input_ids={"dataset": BlockInstanceId("source_output")},
-        configuration_values=_config(
-            {
-                "path": "/path/to/output.grib2",
-            }
+    return BlockInstance.from_block(
+        BlockInstanceBase(
+            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="GribSink"),  # type: ignore
+            input_ids={"dataset": BlockInstanceId("source_output")},
+            configuration_values=_config(
+                {
+                    "path": "/path/to/output.grib2",
+                }
+            ),
         ),
+        GribSink.configuration_options,
     )
 
 
@@ -430,6 +439,14 @@ class TestZarrSink:
             inputs={"dataset": temporal_output},  # type: ignore[dict-item]
         ).get_or_raise()
         assert isinstance(output, NoOutput)
+
+    def test_compile(self, ekdsource_output: QubedOutput, ekdsource_action: Action, zarr_sink_configuration: BlockInstance) -> None:
+        block = ZarrSink()
+        block.validate(block=zarr_sink_configuration, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
+        action = block.compile(
+            inputs={BlockInstanceId("source_output"): ekdsource_action}, block_id=BlockInstanceId("grib"), block=zarr_sink_configuration
+        ).get_or_raise()
+        assert action.nodes.dims == {}
 
 
 class TestSelectParameters:
@@ -691,6 +708,92 @@ class TestGribSink:
             inputs={"dataset": temporal_output},  # type: ignore[dict-item]
         ).get_or_raise()
         assert isinstance(output, NoOutput)
+
+    @pytest.mark.parametrize(
+        "filepath",
+        [
+            "/path/to/output.grib",
+            "/path/to/{param}.grib",
+            "/path/to/{shortName}.grib",
+            "/path/to/{param}_{shortName}_{step}.grib",
+        ],
+    )
+    def test_validate_template_values(self, ekdsource_output: QubedOutput, filepath: str) -> None:
+        block = GribSink()
+        config = BlockInstance.from_block(
+            BlockInstanceBase(
+                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="GribSink"),  # type: ignore
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config(
+                    {
+                        "path": filepath,
+                    }
+                ),
+            ),
+            GribSink.configuration_options,
+        )
+        output = block.validate(  # type: ignore[assignment]
+            block=config,
+            inputs={"dataset": ekdsource_output},  # type: ignore[dict-item]
+        ).get_or_raise()
+        assert isinstance(output, NoOutput)
+
+    @pytest.mark.parametrize(
+        "filepath, error",
+        [
+            ["/path/to/{unkwown}.grib2", "Invalid filename: template values in filename must be one of"],
+            ["/path/to/{param}/{step}.grib", "Invalid filepath: directory path can not contain template values"],
+        ],
+    )
+    def test_invalid_path(self, ekdsource_output: QubedOutput, filepath: str, error: str) -> None:
+        block = GribSink()
+        config = BlockInstance.from_block(
+            BlockInstanceBase(
+                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="GribSink"),  # type: ignore
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config(
+                    {
+                        "path": filepath,
+                    }
+                ),
+            ),
+            GribSink.configuration_options,
+        )
+        output = block.validate(  # type: ignore[assignment]
+            block=config,
+            inputs={"dataset": ekdsource_output},  # type: ignore[dict-item]
+        )
+        with pytest.raises(Exception, match=error):
+            output.get_or_raise()
+
+    @pytest.mark.parametrize(
+        "filepath, dims",
+        [
+            ["/path/to/output.grib", {}],
+            ["/path/to/{param}.grib", {"param": 2}],
+            ["/path/to/{param}_{shortName}_{step}.grib", {"param": 2, "step": 3}],
+            ["/path/to/{stepRange}_{number}.grib", {"step": 3, "number": 5}],
+        ],
+    )
+    def test_compile(self, ekdsource_output: QubedOutput, ekdsource_action: Action, filepath: str, dims: dict[str, int]) -> None:
+        block = GribSink()
+        config = BlockInstance.from_block(
+            BlockInstanceBase(
+                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="GribSink"),  # type: ignore
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config(
+                    {
+                        "path": filepath,
+                    }
+                ),
+            ),
+            GribSink.configuration_options,
+        )
+        block.validate(block=config, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
+        action = block.compile(
+            inputs={BlockInstanceId("source_output"): ekdsource_action}, block_id=BlockInstanceId("grib"), block=config
+        ).get_or_raise()
+        assert action.nodes.dims == dims
 
 
 class TestMapPlotSink:
