@@ -31,11 +31,17 @@ from qubed import Qube
 from fiab_plugin_ecmwf import plugin
 from fiab_plugin_ecmwf.anemoi.utils import get_checkpoint_enum_type
 from fiab_plugin_ecmwf.blocks import (
-    VARIABLE,
+    ENSEMBLE,
+    ENSEMBLE_DIM,
+    PARAM_DIM,
+    STEP,
+    STEP_DIM,
     EkdSource,
     EnsembleStatistics,
     MapPlotSink,
-    SelectVariable,
+    SelectMembers,
+    SelectParameters,
+    SelectSteps,
     TemporalStatistics,
     ZarrSink,
 )
@@ -133,18 +139,50 @@ def temporal_statistics_configuration() -> BlockInstance:
 
 
 @pytest.fixture
-def select_variable_configuration() -> BlockInstance:
+def select_parameters_configuration() -> BlockInstance:
     return BlockInstance.from_block(
         BlockInstanceBase(
-            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="SelectVariable"),  # type: ignore
+            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="SelectParameters"),  # type: ignore
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values=_config(
                 {
-                    "variable": "2t",
+                    "param": ["2t"],
                 }
             ),
         ),
-        SelectVariable.configuration_options,
+        SelectParameters.configuration_options,
+    )
+
+
+@pytest.fixture
+def select_steps_configuration() -> BlockInstance:
+    return BlockInstance.from_block(
+        BlockInstanceBase(
+            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="SelectSteps"),  # type: ignore
+            input_ids={"dataset": BlockInstanceId("source_output")},
+            configuration_values=_config(
+                {
+                    "step": [0],
+                }
+            ),
+        ),
+        SelectSteps.configuration_options,
+    )
+
+
+@pytest.fixture
+def select_members_configuration() -> BlockInstance:
+    return BlockInstance.from_block(
+        BlockInstanceBase(
+            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="SelectMembers"),  # type: ignore
+            input_ids={"dataset": BlockInstanceId("source_output")},
+            configuration_values=_config(
+                {
+                    "number": [1],
+                }
+            ),
+        ),
+        SelectMembers.configuration_options,
     )
 
 
@@ -360,48 +398,203 @@ class TestZarrSink:
         assert isinstance(output, NoOutput)
 
 
-class TestSelectVariable:
+class TestSelectParameters:
     def test_catalogue_value_type_is_canonical(self) -> None:
-        assert SelectVariable.configuration_options[VARIABLE].value_type == "str"
+        assert SelectParameters.configuration_options[PARAM_DIM].value_type == "list[str]"
 
-    def test_from_ekdsource(self, select_variable_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
-        block = SelectVariable()
+    def test_from_ekdsource(self, select_parameters_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
+        block = SelectParameters()
         assert block.intersect(other=ekdsource_output)  # type: ignore[arg-type]
-        output = block.validate(block=select_variable_configuration, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
+        output = block.validate(block=select_parameters_configuration, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
         assert isinstance(output, QubedOutput)
         assert output.dataqube is not None
         assert axes(output)["param"] == {"2t"}
 
-    def test_missing_variable(self, select_variable_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
-        block = SelectVariable()
-        config = select_variable_configuration.model_copy(update={"configuration_values": _config({"variable": "nonexistent"})})
+    def test_from_ekdsource_multiple_parameters(
+        self, select_parameters_configuration: BlockInstance, ekdsource_output: QubedOutput
+    ) -> None:
+        block = SelectParameters()
+        config = select_parameters_configuration.model_copy(update={"configuration_values": _config({"param": ["2t", "msl"]})})
+        output = block.validate(block=config, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
+        assert axes(output)["param"] == {"2t", "msl"}
+
+    def test_missing_parameters(self, select_parameters_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
+        block = SelectParameters()
+        config = select_parameters_configuration.model_copy(update={"configuration_values": _config({"param": ["nonexistent"]})})
         result = block.validate(block=config, inputs={"dataset": ekdsource_output})  # type: ignore[dict-item]
-        with pytest.raises(Exception, match="variable nonexistent is not in the input parameters"):
+        with pytest.raises(Exception, match="parameters \\['nonexistent'\\] are not in the input parameters"):
             result.get_or_raise()
 
-    def test_compile_calls_select(self, select_variable_configuration: BlockInstance) -> None:
-        block = SelectVariable()
+    def test_compile_calls_select(self, select_parameters_configuration: BlockInstance) -> None:
+        block = SelectParameters()
         input_action = MagicMock()
         selected_action = MagicMock()
         input_action.select.return_value = selected_action
 
         result = block.compile(
             inputs={BlockInstanceId("source_output"): input_action},  # type: ignore[dict-item]
-            block_id=BlockInstanceId("select_variable"),
-            block=select_variable_configuration,
+            block_id=BlockInstanceId("select_parameters"),
+            block=select_parameters_configuration,
         )
         assert result.t is selected_action
         input_action.select.assert_called_once_with({ConfigurationOptionId("param"): "2t"})
 
-    def test_expander_adds_variable_restrictions(self, ekdsource_output: QubedOutput) -> None:
+    def test_compile_calls_select_with_multiple_parameters(self, select_parameters_configuration: BlockInstance) -> None:
+        block = SelectParameters()
+        input_action = MagicMock()
+        selected_action = MagicMock()
+        input_action.select.return_value = selected_action
+        config = select_parameters_configuration.model_copy(update={"configuration_values": _config({"param": ["2t", "msl"]})})
+
+        result = block.compile(
+            inputs={BlockInstanceId("source_output"): input_action},  # type: ignore[dict-item]
+            block_id=BlockInstanceId("select_parameters"),
+            block=config,
+        )
+        assert result.t is selected_action
+        input_action.select.assert_called_once_with({ConfigurationOptionId("param"): ["2t", "msl"]})
+
+    def test_expander_adds_parameters_restrictions(self, ekdsource_output: QubedOutput) -> None:
         expansions = plugin().expander(ekdsource_output)
-        select_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("selectVariable"))
-        assert select_expansion.restrictions[VARIABLE].serialize() == "enumClosed[2t,msl]"
+        select_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("selectParameters"))
+        assert select_expansion.restrictions[PARAM_DIM].serialize() == "list[enumClosed[2t,msl]]"
 
     def test_expander_skips_restriction_for_non_string_axes(self) -> None:
         output = QubedOutput(dataqube=Qube.from_datacube({"param": [1, 2]}))
         expansions = plugin().expander(output)
-        select_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("selectVariable"))
+        select_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("selectParameters"))
+        assert select_expansion.restrictions == {}
+
+
+class TestSelectSteps:
+    def test_catalogue_value_type_is_canonical(self) -> None:
+        assert SelectSteps.configuration_options[STEP].value_type == "list[int]"
+
+    def test_from_ekdsource(self, select_steps_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
+        block = SelectSteps()
+        assert block.intersect(other=ekdsource_output)  # type: ignore[arg-type]
+        output = block.validate(block=select_steps_configuration, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
+        assert isinstance(output, QubedOutput)
+        assert output.dataqube is not None
+        assert axes(output)[STEP_DIM] == {0}
+
+    def test_from_ekdsource_multiple_steps(self, select_steps_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
+        block = SelectSteps()
+        config = select_steps_configuration.model_copy(update={"configuration_values": _config({"step": [0, 6]})})
+        output = block.validate(block=config, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
+        assert axes(output)[STEP_DIM] == {0, 6}
+
+    def test_missing_steps(self, select_steps_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
+        block = SelectSteps()
+        config = select_steps_configuration.model_copy(update={"configuration_values": _config({"step": [999]})})
+        result = block.validate(block=config, inputs={"dataset": ekdsource_output})  # type: ignore[dict-item]
+        with pytest.raises(Exception, match="steps \\[999\\] are not in the input steps"):
+            result.get_or_raise()
+
+    def test_compile_calls_select(self, select_steps_configuration: BlockInstance) -> None:
+        block = SelectSteps()
+        input_action = MagicMock()
+        selected_action = MagicMock()
+        input_action.select.return_value = selected_action
+
+        result = block.compile(
+            inputs={BlockInstanceId("source_output"): input_action},  # type: ignore[dict-item]
+            block_id=BlockInstanceId("select_steps"),
+            block=select_steps_configuration,
+        )
+        assert result.t is selected_action
+        input_action.select.assert_called_once_with({STEP_DIM: 0})
+
+    def test_compile_calls_select_with_multiple_steps(self, select_steps_configuration: BlockInstance) -> None:
+        block = SelectSteps()
+        input_action = MagicMock()
+        selected_action = MagicMock()
+        input_action.select.return_value = selected_action
+        config = select_steps_configuration.model_copy(update={"configuration_values": _config({"step": [0, 6]})})
+
+        result = block.compile(
+            inputs={BlockInstanceId("source_output"): input_action},  # type: ignore[dict-item]
+            block_id=BlockInstanceId("select_steps"),
+            block=config,
+        )
+        assert result.t is selected_action
+        input_action.select.assert_called_once_with({STEP_DIM: [0, 6]})
+
+    def test_expander_adds_step_restrictions(self, ekdsource_output: QubedOutput) -> None:
+        expansions = plugin().expander(ekdsource_output)
+        select_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("selectSteps"))
+        assert select_expansion.restrictions[STEP].serialize() == "list[enumClosed[0,6,12]]"
+
+    def test_expander_skips_restriction_for_non_int_axes(self) -> None:
+        output = QubedOutput(dataqube=Qube.from_datacube({STEP_DIM: ["0", "6"]}))
+        expansions = plugin().expander(output)
+        select_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("selectSteps"))
+        assert select_expansion.restrictions == {}
+
+
+class TestSelectMembers:
+    def test_catalogue_value_type_is_canonical(self) -> None:
+        assert SelectMembers.configuration_options[ENSEMBLE].value_type == "list[int]"
+
+    def test_from_ekdsource(self, select_members_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
+        block = SelectMembers()
+        assert block.intersect(other=ekdsource_output)  # type: ignore[arg-type]
+        output = block.validate(block=select_members_configuration, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
+        assert isinstance(output, QubedOutput)
+        assert output.dataqube is not None
+        assert axes(output)[ENSEMBLE_DIM] == {1}
+
+    def test_from_ekdsource_multiple_members(self, select_members_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
+        block = SelectMembers()
+        config = select_members_configuration.model_copy(update={"configuration_values": _config({"number": [1, 2]})})
+        output = block.validate(block=config, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
+        assert axes(output)[ENSEMBLE_DIM] == {1, 2}
+
+    def test_missing_members(self, select_members_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
+        block = SelectMembers()
+        config = select_members_configuration.model_copy(update={"configuration_values": _config({"number": [999]})})
+        result = block.validate(block=config, inputs={"dataset": ekdsource_output})  # type: ignore[dict-item]
+        with pytest.raises(Exception, match="members \\[999\\] are not in the input members"):
+            result.get_or_raise()
+
+    def test_compile_calls_select(self, select_members_configuration: BlockInstance) -> None:
+        block = SelectMembers()
+        input_action = MagicMock()
+        selected_action = MagicMock()
+        input_action.select.return_value = selected_action
+
+        result = block.compile(
+            inputs={BlockInstanceId("source_output"): input_action},  # type: ignore[dict-item]
+            block_id=BlockInstanceId("select_members"),
+            block=select_members_configuration,
+        )
+        assert result.t is selected_action
+        input_action.select.assert_called_once_with({ENSEMBLE_DIM: 1})
+
+    def test_compile_calls_select_with_multiple_members(self, select_members_configuration: BlockInstance) -> None:
+        block = SelectMembers()
+        input_action = MagicMock()
+        selected_action = MagicMock()
+        input_action.select.return_value = selected_action
+        config = select_members_configuration.model_copy(update={"configuration_values": _config({"number": [1, 2]})})
+
+        result = block.compile(
+            inputs={BlockInstanceId("source_output"): input_action},  # type: ignore[dict-item]
+            block_id=BlockInstanceId("select_members"),
+            block=config,
+        )
+        assert result.t is selected_action
+        input_action.select.assert_called_once_with({ENSEMBLE_DIM: [1, 2]})
+
+    def test_expander_adds_member_restrictions(self, ekdsource_output: QubedOutput) -> None:
+        expansions = plugin().expander(ekdsource_output)
+        select_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("selectMembers"))
+        assert select_expansion.restrictions[ENSEMBLE].serialize() == "list[enumClosed[1,2,3,4,5]]"
+
+    def test_expander_skips_restriction_for_non_int_axes(self) -> None:
+        output = QubedOutput(dataqube=Qube.from_datacube({ENSEMBLE_DIM: ["1", "2"]}))
+        expansions = plugin().expander(output)
+        select_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("selectMembers"))
         assert select_expansion.restrictions == {}
 
 
@@ -422,6 +615,17 @@ class TestMapPlotSink:
         block = MapPlotSink()
         collapsed = collapse(ekdsource_output, "param")
         assert not block.intersect(other=collapsed)  # type: ignore[arg-type]
+
+    def test_expander_adds_parameters_restrictions(self, ekdsource_output: QubedOutput) -> None:
+        expansions = plugin().expander(ekdsource_output)
+        map_plot_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("mapPlotSink"))
+        assert map_plot_expansion.restrictions[PARAM_DIM].serialize() == "list[enumClosed[2t,msl]]"
+
+    def test_expander_skips_restriction_for_non_string_axes(self) -> None:
+        output = QubedOutput(dataqube=Qube.from_datacube({"param": [1, 2]}))
+        expansions = plugin().expander(output)
+        map_plot_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("mapPlotSink"))
+        assert map_plot_expansion.restrictions == {}
 
     def test_validate_from_ekdsource(self, map_plot_sink_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
         block = MapPlotSink()
