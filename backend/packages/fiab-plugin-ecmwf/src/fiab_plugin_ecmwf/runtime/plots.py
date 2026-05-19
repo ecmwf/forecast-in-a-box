@@ -21,6 +21,14 @@ logger = logging.getLogger(__name__)
 
 WIND_SHORTNAMES = ["u", "v", "10u", "10v", "100u", "100v"]
 
+# Map Plot `format` -> output MIME. blocks.py declares it and map_plot returns
+# it; the two must match or the run-output endpoint rejects the result.
+FORMAT_MIME_TYPES: dict[str, str] = {
+    "png": "image/png",
+    "pdf": "application/pdf",
+    "svg": "image/svg+xml",
+}
+
 
 def _configure_schema(style_schema: str) -> None:
     """Configure the earthkit-plots schema from a schema identifier.
@@ -63,7 +71,7 @@ def _export_figure(figure: "Figure", fmt: str = "png", dpi: int = 100) -> tuple[
     """Serialise a Figure to bytes and return ``(data, mime_type)``."""
     buf = io.BytesIO()
     figure.save(buf, format=fmt, dpi=dpi)
-    return buf.getvalue(), f"image/{fmt}"
+    return buf.getvalue(), FORMAT_MIME_TYPES[fmt]
 
 
 def map_plot(

@@ -28,6 +28,7 @@ from fiab_core.tools.blocks import Product, Sink, Source
 from qubed import Qube
 
 from .qubed_utils import axes, contains, coxpand, dimensions
+from .runtime.plots import FORMAT_MIME_TYPES
 
 SOURCE = ConfigurationOptionId("source")
 DATE = ConfigurationOptionId("date")
@@ -357,7 +358,7 @@ class MapPlotSink(Sink):
         #         f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
         #     )
 
-        return Either.ok(RawOutput(type_fqn=f"image/{block.config_as_str(FORMAT)}"))
+        return Either.ok(RawOutput(mime_type=FORMAT_MIME_TYPES[block.config_as_str(FORMAT)]))
 
     def compile(
         self,

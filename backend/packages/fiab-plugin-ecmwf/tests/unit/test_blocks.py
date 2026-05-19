@@ -441,3 +441,22 @@ class TestMapPlotSink:
         assert block.intersect(other=ensemble_output)  # type: ignore[arg-type]
         output = block.validate(block=map_plot_sink_configuration, inputs={"dataset": ensemble_output}).get_or_raise()  # type: ignore[dict-item]
         assert isinstance(output, RawOutput)
+
+    @pytest.mark.parametrize(
+        ("fmt", "expected_mime"),
+        [("png", "image/png"), ("pdf", "application/pdf"), ("svg", "image/svg+xml")],
+    )
+    def test_validate_declares_standard_mime(self, ekdsource_output: QubedOutput, fmt: str, expected_mime: str) -> None:
+        """validate() must set RawOutput.mime_type to the format's standard MIME."""
+        block = MapPlotSink()
+        config = BlockInstance.from_block(
+            BlockInstanceBase(
+                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),  # type: ignore
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config({"param": ["2t"], "domain": "global", "format": fmt}),
+            ),
+            MapPlotSink.configuration_options,
+        )
+        output = block.validate(block=config, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
+        assert isinstance(output, RawOutput)
+        assert output.mime_type == expected_mime
