@@ -303,9 +303,9 @@ class ZarrSink(Sink):
 
         action = (
             inputs[input_task]
-            .combine_branches(dim=PARAM_DIM, force=True)
-            .flatten(new_dim="**temp**", reset_coords=True)
-            .concatenate(dim="**temp**")
+            .flatten(new_dim="**temp1**", reset_coords=True)
+            .combine_branches(dim="**temp1**")
+            .concatenate(dim="**temp1**")
             .map(
                 Payload(
                     "fiab_plugin_ecmwf.runtime.sinks.write_zarr",
@@ -428,11 +428,12 @@ class GribSink(Sink):
         dirname = os.path.dirname(path)
         if len(self._find_template_values(dirname)) != 0:
             return Either.error(f"Invalid filepath: directory path can not contain template values")
-        path_dims = self._find_template_values(path)
-        if not all([contains(input_dataset, GRIB_ALIASES.get(dim, dim)) for dim in path_dims]):
-            return Either.error(
-                f"Invalid filename: template values in filename must be one of {set(GRIB_ALIASES.keys()).union(dimensions(input_dataset))}"
-            )
+        path_templates = self._find_template_values(path)
+        allowed_templates = dimensions(input_dataset).union(
+            set([alias for alias, dim in GRIB_ALIASES.items() if contains(input_dataset, dim)])
+        )
+        if not all([dim in allowed_templates for dim in path_templates]):
+            return Either.error(f"Invalid filename: template values in filename must be one of {allowed_templates}")
         return Either.ok(NoOutput())
 
     def compile(

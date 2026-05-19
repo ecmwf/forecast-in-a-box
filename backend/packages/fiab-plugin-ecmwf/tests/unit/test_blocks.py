@@ -741,7 +741,8 @@ class TestGribSink:
     @pytest.mark.parametrize(
         "filepath, error",
         [
-            ["/path/to/{unkwown}.grib2", "Invalid filename: template values in filename must be one of"],
+            ["/path/to/{unknown}.grib2", "Invalid filename: template values in filename must be one of"],
+            ["/path/to/{levelist}.grib2", "Invalid filename: template values in filename must be one of"],
             ["/path/to/{param}/{step}.grib", "Invalid filepath: directory path can not contain template values"],
         ],
     )
