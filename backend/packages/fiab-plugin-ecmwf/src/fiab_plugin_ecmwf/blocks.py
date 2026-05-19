@@ -64,6 +64,12 @@ STEP_DIM = "step"
 
 logger = logging.getLogger(__name__)
 
+PLOT_FORMAT_TO_MIME: dict[str, str] = {
+    "png": "image/png",
+    "pdf": "application/pdf",
+    "svg": "image/svg+xml",
+}
+
 
 class EkdSource(Source):
     title: str = "Earthkit Data Source"
@@ -357,7 +363,11 @@ class MapPlotSink(Sink):
         #         f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
         #     )
 
-        return Either.ok(RawOutput(type_fqn=f"image/{block.config_as_str(FORMAT)}"))
+        fmt = block.config_as_str(FORMAT)
+        mime_type = PLOT_FORMAT_TO_MIME.get(fmt)
+        if mime_type is None:
+            return Either.error(f"Unsupported output format: {fmt}")
+        return Either.ok(RawOutput(type_fqn="bytes", mime_type=mime_type))
 
     def compile(
         self,

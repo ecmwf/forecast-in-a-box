@@ -59,11 +59,11 @@ def _plot_fields(subplot: "Subplot", fields: ekd.FieldList, **kwargs: Any) -> No
                 subplot.quickplot(ekd.FieldList.from_fields(sub_fields), **kwargs.get("quickplot", {}))
 
 
-def _export_figure(figure: "Figure", fmt: str = "png", dpi: int = 100) -> tuple[bytes, str]:
-    """Serialise a Figure to bytes and return ``(data, mime_type)``."""
+def _export_figure(figure: "Figure", fmt: str = "png", dpi: int = 100) -> bytes:
+    """Serialise a Figure to bytes."""
     buf = io.BytesIO()
     figure.save(buf, format=fmt, dpi=dpi)
-    return buf.getvalue(), f"image/{fmt}"
+    return buf.getvalue()
 
 
 def map_plot(
@@ -72,10 +72,10 @@ def map_plot(
     format: str = "png",
     groupby: str = "none",
     style_schema: str = "default",
-) -> tuple[bytes, str]:
+) -> bytes:
     """Render a geographic map from *fields* using earthkit-plots.
 
-    Returns ``(image_bytes, mime_type)``.
+    Returns image bytes.
     """
     from earthkit.plots import Figure  # type: ignore[unresolved-import]
     from earthkit.plots.components import layouts  # type: ignore[unresolved-import]

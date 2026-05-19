@@ -106,7 +106,7 @@ catalogue = lambda: BlockFactoryCatalogue(
 
 def validator(instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
     if instance.factory_id.factory in ("sink_file",):
-        return Either.ok(RawOutput(type_fqn="str", mime_type="text/plain"))
+        return Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain"))
     elif instance.factory_id.factory in ("sink_image",):
         return Either.ok(RawOutput(type_fqn="bytes", mime_type="image/png"))
     elif instance.factory_id.factory in ("source_sleep", "source_text", "source_filesize"):
@@ -129,7 +129,7 @@ def expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
                 BlockExpansion(factory=BlockFactoryId("sink_file")),
                 BlockExpansion(factory=BlockFactoryId("sink_image")),
             ]
-        if output.type_fqn == "str":
+        if output.type_fqn in ("str", "bytes"):
             return [BlockExpansion(factory=BlockFactoryId("sink_file"))]
     return []
 
