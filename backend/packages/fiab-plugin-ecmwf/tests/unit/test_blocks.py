@@ -396,7 +396,7 @@ class TestZarrSink:
             block=zarr_sink_configuration,
             inputs={"dataset": ekdsource_output},  # type: ignore[dict-item]
         ).get_or_raise()
-        assert isinstance(output, NoOutput)
+        assert isinstance(output, RawOutput)
 
     def test_from_ensemble_statistics(
         self,
@@ -417,7 +417,7 @@ class TestZarrSink:
             block=zarr_sink_configuration,
             inputs={"dataset": ensemble_output},  # type: ignore[dict-item]
         ).get_or_raise()
-        assert isinstance(output, NoOutput)
+        assert isinstance(output, RawOutput)
 
     def test_from_temporal_statistics(
         self,
@@ -438,7 +438,7 @@ class TestZarrSink:
             block=zarr_sink_configuration,
             inputs={"dataset": temporal_output},  # type: ignore[dict-item]
         ).get_or_raise()
-        assert isinstance(output, NoOutput)
+        assert isinstance(output, RawOutput)
 
     def test_compile(self, ekdsource_output: QubedOutput, ekdsource_action: Action, zarr_sink_configuration: BlockInstance) -> None:
         block = ZarrSink()
@@ -665,7 +665,7 @@ class TestGribSink:
             block=grib_sink_configuration,
             inputs={"dataset": ekdsource_output},  # type: ignore[dict-item]
         ).get_or_raise()
-        assert isinstance(output, NoOutput)
+        assert isinstance(output, RawOutput)
 
     def test_from_ensemble_statistics(
         self,
@@ -686,7 +686,7 @@ class TestGribSink:
             block=grib_sink_configuration,
             inputs={"dataset": ensemble_output},  # type: ignore[dict-item]
         ).get_or_raise()
-        assert isinstance(output, NoOutput)
+        assert isinstance(output, RawOutput)
 
     def test_from_temporal_statistics(
         self,
@@ -707,7 +707,7 @@ class TestGribSink:
             block=grib_sink_configuration,
             inputs={"dataset": temporal_output},  # type: ignore[dict-item]
         ).get_or_raise()
-        assert isinstance(output, NoOutput)
+        assert isinstance(output, RawOutput)
 
     @pytest.mark.parametrize(
         "filepath",
@@ -736,7 +736,7 @@ class TestGribSink:
             block=config,
             inputs={"dataset": ekdsource_output},  # type: ignore[dict-item]
         ).get_or_raise()
-        assert isinstance(output, NoOutput)
+        assert isinstance(output, RawOutput)
 
     @pytest.mark.parametrize(
         "filepath, error",

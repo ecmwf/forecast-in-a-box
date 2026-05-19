@@ -291,7 +291,7 @@ class ZarrSink(Sink):
     inputs: list[str] = ["dataset"]
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        return Either.ok(NoOutput())
+        return Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain"))
 
     def compile(
         self,
@@ -404,6 +404,7 @@ class SelectDimension(Transform):
     def intersect(self, other: QubedOutput) -> bool:
         return contains(other, self.option_id)
 
+
 class GribSink(Sink):
     title: str = "GRIB Sink"
     description: str = "Write dataset to a GRIB file on the local filesystem"
@@ -434,7 +435,7 @@ class GribSink(Sink):
         )
         if not all([dim in allowed_templates for dim in path_templates]):
             return Either.error(f"Invalid filename: template values in filename must be one of {allowed_templates}")
-        return Either.ok(NoOutput())
+        return Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain"))
 
     def compile(
         self,
