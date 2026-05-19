@@ -12,7 +12,7 @@ Run entity routes — /run/*. Corresponds to `domain.run` backend-managed entity
 
 Contains three categories of routes:
  - CRD+List endpoints (no update, this is backend-managed entity), and a restart endpoint (which is effectively another create),
- - Further detail endpoints -- inspecting outputs, getting logs
+ - Further detail endpoints -- inspecting outputs, getting logs, and retrieving compilation detail
 """
 
 import asyncio
@@ -35,7 +35,8 @@ from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.run import db, service
 from forecastbox.domain.run.cascade import RunOutputs
-from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
+from forecastbox.domain.run.detail import retrieve_compilation_detail
+from forecastbox.domain.run.exceptions import CompilationDetailCorrupted, CompilationDetailNotFound, RunAccessDenied, RunNotFound
 from forecastbox.domain.run.types import RunId
 from forecastbox.routes.gateway import Globals
 from forecastbox.utility.auth import AuthContext
@@ -130,6 +131,21 @@ class RunDeleteRequest(FiabBaseModel):
 
     run_id: RunId
     attempt_count: int
+
+
+class CompilationDetailTask(FiabBaseModel):
+    """Task-level detail as returned by the /getCompilationDetail endpoint."""
+
+    task_id: TaskId
+    block: BlockInstanceId
+    display_name: str
+    parents: list[TaskId]
+
+
+class CompilationDetailResponse(FiabBaseModel):
+    """Response for /getCompilationDetail, containing a list of task-level details."""
+
+    tasks: list[CompilationDetailTask]
 
 
 # ---------------------------------------------------------------------------
@@ -285,6 +301,46 @@ async def get_run(
     except RunAccessDenied:
         raise HTTPException(status_code=403, detail=f"Access denied to execution {spec.run_id!r}.")
     return _to_run_detail(domain_detail)
+
+
+@router.get("/getCompilationDetail")
+async def get_compilation_detail(
+    spec: Annotated[RunLookup, Depends()],
+    block_id: str | None = None,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> CompilationDetailResponse:
+    """Return task-level compilation detail for a run.
+
+    If ``block_id`` is provided, only tasks belonging to that block are returned.
+    Returns 404 if the run is not found or if no compilation detail is available
+    (e.g. the run has not yet been submitted, or the cache entry has expired).
+    """
+    try:
+        await db.get_run(spec.run_id, spec.attempt_count, auth_context=auth_context)
+    except RunNotFound:
+        raise HTTPException(status_code=404, detail=f"Run {spec.run_id!r} not found.")
+    except RunAccessDenied:
+        raise HTTPException(status_code=403, detail=f"Access denied to execution {spec.run_id!r}.")
+    try:
+        detail = retrieve_compilation_detail(spec.run_id)
+    except CompilationDetailNotFound:
+        raise HTTPException(status_code=404, detail=f"Compilation detail for run {spec.run_id!r} not found.")
+    except CompilationDetailCorrupted:
+        raise HTTPException(status_code=500, detail=f"Compilation detail for run {spec.run_id!r} is corrupted.")
+    task_detail = detail.task_detail
+    if block_id is not None:
+        filter_block = BlockInstanceId(block_id)  # ty: ignore[invalid-argument-type]
+        task_detail = {k: v for k, v in task_detail.items() if v.block == filter_block}
+    tasks = [
+        CompilationDetailTask(
+            task_id=task_id,
+            block=td.block,
+            display_name=td.display_name,
+            parents=td.parents,
+        )
+        for task_id, td in task_detail.items()
+    ]
+    return CompilationDetailResponse(tasks=tasks)
 
 
 @router.post("/delete")
