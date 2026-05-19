@@ -929,3 +929,30 @@ class TestMapPlotSink:
         assert block.intersect(other=ensemble_output)  # type: ignore[arg-type]
         output = block.validate(block=map_plot_sink_configuration, inputs={"dataset": ensemble_output}).get_or_raise()  # type: ignore[dict-item]
         assert isinstance(output, RawOutput)
+
+    @pytest.mark.parametrize(
+        "groupby, dims", [["none", {"param": 2, "step": 3, "number": 5}], ["number", {"number": 5}], ["step", {"step": 3}]]
+    )
+    def test_compile_groupby(self, ekdsource_output: QubedOutput, ekdsource_action: Action, groupby: str, dims: dict[str, int]) -> None:
+        block = MapPlotSink()
+        config = BlockInstance.from_block(
+            BlockInstanceBase(
+                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),  # type: ignore
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config(
+                    {
+                        "param": ["2t", "msl"],
+                        "domain": "global",
+                        "format": "png",
+                        "groupby": groupby,
+                        "style_schema": "inbuilt://fiab",
+                    }
+                ),
+            ),
+            MapPlotSink.configuration_options,
+        )
+        block.validate(block=config, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
+        action = block.compile(
+            inputs={BlockInstanceId("source_output"): ekdsource_action}, block_id=BlockInstanceId("plot"), block=config
+        ).get_or_raise()
+        assert action.nodes.dims == dims

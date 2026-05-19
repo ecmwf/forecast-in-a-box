@@ -540,11 +540,10 @@ class MapPlotSink(Sink):
         selected = merged.select({PARAM: params if len(params) > 1 else params[0]})
 
         groupby = block.config_as_str("groupby")
-
-        if groupby != "none":
-            selected = selected.flatten(keep_dims=[groupby])
-        else:
+        if groupby == "none":
             groupby = None
+        else:
+            selected = selected.flatten(new_dim="temp_dim", keep_dims=[groupby], reset_coords=True).concatenate(dim="temp_dim")
 
         action = selected.map(
             Payload(
