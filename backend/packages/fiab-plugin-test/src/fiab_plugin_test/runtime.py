@@ -30,10 +30,10 @@ def source_filesize(path: str) -> str:
     return str(pathlib.Path(path).stat().st_size)
 
 
-def sink_file(data: object, fname: str) -> tuple[bytes, str]:
+def sink_file(data: object, fname: str) -> bytes:
     p = pathlib.Path(fname)
     p.write_text(str(data))
-    return f"file://{p.absolute()}".encode("ascii"), "text/plain"
+    return f"file://{p.absolute()}".encode("ascii")
 
 
 def _png_chunk(chunk_type: bytes, data: bytes) -> bytes:
@@ -41,7 +41,7 @@ def _png_chunk(chunk_type: bytes, data: bytes) -> bytes:
     return struct.pack(">I", len(data)) + payload + struct.pack(">I", zlib.crc32(payload) & 0xFFFFFFFF)
 
 
-def sink_image(data: int) -> tuple[bytes, str]:
+def sink_image(data: int) -> bytes:
     """Generate a 64x64 grayscale PNG image filled with the given value (mod 256)."""
     pixel = data % 256
     width = height = 64
@@ -57,4 +57,4 @@ def sink_image(data: int) -> tuple[bytes, str]:
 
     iend = _png_chunk(b"IEND", b"")
 
-    return signature + ihdr + idat + iend, "image/png"
+    return signature + ihdr + idat + iend

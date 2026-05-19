@@ -34,7 +34,7 @@ from fiab_core.fable import BlockInstanceId
 from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.run import db, service
-from forecastbox.domain.run.cascade import RunOutputs, encode_result
+from forecastbox.domain.run.cascade import RunOutputs
 from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
 from forecastbox.domain.run.types import RunId
 from forecastbox.routes.gateway import Globals
@@ -386,10 +386,13 @@ async def get_run_output_content(
     response = cast(api.ResultRetrievalResponse, response)
     if response.error:
         raise HTTPException(500, f"Result retrieval failed: {response.error}")
-    encoded = encode_result(response, mime_result.t)
-    if encoded.t is None:
-        raise HTTPException(500, f"Result decoding failed: {encoded.e}")
-    return Response(encoded.t, media_type=mime_result.t)
+    try:
+        decoded = api.decoded_result(response, job=None)  # type: ignore[attr-defined]
+    except Exception as e:
+        raise HTTPException(500, f"Result decoding failed: {e}")
+    if not isinstance(decoded, bytes):
+        raise HTTPException(500, f"Result decoding failed: expected bytes, got {type(decoded).__name__}")
+    return Response(decoded, media_type=mime_result.t)
 
 
 @router.get("/logs")

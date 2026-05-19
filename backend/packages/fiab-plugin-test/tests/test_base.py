@@ -26,7 +26,7 @@ from fiab_core.fable import (
 )
 
 from fiab_plugin_test import _get_checkpoint_enum_type, catalogue, compiler, validator
-from fiab_plugin_test.runtime import sink_image, source_filesize
+from fiab_plugin_test.runtime import sink_file, sink_image, source_filesize
 
 # ---------------------------------------------------------------------------
 # runtime.source_filesize
@@ -138,7 +138,7 @@ def test_ok() -> None:
 
 
 def test_sink_image_returns_valid_png() -> None:
-    result, mime = sink_image(42)
+    result = sink_image(42)
 
     assert isinstance(result, bytes)
     assert len(result) > 0
@@ -159,11 +159,16 @@ def test_sink_image_returns_valid_png() -> None:
     assert color_type == 0  # grayscale
 
     assert b"IEND" in result, "PNG must contain IEND chunk"
-    assert mime == "image/png"
 
 
 def test_sink_image_modulo_256() -> None:
     """Values >= 256 are taken modulo 256."""
-    result_low, _ = sink_image(42)
-    result_high, _ = sink_image(42 + 256)
+    result_low = sink_image(42)
+    result_high = sink_image(42 + 256)
     assert result_low == result_high
+
+
+def test_sink_file_returns_bytes_locator(tmp_path: pathlib.Path) -> None:
+    locator = sink_file("hello", str(tmp_path / "out.txt"))
+    assert isinstance(locator, bytes)
+    assert locator.startswith(b"file://")

@@ -361,6 +361,37 @@ class TestMapPlotSink:
         block = MapPlotSink()
         output = block.validate(block=map_plot_sink_configuration, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
         assert isinstance(output, RawOutput)
+        assert output.type_fqn == "bytes"
+        assert output.mime_type == "image/png"
+
+    @pytest.mark.parametrize(
+        ("fmt", "expected_mime"),
+        [
+            ("png", "image/png"),
+            ("pdf", "application/pdf"),
+            ("svg", "image/svg+xml"),
+        ],
+    )
+    def test_validate_sets_mime_from_format(self, fmt: str, expected_mime: str, ekdsource_output: QubedOutput) -> None:
+        block = MapPlotSink()
+        config = BlockInstance.from_block(
+            BlockInstanceBase(
+                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),  # type: ignore
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config(
+                    {
+                        "param": ["2t"],
+                        "domain": "global",
+                        "format": fmt,
+                    }
+                ),
+            ),
+            MapPlotSink.configuration_options,
+        )
+        output = block.validate(block=config, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
+        assert isinstance(output, RawOutput)
+        assert output.type_fqn == "bytes"
+        assert output.mime_type == expected_mime
 
     def test_validate_multi_param(self, ekdsource_output: QubedOutput) -> None:
         block = MapPlotSink()
