@@ -67,6 +67,7 @@ import {
 } from '@/components/ui/select'
 import {
   BLOCK_KIND_METADATA,
+  getBlockConfigurationRestrictions,
   getBlockKindIcon,
   getFactory,
 } from '@/api/types/fable.types'
@@ -106,6 +107,10 @@ export function BlockInstanceCard({
   )
   const connectBlocks = useFableBuilderStore((state) => state.connectBlocks)
   const disconnectBlock = useFableBuilderStore((state) => state.disconnectBlock)
+  const validationState = useFableBuilderStore((state) => state.validationState)
+  const pendingRestrictions = useFableBuilderStore(
+    (state) => state.blockConfigurationRestrictions?.[instanceId],
+  )
   const resolvedConfigForBlock = useFableBuilderStore(
     (state) =>
       state.validationState?.resolvedConfigurationOptions[instanceId] ?? null,
@@ -114,6 +119,10 @@ export function BlockInstanceCard({
 
   const instance = fable.blocks[instanceId]
   const factory = getFactory(catalogue, instance.factory_id)
+  const configRestrictions = {
+    ...(pendingRestrictions ?? {}),
+    ...getBlockConfigurationRestrictions(fable, validationState, instanceId),
+  }
 
   // Compute available sources that can be connected to this block's inputs
   const availableSources = useMemo(() => {
@@ -291,7 +300,9 @@ export function BlockInstanceCard({
                           key={key}
                           id={`${instanceId}-${key}`}
                           configKey={key}
-                          valueType={option.value_type}
+                          valueType={
+                            configRestrictions[key] ?? option.value_type
+                          }
                           value={instance.configuration_values[key] ?? ''}
                           onChange={(value) =>
                             updateBlockConfig(instanceId, key, value)

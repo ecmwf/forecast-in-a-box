@@ -47,6 +47,9 @@ const POPOVER_SIDE: Record<string, 'top' | 'bottom' | 'left' | 'right'> = {
   RL: 'left',
 }
 
+const EMPTY_EXPANSION_RESTRICTIONS: Record<string, Record<string, string>> = {}
+const EMPTY_CONFIG_RESTRICTIONS: Record<string, string> = {}
+
 /** Wraps a block's output `<Handle>` with an add-downstream-block popover:
  *  clicking the handle opens the menu, dragging it still draws a connection. */
 export const AddNodeButton = memo(function ({
@@ -61,7 +64,15 @@ export const AddNodeButton = memo(function ({
 
   const addBlock = useFableBuilderStore((state) => state.addBlock)
   const connectBlocks = useFableBuilderStore((state) => state.connectBlocks)
+  const setBlockConfigurationRestrictions = useFableBuilderStore(
+    (state) => state.setBlockConfigurationRestrictions,
+  )
   const layoutDirection = useFableBuilderStore((state) => state.layoutDirection)
+  const expansionRestrictions = useFableBuilderStore(
+    (state) =>
+      state.validationState?.blockStates[sourceBlockId]
+        ?.possibleExpansionRestrictions ?? EMPTY_EXPANSION_RESTRICTIONS,
+  )
 
   // When the backend provides validated expansions, use them. Otherwise build
   // a fallback from the full catalogue (all factories that accept inputs) so
@@ -72,10 +83,18 @@ export const AddNodeButton = memo(function ({
         .map((id) => ({
           id,
           factory: getFactory(catalogue, id),
+          restrictions:
+            expansionRestrictions[factoryIdToKey(id)] ??
+            EMPTY_CONFIG_RESTRICTIONS,
         }))
         .filter(
-          (item): item is { id: PluginBlockFactoryId; factory: BlockFactory } =>
-            item.factory !== undefined,
+          (
+            item,
+          ): item is {
+            id: PluginBlockFactoryId
+            factory: BlockFactory
+            restrictions: Record<string, string>
+          } => item.factory !== undefined,
         )
     }
 
@@ -83,6 +102,7 @@ export const AddNodeButton = memo(function ({
     const fallback: Array<{
       id: PluginBlockFactoryId
       factory: BlockFactory
+      restrictions: Record<string, string>
     }> = []
     for (const [pluginKey, plugin] of Object.entries(catalogue)) {
       for (const [factoryKey, factory] of Object.entries(plugin.factories)) {
@@ -92,12 +112,13 @@ export const AddNodeButton = memo(function ({
           fallback.push({
             id: { plugin: { store, local }, factory: factoryKey },
             factory,
+            restrictions: {},
           })
         }
       }
     }
     return fallback
-  }, [possibleExpansions, catalogue])
+  }, [possibleExpansions, catalogue, expansionRestrictions])
 
   const filteredFactories = useMemo(() => {
     if (!search.trim()) return availableFactories
@@ -113,7 +134,11 @@ export const AddNodeButton = memo(function ({
   const groupedFactories = useMemo(() => {
     const groups: Record<
       string,
-      Array<{ id: PluginBlockFactoryId; factory: BlockFactory }>
+      Array<{
+        id: PluginBlockFactoryId
+        factory: BlockFactory
+        restrictions: Record<string, string>
+      }>
     > = {}
 
     for (const item of filteredFactories) {
@@ -128,12 +153,14 @@ export const AddNodeButton = memo(function ({
   const handleAddBlock = (
     factoryId: PluginBlockFactoryId,
     factory: BlockFactory,
+    restrictions: Record<string, string>,
   ) => {
     const newBlockId = addBlock(factoryId, factory)
 
     if (factory.inputs.length > 0) {
       connectBlocks(newBlockId, factory.inputs[0], sourceBlockId)
     }
+    setBlockConfigurationRestrictions(newBlockId, restrictions)
 
     setOpen(false)
     setSearch('')
@@ -175,7 +202,7 @@ export const AddNodeButton = memo(function ({
                     {metadata.label}
                   </div>
 
-                  {factories.map(({ id, factory }) => {
+                  {factories.map(({ id, factory, restrictions }) => {
                     const IconComponent = getBlockKindIcon(factory.kind)
                     const itemMetadata = BLOCK_KIND_METADATA[factory.kind]
 
@@ -187,7 +214,9 @@ export const AddNodeButton = memo(function ({
                           'text-left hover:bg-accent',
                           'transition-colors',
                         )}
-                        onClick={() => handleAddBlock(id, factory)}
+                        onClick={() =>
+                          handleAddBlock(id, factory, restrictions)
+                        }
                       >
                         <IconComponent
                           className={cn(

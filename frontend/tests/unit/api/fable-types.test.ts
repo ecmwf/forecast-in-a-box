@@ -149,5 +149,8 @@ describe('toValidationState', () => {
         factory: 'sink',
       },
     ])
+    expect(result.blockStates.b1.possibleExpansionRestrictions).toEqual({
+      'ecmwf/base:sink': { amount: 'enumClosed[1,2,3]' },
+    })
   })
 })

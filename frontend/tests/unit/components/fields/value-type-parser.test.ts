@@ -79,6 +79,13 @@ describe('parseValueType', () => {
         itemType: 'int',
       })
     })
+
+    it('parses list with closed enum item type', () => {
+      expect(parseValueType('list[enumClosed[2t,msl]]')).toEqual({
+        type: 'enumList',
+        options: ['2t', 'msl'],
+      })
+    })
   })
 
   describe('enum types', () => {
@@ -107,6 +114,13 @@ describe('parseValueType', () => {
       expect(parseValueType("enumClosed['mars','ecmwf-open-data']")).toEqual({
         type: 'enum',
         options: ['mars', 'ecmwf-open-data'],
+      })
+    })
+
+    it('parses unquoted enumClosed options', () => {
+      expect(parseValueType('enumClosed[2t,msl]')).toEqual({
+        type: 'enum',
+        options: ['2t', 'msl'],
       })
     })
   })
@@ -257,6 +271,12 @@ describe('getDefaultValueForType', () => {
     expect(getDefaultValueForType({ type: 'list', itemType: 'string' })).toBe(
       '',
     )
+  })
+
+  it('returns empty string for enum list type', () => {
+    expect(
+      getDefaultValueForType({ type: 'enumList', options: ['2t', 'msl'] }),
+    ).toBe('')
   })
 
   it('returns first option for enum type', () => {

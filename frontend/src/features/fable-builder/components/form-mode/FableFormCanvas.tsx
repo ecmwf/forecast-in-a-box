@@ -58,6 +58,9 @@ export function FableFormCanvas({ catalogue }: FableFormCanvasProps) {
   const validationState = useFableBuilderStore((state) => state.validationState)
   const addBlock = useFableBuilderStore((state) => state.addBlock)
   const connectBlocks = useFableBuilderStore((state) => state.connectBlocks)
+  const setBlockConfigurationRestrictions = useFableBuilderStore(
+    (state) => state.setBlockConfigurationRestrictions,
+  )
   const selectedBlockId = useFableBuilderStore((state) => state.selectedBlockId)
   const selectBlock = useFableBuilderStore((state) => state.selectBlock)
 
@@ -185,6 +188,11 @@ export function FableFormCanvas({ catalogue }: FableFormCanvasProps) {
     if (!factory) return
 
     const newBlockId = addBlock(factoryId, factory)
+    const restrictions =
+      direction === 'parent'
+        ? {}
+        : (validationState?.blockStates[anchorBlockId]
+            ?.possibleExpansionRestrictions[factoryIdToKey(factoryId)] ?? {})
 
     if (direction === 'parent') {
       // New block is upstream: connect it into the anchor's first input.
@@ -200,6 +208,7 @@ export function FableFormCanvas({ catalogue }: FableFormCanvasProps) {
       // New block is downstream: connect the anchor into its first input.
       connectBlocks(newBlockId, factory.inputs[0], anchorBlockId)
     }
+    setBlockConfigurationRestrictions(newBlockId, restrictions)
 
     // Navigate to the new block's step
     setCurrentStep(factory.kind)

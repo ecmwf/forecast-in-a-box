@@ -305,6 +305,7 @@ export interface BlockValidationState {
   errors: Array<string>
   hasErrors: boolean
   possibleExpansions: Array<PluginBlockFactoryId>
+  possibleExpansionRestrictions: Record<string, Record<string, string>>
   /** Unknown glyph names per option, from /blueprint/expand. */
   missingGlyphs: Record<string, Array<string>>
 }
@@ -608,15 +609,16 @@ export function toValidationState(
     const missingErrors = missingRequiredByBlock[blockId] ?? []
     const errors = [...backendErrors, ...missingErrors]
     const missingGlyphs = expansion.missing_glyphs[blockId] ?? {}
+    const possibleExpansions = expansion.possible_expansions[blockId] ?? []
     const hasMissingGlyphs = Object.values(missingGlyphs).some(
       (names) => names.length > 0,
     )
     blockStates[blockId] = {
       errors,
       hasErrors: errors.length > 0 || hasMissingGlyphs,
-      possibleExpansions: toPluginFactoryIds(
-        expansion.possible_expansions[blockId] ?? [],
-      ),
+      possibleExpansions: toPluginFactoryIds(possibleExpansions),
+      possibleExpansionRestrictions:
+        toExpansionRestrictionMap(possibleExpansions),
       missingGlyphs,
     }
   }
@@ -643,8 +645,39 @@ function toPluginFactoryIds(
   }))
 }
 
+function toExpansionRestrictionMap(
+  expansions: ReadonlyArray<BlockExpansion>,
+): Record<string, Record<string, string>> {
+  const result: Record<string, Record<string, string>> = {}
+  for (const expansion of expansions) {
+    result[factoryIdToKey(expansion)] = expansion.restrictions
+  }
+  return result
+}
+
 function isOptionalValueType(valueType: string): boolean {
   return /^optional\[(.+)\]$/i.test(valueType.trim())
+}
+
+export function getBlockConfigurationRestrictions(
+  fable: FableBuilderV1,
+  validationState: FableValidationState | null,
+  blockId: BlockInstanceId,
+): Record<string, string> {
+  const block = fable.blocks[blockId]
+  if (!block || !validationState) return {}
+
+  const blockFactoryKey = factoryIdToKey(block.factory_id)
+  const restrictions: Record<string, string> = {}
+  for (const sourceId of Object.values(block.input_ids)) {
+    Object.assign(
+      restrictions,
+      validationState.blockStates[sourceId]?.possibleExpansionRestrictions[
+        blockFactoryKey
+      ] ?? {},
+    )
+  }
+  return restrictions
 }
 
 function toPythonStringSet(items: ReadonlyArray<string>): string {
