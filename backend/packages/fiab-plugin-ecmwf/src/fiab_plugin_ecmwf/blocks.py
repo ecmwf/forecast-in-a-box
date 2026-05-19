@@ -301,11 +301,12 @@ class ZarrSink(Sink):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
 
+        temp_dim = inputs[input_task]._temp_dim()
         action = (
             inputs[input_task]
-            .flatten(new_dim="**temp1**", reset_coords=True)
-            .combine_branches(dim="**temp1**")
-            .concatenate(dim="**temp1**")
+            .flatten(new_dim=temp_dim, reset_coords=True)
+            .combine_branches(dim=temp_dim)
+            .concatenate(dim=temp_dim)
             .map(
                 Payload(
                     "fiab_plugin_ecmwf.runtime.sinks.write_zarr",
@@ -450,12 +451,13 @@ class GribSink(Sink):
             mapped_dim = GRIB_ALIASES.get(dim, dim)
             if mapped_dim not in keep_dims:
                 keep_dims.append(mapped_dim)
-        action = inputs[input_task].flatten(new_dim="**temp**", keep_dims=keep_dims, reset_coords=True).concatenate(dim="**temp**")
+        temp_dim = inputs[input_task]._temp_dim()
+        action = inputs[input_task].flatten(new_dim=temp_dim, keep_dims=keep_dims, reset_coords=True).concatenate(dim=temp_dim)
         try:
             if PARAM_DIM in keep_dims:
                 action = action.combine_branches(dim=PARAM_DIM)
             else:
-                action = action.combine_branches(dim="**temp**").concatenate(dim="**temp**")
+                action = action.combine_branches(dim=temp_dim).concatenate(dim=temp_dim)
         except:
             pass
 
