@@ -149,7 +149,7 @@ class EkdSource(Source):
                                     "date": block.config_as_date(DATE).isoformat(),
                                     "expver": block.config_as_str(EXPVER),
                                     PARAM: p,
-                                    ENSEMBLE: number,
+                                    ENSEMBLE: ensemble,
                                     STEP: step,
                                 }
                             },

@@ -32,10 +32,8 @@ from fiab_plugin_ecmwf import plugin
 from fiab_plugin_ecmwf.anemoi.utils import get_checkpoint_enum_type
 from fiab_plugin_ecmwf.blocks import (
     ENSEMBLE,
-    ENSEMBLE_DIM,
-    PARAM_DIM,
+    PARAM,
     STEP,
-    STEP_DIM,
     EkdSource,
     EnsembleStatistics,
     MapPlotSink,
@@ -400,7 +398,7 @@ class TestZarrSink:
 
 class TestSelectParameters:
     def test_catalogue_value_type_is_canonical(self) -> None:
-        assert SelectParameters.configuration_options[PARAM_DIM].value_type == "list[str]"
+        assert SelectParameters.configuration_options[PARAM].value_type == "list[str]"
 
     def test_from_ekdsource(self, select_parameters_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
         block = SelectParameters()
@@ -457,7 +455,7 @@ class TestSelectParameters:
     def test_expander_adds_parameters_restrictions(self, ekdsource_output: QubedOutput) -> None:
         expansions = plugin().expander(ekdsource_output)
         select_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("selectParameters"))
-        assert select_expansion.restrictions[PARAM_DIM].serialize() == "list[enumClosed[2t,msl]]"
+        assert select_expansion.restrictions[PARAM].serialize() == "list[enumClosed[2t,msl]]"
 
     def test_expander_skips_restriction_for_non_string_axes(self) -> None:
         output = QubedOutput(dataqube=Qube.from_datacube({"param": [1, 2]}))
@@ -476,13 +474,13 @@ class TestSelectSteps:
         output = block.validate(block=select_steps_configuration, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
         assert isinstance(output, QubedOutput)
         assert output.dataqube is not None
-        assert axes(output)[STEP_DIM] == {0}
+        assert axes(output)[STEP] == {0}
 
     def test_from_ekdsource_multiple_steps(self, select_steps_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
         block = SelectSteps()
         config = select_steps_configuration.model_copy(update={"configuration_values": _config({"step": [0, 6]})})
         output = block.validate(block=config, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
-        assert axes(output)[STEP_DIM] == {0, 6}
+        assert axes(output)[STEP] == {0, 6}
 
     def test_missing_steps(self, select_steps_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
         block = SelectSteps()
@@ -503,7 +501,7 @@ class TestSelectSteps:
             block=select_steps_configuration,
         )
         assert result.t is selected_action
-        input_action.select.assert_called_once_with({STEP_DIM: 0})
+        input_action.select.assert_called_once_with({STEP: 0})
 
     def test_compile_calls_select_with_multiple_steps(self, select_steps_configuration: BlockInstance) -> None:
         block = SelectSteps()
@@ -518,7 +516,7 @@ class TestSelectSteps:
             block=config,
         )
         assert result.t is selected_action
-        input_action.select.assert_called_once_with({STEP_DIM: [0, 6]})
+        input_action.select.assert_called_once_with({STEP: [0, 6]})
 
     def test_expander_adds_step_restrictions(self, ekdsource_output: QubedOutput) -> None:
         expansions = plugin().expander(ekdsource_output)
@@ -526,7 +524,7 @@ class TestSelectSteps:
         assert select_expansion.restrictions[STEP].serialize() == "list[enumClosed[0,6,12]]"
 
     def test_expander_skips_restriction_for_non_int_axes(self) -> None:
-        output = QubedOutput(dataqube=Qube.from_datacube({STEP_DIM: ["0", "6"]}))
+        output = QubedOutput(dataqube=Qube.from_datacube({STEP: ["0", "6"]}))
         expansions = plugin().expander(output)
         select_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("selectSteps"))
         assert select_expansion.restrictions == {}
@@ -542,13 +540,13 @@ class TestSelectMembers:
         output = block.validate(block=select_members_configuration, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
         assert isinstance(output, QubedOutput)
         assert output.dataqube is not None
-        assert axes(output)[ENSEMBLE_DIM] == {1}
+        assert axes(output)[ENSEMBLE] == {1}
 
     def test_from_ekdsource_multiple_members(self, select_members_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
         block = SelectMembers()
         config = select_members_configuration.model_copy(update={"configuration_values": _config({"number": [1, 2]})})
         output = block.validate(block=config, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
-        assert axes(output)[ENSEMBLE_DIM] == {1, 2}
+        assert axes(output)[ENSEMBLE] == {1, 2}
 
     def test_missing_members(self, select_members_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
         block = SelectMembers()
@@ -569,7 +567,7 @@ class TestSelectMembers:
             block=select_members_configuration,
         )
         assert result.t is selected_action
-        input_action.select.assert_called_once_with({ENSEMBLE_DIM: 1})
+        input_action.select.assert_called_once_with({ENSEMBLE: 1})
 
     def test_compile_calls_select_with_multiple_members(self, select_members_configuration: BlockInstance) -> None:
         block = SelectMembers()
@@ -584,7 +582,7 @@ class TestSelectMembers:
             block=config,
         )
         assert result.t is selected_action
-        input_action.select.assert_called_once_with({ENSEMBLE_DIM: [1, 2]})
+        input_action.select.assert_called_once_with({ENSEMBLE: [1, 2]})
 
     def test_expander_adds_member_restrictions(self, ekdsource_output: QubedOutput) -> None:
         expansions = plugin().expander(ekdsource_output)
@@ -592,7 +590,7 @@ class TestSelectMembers:
         assert select_expansion.restrictions[ENSEMBLE].serialize() == "list[enumClosed[1,2,3,4,5]]"
 
     def test_expander_skips_restriction_for_non_int_axes(self) -> None:
-        output = QubedOutput(dataqube=Qube.from_datacube({ENSEMBLE_DIM: ["1", "2"]}))
+        output = QubedOutput(dataqube=Qube.from_datacube({ENSEMBLE: ["1", "2"]}))
         expansions = plugin().expander(output)
         select_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("selectMembers"))
         assert select_expansion.restrictions == {}
@@ -619,7 +617,7 @@ class TestMapPlotSink:
     def test_expander_adds_parameters_restrictions(self, ekdsource_output: QubedOutput) -> None:
         expansions = plugin().expander(ekdsource_output)
         map_plot_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("mapPlotSink"))
-        assert map_plot_expansion.restrictions[PARAM_DIM].serialize() == "list[enumClosed[2t,msl]]"
+        assert map_plot_expansion.restrictions[PARAM].serialize() == "list[enumClosed[2t,msl]]"
 
     def test_expander_skips_restriction_for_non_string_axes(self) -> None:
         output = QubedOutput(dataqube=Qube.from_datacube({"param": [1, 2]}))
