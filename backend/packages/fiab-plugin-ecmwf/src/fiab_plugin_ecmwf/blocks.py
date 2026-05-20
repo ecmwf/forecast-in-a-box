@@ -27,7 +27,7 @@ from fiab_core.fable import (
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
 from fiab_core.tools.blocks import Product, Sink, Source, Transform
-from fiab_core.types import ClosedEnumListType
+from fiab_core.types import ClosedEnumType, ListType
 from qubed import Qube
 
 from .qubed_utils import axes, contains, coxpand, dimensions
@@ -384,7 +384,7 @@ class SelectDimension(Transform):
 
     def restrictions(self, other: QubedOutput) -> ConfigurationOptionRestriction:
         values = self._restriction_value_strings(axes(other).get(self.option_id, set()))
-        return {self.option_id: ClosedEnumListType(values)} if values else {}
+        return {self.option_id: ListType(ClosedEnumType(values))} if values else {}
 
     def intersect(self, other: QubedOutput) -> bool:
         return contains(other, self.option_id)
@@ -483,7 +483,7 @@ class MapPlotSink(Sink):
 
     def restrictions(self, other: QubedOutput) -> ConfigurationOptionRestriction:
         values = [value for value in axes(other).get(PARAM, set()) if isinstance(value, str)]
-        return {PARAM: ClosedEnumListType(sorted(values))} if values else {}
+        return {PARAM: ListType(ClosedEnumType(sorted(values)))} if values else {}
 
     def intersect(self, other: QubedOutput) -> bool:
         return contains(other, PARAM)

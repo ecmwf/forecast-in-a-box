@@ -92,8 +92,6 @@ class FableType(ABC):
             inner_type = FableType.parse(inner_type_expr)
             if isinstance(inner_type, ListType):
                 raise NotFableType("Nested lists are not supported")
-            if isinstance(inner_type, ClosedEnumType):
-                return ClosedEnumListType(inner_type.items)
             return ListType(inner_type)
 
         raise NotFableType(
@@ -255,11 +253,3 @@ class ListType(FableType):
 
     def serialize(self) -> str:
         return f"list[{self.item_type.serialize()}]"
-
-
-class ClosedEnumListType(ListType):
-    """List type whose items must be members of a closed enumeration."""
-
-    def __init__(self, items: list[str]) -> None:
-        self.items = items
-        super().__init__(ClosedEnumType(items))

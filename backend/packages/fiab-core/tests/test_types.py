@@ -14,7 +14,6 @@ from datetime import date, datetime
 import pytest
 
 from fiab_core.types import (
-    ClosedEnumListType,
     ClosedEnumType,
     DatetimeType,
     DateType,
@@ -286,8 +285,8 @@ class TestFableTypeParse:
 
     def test_parse_list_of_enum(self) -> None:
         t = FableType.parse("list[enumClosed[a,b]]")
-        assert isinstance(t, ClosedEnumListType)
         assert isinstance(t, ListType)
+        assert isinstance(t.item_type, ClosedEnumType)
         assert t.validate_convert("a,b,a") == ["a", "b", "a"]
         assert t.serialize() == "list[enumClosed[a,b]]"
 
