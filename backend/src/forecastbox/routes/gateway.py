@@ -19,7 +19,6 @@ from fastapi import APIRouter, HTTPException
 from forecastbox.domain.gateway.exceptions import (
     GatewayAlreadyRunning,
     GatewayExited,
-    GatewayManagerNotInitialized,
     GatewayNotRunning,
     GatewayNotStarted,
 )
@@ -42,8 +41,6 @@ async def start_gateway() -> str:
         launch_gateway()
     except GatewayAlreadyRunning:
         raise HTTPException(400, "Process already running.")
-    except GatewayManagerNotInitialized:
-        raise HTTPException(500, "Gateway manager is not initialized")
     return "started"
 
 
@@ -58,8 +55,6 @@ async def get_status() -> str:
         return "not started"
     except GatewayExited as e:
         return f"exited with {e.exitcode}"
-    except GatewayManagerNotInitialized:
-        raise HTTPException(500, "Gateway manager is not initialized")
 
 
 @router.post("/kill")
@@ -70,6 +65,4 @@ async def kill_gateway() -> str:
         stop_gateway()
     except GatewayNotRunning:
         raise HTTPException(400, "Gateway is not running")
-    except GatewayManagerNotInitialized:
-        raise HTTPException(500, "Gateway manager is not initialized")
     return "killed"

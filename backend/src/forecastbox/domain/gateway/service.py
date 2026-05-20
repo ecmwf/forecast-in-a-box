@@ -24,7 +24,6 @@ from cascade.gateway.server import main_enp
 from forecastbox.domain.gateway.exceptions import (
     GatewayAlreadyRunning,
     GatewayExited,
-    GatewayManagerNotInitialized,
     GatewayNotRunning,
     GatewayNotStarted,
 )
@@ -39,31 +38,9 @@ class GatewayProcess:
     process: BaseProcess
 
 
-@dataclass(eq=False, slots=True)
 class GatewayConnectionManager:
-    lock: threading.Lock
+    lock: threading.Lock = threading.Lock()
     gateway_process: GatewayProcess | None = None
-
-
-_manager: GatewayConnectionManager | None = None
-
-
-def _require_manager() -> GatewayConnectionManager:
-    if _manager is None:
-        raise GatewayManagerNotInitialized("Gateway manager is not initialized")
-    return _manager
-
-
-def init_manager() -> None:
-    global _manager
-    if _manager is not None:
-        raise ValueError("Gateway manager is already initialized")
-    _manager = GatewayConnectionManager(lock=threading.Lock())
-
-
-def _reset_manager() -> None:
-    global _manager
-    _manager = None
 
 
 def launch_cascade(cascade_url: str, log_base: str | None, max_concurrent_jobs: int | None) -> None:
@@ -75,9 +52,8 @@ def launch_cascade(cascade_url: str, log_base: str | None, max_concurrent_jobs: 
 
 
 def launch_gateway() -> None:
-    manager = _require_manager()
-    with manager.lock:
-        if manager.gateway_process is not None:
+    with GatewayConnectionManager.lock:
+        if GatewayConnectionManager.gateway_process is not None:
             raise GatewayAlreadyRunning("Process already running.")
         logs_directory = TemporaryDirectory(prefix="fiabLogs")
         logger.debug(f"logging base is at {logs_directory.name}")
@@ -89,27 +65,24 @@ def launch_gateway() -> None:
         )  # type: ignore[unresolved-attribute] # context
         process.start()
         logger.debug(f"spawned new gateway process with pid {process.pid}")
-        manager.gateway_process = GatewayProcess(logs_directory=logs_directory, process=process)
+        GatewayConnectionManager.gateway_process = GatewayProcess(logs_directory=logs_directory, process=process)
 
 
 def get_gateway_url() -> str:
-    manager = _require_manager()
-    if manager.gateway_process is None:
+    if GatewayConnectionManager.gateway_process is None:
         raise GatewayNotRunning("Gateway is not running")
     return config.cascade.cascade_url
 
 
 def get_logs_directory() -> TemporaryDirectory | None:
-    manager = _require_manager()
-    gateway_process = manager.gateway_process
+    gateway_process = GatewayConnectionManager.gateway_process
     if gateway_process is None:
         return None
     return gateway_process.logs_directory
 
 
 def status_gateway() -> str:
-    manager = _require_manager()
-    gateway_process = manager.gateway_process
+    gateway_process = GatewayConnectionManager.gateway_process
     if gateway_process is None:
         raise GatewayNotStarted("Gateway was not started")
     if gateway_process.process.exitcode is not None:
@@ -118,9 +91,8 @@ def status_gateway() -> str:
 
 
 def stop_gateway() -> None:
-    manager = _require_manager()
-    with manager.lock:
-        gateway_process = manager.gateway_process
+    with GatewayConnectionManager.lock:
+        gateway_process = GatewayConnectionManager.gateway_process
         if gateway_process is None or gateway_process.process.exitcode is not None:
             raise GatewayNotRunning("Gateway is not running")
 
@@ -135,18 +107,14 @@ def stop_gateway() -> None:
         if process.exitcode is None:
             logger.debug("gateway kill")
             process.kill()
-        manager.gateway_process = None
+        GatewayConnectionManager.gateway_process = None
 
 
 async def shutdown_processes() -> None:
     """Terminate all running gateway processes on app shutdown."""
     logger.debug("initiating graceful gateway shutdown")
-    if _manager is None:
-        return
-    manager = _require_manager()
-    gateway_process = manager.gateway_process
+    gateway_process = GatewayConnectionManager.gateway_process
     if gateway_process is None:
-        _reset_manager()
         return
     if gateway_process.process.exitcode is None:
         try:
@@ -154,5 +122,4 @@ async def shutdown_processes() -> None:
         except GatewayNotRunning:
             pass
     else:
-        manager.gateway_process = None
-    _reset_manager()
+        GatewayConnectionManager.gateway_process = None

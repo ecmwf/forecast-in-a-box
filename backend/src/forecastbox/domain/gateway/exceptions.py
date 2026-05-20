@@ -14,10 +14,6 @@ class GatewayError(Exception):
     """Base class for gateway domain errors."""
 
 
-class GatewayManagerNotInitialized(GatewayError):
-    """Raised when gateway manager singleton was not initialized."""
-
-
 class GatewayAlreadyRunning(GatewayError):
     """Raised when attempting to start an already tracked gateway process."""
 
