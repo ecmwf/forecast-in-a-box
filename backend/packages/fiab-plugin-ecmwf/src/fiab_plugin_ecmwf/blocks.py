@@ -8,6 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 import logging
+from typing import Any, ClassVar, cast
 
 import numpy as np
 from cascade.low.func import Either
@@ -304,9 +305,70 @@ class ZarrSink(Sink):
         return bool(dimensions(other))
 
 
-class SelectParameters(Transform):
+SelectAxisValue = str | int
+
+
+class _SelectDimension(Transform):
+    option_id: ClassVar[ConfigurationOptionId]
+    item_python_type: ClassVar[type[str] | type[int]]
+    selection_label: ClassVar[str]
+    inputs: list[str] = ["dataset"]
+
+    def _selected_values(self, block: BlockInstance) -> list[SelectAxisValue]:
+        if self.item_python_type is str:
+            return cast(list[SelectAxisValue], block.config_as_list(self.option_id, str, allow_empty=False))
+        if self.item_python_type is int:
+            return cast(list[SelectAxisValue], block.config_as_list(self.option_id, int, allow_empty=False))
+        raise TypeError(f"Unsupported select value type {self.item_python_type!r}")
+
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_dataset = inputs.get("dataset")
+        if not isinstance(input_dataset, QubedOutput):
+            actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
+            return Either.error(f"Unsupported input type for 'dataset': expected QubedOutput, got {actual_type}")
+
+        selected_values = self._selected_values(block)
+        if not contains(input_dataset, {self.option_id: selected_values}):
+            return Either.error(
+                f"{self.selection_label} {selected_values} are not in the input "
+                f"{self.selection_label}: {axes(input_dataset).get(self.option_id, [])}"
+            )
+
+        output = coxpand(input_dataset, self.option_id, {self.option_id: selected_values})
+        return Either.ok(output)
+
+    def compile(
+        self,
+        inputs: ActionLookup,
+        block_id: BlockInstanceId,
+        block: BlockInstance,
+    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_task = block.input_ids["dataset"]
+        selected_values = self._selected_values(block)
+        selected = inputs[input_task].select({self.option_id: selected_values if len(selected_values) > 1 else selected_values[0]})
+        return Either.ok(selected)
+
+    def _restriction_value_strings(self, axis_values: set[Any]) -> list[str]:
+        if self.item_python_type is str:
+            return sorted(value for value in axis_values if isinstance(value, str))
+        if self.item_python_type is int:
+            return [str(value) for value in sorted(value for value in axis_values if type(value) is int)]
+        raise TypeError(f"Unsupported select value type {self.item_python_type!r}")
+
+    def restrictions(self, other: QubedOutput) -> ConfigurationOptionRestriction:
+        values = self._restriction_value_strings(axes(other).get(self.option_id, set()))
+        return {self.option_id: ClosedEnumListType(values)} if values else {}
+
+    def intersect(self, other: QubedOutput) -> bool:
+        return contains(other, self.option_id)
+
+
+class SelectParameters(_SelectDimension):
     title: str = "Select Parameters"
     description: str = "Select parameters from the input dataset"
+    option_id: ClassVar[ConfigurationOptionId] = PARAM
+    item_python_type: ClassVar[type[str] | type[int]] = str
+    selection_label: ClassVar[str] = "parameters"
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
         PARAM: BlockConfigurationOption(
             title="Parameters",
@@ -314,43 +376,14 @@ class SelectParameters(Transform):
             value_type="list[str]",
         )
     }
-    inputs: list[str] = ["dataset"]
-
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_dataset = inputs.get("dataset")
-        if not isinstance(input_dataset, QubedOutput):
-            actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
-            return Either.error(f"Unsupported input type for 'dataset': expected QubedOutput, got {actual_type}")
-
-        parameters = block.config_as_list(PARAM, str, allow_empty=False)
-        if not contains(input_dataset, {PARAM: parameters}):
-            return Either.error(f"parameters {parameters} are not in the input parameters: {axes(input_dataset).get(PARAM, [])}")
-
-        output = coxpand(input_dataset, PARAM, {PARAM: parameters})
-        return Either.ok(output)
-
-    def compile(
-        self,
-        inputs: ActionLookup,
-        block_id: BlockInstanceId,
-        block: BlockInstance,
-    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_task = block.input_ids["dataset"]
-        parameters = block.config_as_list(PARAM, str, allow_empty=False)
-        selected = inputs[input_task].select({PARAM: parameters if len(parameters) > 1 else parameters[0]})
-        return Either.ok(selected)
-
-    def restrictions(self, other: QubedOutput) -> ConfigurationOptionRestriction:
-        values = [value for value in axes(other).get(PARAM, set()) if isinstance(value, str)]
-        return {PARAM: ClosedEnumListType(sorted(values))} if values else {}
-
-    def intersect(self, other: QubedOutput) -> bool:
-        return contains(other, PARAM)
 
 
-class SelectSteps(Transform):
+class SelectSteps(_SelectDimension):
     title: str = "Select Steps"
     description: str = "Select forecast steps from the input dataset"
+    option_id: ClassVar[ConfigurationOptionId] = STEP
+    item_python_type: ClassVar[type[str] | type[int]] = int
+    selection_label: ClassVar[str] = "steps"
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
         STEP: BlockConfigurationOption(
             title="Steps",
@@ -358,43 +391,14 @@ class SelectSteps(Transform):
             value_type="list[int]",
         )
     }
-    inputs: list[str] = ["dataset"]
-
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_dataset = inputs.get("dataset")
-        if not isinstance(input_dataset, QubedOutput):
-            actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
-            return Either.error(f"Unsupported input type for 'dataset': expected QubedOutput, got {actual_type}")
-
-        steps = block.config_as_list(STEP, int, allow_empty=False)
-        if not contains(input_dataset, {STEP: steps}):
-            return Either.error(f"steps {steps} are not in the input steps: {axes(input_dataset).get(STEP, [])}")
-
-        output = coxpand(input_dataset, STEP, {STEP: steps})
-        return Either.ok(output)
-
-    def compile(
-        self,
-        inputs: ActionLookup,
-        block_id: BlockInstanceId,
-        block: BlockInstance,
-    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_task = block.input_ids["dataset"]
-        steps = block.config_as_list(STEP, int, allow_empty=False)
-        selected = inputs[input_task].select({STEP: steps if len(steps) > 1 else steps[0]})
-        return Either.ok(selected)
-
-    def restrictions(self, other: QubedOutput) -> ConfigurationOptionRestriction:
-        values = [value for value in axes(other).get(STEP, set()) if isinstance(value, int)]
-        return {STEP: ClosedEnumListType([str(value) for value in sorted(values)])} if values else {}
-
-    def intersect(self, other: QubedOutput) -> bool:
-        return contains(other, STEP)
 
 
-class SelectMembers(Transform):
+class SelectMembers(_SelectDimension):
     title: str = "Select Members"
     description: str = "Select ensemble members from the input dataset"
+    option_id: ClassVar[ConfigurationOptionId] = ENSEMBLE
+    item_python_type: ClassVar[type[str] | type[int]] = int
+    selection_label: ClassVar[str] = "members"
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
         ENSEMBLE: BlockConfigurationOption(
             title="Ensemble Members",
@@ -402,38 +406,6 @@ class SelectMembers(Transform):
             value_type="list[int]",
         )
     }
-    inputs: list[str] = ["dataset"]
-
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_dataset = inputs.get("dataset")
-        if not isinstance(input_dataset, QubedOutput):
-            actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
-            return Either.error(f"Unsupported input type for 'dataset': expected QubedOutput, got {actual_type}")
-
-        members = block.config_as_list(ENSEMBLE, int, allow_empty=False)
-        if not contains(input_dataset, {ENSEMBLE: members}):
-            return Either.error(f"members {members} are not in the input members: {axes(input_dataset).get(ENSEMBLE, [])}")
-
-        output = coxpand(input_dataset, ENSEMBLE, {ENSEMBLE: members})
-        return Either.ok(output)
-
-    def compile(
-        self,
-        inputs: ActionLookup,
-        block_id: BlockInstanceId,
-        block: BlockInstance,
-    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_task = block.input_ids["dataset"]
-        members = block.config_as_list(ENSEMBLE, int, allow_empty=False)
-        selected = inputs[input_task].select({ENSEMBLE: members if len(members) > 1 else members[0]})
-        return Either.ok(selected)
-
-    def restrictions(self, other: QubedOutput) -> ConfigurationOptionRestriction:
-        values = [value for value in axes(other).get(ENSEMBLE, set()) if isinstance(value, int)]
-        return {ENSEMBLE: ClosedEnumListType([str(value) for value in sorted(values)])} if values else {}
-
-    def intersect(self, other: QubedOutput) -> bool:
-        return contains(other, ENSEMBLE)
 
 
 class MapPlotSink(Sink):
