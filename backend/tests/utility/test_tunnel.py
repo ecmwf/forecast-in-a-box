@@ -44,8 +44,8 @@ def test_setup_registers_tunnel_and_builds_master_command(
         local_port=21001,
         remote_port=31001,
     )
-    assert handle.cascade_url == "tcp://localhost:21001"
-    assert handle in fresh_registry
+    assert handle.as_local_url() == "tcp://localhost:21001"
+    assert handle in fresh_registry._handles
     assert ssh_calls == [
         (
             [
@@ -102,7 +102,7 @@ def test_setup_retries_on_bind_failure(
     handle = tunnel.setup("fiabServer")
 
     assert handle.remote_port == 31002
-    assert handle in fresh_registry
+    assert handle in fresh_registry._handles
     assert ssh_calls == [
         [
             "ssh",
@@ -165,7 +165,7 @@ def test_status_execute_and_stop_use_existing_control_socket(
     tunnel.execute(handle, ["uv", "run", "python", "-m", "cascade.gateway", "--port", "22001"])
     tunnel.stop(handle)
 
-    assert handle not in fresh_registry
+    assert handle not in fresh_registry._handles
     assert ssh_calls == [
         (
             [
@@ -236,4 +236,4 @@ def test_shutdown_stops_all_tracked_handles(
     tunnel.shutdown()
 
     assert set(seen) == set(handles)
-    assert len(fresh_registry) == 0
+    assert len(fresh_registry._handles) == 0

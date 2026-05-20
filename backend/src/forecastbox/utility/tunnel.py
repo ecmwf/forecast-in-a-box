@@ -10,14 +10,14 @@
 """Helpers for SSH multiplexing tunnels."""
 
 import os
-import secrets
+import random
 import shlex
 import socket
 import subprocess
 import tempfile
 import threading
 import uuid
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -40,7 +40,7 @@ def _claim_free_port() -> int:
 
 
 def _claim_remote_port() -> int:
-    return _REMOTE_PORT_MIN + secrets.randbelow(_REMOTE_PORT_MAX - _REMOTE_PORT_MIN + 1)
+    return random.randint(_REMOTE_PORT_MIN, _REMOTE_PORT_MAX)
 
 
 def _validate_port(port: int, name: str) -> None:
@@ -91,9 +91,8 @@ class ConnectionHandle:
     local_port: int
     remote_port: int
 
-    @property
-    def cascade_url(self) -> str:
-        """Return the local Cascade URL exposed through the tunnel."""
+    def as_local_url(self) -> str:
+        """Return the local URL for the service forwarded through the tunnel."""
 
         return f"tcp://localhost:{self.local_port}"
 
@@ -118,18 +117,6 @@ class TunnelRegistry:
             handles = tuple(self._handles)
         for handle in handles:
             stop(handle)
-
-    def __contains__(self, handle: ConnectionHandle) -> bool:
-        with self._lock:
-            return handle in self._handles
-
-    def __len__(self) -> int:
-        with self._lock:
-            return len(self._handles)
-
-    def __iter__(self) -> Iterable[ConnectionHandle]:
-        with self._lock:
-            return iter(tuple(self._handles))
 
 
 registry = TunnelRegistry()
