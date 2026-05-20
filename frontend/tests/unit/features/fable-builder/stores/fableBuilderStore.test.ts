@@ -905,6 +905,167 @@ describe('useFableBuilderStore', () => {
   })
 })
 
+describe('undo/redo', () => {
+  beforeEach(() => {
+    act(() => useFableBuilderStore.getState().reset())
+  })
+
+  const factoryId = {
+    plugin: { store: 'ecmwf', local: 'test' },
+    factory: 'source',
+  }
+
+  it('starts with empty history', () => {
+    const s = useFableBuilderStore.getState()
+    expect(s.past).toEqual([])
+    expect(s.future).toEqual([])
+  })
+
+  it('undo restores the pre-mutation fable', () => {
+    const before = useFableBuilderStore.getState().fable
+    act(() => {
+      useFableBuilderStore.getState().addBlock(factoryId, mockFactory)
+    })
+    act(() => useFableBuilderStore.getState().undo())
+    expect(useFableBuilderStore.getState().fable).toEqual(before)
+  })
+
+  it('redo replays the undone mutation', () => {
+    let added = ''
+    act(() => {
+      added = useFableBuilderStore.getState().addBlock(factoryId, mockFactory)
+    })
+    const afterAdd = useFableBuilderStore.getState().fable
+    act(() => useFableBuilderStore.getState().undo())
+    act(() => useFableBuilderStore.getState().redo())
+    expect(useFableBuilderStore.getState().fable).toEqual(afterAdd)
+    expect(useFableBuilderStore.getState().fable.blocks[added]).toBeDefined()
+  })
+
+  it('clears future on a fresh edit after undo', () => {
+    act(() => {
+      useFableBuilderStore.getState().addBlock(factoryId, mockFactory)
+    })
+    act(() => useFableBuilderStore.getState().undo())
+    expect(useFableBuilderStore.getState().future.length).toBe(1)
+    act(() => {
+      useFableBuilderStore.getState().addBlock(factoryId, mockFactory)
+    })
+    expect(useFableBuilderStore.getState().future).toEqual([])
+  })
+
+  it('coalesces same-key config edits into a single undo step', () => {
+    let blockId = ''
+    act(() => {
+      blockId = useFableBuilderStore.getState().addBlock(factoryId, mockFactory)
+    })
+    // The addBlock push leaves past.length === 1. Subsequent same-key typing
+    // should not grow past — it collapses into the original snapshot.
+    const pastAfterAdd = useFableBuilderStore.getState().past.length
+    act(() => {
+      useFableBuilderStore.getState().updateBlockConfig(blockId, 'param1', 'a')
+    })
+    act(() => {
+      useFableBuilderStore.getState().updateBlockConfig(blockId, 'param1', 'ab')
+    })
+    act(() => {
+      useFableBuilderStore
+        .getState()
+        .updateBlockConfig(blockId, 'param1', 'abc')
+    })
+    // First typing keystroke pushes once; the next two coalesce.
+    expect(useFableBuilderStore.getState().past.length).toBe(pastAfterAdd + 1)
+    // Undoing returns to the empty-value state (the snapshot taken before
+    // the first keystroke), not to the in-between values.
+    act(() => useFableBuilderStore.getState().undo())
+    expect(
+      useFableBuilderStore.getState().fable.blocks[blockId].configuration_values
+        .param1,
+    ).toBe('')
+  })
+
+  it('does not coalesce edits to different keys', () => {
+    let blockId = ''
+    act(() => {
+      blockId = useFableBuilderStore.getState().addBlock(factoryId, mockFactory)
+    })
+    const base = useFableBuilderStore.getState().past.length
+    act(() => {
+      useFableBuilderStore.getState().updateBlockConfig(blockId, 'param1', 'x')
+    })
+    act(() => {
+      useFableBuilderStore.getState().updateBlockConfig(blockId, 'param2', 'y')
+    })
+    // Different coalesce keys → both push.
+    expect(useFableBuilderStore.getState().past.length).toBe(base + 2)
+  })
+
+  it('bounds the history at MAX_HISTORY entries', () => {
+    // MAX_HISTORY is 100 in the store; push 120 distinct edits and confirm
+    // the stack stays capped while preserving the most recent snapshots.
+    for (let i = 0; i < 120; i++) {
+      act(() => {
+        useFableBuilderStore.getState().addBlock(factoryId, mockFactory)
+      })
+    }
+    expect(useFableBuilderStore.getState().past.length).toBe(100)
+  })
+
+  it('setFable clears the entire history', () => {
+    act(() => {
+      useFableBuilderStore.getState().addBlock(factoryId, mockFactory)
+    })
+    act(() => useFableBuilderStore.getState().undo())
+    expect(useFableBuilderStore.getState().future.length).toBe(1)
+    act(() => useFableBuilderStore.getState().setFable(mockFable))
+    expect(useFableBuilderStore.getState().past).toEqual([])
+    expect(useFableBuilderStore.getState().future).toEqual([])
+  })
+
+  it('undo with an empty past is a no-op', () => {
+    const before = useFableBuilderStore.getState().fable
+    act(() => useFableBuilderStore.getState().undo())
+    expect(useFableBuilderStore.getState().fable).toBe(before)
+  })
+
+  it('redo with an empty future is a no-op', () => {
+    act(() => {
+      useFableBuilderStore.getState().addBlock(factoryId, mockFactory)
+    })
+    const after = useFableBuilderStore.getState().fable
+    act(() => useFableBuilderStore.getState().redo())
+    expect(useFableBuilderStore.getState().fable).toBe(after)
+  })
+
+  it('history transactions collapse a multi-action UI flow to one undo step', () => {
+    let blockId = ''
+    // Mirror what a drag-drop or popover-add does: add + connect inside one
+    // transaction. Both pushHistory calls coalesce; only one snapshot lands.
+    act(() => {
+      useFableBuilderStore.getState().beginHistoryTransaction()
+      blockId = useFableBuilderStore.getState().addBlock(factoryId, mockFactory)
+      useFableBuilderStore.getState().connectBlocks(blockId, 'in', blockId)
+      useFableBuilderStore.getState().endHistoryTransaction()
+    })
+    expect(useFableBuilderStore.getState().past.length).toBe(1)
+    act(() => useFableBuilderStore.getState().undo())
+    // One undo wipes the whole transaction — no orphaned node, no stray edges.
+    expect(
+      useFableBuilderStore.getState().fable.blocks[blockId],
+    ).toBeUndefined()
+  })
+
+  it('clears selectedBlockId on undo when the selected block disappears', () => {
+    let blockId = ''
+    act(() => {
+      blockId = useFableBuilderStore.getState().addBlock(factoryId, mockFactory)
+    })
+    expect(useFableBuilderStore.getState().selectedBlockId).toBe(blockId)
+    act(() => useFableBuilderStore.getState().undo())
+    expect(useFableBuilderStore.getState().selectedBlockId).toBeNull()
+  })
+})
+
 describe('selector hooks', () => {
   beforeEach(() => {
     act(() => useFableBuilderStore.getState().reset())

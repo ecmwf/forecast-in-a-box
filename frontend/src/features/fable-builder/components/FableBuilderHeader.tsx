@@ -16,8 +16,10 @@ import {
   FileText,
   LayoutGrid,
   MoreVertical,
+  Redo2,
   Save,
   Share2,
+  Undo2,
   Upload,
 } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
@@ -32,6 +34,7 @@ import type {
 } from '@/api/types/fable.types'
 import { getBlocksByKind } from '@/api/types/fable.types'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
+import { useUndoRedoShortcuts } from '@/features/fable-builder/hooks/useUndoRedoShortcuts'
 import { formatInZone, getAppTimeZone } from '@/lib/datetime'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
@@ -82,6 +85,14 @@ export function FableBuilderHeader({
   const setStep = useFableBuilderStore((s) => s.setStep)
   const setFable = useFableBuilderStore((s) => s.setFable)
   const setSubmitDialogOpen = useFableBuilderStore((s) => s.setSubmitDialogOpen)
+  const undo = useFableBuilderStore((s) => s.undo)
+  const redo = useFableBuilderStore((s) => s.redo)
+  const canUndo = useFableBuilderStore((s) => s.past.length > 0)
+  const canRedo = useFableBuilderStore((s) => s.future.length > 0)
+
+  // Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z (Ctrl+Y on Windows) only while editing —
+  // the review step is read-only, undo there would be misleading.
+  useUndoRedoShortcuts(step === 'edit')
 
   const blockCount = Object.keys(fable.blocks).length
   const isValid = validationState?.isValid ?? false
@@ -289,6 +300,41 @@ export function FableBuilderHeader({
               <>
                 {/* Desktop: Show main buttons */}
                 <div className="hidden items-center gap-2 sm:flex">
+                  {/* Undo/redo. Disabled when the respective stack is empty;
+                      keyboard shortcuts live in useUndoRedoShortcuts. */}
+                  <div className="flex items-center gap-1">
+                    <Tooltip>
+                      <TooltipTrigger render={<span className="inline-flex" />}>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={undo}
+                          disabled={!canUndo}
+                          aria-label={t('header.undo')}
+                        >
+                          <Undo2 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t('header.undo')}</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger render={<span className="inline-flex" />}>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={redo}
+                          disabled={!canRedo}
+                          aria-label={t('header.redo')}
+                        >
+                          <Redo2 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t('header.redo')}</TooltipContent>
+                    </Tooltip>
+                  </div>
+
                   {/* Save Config with dropdown for more actions */}
                   <ButtonGroup>
                     <SaveConfigPopover

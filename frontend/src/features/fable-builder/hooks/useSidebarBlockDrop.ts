@@ -144,6 +144,12 @@ export function useSidebarBlockDrop(catalogue: BlockFactoryCatalogue) {
   const addBlock = useFableBuilderStore((s) => s.addBlock)
   const connectBlocks = useFableBuilderStore((s) => s.connectBlocks)
   const setDraggedFactory = useFableBuilderStore((s) => s.setDraggedFactory)
+  const beginHistoryTransaction = useFableBuilderStore(
+    (s) => s.beginHistoryTransaction,
+  )
+  const endHistoryTransaction = useFableBuilderStore(
+    (s) => s.endHistoryTransaction,
+  )
   const activeHandleRef = useRef<Element | null>(null)
 
   const clearActiveHandle = useCallback(() => {
@@ -218,26 +224,32 @@ export function useSidebarBlockDrop(catalogue: BlockFactoryCatalogue) {
         }
       }
 
-      const newId = addBlock(dragged.id, dragged.factory)
+      // Group add + connect + splice rewires into a single undo step.
+      beginHistoryTransaction()
+      try {
+        const newId = addBlock(dragged.id, dragged.factory)
 
-      if (conn) {
-        if (conn.isInput) {
-          // New block feeds the existing node's input port.
-          connectBlocks(conn.nodeId, conn.handleId, newId)
-          // Splice: the input's prior parent now feeds the new block instead
-          // of being orphaned by the connectBlocks above.
-          if (priorParent) {
-            connectBlocks(newId, dragged.factory.inputs[0], priorParent)
-          }
-        } else {
-          // New block consumes the existing node's output.
-          connectBlocks(newId, dragged.factory.inputs[0], conn.nodeId)
-          // Splice: redirect prior consumers of conn.nodeId through new so
-          // the drop inserts an in-line transform rather than a side branch.
-          for (const { id, inputName } of downstream) {
-            connectBlocks(id, inputName, newId)
+        if (conn) {
+          if (conn.isInput) {
+            // New block feeds the existing node's input port.
+            connectBlocks(conn.nodeId, conn.handleId, newId)
+            // Splice: the input's prior parent now feeds the new block
+            // instead of being orphaned by the connectBlocks above.
+            if (priorParent) {
+              connectBlocks(newId, dragged.factory.inputs[0], priorParent)
+            }
+          } else {
+            // New block consumes the existing node's output.
+            connectBlocks(newId, dragged.factory.inputs[0], conn.nodeId)
+            // Splice: redirect prior consumers of conn.nodeId through new so
+            // the drop inserts an in-line transform rather than a side branch.
+            for (const { id, inputName } of downstream) {
+              connectBlocks(id, inputName, newId)
+            }
           }
         }
+      } finally {
+        endHistoryTransaction()
       }
 
       setDraggedFactory(null)
@@ -248,6 +260,8 @@ export function useSidebarBlockDrop(catalogue: BlockFactoryCatalogue) {
       catalogue,
       addBlock,
       connectBlocks,
+      beginHistoryTransaction,
+      endHistoryTransaction,
       setDraggedFactory,
       clearActiveHandle,
     ],

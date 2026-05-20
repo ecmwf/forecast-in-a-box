@@ -74,6 +74,12 @@ export const AddNodeButton = memo(function ({
       state.validationState?.blockStates[sourceBlockId]
         ?.possibleExpansionRestrictions ?? EMPTY_EXPANSION_RESTRICTIONS,
   )
+  const beginHistoryTransaction = useFableBuilderStore(
+    (state) => state.beginHistoryTransaction,
+  )
+  const endHistoryTransaction = useFableBuilderStore(
+    (state) => state.endHistoryTransaction,
+  )
 
   // When the backend provides validated expansions, use them. Otherwise build
   // a fallback from the full catalogue (all factories that accept inputs) so
@@ -167,15 +173,21 @@ export const AddNodeButton = memo(function ({
         )
       : []
 
-    const newBlockId = addBlock(factoryId, factory)
+    // Group add + connect + splice rewires into a single undo step.
+    beginHistoryTransaction()
+    try {
+      const newBlockId = addBlock(factoryId, factory)
 
-    if (factory.inputs.length > 0) {
-      connectBlocks(newBlockId, factory.inputs[0], sourceBlockId)
-    }
-    setBlockConfigurationRestrictions(newBlockId, restrictions)
+      if (factory.inputs.length > 0) {
+        connectBlocks(newBlockId, factory.inputs[0], sourceBlockId)
+      }
+      setBlockConfigurationRestrictions(newBlockId, restrictions)
 
-    for (const { id, inputName } of downstream) {
-      connectBlocks(id, inputName, newBlockId)
+      for (const { id, inputName } of downstream) {
+        connectBlocks(id, inputName, newBlockId)
+      }
+    } finally {
+      endHistoryTransaction()
     }
 
     setOpen(false)
