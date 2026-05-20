@@ -13,7 +13,6 @@ import re
 from typing import Any, cast
 
 import numpy as np
-from typing import Any
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action, Payload, from_source, merge
 from earthkit.workflows.nodetree import nodetree_dimensions, nodetree_new_dimension
