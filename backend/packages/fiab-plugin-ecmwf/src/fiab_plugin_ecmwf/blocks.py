@@ -8,7 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 import logging
-from typing import Any, ClassVar, cast
+from typing import Any, cast
 
 import numpy as np
 from cascade.low.func import Either
@@ -308,11 +308,38 @@ class ZarrSink(Sink):
 SelectAxisValue = str | int
 
 
-class _SelectDimension(Transform):
-    option_id: ClassVar[ConfigurationOptionId]
-    item_python_type: ClassVar[type[str] | type[int]]
-    selection_label: ClassVar[str]
+class SelectDimension(Transform):
     inputs: list[str] = ["dataset"]
+
+    def __init__(
+        self,
+        *,
+        option_id: ConfigurationOptionId,
+        item_python_type: type[str] | type[int],
+        selection_label: str,
+    ) -> None:
+        label_title = selection_label.title()
+        label_sentence = selection_label[:1].upper() + selection_label[1:]
+
+        self.title = f"Select {label_title}"
+        self.description = f"Select {selection_label} from the input dataset"
+        self.option_id = option_id
+        self.item_python_type = item_python_type
+        self.selection_label = selection_label
+        self.configuration_options = {
+            option_id: BlockConfigurationOption(
+                title=label_title,
+                description=f"{label_sentence} to select from the dataset",
+                value_type=f"list[{self._value_type_name()}]",
+            )
+        }
+
+    def _value_type_name(self) -> str:
+        if self.item_python_type is str:
+            return "str"
+        if self.item_python_type is int:
+            return "int"
+        raise TypeError(f"Unsupported select value type {self.item_python_type!r}")
 
     def _selected_values(self, block: BlockInstance) -> list[SelectAxisValue]:
         if self.item_python_type is str:
@@ -361,51 +388,6 @@ class _SelectDimension(Transform):
 
     def intersect(self, other: QubedOutput) -> bool:
         return contains(other, self.option_id)
-
-
-class SelectParameters(_SelectDimension):
-    title: str = "Select Parameters"
-    description: str = "Select parameters from the input dataset"
-    option_id: ClassVar[ConfigurationOptionId] = PARAM
-    item_python_type: ClassVar[type[str] | type[int]] = str
-    selection_label: ClassVar[str] = "parameters"
-    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
-        PARAM: BlockConfigurationOption(
-            title="Parameters",
-            description="Parameters to select from the dataset",
-            value_type="list[str]",
-        )
-    }
-
-
-class SelectSteps(_SelectDimension):
-    title: str = "Select Steps"
-    description: str = "Select forecast steps from the input dataset"
-    option_id: ClassVar[ConfigurationOptionId] = STEP
-    item_python_type: ClassVar[type[str] | type[int]] = int
-    selection_label: ClassVar[str] = "steps"
-    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
-        STEP: BlockConfigurationOption(
-            title="Steps",
-            description="Forecast steps to select from the dataset",
-            value_type="list[int]",
-        )
-    }
-
-
-class SelectMembers(_SelectDimension):
-    title: str = "Select Members"
-    description: str = "Select ensemble members from the input dataset"
-    option_id: ClassVar[ConfigurationOptionId] = ENSEMBLE
-    item_python_type: ClassVar[type[str] | type[int]] = int
-    selection_label: ClassVar[str] = "members"
-    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
-        ENSEMBLE: BlockConfigurationOption(
-            title="Ensemble Members",
-            description="Ensemble members to select from the dataset",
-            value_type="list[int]",
-        )
-    }
 
 
 class MapPlotSink(Sink):
