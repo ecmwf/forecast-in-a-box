@@ -78,7 +78,7 @@ export async function getJobStatus(
 export async function getJobResult(
   runId: string,
   datasetId: string,
-): Promise<{ blob: Blob; contentType: string }> {
+): Promise<{ blob: Blob }> {
   const url = buildUrl(API_ENDPOINTS.job.outputContent, {
     run_id: runId,
     dataset_id: datasetId,
@@ -97,9 +97,7 @@ export async function getJobResult(
   }
 
   const blob = await response.blob()
-  const contentType =
-    response.headers.get('content-type') ?? 'application/octet-stream'
-  return { blob, contentType }
+  return { blob }
 }
 
 /**

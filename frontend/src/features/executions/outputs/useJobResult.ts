@@ -26,7 +26,6 @@ import { getJobResult, getJobResultHead } from '@/api/endpoints/job'
 
 interface JobResult {
   blob: Blob
-  contentType: string
 }
 
 export const jobResultKeys = {
