@@ -89,7 +89,7 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
   const validationState = useFableBuilderStore((state) => state.validationState)
   const pendingRestrictions = useFableBuilderStore((state) =>
     selectedBlockId
-      ? state.blockConfigurationRestrictions?.[selectedBlockId]
+      ? state.blockConfigurationRestrictions[selectedBlockId]
       : undefined,
   )
   const factory = selectedBlock

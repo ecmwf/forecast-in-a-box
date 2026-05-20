@@ -659,23 +659,33 @@ function isOptionalValueType(valueType: string): boolean {
   return /^optional\[(.+)\]$/i.test(valueType.trim())
 }
 
+function getRecordItem<T>(
+  record: Record<string, T>,
+  key: string,
+): T | undefined {
+  return Object.hasOwn(record, key) ? record[key] : undefined
+}
+
 export function getBlockConfigurationRestrictions(
   fable: FableBuilderV1,
   validationState: FableValidationState | null,
   blockId: BlockInstanceId,
 ): Record<string, string> {
-  const block = fable.blocks[blockId]
+  const block = getRecordItem(fable.blocks, blockId)
   if (!block || !validationState) return {}
 
   const blockFactoryKey = factoryIdToKey(block.factory_id)
   const restrictions: Record<string, string> = {}
   for (const sourceId of Object.values(block.input_ids)) {
-    Object.assign(
-      restrictions,
-      validationState.blockStates[sourceId]?.possibleExpansionRestrictions[
-        blockFactoryKey
-      ] ?? {},
-    )
+    const sourceState = getRecordItem(validationState.blockStates, sourceId)
+    const sourceRestrictions = sourceState
+      ? getRecordItem(
+          sourceState.possibleExpansionRestrictions,
+          blockFactoryKey,
+        )
+      : undefined
+
+    Object.assign(restrictions, sourceRestrictions)
   }
   return restrictions
 }

@@ -109,7 +109,7 @@ export function BlockInstanceCard({
   const disconnectBlock = useFableBuilderStore((state) => state.disconnectBlock)
   const validationState = useFableBuilderStore((state) => state.validationState)
   const pendingRestrictions = useFableBuilderStore(
-    (state) => state.blockConfigurationRestrictions?.[instanceId],
+    (state) => state.blockConfigurationRestrictions[instanceId],
   )
   const resolvedConfigForBlock = useFableBuilderStore(
     (state) =>
@@ -120,7 +120,7 @@ export function BlockInstanceCard({
   const instance = fable.blocks[instanceId]
   const factory = getFactory(catalogue, instance.factory_id)
   const configRestrictions = {
-    ...(pendingRestrictions ?? {}),
+    ...pendingRestrictions,
     ...getBlockConfigurationRestrictions(fable, validationState, instanceId),
   }
 
