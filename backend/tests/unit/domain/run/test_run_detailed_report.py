@@ -73,6 +73,7 @@ async def test_poll_and_update_requests_detailed_report_and_translates_to_block_
     with (
         patch("forecastbox.domain.run.service.client.request_response", return_value=response) as mock_request,
         patch("forecastbox.domain.run.service.retrieve_compilation_detail", return_value=compilation_detail) as mock_retrieve,
+        patch("forecastbox.domain.run.service.get_gateway_url", return_value="tcp://localhost:8067"),
         patch("forecastbox.domain.run.service.run_db.update_run_runtime", new=AsyncMock()),
     ):
         detail = await run_service.poll_and_update(cast(Run, execution), detailed_report=True)
@@ -112,6 +113,7 @@ async def test_poll_and_update_disables_detailed_report_when_cache_misses() -> N
         patch(
             "forecastbox.domain.run.service.retrieve_compilation_detail", side_effect=CompilationDetailNotFound("missing")
         ) as mock_retrieve,
+        patch("forecastbox.domain.run.service.get_gateway_url", return_value="tcp://localhost:8067"),
         patch("forecastbox.domain.run.service.run_db.update_run_runtime", new=AsyncMock()),
     ):
         detail = await run_service.poll_and_update(cast(Run, execution), detailed_report=True)

@@ -33,10 +33,10 @@ from forecastbox.domain.admin import get_local_release
 from forecastbox.domain.artifact.base import get_artifact_local_path
 from forecastbox.domain.artifact.manager import ArtifactManager, join_artifact_manager, submit_refresh_catalog
 from forecastbox.domain.experiment.scheduling.background import start_scheduler, stop_scheduler
+from forecastbox.domain.gateway.service import init_manager, shutdown_processes
 from forecastbox.domain.lens.manager import shutdown_all_lens_instances
 from forecastbox.domain.plugin.manager import join_updater_thread, submit_load_plugins
 from forecastbox.domain.plugin.store import join_stores_thread, submit_initialize_stores
-from forecastbox.routes.gateway import shutdown_processes
 from forecastbox.utility.config import config
 from forecastbox.utility.tunnel import shutdown as shutdown_tunnels
 
@@ -46,6 +46,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.debug(f"Starting FIAB with config: {config}")
+    init_manager()
     for module_info in pkgutil.iter_modules(forecastbox.schemata.__path__):
         module = importlib.import_module(f"forecastbox.schemata.{module_info.name}")
         if hasattr(module, "create_db_and_tables"):

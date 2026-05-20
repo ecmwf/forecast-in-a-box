@@ -20,6 +20,7 @@ from pydantic import Field
 
 from forecastbox.domain.artifact.manager import ArtifactManager, submit_artifact_download
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
+from forecastbox.domain.gateway.service import get_gateway_url
 from forecastbox.utility.config import config
 from forecastbox.utility.pydantic import FiabBaseModel
 
@@ -100,7 +101,7 @@ def execute_cascade(spec: ExecutionSpecification) -> SubmitJobResponse:
         )
     )
     try:
-        submit_job_response: SubmitJobResponse = request_response(r, f"{config.cascade.cascade_url}")  # type: ignore
+        submit_job_response: SubmitJobResponse = request_response(r, get_gateway_url())  # type: ignore
     except Exception as e:
         return SubmitJobResponse(job_id=None, error=repr(e))
 

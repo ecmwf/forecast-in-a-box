@@ -33,14 +33,13 @@ from fiab_core.fable import BlockInstanceId
 
 from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint.types import BlueprintId
+from forecastbox.domain.gateway.service import get_gateway_url, get_logs_directory
 from forecastbox.domain.run import db, service
 from forecastbox.domain.run.cascade import RunOutputs
 from forecastbox.domain.run.detail import retrieve_compilation_detail
 from forecastbox.domain.run.exceptions import CompilationDetailCorrupted, CompilationDetailNotFound, RunAccessDenied, RunNotFound
 from forecastbox.domain.run.types import RunId
-from forecastbox.routes.gateway import Globals
 from forecastbox.utility.auth import AuthContext
-from forecastbox.utility.config import config
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
 
@@ -209,7 +208,7 @@ async def _resolve_run_with_cascade(
 async def _build_run_logs_response(cascade_job_id: str, db_entity_ser: bytes) -> Response:
     try:
         request = api.JobProgressRequest(job_ids=[JobId(cascade_job_id)])
-        gw_state = client.request_response(request, f"{config.cascade.cascade_url}").model_dump()
+        gw_state = client.request_response(request, get_gateway_url()).model_dump()
     except TimeoutError:
         gw_state = {"progresses": {}, "datasets": {}, "error": "TimeoutError"}
     except Exception as e:
@@ -221,10 +220,11 @@ async def _build_run_logs_response(cascade_job_id: str, db_entity_ser: bytes) ->
             with zipfile.ZipFile(buffer, "a", zipfile.ZIP_DEFLATED) as zf:
                 zf.writestr("db_entity.json", db_entity_ser)
                 zf.writestr("gw_state.json", orjson.dumps(gw_state))
-                if not Globals.logs_directory:
+                logs_directory = get_logs_directory()
+                if not logs_directory:
                     zf.writestr("logs_directory.error.txt", "logs directory missing")
                 else:
-                    p = pathlib.Path(Globals.logs_directory.name)
+                    p = pathlib.Path(logs_directory.name)
                     f = ""
                     try:
                         for f in os.listdir(p):
@@ -366,7 +366,7 @@ async def delete_run(
     try:
         client.request_response(
             api.ResultDeletionRequest(datasets={cascade_job_id: []}),  # type: ignore[invalid-argument-type]
-            f"{config.cascade.cascade_url}",
+            get_gateway_url(),
         )
     except Exception as e:
         raise HTTPException(500, f"Job deletion failed: {e}")
@@ -431,7 +431,7 @@ async def get_run_output_content(
         raise HTTPException(500, f"Result mime lookup failed: {mime_result.e}")
     response = client.request_response(
         api.ResultRetrievalRequest(job_id=JobId(cascade_job_id), dataset_id=dataset),
-        f"{config.cascade.cascade_url}",
+        get_gateway_url(),
     )
     response = cast(api.ResultRetrievalResponse, response)
     if response.error:
