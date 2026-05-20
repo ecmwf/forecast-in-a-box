@@ -15,10 +15,10 @@
 import { HttpResponse, delay, http } from 'msw'
 import {
   addExecution,
-  createMockPngBlob,
   deleteExecution,
   getAllExecutions,
   getExecution,
+  mockBlobForMime,
   restartExecution,
 } from '../data/job.data'
 import type {
@@ -166,10 +166,31 @@ export const jobHandlers = [
       )
     }
 
-    const blob = createMockPngBlob()
+    // Mirror backend #443: stored mime drives Content-Type; missing metadata
+    // is a "Result mime lookup failed: …" 500.
+    if (exec.outputs === null) {
+      return HttpResponse.json(
+        {
+          detail: `Result mime lookup failed: Run '${executionId}' has no recorded outputs yet`,
+        },
+        { status: 500 },
+      )
+    }
+    // Cast to surface runtime undefined (no noUncheckedIndexedAccess).
+    const stored = exec.outputs[datasetId] as RunOutputMetadata | undefined
+    if (!stored) {
+      return HttpResponse.json(
+        {
+          detail: `Result mime lookup failed: Output '${datasetId}' not found for run '${executionId}'`,
+        },
+        { status: 500 },
+      )
+    }
+
+    const blob = mockBlobForMime(stored.mime_type)
     return new HttpResponse(blob, {
       headers: {
-        'Content-Type': 'image/png',
+        'Content-Type': stored.mime_type,
         'Content-Length': String(blob.size),
       },
     })

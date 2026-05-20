@@ -50,12 +50,12 @@ const seedExecutions: Array<JobExecutionDetail> = [
         is_available: true,
       },
       'task-out-2': {
-        mime_type: 'image/png',
+        mime_type: 'application/pdf',
         original_block: 'sink_temperature_map',
         is_available: true,
       },
       'task-out-3': {
-        mime_type: 'image/png',
+        mime_type: 'image/svg+xml',
         original_block: 'sink_wind_map',
         is_available: true,
       },
@@ -169,6 +169,24 @@ export const opaqueMimeExecution: JobExecutionDetail = {
   planned_block_ids: null,
 }
 
+/** Terminal run with `outputs: null` — drives the backend's "no recorded
+ * outputs yet" 500 from /run/outputContent. Inject via injectMockExecution. */
+export const noStoredOutputsExecution: JobExecutionDetail = {
+  run_id: 'job-no-outputs-007',
+  attempt_count: 1,
+  status: 'completed',
+  created_at: oneHourAgo,
+  updated_at: oneHourAgo,
+  blueprint_id: 'def-007',
+  blueprint_version: 1,
+  error: null,
+  progress: '100',
+  cascade_job_id: 'cascade-007',
+  outputs: null,
+  completed_block_ids: null,
+  planned_block_ids: null,
+}
+
 export function resetJobsState(): void {
   executionsState = {}
   executionIdCounter = 200
@@ -273,4 +291,46 @@ export function createMockPngBlob(): Blob {
     0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
   ])
   return new Blob([pngBytes], { type: 'image/png' })
+}
+
+/** Minimal PDF — `%PDF-` magic is enough to sniff; pdfjs may reject the body
+ * and PdfThumbnail then falls back to the FileText icon. */
+export function createMockPdfBlob(): Blob {
+  const body =
+    '%PDF-1.4\n' +
+    '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n' +
+    '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n' +
+    '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 100 100]>>endobj\n' +
+    'trailer<</Size 4/Root 1 0 R>>\n' +
+    '%%EOF\n'
+  return new Blob([new TextEncoder().encode(body)], {
+    type: 'application/pdf',
+  })
+}
+
+export function createMockSvgBlob(): Blob {
+  const body =
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">' +
+    '<rect width="64" height="64" fill="#94a3b8"/></svg>\n'
+  return new Blob([new TextEncoder().encode(body)], {
+    type: 'image/svg+xml',
+  })
+}
+
+/** Mock blob for a stored mime. Opaque mimes return PNG bytes so the
+ * sniff-promotion path stays exercised; unknown mimes also fall back to PNG. */
+export function mockBlobForMime(mimeType: string): Blob {
+  switch (mimeType) {
+    case 'application/pdf':
+      return createMockPdfBlob()
+    case 'image/svg+xml':
+      return createMockSvgBlob()
+    case 'image/png':
+    case 'application/octet-stream':
+    case 'application/pickle':
+    case 'application/clpkl':
+    default:
+      return createMockPngBlob()
+  }
 }
