@@ -187,7 +187,8 @@
   },
   "field": {
     "selectPlaceholder": "Select an option...",
-    "addItemPlaceholder": "Add item..."
+    "addItemPlaceholder": "Add item...",
+    "noMatches": "No matches"
   },
   "notificationBanner": {
     "dismiss": "Dismiss notification"
