@@ -414,6 +414,7 @@ class TestSelectParameters:
         block = SelectParameters()
         config = select_parameters_configuration.model_copy(update={"configuration_values": _config({"param": ["2t", "msl"]})})
         output = block.validate(block=config, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
+        assert isinstance(output, QubedOutput)
         assert axes(output)["param"] == {"2t", "msl"}
 
     def test_missing_parameters(self, select_parameters_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
@@ -480,6 +481,7 @@ class TestSelectSteps:
         block = SelectSteps()
         config = select_steps_configuration.model_copy(update={"configuration_values": _config({"step": [0, 6]})})
         output = block.validate(block=config, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
+        assert isinstance(output, QubedOutput)
         assert axes(output)[STEP] == {0, 6}
 
     def test_missing_steps(self, select_steps_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
@@ -546,6 +548,7 @@ class TestSelectMembers:
         block = SelectMembers()
         config = select_members_configuration.model_copy(update={"configuration_values": _config({"number": [1, 2]})})
         output = block.validate(block=config, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
+        assert isinstance(output, QubedOutput)
         assert axes(output)[ENSEMBLE] == {1, 2}
 
     def test_missing_members(self, select_members_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
