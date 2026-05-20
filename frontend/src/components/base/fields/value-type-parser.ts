@@ -37,6 +37,7 @@ export type ParsedValueType =
   | { type: 'list'; itemType: 'string'; optional?: boolean }
   | { type: 'list'; itemType: 'int'; optional?: boolean }
   | { type: 'enum'; options: Array<string>; optional?: boolean }
+  | { type: 'enumList'; options: Array<string>; optional?: boolean }
   | { type: 'unknown'; raw: string; optional?: boolean }
 
 /**
@@ -80,18 +81,21 @@ export function parseValueType(valueType: string | undefined): ParsedValueType {
     return { type: 'date' }
   }
 
-  // List type: list[str] or list[int]
+  // List type: list[str], list[int], or list[enumClosed[...]]
   // Match the trimmed string so leading/trailing whitespace does not fall through.
-  const listMatch = trimmed.match(/^list\[(\w+)\]$/i)
+  const listMatch = trimmed.match(/^list\[(.+)\]$/i)
   if (listMatch) {
-    const itemType = listMatch[1].toLowerCase()
-    if (itemType === 'str' || itemType === 'string') {
+    const itemValueType = parseValueType(listMatch[1])
+    if (itemValueType.type === 'string') {
       return { type: 'list', itemType: 'string' }
     }
-    if (itemType === 'int' || itemType === 'integer') {
+    if (itemValueType.type === 'int') {
       return { type: 'list', itemType: 'int' }
     }
-    // For now, only support list[str] and list[int]
+    if (itemValueType.type === 'enum') {
+      return { type: 'enumList', options: itemValueType.options }
+    }
+    // For now, only support list[str], list[int], and list[enumClosed[...]]
     return { type: 'unknown', raw: trimmed }
   }
 
@@ -112,17 +116,20 @@ export function parseValueType(valueType: string | undefined): ParsedValueType {
  * Parse enum options from a string like "'a','b','c'" or '"a","b","c"'
  */
 function parseEnumOptions(optionsStr: string): Array<string> {
-  const options: Array<string> = []
-
-  // Match quoted strings (single or double quotes)
-  const regex = /['"]([^'"]+)['"]/g
-  let match
-
-  while ((match = regex.exec(optionsStr)) !== null) {
-    options.push(match[1])
-  }
-
-  return options
+  return optionsStr
+    .split(',')
+    .map((option) => option.trim())
+    .filter(Boolean)
+    .map((option) => {
+      if (
+        option.length >= 2 &&
+        option[0] === option[option.length - 1] &&
+        (option[0] === "'" || option[0] === '"')
+      ) {
+        return option.slice(1, -1)
+      }
+      return option
+    })
 }
 
 /**
@@ -146,6 +153,8 @@ export function getDefaultValueForType(parsedType: ParsedValueType): string {
       return ''
     case 'enum':
       return parsedType.options[0] ?? ''
+    case 'enumList':
+      return ''
     case 'unknown':
       return ''
   }

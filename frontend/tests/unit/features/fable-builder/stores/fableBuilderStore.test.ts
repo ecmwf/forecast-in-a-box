@@ -10,7 +10,11 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import type { BlockFactory, FableBuilderV1 } from '@/api/types/fable.types'
+import type {
+  BlockFactory,
+  FableBuilderV1,
+  FableValidationState,
+} from '@/api/types/fable.types'
 import {
   useFableBuilderStore,
   useHasBlocks,
@@ -50,6 +54,18 @@ const mockFable: FableBuilderV1 = {
       input_ids: { input: 'block-1' },
     },
   },
+}
+
+function makeValidationState(
+  blockStates: FableValidationState['blockStates'] = {},
+): FableValidationState {
+  return {
+    isValid: true,
+    globalErrors: [],
+    blockStates,
+    possibleSources: [],
+    resolvedConfigurationOptions: {},
+  }
 }
 
 describe('useFableBuilderStore', () => {
@@ -641,6 +657,94 @@ describe('useFableBuilderStore', () => {
           .new_input,
       ).toBe('block-1')
     })
+
+    it('replaces stale restrictions when reconnecting to an unrestricted source', () => {
+      const fable: FableBuilderV1 = {
+        blocks: {
+          restricted: {
+            factory_id: {
+              plugin: { store: 'ecmwf', local: 'test' },
+              factory: 'source',
+            },
+            configuration_values: {},
+            input_ids: {},
+          },
+          unrestricted: {
+            factory_id: {
+              plugin: { store: 'ecmwf', local: 'test' },
+              factory: 'source',
+            },
+            configuration_values: {},
+            input_ids: {},
+          },
+          target: {
+            factory_id: {
+              plugin: { store: 'ecmwf', local: 'test' },
+              factory: 'transform',
+            },
+            configuration_values: {},
+            input_ids: {},
+          },
+        },
+      }
+
+      act(() => useFableBuilderStore.getState().setFable(fable))
+      act(() =>
+        useFableBuilderStore.getState().setValidationState(
+          makeValidationState({
+            restricted: {
+              errors: [],
+              hasErrors: false,
+              possibleExpansions: [],
+              possibleExpansionRestrictions: {
+                'ecmwf/test:transform': {
+                  param: 'list[enumClosed[2t,msl]]',
+                },
+              },
+              missingGlyphs: {},
+            },
+            unrestricted: {
+              errors: [],
+              hasErrors: false,
+              possibleExpansions: [],
+              possibleExpansionRestrictions: {},
+              missingGlyphs: {},
+            },
+          }),
+        ),
+      )
+      act(() =>
+        useFableBuilderStore
+          .getState()
+          .connectBlocks('target', 'input', 'restricted'),
+      )
+      expect(
+        useFableBuilderStore.getState().blockConfigurationRestrictions.target,
+      ).toEqual({ param: 'list[enumClosed[2t,msl]]' })
+
+      act(() =>
+        useFableBuilderStore.getState().setValidationState(
+          makeValidationState({
+            unrestricted: {
+              errors: [],
+              hasErrors: false,
+              possibleExpansions: [],
+              possibleExpansionRestrictions: {},
+              missingGlyphs: {},
+            },
+          }),
+        ),
+      )
+      act(() =>
+        useFableBuilderStore
+          .getState()
+          .connectBlocks('target', 'input', 'unrestricted'),
+      )
+
+      expect(
+        useFableBuilderStore.getState().blockConfigurationRestrictions.target,
+      ).toBeUndefined()
+    })
   })
 
   describe('disconnectBlock', () => {
@@ -705,13 +809,9 @@ describe('useFableBuilderStore', () => {
 
   describe('validation', () => {
     it('sets validation state', () => {
-      const validationState = {
-        isValid: false,
-        globalErrors: ['Missing required block'],
-        blockStates: {},
-        possibleSources: [],
-        resolvedConfigurationOptions: {},
-      }
+      const validationState = makeValidationState()
+      validationState.isValid = false
+      validationState.globalErrors = ['Missing required block']
       act(() =>
         useFableBuilderStore.getState().setValidationState(validationState),
       )
@@ -723,18 +823,34 @@ describe('useFableBuilderStore', () => {
     it('sets lastValidatedAt when setting validation state', () => {
       const before = Date.now()
       act(() =>
-        useFableBuilderStore.getState().setValidationState({
-          isValid: true,
-          globalErrors: [],
-          blockStates: {},
-          possibleSources: [],
-          resolvedConfigurationOptions: {},
-        }),
+        useFableBuilderStore
+          .getState()
+          .setValidationState(makeValidationState()),
       )
       const after = Date.now()
       const lastValidatedAt = useFableBuilderStore.getState().lastValidatedAt
       expect(lastValidatedAt).toBeGreaterThanOrEqual(before)
       expect(lastValidatedAt).toBeLessThanOrEqual(after)
+    })
+
+    it('clears pending configuration restrictions when fresh validation arrives', () => {
+      act(() =>
+        useFableBuilderStore
+          .getState()
+          .setBlockConfigurationRestrictions('block-2', {
+            param: 'list[enumClosed[2t,msl]]',
+          }),
+      )
+
+      act(() =>
+        useFableBuilderStore
+          .getState()
+          .setValidationState(makeValidationState()),
+      )
+
+      expect(
+        useFableBuilderStore.getState().blockConfigurationRestrictions,
+      ).toEqual({})
     })
 
     it('sets isValidating', () => {

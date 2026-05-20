@@ -23,6 +23,7 @@ import { STORAGE_KEYS, STORE_VERSIONS } from '@/lib/storage-keys'
 import {
   createBlockInstance,
   createEmptyFable,
+  factoryIdToKey,
   generateBlockInstanceId,
 } from '@/api/types/fable.types'
 
@@ -74,6 +75,20 @@ function findDownstreamBlocks(
   return downstream
 }
 
+function replaceBlockConfigurationRestrictions(
+  current: Record<BlockInstanceId, Record<string, string>>,
+  blockId: BlockInstanceId,
+  restrictions: Record<string, string> | undefined,
+): Record<BlockInstanceId, Record<string, string>> {
+  const next = { ...current }
+  if (restrictions && Object.keys(restrictions).length > 0) {
+    next[blockId] = restrictions
+  } else {
+    delete next[blockId]
+  }
+  return next
+}
+
 interface FableBuilderState {
   fable: FableBuilderV1
   fableId: string | null
@@ -93,6 +108,10 @@ interface FableBuilderState {
   layoutDirection: LayoutDirection
   nodesLocked: boolean
   validationState: FableValidationState | null
+  blockConfigurationRestrictions: Record<
+    BlockInstanceId,
+    Record<string, string>
+  >
   isValidating: boolean
   lastValidatedAt: number | null
   isDirty: boolean
@@ -152,6 +171,10 @@ interface FableBuilderState {
   setLocalGlyph: (key: string, value: string) => void
   removeLocalGlyph: (key: string) => void
   setValidationState: (state: FableValidationState | null) => void
+  setBlockConfigurationRestrictions: (
+    blockId: BlockInstanceId,
+    restrictions: Record<string, string>,
+  ) => void
   setIsValidating: (validating: boolean) => void
   setSubmitDialogOpen: (open: boolean) => void
   setDraggedFactory: (dragged: DraggedFactory | null) => void
@@ -192,6 +215,7 @@ function createInitialState() {
     layoutDirection: getDefaultLayoutDirection(),
     nodesLocked: true,
     validationState: null,
+    blockConfigurationRestrictions: {},
     isValidating: false,
     lastValidatedAt: null,
     isDirty: false,
@@ -219,6 +243,7 @@ export const useFableBuilderStore = create<FableBuilderState>()(
             isDirty: false,
             selectedBlockId: null,
             validationState: null,
+            blockConfigurationRestrictions: {},
             step: 'edit',
           }),
 
@@ -285,6 +310,10 @@ export const useFableBuilderStore = create<FableBuilderState>()(
         removeBlock: (instanceId) => {
           const { fable, selectedBlockId } = get()
           const { [instanceId]: _removed, ...remainingBlocks } = fable.blocks
+          const {
+            [instanceId]: _removedRestrictions,
+            ...remainingRestrictions
+          } = get().blockConfigurationRestrictions
 
           const updatedBlocks: Record<BlockInstanceId, BlockInstance> = {}
           for (const [id, block] of Object.entries(remainingBlocks)) {
@@ -305,6 +334,7 @@ export const useFableBuilderStore = create<FableBuilderState>()(
               selectedBlockId === instanceId ? null : selectedBlockId,
             isDirty: true,
             validationState: null,
+            blockConfigurationRestrictions: remainingRestrictions,
           })
         },
 
@@ -318,6 +348,12 @@ export const useFableBuilderStore = create<FableBuilderState>()(
           const toRemove = new Set([instanceId, ...downstreamBlocks])
 
           const remainingBlocks: Record<BlockInstanceId, BlockInstance> = {}
+          const remainingRestrictions = {
+            ...get().blockConfigurationRestrictions,
+          }
+          for (const id of toRemove) {
+            delete remainingRestrictions[id]
+          }
           for (const [id, block] of Object.entries(fable.blocks)) {
             if (!toRemove.has(id)) {
               const cleanedInputIds: Record<string, string> = {}
@@ -339,12 +375,16 @@ export const useFableBuilderStore = create<FableBuilderState>()(
               : selectedBlockId,
             isDirty: true,
             validationState: null,
+            blockConfigurationRestrictions: remainingRestrictions,
           })
         },
 
         duplicateBlock: (instanceId) => {
           const { fable } = get()
           const block = fable.blocks[instanceId]
+          const restrictions = get().blockConfigurationRestrictions[
+            instanceId
+          ] as Record<string, string> | undefined
           const newInstanceId = generateBlockInstanceId()
           const duplicatedBlock: BlockInstance = {
             factory_id: block.factory_id,
@@ -363,6 +403,12 @@ export const useFableBuilderStore = create<FableBuilderState>()(
             selectedBlockId: newInstanceId,
             isDirty: true,
             validationState: null,
+            blockConfigurationRestrictions:
+              replaceBlockConfigurationRestrictions(
+                state.blockConfigurationRestrictions,
+                newInstanceId,
+                restrictions,
+              ),
           }))
 
           return newInstanceId
@@ -424,8 +470,16 @@ export const useFableBuilderStore = create<FableBuilderState>()(
         },
 
         connectBlocks: (targetBlockId, inputName, sourceBlockId) => {
-          const { fable } = get()
+          const { fable, validationState } = get()
           const block = fable.blocks[targetBlockId]
+          const restrictions =
+            validationState?.blockStates[sourceBlockId]
+              ?.possibleExpansionRestrictions[factoryIdToKey(block.factory_id)]
+          const nextRestrictions = replaceBlockConfigurationRestrictions(
+            get().blockConfigurationRestrictions,
+            targetBlockId,
+            restrictions,
+          )
 
           set({
             fable: {
@@ -440,6 +494,7 @@ export const useFableBuilderStore = create<FableBuilderState>()(
             },
             isDirty: true,
             validationState: null,
+            blockConfigurationRestrictions: nextRestrictions,
           })
         },
 
@@ -458,6 +513,12 @@ export const useFableBuilderStore = create<FableBuilderState>()(
             },
             isDirty: true,
             validationState: null,
+            blockConfigurationRestrictions:
+              replaceBlockConfigurationRestrictions(
+                get().blockConfigurationRestrictions,
+                targetBlockId,
+                undefined,
+              ),
           })
         },
 
@@ -518,7 +579,17 @@ export const useFableBuilderStore = create<FableBuilderState>()(
           set({
             validationState: state,
             lastValidatedAt: state ? Date.now() : null,
+            ...(state ? { blockConfigurationRestrictions: {} } : {}),
           }),
+        setBlockConfigurationRestrictions: (blockId, restrictions) =>
+          set((state) => ({
+            blockConfigurationRestrictions:
+              replaceBlockConfigurationRestrictions(
+                state.blockConfigurationRestrictions,
+                blockId,
+                restrictions,
+              ),
+          })),
         setIsValidating: (validating) => set({ isValidating: validating }),
         setSubmitDialogOpen: (open) => set({ submitDialogOpen: open }),
         setDraggedFactory: (dragged) => set({ draggedFactory: dragged }),

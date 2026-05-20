@@ -12,13 +12,37 @@ from fiab_core.tools.blocks import QubedBlockBuilder
 from fiab_core.tools.plugins import QubedPluginBuilder
 
 from fiab_plugin_ecmwf.anemoi.blocks import AnemoiSource, AnemoiTransform
-from fiab_plugin_ecmwf.blocks import EkdSource, EnsembleStatistics, MapPlotSink, SelectVariable, TemporalStatistics, ZarrSink
+from fiab_plugin_ecmwf.blocks import (
+    ENSEMBLE,
+    PARAM,
+    STEP,
+    EkdSource,
+    EnsembleStatistics,
+    MapPlotSink,
+    SelectDimension,
+    TemporalStatistics,
+    ZarrSink,
+)
 
 blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
     BlockFactoryId("ekdSource"): EkdSource(),
     BlockFactoryId("ensembleStatistics"): EnsembleStatistics(),
     BlockFactoryId("temporalStatistics"): TemporalStatistics(),
-    BlockFactoryId("selectVariable"): SelectVariable(),
+    BlockFactoryId("selectParameters"): SelectDimension(
+        option_id=PARAM,
+        item_python_type=str,
+        selection_label="parameters",
+    ),
+    BlockFactoryId("selectSteps"): SelectDimension(
+        option_id=STEP,
+        item_python_type=int,
+        selection_label="steps",
+    ),
+    BlockFactoryId("selectMembers"): SelectDimension(
+        option_id=ENSEMBLE,
+        item_python_type=int,
+        selection_label="members",
+    ),
     BlockFactoryId("zarrSink"): ZarrSink(),
     BlockFactoryId("anemoiSource"): AnemoiSource(),
     BlockFactoryId("anemoiTransform"): AnemoiTransform(),

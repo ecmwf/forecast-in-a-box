@@ -16,6 +16,7 @@ import { useFieldErrorMessages } from '@/features/fable-builder/hooks/useFieldEr
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import {
   BLOCK_KIND_METADATA,
+  getBlockConfigurationRestrictions,
   getBlockKindIcon,
   getFactory,
 } from '@/api/types/fable.types'
@@ -85,6 +86,12 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
   const disconnectBlock = useFableBuilderStore((state) => state.disconnectBlock)
 
   const selectedBlock = selectedBlockId ? fable.blocks[selectedBlockId] : null
+  const validationState = useFableBuilderStore((state) => state.validationState)
+  const pendingRestrictions = useFableBuilderStore((state) =>
+    selectedBlockId
+      ? state.blockConfigurationRestrictions[selectedBlockId]
+      : undefined,
+  )
   const factory = selectedBlock
     ? getFactory(catalogue, selectedBlock.factory_id)
     : null
@@ -153,6 +160,14 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
 
   const metadata = BLOCK_KIND_METADATA[factory.kind]
   const IconComponent = getBlockKindIcon(factory.kind)
+  const configRestrictions = {
+    ...(pendingRestrictions ?? {}),
+    ...getBlockConfigurationRestrictions(
+      fable,
+      validationState,
+      selectedBlockId ?? '',
+    ),
+  }
   const configOptions = Object.entries(factory.configuration_options)
   const inputs = factory.inputs
 
@@ -225,7 +240,7 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
                     key={key}
                     id={`config-${key}`}
                     configKey={key}
-                    valueType={option.value_type}
+                    valueType={configRestrictions[key] ?? option.value_type}
                     value={selectedBlock.configuration_values[key] || ''}
                     onChange={(value) => handleConfigChange(key, value)}
                     label={option.title || key}
