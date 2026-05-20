@@ -678,7 +678,7 @@ class TestSelectMembers:
     def test_expander_adds_member_restrictions(self, ekdsource_output: QubedOutput) -> None:
         expansions = plugin().expander(ekdsource_output)
         select_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("selectMembers"))
-        assert select_expansion.restrictions[ENSEMBLE].serialize() == "list[enumClosed[1,2,3,4,5]]"
+        assert select_expansion.restrictions[ENSEMBLE].serialize() == "list[enumClosed[0,1,2,3,4]]"
 
     def test_expander_skips_restriction_for_non_int_axes(self) -> None:
         output = QubedOutput(dataqube=Qube.from_datacube({ENSEMBLE: ["1", "2"]}))
@@ -841,7 +841,7 @@ class TestMapPlotSink:
     def test_expander_adds_parameters_restrictions(self, ekdsource_output: QubedOutput) -> None:
         expansions = plugin().expander(ekdsource_output)
         map_plot_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("mapPlotSink"))
-        assert map_plot_expansion.restrictions[PARAM].serialize() == "list[enumClosed[2t,msl]]"
+        assert map_plot_expansion.restrictions[PARAM].serialize() == "list[enumClosed[2t,msl,z]]"
 
     def test_expander_skips_restriction_for_non_string_axes(self) -> None:
         output = QubedOutput(dataqube=Qube.from_datacube({"param": [1, 2]}))
