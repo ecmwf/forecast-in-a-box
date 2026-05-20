@@ -41,12 +41,12 @@ from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.background import execute_background
 from forecastbox.domain.run.cascade import RunOutputs
 from forecastbox.domain.run.db import CompilerRuntimeContext
-from forecastbox.domain.run.exceptions import RunNotFound
+from forecastbox.domain.run.detail import retrieve_compilation_detail
+from forecastbox.domain.run.exceptions import CompilationDetailCorrupted, CompilationDetailNotFound, RunNotFound
 from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import Blueprint, Run
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.config import config
-from forecastbox.utility.memcache import get as get_memcache
 from forecastbox.utility.memcache import pop as pop_memcache
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import value_dt2str
@@ -244,10 +244,11 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
         task_to_block: dict[TaskId, BlockInstanceId] | None = None
         if detailed_report:
             try:
-                task_to_block = cast(dict[TaskId, BlockInstanceId], get_memcache(run_id, dict))
-            except (KeyError, TypeError):
+                compilation_detail = retrieve_compilation_detail(run_id)
+                task_to_block = {task_id: td.block for task_id, td in compilation_detail.task_detail.items()}
+            except (CompilationDetailNotFound, CompilationDetailCorrupted) as e:
                 detailed_report = False
-                warning_error = "unable to provide completed/planned tasks"
+                warning_error = f"unable to provide completed/planned tasks: {repr(e)}"
 
         try:
             response = client.request_response(
@@ -292,7 +293,6 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
             return _build(status_override="failed", error_override=jobprogress.failure)
         elif jobprogress.completed or jobprogress.pct == "100.00":
             await run_db.update_run_runtime(run_id, actual_attempt, status="completed", progress="100.00")
-            pop_memcache(run_id)
             return _build(status_override="completed", progress_override="100.00")
         else:
             await run_db.update_run_runtime(run_id, actual_attempt, status="running", progress=jobprogress.pct)

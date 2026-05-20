@@ -39,7 +39,7 @@ from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId, Conf
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs
-from forecastbox.routes.run import RunCreateResponse
+from forecastbox.routes.run import CompilationDetailResponse, RunCreateResponse
 
 from .conftest import fake_artifact_store_id, test_blueprint_artifact_id, testPluginId
 from .utils import compare_with_tolerance, retry_until
@@ -983,6 +983,12 @@ def test_blueprint_composite_glyph_execute(tmpdir: Any, backend_client_with_auth
 
     ensure_completed_v2(backend_client_with_auth, run_id, sleep=1, attempts=120)
 
+    # Verify compilation detail is accessible and has the expected number of tasks
+    detail_resp = backend_client_with_auth.get("/run/getCompilationDetail", params={"run_id": run_id})
+    assert detail_resp.is_success, detail_resp.text
+    detail = CompilationDetailResponse.model_validate(detail_resp.json())
+    assert len(detail.tasks) == 2, f"Expected 2 tasks, got {len(detail.tasks)}: {detail.tasks}"
+
     output = pathlib.Path(f"{tmpdir}/composite_exec_output.txt")
     content = output.read_text()
     # Content must be "exec_global/<run_id>"
@@ -1318,3 +1324,9 @@ def test_blueprint_artifact_execute(tmpdir: Any, backend_client_with_auth: httpx
 
     output = pathlib.Path(f"{tmpdir}/filesize_{run_id}.txt")
     assert output.read_text() == "64", f"Expected file size 64, got: {output.read_text()}"
+
+    # Verify compilation detail is accessible and has the expected number of tasks
+    detail_resp = backend_client_with_auth.get("/run/getCompilationDetail", params={"run_id": run_id})
+    assert detail_resp.is_success, detail_resp.text
+    detail = CompilationDetailResponse.model_validate(detail_resp.json())
+    assert len(detail.tasks) == 2, f"Expected 2 tasks, got {len(detail.tasks)}: {detail.tasks}"
