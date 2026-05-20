@@ -41,10 +41,15 @@ export default function ImageViewer({ item, adapter, onClose }: ViewerProps) {
   const dragRef = useRef<Point | null>(null)
   const stageRef = useRef<HTMLDivElement>(null)
 
-  // SVG needs an explicit MIME tag — `<img>` strict-checks unlike PNG which
-  // the browser sniffs.
+  // SVG needs an explicit mime tag — `<img>` strict-checks it where it
+  // sniffs raster. For raster, trust item.mimeType when the adapter
+  // advertises it, else fall back to the adapter's primary mime.
   const renderMime =
-    adapter.id === 'image-vector' ? 'image/svg+xml' : 'image/png'
+    adapter.id === 'image-vector'
+      ? 'image/svg+xml'
+      : adapter.mimeTypes.includes(item.mimeType)
+        ? item.mimeType
+        : (adapter.mimeTypes[0] ?? 'image/png')
 
   // Shared cache — the grid thumbnail for this same output reuses this blob.
   const { data, error } = useJobResultBlob(item.jobId, item.taskId)

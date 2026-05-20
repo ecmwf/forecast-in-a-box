@@ -11,14 +11,15 @@
 import { ImageOff } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useJobResultBlob } from '../useJobResult'
-import type { ThumbnailProps } from '../types'
+import type { OutputAdapter, OutputItem, ThumbnailProps } from '../types'
 
-/** Resolve the MIME the browser should use to render the blob. The wire
- * Content-Type is unreliable (cascade may say `application/pickle` for raw
- * bytes); the adapter knows the truth. */
-function browserImageMime(adapterId: string): string {
-  if (adapterId === 'image-vector') return 'image/svg+xml'
-  return 'image/png'
+/** Browser-rendering mime: trust the stored mime if the adapter advertises it
+ * (real JPEG/WebP), else fall back to the adapter's primary mime (post-sniff
+ * adapter selection guarantees that's the right bucket). */
+function browserImageMime(item: OutputItem, adapter: OutputAdapter): string {
+  if (adapter.id === 'image-vector') return 'image/svg+xml'
+  if (adapter.mimeTypes.includes(item.mimeType)) return item.mimeType
+  return adapter.mimeTypes[0] ?? 'image/png'
 }
 
 export function ImageThumbnail({ item, adapter }: ThumbnailProps) {
@@ -33,11 +34,11 @@ export function ImageThumbnail({ item, adapter }: ThumbnailProps) {
 
   useEffect(() => {
     if (!blob) return
-    const tagged = new Blob([blob], { type: browserImageMime(adapter.id) })
+    const tagged = new Blob([blob], { type: browserImageMime(item, adapter) })
     const createdUrl = URL.createObjectURL(tagged)
     setUrl(createdUrl)
     return () => URL.revokeObjectURL(createdUrl)
-  }, [adapter.id, blob])
+  }, [adapter, blob, item])
 
   if (isError) {
     return (
