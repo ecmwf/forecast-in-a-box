@@ -82,6 +82,8 @@ def compile_builder(
     Sets ``job_instance.ext_outputs`` to the authoritative list of cascade external
     outputs (previously a side effect of ``execute_cascade``).
     """
+    # TODO this is a bulky method, returning a tuple of things -- worth simplifying,
+    # like a single dto or perhaps derive the RunOutputs from CompilationDetail
     graph = Graph([])
     plugins = PluginManager.plugins
     action_lookup = {}
@@ -125,6 +127,10 @@ def compile_builder(
         except Exception as e:
             raise ValueError(f"compile failed at {blockId=} with {e}")
 
+        # TODO this is inefficient -- every task in a source block gets traversed as
+        # many times as there are sinks. Instead, we should utilize the Context for
+        # metadata enrichment during compilation to inject BlockId, and retrieve that
+        # at the end. Sinks should also be collected from the cascade graph presumably
         if block_factory.kind == "sink":
             block_graph = action_lookup[blockId].graph()
             for node in block_graph.nodes():

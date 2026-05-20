@@ -47,6 +47,7 @@ def fluentNode_to_detail(node: Node, block: BlockInstanceId) -> tuple[TaskId, Ta
     """Convert an earthkit.workflows Node to a (TaskId, TaskDetail) pair."""
     task_id = _fluentName_to_taskId(node.name)
     parents = [_fluentName_to_taskId(output.parent.name) for output in node.inputs.values()]
+    # TODO retrieve display name from the fluent metadata if present, node.name should be fallback
     return task_id, TaskDetail(block=block, display_name=node.name, parents=parents)
 
 
