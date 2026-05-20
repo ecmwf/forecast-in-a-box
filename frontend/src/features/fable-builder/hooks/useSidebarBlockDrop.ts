@@ -194,15 +194,49 @@ export function useSidebarBlockDrop(catalogue: BlockFactoryCatalogue) {
         fable,
         catalogue,
       )
-      const newId = addBlock(draggedFactory.id, draggedFactory.factory)
+      const dragged = draggedFactory
+
+      // Splice context, captured pre-insert:
+      // - Output drop: prior consumers of conn.nodeId rewire through new.
+      // - Input drop: the input's prior parent becomes new's upstream.
+      const downstream: Array<{ id: string; inputName: string }> = []
+      let priorParent: string | null = null
+      if (conn) {
+        if (!conn.isInput && dragged.factory.inputs.length > 0) {
+          for (const [id, block] of Object.entries(fable.blocks)) {
+            for (const [inputName, parentId] of Object.entries(
+              block.input_ids,
+            )) {
+              if (parentId === conn.nodeId) downstream.push({ id, inputName })
+            }
+          }
+        } else if (conn.isInput && dragged.factory.inputs.length > 0) {
+          // Cast to surface runtime undefined (no noUncheckedIndexedAccess).
+          const block = fable.blocks[conn.nodeId]
+          const raw = block.input_ids[conn.handleId] as string | undefined
+          priorParent = raw ?? null
+        }
+      }
+
+      const newId = addBlock(dragged.id, dragged.factory)
 
       if (conn) {
         if (conn.isInput) {
           // New block feeds the existing node's input port.
           connectBlocks(conn.nodeId, conn.handleId, newId)
+          // Splice: the input's prior parent now feeds the new block instead
+          // of being orphaned by the connectBlocks above.
+          if (priorParent) {
+            connectBlocks(newId, dragged.factory.inputs[0], priorParent)
+          }
         } else {
           // New block consumes the existing node's output.
-          connectBlocks(newId, draggedFactory.factory.inputs[0], conn.nodeId)
+          connectBlocks(newId, dragged.factory.inputs[0], conn.nodeId)
+          // Splice: redirect prior consumers of conn.nodeId through new so
+          // the drop inserts an in-line transform rather than a side branch.
+          for (const { id, inputName } of downstream) {
+            connectBlocks(id, inputName, newId)
+          }
         }
       }
 
