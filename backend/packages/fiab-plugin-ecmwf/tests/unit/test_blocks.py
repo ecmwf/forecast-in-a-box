@@ -84,6 +84,7 @@ def dummy_blockinstance() -> BlockInstance:
                 {
                     "source": "ecmwf-open-data",
                     "base_time": datetime(2024, 1, 1),
+                    "forecast": "ifs-ens",
                     "expver": "1",
                     "param": ["2t", "msl", "z"],
                     "step": [0, 6, 12],
