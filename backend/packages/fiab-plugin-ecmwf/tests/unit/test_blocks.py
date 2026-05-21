@@ -738,15 +738,7 @@ class TestGribSink:
         ).get_or_raise()
         assert isinstance(output, RawOutput)
 
-    @pytest.mark.parametrize(
-        "filepath, error",
-        [
-            ["/path/to/[unknown].grib2", "Invalid filename: template values in filename must be one of"],
-            ["/path/to/[levelist].grib2", "Invalid filename: template values in filename must be one of"],
-            ["/path/to/[param]/[step].grib", "Invalid filepath: directory path can not contain template values"],
-        ],
-    )
-    def test_invalid_path(self, ekdsource_output: QubedOutput, filepath: str, error: str) -> None:
+    def test_invalid_path(self, ekdsource_output: QubedOutput) -> None:
         block = GribSink()
         config = BlockInstance.from_block(
             BlockInstanceBase(
@@ -754,7 +746,7 @@ class TestGribSink:
                 input_ids={"dataset": BlockInstanceId("source_output")},
                 configuration_values=_config(
                     {
-                        "path": filepath,
+                        "path": "/path/to/[param]/[step].grib",
                     }
                 ),
             ),
@@ -764,7 +756,7 @@ class TestGribSink:
             block=config,
             inputs={"dataset": ekdsource_output},  # type: ignore[dict-item]
         )
-        with pytest.raises(Exception, match=error):
+        with pytest.raises(Exception, match="Invalid filepath: directory path can not contain template values"):
             output.get_or_raise()
 
     @pytest.mark.parametrize(
@@ -773,7 +765,7 @@ class TestGribSink:
             ["/path/to/output.grib", {}],
             ["/path/to/[param].grib", {"param": 2}],
             ["/path/to/[param]_[shortName]_[step].grib", {"param": 2, "step": 3}],
-            ["/path/to/[stepRange]_[number].grib", {"step": 3, "number": 5}],
+            ["/path/to/[stepRange]_[number]_[non_dim].grib", {"step": 3, "number": 5}],
         ],
     )
     def test_compile(self, ekdsource_output: QubedOutput, ekdsource_action: Action, filepath: str, dims: dict[str, int]) -> None:

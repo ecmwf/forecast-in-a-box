@@ -15,6 +15,7 @@ from typing import Any, cast
 import numpy as np
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action, Payload, from_source
+from earthkit.workflows.nodetree import nodetree_dimensions, nodetree_new_dimension
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
@@ -301,7 +302,7 @@ class ZarrSink(Sink):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
 
-        temp_dim = inputs[input_task]._temp_dim()
+        temp_dim = nodetree_new_dimension(inputs[input_task].nodes)
         action = (
             inputs[input_task]
             .flatten(new_dim=temp_dim, reset_coords=True)
@@ -419,7 +420,7 @@ class GribSink(Sink):
     inputs: list[str] = ["dataset"]
 
     def _find_template_values(cls, path: str) -> list[str]:
-        return re.findall(r"\{[.*?]\}", path)
+        return re.findall(r"\[(.*?)\]", path)
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         input_dataset = inputs.get("dataset")
@@ -430,12 +431,6 @@ class GribSink(Sink):
         dirname = os.path.dirname(path)
         if len(self._find_template_values(dirname)) != 0:
             return Either.error(f"Invalid filepath: directory path can not contain template values")
-        path_templates = self._find_template_values(path)
-        allowed_templates = dimensions(input_dataset).union(
-            set([alias for alias, dim in GRIB_ALIASES.items() if contains(input_dataset, dim)])
-        )
-        if not all([dim in allowed_templates for dim in path_templates]):
-            return Either.error(f"Invalid filename: template values in filename must be one of {allowed_templates}")
         return Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain"))
 
     def compile(
@@ -446,12 +441,13 @@ class GribSink(Sink):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
         path_dims = self._find_template_values(block.config_as_str(PATH))
+        action_dims = nodetree_dimensions(inputs[input_task].nodes)
         keep_dims = []
         for dim in path_dims:
             mapped_dim = GRIB_ALIASES.get(dim, dim)
-            if mapped_dim not in keep_dims:
+            if mapped_dim in action_dims and mapped_dim not in keep_dims:
                 keep_dims.append(mapped_dim)
-        temp_dim = inputs[input_task]._temp_dim()
+        temp_dim = nodetree_new_dimension(inputs[input_task].nodes)
         action = inputs[input_task].flatten(new_dim=temp_dim, keep_dims=keep_dims, reset_coords=True).concatenate(dim=temp_dim)
         try:
             if PARAM in keep_dims:
