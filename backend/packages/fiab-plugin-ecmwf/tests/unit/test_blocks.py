@@ -932,9 +932,7 @@ class TestMapPlotSink:
         output = block.validate(block=map_plot_sink_configuration, inputs={"dataset": ensemble_output}).get_or_raise()  # type: ignore[dict-item]
         assert isinstance(output, RawOutput)
 
-    @pytest.mark.parametrize(
-        "groupby", ["none", "number"]
-    )
+    @pytest.mark.parametrize("groupby", ["none", "number"])
     def test_compile_groupby(self, ekdsource_output: QubedOutput, ekdsource_action: Action, groupby: str) -> None:
         block = MapPlotSink()
         config = BlockInstance.from_block(
