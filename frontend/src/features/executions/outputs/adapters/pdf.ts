@@ -16,7 +16,8 @@ import type { OutputAdapter } from '../types'
 
 export const pdfAdapter: OutputAdapter = {
   id: 'pdf',
-  // Backend emits `image/pdf`; standard is `application/pdf`. Accept both.
+  // Current backend emits `application/pdf`; `image/pdf` kept as a defensive
+  // alias for runs whose stored mime predates #446.
   mimeTypes: ['image/pdf', 'application/pdf'],
   icon: FileText,
   label: (t) => t('outputs.adapters.pdf.label'),

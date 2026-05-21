@@ -34,7 +34,7 @@ export const JobExecuteResponseSchema = z.object({
   attempt_count: z.number(),
 })
 
-/** routes/run.py: RunOutputMetadata */
+/** routes/run.py: RunOutputDetail */
 export const RunOutputMetadataSchema = z.object({
   mime_type: z.string(),
   original_block: z.string(),

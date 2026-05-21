@@ -84,6 +84,15 @@ describe('parseValueType', () => {
       expect(parseValueType('list[enumClosed[2t,msl]]')).toEqual({
         type: 'enumList',
         options: ['2t', 'msl'],
+        closed: true,
+      })
+    })
+
+    it('parses list with open enum item type', () => {
+      expect(parseValueType("list[enum['a','b']]")).toEqual({
+        type: 'enumList',
+        options: ['a', 'b'],
+        closed: false,
       })
     })
   })
@@ -93,6 +102,7 @@ describe('parseValueType', () => {
       expect(parseValueType("enum['a','b','c']")).toEqual({
         type: 'enum',
         options: ['a', 'b', 'c'],
+        closed: false,
       })
     })
 
@@ -100,6 +110,7 @@ describe('parseValueType', () => {
       expect(parseValueType('enum["x","y","z"]')).toEqual({
         type: 'enum',
         options: ['x', 'y', 'z'],
+        closed: false,
       })
     })
 
@@ -107,6 +118,7 @@ describe('parseValueType', () => {
       expect(parseValueType("enum['only']")).toEqual({
         type: 'enum',
         options: ['only'],
+        closed: false,
       })
     })
 
@@ -114,6 +126,7 @@ describe('parseValueType', () => {
       expect(parseValueType("enumClosed['mars','ecmwf-open-data']")).toEqual({
         type: 'enum',
         options: ['mars', 'ecmwf-open-data'],
+        closed: true,
       })
     })
 
@@ -121,6 +134,7 @@ describe('parseValueType', () => {
       expect(parseValueType('enumClosed[2t,msl]')).toEqual({
         type: 'enum',
         options: ['2t', 'msl'],
+        closed: true,
       })
     })
   })
@@ -200,6 +214,7 @@ describe('parseValueType', () => {
       expect(parseValueType("optional[enum['a','b']]")).toEqual({
         type: 'enum',
         options: ['a', 'b'],
+        closed: false,
         optional: true,
       })
     })
@@ -208,6 +223,7 @@ describe('parseValueType', () => {
       expect(parseValueType("optional[enumClosed['mean','std']]")).toEqual({
         type: 'enum',
         options: ['mean', 'std'],
+        closed: true,
         optional: true,
       })
     })
@@ -275,18 +291,28 @@ describe('getDefaultValueForType', () => {
 
   it('returns empty string for enum list type', () => {
     expect(
-      getDefaultValueForType({ type: 'enumList', options: ['2t', 'msl'] }),
+      getDefaultValueForType({
+        type: 'enumList',
+        options: ['2t', 'msl'],
+        closed: true,
+      }),
     ).toBe('')
   })
 
   it('returns first option for enum type', () => {
     expect(
-      getDefaultValueForType({ type: 'enum', options: ['alpha', 'beta'] }),
+      getDefaultValueForType({
+        type: 'enum',
+        options: ['alpha', 'beta'],
+        closed: true,
+      }),
     ).toBe('alpha')
   })
 
   it('returns empty string for enum with no options', () => {
-    expect(getDefaultValueForType({ type: 'enum', options: [] })).toBe('')
+    expect(
+      getDefaultValueForType({ type: 'enum', options: [], closed: true }),
+    ).toBe('')
   })
 
   it('returns empty string for unknown type', () => {

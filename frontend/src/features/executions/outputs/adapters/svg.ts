@@ -17,7 +17,8 @@ import type { OutputAdapter } from '../types'
 
 export const imageVectorAdapter: OutputAdapter = {
   id: 'image-vector',
-  // Backend emits `image/svg`; standard is `image/svg+xml`. Accept both.
+  // Current backend emits `image/svg+xml`; `image/svg` kept as a defensive
+  // alias for runs whose stored mime predates #446.
   mimeTypes: ['image/svg', 'image/svg+xml'],
   icon: ImagePlus,
   label: (t) => t('outputs.adapters.image-vector.label'),

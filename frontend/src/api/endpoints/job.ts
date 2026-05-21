@@ -24,7 +24,7 @@ import {
   JobExecutionDetailSchema,
   JobExecutionListSchema,
 } from '@/api/types/job.types'
-import { ApiClientError, apiClient, buildUrl } from '@/api/client'
+import { apiClient, apiErrorFromResponse, buildUrl } from '@/api/client'
 import { API_ENDPOINTS } from '@/api/endpoints'
 import { readAnonymousId } from '@/lib/anonymous-id'
 
@@ -78,7 +78,7 @@ export async function getJobStatus(
 export async function getJobResult(
   runId: string,
   datasetId: string,
-): Promise<{ blob: Blob; contentType: string }> {
+): Promise<{ blob: Blob }> {
   const url = buildUrl(API_ENDPOINTS.job.outputContent, {
     run_id: runId,
     dataset_id: datasetId,
@@ -90,16 +90,14 @@ export async function getJobResult(
   })
 
   if (!response.ok) {
-    throw new ApiClientError(
+    throw await apiErrorFromResponse(
+      response,
       `Failed to fetch result: ${response.statusText}`,
-      response.status,
     )
   }
 
   const blob = await response.blob()
-  const contentType =
-    response.headers.get('content-type') ?? 'application/octet-stream'
-  return { blob, contentType }
+  return { blob }
 }
 
 /**
@@ -126,9 +124,9 @@ export async function getJobResultHead(
   })
 
   if (!response.ok) {
-    throw new ApiClientError(
+    throw await apiErrorFromResponse(
+      response,
       `Failed to fetch result head: ${response.statusText}`,
-      response.status,
     )
   }
 
@@ -148,9 +146,9 @@ export async function downloadJobLogs(runId: string): Promise<Blob> {
   })
 
   if (!response.ok) {
-    throw new ApiClientError(
+    throw await apiErrorFromResponse(
+      response,
       `Failed to download logs: ${response.statusText}`,
-      response.status,
     )
   }
 

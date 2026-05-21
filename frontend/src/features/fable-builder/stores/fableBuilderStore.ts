@@ -32,6 +32,13 @@ export type BuilderStep = 'edit' | 'review'
 export type EdgeStyle = 'bezier' | 'smoothstep' | 'step'
 export type { LayoutDirection } from '@/features/fable-builder/utils/layout-blocks'
 
+/** Max number of `fable` snapshots retained on the undo stack. Oldest entries
+ * are evicted once the bound is reached. */
+const MAX_HISTORY = 100
+/** Coalesce window for repeated same-key edits (typing in a config field).
+ * Within this window the meta is refreshed but no new snapshot is pushed. */
+const HISTORY_COALESCE_MS = 500
+
 /** A block factory being dragged from the palette onto the canvas. */
 export interface DraggedFactory {
   id: PluginBlockFactoryId
@@ -108,6 +115,8 @@ interface FableBuilderState {
   layoutDirection: LayoutDirection
   nodesLocked: boolean
   validationState: FableValidationState | null
+  /** Per-block restrictions captured at add/connect time so the ConfigPanel
+   * has them immediately, before the next /blueprint/expand round-trip. */
   blockConfigurationRestrictions: Record<
     BlockInstanceId,
     Record<string, string>
@@ -122,6 +131,19 @@ interface FableBuilderState {
   submitDialogOpen: boolean
   /** Palette block being dragged onto the canvas; null when idle. Not persisted. */
   draggedFactory: DraggedFactory | null
+  /** Bounded undo/redo of `fable` snapshots. Selection, panel toggles, and
+   * viewport state deliberately do NOT participate. */
+  past: ReadonlyArray<FableBuilderV1>
+  future: ReadonlyArray<FableBuilderV1>
+  /** Coalescing scratchpad. Same-key edits within `HISTORY_COALESCE_MS`
+   * refresh `t` without pushing a new snapshot — so a typing burst collapses
+   * to a single undo step. Internal; do not read from React. */
+  _historyMeta: { key: string | null; t: number }
+  /** When non-null, every tracked mutation collapses into a single undo step
+   * (regardless of the time window). UI flows that fire multiple actions
+   * atomically — drag-drop with splice, popover add with splice — wrap their
+   * sequence in `beginHistoryTransaction` / `endHistoryTransaction`. */
+  _currentTransactionKey: string | null
 
   setFable: (fable: FableBuilderV1, id?: string | null) => void
   setFableName: (name: string) => void
@@ -187,6 +209,10 @@ interface FableBuilderState {
    */
   markSubmitted: () => void
   reset: () => void
+  undo: () => void
+  redo: () => void
+  beginHistoryTransaction: () => void
+  endHistoryTransaction: () => void
 }
 
 /**
@@ -215,7 +241,10 @@ function createInitialState() {
     layoutDirection: getDefaultLayoutDirection(),
     nodesLocked: true,
     validationState: null,
-    blockConfigurationRestrictions: {},
+    blockConfigurationRestrictions: {} as Record<
+      BlockInstanceId,
+      Record<string, string>
+    >,
     isValidating: false,
     lastValidatedAt: null,
     isDirty: false,
@@ -223,6 +252,10 @@ function createInitialState() {
     draftWritePending: false,
     submitDialogOpen: false,
     draggedFactory: null,
+    past: [] as ReadonlyArray<FableBuilderV1>,
+    future: [] as ReadonlyArray<FableBuilderV1>,
+    _historyMeta: { key: null as string | null, t: 0 },
+    _currentTransactionKey: null as string | null,
   }
 }
 
@@ -232,60 +265,13 @@ export const useFableBuilderStore = create<FableBuilderState>()(
       // `subscribeWithSelector` lets useDraftPersistence subscribe to just the
       // slices it cares about instead of running its dirty-check on every
       // unrelated state change.
-      subscribeWithSelector((set, get) => ({
-        ...createInitialState(),
-
-        setFable: (fable, id = null) =>
-          set({
-            fable,
-            fableId: id,
-            fableVersion: null,
-            isDirty: false,
-            selectedBlockId: null,
-            validationState: null,
-            blockConfigurationRestrictions: {},
-            step: 'edit',
-          }),
-
-        setFableName: (name) => set({ fableName: name, isDirty: true }),
-
-        newFable: () =>
-          set({
-            ...createInitialState(),
-            mode: get().mode,
-            isPaletteOpen: get().isPaletteOpen,
-            isConfigPanelOpen: get().isConfigPanelOpen,
-          }),
-
-        addBlock: (factoryId, factory) => {
-          const instanceId = generateBlockInstanceId()
-          const instance = createBlockInstance(factoryId, factory)
-
-          set((state) => ({
-            fable: {
-              ...state.fable,
-              blocks: {
-                ...state.fable.blocks,
-                [instanceId]: instance,
-              },
-            },
-            selectedBlockId: instanceId,
-            isConfigPanelOpen: true,
-            isMobilePaletteOpen: false,
-            isDirty: true,
-            validationState: null,
-          }))
-
-          return instanceId
-        },
-
-        // Single-key update is just a one-entry batch.
-        updateBlockConfig: (instanceId, configKey, value) =>
-          get().updateBlockConfigBatch(instanceId, { [configKey]: value }),
-
-        updateBlockConfigBatch: (instanceId, values) =>
-          // Functional update: reads the latest `state` so a rapid write burst
-          // can't read a stale `fable` and drop an earlier update.
+      subscribeWithSelector((set, get) => {
+        /** Functional update: reads the latest `state` so a rapid write burst
+         * can't read a stale `fable` and drop an earlier update. */
+        function applyBlockConfigUpdate(
+          instanceId: BlockInstanceId,
+          values: Record<string, string>,
+        ): void {
           set((state) => {
             const block = state.fable.blocks[instanceId]
             return {
@@ -305,307 +291,481 @@ export const useFableBuilderStore = create<FableBuilderState>()(
               isDirty: true,
               validationState: null,
             }
-          }),
-
-        removeBlock: (instanceId) => {
-          const { fable, selectedBlockId } = get()
-          const { [instanceId]: _removed, ...remainingBlocks } = fable.blocks
-          const {
-            [instanceId]: _removedRestrictions,
-            ...remainingRestrictions
-          } = get().blockConfigurationRestrictions
-
-          const updatedBlocks: Record<BlockInstanceId, BlockInstance> = {}
-          for (const [id, block] of Object.entries(remainingBlocks)) {
-            const updatedInputIds: Record<string, string> = {}
-            for (const [inputName, sourceId] of Object.entries(
-              block.input_ids,
-            )) {
-              if (sourceId !== instanceId) {
-                updatedInputIds[inputName] = sourceId
-              }
-            }
-            updatedBlocks[id] = { ...block, input_ids: updatedInputIds }
-          }
-
-          set({
-            fable: { ...fable, blocks: updatedBlocks },
-            selectedBlockId:
-              selectedBlockId === instanceId ? null : selectedBlockId,
-            isDirty: true,
-            validationState: null,
-            blockConfigurationRestrictions: remainingRestrictions,
           })
-        },
+        }
 
-        removeBlockCascade: (instanceId) => {
-          const { fable, selectedBlockId } = get()
-
-          const downstreamBlocks = findDownstreamBlocks(
-            instanceId,
-            fable.blocks,
-          )
-          const toRemove = new Set([instanceId, ...downstreamBlocks])
-
-          const remainingBlocks: Record<BlockInstanceId, BlockInstance> = {}
-          const remainingRestrictions = {
-            ...get().blockConfigurationRestrictions,
+        /** Push the current `fable` onto the undo stack before a mutation.
+         * Coalesces when (a) inside an open transaction with a matching key,
+         * or (b) the same `coalesceKey` was seen within `HISTORY_COALESCE_MS`
+         * (typing-burst collapse). Always clears `future` — a new edit
+         * invalidates redo. */
+        function pushHistory(coalesceKey?: string): void {
+          const { fable, past, _historyMeta, _currentTransactionKey } = get()
+          const now = Date.now()
+          // The active transaction (if any) overrides the caller's key so all
+          // actions in the transaction share a single coalesce target.
+          const effectiveKey = _currentTransactionKey ?? coalesceKey
+          const inTransaction = _currentTransactionKey !== null
+          if (
+            effectiveKey !== undefined &&
+            _historyMeta.key === effectiveKey &&
+            (inTransaction || now - _historyMeta.t < HISTORY_COALESCE_MS)
+          ) {
+            set({
+              _historyMeta: { key: effectiveKey, t: now },
+              future: [],
+            })
+            return
           }
-          for (const id of toRemove) {
-            delete remainingRestrictions[id]
-          }
-          for (const [id, block] of Object.entries(fable.blocks)) {
-            if (!toRemove.has(id)) {
-              const cleanedInputIds: Record<string, string> = {}
+          // Bounded: drop oldest snapshot once we'd exceed MAX_HISTORY.
+          const start =
+            past.length >= MAX_HISTORY ? past.length - MAX_HISTORY + 1 : 0
+          set({
+            past: [...past.slice(start), fable],
+            future: [],
+            _historyMeta: { key: effectiveKey ?? null, t: now },
+          })
+        }
+
+        return {
+          ...createInitialState(),
+
+          setFable: (fable, id = null) =>
+            set({
+              fable,
+              fableId: id,
+              fableVersion: null,
+              isDirty: false,
+              selectedBlockId: null,
+              validationState: null,
+              blockConfigurationRestrictions: {},
+              step: 'edit',
+              // Loading a different fable invalidates the entire history.
+              past: [],
+              future: [],
+              _historyMeta: { key: null, t: 0 },
+              _currentTransactionKey: null,
+            }),
+
+          setFableName: (name) => set({ fableName: name, isDirty: true }),
+
+          newFable: () =>
+            set({
+              ...createInitialState(),
+              mode: get().mode,
+              isPaletteOpen: get().isPaletteOpen,
+              isConfigPanelOpen: get().isConfigPanelOpen,
+            }),
+
+          addBlock: (factoryId, factory) => {
+            pushHistory()
+            const instanceId = generateBlockInstanceId()
+            const instance = createBlockInstance(factoryId, factory)
+
+            set((state) => ({
+              fable: {
+                ...state.fable,
+                blocks: {
+                  ...state.fable.blocks,
+                  [instanceId]: instance,
+                },
+              },
+              selectedBlockId: instanceId,
+              isConfigPanelOpen: true,
+              isMobilePaletteOpen: false,
+              isDirty: true,
+              validationState: null,
+            }))
+
+            return instanceId
+          },
+
+          // Single-key update coalesces consecutive edits to the same option
+          // into one undo step (so a typing burst collapses).
+          updateBlockConfig: (instanceId, configKey, value) => {
+            pushHistory(`config:${instanceId}:${configKey}`)
+            applyBlockConfigUpdate(instanceId, { [configKey]: value })
+          },
+
+          updateBlockConfigBatch: (instanceId, values) => {
+            // Batched edits are distinct undo steps — no coalesce key.
+            pushHistory()
+            applyBlockConfigUpdate(instanceId, values)
+          },
+
+          removeBlock: (instanceId) => {
+            pushHistory()
+            const { fable, selectedBlockId } = get()
+            const { [instanceId]: _removed, ...remainingBlocks } = fable.blocks
+            const {
+              [instanceId]: _removedRestrictions,
+              ...remainingRestrictions
+            } = get().blockConfigurationRestrictions
+
+            const updatedBlocks: Record<BlockInstanceId, BlockInstance> = {}
+            for (const [id, block] of Object.entries(remainingBlocks)) {
+              const updatedInputIds: Record<string, string> = {}
               for (const [inputName, sourceId] of Object.entries(
                 block.input_ids,
               )) {
-                if (!toRemove.has(sourceId)) {
-                  cleanedInputIds[inputName] = sourceId
+                if (sourceId !== instanceId) {
+                  updatedInputIds[inputName] = sourceId
                 }
               }
-              remainingBlocks[id] = { ...block, input_ids: cleanedInputIds }
+              updatedBlocks[id] = { ...block, input_ids: updatedInputIds }
             }
-          }
 
-          set({
-            fable: { ...fable, blocks: remainingBlocks },
-            selectedBlockId: toRemove.has(selectedBlockId ?? '')
-              ? null
-              : selectedBlockId,
-            isDirty: true,
-            validationState: null,
-            blockConfigurationRestrictions: remainingRestrictions,
-          })
-        },
+            set({
+              fable: { ...fable, blocks: updatedBlocks },
+              selectedBlockId:
+                selectedBlockId === instanceId ? null : selectedBlockId,
+              isDirty: true,
+              validationState: null,
+              blockConfigurationRestrictions: remainingRestrictions,
+            })
+          },
 
-        duplicateBlock: (instanceId) => {
-          const { fable } = get()
-          const block = fable.blocks[instanceId]
-          const restrictions = get().blockConfigurationRestrictions[
-            instanceId
-          ] as Record<string, string> | undefined
-          const newInstanceId = generateBlockInstanceId()
-          const duplicatedBlock: BlockInstance = {
-            factory_id: block.factory_id,
-            configuration_values: { ...block.configuration_values },
-            input_ids: { ...block.input_ids },
-          }
+          removeBlockCascade: (instanceId) => {
+            pushHistory()
+            const { fable, selectedBlockId } = get()
 
-          set((state) => ({
-            fable: {
-              ...state.fable,
-              blocks: {
-                ...state.fable.blocks,
-                [newInstanceId]: duplicatedBlock,
-              },
-            },
-            selectedBlockId: newInstanceId,
-            isDirty: true,
-            validationState: null,
-            blockConfigurationRestrictions:
-              replaceBlockConfigurationRestrictions(
-                state.blockConfigurationRestrictions,
-                newInstanceId,
-                restrictions,
-              ),
-          }))
+            const downstreamBlocks = findDownstreamBlocks(
+              instanceId,
+              fable.blocks,
+            )
+            const toRemove = new Set([instanceId, ...downstreamBlocks])
 
-          return newInstanceId
-        },
-
-        duplicateBlockWithChildren: (instanceId) => {
-          const { fable } = get()
-
-          const downstreamBlocks = findDownstreamBlocks(
-            instanceId,
-            fable.blocks,
-          )
-          const toDuplicate = [instanceId, ...downstreamBlocks]
-
-          // Create ID mapping for all blocks to duplicate
-          const idMapping: Record<BlockInstanceId, BlockInstanceId> = {}
-          for (const id of toDuplicate) {
-            idMapping[id] = generateBlockInstanceId()
-          }
-
-          // Duplicate each block with updated input_ids
-          const newBlocks: Record<BlockInstanceId, BlockInstance> = {}
-          for (const id of toDuplicate) {
-            const block = fable.blocks[id]
-            const newInputIds: Record<string, string> = {}
-
-            // Update input_ids to point to new IDs if the source is also being duplicated
-            for (const [inputName, sourceId] of Object.entries(
-              block.input_ids,
-            )) {
-              if (idMapping[sourceId]) {
-                newInputIds[inputName] = idMapping[sourceId]
-              } else {
-                newInputIds[inputName] = sourceId
+            const remainingBlocks: Record<BlockInstanceId, BlockInstance> = {}
+            const remainingRestrictions = {
+              ...get().blockConfigurationRestrictions,
+            }
+            for (const id of toRemove) {
+              delete remainingRestrictions[id]
+            }
+            for (const [id, block] of Object.entries(fable.blocks)) {
+              if (!toRemove.has(id)) {
+                const cleanedInputIds: Record<string, string> = {}
+                for (const [inputName, sourceId] of Object.entries(
+                  block.input_ids,
+                )) {
+                  if (!toRemove.has(sourceId)) {
+                    cleanedInputIds[inputName] = sourceId
+                  }
+                }
+                remainingBlocks[id] = { ...block, input_ids: cleanedInputIds }
               }
             }
 
-            newBlocks[idMapping[id]] = {
+            set({
+              fable: { ...fable, blocks: remainingBlocks },
+              selectedBlockId: toRemove.has(selectedBlockId ?? '')
+                ? null
+                : selectedBlockId,
+              isDirty: true,
+              validationState: null,
+              blockConfigurationRestrictions: remainingRestrictions,
+            })
+          },
+
+          duplicateBlock: (instanceId) => {
+            pushHistory()
+            const { fable } = get()
+            const block = fable.blocks[instanceId]
+            const restrictions = get().blockConfigurationRestrictions[
+              instanceId
+            ] as Record<string, string> | undefined
+            const newInstanceId = generateBlockInstanceId()
+            const duplicatedBlock: BlockInstance = {
               factory_id: block.factory_id,
               configuration_values: { ...block.configuration_values },
-              input_ids: newInputIds,
+              input_ids: { ...block.input_ids },
             }
-          }
 
-          set((state) => ({
-            fable: {
-              ...state.fable,
-              blocks: {
-                ...state.fable.blocks,
-                ...newBlocks,
-              },
-            },
-            selectedBlockId: idMapping[instanceId],
-            isDirty: true,
-            validationState: null,
-          }))
-
-          return idMapping
-        },
-
-        connectBlocks: (targetBlockId, inputName, sourceBlockId) => {
-          const { fable, validationState } = get()
-          const block = fable.blocks[targetBlockId]
-          const restrictions =
-            validationState?.blockStates[sourceBlockId]
-              ?.possibleExpansionRestrictions[factoryIdToKey(block.factory_id)]
-          const nextRestrictions = replaceBlockConfigurationRestrictions(
-            get().blockConfigurationRestrictions,
-            targetBlockId,
-            restrictions,
-          )
-
-          set({
-            fable: {
-              ...fable,
-              blocks: {
-                ...fable.blocks,
-                [targetBlockId]: {
-                  ...block,
-                  input_ids: { ...block.input_ids, [inputName]: sourceBlockId },
+            set((state) => ({
+              fable: {
+                ...state.fable,
+                blocks: {
+                  ...state.fable.blocks,
+                  [newInstanceId]: duplicatedBlock,
                 },
               },
-            },
-            isDirty: true,
-            validationState: null,
-            blockConfigurationRestrictions: nextRestrictions,
-          })
-        },
+              selectedBlockId: newInstanceId,
+              isDirty: true,
+              validationState: null,
+              blockConfigurationRestrictions:
+                replaceBlockConfigurationRestrictions(
+                  state.blockConfigurationRestrictions,
+                  newInstanceId,
+                  restrictions,
+                ),
+            }))
 
-        disconnectBlock: (targetBlockId, inputName) => {
-          const { fable } = get()
-          const block = fable.blocks[targetBlockId]
-          const { [inputName]: _removed, ...remainingInputs } = block.input_ids
+            return newInstanceId
+          },
 
-          set({
-            fable: {
-              ...fable,
-              blocks: {
-                ...fable.blocks,
-                [targetBlockId]: { ...block, input_ids: remainingInputs },
+          duplicateBlockWithChildren: (instanceId) => {
+            pushHistory()
+            const { fable } = get()
+
+            const downstreamBlocks = findDownstreamBlocks(
+              instanceId,
+              fable.blocks,
+            )
+            const toDuplicate = [instanceId, ...downstreamBlocks]
+
+            // Create ID mapping for all blocks to duplicate
+            const idMapping: Record<BlockInstanceId, BlockInstanceId> = {}
+            for (const id of toDuplicate) {
+              idMapping[id] = generateBlockInstanceId()
+            }
+
+            // Duplicate each block with updated input_ids
+            const newBlocks: Record<BlockInstanceId, BlockInstance> = {}
+            for (const id of toDuplicate) {
+              const block = fable.blocks[id]
+              const newInputIds: Record<string, string> = {}
+
+              // Update input_ids to point to new IDs if the source is also being duplicated
+              for (const [inputName, sourceId] of Object.entries(
+                block.input_ids,
+              )) {
+                if (idMapping[sourceId]) {
+                  newInputIds[inputName] = idMapping[sourceId]
+                } else {
+                  newInputIds[inputName] = sourceId
+                }
+              }
+
+              newBlocks[idMapping[id]] = {
+                factory_id: block.factory_id,
+                configuration_values: { ...block.configuration_values },
+                input_ids: newInputIds,
+              }
+            }
+
+            set((state) => ({
+              fable: {
+                ...state.fable,
+                blocks: {
+                  ...state.fable.blocks,
+                  ...newBlocks,
+                },
               },
-            },
-            isDirty: true,
-            validationState: null,
-            blockConfigurationRestrictions:
-              replaceBlockConfigurationRestrictions(
-                get().blockConfigurationRestrictions,
-                targetBlockId,
-                undefined,
-              ),
-          })
-        },
+              selectedBlockId: idMapping[instanceId],
+              isDirty: true,
+              validationState: null,
+            }))
 
-        selectBlock: (blockId) =>
-          set({
-            selectedBlockId: blockId,
-            // Sidebar stays open even on deselect (blockId === null) —
-            // it shows a "Select a block to configure" placeholder.
-            // User closes it explicitly via toggleConfigPanel.
-            isConfigPanelOpen: true,
-          }),
+            return idMapping
+          },
 
-        setMode: (mode) => set({ mode }),
-        setStep: (step) => set({ step }),
-        togglePalette: () =>
-          set((state) => ({ isPaletteOpen: !state.isPaletteOpen })),
-        toggleConfigPanel: () =>
-          set((state) => ({ isConfigPanelOpen: !state.isConfigPanelOpen })),
-        setPaletteOpen: (open) => set({ isPaletteOpen: open }),
-        setConfigPanelOpen: (open) => set({ isConfigPanelOpen: open }),
-        setMobilePaletteOpen: (open) => set({ isMobilePaletteOpen: open }),
-        setMobileConfigOpen: (open) => set({ isMobileConfigOpen: open }),
-        openMobileConfig: (blockId) =>
-          set({ selectedBlockId: blockId, isMobileConfigOpen: true }),
-        setMiniMapOpen: (open) => set({ isMiniMapOpen: open }),
-        toggleMiniMap: () =>
-          set((state) => ({ isMiniMapOpen: !state.isMiniMapOpen })),
-        triggerFitView: () =>
-          set((state) => ({ fitViewTrigger: state.fitViewTrigger + 1 })),
-        setEdgeStyle: (style) => set({ edgeStyle: style }),
-        setAutoLayout: (enabled) => set({ autoLayout: enabled }),
-        setLayoutDirection: (direction) => set({ layoutDirection: direction }),
-        setNodesLocked: (locked) => set({ nodesLocked: locked }),
+          connectBlocks: (targetBlockId, inputName, sourceBlockId) => {
+            pushHistory()
+            const { fable, validationState } = get()
+            const block = fable.blocks[targetBlockId]
+            const restrictions =
+              validationState?.blockStates[sourceBlockId]
+                ?.possibleExpansionRestrictions[
+                factoryIdToKey(block.factory_id)
+              ]
+            const nextRestrictions = replaceBlockConfigurationRestrictions(
+              get().blockConfigurationRestrictions,
+              targetBlockId,
+              restrictions,
+            )
 
-        setLocalGlyph: (key, value) => {
-          const { fable } = get()
-          set({
-            fable: {
-              ...fable,
-              local_glyphs: { ...(fable.local_glyphs ?? {}), [key]: value },
-            },
-            isDirty: true,
-            validationState: null,
-          })
-        },
+            set({
+              fable: {
+                ...fable,
+                blocks: {
+                  ...fable.blocks,
+                  [targetBlockId]: {
+                    ...block,
+                    input_ids: {
+                      ...block.input_ids,
+                      [inputName]: sourceBlockId,
+                    },
+                  },
+                },
+              },
+              isDirty: true,
+              validationState: null,
+              blockConfigurationRestrictions: nextRestrictions,
+            })
+          },
 
-        removeLocalGlyph: (key) => {
-          const { fable } = get()
-          const { [key]: _removed, ...rest } = fable.local_glyphs ?? {}
-          set({
-            fable: { ...fable, local_glyphs: rest },
-            isDirty: true,
-            validationState: null,
-          })
-        },
+          disconnectBlock: (targetBlockId, inputName) => {
+            pushHistory()
+            const { fable } = get()
+            const block = fable.blocks[targetBlockId]
+            const { [inputName]: _removed, ...remainingInputs } =
+              block.input_ids
 
-        setValidationState: (state) =>
-          set({
-            validationState: state,
-            lastValidatedAt: state ? Date.now() : null,
-            ...(state ? { blockConfigurationRestrictions: {} } : {}),
-          }),
-        setBlockConfigurationRestrictions: (blockId, restrictions) =>
-          set((state) => ({
-            blockConfigurationRestrictions:
-              replaceBlockConfigurationRestrictions(
-                state.blockConfigurationRestrictions,
-                blockId,
-                restrictions,
-              ),
-          })),
-        setIsValidating: (validating) => set({ isValidating: validating }),
-        setSubmitDialogOpen: (open) => set({ submitDialogOpen: open }),
-        setDraggedFactory: (dragged) => set({ draggedFactory: dragged }),
+            set({
+              fable: {
+                ...fable,
+                blocks: {
+                  ...fable.blocks,
+                  [targetBlockId]: { ...block, input_ids: remainingInputs },
+                },
+              },
+              isDirty: true,
+              validationState: null,
+              blockConfigurationRestrictions:
+                replaceBlockConfigurationRestrictions(
+                  get().blockConfigurationRestrictions,
+                  targetBlockId,
+                  undefined,
+                ),
+            })
+          },
 
-        markSaved: (id, version, name) =>
-          set({
-            fableId: id,
-            fableVersion: version,
-            isDirty: false,
-            lastSavedAt: Date.now(),
-            ...(name !== undefined && { fableName: name }),
-          }),
-        markSubmitted: () => set({ isDirty: false, lastSavedAt: Date.now() }),
+          selectBlock: (blockId) =>
+            set({
+              selectedBlockId: blockId,
+              // Sidebar stays open even on deselect (blockId === null) —
+              // it shows a "Select a block to configure" placeholder.
+              // User closes it explicitly via toggleConfigPanel.
+              isConfigPanelOpen: true,
+            }),
 
-        reset: () => set(createInitialState()),
-      })),
+          setMode: (mode) => set({ mode }),
+          setStep: (step) => set({ step }),
+          togglePalette: () =>
+            set((state) => ({ isPaletteOpen: !state.isPaletteOpen })),
+          toggleConfigPanel: () =>
+            set((state) => ({ isConfigPanelOpen: !state.isConfigPanelOpen })),
+          setPaletteOpen: (open) => set({ isPaletteOpen: open }),
+          setConfigPanelOpen: (open) => set({ isConfigPanelOpen: open }),
+          setMobilePaletteOpen: (open) => set({ isMobilePaletteOpen: open }),
+          setMobileConfigOpen: (open) => set({ isMobileConfigOpen: open }),
+          openMobileConfig: (blockId) =>
+            set({ selectedBlockId: blockId, isMobileConfigOpen: true }),
+          setMiniMapOpen: (open) => set({ isMiniMapOpen: open }),
+          toggleMiniMap: () =>
+            set((state) => ({ isMiniMapOpen: !state.isMiniMapOpen })),
+          triggerFitView: () =>
+            set((state) => ({ fitViewTrigger: state.fitViewTrigger + 1 })),
+          setEdgeStyle: (style) => set({ edgeStyle: style }),
+          setAutoLayout: (enabled) => set({ autoLayout: enabled }),
+          setLayoutDirection: (direction) =>
+            set({ layoutDirection: direction }),
+          setNodesLocked: (locked) => set({ nodesLocked: locked }),
+
+          setLocalGlyph: (key, value) => {
+            // Coalesce typing in the same local glyph into one undo step.
+            pushHistory(`localGlyph:${key}`)
+            const { fable } = get()
+            set({
+              fable: {
+                ...fable,
+                local_glyphs: { ...(fable.local_glyphs ?? {}), [key]: value },
+              },
+              isDirty: true,
+              validationState: null,
+            })
+          },
+
+          removeLocalGlyph: (key) => {
+            pushHistory()
+            const { fable } = get()
+            const { [key]: _removed, ...rest } = fable.local_glyphs ?? {}
+            set({
+              fable: { ...fable, local_glyphs: rest },
+              isDirty: true,
+              validationState: null,
+            })
+          },
+
+          setValidationState: (state) =>
+            set({
+              validationState: state,
+              lastValidatedAt: state ? Date.now() : null,
+              // Fresh validation supersedes the optimistic in-flight cache.
+              ...(state ? { blockConfigurationRestrictions: {} } : {}),
+            }),
+          setBlockConfigurationRestrictions: (blockId, restrictions) =>
+            set((state) => ({
+              blockConfigurationRestrictions:
+                replaceBlockConfigurationRestrictions(
+                  state.blockConfigurationRestrictions,
+                  blockId,
+                  restrictions,
+                ),
+            })),
+          setIsValidating: (validating) => set({ isValidating: validating }),
+          setSubmitDialogOpen: (open) => set({ submitDialogOpen: open }),
+          setDraggedFactory: (dragged) => set({ draggedFactory: dragged }),
+
+          markSaved: (id, version, name) =>
+            set({
+              fableId: id,
+              fableVersion: version,
+              isDirty: false,
+              lastSavedAt: Date.now(),
+              ...(name !== undefined && { fableName: name }),
+            }),
+          markSubmitted: () => set({ isDirty: false, lastSavedAt: Date.now() }),
+
+          reset: () => set(createInitialState()),
+
+          undo: () => {
+            const { fable, past, future, selectedBlockId } = get()
+            if (past.length === 0) return
+            const previous = past[past.length - 1]
+            set({
+              fable: previous,
+              past: past.slice(0, -1),
+              future: [...future, fable],
+              // Drop coalesce state so the next edit starts a fresh snapshot.
+              _historyMeta: { key: null, t: 0 },
+              // Clear selection if the restored fable no longer has it.
+              selectedBlockId:
+                selectedBlockId &&
+                (previous.blocks[selectedBlockId] as BlockInstance | undefined)
+                  ? selectedBlockId
+                  : null,
+              isDirty: true,
+              validationState: null,
+            })
+          },
+
+          beginHistoryTransaction: () => {
+            // Unique token so stale prior `_historyMeta.key` can't pollute
+            // a freshly opened transaction's coalesce check.
+            const key = `tx:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`
+            set({ _currentTransactionKey: key })
+          },
+
+          endHistoryTransaction: () => {
+            // Reset meta so the next standalone edit pushes a fresh snapshot
+            // rather than coalescing into the now-closed transaction.
+            set({
+              _currentTransactionKey: null,
+              _historyMeta: { key: null, t: 0 },
+            })
+          },
+
+          redo: () => {
+            const { fable, past, future, selectedBlockId } = get()
+            if (future.length === 0) return
+            const next = future[future.length - 1]
+            set({
+              fable: next,
+              past: [...past, fable],
+              future: future.slice(0, -1),
+              _historyMeta: { key: null, t: 0 },
+              selectedBlockId:
+                selectedBlockId &&
+                (next.blocks[selectedBlockId] as BlockInstance | undefined)
+                  ? selectedBlockId
+                  : null,
+              isDirty: true,
+              validationState: null,
+            })
+          },
+        }
+      }),
       {
         name: STORAGE_KEYS.stores.fableBuilder,
         version: STORE_VERSIONS.fableBuilder,

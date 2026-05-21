@@ -64,7 +64,9 @@
     "submitJob": "Submit Job",
     "reviewTooltipNoBlocks": "Add blocks to your configuration",
     "reviewTooltipNoSink": "Add at least one output block",
-    "reviewTooltipInvalid": "Fix validation errors before submitting"
+    "reviewTooltipInvalid": "Fix validation errors before submitting",
+    "undo": "Undo",
+    "redo": "Redo"
   },
   "blockCount_one": "{{count}} block",
   "blockCount_other": "{{count}} blocks",

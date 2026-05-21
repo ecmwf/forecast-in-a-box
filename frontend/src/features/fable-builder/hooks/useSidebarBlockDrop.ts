@@ -23,7 +23,7 @@ const HANDLE_PADDING = 20
 const ACTIVE_CLASS = 'dnd-active'
 
 /** A concrete connection a drop would create against an existing node. */
-interface DropConnection {
+export interface DropConnection {
   nodeId: string
   /** The existing node's handle that gets wired. */
   handleId: string
@@ -31,6 +31,36 @@ interface DropConnection {
   isInput: boolean
   /** That handle's DOM element, for the hover highlight (may be null). */
   handleEl: Element | null
+}
+
+/** Rewires needed around a newly-inserted block:
+ *  - `downstream`: prior consumers of `conn.nodeId` (output drop), to route
+ *    through the new block. Empty for sinks — they have no output. Drop
+ *    becomes a sibling instead of a splice.
+ *  - `priorParent`: the input's prior parent (input drop), to feed the new
+ *    block instead of being orphaned by the connect. */
+export function computeSpliceContext(
+  conn: DropConnection,
+  factory: BlockFactory,
+  fable: FableBuilderV1,
+): {
+  downstream: Array<{ id: string; inputName: string }>
+  priorParent: string | null
+} {
+  const downstream: Array<{ id: string; inputName: string }> = []
+  let priorParent: string | null = null
+  if (!conn.isInput && factory.kind !== 'sink' && factory.inputs.length > 0) {
+    for (const [id, block] of Object.entries(fable.blocks)) {
+      for (const [inputName, parentId] of Object.entries(block.input_ids)) {
+        if (parentId === conn.nodeId) downstream.push({ id, inputName })
+      }
+    }
+  } else if (conn.isInput && factory.inputs.length > 0) {
+    const block = fable.blocks[conn.nodeId]
+    const raw = block.input_ids[conn.handleId] as string | undefined
+    priorParent = raw ?? null
+  }
+  return { downstream, priorParent }
 }
 
 /** Whether a dragged factory fits a handle: an input handle needs it to have
@@ -144,6 +174,12 @@ export function useSidebarBlockDrop(catalogue: BlockFactoryCatalogue) {
   const addBlock = useFableBuilderStore((s) => s.addBlock)
   const connectBlocks = useFableBuilderStore((s) => s.connectBlocks)
   const setDraggedFactory = useFableBuilderStore((s) => s.setDraggedFactory)
+  const beginHistoryTransaction = useFableBuilderStore(
+    (s) => s.beginHistoryTransaction,
+  )
+  const endHistoryTransaction = useFableBuilderStore(
+    (s) => s.endHistoryTransaction,
+  )
   const activeHandleRef = useRef<Element | null>(null)
 
   const clearActiveHandle = useCallback(() => {
@@ -194,16 +230,38 @@ export function useSidebarBlockDrop(catalogue: BlockFactoryCatalogue) {
         fable,
         catalogue,
       )
-      const newId = addBlock(draggedFactory.id, draggedFactory.factory)
+      const dragged = draggedFactory
 
-      if (conn) {
-        if (conn.isInput) {
-          // New block feeds the existing node's input port.
-          connectBlocks(conn.nodeId, conn.handleId, newId)
-        } else {
-          // New block consumes the existing node's output.
-          connectBlocks(newId, draggedFactory.factory.inputs[0], conn.nodeId)
+      const { downstream, priorParent } = conn
+        ? computeSpliceContext(conn, dragged.factory, fable)
+        : { downstream: [], priorParent: null }
+
+      // Group add + connect + splice rewires into a single undo step.
+      beginHistoryTransaction()
+      try {
+        const newId = addBlock(dragged.id, dragged.factory)
+
+        if (conn) {
+          if (conn.isInput) {
+            // New block feeds the existing node's input port.
+            connectBlocks(conn.nodeId, conn.handleId, newId)
+            // Splice: the input's prior parent now feeds the new block
+            // instead of being orphaned by the connectBlocks above.
+            if (priorParent) {
+              connectBlocks(newId, dragged.factory.inputs[0], priorParent)
+            }
+          } else {
+            // New block consumes the existing node's output.
+            connectBlocks(newId, dragged.factory.inputs[0], conn.nodeId)
+            // Splice: redirect prior consumers of conn.nodeId through new so
+            // the drop inserts an in-line transform rather than a side branch.
+            for (const { id, inputName } of downstream) {
+              connectBlocks(id, inputName, newId)
+            }
+          }
         }
+      } finally {
+        endHistoryTransaction()
       }
 
       setDraggedFactory(null)
@@ -214,6 +272,8 @@ export function useSidebarBlockDrop(catalogue: BlockFactoryCatalogue) {
       catalogue,
       addBlock,
       connectBlocks,
+      beginHistoryTransaction,
+      endHistoryTransaction,
       setDraggedFactory,
       clearActiveHandle,
     ],

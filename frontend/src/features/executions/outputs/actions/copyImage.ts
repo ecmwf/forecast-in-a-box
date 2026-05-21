@@ -38,12 +38,13 @@ async function runCopyImage(
       showToast.success(i18n.t('executions:outputs.copy.svgSuccess'))
       return
     }
-    // Raster: tag the blob explicitly as image/png — even if the wire blob's
-    // .type is wrong (cascade may say application/pickle for raw bytes), the
-    // ClipboardItem trusts the declared key.
-    const tagged = new Blob([blob], { type: 'image/png' })
+    // Clipboard accepts only image/png and image/jpeg; the wire blob's .type
+    // may be a cascade-set opaque, so set the key explicitly.
+    const clipboardMime: 'image/png' | 'image/jpeg' =
+      item.mimeType === 'image/jpeg' ? 'image/jpeg' : 'image/png'
+    const tagged = new Blob([blob], { type: clipboardMime })
     await navigator.clipboard.write([
-      new ClipboardItem({ 'image/png': tagged }),
+      new ClipboardItem({ [clipboardMime]: tagged }),
     ])
     showToast.success(i18n.t('executions:outputs.copy.imageSuccess'))
   } catch (err) {

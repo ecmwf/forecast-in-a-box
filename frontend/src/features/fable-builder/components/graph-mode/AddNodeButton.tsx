@@ -67,11 +67,18 @@ export const AddNodeButton = memo(function ({
   const setBlockConfigurationRestrictions = useFableBuilderStore(
     (state) => state.setBlockConfigurationRestrictions,
   )
+  const blocks = useFableBuilderStore((state) => state.fable.blocks)
   const layoutDirection = useFableBuilderStore((state) => state.layoutDirection)
   const expansionRestrictions = useFableBuilderStore(
     (state) =>
       state.validationState?.blockStates[sourceBlockId]
         ?.possibleExpansionRestrictions ?? EMPTY_EXPANSION_RESTRICTIONS,
+  )
+  const beginHistoryTransaction = useFableBuilderStore(
+    (state) => state.beginHistoryTransaction,
+  )
+  const endHistoryTransaction = useFableBuilderStore(
+    (state) => state.endHistoryTransaction,
   )
 
   // When the backend provides validated expansions, use them. Otherwise build
@@ -155,12 +162,33 @@ export const AddNodeButton = memo(function ({
     factory: BlockFactory,
     restrictions: Record<string, string>,
   ) => {
-    const newBlockId = addBlock(factoryId, factory)
+    // Splice: redirect existing consumers of sourceBlockId through the new
+    // block. Skipped for sinks and 0-input factories (can't slot in).
+    const canSplice = factory.kind !== 'sink' && factory.inputs.length > 0
+    const downstream = canSplice
+      ? Object.entries(blocks).flatMap(([id, block]) =>
+          Object.entries(block.input_ids)
+            .filter(([, parentId]) => parentId === sourceBlockId)
+            .map(([inputName]) => ({ id, inputName })),
+        )
+      : []
 
-    if (factory.inputs.length > 0) {
-      connectBlocks(newBlockId, factory.inputs[0], sourceBlockId)
+    // Group add + connect + splice rewires into a single undo step.
+    beginHistoryTransaction()
+    try {
+      const newBlockId = addBlock(factoryId, factory)
+
+      if (factory.inputs.length > 0) {
+        connectBlocks(newBlockId, factory.inputs[0], sourceBlockId)
+      }
+      setBlockConfigurationRestrictions(newBlockId, restrictions)
+
+      for (const { id, inputName } of downstream) {
+        connectBlocks(id, inputName, newBlockId)
+      }
+    } finally {
+      endHistoryTransaction()
     }
-    setBlockConfigurationRestrictions(newBlockId, restrictions)
 
     setOpen(false)
     setSearch('')
