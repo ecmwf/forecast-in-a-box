@@ -257,7 +257,6 @@ def map_plot_sink_configuration() -> BlockInstance:
                     "domain": "global",
                     "format": "png",
                     "groupby": "step",
-                    "style_schema": "inbuilt://fiab",
                 }
             ),
         ),
@@ -841,7 +840,6 @@ class TestMapPlotSink:
                         "domain": "global",
                         "format": fmt,
                         "groupby": "none",
-                        "style_schema": "inbuilt://fiab",
                     }
                 ),
             ),
@@ -864,7 +862,6 @@ class TestMapPlotSink:
                         "domain": "global",
                         "format": "png",
                         "groupby": "none",
-                        "style_schema": "inbuilt://fiab",
                     }
                 ),
             ),
@@ -885,7 +882,6 @@ class TestMapPlotSink:
                         "domain": "global",
                         "format": "png",
                         "groupby": "none",
-                        "style_schema": "inbuilt://fiab",
                     }
                 ),
             ),
@@ -907,7 +903,6 @@ class TestMapPlotSink:
                         "domain": "global",
                         "format": "png",
                         "groupby": "none",
-                        "style_schema": "inbuilt://fiab",
                     }
                 ),
             ),
@@ -945,7 +940,6 @@ class TestMapPlotSink:
                         "domain": "global",
                         "format": "png",
                         "groupby": groupby,
-                        "style_schema": "inbuilt://fiab",
                     }
                 ),
             ),

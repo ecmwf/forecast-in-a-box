@@ -493,11 +493,11 @@ class MapPlotSink(Sink):
             description="Dimension to create subplots over",
             value_type="enumClosed['valid_datetime', 'step', 'number', 'none']",
         ),
-        ConfigurationOptionId("style_schema"): BlockConfigurationOption(
-            title="Style Schema",
-            description="earthkit-plots schema identifier",
-            value_type="str",
-        ),
+        # ConfigurationOptionId("style_schema"): BlockConfigurationOption(
+        #     title="Style Schema",
+        #     description="earthkit-plots schema identifier",
+        #     value_type="str",
+        # ),
     }
     inputs: list[str] = ["dataset"]
 
@@ -553,7 +553,7 @@ class MapPlotSink(Sink):
                     "domain": block.config_as_str(DOMAIN) or None,
                     "format": block.config_as_str(FORMAT),
                     "groupby": None if groupby == "none" else groupby,
-                    "style_schema": block.config_as_str("style_schema") or "inbuilt://fiab",
+                    # "style_schema": block.config_as_str("style_schema") or "inbuilt://fiab",
                 },
                 metadata={"environment": ["earthkit-plots<1.0.0", "earthkit-regrid<1.0.0"]},
             )
