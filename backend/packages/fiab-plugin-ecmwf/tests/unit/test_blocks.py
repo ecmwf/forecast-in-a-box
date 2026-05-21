@@ -741,9 +741,9 @@ class TestGribSink:
     @pytest.mark.parametrize(
         "filepath, error",
         [
-            ["/path/to/{unknown}.grib2", "Invalid filename: template values in filename must be one of"],
-            ["/path/to/{levelist}.grib2", "Invalid filename: template values in filename must be one of"],
-            ["/path/to/{param}/{step}.grib", "Invalid filepath: directory path can not contain template values"],
+            ["/path/to/[unknown].grib2", "Invalid filename: template values in filename must be one of"],
+            ["/path/to/[levelist].grib2", "Invalid filename: template values in filename must be one of"],
+            ["/path/to/[param]/[step].grib", "Invalid filepath: directory path can not contain template values"],
         ],
     )
     def test_invalid_path(self, ekdsource_output: QubedOutput, filepath: str, error: str) -> None:
@@ -771,9 +771,9 @@ class TestGribSink:
         "filepath, dims",
         [
             ["/path/to/output.grib", {}],
-            ["/path/to/{param}.grib", {"param": 2}],
-            ["/path/to/{param}_{shortName}_{step}.grib", {"param": 2, "step": 3}],
-            ["/path/to/{stepRange}_{number}.grib", {"step": 3, "number": 5}],
+            ["/path/to/[param].grib", {"param": 2}],
+            ["/path/to/[param]_[shortName]_[step].grib", {"param": 2, "step": 3}],
+            ["/path/to/[stepRange]_[number].grib", {"step": 3, "number": 5}],
         ],
     )
     def test_compile(self, ekdsource_output: QubedOutput, ekdsource_action: Action, filepath: str, dims: dict[str, int]) -> None:

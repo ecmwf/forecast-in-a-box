@@ -412,14 +412,14 @@ class GribSink(Sink):
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
         PATH: BlockConfigurationOption(
             title="GRIB Path",
-            description="Filesystem path where the GRIB file should be written",
+            description="Filesystem path where the GRIB file should be written. Filename can contain template values from metadata in [] brackets.",
             value_type="str",
         )
     }
     inputs: list[str] = ["dataset"]
 
     def _find_template_values(cls, path: str) -> list[str]:
-        return re.findall(r"\{(.*?)\}", path)
+        return re.findall(r"\{[.*?]\}", path)
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         input_dataset = inputs.get("dataset")
