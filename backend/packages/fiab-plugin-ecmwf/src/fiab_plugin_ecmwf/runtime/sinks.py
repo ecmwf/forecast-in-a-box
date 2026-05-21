@@ -13,6 +13,6 @@ def write_zarr(fieldlist: earthkit.data.SimpleFieldList, path: str) -> bytes:
 def write_grib(fieldlist: earthkit.data.SimpleFieldList, path: str) -> bytes:
     p = pathlib.Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    formatted_path = path.replace("{", "[").replace("}", "]")
+    formatted_path = path.replace("[", "{").replace("]", "}")
     fieldlist.to_target("file-pattern", formatted_path)
     return path.encode("ascii")
