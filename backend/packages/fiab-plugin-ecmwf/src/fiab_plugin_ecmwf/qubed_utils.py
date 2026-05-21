@@ -115,7 +115,7 @@ def axes(qube: QubedOutput) -> dict[str, set[Any]]:
 
     Usage
     -----
-    >>> output = QubedInstanceOutput(dataqube=Qube.from_datacube({
+    >>> output = QubedOutput(dataqube=Qube.from_datacube({
     ...     'param': ['2t', 'tp'],
     ...     'time': [0, 1, 2],
     ... }))
@@ -138,7 +138,7 @@ def dimensions(qube: QubedOutput) -> set[str]:
 
     Usage
     -----
-    >>> output = QubedInstanceOutput(dataqube=Qube.from_datacube({
+    >>> output = QubedOutput(dataqube=Qube.from_datacube({
     ...     'param': ['2t', 'tp'],
     ...     'time': [0, 1, 2],
     ... }))
@@ -146,6 +146,30 @@ def dimensions(qube: QubedOutput) -> set[str]:
     {'param', 'time'}
     """
     return set(axes(qube).keys())
+
+
+def common_dimensions(qube: QubedOutput) -> set[str]:
+    """Return the list of dimension names present in all nodes of the dataqube.
+
+    Returns
+    -------
+    set[str]
+        A set of dimension names.
+
+    Usage
+    -----
+    >>> output = QubedOutput(
+    ...     dataqube=(Qube.from_datacube({
+    ...         'param': ['2t', 'tp'],
+    ...         'time': [0, 1, 2],
+    ...     }) | Qube.from_datacube({
+    ...         'param': ['msl'],
+    ...     }))
+    ... )
+    >>> common_dimensions(output)
+    {'param'}
+    """
+    return set.intersection(*[set(datacube.keys()) for datacube in qube.dataqube.datacubes()])
 
 
 def contains(qube: QubedOutput, item: Qube | str | dict) -> bool:
