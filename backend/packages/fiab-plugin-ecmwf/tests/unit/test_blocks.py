@@ -971,7 +971,6 @@ class TestMapPlotSink:
                         "format": "png",
                         "groupby": "none",
                         "splitby": splitby,
-                        "style_schema": "inbuilt://fiab",
                     }
                 ),
             ),
