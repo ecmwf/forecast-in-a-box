@@ -18,11 +18,11 @@ from fiab_plugin_ecmwf.blocks import (
     STEP,
     EkdSource,
     EnsembleStatistics,
+    GribSink,
     MapPlotSink,
     SelectDimension,
     TemporalStatistics,
     ZarrSink,
-    GribSink,
 )
 
 blocks: dict[BlockFactoryId, QubedBlockBuilder] = {

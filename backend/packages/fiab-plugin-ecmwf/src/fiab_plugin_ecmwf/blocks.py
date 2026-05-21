@@ -8,9 +8,9 @@
 # nor does it submit to any jurisdiction.
 
 import logging
-from typing import Any, cast
 import os
 import re
+from typing import Any, cast
 
 import numpy as np
 from cascade.low.func import Either
@@ -68,8 +68,8 @@ IFS_REQUEST = {
 }
 
 GRIB_ALIASES = {
-    "shortName": PARAM_DIM,
-    "paramId": PARAM_DIM,
+    "shortName": PARAM,
+    "paramId": PARAM,
     "stepRange": "step",
     "level": "levelist",
 }
@@ -454,8 +454,8 @@ class GribSink(Sink):
         temp_dim = inputs[input_task]._temp_dim()
         action = inputs[input_task].flatten(new_dim=temp_dim, keep_dims=keep_dims, reset_coords=True).concatenate(dim=temp_dim)
         try:
-            if PARAM_DIM in keep_dims:
-                action = action.combine_branches(dim=PARAM_DIM)
+            if PARAM in keep_dims:
+                action = action.combine_branches(dim=PARAM)
             else:
                 action = action.combine_branches(dim=temp_dim).concatenate(dim=temp_dim)
         except:
