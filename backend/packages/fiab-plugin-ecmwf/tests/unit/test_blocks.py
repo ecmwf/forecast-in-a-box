@@ -840,6 +840,8 @@ class TestMapPlotSink:
                         "param": ["2t"],
                         "domain": "global",
                         "format": fmt,
+                        "groupby": "none",
+                        "style_schema": "inbuilt://fiab",
                     }
                 ),
             ),
@@ -931,9 +933,9 @@ class TestMapPlotSink:
         assert isinstance(output, RawOutput)
 
     @pytest.mark.parametrize(
-        "groupby, dims", [["none", {"param": 2, "step": 3, "number": 5}], ["number", {"number": 5}], ["step", {"step": 3}]]
+        "groupby", ["none", "number"]
     )
-    def test_compile_groupby(self, ekdsource_output: QubedOutput, ekdsource_action: Action, groupby: str, dims: dict[str, int]) -> None:
+    def test_compile_groupby(self, ekdsource_output: QubedOutput, ekdsource_action: Action, groupby: str) -> None:
         block = MapPlotSink()
         config = BlockInstance.from_block(
             BlockInstanceBase(
@@ -955,4 +957,4 @@ class TestMapPlotSink:
         action = block.compile(
             inputs={BlockInstanceId("source_output"): ekdsource_action}, block_id=BlockInstanceId("plot"), block=config
         ).get_or_raise()
-        assert action.nodes.dims == dims
+        assert action.nodes.dims == {}

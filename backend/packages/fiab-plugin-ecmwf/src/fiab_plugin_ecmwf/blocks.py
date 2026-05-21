@@ -540,10 +540,7 @@ class MapPlotSink(Sink):
         selected = merged.select({PARAM: params if len(params) > 1 else params[0]})
 
         groupby = block.config_as_str("groupby")
-        if groupby == "none":
-            groupby = None
-        else:
-            selected = selected.flatten(new_dim="temp_dim", keep_dims=[groupby], reset_coords=True).concatenate(dim="temp_dim")
+        selected = selected.flatten(new_dim="temp_dim", reset_coords=True).concatenate(dim="temp_dim")
 
         action = selected.map(
             Payload(
@@ -551,7 +548,7 @@ class MapPlotSink(Sink):
                 kwargs={
                     "domain": block.config_as_str(DOMAIN) or None,
                     "format": block.config_as_str(FORMAT),
-                    "groupby": groupby,
+                    "groupby": None if groupby == "none" else groupby,
                     "style_schema": block.config_as_str("style_schema") or "inbuilt://fiab",
                 },
                 metadata={"environment": ["earthkit-plots<1.0.0", "earthkit-regrid<1.0.0"]},
