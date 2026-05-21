@@ -15,16 +15,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
 import type {
+  CompilationDetailResponse,
   EnvironmentSpecification,
   JobExecuteResponse,
   JobExecutionDetail,
   JobExecutionList,
   JobStatus,
 } from '@/api/types/job.types'
+import { ApiClientError } from '@/api/client'
 import { isTerminalStatus } from '@/api/types/job.types'
 import {
   deleteJob,
   executeJob,
+  getCompilationDetail,
   getJobStatus,
   getJobsStatus,
   restartJob,
@@ -37,6 +40,8 @@ export const jobKeys = {
   status: (jobId: string) => [...jobKeys.all, 'status', jobId] as const,
   list: (page: number, pageSize: number, status?: JobStatus) =>
     [...jobKeys.all, 'list', page, pageSize, status] as const,
+  compilation: (jobId: string) =>
+    [...jobKeys.all, 'compilation', jobId] as const,
 }
 
 export function useJobStatus(jobId: string | undefined) {
@@ -51,6 +56,27 @@ export function useJobStatus(jobId: string | undefined) {
       return status === 'submitted' ? 2000 : 3000
     },
     refetchOnWindowFocus: false,
+  })
+}
+
+/** Compilation detail is server-cached and may be absent for older runs or
+ * after the cache entry expires. 404 is a normal "not available" signal,
+ * not an error: don't retry, and consumers branch on `error.status === 404`. */
+export function useCompilationDetail(
+  jobId: string | undefined,
+  status: JobStatus | undefined,
+) {
+  return useQuery<CompilationDetailResponse>({
+    queryKey: jobKeys.compilation(jobId ?? ''),
+    queryFn: () => getCompilationDetail(jobId!),
+    // Wait for status so we don't fire during the initial load tick.
+    enabled: !!jobId && !!status,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    retry: (count, error) => {
+      if (error instanceof ApiClientError && error.status === 404) return false
+      return count < 2
+    },
   })
 }
 

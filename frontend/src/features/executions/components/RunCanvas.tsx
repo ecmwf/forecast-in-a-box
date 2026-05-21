@@ -42,6 +42,7 @@ import {
 import { layoutNodes } from '@/features/fable-builder/utils/layout-blocks'
 import { BeamEdge } from '@/features/executions/components/BeamEdge'
 import { RunNode } from '@/features/executions/components/RunNode'
+import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -97,6 +98,14 @@ function RunCanvasInner({
   completedBlockIds,
   plannedBlockIds,
 }: RunCanvasProps) {
+  // Primitive selectors (per field) — an object-returning selector would
+  // mint a new reference each render and loop Zustand's Object.is check.
+  const selectedBlockId = useExecutionHoverStore(
+    (state) => state.selectedBlockId,
+  )
+  const setSelectedBlockId = useExecutionHoverStore(
+    (state) => state.setSelectedBlockId,
+  )
   const { t } = useTranslation('executions')
   const [showConfig, setShowConfig] = useState(true)
   const { fitView } = useReactFlow()
@@ -152,12 +161,12 @@ function RunCanvasInner({
   const { layoutedNodes, edges, canvasHeight } = useMemo(() => {
     const nodes = fableToNodes(fable, catalogue)
     const edgeList = fableToEdges(fable, catalogue)
-    // The execution node renders compact (~110px tall when collapsed); dagre's
-    // default nodeHeight=200 + nodeSpacingY=100 over-reserves vertical room.
+    // 130/48 reserves enough vertical room that stacked sinks don't touch,
+    // without leaving the canvas feeling sparse.
     const laid = layoutNodes(nodes, edgeList, {
       direction: 'LR',
-      nodeHeight: 110,
-      nodeSpacingY: 40,
+      nodeHeight: 130,
+      nodeSpacingY: 48,
     })
     const hasPlanInfo = blockProgress.plannedSet.size > 0
     const remapped = edgeList.map((e) => {
@@ -220,6 +229,13 @@ function RunCanvasInner({
             fitView={true}
             fitViewOptions={{ padding: 0.15 }}
             proOptions={{ hideAttribution: true }}
+            onNodeClick={(_event, node) => {
+              // Toggle: click the already-selected block to clear.
+              setSelectedBlockId(selectedBlockId === node.id ? null : node.id)
+            }}
+            onPaneClick={() => {
+              if (selectedBlockId !== null) setSelectedBlockId(null)
+            }}
           >
             <Background
               variant={BackgroundVariant.Dots}

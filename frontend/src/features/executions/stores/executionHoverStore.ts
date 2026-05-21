@@ -13,6 +13,12 @@ import { create } from 'zustand'
 interface ExecutionHoverState {
   hoveredBlockId: string | null
   setHoveredBlockId: (id: string | null) => void
+  /** Cross-panel selection shared between the left RunCanvas and the right
+   * tabs (Outputs, Compilation, Graph). `null` = nothing selected. */
+  selectedBlockId: string | null
+  setSelectedBlockId: (id: string | null) => void
+  /** Call on run change so a stale selection doesn't bleed across runs. */
+  resetExecutionSelection: () => void
 }
 
 export const useExecutionHoverStore = create<ExecutionHoverState>(
@@ -22,12 +28,25 @@ export const useExecutionHoverStore = create<ExecutionHoverState>(
       if (get().hoveredBlockId === id) return
       set({ hoveredBlockId: id })
     },
+    selectedBlockId: null,
+    setSelectedBlockId: (id) => {
+      if (get().selectedBlockId === id) return
+      set({ selectedBlockId: id })
+    },
+    resetExecutionSelection: () => {
+      set({ hoveredBlockId: null, selectedBlockId: null })
+    },
   }),
 )
 
 /** True when this block id is the currently-hovered one. */
 export function useIsBlockHovered(blockId: string): boolean {
   return useExecutionHoverStore((state) => state.hoveredBlockId === blockId)
+}
+
+/** True when this block id is the currently-selected one. */
+export function useIsBlockSelected(blockId: string): boolean {
+  return useExecutionHoverStore((state) => state.selectedBlockId === blockId)
 }
 
 /** Stable enter/leave handlers that set `blockId` on enter and clear on leave.

@@ -14,6 +14,19 @@ import { showToast } from './toast'
 
 const log = createLogger('GlobalError')
 
+/** Browser-emitted notifications that look like errors but are benign.
+ * The two `ResizeObserver loop ...` messages fire when an RO callback
+ * triggers layout work that spans more than one frame — spec-compliant,
+ * not failures. Silencing them keeps the UI free of spurious toasts. */
+function isBenignBrowserNotification(message: string | Event): boolean {
+  const text = typeof message === 'string' ? message : ''
+  return (
+    text.includes(
+      'ResizeObserver loop completed with undelivered notifications',
+    ) || text.includes('ResizeObserver loop limit exceeded')
+  )
+}
+
 /**
  * Extracts a user-friendly message from an error of unknown type.
  */
@@ -45,6 +58,11 @@ export function setupGlobalErrorHandlers(): void {
     colno?: number,
     error?: Error,
   ): boolean => {
+    if (isBenignBrowserNotification(message)) {
+      // Don't log or toast — but still let the browser print to DevTools.
+      return false
+    }
+
     log.error('Uncaught error:', {
       message,
       source,

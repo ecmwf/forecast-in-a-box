@@ -147,6 +147,8 @@ export const API_ENDPOINTS = {
     list: `${API_PREFIX}/run/list`,
     /** GET - Get status of a single execution (query: run_id) */
     get: `${API_PREFIX}/run/get`,
+    /** GET - Get task-level compilation detail (query: run_id, block_id?) */
+    compilationDetail: `${API_PREFIX}/run/getCompilationDetail`,
     /** POST - Restart an execution (body: { run_id, attempt_count }) */
     restart: `${API_PREFIX}/run/restart`,
     /** GET - Get a single output's content (query: run_id, dataset_id) */

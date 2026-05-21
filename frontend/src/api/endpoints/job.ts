@@ -13,6 +13,7 @@
  */
 
 import type {
+  CompilationDetailResponse,
   JobExecuteRequest,
   JobExecuteResponse,
   JobExecutionDetail,
@@ -20,6 +21,7 @@ import type {
   JobStatus,
 } from '@/api/types/job.types'
 import {
+  CompilationDetailResponseSchema,
   JobExecuteResponseSchema,
   JobExecutionDetailSchema,
   JobExecutionListSchema,
@@ -72,6 +74,20 @@ export async function getJobStatus(
   return apiClient.get(API_ENDPOINTS.job.get, {
     params,
     schema: JobExecutionDetailSchema,
+  })
+}
+
+export async function getCompilationDetail(
+  runId: string,
+  blockId?: string,
+): Promise<CompilationDetailResponse> {
+  const params: Record<string, string> = { run_id: runId }
+  if (blockId != null) {
+    params.block_id = blockId
+  }
+  return apiClient.get(API_ENDPOINTS.job.compilationDetail, {
+    params,
+    schema: CompilationDetailResponseSchema,
   })
 }
 

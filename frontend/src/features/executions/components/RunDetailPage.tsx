@@ -14,17 +14,27 @@
  * Job detail page with status header, execution canvas, and tabbed panels.
  */
 
-import { useCallback, useState } from 'react'
-import { ArrowLeft, FileJson, Package, ScrollText } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  ArrowLeft,
+  FileJson,
+  Network,
+  Package,
+  ScrollText,
+  Share2,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { RunCanvas } from './RunCanvas'
+import { CompilationForceGraph } from './CompilationForceGraph'
+import { CompilationPanel } from './CompilationPanel'
 import { RunErrorBanner } from './RunErrorBanner'
 import { RunStatusHeader } from './RunStatusHeader'
 import { LogsPanel } from './LogsPanel'
 import { OutputsPanel } from './OutputsPanel'
 import { SpecificationPanel } from './SpecificationPanel'
 import { RunMetadataDialog } from '@/features/journal/components/RunMetadataDialog'
+import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
 import { showToast } from '@/lib/toast'
 import { ApiClientError } from '@/api/client'
 import { useBlockCatalogue, useFableRetrieve } from '@/api/hooks/useFable'
@@ -64,6 +74,15 @@ export function RunDetailPage() {
 
   const jobData = statusQuery.data
   const { data: fableData } = useFableRetrieve(jobData?.blueprint_id)
+
+  // Cross-panel selection is per-run; clear it on mount and on jobId change.
+  const resetExecutionSelection = useExecutionHoverStore(
+    (state) => state.resetExecutionSelection,
+  )
+  useEffect(() => {
+    resetExecutionSelection()
+    return () => resetExecutionSelection()
+  }, [jobId, resetExecutionSelection])
 
   const layoutMode = useUiStore((state) => state.layoutMode)
   const { data: catalogue } = useBlockCatalogue()
@@ -233,7 +252,7 @@ export function RunDetailPage() {
           >
             {/* Sticky for the mobile single-scroll layout; no-op at wide.
                 Default `bg-muted` is the sticky background — don't override. */}
-            <TabsList className="sticky top-0 z-10 grid w-full shrink-0 grid-cols-3">
+            <TabsList className="sticky top-0 z-10 grid w-full shrink-0 grid-cols-5">
               <TabsTrigger value="outputs">
                 <Package className="h-4 w-4" />
                 {t('tabs.outputs')}
@@ -241,6 +260,14 @@ export function RunDetailPage() {
               <TabsTrigger value="logs">
                 <ScrollText className="h-4 w-4" />
                 {t('tabs.logs')}
+              </TabsTrigger>
+              <TabsTrigger value="compilation">
+                <Network className="h-4 w-4" />
+                {t('tabs.compilation')}
+              </TabsTrigger>
+              <TabsTrigger value="graph">
+                <Share2 className="h-4 w-4" />
+                {t('tabs.graph')}
               </TabsTrigger>
               <TabsTrigger value="specification">
                 <FileJson className="h-4 w-4" />
@@ -266,6 +293,22 @@ export function RunDetailPage() {
             </TabsContent>
             <TabsContent value="logs" className={WIDE_TAB_CONTENT}>
               <LogsPanel jobId={jobId} status={jobData.status} />
+            </TabsContent>
+            <TabsContent value="compilation" className={WIDE_TAB_CONTENT}>
+              <CompilationPanel
+                jobId={jobId}
+                status={jobData.status}
+                fable={fableData?.builder}
+                catalogue={catalogue}
+              />
+            </TabsContent>
+            <TabsContent value="graph" className={WIDE_TAB_CONTENT}>
+              <CompilationForceGraph
+                jobId={jobId}
+                status={jobData.status}
+                fable={fableData?.builder}
+                catalogue={catalogue}
+              />
             </TabsContent>
             <TabsContent value="specification" className={WIDE_TAB_CONTENT}>
               <SpecificationPanel fableSnapshot={fableData?.builder} />
