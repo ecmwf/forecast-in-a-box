@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { AlertCircle, Link2, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
@@ -147,6 +147,14 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
     [blockErrors, missingGlyphs, fieldErrorMessages],
   )
 
+  // Cache last-known restrictions per block so the field doesn't flash to
+  // its catalogue `value_type` during the validation-flight gap (~300 ms,
+  // validationState=null between an edit and the next /blueprint/expand).
+  // Hook runs unconditionally — must precede the early-return below.
+  const lastConfigRestrictionsRef = useRef<
+    Record<string, Record<string, string>>
+  >({})
+
   if (!selectedBlock || !factory) {
     return (
       <div className="flex h-full flex-col items-center justify-center p-6 text-center">
@@ -160,13 +168,25 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
 
   const metadata = BLOCK_KIND_METADATA[factory.kind]
   const IconComponent = getBlockKindIcon(factory.kind)
+  // Live when validationState is present; fall back to cache during the gap.
+  const liveConfigRestrictions = validationState
+    ? getBlockConfigurationRestrictions(
+        fable,
+        validationState,
+        selectedBlockId ?? '',
+      )
+    : null
+  if (liveConfigRestrictions !== null && selectedBlockId) {
+    lastConfigRestrictionsRef.current[selectedBlockId] = liveConfigRestrictions
+  }
+  const cachedConfigRestrictions = selectedBlockId
+    ? (lastConfigRestrictionsRef.current[selectedBlockId] as
+        | Record<string, string>
+        | undefined)
+    : undefined
   const configRestrictions = {
     ...(pendingRestrictions ?? {}),
-    ...getBlockConfigurationRestrictions(
-      fable,
-      validationState,
-      selectedBlockId ?? '',
-    ),
+    ...(liveConfigRestrictions ?? cachedConfigRestrictions ?? {}),
   }
   const configOptions = Object.entries(factory.configuration_options)
   const inputs = factory.inputs

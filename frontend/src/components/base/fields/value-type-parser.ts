@@ -21,9 +21,14 @@
  * - date-iso8601 → date input
  * - list[str] → tag input (badges with add/remove)
  * - list[int] → tag input (badges with add/remove)
- * - enum['a','b','c'] → select dropdown
- * - enumClosed['a','b','c'] → select dropdown
+ * - enum['a','b','c'] → select dropdown (open: suggestions, accept any string)
+ * - enumClosed['a','b','c'] → select dropdown (closed: must be one of the listed)
+ * - list[enumClosed[a,b,c]] → multi-select restricted to the listed items
+ * - list[enum[a,b,c]] → multi-select with suggestions, accept any string
  * - optional[T] → same widget as T, with optional=true flag
+ *
+ * `enum`/`enumList` carry `closed: boolean` (closed vs open) for forward
+ * compat; no first-party factory emits the open form yet.
  */
 
 import { getAppTimeZone, todayInZone } from '@/lib/datetime'
@@ -36,8 +41,20 @@ export type ParsedValueType =
   | { type: 'date'; optional?: boolean }
   | { type: 'list'; itemType: 'string'; optional?: boolean }
   | { type: 'list'; itemType: 'int'; optional?: boolean }
-  | { type: 'enum'; options: Array<string>; optional?: boolean }
-  | { type: 'enumList'; options: Array<string>; optional?: boolean }
+  | {
+      type: 'enum'
+      options: Array<string>
+      /** `enumClosed[…]` ⇒ true (must be in `options`); `enum[…]` ⇒ false. */
+      closed: boolean
+      optional?: boolean
+    }
+  | {
+      type: 'enumList'
+      options: Array<string>
+      /** `list[enumClosed[…]]` ⇒ true; `list[enum[…]]` ⇒ false. */
+      closed: boolean
+      optional?: boolean
+    }
   | { type: 'unknown'; raw: string; optional?: boolean }
 
 /**
@@ -93,19 +110,26 @@ export function parseValueType(valueType: string | undefined): ParsedValueType {
       return { type: 'list', itemType: 'int' }
     }
     if (itemValueType.type === 'enum') {
-      return { type: 'enumList', options: itemValueType.options }
+      return {
+        type: 'enumList',
+        options: itemValueType.options,
+        closed: itemValueType.closed,
+      }
     }
-    // For now, only support list[str], list[int], and list[enumClosed[...]]
+    // Supported: list[str], list[int], list[enum[…]], list[enumClosed[…]].
     return { type: 'unknown', raw: trimmed }
   }
 
   // Enum type: enum[...] / enumClosed[...] with single or double quotes
-  const enumMatch = trimmed.match(/^(?:enum|enumClosed)\[(.+)\]$/i)
+  const enumMatch = trimmed.match(/^(enum|enumClosed)\[(.+)\]$/i)
   if (enumMatch) {
-    const optionsStr = enumMatch[1]
-    const options = parseEnumOptions(optionsStr)
+    const options = parseEnumOptions(enumMatch[2])
     if (options.length > 0) {
-      return { type: 'enum', options }
+      return {
+        type: 'enum',
+        options,
+        closed: enumMatch[1].toLowerCase() === 'enumclosed',
+      }
     }
   }
 

@@ -305,6 +305,9 @@ export interface BlockValidationState {
   errors: Array<string>
   hasErrors: boolean
   possibleExpansions: Array<PluginBlockFactoryId>
+  /** Per-child-factory config restrictions. Outer key
+   * `factoryIdToKey(childId)`; inner maps option id → FableType (e.g.
+   * `mapPlotSink → { param: "list[enumClosed[…]]" }`). */
   possibleExpansionRestrictions: Record<string, Record<string, string>>
   /** Unknown glyph names per option, from /blueprint/expand. */
   missingGlyphs: Record<string, Array<string>>
