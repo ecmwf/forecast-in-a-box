@@ -23,7 +23,7 @@ const HANDLE_PADDING = 20
 const ACTIVE_CLASS = 'dnd-active'
 
 /** A concrete connection a drop would create against an existing node. */
-interface DropConnection {
+export interface DropConnection {
   nodeId: string
   /** The existing node's handle that gets wired. */
   handleId: string
@@ -31,6 +31,36 @@ interface DropConnection {
   isInput: boolean
   /** That handle's DOM element, for the hover highlight (may be null). */
   handleEl: Element | null
+}
+
+/** Rewires needed around a newly-inserted block:
+ *  - `downstream`: prior consumers of `conn.nodeId` (output drop), to route
+ *    through the new block. Empty for sinks — they have no output. Drop
+ *    becomes a sibling instead of a splice.
+ *  - `priorParent`: the input's prior parent (input drop), to feed the new
+ *    block instead of being orphaned by the connect. */
+export function computeSpliceContext(
+  conn: DropConnection,
+  factory: BlockFactory,
+  fable: FableBuilderV1,
+): {
+  downstream: Array<{ id: string; inputName: string }>
+  priorParent: string | null
+} {
+  const downstream: Array<{ id: string; inputName: string }> = []
+  let priorParent: string | null = null
+  if (!conn.isInput && factory.kind !== 'sink' && factory.inputs.length > 0) {
+    for (const [id, block] of Object.entries(fable.blocks)) {
+      for (const [inputName, parentId] of Object.entries(block.input_ids)) {
+        if (parentId === conn.nodeId) downstream.push({ id, inputName })
+      }
+    }
+  } else if (conn.isInput && factory.inputs.length > 0) {
+    const block = fable.blocks[conn.nodeId]
+    const raw = block.input_ids[conn.handleId] as string | undefined
+    priorParent = raw ?? null
+  }
+  return { downstream, priorParent }
 }
 
 /** Whether a dragged factory fits a handle: an input handle needs it to have
@@ -202,27 +232,9 @@ export function useSidebarBlockDrop(catalogue: BlockFactoryCatalogue) {
       )
       const dragged = draggedFactory
 
-      // Splice context, captured pre-insert:
-      // - Output drop: prior consumers of conn.nodeId rewire through new.
-      // - Input drop: the input's prior parent becomes new's upstream.
-      const downstream: Array<{ id: string; inputName: string }> = []
-      let priorParent: string | null = null
-      if (conn) {
-        if (!conn.isInput && dragged.factory.inputs.length > 0) {
-          for (const [id, block] of Object.entries(fable.blocks)) {
-            for (const [inputName, parentId] of Object.entries(
-              block.input_ids,
-            )) {
-              if (parentId === conn.nodeId) downstream.push({ id, inputName })
-            }
-          }
-        } else if (conn.isInput && dragged.factory.inputs.length > 0) {
-          // Cast to surface runtime undefined (no noUncheckedIndexedAccess).
-          const block = fable.blocks[conn.nodeId]
-          const raw = block.input_ids[conn.handleId] as string | undefined
-          priorParent = raw ?? null
-        }
-      }
+      const { downstream, priorParent } = conn
+        ? computeSpliceContext(conn, dragged.factory, fable)
+        : { downstream: [], priorParent: null }
 
       // Group add + connect + splice rewires into a single undo step.
       beginHistoryTransaction()
