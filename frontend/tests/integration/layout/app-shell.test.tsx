@@ -67,9 +67,6 @@ describe('Layout', () => {
       await expect
         .element(screen.getByAltText('Destination Earth'))
         .toBeVisible()
-      await expect
-        .element(screen.getByAltText('World Meteorological Organization'))
-        .toBeVisible()
     })
   })
 

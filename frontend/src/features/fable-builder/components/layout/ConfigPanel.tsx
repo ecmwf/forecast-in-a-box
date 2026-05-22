@@ -137,7 +137,7 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
   const fieldErrorMessages = useFieldErrorMessages()
   // Hook must be called unconditionally — guard inside rather than early-
   // returning above it.
-  const mappedErrors = useMemo(
+  const liveMappedErrors = useMemo(
     () =>
       mapBlockErrorsToFields(
         blockErrors ?? [],
@@ -154,6 +154,11 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
   const lastConfigRestrictionsRef = useRef<
     Record<string, Record<string, string>>
   >({})
+  // Same caching for mapped errors — otherwise they blank during the gap
+  // and the form jumps up and back when the next response arrives.
+  const lastMappedErrorsRef = useRef<Record<string, typeof liveMappedErrors>>(
+    {},
+  )
 
   if (!selectedBlock || !factory) {
     return (
@@ -188,6 +193,13 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
     ...(pendingRestrictions ?? {}),
     ...(liveConfigRestrictions ?? cachedConfigRestrictions ?? {}),
   }
+  if (validationState && selectedBlockId) {
+    lastMappedErrorsRef.current[selectedBlockId] = liveMappedErrors
+  }
+  const mappedErrors =
+    validationState || !selectedBlockId
+      ? liveMappedErrors
+      : (lastMappedErrorsRef.current[selectedBlockId] ?? liveMappedErrors)
   const configOptions = Object.entries(factory.configuration_options)
   const inputs = factory.inputs
 

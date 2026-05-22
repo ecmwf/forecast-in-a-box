@@ -95,8 +95,7 @@
     "help": "Help",
     "about": "About",
     "logoEcmwf": "ECMWF",
-    "logoDestinationEarth": "Destination Earth",
-    "logoWmo": "World Meteorological Organization"
+    "logoDestinationEarth": "Destination Earth"
   },
   "userMenu": {
     "dashboard": "Dashboard",

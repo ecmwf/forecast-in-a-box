@@ -58,12 +58,9 @@ export const ForecastRunRow = memo(function ({
   const startedAt =
     formatInZone(startedInstant, timeZone, 'yyyy-MM-dd HH:mm') +
     ` ${timeZoneOffsetLabel(timeZone, startedInstant)}`
+  const startedDate = formatInZone(startedInstant, timeZone, 'yyyy-MM-dd')
   const runIdLabel =
     run.runId.length > 12 ? `${run.runId.slice(0, 12)}...` : run.runId
-  const meta = [
-    t('item.started', { time: startedAt }),
-    t('item.outputs', { count: run.outputCount }),
-  ].join(' · ')
   const modelLabel = run.modelLabel
 
   return (
@@ -99,8 +96,22 @@ export const ForecastRunRow = memo(function ({
               {run.displayDescription}
             </p>
           )}
-          <div className="mb-2 truncate text-sm text-muted-foreground">
-            {meta}
+          <div className="mb-2 flex flex-wrap items-center gap-x-1.5 text-sm text-muted-foreground">
+            <span>{t('item.startedLabel')}</span>
+            {onAddFacet ? (
+              <button
+                type="button"
+                onClick={() => onAddFacet({ key: 'date', value: startedDate })}
+                aria-label={t('item.filterByDate')}
+                className="rounded transition-colors hover:text-foreground"
+              >
+                {startedAt}
+              </button>
+            ) : (
+              <span>{startedAt}</span>
+            )}
+            <span aria-hidden>·</span>
+            <span>{t('item.outputs', { count: run.outputCount })}</span>
           </div>
           <div className="flex flex-wrap items-start gap-2">
             {run.scheduleName && (

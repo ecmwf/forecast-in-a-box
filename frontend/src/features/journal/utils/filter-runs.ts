@@ -28,6 +28,11 @@ function matchesFacet(
   if (key === 'output') {
     return run.outputKinds.some((kind) => kind.toLowerCase().includes(needle))
   }
+  if (key === 'date') {
+    // Naive-ISO YYYY-MM-DD prefix; matches the displayed date for users in
+    // zones near the server (corner case at the local midnight boundary).
+    return run.createdAt.slice(0, 10).includes(needle)
+  }
   return run.tags.some((tag) => tag.toLowerCase().includes(needle))
 }
 
@@ -44,13 +49,15 @@ export function filterRuns(
   })
 
   return applyFacetQuery(byTab, query, {
-    supportedKeys: ['model', 'output', 'tag'],
+    supportedKeys: ['model', 'output', 'tag', 'date'],
     matchFacet: matchesFacet,
     matchText: (run, text) =>
       run.displayName.toLowerCase().includes(text) ||
       (run.displayDescription?.toLowerCase().includes(text) ?? false) ||
       run.runId.toLowerCase().includes(text) ||
       (run.modelLabel?.toLowerCase().includes(text) ?? false) ||
-      run.tags.some((tag) => tag.toLowerCase().includes(text)),
+      run.tags.some((tag) => tag.toLowerCase().includes(text)) ||
+      // Plain `2026-05-22` matches without the `date:` prefix too.
+      run.createdAt.slice(0, 10).includes(text),
   })
 }
