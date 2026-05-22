@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   AlertCircle,
   Bookmark,
@@ -119,9 +119,18 @@ export function BlockInstanceCard({
 
   const instance = fable.blocks[instanceId]
   const factory = getFactory(catalogue, instance.factory_id)
+  // Cache restrictions and mapped errors so the form doesn't blank during
+  // the validation-flight gap (validationState=null between edits).
+  const lastRestrictionsRef = useRef<Record<string, string>>({})
+  const liveConfigRestrictions = validationState
+    ? getBlockConfigurationRestrictions(fable, validationState, instanceId)
+    : null
+  if (liveConfigRestrictions) {
+    lastRestrictionsRef.current = liveConfigRestrictions
+  }
   const configRestrictions = {
     ...pendingRestrictions,
-    ...getBlockConfigurationRestrictions(fable, validationState, instanceId),
+    ...(liveConfigRestrictions ?? lastRestrictionsRef.current),
   }
 
   // Compute available sources that can be connected to this block's inputs
@@ -146,10 +155,17 @@ export function BlockInstanceCard({
   const errors = blockValidation?.errors ?? []
   const missingGlyphs = blockValidation?.missingGlyphs ?? {}
   const fieldErrorMessages = useFieldErrorMessages()
-  const mappedErrors = useMemo(
+  const liveMappedErrors = useMemo(
     () => mapBlockErrorsToFields(errors, missingGlyphs, fieldErrorMessages),
     [errors, missingGlyphs, fieldErrorMessages],
   )
+  const lastMappedErrorsRef = useRef(liveMappedErrors)
+  if (validationState) {
+    lastMappedErrorsRef.current = liveMappedErrors
+  }
+  const mappedErrors = validationState
+    ? liveMappedErrors
+    : lastMappedErrorsRef.current
 
   if (!factory) {
     return null
