@@ -121,8 +121,9 @@ function ChipRemove({
 /** Map a facet key to its statically-known i18n label key. */
 function facetLabelKey(
   key: FacetKey,
-): 'facet.model' | 'facet.output' | 'facet.tag' {
+): 'facet.model' | 'facet.output' | 'facet.tag' | 'facet.date' {
   if (key === 'model') return 'facet.model'
   if (key === 'output') return 'facet.output'
+  if (key === 'date') return 'facet.date'
   return 'facet.tag'
 }

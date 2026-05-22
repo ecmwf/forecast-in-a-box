@@ -39,7 +39,8 @@
   "facet": {
     "model": "Model",
     "output": "Output",
-    "tag": "Tag"
+    "tag": "Tag",
+    "date": "Date"
   },
   "attempts": {
     "label": "{{count}} attempts",
@@ -54,7 +55,8 @@
     "unknown": "Unknown"
   },
   "item": {
-    "started": "Started: {{time}}",
+    "startedLabel": "Started:",
+    "filterByDate": "Filter by this date",
     "outputs_one": "{{count}} output",
     "outputs_other": "{{count}} outputs",
     "untitled": "Untitled forecast",
