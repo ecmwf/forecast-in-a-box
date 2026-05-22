@@ -957,7 +957,30 @@ class TestMapPlotSink:
         ).get_or_raise()
         assert action.nodes.dims == {}
 
-    @pytest.mark.parametrize("splitby, dims", [[[], {}], [["number"], {"number": 5}], [["number", "step"], {"number": 5, "step": 3}]])
+    def test_validate_splitby(self, ekdsource_output: QubedOutput) -> None:
+        block = MapPlotSink()
+        config = BlockInstance.from_block(
+            BlockInstanceBase(
+                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),  # type: ignore
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config(
+                    {
+                        "param": ["2t", "msl"],
+                        "domain": "global",
+                        "format": "png",
+                        "groupby": "none",
+                        "splitby": ["none", "param"],
+                    }
+                ),
+            ),
+            MapPlotSink.configuration_options,
+        )
+        with pytest.raises(Exception, match="Invalid splitby value: if none is selected, no other dimensions can be present"):
+            block.validate(block=config, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
+
+    @pytest.mark.parametrize(
+        "splitby, dims", [[[], {}], [["none"], {}], [["number"], {"number": 5}], [["number", "step"], {"number": 5, "step": 3}]]
+    )
     def test_compile_splitby(self, ekdsource_output: QubedOutput, ekdsource_action: Action, splitby: str, dims: dict[str, int]) -> None:
         block = MapPlotSink()
         config = BlockInstance.from_block(

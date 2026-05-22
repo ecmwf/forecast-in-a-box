@@ -526,6 +526,10 @@ class MapPlotSink(Sink):
                 f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
             )
 
+        splitby_value = block.config_as_list(SPLITBY, str)
+        if "none" in splitby_value and len(splitby_value) != 1:
+            return Either.error(f"Invalid splitby value: if none is selected, no other dimensions can be present")
+
         fmt = block.config_as_str(FORMAT)
         mime_type = PLOT_FORMAT_TO_MIME.get(fmt)
         if mime_type is None:
@@ -542,6 +546,8 @@ class MapPlotSink(Sink):
         params = block.config_as_list(PARAM, str, allow_empty=False)
         groupby = block.config_as_str(GROUPBY)
         splitby = block.config_as_list(SPLITBY, str, allow_empty=True)
+        if "none" in splitby:
+            splitby = []
 
         selected = (
             inputs[input_task]
@@ -572,7 +578,7 @@ class MapPlotSink(Sink):
         if param_values:
             restrict[PARAM] = ListType(ClosedEnumType(sorted(param_values)))
 
-        restrict[SPLITBY] = ListType(ClosedEnumType(sorted(common_dimensions(other))))
+        restrict[SPLITBY] = ListType(ClosedEnumType(sorted(common_dimensions(other)) + ["none"]))
         return restrict
 
     def intersect(self, other: QubedOutput) -> bool:
