@@ -8,11 +8,14 @@
 # nor does it submit to any jurisdiction.
 
 import logging
+import os
+import re
 from typing import Any, cast
 
 import numpy as np
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action, Payload, from_source
+from earthkit.workflows.nodetree import nodetree_dimensions, nodetree_new_dimension
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
@@ -63,6 +66,13 @@ IFS_REQUEST = {
     "step": list(range(0, 61, 6)),
     "type": "pf",
     "number": list(range(1, 6)),
+}
+
+GRIB_ALIASES = {
+    "shortName": PARAM,
+    "paramId": PARAM,
+    "stepRange": "step",
+    "level": "levelist",
 }
 
 logger = logging.getLogger(__name__)
@@ -282,7 +292,7 @@ class ZarrSink(Sink):
     inputs: list[str] = ["dataset"]
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        return Either.ok(NoOutput())
+        return Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain"))
 
     def compile(
         self,
@@ -292,11 +302,18 @@ class ZarrSink(Sink):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
 
-        action = inputs[input_task].map(
-            Payload(
-                "fiab_plugin_ecmwf.runtime.sinks.write_zarr",
-                kwargs={"path": block.config_as_str(PATH)},
-                metadata={"environment": ["zarr"]},
+        temp_dim = nodetree_new_dimension(inputs[input_task].nodes)
+        action = (
+            inputs[input_task]
+            .flatten(new_dim=temp_dim, reset_coords=True)
+            .combine_branches(dim=temp_dim)
+            .concatenate(dim=temp_dim)
+            .map(
+                Payload(
+                    "fiab_plugin_ecmwf.runtime.sinks.write_zarr",
+                    kwargs={"path": block.config_as_str(PATH)},
+                    metadata={"environment": ["zarr"]},
+                )
             )
         )
         return Either.ok(action)
@@ -388,6 +405,68 @@ class SelectDimension(Transform):
 
     def intersect(self, other: QubedOutput) -> bool:
         return contains(other, self.option_id)
+
+
+class GribSink(Sink):
+    title: str = "GRIB Sink"
+    description: str = "Write dataset to a GRIB file on the local filesystem"
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
+        PATH: BlockConfigurationOption(
+            title="GRIB Path",
+            description="Filesystem path where the GRIB file should be written. Filename can contain template values from metadata in [] brackets.",
+            value_type="str",
+        )
+    }
+    inputs: list[str] = ["dataset"]
+
+    def _find_template_values(cls, path: str) -> list[str]:
+        return re.findall(r"\[(.*?)\]", path)
+
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_dataset = inputs.get("dataset")
+        if not isinstance(input_dataset, QubedOutput):
+            actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
+            return Either.error(f"Unsupported input type for 'dataset': expected QubedOutput, got {actual_type}")
+        path = block.config_as_str(PATH)
+        dirname = os.path.dirname(path)
+        if len(self._find_template_values(dirname)) != 0:
+            return Either.error(f"Invalid filepath: directory path can not contain template values")
+        return Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain"))
+
+    def compile(
+        self,
+        inputs: ActionLookup,
+        block_id: BlockInstanceId,
+        block: BlockInstance,
+    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_task = block.input_ids["dataset"]
+        path_dims = self._find_template_values(block.config_as_str(PATH))
+        action_dims = nodetree_dimensions(inputs[input_task].nodes)
+        keep_dims = []
+        for dim in path_dims:
+            mapped_dim = GRIB_ALIASES.get(dim, dim)
+            if mapped_dim in action_dims and mapped_dim not in keep_dims:
+                keep_dims.append(mapped_dim)
+        temp_dim = nodetree_new_dimension(inputs[input_task].nodes)
+        action = inputs[input_task].flatten(new_dim=temp_dim, keep_dims=keep_dims, reset_coords=True).concatenate(dim=temp_dim)
+        try:
+            if PARAM in keep_dims:
+                action = action.combine_branches(dim=PARAM)
+            else:
+                action = action.combine_branches(dim=temp_dim).concatenate(dim=temp_dim)
+        except:
+            pass
+
+        action = action.map(
+            Payload(
+                "fiab_plugin_ecmwf.runtime.sinks.write_grib",
+                kwargs={"path": block.config_as_str(PATH)},
+            )
+        )
+        return Either.ok(action)
+
+    def intersect(self, other: QubedOutput) -> bool:
+        return bool(dimensions(other))
 
 
 class MapPlotSink(Sink):
