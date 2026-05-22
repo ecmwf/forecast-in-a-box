@@ -14,7 +14,7 @@
  * Job detail page with status header, execution canvas, and tabbed panels.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import {
   ArrowLeft,
   FileJson,
@@ -87,6 +87,12 @@ export function RunDetailPage() {
   const layoutMode = useUiStore((state) => state.layoutMode)
   const { data: catalogue } = useBlockCatalogue()
 
+  // Sync scroll-to-top before paint — a tall /configure scroll position
+  // otherwise clamps into the shorter loading layout and exposes the footer.
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0)
+  }, [jobId])
+
   const handleRestart = () => {
     restartMutation.mutate(
       { runId: jobId, attemptCount: jobData!.attempt_count },
@@ -140,8 +146,16 @@ export function RunDetailPage() {
   }
 
   if (statusQuery.isLoading) {
+    // min-h-screen (not the loaded state's smaller min) so the spinner area
+    // fills the viewport and the navy footer stays below the fold during the
+    // submit → detail-page transition.
     return (
-      <div className="flex h-64 items-center justify-center">
+      <div
+        className={cn(
+          'mx-auto flex min-h-screen flex-col items-center justify-center px-4 py-8 sm:px-6 lg:px-8',
+          layoutMode === 'boxed' ? 'max-w-7xl' : 'max-w-none',
+        )}
+      >
         <LoadingSpinner />
       </div>
     )
