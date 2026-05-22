@@ -74,12 +74,12 @@ def _is_bind_failure(exc: subprocess.CalledProcessError) -> bool:
     return "cannot listen to port" in stderr or "address already in use" in stderr
 
 
-def _render_remote_command(command: RemoteCommand) -> str:
+def _render_remote_command(command: RemoteCommand, output_path: str = "/dev/null") -> str:
     if isinstance(command, str):
         rendered = command
     else:
         rendered = shlex.join(command)
-    return f"nohup {rendered} >/dev/null 2>&1 < /dev/null &"
+    return f"nohup bash --login -c '{rendered}' > {output_path} 2>&1 < /dev/null &"
 
 
 @dataclass(frozen=True, slots=True)
@@ -185,18 +185,19 @@ def status(handle: ConnectionHandle) -> bool:
     return result.returncode == 0
 
 
-def execute(handle: ConnectionHandle, command: RemoteCommand) -> None:
+def execute(handle: ConnectionHandle, command: RemoteCommand, output_path: str = "/dev/null") -> subprocess.CompletedProcess[str]:
     """Launch a remote command over the existing SSH control socket."""
 
-    remote_command = _render_remote_command(command)
-    _ssh_run([*_ssh_base_args(handle), handle.host, remote_command])
+    remote_command = _render_remote_command(command, output_path)
+    return _ssh_run([*_ssh_base_args(handle), handle.host, remote_command])
 
 
-def stop(handle: ConnectionHandle) -> None:
+def stop(handle: ConnectionHandle) -> subprocess.CompletedProcess[str]:
     """Terminate an SSH master connection and remove it from the registry."""
 
-    _ssh_run([*_ssh_base_args(handle), "-O", "exit", handle.host])
+    rv = _ssh_run([*_ssh_base_args(handle), "-O", "exit", handle.host])
     registry.discard(handle)
+    return rv
 
 
 def shutdown() -> None:

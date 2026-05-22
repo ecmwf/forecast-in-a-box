@@ -220,11 +220,11 @@ async def _build_run_logs_response(cascade_job_id: str, db_entity_ser: bytes) ->
             with zipfile.ZipFile(buffer, "a", zipfile.ZIP_DEFLATED) as zf:
                 zf.writestr("db_entity.json", db_entity_ser)
                 zf.writestr("gw_state.json", orjson.dumps(gw_state))
-                logs_directory = get_logs_directory()
-                if not logs_directory:
-                    zf.writestr("logs_directory.error.txt", "logs directory missing")
+                maybe_logs_directory = get_logs_directory()
+                if maybe_logs_directory.t is None:
+                    zf.writestr("logs_directory.error.txt", "logs directory missing: {maybe_logs_directory.e}")
                 else:
-                    p = pathlib.Path(logs_directory.name)
+                    p = pathlib.Path(maybe_logs_directory.t.name)
                     f = ""
                     try:
                         for f in os.listdir(p):
