@@ -32,7 +32,7 @@ def test_setup_registers_tunnel_and_builds_master_command(
     monkeypatch: pytest.MonkeyPatch,
     ssh_calls: list[tuple[list[str], bool]],
 ) -> None:
-    monkeypatch.setattr(tunnel, "_claim_free_port", lambda: 21001)
+    monkeypatch.setattr(tunnel, "claim_free_port", lambda: 21001)
     monkeypatch.setattr(tunnel, "_claim_remote_port", lambda: 31001)
     monkeypatch.setattr(tunnel, "_new_control_path", lambda: "/tmp/forecastbox-ssh/test.sock")
 
@@ -83,7 +83,7 @@ def test_setup_retries_on_bind_failure(
     control_paths = iter(["/tmp/forecastbox-ssh/a.sock", "/tmp/forecastbox-ssh/b.sock"])
     ssh_calls: list[list[str]] = []
 
-    monkeypatch.setattr(tunnel, "_claim_free_port", lambda: next(local_ports))
+    monkeypatch.setattr(tunnel, "claim_free_port", lambda: next(local_ports))
     monkeypatch.setattr(tunnel, "_claim_remote_port", lambda: next(remote_ports))
     monkeypatch.setattr(tunnel, "_new_control_path", lambda: next(control_paths))
 

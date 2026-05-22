@@ -11,7 +11,6 @@
 
 import logging
 import os
-import socket
 import threading
 import urllib.parse
 from dataclasses import dataclass
@@ -22,6 +21,7 @@ from cascade.deployment.logging import LoggingConfig
 from cascade.executor import platform
 from cascade.gateway import api, client
 from cascade.gateway.server import main_enp
+from cascade.low.func import assert_never
 
 from forecastbox.domain.gateway.exceptions import (
     GatewayAlreadyRunning,
@@ -57,11 +57,6 @@ GatewayConnection = LocalProcess | RemoteTunnel | RemoteUrl
 GatewayConnectionType = type[LocalProcess] | type[RemoteTunnel] | type[RemoteUrl]
 
 
-class GatewayConnectionManager:
-    lock: threading.Lock = threading.Lock()
-    gateway_connection: GatewayConnection | None = None
-
-
 def config2gatewayMethod() -> GatewayConnectionType:
     parsed_url = urllib.parse.urlparse(config.cascade.cascade_url)
     if not config.cascade.spawn_gateway:
@@ -78,6 +73,11 @@ def _initial_connection() -> GatewayConnection | None:
     return None
 
 
+class GatewayConnectionManager:
+    lock: threading.Lock = threading.Lock()
+    gateway_connection: GatewayConnection | None = _initial_connection()
+
+
 def _remote_tunnel_target_and_port() -> tuple[str, int]:
     parsed_url = urllib.parse.urlparse(config.cascade.cascade_url)
     if parsed_url.hostname is None or parsed_url.port is None:
@@ -86,17 +86,7 @@ def _remote_tunnel_target_and_port() -> tuple[str, int]:
     return host, parsed_url.port
 
 
-def _random_local_gateway_url() -> str:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        port = int(sock.getsockname()[1])
-    return f"tcp://localhost:{port}"
-
-
-GatewayConnectionManager.gateway_connection = _initial_connection()
-
-
-def launch_cascade(cascade_url: str, log_base: str | None, max_concurrent_jobs: int | None) -> None:
+def _local_process_entrypoint(cascade_url: str, log_base: str | None, max_concurrent_jobs: int | None) -> None:
     logging_config = LoggingConfig(path_base=log_base, formatter="line")
     try:
         main_enp(url=cascade_url, loggingConfig=logging_config, max_concurrent_jobs=max_concurrent_jobs)
@@ -114,9 +104,9 @@ def launch_gateway() -> None:
             logs_directory = TemporaryDirectory(prefix="fiabLogs")
             logger.debug(f"logging base is at {logs_directory.name}")
             logs_base = None if os.getenv("FIAB_LOGSTDOUT", "nay") == "yea" else logs_directory.name + os.sep
-            gateway_url = _random_local_gateway_url()
+            gateway_url = f"tcp://localhost:{tunnel.claim_free_port()}"
             process = platform.get_mp_ctx("gateway").Process(
-                target=launch_cascade,
+                target=_local_process_entrypoint,
                 args=(gateway_url, logs_base, max_concurrent_jobs),
             )  # type: ignore[unresolved-attribute] # context
             process.start()
@@ -127,7 +117,7 @@ def launch_gateway() -> None:
                 gateway_url=gateway_url,
             )
             return
-        if gateway_method is RemoteTunnel:
+        elif gateway_method is RemoteTunnel:
             host, remote_port = _remote_tunnel_target_and_port()
             handle = tunnel.setup(host=host, remote_port=remote_port)
             remote_gateway_url = f"tcp://localhost:{handle.remote_port}"
@@ -136,8 +126,10 @@ def launch_gateway() -> None:
                 cmd.extend(["--max_concurrent_jobs", str(max_concurrent_jobs)])
             tunnel.execute(handle, cmd)
             GatewayConnectionManager.gateway_connection = RemoteTunnel(handle=handle)
-            return
-        raise NotImplementedError("RemoteUrl gateway cannot be launched by backend")
+        elif gateway_method is RemoteUrl:
+            raise NotImplementedError("RemoteUrl gateway cannot be launched by backend")
+        else:
+            assert_never(gateway_method)
 
 
 def get_gateway_url() -> str:
@@ -146,9 +138,12 @@ def get_gateway_url() -> str:
         raise GatewayNotRunning("Gateway is not running")
     if isinstance(gateway_connection, LocalProcess):
         return gateway_connection.gateway_url
-    if isinstance(gateway_connection, RemoteTunnel):
+    elif isinstance(gateway_connection, RemoteTunnel):
         return gateway_connection.handle.as_local_url()
-    return config.cascade.cascade_url
+    elif isinstance(gateway_connection, RemoteUrl):
+        return config.cascade.cascade_url
+    else:
+        assert_never(gateway_connection)
 
 
 def get_logs_directory() -> TemporaryDirectory | None:
@@ -157,7 +152,12 @@ def get_logs_directory() -> TemporaryDirectory | None:
         return None
     if isinstance(gateway_connection, LocalProcess):
         return gateway_connection.logs_directory
-    raise NotImplementedError("Logs directory is available only for local gateway process")
+    elif isinstance(gateway_connection, RemoteTunnel):
+        raise NotImplementedError("Logs directory is available only for local gateway process")
+    elif isinstance(gateway_connection, RemoteUrl):
+        raise NotImplementedError("Logs directory is available only for local gateway process")
+    else:
+        assert_never(gateway_connection)
 
 
 def status_gateway() -> str:
@@ -168,13 +168,16 @@ def status_gateway() -> str:
         if gateway_connection.process.exitcode is not None:
             raise GatewayExited(gateway_connection.process.exitcode)
         return StatusMessage.gateway_running
-    if isinstance(gateway_connection, RemoteTunnel):
+    elif isinstance(gateway_connection, RemoteTunnel):
         # TODO -- call gw status api once available, on fallback run command to check the proc status?
         if tunnel.status(gateway_connection.handle):
             return StatusMessage.gateway_running
         raise GatewayExited(255)
-    # TODO -- actually attempt resolving the url, then call gw status api once its available.
-    return StatusMessage.gateway_running
+    elif isinstance(gateway_connection, RemoteUrl):
+        # TODO -- actually attempt resolving the url, then call gw status api once its available.
+        return StatusMessage.gateway_running
+    else:
+        assert_never(gateway_connection)
 
 
 def stop_gateway() -> None:
@@ -198,7 +201,7 @@ def stop_gateway() -> None:
                 process.kill()
             GatewayConnectionManager.gateway_connection = None
             return
-        if isinstance(gateway_connection, RemoteTunnel):
+        elif isinstance(gateway_connection, RemoteTunnel):
             logger.debug("remote gateway shutdown message")
             m = api.ShutdownRequest()
             client.request_response(m, gateway_connection.handle.as_local_url(), 4_000)
@@ -206,14 +209,17 @@ def stop_gateway() -> None:
             tunnel.stop(gateway_connection.handle)
             GatewayConnectionManager.gateway_connection = None
             return
-        raise NotImplementedError("RemoteUrl gateway cannot be stopped by backend")
+        elif isinstance(gateway_connection, RemoteUrl):
+            raise NotImplementedError("RemoteUrl gateway cannot be stopped by backend")
+        else:
+            assert_never(gateway_connection)
 
 
 async def shutdown_processes() -> None:
     """Terminate all running gateway processes on app shutdown."""
     logger.debug("initiating graceful gateway shutdown")
     gateway_connection = GatewayConnectionManager.gateway_connection
-    if gateway_connection is None or isinstance(gateway_connection, RemoteUrl):
+    if gateway_connection is None:
         return
     if isinstance(gateway_connection, LocalProcess):
         if gateway_connection.process.exitcode is None:
@@ -222,15 +228,20 @@ async def shutdown_processes() -> None:
             except GatewayNotRunning:
                 pass
         else:
-            GatewayConnectionManager.gateway_connection = None
+            with GatewayConnectionManager.lock:
+                GatewayConnectionManager.gateway_connection = None
         return
-    if isinstance(gateway_connection, RemoteTunnel):
+    elif isinstance(gateway_connection, RemoteTunnel):
         if tunnel.status(gateway_connection.handle):
             try:
                 stop_gateway()
             except GatewayNotRunning:
                 pass
         else:
-            GatewayConnectionManager.gateway_connection = None
+            with GatewayConnectionManager.lock:
+                GatewayConnectionManager.gateway_connection = None
         return
-    raise NotImplementedError("Unknown gateway connection type")
+    elif isinstance(gateway_connection, RemoteUrl):
+        return
+    else:
+        assert_never(gateway_connection)

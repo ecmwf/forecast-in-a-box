@@ -33,7 +33,7 @@ def _ensure_control_root() -> None:
     _CONTROL_ROOT.mkdir(mode=0o700, parents=True, exist_ok=True)
 
 
-def _claim_free_port() -> int:
+def claim_free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))
         return int(sock.getsockname()[1])
@@ -136,7 +136,7 @@ def setup(
     last_error: subprocess.CalledProcessError | None = None
     attempts = 1 if remote_port is not None else _SETUP_ATTEMPTS
     for _ in range(attempts):
-        resolved_local_port = local_port if local_port is not None else _claim_free_port()
+        resolved_local_port = local_port if local_port is not None else claim_free_port()
         resolved_remote_port = remote_port if remote_port is not None else _claim_remote_port()
         handle = ConnectionHandle(
             host=host,
