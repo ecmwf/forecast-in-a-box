@@ -223,7 +223,12 @@ const mockModels: Array<MlModelDetail> = [
       'ECMWF Artificial Intelligence Forecasting System (AIFS) single model for medium-range weather prediction.',
     url: 'https://www.ecmwf.int/en/forecasts/documentation-and-support',
     pip_package_constraints: ['torch>=2.0.0', 'numpy>=1.24.0'],
-    output_characteristics: buildAifsQube({
+    input_qube: buildAifsQube({
+      pressureParams: STANDARD_PRESSURE_PARAMS,
+      pressureLevels: STANDARD_PRESSURE_LEVELS,
+      surfaceParams: STANDARD_SURFACE_PARAMS,
+    }),
+    output_qube: buildAifsQube({
       pressureParams: STANDARD_PRESSURE_PARAMS,
       pressureLevels: STANDARD_PRESSURE_LEVELS,
       surfaceParams: STANDARD_SURFACE_PARAMS,
@@ -257,7 +262,12 @@ const mockModels: Array<MlModelDetail> = [
       'torch>=2.6.0',
       'torch_geometric==2.4.0',
     ],
-    output_characteristics: buildAifsQube({
+    input_qube: buildAifsQube({
+      pressureParams: STANDARD_PRESSURE_PARAMS,
+      pressureLevels: STANDARD_PRESSURE_LEVELS,
+      surfaceParams: EXTENDED_SURFACE_PARAMS,
+    }),
+    output_qube: buildAifsQube({
       pressureParams: STANDARD_PRESSURE_PARAMS,
       pressureLevels: STANDARD_PRESSURE_LEVELS,
       surfaceParams: EXTENDED_SURFACE_PARAMS,
@@ -290,16 +300,16 @@ const mockModels: Array<MlModelDetail> = [
       'torch>=2.6.0',
       'torch_geometric==2.4.0',
     ],
-    // Legacy list[str] shape — exercises the back-compat render path until
-    // the backend update propagates everywhere.
-    output_characteristics: [
-      '2t',
-      '10u',
-      '10v',
-      'msl',
-      'tp',
-      't @ 1000/850/700/500/250 hPa',
-    ],
+    input_qube: buildAifsQube({
+      pressureParams: STANDARD_PRESSURE_PARAMS,
+      pressureLevels: STANDARD_PRESSURE_LEVELS,
+      surfaceParams: EXTENDED_SURFACE_PARAMS,
+    }),
+    output_qube: buildAifsQube({
+      pressureParams: STANDARD_PRESSURE_PARAMS,
+      pressureLevels: STANDARD_PRESSURE_LEVELS,
+      surfaceParams: EXTENDED_SURFACE_PARAMS,
+    }),
     input_characteristics: [
       'input_source',
       'lead_time',
@@ -326,7 +336,8 @@ const mockModels: Array<MlModelDetail> = [
     url: 'https://www.ecmwf.int/en/forecasts/documentation-and-support',
     pip_package_constraints: ['torch>=2.0.0', 'numpy>=1.24.0'],
     // Non-AIFS-shaped qube — exercises the generic compressed-tree dispatch.
-    output_characteristics: buildGenericQube(),
+    input_qube: buildGenericQube(),
+    output_qube: buildGenericQube(),
     input_characteristics: [
       'input_source',
       'lead_time',
@@ -394,7 +405,8 @@ export const artifactsHandlers = [
         display_description,
         url,
         pip_package_constraints,
-        output_characteristics,
+        input_qube,
+        output_qube,
         input_characteristics,
         timestep,
         ...overview

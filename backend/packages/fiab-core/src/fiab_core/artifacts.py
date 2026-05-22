@@ -71,7 +71,13 @@ class MlModelCheckpoint(FiabCoreBaseModel):
     )  # Question: do we want key-values, or just keys and the plugins define values?
     # Question: how would we capture memory requirements? May be tricky since technically its a function of config and backend
 
+    input_qube: dict[str, Any] = Field(description="Json Dump of the input qube structure, including variables, levels")
     output_qube: dict[str, Any] = Field(description="Json Dump of the output qube structure, including variables, levels, but not step")
+
+    input_options: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional options related to the input source, e.g. for polytope collection or mars requests. This is a free-form dict since it will likely be very different between plugins and we want to allow flexibility here.",
+    )
     timestep: str = Field(description="Timestep of the model output, e.g. '1h', '6h'")
 
 

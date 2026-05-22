@@ -9,6 +9,14 @@
 
 
 from functools import lru_cache
+from typing import TypedDict
+
+from qubed import Qube
+
+
+class QubesInfo(TypedDict):
+    input: Qube
+    output: Qube
 
 
 @lru_cache(maxsize=None)
@@ -18,15 +26,22 @@ def open_checkpoint(checkpoint_path: str) -> "Checkpoint":  # type: ignore
     return Checkpoint(checkpoint_path)
 
 
-def get_output_qube(checkpoint_path: str) -> str:
-    import json
+def get_qubes(checkpoint_path: str) -> QubesInfo:
 
     checkpoint = open_checkpoint(checkpoint_path)
+    metadata = checkpoint._metadata
+    variables_metadata = metadata.typed_variables
 
-    from earthkit.workflows.plugins.anemoi.utils import expansion_qube_from_metadata
+    from earthkit.workflows.plugins.anemoi.utils import _expansion_qube
 
-    qube = expansion_qube_from_metadata(checkpoint._metadata, lead_time=12)
-    return json.dumps(qube.remove_by_key("step").to_json())
+    in_variables = metadata.select_variables(include=["prognostic", "forcing"], has_mars_requests=False)
+    out_variables = metadata.select_variables(include=["diagnostic", "prognostic"], has_mars_requests=False)
+    model_step = metadata.timestep.seconds
+
+    in_qube = _expansion_qube(in_variables, variables_metadata, model_step, 6).remove_by_key("step")
+    out_qube = _expansion_qube(out_variables, variables_metadata, model_step, 6).remove_by_key("step")
+
+    return QubesInfo(input=in_qube, output=out_qube)
 
 
 def get_package_versions(checkpoint_path: str) -> list[str]:
@@ -43,9 +58,16 @@ def get_bytes_on_disk(checkpoint_path: str) -> int:
 
 
 def get_info(checkpoint_path: str) -> None:
-    print(get_package_versions(checkpoint_path))
-    print(get_output_qube(checkpoint_path))
-    print(get_bytes_on_disk(checkpoint_path))
+    print(f"Checkpoint path: {checkpoint_path}")
+    print(f"Package versions: {get_package_versions(checkpoint_path)}")
+    qubes = get_qubes(checkpoint_path)
+    import json
+
+    print("Input qube:")
+    print(json.dumps(qubes["input"].to_json()))
+    print("Output qube:")
+    print(json.dumps(qubes["output"].to_json()))
+    print(f"Bytes on disk: {get_bytes_on_disk(checkpoint_path)}")
 
 
 if __name__ == "__main__":
