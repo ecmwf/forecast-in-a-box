@@ -34,6 +34,9 @@ import { useExecutionHoverStore } from '@/features/executions/stores/executionHo
 import { ExperimentalNotice } from '@/features/executions/components/ExperimentalNotice'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { P } from '@/components/base/typography'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+
+type LayoutMode = 'layered' | 'organic'
 
 interface CompilationForceGraphProps {
   jobId: string
@@ -47,6 +50,8 @@ interface GraphNode {
   task: CompilationDetailTask
   blockLabel: string
   fill: string
+  /** Tasks with no parents — the entry points the user is looking for. */
+  isEntry: boolean
   x?: number
   y?: number
 }
@@ -171,13 +176,17 @@ export function CompilationForceGraph({
 
   const graphData = useMemo(() => {
     const taskIds = new Set(tasks.map((task) => task.task_id))
+    // Entry point: every parent reference lies outside the visible slice
+    // (or parents is empty). Pinned to the left edge under dagMode='lr'.
     const nodes: Array<GraphNode> = tasks.map((task) => {
       const kind = classifyTask(task.task_id)
+      const isEntry = task.parents.every((p) => !taskIds.has(p))
       return {
         id: task.task_id,
         task,
         blockLabel: blockLabelFor(task.block),
         fill: TASK_KIND_FILL[kind] ?? TASK_KIND_FILL.unknown,
+        isEntry,
       }
     })
     const links: Array<GraphLink> = []
@@ -192,6 +201,7 @@ export function CompilationForceGraph({
 
   const [hoverId, setHoverId] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>('organic')
   const anchorId = hoverId ?? selectedId
   const lineageSet = useMemo(() => {
     if (!anchorId) return null
@@ -207,12 +217,44 @@ export function CompilationForceGraph({
     (state) => state.setSelectedBlockId,
   )
 
+  // Data-flow view of a block selection: block's tasks ∪ their ancestor
+  // closure. Cascade attributes shared upstream chains to a single owning
+  // block — this set lights up everything that feeds the selection
+  // regardless of attribution.
+  const selectionAncestorSet = useMemo(() => {
+    if (!selectedBlockId) return null
+    const set = new Set<string>()
+    for (const task of tasks) {
+      if (task.block !== selectedBlockId) continue
+      set.add(task.task_id)
+      lineage.ancestors.get(task.task_id)?.forEach((id) => set.add(id))
+    }
+    return set
+  }, [selectedBlockId, tasks, lineage])
+
+  // Per-block companion: any block with at least one task in the data-flow
+  // set. Drives halo brightness so contributing blocks lift, not just dim.
+  const contributingBlockIds = useMemo(() => {
+    if (!selectionAncestorSet) return null
+    const set = new Set<string>()
+    for (const task of tasks) {
+      if (selectionAncestorSet.has(task.task_id)) set.add(task.block)
+    }
+    return set
+  }, [selectionAncestorSet, tasks])
+
   const focusedTask =
     tasks.find((task) => task.task_id === selectedId) ?? undefined
 
   useEffect(() => {
     graphRef.current?.d3ReheatSimulation()
   }, [graphData])
+
+  // dagMode change only takes effect after the sim re-runs; the existing
+  // onEngineStop handler re-fits once it settles.
+  useEffect(() => {
+    graphRef.current?.d3ReheatSimulation()
+  }, [layoutMode])
 
   // Re-frame on container resize. The initial settle-fit comes via
   // onEngineStop; this debounce handles later window/sidebar resizes.
@@ -269,7 +311,41 @@ export function CompilationForceGraph({
       <ExperimentalNotice />
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
         <span>{t('compilation.forceDescription')}</span>
-        <span>{t('compilation.taskCount', { count: tasks.length })}</span>
+        <div className="flex items-center gap-3">
+          <ToggleGroup
+            value={[layoutMode]}
+            onValueChange={(values) => {
+              // Base UI uses `string[]` even for single-select toggles.
+              // Empty array = user untoggled — keep the current mode.
+              const next = values[0]
+              if (next === 'layered' || next === 'organic') {
+                setLayoutMode(next)
+              }
+            }}
+            variant="outline"
+          >
+            <ToggleGroupItem
+              value="layered"
+              variant="outline"
+              aria-label={t('compilation.layoutLayered')}
+              className="text-xs"
+            >
+              {t('compilation.layoutLayered')}
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value="organic"
+              variant="outline"
+              aria-label={t('compilation.layoutOrganic')}
+              className="text-xs"
+            >
+              {t('compilation.layoutOrganic')}
+            </ToggleGroupItem>
+          </ToggleGroup>
+          <span>
+            {layoutMode === 'layered' && `${t('compilation.entryHint')} · `}
+            {t('compilation.taskCount', { count: tasks.length })}
+          </span>
+        </div>
       </div>
 
       <BlockLegend
@@ -288,12 +364,16 @@ export function CompilationForceGraph({
           width={size.width}
           height={size.height}
           nodeRelSize={4}
+          // 'lr' = topological rank constraint; undefined = unbiased d3-force.
+          dagMode={layoutMode === 'layered' ? 'lr' : undefined}
+          dagLevelDistance={70}
           nodeLabel={(node: GraphNode) => {
             const humanised = humaniseTaskName(node.task.task_id)
             return `${humanised.headline} · ${node.blockLabel}`
           }}
-          linkDirectionalArrowLength={4}
+          linkDirectionalArrowLength={5}
           linkDirectionalArrowRelPos={1}
+          linkWidth={1.2}
           linkColor={(link: GraphLink) => {
             const source =
               typeof link.source === 'object' ? link.source : undefined
@@ -307,39 +387,54 @@ export function CompilationForceGraph({
               !lineageSet ||
               (lineageSet.has(String(sourceId)) &&
                 lineageSet.has(String(targetId)))
-            // While a block is selected, only intra-block edges stay lit.
+            // Lit when both endpoints are in the data-flow set — leaf-block
+            // selections trace back to the root.
             const blockLit =
-              !selectedBlockId ||
-              (source?.task.block === selectedBlockId &&
-                target?.task.block === selectedBlockId)
+              !selectionAncestorSet ||
+              (selectionAncestorSet.has(String(sourceId)) &&
+                selectionAncestorSet.has(String(targetId)))
             const lit = lineageLit && blockLit
-            return lit
-              ? 'rgba(100, 116, 139, 0.55)'
-              : 'rgba(100, 116, 139, 0.1)'
+            // Punchier defaults so long cross-cluster edges read against
+            // the halo gradient.
+            return lit ? 'rgba(71, 85, 105, 0.78)' : 'rgba(100, 116, 139, 0.08)'
           }}
           nodeCanvasObject={(node: GraphNode, ctx, globalScale) => {
             if (node.x === undefined || node.y === undefined) return
             const lineageDim = !!lineageSet && !lineageSet.has(node.id)
             const blockDim =
-              !!selectedBlockId && node.task.block !== selectedBlockId
+              !!selectionAncestorSet && !selectionAncestorSet.has(node.id)
             ctx.globalAlpha = lineageDim || blockDim ? 0.25 : 1
             const blockColor =
               blockColorById.get(node.task.block) ?? 'rgba(148,163,184,0.6)'
+            // Entry points (no in-set parents) get a wider accent ring +
+            // bigger fill so "where does this start?" reads at a glance.
+            const outerR = node.isEntry ? 11 : 7
+            const innerR = node.isEntry ? 7 : 5
+            if (node.isEntry) {
+              ctx.beginPath()
+              ctx.arc(node.x, node.y, 13, 0, 2 * Math.PI)
+              ctx.strokeStyle = blockColor
+              ctx.lineWidth = 1.5 / globalScale
+              ctx.stroke()
+            }
             ctx.beginPath()
-            ctx.arc(node.x, node.y, 7, 0, 2 * Math.PI)
+            ctx.arc(node.x, node.y, outerR, 0, 2 * Math.PI)
             ctx.fillStyle = blockColor
             ctx.fill()
             ctx.beginPath()
-            ctx.arc(node.x, node.y, 5, 0, 2 * Math.PI)
+            ctx.arc(node.x, node.y, innerR, 0, 2 * Math.PI)
             ctx.fillStyle = node.fill
             ctx.fill()
-            if (globalScale > 1.4) {
+            if (globalScale > 1.4 || node.isEntry) {
               const humanised = humaniseTaskName(node.task.task_id)
-              ctx.font = `${12 / globalScale}px sans-serif`
+              const label = node.isEntry
+                ? `▶ ${humanised.headline}`
+                : humanised.headline
+              ctx.font = `${(node.isEntry ? 13 : 12) / globalScale}px sans-serif`
               ctx.fillStyle = 'rgba(15, 23, 42, 0.85)'
               ctx.textAlign = 'left'
               ctx.textBaseline = 'middle'
-              ctx.fillText(humanised.headline, node.x + 9, node.y)
+              ctx.fillText(label, node.x + outerR + 3, node.y)
             }
             ctx.globalAlpha = 1
           }}
@@ -347,7 +442,7 @@ export function CompilationForceGraph({
             if (node.x === undefined || node.y === undefined) return
             ctx.fillStyle = color
             ctx.beginPath()
-            ctx.arc(node.x, node.y, 10, 0, 2 * Math.PI)
+            ctx.arc(node.x, node.y, node.isEntry ? 14 : 10, 0, 2 * Math.PI)
             ctx.fill()
           }}
           onNodeHover={(node) =>
@@ -399,21 +494,22 @@ export function CompilationForceGraph({
                 cy,
                 radius,
               )
-              // Halo intensity tracks the cross-panel selection: focused
-              // block brightens, others fade back.
-              const isFocused = !selectedBlockId || selectedBlockId === blockId
+              // Contributing blocks brighten, others fade. Alphas kept
+              // soft so the halo never washes out the underlying edges.
+              const isFocused =
+                !contributingBlockIds || contributingBlockIds.has(blockId)
               const otherSelected =
-                !!selectedBlockId && selectedBlockId !== blockId
+                !!contributingBlockIds && !contributingBlockIds.has(blockId)
               const inner = otherSelected
                 ? 0.09
                 : isFocused && selectedBlockId
-                  ? 0.5
-                  : 0.38
+                  ? 0.32
+                  : 0.18
               const mid = otherSelected
                 ? 0.04
                 : isFocused && selectedBlockId
-                  ? 0.25
-                  : 0.15
+                  ? 0.13
+                  : 0.07
               gradient.addColorStop(0, withAlpha(color, inner))
               gradient.addColorStop(0.55, withAlpha(color, mid))
               gradient.addColorStop(1, withAlpha(color, 0))

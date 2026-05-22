@@ -300,6 +300,7 @@ export function RunDetailPage() {
                 status={jobData.status}
                 fable={fableData?.builder}
                 catalogue={catalogue}
+                onSwitchTab={setActiveTab}
               />
             </TabsContent>
             <TabsContent value="graph" className={WIDE_TAB_CONTENT}>

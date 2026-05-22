@@ -19,12 +19,19 @@ import { cn } from '@/lib/utils'
  * `pointer-events-none` lets clicks pass through to the task nodes on top. */
 export const CompilationBlockNode = memo(function ({ data }: NodeProps) {
   const { t } = useTranslation('executions')
-  const { blockId, label, taskCount } = data as BlockGroupData
+  const {
+    blockId,
+    label,
+    taskCount,
+    isContributing = null,
+  } = data as BlockGroupData & { isContributing?: boolean | null }
   const selectedBlockId = useExecutionHoverStore(
     (state) => state.selectedBlockId,
   )
   const isSelected = selectedBlockId === blockId
-  const isDimmed = selectedBlockId !== null && !isSelected
+  // Dim only if the data-flow set excludes this swimlane entirely.
+  const isDimmed =
+    !isSelected && isContributing !== null && isContributing === false
   return (
     <div
       className={cn(

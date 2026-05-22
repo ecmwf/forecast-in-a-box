@@ -83,6 +83,10 @@ export function buildTaskGraph(
         x: node.x - NODE_WIDTH / 2,
         y: node.y - NODE_HEIGHT / 2,
       },
+      // Explicit dims so the MiniMap can paint each node before React Flow
+      // measures it on mount, and so fitView has bounds it can rely on.
+      width: NODE_WIDTH,
+      height: NODE_HEIGHT,
       data: { task, revealIndex: index },
       draggable: false,
       selectable: true,
@@ -150,6 +154,8 @@ export function buildFullTaskGraph(
       maxX = Math.max(maxX, node.position.x + NODE_WIDTH)
       maxY = Math.max(maxY, node.position.y + NODE_HEIGHT)
     }
+    const width = maxX - minX + 2 * GROUP_PAD_X
+    const height = maxY - minY + GROUP_PAD_TOP + GROUP_PAD_BOTTOM
     groupNodes.push({
       id: `group:${blockId}`,
       type: COMPILATION_BLOCK_NODE_TYPE,
@@ -159,10 +165,11 @@ export function buildFullTaskGraph(
         label: resolveBlockLabel(blockId),
         taskCount: blockTasks.length,
       },
-      style: {
-        width: maxX - minX + 2 * GROUP_PAD_X,
-        height: maxY - minY + GROUP_PAD_TOP + GROUP_PAD_BOTTOM,
-      },
+      // Both top-level dims and CSS dims: the former is what the MiniMap and
+      // fitView read; the latter sizes the actual DOM box.
+      width,
+      height,
+      style: { width, height },
       zIndex: -1,
       selectable: false,
       draggable: false,

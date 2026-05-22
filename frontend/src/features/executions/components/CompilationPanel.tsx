@@ -11,7 +11,7 @@
 /** Dagre/swimlane Compilation tab. Static LR layout of the full task DAG;
  * each block becomes a labelled group node, cross-block edges are dashed. */
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Background,
   BackgroundVariant,
@@ -21,8 +21,9 @@ import {
   ReactFlowProvider,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import { Share2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { Node, NodeMouseHandler } from '@xyflow/react'
+import type { Node, NodeMouseHandler, ReactFlowInstance } from '@xyflow/react'
 import type {
   BlockFactoryCatalogue,
   FableBuilderV1,
@@ -32,6 +33,7 @@ import type {
   BlockGroupData,
   TaskNodeData,
 } from '@/features/executions/utils/taskDagLayout'
+import { Button } from '@/components/ui/button'
 import { ApiClientError } from '@/api/client'
 import { getFactory } from '@/api/types/fable.types'
 import { useCompilationDetail } from '@/api/hooks/useJobs'
@@ -60,6 +62,9 @@ interface CompilationPanelProps {
   status: JobStatus
   fable: FableBuilderV1 | undefined
   catalogue: BlockFactoryCatalogue | undefined
+  /** Lets the panel hand control back to the parent's tab switcher when
+   * we need to redirect the user to the Graph tab (large-DAG fallback). */
+  onSwitchTab?: (tab: string) => void
 }
 
 const nodeTypes = {
@@ -67,11 +72,16 @@ const nodeTypes = {
   [COMPILATION_BLOCK_NODE_TYPE]: CompilationBlockNode,
 }
 
+/** Hard cap on the dagre/SVG view; locks the browser past ~250 nodes.
+ * Force-graph tab (canvas) handles larger DAGs. */
+const MAX_LAYERED_TASKS = 150
+
 export function CompilationPanel({
   jobId,
   status,
   fable,
   catalogue,
+  onSwitchTab,
 }: CompilationPanelProps) {
   const { t } = useTranslation('executions')
   const query = useCompilationDetail(jobId, status)
@@ -90,9 +100,15 @@ export function CompilationPanel({
   }, [fable, catalogue])
 
   const tasks: ReadonlyArray<CompilationDetailTask> = query.data?.tasks ?? []
+  const isTooLarge = tasks.length > MAX_LAYERED_TASKS
+  // Past the threshold, skip the layout entirely — emitting that many
+  // React nodes is what locks the tab.
   const graph = useMemo(
-    () => buildFullTaskGraph(tasks, blockLabelFor),
-    [tasks, blockLabelFor],
+    () =>
+      isTooLarge
+        ? { nodes: [], edges: [] }
+        : buildFullTaskGraph(tasks, blockLabelFor),
+    [tasks, blockLabelFor, isTooLarge],
   )
   const lineage = useMemo(() => buildLineage(tasks), [tasks])
   const taskById = useMemo(() => {
@@ -103,6 +119,19 @@ export function CompilationPanel({
 
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [hoverTaskId, setHoverTaskId] = useState<string | null>(null)
+  const flowRef = useRef<ReactFlowInstance<
+    Node<TaskNodeData | BlockGroupData>
+  > | null>(null)
+
+  // `fitView` prop only fires on mount, often before measurement settles.
+  // Re-fit imperatively whenever the graph dataset changes.
+  useEffect(() => {
+    if (graph.nodes.length === 0) return
+    const id = requestAnimationFrame(() => {
+      flowRef.current?.fitView({ padding: 0.18, duration: 300 })
+    })
+    return () => cancelAnimationFrame(id)
+  }, [graph])
 
   // Primitive selectors (per field) — an object-returning selector would
   // mint a new reference each render and loop Zustand's Object.is check.
@@ -119,32 +148,65 @@ export function CompilationPanel({
     return lineageUnion(anchorId, lineage)
   }, [anchorId, lineage])
 
-  // Hover lineage wins over block selection when both are present.
+  // Hover lineage beats block selection. Block selection is a data-flow
+  // view: block tasks ∪ ancestor closure (cascade attributes shared
+  // upstream to a single owning block; this widens it to everything the
+  // selection reads from).
   const selectionTaskSet = useMemo(() => {
     if (lineageSet) return lineageSet
     if (!selectedBlockId) return null
     const set = new Set<string>()
     for (const task of tasks) {
-      if (task.block === selectedBlockId) set.add(task.task_id)
+      if (task.block !== selectedBlockId) continue
+      set.add(task.task_id)
+      lineage.ancestors.get(task.task_id)?.forEach((id) => set.add(id))
     }
     return set
-  }, [lineageSet, selectedBlockId, tasks])
+  }, [lineageSet, selectedBlockId, tasks, lineage])
+
+  // Swimlanes lift if any of their tasks contribute to the data-flow view.
+  const contributingBlockIds = useMemo(() => {
+    if (!selectionTaskSet) return null
+    const set = new Set<string>()
+    for (const task of tasks) {
+      if (selectionTaskSet.has(task.task_id)) set.add(task.block)
+    }
+    return set
+  }, [selectionTaskSet, tasks])
 
   const nodes = useMemo<Array<Node<TaskNodeData | BlockGroupData>>>(() => {
-    if (!selectionTaskSet) return graph.nodes
+    if (!selectionTaskSet && !contributingBlockIds) return graph.nodes
     return graph.nodes.map((node) => {
-      if (node.type !== 'compilationTask') return node
-      return {
-        ...node,
-        data: {
-          ...node.data,
-          lineageState: selectionTaskSet.has(node.id)
-            ? ('highlighted' as const)
-            : ('dimmed' as const),
-        },
+      if (node.type === 'compilationTask') {
+        if (!selectionTaskSet) return node
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            lineageState: selectionTaskSet.has(node.id)
+              ? ('highlighted' as const)
+              : ('dimmed' as const),
+          },
+        }
       }
+      if (node.type === COMPILATION_BLOCK_NODE_TYPE) {
+        const data = node.data as BlockGroupData
+        return {
+          ...node,
+          data: {
+            ...data,
+            // null = no selection; true/false = whether the swimlane
+            // contributes to it. Consumed by CompilationBlockNode.
+            isContributing:
+              contributingBlockIds === null
+                ? null
+                : contributingBlockIds.has(data.blockId),
+          },
+        }
+      }
+      return node
     })
-  }, [graph.nodes, selectionTaskSet])
+  }, [graph.nodes, selectionTaskSet, contributingBlockIds])
 
   const edges = useMemo(() => {
     if (!selectionTaskSet) return graph.edges
@@ -219,6 +281,16 @@ export function CompilationPanel({
     )
   }
 
+  if (isTooLarge) {
+    return (
+      <TooLargeMessage
+        taskCount={tasks.length}
+        limit={MAX_LAYERED_TASKS}
+        onSwitchToGraph={onSwitchTab ? () => onSwitchTab('graph') : undefined}
+      />
+    )
+  }
+
   return (
     <div className="flex h-[min(640px,calc(100vh-22rem))] min-h-[420px] flex-col gap-2 min-[1280px]:!h-full min-[1280px]:min-h-0">
       <ExperimentalNotice />
@@ -229,6 +301,11 @@ export function CompilationPanel({
       <div className="relative flex-1 overflow-hidden rounded-lg">
         <ReactFlowProvider>
           <ReactFlow
+            onInit={(instance) => {
+              flowRef.current = instance
+              // Initial fit — the graph-change effect handles later updates.
+              requestAnimationFrame(() => instance.fitView({ padding: 0.18 }))
+            }}
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
@@ -238,7 +315,7 @@ export function CompilationPanel({
             panOnDrag={true}
             zoomOnScroll={true}
             fitView={true}
-            fitViewOptions={{ padding: 0.12 }}
+            fitViewOptions={{ padding: 0.18 }}
             proOptions={{ hideAttribution: true }}
             onNodeMouseEnter={handleNodeMouseEnter}
             onNodeMouseLeave={handleNodeMouseLeave}
@@ -254,6 +331,17 @@ export function CompilationPanel({
             />
             <MiniMap
               position="bottom-right"
+              // Default minimap can't fill our custom node types — pick
+              // explicit colours so the markers are visible.
+              nodeColor={(node) =>
+                node.type === COMPILATION_BLOCK_NODE_TYPE
+                  ? 'rgb(203, 213, 225)'
+                  : 'rgb(59, 130, 246)'
+              }
+              nodeStrokeWidth={2}
+              maskColor="rgba(0, 0, 0, 0.06)"
+              pannable
+              zoomable
               className="right-2! bottom-2! h-[80px]! w-[120px]! rounded border border-border bg-background/80 shadow-sm"
             />
             <Controls
@@ -269,6 +357,39 @@ export function CompilationPanel({
           task={taskById.get(selectedTaskId)}
           onClose={() => setSelectedTaskId(null)}
         />
+      )}
+    </div>
+  )
+}
+
+function TooLargeMessage({
+  taskCount,
+  limit,
+  onSwitchToGraph,
+}: {
+  taskCount: number
+  limit: number
+  onSwitchToGraph?: () => void
+}) {
+  const { t } = useTranslation('executions')
+  return (
+    <div className="flex h-[480px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed py-12 text-center">
+      <P className="font-medium text-muted-foreground">
+        {t('compilation.tooLargeTitle')}
+      </P>
+      <P className="max-w-md text-muted-foreground">
+        {t('compilation.tooLargeBody', { count: taskCount, limit })}
+      </P>
+      {onSwitchToGraph && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onSwitchToGraph}
+          className="gap-1.5"
+        >
+          <Share2 className="h-3.5 w-3.5" />
+          {t('compilation.openGraphTab')}
+        </Button>
       )}
     </div>
   )
