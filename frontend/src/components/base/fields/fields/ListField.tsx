@@ -147,11 +147,11 @@ function ListFieldConcrete({
     }
   }
 
-  // Single flex-wrap row keeps badges and the input on the same line, so the
-  // GlyphFieldWrapper's inline-start `{}` toggle aligns with the content
-  // instead of floating between a badges row and an input row.
+  // data-slot opts into InputGroup's h-auto + items-stretch so the field
+  // grows when chips wrap and the inline-start `{}` toggle stays aligned.
   return (
     <div
+      data-slot="input-group-content"
       className={cn(
         'flex min-w-0 flex-1 flex-wrap items-center gap-1.5 py-1',
         className,
