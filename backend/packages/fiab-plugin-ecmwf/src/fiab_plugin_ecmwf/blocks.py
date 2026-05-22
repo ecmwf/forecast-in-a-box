@@ -494,6 +494,7 @@ class MapPlotSink(Sink):
             title="Group By",
             description="Dimension to create subplots over",
             value_type="enumClosed['valid_datetime', 'step', 'number', 'none']",
+            default_value="none",
         ),
         SPLITBY: BlockConfigurationOption(
             title="Split By",
@@ -521,10 +522,6 @@ class MapPlotSink(Sink):
 
         groupby_value = block.config_as_str(GROUPBY)
         if groupby_value not in ("valid_datetime", "step", "number", "none"):
-            return Either.error(
-                f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
-            )
-        if groupby_value != "none" and groupby_value not in dimensions(input_dataset):
             return Either.error(
                 f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
             )
