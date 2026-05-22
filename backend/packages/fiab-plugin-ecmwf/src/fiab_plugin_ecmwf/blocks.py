@@ -520,13 +520,7 @@ class MapPlotSink(Sink):
         if missing:
             return Either.error(f"params {missing} are not in the input parameters: {axes(input_dataset).get(PARAM, [])}")
 
-        groupby_value = block.config_as_str(GROUPBY)
-        if groupby_value not in ("valid_datetime", "step", "number", "none"):
-            return Either.error(
-                f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
-            )
-
-        splitby_value = block.config_as_list(SPLITBY, str)
+        splitby_value = block.config_as_list(SPLITBY, str, allow_empty=True)
         if "none" in splitby_value and len(splitby_value) != 1:
             return Either.error(f"Invalid splitby value: if none is selected, no other dimensions can be present")
 
