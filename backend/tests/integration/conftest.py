@@ -143,7 +143,7 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         config = FIABConfig()
         config.auth.jwt_secret = SecretStr("x" * 32)
         config.api.uvicorn_port = 30645
-        config.cascade.cascade_url = "tcp://localhost:30644"
+        config.cascade.cascade_url = "tcp://localhost"
         config.db.sqlite_userdb_path = f"{td.name}/user.db"
         config.db.sqlite_jobdb_path = f"{td.name}/job.db"
         config.api.data_path = td_data.name

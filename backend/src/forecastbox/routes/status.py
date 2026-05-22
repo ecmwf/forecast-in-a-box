@@ -17,6 +17,7 @@ from cascade.gateway import api, client
 from fastapi import APIRouter, Request
 
 from forecastbox.domain.experiment.scheduling.background import status_scheduler
+from forecastbox.domain.gateway.service import get_gateway_url
 from forecastbox.domain.plugin.manager import status_brief
 from forecastbox.utility.config import config
 
@@ -44,7 +45,7 @@ def get_status(request: Request) -> StatusResponse:
     status: dict[str, str] = {"api": "up", "cascade": "up", "ecmwf": "up", "scheduler": "up", "version": request.app.version}
 
     try:
-        client.request_response(api.JobProgressRequest(job_ids=[]), config.cascade.cascade_url, timeout_ms=1000)
+        client.request_response(api.JobProgressRequest(job_ids=[]), get_gateway_url(), timeout_ms=1000)
         status["cascade"] = "up"
     except Exception as e:
         logger.warning(f"Error connecting to Cascade: {repr(e)}")

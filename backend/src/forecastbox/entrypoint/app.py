@@ -33,11 +33,12 @@ from forecastbox.domain.admin import get_local_release
 from forecastbox.domain.artifact.base import get_artifact_local_path
 from forecastbox.domain.artifact.manager import ArtifactManager, join_artifact_manager, submit_refresh_catalog
 from forecastbox.domain.experiment.scheduling.background import start_scheduler, stop_scheduler
+from forecastbox.domain.gateway.service import shutdown_processes
 from forecastbox.domain.lens.manager import shutdown_all_lens_instances
 from forecastbox.domain.plugin.manager import join_updater_thread, submit_load_plugins
 from forecastbox.domain.plugin.store import join_stores_thread, submit_initialize_stores
-from forecastbox.routes.gateway import shutdown_processes
 from forecastbox.utility.config import config
+from forecastbox.utility.tunnel import shutdown as shutdown_tunnels
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         stop_scheduler()
     shutdown_all_lens_instances()
     await shutdown_processes()
+    shutdown_tunnels()
     join_updater_thread(timeout_sec=10)
     join_stores_thread(timeout_sec=10)
     join_artifact_manager(timeout_sec=10)

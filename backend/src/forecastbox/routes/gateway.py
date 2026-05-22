@@ -8,78 +8,24 @@
 # nor does it submit to any jurisdiction.
 
 """
-Gateway operations routes — /gateway/*. Corresponds to no domain entity.
+Gateway operations routes — /gateway/*. Corresponds to operational functions in
+`domain.gateway`, not a persisted user-managed entity.
 
-All routes are purely operational, no ids -- gateway start, status, kill."""
+All routes are purely operational, no ids -- gateway start, status, kill.
+"""
 
-import asyncio
-import logging
-import os
-import select
-import subprocess
-from dataclasses import dataclass
-from multiprocessing.process import BaseProcess
-from tempfile import TemporaryDirectory
-from typing import NewType
+from fastapi import APIRouter, HTTPException
 
-from cascade.deployment.logging import LoggingConfig
-from cascade.executor import platform
-from cascade.gateway import api, client
-from cascade.gateway.server import main_enp
-from fastapi import APIRouter, HTTPException, Request
-from sse_starlette.sse import EventSourceResponse
-
-from forecastbox.utility.config import StatusMessage, config
+from forecastbox.domain.gateway.exceptions import (
+    GatewayAlreadyRunning,
+    GatewayExited,
+    GatewayNotRunning,
+    GatewayNotStarted,
+)
+from forecastbox.domain.gateway.service import launch_gateway, status_gateway, stop_gateway
+from forecastbox.utility.config import config
 
 PREFIX = "/api/v1/gateway"
-
-logger = logging.getLogger(__name__)
-
-GatewayProcess = NewType("GatewayProcess", BaseProcess)
-
-
-def cleanup_gw(process: GatewayProcess) -> None:
-    pass
-
-
-def kill_gw(process: GatewayProcess) -> None:
-    logger.debug("gateway shutdown message")
-    m = api.ShutdownRequest()
-    client.request_response(m, config.cascade.cascade_url, 4_000)
-    logger.debug("gateway terminate and join")
-
-    process.terminate()
-    process.join(1)
-    if process.exitcode is None:
-        logger.debug("gateway kill")
-        process.kill()
-
-
-def launch_cascade(cascade_url: str, log_base: str | None, max_concurrent_jobs: int | None) -> None:
-    loggingConfig = LoggingConfig(path_base=log_base, formatter="line")
-
-    try:
-        main_enp(url=cascade_url, loggingConfig=loggingConfig, max_concurrent_jobs=max_concurrent_jobs)
-    except KeyboardInterrupt:
-        pass  # no need to spew stacktrace to log
-
-
-class Globals:
-    # NOTE we cant have them at top level due to imports from other modules
-    # TODO refactor the above dataclass into classmethods here, its singletons anyway
-    logs_directory: TemporaryDirectory | None = None
-    gateway: GatewayProcess | None = None
-
-
-async def shutdown_processes() -> None:
-    """Terminate all running processes on shutdown."""
-    logger.debug("initiating graceful gateway shutdown")
-    if Globals.gateway is not None:
-        if Globals.gateway.exitcode is None:
-            kill_gw(Globals.gateway)
-        cleanup_gw(Globals.gateway)
-        Globals.gateway = None
-
 
 router = APIRouter(
     tags=["gateway"],
@@ -91,27 +37,10 @@ router = APIRouter(
 async def start_gateway() -> str:
     if not config.cascade.spawn_gateway:
         raise HTTPException(400, "This instance does not manage the gateway")
-    if Globals.logs_directory is None:
-        Globals.logs_directory = TemporaryDirectory(prefix="fiabLogs")
-        logger.debug(f"logging base is at {Globals.logs_directory.name}")
-    if Globals.gateway is not None:
-        if Globals.gateway.exitcode is None:
-            # TODO add an explicit restart option
-            raise HTTPException(400, "Process already running.")
-        else:
-            logger.warning(f"restarting gateway as it exited with {Globals.gateway.exitcode}")
-            # TODO spawn as async task? This blocks... but we'd need to lock
-            cleanup_gw(Globals.gateway)
-            Globals.gateway = None
-
-    logs_directory = None if os.getenv("FIAB_LOGSTDOUT", "nay") == "yea" else Globals.logs_directory.name + os.sep
-    max_concurrent_jobs = config.cascade.max_concurrent_jobs
-    process = platform.get_mp_ctx("gateway").Process(
-        target=launch_cascade, args=(config.cascade.cascade_url, logs_directory, max_concurrent_jobs)
-    )  # type: ignore[unresolved-attribute] # context
-    process.start()
-    Globals.gateway = GatewayProcess(process)
-    logger.debug(f"spawned new gateway process with pid {process.pid}")
+    try:
+        launch_gateway()
+    except GatewayAlreadyRunning:
+        raise HTTPException(400, "Process already running.")
     return "started"
 
 
@@ -120,23 +49,20 @@ async def get_status() -> str:
     """Get the status of the Cascade Gateway process."""
     if not config.cascade.spawn_gateway:
         return "not managed"
-    elif Globals.gateway is None:
+    try:
+        return status_gateway()
+    except GatewayNotStarted:
         return "not started"
-    elif Globals.gateway.exitcode is not None:
-        return f"exited with {Globals.gateway.exitcode}"
-    else:
-        return StatusMessage.gateway_running
+    except GatewayExited as e:
+        return f"exited with {e.exitcode}"
 
 
 @router.post("/kill")
 async def kill_gateway() -> str:
     if not config.cascade.spawn_gateway:
         raise HTTPException(400, "This instance does not manage the gateway")
-    if Globals.gateway is None or Globals.gateway.exitcode is not None:
+    try:
+        stop_gateway()
+    except GatewayNotRunning:
         raise HTTPException(400, "Gateway is not running")
-    else:
-        # TODO spawn as async task? This blocks... but we'd need to lock
-        kill_gw(Globals.gateway)
-        cleanup_gw(Globals.gateway)
-        Globals.gateway = None
-        return "killed"
+    return "killed"

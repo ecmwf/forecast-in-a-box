@@ -8,6 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 import logging
+import tempfile
 import time
 from pathlib import Path
 from typing import Literal
@@ -20,6 +21,7 @@ from pydantic import Field
 
 from forecastbox.domain.artifact.manager import ArtifactManager, submit_artifact_download
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
+from forecastbox.domain.gateway.service import get_gateway_url
 from forecastbox.utility.config import config
 from forecastbox.utility.pydantic import FiabBaseModel
 
@@ -88,19 +90,18 @@ def execute_cascade(spec: ExecutionSpecification) -> SubmitJobResponse:
     environment = spec.environment
     hosts = min(config.cascade.max_hosts, environment.hosts or config.cascade.default_hosts)
     workers_per_host = min(config.cascade.max_workers_per_host, environment.workers_per_host or config.cascade.default_workers_per_host)
-    env_vars = {"TMPDIR": config.cascade.venv_temp_dir}
 
     r = SubmitJobRequest(
         job=JobSpec(
             workers_per_host=workers_per_host,
             hosts=hosts,
-            envvars=env_vars,
+            envvars={},
             use_slurm=False,
             job_instance=JobInstanceRich(jobInstance=job, checkpointSpec=None),
         )
     )
     try:
-        submit_job_response: SubmitJobResponse = request_response(r, f"{config.cascade.cascade_url}")  # type: ignore
+        submit_job_response: SubmitJobResponse = request_response(r, get_gateway_url())  # type: ignore
     except Exception as e:
         return SubmitJobResponse(job_id=None, error=repr(e))
 

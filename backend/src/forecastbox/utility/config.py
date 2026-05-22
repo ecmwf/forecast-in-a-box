@@ -243,24 +243,17 @@ class CascadeSettings(FiabBaseModel):
     """Default number of workers per hosts for Cascade if unspecified in a job."""
     max_workers_per_host: int = 8
     """Max number of workers per host for Cascade."""
-    cascade_url: str = "tcp://localhost:8067"
-    """Base URL for the Cascade API."""
+    cascade_url: str = "tcp://localhost"
+    """Base URL for the Cascade API in case of unmanaged gateway, otherwise localhost or sshable [<user>@]<hostname>."""
+    cascade_logging_base: str | None = None
+    """Where to store logs of cascade gw and jobs. Use eg /home/<user>/fiabLogs or /tmp/fiabLogs"""
     spawn_gateway: bool = True
     """Whether the backend should spawn a gateway or assume it is provided externally"""
-    # TODO remove the spawn_gateway setting -- instead, base it on whether cascade_url is provided.
-    # But that needs refactoring of the code to provide the cascade_url dynamically in case of a local spawn,
-    # and utilization of the FreePortsManager etc
-    log_collection_max_size: int = 1000
-    """Maximum size of the log collection for Cascade."""
-    venv_temp_dir: str = "/tmp"
-    """Temporary directory for virtual environments."""
     max_concurrent_jobs: int | None = 1
     """If more jobs submitted at a given time, all but this many wait in a queue"""
 
     def validate_runtime(self) -> list[str]:
         errors = []
-        if not os.path.isdir(self.venv_temp_dir):
-            errors.append(f"not a directory: venv_temp_dir={self.venv_temp_dir}")
         if not _validate_url(self.cascade_url):
             errors.append(f"not an url: cascade_url={self.cascade_url}")
         return errors

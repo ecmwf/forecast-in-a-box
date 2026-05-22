@@ -38,6 +38,7 @@ import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.run.db as run_db
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
+from forecastbox.domain.gateway.service import get_gateway_url
 from forecastbox.domain.run.background import execute_background
 from forecastbox.domain.run.cascade import RunOutputs
 from forecastbox.domain.run.db import CompilerRuntimeContext
@@ -46,7 +47,6 @@ from forecastbox.domain.run.exceptions import CompilationDetailCorrupted, Compil
 from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import Blueprint, Run
 from forecastbox.utility.auth import AuthContext
-from forecastbox.utility.config import config
 from forecastbox.utility.memcache import pop as pop_memcache
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import value_dt2str
@@ -253,7 +253,7 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
         try:
             response = client.request_response(
                 api.JobProgressRequest(job_ids=[job_id], detailed_report=detailed_report),
-                f"{config.cascade.cascade_url}",
+                get_gateway_url(),
             )
             response = cast(api.JobProgressResponse, response)
         except TimeoutError:

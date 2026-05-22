@@ -8,10 +8,9 @@
 # nor does it submit to any jurisdiction.
 
 """
-Manages the Run domain -- execution of python workflows using the `cascade`
-execution engine, based on a Blueprint.
+Manages the Gateway domain -- process lifecycle and connection URL used by
+other domains to execute and inspect workflow jobs.
 
-Depends on Blueprint, Glyph, Plugin and Gateway domains -- all are used when
-compiling and submitting a Run.
-Depended on by Experiment domain (which spawns Runs).
+Depends on utility config and Cascade runtime bindings.
+Depended on by Run domain and gateway/status routes.
 """
