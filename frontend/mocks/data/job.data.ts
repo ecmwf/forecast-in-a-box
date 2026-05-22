@@ -13,6 +13,7 @@
  */
 
 import type {
+  CompilationDetailResponse,
   JobExecuteRequest,
   JobExecuteResponse,
   JobExecutionDetail,
@@ -279,6 +280,141 @@ export function setMockOutputAvailable(
   if (!meta) return false
   meta.is_available = isAvailable
   return true
+}
+
+// ─── Compilation detail fixtures ──────────────────────────────────────────
+//
+// Only some runs have a fixture; the rest exercise the 404 "not available"
+// path that the cross-panel highlight gracefully degrades to.
+
+/** Tasks for `job-completed-001` (def-001: source → product → sink),
+ * a fully cross-block DAG with leaf tasks under each block. */
+const compilationDetailJobCompleted001: CompilationDetailResponse = {
+  tasks: [
+    {
+      task_id:
+        'earthkit.workflows.plugins.anemoi.inference._get_initial_conditions_from_config:a1b2c3d4',
+      block: 'block_source_1',
+      display_name:
+        'earthkit.workflows.plugins.anemoi.inference._get_initial_conditions_from_config:a1b2c3d4',
+      parents: [],
+    },
+    {
+      task_id: '_empty_payload:e5f6a7b8',
+      block: 'block_source_1',
+      display_name: '_empty_payload:e5f6a7b8',
+      parents: [
+        'earthkit.workflows.plugins.anemoi.inference._get_initial_conditions_from_config:a1b2c3d4',
+      ],
+    },
+    {
+      task_id:
+        'earthkit.workflows.plugins.anemoi.inference.run_as_earthkit_from_config:c9d0e1f2',
+      block: 'block_source_1',
+      display_name:
+        'earthkit.workflows.plugins.anemoi.inference.run_as_earthkit_from_config:c9d0e1f2',
+      parents: ['_empty_payload:e5f6a7b8'],
+    },
+    {
+      task_id: 'take:33445566778899aa',
+      block: 'block_product_1',
+      display_name: 'take:33445566778899aa',
+      parents: [
+        'earthkit.workflows.plugins.anemoi.inference.run_as_earthkit_from_config:c9d0e1f2',
+      ],
+    },
+    {
+      task_id:
+        'fiab_plugin_ecmwf.runtime.statistics.ensemble_mean:bbccddeeff001122',
+      block: 'block_product_1',
+      display_name:
+        'fiab_plugin_ecmwf.runtime.statistics.ensemble_mean:bbccddeeff001122',
+      parents: ['take:33445566778899aa'],
+    },
+    {
+      task_id: 'take:33445566fedcba98',
+      block: 'block_sink_1',
+      display_name: 'take:33445566fedcba98',
+      parents: [
+        'fiab_plugin_ecmwf.runtime.statistics.ensemble_mean:bbccddeeff001122',
+      ],
+    },
+    {
+      task_id: 'fiab_plugin_ecmwf.runtime.plots.map_plot:01234567abcdef89',
+      block: 'block_sink_1',
+      display_name: 'fiab_plugin_ecmwf.runtime.plots.map_plot:01234567abcdef89',
+      parents: ['take:33445566fedcba98'],
+    },
+    {
+      task_id: 'take:8899aabbccddeeff',
+      block: 'block_sink_1',
+      display_name: 'take:8899aabbccddeeff',
+      parents: [
+        'fiab_plugin_ecmwf.runtime.statistics.ensemble_mean:bbccddeeff001122',
+      ],
+    },
+    {
+      task_id: 'fiab_plugin_ecmwf.runtime.plots.map_plot:fedcba9876543210',
+      block: 'block_sink_1',
+      display_name: 'fiab_plugin_ecmwf.runtime.plots.map_plot:fedcba9876543210',
+      parents: ['take:8899aabbccddeeff'],
+    },
+  ],
+}
+
+/** Tasks for `job-running-002` (def-002: source → sink) — partial DAG. */
+const compilationDetailJobRunning002: CompilationDetailResponse = {
+  tasks: [
+    {
+      task_id:
+        'earthkit.workflows.plugins.anemoi.inference._get_initial_conditions_from_config:11aa22bb',
+      block: 'block_source_1',
+      display_name:
+        'earthkit.workflows.plugins.anemoi.inference._get_initial_conditions_from_config:11aa22bb',
+      parents: [],
+    },
+    {
+      task_id:
+        'earthkit.workflows.plugins.anemoi.inference.run_as_earthkit_from_config:33cc44dd',
+      block: 'block_source_1',
+      display_name:
+        'earthkit.workflows.plugins.anemoi.inference.run_as_earthkit_from_config:33cc44dd',
+      parents: [
+        'earthkit.workflows.plugins.anemoi.inference._get_initial_conditions_from_config:11aa22bb',
+      ],
+    },
+    {
+      task_id: 'take:55ee66ff77001122',
+      block: 'block_sink_1',
+      display_name: 'take:55ee66ff77001122',
+      parents: [
+        'earthkit.workflows.plugins.anemoi.inference.run_as_earthkit_from_config:33cc44dd',
+      ],
+    },
+  ],
+}
+
+/** Lookup keyed by run_id. Absence ⇒ backend would return 404. */
+const compilationDetailByRunId: Record<string, CompilationDetailResponse> = {
+  'job-completed-001': compilationDetailJobCompleted001,
+  'job-running-002': compilationDetailJobRunning002,
+  // job-errored-003 deliberately omitted to exercise the empty-state path.
+}
+
+export function getCompilationDetailFixture(
+  runId: string,
+): CompilationDetailResponse | undefined {
+  return compilationDetailByRunId[runId]
+}
+
+/** Add or replace a compilation-detail fixture for a given run.
+ * Intended for tests that need to pair a custom execution (via
+ * {@link injectMockExecution}) with a matching compilation DAG. */
+export function injectCompilationDetail(
+  runId: string,
+  fixture: CompilationDetailResponse,
+): void {
+  compilationDetailByRunId[runId] = fixture
 }
 
 export function createMockPngBlob(): Blob {

@@ -11,6 +11,7 @@
 import { Eye } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { OutputAdapter, OutputItem } from './types'
+import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
 import { Button } from '@/components/ui/button'
 import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
@@ -27,6 +28,14 @@ export function OutputCard({ item, adapter, onOpenViewer }: OutputCardProps) {
   const shortLabel = (adapter.shortLabel ?? adapter.label)(t)
   const filename = `${item.originalBlock}.${adapter.extension}`
 
+  // Read-only cross-panel highlight: outputs of the focused block lift,
+  // the rest fade. Card click still opens the viewer as usual.
+  const selectedBlockId = useExecutionHoverStore(
+    (state) => state.selectedBlockId,
+  )
+  const isSelectedBlock = selectedBlockId === item.originalBlock
+  const isOtherSelected = selectedBlockId !== null && !isSelectedBlock
+
   const handleOpenViewer = () => {
     if (Viewer) onOpenViewer(item, adapter)
   }
@@ -34,7 +43,14 @@ export function OutputCard({ item, adapter, onOpenViewer }: OutputCardProps) {
   const visibleActions = actions.filter((a) => a.isAvailable?.(item) ?? true)
 
   return (
-    <div className="w-full space-y-2 overflow-hidden rounded-lg border bg-card p-3 transition-colors hover:bg-muted/40">
+    <div
+      className={cn(
+        'w-full space-y-2 overflow-hidden rounded-lg border bg-card p-3 transition-all hover:bg-muted/40',
+        // Inset ring so the rightmost card in the grid doesn't get clipped.
+        isSelectedBlock && 'border-primary ring-2 ring-primary ring-inset',
+        isOtherSelected && 'opacity-40',
+      )}
+    >
       <div
         className={Viewer ? 'relative cursor-pointer' : 'relative'}
         role={Viewer ? 'button' : undefined}

@@ -68,6 +68,19 @@ export const JobExecutionDetailSchema = z.object({
   planned_block_ids: z.array(z.string()).nullable().optional(),
 })
 
+/** routes/run.py: CompilationDetailTask */
+export const CompilationDetailTaskSchema = z.object({
+  task_id: z.string(),
+  block: z.string(),
+  display_name: z.string(),
+  parents: z.array(z.string()),
+})
+
+/** routes/run.py: CompilationDetailResponse */
+export const CompilationDetailResponseSchema = z.object({
+  tasks: z.array(CompilationDetailTaskSchema),
+})
+
 /** routes/run.py: JobExecutionList */
 export const JobExecutionListSchema = z.object({
   runs: z.array(JobExecutionDetailSchema),
@@ -111,6 +124,10 @@ export type RunOutputMetadata = z.infer<typeof RunOutputMetadataSchema>
 export type RunOutputs = z.infer<typeof RunOutputsSchema>
 export type JobExecutionDetail = z.infer<typeof JobExecutionDetailSchema>
 export type JobExecutionList = z.infer<typeof JobExecutionListSchema>
+export type CompilationDetailTask = z.infer<typeof CompilationDetailTaskSchema>
+export type CompilationDetailResponse = z.infer<
+  typeof CompilationDetailResponseSchema
+>
 export type EnvironmentSpecification = z.infer<
   typeof EnvironmentSpecificationSchema
 >

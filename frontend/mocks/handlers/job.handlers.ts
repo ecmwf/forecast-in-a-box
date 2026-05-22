@@ -17,6 +17,7 @@ import {
   addExecution,
   deleteExecution,
   getAllExecutions,
+  getCompilationDetailFixture,
   getExecution,
   mockBlobForMime,
   restartExecution,
@@ -114,6 +115,35 @@ export const jobHandlers = [
     }
 
     return HttpResponse.json(toWireDetail(exec))
+  }),
+
+  http.get(API_ENDPOINTS.job.compilationDetail, async ({ request }) => {
+    await delay(120)
+
+    const url = new URL(request.url)
+    const runId = url.searchParams.get('run_id')
+    const blockId = url.searchParams.get('block_id')
+
+    if (!runId) {
+      return HttpResponse.json(
+        { detail: 'Missing run_id parameter' },
+        { status: 400 },
+      )
+    }
+
+    const fixture = getCompilationDetailFixture(runId)
+    if (!fixture) {
+      return HttpResponse.json(
+        { detail: `Compilation detail for run '${runId}' not found.` },
+        { status: 404 },
+      )
+    }
+
+    const tasks = blockId
+      ? fixture.tasks.filter((task) => task.block === blockId)
+      : fixture.tasks
+
+    return HttpResponse.json({ tasks })
   }),
 
   http.post(API_ENDPOINTS.job.restart, async ({ request }) => {

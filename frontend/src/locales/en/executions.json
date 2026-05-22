@@ -28,6 +28,8 @@
   "tabs": {
     "outputs": "Outputs",
     "logs": "Logs",
+    "compilation": "Compilation",
+    "graph": "Graph",
     "specification": "Specification"
   },
   "actions": {
@@ -166,6 +168,37 @@
       "image-raster": { "label": "Image" },
       "image-vector": { "label": "SVG" },
       "pdf": { "label": "PDF" }
+    }
+  },
+  "compilation": {
+    "experimental": "Experimental view — subject to change or complete removal.",
+    "fullDescription": "Task-level graph compiled from this run. Click a block on the left to focus its cluster; click a task to focus its block.",
+    "forceDescription": "Drag a task to rearrange, click a block on the left to focus its cluster, hover to highlight lineage.",
+    "entryHint": "▶ marks entry points (no upstream tasks)",
+    "layoutLayered": "Layered",
+    "layoutOrganic": "Organic",
+    "unavailable": "Compilation detail unavailable",
+    "unavailableDescription": "This run was submitted before compilation detail was recorded, or its cache entry has expired.",
+    "fetchError": "Could not load compilation detail.",
+    "tooLargeTitle": "Layered view unavailable for graphs this large",
+    "tooLargeBody": "This run compiled into {{count}} tasks. The Layered view is limited to {{limit}} tasks because it can freeze the browser at larger sizes. The Graph tab uses canvas rendering and handles much larger DAGs.",
+    "openGraphTab": "Open Graph tab",
+    "taskCount_one": "{{count}} task",
+    "taskCount_other": "{{count}} tasks",
+    "close": "Close",
+    "noTasks": "No tasks compiled for this run.",
+    "taskKind": {
+      "select": "Select",
+      "inference": "Inference",
+      "payload": "Payload",
+      "plot": "Plot",
+      "transform": "Transform",
+      "unknown": "Task"
+    },
+    "fields": {
+      "taskId": "Task ID",
+      "parents": "Parents",
+      "kind": "Kind"
     }
   },
   "logs": {

@@ -12,14 +12,17 @@ import { memo } from 'react'
 import { Handle, Position } from '@xyflow/react'
 import { CheckCircle2, Loader2 } from 'lucide-react'
 import type { NodeProps } from '@xyflow/react'
-import type { FableNodeData } from '@/features/fable-builder/utils/fable-to-graph'
 import type { BlockKind } from '@/api/types/fable.types'
+import type { FableNodeData } from '@/features/fable-builder/utils/fable-to-graph'
 import { BLOCK_KIND_METADATA, getBlockKindIcon } from '@/api/types/fable.types'
 import {
   useBlockProgress,
   useShowConfig,
 } from '@/features/executions/components/RunCanvas'
-import { useIsBlockHovered } from '@/features/executions/stores/executionHoverStore'
+import {
+  useIsBlockHovered,
+  useIsBlockSelected,
+} from '@/features/executions/stores/executionHoverStore'
 import { cn } from '@/lib/utils'
 
 const NODE_TYPE_TO_KIND: Record<string, BlockKind> = {
@@ -29,12 +32,8 @@ const NODE_TYPE_TO_KIND: Record<string, BlockKind> = {
   sinkBlock: 'sink',
 }
 
-/**
- * Vertical centre of the node's header row, in pixels from the top of the
- * node. Keeping handles pinned here means they line up horizontally across
- * nodes regardless of how tall the optional config block makes the body —
- * which is what makes a `smoothstep` edge collapse to a straight line.
- */
+/** Y-offset of the node header centre. Keeping handles pinned here lets
+ * smoothstep edges collapse to straight lines regardless of body height. */
 const HANDLE_Y_PX = 32
 /** Vertical spacing between adjacent handles on a multi-input target. */
 const MULTI_HANDLE_GAP_PX = 12
@@ -44,6 +43,7 @@ export const RunNode = memo(function ({ data, type }: NodeProps) {
   const showConfig = useShowConfig()
   const { completedSet, runningSet, plannedSet } = useBlockProgress()
   const isHovered = useIsBlockHovered(nodeData.instanceId)
+  const isSelected = useIsBlockSelected(nodeData.instanceId)
   const kind = NODE_TYPE_TO_KIND[type] ?? 'source'
   const kindMeta = BLOCK_KIND_METADATA[kind]
   const Icon = getBlockKindIcon(kind)
@@ -66,12 +66,14 @@ export const RunNode = memo(function ({ data, type }: NodeProps) {
   return (
     <div
       className={cn(
-        'relative rounded-lg border bg-card shadow-sm transition-colors',
+        'relative cursor-pointer rounded-lg border bg-card shadow-sm transition-colors',
         showConfig && configEntries.length > 0 ? 'w-[200px]' : 'w-[140px]',
         isCompleted && 'border-l-2 border-l-emerald-500',
         isRunning && 'animate-pulse border-amber-500',
         isPlannedIdle && 'opacity-60',
-        isHovered && 'bg-primary/10',
+        isHovered && !isSelected && 'bg-primary/10',
+        isSelected &&
+          'ring-2 ring-primary ring-offset-2 ring-offset-background',
       )}
     >
       {inputNames.map((inputName, i) => {

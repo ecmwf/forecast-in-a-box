@@ -241,6 +241,19 @@
   }
 }
 
+/* Compilation-drawer task nodes fade and lift into place; stagger is applied
+ * via per-node `animation-delay` so the reveal walks the DAG root-first. */
+@keyframes task-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Skeleton pulse for "currently processing" — a touch more pronounced than
  * Tailwind's default `animate-pulse` (1 → 0.5 @ 2s). */
 @keyframes pulse-strong {
