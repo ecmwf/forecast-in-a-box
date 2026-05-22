@@ -16,11 +16,11 @@ def fresh_registry(monkeypatch: pytest.MonkeyPatch) -> TunnelRegistry:
 
 
 @pytest.fixture
-def ssh_calls(monkeypatch: pytest.MonkeyPatch) -> list[tuple[list[str], bool]]:
-    calls: list[tuple[list[str], bool]] = []
+def ssh_calls(monkeypatch: pytest.MonkeyPatch) -> list[tuple[list[str], bool, bool]]:
+    calls: list[tuple[list[str], bool, bool]] = []
 
-    def fake_run(args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
-        calls.append((args, check))
+    def fake_run(args: list[str], *, check: bool = True, start_new_session: bool = False) -> subprocess.CompletedProcess[str]:
+        calls.append((args, check, start_new_session))
         return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
 
     monkeypatch.setattr(tunnel, "_ssh_run", fake_run)
@@ -30,7 +30,7 @@ def ssh_calls(monkeypatch: pytest.MonkeyPatch) -> list[tuple[list[str], bool]]:
 def test_setup_registers_tunnel_and_builds_master_command(
     fresh_registry: TunnelRegistry,
     monkeypatch: pytest.MonkeyPatch,
-    ssh_calls: list[tuple[list[str], bool]],
+    ssh_calls: list[tuple[list[str], bool, bool]],
 ) -> None:
     monkeypatch.setattr(tunnel, "claim_free_port", lambda: 21001)
     monkeypatch.setattr(tunnel, "_claim_remote_port", lambda: 31001)
@@ -70,6 +70,7 @@ def test_setup_registers_tunnel_and_builds_master_command(
                 "fiabServer",
             ],
             True,
+            True,
         )
     ]
 
@@ -81,14 +82,14 @@ def test_setup_retries_on_bind_failure(
     local_ports = iter([21001, 21001])
     remote_ports = iter([31001, 31002])
     control_paths = iter(["/tmp/forecastbox-ssh/a.sock", "/tmp/forecastbox-ssh/b.sock"])
-    ssh_calls: list[list[str]] = []
+    ssh_calls: list[tuple[list[str], bool, bool]] = []
 
     monkeypatch.setattr(tunnel, "claim_free_port", lambda: next(local_ports))
     monkeypatch.setattr(tunnel, "_claim_remote_port", lambda: next(remote_ports))
     monkeypatch.setattr(tunnel, "_new_control_path", lambda: next(control_paths))
 
-    def fake_run(args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
-        ssh_calls.append(args)
+    def fake_run(args: list[str], *, check: bool = True, start_new_session: bool = False) -> subprocess.CompletedProcess[str]:
+        ssh_calls.append((args, check, start_new_session))
         if len(ssh_calls) == 1:
             raise subprocess.CalledProcessError(
                 returncode=255,
@@ -104,54 +105,62 @@ def test_setup_retries_on_bind_failure(
     assert handle.remote_port == 31002
     assert handle in fresh_registry._handles
     assert ssh_calls == [
-        [
-            "ssh",
-            "-M",
-            "-f",
-            "-N",
-            "-L",
-            "21001:localhost:31001",
-            "-o",
-            "BatchMode=yes",
-            "-o",
-            "ConnectTimeout=10",
-            "-o",
-            "ControlMaster=auto",
-            "-o",
-            "ControlPath=/tmp/forecastbox-ssh/a.sock",
-            "-o",
-            "ControlPersist=10m",
-            "-o",
-            "ExitOnForwardFailure=yes",
-            "fiabServer",
-        ],
-        [
-            "ssh",
-            "-M",
-            "-f",
-            "-N",
-            "-L",
-            "21001:localhost:31002",
-            "-o",
-            "BatchMode=yes",
-            "-o",
-            "ConnectTimeout=10",
-            "-o",
-            "ControlMaster=auto",
-            "-o",
-            "ControlPath=/tmp/forecastbox-ssh/b.sock",
-            "-o",
-            "ControlPersist=10m",
-            "-o",
-            "ExitOnForwardFailure=yes",
-            "fiabServer",
-        ],
+        (
+            [
+                "ssh",
+                "-M",
+                "-f",
+                "-N",
+                "-L",
+                "21001:localhost:31001",
+                "-o",
+                "BatchMode=yes",
+                "-o",
+                "ConnectTimeout=10",
+                "-o",
+                "ControlMaster=auto",
+                "-o",
+                "ControlPath=/tmp/forecastbox-ssh/a.sock",
+                "-o",
+                "ControlPersist=10m",
+                "-o",
+                "ExitOnForwardFailure=yes",
+                "fiabServer",
+            ],
+            True,
+            True,
+        ),
+        (
+            [
+                "ssh",
+                "-M",
+                "-f",
+                "-N",
+                "-L",
+                "21001:localhost:31002",
+                "-o",
+                "BatchMode=yes",
+                "-o",
+                "ConnectTimeout=10",
+                "-o",
+                "ControlMaster=auto",
+                "-o",
+                "ControlPath=/tmp/forecastbox-ssh/b.sock",
+                "-o",
+                "ControlPersist=10m",
+                "-o",
+                "ExitOnForwardFailure=yes",
+                "fiabServer",
+            ],
+            True,
+            True,
+        ),
     ]
 
 
 def test_status_execute_and_stop_use_existing_control_socket(
     fresh_registry: TunnelRegistry,
-    ssh_calls: list[tuple[list[str], bool]],
+    ssh_calls: list[tuple[list[str], bool, bool]],
 ) -> None:
     handle = ConnectionHandle(
         host="user@fiabServer",
@@ -181,6 +190,7 @@ def test_status_execute_and_stop_use_existing_control_socket(
                 "user@fiabServer",
             ],
             False,
+            False,
         ),
         (
             [
@@ -195,6 +205,7 @@ def test_status_execute_and_stop_use_existing_control_socket(
                 "nohup uv run python -m cascade.gateway --port 22001 >/dev/null 2>&1 < /dev/null &",
             ],
             True,
+            False,
         ),
         (
             [
@@ -210,6 +221,7 @@ def test_status_execute_and_stop_use_existing_control_socket(
                 "user@fiabServer",
             ],
             True,
+            False,
         ),
     ]
 

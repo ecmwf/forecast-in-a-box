@@ -8,6 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 import logging
+import tempfile
 import time
 from pathlib import Path
 from typing import Literal
@@ -94,7 +95,7 @@ def execute_cascade(spec: ExecutionSpecification) -> SubmitJobResponse:
         job=JobSpec(
             workers_per_host=workers_per_host,
             hosts=hosts,
-            envvars=env_vars,
+            envvars={},
             use_slurm=False,
             job_instance=JobInstanceRich(jobInstance=job, checkpointSpec=None),
         )

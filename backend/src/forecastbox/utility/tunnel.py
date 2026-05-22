@@ -65,8 +65,17 @@ def _ssh_base_args(handle: "ConnectionHandle") -> list[str]:
     ]
 
 
-def _ssh_run(args: Sequence[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(list(args), check=check, capture_output=True, text=True)
+def _ssh_run(
+    args: Sequence[str],
+    *,
+    check: bool = True,
+    start_new_session: bool = False,
+) -> subprocess.CompletedProcess[str]:
+    """The start_new_session prevents interrupt / Ctrl-C stopping the command
+    too early -- we use this when we setup a long running ssh tunnel, because
+    those we want to explicitly exit ourselves, after we have sent a gateway
+    termination command over it."""
+    return subprocess.run(list(args), check=check, capture_output=True, text=True, start_new_session=start_new_session)
 
 
 def _is_bind_failure(exc: subprocess.CalledProcessError) -> bool:
@@ -166,7 +175,8 @@ def setup(
                     "-o",
                     "ExitOnForwardFailure=yes",
                     host,
-                ]
+                ],
+                start_new_session=True,  # NOTE detaching to prevent early interrupt
             )
         except subprocess.CalledProcessError as exc:
             last_error = exc
