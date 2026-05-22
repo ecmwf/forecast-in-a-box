@@ -61,10 +61,6 @@ interface UiState {
   journalShowFlow: boolean
   setJournalShowFlow: (value: boolean) => void
 
-  // Temporary: render mini-flow previews in monochrome (to be removed).
-  journalFlowMonochrome: boolean
-  setJournalFlowMonochrome: (value: boolean) => void
-
   // Reset store
   reset: () => void
 }
@@ -81,7 +77,6 @@ const initialState = {
   artifactsViewMode: 'table' as AdminViewMode,
   timeZone: 'UTC',
   journalShowFlow: false,
-  journalFlowMonochrome: false,
 }
 
 export const useUiStore = create<UiState>()(
@@ -131,8 +126,6 @@ export const useUiStore = create<UiState>()(
 
         // Forecast Journal flow preview (session-only — not persisted)
         setJournalShowFlow: (journalShowFlow) => set({ journalShowFlow }),
-        setJournalFlowMonochrome: (journalFlowMonochrome) =>
-          set({ journalFlowMonochrome }),
 
         // Reset to initial state
         reset: () => set(initialState),

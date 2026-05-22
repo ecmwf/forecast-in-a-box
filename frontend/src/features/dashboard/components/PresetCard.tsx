@@ -19,7 +19,6 @@ import { useFableRetrieve } from '@/api/hooks/useFable'
 import { FableMiniFlow } from '@/features/journal/components/FableMiniFlow'
 import { JournalChip } from '@/features/journal/components/JournalChip'
 import { RunMetadataDialog } from '@/features/journal/components/RunMetadataDialog'
-import { useUiStore } from '@/stores/uiStore'
 import { cn } from '@/lib/utils'
 
 export function PresetCard({
@@ -30,7 +29,6 @@ export function PresetCard({
   onToggleFavourite: () => void
 }) {
   const { t } = useTranslation('journal')
-  const showFlow = useUiStore((state) => state.journalShowFlow)
   const { data: blueprint } = useFableRetrieve(preset.blueprintId)
   const [metadataOpen, setMetadataOpen] = useState(false)
 
@@ -94,9 +92,9 @@ export function PresetCard({
         </div>
       )}
 
-      {showFlow && builder && (
+      {builder && (
         <div className="pt-1">
-          <FableMiniFlow builder={builder} />
+          <FableMiniFlow builder={builder} monochrome={false} />
         </div>
       )}
 

@@ -45,8 +45,6 @@ export function ForecastRunSearchHeader({
   const { t } = useTranslation('journal')
   const showFlow = useUiStore((state) => state.journalShowFlow)
   const setShowFlow = useUiStore((state) => state.setJournalShowFlow)
-  const monochrome = useUiStore((state) => state.journalFlowMonochrome)
-  const setMonochrome = useUiStore((state) => state.setJournalFlowMonochrome)
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-border p-4 sm:p-6">
@@ -61,17 +59,6 @@ export function ForecastRunSearchHeader({
             aria-label={t('flowToggle')}
           />
         </div>
-        {/* Monochrome mini-flow toggle. */}
-        {showFlow && (
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <span>{t('flowMonochrome')}</span>
-            <Switch
-              checked={monochrome}
-              onCheckedChange={setMonochrome}
-              aria-label={t('flowMonochrome')}
-            />
-          </div>
-        )}
       </div>
 
       {/* Controls — search, status filters, group-by. Filters wrap rather than hide. */}

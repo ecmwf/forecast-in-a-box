@@ -16,6 +16,8 @@
 
 import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
+import type { FableBuilderV1 } from '@/api/types/fable.types'
+import { FableMiniFlow } from '@/features/journal/components/FableMiniFlow'
 import { H3, P } from '@/components/base/typography'
 import {
   Tooltip,
@@ -34,6 +36,8 @@ interface GettingStartedCardProps {
   disabledMessage?: string
   iconColor?: string
   borderColor?: string
+  /** When provided, renders a colour mini-flow preview under the description. */
+  previewFable?: FableBuilderV1
   onClick?: () => void
 }
 
@@ -47,6 +51,7 @@ export function GettingStartedCard({
   disabledMessage,
   iconColor = 'bg-primary/10 text-primary',
   borderColor = 'border-border hover:border-blue-400',
+  previewFable,
   onClick,
 }: GettingStartedCardProps) {
   const { t } = useTranslation('dashboard')
@@ -86,6 +91,12 @@ export function GettingStartedCard({
       <P className="mb-4 leading-relaxed text-muted-foreground">
         {description}
       </P>
+
+      {previewFable && !disabled && (
+        <div className="mb-4">
+          <FableMiniFlow builder={previewFable} monochrome={false} />
+        </div>
+      )}
 
       <div className="mt-auto flex flex-wrap gap-2">
         {tags.map((tag) => (

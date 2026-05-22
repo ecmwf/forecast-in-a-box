@@ -14,7 +14,15 @@ import { FableBuilderPage } from '@/features/fable-builder/components/FableBuild
 
 const searchSchema = z.object({
   preset: z
-    .enum(['quick-start', 'standard', 'custom-model', 'dataset'])
+    .enum([
+      'quick-start',
+      'standard',
+      'custom-model',
+      'dataset',
+      'ecmwf-open-data',
+      'aifs-forecast',
+      'aifs-dataset',
+    ])
     .optional(),
   state: z.string().optional(),
   fableId: z.string().optional(),

@@ -137,7 +137,11 @@ const PresetRow = memo(function ({
 
         {/* Flow preview — aligned with the row actions. */}
         {showFlow && builder && (
-          <FableMiniFlow builder={builder} className="max-w-[18rem] shrink-0" />
+          <FableMiniFlow
+            builder={builder}
+            className="max-w-[18rem] shrink-0"
+            monochrome
+          />
         )}
 
         {/* Actions */}
@@ -255,8 +259,6 @@ export function PresetsPage() {
   const panelShadow = useUiStore((state) => state.panelShadow)
   const showFlow = useUiStore((state) => state.journalShowFlow)
   const setShowFlow = useUiStore((state) => state.setJournalShowFlow)
-  const monochrome = useUiStore((state) => state.journalFlowMonochrome)
-  const setMonochrome = useUiStore((state) => state.setJournalFlowMonochrome)
 
   const { presets, deletePreset, toggleFavourite } = useConfigPresets()
   const [query, setQuery] = useState('')
@@ -308,17 +310,6 @@ export function PresetsPage() {
                 aria-label={t('journal:flowToggle')}
               />
             </div>
-            {/* Monochrome mini-flow toggle. */}
-            {showFlow && (
-              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <span>{t('journal:flowMonochrome')}</span>
-                <Switch
-                  checked={monochrome}
-                  onCheckedChange={setMonochrome}
-                  aria-label={t('journal:flowMonochrome')}
-                />
-              </div>
-            )}
           </div>
 
           {/* Faceted search — shared with the Forecast Journal — plus tabs. */}

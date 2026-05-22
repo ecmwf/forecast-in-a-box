@@ -226,10 +226,16 @@
     "quickStartDescription": "Ready to run with optimized defaults",
     "standardName": "Standard Forecast",
     "standardDescription": "Standard forecast data pipeline",
-    "customModelName": "Custom Forecast",
-    "customModelDescription": "Start with empty canvas for full customization",
+    "customModelName": "Start from Scratch",
+    "customModelDescription": "Empty canvas — build a forecast with full control",
     "datasetName": "Open Data Forecast",
-    "datasetDescription": "Start with ECMWF open data as source"
+    "datasetDescription": "Start with ECMWF open data as source",
+    "ecmwfOpenDataName": "ECMWF Open Data",
+    "ecmwfOpenDataDescription": "Ensemble-mean 2 m temperature maps from ECMWF IFS Open Data",
+    "aifsForecastName": "AIFS 72h Forecast",
+    "aifsForecastDescription": "72-hour AIFS Open Data forecast with global PDF and European PNG map plots",
+    "aifsDatasetName": "AIFS Ensemble Dataset",
+    "aifsDatasetDescription": "10-member AIFS Open Data ensemble exported as a Zarr archive"
   },
   "draftRestored": {
     "justNow": "just now",

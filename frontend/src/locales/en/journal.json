@@ -5,7 +5,6 @@
   "viewAll": "View all",
   "clearFilters": "Clear filters",
   "flowToggle": "Flow preview",
-  "flowMonochrome": "Monochrome",
   "filters": {
     "label": "Filter by status",
     "all": "All",

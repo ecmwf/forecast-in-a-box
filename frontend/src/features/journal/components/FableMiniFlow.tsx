@@ -23,7 +23,6 @@ import {
 } from '@/features/fable-builder/utils/fable-to-graph'
 import { layoutNodes } from '@/features/fable-builder/utils/layout-blocks'
 import { cn } from '@/lib/utils'
-import { useUiStore } from '@/stores/uiStore'
 
 const NODE_W = 100
 const NODE_H = 26
@@ -49,7 +48,7 @@ const KIND_STYLE: Record<BlockKind, { rect: string; text: string }> = {
   },
 }
 
-/** Neutral node styling for the monochrome toggle. */
+/** Neutral node styling when `monochrome` is on. */
 const MONO_STYLE = {
   rect: 'fill-slate-100 stroke-slate-300 dark:fill-slate-800 dark:stroke-slate-600',
   text: 'fill-slate-600 dark:fill-slate-300',
@@ -62,14 +61,15 @@ function truncate(label: string): string {
 export function FableMiniFlow({
   builder,
   className,
+  monochrome,
 }: {
   builder: FableBuilderV1
   className?: string
+  monochrome: boolean
 }) {
   const { t } = useTranslation('journal')
   const { data: catalogue } = useBlockCatalogue()
   const arrowId = useId()
-  const monochrome = useUiStore((state) => state.journalFlowMonochrome)
 
   const graph = useMemo(() => {
     if (!catalogue) return null
