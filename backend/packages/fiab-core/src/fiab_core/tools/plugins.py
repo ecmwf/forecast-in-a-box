@@ -1,4 +1,5 @@
 import importlib.metadata
+import json
 import os
 from typing import Callable, cast
 
@@ -30,6 +31,18 @@ def _detect_editable_install(distname: str) -> str:
         if hasattr(origin, "url") and isinstance(origin.url, str) and origin.url.startswith("file://"):
             # NOTE this doesnt work well for non-std layout but again we can restrict to only that
             return "-e " + origin.url[len("file://") :]
+
+    direct_url_text = distribution.read_text("direct_url.json")
+    if direct_url_text:
+        info = json.loads(direct_url_text)
+        if not info.get("dir_info", {}).get("editable"):
+            return distname
+
+        url = info.get("url", "")
+        if not url.startswith("file://"):
+            return distname
+        return "-e " + url[len("file://") :]
+
     return distname
 
 

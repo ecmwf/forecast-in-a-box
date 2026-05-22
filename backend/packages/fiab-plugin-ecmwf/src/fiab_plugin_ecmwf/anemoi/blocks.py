@@ -13,7 +13,8 @@ from typing import Any
 
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
-from earthkit.workflows.plugins.anemoi.fluent import Inference
+from earthkit.workflows.plugins.anemoi.fluent import Inference, get_initial_conditions
+from earthkit.workflows.plugins.anemoi.types import DATE
 from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import (
     ActionLookup,
@@ -30,11 +31,8 @@ from fiab_core.tools.blocks import Source, Transform
 from fiab_plugin_ecmwf.qubed_utils import axes, contains, dimensions, expand
 
 from .utils import (
+    CheckpointArtifact,
     get_checkpoint_enum_type,
-    get_environment,
-    get_local_path,
-    get_model_output,
-    validate_anemoi_block,
 )
 
 INPUT_SOURCE_EXTRAS: dict[str, list[str]] = {
@@ -42,40 +40,65 @@ INPUT_SOURCE_EXTRAS: dict[str, list[str]] = {
     "polytope": ["anemoi-plugins-ecmwf-inference[polytope]"],
     "mars": ["earthkit-data[mars]"],
 }
-INPUT_SOURCE_CONFIGURATION_OPTIONS = {"polytope": {"collection": "initial-conditions"}}
+
+ENSEMBLE = ConfigurationOptionId("number")
+CHECKPOINT = ConfigurationOptionId("checkpoint")
+LEAD_TIME = ConfigurationOptionId("lead_time")
+INPUT_SOURCE = ConfigurationOptionId("input_source")
+BASE_TIME = ConfigurationOptionId("base_time")
 
 
 class AnemoiBuilder:
     """Utility to build an Inference from an Anemoi checkpoint, for use in both Source and Transform blocks"""
 
     def __init__(self, checkpoint: str) -> None:
-        self.checkpoint = checkpoint
-        self.artifact_id = CompositeArtifactId.from_str(checkpoint)
+        self.checkpoint = CheckpointArtifact(checkpoint)
+        self.artifact_id = self.checkpoint.artifact
 
+    @property
     def _local_path(self) -> Path:
-        return get_local_path(self.artifact_id)
+        "Get local path to the checkpoint artifact, assumes it is already locally available, does not trigger download"
+        return self.checkpoint.get_local_path()
 
-    def build(self, lead_time: int, *, extra_environment: list[str] | None = None) -> Inference:  # type: ignore[reportReturnType]
-        import functools
+    def inference(self, lead_time: int, *, extra_environment: list[str] | None = None) -> Inference:
+        """Build an Inference action for this checkpoint and lead time, with the appropriate environment for the input source if specified"""
+        env = self.checkpoint.get_environment()
+        env.extend(extra_environment or [])
 
-        class WrappedInference(Inference):
-            @functools.wraps(Inference.from_input)
-            def from_input(s, *a: Any, **k: Any) -> Action:  # type: ignore[reportIncompatibleMethodOverride, reportSelfClsParameterName]
-                return super().from_input(*a, **k, payload_metadata={"artifacts": [self.artifact_id]})
-
-            @functools.wraps(Inference.from_initial_conditions)
-            def from_initial_conditions(s, *a: Any, **k: Any) -> Action:  # type: ignore[reportIncompatibleMethodOverride, reportSelfClsParameterName]
-                return super().from_initial_conditions(*a, **k, payload_metadata={"artifacts": [self.artifact_id]})
-
-        env = get_environment(self.artifact_id)
-        if extra_environment:
-            env.extend(extra_environment)
-
-        return WrappedInference(
-            ckpt=self._local_path(),
+        return Inference(
+            ckpt=self._local_path,
             lead_time=lead_time,
             environment=env,
-            expansion_qube=get_model_output(self.artifact_id, lead_time=lead_time).dataqube,
+            expansion_qube=self.checkpoint.get_model_output(lead_time=lead_time).dataqube,
+        )
+
+    def from_input(self, input_source: str, date: DATE, lead_time: int, ensemble: int = 1, **k: Any) -> Action:
+        input_configuration = self.checkpoint.get_input_configuration(input_source)
+        return self.inference(lead_time=lead_time, extra_environment=INPUT_SOURCE_EXTRAS.get(input_source)).from_input(
+            input=input_configuration,
+            date=date,
+            lead_time=lead_time,
+            ensemble_members=ensemble,
+            **k,
+            payload_metadata={"artifacts": [self.artifact_id]},
+        )
+
+    def from_initial_conditions(self, initial_conditions: Any, lead_time: int, ensemble: int = 1, **k: Any) -> Action:
+        return self.inference(lead_time=lead_time).from_initial_conditions(
+            initial_conditions, ensemble_members=ensemble, **k, payload_metadata={"artifacts": [self.artifact_id]}
+        )
+
+    def get_initial_conditions(self, input_source: str, date: DATE, **k: Any) -> Action:
+        env = self.checkpoint.get_environment()
+        env.extend(INPUT_SOURCE_EXTRAS.get(input_source, []))
+
+        return get_initial_conditions(
+            ckpt=self._local_path,
+            input=self.checkpoint.get_input_configuration(input_source),
+            date=date,
+            environment=env,
+            payload_metadata={"artifacts": [self.artifact_id]},
+            **k,
         )
 
 
@@ -85,80 +108,122 @@ class AnemoiSource(Source):
     inputs: list[str] = []
 
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
-        ConfigurationOptionId("checkpoint"): BlockConfigurationOption(
+        CHECKPOINT: BlockConfigurationOption(
             title="Anemoi Checkpoint",
             description="Anemoi checkpoint name",
             value_type=get_checkpoint_enum_type(),
         ),
-        ConfigurationOptionId("input_source"): BlockConfigurationOption(
+        INPUT_SOURCE: BlockConfigurationOption(
             title="Input Source",
             description="Source of the initial conditions",
-            value_type="enumClosed['mars', 'opendata', 'polytope']",
+            value_type="enumOpen['mars', 'opendata', 'polytope']",
+            default_value="opendata",
         ),
-        ConfigurationOptionId("lead_time"): BlockConfigurationOption(
+        LEAD_TIME: BlockConfigurationOption(
             title="Lead time",
             description="Lead time of the forecast",
             value_type="int",
         ),
-        ConfigurationOptionId("base_time"): BlockConfigurationOption(
+        BASE_TIME: BlockConfigurationOption(
             title="Base time",
             description="Base time of the forecast",
             value_type="datetime",
         ),
-        ConfigurationOptionId("ensemble_members"): BlockConfigurationOption(
+        ENSEMBLE: BlockConfigurationOption(
             title="Ensemble Members",
-            description="Number of ensemble members, default is 1.",
+            description="Number of ensemble members, default is 1 - deterministic.",
             value_type="int",
+            default_value="1",
         ),
     }
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        ensemble_members = block.config_as_int("ensemble_members")
+        ensemble_members = block.config_as_int(ENSEMBLE)
         if ensemble_members < 1:
-            return Either.error("Ensemble members must be an int and positive")
+            return Either.error("Ensemble members must be an int, positive and non zero.")
 
-        result = validate_anemoi_block(block)
-        if result.e or not result.t:
-            return Either.error(result.e)
+        qubed_output = CheckpointArtifact(CompositeArtifactId.from_str(block.config_as_str(CHECKPOINT))).get_model_output(
+            lead_time=block.config_as_int(LEAD_TIME)
+        )
+        if ensemble_members > 1:
+            qubed_output = expand(qubed_output, {"number": range(1, ensemble_members + 1)})
+        return Either.ok(qubed_output)
 
-        qubed_instance = expand(result.t, {"number": range(1, ensemble_members + 1)})
-        return Either.ok(qubed_instance)
-
-    def compile(
+    def compile(  # type:ignore[invalid-argument] # semigroup
         self,
         inputs: ActionLookup,
         block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
-        checkpoint = block.config_as_str("checkpoint")
-        lead_time = block.config_as_int("lead_time")
-        input_source = block.config_as_str("input_source")
-        ensemble_members = block.config_as_int("ensemble_members")
 
-        inference = AnemoiBuilder(checkpoint).build(lead_time=lead_time, extra_environment=INPUT_SOURCE_EXTRAS.get(input_source, []))
-        if input_source in INPUT_SOURCE_CONFIGURATION_OPTIONS and not isinstance(input_source, dict):
-            input_source = {input_source: INPUT_SOURCE_CONFIGURATION_OPTIONS[input_source]}
+        input_source = block.config_as_str(INPUT_SOURCE)
+        builder = AnemoiBuilder(block.config_as_str(CHECKPOINT))
 
-        action = inference.from_input(
-            input_source,
-            date=block.config_as_datetime("base_time"),
-            ensemble_members=ensemble_members,
+        action = builder.from_input(
+            input_source=input_source,
+            lead_time=block.config_as_int(LEAD_TIME),
+            date=block.config_as_datetime(BASE_TIME),
+            ensemble=block.config_as_int(ENSEMBLE),
         )
+        return Either.ok(action)
+
+
+class AnemoiInputSource(Source):
+    title: str = "Anemoi Model Input Source"
+    description: str = "Get the initial conditions for an Anemoi forecast, from a source, no forecast output."
+    inputs: list[str] = []
+
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
+        CHECKPOINT: BlockConfigurationOption(
+            title="Anemoi Checkpoint",
+            description="Anemoi checkpoint name",
+            value_type=get_checkpoint_enum_type(),
+        ),
+        INPUT_SOURCE: BlockConfigurationOption(
+            title="Input Source",
+            description="Source of the initial conditions",
+            value_type="enumOpen['mars', 'opendata', 'polytope']",
+            default_value="opendata",
+        ),
+        BASE_TIME: BlockConfigurationOption(
+            title="Base time",
+            description="Base time of the forecast",
+            value_type="datetime",
+        ),
+    }
+
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        return Either.ok(QubedOutput(dataqube=CheckpointArtifact(block.config_as_str(CHECKPOINT)).get_model_input()))
+
+    def compile(  # type:ignore[invalid-argument] # semigroup
+        self,
+        inputs: ActionLookup,
+        block_id: BlockInstanceId,
+        block: BlockInstance,
+    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
+
+        builder = AnemoiBuilder(block.config_as_str(CHECKPOINT))
+
+        action = builder.get_initial_conditions(
+            input_source=block.config_as_str(INPUT_SOURCE),
+            date=block.config_as_datetime(BASE_TIME),
+        )
+
         return Either.ok(action)
 
 
 class AnemoiTransform(Transform):
     title: str = "Anemoi Model Transform"
-    description: str = "Initialise an Anemoi model from an existing datasource"
+    description: str = "Run an Anemoi model from a prior node"
     inputs: list[str] = ["dataset"]
 
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
-        ConfigurationOptionId("checkpoint"): BlockConfigurationOption(
+        CHECKPOINT: BlockConfigurationOption(
             title="Anemoi Checkpoint",
             description="Anemoi checkpoint name",
             value_type=get_checkpoint_enum_type(),
         ),
-        ConfigurationOptionId("lead_time"): BlockConfigurationOption(
+        LEAD_TIME: BlockConfigurationOption(
             title="Lead time",
             description="Lead time of the forecast",
             value_type="int",
@@ -166,33 +231,32 @@ class AnemoiTransform(Transform):
     }
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        # TODO: Validate that initial conditions are fully provided
-        result = validate_anemoi_block(block)
-        if result.e or not result.t:
-            return Either.error(result.e)
+        qubed_input = CheckpointArtifact(block.config_as_str(CHECKPOINT)).get_model_input()
+        if not contains(inputs["dataset"], qubed_input):
+            difference_qube = qubed_input ^ inputs["dataset"].dataqube
+            return Either.error(f"Input dataset is not compatible with the model checkpoint. Difference in qubes: {difference_qube}")
 
-        qubed_instance = result.t
+        qubed_output = CheckpointArtifact(block.config_as_str(CHECKPOINT)).get_model_output(lead_time=block.config_as_int(LEAD_TIME))
+
         input_dataset = inputs["dataset"]
         if contains(input_dataset, "number"):
-            qubed_instance = expand(qubed_instance, {"number": axes(input_dataset)["number"]})
-        return Either.ok(qubed_instance)
+            qubed_output = expand(qubed_output, {"number": axes(input_dataset)["number"]})
+        return Either.ok(qubed_output)
 
-    def compile(
+    def compile(  # type:ignore[invalid-argument] # semigroup
         self,
         inputs: ActionLookup,
         block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
-        checkpoint = block.config_as_str("checkpoint")
-        lead_time = block.config_as_int("lead_time")
 
-        inference = AnemoiBuilder(checkpoint).build(lead_time=lead_time)
-        action = inference.from_initial_conditions(
+        builder = AnemoiBuilder(block.config_as_str(CHECKPOINT))
+        action = builder.from_initial_conditions(
             inputs[input_task],
+            lead_time=block.config_as_int(LEAD_TIME),
         )
         return Either.ok(action)
 
     def intersect(self, other: QubedOutput) -> bool:
-        # NOTE not sure if this is exactly correct -- tests prescribe that for QubedOutput() this should return False, otherwise True
-        return bool(dimensions(other))
+        return contains(other, "param")  # Basic check to see if the input contains params, cannot validate further

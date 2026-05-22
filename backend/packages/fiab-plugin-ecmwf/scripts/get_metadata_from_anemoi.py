@@ -34,7 +34,7 @@ def get_qubes(checkpoint_path: str) -> QubesInfo:
 
     from earthkit.workflows.plugins.anemoi.utils import _expansion_qube
 
-    in_variables = metadata.select_variables(include=["prognostic", "forcing"], has_mars_requests=False)
+    in_variables = metadata.select_variables(include=["prognostic", "forcing", "constant"], has_mars_requests=False)
     out_variables = metadata.select_variables(include=["diagnostic", "prognostic"], has_mars_requests=False)
     model_step = metadata.timestep.seconds
 

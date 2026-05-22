@@ -11,14 +11,13 @@ import importlib.metadata
 import logging
 from pathlib import Path
 
-from cascade.low.func import Either
 from fiab_core.artifacts import ArtifactsProvider, CompositeArtifactId, MlModelCheckpoint
 from fiab_core.fable import QubedOutput
-from fiab_core.plugin import Error
-from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
 from qubed import Qube
 
 from ..qubed_utils import expand
+
+INPUT_SOURCE_CONFIGURATION_OPTIONS = {"polytope": {"collection": "initial-conditions"}}
 
 logger = logging.getLogger(__name__)
 
@@ -44,48 +43,63 @@ def get_checkpoint_enum_type() -> str:
     return f"enumClosed[{values}]"
 
 
-def get_local_path(composite_id: CompositeArtifactId) -> Path:
-    return Path(ArtifactsProvider.get_artifact_local_path(composite_id))
+class CheckpointArtifact:
+    """Wrapper around the checkpoint artifact to provide utility methods for accessing the checkpoint data and creating model input configuration."""
 
+    def __init__(self, artifact: CompositeArtifactId | str) -> None:
+        self.artifact = CompositeArtifactId.from_str(artifact) if isinstance(artifact, str) else artifact
 
-def get_model_output(composite_id: CompositeArtifactId, lead_time: int) -> QubedOutput:
-    checkpoint = get_available_checkpoints()[composite_id]
-    qube = Qube.from_json(checkpoint.output_qube)
+    def get_local_path(self) -> Path:
+        """Get local path to the checkpoint artifact, assumes it is already locally available, does not trigger download"""
+        return Path(ArtifactsProvider.get_artifact_local_path(self.artifact))
 
-    from earthkit.data.utils.dates import to_timedelta
+    def get_model_input(self) -> Qube:
+        """Get the model input qube from the checkpoint artifact"""
+        checkpoint = get_available_checkpoints()[self.artifact]
+        qube = Qube.from_json(checkpoint.input_qube)
+        return qube
 
-    lead_time_seconds = lead_time * 3600
-    model_step_seconds = int(to_timedelta(checkpoint.timestep).total_seconds())
-    steps = list(map(lambda x: x // 3600, range(model_step_seconds, lead_time_seconds + model_step_seconds, model_step_seconds)))
+    def get_input_configuration(self, input_source: str | dict) -> dict[str, dict] | str:
+        """Create input configuration for the model based on the checkpoint artifact and input source."""
+        checkpoint = get_available_checkpoints()[self.artifact]
 
-    qubeoutput = QubedOutput(dataqube=qube)
-    return expand(qubeoutput, {"step": steps})
+        if checkpoint.input_options is None:
+            return input_source
 
+        if not isinstance(input_source, dict):
+            input_source = {input_source: {}}
 
-def get_environment(composite_id: CompositeArtifactId) -> list[str]:
-    packages = list(get_available_checkpoints()[composite_id].pip_package_constraints)
+        input_source = {**input_source}  # shallow copy to avoid mutating the original
+        if next(iter(input_source.keys())) in INPUT_SOURCE_CONFIGURATION_OPTIONS:
+            input_source[next(iter(input_source.keys()))].update(INPUT_SOURCE_CONFIGURATION_OPTIONS[next(iter(input_source.keys()))])
 
-    ekw_anemoi_version = importlib.metadata.version("earthkit-workflows-anemoi")
-    if not "dev" in ekw_anemoi_version:
-        packages.append(f"earthkit-workflows-anemoi[runtime-inference]=={importlib.metadata.version('earthkit-workflows-anemoi')}")
+        input_source.update(**checkpoint.input_options)
+        return input_source
 
-    return packages
+    def get_model_output(self, lead_time: int) -> QubedOutput:
+        """Get the model output qube from the checkpoint artifact"""
+        checkpoint = get_available_checkpoints()[self.artifact]
+        qube = Qube.from_json(checkpoint.output_qube)
 
+        from earthkit.data.utils.dates import to_timedelta
 
-def validate_anemoi_block(block: BlockInstance) -> Either[QubedOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-    """Validate common Anemoi block configuration, returning the base QubedOutput on success."""
-    checkpoint = block.config_as_str("checkpoint")
-    lead_time = block.config_as_int("lead_time")
+        lead_time_seconds = lead_time * 3600
+        model_step_seconds = int(to_timedelta(checkpoint.timestep).total_seconds())
+        steps = list(map(lambda x: x // 3600, range(model_step_seconds, lead_time_seconds + model_step_seconds, model_step_seconds)))
 
-    if lead_time < 0:
-        return Either.error("Lead time must be a non-negative integer")
+        qubeoutput = QubedOutput(dataqube=qube)
+        return expand(qubeoutput, {"step": steps})
 
-    try:
-        composite_id = CompositeArtifactId.from_str(checkpoint)
-    except ValueError:
-        return Either.error("Checkpoint must be a valid checkpoint identifier")
+    def get_environment(self) -> list[str]:
+        """Get the environment for the model based on the checkpoint artifact and input source."""
+        packages = list(get_available_checkpoints()[self.artifact].pip_package_constraints)
 
-    try:
-        return Either.ok(get_model_output(composite_id, lead_time))
-    except KeyError:
-        return Either.error(f"Unknown checkpoint: {checkpoint}")
+        ekw_anemoi_version = importlib.metadata.version("earthkit-workflows-anemoi")
+        from fiab_core.tools.plugins import _detect_editable_install
+
+        if not "dev" in ekw_anemoi_version:
+            editable = _detect_editable_install(f"earthkit-workflows-anemoi")
+            if not editable.startswith("-e "):
+                editable = f"earthkit-workflows-anemoi=={ekw_anemoi_version}"
+            packages.append(editable)
+        return packages
