@@ -325,15 +325,42 @@ export function OutputsView({
         )}
       </div>
 
-      {ActiveViewer && activeViewer && (
-        <Suspense fallback={null}>
-          <ActiveViewer
-            item={activeViewer.item}
-            adapter={activeViewer.adapter}
-            onClose={() => setActiveViewer(null)}
-          />
-        </Suspense>
-      )}
+      {ActiveViewer &&
+        activeViewer &&
+        (() => {
+          const activeIndex = visibleItems.findIndex(
+            (it) => it.taskId === activeViewer.item.taskId,
+          )
+          const prevItem =
+            activeIndex > 0 ? visibleItems[activeIndex - 1] : null
+          const nextItem =
+            activeIndex >= 0 && activeIndex < visibleItems.length - 1
+              ? visibleItems[activeIndex + 1]
+              : null
+          const stepTo = (item: OutputItem) =>
+            setActiveViewer({
+              item,
+              adapter: resolveAdapter(effectiveMime(item)),
+            })
+          return (
+            <Suspense fallback={null}>
+              <ActiveViewer
+                // Fresh mount per item resets pan/zoom/page.
+                key={activeViewer.item.taskId}
+                item={activeViewer.item}
+                adapter={activeViewer.adapter}
+                onClose={() => setActiveViewer(null)}
+                onPrev={prevItem ? () => stepTo(prevItem) : undefined}
+                onNext={nextItem ? () => stepTo(nextItem) : undefined}
+                navIndex={
+                  activeIndex >= 0
+                    ? { current: activeIndex + 1, total: visibleItems.length }
+                    : undefined
+                }
+              />
+            </Suspense>
+          )
+        })()}
     </Card>
   )
 }

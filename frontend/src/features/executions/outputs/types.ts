@@ -67,6 +67,11 @@ export interface ViewerProps {
    * picked. Carries the (possibly sniff-promoted) extension etc. */
   adapter: OutputAdapter
   onClose: () => void
+  /** Step prev/next in the visible list; undefined at boundaries. */
+  onPrev?: () => void
+  onNext?: () => void
+  /** 1-based position for the header indicator. */
+  navIndex?: { current: number; total: number }
 }
 
 export interface OutputAdapter {
