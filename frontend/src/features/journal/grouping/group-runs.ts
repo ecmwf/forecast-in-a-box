@@ -36,19 +36,26 @@ export interface RunGroup {
 /** Stable display order for date buckets. */
 const DATE_BUCKETS = ['today', 'yesterday', 'week', 'older'] as const
 
-function dateBucket(createdAt: string, now: Date): string {
-  const days = differenceInCalendarDays(now, new Date(createdAt))
+function dateBucket(
+  createdAt: string,
+  now: Date,
+  parse: (naive: string) => Date,
+): string {
+  const days = differenceInCalendarDays(now, parse(createdAt))
   if (days <= 0) return 'today'
   if (days === 1) return 'yesterday'
   if (days < 7) return 'week'
   return 'older'
 }
 
-/** Split runs into ordered, non-empty groups for the given grouping. */
+/** Split runs into ordered, non-empty groups for the given grouping.
+ * Pass `useServerTime().serverTimeToLocal` for `parseCreatedAt` to avoid
+ * TZ-offset skew; the `new Date` default is fine for tests. */
 export function groupRuns(
   runs: ReadonlyArray<ForecastRunViewModel>,
   groupBy: GroupBy,
   now: Date = new Date(),
+  parseCreatedAt: (naive: string) => Date = (s) => new Date(s),
 ): Array<RunGroup> {
   if (groupBy === 'none') {
     return runs.length > 0 ? [{ id: 'all', runs: [...runs] }] : []
@@ -84,7 +91,9 @@ export function groupRuns(
   }
 
   // date
-  const byBucket = groupByKey(runs, (run) => dateBucket(run.createdAt, now))
+  const byBucket = groupByKey(runs, (run) =>
+    dateBucket(run.createdAt, now, parseCreatedAt),
+  )
   return DATE_BUCKETS.map((bucket) => ({
     id: bucket,
     runs: byBucket.find(([id]) => id === bucket)?.[1] ?? [],

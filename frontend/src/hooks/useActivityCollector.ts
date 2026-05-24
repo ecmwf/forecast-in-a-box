@@ -27,6 +27,7 @@ import { useEffect, useRef } from 'react'
 import i18n from 'i18next'
 import { useArtifacts, useDownloadModel } from '@/api/hooks/useArtifacts'
 import { useJobsStatus } from '@/api/hooks/useJobs'
+import { useServerTime } from '@/api/hooks/useSchedules'
 import { isTerminalStatus } from '@/api/types/job.types'
 import { useActivityStore } from '@/stores/activityStore'
 import { capitalize } from '@/utils/formatters'
@@ -101,6 +102,7 @@ function useCollectDownloads() {
  */
 function useCollectJobs() {
   const { data } = useJobsStatus(1, 20)
+  const { serverTimeToLocal } = useServerTime()
 
   useEffect(() => {
     if (!data?.runs) return
@@ -138,12 +140,12 @@ function useCollectJobs() {
           label,
           description: capitalize(job.status),
           status: 'active',
-          startedAt: new Date(job.created_at).getTime(),
+          startedAt: serverTimeToLocal(job.created_at).getTime(),
           navigateTo: `/executions/${job.run_id}`,
         })
       }
     }
-  }, [data])
+  }, [data, serverTimeToLocal])
 }
 
 /**

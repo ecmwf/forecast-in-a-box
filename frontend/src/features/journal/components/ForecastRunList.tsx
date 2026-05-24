@@ -16,6 +16,7 @@ import type { ForecastRunViewModel } from '@/features/journal/types'
 import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
 import type { GroupBy } from '@/features/journal/grouping/group-runs'
 import type { FacetToken } from '@/features/journal/facets/facet-types'
+import { useServerTime } from '@/api/hooks/useSchedules'
 import { groupRuns } from '@/features/journal/grouping/group-runs'
 import { ForecastRunRow } from '@/features/journal/components/ForecastRunRow'
 import { JournalGroup } from '@/features/journal/components/JournalGroup'
@@ -48,6 +49,7 @@ export function ForecastRunList({
   shadow,
 }: ForecastRunListProps) {
   const { t } = useTranslation('journal')
+  const { serverTimeToLocal } = useServerTime()
 
   function rows(items: Array<ForecastRunViewModel>): ReactNode {
     return items.map((run) => (
@@ -76,30 +78,32 @@ export function ForecastRunList({
   } else if (groupBy === 'none') {
     body = <div className="divide-y divide-border">{rows(runs)}</div>
   } else {
-    body = groupRuns(runs, groupBy).map((group) => {
-      let label: string
-      if (groupBy === 'date') {
-        label =
-          group.id === 'today'
-            ? t('dateGroup.today')
-            : group.id === 'yesterday'
-              ? t('dateGroup.yesterday')
-              : group.id === 'week'
-                ? t('dateGroup.week')
-                : t('dateGroup.older')
-      } else if (group.id === '__untagged__') {
-        label = t('group.untagged')
-      } else if (group.id === '__unscheduled__') {
-        label = t('group.unscheduled')
-      } else {
-        label = group.id
-      }
-      return (
-        <JournalGroup key={group.id} label={label} count={group.runs.length}>
-          {rows(group.runs)}
-        </JournalGroup>
-      )
-    })
+    body = groupRuns(runs, groupBy, undefined, serverTimeToLocal).map(
+      (group) => {
+        let label: string
+        if (groupBy === 'date') {
+          label =
+            group.id === 'today'
+              ? t('dateGroup.today')
+              : group.id === 'yesterday'
+                ? t('dateGroup.yesterday')
+                : group.id === 'week'
+                  ? t('dateGroup.week')
+                  : t('dateGroup.older')
+        } else if (group.id === '__untagged__') {
+          label = t('group.untagged')
+        } else if (group.id === '__unscheduled__') {
+          label = t('group.unscheduled')
+        } else {
+          label = group.id
+        }
+        return (
+          <JournalGroup key={group.id} label={label} count={group.runs.length}>
+            {rows(group.runs)}
+          </JournalGroup>
+        )
+      },
+    )
   }
 
   return (
