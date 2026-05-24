@@ -17,3 +17,7 @@
  */
 export const viewerHeaderBtn =
   'inline-flex h-8 w-8 items-center justify-center rounded-md text-white/90 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30'
+
+/** Inline keycap badge for shortcut hints in viewer buttons. */
+export const kbdBadge =
+  'rounded-sm border border-white/20 bg-white/5 px-1 font-sans text-[10px] font-medium text-white/60'

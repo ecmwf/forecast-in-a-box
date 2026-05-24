@@ -12,6 +12,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Download,
   Maximize2,
+  Pause,
+  Play,
   SkipBack,
   SkipForward,
   X,
@@ -21,7 +23,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import { downloadAction } from '../actions/download'
 import { useJobResultBlob } from '../useJobResult'
-import { viewerHeaderBtn } from './viewerHeaderBtn'
+import { kbdBadge, viewerHeaderBtn } from './viewerHeaderBtn'
 import type { ViewerProps } from '../types'
 import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
@@ -48,6 +50,8 @@ export default function ImageViewer({
   onPrev,
   onNext,
   navIndex,
+  isPlaying,
+  onTogglePlay,
 }: ViewerProps) {
   const { t } = useTranslation('executions')
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
@@ -228,11 +232,15 @@ export default function ImageViewer({
             <button
               type="button"
               aria-label={t('outputs.viewer.previousOutput')}
-              className={cn(viewerHeaderBtn, 'pointer-events-auto')}
+              className={cn(
+                viewerHeaderBtn,
+                'pointer-events-auto w-auto gap-1 px-1.5',
+              )}
               onClick={onPrev}
               disabled={!onPrev}
             >
               <SkipBack className="h-4 w-4" />
+              <kbd className={kbdBadge}>←</kbd>
             </button>
             <span className="min-w-10 text-center font-mono text-xs tabular-nums">
               {navIndex.current} / {navIndex.total}
@@ -240,12 +248,34 @@ export default function ImageViewer({
             <button
               type="button"
               aria-label={t('outputs.viewer.nextOutput')}
-              className={cn(viewerHeaderBtn, 'pointer-events-auto')}
+              className={cn(
+                viewerHeaderBtn,
+                'pointer-events-auto w-auto gap-1 px-1.5',
+              )}
               onClick={onNext}
               disabled={!onNext}
             >
+              <kbd className={kbdBadge}>→</kbd>
               <SkipForward className="h-4 w-4" />
             </button>
+            {onTogglePlay && (
+              <button
+                type="button"
+                aria-label={
+                  isPlaying
+                    ? t('outputs.viewer.pauseAutoplay')
+                    : t('outputs.viewer.playAutoplay')
+                }
+                className={cn(viewerHeaderBtn, 'pointer-events-auto ml-1')}
+                onClick={onTogglePlay}
+              >
+                {isPlaying ? (
+                  <Pause className="h-4 w-4" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+              </button>
+            )}
           </div>
         )}
         <div className="ml-auto flex items-center gap-1">

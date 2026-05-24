@@ -13,6 +13,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  Pause,
+  Play,
   SkipBack,
   SkipForward,
   X,
@@ -23,8 +25,8 @@ import { useTranslation } from 'react-i18next'
 import { downloadAction } from '../actions/download'
 import { useJobResultBlob } from '../useJobResult'
 import { pdfjs } from './pdfjs'
-import { viewerHeaderBtn } from './viewerHeaderBtn'
-import type { PDFDocumentProxy } from 'pdfjs-dist'
+import { kbdBadge, viewerHeaderBtn } from './viewerHeaderBtn'
+import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
 import type { ViewerProps } from '../types'
 import { createLogger } from '@/lib/logger'
 import { showToast } from '@/lib/toast'
@@ -41,6 +43,8 @@ export default function PdfViewer({
   onPrev,
   onNext,
   navIndex,
+  isPlaying,
+  onTogglePlay,
 }: ViewerProps) {
   const { t } = useTranslation('executions')
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
@@ -90,38 +94,57 @@ export default function PdfViewer({
 
   useEffect(() => {
     if (!doc) return
-    const state: { cancelled: boolean } = { cancelled: false }
+    const state: {
+      cancelled: boolean
+      renderTask: ReturnType<PDFPageProxy['render']> | null
+    } = { cancelled: false, renderTask: null }
     void (async () => {
-      const page = await doc.getPage(pageNumber)
+      try {
+        const page = await doc.getPage(pageNumber)
 
-      if (state.cancelled) return
-      const canvas = canvasRef.current
-      if (!canvas) return
-      const dpr = window.devicePixelRatio || 1
-      const viewport = page.getViewport({ scale: scale * dpr })
-      canvas.width = viewport.width
-      canvas.height = viewport.height
-      canvas.style.width = `${viewport.width / dpr}px`
-      canvas.style.height = `${viewport.height / dpr}px`
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return
-      await page.render({ canvasContext: ctx, viewport, canvas }).promise
+        if (state.cancelled) return
+        const canvas = canvasRef.current
+        if (!canvas) return
+        const dpr = window.devicePixelRatio || 1
+        const viewport = page.getViewport({ scale: scale * dpr })
+        canvas.width = viewport.width
+        canvas.height = viewport.height
+        canvas.style.width = `${viewport.width / dpr}px`
+        canvas.style.height = `${viewport.height / dpr}px`
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+        state.renderTask = page.render({ canvasContext: ctx, viewport, canvas })
+        await state.renderTask.promise
+      } catch (err) {
+        // Expected on .cancel() during rapid output nav — swallow it.
+        if (
+          (err as { name?: string } | null)?.name ===
+          'RenderingCancelledException'
+        ) {
+          return
+        }
+        log.error('Failed to render PDF page', {
+          taskId: item.taskId,
+          pageNumber,
+          error: err,
+        })
+        showToast.error(err instanceof Error ? err.message : String(err))
+      }
     })()
     return () => {
       state.cancelled = true
+      state.renderTask?.cancel()
     }
-  }, [doc, pageNumber, scale])
+  }, [doc, pageNumber, scale, item.taskId])
 
   useEffect(() => {
+    // Arrow keys belong to output nav (OutputsView); page nav uses buttons.
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
-      else if (e.key === 'ArrowLeft') setPageNumber((p) => Math.max(1, p - 1))
-      else if (e.key === 'ArrowRight')
-        setPageNumber((p) => Math.min(doc?.numPages ?? p, p + 1))
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [doc, onClose])
+  }, [onClose])
 
   const zoomIn = useCallback(
     () => setScale((s) => Math.min(MAX_SCALE, s * 1.25)),
@@ -155,11 +178,15 @@ export default function PdfViewer({
             <button
               type="button"
               aria-label={t('outputs.viewer.previousOutput')}
-              className={cn(viewerHeaderBtn, 'pointer-events-auto')}
+              className={cn(
+                viewerHeaderBtn,
+                'pointer-events-auto w-auto gap-1 px-1.5',
+              )}
               onClick={onPrev}
               disabled={!onPrev}
             >
               <SkipBack className="h-4 w-4" />
+              <kbd className={kbdBadge}>←</kbd>
             </button>
             <span className="min-w-10 text-center font-mono text-xs tabular-nums">
               {navIndex.current} / {navIndex.total}
@@ -167,12 +194,34 @@ export default function PdfViewer({
             <button
               type="button"
               aria-label={t('outputs.viewer.nextOutput')}
-              className={cn(viewerHeaderBtn, 'pointer-events-auto')}
+              className={cn(
+                viewerHeaderBtn,
+                'pointer-events-auto w-auto gap-1 px-1.5',
+              )}
               onClick={onNext}
               disabled={!onNext}
             >
+              <kbd className={kbdBadge}>→</kbd>
               <SkipForward className="h-4 w-4" />
             </button>
+            {onTogglePlay && (
+              <button
+                type="button"
+                aria-label={
+                  isPlaying
+                    ? t('outputs.viewer.pauseAutoplay')
+                    : t('outputs.viewer.playAutoplay')
+                }
+                className={cn(viewerHeaderBtn, 'pointer-events-auto ml-1')}
+                onClick={onTogglePlay}
+              >
+                {isPlaying ? (
+                  <Pause className="h-4 w-4" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+              </button>
+            )}
           </div>
         )}
         <div className="ml-auto flex items-center gap-1">
