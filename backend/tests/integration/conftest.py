@@ -146,7 +146,7 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         config.cascade.cascade_url = "tcp://localhost"
         config.db.sqlite_userdb_path = f"{td.name}/user.db"
         config.db.sqlite_jobdb_path = f"{td.name}/job.db"
-        config.api.data_path = td_data.name
+        config.api.data_path = f"file://{td_data.name}"
         config.api.allow_scheduler = True
         config.product.artifact_stores = {
             ArtifactStoreId(fake_artifact_store_id): ArtifactStoreConfig(

@@ -206,8 +206,8 @@ class ProductSettings(FiabBaseModel):
 
 
 class BackendAPISettings(FiabBaseModel):
-    data_path: str = str(fiab_home / "data_dir")
-    """Path to the data directory."""
+    data_path: str = f"file://{fiab_home / 'data_dir'}"
+    """Path to the data directory. Supports file:// (local) and ssh://[user@]host/path (remote) schemes."""
     model_repository: str = "https://sites.ecmwf.int/repository/fiab"
     """URL to the model repository."""
     uvicorn_host: str = "0.0.0.0"
@@ -219,13 +219,33 @@ class BackendAPISettings(FiabBaseModel):
     allow_scheduler: bool = False
     """Whether scheduler thread should be started. Best combine with allow_service=True"""
 
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_plain_data_path(cls, data: dict) -> dict:  # type: ignore[override]
+        """Convert legacy plain-path data_path values to file:// URLs."""
+        if isinstance(data, dict) and "data_path" in data:
+            val = data["data_path"]
+            if isinstance(val, str) and "://" not in val:
+                logger.warning(f"data_path '{val}' is a plain path; please update your config to use file:// scheme")
+                data["data_path"] = f"file://{val}"
+        return data
+
     def local_url(self) -> str:
         return f"http://localhost:{self.uvicorn_port}"
 
     def validate_runtime(self) -> list[str]:
         errors = []
-        if not os.path.isdir(self.data_path):
-            errors.append(f"not a directory: data_path={self.data_path}")
+        parsed = urllib.parse.urlparse(self.data_path)
+        if parsed.scheme == "file":
+            if not os.path.isdir(parsed.path):
+                errors.append(f"not a directory: data_path={self.data_path}")
+        elif parsed.scheme == "ssh":
+            if not parsed.netloc:
+                errors.append(f"missing host in ssh:// data_path: {self.data_path}")
+            if not parsed.path.startswith("/"):
+                errors.append(f"ssh:// data_path must have an absolute path: {self.data_path}")
+        else:
+            errors.append(f"unsupported scheme in data_path (use file:// or ssh://): {self.data_path}")
         if not _validate_url(self.model_repository):
             errors.append(f"not an url: model_repository={self.model_repository}")
         pseudo_url = f"http://{self.uvicorn_host}:{self.uvicorn_port}"

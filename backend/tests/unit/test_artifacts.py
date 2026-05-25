@@ -8,6 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 import json
+import subprocess
 import tempfile
 from collections.abc import Generator
 from pathlib import Path
@@ -25,12 +26,14 @@ from forecastbox.domain.artifact.base import (
     CompositeArtifactId,
     get_artifact_local_path,
 )
+from forecastbox.domain.artifact.catalog import get_artifacts_catalog
 from forecastbox.domain.artifact.io import (
+    delete_artifact,
     download_artifact,
-    get_artifacts_catalog,
-    list_local_storage,
+    list_storage,
 )
 from forecastbox.utility.config import ArtifactStoreConfig, ArtifactStoresConfig
+from forecastbox.utility.tunnel import CommandHandle
 
 
 @pytest.fixture
@@ -234,19 +237,19 @@ def test_get_artifacts_catalog_from_local_file(tmpdir_path: Path, sample_checkpo
 
 
 def test_list_local_storage_empty(tmpdir_path: Path, sample_artifact: Any) -> None:
-    """Test list_local_storage with no artifacts"""
+    """Test list_storage with no artifacts"""
     catalog: ArtifactCatalog = pmap(
         {
             CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1")): sample_artifact,
         }
     )
 
-    result = list_local_storage(catalog, tmpdir_path)
+    result = list_storage(catalog, f"file://{tmpdir_path}")
     assert result == []
 
 
 def test_list_local_storage_nonexistent_dir(tmpdir_path: Path, sample_artifact: Any) -> None:
-    """Test list_local_storage with nonexistent artifacts directory"""
+    """Test list_storage with nonexistent artifacts directory"""
     catalog: ArtifactCatalog = pmap(
         {
             CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1")): sample_artifact,
@@ -254,12 +257,12 @@ def test_list_local_storage_nonexistent_dir(tmpdir_path: Path, sample_artifact: 
     )
 
     nonexistent_dir = tmpdir_path / "nonexistent"
-    result = list_local_storage(catalog, nonexistent_dir)
+    result = list_storage(catalog, f"file://{nonexistent_dir}")
     assert result == []
 
 
 def test_list_local_storage_with_artifacts(tmpdir_path: Path, sample_artifact: Any) -> None:
-    """Test list_local_storage with existing artifacts as files"""
+    """Test list_storage with existing artifacts as files"""
     catalog: ArtifactCatalog = pmap(
         {
             CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt")): sample_artifact,
@@ -279,7 +282,7 @@ def test_list_local_storage_with_artifacts(tmpdir_path: Path, sample_artifact: A
     (store1_dir / "model2.ckpt").touch()
     (store2_dir / "model3.ckpt").touch()
 
-    result = list_local_storage(catalog, tmpdir_path)
+    result = list_storage(catalog, f"file://{tmpdir_path}")
 
     assert len(result) == 3
     assert CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt")) in result
@@ -288,7 +291,7 @@ def test_list_local_storage_with_artifacts(tmpdir_path: Path, sample_artifact: A
 
 
 def test_list_local_storage_with_unknown_store(tmpdir_path: Path, sample_artifact: Any) -> None:
-    """Test list_local_storage with unknown store directory"""
+    """Test list_storage with unknown store directory"""
     catalog: ArtifactCatalog = pmap(
         {
             CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt")): sample_artifact,
@@ -305,14 +308,14 @@ def test_list_local_storage_with_unknown_store(tmpdir_path: Path, sample_artifac
     (store1_dir / "model1.ckpt").touch()
     (unknown_dir / "model2.ckpt").touch()
 
-    result = list_local_storage(catalog, tmpdir_path)
+    result = list_storage(catalog, f"file://{tmpdir_path}")
 
     assert len(result) == 1
     assert CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt")) in result
 
 
 def test_list_local_storage_with_unknown_checkpoint(tmpdir_path: Path, sample_artifact: Any) -> None:
-    """Test list_local_storage with unknown checkpoint in known store"""
+    """Test list_storage with unknown checkpoint in known store"""
     catalog: ArtifactCatalog = pmap(
         {
             CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt")): sample_artifact,
@@ -327,7 +330,7 @@ def test_list_local_storage_with_unknown_checkpoint(tmpdir_path: Path, sample_ar
     (store1_dir / "model1.ckpt").touch()
     (store1_dir / "unknown_model.ckpt").touch()
 
-    result = list_local_storage(catalog, tmpdir_path)
+    result = list_storage(catalog, f"file://{tmpdir_path}")
 
     assert len(result) == 1
     assert CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt")) in result
@@ -385,7 +388,7 @@ def test_download_artifact_success(tmpdir_path: Path, sample_artifact: Any) -> N
         mock_client.stream.return_value.__enter__.return_value = mock_response
         mock_client_class.return_value = mock_client
 
-        download_artifact(composite_id, sample_artifact, tmpdir_path)
+        download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
 
         # Verify the file was downloaded
         artifact_path = get_artifact_local_path(composite_id, tmpdir_path)
@@ -411,7 +414,7 @@ def test_download_artifact_creates_directory(tmpdir_path: Path, sample_artifact:
         mock_client.stream.return_value.__enter__.return_value = mock_response
         mock_client_class.return_value = mock_client
 
-        download_artifact(composite_id, sample_artifact, tmpdir_path)
+        download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
 
         artifact_path = get_artifact_local_path(composite_id, tmpdir_path)
         assert artifact_path.exists()
@@ -433,7 +436,7 @@ def test_download_artifact_http_error(tmpdir_path: Path, sample_artifact: Any) -
         mock_client_class.return_value = mock_client
 
         with pytest.raises(httpx.HTTPStatusError):
-            download_artifact(composite_id, sample_artifact, tmpdir_path)
+            download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
 
 
 def test_download_artifact_chunked_download(tmpdir_path: Path, sample_artifact: Any) -> None:
@@ -457,10 +460,178 @@ def test_download_artifact_chunked_download(tmpdir_path: Path, sample_artifact: 
         mock_client.stream.return_value.__enter__.return_value = mock_response
         mock_client_class.return_value = mock_client
 
-        download_artifact(composite_id, sample_artifact, tmpdir_path)
+        download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
 
         # Verify all chunks were written
         artifact_path = get_artifact_local_path(composite_id, tmpdir_path)
 
         assert artifact_path.exists()
         assert artifact_path.read_bytes() == total_content
+
+
+# ---------------------------------------------------------------------------
+# SSH remote tests (mock tunnel.run)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def fake_handle() -> CommandHandle:
+    return CommandHandle(host="fakehost", control_path="/tmp/fake.sock")
+
+
+def test_list_storage_remote_empty(fake_handle: CommandHandle, sample_artifact: Any) -> None:
+    """list_storage with ssh:// returns empty list when find produces no output."""
+    catalog: ArtifactCatalog = pmap({CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt")): sample_artifact})
+    mock_result = MagicMock()
+    mock_result.stdout = ""
+
+    with patch("forecastbox.domain.artifact.io.tunnel") as mock_tunnel:
+        mock_tunnel.run.return_value = mock_result
+        result = list_storage(catalog, "ssh://fakehost/remote/data", handle=fake_handle)
+
+    assert result == []
+    mock_tunnel.run.assert_called_once()
+    cmd = mock_tunnel.run.call_args[0][1]
+    assert "find" in cmd
+    assert "/remote/data/artifacts" in cmd
+
+
+def test_list_storage_remote_with_artifacts(fake_handle: CommandHandle, sample_artifact: Any) -> None:
+    """list_storage with ssh:// correctly parses find output."""
+    catalog: ArtifactCatalog = pmap(
+        {
+            CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt")): sample_artifact,
+            CompositeArtifactId(ArtifactStoreId("store2"), ArtifactLocalId("model2.ckpt")): sample_artifact,
+        }
+    )
+    mock_result = MagicMock()
+    mock_result.stdout = "/remote/data/artifacts/store1/model1.ckpt\n/remote/data/artifacts/store2/model2.ckpt\n"
+
+    with patch("forecastbox.domain.artifact.io.tunnel") as mock_tunnel:
+        mock_tunnel.run.return_value = mock_result
+        result = list_storage(catalog, "ssh://fakehost/remote/data", handle=fake_handle)
+
+    assert len(result) == 2
+    assert CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt")) in result
+    assert CompositeArtifactId(ArtifactStoreId("store2"), ArtifactLocalId("model2.ckpt")) in result
+
+
+def test_list_storage_remote_unknown_store_ignored(fake_handle: CommandHandle, sample_artifact: Any) -> None:
+    """list_storage with ssh:// ignores paths from unknown stores."""
+    catalog: ArtifactCatalog = pmap({CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt")): sample_artifact})
+    mock_result = MagicMock()
+    mock_result.stdout = "/remote/data/artifacts/store1/model1.ckpt\n/remote/data/artifacts/unknown_store/model2.ckpt\n"
+
+    with patch("forecastbox.domain.artifact.io.tunnel") as mock_tunnel:
+        mock_tunnel.run.return_value = mock_result
+        result = list_storage(catalog, "ssh://fakehost/remote/data", handle=fake_handle)
+
+    assert len(result) == 1
+    assert CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt")) in result
+
+
+def test_list_storage_requires_handle_for_ssh() -> None:
+    """list_storage raises ValueError when no handle is given for ssh:// URL."""
+    from pyrsistent import pmap as pm
+
+    with pytest.raises(ValueError, match="SSH handle required"):
+        list_storage(pm({}), "ssh://host/path", handle=None)
+
+
+def test_download_artifact_remote_sends_correct_commands(fake_handle: CommandHandle, sample_artifact: Any) -> None:
+    """download_artifact with ssh:// sends mkdir then curl+mv commands."""
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
+
+    mock_result = MagicMock()
+    mock_result.stdout = ""
+    mock_result.stderr = ""
+
+    with patch("forecastbox.domain.artifact.io.tunnel") as mock_tunnel:
+        mock_tunnel.run.return_value = mock_result
+        download_artifact(composite_id, sample_artifact, "ssh://fakehost/remote/data", handle=fake_handle)
+
+    calls = mock_tunnel.run.call_args_list
+    assert len(calls) == 2
+
+    mkdir_cmd = calls[0][0][1]
+    assert "mkdir" in mkdir_cmd
+    assert "/remote/data/artifacts/store1" in mkdir_cmd
+
+    curl_cmd = calls[1][0][1]
+    assert "curl" in curl_cmd
+    assert "https://example.com/model.ckpt" in curl_cmd
+    assert "/remote/data/artifacts/store1/model1.ckpt" in curl_cmd
+    assert ".tmp" in curl_cmd
+
+
+def test_download_artifact_remote_cleans_up_on_curl_failure(fake_handle: CommandHandle, sample_artifact: Any) -> None:
+    """download_artifact with ssh:// attempts to remove temp file if curl fails."""
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
+
+    curl_error = subprocess.CalledProcessError(1, "curl", stderr="curl: (6) Could not resolve host")
+
+    with patch("forecastbox.domain.artifact.io.tunnel") as mock_tunnel:
+        mock_tunnel.run.side_effect = [MagicMock(), curl_error, MagicMock()]
+        with pytest.raises(subprocess.CalledProcessError):
+            download_artifact(composite_id, sample_artifact, "ssh://fakehost/remote/data", handle=fake_handle)
+
+    # Third call should be rm -f for cleanup
+    cleanup_cmd = mock_tunnel.run.call_args_list[2][0][1]
+    assert "rm -f" in cleanup_cmd
+    assert ".tmp" in cleanup_cmd
+
+
+def test_delete_artifact_remote_sends_rm(fake_handle: CommandHandle, sample_artifact: Any) -> None:
+    """delete_artifact with ssh:// sends an rm command for the correct path."""
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
+
+    mock_result = MagicMock()
+    mock_result.stdout = ""
+    mock_result.stderr = ""
+
+    with patch("forecastbox.domain.artifact.io.tunnel") as mock_tunnel:
+        mock_tunnel.run.return_value = mock_result
+        delete_artifact(composite_id, "ssh://fakehost/remote/data", handle=fake_handle)
+
+    cmd = mock_tunnel.run.call_args[0][1]
+    assert "rm" in cmd
+    assert "/remote/data/artifacts/store1/model1.ckpt" in cmd
+
+
+def test_delete_artifact_remote_raises_file_not_found(fake_handle: CommandHandle) -> None:
+    """delete_artifact with ssh:// raises FileNotFoundError when rm says no such file."""
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
+
+    error = subprocess.CalledProcessError(1, "rm", stderr="rm: cannot remove '/path': No such file or directory")
+
+    with patch("forecastbox.domain.artifact.io.tunnel") as mock_tunnel:
+        mock_tunnel.run.side_effect = error
+        with pytest.raises(FileNotFoundError):
+            delete_artifact(composite_id, "ssh://fakehost/remote/data", handle=fake_handle)
+
+
+def test_delete_artifact_remote_reraises_other_errors(fake_handle: CommandHandle) -> None:
+    """delete_artifact with ssh:// re-raises non-FileNotFound errors unchanged."""
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
+
+    error = subprocess.CalledProcessError(1, "rm", stderr="rm: cannot remove '/path': Permission denied")
+
+    with patch("forecastbox.domain.artifact.io.tunnel") as mock_tunnel:
+        mock_tunnel.run.side_effect = error
+        with pytest.raises(subprocess.CalledProcessError):
+            delete_artifact(composite_id, "ssh://fakehost/remote/data", handle=fake_handle)
+
+
+def test_list_storage_raises_on_unsupported_scheme() -> None:
+    """list_storage raises ValueError for unknown URL schemes."""
+    from pyrsistent import pmap as pm
+
+    with pytest.raises(ValueError, match="Unsupported data_dir scheme"):
+        list_storage(pm({}), "ftp://host/path")
+
+
+def test_download_artifact_raises_on_unsupported_scheme(sample_artifact: Any) -> None:
+    """download_artifact raises ValueError for unknown URL schemes."""
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
+    with pytest.raises(ValueError, match="Unsupported data_dir scheme"):
+        download_artifact(composite_id, sample_artifact, "ftp://host/path")

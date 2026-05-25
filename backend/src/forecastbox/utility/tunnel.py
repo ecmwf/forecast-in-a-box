@@ -53,11 +53,11 @@ def _new_control_path() -> str:
     return str(_CONTROL_ROOT / f"{uuid.uuid4().hex[:12]}.sock")
 
 
-def _ssh_base_args(handle: "ConnectionHandle") -> list[str]:
+def _ssh_base_args(control_path: str) -> list[str]:
     return [
         "ssh",
         "-S",
-        handle.control_path,
+        control_path,
         "-o",
         "BatchMode=yes",
         "-o",
@@ -106,11 +106,20 @@ class ConnectionHandle:
         return f"tcp://localhost:{self.local_port}"
 
 
+@dataclass(frozen=True, slots=True)
+class CommandHandle:
+    """A persistent SSH master connection for running remote commands (no port forwarding)."""
+
+    host: str
+    control_path: str
+
+
 class TunnelRegistry:
     """Track live tunnel handles so the app can shut them down on exit."""
 
     def __init__(self) -> None:
         self._handles: set[ConnectionHandle] = set()
+        self._command_handles: set[CommandHandle] = set()
         self._lock = threading.Lock()
 
     def register(self, handle: ConnectionHandle) -> None:
@@ -121,11 +130,22 @@ class TunnelRegistry:
         with self._lock:
             self._handles.discard(handle)
 
+    def register_command(self, handle: CommandHandle) -> None:
+        with self._lock:
+            self._command_handles.add(handle)
+
+    def discard_command(self, handle: CommandHandle) -> None:
+        with self._lock:
+            self._command_handles.discard(handle)
+
     def shutdown(self) -> None:
         with self._lock:
             handles = tuple(self._handles)
+            command_handles = tuple(self._command_handles)
         for handle in handles:
             stop(handle)
+        for handle in command_handles:
+            disconnect(handle)
 
 
 registry = TunnelRegistry()
@@ -191,7 +211,7 @@ def setup(
 def status(handle: ConnectionHandle) -> bool:
     """Return whether the SSH master connection is alive."""
 
-    result = _ssh_run([*_ssh_base_args(handle), "-O", "check", handle.host], check=False)
+    result = _ssh_run([*_ssh_base_args(handle.control_path), "-O", "check", handle.host], check=False)
     return result.returncode == 0
 
 
@@ -199,13 +219,13 @@ def execute(handle: ConnectionHandle, command: RemoteCommand, output_path: str =
     """Launch a remote command over the existing SSH control socket."""
 
     remote_command = _render_remote_command(command, output_path)
-    return _ssh_run([*_ssh_base_args(handle), handle.host, remote_command])
+    return _ssh_run([*_ssh_base_args(handle.control_path), handle.host, remote_command])
 
 
 def stop(handle: ConnectionHandle) -> subprocess.CompletedProcess[str]:
     """Terminate an SSH master connection and remove it from the registry."""
 
-    rv = _ssh_run([*_ssh_base_args(handle), "-O", "exit", handle.host])
+    rv = _ssh_run([*_ssh_base_args(handle.control_path), "-O", "exit", handle.host])
     registry.discard(handle)
     return rv
 
@@ -214,3 +234,53 @@ def shutdown() -> None:
     """Stop all tracked SSH tunnels."""
 
     registry.shutdown()
+
+
+def connect(host: str) -> CommandHandle:
+    """Start a persistent SSH master connection without port forwarding, for running remote commands."""
+
+    handle = CommandHandle(host=host, control_path=_new_control_path())
+    _ssh_run(
+        [
+            "ssh",
+            "-M",
+            "-f",
+            "-N",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "ConnectTimeout=10",
+            "-o",
+            "ControlMaster=auto",
+            "-o",
+            f"ControlPath={handle.control_path}",
+            "-o",
+            "ControlPersist=10m",
+            host,
+        ],
+        start_new_session=True,
+    )
+    registry.register_command(handle)
+    return handle
+
+
+def run(handle: CommandHandle, command: RemoteCommand) -> subprocess.CompletedProcess[str]:
+    """Run a command synchronously over the SSH control socket, returning stdout/stderr."""
+
+    cmd = command if isinstance(command, str) else shlex.join(command)
+    return _ssh_run([*_ssh_base_args(handle.control_path), handle.host, cmd])
+
+
+def status_cmd(handle: CommandHandle) -> bool:
+    """Return whether the command SSH master connection is alive."""
+
+    result = _ssh_run([*_ssh_base_args(handle.control_path), "-O", "check", handle.host], check=False)
+    return result.returncode == 0
+
+
+def disconnect(handle: CommandHandle) -> subprocess.CompletedProcess[str]:
+    """Terminate a command SSH master connection and remove it from the registry."""
+
+    rv = _ssh_run([*_ssh_base_args(handle.control_path), "-O", "exit", handle.host], check=False)
+    registry.discard_command(handle)
+    return rv
