@@ -22,10 +22,14 @@
 import { Suspense, lazy, useState } from 'react'
 import { Copy, Map, Maximize2, Minimize2, Radar, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { LensInstanceDetailResponse } from '@/api/types/lens.types'
+import type {
+  LensInstanceDetailResponse,
+  LensStatus,
+} from '@/api/types/lens.types'
 import { useLensList, useStopLens } from '@/api/hooks/useLens'
 import { buildLensBaseUrl, buildWmsCapabilitiesUrl } from '@/api/endpoints/lens'
 import { showToast } from '@/lib/toast'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
@@ -39,6 +43,16 @@ import {
 import { P } from '@/components/base/typography'
 
 const WmsViewer = lazy(() => import('./WmsViewer'))
+
+const LENS_STATUS_CLASS: Record<LensStatus, string> = {
+  running:
+    'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
+  starting:
+    'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
+  terminated:
+    'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
+  failed: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300',
+}
 
 export function ActiveLensesCard() {
   const { t } = useTranslation('executions')
@@ -173,14 +187,10 @@ function ActiveLensRow({
         <div className="flex items-baseline gap-2">
           <P className="text-sm font-medium">{lens.lens_name}</P>
           <span
-            className={
-              'rounded px-1.5 py-px text-xs ' +
-              (lens.status === 'running'
-                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
-                : lens.status === 'starting'
-                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
-                  : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200')
-            }
+            className={cn(
+              'rounded px-1.5 py-px text-xs',
+              LENS_STATUS_CLASS[lens.status],
+            )}
           >
             {lens.status}
           </span>

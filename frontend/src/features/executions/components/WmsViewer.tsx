@@ -168,6 +168,12 @@ const DEFAULT_BASEMAP_ID = BASEMAPS[0].id
 const DEFAULT_LAYER_OPACITY = 0.85
 // SkinnyWMS border overlay sits above every data layer (which use z 1…N).
 const REFERENCE_OVERLAY_Z = 1000
+// GetCapabilities retry — lens `running` precedes WMS-port readiness.
+const CAPABILITIES_RETRY_DELAYS_MS = [300, 600, 1200, 2400, 4800] as const
+// Safety ceiling per prefetch image — server-hung loads shouldn't leak layers.
+const PREFETCH_LOAD_TIMEOUT_MS = 30_000
+// Hover-popover close delay — lets the cursor travel trigger→content.
+const LEGEND_HOVER_CLOSE_MS = 200
 
 // Standard Web Mercator world extent (projection asymptotes at ±85.0511°);
 // constrains panning to the basemap's coverage.
@@ -318,7 +324,7 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
 
   useEffect(() => {
     const ac = new AbortController()
-    const delaysMs = [300, 600, 1200, 2400, 4800]
+    const delaysMs = CAPABILITIES_RETRY_DELAYS_MS
     setError(null)
     setLoadingLayers(true)
     setRetrying(false)
@@ -645,9 +651,11 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
           zIndex: -1,
         })
         let settled = false
+        let safetyTimer = 0
         const settle = () => {
           if (settled) return
           settled = true
+          window.clearTimeout(safetyTimer)
           map.removeLayer(hidden)
           const i = hiddenLayers.indexOf(hidden)
           if (i >= 0) hiddenLayers.splice(i, 1)
@@ -656,7 +664,7 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
         source.once('imageloadend', settle)
         source.once('imageloaderror', settle)
         // Safety: if the load events never fire (server hung), don't leak.
-        window.setTimeout(settle, 30000)
+        safetyTimer = window.setTimeout(settle, PREFETCH_LOAD_TIMEOUT_MS)
         hiddenLayers.push(hidden)
         map.addLayer(hidden)
       })
@@ -1532,14 +1540,15 @@ function SortableLayerItem({
         }}
         className="flex cursor-grab items-start gap-2 p-2.5 active:cursor-grabbing"
       >
-        <button
-          type="button"
-          aria-label={t('lens.dragHandle')}
+        {/* Decorative grip — drag is initiated by the parent draggable div.
+            No keyboard reorder path; mouse/touch-only by design. */}
+        <span
+          aria-hidden="true"
           title={t('lens.dragHandle')}
-          className="text-muted-foreground hover:text-foreground"
+          className="text-muted-foreground"
         >
           <GripVertical className="h-4 w-4" />
-        </button>
+        </span>
         <div className="min-w-0 flex-1">
           <P className="truncate text-sm font-medium" title={layer.title}>
             {layer.title}
@@ -1671,7 +1680,7 @@ function LegendImage({ url, title }: { url: string; title: string }) {
     closeTimer.current = window.setTimeout(() => {
       setHovered(false)
       closeTimer.current = null
-    }, 200)
+    }, LEGEND_HOVER_CLOSE_MS)
   }, [cancelTimer])
   useEffect(() => () => cancelTimer(), [cancelTimer])
 
@@ -1739,9 +1748,12 @@ function PinnedLegendsBar({
   onUnpin: (name: string) => void
 }) {
   const { t } = useTranslation('executions')
-  const items = Array.from(pinnedLegends)
-    .map((name) => layers.find((l) => l.name === name))
-    .filter((l): l is ParsedLayer => !!l && !!l.styles[0]?.legendUrl)
+  const items = Array.from(pinnedLegends).flatMap((name) => {
+    const layer = layers.find((l) => l.name === name)
+    const legendUrl = layer?.styles[0]?.legendUrl
+    if (!layer || !legendUrl) return []
+    return [{ layer, legendUrl: rebaseLensUrl(legendUrl, baseUrl) }]
+  })
   if (items.length === 0) return null
   // Pick column count to match item count exactly (so the strip always
   // fills the row), capped at 3 on very wide screens. Special case: 4
@@ -1759,40 +1771,34 @@ function PinnedLegendsBar({
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 max-h-[45%] overflow-y-auto">
       <div className="pointer-events-auto m-3">
         <div className={cn('grid gap-2', gridClass)}>
-          {items.map((layer) => {
-            const legendUrl = rebaseLensUrl(layer.styles[0].legendUrl!, baseUrl)
-            return (
-              <div
-                key={layer.name}
-                className="flex items-start gap-2 rounded border border-border bg-card px-2 py-2"
-              >
-                <div className="min-w-0 flex-1">
-                  <P
-                    className="truncate text-xs font-medium"
-                    title={layer.title}
-                  >
-                    {layer.title}
-                  </P>
-                  <img
-                    src={legendUrl}
-                    alt={`${layer.title} legend`}
-                    className="mt-1 h-auto max-h-40 w-full object-contain"
-                    loading="lazy"
-                  />
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 shrink-0"
-                  onClick={() => onUnpin(layer.name)}
-                  aria-label={t('lens.unpinLegend')}
-                  title={t('lens.unpinLegend')}
-                >
-                  <PinOff className="h-3.5 w-3.5" />
-                </Button>
+          {items.map(({ layer, legendUrl }) => (
+            <div
+              key={layer.name}
+              className="flex items-start gap-2 rounded border border-border bg-card px-2 py-2"
+            >
+              <div className="min-w-0 flex-1">
+                <P className="truncate text-xs font-medium" title={layer.title}>
+                  {layer.title}
+                </P>
+                <img
+                  src={legendUrl}
+                  alt={`${layer.title} legend`}
+                  className="mt-1 h-auto max-h-40 w-full object-contain"
+                  loading="lazy"
+                />
               </div>
-            )
-          })}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 shrink-0"
+                onClick={() => onUnpin(layer.name)}
+                aria-label={t('lens.unpinLegend')}
+                title={t('lens.unpinLegend')}
+              >
+                <PinOff className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
         </div>
       </div>
     </div>

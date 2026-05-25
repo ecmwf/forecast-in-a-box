@@ -24,20 +24,19 @@ AvailableIntrinsicGlyphs = Literal[
 ]
 # fmt: on
 
-_current_time_example = value_dt2str(current_time())
-
-# TODO: replace with frozendict once available so that we have immutability
-_values_and_examples: dict[AvailableIntrinsicGlyphs, str] = {
-    "runId": str(uuid.uuid4()),
-    "submitDatetime": _current_time_example,
-    "startDatetime": _current_time_example,
-    "attemptCount": "1",
-}
-
 
 def get_values_and_examples() -> dict[AvailableIntrinsicGlyphs, str]:
-    """Return all intrinsic glyph names with example values generated at import time.
+    """Return all intrinsic glyph names paired with example values.
 
-    Used for pre-submit validation and frontend display.
+    Generated per call: the datetime examples must track the current time so
+    pre-submit validation and the frontend "resolves to" preview reflect "now".
+    Computing them once at import froze every preview at the backend's
+    start-up time.
     """
-    return _values_and_examples
+    now = value_dt2str(current_time())
+    return {
+        "runId": str(uuid.uuid4()),
+        "submitDatetime": now,
+        "startDatetime": now,
+        "attemptCount": "1",
+    }

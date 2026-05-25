@@ -33,8 +33,12 @@ export function useLensList() {
 }
 
 export function useStartSkinnyWms() {
+  const queryClient = useQueryClient()
   return useMutation<string, Error, { localPath: string }>({
     mutationFn: ({ localPath }) => startSkinnyWms(localPath),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: lensKeys.list() })
+    },
   })
 }
 
@@ -66,6 +70,7 @@ export function useStopLens() {
       void queryClient.invalidateQueries({
         queryKey: lensKeys.status(lensInstanceId),
       })
+      void queryClient.invalidateQueries({ queryKey: lensKeys.list() })
     },
   })
 }

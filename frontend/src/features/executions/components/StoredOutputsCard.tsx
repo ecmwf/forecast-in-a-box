@@ -185,8 +185,7 @@ function StoredOutputRowItem({
     ? undefined
     : t('storedOutputs.fileMissing')
   const openPending = startMutation.isPending && pendingSource === 'open'
-  const copyButtonPending =
-    startMutation.isPending && pendingSource === 'copy'
+  const copyButtonPending = startMutation.isPending && pendingSource === 'copy'
 
   return (
     <li className="py-2">
@@ -263,7 +262,10 @@ function CopyUrlPanel({
   const url = running ? buildWmsCapabilitiesUrl(port) : null
 
   const close = () => {
-    stopMutation.mutate({ lensInstanceId })
+    stopMutation.mutate(
+      { lensInstanceId },
+      { onError: (err) => showToast.error(err.message) },
+    )
     onClose()
   }
 
@@ -344,7 +346,10 @@ function LensRunner({
   const [expanded, setExpanded] = useState(false)
 
   const close = () => {
-    stopMutation.mutate({ lensInstanceId })
+    stopMutation.mutate(
+      { lensInstanceId },
+      { onError: (err) => showToast.error(err.message) },
+    )
     onClose()
   }
 
