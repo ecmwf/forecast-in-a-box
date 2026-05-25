@@ -21,17 +21,20 @@ We use pyrsistent immutable structures for safe lock-free reads.
 import logging
 import threading
 import time
+import urllib.parse
 from concurrent.futures import Future, ThreadPoolExecutor
-from pathlib import Path
 
 from cascade.low.func import Either
 from pyrsistent import pmap, pset
 from pyrsistent.typing import PMap, PSet
 
 from forecastbox.domain.artifact.base import ArtifactCatalog, CompositeArtifactId, MlModelDetail, MlModelOverview
-from forecastbox.domain.artifact.io import delete_artifact, download_artifact, get_artifacts_catalog, list_local_storage
+from forecastbox.domain.artifact.catalog import get_artifacts_catalog
+from forecastbox.domain.artifact.io import delete_artifact, download_artifact, list_storage
+from forecastbox.utility import tunnel
 from forecastbox.utility.concurrent import timed_acquire
 from forecastbox.utility.config import config
+from forecastbox.utility.tunnel import CommandHandle
 
 logger = logging.getLogger(__name__)
 
@@ -46,11 +49,13 @@ timeout_acquire_error = 2  # something failed, report quickly so that can be joi
 
 class ArtifactManager:
     lock: threading.Lock = threading.Lock()
+    ssh_handle_lock: threading.Lock = threading.Lock()
     catalog: ArtifactCatalog = pmap()
     locally_available: PSet[CompositeArtifactId] = pset()
     ongoing_downloads: PMap[CompositeArtifactId, int | str] = pmap()
     executor: ThreadPoolExecutor | None = None
     refresh_error: str | None = None
+    ssh_handle: CommandHandle | None = None
 
     @classmethod
     def _ensure_pool(cls) -> None:
@@ -59,13 +64,40 @@ class ArtifactManager:
         if cls.executor is None:
             cls.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="artifact-io")
 
+    @classmethod
+    def _get_or_create_ssh_handle(cls, timeout: int) -> CommandHandle:
+        """Return an alive CommandHandle for the configured SSH data_path, creating or reconnecting as needed."""
+        with timed_acquire(cls.ssh_handle_lock, timeout) as result:
+            if not result:
+                raise ValueError("failed to acquire SSH handle lock")
+            if cls.ssh_handle is not None:
+                if tunnel.status_cmd(cls.ssh_handle):
+                    return cls.ssh_handle
+                # Stale handle -- attempt graceful close before replacing
+                try:
+                    tunnel.disconnect(cls.ssh_handle)
+                except Exception as e:
+                    logger.warning(f"Could not disconnect stale SSH handle: {e}")
+            parsed = urllib.parse.urlparse(config.api.data_path)
+            cls.ssh_handle = tunnel.connect(parsed.netloc)
+            return cls.ssh_handle
+
+
+def _ssh_handle_if_needed(timeout: int = timeout_acquire_task) -> CommandHandle | None:
+    """Return SSH handle if data_path uses ssh:// scheme, else None."""
+    parsed = urllib.parse.urlparse(config.api.data_path)
+    if parsed.scheme == "ssh":
+        return ArtifactManager._get_or_create_ssh_handle(timeout)
+    return None
+
 
 def _refresh_catalog_task() -> None:
     """Background task to refresh catalog and local artifact list."""
     try:
         logger.info("Starting artifact catalog refresh")
         catalog = get_artifacts_catalog(config.product.artifact_stores)
-        local_artifacts = list_local_storage(catalog, Path(config.api.data_path))
+        handle = _ssh_handle_if_needed()
+        local_artifacts = list_storage(catalog, config.api.data_path, handle)
 
         with timed_acquire(ArtifactManager.lock, timeout_acquire_task) as result:
             if not result:
@@ -101,7 +133,8 @@ def _download_artifact_task(composite_id: CompositeArtifactId) -> None:
         def progress_callback(progress: int) -> None:
             report_artifact_download_progress(composite_id, progress=progress)
 
-        download_artifact(composite_id, checkpoint, Path(config.api.data_path), progress_callback=progress_callback)
+        handle = _ssh_handle_if_needed()
+        download_artifact(composite_id, checkpoint, config.api.data_path, handle=handle, progress_callback=progress_callback)
 
         with timed_acquire(ArtifactManager.lock, timeout_acquire_task) as result:
             if not result:
@@ -245,8 +278,9 @@ def delete_model(composite_id: CompositeArtifactId) -> Either[str, str]:  # ty: 
 
     # TODO race condition possibility 1/ pop in one thread 2/ another request triggers a download
     # 3/ unlink happens while download is ongoing -> fix by making the delete two-step
+    handle = _ssh_handle_if_needed()
     try:
-        delete_artifact(composite_id, Path(config.api.data_path))
+        delete_artifact(composite_id, config.api.data_path, handle=handle)
     except Exception as e:
         logger.exception(f"Failed to delete artifact {composite_id}: {repr(e)}")
         return Either.error(f"Failed to delete: {repr(e)}")

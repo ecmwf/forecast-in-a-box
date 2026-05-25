@@ -8,121 +8,139 @@
 # nor does it submit to any jurisdiction.
 
 """
-Downloading and managing artifacts such as ml model checkpoints
+Downloading and managing artifacts such as ml model checkpoints.
 
-All the methods here are blocking -- see manager for nonblocking invocations
+All the methods here are blocking -- see manager for nonblocking invocations.
+Supports both local (file://) and remote (ssh://) data directories.
 """
 
-import json
 import logging
+import shlex
 import shutil
+import subprocess
 import tempfile
+import urllib.parse
 from collections.abc import Callable
 from pathlib import Path
-from typing import cast
 
 import httpx
-from cascade.low.func import assert_never
-from fiab_core.artifacts import ArtifactLocalId, ArtifactResolved, ArtifactStoreId, ArtifactType, MlModelCheckpoint
-from pyrsistent import pmap
+from fiab_core.artifacts import ArtifactLocalId, ArtifactResolved, ArtifactStoreId
 
 from forecastbox.domain.artifact.base import ArtifactCatalog, CompositeArtifactId, artifacts_subdir, get_artifact_local_path
-from forecastbox.domain.artifact.compatibility import get_model_checkpoint_compatibility, get_platform_info
-from forecastbox.utility.config import ArtifactStoresConfig
-from forecastbox.utility.httpx import fetch_content
+from forecastbox.utility import tunnel
+from forecastbox.utility.tunnel import CommandHandle
 
 logger = logging.getLogger(__name__)
 
 
-def get_artifacts_catalog(artifact_stores_config: ArtifactStoresConfig) -> ArtifactCatalog:
-    """Query each artifact store and return a composed catalog of all available artifacts."""
-    catalog = {}
-    platform_info = get_platform_info()
-
-    with httpx.Client(follow_redirects=True) as client:
-        for store_id, store_config in artifact_stores_config.items():
-            if store_config.method == "file":
-                raw = fetch_content(store_config.url, client)
-                store_data = json.loads(raw)
-                artifacts = store_data.get("artifacts", {})
-                for artifact_id, artifact_data in artifacts.items():
-                    composite_id = CompositeArtifactId(artifact_store_id=store_id, artifact_local_id=ArtifactLocalId(artifact_id))
-                    artifact_type = cast(ArtifactType, artifact_data["artifact_type"])
-                    store_info_data = artifact_data["store_info"]
-                    if artifact_type == "MlModelCheckpoint":
-                        store_info = MlModelCheckpoint(**store_info_data)
-                        is_locally_compatible, local_compatibility_detail = get_model_checkpoint_compatibility(store_info, platform_info)
-                    else:
-                        assert_never(artifact_type)
-
-                    catalog[composite_id] = ArtifactResolved(
-                        artifact_type=artifact_type,
-                        store_info=store_info,
-                        is_locally_compatible=is_locally_compatible,
-                        local_compatibility_detail=local_compatibility_detail,
-                    )
-                    logger.debug(f"Loaded artifact {composite_id} from store {store_id}")
-            else:
-                assert_never(store_config.method)
-
-    return pmap(catalog)
+def _parse_data_dir_url(data_dir_url: str) -> tuple[str, str, str]:
+    """Parse a data_dir URL into (scheme, netloc, path). Raises ValueError on error."""
+    if "://" not in data_dir_url:
+        raise ValueError(f"Invalid data_dir URL (missing scheme): {data_dir_url}")
+    parsed = urllib.parse.urlparse(data_dir_url)
+    if not parsed.scheme:
+        raise ValueError(f"Invalid data_dir URL (no scheme): {data_dir_url}")
+    return parsed.scheme, parsed.netloc, parsed.path
 
 
-def list_local_storage(artifacts_catalog: ArtifactCatalog, data_dir: Path) -> list[CompositeArtifactId]:
-    """List locally stored artifacts by traversing the artifacts directory under data_dir/artifacts/{store_id}/{checkpoint_id}."""
-    artifacts_base = data_dir / artifacts_subdir
+# ---------------------------------------------------------------------------
+# Listing
+# ---------------------------------------------------------------------------
 
+
+def _enumerate_artifacts_local(data_dir: str) -> list[tuple[str, str]]:
+    """Return (store_id, artifact_id) pairs from local filesystem."""
+    artifacts_base = Path(data_dir) / artifacts_subdir
     if not artifacts_base.exists():
         return []
 
-    local_artifacts: list[CompositeArtifactId] = []
-    known_store_ids = {artifact_id.artifact_store_id for artifact_id in artifacts_catalog.keys()}
-
+    entries: list[tuple[str, str]] = []
     for store_item in artifacts_base.iterdir():
         if not store_item.is_dir():
             logger.warning(f"Found non-directory item in artifacts directory: {store_item.name}")
             continue
-
         store_id = store_item.name
-
-        if store_id not in known_store_ids:
-            logger.warning(f"Found unknown artifact store directory: {store_id}")
-            continue
-
         for checkpoint_item in store_item.iterdir():
             if checkpoint_item.is_dir():
                 logger.warning(f"Found directory instead of file for checkpoint: {checkpoint_item.name}")
                 continue
-
-            checkpoint_id = checkpoint_item.name
-            composite_id = CompositeArtifactId(
-                artifact_store_id=ArtifactStoreId(store_id), artifact_local_id=ArtifactLocalId(checkpoint_id)
-            )
-
-            if composite_id in artifacts_catalog:
-                local_artifacts.append(composite_id)
-            else:
-                logger.warning(f"Found local artifact not in catalog: {composite_id}")
-
-    return local_artifacts
+            entries.append((store_id, checkpoint_item.name))
+    return entries
 
 
-def download_artifact(
+def _enumerate_artifacts_remote(path: str, handle: CommandHandle) -> list[tuple[str, str]]:
+    """Return (store_id, artifact_id) pairs from a remote host via SSH."""
+    artifacts_base = path.rstrip("/") + "/" + artifacts_subdir
+    cmd = f"find {shlex.quote(artifacts_base)} -mindepth 2 -maxdepth 2 -not -type d 2>/dev/null || true"
+    result = tunnel.run(handle, cmd)
+
+    prefix = artifacts_base.rstrip("/") + "/"
+    entries: list[tuple[str, str]] = []
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if not line or not line.startswith(prefix):
+            continue
+        rest = line[len(prefix) :]
+        parts = rest.split("/", 1)
+        if len(parts) == 2:
+            entries.append((parts[0], parts[1]))
+    return entries
+
+
+def _match_artifacts_to_catalog(catalog: ArtifactCatalog, entries: list[tuple[str, str]]) -> list[CompositeArtifactId]:
+    """Filter (store_id, artifact_id) pairs against the catalog, returning matching CompositeArtifactIds."""
+    known_store_ids = {artifact_id.artifact_store_id for artifact_id in catalog.keys()}
+    result: list[CompositeArtifactId] = []
+    for store_id, checkpoint_id in entries:
+        if store_id not in known_store_ids:
+            logger.warning(f"Found unknown artifact store directory: {store_id}")
+            continue
+        composite_id = CompositeArtifactId(
+            artifact_store_id=ArtifactStoreId(store_id),
+            artifact_local_id=ArtifactLocalId(checkpoint_id),
+        )
+        if composite_id in catalog:
+            result.append(composite_id)
+        else:
+            logger.warning(f"Found local artifact not in catalog: {composite_id}")
+    return result
+
+
+def list_storage(catalog: ArtifactCatalog, data_dir_url: str, handle: CommandHandle | None = None) -> list[CompositeArtifactId]:
+    """List stored artifacts at the given data_dir_url (file:// or ssh://)."""
+    scheme, _netloc, path = _parse_data_dir_url(data_dir_url)
+    if scheme == "file":
+        entries = _enumerate_artifacts_local(path)
+    elif scheme == "ssh":
+        if handle is None:
+            raise ValueError("SSH handle required for ssh:// data_dir_url")
+        entries = _enumerate_artifacts_remote(path, handle)
+    else:
+        raise NotImplementedError(f"Unsupported data_dir scheme: {scheme!r}")
+    return _match_artifacts_to_catalog(catalog, entries)
+
+
+# ---------------------------------------------------------------------------
+# Downloading
+# ---------------------------------------------------------------------------
+
+
+def _download_artifact_local(
     composite_id: CompositeArtifactId,
     artifact: ArtifactResolved,
-    data_dir: Path,
+    data_dir_url: str,
     progress_callback: Callable[[int], None] | None = None,
 ) -> None:
-    """Download an artifact from its remote URL to local storage, raising httpx.HTTPError if download fails."""
+    """Download an artifact from its remote URL to local storage."""
     checkpoint = artifact.store_info
-    artifact_path = get_artifact_local_path(composite_id, data_dir)
+    artifact_path = get_artifact_local_path(composite_id, data_dir_url)
     artifact_path.parent.mkdir(parents=True, exist_ok=True)
 
-    try:
-        temp_file = tempfile.NamedTemporaryFile(prefix="artifact_", suffix=".ckpt", delete=False)
-        temp_path = Path(temp_file.name)
-        temp_file.close()
+    temp_file = tempfile.NamedTemporaryFile(prefix="artifact_", suffix=".ckpt", delete=False)
+    temp_path = Path(temp_file.name)
+    temp_file.close()
 
+    try:
         with httpx.Client(follow_redirects=True, timeout=300.0) as client:
             logger.debug(f"Starting download for {composite_id} from {checkpoint.url} to {temp_path}")
             with client.stream("GET", checkpoint.url) as response:
@@ -142,22 +160,105 @@ def download_artifact(
                                 if progress_callback:
                                     progress_callback(progress)
 
-            logger.debug(f"Download completed for {composite_id}, total bytes: {downloaded}")
-            shutil.move(str(temp_path), str(artifact_path))
-            logger.info(f"Successfully downloaded artifact {composite_id} to {artifact_path}")
+        logger.debug(f"Download completed for {composite_id}, total bytes: {downloaded}")
+        shutil.move(str(temp_path), str(artifact_path))
+        logger.info(f"Successfully downloaded artifact {composite_id} to {artifact_path}")
 
     except Exception as e:
-        # Clean up temp file if it exists
         if temp_path.exists():
             temp_path.unlink()
         logger.error(f"Failed to download artifact {composite_id}: {e}")
         raise
 
 
-def delete_artifact(composite_id: CompositeArtifactId, data_dir: Path) -> None:
-    """Delete a locally stored artifact file, raising FileNotFoundError if it doesn't exist."""
-    artifact_path = get_artifact_local_path(composite_id, data_dir)
+def _download_artifact_remote(
+    composite_id: CompositeArtifactId,
+    artifact: ArtifactResolved,
+    data_dir_url: str,
+    handle: CommandHandle,
+) -> None:
+    """Download an artifact from its HTTP URL to remote storage via SSH curl."""
+    checkpoint = artifact.store_info
+    artifact_path = get_artifact_local_path(composite_id, data_dir_url)
+    temp_path = str(artifact_path) + ".tmp"
+
+    logger.debug(f"Starting remote download for {composite_id} from {checkpoint.url}")
+
+    tunnel.run(handle, f"mkdir -p {shlex.quote(str(artifact_path.parent))}")
+
+    curl_cmd = f"curl -fsSL -o {shlex.quote(temp_path)} {shlex.quote(checkpoint.url)} && mv {shlex.quote(temp_path)} {shlex.quote(str(artifact_path))}"
+    try:
+        tunnel.run(handle, curl_cmd)
+    except subprocess.CalledProcessError as e:
+        try:
+            tunnel.run(handle, f"rm -f {shlex.quote(temp_path)}")
+        except Exception as cleanup_err:
+            logger.warning(f"Could not clean up remote temp file {temp_path!r}: {cleanup_err}")
+        logger.error(f"Failed remote download for {composite_id}: {e.stderr}")
+        raise
+
+    logger.info(f"Successfully downloaded artifact {composite_id} to {artifact_path} on {handle.host}")
+
+
+def download_artifact(
+    composite_id: CompositeArtifactId,
+    artifact: ArtifactResolved,
+    data_dir_url: str,
+    handle: CommandHandle | None = None,
+    progress_callback: Callable[[int], None] | None = None,
+) -> None:
+    """Download an artifact to local or remote storage, dispatching on the data_dir_url scheme.
+    `handle` required for `ssh://` scheme."""
+    scheme, _netloc, path = _parse_data_dir_url(data_dir_url)
+    if scheme == "file":
+        _download_artifact_local(composite_id, artifact, data_dir_url, progress_callback)
+    elif scheme == "ssh":
+        if handle is None:
+            raise ValueError("SSH handle required for ssh:// data_dir_url")
+        _download_artifact_remote(composite_id, artifact, data_dir_url, handle)
+    else:
+        raise NotImplementedError(f"Unsupported data_dir scheme: {scheme!r}")
+
+
+# ---------------------------------------------------------------------------
+# Deleting
+# ---------------------------------------------------------------------------
+
+
+def _delete_artifact_local(composite_id: CompositeArtifactId, data_dir_url: str) -> None:
+    """Delete a locally stored artifact file."""
+    artifact_path = get_artifact_local_path(composite_id, data_dir_url)
     if not artifact_path.exists():
         raise FileNotFoundError(f"Artifact file not found: {artifact_path}")
     artifact_path.unlink()
     logger.info(f"Deleted artifact {composite_id} from {artifact_path}")
+
+
+def _delete_artifact_remote(composite_id: CompositeArtifactId, data_dir_url: str, handle: CommandHandle) -> None:
+    """Delete a remotely stored artifact file via SSH."""
+    artifact_path = str(get_artifact_local_path(composite_id, data_dir_url))
+    try:
+        tunnel.run(handle, f"rm {shlex.quote(artifact_path)}")
+    except subprocess.CalledProcessError as e:
+        stderr = (e.stderr or "").lower()
+        if "no such file or directory" in stderr:
+            raise FileNotFoundError(f"Artifact file not found on remote: {artifact_path}") from e
+        raise
+    logger.info(f"Deleted remote artifact {composite_id} at {artifact_path} on {handle.host}")
+
+
+def delete_artifact(
+    composite_id: CompositeArtifactId,
+    data_dir_url: str,
+    handle: CommandHandle | None = None,
+) -> None:
+    """Delete an artifact from local or remote storage, dispatching on the data_dir_url scheme."""
+    scheme, _netloc, _path = _parse_data_dir_url(data_dir_url)
+    if scheme == "file":
+        _delete_artifact_local(composite_id, data_dir_url)
+    elif scheme == "ssh":
+        if handle is None:
+            raise ValueError("SSH handle required for ssh:// data_dir_url")
+        _delete_artifact_remote(composite_id, data_dir_url, handle)
+    else:
+        raise NotImplementedError(f"Unsupported data_dir scheme: {scheme!r}")

@@ -136,6 +136,7 @@ def expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
 
 def compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
     with PayloadBuildingContext(environment=[f"-e {pathlib.Path(__file__).parent.parent.parent}"]):
+        # with PayloadBuildingContext(environment=["-e /home/dev/src/fiab-plugin-test"]): # TODO handle the ssh:// scenario intelligently
         if instance.factory_id.factory == "source_42":
             action = from_source(Payload("fiab_plugin_test.runtime.source_42"))  # type: ignore
         elif instance.factory_id.factory == "source_text":

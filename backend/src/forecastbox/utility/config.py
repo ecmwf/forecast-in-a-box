@@ -206,8 +206,8 @@ class ProductSettings(FiabBaseModel):
 
 
 class BackendAPISettings(FiabBaseModel):
-    data_path: str = str(fiab_home / "data_dir")
-    """Path to the data directory."""
+    data_path: str = f"file://{fiab_home / 'data_dir'}"
+    """Data directory URL. Supports file:// (local) and ssh://[user@]host/path (remote) schemes."""
     model_repository: str = "https://sites.ecmwf.int/repository/fiab"
     """URL to the model repository."""
     uvicorn_host: str = "0.0.0.0"
@@ -224,8 +224,17 @@ class BackendAPISettings(FiabBaseModel):
 
     def validate_runtime(self) -> list[str]:
         errors = []
-        if not os.path.isdir(self.data_path):
-            errors.append(f"not a directory: data_path={self.data_path}")
+        parsed = urllib.parse.urlparse(self.data_path)
+        if parsed.scheme == "file":
+            if not os.path.isdir(parsed.path):
+                errors.append(f"not a directory: data_path={self.data_path}")
+        elif parsed.scheme == "ssh":
+            if not parsed.netloc:
+                errors.append(f"missing host in ssh:// data_path: {self.data_path}")
+            if not parsed.path.startswith("/"):
+                errors.append(f"ssh:// data_path must have an absolute path: {self.data_path}")
+        else:
+            errors.append(f"unsupported scheme in data_path (use file:// or ssh://): {self.data_path}")
         if not _validate_url(self.model_repository):
             errors.append(f"not an url: model_repository={self.model_repository}")
         pseudo_url = f"http://{self.uvicorn_host}:{self.uvicorn_port}"
@@ -300,6 +309,17 @@ class FIABConfig(BaseSettings):
         config_path.parent.mkdir(parents=True, exist_ok=True)
         with open(config_path, "w") as f:
             f.write(self._get_toml(exclude_defaults=True, exclude_none=True))
+
+    def validate_runtime(self) -> list[str]:
+        cascade = urllib.parse.urlparse(self.cascade.cascade_url)
+        data_path = urllib.parse.urlparse(self.api.data_path)
+        errors = []
+        if cascade.scheme != data_path.scheme:
+            errors.append(f"cascade and data path must use the same scheme: {cascade=} != {data_path=}")
+        if cascade.scheme == "ssh":
+            if cascade.netloc != data_path.netloc:
+                errors.append(f"under ssh://, cascade and data path must use the same netlo: {cascade=} != {data_path=}")
+        return errors
 
 
 def validate_runtime(config: FIABConfig) -> None:

@@ -56,9 +56,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.version = f"{release_version}@{release_time}"
     submit_initialize_stores()
     ArtifactsProvider.register_get_artifacts_lookup(lambda: ArtifactManager.catalog)
-    ArtifactsProvider.register_get_artifact_local_path(
-        lambda composite_id: get_artifact_local_path(composite_id, Path(config.api.data_path))
-    )
+    ArtifactsProvider.register_get_artifact_local_path(lambda composite_id: get_artifact_local_path(composite_id, config.api.data_path))
     catalog_ready = submit_refresh_catalog()
     submit_load_plugins(start_after=catalog_ready)
     yield
