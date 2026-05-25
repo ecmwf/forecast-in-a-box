@@ -209,12 +209,8 @@ export function FableBuilderPage({
     } else if (!fableId && !encodedState) {
       if (preset) {
         const presetConfig = getPreset(preset)
-        if (presetConfig) {
-          setFable(presetConfig.fable, null)
-          setFableName(presetConfig.name)
-        } else {
-          newFable()
-        }
+        setFable(presetConfig.fable, null)
+        setFableName(presetConfig.name)
       } else {
         newFable()
       }

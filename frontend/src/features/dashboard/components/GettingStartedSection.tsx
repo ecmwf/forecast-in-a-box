@@ -44,11 +44,11 @@ export function GettingStartedSection({
   // Builder graphs are evaluated once per render — date defaults are stamped
   // here so the flow previews always reflect the date the cards will load with.
   const ecmwfOpenDataFable = useMemo(
-    () => getPreset('ecmwf-open-data')?.fable,
+    () => getPreset('ecmwf-open-data').fable,
     [],
   )
-  const aifsForecastFable = useMemo(() => getPreset('aifs-forecast')?.fable, [])
-  const aifsDatasetFable = useMemo(() => getPreset('aifs-dataset')?.fable, [])
+  const aifsForecastFable = useMemo(() => getPreset('aifs-forecast').fable, [])
+  const aifsDatasetFable = useMemo(() => getPreset('aifs-dataset').fable, [])
 
   const content = (
     <>

@@ -331,6 +331,6 @@ const PRESET_BUILDERS: Record<PresetId, () => FablePreset> = {
   'aifs-dataset': aifsDatasetPreset,
 }
 
-export function getPreset(id: PresetId): FablePreset | undefined {
+export function getPreset(id: PresetId): FablePreset {
   return PRESET_BUILDERS[id]()
 }
