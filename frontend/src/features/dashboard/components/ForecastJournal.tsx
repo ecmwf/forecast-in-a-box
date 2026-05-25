@@ -15,15 +15,17 @@ import { ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
 import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
-import type { RunFilter } from '@/features/journal/types'
+import type { ForecastRunViewModel, RunFilter } from '@/features/journal/types'
 import type { GroupBy } from '@/features/journal/grouping/group-runs'
 import type { FacetToken } from '@/features/journal/facets/facet-types'
 import { useJobsStatus } from '@/api/hooks/useJobs'
+import { useServerTime } from '@/api/hooks/useSchedules'
 import { useForecastRuns } from '@/features/journal/data/useForecastRuns'
 import { filterRuns } from '@/features/journal/utils/filter-runs'
 import { addToken, parseQuery } from '@/features/journal/facets/parse-query'
 import { ForecastRunList } from '@/features/journal/components/ForecastRunList'
 import { ForecastRunSearchHeader } from '@/features/journal/components/ForecastRunSearchHeader'
+import { formatInZone } from '@/lib/datetime'
 
 interface ForecastJournalProps {
   variant?: DashboardVariant
@@ -50,11 +52,20 @@ export function ForecastJournal({ variant, shadow }: ForecastJournalProps) {
   const { data, isLoading } = useJobsStatus(1, DASHBOARD_RUN_COUNT)
   const { runs, toggleBookmark } = useForecastRuns(data?.runs ?? [])
 
+  // App-TZ date — keeps the facet aligned with the row in any client TZ.
+  const { serverTimeToLocal, timeZone } = useServerTime()
+  const displayDateFor = useCallback(
+    (run: ForecastRunViewModel) =>
+      formatInZone(serverTimeToLocal(run.createdAt), timeZone, 'yyyy-MM-dd'),
+    [serverTimeToLocal, timeZone],
+  )
+
   // Defer filtering so typing in the search box stays responsive on long lists.
   const deferredQuery = useDeferredValue(query)
   const filtered = useMemo(
-    () => filterRuns(runs, activeFilter, parseQuery(deferredQuery)),
-    [runs, activeFilter, deferredQuery],
+    () =>
+      filterRuns(runs, activeFilter, parseQuery(deferredQuery), displayDateFor),
+    [runs, activeFilter, deferredQuery, displayDateFor],
   )
 
   const handleAddFacet = useCallback(

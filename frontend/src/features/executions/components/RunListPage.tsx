@@ -10,12 +10,13 @@
 
 /** The /executions page — the full, paginated Forecast Journal. */
 
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getRouteApi } from '@tanstack/react-router'
-import type { RunFilter } from '@/features/journal/types'
+import type { ForecastRunViewModel, RunFilter } from '@/features/journal/types'
 import type { GroupBy } from '@/features/journal/grouping/group-runs'
 import { useJobsStatus } from '@/api/hooks/useJobs'
+import { useServerTime } from '@/api/hooks/useSchedules'
 import { useForecastRuns } from '@/features/journal/data/useForecastRuns'
 import { filterRuns } from '@/features/journal/utils/filter-runs'
 import { addToken, parseQuery } from '@/features/journal/facets/parse-query'
@@ -26,6 +27,7 @@ import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { PageHeader } from '@/components/common/PageHeader'
 import { Pagination } from '@/components/common/Pagination'
 import { useUiStore } from '@/stores/uiStore'
+import { formatInZone } from '@/lib/datetime'
 
 const PAGE_SIZE = 10
 
@@ -77,9 +79,17 @@ export function RunListPage() {
   const { runs, toggleBookmark } = useForecastRuns(data?.runs ?? [])
   const totalPages = data?.total_pages ?? 1
 
+  // App-TZ date — keeps the facet aligned with the row in any client TZ.
+  const { serverTimeToLocal, timeZone } = useServerTime()
+  const displayDateFor = useCallback(
+    (run: ForecastRunViewModel) =>
+      formatInZone(serverTimeToLocal(run.createdAt), timeZone, 'yyyy-MM-dd'),
+    [serverTimeToLocal, timeZone],
+  )
+
   const filtered = useMemo(
-    () => filterRuns(runs, activeFilter, parseQuery(query)),
-    [runs, activeFilter, query],
+    () => filterRuns(runs, activeFilter, parseQuery(query), displayDateFor),
+    [runs, activeFilter, query, displayDateFor],
   )
 
   if (isError) {
