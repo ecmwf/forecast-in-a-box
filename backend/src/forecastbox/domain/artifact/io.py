@@ -36,11 +36,13 @@ logger = logging.getLogger(__name__)
 def _parse_data_dir_url(data_dir_url: str) -> tuple[str, str, str]:
     """Parse a data_dir URL into (scheme, netloc, path).
 
-    Plain paths without a scheme (legacy format) are treated as file:// URLs.
+    Raises ValueError if the URL is invalid or missing a scheme.
     """
     if "://" not in data_dir_url:
-        return "file", "", data_dir_url
+        raise ValueError(f"Invalid data_dir URL (missing scheme): {data_dir_url}")
     parsed = urllib.parse.urlparse(data_dir_url)
+    if not parsed.scheme:
+        raise ValueError(f"Invalid data_dir URL (no scheme): {data_dir_url}")
     return parsed.scheme, parsed.netloc, parsed.path
 
 
@@ -129,12 +131,12 @@ def list_storage(catalog: ArtifactCatalog, data_dir_url: str, handle: CommandHan
 def _download_artifact_local(
     composite_id: CompositeArtifactId,
     artifact: ArtifactResolved,
-    data_dir: Path,
+    data_dir_url: str,
     progress_callback: Callable[[int], None] | None = None,
 ) -> None:
     """Download an artifact from its remote URL to local storage."""
     checkpoint = artifact.store_info
-    artifact_path = get_artifact_local_path(composite_id, data_dir)
+    artifact_path = get_artifact_local_path(composite_id, data_dir_url)
     artifact_path.parent.mkdir(parents=True, exist_ok=True)
 
     temp_file = tempfile.NamedTemporaryFile(prefix="artifact_", suffix=".ckpt", delete=False)
@@ -214,7 +216,7 @@ def download_artifact(
     """Download an artifact to local or remote storage, dispatching on the data_dir_url scheme."""
     scheme, _netloc, path = _parse_data_dir_url(data_dir_url)
     if scheme == "file":
-        _download_artifact_local(composite_id, artifact, Path(path), progress_callback)
+        _download_artifact_local(composite_id, artifact, data_dir_url, progress_callback)
     elif scheme == "ssh":
         if handle is None:
             raise ValueError("SSH handle required for ssh:// data_dir_url")
@@ -228,18 +230,18 @@ def download_artifact(
 # ---------------------------------------------------------------------------
 
 
-def _delete_artifact_local(composite_id: CompositeArtifactId, data_dir: Path) -> None:
+def _delete_artifact_local(composite_id: CompositeArtifactId, data_dir_url: str) -> None:
     """Delete a locally stored artifact file."""
-    artifact_path = get_artifact_local_path(composite_id, data_dir)
+    artifact_path = get_artifact_local_path(composite_id, data_dir_url)
     if not artifact_path.exists():
         raise FileNotFoundError(f"Artifact file not found: {artifact_path}")
     artifact_path.unlink()
     logger.info(f"Deleted artifact {composite_id} from {artifact_path}")
 
 
-def _delete_artifact_remote(composite_id: CompositeArtifactId, handle: CommandHandle, remote_path: str) -> None:
+def _delete_artifact_remote(composite_id: CompositeArtifactId, handle: CommandHandle, data_dir_url: str) -> None:
     """Delete a remotely stored artifact file via SSH."""
-    artifact_path = str(get_artifact_local_path(composite_id, remote_path))
+    artifact_path = str(get_artifact_local_path(composite_id, data_dir_url))
     try:
         tunnel.run(handle, f"rm {shlex.quote(artifact_path)}")
     except subprocess.CalledProcessError as e:
@@ -256,12 +258,12 @@ def delete_artifact(
     handle: CommandHandle | None = None,
 ) -> None:
     """Delete an artifact from local or remote storage, dispatching on the data_dir_url scheme."""
-    scheme, _netloc, path = _parse_data_dir_url(data_dir_url)
+    scheme, _netloc, _path = _parse_data_dir_url(data_dir_url)
     if scheme == "file":
-        _delete_artifact_local(composite_id, Path(path))
+        _delete_artifact_local(composite_id, data_dir_url)
     elif scheme == "ssh":
         if handle is None:
             raise ValueError("SSH handle required for ssh:// data_dir_url")
-        _delete_artifact_remote(composite_id, handle, path)
+        _delete_artifact_remote(composite_id, handle, data_dir_url)
     else:
         raise ValueError(f"Unsupported data_dir scheme: {scheme!r}")

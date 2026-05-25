@@ -49,6 +49,7 @@ timeout_acquire_error = 2  # something failed, report quickly so that can be joi
 
 class ArtifactManager:
     lock: threading.Lock = threading.Lock()
+    ssh_handle_lock: threading.Lock = threading.Lock()
     catalog: ArtifactCatalog = pmap()
     locally_available: PSet[CompositeArtifactId] = pset()
     ongoing_downloads: PMap[CompositeArtifactId, int | str] = pmap()
@@ -63,31 +64,30 @@ class ArtifactManager:
         if cls.executor is None:
             cls.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="artifact-io")
 
+    @classmethod
+    def _get_or_create_ssh_handle(cls, timeout: int) -> CommandHandle:
+        """Return an alive CommandHandle for the configured SSH data_path, creating or reconnecting as needed."""
+        with timed_acquire(cls.ssh_handle_lock, timeout) as result:
+            if not result:
+                raise ValueError("failed to acquire SSH handle lock")
+            if cls.ssh_handle is not None:
+                if tunnel.status_cmd(cls.ssh_handle):
+                    return cls.ssh_handle
+                # Stale handle -- attempt graceful close before replacing
+                try:
+                    tunnel.disconnect(cls.ssh_handle)
+                except Exception as e:
+                    logger.warning(f"Could not disconnect stale SSH handle: {e}")
+            parsed = urllib.parse.urlparse(config.api.data_path)
+            cls.ssh_handle = tunnel.connect(parsed.netloc)
+            return cls.ssh_handle
 
-_ssh_handle_lock = threading.Lock()
 
-
-def _get_or_create_ssh_handle() -> CommandHandle:
-    """Return an alive CommandHandle for the configured SSH data_path, creating or reconnecting as needed."""
-    with _ssh_handle_lock:
-        if ArtifactManager.ssh_handle is not None:
-            if tunnel.status_cmd(ArtifactManager.ssh_handle):
-                return ArtifactManager.ssh_handle
-            # Stale handle -- attempt graceful close before replacing
-            try:
-                tunnel.disconnect(ArtifactManager.ssh_handle)
-            except Exception as e:
-                logger.warning(f"Could not disconnect stale SSH handle: {e}")
-        parsed = urllib.parse.urlparse(config.api.data_path)
-        ArtifactManager.ssh_handle = tunnel.connect(parsed.netloc)
-        return ArtifactManager.ssh_handle
-
-
-def _ssh_handle_if_needed() -> CommandHandle | None:
+def _ssh_handle_if_needed(timeout: int = timeout_acquire_task) -> CommandHandle | None:
     """Return SSH handle if data_path uses ssh:// scheme, else None."""
     parsed = urllib.parse.urlparse(config.api.data_path)
     if parsed.scheme == "ssh":
-        return _get_or_create_ssh_handle()
+        return ArtifactManager._get_or_create_ssh_handle(timeout)
     return None
 
 

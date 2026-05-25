@@ -58,16 +58,18 @@ ArtifactCatalog = PMap[CompositeArtifactId, ArtifactResolved]
 artifacts_subdir = "artifacts"
 
 
-def get_artifact_local_path(composite_id: CompositeArtifactId, data_dir_url: str | Path) -> Path:
+def get_artifact_local_path(composite_id: CompositeArtifactId, data_dir_url: str) -> Path:
     """Get the local filesystem path for an artifact file.
 
-    data_dir_url can be:
-    - A Path object (legacy, treated as-is)
-    - A file:// URL (parsed to extract the path)
-    - A plain path string without scheme (treated as file://)
+    Args:
+        composite_id: The composite artifact ID
+        data_dir_url: The data directory URL (must be file:// or ssh:// scheme)
 
-    Raises ValueError if the composite ID contains invalid path characters.
-    The returned Path is not checked for existence, only for validity.
+    Returns:
+        Path to the artifact file
+
+    Raises:
+        ValueError: If the composite ID contains invalid path characters
     """
     store_id = composite_id.artifact_store_id
     artifact_local_id = composite_id.artifact_local_id
@@ -76,15 +78,8 @@ def get_artifact_local_path(composite_id: CompositeArtifactId, data_dir_url: str
     if any(char in store_id for char in invalid_chars) or any(char in artifact_local_id for char in invalid_chars):
         raise ValueError(f"Invalid characters in artifact ID: {composite_id}")
 
-    if isinstance(data_dir_url, Path):
-        data_dir = data_dir_url
-    else:
-        data_dir_str = str(data_dir_url)
-        if "://" not in data_dir_str:
-            data_dir = Path(data_dir_str)
-        else:
-            parsed = urllib.parse.urlparse(data_dir_str)
-            data_dir = Path(parsed.path)
+    parsed = urllib.parse.urlparse(data_dir_url)
+    data_dir = Path(parsed.path)
 
     artifact_path = data_dir / artifacts_subdir / store_id / artifact_local_id
 

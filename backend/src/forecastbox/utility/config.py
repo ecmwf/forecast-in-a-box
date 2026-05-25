@@ -207,7 +207,7 @@ class ProductSettings(FiabBaseModel):
 
 class BackendAPISettings(FiabBaseModel):
     data_path: str = f"file://{fiab_home / 'data_dir'}"
-    """Path to the data directory. Supports file:// (local) and ssh://[user@]host/path (remote) schemes."""
+    """Data directory URL. Supports file:// (local) and ssh://[user@]host/path (remote) schemes."""
     model_repository: str = "https://sites.ecmwf.int/repository/fiab"
     """URL to the model repository."""
     uvicorn_host: str = "0.0.0.0"
@@ -218,17 +218,6 @@ class BackendAPISettings(FiabBaseModel):
     """Whether we assume that a system-level service has been registered. Affects entrypoint.main behaviour"""
     allow_scheduler: bool = False
     """Whether scheduler thread should be started. Best combine with allow_service=True"""
-
-    @model_validator(mode="before")
-    @classmethod
-    def migrate_plain_data_path(cls, data: dict) -> dict:  # type: ignore[override]
-        """Convert legacy plain-path data_path values to file:// URLs."""
-        if isinstance(data, dict) and "data_path" in data:
-            val = data["data_path"]
-            if isinstance(val, str) and "://" not in val:
-                logger.warning(f"data_path '{val}' is a plain path; please update your config to use file:// scheme")
-                data["data_path"] = f"file://{val}"
-        return data
 
     def local_url(self) -> str:
         return f"http://localhost:{self.uvicorn_port}"

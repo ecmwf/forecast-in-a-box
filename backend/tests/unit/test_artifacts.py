@@ -339,16 +339,16 @@ def test_list_local_storage_with_unknown_checkpoint(tmpdir_path: Path, sample_ar
 def test_get_artifact_local_path(tmpdir_path: Path) -> None:
     """Test get_artifact_local_path returns correct path"""
     composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
-    path = get_artifact_local_path(composite_id, tmpdir_path)
+    path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
 
     expected = tmpdir_path / "artifacts" / "store1" / "model1.ckpt"
     assert path == expected
 
 
 def test_get_artifact_local_path_with_string_dir(tmpdir_path: Path) -> None:
-    """Test get_artifact_local_path with Path directory path"""
+    """Test get_artifact_local_path with file:// URL"""
     composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
-    path = get_artifact_local_path(composite_id, tmpdir_path)
+    path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
 
     expected = tmpdir_path / "artifacts" / "store1" / "model1.ckpt"
     assert path == expected
@@ -356,7 +356,7 @@ def test_get_artifact_local_path_with_string_dir(tmpdir_path: Path) -> None:
 
 def test_get_artifact_local_path_invalid_characters() -> None:
     """Test get_artifact_local_path raises on invalid path characters"""
-    tmpdir = Path("/tmp")
+    tmpdir_url = "file:///tmp"
     invalid_ids = [
         CompositeArtifactId(ArtifactStoreId("../etc"), ArtifactLocalId("model1.ckpt")),
         CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("../../../etc/passwd")),
@@ -368,7 +368,7 @@ def test_get_artifact_local_path_invalid_characters() -> None:
 
     for invalid_id in invalid_ids:
         with pytest.raises(ValueError, match="Invalid characters in artifact ID"):
-            get_artifact_local_path(invalid_id, tmpdir)
+            get_artifact_local_path(invalid_id, tmpdir_url)
 
 
 def test_download_artifact_success(tmpdir_path: Path, sample_artifact: Any) -> None:
@@ -391,7 +391,7 @@ def test_download_artifact_success(tmpdir_path: Path, sample_artifact: Any) -> N
         download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
 
         # Verify the file was downloaded
-        artifact_path = get_artifact_local_path(composite_id, tmpdir_path)
+        artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
 
         assert artifact_path.exists()
         assert artifact_path.read_bytes() == mock_content
@@ -416,7 +416,7 @@ def test_download_artifact_creates_directory(tmpdir_path: Path, sample_artifact:
 
         download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
 
-        artifact_path = get_artifact_local_path(composite_id, tmpdir_path)
+        artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
         assert artifact_path.exists()
         assert artifact_path.is_file()
         assert artifact_path.parent.is_dir()
@@ -463,7 +463,7 @@ def test_download_artifact_chunked_download(tmpdir_path: Path, sample_artifact: 
         download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
 
         # Verify all chunks were written
-        artifact_path = get_artifact_local_path(composite_id, tmpdir_path)
+        artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
 
         assert artifact_path.exists()
         assert artifact_path.read_bytes() == total_content
