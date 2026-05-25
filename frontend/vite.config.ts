@@ -30,6 +30,16 @@ export default defineConfig(({ mode }) => {
       }),
       viteReact(),
       tailwindcss(),
+      // Inject localhost CSP allowlist only in dev — prod CSP stays clean.
+      {
+        name: 'csp-dev-hosts',
+        transformIndexHtml(html) {
+          return html.replaceAll(
+            '<!--CSP_DEV_HOSTS-->',
+            isDev ? 'http://localhost:* http://127.0.0.1:*' : '',
+          )
+        },
+      },
       ...(mode === 'analyze'
         ? [
             visualizer({

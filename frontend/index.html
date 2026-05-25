@@ -12,8 +12,8 @@
         default-src 'self';
         script-src 'self';
         style-src 'self' 'unsafe-inline' https://*.basemaps.cartocdn.com https://basemaps.cartocdn.com https://cdn.jsdelivr.net;
-        img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://basemaps.cartocdn.com http://localhost:* http://127.0.0.1:*;
-        connect-src 'self' https://*.basemaps.cartocdn.com https://basemaps.cartocdn.com https://cdn.jsdelivr.net http://localhost:* http://127.0.0.1:*;
+        img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://basemaps.cartocdn.com <!--CSP_DEV_HOSTS-->;
+        connect-src 'self' https://*.basemaps.cartocdn.com https://basemaps.cartocdn.com https://cdn.jsdelivr.net <!--CSP_DEV_HOSTS-->;
         frame-src 'self';
         font-src 'self' https://*.basemaps.cartocdn.com https://basemaps.cartocdn.com https://cdn.jsdelivr.net;
       "
