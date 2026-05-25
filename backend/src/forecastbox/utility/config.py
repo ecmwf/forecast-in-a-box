@@ -310,6 +310,17 @@ class FIABConfig(BaseSettings):
         with open(config_path, "w") as f:
             f.write(self._get_toml(exclude_defaults=True, exclude_none=True))
 
+    def validate_runtime(self) -> list[str]:
+        cascade = urllib.parse.urlparse(self.cascade.cascade_url)
+        data_path = urllib.parse.urlparse(self.api.data_path)
+        errors = []
+        if cascade.scheme != data_path.scheme:
+            errors.append(f"cascade and data path must use the same scheme: {cascade=} != {data_path=}")
+        if cascade.scheme == "ssh":
+            if cascade.netloc != data_path.netloc:
+                errors.append(f"under ssh://, cascade and data path must use the same netlo: {cascade=} != {data_path=}")
+        return errors
+
 
 def validate_runtime(config: FIABConfig) -> None:
     """Validates that a particular config can be used to execute FIAB in this machine/venv.

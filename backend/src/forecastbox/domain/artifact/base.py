@@ -59,18 +59,9 @@ artifacts_subdir = "artifacts"
 
 
 def get_artifact_local_path(composite_id: CompositeArtifactId, data_dir_url: str) -> Path:
-    """Get the local filesystem path for an artifact file.
-
-    Args:
-        composite_id: The composite artifact ID
-        data_dir_url: The data directory URL (must be file:// or ssh:// scheme)
-
-    Returns:
-        Path to the artifact file
-
-    Raises:
-        ValueError: If the composite ID contains invalid path characters
-    """
+    """Get the local filesystem path for an artifact file, raising ValueError if the composite ID contains invalid path characters.
+    The Path is not checked for existence, only for validity (ie invalid chars). For remote paths (ssh:// scheme), resolves
+    from the PoV of the remote host."""
     store_id = composite_id.artifact_store_id
     artifact_local_id = composite_id.artifact_local_id
 

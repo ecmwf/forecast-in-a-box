@@ -34,10 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_data_dir_url(data_dir_url: str) -> tuple[str, str, str]:
-    """Parse a data_dir URL into (scheme, netloc, path).
-
-    Raises ValueError if the URL is invalid or missing a scheme.
-    """
+    """Parse a data_dir URL into (scheme, netloc, path). Raises ValueError on error."""
     if "://" not in data_dir_url:
         raise ValueError(f"Invalid data_dir URL (missing scheme): {data_dir_url}")
     parsed = urllib.parse.urlparse(data_dir_url)
@@ -51,9 +48,9 @@ def _parse_data_dir_url(data_dir_url: str) -> tuple[str, str, str]:
 # ---------------------------------------------------------------------------
 
 
-def _enumerate_artifacts_local(data_dir: Path) -> list[tuple[str, str]]:
+def _enumerate_artifacts_local(data_dir: str) -> list[tuple[str, str]]:
     """Return (store_id, artifact_id) pairs from local filesystem."""
-    artifacts_base = data_dir / artifacts_subdir
+    artifacts_base = Path(data_dir) / artifacts_subdir
     if not artifacts_base.exists():
         return []
 
@@ -71,9 +68,9 @@ def _enumerate_artifacts_local(data_dir: Path) -> list[tuple[str, str]]:
     return entries
 
 
-def _enumerate_artifacts_remote(handle: CommandHandle, remote_path: str) -> list[tuple[str, str]]:
+def _enumerate_artifacts_remote(path: str, handle: CommandHandle) -> list[tuple[str, str]]:
     """Return (store_id, artifact_id) pairs from a remote host via SSH."""
-    artifacts_base = remote_path.rstrip("/") + "/" + artifacts_subdir
+    artifacts_base = path.rstrip("/") + "/" + artifacts_subdir
     cmd = f"find {shlex.quote(artifacts_base)} -mindepth 2 -maxdepth 2 -not -type d 2>/dev/null || true"
     result = tunnel.run(handle, cmd)
 
@@ -113,13 +110,13 @@ def list_storage(catalog: ArtifactCatalog, data_dir_url: str, handle: CommandHan
     """List stored artifacts at the given data_dir_url (file:// or ssh://)."""
     scheme, _netloc, path = _parse_data_dir_url(data_dir_url)
     if scheme == "file":
-        entries = _enumerate_artifacts_local(Path(path))
+        entries = _enumerate_artifacts_local(path)
     elif scheme == "ssh":
         if handle is None:
             raise ValueError("SSH handle required for ssh:// data_dir_url")
-        entries = _enumerate_artifacts_remote(handle, path)
+        entries = _enumerate_artifacts_remote(path, handle)
     else:
-        raise ValueError(f"Unsupported data_dir scheme: {scheme!r}")
+        raise NotImplementedError(f"Unsupported data_dir scheme: {scheme!r}")
     return _match_artifacts_to_catalog(catalog, entries)
 
 
@@ -177,22 +174,19 @@ def _download_artifact_local(
 def _download_artifact_remote(
     composite_id: CompositeArtifactId,
     artifact: ArtifactResolved,
+    data_dir_url: str,
     handle: CommandHandle,
-    remote_path: str,
 ) -> None:
     """Download an artifact from its HTTP URL to remote storage via SSH curl."""
     checkpoint = artifact.store_info
-    artifact_path = str(get_artifact_local_path(composite_id, remote_path))
-    artifact_dir = str(Path(artifact_path).parent)
-    temp_path = artifact_path + ".tmp"
+    artifact_path = get_artifact_local_path(composite_id, data_dir_url)
+    temp_path = str(artifact_path) + ".tmp"
 
     logger.debug(f"Starting remote download for {composite_id} from {checkpoint.url}")
 
-    tunnel.run(handle, f"mkdir -p {shlex.quote(artifact_dir)}")
+    tunnel.run(handle, f"mkdir -p {shlex.quote(str(artifact_path.parent))}")
 
-    curl_cmd = (
-        f"curl -fsSL -o {shlex.quote(temp_path)} {shlex.quote(checkpoint.url)} && mv {shlex.quote(temp_path)} {shlex.quote(artifact_path)}"
-    )
+    curl_cmd = f"curl -fsSL -o {shlex.quote(temp_path)} {shlex.quote(checkpoint.url)} && mv {shlex.quote(temp_path)} {shlex.quote(str(artifact_path))}"
     try:
         tunnel.run(handle, curl_cmd)
     except subprocess.CalledProcessError as e:
@@ -213,16 +207,17 @@ def download_artifact(
     handle: CommandHandle | None = None,
     progress_callback: Callable[[int], None] | None = None,
 ) -> None:
-    """Download an artifact to local or remote storage, dispatching on the data_dir_url scheme."""
+    """Download an artifact to local or remote storage, dispatching on the data_dir_url scheme.
+    `handle` required for `ssh://` scheme."""
     scheme, _netloc, path = _parse_data_dir_url(data_dir_url)
     if scheme == "file":
         _download_artifact_local(composite_id, artifact, data_dir_url, progress_callback)
     elif scheme == "ssh":
         if handle is None:
             raise ValueError("SSH handle required for ssh:// data_dir_url")
-        _download_artifact_remote(composite_id, artifact, handle, path)
+        _download_artifact_remote(composite_id, artifact, data_dir_url, handle)
     else:
-        raise ValueError(f"Unsupported data_dir scheme: {scheme!r}")
+        raise NotImplementedError(f"Unsupported data_dir scheme: {scheme!r}")
 
 
 # ---------------------------------------------------------------------------
@@ -239,7 +234,7 @@ def _delete_artifact_local(composite_id: CompositeArtifactId, data_dir_url: str)
     logger.info(f"Deleted artifact {composite_id} from {artifact_path}")
 
 
-def _delete_artifact_remote(composite_id: CompositeArtifactId, handle: CommandHandle, data_dir_url: str) -> None:
+def _delete_artifact_remote(composite_id: CompositeArtifactId, data_dir_url: str, handle: CommandHandle) -> None:
     """Delete a remotely stored artifact file via SSH."""
     artifact_path = str(get_artifact_local_path(composite_id, data_dir_url))
     try:
@@ -264,6 +259,6 @@ def delete_artifact(
     elif scheme == "ssh":
         if handle is None:
             raise ValueError("SSH handle required for ssh:// data_dir_url")
-        _delete_artifact_remote(composite_id, handle, data_dir_url)
+        _delete_artifact_remote(composite_id, data_dir_url, handle)
     else:
-        raise ValueError(f"Unsupported data_dir scheme: {scheme!r}")
+        raise NotImplementedError(f"Unsupported data_dir scheme: {scheme!r}")

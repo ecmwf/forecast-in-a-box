@@ -626,12 +626,12 @@ def test_list_storage_raises_on_unsupported_scheme() -> None:
     """list_storage raises ValueError for unknown URL schemes."""
     from pyrsistent import pmap as pm
 
-    with pytest.raises(ValueError, match="Unsupported data_dir scheme"):
+    with pytest.raises(NotImplementedError, match="Unsupported data_dir scheme"):
         list_storage(pm({}), "ftp://host/path")
 
 
 def test_download_artifact_raises_on_unsupported_scheme(sample_artifact: Any) -> None:
     """download_artifact raises ValueError for unknown URL schemes."""
     composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
-    with pytest.raises(ValueError, match="Unsupported data_dir scheme"):
+    with pytest.raises(NotImplementedError, match="Unsupported data_dir scheme"):
         download_artifact(composite_id, sample_artifact, "ftp://host/path")
