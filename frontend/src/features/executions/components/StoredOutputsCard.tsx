@@ -148,24 +148,32 @@ function StoredOutputRowItem({
   const { t } = useTranslation('executions')
   const startMutation = useStartSkinnyWms()
   const [copyLensId, setCopyLensId] = useState<string | null>(null)
+  // Two buttons share one mutation — track which initiated to route the spinner.
+  const [pendingSource, setPendingSource] = useState<'open' | 'copy' | null>(
+    null,
+  )
 
   const open = () => {
+    setPendingSource('open')
     startMutation.mutate(
       { localPath: row.path },
       {
         onSuccess: (id) => onLaunched(id),
         onError: (err) => showToast.error(err.message),
+        onSettled: () => setPendingSource(null),
       },
     )
   }
 
   const openCopyPanel = () => {
     if (copyLensId) return // panel already open for this row
+    setPendingSource('copy')
     startMutation.mutate(
       { localPath: row.path },
       {
         onSuccess: (id) => setCopyLensId(id),
         onError: (err) => showToast.error(err.message),
+        onSettled: () => setPendingSource(null),
       },
     )
   }
@@ -176,9 +184,9 @@ function StoredOutputRowItem({
   const unavailableTitle = row.isAvailable
     ? undefined
     : t('storedOutputs.fileMissing')
-  const openPending = startMutation.isPending && copyLensId === null
+  const openPending = startMutation.isPending && pendingSource === 'open'
   const copyButtonPending =
-    startMutation.isPending && copyLensId === null && !openPending
+    startMutation.isPending && pendingSource === 'copy'
 
   return (
     <li className="py-2">
