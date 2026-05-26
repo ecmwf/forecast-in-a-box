@@ -48,6 +48,7 @@ def sample_checkpoint() -> MlModelCheckpoint:
         pip_package_constraints=["torch>=2.0"],
         supported_platforms=["linux", "macos"],
         input_characteristics=["input_source"],
+        input_qube={},
         output_qube={},
         timestep="1h",
         comment="",

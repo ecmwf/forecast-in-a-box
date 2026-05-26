@@ -30,6 +30,7 @@ def dummy_provider() -> Generator[None, None, None]:
                     pip_package_constraints=[],
                     supported_platforms=["linux"],
                     input_characteristics=[],
+                    input_qube={},
                     output_qube={},
                     timestep="1h",
                     comment="A dummy comment",

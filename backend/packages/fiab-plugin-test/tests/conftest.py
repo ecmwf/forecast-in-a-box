@@ -18,6 +18,7 @@ def register_artifacts_provider() -> None:
                     pip_package_constraints=[],
                     supported_platforms=[],
                     input_characteristics=[],
+                    input_qube={},
                     output_qube={},
                     timestep="1h",
                     comment="",
