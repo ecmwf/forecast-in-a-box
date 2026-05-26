@@ -11,7 +11,7 @@ import importlib.metadata
 import logging
 from pathlib import Path
 
-from fiab_core.artifacts import ArtifactsProvider, CompositeArtifactId, MlModelCheckpoint
+from fiab_core.artifacts import AnemoiCheckpoint, ArtifactsProvider, CompositeArtifactId
 from fiab_core.fable import QubedOutput
 from qubed import Qube
 
@@ -22,12 +22,12 @@ INPUT_SOURCE_CONFIGURATION_OPTIONS = {"polytope": {"collection": "initial-condit
 logger = logging.getLogger(__name__)
 
 
-def get_available_checkpoints() -> dict[CompositeArtifactId, MlModelCheckpoint]:
+def get_available_checkpoints() -> dict[CompositeArtifactId, AnemoiCheckpoint]:
     all_artifacts = ArtifactsProvider.get_artifacts_lookup()
     return {
         composite_id: artifact.store_info
         for composite_id, artifact in all_artifacts.items()
-        if artifact.artifact_type == "MlModelCheckpoint" and artifact.is_locally_compatible
+        if artifact.artifact_type == "AnemoiCheckpoint" and artifact.is_locally_compatible
     }
 
 

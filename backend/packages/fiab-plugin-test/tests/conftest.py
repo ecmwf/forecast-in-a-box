@@ -1,5 +1,5 @@
 import pytest
-from fiab_core.artifacts import ArtifactResolved, ArtifactsProvider, CompositeArtifactId, MlModelCheckpoint
+from fiab_core.artifacts import AnemoiCheckpoint, ArtifactResolved, ArtifactsProvider, CompositeArtifactId
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -8,8 +8,8 @@ def register_artifacts_provider() -> None:
     ArtifactsProvider.register_get_artifacts_lookup(
         lambda: {
             fake_id: ArtifactResolved(
-                artifact_type="MlModelCheckpoint",
-                store_info=MlModelCheckpoint(
+                artifact_type="AnemoiCheckpoint",
+                store_info=AnemoiCheckpoint(
                     url="http://example.com/fake_checkpoint",
                     display_name="Fake Checkpoint",
                     display_author="Test Author",

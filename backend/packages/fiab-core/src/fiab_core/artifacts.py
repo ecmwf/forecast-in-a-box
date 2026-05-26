@@ -25,7 +25,7 @@ Platform = Literal["macos", "linux"]
 
 ArtifactLocalId = NewType("ArtifactLocalId", str)
 ArtifactStoreId = NewType("ArtifactStoreId", str)
-ArtifactType = Literal["MlModelCheckpoint"]
+ArtifactType = Literal["AnemoiCheckpoint"]
 
 
 @dataclass(frozen=True, eq=True, slots=True)
@@ -47,7 +47,7 @@ class CompositeArtifactId:
         return f"{k.artifact_store_id}:{k.artifact_local_id}"
 
 
-class MlModelCheckpoint(FiabCoreBaseModel):
+class AnemoiCheckpoint(FiabCoreBaseModel):
     url: str = Field(
         description="Location such as anemoi catalogue or hugging face registry url. Represents the source url, not an url of a local copy"
     )
@@ -86,7 +86,7 @@ class ArtifactResolved:
     """A combination of info from the store and locally gathered compatibility information"""
 
     artifact_type: ArtifactType  # determines the store_info class
-    store_info: MlModelCheckpoint  # NOTE this will eventually be a union
+    store_info: AnemoiCheckpoint  # NOTE this will eventually be a union
     is_locally_compatible: bool
     local_compatibility_detail: str | None
 

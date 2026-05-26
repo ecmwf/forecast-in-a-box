@@ -37,7 +37,7 @@ class FakeArtifactRegistry(SimpleHTTPRequestHandler):
             def make_artifact(i: int) -> dict:
                 checkpoint_id = f"{test_model_artifact_id}{i}"
                 return {
-                    "artifact_type": "MlModelCheckpoint",
+                    "artifact_type": "AnemoiCheckpoint",
                     "store_info": {
                         "url": f"http://localhost:{fake_artifact_registry_port}/{checkpoint_id}",
                         "display_name": f"Test Model Checkpoint {i}",
@@ -54,7 +54,7 @@ class FakeArtifactRegistry(SimpleHTTPRequestHandler):
                 }
 
             small_artifact = {
-                "artifact_type": "MlModelCheckpoint",
+                "artifact_type": "AnemoiCheckpoint",
                 "store_info": {
                     "url": f"http://localhost:{fake_artifact_registry_port}/{test_blueprint_artifact_id}",
                     "display_name": "Small Test Checkpoint",

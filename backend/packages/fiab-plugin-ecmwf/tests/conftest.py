@@ -12,7 +12,7 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-from fiab_core.artifacts import ArtifactResolved, ArtifactsProvider, CompositeArtifactId, MlModelCheckpoint
+from fiab_core.artifacts import AnemoiCheckpoint, ArtifactResolved, ArtifactsProvider, CompositeArtifactId
 from qubed import Qube
 
 DUMMY_QUBE = Qube.from_json(
@@ -39,8 +39,8 @@ def dummy_provider() -> Generator[None, None, None]:
     ArtifactsProvider.register_get_artifacts_lookup(
         lambda: {
             CompositeArtifactId.from_str("dummy_store:dummy_ckpt"): ArtifactResolved(
-                artifact_type="MlModelCheckpoint",
-                store_info=MlModelCheckpoint(
+                artifact_type="AnemoiCheckpoint",
+                store_info=AnemoiCheckpoint(
                     url="http://example.com/dummy_checkpoint",
                     display_name="Dummy Checkpoint",
                     display_author="Author",
