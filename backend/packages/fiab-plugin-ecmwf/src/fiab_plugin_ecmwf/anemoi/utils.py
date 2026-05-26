@@ -49,6 +49,9 @@ class CheckpointArtifact:
     def __init__(self, artifact: CompositeArtifactId | str) -> None:
         self.artifact = CompositeArtifactId.from_str(artifact) if isinstance(artifact, str) else artifact
 
+        if self.artifact not in get_available_checkpoints():
+            raise ValueError(f"Unknown checkpoint artifact: {self.artifact!r}")
+
     def get_local_path(self) -> Path:
         """Get local path to the checkpoint artifact, assumes it is already locally available, does not trigger download"""
         return Path(ArtifactsProvider.get_artifact_local_path(self.artifact))

@@ -13,6 +13,25 @@ from pathlib import Path
 
 import pytest
 from fiab_core.artifacts import ArtifactResolved, ArtifactsProvider, CompositeArtifactId, MlModelCheckpoint
+from qubed import Qube
+
+DUMMY_QUBE = Qube.from_json(
+    {
+        "key": "root",
+        "values": {"type": "enum", "dtype": "str", "values": ("root",)},
+        "metadata": {},
+        "children": [
+            {
+                "key": "levtype",
+                "values": {"type": "enum", "dtype": "str", "values": ("sfc",)},
+                "metadata": {"name": {"shape": (1, 1, 1), "dtype": "str", "values": ["surface"]}},
+                "children": [
+                    {"key": "param", "values": {"type": "enum", "dtype": "str", "values": ("2t", "msl")}, "metadata": {}, "children": []}
+                ],
+            }
+        ],
+    }
+)
 
 
 @contextlib.contextmanager
@@ -30,8 +49,8 @@ def dummy_provider() -> Generator[None, None, None]:
                     pip_package_constraints=[],
                     supported_platforms=["linux"],
                     input_characteristics=[],
-                    input_qube={},
-                    output_qube={},
+                    input_qube=DUMMY_QUBE.to_json(),
+                    output_qube=DUMMY_QUBE.to_json(),
                     timestep="1h",
                     comment="A dummy comment",
                 ),
@@ -48,13 +67,19 @@ def dummy_provider() -> Generator[None, None, None]:
     ArtifactsProvider._get_artifact_local_path = None
 
 
-@pytest.fixture
+@pytest.fixture(scope="module", autouse=True)
 def registered_provider() -> Generator[None, None, None]:
     """Pytest fixture that registers the dummy ArtifactsProvider for the duration of a test."""
     with dummy_provider():
         yield
 
 
-# Configure blocks module with dummy provider for unit tests
-with dummy_provider():
-    from fiab_plugin_ecmwf import blocks  # noqa: F401
+@pytest.fixture(scope="module")
+def dummy_checkpoint() -> str:
+    return "dummy_store:dummy_ckpt"
+
+
+@pytest.fixture(scope="module")
+def dummy_qube() -> Qube:
+    """Pytest fixture that provides the dummy qube for testing."""
+    return DUMMY_QUBE

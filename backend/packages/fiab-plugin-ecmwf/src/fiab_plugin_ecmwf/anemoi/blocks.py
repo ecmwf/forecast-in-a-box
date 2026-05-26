@@ -138,12 +138,12 @@ class AnemoiSource(Source):
     }
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        ensemble_members = block.config_as_int(ENSEMBLE)
+        ensemble_members = block.config_as_int(ENSEMBLE, sign="positive")
         if ensemble_members < 1:
             return Either.error("Ensemble members must be an int, positive and non zero.")
 
         qubed_output = CheckpointArtifact(CompositeArtifactId.from_str(block.config_as_str(CHECKPOINT))).get_model_output(
-            lead_time=block.config_as_int(LEAD_TIME)
+            lead_time=block.config_as_int(LEAD_TIME, sign="positive")
         )
         if ensemble_members > 1:
             qubed_output = expand(qubed_output, {"number": range(1, ensemble_members + 1)})
@@ -161,9 +161,9 @@ class AnemoiSource(Source):
 
         action = builder.from_input(
             input_source=input_source,
-            lead_time=block.config_as_int(LEAD_TIME),
+            lead_time=block.config_as_int(LEAD_TIME, sign="positive"),
             date=block.config_as_datetime(BASE_TIME),
-            ensemble=block.config_as_int(ENSEMBLE),
+            ensemble=block.config_as_int(ENSEMBLE, sign="positive"),
         )
         return Either.ok(action)
 
@@ -236,7 +236,9 @@ class AnemoiTransform(Transform):
             difference_qube = qubed_input ^ inputs["dataset"].dataqube
             return Either.error(f"Input dataset is not compatible with the model checkpoint. Difference in qubes: {difference_qube}")
 
-        qubed_output = CheckpointArtifact(block.config_as_str(CHECKPOINT)).get_model_output(lead_time=block.config_as_int(LEAD_TIME))
+        qubed_output = CheckpointArtifact(block.config_as_str(CHECKPOINT)).get_model_output(
+            lead_time=block.config_as_int(LEAD_TIME, sign="positive")
+        )
 
         input_dataset = inputs["dataset"]
         if contains(input_dataset, "number"):
@@ -254,7 +256,7 @@ class AnemoiTransform(Transform):
         builder = AnemoiBuilder(block.config_as_str(CHECKPOINT))
         action = builder.from_initial_conditions(
             inputs[input_task],
-            lead_time=block.config_as_int(LEAD_TIME),
+            lead_time=block.config_as_int(LEAD_TIME, sign="positive"),
         )
         return Either.ok(action)
 

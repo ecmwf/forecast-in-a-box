@@ -9,7 +9,7 @@
 
 import abc
 from datetime import date, datetime
-from typing import TypeVar
+from typing import Literal, TypeVar
 
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
@@ -77,21 +77,29 @@ class BlockInstanceRich(BlockInstance):
             return raw_value
         raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected str, got {type(raw_value).__name__}")
 
-    def config_as_int(self, key: str | ConfigurationOptionId) -> int:
+    def config_as_int(self, key: str | ConfigurationOptionId, *, sign: Literal["positive", "negative", "any"] = "any") -> int:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.parsed_value_type, IntType):
             raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} has type {option.value_type!r}, not int")
         raw_value = self._get_raw_value(option_id)
         if type(raw_value) is int:
+            if sign == "positive" and raw_value <= 0:
+                raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected positive int, got {raw_value}")
+            if sign == "negative" and raw_value >= 0:
+                raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected negative int, got {raw_value}")
             return raw_value
         raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected int, got {type(raw_value).__name__}")
 
-    def config_as_float(self, key: str | ConfigurationOptionId) -> float:
+    def config_as_float(self, key: str | ConfigurationOptionId, *, sign: Literal["positive", "negative", "any"] = "any") -> float:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.parsed_value_type, FloatType):
             raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} has type {option.value_type!r}, not float")
         raw_value = self._get_raw_value(option_id)
         if type(raw_value) is float:
+            if sign == "positive" and raw_value <= 0:
+                raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected positive float, got {raw_value}")
+            if sign == "negative" and raw_value >= 0:
+                raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected negative float, got {raw_value}")
             return raw_value
         raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected float, got {type(raw_value).__name__}")
 

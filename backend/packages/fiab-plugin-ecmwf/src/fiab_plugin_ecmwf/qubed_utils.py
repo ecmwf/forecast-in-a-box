@@ -93,8 +93,9 @@ def expand(qube: QubedOutput, dimension: Mapping[str, Iterable[Any]]) -> QubedOu
     >>> axes(expanded)
     {'ensemble': {'ens1', 'ens2'}, 'param': {'2t', 'tp'}, 'time': {0, 1, 2}}
     """
+    print(qube.dataqube, dimension)
     dataqube = functools.reduce(
-        lambda q, kv: Qube.make_root([Qube.make_node(kv[0], list(kv[1]), q.children)]), dimension.items(), qube.dataqube
+        lambda q, kv: Qube.make_root([Qube.make_node(kv[0], list(kv[1]) or [None], q.children)]), dimension.items(), qube.dataqube
     )
 
     return qube.model_copy(update={"dataqube": dataqube})
