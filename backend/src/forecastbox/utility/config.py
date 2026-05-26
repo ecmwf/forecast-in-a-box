@@ -226,7 +226,7 @@ class BackendAPISettings(FiabBaseModel):
         errors = []
         parsed = urllib.parse.urlparse(self.data_path)
         if parsed.scheme == "file":
-            if not os.path.isdir(parsed.path):
+            if not os.path.isdir(self.data_path.replace("file://", "")):
                 errors.append(f"not a directory: data_path={self.data_path}")
         elif parsed.scheme == "ssh":
             if not parsed.netloc:
@@ -315,7 +315,8 @@ class FIABConfig(BaseSettings):
         data_path = urllib.parse.urlparse(self.api.data_path)
         errors = []
         if cascade.scheme != data_path.scheme:
-            errors.append(f"cascade and data path must use the same scheme: {cascade=} != {data_path=}")
+            if cascade.geturl() != "tcp://localhost":  # allow local cascade with any data path scheme
+                errors.append(f"cascade and data path must use the same scheme: {cascade=} != {data_path=}")
         if cascade.scheme == "ssh":
             if cascade.netloc != data_path.netloc:
                 errors.append(f"under ssh://, cascade and data path must use the same netlo: {cascade=} != {data_path=}")
