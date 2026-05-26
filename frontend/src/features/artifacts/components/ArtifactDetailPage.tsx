@@ -218,6 +218,10 @@ export function ArtifactDetailPage({
       {/* Input Structure */}
       <div>
         <H2 className="mb-3 text-lg font-semibold">
+          {t('detail.inputCharacteristics')}
+        </H2>
+        <CharacteristicsCard data={detail.input_characteristics} />
+        <H2 className="mb-3 text-lg font-semibold">
           {t('detail.inputStructure')}
         </H2>
         {detail.input_qube.children.length > 0 ? (
@@ -246,3 +250,59 @@ export function ArtifactDetailPage({
   )
 }
 
+function CharacteristicsCard({
+  data,
+}: {
+  data: Array<string> | Record<string, unknown>
+}) {
+  const { t } = useTranslation('artifacts')
+
+  // Array of strings (e.g. ["u", "v", "t", "q"])
+  if (Array.isArray(data)) {
+    if (data.length === 0) {
+      return (
+        <P className="text-sm text-muted-foreground">
+          {t('detail.noCharacteristics')}
+        </P>
+      )
+    }
+    return (
+      <div className="flex flex-wrap gap-2">
+        {data.map((item) => (
+          <span
+            key={item}
+            className="rounded bg-muted px-2.5 py-1 font-mono text-sm text-muted-foreground"
+          >
+            {item}
+          </span>
+        ))}
+      </div>
+    )
+  }
+
+  // Object/record (e.g. { variables: [...], resolution: "0.25 degrees" })
+  const entries = Object.entries(data)
+
+  if (entries.length === 0) {
+    return (
+      <P className="text-sm text-muted-foreground">
+        {t('detail.noCharacteristics')}
+      </P>
+    )
+  }
+
+  return (
+    <Card className="divide-y divide-border overflow-hidden">
+      {entries.map(([key, value]) => (
+        <div key={key} className="flex items-start gap-4 px-4 py-3">
+          <span className="min-w-[140px] text-sm font-medium text-muted-foreground">
+            {key}
+          </span>
+          <span className="text-sm">
+            {Array.isArray(value) ? value.join(', ') : String(value)}
+          </span>
+        </div>
+      ))}
+    </Card>
+  )
+}
