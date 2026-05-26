@@ -47,6 +47,27 @@ class CompositeArtifactId:
         return f"{k.artifact_store_id}:{k.artifact_local_id}"
 
 
+class AnemoiCheckpointConfiguration(FiabCoreBaseModel):
+    """Advanced configuration for an Anemoi model"""
+
+    pre_processors: list[dict[str, Any]] = Field(default_factory=list, description="List of preprocessors to apply")
+    post_processors: list[dict[str, Any]] = Field(default_factory=list, description="List of postprocessors to apply")
+    control_options: dict[str, Any] | None = Field(
+        description="Environment variables to set to control model behavior, such as backend selection for attention implementation",
+        default=None,
+    )
+    input_options: dict[str, Any] | list[dict[str, dict[str, Any]]] | None = Field(
+        default=None,
+        description="Override options for the input retrieval, if list, assumed to be cutout input, with subinput configuration",
+    )
+    nested_model: bool = Field(
+        default=False, description="Whether this model is a nested model, which has implications how the model is invoked"
+    )
+    region_of_interest: str | None = Field(
+        default=None, description="Region to extract from cutout for output, only valid for nested models, and must be in input_options"
+    )
+
+
 class AnemoiCheckpoint(FiabCoreBaseModel):
     url: str = Field(
         description="Location such as anemoi catalogue or hugging face registry url. Represents the source url, not an url of a local copy"
@@ -74,9 +95,9 @@ class AnemoiCheckpoint(FiabCoreBaseModel):
     input_qube: dict[str, Any] = Field(description="Json Dump of the input qube structure, including variables, levels")
     output_qube: dict[str, Any] = Field(description="Json Dump of the output qube structure, including variables, levels, but not step")
 
-    input_options: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Additional options related to the input source, e.g. for polytope collection or mars requests. This is a free-form dict since it will likely be very different between plugins and we want to allow flexibility here.",
+    configuration: AnemoiCheckpointConfiguration = Field(
+        default_factory=AnemoiCheckpointConfiguration,
+        description="Additional configuration for the checkpoint such as pre and post processors and control options",
     )
     timestep: str = Field(description="Timestep of the model output, e.g. '1h', '6h'")
 

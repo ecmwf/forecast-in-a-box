@@ -70,6 +70,7 @@ class AnemoiBuilder:
             lead_time=lead_time,
             environment=env,
             expansion_qube=self.checkpoint.get_model_output(lead_time=lead_time).dataqube,
+            **self.checkpoint.get_additional_kwargs(),
         )
 
     def from_input(self, input_source: str, date: DATE, lead_time: int, ensemble: int = 1, **k: Any) -> Action:
@@ -99,6 +100,7 @@ class AnemoiBuilder:
             environment=env,
             payload_metadata={"artifacts": [self.artifact_id]},
             **k,
+            **self.checkpoint.get_additional_kwargs(),
         )
 
 

@@ -46,7 +46,7 @@ def get_qubes(checkpoint_path: str) -> dict[str, Any]:
 def get_package_versions(checkpoint_path: str) -> list[str]:
     checkpoint = open_checkpoint(checkpoint_path)
 
-    deps = ["anemoi.models", "torch", "torch_geometric"]
+    deps = ["anemoi.models", "anemoi-graphs", "torch", "torch_geometric"]
     return [f"{dep}=={checkpoint._metadata.provenance_training()['module_versions'][dep]}" for dep in deps]
 
 
