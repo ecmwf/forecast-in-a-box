@@ -34,6 +34,7 @@ import type {
 } from '@/api/types/artifacts.types'
 import { formatBytes } from '@/api/types/artifacts.types'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
