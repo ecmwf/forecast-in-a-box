@@ -226,7 +226,7 @@ class BackendAPISettings(FiabBaseModel):
         errors = []
         parsed = urllib.parse.urlparse(self.data_path)
         if parsed.scheme == "file":
-            if not os.path.isdir(self.data_path.replace("file://", "")):
+            if not os.path.isdir(parsed.path):
                 errors.append(f"not a directory: data_path={self.data_path}")
         elif parsed.scheme == "ssh":
             if not parsed.netloc:
