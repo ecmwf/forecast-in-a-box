@@ -9,7 +9,7 @@
 
 import abc
 from datetime import date, datetime
-from typing import Literal, TypeVar
+from typing import Any, Callable, Literal, TypeVar
 
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
@@ -68,56 +68,58 @@ class BlockInstanceRich(BlockInstance):
             f"Configuration option {option_id!r} is missing for block factory {self.factory_id.factory!r}"
         )
 
-    def config_as_str(self, key: str | ConfigurationOptionId) -> str:
+    def config_as_str(self, key: str | ConfigurationOptionId, *, validator: Callable[[str, str], None] | None = None) -> str:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.parsed_value_type, (StringType, ClosedEnumType, OpenEnumType)):
             raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} has type {option.value_type!r}, not str")
         raw_value = self._get_raw_value(option_id)
         if isinstance(raw_value, str):
+            if validator is not None:
+                validator(raw_value, option_id)
             return raw_value
         raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected str, got {type(raw_value).__name__}")
 
-    def config_as_int(self, key: str | ConfigurationOptionId, *, sign: Literal["positive", "negative", "any"] = "any") -> int:
+    def config_as_int(self, key: str | ConfigurationOptionId, *, validator: Callable[[int, str], None] | None = None) -> int:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.parsed_value_type, IntType):
             raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} has type {option.value_type!r}, not int")
         raw_value = self._get_raw_value(option_id)
         if type(raw_value) is int:
-            if sign == "positive" and raw_value <= 0:
-                raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected positive int, got {raw_value}")
-            if sign == "negative" and raw_value >= 0:
-                raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected negative int, got {raw_value}")
+            if validator is not None:
+                validator(raw_value, option_id)
             return raw_value
         raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected int, got {type(raw_value).__name__}")
 
-    def config_as_float(self, key: str | ConfigurationOptionId, *, sign: Literal["positive", "negative", "any"] = "any") -> float:
+    def config_as_float(self, key: str | ConfigurationOptionId, *, validator: Callable[[float, str], None] | None = None) -> float:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.parsed_value_type, FloatType):
             raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} has type {option.value_type!r}, not float")
         raw_value = self._get_raw_value(option_id)
         if type(raw_value) is float:
-            if sign == "positive" and raw_value <= 0:
-                raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected positive float, got {raw_value}")
-            if sign == "negative" and raw_value >= 0:
-                raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected negative float, got {raw_value}")
+            if validator is not None:
+                validator(raw_value, option_id)
             return raw_value
         raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected float, got {type(raw_value).__name__}")
 
-    def config_as_date(self, key: str | ConfigurationOptionId) -> date:
+    def config_as_date(self, key: str | ConfigurationOptionId, *, validator: Callable[[date, str], None] | None = None) -> date:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.parsed_value_type, DateType):
             raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} has type {option.value_type!r}, not date")
         raw_value = self._get_raw_value(option_id)
         if type(raw_value) is date:
+            if validator is not None:
+                validator(raw_value, option_id)
             return raw_value
         raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected date, got {type(raw_value).__name__}")
 
-    def config_as_datetime(self, key: str | ConfigurationOptionId) -> datetime:
+    def config_as_datetime(self, key: str | ConfigurationOptionId, *, validator: Callable[[datetime, str], None] | None = None) -> datetime:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.parsed_value_type, DatetimeType):
             raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} has type {option.value_type!r}, not datetime")
         raw_value = self._get_raw_value(option_id)
         if type(raw_value) is datetime:
+            if validator is not None:
+                validator(raw_value, option_id)
             return raw_value
         raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected datetime, got {type(raw_value).__name__}")
 
@@ -127,6 +129,7 @@ class BlockInstanceRich(BlockInstance):
         item_type: type[T],
         *,
         allow_empty: bool = True,
+        validator: Callable[[list[T], str], None] | None = None,
     ) -> list[T]:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.parsed_value_type, ListType):
@@ -157,6 +160,9 @@ class BlockInstanceRich(BlockInstance):
             raise BlockInstanceConfigurationError(
                 f"Configuration option {option_id!r} expected list[{item_type.__name__}], got {[type(item).__name__ for item in raw_value]!r}"
             )
+        if validator is not None:
+            for item in raw_value:
+                validator(item, option_id)
         return raw_value
 
 

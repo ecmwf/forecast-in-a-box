@@ -183,7 +183,7 @@ class TestAnemoiSourceValidate:
             AnemoiSource,
             {"checkpoint": dummy_checkpoint, "lead_time": -1, "base_time": datetime(2024, 1, 1), "number": 1},
         )
-        with pytest.raises(BlockInstanceConfigurationError, match="expected positive int"):
+        with pytest.raises(BlockInstanceConfigurationError, match="must be positive"):
             AnemoiSource().validate(block=block, inputs={})
 
     def test_invalid_number_zero(self, dummy_checkpoint: str) -> None:
@@ -191,7 +191,7 @@ class TestAnemoiSourceValidate:
             AnemoiSource,
             {"checkpoint": dummy_checkpoint, "lead_time": 24, "base_time": datetime(2024, 1, 1), "number": 0},
         )
-        with pytest.raises(BlockInstanceConfigurationError, match="expected positive int"):
+        with pytest.raises(BlockInstanceConfigurationError, match="must be positive"):
             AnemoiSource().validate(block=block, inputs={})
 
     def test_invalid_number_not_a_digit(self, dummy_checkpoint: str) -> None:
@@ -337,7 +337,7 @@ class TestAnemoiTransformValidate:
             {"checkpoint": dummy_checkpoint, "lead_time": -1},
             input_ids={"dataset": "src"},
         )
-        with pytest.raises(BlockInstanceConfigurationError, match="expected positive int"):
+        with pytest.raises(BlockInstanceConfigurationError, match="must be positive"):
             AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset})
 
     def test_unknown_checkpoint(self, registered_provider: None, dummy_qube: Qube) -> None:
