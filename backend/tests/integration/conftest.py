@@ -16,7 +16,14 @@ from pydantic import SecretStr
 
 import forecastbox.utility.config
 from forecastbox.entrypoint.main import launch_all
-from forecastbox.utility.config import ArtifactStoreConfig, FIABConfig, PluginCompositeIdReadable, PluginSettings, PluginStoreConfig
+from forecastbox.utility.config import (
+    ArtifactStoreConfig,
+    FIABConfig,
+    PluginCompositeIdReadable,
+    PluginSettings,
+    PluginStoreConfig,
+    validate_runtime,
+)
 
 from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
 
@@ -170,12 +177,14 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         config.general.launch_browser = False
         config.auth.domain_allowlist_registry = ["somewhere.org"]
         config.auth.passthrough = False
+        validate_runtime(config)
 
         # Start fake artifact registry before launching the app
         shutdown_event_artifacts = Event()
         p_artifacts = Process(target=run_artifact_registry, args=(shutdown_event_artifacts,))
         p_artifacts.start()
 
+        validate_runtime(config)
         handles = launch_all(config)
         client = httpx.Client(base_url=config.api.local_url() + "/api/v1", follow_redirects=True)
         yield client
