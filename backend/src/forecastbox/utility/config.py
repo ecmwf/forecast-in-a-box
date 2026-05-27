@@ -206,7 +206,7 @@ class ProductSettings(FiabBaseModel):
 
 
 class BackendAPISettings(FiabBaseModel):
-    data_path: str = f"file://{fiab_home / 'data_dir'}"
+    data_path: str = f"file://{fiab_home.absolute() / 'data_dir'}"
     """Data directory URL. Supports file:// (local) and ssh://[user@]host/path (remote) schemes."""
     model_repository: str = "https://sites.ecmwf.int/repository/fiab"
     """URL to the model repository."""
@@ -314,8 +314,12 @@ class FIABConfig(BaseSettings):
         cascade = urllib.parse.urlparse(self.cascade.cascade_url)
         data_path = urllib.parse.urlparse(self.api.data_path)
         errors = []
-        if cascade.scheme != data_path.scheme:
-            errors.append(f"cascade and data path must use the same scheme: {cascade=} != {data_path=}")
+        compatible_scheme_pairs = {
+            ("tcp", "file"),
+            ("ssh", "ssh"),
+        }
+        if (cascade.scheme, data_path.scheme) not in compatible_scheme_pairs:
+            errors.append(f"cascade and data path must use a compatible scheme: {cascade=} != {data_path=}")
         if cascade.scheme == "ssh":
             if cascade.netloc != data_path.netloc:
                 errors.append(f"under ssh://, cascade and data path must use the same netlo: {cascade=} != {data_path=}")
