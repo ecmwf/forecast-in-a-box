@@ -70,7 +70,7 @@ class TestAnemoiSourceValidate:
             "AnemoiSource",
             {"checkpoint": dummy_checkpoint, "lead_time": "-1", "base_time": "2024-01-01", "number": "1"},
         )
-        with pytest.raises(Exception, match="expected positive int"):
+        with pytest.raises(Exception, match="must be positive"):
             result = AnemoiSource().validate(block=block, inputs={})
             result.get_or_raise()
 
@@ -79,7 +79,7 @@ class TestAnemoiSourceValidate:
             "AnemoiSource",
             {"checkpoint": dummy_checkpoint, "lead_time": "24", "base_time": "2024-01-01", "number": "0"},
         )
-        with pytest.raises(Exception, match="expected positive int"):
+        with pytest.raises(Exception, match="must be positive"):
             result = AnemoiSource().validate(block=block, inputs={})
 
     def test_invalid_number_not_a_digit(self, dummy_checkpoint: str) -> None:
@@ -136,7 +136,7 @@ class TestAnemoiTransformValidate:
     def test_invalid_lead_time_negative(self, dummy_checkpoint: str, dummy_qube: Qube) -> None:
         input_dataset = QubedOutput(dataqube=dummy_qube)
         block = make_block("AnemoiTransform", {"checkpoint": dummy_checkpoint, "lead_time": "-1"}, input_ids={"dataset": "src"})
-        with pytest.raises(Exception, match="expected positive int"):
+        with pytest.raises(Exception, match="must be positive"):
             result = AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset})
 
     def test_unknown_checkpoint(self, registered_provider: None, dummy_qube: Qube) -> None:
