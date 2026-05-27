@@ -12,7 +12,7 @@
                 "pip_package_constraints": [
                     "anemoi-models==0.5.0",
                     "anemoi-inference<0.11.0",
-                    "torch>=2.6.0",
+                    "torch==2.6.0",
                     "torch_geometric==2.4.0"
                 ],
                 "supported_platforms": ["linux", "macos"],
@@ -33,15 +33,20 @@
                 "pip_package_constraints": [
                     "anemoi-models==0.4.2",
                     "anemoi-inference<0.11.0",
-                    "torch>=2.6.0",
+                    "torch==2.6.0",
                     "torch_geometric==2.4.0",
-                    "https://github.com/cathalobrien/get-flash-attn/releases/download/v0.1-alpha/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp310-cp310-linux_x86_64.whl"
+                    "https://github.com/cathalobrien/get-flash-attn/releases/download/v0.1-alpha/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp312-cp312-linux_x86_64.whl"
                 ],
                 "supported_platforms": ["linux"],
                 "input_characteristics": ["input_source", "lead_time", "base_time"],
                 "input_qube": {"key": "root", "values": {"type": "enum", "dtype": "str", "values": ["root"]}, "metadata": {}, "children": [{"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["pl"]}, "metadata": {"name": {"shape": [1, 1, 1], "dtype": "str", "values": ["pressure"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["q", "t", "u", "v", "w", "z"]}, "metadata": {}, "children": [{"key": "level", "values": {"type": "enum", "dtype": "int64", "values": [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]}, "metadata": {}, "children": []}]}]}, {"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["sfc"]}, "metadata": {"name": {"shape": [1, 1, 1], "dtype": "str", "values": ["surface"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["10u", "10v", "2d", "2t", "lsm", "msl", "sdor", "skt", "slor", "sp", "stl1", "stl2", "swvl1", "swvl2", "tcw", "z"]}, "metadata": {}, "children": []}]}]},
                 "output_qube": {"key": "root", "values": {"type": "enum", "dtype": "str", "values": ["root"]}, "metadata": {}, "children": [{"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["pl"]}, "metadata": {"name": {"shape": [1, 2, 1], "dtype": "str", "values": ["pressure", "pressure"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["q", "t", "u", "v", "w", "z"]}, "metadata": {}, "children": [{"key": "level", "values": {"type": "enum", "dtype": "int64", "values": [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]}, "metadata": {}, "children": []}]}]}, {"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["sfc"]}, "metadata": {"name": {"shape": [1, 2, 1], "dtype": "str", "values": ["surface", "surface"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["100u", "100v", "10u", "10v", "2d", "2t", "cp", "hcc", "lcc", "mcc", "msl", "ro", "sf", "skt", "sp", "ssrd", "stl1", "stl2", "strd", "swvl1", "swvl2", "tcc", "tcw", "tp"]}, "metadata": {}, "children": []}]}]},
-                "timestep": "6h"
+                "timestep": "6h",
+                "configuration": {
+                    "control_options":{
+                        "ANEMOI_INFERENCE_NUM_CHUNKS": 8
+                    }
+                }  
             }
         },
         "aifs-single-mse-1.1_w_sdpa": {
@@ -55,14 +60,19 @@
                 "pip_package_constraints": [
                     "anemoi-models==0.4.2",
                     "anemoi-inference<0.11.0",
-                    "torch>=2.6.0",
+                    "torch==2.6.0",
                     "torch_geometric==2.4.0"
                 ],
                 "supported_platforms": ["linux","macos"],
                 "input_characteristics": ["input_source", "lead_time", "base_time"],
                 "input_qube": {"key": "root", "values": {"type": "enum", "dtype": "str", "values": ["root"]}, "metadata": {}, "children": [{"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["pl"]}, "metadata": {"name": {"shape": [1, 1, 1], "dtype": "str", "values": ["pressure"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["q", "t", "u", "v", "w", "z"]}, "metadata": {}, "children": [{"key": "level", "values": {"type": "enum", "dtype": "int64", "values": [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]}, "metadata": {}, "children": []}]}]}, {"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["sfc"]}, "metadata": {"name": {"shape": [1, 1, 1], "dtype": "str", "values": ["surface"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["10u", "10v", "2d", "2t", "lsm", "msl", "sdor", "skt", "slor", "sp", "stl1", "stl2", "swvl1", "swvl2", "tcw", "z"]}, "metadata": {}, "children": []}]}]},
                 "output_qube": {"key": "root", "values": {"type": "enum", "dtype": "str", "values": ["root"]}, "metadata": {}, "children": [{"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["pl"]}, "metadata": {"name": {"shape": [1, 2, 1], "dtype": "str", "values": ["pressure", "pressure"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["q", "t", "u", "v", "w", "z"]}, "metadata": {}, "children": [{"key": "level", "values": {"type": "enum", "dtype": "int64", "values": [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]}, "metadata": {}, "children": []}]}]}, {"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["sfc"]}, "metadata": {"name": {"shape": [1, 2, 1], "dtype": "str", "values": ["surface", "surface"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["100u", "100v", "10u", "10v", "2d", "2t", "cp", "hcc", "lcc", "mcc", "msl", "ro", "sf", "skt", "sp", "ssrd", "stl1", "stl2", "strd", "swvl1", "swvl2", "tcc", "tcw", "tp"]}, "metadata": {}, "children": []}]}]},
-                "timestep": "6h"
+                "timestep": "6h",
+                "configuration": {
+                    "control_options":{
+                        "ANEMOI_INFERENCE_NUM_CHUNKS": 8
+                    }
+                }
             }
         },
         "aifs-ens-crps-1.0_w_flash_attn": {
@@ -75,7 +85,7 @@
                 "disk_size_bytes": 921584533,
                 "pip_package_constraints": [
                     "anemoi-models==0.6.0",
-                    "torch>=2.6.0",
+                    "torch==2.6.0",
                     "torch_geometric==2.4.0",
                     "https://github.com/cathalobrien/get-flash-attn/releases/download/v0.1-alpha/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp310-cp310-linux_x86_64.whl"
                 ],
@@ -83,7 +93,12 @@
                 "input_characteristics": ["input_source", "lead_time", "base_time", "ensemble_number"],
                 "input_qube": {"key": "root", "values": {"type": "enum", "dtype": "str", "values": ["root"]}, "metadata": {}, "children": [{"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["pl"]}, "metadata": {"name": {"shape": [1, 1, 1], "dtype": "str", "values": ["pressure"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["q", "t", "u", "v", "w", "z"]}, "metadata": {}, "children": [{"key": "level", "values": {"type": "enum", "dtype": "int64", "values": [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]}, "metadata": {}, "children": []}]}]}, {"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["sfc"]}, "metadata": {"name": {"shape": [1, 1, 1], "dtype": "str", "values": ["surface"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["10u", "10v", "2d", "2t", "lsm", "msl", "sdor", "skt", "slor", "sp", "stl1", "stl2", "tcw", "z"]}, "metadata": {}, "children": []}]}]},
                 "output_qube": {"key": "root", "values": {"type": "enum", "dtype": "str", "values": ["root"]}, "metadata": {}, "children": [{"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["pl"]}, "metadata": {"name": {"shape": [1, 2, 1], "dtype": "str", "values": ["pressure", "pressure"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["q", "t", "u", "v", "w", "z"]}, "metadata": {}, "children": [{"key": "level", "values": {"type": "enum", "dtype": "int64", "values": [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]}, "metadata": {}, "children": []}]}]}, {"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["sfc"]}, "metadata": {"name": {"shape": [1, 2, 1], "dtype": "str", "values": ["surface", "surface"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["100u", "100v", "10u", "10v", "2d", "2t", "cp", "hcc", "lcc", "mcc", "msl", "ro", "sf", "skt", "sp", "ssrd", "stl1", "stl2", "strd", "tcc", "tcw", "tp"]}, "metadata": {}, "children": []}]}]},
-                "timestep": "6h"
+                "timestep": "6h",
+                "configuration": {
+                    "control_options":{
+                        "ANEMOI_INFERENCE_NUM_CHUNKS": 8
+                    }
+                }
             }
         },
         "aifs-ens-crps-1.0_w_sdpa": {
@@ -97,14 +112,19 @@
                 "pip_package_constraints": [
                     "anemoi-models==0.6.0",
                     "anemoi-inference<0.11.0",
-                    "torch>=2.6.0",
+                    "torch==2.6.0",
                     "torch_geometric==2.4.0"
                 ],
                 "supported_platforms": ["linux","macos"],
                 "input_characteristics": ["input_source", "lead_time", "base_time", "ensemble_number"],
                 "input_qube": {"key": "root", "values": {"type": "enum", "dtype": "str", "values": ["root"]}, "metadata": {}, "children": [{"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["pl"]}, "metadata": {"name": {"shape": [1, 1, 1], "dtype": "str", "values": ["pressure"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["q", "t", "u", "v", "w", "z"]}, "metadata": {}, "children": [{"key": "level", "values": {"type": "enum", "dtype": "int64", "values": [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]}, "metadata": {}, "children": []}]}]}, {"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["sfc"]}, "metadata": {"name": {"shape": [1, 1, 1], "dtype": "str", "values": ["surface"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["10u", "10v", "2d", "2t", "lsm", "msl", "sdor", "skt", "slor", "sp", "stl1", "stl2", "tcw", "z"]}, "metadata": {}, "children": []}]}]},
                 "output_qube": {"key": "root", "values": {"type": "enum", "dtype": "str", "values": ["root"]}, "metadata": {}, "children": [{"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["pl"]}, "metadata": {"name": {"shape": [1, 2, 1], "dtype": "str", "values": ["pressure", "pressure"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["q", "t", "u", "v", "w", "z"]}, "metadata": {}, "children": [{"key": "level", "values": {"type": "enum", "dtype": "int64", "values": [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]}, "metadata": {}, "children": []}]}]}, {"key": "levtype", "values": {"type": "enum", "dtype": "str", "values": ["sfc"]}, "metadata": {"name": {"shape": [1, 2, 1], "dtype": "str", "values": ["surface", "surface"]}}, "children": [{"key": "param", "values": {"type": "enum", "dtype": "str", "values": ["100u", "100v", "10u", "10v", "2d", "2t", "cp", "hcc", "lcc", "mcc", "msl", "ro", "sf", "skt", "sp", "ssrd", "stl1", "stl2", "strd", "tcc", "tcw", "tp"]}, "metadata": {}, "children": []}]}]},
-                "timestep": "6h"
+                "timestep": "6h",
+                "configuration": {
+                    "control_options":{
+                        "ANEMOI_INFERENCE_NUM_CHUNKS": 8
+                    }
+                }
             }
         },
         "imerg-gt": {
@@ -118,7 +138,7 @@
                 "pip_package_constraints": [
                     "anemoi-models==0.12.0",
                     "anemoi-inference<0.11.0",
-                    "torch>=2.9.0",
+                    "torch==2.9.0",
                     "torch_geometric==2.7.0"
                 ],
                 "supported_platforms": ["linux"],
