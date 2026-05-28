@@ -18,7 +18,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 from cascade.low.exceptions import CascadeInternalError
-from fiab_core.artifacts import ArtifactLocalId, ArtifactResolved, ArtifactStoreId, MlModelCheckpoint
+from fiab_core.artifacts import AnemoiCheckpoint, ArtifactLocalId, ArtifactResolved, ArtifactStoreId
 from pyrsistent import pmap
 
 from forecastbox.domain.artifact.base import (
@@ -37,9 +37,9 @@ from forecastbox.utility.tunnel import CommandHandle
 
 
 @pytest.fixture
-def sample_checkpoint() -> MlModelCheckpoint:
+def sample_checkpoint() -> AnemoiCheckpoint:
     """Sample ML model checkpoint for testing"""
-    return MlModelCheckpoint(
+    return AnemoiCheckpoint(
         url="https://example.com/model.ckpt",
         display_name="Test Model",
         display_author="Test Author",
@@ -56,10 +56,10 @@ def sample_checkpoint() -> MlModelCheckpoint:
 
 
 @pytest.fixture
-def sample_artifact(sample_checkpoint: MlModelCheckpoint) -> ArtifactResolved:
+def sample_artifact(sample_checkpoint: AnemoiCheckpoint) -> ArtifactResolved:
     """Sample ArtifactResolved wrapping sample_checkpoint, locally compatible"""
     return ArtifactResolved(
-        artifact_type="MlModelCheckpoint",
+        artifact_type="AnemoiCheckpoint",
         store_info=sample_checkpoint,
         is_locally_compatible=True,
         local_compatibility_detail=None,
@@ -142,15 +142,15 @@ def test_get_artifacts_catalog(sample_artifact_stores_config: Any, sample_checkp
     store1_data = {
         "display_name": "Store 1",
         "artifacts": {
-            "model1": {"artifact_type": "MlModelCheckpoint", "store_info": sample_checkpoint.model_dump()},
-            "model2": {"artifact_type": "MlModelCheckpoint", "store_info": sample_checkpoint.model_dump()},
+            "model1": {"artifact_type": "AnemoiCheckpoint", "store_info": sample_checkpoint.model_dump()},
+            "model2": {"artifact_type": "AnemoiCheckpoint", "store_info": sample_checkpoint.model_dump()},
         },
     }
 
     store2_data = {
         "display_name": "Store 2",
         "artifacts": {
-            "model3": {"artifact_type": "MlModelCheckpoint", "store_info": sample_checkpoint.model_dump()},
+            "model3": {"artifact_type": "AnemoiCheckpoint", "store_info": sample_checkpoint.model_dump()},
         },
     }
 
@@ -176,8 +176,8 @@ def test_get_artifacts_catalog(sample_artifact_stores_config: Any, sample_checkp
 
         for composite_id, artifact in catalog.items():
             assert isinstance(artifact, ArtifactResolved)
-            assert artifact.artifact_type == "MlModelCheckpoint"
-            assert isinstance(artifact.store_info, MlModelCheckpoint)
+            assert artifact.artifact_type == "AnemoiCheckpoint"
+            assert isinstance(artifact.store_info, AnemoiCheckpoint)
             assert artifact.store_info.display_name == "Test Model"
             assert artifact.is_locally_compatible is True
             assert artifact.local_compatibility_detail is None
@@ -213,7 +213,7 @@ def test_get_artifacts_catalog_from_local_file(tmpdir_path: Path, sample_checkpo
     store_data = {
         "display_name": "Local Store",
         "artifacts": {
-            "local_model": {"artifact_type": "MlModelCheckpoint", "store_info": sample_checkpoint.model_dump()},
+            "local_model": {"artifact_type": "AnemoiCheckpoint", "store_info": sample_checkpoint.model_dump()},
         },
     }
 

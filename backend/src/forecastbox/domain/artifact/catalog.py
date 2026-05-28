@@ -15,7 +15,7 @@ from typing import cast
 
 import httpx
 from cascade.low.func import assert_never
-from fiab_core.artifacts import ArtifactLocalId, ArtifactResolved, ArtifactStoreId, ArtifactType, MlModelCheckpoint
+from fiab_core.artifacts import AnemoiCheckpoint, ArtifactLocalId, ArtifactResolved, ArtifactStoreId, ArtifactType
 from pyrsistent import pmap
 
 from forecastbox.domain.artifact.base import ArtifactCatalog, CompositeArtifactId
@@ -41,8 +41,8 @@ def get_artifacts_catalog(artifact_stores_config: ArtifactStoresConfig) -> Artif
                     composite_id = CompositeArtifactId(artifact_store_id=store_id, artifact_local_id=ArtifactLocalId(artifact_id))
                     artifact_type = cast(ArtifactType, artifact_data["artifact_type"])
                     store_info_data = artifact_data["store_info"]
-                    if artifact_type == "MlModelCheckpoint":
-                        store_info = MlModelCheckpoint(**store_info_data)
+                    if artifact_type == "AnemoiCheckpoint":
+                        store_info = AnemoiCheckpoint(**store_info_data)
                         is_locally_compatible, local_compatibility_detail = get_model_checkpoint_compatibility(store_info, platform_info)
                     else:
                         assert_never(artifact_type)

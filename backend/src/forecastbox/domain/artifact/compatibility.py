@@ -3,7 +3,7 @@ import platform
 import subprocess
 from dataclasses import dataclass
 
-from fiab_core.artifacts import MlModelCheckpoint, Platform
+from fiab_core.artifacts import AnemoiCheckpoint, Platform
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ def get_platform_info() -> PlatformInfo | None:
         return PlatformInfo(platform_name=None, gpu_memory_mib=None)
 
 
-def get_model_checkpoint_compatibility(model_checkpoint: MlModelCheckpoint, platform_info: PlatformInfo | None) -> tuple[bool, str | None]:
+def get_model_checkpoint_compatibility(model_checkpoint: AnemoiCheckpoint, platform_info: PlatformInfo | None) -> tuple[bool, str | None]:
     errors = []
     if platform_info is None:
         errors.append("local PlatformInfo not detected")
