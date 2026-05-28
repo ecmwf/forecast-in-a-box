@@ -257,7 +257,7 @@ def map_plot_sink_configuration() -> BlockInstance:
                     "domain": "global",
                     "format": "png",
                     "groupby": "step",
-                    "style_schema": "inbuilt://fiab",
+                    "splitby": [],
                 }
             ),
         ),
@@ -812,7 +812,7 @@ class TestMapPlotSink:
         output = QubedOutput(dataqube=Qube.from_datacube({"param": [1, 2]}))
         expansions = plugin().expander(output)
         map_plot_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("mapPlotSink"))
-        assert map_plot_expansion.restrictions == {}
+        assert PARAM not in map_plot_expansion.restrictions
 
     def test_validate_from_ekdsource(self, map_plot_sink_configuration: BlockInstance, ekdsource_output: QubedOutput) -> None:
         block = MapPlotSink()
@@ -840,6 +840,8 @@ class TestMapPlotSink:
                         "param": ["2t"],
                         "domain": "global",
                         "format": fmt,
+                        "groupby": "none",
+                        "splitby": [],
                     }
                 ),
             ),
@@ -862,7 +864,7 @@ class TestMapPlotSink:
                         "domain": "global",
                         "format": "png",
                         "groupby": "none",
-                        "style_schema": "inbuilt://fiab",
+                        "splitby": [],
                     }
                 ),
             ),
@@ -883,7 +885,7 @@ class TestMapPlotSink:
                         "domain": "global",
                         "format": "png",
                         "groupby": "none",
-                        "style_schema": "inbuilt://fiab",
+                        "splitby": [],
                     }
                 ),
             ),
@@ -905,7 +907,7 @@ class TestMapPlotSink:
                         "domain": "global",
                         "format": "png",
                         "groupby": "none",
-                        "style_schema": "inbuilt://fiab",
+                        "splitby": [],
                     }
                 ),
             ),
@@ -929,3 +931,76 @@ class TestMapPlotSink:
         assert block.intersect(other=ensemble_output)  # type: ignore[arg-type]
         output = block.validate(block=map_plot_sink_configuration, inputs={"dataset": ensemble_output}).get_or_raise()  # type: ignore[dict-item]
         assert isinstance(output, RawOutput)
+
+    @pytest.mark.parametrize("groupby", ["none", "number"])
+    def test_compile_groupby(self, ekdsource_output: QubedOutput, ekdsource_action: Action, groupby: str) -> None:
+        block = MapPlotSink()
+        config = BlockInstance.from_block(
+            BlockInstanceBase(
+                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),  # type: ignore
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config(
+                    {
+                        "param": ["2t", "msl"],
+                        "domain": "global",
+                        "format": "png",
+                        "groupby": groupby,
+                        "splitby": [],
+                    }
+                ),
+            ),
+            MapPlotSink.configuration_options,
+        )
+        block.validate(block=config, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
+        action = block.compile(
+            inputs={BlockInstanceId("source_output"): ekdsource_action}, block_id=BlockInstanceId("plot"), block=config
+        ).get_or_raise()
+        assert action.nodes.dims == {}
+
+    def test_validate_splitby(self, ekdsource_output: QubedOutput) -> None:
+        block = MapPlotSink()
+        config = BlockInstance.from_block(
+            BlockInstanceBase(
+                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),  # type: ignore
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config(
+                    {
+                        "param": ["2t", "msl"],
+                        "domain": "global",
+                        "format": "png",
+                        "groupby": "none",
+                        "splitby": ["none", "param"],
+                    }
+                ),
+            ),
+            MapPlotSink.configuration_options,
+        )
+        with pytest.raises(Exception, match="Invalid splitby value: if none is selected, no other dimensions can be present"):
+            block.validate(block=config, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
+
+    @pytest.mark.parametrize(
+        "splitby, dims", [[[], {}], [["none"], {}], [["number"], {"number": 5}], [["number", "step"], {"number": 5, "step": 3}]]
+    )
+    def test_compile_splitby(self, ekdsource_output: QubedOutput, ekdsource_action: Action, splitby: str, dims: dict[str, int]) -> None:
+        block = MapPlotSink()
+        config = BlockInstance.from_block(
+            BlockInstanceBase(
+                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),  # type: ignore
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config(
+                    {
+                        "param": ["2t", "msl"],
+                        "domain": "global",
+                        "format": "png",
+                        "groupby": "none",
+                        "splitby": splitby,
+                    }
+                ),
+            ),
+            MapPlotSink.configuration_options,
+        )
+        block.validate(block=config, inputs={"dataset": ekdsource_output}).get_or_raise()  # type: ignore[dict-item]
+        action = block.compile(
+            inputs={BlockInstanceId("source_output"): ekdsource_action}, block_id=BlockInstanceId("plot"), block=config
+        ).get_or_raise()
+        assert action.nodes.dims == dims

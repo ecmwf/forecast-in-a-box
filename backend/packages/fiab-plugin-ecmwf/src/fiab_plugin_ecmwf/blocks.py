@@ -33,7 +33,7 @@ from fiab_core.tools.blocks import Product, Sink, Source, Transform
 from fiab_core.types import ClosedEnumType, ListType
 from qubed import Qube
 
-from .qubed_utils import axes, contains, coxpand, dimensions
+from .qubed_utils import axes, common_dimensions, contains, coxpand, dimensions
 
 SOURCE = ConfigurationOptionId("source")
 DATE = ConfigurationOptionId("date")
@@ -45,6 +45,8 @@ FORMAT = ConfigurationOptionId("format")
 PARAM = ConfigurationOptionId("param")
 ENSEMBLE = ConfigurationOptionId("number")
 STEP = ConfigurationOptionId("step")
+GROUPBY = ConfigurationOptionId("groupby")
+SPLITBY = ConfigurationOptionId("splitby")
 
 IFS_REQUEST = {
     "class": "od",
@@ -488,13 +490,18 @@ class MapPlotSink(Sink):
             description="Output image format",
             value_type="enumClosed['png', 'pdf', 'svg']",
         ),
-        # Disabled for now
-        # "groupby": BlockConfigurationOption(
-        #     title="Group By",
-        #     description="Dimension to create subplots over",
-        #     value_type="enum['valid_datetime', 'step', 'number', 'none']",
-        # ),
-        # "style_schema": BlockConfigurationOption(
+        GROUPBY: BlockConfigurationOption(
+            title="Group By",
+            description="Dimension to create subplots over",
+            value_type="enumClosed['valid_datetime', 'step', 'number', 'none']",
+            default_value="none",
+        ),
+        SPLITBY: BlockConfigurationOption(
+            title="Split By",
+            description="Dimensions to separate plots by",
+            value_type="list[str]",
+        ),
+        # ConfigurationOptionId("style_schema"): BlockConfigurationOption(
         #     title="Style Schema",
         #     description="earthkit-plots schema identifier",
         #     value_type="str",
@@ -513,16 +520,9 @@ class MapPlotSink(Sink):
         if missing:
             return Either.error(f"params {missing} are not in the input parameters: {axes(input_dataset).get(PARAM, [])}")
 
-        # Disabled for now
-        # groupby_value = block.configuration_values["groupby"]
-        # if groupby_value not in ("valid_datetime", "step", "number", "none"):
-        #     return Either.error(
-        #         f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
-        #     )
-        # if groupby_value != "none" and groupby_value not in dimensions(input_dataset):
-        #     return Either.error(
-        #         f"Invalid groupby value: {groupby_value}, must be one of {set(['valid_datetime', 'step', 'number', 'none']).intersection(dimensions(input_dataset))}"
-        #     )
+        splitby_value = block.config_as_list(SPLITBY, str, allow_empty=True)
+        if "none" in splitby_value and len(splitby_value) != 1:
+            return Either.error(f"Invalid splitby value: if none is selected, no other dimensions can be present")
 
         fmt = block.config_as_str(FORMAT)
         mime_type = PLOT_FORMAT_TO_MIME.get(fmt)
@@ -538,13 +538,18 @@ class MapPlotSink(Sink):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
         params = block.config_as_list(PARAM, str, allow_empty=False)
-        selected = inputs[input_task].select({PARAM: params if len(params) > 1 else params[0]})
+        groupby = block.config_as_str(GROUPBY)
+        splitby = block.config_as_list(SPLITBY, str, allow_empty=True)
+        if "none" in splitby:
+            splitby = []
 
-        # Disabled for now
-        # groupby = block.configuration_values["groupby"] or "valid_datetime"
-
-        # if groupby != "none":
-        #     selected = selected.concatenate(groupby)
+        selected = (
+            inputs[input_task]
+            .combine_branches(dim=PARAM, force=True)
+            .select({PARAM: params if len(params) > 1 else params[0]})
+            .flatten(new_dim="temp_dim", keep_dims=splitby, reset_coords=True)
+            .concatenate(dim="temp_dim")
+        )
 
         action = selected.map(
             Payload(
@@ -552,8 +557,8 @@ class MapPlotSink(Sink):
                 kwargs={
                     "domain": block.config_as_str(DOMAIN) or None,
                     "format": block.config_as_str(FORMAT),
-                    # "groupby": block.configuration_values["groupby"] or "valid_datetime",
-                    # "style_schema": block.configuration_values["style_schema"] or "inbuilt://fiab",
+                    "groupby": None if groupby == "none" else groupby,
+                    # "style_schema": block.config_as_str("style_schema") or "inbuilt://fiab",
                 },
                 metadata={"environment": ["earthkit-plots<1.0.0", "earthkit-regrid<1.0.0"]},
             )
@@ -561,8 +566,14 @@ class MapPlotSink(Sink):
         return Either.ok(action)
 
     def restrictions(self, other: QubedOutput) -> ConfigurationOptionRestriction:
-        values = [value for value in axes(other).get(PARAM, set()) if isinstance(value, str)]
-        return {PARAM: ListType(ClosedEnumType(sorted(values)))} if values else {}
+        restrict = {}
+
+        param_values = [value for value in axes(other).get(PARAM, set()) if isinstance(value, str)]
+        if param_values:
+            restrict[PARAM] = ListType(ClosedEnumType(sorted(param_values)))
+
+        restrict[SPLITBY] = ListType(ClosedEnumType(sorted(common_dimensions(other)) + ["none"]))
+        return restrict
 
     def intersect(self, other: QubedOutput) -> bool:
         return contains(other, PARAM)
