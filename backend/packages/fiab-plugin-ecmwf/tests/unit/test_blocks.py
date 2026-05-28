@@ -13,6 +13,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from earthkit.workflows.fluent import Action
+from earthkit.workflows.nodetree import nodetree_arrays, nodetree_dimensions
 from fiab_core.fable import (
     BlockFactoryId,
     BlockInstanceId,
@@ -275,7 +276,11 @@ class TestEkdSource:
         assert isinstance(output, QubedOutput)
         assert output.dataqube is not None
         assert contains(output, "param")
-        block.compile({}, BlockInstanceId("ekdsource"), dummy_blockinstance)
+        action = block.compile({}, BlockInstanceId("ekdsource"), dummy_blockinstance).get_or_raise()
+        for _, array in nodetree_arrays(action.nodes):
+            assert array.sizes[STEP] == 3
+            assert array.sizes[ENSEMBLE] == 5
+        assert "levelist" in nodetree_dimensions(action.nodes)
 
     @pytest.mark.parametrize(
         "config, error",

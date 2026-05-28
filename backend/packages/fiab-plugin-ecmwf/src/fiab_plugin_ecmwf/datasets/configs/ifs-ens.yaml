@@ -443,9 +443,7 @@ datacubes:
 - class: od
   levelist:
   - 10
-  - 30
   - 50
-  - 70
   - 100
   - 150
   - 200
@@ -623,9 +621,7 @@ datacubes:
 - class: od
   levelist:
   - 10
-  - 30
   - 50
-  - 70
   - 100
   - 150
   - 200
@@ -1590,9 +1586,7 @@ datacubes:
 - class: od
   levelist:
   - 10
-  - 30
   - 50
-  - 70
   - 100
   - 150
   - 200
@@ -1734,9 +1728,7 @@ datacubes:
 - class: od
   levelist:
   - 10
-  - 30
   - 50
-  - 70
   - 100
   - 150
   - 200

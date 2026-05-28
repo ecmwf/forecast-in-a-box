@@ -45,6 +45,8 @@ FORMAT = ConfigurationOptionId("format")
 PARAM = ConfigurationOptionId("param")
 ENSEMBLE = ConfigurationOptionId("number")
 STEP = ConfigurationOptionId("step")
+LEVTYPE = ConfigurationOptionId("levtype")
+LEVEL = ConfigurationOptionId("levelist")
 GROUPBY = ConfigurationOptionId("groupby")
 SPLITBY = ConfigurationOptionId("splitby")
 FORECAST = ConfigurationOptionId("forecast")
@@ -52,8 +54,8 @@ FORECAST = ConfigurationOptionId("forecast")
 GRIB_ALIASES = {
     "shortName": PARAM,
     "paramId": PARAM,
-    "stepRange": "step",
-    "level": "levelist",
+    "stepRange": STEP,
+    "level": LEVEL,
 }
 
 logger = logging.getLogger(__name__)
@@ -79,7 +81,8 @@ class EkdSource(Source):
         FORECAST: BlockConfigurationOption(
             title="Forecast model",
             description="Name of forecast",
-            value_type=f"enumClosed[{list(FORECAST_DATASETS.keys())}]",
+            value_type=f"enumClosed[{','.join(FORECAST_DATASETS.keys())}]",
+            default_value=list(FORECAST_DATASETS.keys())[0],
         ),
         BASETIME: BlockConfigurationOption(
             title="Base time",
@@ -90,6 +93,7 @@ class EkdSource(Source):
             title="Expver",
             description="The expver value of the forecast",
             value_type="str",
+            default_value="0001",
         ),
         PARAM: BlockConfigurationOption(
             title="Parameters",
@@ -154,16 +158,17 @@ class EkdSource(Source):
         }
         subqube = fc_qube.select(select_dims)
         actions = {}
-        for levtype in subqube.axes()["levtype"]:
+        for levtype in subqube.axes()[LEVTYPE]:
             path = f"levtype={levtype}"
             levtype_actions = {}
             ens_branches = set()
-            for index, datacube in enumerate(subqube.select({"levtype": levtype}).datacubes()):
+            for index, datacube in enumerate(subqube.select({LEVTYPE: levtype}).datacubes()):
                 ens_branch = str(datacube[PARAM])
                 datacube_path = f"{ens_branch}/{index}"
                 expansion_datacube = datacube.copy()
+                coords = {PARAM: datacube[PARAM]}
                 if fc_preset.is_member_zero(datacube):
-                    expansion_datacube[ENSEMBLE] = 0
+                    coords[ENSEMBLE] = 0
                 ens_branches.add(ens_branch)
 
                 levtype_actions[datacube_path] = from_source(
@@ -175,7 +180,7 @@ class EkdSource(Source):
                                 {
                                     "requests": [
                                         dict(
-                                            datacube,
+                                            {k: (v if len(v) > 1 else v[0]) for k, v in datacube.items()},
                                             date=basetime.date().isoformat(),
                                             time=f"{basetime.time().hour:02d}",
                                             expver=block.config_as_str(EXPVER),
@@ -187,8 +192,9 @@ class EkdSource(Source):
                             for p in datacube[PARAM]
                         ]
                     ),
-                    coords={PARAM: datacube[PARAM]},
-                ).expand_as_qube(Qube.from_datacube(expansion_datacube), dims=[STEP, ENSEMBLE, "levtype", "levelist"])
+                    dims=[PARAM],
+                    coords=coords,
+                ).expand_as_qube(Qube.from_datacube(expansion_datacube), dims=[STEP, ENSEMBLE, LEVTYPE, LEVEL])
             merged = merge(**levtype_actions)
             for branch in ens_branches:
                 merged = merged.combine_branches(dim=ENSEMBLE, path=branch)
