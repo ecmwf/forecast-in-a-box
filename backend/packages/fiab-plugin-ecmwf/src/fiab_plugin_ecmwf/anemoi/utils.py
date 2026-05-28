@@ -9,7 +9,6 @@
 
 import importlib.metadata
 import logging
-from functools import cached_property
 from pathlib import Path
 from typing import Any
 
@@ -51,7 +50,6 @@ class CheckpointArtifact:
     def __init__(self, artifact: CompositeArtifactId | str) -> None:
         self.artifact = CompositeArtifactId.from_str(artifact) if isinstance(artifact, str) else artifact
 
-    @cached_property
     def checkpoint(self) -> AnemoiCheckpoint:
         """Get the AnemoiCheckpoint artifact from the artifact store."""
         available_checkpoints = get_available_checkpoints()
