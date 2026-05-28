@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 from typing import Literal
 
-from cascade.gateway.api import JobSpec, SubmitJobRequest, SubmitJobResponse
+from cascade.gateway.api import JobSpec, LocalProcesses, SubmitJobRequest, SubmitJobResponse
 from cascade.gateway.client import request_response
 from cascade.low.core import JobInstance, JobInstanceRich, TaskId
 from fiab_core.fable import BlockInstanceId
@@ -95,10 +95,8 @@ def execute_cascade(spec: ExecutionSpecification) -> SubmitJobResponse:
 
     r = SubmitJobRequest(
         job=JobSpec(
-            workers_per_host=workers_per_host,
-            hosts=hosts,
+            infra_spec=LocalProcesses(workers_per_host=workers_per_host, hosts=hosts),
             envvars={},
-            use_slurm=False,
             job_instance=JobInstanceRich(jobInstance=job, checkpointSpec=None),
         )
     )
