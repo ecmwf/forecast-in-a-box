@@ -34,7 +34,6 @@ from forecastbox.utility import tunnel
 from forecastbox.utility.config import LocalGateway, RemoteGateway, StatusMessage, UnmanagedGateway, config
 
 logger = logging.getLogger(__name__)
-_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
 @dataclass(frozen=True, eq=True, slots=True)
@@ -55,27 +54,10 @@ class RemoteUrl:
 
 
 GatewayConnection = LocalProcess | RemoteTunnel | RemoteUrl
-GatewayConnectionType = type[LocalProcess] | type[RemoteTunnel] | type[RemoteUrl]
-
-
-def config2gatewayMethod() -> GatewayConnectionType:
-    if isinstance(config.cascade.gateway, UnmanagedGateway):
-        return RemoteUrl
-    gateway = config.cascade.gateway
-    if isinstance(gateway, LocalGateway):
-        return LocalProcess
-    elif isinstance(gateway, RemoteGateway):
-        parsed_url = urllib.parse.urlparse(gateway.cascade_url)
-        if parsed_url.scheme != "ssh":
-            raise ValueError(f"unsupported protocol for RemoteGateway: {parsed_url.scheme}. Use ssh")
-        return RemoteTunnel
-    else:
-        assert_never(gateway)
 
 
 def _initial_connection() -> GatewayConnection | None:
-    gateway_method = config2gatewayMethod()
-    if gateway_method is RemoteUrl:
+    if isinstance(config.cascade.gateway, UnmanagedGateway):
         return RemoteUrl()
     return None
 
@@ -107,11 +89,8 @@ def launch_gateway() -> None:
     with GatewayConnectionManager.lock:
         if GatewayConnectionManager.gateway_connection is not None:
             raise GatewayAlreadyRunning("Process already running.")
-        gateway_method = config2gatewayMethod()
-        if gateway_method is LocalProcess:
-            gateway = config.cascade.gateway
-            if not isinstance(gateway, LocalGateway):
-                raise ValueError("Expected LocalGateway when gateway_method is LocalProcess")
+        gateway = config.cascade.gateway
+        if isinstance(gateway, LocalGateway):
             startup_params = gateway.startup_params
             max_concurrent_jobs = startup_params.max_concurrent_jobs
             cascade_logging_base = startup_params.cascade_logging_base
@@ -130,10 +109,7 @@ def launch_gateway() -> None:
                 process=process,
                 gateway_url=gateway_url,
             )
-        elif gateway_method is RemoteTunnel:
-            gateway = config.cascade.gateway
-            if not isinstance(gateway, RemoteGateway):
-                raise ValueError("Expected RemoteGateway when gateway_method is RemoteTunnel")
+        elif isinstance(gateway, RemoteGateway):
             startup_params = gateway.startup_params
             max_concurrent_jobs = startup_params.max_concurrent_jobs
             cascade_logging_base = startup_params.cascade_logging_base
@@ -160,10 +136,10 @@ def launch_gateway() -> None:
                 cmd.extend(["--max_concurrent_jobs", str(max_concurrent_jobs)])
             tunnel.execute(handle, cmd, output_path=log_base + "gwstdouterr")
             GatewayConnectionManager.gateway_connection = RemoteTunnel(handle=handle)
-        elif gateway_method is RemoteUrl:
+        elif isinstance(gateway, UnmanagedGateway):
             raise NotImplementedError("RemoteUrl gateway cannot be launched by backend")
         else:
-            assert_never(gateway_method)
+            assert_never(gateway)
 
 
 def get_gateway_url() -> str:

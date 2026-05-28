@@ -202,6 +202,12 @@ class ExternalServicesSettings(FiabBaseModel):
     model_repository: str = "https://sites.ecmwf.int/repository/fiab"
     """URL to the model repository."""
 
+    def validate_runtime(self) -> list[str]:
+        errors = []
+        if not _validate_url(self.model_repository):
+            errors.append(f"not an url: model_repository={self.model_repository}")
+        return errors
+
 
 class BackendSettings(FiabBaseModel):
     data_path: str = f"file://{fiab_home.absolute() / 'data_dir'}"
@@ -257,6 +263,12 @@ class RemoteGateway(FiabBaseModel):
     startup_params: GatewayStartupParams = Field(default_factory=GatewayStartupParams)
     cascade_url: str
     """Sshable url like 'ssh://[<user>@]<hostname>:<port>'"""
+
+    def validate_runtime(self) -> list[str]:
+        parsed = urllib.parse.urlparse(self.cascade_url)
+        if parsed.scheme != "ssh":
+            return [f"unsupported protocol for RemoteGateway cascade_url: {parsed.scheme!r}. Use ssh://"]
+        return []
 
 
 class UnmanagedGateway(FiabBaseModel):
