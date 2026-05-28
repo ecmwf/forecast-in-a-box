@@ -212,7 +212,7 @@ def list_models() -> list[MlModelOverview]:
 
         overviews = []
         for composite_id, artifact in ArtifactManager.catalog.items():
-            if artifact.artifact_type != "MlModelCheckpoint":
+            if artifact.artifact_type != "AnemoiCheckpoint":
                 continue
             checkpoint = artifact.store_info
             overview = MlModelOverview(
@@ -237,8 +237,8 @@ def get_model_details(composite_id: CompositeArtifactId) -> MlModelDetail:
             raise TimeoutError
 
         artifact = ArtifactManager.catalog[composite_id]
-        if artifact.artifact_type != "MlModelCheckpoint":
-            raise KeyError(f"Artifact {composite_id} is not an MlModelCheckpoint")
+        if artifact.artifact_type != "AnemoiCheckpoint":
+            raise KeyError(f"Artifact {composite_id} is not an AnemoiCheckpoint")
         checkpoint = artifact.store_info
 
         detail = MlModelDetail(
@@ -250,7 +250,8 @@ def get_model_details(composite_id: CompositeArtifactId) -> MlModelDetail:
             disk_size_bytes=checkpoint.disk_size_bytes,
             pip_package_constraints=checkpoint.pip_package_constraints,
             supported_platforms=checkpoint.supported_platforms,
-            output_characteristics=checkpoint.output_qube,
+            input_qube=checkpoint.input_qube,
+            output_qube=checkpoint.output_qube,
             input_characteristics=checkpoint.input_characteristics,
             is_available=composite_id in ArtifactManager.locally_available,
             is_locally_compatible=artifact.is_locally_compatible,

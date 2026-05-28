@@ -32,7 +32,7 @@ import type {
   CompositeArtifactId,
   MlModelDetail,
 } from '@/api/types/artifacts.types'
-import { formatBytes, isStructuredQube } from '@/api/types/artifacts.types'
+import { formatBytes } from '@/api/types/artifacts.types'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -216,29 +216,36 @@ export function ArtifactDetailPage({
         )}
       </div>
 
-      {/* Output Structure (qube or legacy list) — backend may return either
-          shape under output_characteristics during the consolidation rollout. */}
-      <div>
-        <H2 className="mb-3 text-lg font-semibold">
-          {t('detail.outputStructure')}
-        </H2>
-        {isStructuredQube(detail.output_characteristics) ? (
-          <QubeTree node={detail.output_characteristics} />
-        ) : detail.output_characteristics.length > 0 ? (
-          <CharacteristicsCard data={detail.output_characteristics} />
-        ) : (
-          <P className="text-sm text-muted-foreground">
-            {t('detail.outputStructurePending')}
-          </P>
-        )}
-      </div>
-
-      {/* Input Characteristics */}
+      {/* Input Structure */}
       <div>
         <H2 className="mb-3 text-lg font-semibold">
           {t('detail.inputCharacteristics')}
         </H2>
         <CharacteristicsCard data={detail.input_characteristics} />
+        <H2 className="mb-3 text-lg font-semibold">
+          {t('detail.inputStructure')}
+        </H2>
+        {detail.input_qube.children.length > 0 ? (
+          <QubeTree node={detail.input_qube} />
+        ) : (
+          <P className="text-sm text-muted-foreground">
+            {t('detail.noInputStructure')}
+          </P>
+        )}
+      </div>
+
+      {/* Output Structure */}
+      <div>
+        <H2 className="mb-3 text-lg font-semibold">
+          {t('detail.outputStructure')}
+        </H2>
+        {detail.output_qube.children.length > 0 ? (
+          <QubeTree node={detail.output_qube} />
+        ) : (
+          <P className="text-sm text-muted-foreground">
+            {t('detail.noOutputStructure')}
+          </P>
+        )}
       </div>
     </div>
   )

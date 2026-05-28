@@ -10,25 +10,25 @@
 import importlib.metadata
 import logging
 from pathlib import Path
+from typing import Any
 
-from cascade.low.func import Either
-from fiab_core.artifacts import ArtifactsProvider, CompositeArtifactId, MlModelCheckpoint
+from fiab_core.artifacts import AnemoiCheckpoint, ArtifactsProvider, CompositeArtifactId
 from fiab_core.fable import QubedOutput
-from fiab_core.plugin import Error
-from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
 from qubed import Qube
 
 from ..qubed_utils import expand
 
+INPUT_SOURCE_CONFIGURATION_OPTIONS = {"polytope": {"collection": "initial-conditions"}}
+
 logger = logging.getLogger(__name__)
 
 
-def get_available_checkpoints() -> dict[CompositeArtifactId, MlModelCheckpoint]:
+def get_available_checkpoints() -> dict[CompositeArtifactId, AnemoiCheckpoint]:
     all_artifacts = ArtifactsProvider.get_artifacts_lookup()
     return {
         composite_id: artifact.store_info
         for composite_id, artifact in all_artifacts.items()
-        if artifact.artifact_type == "MlModelCheckpoint" and artifact.is_locally_compatible
+        if artifact.artifact_type == "AnemoiCheckpoint" and artifact.is_locally_compatible
     }
 
 
@@ -44,48 +44,122 @@ def get_checkpoint_enum_type() -> str:
     return f"enumClosed[{values}]"
 
 
-def get_local_path(composite_id: CompositeArtifactId) -> Path:
-    return Path(ArtifactsProvider.get_artifact_local_path(composite_id))
+class CheckpointArtifact:
+    """Wrapper around the checkpoint artifact to provide utility methods for accessing the checkpoint data and creating model input configuration."""
 
+    def __init__(self, artifact: CompositeArtifactId | str) -> None:
+        self.artifact = CompositeArtifactId.from_str(artifact) if isinstance(artifact, str) else artifact
 
-def get_model_output(composite_id: CompositeArtifactId, lead_time: int) -> QubedOutput:
-    checkpoint = get_available_checkpoints()[composite_id]
-    qube = Qube.from_json(checkpoint.output_qube)
+    def checkpoint(self) -> AnemoiCheckpoint:
+        """Get the AnemoiCheckpoint artifact from the artifact store."""
+        available_checkpoints = get_available_checkpoints()
+        if self.artifact not in available_checkpoints:
+            raise ValueError(
+                f"Checkpoint artifact {CompositeArtifactId.to_str(self.artifact)} not found in available checkpoints: {[CompositeArtifactId.to_str(k) for k in available_checkpoints.keys()]}"
+            )
+        return available_checkpoints[self.artifact]
 
-    from earthkit.data.utils.dates import to_timedelta
+    def get_local_path(self) -> Path:
+        """Get local path to the checkpoint artifact, assumes it is already locally available, does not trigger download"""
+        return Path(ArtifactsProvider.get_artifact_local_path(self.artifact))
 
-    lead_time_seconds = lead_time * 3600
-    model_step_seconds = int(to_timedelta(checkpoint.timestep).total_seconds())
-    steps = list(map(lambda x: x // 3600, range(model_step_seconds, lead_time_seconds + model_step_seconds, model_step_seconds)))
+    def get_model_input(self) -> Qube:
+        """Get the model input qube from the checkpoint artifact"""
+        return Qube.from_json(self.checkpoint.input_qube)
 
-    qubeoutput = QubedOutput(dataqube=qube)
-    return expand(qubeoutput, {"step": steps})
+    def get_model_output(self, lead_time: int) -> QubedOutput:
+        """Get the model output qube from the checkpoint artifact"""
+        qube = Qube.from_json(self.checkpoint.output_qube)
 
+        from earthkit.data.utils.dates import to_timedelta
 
-def get_environment(composite_id: CompositeArtifactId) -> list[str]:
-    packages = list(get_available_checkpoints()[composite_id].pip_package_constraints)
+        lead_time_seconds = lead_time * 3600
+        model_step_seconds = int(to_timedelta(self.checkpoint.timestep).total_seconds())
+        steps = list(map(lambda x: x // 3600, range(model_step_seconds, lead_time_seconds + model_step_seconds, model_step_seconds)))
 
-    ekw_anemoi_version = importlib.metadata.version("earthkit-workflows-anemoi")
-    if not "dev" in ekw_anemoi_version:
-        packages.append(f"earthkit-workflows-anemoi[runtime-inference]=={importlib.metadata.version('earthkit-workflows-anemoi')}")
+        qubeoutput = QubedOutput(dataqube=qube)
+        return expand(qubeoutput, {"step": steps})
 
-    return packages
+    def get_additional_kwargs(self) -> dict[str, Any]:
+        """Get additional kwargs for the model inference from the checkpoint artifact, such as post processors and control options."""
 
+        post_processors = []
+        if self.checkpoint.configuration.post_processors is not None:
+            post_processors.extend(self.checkpoint.configuration.post_processors)
 
-def validate_anemoi_block(block: BlockInstance) -> Either[QubedOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-    """Validate common Anemoi block configuration, returning the base QubedOutput on success."""
-    checkpoint = block.config_as_str("checkpoint")
-    lead_time = block.config_as_int("lead_time")
+        # Add post processor to extract region of interest for nested models with cutout input
+        if self.checkpoint.configuration.nested_model:
+            if self.checkpoint.configuration.region_of_interest is None:
+                raise ValueError("Nested models must specify a region of interest in the checkpoint configuration")
+            if not self.checkpoint.configuration.input_options or not isinstance(self.checkpoint.configuration.input_options, list):
+                raise ValueError(
+                    "Nested models must specify input options as a list of region configurations in the checkpoint configuration"
+                )
+            if not self.checkpoint.configuration.region_of_interest in [
+                next(iter(region.keys())) for region in self.checkpoint.configuration.input_options
+            ]:
+                raise ValueError(
+                    f"Region of interest {self.checkpoint.configuration.region_of_interest} must be one of the regions specified in input options {[next(iter(region.keys())) for region in self.checkpoint.configuration.input_options]}"
+                )
+            post_processors.append({"extract_from_state": {"region": self.checkpoint.configuration.region_of_interest}})
 
-    if lead_time < 0:
-        return Either.error("Lead time must be a non-negative integer")
+        return {
+            "post_processors": post_processors,
+            "env": self.checkpoint.configuration.control_options or {},
+        }
 
-    try:
-        composite_id = CompositeArtifactId.from_str(checkpoint)
-    except ValueError:
-        return Either.error("Checkpoint must be a valid checkpoint identifier")
+    def get_input_configuration(self, input_source: str | dict) -> dict[str, dict] | str:
+        """Create input configuration for the model based on the checkpoint artifact and input source."""
+        if not isinstance(input_source, dict):
+            input_source = {input_source: {}}
+        elif len(input_source) != 1:
+            raise ValueError(f"Input source must have exactly one key representing the source name, got {input_source}")
 
-    try:
-        return Either.ok(get_model_output(composite_id, lead_time))
-    except KeyError:
-        return Either.error(f"Unknown checkpoint: {checkpoint}")
+        source_name = next(iter(input_source.keys()))
+
+        input_source = {**input_source}  # shallow copy to avoid mutating the original
+        if source_name in INPUT_SOURCE_CONFIGURATION_OPTIONS:
+            input_source[source_name].update(INPUT_SOURCE_CONFIGURATION_OPTIONS[source_name])
+
+        if self.checkpoint.configuration.pre_processors is not None:
+            input_source[source_name].setdefault("pre_processors", []).extend(self.checkpoint.configuration.pre_processors)
+
+        if self.checkpoint.configuration.input_options is None:
+            return input_source
+        elif isinstance(self.checkpoint.configuration.input_options, dict):
+            input_source.update(**self.checkpoint.configuration.input_options)
+            return input_source
+        # Input options is a list, which implies cutout input
+        if not self.checkpoint.configuration.nested_model:
+            raise ValueError("Cutout input configuration is only supported for nested models")
+
+        # Input options is a named set of configurations for sub-inputs
+        regions = self.checkpoint.configuration.input_options
+        cutout_input_configuration: dict[str, dict[str, Any]] = {}
+
+        for region_config in regions:
+            if len(region_config) != 1:
+                raise ValueError(f"Each region config must have exactly one key representing the region name, got {region_config}")
+            region_name = next(iter(region_config.keys()))
+            region_config = region_config[region_name]
+
+            cutout_input_configuration[region_name] = input_source.copy()  # First set to user defined input config, i.e source
+            cutout_input_configuration[region_name][source_name].update(
+                region_config
+            )  # Then override with region specific config from the checkpoint
+
+        return input_source
+
+    def get_environment(self) -> list[str]:
+        """Get the environment for the model based on the checkpoint artifact and input source."""
+        packages = list(self.checkpoint.pip_package_constraints)
+
+        ekw_anemoi_version = importlib.metadata.version("earthkit-workflows-anemoi")
+        from fiab_core.tools.plugins import _detect_editable_install
+
+        if not "dev" in ekw_anemoi_version:
+            editable = _detect_editable_install(f"earthkit-workflows-anemoi")
+            if not editable.startswith("-e "):
+                editable = f"earthkit-workflows-anemoi=={ekw_anemoi_version}"
+            packages.append(editable)
+        return packages

@@ -13,13 +13,13 @@ from pathlib import Path
 import pytest
 
 from fiab_core.artifacts import (
+    AnemoiCheckpoint,
     ArtifactLocalId,
     ArtifactResolved,
     ArtifactsLookup,
     ArtifactsProvider,
     ArtifactStoreId,
     CompositeArtifactId,
-    MlModelCheckpoint,
 )
 
 
@@ -47,7 +47,7 @@ def test_get_artifact_local_path_raises_before_registration() -> None:
 
 
 def test_get_artifacts_lookup_returns_registered_result() -> None:
-    checkpoint = MlModelCheckpoint(
+    checkpoint = AnemoiCheckpoint(
         url="http://example.com/model.ckpt",
         display_name="My Model",
         display_author="Author",
@@ -56,12 +56,13 @@ def test_get_artifacts_lookup_returns_registered_result() -> None:
         pip_package_constraints=[],
         supported_platforms=["linux"],
         input_characteristics=[],
+        input_qube={},
         output_qube={},
         timestep="1h",
         comment="",
     )
     artifact = ArtifactResolved(
-        artifact_type="MlModelCheckpoint",
+        artifact_type="AnemoiCheckpoint",
         store_info=checkpoint,
         is_locally_compatible=True,
         local_compatibility_detail=None,
@@ -78,7 +79,7 @@ def test_get_artifacts_lookup_returns_registered_result() -> None:
 
 def test_get_artifacts_lookup_returns_registered_result_incompatible() -> None:
     """Verifies that incompatible artifacts are stored and returned correctly."""
-    checkpoint = MlModelCheckpoint(
+    checkpoint = AnemoiCheckpoint(
         url="http://example.com/model.ckpt",
         display_name="Incompatible Model",
         display_author="Author",
@@ -87,12 +88,13 @@ def test_get_artifacts_lookup_returns_registered_result_incompatible() -> None:
         pip_package_constraints=[],
         supported_platforms=["linux"],
         input_characteristics=[],
+        input_qube={},
         output_qube={},
         timestep="1h",
         comment="",
     )
     artifact = ArtifactResolved(
-        artifact_type="MlModelCheckpoint",
+        artifact_type="AnemoiCheckpoint",
         store_info=checkpoint,
         is_locally_compatible=False,
         local_compatibility_detail="Requires CUDA 12, but only CUDA 11 is available",
@@ -111,7 +113,7 @@ def test_get_artifacts_lookup_returns_current_value_of_mutable_source() -> None:
     ArtifactsProvider.register_get_artifacts_lookup(lambda: catalog)
     assert len(ArtifactsProvider.get_artifacts_lookup()) == 0
 
-    checkpoint = MlModelCheckpoint(
+    checkpoint = AnemoiCheckpoint(
         url="http://example.com/model.ckpt",
         display_name="M",
         display_author="A",
@@ -120,12 +122,13 @@ def test_get_artifacts_lookup_returns_current_value_of_mutable_source() -> None:
         pip_package_constraints=[],
         supported_platforms=[],
         input_characteristics=[],
+        input_qube={},
         output_qube={},
         timestep="1h",
         comment="",
     )
     artifact = ArtifactResolved(
-        artifact_type="MlModelCheckpoint",
+        artifact_type="AnemoiCheckpoint",
         store_info=checkpoint,
         is_locally_compatible=True,
         local_compatibility_detail=None,

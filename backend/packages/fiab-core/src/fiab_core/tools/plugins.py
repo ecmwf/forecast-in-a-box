@@ -1,4 +1,5 @@
 import importlib.metadata
+import json
 import os
 from typing import Callable, cast
 
@@ -23,13 +24,26 @@ def _detect_editable_install(distname: str) -> str:
     """If the distname's install is detected to be editable,
      we propagate it as editable command, otherwise we return
     unchanged"""
-    # NOTE this doesnt work well for python 3.13, but since its a developer util we are ok
+    # NOTE: This block is for 3.14+
     distribution = importlib.metadata.distribution(distname)
     if hasattr(distribution, "origin"):
         origin = distribution.origin
         if hasattr(origin, "url") and isinstance(origin.url, str) and origin.url.startswith("file://"):
             # NOTE this doesnt work well for non-std layout but again we can restrict to only that
             return "-e " + origin.url[len("file://") :]
+
+	# NOTE: pre 3.14, eventually remove
+    direct_url_text = distribution.read_text("direct_url.json")
+    if direct_url_text:
+        info = json.loads(direct_url_text)
+        if not info.get("dir_info", {}).get("editable"):
+            return distname
+
+        url = info.get("url", "")
+        if not url.startswith("file://"):
+            return distname
+        return "-e " + url[len("file://") :]
+
     return distname
 
 

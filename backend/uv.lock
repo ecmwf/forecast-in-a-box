@@ -1325,16 +1325,16 @@ wheels = [
 
 [[package]]
 name = "earthkit-workflows-anemoi"
-version = "0.6.0"
+version = "0.6.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anemoi-utils", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "earthkit-workflows", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "qubed", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/94/d5/f4643c7806f5192de20dc2f5f9c8c74560bb9809e55f7860da653d80329a/earthkit_workflows_anemoi-0.6.0.tar.gz", hash = "sha256:0785c0442cd52bb3f967f2f6cdc9163d7cc091f94a25757836074565d159bd53", size = 37158, upload-time = "2026-04-24T19:58:14.159Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/41/17/8106fa919111e220356839eef36a6b0344ad48bc0aa3f4160445b8e3d52a/earthkit_workflows_anemoi-0.6.2.tar.gz", hash = "sha256:7523f964121da891bb2f0385cdd3fa885203e8a138c7ed08194f049741d4b2c0", size = 46912, upload-time = "2026-05-26T13:28:25.226Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/98/0d/51c02b40ada5a449cdce9c513275288e55ee03a3d93ad608ded1561711a9/earthkit_workflows_anemoi-0.6.0-py3-none-any.whl", hash = "sha256:42d0156d64848b93bb9f63f925931b62b322b09145c27bb30f6e4e58ddd6031a", size = 23059, upload-time = "2026-04-24T19:58:12.904Z" },
+    { url = "https://files.pythonhosted.org/packages/85/1e/702115001b1dca5c280443612daa91b123e2273fa32e662e989a7df26505/earthkit_workflows_anemoi-0.6.2-py3-none-any.whl", hash = "sha256:db604a9f9c545cf84916c7d0a9f2b12e4b91046b73ffbd653b5d5e63b547e601", size = 23958, upload-time = "2026-05-26T13:28:23.753Z" },
 ]
 
 [package.optional-dependencies]
@@ -1612,7 +1612,7 @@ requires-dist = [
     { name = "earthkit-data", marker = "extra == 'runtime'", specifier = ">=0.18.2" },
     { name = "earthkit-plots", marker = "extra == 'runtime'", specifier = ">=0.3.5,<1.0" },
     { name = "earthkit-workflows", specifier = ">=0.9.0" },
-    { name = "earthkit-workflows-anemoi", specifier = ">0.5.2" },
+    { name = "earthkit-workflows-anemoi", specifier = ">0.6.1" },
     { name = "earthkit-workflows-anemoi", extras = ["runtime-inference"], marker = "extra == 'runtime'" },
     { name = "fiab-core", editable = "packages/fiab-core" },
 ]
