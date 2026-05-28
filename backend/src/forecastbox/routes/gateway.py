@@ -23,7 +23,7 @@ from forecastbox.domain.gateway.exceptions import (
     GatewayNotStarted,
 )
 from forecastbox.domain.gateway.service import launch_gateway, status_gateway, stop_gateway
-from forecastbox.utility.config import config
+from forecastbox.utility.config import UnmanagedGateway, config
 
 PREFIX = "/api/v1/gateway"
 
@@ -35,7 +35,7 @@ router = APIRouter(
 
 @router.post("/start")
 async def start_gateway() -> str:
-    if not config.cascade.spawn_gateway:
+    if isinstance(config.cascade.gateway, UnmanagedGateway):
         raise HTTPException(400, "This instance does not manage the gateway")
     try:
         launch_gateway()
@@ -47,7 +47,7 @@ async def start_gateway() -> str:
 @router.get("/status")
 async def get_status() -> str:
     """Get the status of the Cascade Gateway process."""
-    if not config.cascade.spawn_gateway:
+    if isinstance(config.cascade.gateway, UnmanagedGateway):
         return "not managed"
     try:
         return status_gateway()
@@ -59,7 +59,7 @@ async def get_status() -> str:
 
 @router.post("/kill")
 async def kill_gateway() -> str:
-    if not config.cascade.spawn_gateway:
+    if isinstance(config.cascade.gateway, UnmanagedGateway):
         raise HTTPException(400, "This instance does not manage the gateway")
     try:
         stop_gateway()

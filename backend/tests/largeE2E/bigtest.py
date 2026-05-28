@@ -13,7 +13,7 @@ import time
 import httpx
 
 from forecastbox.entrypoint.main import launch_all
-from forecastbox.utility.config import FIABConfig, config
+from forecastbox.utility.config import FIABConfig, UnmanagedGateway, config
 
 logger = logging.getLogger("forecastbox.bigtest")
 
@@ -67,19 +67,19 @@ if __name__ == "__main__":
     dataDir = None
     try:
         config = FIABConfig()
-        config.api.uvicorn_port = 30645
+        config.backend.uvicorn_port = 30645
         config.auth.passthrough = True
-        config.cascade.cascade_url = "tcp://localhost:30644"
-        config.general.launch_browser = False
+        config.cascade.gateway = UnmanagedGateway(gateway_type="unmanaged", cascade_url="tcp://localhost:30644")
+        config.backend.launch_browser = False
         if os.environ.get("UNCLEAN", "") != "yea":
             dbDir = tempfile.TemporaryDirectory()
             config.db.sqlite_userdb_path = f"{dbDir.name}/user.db"
             config.db.sqlite_jobdb_path = f"{dbDir.name}/job.db"
             dataDir = tempfile.TemporaryDirectory()
-            config.api.data_path = dataDir.name
+            config.backend.data_path = dataDir.name
 
         handles = launch_all(config, attempts=50)
-        client = httpx.Client(base_url=config.api.local_url() + "/api/v1", follow_redirects=True)
+        client = httpx.Client(base_url=config.backend.local_url() + "/api/v1", follow_redirects=True)
 
         # download model
         client.post(f"/model/{model_id}/download").raise_for_status()

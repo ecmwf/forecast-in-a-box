@@ -88,8 +88,10 @@ def execute_cascade(spec: ExecutionSpecification) -> SubmitJobResponse:
     job = spec.job.job_instance
 
     environment = spec.environment
-    hosts = min(config.cascade.max_hosts, environment.hosts or config.cascade.default_hosts)
-    workers_per_host = min(config.cascade.max_workers_per_host, environment.workers_per_host or config.cascade.default_workers_per_host)
+    hosts = min(config.cascade.constraints.max_hosts, environment.hosts or config.cascade.constraints.default_hosts)
+    workers_per_host = min(
+        config.cascade.constraints.max_workers_per_host, environment.workers_per_host or config.cascade.constraints.default_workers_per_host
+    )
 
     r = SubmitJobRequest(
         job=JobSpec(

@@ -76,7 +76,7 @@ def get_plugin_details(forceRefresh: bool = False) -> PluginListing:
         raise NotImplementedError
     rv = {}
     statuses = status_full()
-    disabled = {pluginCompositeId for pluginCompositeId, pluginSettings in config.product.plugins.items() if not pluginSettings.enabled}
+    disabled = {pluginCompositeId for pluginCompositeId, pluginSettings in config.external.plugins.items() if not pluginSettings.enabled}
     errored = set(statuses.plugin_errors.keys())
     loaded = set(statuses.plugin_versions.keys())
     installed = errored.union(loaded).union(disabled)

@@ -19,6 +19,8 @@ from forecastbox.entrypoint.main import launch_all
 from forecastbox.utility.config import (
     ArtifactStoreConfig,
     FIABConfig,
+    GatewayStartupParams,
+    LocalGateway,
     PluginCompositeIdReadable,
     PluginSettings,
     PluginStoreConfig,
@@ -151,32 +153,32 @@ def backend_client() -> Generator[httpx.Client, None, None]:
 
         config = FIABConfig()
         config.auth.jwt_secret = SecretStr("x" * 32)
-        config.api.uvicorn_port = 30645
-        config.cascade.cascade_url = "tcp://localhost"
+        config.backend.uvicorn_port = 30645
+        config.cascade.gateway = LocalGateway(gateway_type="local", startup_params=GatewayStartupParams())
         config.db.sqlite_userdb_path = f"{td.name}/user.db"
         config.db.sqlite_jobdb_path = f"{td.name}/job.db"
-        config.api.data_path = f"file://{td_data.name}"
-        config.api.allow_scheduler = True
-        config.product.artifact_stores = {
+        config.backend.data_path = f"file://{td_data.name}"
+        config.backend.allow_scheduler = True
+        config.external.artifact_stores = {
             ArtifactStoreId(fake_artifact_store_id): ArtifactStoreConfig(
                 url=f"http://localhost:{fake_artifact_registry_port}/artifacts.json",
                 method="file",
             )
         }
-        config.product.plugin_stores = {
+        config.external.plugin_stores = {
             PluginStoreId("localTest"): PluginStoreConfig(
                 url="file://../../packages/fiab-plugin-test",
                 method="localSingle",
             ),
         }
-        config.product.plugins = {
+        config.external.plugins = {
             testPluginId: PluginSettings(
                 pip_source="-e file://../../packages/fiab-plugin-test",
                 module_name="fiab_plugin_test",
             ),
         }
 
-        config.general.launch_browser = False
+        config.backend.launch_browser = False
         config.auth.domain_allowlist_registry = ["somewhere.org"]
         config.auth.passthrough = False
         validate_runtime(config)
@@ -188,7 +190,7 @@ def backend_client() -> Generator[httpx.Client, None, None]:
 
         validate_runtime(config)
         handles = launch_all(config)
-        client = httpx.Client(base_url=config.api.local_url() + "/api/v1", follow_redirects=True)
+        client = httpx.Client(base_url=config.backend.local_url() + "/api/v1", follow_redirects=True)
         yield client
     finally:
         if client is not None:

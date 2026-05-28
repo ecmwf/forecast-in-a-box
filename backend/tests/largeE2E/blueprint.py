@@ -19,7 +19,7 @@ from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.run.cascade import ExecutionSpecification, RawCascadeJob
 from forecastbox.entrypoint.main import launch_all
-from forecastbox.utility.config import FIABConfig
+from forecastbox.utility.config import FIABConfig, UnmanagedGateway
 
 
 def _config(values: dict[str, str]) -> dict[ConfigurationOptionId, str]:
@@ -50,19 +50,19 @@ if __name__ == "__main__":
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             config = FIABConfig()
-            config.api.uvicorn_port = 30645
+            config.backend.uvicorn_port = 30645
             config.auth.passthrough = True
-            config.cascade.cascade_url = "tcp://localhost:30644"
-            config.general.launch_browser = False
+            config.cascade.gateway = UnmanagedGateway(gateway_type="unmanaged", cascade_url="tcp://localhost:30644")
+            config.backend.launch_browser = False
             if os.environ.get("UNCLEAN", "") != "yea":
                 dbDir = tempfile.TemporaryDirectory()
                 config.db.sqlite_userdb_path = f"{dbDir.name}/user.db"
                 config.db.sqlite_jobdb_path = f"{dbDir.name}/job.db"
                 dataDir = tempfile.TemporaryDirectory()
-                config.api.data_path = dataDir.name
+                config.backend.data_path = dataDir.name
 
             handles = launch_all(config, attempts=50)
-            client = httpx.Client(base_url=config.api.local_url() + "/api/v1", follow_redirects=True)
+            client = httpx.Client(base_url=config.backend.local_url() + "/api/v1", follow_redirects=True)
 
             response = client.get("/blueprint/catalogue").raise_for_status()
             assert len(response.json()) > 0

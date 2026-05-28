@@ -57,11 +57,11 @@ def check_backend_ready(
 ) -> None:
     try:
         with httpx.Client() as client:
-            _wait_for(client, config.api.local_url() + "/api/v1/status", attempts, _call_succ)
+            _wait_for(client, config.backend.local_url() + "/api/v1/status", attempts, _call_succ)
             if spawn_gateway:
-                client.post(config.api.local_url() + "/api/v1/gateway/start").raise_for_status()
+                client.post(config.backend.local_url() + "/api/v1/gateway/start").raise_for_status()
             gw_check = lambda resp, _: resp.raise_for_status().text == f'"{StatusMessage.gateway_running}"'
-            _wait_for(client, config.api.local_url() + "/api/v1/gateway/status", attempts, gw_check)
+            _wait_for(client, config.backend.local_url() + "/api/v1/gateway/status", attempts, gw_check)
     except StartupError as e:
         logger.error(f"failed to start the backend: {e}")
         if handles is not None:
@@ -74,7 +74,7 @@ def install_default_plugins(config: FIABConfig) -> None:
     try:
         with httpx.Client(follow_redirects=True) as client:
             for pluginId in _default_plugins().keys():
-                url = config.api.local_url() + "/api/v1/plugin/install"
+                url = config.backend.local_url() + "/api/v1/plugin/install"
                 try:
                     client.post(url, json=pluginId.model_dump()).raise_for_status()
                 except Exception:

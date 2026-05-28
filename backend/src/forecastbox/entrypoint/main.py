@@ -27,7 +27,7 @@ from forecastbox.entrypoint.bootstrap.checks import check_backend_ready, install
 from forecastbox.entrypoint.bootstrap.config import export_recursive, setup_process
 from forecastbox.entrypoint.bootstrap.launchers import launch_backend
 from forecastbox.entrypoint.bootstrap.procs import ChildProcessGroup, previous_cleanup
-from forecastbox.utility.config import FIABConfig, validate_runtime
+from forecastbox.utility.config import FIABConfig, UnmanagedGateway, validate_runtime
 
 logger = logging.getLogger(__name__ if __name__ != "__main__" else __package__)
 
@@ -37,7 +37,7 @@ def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
     logger.info("main process starting")
     logger.debug(f"loaded config {config.model_dump()}")
 
-    if not config.api.allow_service:
+    if not config.backend.allow_service:
         previous_cleanup()
         export_recursive(
             config.model_dump(exclude_defaults=True),
@@ -48,7 +48,7 @@ def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
         backend = get_context("forkserver").Process(target=launch_backend)
         backend.start()
         handle = ChildProcessGroup([backend])
-        spawn_gateway = config.cascade.spawn_gateway
+        spawn_gateway = not isinstance(config.cascade.gateway, UnmanagedGateway)
     else:
         if not forecastbox.entrypoint.bootstrap.service.is_running():
             raise ValueError("configured to use service, but is not running!")
@@ -59,8 +59,8 @@ def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
     if should_install_default_plugin():
         install_default_plugins(config)
 
-    if config.general.launch_browser:
-        webbrowser.open(config.api.local_url())
+    if config.backend.launch_browser:
+        webbrowser.open(config.backend.local_url())
 
     return handle
 

@@ -64,7 +64,7 @@ def get_status(request: Request) -> StatusResponse:
         status["plugins"] = f"failure getting status"
 
     try:
-        response = requests.get(f"{config.api.model_repository}/MANIFEST", timeout=5)
+        response = requests.get(f"{config.external.model_repository}/MANIFEST", timeout=5)
         if response.status_code == 200:
             status["ecmwf"] = "up"
         else:

@@ -31,7 +31,7 @@ from forecastbox.domain.gateway.exceptions import (
     GatewayNotStarted,
 )
 from forecastbox.utility import tunnel
-from forecastbox.utility.config import StatusMessage, config
+from forecastbox.utility.config import LocalGateway, RemoteGateway, StatusMessage, UnmanagedGateway, config
 
 logger = logging.getLogger(__name__)
 _LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
@@ -59,17 +59,18 @@ GatewayConnectionType = type[LocalProcess] | type[RemoteTunnel] | type[RemoteUrl
 
 
 def config2gatewayMethod() -> GatewayConnectionType:
-    if not config.cascade.spawn_gateway:
+    if isinstance(config.cascade.gateway, UnmanagedGateway):
         return RemoteUrl
-    parsed_url = urllib.parse.urlparse(config.cascade.cascade_url)
-    if parsed_url.scheme not in ("tcp", "ssh"):
-        raise ValueError("unsupported protocol: {parsed_url.scheme}. Use tcp for local, ssh for remote")
-    if parsed_url.hostname in _LOCAL_HOSTS and parsed_url.scheme == "tcp":
+    gateway = config.cascade.gateway
+    if isinstance(gateway, LocalGateway):
         return LocalProcess
-    elif parsed_url.scheme == "ssh":
+    elif isinstance(gateway, RemoteGateway):
+        parsed_url = urllib.parse.urlparse(gateway.cascade_url)
+        if parsed_url.scheme != "ssh":
+            raise ValueError(f"unsupported protocol for RemoteGateway: {parsed_url.scheme}. Use ssh")
         return RemoteTunnel
     else:
-        raise ValueError("tcp protocol but not a local host! Gateway spawning not supported!")
+        assert_never(gateway)
 
 
 def _initial_connection() -> GatewayConnection | None:
@@ -85,9 +86,11 @@ class GatewayConnectionManager:
 
 
 def _remote_tunnel_target() -> tuple[str, int | None]:
-    parsed_url = urllib.parse.urlparse(config.cascade.cascade_url)
+    if not isinstance(config.cascade.gateway, RemoteGateway):
+        raise ValueError("_remote_tunnel_target called but gateway is not RemoteGateway")
+    parsed_url = urllib.parse.urlparse(config.cascade.gateway.cascade_url)
     if parsed_url.hostname is None:
-        raise ValueError(f"Invalid cascade_url for remote tunnel mode: {config.cascade.cascade_url!r}")
+        raise ValueError(f"Invalid cascade_url for remote tunnel mode: {config.cascade.gateway.cascade_url!r}")
     host = f"{parsed_url.username}@{parsed_url.hostname}" if parsed_url.username else parsed_url.hostname
     return host, parsed_url.port
 
@@ -105,9 +108,14 @@ def launch_gateway() -> None:
         if GatewayConnectionManager.gateway_connection is not None:
             raise GatewayAlreadyRunning("Process already running.")
         gateway_method = config2gatewayMethod()
-        max_concurrent_jobs = config.cascade.max_concurrent_jobs
         if gateway_method is LocalProcess:
-            logs_directory = TemporaryDirectory(prefix="fiabLogs", dir=config.cascade.cascade_logging_base)
+            gateway = config.cascade.gateway
+            if not isinstance(gateway, LocalGateway):
+                raise ValueError("Expected LocalGateway when gateway_method is LocalProcess")
+            startup_params = gateway.startup_params
+            max_concurrent_jobs = startup_params.max_concurrent_jobs
+            cascade_logging_base = startup_params.cascade_logging_base
+            logs_directory = TemporaryDirectory(prefix="fiabLogs", dir=cascade_logging_base)
             logger.debug(f"logging base is at {logs_directory.name}")
             logs_base = None if os.getenv("FIAB_LOGSTDOUT", "nay") == "yea" else logs_directory.name + os.sep
             gateway_url = f"tcp://localhost:{tunnel.claim_free_port()}"
@@ -123,9 +131,15 @@ def launch_gateway() -> None:
                 gateway_url=gateway_url,
             )
         elif gateway_method is RemoteTunnel:
+            gateway = config.cascade.gateway
+            if not isinstance(gateway, RemoteGateway):
+                raise ValueError("Expected RemoteGateway when gateway_method is RemoteTunnel")
+            startup_params = gateway.startup_params
+            max_concurrent_jobs = startup_params.max_concurrent_jobs
+            cascade_logging_base = startup_params.cascade_logging_base
             host, remote_port = _remote_tunnel_target()
             handle = tunnel.setup(host=host, remote_port=remote_port)
-            log_base = f"{config.cascade.cascade_logging_base or '/tmp/'}fiabLogs{uuid.uuid4()}."
+            log_base = f"{cascade_logging_base or '/tmp/'}fiabLogs{uuid.uuid4()}."
             logger.debug(f"logging base for tunnel gateway is {log_base}")
             remote_gateway_url = f"tcp://localhost:{handle.remote_port}"
             logging_config = LoggingConfig(path_base=log_base, formatter="line")
@@ -161,7 +175,10 @@ def get_gateway_url() -> str:
     elif isinstance(gateway_connection, RemoteTunnel):
         return gateway_connection.handle.as_local_url()
     elif isinstance(gateway_connection, RemoteUrl):
-        return config.cascade.cascade_url
+        if isinstance(config.cascade.gateway, UnmanagedGateway):
+            return config.cascade.gateway.cascade_url
+        else:
+            raise ValueError("RemoteUrl gateway connection but gateway is not UnmanagedGateway")
     else:
         assert_never(gateway_connection)
 

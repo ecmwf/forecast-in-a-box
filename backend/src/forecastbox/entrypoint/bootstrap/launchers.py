@@ -47,8 +47,8 @@ def launch_backend() -> None:
 
     setup_process()
     logger.debug(f"logging initialized post-{forecastbox.entrypoint.app.__name__} import")
-    port = config.api.uvicorn_port
-    host = config.api.uvicorn_host
+    port = config.backend.uvicorn_port
+    host = config.backend.uvicorn_host
     task = _uvicorn_run("forecastbox.entrypoint.app:app", host, port)
     try:
         asyncio.run(task)

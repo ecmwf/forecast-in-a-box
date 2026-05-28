@@ -25,7 +25,7 @@ from pydantic import UUID4
 from forecastbox.domain.admin import Release, get_local_release, get_most_recent_release, get_pylock, mark_release, save_pylock
 from forecastbox.domain.auth.db import delete_user_by_id, get_user_by_id, list_users, patch_user_by_id, update_user_by_id
 from forecastbox.domain.auth.users import UserRead, UserUpdate, current_active_user
-from forecastbox.utility.config import BackendAPISettings, CascadeSettings, ProductSettings, config
+from forecastbox.utility.config import BackendSettings, CascadeSettings, ExternalServicesSettings, config
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.rsjf import ExportedSchemas, FormDefinition, from_pydantic
 
@@ -52,9 +52,9 @@ router = APIRouter(
 class ExposedSettings(FiabBaseModel):
     """Exposed settings for modification"""
 
-    product: ProductSettings = config.product
+    external: ExternalServicesSettings = config.external
 
-    api: BackendAPISettings = config.api
+    backend: BackendSettings = config.backend
     cascade: CascadeSettings = config.cascade
 
     def to_rjsf(self) -> FormDefinition:
@@ -126,8 +126,8 @@ async def update_settings(settings: ExposedSettings, admin: UserRead | None = De
             setattr(old, key, val)
 
     try:
-        update(config.api, settings.api)
-        update(config.product, settings.product)
+        update(config.backend, settings.backend)
+        update(config.external, settings.external)
         update(config.cascade, settings.cascade)
     except Exception as e:
         return HTMLResponse(content=str(e), status_code=500)

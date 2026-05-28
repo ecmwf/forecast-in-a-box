@@ -226,7 +226,7 @@ def submit_load_plugins(start_after: Future[None]) -> None:
         elif PluginManager.updater is not None:
             raise TypeError("attempted to submit load_plugins but updater is already in progress")
         else:
-            PluginManager.updater = delayed_thread(start_after, load_plugins, (config.product.plugins,))
+            PluginManager.updater = delayed_thread(start_after, load_plugins, (config.external.plugins,))
             PluginManager.updater.start()
 
 
@@ -281,7 +281,7 @@ def catalogue_view() -> dict[PluginCompositeId, BlockFactoryCatalogue] | bool:
 
 
 def submit_update_single(pluginId: PluginCompositeId, isUpdate: bool) -> str:
-    pluginSettings = config.product.plugins.get(pluginId, None)
+    pluginSettings = config.external.plugins.get(pluginId, None)
     if pluginSettings is None:
         return f"plugin {pluginId} not configured"
     else:
@@ -303,12 +303,12 @@ def submit_update_single(pluginId: PluginCompositeId, isUpdate: bool) -> str:
 
 
 def uninstall_plugin(pluginId: PluginCompositeId) -> None:
-    if pluginId not in config.product.plugins:
+    if pluginId not in config.external.plugins:
         raise ValueError(f"plugin {pluginId} not installed")
     with timed_acquire(config_edit_lock, 5) as result:
         if not result:
             raise ValueError("failed to acquire the shared lock")
-        config.product.plugins.pop(pluginId)
+        config.external.plugins.pop(pluginId)
         config.save_to_file()
     unload_single(pluginId)
 
@@ -317,7 +317,7 @@ def modify_enabled(pluginId: PluginCompositeId, isEnabled: bool) -> None:
     with timed_acquire(config_edit_lock, 5) as result:
         if not result:
             raise ValueError("failed to acquire the shared lock")
-        config.product.plugins[pluginId].enabled = isEnabled
+        config.external.plugins[pluginId].enabled = isEnabled
         config.save_to_file()
     if not isEnabled:
         unload_single(pluginId)

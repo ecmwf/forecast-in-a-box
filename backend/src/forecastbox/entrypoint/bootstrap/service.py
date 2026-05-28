@@ -9,7 +9,7 @@ from forecastbox.entrypoint.bootstrap.checks import check_backend_ready
 from forecastbox.entrypoint.bootstrap.config import export_recursive, setup_process
 from forecastbox.entrypoint.bootstrap.launchers import launch_backend
 from forecastbox.entrypoint.bootstrap.procs import ChildProcessGroup, previous_cleanup
-from forecastbox.utility.config import FIABConfig, fiab_home, validate_runtime
+from forecastbox.utility.config import FIABConfig, UnmanagedGateway, fiab_home, validate_runtime
 
 logger = logging.getLogger(__name__ if __name__ != "__main__" else __package__)
 
@@ -41,7 +41,7 @@ if __name__ == "__main__":
     freeze_support()
     setup_process()
 
-    if not config.api.allow_service:
+    if not config.backend.allow_service:
         raise TypeError("launched as a service but config incompatible")
 
     previous_cleanup()
@@ -58,4 +58,4 @@ if __name__ == "__main__":
     else:
         raise ValueError(f"start failure: {backend.exitcode}")
 
-    check_backend_ready(config, handle, config.cascade.spawn_gateway)
+    check_backend_ready(config, handle, not isinstance(config.cascade.gateway, UnmanagedGateway))

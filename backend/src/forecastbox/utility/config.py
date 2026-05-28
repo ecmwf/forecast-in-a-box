@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Annotated, Any, Literal, Self
 
 import toml
-from cascade.low.func import pydantic_recursive_collect
+from cascade.low.func import assert_never, pydantic_recursive_collect
 from fiab_core.artifacts import ArtifactStoreId
 from fiab_core.fable import PluginCompositeId, PluginId, PluginStoreId
 from pydantic import BeforeValidator, Field, PlainSerializer, SecretStr, model_validator
@@ -100,12 +100,6 @@ class AuthSettings(FiabBaseModel):
         if self.public_url is not None and not _validate_url(self.public_url):
             errors.append(f"not an url: public_url={self.public_url}")
         return errors
-
-
-class GeneralSettings(FiabBaseModel):
-    launch_browser: bool = True
-    """Whether a browser window should be opened after start. Used only when
-    entrypoint.main.launch_all module is used"""
 
 
 PluginRefreshStrategy = Literal["automatic", "manual"]
@@ -194,10 +188,6 @@ class ProductSettings(FiabBaseModel):
     default_input_source: str = "opendata"
     """Default input source for models, if not specified otherwise"""
 
-    plugins: PluginsSettings = Field(default_factory=_default_plugins)
-    plugin_stores: PluginStoresConfig = Field(default_factory=_default_plugin_stores)
-    artifact_stores: ArtifactStoresConfig = Field(default_factory=_default_artifact_stores)
-
     def validate_runtime(self) -> list[str]:
         if self.pproc_schema_dir and not os.path.isdir(self.pproc_schema_dir):
             return ["not a directory: pproc_schema_dir={self.pproc_schema_dir}"]
@@ -205,11 +195,17 @@ class ProductSettings(FiabBaseModel):
             return []
 
 
-class BackendAPISettings(FiabBaseModel):
-    data_path: str = f"file://{fiab_home.absolute() / 'data_dir'}"
-    """Data directory URL. Supports file:// (local) and ssh://[user@]host/path (remote) schemes."""
+class ExternalServicesSettings(FiabBaseModel):
+    plugins: PluginsSettings = Field(default_factory=_default_plugins)
+    plugin_stores: PluginStoresConfig = Field(default_factory=_default_plugin_stores)
+    artifact_stores: ArtifactStoresConfig = Field(default_factory=_default_artifact_stores)
     model_repository: str = "https://sites.ecmwf.int/repository/fiab"
     """URL to the model repository."""
+
+
+class BackendSettings(FiabBaseModel):
+    data_path: str = f"file://{fiab_home.absolute() / 'data_dir'}"
+    """Data directory URL. Supports file:// (local) and ssh://[user@]host/path (remote) schemes."""
     uvicorn_host: str = "0.0.0.0"
     """Listening host of the whole server."""
     uvicorn_port: int = 8000
@@ -218,6 +214,9 @@ class BackendAPISettings(FiabBaseModel):
     """Whether we assume that a system-level service has been registered. Affects entrypoint.main behaviour"""
     allow_scheduler: bool = False
     """Whether scheduler thread should be started. Best combine with allow_service=True"""
+    launch_browser: bool = True
+    """Whether a browser window should be opened after start. Used only when
+    entrypoint.main.launch_all module is used"""
 
     def local_url(self) -> str:
         return f"http://localhost:{self.uvicorn_port}"
@@ -235,15 +234,38 @@ class BackendAPISettings(FiabBaseModel):
                 errors.append(f"ssh:// data_path must have an absolute path: {self.data_path}")
         else:
             errors.append(f"unsupported scheme in data_path (use file:// or ssh://): {self.data_path}")
-        if not _validate_url(self.model_repository):
-            errors.append(f"not an url: model_repository={self.model_repository}")
         pseudo_url = f"http://{self.uvicorn_host}:{self.uvicorn_port}"
         if not _validate_url(pseudo_url) or (self.uvicorn_port < 0) or (self.uvicorn_port > 2**16):
             errors.append(f"not a valid uvicorn config: {pseudo_url}")
         return errors
 
 
-class CascadeSettings(FiabBaseModel):
+class GatewayStartupParams(FiabBaseModel):
+    max_concurrent_jobs: int | None = 1
+    """If more jobs submitted at a given time, all but this many wait in a queue"""
+    cascade_logging_base: str | None = None
+    """Where to store logs of cascade gw and jobs. Use eg /home/<user>/fiabLogs or /tmp/fiabLogs"""
+
+
+class LocalGateway(FiabBaseModel):
+    gateway_type: Literal["local"]
+    startup_params: GatewayStartupParams = Field(default_factory=GatewayStartupParams)
+
+
+class RemoteGateway(FiabBaseModel):
+    gateway_type: Literal["remote"]
+    startup_params: GatewayStartupParams = Field(default_factory=GatewayStartupParams)
+    cascade_url: str
+    """Sshable url like 'ssh://[<user>@]<hostname>:<port>'"""
+
+
+class UnmanagedGateway(FiabBaseModel):
+    gateway_type: Literal["unmanaged"]
+    cascade_url: str
+    """Base URL for the Cascade API, eg tcp://<hostname>:<port>"""
+
+
+class CascadeConstraints(FiabBaseModel):
     default_hosts: int = 1
     """Default number of hosts for Cascade if unspecified in a job."""
     max_hosts: int = 1
@@ -252,32 +274,42 @@ class CascadeSettings(FiabBaseModel):
     """Default number of workers per hosts for Cascade if unspecified in a job."""
     max_workers_per_host: int = 8
     """Max number of workers per host for Cascade."""
-    cascade_url: str = "tcp://localhost"
-    """Base URL for the Cascade API in case of unmanaged gateway, otherwise localhost or sshable [<user>@]<hostname>."""
-    cascade_logging_base: str | None = None
-    """Where to store logs of cascade gw and jobs. Use eg /home/<user>/fiabLogs or /tmp/fiabLogs"""
-    spawn_gateway: bool = True
-    """Whether the backend should spawn a gateway or assume it is provided externally"""
-    max_concurrent_jobs: int | None = 1
-    """If more jobs submitted at a given time, all but this many wait in a queue"""
+
+
+class CascadeSettings(FiabBaseModel):
+    gateway: UnmanagedGateway | LocalGateway | RemoteGateway = Field(
+        discriminator="gateway_type", default_factory=lambda: LocalGateway(gateway_type="local")
+    )
+    constraints: CascadeConstraints = Field(default_factory=CascadeConstraints)
 
     def validate_runtime(self) -> list[str]:
         errors = []
-        if not _validate_url(self.cascade_url):
-            errors.append(f"not an url: cascade_url={self.cascade_url}")
+        cascade_url = self._get_cascade_url()
+        if not _validate_url(cascade_url):
+            errors.append(f"not an url: cascade_url={cascade_url}")
         return errors
+
+    def _get_cascade_url(self) -> str:
+        if isinstance(self.gateway, LocalGateway):
+            return "tcp://localhost"
+        elif isinstance(self.gateway, RemoteGateway):
+            return self.gateway.cascade_url
+        elif isinstance(self.gateway, UnmanagedGateway):
+            return self.gateway.cascade_url
+        else:
+            assert_never(self.gateway)
 
 
 class FIABConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", env_prefix="fiab__", case_sensitive=True)
 
-    general: GeneralSettings = Field(default_factory=GeneralSettings)
     product: ProductSettings = Field(default_factory=ProductSettings, description="Product specific settings")
 
     auth: AuthSettings = Field(default_factory=AuthSettings)
 
     db: DatabaseSettings = Field(default_factory=DatabaseSettings)
-    api: BackendAPISettings = Field(default_factory=BackendAPISettings)
+    external: ExternalServicesSettings = Field(default_factory=ExternalServicesSettings)
+    backend: BackendSettings = Field(default_factory=BackendSettings)
     cascade: CascadeSettings = Field(default_factory=CascadeSettings)
 
     @classmethod
@@ -311,8 +343,9 @@ class FIABConfig(BaseSettings):
             f.write(self._get_toml(exclude_defaults=True, exclude_none=True))
 
     def validate_runtime(self) -> list[str]:
-        cascade = urllib.parse.urlparse(self.cascade.cascade_url)
-        data_path = urllib.parse.urlparse(self.api.data_path)
+        cascade_url = self.cascade._get_cascade_url()
+        cascade = urllib.parse.urlparse(cascade_url)
+        data_path = urllib.parse.urlparse(self.backend.data_path)
         errors = []
         compatible_scheme_pairs = {
             ("tcp", "file"),
@@ -322,7 +355,7 @@ class FIABConfig(BaseSettings):
             errors.append(f"cascade and data path must use a compatible scheme: {cascade=} != {data_path=}")
         if cascade.scheme == "ssh":
             if cascade.netloc != data_path.netloc:
-                errors.append(f"under ssh://, cascade and data path must use the same netlo: {cascade=} != {data_path=}")
+                errors.append(f"under ssh://, cascade and data path must use the same netloc: {cascade=} != {data_path=}")
         return errors
 
 
