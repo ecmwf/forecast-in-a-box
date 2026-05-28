@@ -301,6 +301,7 @@ class TestEkdSource:
                             "step": [0, 6, 12],
                             "number": [1, 2, 3, 4, 5],
                             "param": ["2t", "msl"],
+                            "forecast": "ifs-ens",
                         },
                         **config,
                     )
@@ -799,8 +800,8 @@ class TestGribSink:
         "filepath, dims",
         [
             ["/path/to/output.grib", {}],
-            ["/path/to/[param].grib", {"param": 2}],
-            ["/path/to/[param]_[shortName]_[step].grib", {"param": 2, "step": 3}],
+            ["/path/to/[param].grib", {"param": 3}],
+            ["/path/to/[param]_[shortName]_[step].grib", {"param": 3, "step": 3}],
             ["/path/to/[stepRange]_[number]_[non_dim].grib", {"step": 3, "number": 5}],
         ],
     )

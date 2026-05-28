@@ -1,6 +1,6 @@
 member_zero:
   type: fc
-qube:
+datacubes:
 - class: od
   levtype: sfc
   param:

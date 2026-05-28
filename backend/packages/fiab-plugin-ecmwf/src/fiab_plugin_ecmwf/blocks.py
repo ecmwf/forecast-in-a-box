@@ -10,13 +10,11 @@
 import logging
 import os
 import re
-from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import numpy as np
-import yaml
 from cascade.low.func import Either
-from earthkit.workflows.fluent import Action, Payload, expand_as_qube, from_source
+from earthkit.workflows.fluent import Action, Payload, from_source, merge
 from earthkit.workflows.nodetree import nodetree_dimensions, nodetree_new_dimension
 from fiab_core.fable import (
     ActionLookup,
@@ -25,18 +23,17 @@ from fiab_core.fable import (
     BlockInstanceOutput,
     ConfigurationOptionId,
     ConfigurationOptionRestriction,
-    NoOutput,
     QubedOutput,
     RawOutput,
 )
 from fiab_core.plugin import Error
-from fiab_core.pydantic_utils import FiabCoreBaseModel
 from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
 from fiab_core.tools.blocks import Product, Sink, Source, Transform
 from fiab_core.types import ClosedEnumType, ListType
 from qubed import Qube
 
-from .qubed_utils import axes, common_dimensions, contains, coxpand, dimensions
+from .datasets.utils import load_datasets
+from .qubed_utils import axes, common_dimensions, contains, coxpand, dimensions, select
 
 SOURCE = ConfigurationOptionId("source")
 BASETIME = ConfigurationOptionId("base_time")
@@ -66,35 +63,8 @@ PLOT_FORMAT_TO_MIME: dict[str, str] = {
     "pdf": "application/pdf",
     "svg": "image/svg+xml",
 }
-LOCALDIR = Path(__file__).resolve().parent
 
-
-class ForecastPreset(FiabCoreBaseModel):
-    qube: list[dict]
-    member_zero: Optional[dict] = None
-
-
-def load_presets() -> dict[str, Qube]:
-    preset_dir = os.path.join(LOCALDIR, "presets")
-    presets = {}
-    for filepath in os.listdir(preset_dir):
-        fullpath = os.path.join(preset_dir, filepath)
-        if os.path.isfile(fullpath):
-            name = os.path.splitext(filepath)[0]
-            with open(fullpath, "r") as f:
-                config = yaml.safe_load(f)
-            forecast_config = ForecastPreset(**config)
-            qube = Qube.empty()
-            for datacube in forecast_config.qube:
-                new_qube = Qube.from_datacube(datacube)
-                if forecast_config.member_zero and new_qube.select(forecast_config.member_zero).n_leaves > 0:
-                    new_qube.add_metadata({ENSEMBLE: 0})
-                qube = qube | new_qube
-            presets[name] = qube
-    return presets
-
-
-FORECAST_PRESETS = load_presets()
+FORECAST_DATASETS = load_datasets()
 
 
 class EkdSource(Source):
@@ -109,7 +79,7 @@ class EkdSource(Source):
         FORECAST: BlockConfigurationOption(
             title="Forecast model",
             description="Name of forecast",
-            value_type=f"enumClosed[{list(FORECAST_PRESETS.keys())}]",
+            value_type=f"enumClosed[{list(FORECAST_DATASETS.keys())}]",
         ),
         BASETIME: BlockConfigurationOption(
             title="Base time",
@@ -141,14 +111,13 @@ class EkdSource(Source):
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         forecast = block.config_as_str(FORECAST)
-        fc_qube = FORECAST_PRESETS[forecast]
+        ifs_qoutput = QubedOutput(dataqube=FORECAST_DATASETS[forecast].as_qube(ens_dim=ENSEMBLE, include_member_zero=True))
 
         param = block.config_as_list(PARAM, str, allow_empty=False)
         step = block.config_as_list(STEP, int)
         number = block.config_as_list(ENSEMBLE, int)
         basetime = block.config_as_datetime(BASETIME)
 
-        ifs_qoutput = QubedOutput(dataqube=fc_qube)
         for dim, config in [(PARAM, param), (STEP, step), (ENSEMBLE, number)]:
             if not contains(ifs_qoutput, {dim: config}):
                 return Either.error(f"Invalid config for {dim}: must be one of {axes(ifs_qoutput)[dim]}")
@@ -160,7 +129,7 @@ class EkdSource(Source):
             ENSEMBLE: number,
             STEP: step,
         }
-        output = QubedOutput(dataqube=fc_qube.select(select_dims))
+        output = select(ifs_qoutput, select_dims)
         return Either.ok(output)
 
     def compile(
@@ -170,7 +139,8 @@ class EkdSource(Source):
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         forecast = block.config_as_str(FORECAST)
-        fc_qube = FORECAST_PRESETS[forecast]
+        fc_preset = FORECAST_DATASETS[forecast]
+        fc_qube = fc_preset.as_qube(ens_dim=ENSEMBLE)
 
         param = block.config_as_list(PARAM, str, allow_empty=False)
         step = block.config_as_list(STEP, int)
@@ -183,31 +153,48 @@ class EkdSource(Source):
             STEP: step,
         }
         subqube = fc_qube.select(select_dims)
-        payloads = []
-        params = []
-        for datacube in subqube.datacubes():
-            for p in datacube[PARAM]:
-                payloads.append(
-                    Payload(
-                        "fiab_plugin_ecmwf.runtime.source.earthkit_source",
-                        [block.config_as_str(SOURCE)],
-                        {
-                            "requests": [
-                                dict(
-                                    datacube,
-                                    date=basetime.date().isoformat(),
-                                    time=f"{basetime.time().hour:02d}",
-                                    expver=block.config_as_str(EXPVER),
-                                    param=p,
-                                )
-                            ],
-                        },
-                    )
-                )
-                params.append(p)
-        source_actions = from_source(np.asarray(payloads), coords={PARAM: param})
-        action = expand_as_qube(source_actions, subqube)
-        return Either.ok(action)
+        actions = {}
+        for levtype in subqube.axes()["levtype"]:
+            path = f"levtype={levtype}"
+            levtype_actions = {}
+            ens_branches = set()
+            for index, datacube in enumerate(subqube.select({"levtype": levtype}).datacubes()):
+                ens_branch = str(datacube[PARAM])
+                datacube_path = f"{ens_branch}/{index}"
+                expansion_datacube = datacube.copy()
+                if fc_preset.is_member_zero(datacube):
+                    expansion_datacube[ENSEMBLE] = 0
+                ens_branches.add(ens_branch)
+
+                levtype_actions[datacube_path] = from_source(
+                    np.asarray(
+                        [
+                            Payload(
+                                "fiab_plugin_ecmwf.runtime.source.earthkit_source",
+                                [block.config_as_str(SOURCE)],
+                                {
+                                    "requests": [
+                                        dict(
+                                            datacube,
+                                            date=basetime.date().isoformat(),
+                                            time=f"{basetime.time().hour:02d}",
+                                            expver=block.config_as_str(EXPVER),
+                                            param=p,
+                                        )
+                                    ],
+                                },
+                            )
+                            for p in datacube[PARAM]
+                        ]
+                    ),
+                    coords={PARAM: datacube[PARAM]},
+                ).expand_as_qube(Qube.from_datacube(expansion_datacube), dims=[STEP, ENSEMBLE, "levtype", "levelist"])
+            merged = merge(**levtype_actions)
+            for branch in ens_branches:
+                merged = merged.combine_branches(dim=ENSEMBLE, path=branch)
+            actions[path] = merged.combine_branches(dim=PARAM)
+        final_action = merge(**actions)
+        return Either.ok(final_action)
 
 
 class EnsembleStatistics(Product):
@@ -402,7 +389,7 @@ class SelectDimension(Transform):
                 f"{self.selection_label}: {axes(input_dataset).get(self.option_id, [])}"
             )
 
-        output = coxpand(input_dataset, self.option_id, {self.option_id: selected_values})
+        output = select(input_dataset, {self.option_id: selected_values})
         return Either.ok(output)
 
     def compile(
