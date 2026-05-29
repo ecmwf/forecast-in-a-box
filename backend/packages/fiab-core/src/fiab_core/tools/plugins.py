@@ -32,7 +32,7 @@ def _detect_editable_install(distname: str) -> str:
             # NOTE this doesnt work well for non-std layout but again we can restrict to only that
             return "-e " + origin.url[len("file://") :]
 
-	# NOTE: pre 3.14, eventually remove
+    # NOTE: pre 3.14, eventually remove
     direct_url_text = distribution.read_text("direct_url.json")
     if direct_url_text:
         info = json.loads(direct_url_text)
