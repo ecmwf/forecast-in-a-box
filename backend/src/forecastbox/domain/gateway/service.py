@@ -77,10 +77,15 @@ def _remote_tunnel_target() -> tuple[str, int | None]:
     return host, parsed_url.port
 
 
-def _local_process_entrypoint(cascade_url: str, log_base: str | None, max_concurrent_jobs: int | None) -> None:
+def _local_process_entrypoint(cascade_url: str, log_base: str | None, max_concurrent_jobs: int | None, shared_path: str | None) -> None:
     loggingConfigSer = LoggingConfig(path_base=log_base, formatter="line").ser_cliparam()
     try:
-        serve(url=cascade_url, loggingConfigSer=loggingConfigSer, max_concurrent_jobs=max_concurrent_jobs)
+        serve(
+            url=cascade_url,
+            loggingConfigSer=loggingConfigSer,
+            max_concurrent_jobs=max_concurrent_jobs,
+            shared_path=shared_path,
+        )
     except KeyboardInterrupt:
         pass
 
@@ -94,13 +99,14 @@ def launch_gateway() -> None:
             startup_params = gateway.startup_params
             max_concurrent_jobs = startup_params.max_concurrent_jobs
             cascade_logging_base = startup_params.cascade_logging_base
+            shared_path = startup_params.shared_path
             logs_directory = TemporaryDirectory(prefix="fiabLogs", dir=cascade_logging_base)
             logger.debug(f"logging base is at {logs_directory.name}")
             logs_base = None if os.getenv("FIAB_LOGSTDOUT", "nay") == "yea" else logs_directory.name + os.sep
             gateway_url = f"tcp://localhost:{tunnel.claim_free_port()}"
             process = platform.get_mp_ctx("gateway").Process(
                 target=_local_process_entrypoint,
-                args=(gateway_url, logs_base, max_concurrent_jobs),
+                args=(gateway_url, logs_base, max_concurrent_jobs, shared_path),
             )  # type: ignore[unresolved-attribute] # context
             process.start()
             logger.debug(f"spawned new gateway process with pid {process.pid}")
@@ -113,6 +119,7 @@ def launch_gateway() -> None:
             startup_params = gateway.startup_params
             max_concurrent_jobs = startup_params.max_concurrent_jobs
             cascade_logging_base = startup_params.cascade_logging_base
+            shared_path = startup_params.shared_path
             host, remote_port = _remote_tunnel_target()
             handle = tunnel.setup(host=host, remote_port=remote_port)
             log_base = f"{cascade_logging_base or '/tmp/'}fiabLogs{uuid.uuid4()}."
@@ -134,6 +141,8 @@ def launch_gateway() -> None:
             ]
             if max_concurrent_jobs is not None:
                 cmd.extend(["--max_concurrent_jobs", str(max_concurrent_jobs)])
+            if shared_path is not None:
+                cmd.extend(["--shared_path", shared_path])
             tunnel.execute(handle, cmd, output_path=log_base + "gwstdouterr")
             GatewayConnectionManager.gateway_connection = RemoteTunnel(handle=handle)
         elif isinstance(gateway, UnmanagedGateway):

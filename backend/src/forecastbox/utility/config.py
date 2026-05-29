@@ -246,11 +246,20 @@ class BackendSettings(FiabBaseModel):
         return errors
 
 
+class SshClusterSpec(FiabBaseModel):
+    controller_url: str
+    worker_urls: list[str]
+
+
 class GatewayStartupParams(FiabBaseModel):
     max_concurrent_jobs: int | None = 1
     """If more jobs submitted at a given time, all but this many wait in a queue"""
     cascade_logging_base: str | None = None
     """Where to store logs of cascade gw and jobs. Use eg /home/<user>/fiabLogs or /tmp/fiabLogs"""
+    shared_path: str | None = None
+    """Shared filesystem path visible to all workers, required for managed Slurm submissions."""
+    ssh_cluster_spec: SshClusterSpec | None = None
+    """SSH cluster description for sshCluster submissions."""
 
 
 class LocalGateway(FiabBaseModel):
@@ -275,9 +284,12 @@ class UnmanagedGateway(FiabBaseModel):
     gateway_type: Literal["unmanaged"]
     cascade_url: str
     """Base URL for the Cascade API, eg tcp://<hostname>:<port>"""
+    startup_params: GatewayStartupParams = Field(default_factory=GatewayStartupParams)
 
 
 class CascadeConstraints(FiabBaseModel):
+    default_cascade_infra: Literal["localProcess", "slurm", "sshCluster"] = "localProcess"
+    """Default execution infrastructure for jobs if unspecified in a job."""
     default_hosts: int = 1
     """Default number of hosts for Cascade if unspecified in a job."""
     max_hosts: int = 1
