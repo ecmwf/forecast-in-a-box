@@ -139,7 +139,7 @@ def submit_initialize_stores() -> None:
         if not result:
             logger.error("failed to initialize stores")
             return
-        StoresManager.stores_updater = threading.Thread(target=initialize_stores, args=(config.product.plugin_stores,))
+        StoresManager.stores_updater = threading.Thread(target=initialize_stores, args=(config.external.plugin_stores,))
         StoresManager.stores_updater.start()
 
 
@@ -155,11 +155,11 @@ def submit_install_plugin(plugin_composite_key: PluginCompositeId) -> None:
     if pluginStoreEntry is None:
         raise ValueError(f"plugin with id {pluginId} not known to store {storeId}")
 
-    if plugin_composite_key not in config.product.plugins:
+    if plugin_composite_key not in config.external.plugins:
         with timed_acquire(config_edit_lock, 5) as result:
             if not result:
                 raise ValueError("failed to acquire the shared lock")
-            config.product.plugins[plugin_composite_key] = PluginSettings(
+            config.external.plugins[plugin_composite_key] = PluginSettings(
                 pip_source=pluginStoreEntry.pip_source,
                 module_name=pluginStoreEntry.module_name,
                 update_strategy="manual",

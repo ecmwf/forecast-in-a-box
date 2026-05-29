@@ -50,17 +50,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         module = importlib.import_module(f"forecastbox.schemata.{module_info.name}")
         if hasattr(module, "create_db_and_tables"):
             await module.create_db_and_tables()  # type: ignore[call-non-callable] # NOTE no module protocol
-    if config.api.allow_scheduler:
+    if config.backend.allow_scheduler:
         start_scheduler()
     release_time, release_version = get_local_release()
     app.version = f"{release_version}@{release_time}"
     submit_initialize_stores()
     ArtifactsProvider.register_get_artifacts_lookup(lambda: ArtifactManager.catalog)
-    ArtifactsProvider.register_get_artifact_local_path(lambda composite_id: get_artifact_local_path(composite_id, config.api.data_path))
+    ArtifactsProvider.register_get_artifact_local_path(lambda composite_id: get_artifact_local_path(composite_id, config.backend.data_path))
     catalog_ready = submit_refresh_catalog()
     submit_load_plugins(start_after=catalog_ready)
     yield
-    if config.api.allow_scheduler:
+    if config.backend.allow_scheduler:
         stop_scheduler()
     shutdown_all_lens_instances()
     await shutdown_processes()

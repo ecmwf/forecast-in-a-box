@@ -9,6 +9,8 @@
 
 """Cascade execution data models: environment specification."""
 
+from typing import Literal
+
 from fiab_core.artifacts import CompositeArtifactId
 from pydantic import Field, PositiveInt
 
@@ -17,6 +19,7 @@ from forecastbox.utility.pydantic import FiabBaseModel
 
 class EnvironmentSpecification(FiabBaseModel):
     # NOTE warning -- this class is used by the web api. Be careful about changes here
+    cascade_infra: Literal["localProcess", "slurm", "sshCluster"] = Field(default="localProcess")
     hosts: PositiveInt | None = Field(default=None)
     workers_per_host: PositiveInt | None = Field(default=None)
     environment_variables: dict[str, str] = Field(default_factory=dict)

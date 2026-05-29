@@ -78,14 +78,14 @@ class ArtifactManager:
                     tunnel.disconnect(cls.ssh_handle)
                 except Exception as e:
                     logger.warning(f"Could not disconnect stale SSH handle: {e}")
-            parsed = urllib.parse.urlparse(config.api.data_path)
+            parsed = urllib.parse.urlparse(config.backend.data_path)
             cls.ssh_handle = tunnel.connect(parsed.netloc)
             return cls.ssh_handle
 
 
 def _ssh_handle_if_needed(timeout: int = timeout_acquire_task) -> CommandHandle | None:
     """Return SSH handle if data_path uses ssh:// scheme, else None."""
-    parsed = urllib.parse.urlparse(config.api.data_path)
+    parsed = urllib.parse.urlparse(config.backend.data_path)
     if parsed.scheme == "ssh":
         return ArtifactManager._get_or_create_ssh_handle(timeout)
     return None
@@ -95,9 +95,9 @@ def _refresh_catalog_task() -> None:
     """Background task to refresh catalog and local artifact list."""
     try:
         logger.info("Starting artifact catalog refresh")
-        catalog = get_artifacts_catalog(config.product.artifact_stores)
+        catalog = get_artifacts_catalog(config.external.artifact_stores)
         handle = _ssh_handle_if_needed()
-        local_artifacts = list_storage(catalog, config.api.data_path, handle)
+        local_artifacts = list_storage(catalog, config.backend.data_path, handle)
 
         with timed_acquire(ArtifactManager.lock, timeout_acquire_task) as result:
             if not result:
@@ -134,7 +134,7 @@ def _download_artifact_task(composite_id: CompositeArtifactId) -> None:
             report_artifact_download_progress(composite_id, progress=progress)
 
         handle = _ssh_handle_if_needed()
-        download_artifact(composite_id, checkpoint, config.api.data_path, handle=handle, progress_callback=progress_callback)
+        download_artifact(composite_id, checkpoint, config.backend.data_path, handle=handle, progress_callback=progress_callback)
 
         with timed_acquire(ArtifactManager.lock, timeout_acquire_task) as result:
             if not result:
@@ -281,7 +281,7 @@ def delete_model(composite_id: CompositeArtifactId) -> Either[str, str]:  # ty: 
     # 3/ unlink happens while download is ongoing -> fix by making the delete two-step
     handle = _ssh_handle_if_needed()
     try:
-        delete_artifact(composite_id, config.api.data_path, handle=handle)
+        delete_artifact(composite_id, config.backend.data_path, handle=handle)
     except Exception as e:
         logger.exception(f"Failed to delete artifact {composite_id}: {repr(e)}")
         return Either.error(f"Failed to delete: {repr(e)}")

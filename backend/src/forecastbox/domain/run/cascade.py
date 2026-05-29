@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 from typing import Literal
 
-from cascade.gateway.api import JobSpec, SubmitJobRequest, SubmitJobResponse
+from cascade.gateway.api import JobSpec, LocalProcesses, SlurmCluster, SshCluster, SubmitJobRequest, SubmitJobResponse
 from cascade.gateway.client import request_response
 from cascade.low.core import JobInstance, JobInstanceRich, TaskId
 from fiab_core.fable import BlockInstanceId
@@ -22,10 +22,49 @@ from pydantic import Field
 from forecastbox.domain.artifact.manager import ArtifactManager, submit_artifact_download
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.gateway.service import get_gateway_url
-from forecastbox.utility.config import config
+from forecastbox.utility.config import CascadeInfrastructureType, UnmanagedGateway, config
 from forecastbox.utility.pydantic import FiabBaseModel
 
 logger = logging.getLogger(__name__)
+
+
+def _select_cascade_infra(environment: EnvironmentSpecification) -> CascadeInfrastructureType:
+    if "cascade_infra" in environment.model_fields_set:
+        return environment.cascade_infra
+    return config.cascade.constraints.default_cascade_infra
+
+
+def _build_infra_spec(
+    environment: EnvironmentSpecification, workers_per_host: int, hosts: int
+) -> LocalProcesses | SlurmCluster | SshCluster:
+    requested_infra = _select_cascade_infra(environment)
+    gateway = config.cascade.gateway
+
+    if requested_infra == "localProcess":
+        return LocalProcesses(workers_per_host=workers_per_host, hosts=hosts)
+
+    elif requested_infra == "slurm":
+        if not isinstance(gateway, UnmanagedGateway):
+            if not gateway.startup_params.shared_path:
+                raise ValueError(
+                    "slurm submissions with managed gateway require setting config value of cascade.gateway.startup_params.shared_path"
+                )
+        return SlurmCluster(workers_per_host=workers_per_host, hosts=hosts)
+
+    elif requested_infra == "sshCluster":
+        if isinstance(gateway, UnmanagedGateway):
+            raise ValueError("sshCluster submission currently not supported for unmanaged gateway")
+        ssh_cluster_spec = gateway.startup_params.ssh_cluster_spec
+        if ssh_cluster_spec is None:
+            raise ValueError("sshCluster submissions require setting config value of cascade.gateway.startup_params.ssh_cluster_spec")
+        return SshCluster(
+            controller_url=ssh_cluster_spec.controller_url,
+            worker_urls=ssh_cluster_spec.worker_urls,
+            workers_per_host=workers_per_host,
+        )
+
+    else:
+        assert_never(request_infra)
 
 
 class RawCascadeJob(FiabBaseModel):
@@ -88,15 +127,17 @@ def execute_cascade(spec: ExecutionSpecification) -> SubmitJobResponse:
     job = spec.job.job_instance
 
     environment = spec.environment
-    hosts = min(config.cascade.max_hosts, environment.hosts or config.cascade.default_hosts)
-    workers_per_host = min(config.cascade.max_workers_per_host, environment.workers_per_host or config.cascade.default_workers_per_host)
+    hosts = min(config.cascade.constraints.max_hosts, environment.hosts or config.cascade.constraints.default_hosts)
+    workers_per_host = min(
+        config.cascade.constraints.max_workers_per_host, environment.workers_per_host or config.cascade.constraints.default_workers_per_host
+    )
+
+    infra_spec = _build_infra_spec(environment, workers_per_host=workers_per_host, hosts=hosts)
 
     r = SubmitJobRequest(
         job=JobSpec(
-            workers_per_host=workers_per_host,
-            hosts=hosts,
+            infra_spec=infra_spec,
             envvars={},
-            use_slurm=False,
             job_instance=JobInstanceRich(jobInstance=job, checkpointSpec=None),
         )
     )

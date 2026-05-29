@@ -200,7 +200,7 @@ def prod_scheduler() -> None:
 
 
 def status_scheduler() -> str:
-    if not config.api.allow_scheduler:
+    if not config.backend.allow_scheduler:
         return "off"
     if Globals.scheduler is None:
         logger.warning("scheduler reported down due to being None")
