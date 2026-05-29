@@ -21,7 +21,7 @@ from tempfile import TemporaryDirectory
 from cascade.deployment.logging import LoggingConfig
 from cascade.executor import platform
 from cascade.gateway import api, client
-from cascade.gateway.server import main_enp
+from cascade.gateway.server import serve
 from cascade.low.func import Either, assert_never
 
 from forecastbox.domain.gateway.exceptions import (
@@ -78,9 +78,9 @@ def _remote_tunnel_target() -> tuple[str, int | None]:
 
 
 def _local_process_entrypoint(cascade_url: str, log_base: str | None, max_concurrent_jobs: int | None) -> None:
-    logging_config = LoggingConfig(path_base=log_base, formatter="line")
+    loggingConfigSer = LoggingConfig(path_base=log_base, formatter="line").ser_cliparam()
     try:
-        main_enp(url=cascade_url, loggingConfig=logging_config, max_concurrent_jobs=max_concurrent_jobs)
+        serve(url=cascade_url, loggingConfigSer=loggingConfigSer, max_concurrent_jobs=max_concurrent_jobs)
     except KeyboardInterrupt:
         pass
 
