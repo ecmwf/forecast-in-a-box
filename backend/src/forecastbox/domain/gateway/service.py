@@ -143,6 +143,7 @@ def launch_gateway() -> None:
                 cmd.extend(["--max_concurrent_jobs", str(max_concurrent_jobs)])
             if shared_path is not None:
                 cmd.extend(["--shared_path", shared_path])
+            tunnel.execute(handle, ["mkdir", "-p", log_base])
             tunnel.execute(handle, cmd, output_path=log_base + "gwstdouterr")
             GatewayConnectionManager.gateway_connection = RemoteTunnel(handle=handle)
         elif isinstance(gateway, UnmanagedGateway):

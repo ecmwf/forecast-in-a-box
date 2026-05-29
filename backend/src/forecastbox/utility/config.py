@@ -347,13 +347,20 @@ class FIABConfig(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        return (
-            env_settings,
-            file_secret_settings,
-            dotenv_settings,
-            TomlConfigSettingsSource(settings_cls, fiab_home / "config.toml"),
-            init_settings,
-        )
+        # for tests in particular, we dont want user's ~/.fiab or .env to mess up
+        if os.environ.get("FIAB_IGNORE_CONFIG_SOURCES", "0") == "1":
+            return (
+                env_settings,
+                init_settings,
+            )
+        else:
+            return (
+                env_settings,
+                file_secret_settings,
+                dotenv_settings,
+                TomlConfigSettingsSource(settings_cls, fiab_home / "config.toml"),
+                init_settings,
+            )
 
     def _get_toml(self, **k: Any) -> str:
         json_config = self.model_dump(mode="json", **k)

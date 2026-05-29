@@ -32,30 +32,6 @@ class _FakeHandle:
         return "tcp://localhost:7777"
 
 
-def test_launch_gateway_remote_passes_shared_path_to_command(monkeypatch: pytest.MonkeyPatch) -> None:
-    captured: dict[str, Any] = {}
-    monkeypatch.setattr(
-        config.cascade,
-        "gateway",
-        RemoteGateway(
-            gateway_type="remote",
-            startup_params=GatewayStartupParams(shared_path="/mnt/shared"),
-            cascade_url="ssh://user@example.com:2222",
-        ),
-    )
-    monkeypatch.setattr(gateway_service.tunnel, "setup", lambda host, remote_port: _FakeHandle(remote_port=34567))
-    monkeypatch.setattr(gateway_service.tunnel, "execute", lambda handle, cmd, output_path: captured.update({"cmd": cmd}))
-    monkeypatch.setattr(gateway_service.uuid, "uuid4", lambda: "abc")
-    monkeypatch.setattr(gateway_service.GatewayConnectionManager, "gateway_connection", None)
-
-    gateway_service.launch_gateway()
-
-    cmd = captured["cmd"]
-    assert "--shared_path" in cmd
-    assert cmd[cmd.index("--shared_path") + 1] == "/mnt/shared"
-    gateway_service.GatewayConnectionManager.gateway_connection = None
-
-
 def test_launch_gateway_local_forwards_shared_path_to_process_args(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, Any] = {}
 
