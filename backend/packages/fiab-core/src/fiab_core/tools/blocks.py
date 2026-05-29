@@ -9,7 +9,7 @@
 
 import abc
 from datetime import date, datetime
-from typing import Any, Callable, Literal, TypeVar
+from typing import Any, Callable, Literal, TypeVar, cast
 
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
@@ -129,7 +129,7 @@ class BlockInstanceRich(BlockInstance):
         item_type: type[T],
         *,
         allow_empty: bool = True,
-        validator: Callable[[list[T], str], None] | None = None,
+        validator: Callable[[T, str], None] | None = None,
     ) -> list[T]:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.parsed_value_type, ListType):
@@ -160,10 +160,11 @@ class BlockInstanceRich(BlockInstance):
             raise BlockInstanceConfigurationError(
                 f"Configuration option {option_id!r} expected list[{item_type.__name__}], got {[type(item).__name__ for item in raw_value]!r}"
             )
+        typed_raw_value = cast(list[T], raw_value)
         if validator is not None:
-            for item in raw_value:
-                validator(item, option_id)
-        return raw_value
+            for item in typed_raw_value:
+                validator(item, option_id)  # ty: ignore[invalid-argument-type]
+        return typed_raw_value
 
 
 class QubedBlockBuilder(abc.ABC):

@@ -13,7 +13,7 @@ from typing import Any
 
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
-from earthkit.workflows.plugins.anemoi.fluent import Inference, get_initial_conditions
+from earthkit.workflows.plugins.anemoi.fluent import Inference, get_initial_conditions  # ty: ignore[unresolved-import]
 from earthkit.workflows.plugins.anemoi.types import DATE
 from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import (
