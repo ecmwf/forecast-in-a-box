@@ -22,13 +22,13 @@ from pydantic import Field
 from forecastbox.domain.artifact.manager import ArtifactManager, submit_artifact_download
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.gateway.service import get_gateway_url
-from forecastbox.utility.config import UnmanagedGateway, config
+from forecastbox.utility.config import CascadeInfrastructureType, UnmanagedGateway, config
 from forecastbox.utility.pydantic import FiabBaseModel
 
 logger = logging.getLogger(__name__)
 
 
-def _select_cascade_infra(environment: EnvironmentSpecification) -> Literal["localProcess", "slurm", "sshCluster"]:
+def _select_cascade_infra(environment: EnvironmentSpecification) -> CascadeInfrastructureType:
     if "cascade_infra" in environment.model_fields_set:
         return environment.cascade_infra
     return config.cascade.constraints.default_cascade_infra
@@ -43,23 +43,28 @@ def _build_infra_spec(
     if requested_infra == "localProcess":
         return LocalProcesses(workers_per_host=workers_per_host, hosts=hosts)
 
-    if requested_infra == "slurm":
+    elif requested_infra == "slurm":
         if not isinstance(gateway, UnmanagedGateway):
             if not gateway.startup_params.shared_path:
-                raise ValueError("slurm submissions with managed gateway require cascade.gateway.startup_params.shared_path")
+                raise ValueError(
+                    "slurm submissions with managed gateway require setting config value of cascade.gateway.startup_params.shared_path"
+                )
         return SlurmCluster(workers_per_host=workers_per_host, hosts=hosts)
 
-    if requested_infra == "sshCluster":
+    elif requested_infra == "sshCluster":
+        if isinstance(gateway, UnmanagedGateway):
+            raise ValueError("sshCluster submission currently not supported for unmanaged gateway")
         ssh_cluster_spec = gateway.startup_params.ssh_cluster_spec
         if ssh_cluster_spec is None:
-            raise ValueError("sshCluster submissions require cascade.gateway.startup_params.ssh_cluster_spec")
+            raise ValueError("sshCluster submissions require setting config value of cascade.gateway.startup_params.ssh_cluster_spec")
         return SshCluster(
             controller_url=ssh_cluster_spec.controller_url,
             worker_urls=ssh_cluster_spec.worker_urls,
             workers_per_host=workers_per_host,
         )
 
-    raise ValueError(f"Unsupported cascade infrastructure: {requested_infra}")
+    else:
+        assert_never(request_infra)
 
 
 class RawCascadeJob(FiabBaseModel):

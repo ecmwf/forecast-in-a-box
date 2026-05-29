@@ -257,7 +257,7 @@ class GatewayStartupParams(FiabBaseModel):
     cascade_logging_base: str | None = None
     """Where to store logs of cascade gw and jobs. Use eg /home/<user>/fiabLogs or /tmp/fiabLogs"""
     shared_path: str | None = None
-    """Shared filesystem path visible to all workers, required for managed Slurm submissions."""
+    """Shared filesystem path visible to all workers, required for Slurm submissions."""
     ssh_cluster_spec: SshClusterSpec | None = None
     """SSH cluster description for sshCluster submissions."""
 
@@ -284,11 +284,13 @@ class UnmanagedGateway(FiabBaseModel):
     gateway_type: Literal["unmanaged"]
     cascade_url: str
     """Base URL for the Cascade API, eg tcp://<hostname>:<port>"""
-    startup_params: GatewayStartupParams = Field(default_factory=GatewayStartupParams)
+
+
+CascadeInfrastructureType = Literal["localProcess", "slurm", "sshCluster"]
 
 
 class CascadeConstraints(FiabBaseModel):
-    default_cascade_infra: Literal["localProcess", "slurm", "sshCluster"] = "localProcess"
+    default_cascade_infra: CascadeInfrastructureType = "localProcess"
     """Default execution infrastructure for jobs if unspecified in a job."""
     default_hosts: int = 1
     """Default number of hosts for Cascade if unspecified in a job."""

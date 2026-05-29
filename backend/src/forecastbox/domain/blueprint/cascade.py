@@ -7,6 +7,8 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+"""Cascade execution data models: environment specification."""
+
 from typing import Literal
 
 from fiab_core.artifacts import CompositeArtifactId

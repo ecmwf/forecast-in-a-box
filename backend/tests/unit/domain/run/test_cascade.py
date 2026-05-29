@@ -161,7 +161,7 @@ def test_execute_cascade_slurm_does_not_require_shared_path_for_unmanaged_gatewa
 
 def test_execute_cascade_ssh_cluster_requires_spec(patch_submit_stack: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(config.cascade, "constraints", CascadeConstraints(default_cascade_infra="localProcess"))
-    monkeypatch.setattr(config.cascade, "gateway", UnmanagedGateway(gateway_type="unmanaged", cascade_url="tcp://gw"))
+    monkeypatch.setattr(config.cascade, "gateway", LocalGateway(gateway_type="local"))
     environment = EnvironmentSpecification(cascade_infra="sshCluster")
 
     with pytest.raises(ValueError, match="ssh_cluster_spec"):
