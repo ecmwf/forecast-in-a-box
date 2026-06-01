@@ -479,16 +479,19 @@ class MapPlotSink(Sink):
             title="Parameters",
             description="Parameters to select and plot (e.g. '2t', 'msl')",
             value_type="list[str]",
+            default_value="2t",
         ),
         DOMAIN: BlockConfigurationOption(
             title="Domain",
             description="Geographic domain: global, europe, or a named region",
             value_type="str",
+            default_value="global",
         ),
         FORMAT: BlockConfigurationOption(
             title="Format",
             description="Output image format",
             value_type="enumClosed['png', 'pdf', 'svg']",
+            default_value="png",
         ),
         GROUPBY: BlockConfigurationOption(
             title="Group By",
@@ -500,6 +503,7 @@ class MapPlotSink(Sink):
             title="Split By",
             description="Dimensions to separate plots by",
             value_type="list[str]",
+            default_value="none",
         ),
         # ConfigurationOptionId("style_schema"): BlockConfigurationOption(
         #     title="Style Schema",
