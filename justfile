@@ -9,8 +9,9 @@ drun:
 
 fiabwheel:
     #!/usr/bin/env bash
+    set -euo pipefail
     pushd frontend
-    npm install --force # TODO fix the npm dependencies to get rid of --force !!!
+    npm ci
     npm run prodbuild
     popd
 
