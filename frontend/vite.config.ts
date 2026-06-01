@@ -24,7 +24,9 @@ export default defineConfig(({ mode }) => {
     plugins: [
       tanstackRouter({
         target: 'react',
-        autoCodeSplitting: true,
+        // Prod-only: in dev the tsr-split route chunks fail to fetch on HMR/
+        // re-optimization (Vite 8), so bundle routes eagerly instead.
+        autoCodeSplitting: !isDev,
       }),
       viteReact(),
       tailwindcss(),
