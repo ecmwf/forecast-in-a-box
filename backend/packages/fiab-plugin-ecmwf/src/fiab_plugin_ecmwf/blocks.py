@@ -114,20 +114,23 @@ class EkdSource(Source):
     inputs: list[str] = []
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        basetime = block.config_as_datetime(BASETIME)
+        if basetime.time().hour not in [0, 6, 12, 18]:
+            return Either.error(f"Invalid time: base time must be in (00, 06, 12, 18)")
+
         forecast = block.config_as_str(FORECAST)
-        ifs_qoutput = QubedOutput(dataqube=FORECAST_DATASETS[forecast].as_qube(ens_dim=ENSEMBLE, include_member_zero=True))
+        ifs_qoutput = select(
+            QubedOutput(dataqube=FORECAST_DATASETS[forecast].as_qube(ens_dim=ENSEMBLE, include_member_zero=True)),
+            {"time": basetime.time().hour},
+        )
 
         param = block.config_as_list(PARAM, str, allow_empty=False)
         step = block.config_as_list(STEP, int)
         number = block.config_as_list(ENSEMBLE, int)
-        basetime = block.config_as_datetime(BASETIME)
-
         for dim, config in [(PARAM, param), (STEP, step), (ENSEMBLE, number)]:
             if not contains(ifs_qoutput, {dim: config}):
                 return Either.error(f"Invalid config for {dim}: must be one of {axes(ifs_qoutput)[dim]}")
 
-        if basetime.time().hour not in [0, 6, 12, 18]:
-            return Either.error(f"Invalid time: base time must be in (00, 06, 12, 18)")
         select_dims: dict[str, Any] = {
             PARAM: param,
             ENSEMBLE: number,
@@ -155,6 +158,7 @@ class EkdSource(Source):
             PARAM: param,
             ENSEMBLE: number,
             STEP: step,
+            "time": basetime.time().hour,
         }
         subqube = fc_qube.select(select_dims)
         actions = {}
