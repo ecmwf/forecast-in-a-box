@@ -202,7 +202,7 @@ def test_status_execute_and_stop_use_existing_control_socket(
                 "-o",
                 "ConnectTimeout=10",
                 "user@fiabServer",
-                "nohup uv run python -m cascade.gateway --port 22001 >/dev/null 2>&1 < /dev/null &",
+                "nohup bash --login -c 'uv run python -m cascade.gateway --port 22001' > /dev/null 2>&1 < /dev/null &",
             ],
             True,
             False,
