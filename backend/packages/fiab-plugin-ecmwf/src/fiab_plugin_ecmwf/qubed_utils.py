@@ -27,7 +27,7 @@ QubedOutput(dataqube=Qube(...), datatype='netcdf')
 
 import functools
 from collections.abc import Mapping
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from fiab_core.fable import QubedOutput
 from qubed import Qube
@@ -210,3 +210,22 @@ def contains(qube: QubedOutput, item: Qube | str | dict) -> bool:
         return key in current_axes and all(v in current_axes[key] for v in values)
 
     return all(_contains_axis_values(k, v) for k, v in dict_cast_to_list.items())
+
+
+def select(
+    qube: QubedOutput,
+    selection: Mapping[str, Any | Iterable[Any] | Callable[[Any], bool]],
+) -> QubedOutput:
+    """Return a new QubedOutput with the dataqube matching selection criteria
+
+    Usage
+    -----
+    >>> output = QubedOutput(dataqube=Qube.from_datacube({
+    ...     'param': ['2t', 'tp'],
+    ...     'time': [0, 1, 2],
+    ... }))
+    >>> selection = select(output, {'param': '2t'})
+    >>> axes(selection)
+    {'param': {'2t'}, 'time': {0, 1, 2}}
+    """
+    return QubedOutput(dataqube=qube.dataqube.select(selection))

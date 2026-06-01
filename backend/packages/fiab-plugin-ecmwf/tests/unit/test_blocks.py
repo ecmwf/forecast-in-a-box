@@ -8,11 +8,12 @@
 # nor does it submit to any jurisdiction.
 
 
-from datetime import date
+from datetime import datetime
 from unittest.mock import MagicMock
 
 import pytest
 from earthkit.workflows.fluent import Action
+from earthkit.workflows.nodetree import nodetree_arrays, nodetree_dimensions
 from fiab_core.fable import (
     BlockFactoryId,
     BlockInstanceId,
@@ -83,11 +84,12 @@ def dummy_blockinstance() -> BlockInstance:
             configuration_values=_config(
                 {
                     "source": "ecmwf-open-data",
-                    "date": date(2024, 1, 1),
+                    "base_time": datetime(2024, 1, 1),
+                    "forecast": "ifs-ens",
                     "expver": "1",
-                    "param": ["2t", "msl"],
+                    "param": ["2t", "msl", "z"],
                     "step": [0, 6, 12],
-                    "number": [1, 2, 3, 4, 5],
+                    "number": [0, 1, 2, 3, 4],
                 }
             ),
         ),
@@ -109,7 +111,7 @@ def ekdsource_configuration() -> BlockInstance:
             configuration_values=_config(
                 {
                     "source": "ecmwf-open-data",
-                    "date": date(2024, 1, 1),
+                    "base_time": datetime(2024, 1, 1),
                     "expver": "1",
                     "step": [0, 6, 12],
                     "number": [1, 2, 3, 4, 5],
@@ -274,10 +276,51 @@ class TestEkdSource:
         assert isinstance(output, QubedOutput)
         assert output.dataqube is not None
         assert contains(output, "param")
+        action = block.compile({}, BlockInstanceId("ekdsource"), dummy_blockinstance).get_or_raise()
+        for _, array in nodetree_arrays(action.nodes):
+            assert array.sizes[STEP] == 3
+            assert array.sizes[ENSEMBLE] == 5
+        assert "levelist" in nodetree_dimensions(action.nodes)
+
+    @pytest.mark.parametrize(
+        "config, error",
+        [
+            [{"param": ["unknown"]}, "Invalid config for param"],
+            [{"step": [0, 6, 400]}, "Invalid config for step"],
+            [{"number": [0, 50, 100]}, "Invalid config for number"],
+            [{"base_time": datetime(2024, 1, 1, 9)}, "Invalid time"],
+            [{"base_time": datetime(2024, 1, 1, 6), "step": [150]}, "Invalid config for step"],
+        ],
+    )
+    def test_validate(self, config: dict, error: str) -> None:
+        block = EkdSource()
+        block_instance = BlockInstance.from_block(
+            BlockInstanceBase(
+                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="EkdSource"),  # type: ignore
+                input_ids={},
+                configuration_values=_config(
+                    dict(
+                        {
+                            "source": "ecmwf-open-data",
+                            "base_time": datetime(2024, 1, 1),
+                            "expver": "1",
+                            "step": [0, 6, 12],
+                            "number": [1, 2, 3, 4, 5],
+                            "param": ["2t", "msl"],
+                            "forecast": "ifs-ens",
+                        },
+                        **config,
+                    )
+                ),
+            ),
+            EkdSource.configuration_options,
+        )
+        with pytest.raises(Exception, match=error):
+            block.validate(block=block_instance, inputs={}).get_or_raise()  # type: ignore[assignment]
 
     def test_catalogue_value_types_are_canonical(self) -> None:
         assert EkdSource.configuration_options[ConfigurationOptionId("source")].value_type == "enumClosed['mars', 'ecmwf-open-data']"
-        assert EkdSource.configuration_options[ConfigurationOptionId("date")].value_type == "date"
+        assert EkdSource.configuration_options[ConfigurationOptionId("base_time")].value_type == "datetime"
 
 
 class TestEnsembleStatistics:
@@ -509,7 +552,7 @@ class TestSelectParameters:
     def test_expander_adds_parameters_restrictions(self, ekdsource_output: QubedOutput) -> None:
         expansions = plugin().expander(ekdsource_output)
         select_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("selectParameters"))
-        assert select_expansion.restrictions[PARAM].serialize() == "list[enumClosed[2t,msl]]"
+        assert select_expansion.restrictions[PARAM].serialize() == "list[enumClosed[2t,msl,z]]"
 
     def test_expander_skips_restriction_for_non_string_axes(self) -> None:
         output = QubedOutput(dataqube=Qube.from_datacube({"param": [1, 2]}))
@@ -643,7 +686,7 @@ class TestSelectMembers:
     def test_expander_adds_member_restrictions(self, ekdsource_output: QubedOutput) -> None:
         expansions = plugin().expander(ekdsource_output)
         select_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("selectMembers"))
-        assert select_expansion.restrictions[ENSEMBLE].serialize() == "list[enumClosed[1,2,3,4,5]]"
+        assert select_expansion.restrictions[ENSEMBLE].serialize() == "list[enumClosed[0,1,2,3,4]]"
 
     def test_expander_skips_restriction_for_non_int_axes(self) -> None:
         output = QubedOutput(dataqube=Qube.from_datacube({ENSEMBLE: ["1", "2"]}))
@@ -763,8 +806,8 @@ class TestGribSink:
         "filepath, dims",
         [
             ["/path/to/output.grib", {}],
-            ["/path/to/[param].grib", {"param": 2}],
-            ["/path/to/[param]_[shortName]_[step].grib", {"param": 2, "step": 3}],
+            ["/path/to/[param].grib", {"param": 3}],
+            ["/path/to/[param]_[shortName]_[step].grib", {"param": 3, "step": 3}],
             ["/path/to/[stepRange]_[number]_[non_dim].grib", {"step": 3, "number": 5}],
         ],
     )
@@ -806,7 +849,7 @@ class TestMapPlotSink:
     def test_expander_adds_parameters_restrictions(self, ekdsource_output: QubedOutput) -> None:
         expansions = plugin().expander(ekdsource_output)
         map_plot_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("mapPlotSink"))
-        assert map_plot_expansion.restrictions[PARAM].serialize() == "list[enumClosed[2t,msl]]"
+        assert map_plot_expansion.restrictions[PARAM].serialize() == "list[enumClosed[2t,msl,z]]"
 
     def test_expander_skips_restriction_for_non_string_axes(self) -> None:
         output = QubedOutput(dataqube=Qube.from_datacube({"param": [1, 2]}))
