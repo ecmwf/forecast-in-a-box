@@ -178,6 +178,6 @@ jobs:
         working-directory: cli
     steps:
       - uses: actions/checkout@v6
-      - uses: moonrepo/setup-rust@v1
+      # - uses: moonrepo/setup-rust@v1 # `cargo` should be set up on the runner, including this causes a issue in the Post step
       - name: Cargo tests
         run: cargo test # TODO we actually have no tests, neither unit nor integration!
