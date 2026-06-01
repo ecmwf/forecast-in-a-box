@@ -4,15 +4,15 @@ services:
     restart: unless-stopped
     container_name: forecast-in-a-box
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: deployment/ewc/Dockerfile
     volumes:
       - data:/app/data_dir
       - ~/fiab:/root/.fiab
     ports:
       - "8000:8000"
     environment:
-      fiab__API__DATA_PATH: "/app/data_dir/"
+      fiab__BACKEND__DATA_PATH: "/app/data_dir/"
       fiab__AUTH__PUBLIC_URL: ???
 
       ECMWF_API_URL: "https://api.ecmwf.int/v1"

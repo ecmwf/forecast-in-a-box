@@ -52,7 +52,7 @@ WORKDIR /app/backend/forecastbox
 RUN --mount=type=cache,mode=0755,target=/root/.cache/uv bash /app/backend/install.sh
 
 # Copy entrypoint script
-COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY deployment/ewc/docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
 ENV PATH="/app/.venv/bin/:$PATH"
