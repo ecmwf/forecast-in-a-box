@@ -45,7 +45,6 @@ jobs:
               popd
           done
           rm -rf packagesDist/fiab_mcp_server* # lets not be releasing this one just yet
-          rm -rf packagesDist/fiab_plugin_test* # not to be released
           twine check ./packagesDist/*
 
           # upload

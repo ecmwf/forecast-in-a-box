@@ -3,4 +3,4 @@ val:
     uv run pytest
 
 build:
-    echo "automated publishes not assumed for test plugin"
+    python -m build --installer uv .

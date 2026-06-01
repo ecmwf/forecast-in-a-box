@@ -1,6 +1,10 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+
+requires = [ "setuptools>=80", "setuptools-scm[toml]>=6.2" ]
+
 [project]
 name = "fiab-plugin-test"
-version = "0.1.0"
 description = "Weather Forecast in a Box, test plugin"
 readme = "README.md"
 license = "Apache-2.0"
@@ -9,6 +13,9 @@ authors = [
   { name = "European Centre for Medium-Range Weather Forecasts (ECMWF)", email = "software.support@ecmwf.int" },
 ]
 requires-python = ">=3.11"
+
+dynamic = [ "version" ]
+
 dependencies = [
     "fiab-core>=0.0.1,<1.0.0", # ~=0.0
 ]
@@ -18,11 +25,15 @@ dev = [
   "ty==0.0.2",
 ]
 
-
-[build-system]
-requires = ["uv_build>=0.10.6,<0.11.0"]
-build-backend = "uv_build"
-
+[tool.setuptools_scm]
+version_file = "src/fiab_plugin_test/_version.py"
+write_to_template = '''# Do not change! Do not track in version control!
+__version__ = "{version}"
+'''
+local_scheme = "no-local-version"
+root = ".."
+fallback_version = "0.0.0"
+tag_regex = '^[vd](?P<version>\d+(?:\.\d+){0,2}[^\+]*)(?:\+.*)?$'
 
 [tool.ruff]
 line-length = 140
