@@ -5,17 +5,15 @@ services:
     restart: unless-stopped
     container_name: forecast-in-a-box
     build:
-      context: .
-      dockerfile: DockerfileMARSRocky
-    # image: eccr.ecmwf.int/forecast-in-a-box/forecast-in-a-box
+      context: ../..
+      dockerfile: deployment/ewc/DockerfileMARSROCKY
     volumes:
       - data:/app/data_dir
       - ~/fiab:/root/.fiab
     ports:
       - "8000:8000"
     environment:
-      fiab__API__DATA_PATH: "/app/data_dir/"
-      fiab__API__MODEL_REPOSITORY: https://sites.ecmwf.int/repository/fiab/
+      fiab__BACKEND__DATA_PATH: "/app/data_dir/"
 
       fiab__AUTH__PUBLIC_URL: ???
 
@@ -24,7 +22,8 @@ services:
       ECMWF_API_EMAIL: ${ECMWF_API_EMAIL}
 
       FIAB_INSTALL_TYPE: all
-      fiab__CASCADE__CASCADE_URL: "tcp://cascade:8067"
+      fiab__CASCADE__GATEWAY__GATEWAY_TYPE: "unmanaged"
+      fiab__CASCADE__GATEWAY__CASCADE_URL: "tcp://cascade:8067"
     networks:
       - network
 

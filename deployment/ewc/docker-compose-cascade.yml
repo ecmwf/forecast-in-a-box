@@ -4,7 +4,8 @@ name: FIAB
 services:
   forecast-in-a-box:
     environment:
-      fiab__CASCADE__CASCADE_URL: "tcp://cascade:8067"
+      fiab__CASCADE__GATEWAY__GATEWAY_TYPE: "unmanaged"
+      fiab__CASCADE__GATEWAY__CASCADE_URL: "tcp://cascade:8067"
 
   cascade:
     restart: unless-stopped
