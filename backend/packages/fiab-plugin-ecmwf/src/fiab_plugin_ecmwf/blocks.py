@@ -479,7 +479,7 @@ class MapPlotSink(Sink):
             title="Parameters",
             description="Parameters to select and plot (e.g. '2t', 'msl')",
             value_type="list[str]",
-            default_value="2t",
+            default_value="2t,msl",
         ),
         DOMAIN: BlockConfigurationOption(
             title="Domain",
@@ -497,7 +497,7 @@ class MapPlotSink(Sink):
             title="Group By",
             description="Dimension to create subplots over",
             value_type="enumClosed['valid_datetime', 'step', 'number', 'none']",
-            default_value="none",
+            default_value="step",
         ),
         SPLITBY: BlockConfigurationOption(
             title="Split By",
