@@ -31,7 +31,6 @@ from typing import Any, Callable, Iterable
 
 from fiab_core.fable import QubedOutput
 from qubed import Qube
-from qubed.selection import select as qselect
 
 
 def collapse(qube: QubedOutput, axis: str | list[str]) -> QubedOutput:
@@ -229,4 +228,4 @@ def select(
     >>> axes(selection)
     {'param': {'2t'}, 'time': {0, 1, 2}}
     """
-    return QubedOutput(dataqube=qselect(qube.dataqube, selection))
+    return QubedOutput(dataqube=qube.dataqube.select(selection))
