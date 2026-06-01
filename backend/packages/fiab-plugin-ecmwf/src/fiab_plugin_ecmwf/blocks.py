@@ -479,27 +479,31 @@ class MapPlotSink(Sink):
             title="Parameters",
             description="Parameters to select and plot (e.g. '2t', 'msl')",
             value_type="list[str]",
+            default_value="2t,msl",
         ),
         DOMAIN: BlockConfigurationOption(
             title="Domain",
             description="Geographic domain: global, europe, or a named region",
             value_type="str",
+            default_value="global",
         ),
         FORMAT: BlockConfigurationOption(
             title="Format",
             description="Output image format",
             value_type="enumClosed['png', 'pdf', 'svg']",
+            default_value="png",
         ),
         GROUPBY: BlockConfigurationOption(
             title="Group By",
             description="Dimension to create subplots over",
             value_type="enumClosed['valid_datetime', 'step', 'number', 'none']",
-            default_value="none",
+            default_value="step",
         ),
         SPLITBY: BlockConfigurationOption(
             title="Split By",
             description="Dimensions to separate plots by",
             value_type="list[str]",
+            default_value="none",
         ),
         # ConfigurationOptionId("style_schema"): BlockConfigurationOption(
         #     title="Style Schema",
