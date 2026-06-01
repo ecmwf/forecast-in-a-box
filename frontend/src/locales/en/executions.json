@@ -161,8 +161,6 @@
       "nextPage": "Next page",
       "previousOutput": "Previous output",
       "nextOutput": "Next output",
-      "playAutoplay": "Auto-cycle outputs",
-      "pauseAutoplay": "Pause auto-cycle",
       "pageOfTotal": "{{page}} / {{total}}",
       "pdfPageCount_one": "{{count}} page",
       "pdfPageCount_other": "{{count}} pages"

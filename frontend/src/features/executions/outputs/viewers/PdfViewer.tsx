@@ -13,8 +13,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  Pause,
-  Play,
   SkipBack,
   SkipForward,
   X,
@@ -43,8 +41,6 @@ export default function PdfViewer({
   onPrev,
   onNext,
   navIndex,
-  isPlaying,
-  onTogglePlay,
 }: ViewerProps) {
   const { t } = useTranslation('executions')
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
@@ -204,24 +200,6 @@ export default function PdfViewer({
               <kbd className={kbdBadge}>→</kbd>
               <SkipForward className="h-4 w-4" />
             </button>
-            {onTogglePlay && (
-              <button
-                type="button"
-                aria-label={
-                  isPlaying
-                    ? t('outputs.viewer.pauseAutoplay')
-                    : t('outputs.viewer.playAutoplay')
-                }
-                className={cn(viewerHeaderBtn, 'pointer-events-auto ml-1')}
-                onClick={onTogglePlay}
-              >
-                {isPlaying ? (
-                  <Pause className="h-4 w-4" />
-                ) : (
-                  <Play className="h-4 w-4" />
-                )}
-              </button>
-            )}
           </div>
         )}
         <div className="ml-auto flex items-center gap-1">

@@ -12,7 +12,7 @@
  * items, and a lazy viewer for the active selection. */
 
 import { Package } from 'lucide-react'
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { useHotkey } from '@tanstack/react-hotkeys'
@@ -44,9 +44,6 @@ import {
 
 // Side-effect: adapter registration runs at module load. Idempotent.
 registerFirstPartyAdapters()
-
-/** Delay between auto-cycle steps in the viewer. */
-const AUTOPLAY_INTERVAL_MS = 2000
 
 // Single source of truth for the group-by enum: derive the type from the array
 // so adding an option only requires touching this list and the i18n key map.
@@ -84,7 +81,6 @@ export function OutputsView({
     item: OutputItem
     adapter: OutputAdapter
   } | null>(null)
-  const [isPlaying, setIsPlaying] = useState(false)
 
   /** Default order: by block (alphabetic), available before pending within
    * the same block, taskId for stable tiebreak. Keeps items from the same
@@ -337,8 +333,6 @@ export function OutputsView({
           visibleItems={visibleItems}
           effectiveMime={effectiveMime}
           setActiveViewer={setActiveViewer}
-          isPlaying={isPlaying}
-          setIsPlaying={setIsPlaying}
         />
       )}
     </Card>
@@ -353,19 +347,15 @@ interface ActiveViewerHostProps {
   setActiveViewer: (
     next: { item: OutputItem; adapter: OutputAdapter } | null,
   ) => void
-  isPlaying: boolean
-  setIsPlaying: (next: boolean) => void
 }
 
-/** Wires prev/next/autoplay/hotkeys; mounts only while a viewer is open. */
+/** Wires prev/next/hotkeys; mounts only while a viewer is open. */
 function ActiveViewerHost({
   ActiveViewer,
   activeViewer,
   visibleItems,
   effectiveMime,
   setActiveViewer,
-  isPlaying,
-  setIsPlaying,
 }: ActiveViewerHostProps) {
   const activeIndex = visibleItems.findIndex(
     (it) => it.taskId === activeViewer.item.taskId,
@@ -398,17 +388,6 @@ function ActiveViewerHost({
   useHotkey('ArrowRight', goNext, { enabled: !!nextItem, ignoreInputs: true })
   useHotkey('J', goNext, { enabled: !!nextItem, ignoreInputs: true })
 
-  // Re-arms on each item; auto-stops at the last item.
-  useEffect(() => {
-    if (!isPlaying) return
-    if (!nextItem) {
-      setIsPlaying(false)
-      return
-    }
-    const timerId = setTimeout(() => stepTo(nextItem), AUTOPLAY_INTERVAL_MS)
-    return () => clearTimeout(timerId)
-  }, [isPlaying, nextItem, stepTo, setIsPlaying])
-
   return (
     <Suspense fallback={null}>
       <ActiveViewer
@@ -417,7 +396,6 @@ function ActiveViewerHost({
         item={activeViewer.item}
         adapter={activeViewer.adapter}
         onClose={() => {
-          setIsPlaying(false)
           setActiveViewer(null)
         }}
         onPrev={prevItem ? goPrev : undefined}
@@ -427,8 +405,6 @@ function ActiveViewerHost({
             ? { current: activeIndex + 1, total: visibleItems.length }
             : undefined
         }
-        isPlaying={isPlaying}
-        onTogglePlay={nextItem ? () => setIsPlaying(!isPlaying) : undefined}
       />
     </Suspense>
   )

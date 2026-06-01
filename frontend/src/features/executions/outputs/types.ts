@@ -72,9 +72,6 @@ export interface ViewerProps {
   onNext?: () => void
   /** 1-based position for the header indicator. */
   navIndex?: { current: number; total: number }
-  /** Auto-cycle through the visible list; undefined at the last item. */
-  isPlaying?: boolean
-  onTogglePlay?: () => void
 }
 
 export interface OutputAdapter {
