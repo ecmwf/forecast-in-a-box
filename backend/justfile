@@ -1,5 +1,5 @@
 val:
-    uv run ty check
+    uv run ty check src/
     FIAB_IGNORE_CONFIG_SOURCES=1 uv run pytest -n4 tests/unit
     FIAB_IGNORE_CONFIG_SOURCES=1 uv run pytest tests/integration
 

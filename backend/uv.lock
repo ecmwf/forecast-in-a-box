@@ -1623,7 +1623,6 @@ dev = [{ name = "ty", specifier = "==0.0.2" }]
 
 [[package]]
 name = "fiab-plugin-test"
-version = "0.1.0"
 source = { editable = "packages/fiab-plugin-test" }
 dependencies = [
     { name = "fiab-core", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
