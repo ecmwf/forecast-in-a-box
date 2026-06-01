@@ -48,7 +48,6 @@
     "diskSize": "Disk Size",
     "author": "Author",
     "url": "URL",
-    "timestep": "Timestep: {{value}}",
     "pipConstraints": "Pip Package Constraints",
     "inputStructure": "Input Structure",
     "outputStructure": "Output Structure",

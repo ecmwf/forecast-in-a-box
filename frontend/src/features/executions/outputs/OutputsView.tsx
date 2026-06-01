@@ -15,6 +15,7 @@ import { Package } from 'lucide-react'
 import { Suspense, useCallback, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
+import { useHotkey } from '@tanstack/react-hotkeys'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { registerFirstPartyAdapters } from './adapters'
 import { MimeFilterChips } from './MimeFilterChips'
@@ -326,15 +327,86 @@ export function OutputsView({
       </div>
 
       {ActiveViewer && activeViewer && (
-        <Suspense fallback={null}>
-          <ActiveViewer
-            item={activeViewer.item}
-            adapter={activeViewer.adapter}
-            onClose={() => setActiveViewer(null)}
-          />
-        </Suspense>
+        <ActiveViewerHost
+          ActiveViewer={ActiveViewer}
+          activeViewer={activeViewer}
+          visibleItems={visibleItems}
+          effectiveMime={effectiveMime}
+          setActiveViewer={setActiveViewer}
+        />
       )}
     </Card>
+  )
+}
+
+interface ActiveViewerHostProps {
+  ActiveViewer: NonNullable<OutputAdapter['Viewer']>
+  activeViewer: { item: OutputItem; adapter: OutputAdapter }
+  visibleItems: ReadonlyArray<OutputItem>
+  effectiveMime: (item: OutputItem) => string
+  setActiveViewer: (
+    next: { item: OutputItem; adapter: OutputAdapter } | null,
+  ) => void
+}
+
+/** Wires prev/next/hotkeys; mounts only while a viewer is open. */
+function ActiveViewerHost({
+  ActiveViewer,
+  activeViewer,
+  visibleItems,
+  effectiveMime,
+  setActiveViewer,
+}: ActiveViewerHostProps) {
+  const activeIndex = visibleItems.findIndex(
+    (it) => it.taskId === activeViewer.item.taskId,
+  )
+  const prevItem = activeIndex > 0 ? visibleItems[activeIndex - 1] : null
+  const nextItem =
+    activeIndex >= 0 && activeIndex < visibleItems.length - 1
+      ? visibleItems[activeIndex + 1]
+      : null
+
+  const stepTo = useCallback(
+    (item: OutputItem) =>
+      setActiveViewer({
+        item,
+        adapter: resolveAdapter(effectiveMime(item)),
+      }),
+    [setActiveViewer, effectiveMime],
+  )
+
+  const goPrev = useCallback(() => {
+    if (prevItem) stepTo(prevItem)
+  }, [prevItem, stepTo])
+  const goNext = useCallback(() => {
+    if (nextItem) stepTo(nextItem)
+  }, [nextItem, stepTo])
+
+  // Arrow + vi-style output nav (PDF page nav stays on header buttons).
+  useHotkey('ArrowLeft', goPrev, { enabled: !!prevItem, ignoreInputs: true })
+  useHotkey('K', goPrev, { enabled: !!prevItem, ignoreInputs: true })
+  useHotkey('ArrowRight', goNext, { enabled: !!nextItem, ignoreInputs: true })
+  useHotkey('J', goNext, { enabled: !!nextItem, ignoreInputs: true })
+
+  return (
+    <Suspense fallback={null}>
+      <ActiveViewer
+        // Fresh mount per item resets pan/zoom/page.
+        key={activeViewer.item.taskId}
+        item={activeViewer.item}
+        adapter={activeViewer.adapter}
+        onClose={() => {
+          setActiveViewer(null)
+        }}
+        onPrev={prevItem ? goPrev : undefined}
+        onNext={nextItem ? goNext : undefined}
+        navIndex={
+          activeIndex >= 0
+            ? { current: activeIndex + 1, total: visibleItems.length }
+            : undefined
+        }
+      />
+    </Suspense>
   )
 }
 

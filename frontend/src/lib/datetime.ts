@@ -152,6 +152,14 @@ export function todayInZone(
   return formatInZone(instant, timeZone, 'yyyy-MM-dd')
 }
 
+/** Calendar date (`YYYY-MM-DD`) of the day before `instant` in `timeZone`. */
+export function yesterdayInZone(
+  timeZone: string,
+  instant: Date = new Date(),
+): string {
+  return todayInZone(timeZone, new Date(instant.getTime() - 86_400_000))
+}
+
 // ── Formatting ───────────────────────────────────────────────────────────
 
 /**

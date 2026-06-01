@@ -8,6 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
+import { useRef, useState } from 'react'
 import { ChevronDown, Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { EnvironmentSpecification } from '@/api/types/job.types'
@@ -26,13 +27,37 @@ interface EnvironmentConfigProps {
   onChange: (env: EnvironmentSpecification) => void
 }
 
+interface EnvRow {
+  id: string
+  key: string
+  value: string
+}
+
 export function EnvironmentConfig({
   environment,
   onChange,
 }: EnvironmentConfigProps) {
   const { t } = useTranslation('executions')
 
-  const envEntries = Object.entries(environment.environment_variables)
+  // Edit as stable-id rows: keying by the editable name would remount the
+  // input on rename and drop focus. Object is derived from rows on each change.
+  const idCounter = useRef(0)
+  const [rows, setRows] = useState<Array<EnvRow>>(() =>
+    Object.entries(environment.environment_variables).map(([key, value]) => ({
+      id: `env-${idCounter.current++}`,
+      key,
+      value,
+    })),
+  )
+
+  function commitRows(nextRows: Array<EnvRow>) {
+    setRows(nextRows)
+    const vars: Record<string, string> = {}
+    for (const row of nextRows) {
+      if (row.key) vars[row.key] = row.value
+    }
+    onChange({ ...environment, environment_variables: vars })
+  }
 
   function handleHostsChange(value: string) {
     onChange({
@@ -48,38 +73,23 @@ export function EnvironmentConfig({
     })
   }
 
-  function handleEnvKeyChange(oldKey: string, newKey: string) {
-    const newVars = { ...environment.environment_variables }
-    const value = newVars[oldKey] ?? ''
-    delete newVars[oldKey]
-    newVars[newKey] = value
-    onChange({ ...environment, environment_variables: newVars })
+  function handleEnvKeyChange(id: string, key: string) {
+    commitRows(rows.map((row) => (row.id === id ? { ...row, key } : row)))
   }
 
-  function handleEnvValueChange(key: string, value: string) {
-    onChange({
-      ...environment,
-      environment_variables: {
-        ...environment.environment_variables,
-        [key]: value,
-      },
-    })
+  function handleEnvValueChange(id: string, value: string) {
+    commitRows(rows.map((row) => (row.id === id ? { ...row, value } : row)))
   }
 
-  function handleRemoveEnvVar(key: string) {
-    const newVars = { ...environment.environment_variables }
-    delete newVars[key]
-    onChange({ ...environment, environment_variables: newVars })
+  function handleRemoveEnvVar(id: string) {
+    commitRows(rows.filter((row) => row.id !== id))
   }
 
   function handleAddEnvVar() {
-    onChange({
-      ...environment,
-      environment_variables: {
-        ...environment.environment_variables,
-        '': '',
-      },
-    })
+    commitRows([
+      ...rows,
+      { id: `env-${idCounter.current++}`, key: '', value: '' },
+    ])
   }
 
   return (
@@ -114,24 +124,24 @@ export function EnvironmentConfig({
 
           <div className="flex flex-col gap-2">
             <Label>{t('submit.envVariables')}</Label>
-            {envEntries.map(([key, value]) => (
-              <div key={key} className="flex items-center gap-2">
+            {rows.map((row) => (
+              <div key={row.id} className="flex items-center gap-2">
                 <Input
                   placeholder={t('submit.envKeyPlaceholder')}
-                  value={key}
-                  onChange={(e) => handleEnvKeyChange(key, e.target.value)}
+                  value={row.key}
+                  onChange={(e) => handleEnvKeyChange(row.id, e.target.value)}
                   className="flex-1"
                 />
                 <Input
                   placeholder={t('submit.envValuePlaceholder')}
-                  value={value}
-                  onChange={(e) => handleEnvValueChange(key, e.target.value)}
+                  value={row.value}
+                  onChange={(e) => handleEnvValueChange(row.id, e.target.value)}
                   className="flex-1"
                 />
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => handleRemoveEnvVar(key)}
+                  onClick={() => handleRemoveEnvVar(row.id)}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

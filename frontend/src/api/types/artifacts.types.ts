@@ -103,7 +103,6 @@ export const MlModelDetailSchema = MlModelOverviewSchema.extend({
   input_qube: QubeNodeSchema,
   output_qube: QubeNodeSchema,
   input_characteristics: z.array(z.string()),
-  timestep: z.string().optional(),
 })
 
 export type MlModelDetail = z.infer<typeof MlModelDetailSchema>

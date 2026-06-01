@@ -17,7 +17,6 @@
 
 import {
   ArrowLeft,
-  Clock,
   Download,
   ExternalLink,
   HardDrive,
@@ -99,12 +98,6 @@ export function ArtifactDetailPage({
                 {platform}
               </span>
             ))}
-            {detail.timestep ? (
-              <span className="inline-flex items-center gap-1.5 rounded bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground">
-                <Clock className="h-3.5 w-3.5" />
-                {t('detail.timestep', { value: detail.timestep })}
-              </span>
-            ) : null}
             <span
               className={
                 detail.is_locally_compatible

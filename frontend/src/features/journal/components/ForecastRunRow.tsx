@@ -169,6 +169,7 @@ export const ForecastRunRow = memo(function ({
           <FableMiniFlow
             builder={blueprint.builder}
             className="max-w-[18rem] shrink-0"
+            monochrome
           />
         )}
 

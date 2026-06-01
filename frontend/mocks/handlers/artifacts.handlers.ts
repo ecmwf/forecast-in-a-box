@@ -239,7 +239,6 @@ const mockModels: Array<MlModelDetail> = [
       'base_time',
       'anemoi_kwargs',
     ],
-    timestep: '6h',
   },
   {
     composite_id: {
@@ -278,7 +277,6 @@ const mockModels: Array<MlModelDetail> = [
       'base_time',
       'anemoi_kwargs',
     ],
-    timestep: '6h',
   },
   {
     composite_id: {
@@ -317,7 +315,6 @@ const mockModels: Array<MlModelDetail> = [
       'ensemble_number',
       'anemoi_kwargs',
     ],
-    timestep: '6h',
   },
   {
     composite_id: {
@@ -408,7 +405,6 @@ export const artifactsHandlers = [
         input_qube,
         output_qube,
         input_characteristics,
-        timestep,
         ...overview
       }) => overview,
     )
@@ -482,7 +478,7 @@ export const artifactsHandlers = [
 
     return HttpResponse.json({
       status: 'download in progress',
-      composite_id: body,
+      composite_id: compositeIdStr(body),
       progress,
     })
   }),
@@ -503,7 +499,7 @@ export const artifactsHandlers = [
 
     return HttpResponse.json({
       status: 'deleted',
-      composite_id: body,
+      composite_id: compositeIdStr(body),
     })
   }),
 ]

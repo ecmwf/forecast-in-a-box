@@ -20,6 +20,7 @@ function matchesFacet(
   run: ForecastRunViewModel,
   key: FacetKey,
   value: string,
+  displayDateFor: (run: ForecastRunViewModel) => string,
 ): boolean {
   const needle = value.toLowerCase()
   if (key === 'model') {
@@ -29,18 +30,21 @@ function matchesFacet(
     return run.outputKinds.some((kind) => kind.toLowerCase().includes(needle))
   }
   if (key === 'date') {
-    // Naive-ISO YYYY-MM-DD prefix; matches the displayed date for users in
-    // zones near the server (corner case at the local midnight boundary).
-    return run.createdAt.slice(0, 10).includes(needle)
+    // App-TZ rendered date — raw UTC prefix would diverge for non-UTC clients.
+    return displayDateFor(run).includes(needle)
   }
   return run.tags.some((tag) => tag.toLowerCase().includes(needle))
 }
 
-/** Apply the status/bookmark tab filter plus a faceted query to a run list. */
+/** Apply the status/bookmark tab filter plus a faceted query.
+ * `displayDateFor` must match the row's rendered date; defaults to the
+ * raw server prefix for tests. */
 export function filterRuns(
   runs: ReadonlyArray<ForecastRunViewModel>,
   filter: RunFilter,
   query: ParsedQuery,
+  displayDateFor: (run: ForecastRunViewModel) => string = (run) =>
+    run.createdAt.slice(0, 10),
 ): Array<ForecastRunViewModel> {
   const byTab = runs.filter((run) => {
     if (filter === 'all') return true
@@ -50,7 +54,8 @@ export function filterRuns(
 
   return applyFacetQuery(byTab, query, {
     supportedKeys: ['model', 'output', 'tag', 'date'],
-    matchFacet: matchesFacet,
+    matchFacet: (run, key, value) =>
+      matchesFacet(run, key, value, displayDateFor),
     matchText: (run, text) =>
       run.displayName.toLowerCase().includes(text) ||
       (run.displayDescription?.toLowerCase().includes(text) ?? false) ||
@@ -58,6 +63,6 @@ export function filterRuns(
       (run.modelLabel?.toLowerCase().includes(text) ?? false) ||
       run.tags.some((tag) => tag.toLowerCase().includes(text)) ||
       // Plain `2026-05-22` matches without the `date:` prefix too.
-      run.createdAt.slice(0, 10).includes(text),
+      displayDateFor(run).includes(text),
   })
 }

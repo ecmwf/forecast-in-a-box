@@ -9,13 +9,22 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Download, Maximize2, X, ZoomIn, ZoomOut } from 'lucide-react'
+import {
+  Download,
+  Maximize2,
+  SkipBack,
+  SkipForward,
+  X,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { downloadAction } from '../actions/download'
 import { useJobResultBlob } from '../useJobResult'
-import { viewerHeaderBtn } from './viewerHeaderBtn'
+import { kbdBadge, viewerHeaderBtn } from './viewerHeaderBtn'
 import type { ViewerProps } from '../types'
 import { showToast } from '@/lib/toast'
+import { cn } from '@/lib/utils'
 
 const MIN_SCALE = 0.25
 const MAX_SCALE = 32
@@ -32,7 +41,14 @@ interface Marquee {
   end: Point
 }
 
-export default function ImageViewer({ item, adapter, onClose }: ViewerProps) {
+export default function ImageViewer({
+  item,
+  adapter,
+  onClose,
+  onPrev,
+  onNext,
+  navIndex,
+}: ViewerProps) {
   const { t } = useTranslation('executions')
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
   const [scale, setScale] = useState(1)
@@ -195,108 +211,145 @@ export default function ImageViewer({ item, adapter, onClose }: ViewerProps) {
       role="dialog"
       aria-modal="true"
       className="fixed inset-0 z-50 flex flex-col bg-black/85"
-      onClick={onClose}
+      onClick={(e) => {
+        // Close on direct backdrop clicks; children stop propagation.
+        if (e.target === e.currentTarget) onClose()
+      }}
     >
-      <div
-        role="presentation"
-        className="flex h-full w-full flex-col"
+      <header
+        className="relative flex items-center gap-4 border-b border-white/10 px-4 py-2 text-white"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-center gap-4 border-b border-white/10 px-4 py-2 text-white">
-          <span className="truncate font-mono text-sm text-white/80">
-            {item.originalBlock}
-          </span>
-          <div className="ml-auto flex items-center gap-1">
+        <span className="truncate font-mono text-sm text-white/80">
+          {item.originalBlock}
+        </span>
+        {navIndex && (
+          <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center gap-1">
             <button
               type="button"
-              aria-label={t('outputs.viewer.zoomOut')}
-              className={viewerHeaderBtn}
-              onClick={zoomOut}
+              aria-label={t('outputs.viewer.previousOutput')}
+              className={cn(
+                viewerHeaderBtn,
+                'pointer-events-auto w-auto gap-1 px-1.5',
+              )}
+              onClick={onPrev}
+              disabled={!onPrev}
             >
-              <ZoomOut className="h-4 w-4" />
+              <SkipBack className="h-4 w-4" />
+              <kbd className={kbdBadge}>←</kbd>
             </button>
-            <span className="min-w-12 text-center font-mono text-xs tabular-nums">
-              {Math.round(scale * 100)}%
+            <span className="min-w-10 text-center font-mono text-xs tabular-nums">
+              {navIndex.current} / {navIndex.total}
             </span>
             <button
               type="button"
-              aria-label={t('outputs.viewer.zoomIn')}
-              className={viewerHeaderBtn}
-              onClick={zoomIn}
+              aria-label={t('outputs.viewer.nextOutput')}
+              className={cn(
+                viewerHeaderBtn,
+                'pointer-events-auto w-auto gap-1 px-1.5',
+              )}
+              onClick={onNext}
+              disabled={!onNext}
             >
-              <ZoomIn className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              aria-label={t('outputs.viewer.resetZoom')}
-              className={viewerHeaderBtn}
-              onClick={reset}
-            >
-              <Maximize2 className="h-4 w-4" />
+              <kbd className={kbdBadge}>→</kbd>
+              <SkipForward className="h-4 w-4" />
             </button>
           </div>
-          <div className="h-5 w-px bg-white/15" />
+        )}
+        <div className="ml-auto flex items-center gap-1">
           <button
             type="button"
-            aria-label={downloadAction.label(t)}
+            aria-label={t('outputs.viewer.zoomOut')}
             className={viewerHeaderBtn}
-            onClick={() =>
-              void downloadAction.run(item, { resolvedAdapter: adapter })
-            }
+            onClick={zoomOut}
           >
-            <Download className="h-4 w-4" />
+            <ZoomOut className="h-4 w-4" />
+          </button>
+          <span className="min-w-12 text-center font-mono text-xs tabular-nums">
+            {Math.round(scale * 100)}%
+          </span>
+          <button
+            type="button"
+            aria-label={t('outputs.viewer.zoomIn')}
+            className={viewerHeaderBtn}
+            onClick={zoomIn}
+          >
+            <ZoomIn className="h-4 w-4" />
           </button>
           <button
             type="button"
-            aria-label={t('outputs.viewer.close')}
+            aria-label={t('outputs.viewer.resetZoom')}
             className={viewerHeaderBtn}
-            onClick={onClose}
+            onClick={reset}
           >
-            <X className="h-4 w-4" />
+            <Maximize2 className="h-4 w-4" />
           </button>
-        </header>
-
-        <div
-          ref={stageRef}
-          className="relative flex-1 overflow-hidden"
-          onWheel={handleWheel}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
+        </div>
+        <div className="h-5 w-px bg-white/15" />
+        <button
+          type="button"
+          aria-label={downloadAction.label(t)}
+          className={viewerHeaderBtn}
+          onClick={() =>
+            void downloadAction.run(item, { resolvedAdapter: adapter })
+          }
         >
-          {blobUrl && (
-            <img
-              src={blobUrl}
-              alt={item.originalBlock}
-              draggable={false}
-              className="absolute top-1/2 left-1/2 max-h-[85vh] max-w-[85vw] origin-center object-contain select-none [image-rendering:pixelated]"
-              style={{
-                transform: `translate(-50%, -50%) translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-                cursor: marquee
-                  ? 'crosshair'
-                  : dragRef.current
-                    ? 'grabbing'
-                    : 'grab',
-              }}
-            />
-          )}
+          <Download className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          aria-label={t('outputs.viewer.close')}
+          className={viewerHeaderBtn}
+          onClick={onClose}
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </header>
 
-          {marqueeRect && (
-            <div
-              className="pointer-events-none absolute border-2 border-dashed border-white/90 bg-white/10"
-              style={{
-                left: marqueeRect.left,
-                top: marqueeRect.top,
-                width: marqueeRect.width,
-                height: marqueeRect.height,
-              }}
-            />
-          )}
+      <div
+        ref={stageRef}
+        className="relative flex-1 overflow-hidden"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose()
+        }}
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
+        {blobUrl && (
+          <img
+            src={blobUrl}
+            alt={item.originalBlock}
+            draggable={false}
+            onClick={(e) => e.stopPropagation()}
+            className="absolute top-1/2 left-1/2 max-h-[85vh] max-w-[85vw] origin-center object-contain select-none [image-rendering:pixelated]"
+            style={{
+              transform: `translate(-50%, -50%) translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+              cursor: marquee
+                ? 'crosshair'
+                : dragRef.current
+                  ? 'grabbing'
+                  : 'grab',
+            }}
+          />
+        )}
 
-          <div className="pointer-events-none absolute bottom-3 left-3 rounded bg-black/40 px-2 py-1 text-xs text-white/70">
-            {t('outputs.viewer.zoomHint')}
-          </div>
+        {marqueeRect && (
+          <div
+            className="pointer-events-none absolute border-2 border-dashed border-white/90 bg-white/10"
+            style={{
+              left: marqueeRect.left,
+              top: marqueeRect.top,
+              width: marqueeRect.width,
+              height: marqueeRect.height,
+            }}
+          />
+        )}
+
+        <div className="pointer-events-none absolute bottom-3 left-3 rounded bg-black/40 px-2 py-1 text-xs text-white/70">
+          {t('outputs.viewer.zoomHint')}
         </div>
       </div>
     </div>

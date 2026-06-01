@@ -13,7 +13,7 @@
  * schedule's runs rendered through the shared Forecast Journal.
  */
 
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import {
   ArrowLeft,
@@ -26,8 +26,9 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams } from '@tanstack/react-router'
-import type { RunFilter } from '@/features/journal/types'
+import type { ForecastRunViewModel, RunFilter } from '@/features/journal/types'
 import type { GroupBy } from '@/features/journal/grouping/group-runs'
+import { formatInZone } from '@/lib/datetime'
 import { showToast } from '@/lib/toast'
 import { useBlockCatalogue, useFableRetrieve } from '@/api/hooks/useFable'
 import {
@@ -147,10 +148,17 @@ export function ScheduleDetailPage() {
       isBookmarked: isBookmarked(run.run_id),
     }),
   )
+  // App-TZ date — keeps the facet aligned with the row in any client TZ.
+  const displayDateFor = useCallback(
+    (run: ForecastRunViewModel) =>
+      formatInZone(serverTimeToLocal(run.createdAt), timeZone, 'yyyy-MM-dd'),
+    [serverTimeToLocal, timeZone],
+  )
   const filteredRuns = filterRuns(
     runViewModels,
     runFilter,
     parseQuery(runQuery),
+    displayDateFor,
   )
   const totalRunPages = runsData?.total_pages ?? 1
 

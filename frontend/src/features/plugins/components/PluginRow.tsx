@@ -54,6 +54,7 @@ export function PluginRow({
 }: PluginRowProps) {
   const { t } = useTranslation('plugins')
 
+  // plugin.updatedAt is Z-suffixed UTC; don't route through serverTimeToLocal.
   const updatedTimeAgo = plugin.updatedAt
     ? formatDistanceToNow(new Date(plugin.updatedAt), { addSuffix: true })
     : null

@@ -10,10 +10,17 @@
 
 import type { FableBuilderV1 } from '@/api/types/fable.types'
 import type { PluginCompositeId } from '@/api/types/plugins.types'
-import { getAppTimeZone, todayInZone } from '@/lib/datetime'
+import { getAppTimeZone, todayInZone, yesterdayInZone } from '@/lib/datetime'
 import i18n from '@/lib/i18n'
 
-export type PresetId = 'quick-start' | 'standard' | 'custom-model' | 'dataset'
+export type PresetId =
+  | 'quick-start'
+  | 'standard'
+  | 'custom-model'
+  | 'dataset'
+  | 'ecmwf-open-data'
+  | 'aifs-forecast'
+  | 'aifs-dataset'
 
 export interface FablePreset {
   id: PresetId
@@ -34,6 +41,16 @@ function today(): string {
   return todayInZone(getAppTimeZone())
 }
 
+/** Yesterday's calendar date in the application timezone, evaluated per call. */
+function yesterday(): string {
+  return yesterdayInZone(getAppTimeZone())
+}
+
+/** Yesterday at 00:00:00 — anemoi base_time format (naive, treated as UTC). */
+function yesterdayBaseTime(): string {
+  return `${yesterday()}T00:00:00`
+}
+
 function quickStartPreset(): FablePreset {
   return {
     id: 'quick-start',
@@ -50,6 +67,9 @@ function quickStartPreset(): FablePreset {
             source: 'ecmwf-open-data',
             date: today(),
             expver: '0001',
+            param: '2t',
+            step: '0',
+            number: '1,2,3,4,5,6',
           },
           input_ids: {},
         },
@@ -59,7 +79,7 @@ function quickStartPreset(): FablePreset {
             factory: 'ensembleStatistics',
           },
           configuration_values: {
-            variable: '2t',
+            param: '2t',
             statistic: 'mean',
           },
           input_ids: {
@@ -99,6 +119,9 @@ function standardPreset(): FablePreset {
             source: 'mars',
             date: today(),
             expver: '0001',
+            param: '2t',
+            step: '0',
+            number: '0',
           },
           input_ids: {},
         },
@@ -134,8 +157,175 @@ function datasetPreset(): FablePreset {
             source: 'ecmwf-open-data',
             date: today(),
             expver: '0001',
+            param: '2t',
+            step: '0',
+            number: '0',
           },
           input_ids: {},
+        },
+      },
+    },
+  }
+}
+
+function ecmwfOpenDataPreset(): FablePreset {
+  return {
+    id: 'ecmwf-open-data',
+    name: i18n.t('configure:presets.ecmwfOpenDataName'),
+    description: i18n.t('configure:presets.ecmwfOpenDataDescription'),
+    fable: {
+      blocks: {
+        source_1: {
+          factory_id: {
+            plugin: pluginId('ecmwf', 'ecmwf-base'),
+            factory: 'ekdSource',
+          },
+          configuration_values: {
+            source: 'ecmwf-open-data',
+            date: yesterday(),
+            expver: '1',
+            param: '2t',
+            step: '24,48,72,360',
+            number: '1,2,3,4,5,6',
+          },
+          input_ids: {},
+        },
+        product_1: {
+          factory_id: {
+            plugin: pluginId('ecmwf', 'ecmwf-base'),
+            factory: 'ensembleStatistics',
+          },
+          configuration_values: {
+            param: '2t',
+            statistic: 'mean',
+          },
+          input_ids: {
+            dataset: 'source_1',
+          },
+        },
+        sink_1: {
+          factory_id: {
+            plugin: pluginId('ecmwf', 'ecmwf-base'),
+            factory: 'mapPlotSink',
+          },
+          configuration_values: {
+            param: '2t',
+            domain: 'global',
+            format: 'png',
+            groupby: 'none',
+            splitby: 'none',
+          },
+          input_ids: {
+            dataset: 'product_1',
+          },
+        },
+      },
+    },
+  }
+}
+
+function aifsForecastPreset(): FablePreset {
+  return {
+    id: 'aifs-forecast',
+    name: i18n.t('configure:presets.aifsForecastName'),
+    description: i18n.t('configure:presets.aifsForecastDescription'),
+    fable: {
+      blocks: {
+        source_1: {
+          factory_id: {
+            plugin: pluginId('ecmwf', 'ecmwf-base'),
+            factory: 'anemoiSource',
+          },
+          configuration_values: {
+            checkpoint: 'ecmwf:aifs-global-o48',
+            input_source: 'opendata',
+            lead_time: '72',
+            base_time: yesterdayBaseTime(),
+            number: '1',
+          },
+          input_ids: {},
+        },
+        transform_1: {
+          factory_id: {
+            plugin: pluginId('ecmwf', 'ecmwf-base'),
+            factory: 'selectSteps',
+          },
+          configuration_values: {
+            step: '6,12,18,24,30,36,42,48,54,60,66,72',
+          },
+          input_ids: {
+            dataset: 'source_1',
+          },
+        },
+        sink_1: {
+          factory_id: {
+            plugin: pluginId('ecmwf', 'ecmwf-base'),
+            factory: 'mapPlotSink',
+          },
+          configuration_values: {
+            param: '10u,10v',
+            domain: 'europe',
+            format: 'png',
+            groupby: 'none',
+            splitby: 'none',
+          },
+          input_ids: {
+            dataset: 'transform_1',
+          },
+        },
+        sink_2: {
+          factory_id: {
+            plugin: pluginId('ecmwf', 'ecmwf-base'),
+            factory: 'mapPlotSink',
+          },
+          configuration_values: {
+            param: '2t,msl',
+            domain: 'global',
+            format: 'pdf',
+            groupby: 'none',
+            splitby: 'none',
+          },
+          input_ids: {
+            dataset: 'transform_1',
+          },
+        },
+      },
+    },
+  }
+}
+
+function aifsDatasetPreset(): FablePreset {
+  return {
+    id: 'aifs-dataset',
+    name: i18n.t('configure:presets.aifsDatasetName'),
+    description: i18n.t('configure:presets.aifsDatasetDescription'),
+    fable: {
+      blocks: {
+        source_1: {
+          factory_id: {
+            plugin: pluginId('ecmwf', 'ecmwf-base'),
+            factory: 'anemoiSource',
+          },
+          configuration_values: {
+            checkpoint: 'ecmwf:aifs-global-o48',
+            input_source: 'opendata',
+            lead_time: '72',
+            base_time: yesterdayBaseTime(),
+            number: '10',
+          },
+          input_ids: {},
+        },
+        sink_1: {
+          factory_id: {
+            plugin: pluginId('ecmwf', 'ecmwf-base'),
+            factory: 'zarrSink',
+          },
+          configuration_values: {
+            path: '/tmp/${runId}__${attemptCount}.zarr',
+          },
+          input_ids: {
+            dataset: 'source_1',
+          },
         },
       },
     },
@@ -151,8 +341,11 @@ const PRESET_BUILDERS: Record<PresetId, () => FablePreset> = {
   standard: standardPreset,
   'custom-model': customModelPreset,
   dataset: datasetPreset,
+  'ecmwf-open-data': ecmwfOpenDataPreset,
+  'aifs-forecast': aifsForecastPreset,
+  'aifs-dataset': aifsDatasetPreset,
 }
 
-export function getPreset(id: PresetId): FablePreset | undefined {
+export function getPreset(id: PresetId): FablePreset {
   return PRESET_BUILDERS[id]()
 }

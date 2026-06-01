@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import type { JobStatus } from '@/api/types/job.types'
 import { isTerminalStatus } from '@/api/types/job.types'
+import { useServerTime } from '@/api/hooks/useSchedules'
 import {
   getStatusBadgeClasses,
   getStatusBarColor,
@@ -79,6 +80,9 @@ function formatElapsed(ms: number): string {
 }
 
 function useElapsedTime(createdAt: string | null, isTerminal: boolean) {
+  // createdAt is naive server-local — `new Date(naive)` skews by the
+  // local TZ offset; route through the measured server/client offset.
+  const { serverTimeToLocal } = useServerTime()
   const [elapsed, setElapsed] = useState<number | null>(null)
 
   useEffect(() => {
@@ -87,7 +91,7 @@ function useElapsedTime(createdAt: string | null, isTerminal: boolean) {
       return
     }
 
-    const startTime = new Date(createdAt).getTime()
+    const startTime = serverTimeToLocal(createdAt).getTime()
 
     const update = () => setElapsed(Date.now() - startTime)
     update()
@@ -96,7 +100,7 @@ function useElapsedTime(createdAt: string | null, isTerminal: boolean) {
 
     const interval = setInterval(update, 1000)
     return () => clearInterval(interval)
-  }, [createdAt, isTerminal])
+  }, [createdAt, isTerminal, serverTimeToLocal])
 
   return elapsed
 }

@@ -71,6 +71,7 @@ export function PluginCard({
   const { t } = useTranslation('plugins')
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
 
+  // plugin.updatedAt is Z-suffixed UTC; don't route through serverTimeToLocal.
   const updatedTimeAgo = plugin.updatedAt
     ? formatDistanceToNow(new Date(plugin.updatedAt), { addSuffix: true })
     : null

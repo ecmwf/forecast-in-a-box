@@ -62,42 +62,39 @@
     "title": "Getting Started Presets",
     "subtitle": "Choose how to start your forecast configuration",
     "recommended": "Recommended",
-    "quickStart": {
-      "title": "Quick Start",
-      "description": "Start with optimised defaults using the ECMWF plugin blocks and run immediately.",
-      "tags": {
-        "blocks": "4 Blocks",
-        "connected": "Pre-connected",
-        "ready": "Run Now"
-      }
-    },
-    "customForecast": {
-      "title": "Custom Forecast",
+    "startFromScratch": {
+      "title": "Start from Scratch",
       "description": "Build a forecast from scratch with full control over every parameter.",
       "tags": {
         "canvas": "Blank Canvas",
-        "control": "Full Control",
-        "advanced": "Advanced"
+        "control": "Full Control"
       }
     },
-    "standard": {
-      "title": "Standard Forecast",
-      "description": "Balanced settings for typical weather forecasts with flexible configuration.",
-      "comingSoon": "Coming soon",
+    "ecmwfOpenData": {
+      "title": "ECMWF Open Data",
+      "description": "Ensemble-mean 2 m temperature maps from ECMWF IFS Open Data.",
       "tags": {
-        "model": "Choose Model",
-        "time": "120h",
-        "config": "Configurable"
+        "source": "IFS Open Data",
+        "statistic": "Ensemble Mean",
+        "format": "PNG Maps"
       }
     },
-    "dataset": {
-      "title": "Dataset Forecast",
-      "description": "Start with pre-existing forecast data from ECMWF AIFS operational forecasts.",
-      "comingSoon": "Coming soon",
+    "aifsForecast": {
+      "title": "AIFS 72h Forecast",
+      "description": "72-hour AIFS Open Data forecast with global PDF and European PNG map plots.",
       "tags": {
-        "data": "AIFS Data",
-        "source": "External Source",
-        "ready": "Ready to Use"
+        "source": "AIFS Open Data",
+        "leadTime": "72 h",
+        "format": "PNG + PDF"
+      }
+    },
+    "aifsDataset": {
+      "title": "AIFS Ensemble Dataset",
+      "description": "10-member AIFS Open Data ensemble exported as a Zarr archive.",
+      "tags": {
+        "source": "AIFS Open Data",
+        "members": "10 Members",
+        "format": "Zarr Export"
       }
     }
   },

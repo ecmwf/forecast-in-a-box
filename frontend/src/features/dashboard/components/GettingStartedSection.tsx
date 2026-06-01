@@ -14,15 +14,14 @@
  * Section showing different ways to start a forecast configuration
  */
 
-import { BarChart3, Database, Layers, PlayCircle } from 'lucide-react'
+import { Activity, Cloud, Database, Layers } from 'lucide-react'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from '@tanstack/react-router'
 import { GettingStartedCard } from './GettingStartedCard'
 import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
 import type { PresetId } from '@/features/fable-builder/presets/presets'
-import { useBlockCatalogue } from '@/api/hooks/useFable'
-import { generatePluginPipeline } from '@/features/plugins/utils/pipeline-generator'
-import { encodeFableToURL } from '@/features/fable-builder/utils/url-state'
+import { getPreset } from '@/features/fable-builder/presets/presets'
 import { H2, P } from '@/components/base/typography'
 import { Card } from '@/components/ui/card'
 
@@ -37,23 +36,19 @@ export function GettingStartedSection({
 }: GettingStartedSectionProps) {
   const { t } = useTranslation('dashboard')
   const navigate = useNavigate()
-  const { data: catalogue } = useBlockCatalogue()
 
   const handlePresetClick = (preset: PresetId) => {
     navigate({ to: '/configure', search: { preset } })
   }
 
-  const handleQuickStart = () => {
-    if (!catalogue) return
-
-    const { fable } = generatePluginPipeline({
-      pluginId: 'ecmwf/ecmwf-base',
-      catalogue,
-    })
-
-    const encoded = encodeFableToURL(fable)
-    navigate({ to: '/configure', search: { state: encoded } })
-  }
+  // Builder graphs are evaluated once per render — date defaults are stamped
+  // here so the flow previews always reflect the date the cards will load with.
+  const ecmwfOpenDataFable = useMemo(
+    () => getPreset('ecmwf-open-data').fable,
+    [],
+  )
+  const aifsForecastFable = useMemo(() => getPreset('aifs-forecast').fable, [])
+  const aifsDatasetFable = useMemo(() => getPreset('aifs-dataset').fable, [])
 
   const content = (
     <>
@@ -65,65 +60,65 @@ export function GettingStartedSection({
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Quick Start - Recommended */}
-        <GettingStartedCard
-          icon={<PlayCircle className="h-5 w-5" />}
-          title={t('gettingStarted.quickStart.title')}
-          description={t('gettingStarted.quickStart.description')}
-          tags={[
-            t('gettingStarted.quickStart.tags.blocks'),
-            t('gettingStarted.quickStart.tags.connected'),
-            t('gettingStarted.quickStart.tags.ready'),
-          ]}
-          isRecommended
-          onClick={handleQuickStart}
-        />
-
-        {/* Custom Forecast */}
+        {/* Card 1: Start from Scratch — blank canvas (replaces old Quick Start + Custom Forecast). */}
         <GettingStartedCard
           icon={<Layers className="h-5 w-5" />}
-          title={t('gettingStarted.customForecast.title')}
-          description={t('gettingStarted.customForecast.description')}
+          title={t('gettingStarted.startFromScratch.title')}
+          description={t('gettingStarted.startFromScratch.description')}
           tags={[
-            t('gettingStarted.customForecast.tags.canvas'),
-            t('gettingStarted.customForecast.tags.control'),
-            t('gettingStarted.customForecast.tags.advanced'),
+            t('gettingStarted.startFromScratch.tags.canvas'),
+            t('gettingStarted.startFromScratch.tags.control'),
           ]}
-          iconColor="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
-          borderColor="border-border hover:border-emerald-400"
+          isRecommended
           onClick={() => handlePresetClick('custom-model')}
         />
 
-        {/* Standard Forecast - Coming soon */}
+        {/* Card 2: ECMWF Open Data — ensemble-mean 2t global PNG. */}
         <GettingStartedCard
-          icon={<BarChart3 className="h-5 w-5" />}
-          title={t('gettingStarted.standard.title')}
-          description={t('gettingStarted.standard.description')}
+          icon={<Cloud className="h-5 w-5" />}
+          title={t('gettingStarted.ecmwfOpenData.title')}
+          description={t('gettingStarted.ecmwfOpenData.description')}
           tags={[
-            t('gettingStarted.standard.tags.model'),
-            t('gettingStarted.standard.tags.time'),
-            t('gettingStarted.standard.tags.config'),
+            t('gettingStarted.ecmwfOpenData.tags.source'),
+            t('gettingStarted.ecmwfOpenData.tags.statistic'),
+            t('gettingStarted.ecmwfOpenData.tags.format'),
           ]}
           iconColor="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
           borderColor="border-border hover:border-blue-400"
-          disabled
-          disabledMessage={t('gettingStarted.standard.comingSoon')}
+          previewFable={ecmwfOpenDataFable}
+          onClick={() => handlePresetClick('ecmwf-open-data')}
         />
 
-        {/* Dataset Forecast - Coming soon */}
+        {/* Card 3: AIFS 72h Forecast — multi-sink map plots. */}
+        <GettingStartedCard
+          icon={<Activity className="h-5 w-5" />}
+          title={t('gettingStarted.aifsForecast.title')}
+          description={t('gettingStarted.aifsForecast.description')}
+          tags={[
+            t('gettingStarted.aifsForecast.tags.source'),
+            t('gettingStarted.aifsForecast.tags.leadTime'),
+            t('gettingStarted.aifsForecast.tags.format'),
+          ]}
+          iconColor="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
+          borderColor="border-border hover:border-emerald-400"
+          previewFable={aifsForecastFable}
+          onClick={() => handlePresetClick('aifs-forecast')}
+        />
+
+        {/* Card 4: AIFS Ensemble Dataset — Zarr export. */}
         <GettingStartedCard
           icon={<Database className="h-5 w-5" />}
-          title={t('gettingStarted.dataset.title')}
-          description={t('gettingStarted.dataset.description')}
+          title={t('gettingStarted.aifsDataset.title')}
+          description={t('gettingStarted.aifsDataset.description')}
           tags={[
-            t('gettingStarted.dataset.tags.data'),
-            t('gettingStarted.dataset.tags.source'),
-            t('gettingStarted.dataset.tags.ready'),
+            t('gettingStarted.aifsDataset.tags.source'),
+            t('gettingStarted.aifsDataset.tags.members'),
+            t('gettingStarted.aifsDataset.tags.format'),
           ]}
           iconColor="bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400"
           borderColor="border-border hover:border-purple-400"
-          disabled
-          disabledMessage={t('gettingStarted.dataset.comingSoon')}
+          previewFable={aifsDatasetFable}
+          onClick={() => handlePresetClick('aifs-dataset')}
         />
       </div>
     </>
