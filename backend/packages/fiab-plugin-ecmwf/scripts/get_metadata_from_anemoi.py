@@ -47,7 +47,11 @@ def get_package_versions(checkpoint_path: str) -> list[str]:
     checkpoint = open_checkpoint(checkpoint_path)
 
     deps = ["anemoi.models", "anemoi-graphs", "torch", "torch_geometric"]
-    return [f"{dep}=={checkpoint._metadata.provenance_training()['module_versions'][dep]}" for dep in deps]
+    return [
+        f"{dep}=={checkpoint._metadata.provenance_training()['module_versions'][dep]}"
+        for dep in deps
+        if dep in checkpoint._metadata.provenance_training()["module_versions"]
+    ]
 
 
 def get_bytes_on_disk(checkpoint_path: str) -> int:

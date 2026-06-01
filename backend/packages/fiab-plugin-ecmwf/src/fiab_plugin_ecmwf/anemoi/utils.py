@@ -103,7 +103,7 @@ class CheckpointArtifact:
                 raise ValueError(
                     f"Region of interest {configuration.region_of_interest} must be one of the regions specified in input options {[next(iter(region.keys())) for region in configuration.input_options]}"
                 )
-            post_processors.append({"extract_from_state": {"region": configuration.region_of_interest}})
+            post_processors.append({"extract_from_state": configuration.region_of_interest})
 
         return {
             "post_processors": post_processors,
