@@ -77,6 +77,8 @@ GRIB_ALIASES = {
     "level": "levelist",
 }
 
+GRIB_MIME = "text/plain; fiab-format=gribdir"
+
 logger = logging.getLogger(__name__)
 
 PLOT_FORMAT_TO_MIME: dict[str, str] = {
@@ -433,7 +435,7 @@ class GribSink(Sink):
         dirname = os.path.dirname(path)
         if len(self._find_template_values(dirname)) != 0:
             return Either.error(f"Invalid filepath: directory path can not contain template values")
-        return Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain"))
+        return Either.ok(RawOutput(type_fqn="bytes", mime_type=GRIB_MIME))
 
     def compile(
         self,

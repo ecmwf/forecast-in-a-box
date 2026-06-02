@@ -15,4 +15,5 @@ def write_grib(fieldlist: earthkit.data.SimpleFieldList, path: str) -> bytes:
     p.parent.mkdir(parents=True, exist_ok=True)
     formatted_path = path.replace("[", "{").replace("]", "}")
     fieldlist.to_target("file-pattern", formatted_path)
-    return path.encode("ascii")
+    # Returning the parent directory as file-pattern may write multiple files
+    return str(p.parent).encode("ascii")
