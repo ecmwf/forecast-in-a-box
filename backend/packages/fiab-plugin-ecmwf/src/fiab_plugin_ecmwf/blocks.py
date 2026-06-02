@@ -32,12 +32,11 @@ from fiab_core.tools.blocks import Product, Sink, Source, Transform
 from fiab_core.types import ClosedEnumType, ListType
 from qubed import Qube
 
-from .datasets.utils import load_datasets
+from .datasets import load_datasets
 from .qubed_utils import axes, common_dimensions, contains, coxpand, dimensions, select
 
 SOURCE = ConfigurationOptionId("source")
 BASETIME = ConfigurationOptionId("base_time")
-EXPVER = ConfigurationOptionId("expver")
 STATISTIC = ConfigurationOptionId("statistic")
 PATH = ConfigurationOptionId("path")
 DOMAIN = ConfigurationOptionId("domain")
@@ -89,12 +88,6 @@ class EkdSource(Source):
             description="Base time of the forecast",
             value_type="datetime",
         ),
-        EXPVER: BlockConfigurationOption(
-            title="Expver",
-            description="The expver value of the forecast",
-            value_type="str",
-            default_value="0001",
-        ),
         PARAM: BlockConfigurationOption(
             title="Parameters",
             description="Parameters to select and plot (e.g. '2t', 'msl')",
@@ -113,6 +106,9 @@ class EkdSource(Source):
     }
     inputs: list[str] = []
 
+    def _convert_time(cls, time: int) -> str:
+        return f"{time:02d}00"
+
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         basetime = block.config_as_datetime(BASETIME)
         if basetime.time().hour not in [0, 6, 12, 18]:
@@ -121,20 +117,26 @@ class EkdSource(Source):
         forecast = block.config_as_str(FORECAST)
         ifs_qoutput = select(
             QubedOutput(dataqube=FORECAST_DATASETS[forecast].as_qube(ens_dim=ENSEMBLE, include_member_zero=True)),
-            {"time": basetime.time().hour},
+            {"time": self._convert_time(basetime.time().hour)},
         )
 
-        param = block.config_as_list(PARAM, str, allow_empty=False)
-        step = block.config_as_list(STEP, int)
-        number = block.config_as_list(ENSEMBLE, int)
-        for dim, config in [(PARAM, param), (STEP, step), (ENSEMBLE, number)]:
-            if not contains(ifs_qoutput, {dim: config}):
-                return Either.error(f"Invalid config for {dim}: must be one of {axes(ifs_qoutput)[dim]}")
+        params = block.config_as_list(PARAM, str, allow_empty=False)
+        steps = block.config_as_list(STEP, int, allow_empty=False)
+        numbers = block.config_as_list(ENSEMBLE, int, allow_empty=False)
+
+        for param in params:
+            if not contains(ifs_qoutput, {PARAM: param}):
+                return Either.error(f"Invalid config for {PARAM}: must be one of {axes(ifs_qoutput)[PARAM]}")
+            param_qoutput = select(ifs_qoutput, {PARAM: param})
+            for dim, config in [(STEP, steps), (ENSEMBLE, numbers)]:
+                if not contains(param_qoutput, {dim: config}):
+                    return Either.error(f"Invalid config for {dim}: must be one of {axes(param_qoutput)[dim]} for param {param}")
+                param_qoutput = select(param_qoutput, {dim: config})
 
         select_dims: dict[str, Any] = {
-            PARAM: param,
-            ENSEMBLE: number,
-            STEP: step,
+            PARAM: params,
+            ENSEMBLE: numbers,
+            STEP: steps,
         }
         output = select(ifs_qoutput, select_dims)
         return Either.ok(output)
@@ -150,15 +152,17 @@ class EkdSource(Source):
         fc_qube = fc_preset.as_qube(ens_dim=ENSEMBLE)
 
         param = block.config_as_list(PARAM, str, allow_empty=False)
-        step = block.config_as_list(STEP, int)
-        number = block.config_as_list(ENSEMBLE, int)
+        step = block.config_as_list(STEP, int, allow_empty=False)
+        number = block.config_as_list(ENSEMBLE, int, allow_empty=False)
         basetime = block.config_as_datetime(BASETIME)
+        date = basetime.date().isoformat()
+        time = self._convert_time(basetime.time().hour)
 
         select_dims: dict[str, Any] = {
             PARAM: param,
             ENSEMBLE: number,
             STEP: step,
-            "time": basetime.time().hour,
+            "time": time,
         }
         subqube = fc_qube.select(select_dims)
         actions = {}
@@ -185,9 +189,8 @@ class EkdSource(Source):
                                     "requests": [
                                         dict(
                                             {k: (v if len(v) > 1 else v[0]) for k, v in datacube.items()},
-                                            date=basetime.date().isoformat(),
-                                            time=f"{basetime.time().hour:02d}",
-                                            expver=block.config_as_str(EXPVER),
+                                            date=date,
+                                            time=time,
                                             param=p,
                                         )
                                     ],
