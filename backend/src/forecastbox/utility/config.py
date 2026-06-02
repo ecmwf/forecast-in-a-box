@@ -155,7 +155,7 @@ def _default_plugin_stores() -> PluginStoresConfig:
 
 class ArtifactStoreConfig(FiabBaseModel):
     url: str
-    method: Literal["file"]
+    method: Literal["file", "gittag"]
 
 
 ArtifactStoresConfig = dict[ArtifactStoreId, ArtifactStoreConfig]
