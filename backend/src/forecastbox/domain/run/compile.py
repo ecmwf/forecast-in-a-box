@@ -14,6 +14,7 @@ from datetime import datetime
 from cascade.low.core import DatasetId, TaskId
 from cascade.low.func import assert_never
 from earthkit.workflows.compilers import graph2job
+from earthkit.workflows.fluent import PayloadBuildingContext
 from earthkit.workflows.graph import Graph, deduplicate_nodes
 from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import BlockInstanceId, BlockInstanceOutput, NoOutput, RawOutput
@@ -108,7 +109,8 @@ def compile_builder(
         if converted_values.t is None:
             raise ValueError(f"compile failed at {blockId=} with {converted_values.e}")
         blockInstance.configuration_values = converted_values.t
-        result = plugin.compiler(action_lookup, blockId, blockInstance)
+        with PayloadBuildingContext(blockId=blockId):
+            result = plugin.compiler(action_lookup, blockId, blockInstance)
         if result.t is None:
             raise ValueError(f"compile failed at {blockId=} with {result.e}")
         action_lookup[blockId] = result.t
@@ -127,15 +129,9 @@ def compile_builder(
         except Exception as e:
             raise ValueError(f"compile failed at {blockId=} with {e}")
 
-        # TODO this is inefficient -- every task in a source block gets traversed as
-        # many times as there are sinks. Instead, we should utilize the Context for
-        # metadata enrichment during compilation to inject BlockId, and retrieve that
-        # at the end. Sinks should also be collected from the cascade graph presumably
         if block_factory.kind == "sink":
             block_graph = action_lookup[blockId].graph()
-            for node in block_graph.nodes():
-                task_id, detail = fluentNode_to_detail(node, blockId)
-                task_detail[task_id] = detail
+
             sink_tasks.update(
                 _fluentName_to_taskId(node.name)
                 for node in block_graph.sinks
@@ -149,6 +145,13 @@ def compile_builder(
             graph += block_graph
 
     graph = deduplicate_nodes(graph)
+    for node in graph.nodes():
+        metadata = getattr(node.payload, "metadata", None)
+        if not isinstance(metadata, dict) or "blockId" not in metadata:
+            raise ValueError(f"compile failed: missing blockId metadata on task {node.name}")
+        task_block_id = metadata["blockId"]
+        task_id, detail = fluentNode_to_detail(node, task_block_id)
+        task_detail[task_id] = detail
     job_instance = graph2job(graph)
 
     job_instance.ext_outputs = [dataset_id for task_id in sink_tasks for dataset_id in job_instance.outputs_of(task_id)]
