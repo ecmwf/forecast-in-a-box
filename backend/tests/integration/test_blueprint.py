@@ -969,8 +969,17 @@ def test_blueprint_composite_glyph_execute(tmpdir: Any, backend_client_with_auth
         configuration_values=_config({"fname": f"{tmpdir}/composite_exec_output.txt"}),
         input_ids={"data": BlockInstanceId("source_text")},
     )
+    sink_file_2 = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
+        configuration_values=_config({"fname": f"{tmpdir}/composite_exec_output_2.txt"}),
+        input_ids={"data": BlockInstanceId("source_text")},
+    )
     builder = BlueprintBuilder(
-        blocks={BlockInstanceId("source_text"): source_text, BlockInstanceId("sink_file"): sink_file},
+        blocks={
+            BlockInstanceId("source_text"): source_text,
+            BlockInstanceId("sink_file"): sink_file,
+            BlockInstanceId("sink_file_2"): sink_file_2,
+        },
         local_glyphs={"compositeLocalGlyphExec": "${compositeExecGlobalPart}/${runId}"},
     )
     save_resp = backend_client_with_auth.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
@@ -987,13 +996,23 @@ def test_blueprint_composite_glyph_execute(tmpdir: Any, backend_client_with_auth
     detail_resp = backend_client_with_auth.get("/run/getCompilationDetail", params={"run_id": run_id})
     assert detail_resp.is_success, detail_resp.text
     detail = CompilationDetailResponse.model_validate(detail_resp.json())
-    assert len(detail.tasks) == 2, f"Expected 2 tasks, got {len(detail.tasks)}: {detail.tasks}"
+    assert len(detail.tasks) == 3, f"Expected 3 tasks, got {len(detail.tasks)}: {detail.tasks}"
+    assert {task.block for task in detail.tasks} == {
+        BlockInstanceId("source_text"),
+        BlockInstanceId("sink_file"),
+        BlockInstanceId("sink_file_2"),
+    }
 
     output = pathlib.Path(f"{tmpdir}/composite_exec_output.txt")
     content = output.read_text()
     # Content must be "exec_global/<run_id>"
     assert content == f"exec_global/{run_id}", f"Unexpected output: {content!r}"
     output.unlink()
+
+    output_2 = pathlib.Path(f"{tmpdir}/composite_exec_output_2.txt")
+    content_2 = output_2.read_text()
+    assert content_2 == f"exec_global/{run_id}", f"Unexpected output: {content_2!r}"
+    output_2.unlink()
 
     # Clean up the global glyph created in this test
     del_resp = backend_client_with_auth.post(
