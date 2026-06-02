@@ -110,27 +110,25 @@ class EkdSource(Source):
         return f"{time:02d}00"
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        basetime = block.config_as_datetime(BASETIME)
-        if basetime.time().hour not in [0, 6, 12, 18]:
-            return Either.error(f"Invalid time: base time must be in (00, 06, 12, 18)")
-
         forecast = block.config_as_str(FORECAST)
-        ifs_qoutput = select(
-            QubedOutput(dataqube=FORECAST_DATASETS[forecast].as_qube(ens_dim=ENSEMBLE, include_member_zero=True)),
-            {"time": self._convert_time(basetime.time().hour)},
-        )
-
+        basetime = block.config_as_datetime(BASETIME)
+        time = self._convert_time(basetime.time().hour)
         params = block.config_as_list(PARAM, str, allow_empty=False)
         steps = block.config_as_list(STEP, int, allow_empty=False)
         numbers = block.config_as_list(ENSEMBLE, int, allow_empty=False)
 
+        ifs_qoutput = QubedOutput(dataqube=FORECAST_DATASETS[forecast].as_qube(ens_dim=ENSEMBLE, include_member_zero=True))
+        if not contains(ifs_qoutput, {"time": time}):
+            return Either.error(f"Invalid time: must be in {axes(ifs_qoutput)['time']}")
+
+        ifs_qoutput = select(ifs_qoutput, {"time": time})
         for param in params:
             if not contains(ifs_qoutput, {PARAM: param}):
-                return Either.error(f"Invalid config for {PARAM}: must be one of {axes(ifs_qoutput)[PARAM]}")
+                return Either.error(f"Invalid {PARAM}: must be in {axes(ifs_qoutput)[PARAM]}")
             param_qoutput = select(ifs_qoutput, {PARAM: param})
             for dim, config in [(STEP, steps), (ENSEMBLE, numbers)]:
                 if not contains(param_qoutput, {dim: config}):
-                    return Either.error(f"Invalid config for {dim}: must be one of {axes(param_qoutput)[dim]} for param {param}")
+                    return Either.error(f"Invalid {dim}: must be in {axes(param_qoutput)[dim]} for param {param}")
                 param_qoutput = select(param_qoutput, {dim: config})
 
         select_dims: dict[str, Any] = {

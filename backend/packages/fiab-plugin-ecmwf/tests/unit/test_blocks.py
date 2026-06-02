@@ -303,11 +303,11 @@ class TestEkdSource:
     @pytest.mark.parametrize(
         "config, error",
         [
-            [{"param": ["unknown"]}, "Invalid config for param"],
-            [{"step": [0, 6, 400]}, "Invalid config for step"],
-            [{"number": [0, 50, 100]}, "Invalid config for number"],
+            [{"param": ["unknown"]}, "Invalid param"],
+            [{"step": [0, 6, 400]}, "Invalid step"],
+            [{"number": [0, 50, 100]}, "Invalid number"],
             [{"base_time": datetime(2024, 1, 1, 9)}, "Invalid time"],
-            [{"base_time": datetime(2024, 1, 1, 6), "step": [150]}, "Invalid config for step"],
+            [{"base_time": datetime(2024, 1, 1, 6), "step": [150]}, "Invalid step"],
         ],
     )
     def test_validate(self, config: dict, error: str) -> None:
