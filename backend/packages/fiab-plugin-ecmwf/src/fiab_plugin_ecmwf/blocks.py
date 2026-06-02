@@ -594,7 +594,9 @@ class MapPlotSink(Sink):
         if param_values:
             restrict[PARAM] = ListType(ClosedEnumType(sorted(param_values)))
 
-        restrict[SPLITBY] = ListType(ClosedEnumType(sorted(common_dimensions(other)) + ["none"]))
+        common = common_dimensions(other).intersection({PARAM, STEP, ENSEMBLE, LEVEL})
+        splitby = [x for x in common if len(axes(other)[x]) > 1]
+        restrict[SPLITBY] = ListType(ClosedEnumType(sorted(splitby) + ["none"]))
         return restrict
 
     def intersect(self, other: QubedOutput) -> bool:
