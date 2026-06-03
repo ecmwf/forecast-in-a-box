@@ -9,6 +9,7 @@
 
 import importlib.metadata
 import logging
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -110,7 +111,7 @@ class CheckpointArtifact:
             "env": configuration.control_options or {},
         }
 
-    def get_input_configuration(self, input_source: str | dict) -> dict[str, dict] | str:
+    def get_input_configuration(self, input_source: str | dict) -> dict | str:
         """Create input configuration for the model based on the checkpoint artifact and input source."""
         checkpoint = self.checkpoint()
         configuration = checkpoint.configuration
@@ -120,8 +121,8 @@ class CheckpointArtifact:
             raise ValueError(f"Input source must have exactly one key representing the source name, got {input_source}")
 
         source_name = next(iter(input_source.keys()))
+        input_source = deepcopy(input_source)  # Don't modify the original input source dict
 
-        input_source = {**input_source}  # shallow copy to avoid mutating the original
         if source_name in INPUT_SOURCE_CONFIGURATION_OPTIONS:
             input_source[source_name].update(INPUT_SOURCE_CONFIGURATION_OPTIONS[source_name])
 
@@ -133,13 +134,14 @@ class CheckpointArtifact:
         elif isinstance(configuration.input_options, dict):
             input_source.update(**configuration.input_options)
             return input_source
+
         # Input options is a list, which implies cutout input
         if not configuration.nested_model:
             raise ValueError("Cutout input configuration is only supported for nested models")
 
         # Input options is a named set of configurations for sub-inputs
         regions = configuration.input_options
-        cutout_input_configuration: dict[str, dict[str, Any]] = {}
+        cutout_input_configuration: list[dict[str, dict[str, Any]]] = []
 
         for region_config in regions:
             if len(region_config) != 1:
@@ -147,12 +149,12 @@ class CheckpointArtifact:
             region_name = next(iter(region_config.keys()))
             region_config = region_config[region_name]
 
-            cutout_input_configuration[region_name] = input_source.copy()  # First set to user defined input config, i.e source
-            cutout_input_configuration[region_name][source_name].update(
+            cutout_input_configuration.append({region_name: deepcopy(input_source)})  # First set to user defined input config, i.e source
+            cutout_input_configuration[-1][region_name][source_name].update(
                 region_config
             )  # Then override with region specific config from the checkpoint
 
-        return input_source
+        return {"cutout": cutout_input_configuration}
 
     def get_environment(self) -> list[str]:
         """Get the environment for the model based on the checkpoint artifact and input source."""
