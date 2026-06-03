@@ -3,7 +3,8 @@
 ## Affected User Flows
 User wants to run a forecast using a model checkpoint.
 
-## Current status
+## Current Status
+### As of 2026.06.03
 A model registry exists as a file on github, see the `install/` at the repo's top level.
 There is an `artifacts` domain and router in the backend that interacts with it.
 The `fiab-core` package within backend defines the basic contract.
@@ -15,6 +16,13 @@ In particular, it forbids us merging any breaking changes into the `main` branch
 There are two assumptions:
 1. Model releases are occassional now, but expected to increase in the future -- thus a short term solution can involve a chore when there is a new model, but a long term solution cannot.
 2. We expect to have a number of distinct clients in the wild -- multiple deployment scenarios, not necessarily sharing the same version or feature set. This is expected to only grow.
+
+### Update on 2026.06.04
+We have implemented the `Finer git-side management` option, see below for details, and assume that server side is the long term goal.
+Migration towards server-side would involve:
+1/ adding a new ArtifactsStoreConfig option and its implementation -- presumably utilizing the same `core_version` variable required for the newly-added `gittag` option.
+2/ changing the `just val` of fiab-core to instead validate the artifacts compatibility with the server
+3/ the `cd-artifacts_update.yml` GH action would become a CLI command instead
 
 ## Options
 
