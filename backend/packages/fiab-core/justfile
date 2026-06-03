@@ -1,6 +1,7 @@
 val:
     uv run ty check src/
     uv run pytest
+    uv run python scripts/parse_artifacts_catalog.py ../../../install/artifacts.json
 
 build:
     python -m build --installer uv .

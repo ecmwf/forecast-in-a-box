@@ -134,9 +134,6 @@ def test_composite_artifact_id_from_str_missing_colon() -> None:
         CoreCompositeArtifactId.from_str("no_colon_here")
 
 
-import pytest
-
-
 def test_get_artifacts_catalog(sample_artifact_stores_config: Any, sample_checkpoint: Any) -> None:
     """Test getting artifacts catalog from multiple stores"""
     store1_data = {
@@ -183,10 +180,52 @@ def test_get_artifacts_catalog(sample_artifact_stores_config: Any, sample_checkp
             assert artifact.local_compatibility_detail is None
 
 
+def test_get_artifacts_catalog_from_git_tag(sample_checkpoint: Any) -> None:
+    """Test that gittag stores fetch artifacts from the highest c-tag."""
+    store_data = {
+        "display_name": "Store 1",
+        "artifacts": {
+            "model1": {"artifact_type": "AnemoiCheckpoint", "store_info": sample_checkpoint.model_dump()},
+        },
+    }
+
+    config: ArtifactStoresConfig = {
+        ArtifactStoreId("store1"): ArtifactStoreConfig(
+            url="https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/tags/${TAG}/install/artifacts.json",
+            method="gittag",
+        ),
+    }
+
+    with patch("httpx.Client") as mock_client_class:
+        mock_client = MagicMock()
+        mock_client_class.return_value.__enter__.return_value = mock_client
+        with patch("forecastbox.domain.artifact.catalog.get_all_repo_tags", return_value=iter(["v1.2.3", "c0.0.7.0", "c0.0.8.0"])):
+            with patch("forecastbox.domain.artifact.catalog.fetch_content") as mock_fetch:
+                mock_fetch.return_value = json.dumps(store_data).encode()
+
+                catalog = get_artifacts_catalog(config)
+
+    expected_url = "https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/tags/c0.0.8.0/install/artifacts.json"
+    mock_fetch.assert_called_once_with(expected_url, mock_client)
+    assert len(catalog) == 1
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1"))
+    assert composite_id in catalog
+
+
+def test_artifact_store_config_requires_placeholder_for_gittag() -> None:
+    with pytest.raises(ValueError, match=r"url must contain \$\{TAG\}"):
+        ArtifactStoreConfig(
+            url="https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/tags/main/install/artifacts.json",
+            method="gittag",
+        )
+
+
 def test_get_artifacts_catalog_with_error(sample_artifact_stores_config: Any) -> None:
     """Test get_artifacts_catalog raises when there's a network error"""
-    with patch("httpx.get") as mock_get:
-        mock_get.side_effect = httpx.HTTPError("Network error")
+    with patch("httpx.Client") as mock_client_class:
+        mock_client = MagicMock()
+        mock_client_class.return_value.__enter__.return_value = mock_client
+        mock_client.get.side_effect = httpx.HTTPError("Network error")
         with pytest.raises(httpx.HTTPError):
             get_artifacts_catalog(sample_artifact_stores_config)
 
