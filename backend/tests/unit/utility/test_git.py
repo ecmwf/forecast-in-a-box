@@ -34,12 +34,13 @@ def test_get_all_repo_tags_paginates() -> None:
     [
         (["c0.0.6.0", "c0.0.7.0", "c0.0.8.0"], "c0.0.8.0"),
         (["c1.0.0.0", "c0.9.9.9", "c1.0.0.1"], "c1.0.0.1"),
+        (["v1.0.0", "d1.2.0", "c1.1.9"], "d1.2.0"),
     ],
 )
 def test_get_highest_tag(tags: list[str], expected: str) -> None:
     assert get_highest_tag(iter(tags)) == expected
 
 
-def test_get_highest_tag_ignores_non_c_tags() -> None:
+def test_get_highest_tag_ignores_non_version_tags() -> None:
     with pytest.raises(ValueError):
-        get_highest_tag(iter(["v1.0.0", "d1.0.0"]))
+        get_highest_tag(iter(["1.0.0", "release"]))

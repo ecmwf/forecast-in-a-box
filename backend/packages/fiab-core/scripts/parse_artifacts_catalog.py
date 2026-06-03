@@ -15,7 +15,7 @@ from pathlib import Path
 from fiab_core.artifacts import ArtifactStoreId, parse_json
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(argv: Sequence[str] | None = None) -> None:
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -24,8 +24,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     data = args.path.read_text()
     dict(parse_json(ArtifactStoreId("validation"), data, lambda _checkpoint: (True, None)))
-    return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()

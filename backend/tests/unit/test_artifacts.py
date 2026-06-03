@@ -191,7 +191,7 @@ def test_get_artifacts_catalog_from_git_tag(sample_checkpoint: Any) -> None:
 
     config: ArtifactStoresConfig = {
         ArtifactStoreId("store1"): ArtifactStoreConfig(
-            url="https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/heads/main/install/artifacts.json",
+            url="https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/tags/${TAG}/install/artifacts.json",
             method="gittag",
         ),
     }
@@ -210,6 +210,14 @@ def test_get_artifacts_catalog_from_git_tag(sample_checkpoint: Any) -> None:
     assert len(catalog) == 1
     composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1"))
     assert composite_id in catalog
+
+
+def test_artifact_store_config_requires_placeholder_for_gittag() -> None:
+    with pytest.raises(ValueError, match=r"url must contain \$\{TAG\}"):
+        ArtifactStoreConfig(
+            url="https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/tags/main/install/artifacts.json",
+            method="gittag",
+        )
 
 
 def test_get_artifacts_catalog_with_error(sample_artifact_stores_config: Any) -> None:

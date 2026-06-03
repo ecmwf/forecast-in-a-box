@@ -157,6 +157,12 @@ class ArtifactStoreConfig(FiabBaseModel):
     url: str
     method: Literal["file", "gittag"]
 
+    @model_validator(mode="after")
+    def validate_method_url(self) -> Self:
+        if self.method == "gittag" and "${TAG}" not in self.url:
+            raise ValueError("for method='gittag', url must contain ${TAG}")
+        return self
+
 
 ArtifactStoresConfig = dict[ArtifactStoreId, ArtifactStoreConfig]
 

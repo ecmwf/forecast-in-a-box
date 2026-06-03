@@ -16,7 +16,7 @@ import httpx
 
 _GITHUB_OWNER = "ecmwf"
 _GITHUB_REPO = "forecast-in-a-box"
-_TAG_RE = re.compile(r"^c(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)(?:\.(?P<build>\d+))?$")
+_PREFIXED_VERSION_TAG_RE = re.compile(r"^[a-z](?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)(?:\.(?P<build>\d+))?$")
 
 
 def get_all_repo_tags(client: httpx.Client) -> Iterator[str]:
@@ -37,11 +37,11 @@ def get_all_repo_tags(client: httpx.Client) -> Iterator[str]:
 
 
 def get_highest_tag(tags: Iterator[str]) -> str:
-    """Return the highest semantic c-tag from an iterator."""
+    """Return the highest prefixed semantic version tag from an iterator."""
     best_tag: str | None = None
     best_key: tuple[int, int, int, int] | None = None
     for tag in tags:
-        match = _TAG_RE.fullmatch(tag)
+        match = _PREFIXED_VERSION_TAG_RE.fullmatch(tag)
         if match is None:
             continue
         major = int(match.group("major") or 0)
@@ -53,5 +53,5 @@ def get_highest_tag(tags: Iterator[str]) -> str:
             best_key = key
             best_tag = tag
     if best_tag is None:
-        raise ValueError("No c-tags found")
+        raise ValueError("No version tags found")
     return best_tag
