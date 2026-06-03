@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Explicit tag. Use vX.Y.Z, make sure its free on pypi
+        description: Explicit tag. Use cX.Y.Z, make sure its free on pypi
         type: string
-        required: true
+        required: false
       testpypi:
         description: Whether to upload to testpypi instead of pypi.
         type: boolean
@@ -21,6 +21,8 @@ jobs:
     name: "Build and upload"
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v7
@@ -30,8 +32,32 @@ jobs:
           if [ "${{ inputs.testpypi }}" = "true" ] ; then
             set -x
           fi
-          TAG_PREF="v"
+          git fetch --tags origin
+
+          TAG_PREF="c"
           TAG_FULL="${{ inputs.tag }}"
+          if [ -n "$TAG_FULL" ] ; then
+            echo "$TAG_FULL" | grep -Eq '^c[0-9]+\.[0-9]+\.[0-9]+$' || {
+              echo "expected tag in the form cX.Y.Z" >&2
+              exit 1
+            }
+          else
+            LATEST_BASE=$(
+              git tag -l 'c*' \
+              | sed -nE 's/^c([0-9]+\.[0-9]+\.[0-9]+)(\.[0-9]+)?$/\1/p' \
+              | sort -V \
+              | tail -n1
+            )
+            if [ -z "$LATEST_BASE" ] ; then
+              LATEST_BASE="0.0.0"
+            fi
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST_BASE"
+            NEW_PATCH=$((PATCH + 1))
+            TAG_FULL="${TAG_PREF}${MAJOR}.${MINOR}.${NEW_PATCH}"
+            echo "determined tag = $TAG_FULL"
+          fi
+
+          TAG="${TAG_FULL}.0"
           export SETUPTOOLS_SCM_PRETEND_VERSION=${TAG_FULL#$TAG_PREF}
 
           cd backend
@@ -56,7 +82,9 @@ jobs:
             TARGET=""
           fi
           twine upload --verbose $TARGET packagesDist/*
+
+          git tag "$TAG"
+          git push origin "$TAG"
         env:
           TWINE_PASSWORD_PROD: ${{ secrets.PYPI_API_TOKEN }}
           TWINE_PASSWORD_TEST: ${{ secrets.PYPI_TEST_API_TOKEN }}
-

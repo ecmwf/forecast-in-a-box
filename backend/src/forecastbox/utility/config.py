@@ -155,7 +155,13 @@ def _default_plugin_stores() -> PluginStoresConfig:
 
 class ArtifactStoreConfig(FiabBaseModel):
     url: str
-    method: Literal["file"]
+    method: Literal["file", "gittag"]
+
+    @model_validator(mode="after")
+    def validate_method_url(self) -> Self:
+        if self.method == "gittag" and "${TAG}" not in self.url:
+            raise ValueError("for method='gittag', url must contain ${TAG}")
+        return self
 
 
 ArtifactStoresConfig = dict[ArtifactStoreId, ArtifactStoreConfig]
@@ -164,8 +170,8 @@ ArtifactStoresConfig = dict[ArtifactStoreId, ArtifactStoreConfig]
 def _default_artifact_stores() -> ArtifactStoresConfig:
     return {
         ArtifactStoreId("ecmwf"): ArtifactStoreConfig(
-            url="https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/heads/main/install/artifacts.json",
-            method="file",
+            url="https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/tags/${TAG}/install/artifacts.json",
+            method="gittag",
         ),
     }
 

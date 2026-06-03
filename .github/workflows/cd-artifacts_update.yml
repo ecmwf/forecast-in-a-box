@@ -1,0 +1,65 @@
+name: cd artifacts update
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Base tag. Use cX.Y.Z
+        type: string
+        required: true
+
+jobs:
+  update:
+    name: "Validate and tag artifacts"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: astral-sh/setup-uv@v7
+      - run: |
+          set -euo pipefail
+          BASE_TAG="${{ inputs.tag }}"
+          echo "$BASE_TAG" | grep -Eq '^c[0-9]+\.[0-9]+\.[0-9]+$' || {
+            echo "expected tag in the form cX.Y.Z" >&2
+            exit 1
+          }
+
+          git fetch --tags origin
+
+          VERSION="${BASE_TAG#c}"
+          HIGHEST_TAG=$(
+            git tag -l "${BASE_TAG}.*" \
+            | grep -E "^${BASE_TAG}\.[0-9]+$" \
+            | sort -V \
+            | tail -n1
+          )
+          if [ -z "$HIGHEST_TAG" ] ; then
+            HIGHEST_TAG="${BASE_TAG}.0"
+          fi
+
+          CHANGED_FILES=$(git diff --name-only "$HIGHEST_TAG" HEAD)
+          if [ -z "$CHANGED_FILES" ] ; then
+            echo "expected at least artifacts.json to differ from $HIGHEST_TAG" >&2
+            exit 1
+          fi
+          if printf '%s\n' "$CHANGED_FILES" | grep -vx 'install/artifacts.json' >/dev/null ; then
+            echo "unexpected files changed relative to $HIGHEST_TAG" >&2
+            printf '%s\n' "$CHANGED_FILES" >&2
+            exit 1
+          fi
+          if ! printf '%s\n' "$CHANGED_FILES" | grep -qx 'install/artifacts.json' ; then
+            echo "artifacts.json must be part of the changes relative to $HIGHEST_TAG" >&2
+            exit 1
+          fi
+
+          uv run --no-project --with "fiab-core==${VERSION}" python backend/packages/fiab-core/scripts/parse_artifacts_catalog.py install/artifacts.json
+
+          IFS='.' read -r MAJOR MINOR PATCH BUILD <<< "${HIGHEST_TAG#c}"
+          NEW_TAG="c${MAJOR}.${MINOR}.${PATCH}.$((BUILD + 1))"
+          git tag "$NEW_TAG"
+          git push origin "$NEW_TAG"
