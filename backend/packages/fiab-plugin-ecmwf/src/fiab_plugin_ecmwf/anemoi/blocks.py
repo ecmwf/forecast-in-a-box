@@ -15,7 +15,6 @@ from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
 from earthkit.workflows.plugins.anemoi.fluent import Inference, get_initial_conditions  # ty: ignore[unresolved-import]
 from earthkit.workflows.plugins.anemoi.types import DATE
-from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
@@ -145,9 +144,13 @@ class AnemoiSource(Source):
         if ensemble_members < 1:
             return Either.error("Ensemble members must be an int, positive and non zero.")
 
-        qubed_output = CheckpointArtifact(CompositeArtifactId.from_str(block.config_as_str(CHECKPOINT))).get_model_output(
-            lead_time=block.config_as_int(LEAD_TIME, validator=positive)
-        )
+        checkpoint = CheckpointArtifact(block.config_as_str(CHECKPOINT))
+        lead_time = block.config_as_int(LEAD_TIME, validator=positive)
+        validation_error = checkpoint.validate_lead_time(lead_time)
+        if validation_error is not None:
+            return Either.error(validation_error)
+
+        qubed_output = checkpoint.get_model_output(lead_time=lead_time)
         if ensemble_members > 1:
             qubed_output = expand(qubed_output, {"number": range(1, ensemble_members + 1)})
         return Either.ok(qubed_output)
@@ -234,14 +237,18 @@ class AnemoiTransform(Transform):
     }
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        qubed_input = CheckpointArtifact(block.config_as_str(CHECKPOINT)).get_model_input()
+        checkpoint = CheckpointArtifact(block.config_as_str(CHECKPOINT))
+        qubed_input = checkpoint.get_model_input()
         if not contains(inputs["dataset"], qubed_input):
             difference_qube = qubed_input ^ inputs["dataset"].dataqube
             return Either.error(f"Input dataset is not compatible with the model checkpoint. Difference in qubes: {difference_qube}")
 
-        qubed_output = CheckpointArtifact(block.config_as_str(CHECKPOINT)).get_model_output(
-            lead_time=block.config_as_int(LEAD_TIME, validator=positive)
-        )
+        lead_time = block.config_as_int(LEAD_TIME, validator=positive)
+        validation_error = checkpoint.validate_lead_time(lead_time)
+        if validation_error is not None:
+            return Either.error(validation_error)
+
+        qubed_output = checkpoint.get_model_output(lead_time=lead_time)
 
         input_dataset = inputs["dataset"]
         if contains(input_dataset, "number"):

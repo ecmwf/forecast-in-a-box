@@ -35,7 +35,9 @@ DUMMY_QUBE = Qube.from_json(
 
 
 @contextlib.contextmanager
-def dummy_provider() -> Generator[None, None, None]:
+def dummy_provider(*, timestep: str = "1h") -> Generator[None, None, None]:
+    previous_get_artifacts_lookup = ArtifactsProvider._get_artifacts_lookup
+    previous_get_artifact_local_path = ArtifactsProvider._get_artifact_local_path
     ArtifactsProvider.register_get_artifacts_lookup(
         lambda: {
             CompositeArtifactId.from_str("dummy_store:dummy_ckpt"): ArtifactResolved(
@@ -51,7 +53,7 @@ def dummy_provider() -> Generator[None, None, None]:
                     input_characteristics=[],
                     input_qube=DUMMY_QUBE.to_json(),
                     output_qube=DUMMY_QUBE.to_json(),
-                    timestep="1h",
+                    timestep=timestep,
                     comment="A dummy comment",
                 ),
                 is_locally_compatible=True,
@@ -62,9 +64,11 @@ def dummy_provider() -> Generator[None, None, None]:
     ArtifactsProvider.register_get_artifact_local_path(
         lambda composite_id: Path(f"/local/path/for/{CompositeArtifactId.to_str(composite_id)}")
     )
-    yield
-    ArtifactsProvider._get_artifacts_lookup = None
-    ArtifactsProvider._get_artifact_local_path = None
+    try:
+        yield
+    finally:
+        ArtifactsProvider._get_artifacts_lookup = previous_get_artifacts_lookup
+        ArtifactsProvider._get_artifact_local_path = previous_get_artifact_local_path
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -77,6 +81,12 @@ def registered_provider() -> Generator[None, None, None]:
 @pytest.fixture(scope="module")
 def dummy_checkpoint() -> str:
     return "dummy_store:dummy_ckpt"
+
+
+@pytest.fixture
+def six_hour_dummy_checkpoint() -> Generator[str, None, None]:
+    with dummy_provider(timestep="6h"):
+        yield "dummy_store:dummy_ckpt"
 
 
 @pytest.fixture(scope="module")
