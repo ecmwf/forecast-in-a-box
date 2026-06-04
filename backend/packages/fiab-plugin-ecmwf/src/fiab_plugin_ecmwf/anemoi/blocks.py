@@ -22,14 +22,16 @@ from fiab_core.fable import (
     BlockInstanceId,
     BlockInstanceOutput,
     ConfigurationOptionId,
+    ConfigurationOptionRestriction,
     QubedOutput,
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
 from fiab_core.tools.blocks import Source, Transform
 from fiab_core.tools.validators import negative, positive
+from fiab_core.types import ClosedEnumType, ListType
 
-from fiab_plugin_ecmwf.qubed_utils import axes, contains, dimensions, expand
+from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, dimensions, expand
 
 from .utils import (
     CheckpointArtifact,
@@ -47,6 +49,7 @@ CHECKPOINT = ConfigurationOptionId("checkpoint")
 LEAD_TIME = ConfigurationOptionId("lead_time")
 INPUT_SOURCE = ConfigurationOptionId("input_source")
 BASE_TIME = ConfigurationOptionId("base_time")
+DATASET = ConfigurationOptionId("dataset")
 
 
 class AnemoiBuilder:
@@ -70,7 +73,7 @@ class AnemoiBuilder:
             ckpt=self._local_path,
             lead_time=lead_time,
             environment=env,
-            expansion_qube=self.checkpoint.get_model_output(lead_time=lead_time).dataqube,
+            expansion_qube=self.checkpoint.get_model_output(lead_time=lead_time),
             **self.checkpoint.get_additional_kwargs(),
         )
 
@@ -145,12 +148,13 @@ class AnemoiSource(Source):
         if ensemble_members < 1:
             return Either.error("Ensemble members must be an int, positive and non zero.")
 
-        qubed_output = CheckpointArtifact(CompositeArtifactId.from_str(block.config_as_str(CHECKPOINT))).get_model_output(
-            lead_time=block.config_as_int(LEAD_TIME, validator=positive)
+        checkpoint = CheckpointArtifact(CompositeArtifactId.from_str(block.config_as_str(CHECKPOINT)))
+        qubed_output = checkpoint.combine_if_nested_qube(
+            checkpoint.get_model_output(lead_time=block.config_as_int(LEAD_TIME, validator=positive))
         )
         if ensemble_members > 1:
             qubed_output = expand(qubed_output, {"number": range(1, ensemble_members + 1)})
-        return Either.ok(qubed_output)
+        return Either.ok(QubedOutput(dataqube=qubed_output))
 
     def compile(  # type:ignore[invalid-argument] # semigroup
         self,
@@ -196,7 +200,9 @@ class AnemoiInputSource(Source):
     }
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        return Either.ok(QubedOutput(dataqube=CheckpointArtifact(block.config_as_str(CHECKPOINT)).get_model_input()))
+        checkpoint = CheckpointArtifact(CompositeArtifactId.from_str(block.config_as_str(CHECKPOINT)))
+        qubed_output = checkpoint.combine_if_nested_qube(checkpoint.get_model_input())
+        return Either.ok(QubedOutput(dataqube=qubed_output))
 
     def compile(  # type:ignore[invalid-argument] # semigroup
         self,
@@ -234,19 +240,20 @@ class AnemoiTransform(Transform):
     }
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        qubed_input = CheckpointArtifact(block.config_as_str(CHECKPOINT)).get_model_input()
+        checkpoint = CheckpointArtifact(block.config_as_str(CHECKPOINT))
+        qubed_input = checkpoint.combine_if_nested_qube(checkpoint.get_model_input())
         if not contains(inputs["dataset"], qubed_input):
             difference_qube = qubed_input ^ inputs["dataset"].dataqube
             return Either.error(f"Input dataset is not compatible with the model checkpoint. Difference in qubes: {difference_qube}")
 
-        qubed_output = CheckpointArtifact(block.config_as_str(CHECKPOINT)).get_model_output(
-            lead_time=block.config_as_int(LEAD_TIME, validator=positive)
+        qubed_output = checkpoint.combine_if_nested_qube(
+            checkpoint.get_model_output(lead_time=block.config_as_int(LEAD_TIME, validator=positive))
         )
 
         input_dataset = inputs["dataset"]
         if contains(input_dataset, "number"):
             qubed_output = expand(qubed_output, {"number": axes(input_dataset)["number"]})
-        return Either.ok(qubed_output)
+        return Either.ok(QubedOutput(dataqube=qubed_output))
 
     def compile(  # type:ignore[invalid-argument] # semigroup
         self,
@@ -265,3 +272,35 @@ class AnemoiTransform(Transform):
 
     def intersect(self, other: QubedOutput) -> bool:
         return contains(other, "param")  # Basic check to see if the input contains params, cannot validate further
+
+
+class AnemoiDatasetSelect(Transform):
+    title: str = "Anemoi Inference Dataset Select"
+    description: str = "Select a dataset from the output of an Anemoi model."
+    inputs: list[str] = ["dataset"]
+
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
+        DATASET: BlockConfigurationOption(
+            title="Dataset",
+            description="Name of the dataset to select from the Anemoi model output",
+            value_type="str",
+        ),
+    }
+
+    def intersect(self, other: QubedOutput) -> bool:
+        return "dataset" in axes(other)
+
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        dataset_name = block.config_as_str(DATASET)
+        qubed_input = inputs["dataset"]
+        if "dataset" not in axes(qubed_input):
+            return Either.error(f"Input dataset does not contain 'dataset' dimension, found dimensions are {dimensions(qubed_input)}")
+        if not contains(qubed_input, dataset_name):
+            return Either.error(f"Dataset '{dataset_name}' not found in input qube dimensions {dimensions(qubed_input)}")
+
+        qubed_output = collapse(inputs["dataset"], dataset_name)
+        return Either.ok(qubed_output)
+
+    def restrictions(self, other: QubedOutput) -> ConfigurationOptionRestriction:
+        values = axes(other).get(DATASET, set())
+        return {DATASET: ListType(ClosedEnumType(list(map(str, values))))} if values else {}

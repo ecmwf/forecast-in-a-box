@@ -10,6 +10,8 @@
 import importlib.metadata
 import logging
 from copy import deepcopy
+from functools import reduce
+from operator import or_
 from pathlib import Path
 from typing import Any
 
@@ -64,15 +66,27 @@ class CheckpointArtifact:
         """Get local path to the checkpoint artifact, assumes it is already locally available, does not trigger download"""
         return Path(ArtifactsProvider.get_artifact_local_path(self.artifact))
 
-    def get_model_input(self) -> Qube:
+    def _open_qube_json(self, qube_json: dict) -> Qube | dict[str, Qube]:
+        """Open a qube from a json representation, handling both single qube and multiple qube cases."""
+        if not "key" in qube_json:
+            return {key: Qube.from_json(value) for key, value in qube_json.items()}
+        return Qube.from_json(qube_json)
+
+    def combine_if_nested_qube(self, dataset_qube: dict[str, Qube] | Qube) -> Qube:
+        """Combine multiple dataset qubes into a single qube with a dataset dimension, using the dataset name as the coordinate value."""
+        if isinstance(dataset_qube, Qube):
+            return dataset_qube
+        return reduce(or_, (f"dataset={ds}" / q for ds, q in dataset_qube.items()))
+
+    def get_model_input(self) -> Qube | dict[str, Qube]:
         """Get the model input qube from the checkpoint artifact"""
         checkpoint = self.checkpoint()
-        return Qube.from_json(checkpoint.input_qube)
+        return self._open_qube_json(checkpoint.input_qube)
 
-    def get_model_output(self, lead_time: int) -> QubedOutput:
+    def get_model_output(self, lead_time: int) -> Qube | dict[str, Qube]:
         """Get the model output qube from the checkpoint artifact"""
         checkpoint = self.checkpoint()
-        qube = Qube.from_json(checkpoint.output_qube)
+        qube = self._open_qube_json(checkpoint.output_qube)
 
         from earthkit.data.utils.dates import to_timedelta
 
@@ -80,8 +94,9 @@ class CheckpointArtifact:
         model_step_seconds = int(to_timedelta(checkpoint.timestep).total_seconds())
         steps = list(map(lambda x: x // 3600, range(model_step_seconds, lead_time_seconds + model_step_seconds, model_step_seconds)))
 
-        qubeoutput = QubedOutput(dataqube=qube)
-        return expand(qubeoutput, {"step": steps})
+        if isinstance(qube, dict):
+            return {key: expand(q, {"step": steps}) for key, q in qube.items()}
+        return expand(qube, {"step": steps})
 
     def get_additional_kwargs(self) -> dict[str, Any]:
         """Get additional kwargs for the model inference from the checkpoint artifact, such as post processors and control options."""
