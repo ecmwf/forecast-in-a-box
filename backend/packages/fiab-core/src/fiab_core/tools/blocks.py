@@ -173,6 +173,7 @@ class QubedBlockBuilder(abc.ABC):
     description: str
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption]
     inputs: list[str]
+    tags: set[str] | None = None
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         raise NotImplementedError
@@ -198,6 +199,7 @@ class QubedBlockBuilder(abc.ABC):
             description=self.description,
             configuration_options=self.configuration_options,
             inputs=self.inputs,
+            tags=self.tags,
         )
 
 

@@ -109,6 +109,7 @@ class AnemoiSource(Source):
     title: str = "Anemoi Model Source"
     description: str = "Get a forecast from an Anemoi checkpoint, initialised from a source."
     inputs: list[str] = []
+    tags: set[str] = {"anemoi", "forecast"}
 
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
         CHECKPOINT: BlockConfigurationOption(
@@ -175,6 +176,7 @@ class AnemoiInputSource(Source):
     title: str = "Anemoi Model Input Source"
     description: str = "Get the initial conditions for an Anemoi forecast, from a source, no forecast output."
     inputs: list[str] = []
+    tags: set[str] = {"anemoi"}
 
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
         CHECKPOINT: BlockConfigurationOption(
@@ -219,6 +221,7 @@ class AnemoiTransform(Transform):
     title: str = "Anemoi Model Transform"
     description: str = "Run an Anemoi model from a prior node"
     inputs: list[str] = ["dataset"]
+    tags: set[str] = {"anemoi", "forecast"}
 
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
         CHECKPOINT: BlockConfigurationOption(

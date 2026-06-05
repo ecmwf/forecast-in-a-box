@@ -72,6 +72,8 @@ class BlockFactory(FiabCoreBaseModel):
     """A key-value of config-option-key, config-option"""
     inputs: list[str]
     """A list of input names, such as 'initial conditions' or 'forecast', for the purpose of description/configuration"""
+    tags: set[str] | None = None
+    """Optional tags for this block, to be used for filtering/searching in the frontend"""
 
 
 BlockFactoryId = NewType("BlockFactoryId", str)

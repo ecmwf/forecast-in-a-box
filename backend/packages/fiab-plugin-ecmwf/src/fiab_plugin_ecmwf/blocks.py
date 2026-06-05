@@ -124,6 +124,7 @@ class EkdSource(Source):
         ),
     }
     inputs: list[str] = []
+    tags: set[str] = {"earthkit", "mars", "ecmwf-open-data"}
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         param = block.config_as_list(PARAM, str, allow_empty=False)
@@ -202,6 +203,7 @@ class EnsembleStatistics(Product):
         ),
     }
     inputs: list[str] = ["dataset"]
+    tags: set[str] = {"ensemble"}
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         input_dataset = inputs["dataset"]
@@ -247,6 +249,7 @@ class TemporalStatistics(Product):
         ),
     }
     inputs: list[str] = ["dataset"]
+    tags: set[str] = {"temporal"}
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         input_dataset = inputs["dataset"]
@@ -294,6 +297,7 @@ class ZarrSink(Sink):
         )
     }
     inputs: list[str] = ["dataset"]
+    tags: set[str] = {"zarr"}
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         return Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain"))
@@ -331,6 +335,7 @@ SelectAxisValue = str | int
 
 class SelectDimension(Transform):
     inputs: list[str] = ["dataset"]
+    tags: set[str] = {"select"}
 
     def __init__(
         self,
@@ -422,6 +427,7 @@ class GribSink(Sink):
         )
     }
     inputs: list[str] = ["dataset"]
+    tags: set[str] = {"grib"}
 
     def _find_template_values(cls, path: str) -> list[str]:
         return re.findall(r"\[(.*?)\]", path)
@@ -514,6 +520,7 @@ class MapPlotSink(Sink):
         # ),
     }
     inputs: list[str] = ["dataset"]
+    tags: set[str] = {"earthkit", "plot"}
 
     def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         input_dataset = inputs.get("dataset")
