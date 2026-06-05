@@ -224,7 +224,7 @@ class AnemoiInputSource(Source):
 class AnemoiTransform(Transform):
     title: str = "Anemoi Model Transform"
     description: str = "Run an Anemoi model from a prior node"
-    inputs: list[str] = ["dataset"]
+    inputs: list[str] = ["initial conditions"]
 
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
         CHECKPOINT: BlockConfigurationOption(
@@ -261,7 +261,7 @@ class AnemoiTransform(Transform):
         block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_task = block.input_ids["dataset"]
+        input_task = block.input_ids["initial conditions"]
 
         builder = AnemoiBuilder(block.config_as_str(CHECKPOINT))
         action = builder.from_initial_conditions(
