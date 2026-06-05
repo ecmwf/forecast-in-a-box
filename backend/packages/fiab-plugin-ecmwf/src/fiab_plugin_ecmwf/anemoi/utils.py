@@ -95,7 +95,7 @@ class CheckpointArtifact:
         steps = list(map(lambda x: x // 3600, range(model_step_seconds, lead_time_seconds + model_step_seconds, model_step_seconds)))
 
         if isinstance(qube, dict):
-            return {key: expand(q, {"step": steps}) for key, q in qube.items()}
+            return {key: expand(q, {"step": steps}) for key, q in qube.items()}  # type: ignore
         return expand(qube, {"step": steps})
 
     def get_additional_kwargs(self) -> dict[str, Any]:
