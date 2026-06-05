@@ -11,13 +11,14 @@ from fiab_core.fable import BlockFactoryId
 from fiab_core.tools.blocks import QubedBlockBuilder
 from fiab_core.tools.plugins import QubedPluginBuilder
 
-from fiab_plugin_ecmwf.anemoi.blocks import AnemoiDatasetSelect, AnemoiInputSource, AnemoiSource, AnemoiTransform
+from fiab_plugin_ecmwf.anemoi.blocks import AnemoiInputSource, AnemoiSource, AnemoiTransform
 from fiab_plugin_ecmwf.blocks import (
     ENSEMBLE,
     PARAM,
     STEP,
     EkdSource,
     EnsembleStatistics,
+    GenericSelectDimension,
     GribSink,
     MapPlotSink,
     SelectDimension,
@@ -44,12 +45,12 @@ blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
         item_python_type=int,
         selection_label="members",
     ),
+    BlockFactoryId("selectGeneric"): GenericSelectDimension(),
     BlockFactoryId("zarrSink"): ZarrSink(),
     BlockFactoryId("gribSink"): GribSink(),
     BlockFactoryId("anemoiSource"): AnemoiSource(),
     BlockFactoryId("anemoiInputSource"): AnemoiInputSource(),
     BlockFactoryId("anemoiTransform"): AnemoiTransform(),
-    BlockFactoryId("anemoiDatasetSelect"): AnemoiDatasetSelect(),
     BlockFactoryId("mapPlotSink"): MapPlotSink(),
 }
 

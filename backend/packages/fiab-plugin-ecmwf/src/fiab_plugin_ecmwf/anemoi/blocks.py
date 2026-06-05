@@ -272,35 +272,3 @@ class AnemoiTransform(Transform):
 
     def intersect(self, other: QubedOutput) -> bool:
         return contains(other, "param")  # Basic check to see if the input contains params, cannot validate further
-
-
-class AnemoiDatasetSelect(Transform):
-    title: str = "Anemoi Inference Dataset Select"
-    description: str = "Select a dataset from the output of an Anemoi model."
-    inputs: list[str] = ["dataset"]
-
-    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
-        DATASET: BlockConfigurationOption(
-            title="Dataset",
-            description="Name of the dataset to select from the Anemoi model output",
-            value_type="str",
-        ),
-    }
-
-    def intersect(self, other: QubedOutput) -> bool:
-        return "dataset" in axes(other)
-
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        dataset_name = block.config_as_str(DATASET)
-        qubed_input = inputs["dataset"]
-        if "dataset" not in axes(qubed_input):
-            return Either.error(f"Input dataset does not contain 'dataset' dimension, found dimensions are {dimensions(qubed_input)}")
-        if not contains(qubed_input, dataset_name):
-            return Either.error(f"Dataset '{dataset_name}' not found in input qube dimensions {dimensions(qubed_input)}")
-
-        qubed_output = collapse(inputs["dataset"], dataset_name)
-        return Either.ok(qubed_output)
-
-    def restrictions(self, other: QubedOutput) -> ConfigurationOptionRestriction:
-        values = axes(other).get(DATASET, set())
-        return {DATASET: ListType(ClosedEnumType(list(map(str, values))))} if values else {}
