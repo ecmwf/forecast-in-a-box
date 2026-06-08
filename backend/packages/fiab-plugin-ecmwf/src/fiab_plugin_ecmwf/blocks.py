@@ -68,9 +68,9 @@ PLOT_FORMAT_TO_MIME: dict[str, str] = {
 FORECAST_DATASETS = load_datasets()
 
 
-class EkdSource(Source):
-    title: str = "Earthkit Data Source"
-    description: str = "Fetch data from mars or ecmwf open data"
+class OperationalForecastSource(Source):
+    title: str = "Operational forecast source"
+    description: str = "Fetch operational forecast data from mars or ecmwf open data"
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
         SOURCE: BlockConfigurationOption(
             title="Source",
