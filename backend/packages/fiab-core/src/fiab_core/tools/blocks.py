@@ -188,7 +188,8 @@ class QubedBlockBuilder(abc.ABC):
     def intersect(self, other: QubedOutput) -> bool:
         raise NotImplementedError
 
-    def restrictions(self, other: QubedOutput) -> ConfigurationOptionRestriction:
+    def restrictions(self, block: BlockInstanceRich, inputs: dict[str, QubedOutput]) -> ConfigurationOptionRestriction:
+        del block, inputs
         return {}
 
     def as_catalogue(self) -> BlockFactory:

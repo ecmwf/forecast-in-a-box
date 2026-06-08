@@ -46,6 +46,8 @@ ENSEMBLE = ConfigurationOptionId("number")
 STEP = ConfigurationOptionId("step")
 LEVTYPE = ConfigurationOptionId("levtype")
 LEVEL = ConfigurationOptionId("levelist")
+DIMENSION = ConfigurationOptionId("dimension")
+VALUES = ConfigurationOptionId("values")
 GROUPBY = ConfigurationOptionId("groupby")
 SPLITBY = ConfigurationOptionId("splitby")
 FORECAST = ConfigurationOptionId("forecast")
@@ -70,6 +72,30 @@ PLOT_FORMAT_TO_MIME: dict[str, str] = {
 FORECAST_DATASETS = load_datasets()
 
 
+def _restriction_value_strings(axis_values: set[Any], item_python_type: type[str] | type[int]) -> list[str]:
+    if item_python_type is str:
+        return sorted(value for value in axis_values if isinstance(value, str))
+    if item_python_type is int:
+        return [str(value) for value in sorted(value for value in axis_values if type(value) is int)]
+    raise TypeError(f"Unsupported select value type {item_python_type!r}")
+
+
+def _axis_value_strings(axis_values: set[Any]) -> list[str]:
+    if all(isinstance(value, str) for value in axis_values):
+        return _restriction_value_strings(axis_values, str)
+    if all(type(value) is int for value in axis_values):
+        return _restriction_value_strings(axis_values, int)
+    return sorted(str(value) for value in axis_values)
+
+
+def _guess_axis_value(value: str) -> str | int:
+    try:
+        int_value = int(value)
+    except ValueError:
+        return value
+    return int_value if str(int_value) == value else value
+
+
 class OperationalForecastSource(Source):
     title: str = "Operational forecast source"
     description: str = "Fetch operational forecast data from mars or ecmwf open data"
@@ -90,21 +116,6 @@ class OperationalForecastSource(Source):
             description="Base time of the forecast",
             value_type="datetime",
         ),
-        PARAM: BlockConfigurationOption(
-            title="Parameters",
-            description="Parameters to select and plot (e.g. '2t', 'msl')",
-            value_type="list[str]",
-        ),
-        STEP: BlockConfigurationOption(
-            title="Steps",
-            description="Forecast steps to select (e.g. '0,6,12,...')",
-            value_type="list[int]",
-        ),
-        ENSEMBLE: BlockConfigurationOption(
-            title="Ensemble Members",
-            description="Ensemble members to select (e.g. '1,2,3,...')",
-            value_type="list[int]",
-        ),
     }
     inputs: list[str] = []
 
@@ -115,31 +126,12 @@ class OperationalForecastSource(Source):
         forecast = block.config_as_str(FORECAST)
         basetime = block.config_as_datetime(BASETIME)
         time = self._convert_time(basetime.time().hour)
-        params = block.config_as_list(PARAM, str, allow_empty=False)
-        steps = block.config_as_list(STEP, int, allow_empty=False)
-        numbers = block.config_as_list(ENSEMBLE, int, allow_empty=False)
 
         ifs_qoutput = QubedOutput(dataqube=FORECAST_DATASETS[forecast].as_qube(ens_dim=ENSEMBLE, include_member_zero=True))
         if not contains(ifs_qoutput, {"time": time}):
             return Either.error(f"Invalid time: must be in {axes(ifs_qoutput)['time']}")
 
-        ifs_qoutput = select(ifs_qoutput, {"time": time})
-        for param in params:
-            if not contains(ifs_qoutput, {PARAM: param}):
-                return Either.error(f"Invalid {PARAM}: must be in {axes(ifs_qoutput)[PARAM]}")
-            param_qoutput = select(ifs_qoutput, {PARAM: param})
-            for dim, config in [(STEP, steps), (ENSEMBLE, numbers)]:
-                if not contains(param_qoutput, {dim: config}):
-                    return Either.error(f"Invalid {dim}: must be in {axes(param_qoutput)[dim]} for param {param}")
-                param_qoutput = select(param_qoutput, {dim: config})
-
-        select_dims: dict[str, Any] = {
-            PARAM: params,
-            ENSEMBLE: numbers,
-            STEP: steps,
-        }
-        output = select(ifs_qoutput, select_dims)
-        return Either.ok(output)
+        return Either.ok(select(ifs_qoutput, {"time": time}))
 
     def compile(
         self,
@@ -151,20 +143,11 @@ class OperationalForecastSource(Source):
         fc_preset = FORECAST_DATASETS[forecast]
         fc_qube = fc_preset.as_qube(ens_dim=ENSEMBLE)
 
-        param = block.config_as_list(PARAM, str, allow_empty=False)
-        step = block.config_as_list(STEP, int, allow_empty=False)
-        number = block.config_as_list(ENSEMBLE, int, allow_empty=False)
         basetime = block.config_as_datetime(BASETIME)
         date = basetime.date().isoformat()
         time = self._convert_time(basetime.time().hour)
 
-        select_dims: dict[str, Any] = {
-            PARAM: param,
-            ENSEMBLE: number,
-            STEP: step,
-            "time": time,
-        }
-        subqube = fc_qube.select(select_dims)
+        subqube = fc_qube.select({"time": time})
         actions = {}
         for levtype in subqube.axes()[LEVTYPE]:
             path = f"levtype={levtype}"
@@ -205,7 +188,7 @@ class OperationalForecastSource(Source):
             merged = merge(**levtype_actions)
             for branch in ens_branches:
                 merged = merged.combine_branches(dim=ENSEMBLE, path=branch)
-            actions[path] = merged.combine_branches(dim=PARAM)
+            actions[path] = merged
         final_action = merge(**actions)
         return Either.ok(final_action)
 
@@ -349,45 +332,41 @@ class ZarrSink(Sink):
 SelectAxisValue = str | int
 
 
-class SelectDimension(Transform):
+class Select(Transform):
+    title: str = "Select"
+    description: str = "Select values from one dimension of the input dataset"
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
+        DIMENSION: BlockConfigurationOption(
+            title="Dimension",
+            description="Dimension to select from the dataset",
+            value_type="str",
+        ),
+        VALUES: BlockConfigurationOption(
+            title="Values",
+            description="Values to select from the chosen dimension",
+            value_type="list[str]",
+        ),
+    }
     inputs: list[str] = ["dataset"]
 
-    def __init__(
-        self,
-        *,
-        option_id: ConfigurationOptionId,
-        item_python_type: type[str] | type[int],
-        selection_label: str,
-    ) -> None:
-        label_title = selection_label.title()
-        label_sentence = selection_label[:1].upper() + selection_label[1:]
+    def _selected_dimension(self, block: BlockInstance) -> ConfigurationOptionId:
+        return ConfigurationOptionId(block.config_as_str(DIMENSION))
 
-        self.title = f"Select {label_title}"
-        self.description = f"Select {selection_label} from the input dataset"
-        self.option_id = option_id
-        self.item_python_type = item_python_type
-        self.selection_label = selection_label
-        self.configuration_options = {
-            option_id: BlockConfigurationOption(
-                title=label_title,
-                description=f"{label_sentence} to select from the dataset",
-                value_type=f"list[{self._value_type_name()}]",
-            )
-        }
+    def _selected_value_strings(self, block: BlockInstance) -> list[str]:
+        return block.config_as_list(VALUES, str, allow_empty=False)
 
-    def _value_type_name(self) -> str:
-        if self.item_python_type is str:
-            return "str"
-        if self.item_python_type is int:
-            return "int"
-        raise TypeError(f"Unsupported select value type {self.item_python_type!r}")
+    def _selected_axis_values(self, block: BlockInstance, input_dataset: QubedOutput) -> tuple[list[SelectAxisValue] | None, Error | None]:
+        dimension = self._selected_dimension(block)
+        axis_values = axes(input_dataset).get(dimension)
+        if axis_values is None:
+            return None, f"Dimension {dimension!r} is not in the input dimensions: {sorted(dimensions(input_dataset))}"
 
-    def _selected_values(self, block: BlockInstance) -> list[SelectAxisValue]:
-        if self.item_python_type is str:
-            return cast(list[SelectAxisValue], block.config_as_list(self.option_id, str, allow_empty=False))
-        if self.item_python_type is int:
-            return cast(list[SelectAxisValue], block.config_as_list(self.option_id, int, allow_empty=False))
-        raise TypeError(f"Unsupported select value type {self.item_python_type!r}")
+        axis_lookup = {str(value): value for value in axis_values if isinstance(value, (str, int))}
+        selected_strings = self._selected_value_strings(block)
+        missing = [value for value in selected_strings if value not in axis_lookup]
+        if missing:
+            return None, f"Values {missing} are not in the input {dimension}: {_axis_value_strings(axis_values)}"
+        return cast(list[SelectAxisValue], [axis_lookup[value] for value in selected_strings]), None
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         input_dataset = inputs.get("dataset")
@@ -395,14 +374,11 @@ class SelectDimension(Transform):
             actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
             return Either.error(f"Unsupported input type for 'dataset': expected QubedOutput, got {actual_type}")
 
-        selected_values = self._selected_values(block)
-        if not contains(input_dataset, {self.option_id: selected_values}):
-            return Either.error(
-                f"{self.selection_label} {selected_values} are not in the input "
-                f"{self.selection_label}: {axes(input_dataset).get(self.option_id, [])}"
-            )
-
-        output = select(input_dataset, {self.option_id: selected_values})
+        selected_values, error = self._selected_axis_values(block, input_dataset)
+        if selected_values is None:
+            return Either.error(cast(str, error))
+        dimension = self._selected_dimension(block)
+        output = select(input_dataset, {dimension: selected_values})
         return Either.ok(output)
 
     def compile(
@@ -412,23 +388,36 @@ class SelectDimension(Transform):
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
-        selected_values = self._selected_values(block)
-        selected = inputs[input_task].select({self.option_id: selected_values if len(selected_values) > 1 else selected_values[0]})
+        dimension = self._selected_dimension(block)
+        selected_values = [_guess_axis_value(value) for value in self._selected_value_strings(block)]
+        selected = inputs[input_task].select({dimension: selected_values if len(selected_values) > 1 else selected_values[0]})
         return Either.ok(selected)
 
-    def _restriction_value_strings(self, axis_values: set[Any]) -> list[str]:
-        if self.item_python_type is str:
-            return sorted(value for value in axis_values if isinstance(value, str))
-        if self.item_python_type is int:
-            return [str(value) for value in sorted(value for value in axis_values if type(value) is int)]
-        raise TypeError(f"Unsupported select value type {self.item_python_type!r}")
+    def restrictions(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> ConfigurationOptionRestriction:
+        input_dataset = inputs.get("dataset")
+        if not isinstance(input_dataset, QubedOutput):
+            return {}
 
-    def restrictions(self, other: QubedOutput) -> ConfigurationOptionRestriction:
-        values = self._restriction_value_strings(axes(other).get(self.option_id, set()))
-        return {self.option_id: ListType(ClosedEnumType(values))} if values else {}
+        restrict: ConfigurationOptionRestriction = {}
+        dimension_values = sorted(dimensions(input_dataset))
+        if dimension_values:
+            restrict[DIMENSION] = ClosedEnumType(dimension_values)
+
+        raw_dimension = block.configuration_values.get(DIMENSION)
+        if not isinstance(raw_dimension, str):
+            return restrict
+
+        axis_values = axes(input_dataset).get(raw_dimension)
+        if axis_values is None:
+            return restrict
+
+        values = _axis_value_strings(axis_values)
+        if values:
+            restrict[VALUES] = ListType(ClosedEnumType(values))
+        return restrict
 
     def intersect(self, other: QubedOutput) -> bool:
-        return contains(other, self.option_id)
+        return bool(dimensions(other))
 
 
 class GribSink(Sink):
@@ -590,15 +579,19 @@ class MapPlotSink(Sink):
         )
         return Either.ok(action)
 
-    def restrictions(self, other: QubedOutput) -> ConfigurationOptionRestriction:
-        restrict = {}
+    def restrictions(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> ConfigurationOptionRestriction:
+        del block
+        input_dataset = inputs.get("dataset")
+        if not isinstance(input_dataset, QubedOutput):
+            return {}
+        restrict: ConfigurationOptionRestriction = {}
 
-        param_values = [value for value in axes(other).get(PARAM, set()) if isinstance(value, str)]
+        param_values = [value for value in axes(input_dataset).get(PARAM, set()) if isinstance(value, str)]
         if param_values:
             restrict[PARAM] = ListType(ClosedEnumType(sorted(param_values)))
 
-        common = common_dimensions(other).intersection({PARAM, STEP, ENSEMBLE, LEVEL})
-        splitby = [x for x in common if len(axes(other)[x]) > 1]
+        common = common_dimensions(input_dataset).intersection({PARAM, STEP, ENSEMBLE, LEVEL})
+        splitby = [x for x in common if len(axes(input_dataset)[x]) > 1]
         restrict[SPLITBY] = ListType(ClosedEnumType(sorted(splitby) + ["none"]))
         return restrict
 

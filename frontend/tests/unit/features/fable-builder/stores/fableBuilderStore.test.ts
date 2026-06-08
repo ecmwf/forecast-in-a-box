@@ -701,6 +701,7 @@ describe('useFableBuilderStore', () => {
                   param: 'list[enumClosed[2t,msl]]',
                 },
               },
+              configurationRestrictions: {},
               missingGlyphs: {},
             },
             unrestricted: {
@@ -708,6 +709,7 @@ describe('useFableBuilderStore', () => {
               hasErrors: false,
               possibleExpansions: [],
               possibleExpansionRestrictions: {},
+              configurationRestrictions: {},
               missingGlyphs: {},
             },
           }),
@@ -730,6 +732,7 @@ describe('useFableBuilderStore', () => {
               hasErrors: false,
               possibleExpansions: [],
               possibleExpansionRestrictions: {},
+              configurationRestrictions: {},
               missingGlyphs: {},
             },
           }),

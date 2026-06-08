@@ -240,6 +240,19 @@ function aifsForecastPreset(): FablePreset {
           },
           input_ids: {},
         },
+        transform_1: {
+          factory_id: {
+            plugin: pluginId('ecmwf', 'ecmwf-base'),
+            factory: 'select',
+          },
+          configuration_values: {
+            dimension: 'step',
+            values: '6,12,18,24,30,36,42,48,54,60,66,72',
+          },
+          input_ids: {
+            dataset: 'source_1',
+          },
+        },
         sink_1: {
           factory_id: {
             plugin: pluginId('ecmwf', 'ecmwf-base'),

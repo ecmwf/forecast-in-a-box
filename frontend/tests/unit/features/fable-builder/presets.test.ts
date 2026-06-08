@@ -36,7 +36,7 @@ const FACTORY_CONFIG_KEYS: Record<string, ReadonlyArray<string>> = {
     'number',
   ],
   ensembleStatistics: ['param', 'statistic'],
-  selectSteps: ['step'],
+  select: ['dimension', 'values'],
   zarrSink: ['path'],
   gribSink: ['path'],
   mapPlotSink: ['param', 'domain', 'format', 'groupby', 'splitby'],

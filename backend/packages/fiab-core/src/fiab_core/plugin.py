@@ -24,6 +24,7 @@ from fiab_core.fable import (
     BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
+    ConfigurationOptionRestriction,
 )
 
 Error = str
@@ -31,7 +32,10 @@ Validator = Callable[[BlockInstance, dict[str, BlockInstanceOutput]], Either[Blo
 """Given a block instance corresponding to this plugin's Factory and its inputs, either provide error or determine what it outputs"""
 
 Expander = Callable[[BlockInstanceOutput], list[BlockExpansion]]
-"""Given a block instance output (including from other plugin), provide which block factories from this plugin can expand it"""
+"""Given a block instance output, provide which block factories can expand it"""
+
+Restrictor = Callable[[BlockInstance, dict[str, BlockInstanceOutput]], ConfigurationOptionRestriction]
+"""Given a block instance and its inputs, provide restrictions for the block's own configuration options"""
 
 Compiler = Callable[
     [ActionLookup, BlockInstanceId, BlockInstance], Either[Action, Error]  # type:ignore[invalid-argument] # semigroup
@@ -51,3 +55,4 @@ class Plugin:
     validator: Validator
     expander: Expander
     compiler: Compiler
+    restrictor: Restrictor | None = None

@@ -26,10 +26,10 @@ from itertools import groupby
 from typing import cast
 
 from fiab_core.fable import (
-    BlockExpansion,
     BlockFactoryId,
     BlockInstance,
     BlockInstanceId,
+    BlockInstanceOutput,
     BlockKind,
     ConfigurationOptionId,
     NoOutput,
@@ -100,6 +100,7 @@ class BlueprintValidationExpansion(FiabBaseModel):
     block_errors: dict[BlockInstanceId, list[str]]
     possible_sources: list[PluginBlockFactoryId]
     possible_expansions: dict[BlockInstanceId, list[PluginBlockExpansion]]
+    configuration_restrictions: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
     resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
     missing_glyphs: dict[BlockInstanceId, dict[ConfigurationOptionId, list[str]]] = {}
 
@@ -150,6 +151,7 @@ async def validate_expand(
         ]
     )
     possible_expansions: dict[BlockInstanceId, list[PluginBlockExpansion]] = {}
+    configuration_restrictions: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
     resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
     block_errors: dict[BlockInstanceId, list[str]] = defaultdict(list)
     missing_glyphs_result: dict[BlockInstanceId, dict[ConfigurationOptionId, list[str]]] = {}
@@ -261,6 +263,11 @@ async def validate_expand(
             continue
 
         inputs = {input_id: outputs[source_id] for input_id, source_id in blockInstance.input_ids.items()}
+        if not validate_only and plugin.restrictor is not None:
+            restrictions = plugin.restrictor(blockInstance, inputs)
+            if restrictions:
+                configuration_restrictions[blockId] = {k: v.serialize() for k, v in restrictions.items()}
+
         output_or_error = plugin.validator(blockInstance, inputs)
         if output_or_error.t is None:
             block_errors[blockId] += [cast(str, output_or_error.e)]
@@ -294,6 +301,7 @@ async def validate_expand(
     return BlueprintValidationExpansion(
         possible_sources=possible_sources,
         possible_expansions=possible_expansions,
+        configuration_restrictions=configuration_restrictions,
         resolved_configuration_options=resolved_configuration_options,
         block_errors=block_errors,
         global_errors=global_errors,

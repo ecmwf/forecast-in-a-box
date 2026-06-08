@@ -14,6 +14,7 @@ from fiab_core.fable import (
     BlockInstanceId,
     BlockInstanceOutput,
     ConfigurationOptionId,
+    ConfigurationOptionRestriction,
     NoOutput,
     RawOutput,
 )
@@ -134,6 +135,13 @@ def expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
     return []
 
 
+def restrictor(instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> ConfigurationOptionRestriction:
+    del inputs
+    if instance.factory_id.factory == BlockFactoryId("transform_increment"):
+        return {AMOUNT: FableType.parse("enumClosed[1,2,3]")}
+    return {}
+
+
 def compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
     with PayloadBuildingContext(environment=[f"-e {pathlib.Path(__file__).parent.parent.parent}"]):
         # with PayloadBuildingContext(environment=["-e /home/dev/src/fiab-plugin-test"]): # TODO handle the ssh:// scenario intelligently
@@ -186,4 +194,4 @@ def compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance
         return Either.ok(action)
 
 
-plugin = lambda: Plugin(catalogue=catalogue(), validator=validator, expander=expander, compiler=compiler)
+plugin = lambda: Plugin(catalogue=catalogue(), validator=validator, expander=expander, compiler=compiler, restrictor=restrictor)

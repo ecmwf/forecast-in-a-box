@@ -34,15 +34,17 @@ from fiab_plugin_ecmwf import blocks as ecmwf_block_builders
 from fiab_plugin_ecmwf import plugin
 from fiab_plugin_ecmwf.anemoi.utils import get_checkpoint_enum_type
 from fiab_plugin_ecmwf.blocks import (
+    DIMENSION,
     ENSEMBLE,
     FORECAST_DATASETS,
     PARAM,
     STEP,
+    VALUES,
     EnsembleStatistics,
     GribSink,
     MapPlotSink,
     OperationalForecastSource,
-    SelectDimension,
+    Select,
     TemporalStatistics,
     ZarrSink,
 )
@@ -57,21 +59,9 @@ def _block_builder(factory_id: str) -> QubedBlockBuilder:
     return ecmwf_block_builders[BlockFactoryId(factory_id)]
 
 
-def _select_parameters() -> SelectDimension:
-    block = _block_builder("selectParameters")
-    assert isinstance(block, SelectDimension)
-    return block
-
-
-def _select_steps() -> SelectDimension:
-    block = _block_builder("selectSteps")
-    assert isinstance(block, SelectDimension)
-    return block
-
-
-def _select_members() -> SelectDimension:
-    block = _block_builder("selectMembers")
-    assert isinstance(block, SelectDimension)
+def _select() -> Select:
+    block = _block_builder("select")
+    assert isinstance(block, Select)
     return block
 
 
@@ -85,10 +75,7 @@ def dummy_blockinstance() -> BlockInstance:
                 {
                     "source": "ecmwf-open-data",
                     "base_time": datetime(2024, 1, 1),
-                    "forecast": "ifs-ens",
-                    "param": ["2t", "msl", "u"],
-                    "step": [0, 6, 12],
-                    "number": [0, 1, 2, 3, 4],
+                    "forecast": "aifs-ens",
                 }
             ),
         ),
@@ -111,9 +98,7 @@ def operational_forecast_source_configuration() -> BlockInstance:
                 {
                     "source": "ecmwf-open-data",
                     "base_time": datetime(2024, 1, 1),
-                    "step": [0, 6, 12],
-                    "number": [1, 2, 3, 4, 5],
-                    "param": ["2t", "msl"],
+                    "forecast": "ifs-ens",
                 }
             ),
         ),
@@ -168,54 +153,6 @@ def temporal_statistics_configuration() -> BlockInstance:
 
 
 @pytest.fixture
-def select_parameters_configuration() -> BlockInstance:
-    return BlockInstance.from_block(
-        BlockInstanceBase(
-            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="selectParameters"),  # type: ignore
-            input_ids={"dataset": BlockInstanceId("source_output")},
-            configuration_values=_config(
-                {
-                    "param": ["2t"],
-                }
-            ),
-        ),
-        _select_parameters().configuration_options,
-    )
-
-
-@pytest.fixture
-def select_steps_configuration() -> BlockInstance:
-    return BlockInstance.from_block(
-        BlockInstanceBase(
-            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="selectSteps"),  # type: ignore
-            input_ids={"dataset": BlockInstanceId("source_output")},
-            configuration_values=_config(
-                {
-                    "step": [0],
-                }
-            ),
-        ),
-        _select_steps().configuration_options,
-    )
-
-
-@pytest.fixture
-def select_members_configuration() -> BlockInstance:
-    return BlockInstance.from_block(
-        BlockInstanceBase(
-            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="selectMembers"),  # type: ignore
-            input_ids={"dataset": BlockInstanceId("source_output")},
-            configuration_values=_config(
-                {
-                    "number": [1],
-                }
-            ),
-        ),
-        _select_members().configuration_options,
-    )
-
-
-@pytest.fixture
 def zarr_sink_configuration() -> BlockInstance:
     return BlockInstance.from_block(
         BlockInstanceBase(
@@ -251,7 +188,7 @@ def grib_sink_configuration() -> BlockInstance:
 def map_plot_sink_configuration() -> BlockInstance:
     return BlockInstance.from_block(
         BlockInstanceBase(
-            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="MapPlotSink"),  # type: ignore
+            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("mapPlotSink")),
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values=_config(
                 {
@@ -282,9 +219,6 @@ class TestOperationalForecastSource:
                         {
                             "source": "ecmwf-open-data",
                             "base_time": datetime(2024, 1, 1),
-                            "step": [0, 6, 12],
-                            "number": [0, 1, 2, 3, 4],
-                            "param": ["2t", "msl", "u"],
                             "forecast": forecast,
                         },
                     )
@@ -296,20 +230,20 @@ class TestOperationalForecastSource:
         assert isinstance(output, QubedOutput)
         assert output.dataqube is not None
         assert contains(output, "param")
+        assert contains(output, "step")
+        assert contains(output, "number")
+        if forecast != "aifs-ens":
+            return
         action = block.compile({}, BlockInstanceId("operationalForecastSource"), block_instance).get_or_raise()
         for _, array in nodetree_arrays(action.nodes):
-            assert array.sizes[STEP] == 3
-            assert array.sizes[ENSEMBLE] == 5
+            assert array.sizes[STEP] > 0
+            assert array.sizes[ENSEMBLE] > 0
         assert "levelist" in nodetree_dimensions(action.nodes)
 
     @pytest.mark.parametrize(
         "config, error",
         [
-            [{"param": ["unknown"]}, "Invalid param"],
-            [{"step": [0, 6, 400]}, "Invalid step"],
-            [{"number": [0, 50, 100]}, "Invalid number"],
             [{"base_time": datetime(2024, 1, 1, 9)}, "Invalid time"],
-            [{"base_time": datetime(2024, 1, 1, 6), "step": [150]}, "Invalid step"],
         ],
     )
     def test_validate(self, config: dict, error: str) -> None:
@@ -323,9 +257,6 @@ class TestOperationalForecastSource:
                         {
                             "source": "ecmwf-open-data",
                             "base_time": datetime(2024, 1, 1),
-                            "step": [0, 6, 12],
-                            "number": [1, 2, 3, 4, 5],
-                            "param": ["2t", "msl"],
                             "forecast": "ifs-ens",
                         },
                         **config,
@@ -343,6 +274,9 @@ class TestOperationalForecastSource:
             == "enumClosed['mars', 'ecmwf-open-data']"
         )
         assert OperationalForecastSource.configuration_options[ConfigurationOptionId("base_time")].value_type == "datetime"
+        assert PARAM not in OperationalForecastSource.configuration_options
+        assert STEP not in OperationalForecastSource.configuration_options
+        assert ENSEMBLE not in OperationalForecastSource.configuration_options
 
 
 class TestEnsembleStatistics:
@@ -527,221 +461,130 @@ class TestZarrSink:
         assert action.nodes.dims == {}
 
 
-class TestSelectParameters:
-    def test_catalogue_value_type_is_canonical(self) -> None:
-        assert _select_parameters().configuration_options[PARAM].value_type == "list[str]"
+class TestSelect:
+    def test_catalogue_value_types_are_canonical(self) -> None:
+        assert _select().configuration_options[DIMENSION].value_type == "str"
+        assert _select().configuration_options[VALUES].value_type == "list[str]"
 
-    def test_from_operational_forecast_source(
-        self, select_parameters_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
-    ) -> None:
-        block = _select_parameters()
-        assert block.intersect(other=operational_forecast_source_output)  # type: ignore[arg-type]
-        output = block.validate(
-            block=select_parameters_configuration, inputs={"dataset": operational_forecast_source_output}
-        ).get_or_raise()  # type: ignore[dict-item]
-        assert isinstance(output, QubedOutput)
-        assert output.dataqube is not None
-        assert axes(output)["param"] == {"2t"}
-
-    def test_from_operational_forecast_source_multiple_parameters(
-        self, select_parameters_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
-    ) -> None:
-        block = _select_parameters()
-        config = select_parameters_configuration.model_copy(update={"configuration_values": _config({"param": ["2t", "msl"]})})
-        output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}).get_or_raise()  # type: ignore[dict-item]
-        assert isinstance(output, QubedOutput)
-        assert axes(output)["param"] == {"2t", "msl"}
-
-    def test_missing_parameters(
-        self, select_parameters_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
-    ) -> None:
-        block = _select_parameters()
-        config = select_parameters_configuration.model_copy(update={"configuration_values": _config({"param": ["nonexistent"]})})
-        result = block.validate(block=config, inputs={"dataset": operational_forecast_source_output})  # type: ignore[dict-item]
-        with pytest.raises(Exception, match="parameters \\['nonexistent'\\] are not in the input parameters"):
-            result.get_or_raise()
-
-    def test_compile_calls_select(self, select_parameters_configuration: BlockInstance) -> None:
-        block = _select_parameters()
-        input_action = MagicMock()
-        selected_action = MagicMock()
-        input_action.select.return_value = selected_action
-
-        result = block.compile(
-            inputs={BlockInstanceId("source_output"): input_action},  # type: ignore[dict-item]
-            block_id=BlockInstanceId("select_parameters"),
-            block=select_parameters_configuration,
+    def test_restrictor_adds_dimension_restrictions(self, operational_forecast_source_output: QubedOutput) -> None:
+        config = BlockInstance.from_block(
+            BlockInstanceBase(
+                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("select")),
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config({"dimension": "step", "values": ["0"]}),
+            ),
+            _select().configuration_options,
         )
-        assert result.t is selected_action
-        input_action.select.assert_called_once_with({ConfigurationOptionId("param"): "2t"})
 
-    def test_compile_calls_select_with_multiple_parameters(self, select_parameters_configuration: BlockInstance) -> None:
-        block = _select_parameters()
-        input_action = MagicMock()
-        selected_action = MagicMock()
-        input_action.select.return_value = selected_action
-        config = select_parameters_configuration.model_copy(update={"configuration_values": _config({"param": ["2t", "msl"]})})
+        restrictor = plugin().restrictor
+        assert restrictor is not None
+        restriction = restrictor(config, {"dataset": operational_forecast_source_output})[DIMENSION].serialize()
+        assert restriction.startswith("enumClosed[")
+        assert "param" in restriction
+        assert "step" in restriction
+        assert "number" in restriction
 
-        result = block.compile(
-            inputs={BlockInstanceId("source_output"): input_action},  # type: ignore[dict-item]
-            block_id=BlockInstanceId("select_parameters"),
-            block=config,
+    def test_restrictor_adds_values_for_selected_dimension(self, operational_forecast_source_output: QubedOutput) -> None:
+        config = BlockInstance.from_block(
+            BlockInstanceBase(
+                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("select")),
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config({"dimension": "step", "values": ["0"]}),
+            ),
+            _select().configuration_options,
         )
-        assert result.t is selected_action
-        input_action.select.assert_called_once_with({ConfigurationOptionId("param"): ["2t", "msl"]})
 
-    def test_expander_adds_parameters_restrictions(self, operational_forecast_source_output: QubedOutput) -> None:
-        expansions = plugin().expander(operational_forecast_source_output)
-        select_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("selectParameters"))
-        assert select_expansion.restrictions[PARAM].serialize() == "list[enumClosed[2t,msl,u]]"
+        restrictor = plugin().restrictor
+        assert restrictor is not None
+        restrictions = restrictor(config, {"dataset": operational_forecast_source_output})
 
-    def test_expander_skips_restriction_for_non_string_axes(self) -> None:
-        output = QubedOutput(dataqube=Qube.from_datacube({"param": [1, 2]}))
-        expansions = plugin().expander(output)
-        select_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("selectParameters"))
-        assert select_expansion.restrictions == {}
+        assert restrictions[DIMENSION].serialize().startswith("enumClosed[")
+        values_restriction = restrictions[VALUES].serialize()
+        assert values_restriction.startswith("list[enumClosed[")
+        assert "0" in values_restriction
+        assert "6" in values_restriction
+        assert "12" in values_restriction
 
+    def test_selects_string_dimension(self, operational_forecast_source_output: QubedOutput) -> None:
+        block = _select()
+        config = BlockInstance.from_block(
+            BlockInstanceBase(
+                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("select")),
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config({"dimension": "param", "values": ["2t"]}),
+            ),
+            block.configuration_options,
+        )
 
-class TestSelectSteps:
-    def test_catalogue_value_type_is_canonical(self) -> None:
-        assert _select_steps().configuration_options[STEP].value_type == "list[int]"
+        output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}).get_or_raise()
 
-    def test_from_operational_forecast_source(
-        self, select_steps_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
-    ) -> None:
-        block = _select_steps()
-        assert block.intersect(other=operational_forecast_source_output)  # type: ignore[arg-type]
-        output = block.validate(block=select_steps_configuration, inputs={"dataset": operational_forecast_source_output}).get_or_raise()  # type: ignore[dict-item]
         assert isinstance(output, QubedOutput)
-        assert output.dataqube is not None
-        assert axes(output)[STEP] == {0}
+        assert axes(output)[PARAM] == {"2t"}
 
-    def test_from_operational_forecast_source_multiple_steps(
-        self, select_steps_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
-    ) -> None:
-        block = _select_steps()
-        config = select_steps_configuration.model_copy(update={"configuration_values": _config({"step": [0, 6]})})
-        output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}).get_or_raise()  # type: ignore[dict-item]
+    def test_selects_integer_dimension_from_string_values(self, operational_forecast_source_output: QubedOutput) -> None:
+        block = _select()
+        config = BlockInstance.from_block(
+            BlockInstanceBase(
+                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("select")),
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config({"dimension": "step", "values": ["0", "6"]}),
+            ),
+            block.configuration_options,
+        )
+
+        output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}).get_or_raise()
+
         assert isinstance(output, QubedOutput)
         assert axes(output)[STEP] == {0, 6}
 
-    def test_missing_steps(self, select_steps_configuration: BlockInstance, operational_forecast_source_output: QubedOutput) -> None:
-        block = _select_steps()
-        config = select_steps_configuration.model_copy(update={"configuration_values": _config({"step": [999]})})
-        result = block.validate(block=config, inputs={"dataset": operational_forecast_source_output})  # type: ignore[dict-item]
-        with pytest.raises(Exception, match="steps \\[999\\] are not in the input steps"):
+    def test_missing_dimension(self, operational_forecast_source_output: QubedOutput) -> None:
+        block = _select()
+        config = BlockInstance.from_block(
+            BlockInstanceBase(
+                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("select")),
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config({"dimension": "missing", "values": ["0"]}),
+            ),
+            block.configuration_options,
+        )
+
+        result = block.validate(block=config, inputs={"dataset": operational_forecast_source_output})
+        with pytest.raises(Exception, match="Dimension 'missing' is not in the input dimensions"):
             result.get_or_raise()
 
-    def test_compile_calls_select(self, select_steps_configuration: BlockInstance) -> None:
-        block = _select_steps()
+    def test_missing_values(self, operational_forecast_source_output: QubedOutput) -> None:
+        block = _select()
+        config = BlockInstance.from_block(
+            BlockInstanceBase(
+                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("select")),
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config({"dimension": "step", "values": ["999"]}),
+            ),
+            block.configuration_options,
+        )
+
+        result = block.validate(block=config, inputs={"dataset": operational_forecast_source_output})
+        with pytest.raises(Exception, match="Values \\['999'\\] are not in the input step"):
+            result.get_or_raise()
+
+    def test_compile_calls_select_with_integer_values(self) -> None:
+        block = _select()
         input_action = MagicMock()
         selected_action = MagicMock()
         input_action.select.return_value = selected_action
-
-        result = block.compile(
-            inputs={BlockInstanceId("source_output"): input_action},  # type: ignore[dict-item]
-            block_id=BlockInstanceId("select_steps"),
-            block=select_steps_configuration,
+        config = BlockInstance.from_block(
+            BlockInstanceBase(
+                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("select")),
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config({"dimension": "step", "values": ["0", "6"]}),
+            ),
+            block.configuration_options,
         )
-        assert result.t is selected_action
-        input_action.select.assert_called_once_with({STEP: 0})
 
-    def test_compile_calls_select_with_multiple_steps(self, select_steps_configuration: BlockInstance) -> None:
-        block = _select_steps()
-        input_action = MagicMock()
-        selected_action = MagicMock()
-        input_action.select.return_value = selected_action
-        config = select_steps_configuration.model_copy(update={"configuration_values": _config({"step": [0, 6]})})
+        result = block.compile(inputs={BlockInstanceId("source_output"): input_action}, block_id=BlockInstanceId("select"), block=config)
 
-        result = block.compile(
-            inputs={BlockInstanceId("source_output"): input_action},  # type: ignore[dict-item]
-            block_id=BlockInstanceId("select_steps"),
-            block=config,
-        )
         assert result.t is selected_action
         input_action.select.assert_called_once_with({STEP: [0, 6]})
-
-    def test_expander_adds_step_restrictions(self, operational_forecast_source_output: QubedOutput) -> None:
-        expansions = plugin().expander(operational_forecast_source_output)
-        select_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("selectSteps"))
-        assert select_expansion.restrictions[STEP].serialize() == "list[enumClosed[0,6,12]]"
-
-    def test_expander_skips_restriction_for_non_int_axes(self) -> None:
-        output = QubedOutput(dataqube=Qube.from_datacube({STEP: ["0", "6"]}))
-        expansions = plugin().expander(output)
-        select_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("selectSteps"))
-        assert select_expansion.restrictions == {}
-
-
-class TestSelectMembers:
-    def test_catalogue_value_type_is_canonical(self) -> None:
-        assert _select_members().configuration_options[ENSEMBLE].value_type == "list[int]"
-
-    def test_from_operational_forecast_source(
-        self, select_members_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
-    ) -> None:
-        block = _select_members()
-        assert block.intersect(other=operational_forecast_source_output)  # type: ignore[arg-type]
-        output = block.validate(block=select_members_configuration, inputs={"dataset": operational_forecast_source_output}).get_or_raise()  # type: ignore[dict-item]
-        assert isinstance(output, QubedOutput)
-        assert output.dataqube is not None
-        assert axes(output)[ENSEMBLE] == {1}
-
-    def test_from_operational_forecast_source_multiple_members(
-        self, select_members_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
-    ) -> None:
-        block = _select_members()
-        config = select_members_configuration.model_copy(update={"configuration_values": _config({"number": [1, 2]})})
-        output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}).get_or_raise()  # type: ignore[dict-item]
-        assert isinstance(output, QubedOutput)
-        assert axes(output)[ENSEMBLE] == {1, 2}
-
-    def test_missing_members(self, select_members_configuration: BlockInstance, operational_forecast_source_output: QubedOutput) -> None:
-        block = _select_members()
-        config = select_members_configuration.model_copy(update={"configuration_values": _config({"number": [999]})})
-        result = block.validate(block=config, inputs={"dataset": operational_forecast_source_output})  # type: ignore[dict-item]
-        with pytest.raises(Exception, match="members \\[999\\] are not in the input members"):
-            result.get_or_raise()
-
-    def test_compile_calls_select(self, select_members_configuration: BlockInstance) -> None:
-        block = _select_members()
-        input_action = MagicMock()
-        selected_action = MagicMock()
-        input_action.select.return_value = selected_action
-
-        result = block.compile(
-            inputs={BlockInstanceId("source_output"): input_action},  # type: ignore[dict-item]
-            block_id=BlockInstanceId("select_members"),
-            block=select_members_configuration,
-        )
-        assert result.t is selected_action
-        input_action.select.assert_called_once_with({ENSEMBLE: 1})
-
-    def test_compile_calls_select_with_multiple_members(self, select_members_configuration: BlockInstance) -> None:
-        block = _select_members()
-        input_action = MagicMock()
-        selected_action = MagicMock()
-        input_action.select.return_value = selected_action
-        config = select_members_configuration.model_copy(update={"configuration_values": _config({"number": [1, 2]})})
-
-        result = block.compile(
-            inputs={BlockInstanceId("source_output"): input_action},  # type: ignore[dict-item]
-            block_id=BlockInstanceId("select_members"),
-            block=config,
-        )
-        assert result.t is selected_action
-        input_action.select.assert_called_once_with({ENSEMBLE: [1, 2]})
-
-    def test_expander_adds_member_restrictions(self, operational_forecast_source_output: QubedOutput) -> None:
-        expansions = plugin().expander(operational_forecast_source_output)
-        select_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("selectMembers"))
-        assert select_expansion.restrictions[ENSEMBLE].serialize() == "list[enumClosed[0,1,2,3,4]]"
-
-    def test_expander_skips_restriction_for_non_int_axes(self) -> None:
-        output = QubedOutput(dataqube=Qube.from_datacube({ENSEMBLE: ["1", "2"]}))
-        expansions = plugin().expander(output)
-        select_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("selectMembers"))
-        assert select_expansion.restrictions == {}
 
 
 def test_anemoi_catalogue_value_types_are_canonical(registered_provider: None) -> None:
@@ -903,10 +746,21 @@ class TestMapPlotSink:
         collapsed = collapse(operational_forecast_source_output, "param")
         assert not block.intersect(other=collapsed)  # type: ignore[arg-type]
 
-    def test_expander_adds_parameters_restrictions(self, operational_forecast_source_output: QubedOutput) -> None:
+    def test_restrictor_adds_parameters_restrictions(
+        self, map_plot_sink_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
+    ) -> None:
+        restrictor = plugin().restrictor
+        assert restrictor is not None
+        restrictions = restrictor(map_plot_sink_configuration, {"dataset": operational_forecast_source_output})
+        param_restriction = restrictions[PARAM].serialize()
+        assert param_restriction.startswith("list[enumClosed[")
+        assert "2t" in param_restriction
+        assert "msl" in param_restriction
+
+    def test_expander_has_no_parameters_restrictions(self, operational_forecast_source_output: QubedOutput) -> None:
         expansions = plugin().expander(operational_forecast_source_output)
         map_plot_expansion = next(expansion for expansion in expansions if expansion.factory == BlockFactoryId("mapPlotSink"))
-        assert map_plot_expansion.restrictions[PARAM].serialize() == "list[enumClosed[2t,msl,u]]"
+        assert map_plot_expansion.restrictions == {}
 
     def test_expander_skips_restriction_for_non_string_axes(self) -> None:
         output = QubedOutput(dataqube=Qube.from_datacube({"param": [1, 2]}))

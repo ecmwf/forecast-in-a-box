@@ -167,6 +167,7 @@ class BlueprintValidationExpansionResponse(FiabBaseModel):
     block_errors: dict[BlockInstanceId, list[str]]
     possible_sources: list[PluginBlockFactoryId]
     possible_expansions: dict[BlockInstanceId, list[PluginBlockExpansion]]
+    configuration_restrictions: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
     resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]]
     missing_glyphs: dict[BlockInstanceId, dict[ConfigurationOptionId, list[str]]] = {}
 
@@ -426,6 +427,7 @@ async def expand_blueprint(
         block_errors=result.block_errors,
         possible_sources=result.possible_sources,
         possible_expansions=result.possible_expansions,
+        configuration_restrictions=result.configuration_restrictions,
         resolved_configuration_options=result.resolved_configuration_options,
         missing_glyphs=result.missing_glyphs,
     )

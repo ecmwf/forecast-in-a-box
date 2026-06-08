@@ -14,6 +14,7 @@ from fiab_core.fable import (
     BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
+    ConfigurationOptionRestriction,
     QubedOutput,
 )
 from fiab_core.plugin import Error, Plugin
@@ -61,13 +62,24 @@ class QubedPluginBuilder:
         except BlockInstanceConfigurationError as exc:
             return Either.error(str(exc))
 
-    def expand(self, block: QubedOutput) -> list[BlockExpansion]:
+    def expand(self, output: QubedOutput) -> list[BlockExpansion]:
         """Given a block instance output (including from other plugin), provide which block factories from this plugin can expand it"""
         expansions: list[BlockExpansion] = []
         for factory_id, factory in self.block_builders.items():
-            if factory.intersect(block):
-                expansions.append(BlockExpansion(factory=factory_id, restrictions=factory.restrictions(block)))
+            if factory.intersect(output):
+                expansions.append(BlockExpansion(factory=factory_id))
         return expansions
+
+    def restrict(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> ConfigurationOptionRestriction:
+        """Provide restrictions for a block's own configuration options."""
+        factory = self.block_builders.get(block.factory_id.factory)
+        if factory is None:
+            return {}
+        rich_block = BlockInstanceRich.from_block(block, factory.configuration_options)
+        try:
+            return factory.restrictions(rich_block, inputs)
+        except BlockInstanceConfigurationError:
+            return {}
 
     def compile(
         self,
@@ -99,6 +111,13 @@ class QubedPluginBuilder:
                 inputs_validated = cast(dict[str, QubedOutput], inputs)
                 return self.validate(block, inputs_validated)
 
+        def _generic_restrict(block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> ConfigurationOptionRestriction:
+            invalid = [f"{key}->{value.__class__.__name__}" for key, value in inputs.items() if not isinstance(value, QubedOutput)]
+            if any(invalid):
+                return {}
+            inputs_validated = cast(dict[str, QubedOutput], inputs)
+            return self.restrict(block, inputs_validated)
+
         return lambda: Plugin(
             catalogue=BlockFactoryCatalogue(
                 factories={factory_id: factory.as_catalogue() for factory_id, factory in self.block_builders.items()}
@@ -106,4 +125,5 @@ class QubedPluginBuilder:
             validator=_generic_validate,
             expander=_generic_expand,
             compiler=self.compile,
+            restrictor=_generic_restrict,
         )
