@@ -1298,7 +1298,7 @@ wheels = [
 
 [[package]]
 name = "earthkit-workflows"
-version = "0.14.0"
+version = "0.14.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "array-api-compat", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
@@ -1318,9 +1318,9 @@ dependencies = [
     { name = "sortedcontainers", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "xarray", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/24/7b/37021d7c54faa71415a15ab7592ba8e34efb8989150036e59dd6417e26bd/earthkit_workflows-0.14.0.tar.gz", hash = "sha256:98b30f32a52baaef2b1027f5edeaebad1c6686292586b7dded242c0d2989dcf6", size = 10849635, upload-time = "2026-06-01T08:15:06.275Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/52/03/8dd102d62897dfe47669053205623c9404fcccdf38762b894ba199dc5f2e/earthkit_workflows-0.14.2.tar.gz", hash = "sha256:18288d16cb1b8c580d5659ceb28c7dd2b00bdf8867653891ace72386366211d4", size = 10855266, upload-time = "2026-06-08T08:00:51.189Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/61/e4/dfcb6cc2b7601cb5a105fca08e22c7106cdbd8fc839f6308ad5306de72f2/earthkit_workflows-0.14.0-py3-none-any.whl", hash = "sha256:69fdd46e82506f84ba000d4a10a2aee623a4e6968f0c9b7f92417c71a06ce2e0", size = 203583, upload-time = "2026-06-01T08:15:04.951Z" },
+    { url = "https://files.pythonhosted.org/packages/21/c1/c0fc86e6ad49c35ce77d3ad3e285af29e5116ba1d463801555321dff0b18/earthkit_workflows-0.14.2-py3-none-any.whl", hash = "sha256:df3b9445262d2c948575f21a4502ad67662885da633fc82ed0d1d7ef9e91882a", size = 205638, upload-time = "2026-06-08T08:00:48.977Z" },
 ]
 
 [[package]]
