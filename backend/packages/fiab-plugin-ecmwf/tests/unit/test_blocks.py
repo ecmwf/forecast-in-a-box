@@ -254,7 +254,7 @@ def map_plot_sink_configuration() -> BlockInstance:
             configuration_values=_config(
                 {
                     "param": ["2t"],
-                    "domain": "global",
+                    "domain": ["global"],
                     "format": "png",
                     "groupby": "step",
                     "splitby": [],
@@ -838,7 +838,7 @@ class TestMapPlotSink:
                 configuration_values=_config(
                     {
                         "param": ["2t"],
-                        "domain": "global",
+                        "domain": ["global"],
                         "format": fmt,
                         "groupby": "none",
                         "splitby": [],
@@ -861,7 +861,7 @@ class TestMapPlotSink:
                 configuration_values=_config(
                     {
                         "param": ["2t", "msl"],
-                        "domain": "global",
+                        "domain": ["global"],
                         "format": "png",
                         "groupby": "none",
                         "splitby": [],
@@ -882,7 +882,7 @@ class TestMapPlotSink:
                 configuration_values=_config(
                     {
                         "param": ["nonexistent"],
-                        "domain": "global",
+                        "domain": ["global"],
                         "format": "png",
                         "groupby": "none",
                         "splitby": [],
@@ -904,7 +904,7 @@ class TestMapPlotSink:
                 configuration_values=_config(
                     {
                         "param": ["2t", "nonexistent"],
-                        "domain": "global",
+                        "domain": ["global"],
                         "format": "png",
                         "groupby": "none",
                         "splitby": [],
@@ -942,7 +942,7 @@ class TestMapPlotSink:
                 configuration_values=_config(
                     {
                         "param": ["2t", "msl"],
-                        "domain": "global",
+                        "domain": ["global"],
                         "format": "png",
                         "groupby": groupby,
                         "splitby": [],
@@ -966,7 +966,7 @@ class TestMapPlotSink:
                 configuration_values=_config(
                     {
                         "param": ["2t", "msl"],
-                        "domain": "global",
+                        "domain": ["global"],
                         "format": "png",
                         "groupby": "none",
                         "splitby": ["none", "param"],
@@ -990,7 +990,7 @@ class TestMapPlotSink:
                 configuration_values=_config(
                     {
                         "param": ["2t", "msl"],
-                        "domain": "global",
+                        "domain": ["global"],
                         "format": "png",
                         "groupby": "none",
                         "splitby": splitby,
