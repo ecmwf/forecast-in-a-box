@@ -23,6 +23,15 @@ INPUT_SOURCE_CONFIGURATION_OPTIONS = {"polytope": {"collection": "initial-condit
 logger = logging.getLogger(__name__)
 
 
+def _timestep_seconds(timestep: str) -> int:
+    from earthkit.data.utils.dates import to_timedelta
+
+    timestep_seconds = int(to_timedelta(timestep).total_seconds())
+    if timestep_seconds <= 0:
+        raise ValueError(f"Checkpoint timestep must be positive, got {timestep!r}")
+    return timestep_seconds
+
+
 def get_available_checkpoints() -> dict[CompositeArtifactId, AnemoiCheckpoint]:
     all_artifacts = ArtifactsProvider.get_artifacts_lookup()
     return {
@@ -68,15 +77,25 @@ class CheckpointArtifact:
         checkpoint = self.checkpoint()
         return Qube.from_json(checkpoint.input_qube)
 
+    def validate_lead_time(self, lead_time: int) -> str | None:
+        """Validate configured lead time against the checkpoint timestep."""
+        checkpoint = self.checkpoint()
+        model_step_seconds = _timestep_seconds(checkpoint.timestep)
+        lead_time_seconds = lead_time * 3600
+
+        if lead_time_seconds <= model_step_seconds:
+            return f"Configuration option 'lead_time' must be greater than checkpoint timestep {checkpoint.timestep!r}, got {lead_time}h"
+        if lead_time_seconds % model_step_seconds != 0:
+            return f"Configuration option 'lead_time' must be a multiple of checkpoint timestep {checkpoint.timestep!r}, got {lead_time}h"
+        return None
+
     def get_model_output(self, lead_time: int) -> QubedOutput:
         """Get the model output qube from the checkpoint artifact"""
         checkpoint = self.checkpoint()
         qube = Qube.from_json(checkpoint.output_qube)
 
-        from earthkit.data.utils.dates import to_timedelta
-
         lead_time_seconds = lead_time * 3600
-        model_step_seconds = int(to_timedelta(checkpoint.timestep).total_seconds())
+        model_step_seconds = _timestep_seconds(checkpoint.timestep)
         steps = list(map(lambda x: x // 3600, range(model_step_seconds, lead_time_seconds + model_step_seconds, model_step_seconds)))
 
         qubeoutput = QubedOutput(dataqube=qube)

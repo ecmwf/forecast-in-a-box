@@ -186,6 +186,24 @@ class TestAnemoiSourceValidate:
         with pytest.raises(BlockInstanceConfigurationError, match="must be positive"):
             AnemoiSource().validate(block=block, inputs={})
 
+    def test_invalid_lead_time_equal_to_timestep(self, dummy_checkpoint: str) -> None:
+        block = _make_block(
+            AnemoiSource,
+            {"checkpoint": dummy_checkpoint, "lead_time": 1, "base_time": datetime(2024, 1, 1), "number": 1},
+        )
+        result = AnemoiSource().validate(block=block, inputs={})
+        with pytest.raises(Exception, match="must be greater than checkpoint timestep"):
+            result.get_or_raise()
+
+    def test_invalid_lead_time_not_a_timestep_multiple(self, six_hour_dummy_checkpoint: str) -> None:
+        block = _make_block(
+            AnemoiSource,
+            {"checkpoint": six_hour_dummy_checkpoint, "lead_time": 7, "base_time": datetime(2024, 1, 1), "number": 1},
+        )
+        result = AnemoiSource().validate(block=block, inputs={})
+        with pytest.raises(Exception, match="must be a multiple of checkpoint timestep"):
+            result.get_or_raise()
+
     def test_invalid_number_zero(self, dummy_checkpoint: str) -> None:
         block = _make_block(
             AnemoiSource,
@@ -339,6 +357,17 @@ class TestAnemoiTransformValidate:
         )
         with pytest.raises(BlockInstanceConfigurationError, match="must be positive"):
             AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset})
+
+    def test_invalid_lead_time_not_a_timestep_multiple(self, six_hour_dummy_checkpoint: str, dummy_qube: Qube) -> None:
+        input_dataset = QubedOutput(dataqube=dummy_qube)
+        block = _make_block(
+            AnemoiTransform,
+            {"checkpoint": six_hour_dummy_checkpoint, "lead_time": 7},
+            input_ids={"dataset": "src"},
+        )
+        result = AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset})
+        with pytest.raises(Exception, match="must be a multiple of checkpoint timestep"):
+            result.get_or_raise()
 
     def test_unknown_checkpoint(self, registered_provider: None, dummy_qube: Qube) -> None:
         input_dataset = QubedOutput(dataqube=dummy_qube)
