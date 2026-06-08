@@ -88,12 +88,12 @@ class AnemoiBuilder:
             payload_metadata={"artifacts": [self.artifact_id]},
         )
 
-    def from_initial_conditions(self, initial_conditions: Any, lead_time: int, ensemble: int = 1, **k: Any) -> Action:
+    def from_initial_conditions(self, initial_conditions: Any, lead_time: int, **k: Any) -> Action:
         return self.inference(lead_time=lead_time).from_initial_conditions(
-            initial_conditions, ensemble_members=ensemble, **k, payload_metadata={"artifacts": [self.artifact_id]}
+            initial_conditions, **k, payload_metadata={"artifacts": [self.artifact_id]}
         )
 
-    def get_initial_conditions(self, input_source: str, date: DATE, **k: Any) -> Action:
+    def get_initial_conditions(self, input_source: str, date: DATE, ensemble: int = 1, **k: Any) -> Action:
         env = self.checkpoint.get_environment()
         env.extend(INPUT_SOURCE_EXTRAS.get(input_source, []))
 
@@ -102,6 +102,7 @@ class AnemoiBuilder:
             input=self.checkpoint.get_input_configuration(input_source),
             date=date,
             environment=env,
+            ensemble_members=ensemble,
             payload_metadata={"artifacts": [self.artifact_id]},
             **k,
             **self.checkpoint.get_additional_kwargs(),
@@ -136,8 +137,8 @@ class AnemoiSource(Source):
             value_type="datetime",
         ),
         ENSEMBLE: BlockConfigurationOption(
-            title="Ensemble Members",
-            description="Number of ensemble members, default is 1 - deterministic.",
+            title="Ensemble Member",
+            description="ID of ensemble member.",
             value_type="int",
             default_value="1",
         ),
@@ -197,12 +198,23 @@ class AnemoiInputSource(Source):
             description="Base time of the forecast",
             value_type="datetime",
         ),
+        ENSEMBLE: BlockConfigurationOption(
+            title="Ensemble Member",
+            description="ID of ensemble member.",
+            value_type="int",
+            default_value="1",
+        ),
     }
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         checkpoint = CheckpointArtifact(CompositeArtifactId.from_str(block.config_as_str(CHECKPOINT)))
-        qubed_output = checkpoint.combine_if_nested_qube(checkpoint.get_model_input())
-        return Either.ok(QubedOutput(dataqube=qubed_output))
+        number = block.config_as_int(ENSEMBLE, validator=positive)
+        if number < 1:
+            return Either.error("Ensemble members must be an int, positive and non zero.")
+        model_input = checkpoint.combine_if_nested_qube(checkpoint.get_model_input())
+        model_input = expand(model_input, {ENSEMBLE: [number]})
+
+        return Either.ok(QubedOutput(dataqube=model_input))
 
     def compile(  # type:ignore[invalid-argument] # semigroup
         self,
@@ -216,6 +228,7 @@ class AnemoiInputSource(Source):
         action = builder.get_initial_conditions(
             input_source=block.config_as_str(INPUT_SOURCE),
             date=block.config_as_datetime(BASE_TIME),
+            ensemble=block.config_as_int(ENSEMBLE, validator=positive),
         )
 
         return Either.ok(action)
@@ -249,10 +262,9 @@ class AnemoiTransform(Transform):
         qubed_output = checkpoint.combine_if_nested_qube(
             checkpoint.get_model_output(lead_time=block.config_as_int(LEAD_TIME, validator=positive))
         )
-
         input_dataset = inputs["dataset"]
-        if contains(input_dataset, "number"):
-            qubed_output = expand(qubed_output, {"number": axes(input_dataset)["number"]})
+        if contains(input_dataset, ENSEMBLE):
+            qubed_output = expand(qubed_output, {ENSEMBLE: axes(input_dataset)[ENSEMBLE]})
         return Either.ok(QubedOutput(dataqube=qubed_output))
 
     def compile(  # type:ignore[invalid-argument] # semigroup
