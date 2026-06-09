@@ -16,17 +16,17 @@ from fiab_plugin_ecmwf.blocks import (
     ENSEMBLE,
     PARAM,
     STEP,
-    EkdSource,
     EnsembleStatistics,
     GribSink,
     MapPlotSink,
+    OperationalForecastSource,
     SelectDimension,
     TemporalStatistics,
     ZarrSink,
 )
 
 blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
-    BlockFactoryId("ekdSource"): EkdSource(),
+    BlockFactoryId("operationalForecastSource"): OperationalForecastSource(),
     BlockFactoryId("ensembleStatistics"): EnsembleStatistics(),
     BlockFactoryId("temporalStatistics"): TemporalStatistics(),
     BlockFactoryId("selectParameters"): SelectDimension(
