@@ -68,7 +68,7 @@ def _export_figure(figure: "Figure", fmt: str = "png", dpi: int = 100) -> bytes:
 
 def map_plot(
     fields: ekd.FieldList,
-    domain: str = "global",
+    domain: list[str] | None = None,
     format: str = "png",
     groupby: str = "none",
     style_schema: str = "default",
@@ -86,7 +86,7 @@ def map_plot(
     if not isinstance(fields, ekd.FieldList):
         fields = ekd.FieldList.from_fields(fields)
 
-    resolved_domain = None if domain in ("global", "Global", "DataDefined") else domain
+    resolved_domain = None if domain in (["global"], ["Global"], ["DataDefined"]) else domain
 
     if groupby and groupby != "none":
         unique_values = iter_utils.flatten(arg.metadata(groupby) for arg in fields)
