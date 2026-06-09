@@ -18,7 +18,6 @@ against Run outputs. Routes cover: start, status, stop, list, and supported lens
 # TODO currently no log propagation -- consider routing stdout of skinnywms to files, and allow retrieval here via a new route
 
 import logging
-import pathlib
 from typing import Any, Self
 
 import httpx
@@ -32,6 +31,7 @@ from forecastbox.domain.lens.manager import (
     LensStatus,
     get_status,
     list_instances,
+    local_path_available,
     start_skinny_wms,
     stop_instance,
 )
@@ -88,7 +88,7 @@ def start_skinny_wms_endpoint(local_path: str) -> LensInstanceId:
     if not is_skinny_available:
         raise HTTPException(status_code=400, detail="SkinnyWMS installation not found")
     try:
-        if not pathlib.Path(local_path).exists():
+        if not local_path_available(local_path):
             raise HTTPException(status_code=400, detail="Provided path does not exist")
         return start_skinny_wms(local_path)
     except NoFreePortsException:

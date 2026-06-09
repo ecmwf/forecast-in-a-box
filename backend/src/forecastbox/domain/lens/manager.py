@@ -16,8 +16,10 @@ Synchronization uses a single lock protecting the LensInstanceManager's instance
 Pyrsistent immutable structures allow safe lock-free reads.
 """
 
+import glob
 import logging
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -83,6 +85,33 @@ def _compute_status(instance: LensInstance) -> LensInstanceDetail:
     return LensInstanceDetail(status=status, lens_name=instance.lens_name, lens_params=instance.lens_params, ports=instance.ports)
 
 
+def _pattern_to_glob(path: str) -> str:
+    """Turn an earthkit file-pattern path (``…_[shortName].grib2``) into a glob
+    by replacing each ``[token]`` with ``*``."""
+    return re.sub(r"\[[^\]]*\]", "*", path)
+
+
+def _expand_local_path(local_path: str) -> list[str]:
+    """Resolve ``local_path`` to the concrete file(s) SkinnyWMS should serve.
+
+    - an existing single file → ``[local_path]``
+    - a GribSink file-pattern (``[shortName]``) → every glob match
+    - an existing directory → ``[]`` (caller serves the directory directly)
+    """
+    if os.path.isfile(local_path):
+        return [local_path]
+    if os.path.isdir(local_path):
+        return []
+    return sorted(glob.glob(_pattern_to_glob(local_path)))
+
+
+def local_path_available(local_path: str) -> bool:
+    """True if `local_path` resolves to something SkinnyWMS can serve: an
+    existing directory, a single file, or a file-pattern (e.g. a GribSink
+    `…_[shortName].grib2`) matching ≥1 file on disk."""
+    return os.path.isdir(local_path) or bool(_expand_local_path(local_path))
+
+
 def start_skinny_wms(local_path: str) -> LensInstanceId:
     """Start a skinnyWMS instance serving the given local_path.
 
@@ -106,15 +135,20 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
             raise TimeoutError("Failed to acquire lens manager lock")
         LensInstanceManager.instances = LensInstanceManager.instances.set(instance_id, instance)
 
-    # SkinnyWMS only accepts a directory as SKINNYWMS_DATA_PATH. If the caller
-    # supplied a single file (e.g. a GRIB written by GribSink), stage it inside
-    # a private temp directory so SkinnyWMS sees just that one file — and we
-    # don't expose siblings (other runs' files in the same output dir) to the
-    # WMS server. Symlink avoids copying the data.
+    # SkinnyWMS only accepts a directory as SKINNYWMS_DATA_PATH. Stage the
+    # caller's file(s) inside a private temp directory so SkinnyWMS sees only
+    # those — and we don't expose siblings (other runs' files in the same
+    # output dir) to the WMS server. Symlinks avoid copying the data.
+    #
+    # A GribSink path is an earthkit file-pattern (e.g. `…_[shortName].grib2`)
+    # that fans out to one file per field at write time, so the literal path
+    # never exists — `_expand_local_path` globs it to every written file.
     staging_dir: str | None = None
-    if os.path.isfile(local_path):
+    staged_files = _expand_local_path(local_path)
+    if staged_files:
         staging_dir = tempfile.mkdtemp(prefix="fiab-lens-stage-")
-        os.symlink(local_path, os.path.join(staging_dir, os.path.basename(local_path)))
+        for staged in staged_files:
+            os.symlink(staged, os.path.join(staging_dir, os.path.basename(staged)))
         data_path = staging_dir
     else:
         data_path = local_path

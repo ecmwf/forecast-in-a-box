@@ -501,19 +501,17 @@ export function uniquePressureLevels(
 }
 
 /**
- * Rewrite a URL emitted by the lens (which embeds its bind address, e.g.
- * `http://0.0.0.0:54321/...`) so it points at `baseUrl` (the address the
- * frontend actually reaches, e.g. `http://127.0.0.1:54321/...`). Path and
- * query are preserved. Returns the input unchanged on parse failure.
+ * Rewrite an absolute URL emitted by the lens (which embeds its in-pod bind
+ * address, e.g. `http://0.0.0.0:54321/wms?...`) so it is fetched through the
+ * backend proxy. The upstream path + query are grafted onto `baseUrl`
+ * (`…/api/v1/lens/proxy/54321`); swapping only host:port — as this used to —
+ * drops the proxy prefix, and the bind address is unreachable from the browser
+ * anyway. Returns the input unchanged on parse failure.
  */
 export function rebaseLensUrl(url: string, baseUrl: string): string {
   try {
-    const u = new URL(url)
-    const b = new URL(baseUrl)
-    u.protocol = b.protocol
-    u.hostname = b.hostname
-    u.port = b.port
-    return u.toString()
+    const upstream = new URL(url)
+    return `${baseUrl.replace(/\/$/, '')}${upstream.pathname}${upstream.search}`
   } catch {
     return url
   }
