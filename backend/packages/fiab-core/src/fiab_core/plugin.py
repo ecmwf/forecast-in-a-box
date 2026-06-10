@@ -22,7 +22,6 @@ from fiab_core.fable import (
     BlockExpansion,
     BlockFactoryCatalogue,
     BlockInstance,
-    BlockInstanceId,
     BlockInstanceOutput,
     ConfigurationOptionRestriction,
 )
@@ -52,9 +51,7 @@ Validator = Callable[[BlockInstance, dict[str, BlockInstanceOutput]], BlockValid
 Expander = Callable[[BlockInstanceOutput], list[BlockExpansion]]
 """Given a block instance output, provide which block factories can expand it"""
 
-Compiler = Callable[
-    [ActionLookup, BlockInstanceId, BlockInstance], Either[Action, Error]  # type:ignore[invalid-argument] # semigroup
-]
+Compiler = Callable[[ActionLookup, BlockInstance], Either[Action, Error]]  # type:ignore[invalid-argument] # semigroup
 """Given a cascade builder, represented as lookup of fluent actions, and a block instance corresponding to this plugin's Factory, either return the fluent action resulting from this block or an error"""
 
 

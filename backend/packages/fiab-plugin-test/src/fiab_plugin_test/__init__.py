@@ -11,7 +11,6 @@ from fiab_core.fable import (
     BlockFactoryCatalogue,
     BlockFactoryId,
     BlockInstance,
-    BlockInstanceId,
     BlockInstanceOutput,
     ConfigurationOptionId,
     ConfigurationOptionRestriction,
@@ -138,7 +137,7 @@ def expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
     return []
 
 
-def compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
+def compiler(lookup: ActionLookup, instance: BlockInstance) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
     with PayloadBuildingContext(environment=[f"-e {pathlib.Path(__file__).parent.parent.parent}"]):
         # with PayloadBuildingContext(environment=["-e /home/dev/src/fiab-plugin-test"]): # TODO handle the ssh:// scenario intelligently
         if instance.factory_id.factory == "source_42":

@@ -16,7 +16,6 @@ from fiab_core.artifacts import ArtifactsProvider, CompositeArtifactId
 from fiab_core.fable import (
     BlockFactoryId,
     BlockInstance,
-    BlockInstanceId,
     ConfigurationOptionId,
     PluginBlockFactoryId,
     PluginCompositeId,
@@ -116,7 +115,7 @@ def test_compiler_source_filesize_embeds_path_and_artifact_in_payload(tmp_path: 
 
     with patch.object(ArtifactsProvider, "get_artifact_local_path", return_value=artifact_path):
         instance = _make_instance("source_filesize", {"checkpoint": "mystore:mycheckpoint"})
-        result = compiler({}, BlockInstanceId("src"), instance)
+        result = compiler({}, instance)
 
     assert result.t is not None, f"compiler returned error: {result.e}"
 

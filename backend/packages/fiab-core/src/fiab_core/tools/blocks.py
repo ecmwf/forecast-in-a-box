@@ -21,7 +21,6 @@ from fiab_core.fable import (
     BlockConfigurationOption,
     BlockFactory,
     BlockInstance,
-    BlockInstanceId,
     BlockInstanceOutput,
     BlockKind,
     ConfigurationOptionId,
@@ -179,7 +178,6 @@ class QubedBlockBuilder(abc.ABC):
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         raise NotImplementedError

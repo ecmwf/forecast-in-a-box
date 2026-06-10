@@ -13,7 +13,6 @@ from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
     BlockInstance,
-    BlockInstanceId,
     BlockInstanceOutput,
     ConfigurationOptionId,
     NoOutput,
@@ -39,7 +38,6 @@ class _DemoTransform(Transform):
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         return Either.ok(inputs[block.input_ids["dataset"]])
@@ -61,7 +59,6 @@ class _DemoProduct(Product):
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         return Either.ok(inputs[block.input_ids["dataset"]])
@@ -82,7 +79,6 @@ class _DemoSink(Sink):
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         return Either.ok(inputs[block.input_ids["dataset"]])

@@ -19,7 +19,6 @@ from earthkit.workflows.nodetree import nodetree_dimensions, nodetree_new_dimens
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
-    BlockInstanceId,
     BlockInstanceOutput,
     ConfigurationOptionId,
     ConfigurationOptionRestriction,
@@ -144,7 +143,6 @@ class OperationalForecastSource(Source):
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         forecast = block.config_as_str(FORECAST)
@@ -227,7 +225,6 @@ class EnsembleStatistics(Product):
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
@@ -271,7 +268,6 @@ class TemporalStatistics(Product):
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
@@ -313,7 +309,6 @@ class ZarrSink(Sink):
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
@@ -396,7 +391,6 @@ class Select(Transform):
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
@@ -435,7 +429,6 @@ class GribSink(Sink):
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
@@ -542,7 +535,6 @@ class MapPlotSink(Sink):
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]

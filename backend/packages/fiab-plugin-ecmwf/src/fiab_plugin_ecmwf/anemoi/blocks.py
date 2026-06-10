@@ -18,7 +18,6 @@ from earthkit.workflows.plugins.anemoi.types import DATE
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
-    BlockInstanceId,
     BlockInstanceOutput,
     ConfigurationOptionId,
     ConfigurationOptionRestriction,
@@ -163,7 +162,6 @@ class AnemoiSource(Source):
     def compile(  # type:ignore[invalid-argument] # semigroup
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
 
@@ -222,7 +220,6 @@ class AnemoiInputSource(Source):
     def compile(  # type:ignore[invalid-argument] # semigroup
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
 
@@ -279,7 +276,6 @@ class AnemoiTransform(Transform):
     def compile(  # type:ignore[invalid-argument] # semigroup
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["initial conditions"]

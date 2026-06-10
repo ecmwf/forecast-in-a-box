@@ -110,7 +110,7 @@ def compile_builder(
             raise ValueError(f"compile failed at {blockId=} with {converted_values.e}")
         blockInstance.configuration_values = converted_values.t
         with PayloadBuildingContext(blockId=blockId):
-            result = plugin.compiler(action_lookup, blockId, blockInstance)
+            result = plugin.compiler(action_lookup, blockInstance)
         if result.t is None:
             raise ValueError(f"compile failed at {blockId=} with {result.e}")
         action_lookup[blockId] = result.t

@@ -113,9 +113,7 @@ def operational_forecast_source_output(dummy_blockinstance: BlockInstance) -> Qu
 
 @pytest.fixture
 def operational_forecast_source_action(dummy_blockinstance: BlockInstance) -> Action:
-    return (
-        OperationalForecastSource().compile(inputs={}, block_id=BlockInstanceId("source_output"), block=dummy_blockinstance).get_or_raise()
-    )
+    return OperationalForecastSource().compile(inputs={}, block=dummy_blockinstance).get_or_raise()
 
 
 @pytest.fixture
@@ -234,7 +232,7 @@ class TestOperationalForecastSource:
         assert contains(output, "number")
         if forecast != "aifs-ens":
             return
-        action = block.compile({}, BlockInstanceId("operationalForecastSource"), block_instance).get_or_raise()
+        action = block.compile({}, block_instance).get_or_raise()
         for _, array in nodetree_arrays(action.nodes):
             assert array.sizes[STEP] > 0
             assert array.sizes[ENSEMBLE] > 0
@@ -455,7 +453,6 @@ class TestZarrSink:
         block.validate(block=zarr_sink_configuration, inputs={"dataset": operational_forecast_source_output}).get_or_raise()  # type: ignore[dict-item]
         action = block.compile(
             inputs={BlockInstanceId("source_output"): operational_forecast_source_action},
-            block_id=BlockInstanceId("grib"),
             block=zarr_sink_configuration,
         ).get_or_raise()
         assert action.nodes.dims == {}
@@ -594,7 +591,7 @@ class TestSelect:
             block.configuration_options,
         )
 
-        result = block.compile(inputs={BlockInstanceId("source_output"): input_action}, block_id=BlockInstanceId("select"), block=config)
+        result = block.compile(inputs={BlockInstanceId("source_output"): input_action}, block=config)
 
         assert result.t is selected_action
         input_action.select.assert_called_once_with({STEP: [0, 6]})
@@ -739,9 +736,7 @@ class TestGribSink:
             GribSink.configuration_options,
         )
         block.validate(block=config, inputs={"dataset": operational_forecast_source_output}).get_or_raise()  # type: ignore[dict-item]
-        action = block.compile(
-            inputs={BlockInstanceId("source_output"): operational_forecast_source_action}, block_id=BlockInstanceId("grib"), block=config
-        ).get_or_raise()
+        action = block.compile(inputs={BlockInstanceId("source_output"): operational_forecast_source_action}, block=config).get_or_raise()
         assert action.nodes.dims == dims
 
 
@@ -921,9 +916,7 @@ class TestMapPlotSink:
             MapPlotSink.configuration_options,
         )
         block.validate(block=config, inputs={"dataset": operational_forecast_source_output}).get_or_raise()  # type: ignore[dict-item]
-        action = block.compile(
-            inputs={BlockInstanceId("source_output"): operational_forecast_source_action}, block_id=BlockInstanceId("plot"), block=config
-        ).get_or_raise()
+        action = block.compile(inputs={BlockInstanceId("source_output"): operational_forecast_source_action}, block=config).get_or_raise()
         assert action.nodes.dims == {}
 
     def test_validate_splitby(self, operational_forecast_source_output: QubedOutput) -> None:
@@ -975,7 +968,5 @@ class TestMapPlotSink:
             MapPlotSink.configuration_options,
         )
         block.validate(block=config, inputs={"dataset": operational_forecast_source_output}).get_or_raise()  # type: ignore[dict-item]
-        action = block.compile(
-            inputs={BlockInstanceId("source_output"): operational_forecast_source_action}, block_id=BlockInstanceId("plot"), block=config
-        ).get_or_raise()
+        action = block.compile(inputs={BlockInstanceId("source_output"): operational_forecast_source_action}, block=config).get_or_raise()
         assert action.nodes.dims == dims

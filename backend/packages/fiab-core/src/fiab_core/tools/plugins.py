@@ -12,7 +12,6 @@ from fiab_core.fable import (
     BlockFactoryCatalogue,
     BlockFactoryId,
     BlockInstance,
-    BlockInstanceId,
     BlockInstanceOutput,
     QubedOutput,
 )
@@ -72,7 +71,6 @@ class QubedPluginBuilder:
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         """Given a cascade builder and a block instance corresponding to this plugin's Factory, either update the builder with corresponding tasks or provide error"""
@@ -80,7 +78,7 @@ class QubedPluginBuilder:
             factory = self.block_builders[block.factory_id.factory]
             rich_block = BlockInstanceRich.from_block(block, factory.configuration_options)
             try:
-                return factory.compile(inputs, block_id, rich_block)
+                return factory.compile(inputs, rich_block)
             except BlockInstanceConfigurationError as exc:
                 return Either.error(str(exc))
 
