@@ -466,7 +466,7 @@ class TestSelect:
         assert _select().configuration_options[DIMENSION].value_type == "str"
         assert _select().configuration_options[VALUES].value_type == "list[str]"
 
-    def test_restrictor_adds_dimension_restrictions(self, operational_forecast_source_output: QubedOutput) -> None:
+    def test_validator_adds_dimension_restrictions(self, operational_forecast_source_output: QubedOutput) -> None:
         config = BlockInstance.from_block(
             BlockInstanceBase(
                 factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("select")),
@@ -476,15 +476,14 @@ class TestSelect:
             _select().configuration_options,
         )
 
-        restrictor = plugin().restrictor
-        assert restrictor is not None
-        restriction = restrictor(config, {"dataset": operational_forecast_source_output})[DIMENSION].serialize()
+        _, restrictions = plugin().validator(config, {"dataset": operational_forecast_source_output})
+        restriction = restrictions[DIMENSION].serialize()
         assert restriction.startswith("enumClosed[")
         assert "param" in restriction
         assert "step" in restriction
         assert "number" in restriction
 
-    def test_restrictor_adds_values_for_selected_dimension(self, operational_forecast_source_output: QubedOutput) -> None:
+    def test_validator_adds_values_for_selected_dimension(self, operational_forecast_source_output: QubedOutput) -> None:
         config = BlockInstance.from_block(
             BlockInstanceBase(
                 factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("select")),
@@ -494,9 +493,7 @@ class TestSelect:
             _select().configuration_options,
         )
 
-        restrictor = plugin().restrictor
-        assert restrictor is not None
-        restrictions = restrictor(config, {"dataset": operational_forecast_source_output})
+        _, restrictions = plugin().validator(config, {"dataset": operational_forecast_source_output})
 
         assert restrictions[DIMENSION].serialize().startswith("enumClosed[")
         values_restriction = restrictions[VALUES].serialize()
@@ -504,6 +501,22 @@ class TestSelect:
         assert "0" in values_restriction
         assert "6" in values_restriction
         assert "12" in values_restriction
+
+    def test_validator_keeps_restrictions_when_configuration_is_missing(self, operational_forecast_source_output: QubedOutput) -> None:
+        config = BlockInstance.from_block(
+            BlockInstanceBase(
+                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("select")),
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config({"dimension": "step"}),
+            ),
+            _select().configuration_options,
+        )
+
+        result, restrictions = plugin().validator(config, {"dataset": operational_forecast_source_output})
+
+        assert result.e is not None
+        assert DIMENSION in restrictions
+        assert VALUES in restrictions
 
     def test_selects_string_dimension(self, operational_forecast_source_output: QubedOutput) -> None:
         block = _select()
@@ -537,7 +550,7 @@ class TestSelect:
         assert isinstance(output, QubedOutput)
         assert axes(output)[STEP] == {0, 6}
 
-    def test_missing_dimension(self, operational_forecast_source_output: QubedOutput) -> None:
+    def test_validate_does_not_recheck_restricted_dimension(self, operational_forecast_source_output: QubedOutput) -> None:
         block = _select()
         config = BlockInstance.from_block(
             BlockInstanceBase(
@@ -548,11 +561,11 @@ class TestSelect:
             block.configuration_options,
         )
 
-        result = block.validate(block=config, inputs={"dataset": operational_forecast_source_output})
-        with pytest.raises(Exception, match="Dimension 'missing' is not in the input dimensions"):
-            result.get_or_raise()
+        output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}).get_or_raise()
 
-    def test_missing_values(self, operational_forecast_source_output: QubedOutput) -> None:
+        assert isinstance(output, QubedOutput)
+
+    def test_validate_does_not_recheck_restricted_values(self, operational_forecast_source_output: QubedOutput) -> None:
         block = _select()
         config = BlockInstance.from_block(
             BlockInstanceBase(
@@ -563,9 +576,9 @@ class TestSelect:
             block.configuration_options,
         )
 
-        result = block.validate(block=config, inputs={"dataset": operational_forecast_source_output})
-        with pytest.raises(Exception, match="Values \\['999'\\] are not in the input step"):
-            result.get_or_raise()
+        output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}).get_or_raise()
+
+        assert isinstance(output, QubedOutput)
 
     def test_compile_calls_select_with_integer_values(self) -> None:
         block = _select()
@@ -746,12 +759,10 @@ class TestMapPlotSink:
         collapsed = collapse(operational_forecast_source_output, "param")
         assert not block.intersect(other=collapsed)  # type: ignore[arg-type]
 
-    def test_restrictor_adds_parameters_restrictions(
+    def test_validator_adds_parameters_restrictions(
         self, map_plot_sink_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
-        restrictor = plugin().restrictor
-        assert restrictor is not None
-        restrictions = restrictor(map_plot_sink_configuration, {"dataset": operational_forecast_source_output})
+        _, restrictions = plugin().validator(map_plot_sink_configuration, {"dataset": operational_forecast_source_output})
         param_restriction = restrictions[PARAM].serialize()
         assert param_restriction.startswith("list[enumClosed[")
         assert "2t" in param_restriction
@@ -829,7 +840,7 @@ class TestMapPlotSink:
         output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}).get_or_raise()  # type: ignore[dict-item]
         assert isinstance(output, RawOutput)
 
-    def test_validate_missing_param(self, operational_forecast_source_output: QubedOutput) -> None:
+    def test_validate_does_not_recheck_restricted_param(self, operational_forecast_source_output: QubedOutput) -> None:
         block = MapPlotSink()
         config = BlockInstance.from_block(
             BlockInstanceBase(
@@ -847,11 +858,10 @@ class TestMapPlotSink:
             ),
             MapPlotSink.configuration_options,
         )
-        result = block.validate(block=config, inputs={"dataset": operational_forecast_source_output})  # type: ignore[dict-item]
-        with pytest.raises(Exception, match="params \\['nonexistent'\\] are not in the input parameters"):
-            result.get_or_raise()
+        output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}).get_or_raise()  # type: ignore[dict-item]
+        assert isinstance(output, RawOutput)
 
-    def test_validate_partial_missing_params(self, operational_forecast_source_output: QubedOutput) -> None:
+    def test_validate_does_not_recheck_partial_restricted_params(self, operational_forecast_source_output: QubedOutput) -> None:
         block = MapPlotSink()
         config = BlockInstance.from_block(
             BlockInstanceBase(
@@ -869,9 +879,8 @@ class TestMapPlotSink:
             ),
             MapPlotSink.configuration_options,
         )
-        result = block.validate(block=config, inputs={"dataset": operational_forecast_source_output})  # type: ignore[dict-item]
-        with pytest.raises(Exception, match="params \\['nonexistent'\\] are not in the input parameters"):
-            result.get_or_raise()
+        output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}).get_or_raise()  # type: ignore[dict-item]
+        assert isinstance(output, RawOutput)
 
     def test_validate_from_ensemble_statistics(
         self,

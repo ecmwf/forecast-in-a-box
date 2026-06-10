@@ -25,10 +25,9 @@ from fiab_core.fable import (
     BlockInstanceOutput,
     BlockKind,
     ConfigurationOptionId,
-    ConfigurationOptionRestriction,
     QubedOutput,
 )
-from fiab_core.plugin import Error
+from fiab_core.plugin import BlockValidation, Error
 from fiab_core.types import ClosedEnumType, DatetimeType, DateType, FloatType, IntType, ListType, OpenEnumType, StringType
 
 
@@ -174,7 +173,7 @@ class QubedBlockBuilder(abc.ABC):
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption]
     inputs: list[str]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+    def validate(self, block: BlockInstanceRich, inputs: dict[str, QubedOutput]) -> BlockValidation:
         raise NotImplementedError
 
     def compile(
@@ -187,10 +186,6 @@ class QubedBlockBuilder(abc.ABC):
 
     def intersect(self, other: QubedOutput) -> bool:
         raise NotImplementedError
-
-    def restrictions(self, block: BlockInstanceRich, inputs: dict[str, QubedOutput]) -> ConfigurationOptionRestriction:
-        del block, inputs
-        return {}
 
     def as_catalogue(self) -> BlockFactory:
         return BlockFactory(

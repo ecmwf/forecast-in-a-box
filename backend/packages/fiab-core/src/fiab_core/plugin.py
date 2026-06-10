@@ -12,7 +12,7 @@ Types pertaining to declaring FIAB Plugins, in particular their Fable-based inte
 """
 
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, NamedTuple
 
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
@@ -28,14 +28,29 @@ from fiab_core.fable import (
 )
 
 Error = str
-Validator = Callable[[BlockInstance, dict[str, BlockInstanceOutput]], Either[BlockInstanceOutput, Error]]  # type:ignore[invalid-argument] # semigroup
-"""Given a block instance corresponding to this plugin's Factory and its inputs, either provide error or determine what it outputs"""
+
+
+class BlockValidation(NamedTuple):
+    result: Either[BlockInstanceOutput, Error]  # type:ignore[invalid-argument] # semigroup
+    restrictions: ConfigurationOptionRestriction = {}
+
+    def get_or_raise(self) -> BlockInstanceOutput:
+        return self.result.get_or_raise()
+
+    @property
+    def t(self) -> BlockInstanceOutput | None:
+        return self.result.t
+
+    @property
+    def e(self) -> Error | None:
+        return self.result.e
+
+
+Validator = Callable[[BlockInstance, dict[str, BlockInstanceOutput]], BlockValidation]
+"""Given a block instance and its inputs, return either error or output and configuration restrictions"""
 
 Expander = Callable[[BlockInstanceOutput], list[BlockExpansion]]
 """Given a block instance output, provide which block factories can expand it"""
-
-Restrictor = Callable[[BlockInstance, dict[str, BlockInstanceOutput]], ConfigurationOptionRestriction]
-"""Given a block instance and its inputs, provide restrictions for the block's own configuration options"""
 
 Compiler = Callable[
     [ActionLookup, BlockInstanceId, BlockInstance], Either[Action, Error]  # type:ignore[invalid-argument] # semigroup
@@ -55,4 +70,3 @@ class Plugin:
     validator: Validator
     expander: Expander
     compiler: Compiler
-    restrictor: Restrictor | None = None

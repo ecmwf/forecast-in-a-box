@@ -14,10 +14,9 @@ from fiab_core.fable import (
     BlockInstance,
     BlockInstanceId,
     BlockInstanceOutput,
-    ConfigurationOptionRestriction,
     QubedOutput,
 )
-from fiab_core.plugin import Error, Plugin
+from fiab_core.plugin import BlockValidation, Error, Plugin
 from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich, QubedBlockBuilder
 
 
@@ -53,14 +52,14 @@ class QubedPluginBuilder:
         self.block_builders = block_builders
         self.base_environment = [_detect_editable_install(e) for e in base_environment]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        """Given a block instance corresponding to this plugin's Factory and its inputs, either provide error or determine what it outputs"""
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
+        """Given a block instance and its inputs, return either error or output and configuration restrictions."""
         factory = self.block_builders[block.factory_id.factory]
         rich_block = BlockInstanceRich.from_block(block, factory.configuration_options)
         try:
             return factory.validate(rich_block, inputs)
         except BlockInstanceConfigurationError as exc:
-            return Either.error(str(exc))
+            return BlockValidation(Either.error(str(exc)))
 
     def expand(self, output: QubedOutput) -> list[BlockExpansion]:
         """Given a block instance output (including from other plugin), provide which block factories from this plugin can expand it"""
@@ -69,17 +68,6 @@ class QubedPluginBuilder:
             if factory.intersect(output):
                 expansions.append(BlockExpansion(factory=factory_id))
         return expansions
-
-    def restrict(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> ConfigurationOptionRestriction:
-        """Provide restrictions for a block's own configuration options."""
-        factory = self.block_builders.get(block.factory_id.factory)
-        if factory is None:
-            return {}
-        rich_block = BlockInstanceRich.from_block(block, factory.configuration_options)
-        try:
-            return factory.restrictions(rich_block, inputs)
-        except BlockInstanceConfigurationError:
-            return {}
 
     def compile(
         self,
@@ -103,20 +91,13 @@ class QubedPluginBuilder:
             else:
                 return []
 
-        def _generic_validate(block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        def _generic_validate(block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> BlockValidation:
             invalid = [f"{key}->{value.__class__.__name__}" for key, value in inputs.items() if not isinstance(value, QubedOutput)]
             if any(invalid):
-                return Either.error(f"Expected only QubedOutputs in inputs, gotten {','.join(invalid)}")
+                return BlockValidation(Either.error(f"Expected only QubedOutputs in inputs, gotten {','.join(invalid)}"))
             else:
                 inputs_validated = cast(dict[str, QubedOutput], inputs)
                 return self.validate(block, inputs_validated)
-
-        def _generic_restrict(block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> ConfigurationOptionRestriction:
-            invalid = [f"{key}->{value.__class__.__name__}" for key, value in inputs.items() if not isinstance(value, QubedOutput)]
-            if any(invalid):
-                return {}
-            inputs_validated = cast(dict[str, QubedOutput], inputs)
-            return self.restrict(block, inputs_validated)
 
         return lambda: Plugin(
             catalogue=BlockFactoryCatalogue(
@@ -125,5 +106,4 @@ class QubedPluginBuilder:
             validator=_generic_validate,
             expander=_generic_expand,
             compiler=self.compile,
-            restrictor=_generic_restrict,
         )

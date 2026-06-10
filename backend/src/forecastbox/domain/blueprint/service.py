@@ -263,12 +263,9 @@ async def validate_expand(
             continue
 
         inputs = {input_id: outputs[source_id] for input_id, source_id in blockInstance.input_ids.items()}
-        if not validate_only and plugin.restrictor is not None:
-            restrictions = plugin.restrictor(blockInstance, inputs)
-            if restrictions:
-                configuration_restrictions[blockId] = {k: v.serialize() for k, v in restrictions.items()}
-
-        output_or_error = plugin.validator(blockInstance, inputs)
+        output_or_error, restrictions = plugin.validator(blockInstance, inputs)
+        if not validate_only and restrictions:
+            configuration_restrictions[blockId] = {k: v.serialize() for k, v in restrictions.items()}
         if output_or_error.t is None:
             block_errors[blockId] += [cast(str, output_or_error.e)]
             invalidable.add(blockId)

@@ -18,7 +18,7 @@ from fiab_core.fable import (
     NoOutput,
     RawOutput,
 )
-from fiab_core.plugin import Error, Plugin
+from fiab_core.plugin import BlockValidation, Error, Plugin
 from fiab_core.types import FableType
 
 TEXT = ConfigurationOptionId("text")
@@ -105,15 +105,18 @@ catalogue = lambda: BlockFactoryCatalogue(
 )
 
 
-def validator(instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+def validator(instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> BlockValidation:
+    restrictions: ConfigurationOptionRestriction = {}
+    if instance.factory_id.factory == BlockFactoryId("transform_increment"):
+        restrictions = {AMOUNT: FableType.parse("enumClosed[1,2,3]")}
     if instance.factory_id.factory in ("sink_file",):
-        return Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain"))
+        return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain")), restrictions)
     elif instance.factory_id.factory in ("sink_image",):
-        return Either.ok(RawOutput(type_fqn="bytes", mime_type="image/png"))
+        return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type="image/png")), restrictions)
     elif instance.factory_id.factory in ("source_sleep", "source_text", "source_filesize"):
-        return Either.ok(RawOutput(type_fqn="str", mime_type="text/plain"))
+        return BlockValidation(Either.ok(RawOutput(type_fqn="str", mime_type="text/plain")), restrictions)
     elif instance.factory_id.factory in ("source_42", "transform_increment", "product_join"):
-        return Either.ok(RawOutput(type_fqn="int"))
+        return BlockValidation(Either.ok(RawOutput(type_fqn="int")), restrictions)
     else:
         raise TypeError(f"unexpected factory {instance.factory_id.factory}")
 
@@ -133,13 +136,6 @@ def expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
         if output.type_fqn in ("str", "bytes"):
             return [BlockExpansion(factory=BlockFactoryId("sink_file"))]
     return []
-
-
-def restrictor(instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> ConfigurationOptionRestriction:
-    del inputs
-    if instance.factory_id.factory == BlockFactoryId("transform_increment"):
-        return {AMOUNT: FableType.parse("enumClosed[1,2,3]")}
-    return {}
 
 
 def compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
@@ -194,4 +190,4 @@ def compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance
         return Either.ok(action)
 
 
-plugin = lambda: Plugin(catalogue=catalogue(), validator=validator, expander=expander, compiler=compiler, restrictor=restrictor)
+plugin = lambda: Plugin(catalogue=catalogue(), validator=validator, expander=expander, compiler=compiler)

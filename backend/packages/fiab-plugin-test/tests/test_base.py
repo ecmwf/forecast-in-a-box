@@ -98,7 +98,8 @@ def _make_instance(factory: str, config: dict) -> BlockInstance:
 
 def test_validator_source_filesize_returns_str_raw_output() -> None:
     instance = _make_instance("source_filesize", {"checkpoint": "mystore:mycheckpoint"})
-    result = validator(instance, {})
+    result, restrictions = validator(instance, {})
+    assert restrictions == {}
     assert result.t is not None
     assert isinstance(result.t, RawOutput)
     assert result.t.type_fqn == "str"

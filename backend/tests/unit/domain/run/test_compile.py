@@ -16,7 +16,7 @@ from fiab_core.fable import (
     PluginBlockFactoryId,
     PluginCompositeId,
 )
-from fiab_core.plugin import Plugin
+from fiab_core.plugin import BlockValidation, Plugin
 from pyrsistent import pmap
 
 from forecastbox.domain.blueprint.service import BlueprintBuilder
@@ -143,9 +143,9 @@ def test_compile_builder_fails_missing_config_before_plugin_compile(monkeypatch:
         compiler_called = True
         return Either.error("should not be called")
 
-    def _validator(instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, str]:  # type:ignore[invalid-type-arguments] # semigroup
+    def _validator(instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> BlockValidation:
         del instance, inputs
-        return Either.ok(NoOutput())
+        return BlockValidation(Either.ok(NoOutput()))
 
     def _expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
         del output
