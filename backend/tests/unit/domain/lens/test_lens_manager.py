@@ -9,6 +9,7 @@
 
 """Unit tests for the lens domain manager."""
 
+import pathlib
 import subprocess
 from collections.abc import Iterator
 from unittest.mock import MagicMock, patch
@@ -22,8 +23,10 @@ from forecastbox.domain.lens.manager import (
     LensInstanceId,
     LensInstanceManager,
     _compute_status,
+    _expand_local_path,
     get_status,
     list_instances,
+    local_path_available,
     shutdown_all_lens_instances,
     stop_instance,
 )
@@ -228,3 +231,43 @@ class TestFreePortsManager:
         FreePortsManager.free_ports = set()
         FreePortsManager.release_port(19055)
         assert 19055 in FreePortsManager.free_ports
+
+
+class TestLocalPathExpansion:
+    """Path resolution for lens inputs: plain files, earthkit file-patterns
+    (`…[shortName].grib2`), directories, and missing paths."""
+
+    def test_plain_existing_file_is_returned_directly(self, tmp_path: pathlib.Path) -> None:
+        f = tmp_path / "run__1.grib2"
+        f.write_bytes(b"GRIB")
+        assert _expand_local_path(str(f)) == [str(f)]
+        assert local_path_available(str(f))
+
+    def test_pattern_expands_to_all_written_files(self, tmp_path: pathlib.Path) -> None:
+        for short_name in ("2t", "msl"):
+            (tmp_path / f"run__1__{short_name}.grib2").write_bytes(b"GRIB")
+        pattern = str(tmp_path / "run__1__[shortName].grib2")
+        assert _expand_local_path(pattern) == sorted([str(tmp_path / "run__1__2t.grib2"), str(tmp_path / "run__1__msl.grib2")])
+        assert local_path_available(pattern)
+
+    def test_any_pattern_keys_expand(self, tmp_path: pathlib.Path) -> None:
+        # earthkit patterns are not limited to [shortName] — every [key] globs.
+        for name in ("run__500__t.grib2", "run__850__q.grib2"):
+            (tmp_path / name).write_bytes(b"GRIB")
+        pattern = str(tmp_path / "run__[level]__[shortName].grib2")
+        assert _expand_local_path(pattern) == sorted([str(tmp_path / "run__500__t.grib2"), str(tmp_path / "run__850__q.grib2")])
+        assert local_path_available(str(tmp_path / "run__[level]__t.grib2"))
+
+    def test_directory_is_served_as_is(self, tmp_path: pathlib.Path) -> None:
+        assert _expand_local_path(str(tmp_path)) == []
+        assert local_path_available(str(tmp_path))
+
+    def test_missing_plain_path_is_unavailable(self, tmp_path: pathlib.Path) -> None:
+        missing = str(tmp_path / "not_written_yet.grib2")
+        assert _expand_local_path(missing) == []
+        assert not local_path_available(missing)
+
+    def test_pattern_with_no_matches_is_unavailable(self, tmp_path: pathlib.Path) -> None:
+        pattern = str(tmp_path / "run__1__[shortName].grib2")
+        assert _expand_local_path(pattern) == []
+        assert not local_path_available(pattern)
