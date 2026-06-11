@@ -22,7 +22,7 @@ from fiab_core.fable import PluginCompositeId
 from packaging.version import InvalidVersion, Version
 
 from forecastbox.domain.auth.users import UserRead
-from forecastbox.domain.plugin.compatibility import get_compatible_versions, install_specifier
+from forecastbox.domain.plugin.compatibility import get_compatible_versions
 from forecastbox.domain.plugin.manager import PluginsStatus, modify_enabled, status_full, submit_update_single, uninstall_plugin
 from forecastbox.domain.plugin.store import PluginRemoteInfo, PluginStoreEntry, get_plugins_detail, submit_install_plugin
 from forecastbox.routes.admin import get_admin_user
@@ -139,8 +139,7 @@ def update_plugin(
             raise HTTPException(status_code=422, detail=f"Invalid version string: {version!r}")
     else:
         parsed = None
-    specifier_set = install_specifier(parsed)
-    result = submit_update_single(pluginCompositeId, specifier_set=specifier_set)
+    result = submit_update_single(pluginCompositeId, install=True, version=parsed)
     if result:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result)
     return get_catalogue_redirect(request)

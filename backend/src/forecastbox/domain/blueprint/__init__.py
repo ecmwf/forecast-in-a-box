@@ -12,5 +12,6 @@ Manages the Blueprint domain -- user-created entities that capture computation i
 Used to create Runs and Experiments.
 
 Depends on the Glyph domain, to resolve and validate Glyphs.
-Dependen on by Run and Experiment domains.
+Depends on the Plugin domain, to determine fiab-core compatibility.
+Depended on by Run and Experiment domains.
 """

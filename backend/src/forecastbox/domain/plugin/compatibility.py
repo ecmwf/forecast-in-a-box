@@ -16,12 +16,15 @@ Centralises the version-compatibility rules between plugins and ``fiab-core``:
 
 Public API
 ----------
-install_specifier(version)
-    Build the ``SpecifierSet`` used when pip-installing a plugin.
+plugin_default_specifier()
+    Build the default ``SpecifierSet`` for a plugin install based on the installed fiab-core major.
+install_plugin_compatibly(pip_source, version)
+    Install a plugin, pinning fiab-core to the currently installed version.
 get_compatible_versions(plugin_settings, available_versions)
     Filter an iterable of version strings to only compatible ones.
 """
 
+import importlib
 import logging
 from collections.abc import Iterator
 
@@ -29,21 +32,24 @@ from packaging.specifiers import SpecifierSet
 from packaging.version import InvalidVersion, Version
 
 from forecastbox.utility.config import PluginSettings
-from forecastbox.utility.packages import get_fiabcore_version
+from forecastbox.utility.packages import get_existing_install_pin, try_install
 
 logger = logging.getLogger(__name__)
 
 
-def install_specifier(version: Version | None) -> SpecifierSet:
-    """Return the ``SpecifierSet`` to use when installing a plugin. If `version` not given,
-    derive a major-version compatibility range from the currently installed ``fiab-core``
-    (e.g. ``>=1,<2``). Otherwise, pin to that exact release (e.g. ``==1.2.3``). Does not
-    check whether that release is within the fiab core bounds!
+def get_fiabcore_version() -> Version:
+    """Return the currently installed version of ``fiab-core`` as a ``Version`` object."""
+    raw = importlib.metadata.version("fiab-core")
+    return Version(raw)
+
+
+def plugin_default_specifier() -> SpecifierSet:
+    """Return the ``SpecifierSet`` to use when installing a plugin when there is no
+    user version to start from. Derives a major-version compatibility range from
+    the currently installed ``fiab-core`` (e.g. ``>=1,<2``).
     """
-    if version is None:
-        major = get_fiabcore_version().major
-        return SpecifierSet(f">={major},<{major + 1}")
-    return SpecifierSet(f"=={version}")
+    major = get_fiabcore_version().major
+    return SpecifierSet(f">={major}.0.0,<{major + 1}.0.0")
 
 
 def get_compatible_versions(plugin_settings: PluginSettings, available_versions: Iterator[str]) -> Iterator[str]:
@@ -59,3 +65,16 @@ def get_compatible_versions(plugin_settings: PluginSettings, available_versions:
             continue
         if v.major == fiabcore_major:
             yield version_str
+
+
+def install_plugin_compatibly(pip_source: str, version: Version | None) -> None:
+    if pip_source.startswith("-e"):
+        pkgs = pip_source.split(" ", 1)
+    else:
+        if version is not None:
+            pkgs = [f"{pip_source}=={version}"]
+        else:
+            pkgs = [f"{pip_source}{plugin_default_specifier()}"]
+    # TODO -- include the whole pylock.toml
+    pkgs += get_existing_install_pin("fiab-core")
+    try_install(pkgs)

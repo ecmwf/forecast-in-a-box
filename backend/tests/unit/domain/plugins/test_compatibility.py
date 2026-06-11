@@ -15,7 +15,7 @@ import pytest
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
-from forecastbox.domain.plugin.compatibility import get_compatible_versions, install_specifier
+from forecastbox.domain.plugin.compatibility import get_compatible_versions, install_plugin_compatibly, plugin_default_specifier
 from forecastbox.utility.config import PluginSettings
 
 # ---------------------------------------------------------------------------
@@ -26,13 +26,13 @@ _PLUGIN = PluginSettings(pip_source="my-plugin", module_name="my_plugin")
 
 
 # ---------------------------------------------------------------------------
-# install_specifier
+# plugin_default_specifier / install_plugin_compatibly
 # ---------------------------------------------------------------------------
 
 
 def test_install_specifier_none_uses_fiabcore_major() -> None:
     with patch("forecastbox.domain.plugin.compatibility.get_fiabcore_version", return_value=Version("1.5.3")):
-        spec = install_specifier(None)
+        spec = plugin_default_specifier()
     assert Version("1.0.0") in spec
     assert Version("1.99.0") in spec
     assert Version("2.0.0") not in spec
@@ -41,36 +41,39 @@ def test_install_specifier_none_uses_fiabcore_major() -> None:
 
 def test_install_specifier_none_major_zero() -> None:
     with patch("forecastbox.domain.plugin.compatibility.get_fiabcore_version", return_value=Version("0.3.1")):
-        spec = install_specifier(None)
+        spec = plugin_default_specifier()
     assert Version("0.0.0") in spec
     assert Version("0.9.9") in spec
     assert Version("1.0.0") not in spec
 
 
-def test_install_specifier_exact_version() -> None:
-    spec = install_specifier(Version("2.5.0"))
-    assert Version("2.5.0") in spec
-    assert Version("2.5.1") not in spec
-    assert Version("2.4.9") not in spec
+def test_install_plugin_compatibly_exact_version() -> None:
+    with patch("forecastbox.domain.plugin.compatibility.get_existing_install_pin", return_value=["fiab-core==1.0.0"]):
+        with patch("forecastbox.domain.plugin.compatibility.try_install") as mock_install:
+            install_plugin_compatibly("my-plugin", Version("2.5.0"))
+    pkgs = mock_install.call_args[0][0]
+    assert "my-plugin==2.5.0" in pkgs
+    assert "fiab-core==1.0.0" in pkgs
 
 
-def test_install_specifier_returns_specifier_set() -> None:
-    spec = install_specifier(Version("3.0.0"))
+def test_plugin_default_specifier_returns_specifier_set() -> None:
+    with patch("forecastbox.domain.plugin.compatibility.get_fiabcore_version", return_value=Version("3.0.0")):
+        spec = plugin_default_specifier()
     assert isinstance(spec, SpecifierSet)
 
 
 def test_install_specifier_none_returns_specifier_set() -> None:
     with patch("forecastbox.domain.plugin.compatibility.get_fiabcore_version", return_value=Version("1.0.0")):
-        spec = install_specifier(None)
+        spec = plugin_default_specifier()
     assert isinstance(spec, SpecifierSet)
 
 
 def test_install_specifier_consistent_with_major() -> None:
     """Minor/patch of fiab-core version must not affect the range."""
     with patch("forecastbox.domain.plugin.compatibility.get_fiabcore_version", return_value=Version("2.0.0")):
-        spec_a = install_specifier(None)
+        spec_a = plugin_default_specifier()
     with patch("forecastbox.domain.plugin.compatibility.get_fiabcore_version", return_value=Version("2.7.3")):
-        spec_b = install_specifier(None)
+        spec_b = plugin_default_specifier()
     assert str(spec_a) == str(spec_b)
 
 
