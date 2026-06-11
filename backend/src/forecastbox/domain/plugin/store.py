@@ -21,6 +21,7 @@ from pyrsistent import pmap
 from pyrsistent.typing import PMap
 from typing_extensions import Self
 
+from forecastbox.domain.plugin.compatibility import install_specifier
 from forecastbox.domain.plugin.manager import submit_update_single
 from forecastbox.utility.concurrent import timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginStoreConfig, PluginStoreId, PluginStoresConfig, config, config_edit_lock
@@ -166,7 +167,7 @@ def submit_install_plugin(plugin_composite_key: PluginCompositeId) -> None:
             )
             config.save_to_file()
 
-    submit_update_single(plugin_composite_key, isUpdate=True)
+    submit_update_single(plugin_composite_key, specifier_set=install_specifier(None))
 
 
 def join_stores_thread(timeout_sec: int) -> None:

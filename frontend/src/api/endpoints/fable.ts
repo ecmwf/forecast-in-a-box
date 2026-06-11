@@ -103,9 +103,11 @@ export async function retrieveFable(
 export async function upsertFable(
   request: FableUpsertRequest,
 ): Promise<FableUpsertResponse> {
-  return apiClient.post(API_ENDPOINTS.fable.create, request, {
-    schema: FableUpsertResponseSchema,
-  })
+  return apiClient.post(
+    API_ENDPOINTS.fable.create,
+    { ...request, tags: request.tags.map((k) => ({ key: k })) },
+    { schema: FableUpsertResponseSchema },
+  )
 }
 
 /**
@@ -127,9 +129,14 @@ export async function listBlueprints(
 export async function updateBlueprint(
   request: BlueprintUpdateRequest,
 ): Promise<FableUpsertResponse> {
-  return apiClient.post(API_ENDPOINTS.fable.update, request, {
-    schema: FableUpsertResponseSchema,
-  })
+  return apiClient.post(
+    API_ENDPOINTS.fable.update,
+    {
+      ...request,
+      tags: request.tags?.map((k) => ({ key: k })),
+    },
+    { schema: FableUpsertResponseSchema },
+  )
 }
 
 /**

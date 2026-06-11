@@ -22,7 +22,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { userEvent } from 'vitest/browser'
 import { renderWithRouter } from '@tests/utils/render'
 import { worker } from '@tests/test-extend'
-import type { BlueprintListItem } from '@/api/types/fable.types'
 import { ConfigPresetsSection } from '@/features/dashboard/components/ConfigPresetsSection'
 import { PresetsPage } from '@/features/dashboard/components/PresetsPage'
 import { API_ENDPOINTS } from '@/api/endpoints'
@@ -33,13 +32,29 @@ vi.mock('@/hooks/useMedia', () => ({
   useMedia: () => true,
 }))
 
-const mockBlueprints: Array<BlueprintListItem> = [
+// Wire format for a blueprint list item as returned by the backend.
+// Differs from the parsed `BlueprintListItem` type: `tags` are objects here
+// but are transformed to strings by the Zod schema before reaching the app.
+interface WireBlueprint {
+  blueprint_id: string
+  version: number
+  display_name: string | null
+  display_description: string | null
+  tags: Array<{ key: string; value: string }> | null
+  source: string | null
+  created_by: string | null
+}
+
+const mockBlueprints: Array<WireBlueprint> = [
   {
     blueprint_id: 'bp-001',
     version: 1,
     display_name: 'European Forecast',
     display_description: 'Standard European config',
-    tags: ['prod', 'europe'],
+    tags: [
+      { key: 'prod', value: '' },
+      { key: 'europe', value: '' },
+    ],
     source: 'user_defined',
     created_by: null,
   },
@@ -57,14 +72,14 @@ const mockBlueprints: Array<BlueprintListItem> = [
     version: 1,
     display_name: 'Global Forecast',
     display_description: 'Full global run',
-    tags: ['global'],
+    tags: [{ key: 'global', value: '' }],
     source: 'user_defined',
     created_by: null,
   },
 ]
 
 function useBlueprintListHandler(
-  blueprints: Array<BlueprintListItem> = mockBlueprints,
+  blueprints: Array<WireBlueprint> = mockBlueprints,
 ) {
   worker.use(
     http.get(API_ENDPOINTS.fable.list, () => {
@@ -141,7 +156,7 @@ describe('ConfigPresetsSection', () => {
         version: 1,
         display_name: 'Saved Config',
         display_description: null,
-        tags: ['prod'],
+        tags: [{ key: 'prod', value: '' }],
         source: 'user_defined',
         created_by: null,
       },
@@ -150,7 +165,7 @@ describe('ConfigPresetsSection', () => {
         version: 1,
         display_name: 'One-off Run',
         display_description: null,
-        tags: [ONEOFF_TAG],
+        tags: [{ key: ONEOFF_TAG, value: '' }],
         source: 'user_defined',
         created_by: null,
       },

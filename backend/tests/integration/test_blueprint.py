@@ -37,7 +37,7 @@ import pytest
 from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId, ConfigurationOptionId, PluginBlockFactoryId, PluginCompositeId
 
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
-from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand
+from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand, Tag
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs
 from forecastbox.routes.run import CompilationDetailResponse, RunCreateResponse
 
@@ -126,7 +126,7 @@ def test_blueprint_save_and_retrieve(backend_client_with_auth: httpx.Client) -> 
         builder=builder,
         display_name="Test Blueprint",
         display_description="A blueprint saved via the v2 API",
-        tags=["test", "integration"],
+        tags=[Tag(key="test"), Tag(key="integration")],
     )
 
     # Save new blueprint
@@ -143,7 +143,7 @@ def test_blueprint_save_and_retrieve(backend_client_with_auth: httpx.Client) -> 
     assert retrieved["blueprint_id"] == saved["blueprint_id"]
     assert retrieved["version"] == 1
     assert retrieved["display_name"] == "Test Blueprint"
-    assert retrieved["tags"] == ["test", "integration"]
+    assert retrieved["tags"] == [{"key": "test", "value": None}, {"key": "integration", "value": None}]
     assert retrieved["builder"]["blocks"]["source_42"]["factory_id"]["factory"] == "source_42"
     assert retrieved["builder"]["environment"]["hosts"] == 2
     assert retrieved["builder"]["environment"]["workers_per_host"] == 4

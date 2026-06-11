@@ -55,6 +55,17 @@ from forecastbox.utility.pydantic import FiabBaseModel
 logger = logging.getLogger(__name__)
 
 
+class Tag(FiabBaseModel):
+    """A key-value tag that can be attached to a Blueprint.
+
+    ``value`` is ``None`` for plain label tags; non-None for informational
+    key=value pairs (e.g. the ``CoreVersionMismatch`` warning tag).
+    """
+
+    key: str
+    value: str | None = None
+
+
 class BlueprintBuilder(FiabBaseModel):
     # NOTE warning -- this class is used by the web api. Be careful about changes here
     blocks: dict[BlockInstanceId, BlockInstance]
@@ -77,8 +88,9 @@ class BlueprintRetrieveResult(FiabBaseModel):
     builder: BlueprintBuilder
     display_name: str | None = None
     display_description: str | None = None
-    tags: list[str] = []
+    tags: list[Tag] = []
     parent_id: str | None = None
+    fiabcore_major: int
 
 
 class BlueprintValidationExpansion(FiabBaseModel):
@@ -98,7 +110,7 @@ class BlueprintSaveCommand(FiabBaseModel):
     builder: BlueprintBuilder
     display_name: str | None = None
     display_description: str | None = None
-    tags: list[str] = []
+    tags: list[Tag] = []
     parent_id: str | None = None
 
 
@@ -318,7 +330,7 @@ async def save_builder(
         builder=payload.builder.model_dump(mode="json"),
         display_name=payload.display_name,
         display_description=payload.display_description,
-        tags=payload.tags if payload.tags else None,
+        tags=[t.model_dump() for t in payload.tags] if payload.tags else None,
         parent_id=payload.parent_id,
         expected_version=expected_version,
     )
@@ -336,12 +348,14 @@ async def load_builder(blueprint_id: BlueprintId, version: int | None = None) ->
     if blueprint.builder is None:
         raise BlueprintNotFound(f"Blueprint {blueprint_id!r} has no builder spec.")
     builder = BlueprintBuilder.model_validate(blueprint.builder)
+    raw_tags: list[dict] = blueprint.tags or []  # ty:ignore[invalid-argument-type,invalid-assignment]
     return BlueprintRetrieveResult(
         blueprint_id=BlueprintId(str(blueprint.blueprint_id)),  # ty:ignore[invalid-argument-type]
         blueprint_version=cast(int, blueprint.version),
         builder=builder,
         display_name=blueprint.display_name,  # ty:ignore[invalid-argument-type]
         display_description=blueprint.display_description,  # ty:ignore[invalid-argument-type]
-        tags=blueprint.tags or [],  # ty:ignore[invalid-argument-type]
+        tags=[Tag.model_validate(t) for t in raw_tags],
         parent_id=blueprint.parent_id,  # ty:ignore[invalid-argument-type]
+        fiabcore_major=cast(int, blueprint.fiabcore_major),
     )
