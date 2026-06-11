@@ -143,7 +143,7 @@ def test_blueprint_save_and_retrieve(backend_client_with_auth: httpx.Client) -> 
     assert retrieved["blueprint_id"] == saved["blueprint_id"]
     assert retrieved["version"] == 1
     assert retrieved["display_name"] == "Test Blueprint"
-    assert retrieved["tags"] == ["test", "integration"]
+    assert retrieved["tags"] == [["test", None], ["integration", None]]
     assert retrieved["builder"]["blocks"]["source_42"]["factory_id"]["factory"] == "source_42"
     assert retrieved["builder"]["environment"]["hosts"] == 2
     assert retrieved["builder"]["environment"]["workers_per_host"] == 4

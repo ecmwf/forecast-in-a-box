@@ -79,6 +79,7 @@ class BlueprintRetrieveResult(FiabBaseModel):
     display_description: str | None = None
     tags: list[str] = []
     parent_id: str | None = None
+    fiabcore_major: int
 
 
 class BlueprintValidationExpansion(FiabBaseModel):
@@ -344,4 +345,5 @@ async def load_builder(blueprint_id: BlueprintId, version: int | None = None) ->
         display_description=blueprint.display_description,  # ty:ignore[invalid-argument-type]
         tags=blueprint.tags or [],  # ty:ignore[invalid-argument-type]
         parent_id=blueprint.parent_id,  # ty:ignore[invalid-argument-type]
+        fiabcore_major=cast(int, blueprint.fiabcore_major),
     )

@@ -55,6 +55,7 @@ from forecastbox.domain.glyphs.types import GlobalGlyphId
 from forecastbox.domain.plugin.manager import catalogue_view, plugins_ready
 from forecastbox.schemata.jobs import GlobalGlyph
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.packages import get_fiabcore_version
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
 
@@ -101,7 +102,7 @@ class BlueprintGetResponse(FiabBaseModel):
     builder: BlueprintBuilder
     display_name: str | None = None
     display_description: str | None = None
-    tags: list[str] = []
+    tags: list[tuple[str, str | None]] = []
     parent_id: str | None = None
 
 
@@ -266,13 +267,17 @@ async def get_blueprint(
         retrieved = await service.load_builder(spec.blueprint_id, spec.version)
     except BlueprintNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
+    tags: list[tuple[str, str | None]] = [(t, None) for t in retrieved.tags]
+    current_fiabcore_major = get_fiabcore_version().major
+    if retrieved.fiabcore_major != current_fiabcore_major:
+        tags.append(("CoreVersionMismatch", f"!{retrieved.fiabcore_major} != {current_fiabcore_major}"))
     return BlueprintGetResponse(
         blueprint_id=retrieved.blueprint_id,
         version=retrieved.blueprint_version,
         builder=retrieved.builder,
         display_name=retrieved.display_name,
         display_description=retrieved.display_description,
-        tags=retrieved.tags,
+        tags=tags,
         parent_id=retrieved.parent_id,
     )
 

@@ -27,6 +27,7 @@ from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.schemata.jobs import Blueprint, BlueprintSource
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.db import dbRetry, executeAndCommit, querySingle
+from forecastbox.utility.packages import get_fiabcore_version
 
 
 async def upsert_blueprint(
@@ -97,6 +98,7 @@ async def upsert_blueprint(
                     display_description=display_description,
                     tags=tags,
                     builder=builder,
+                    fiabcore_major=get_fiabcore_version().major,
                     is_deleted=False,
                 )
             )
