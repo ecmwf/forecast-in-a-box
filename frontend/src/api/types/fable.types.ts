@@ -243,13 +243,23 @@ export interface FableUpsertRequest {
   parent_id?: string
 }
 
+/**
+ * A tag as returned by the backend: an object with a `key` and an optional
+ * `value`. The `value` is intentionally ignored — existing functionality only
+ * uses the key. The schema transforms the object to the key string so all
+ * downstream code continues to work with plain strings.
+ */
+const TagApiSchema = z
+  .object({ key: z.string(), value: z.string().optional() })
+  .transform((t) => t.key)
+
 /** routes/blueprint.py: BlueprintListItem */
 export const BlueprintListItemSchema = z.object({
   blueprint_id: z.string(),
   version: z.number(),
   display_name: z.string().nullable(),
   display_description: z.string().nullable(),
-  tags: z.array(z.string()).nullable(),
+  tags: z.array(TagApiSchema).nullable(),
   source: z.string().nullable(),
   created_by: z.string().nullable(),
 })
@@ -289,7 +299,7 @@ export const FableRetrieveResponseSchema = z.object({
   builder: FableBuilderV1Schema,
   display_name: z.string().nullable(),
   display_description: z.string().nullable(),
-  tags: z.array(z.string()),
+  tags: z.array(TagApiSchema),
   parent_id: z.string().nullable().optional(),
 })
 

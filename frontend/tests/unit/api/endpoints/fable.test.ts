@@ -175,7 +175,7 @@ describe('retrieveFable', () => {
       builder: mockFable,
       display_name: 'My Config',
       display_description: 'Some description',
-      tags: ['tag1'],
+      tags: [{ key: 'tag1', value: '' }],
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
     }
