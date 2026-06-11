@@ -11,7 +11,7 @@ from fiab_core.fable import BlockFactoryId
 from fiab_core.tools.blocks import QubedBlockBuilder
 from fiab_core.tools.plugins import QubedPluginBuilder
 
-from fiab_plugin_ecmwf.anemoi.blocks import AnemoiInputSource, AnemoiSource, AnemoiTransform
+from fiab_plugin_ecmwf.anemoi.blocks import DATASET, AnemoiInputSource, AnemoiSource, AnemoiTransform
 from fiab_plugin_ecmwf.blocks import (
     ENSEMBLE,
     PARAM,
@@ -49,6 +49,11 @@ blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
     BlockFactoryId("anemoiSource"): AnemoiSource(),
     BlockFactoryId("anemoiInputSource"): AnemoiInputSource(),
     BlockFactoryId("anemoiTransform"): AnemoiTransform(),
+    BlockFactoryId("selectDataset"): SelectDimension(
+        option_id=DATASET,
+        item_python_type=str,
+        selection_label="dataset",
+    ),
     BlockFactoryId("mapPlotSink"): MapPlotSink(),
 }
 

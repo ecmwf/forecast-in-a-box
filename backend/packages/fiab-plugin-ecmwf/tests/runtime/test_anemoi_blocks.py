@@ -108,6 +108,7 @@ def anemoi_input_source_configuration(dummy_checkpoint: str) -> BlockInstance:
             "checkpoint": dummy_checkpoint,
             "input_source": "opendata",
             "base_time": datetime(2024, 1, 1),
+            "number": 1,
         },
     )
 
@@ -268,9 +269,6 @@ class TestAnemoiInputSourceValidate:
         """Input source returns initial conditions - no step dimension."""
         assert not contains(anemoi_input_source_output, "step")
 
-    def test_output_has_no_number_axis(self, anemoi_input_source_output: QubedOutput) -> None:
-        assert not contains(anemoi_input_source_output, "number")
-
 
 class TestAnemoiInputSourceIntersect:
     """Sources always reject intersection - they are roots."""
@@ -298,7 +296,10 @@ class TestAnemoiTransformValidate:
             .get_or_raise()
         )
         assert isinstance(output, QubedOutput)
-        assert not contains(output, "number")
+        assert contains(anemoi_input_source_output, "number")
+        assert contains(output, "number")
+
+        assert axes(anemoi_input_source_output)["number"] == axes(output)["number"]
 
     def test_valid_propagates_number_axis(
         self, anemoi_transform_configuration: BlockInstance, anemoi_input_source_output: QubedOutput
@@ -469,7 +470,8 @@ class TestFlowAnemoiInputSourceToTransform:
         assert isinstance(output, QubedOutput)
         assert contains(output, "param")
         assert contains(output, "step")
-        assert not contains(output, "number")
+        assert contains(output, "number")
+        assert axes(output)["number"] == axes(anemoi_input_source_output)["number"]
 
 
 class TestFlowChainedTransforms:
