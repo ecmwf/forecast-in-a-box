@@ -137,9 +137,9 @@ def test_compile_builder_fails_missing_config_before_plugin_compile(monkeypatch:
     option_id = ConfigurationOptionId("amount")
     compiler_called = False
 
-    def _compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance) -> Either[Action, str]:  # type:ignore[invalid-type-arguments] # semigroup
+    def _compiler(lookup: ActionLookup, instance: BlockInstance) -> Either[Action, str]:  # type:ignore[invalid-type-arguments] # semigroup
         nonlocal compiler_called
-        del lookup, bid, instance
+        del lookup, instance
         compiler_called = True
         return Either.error("should not be called")
 
