@@ -37,6 +37,7 @@ from forecastbox.domain.gateway.service import shutdown_processes
 from forecastbox.domain.lens.manager import shutdown_all_lens_instances
 from forecastbox.domain.plugin.manager import join_updater_thread, submit_load_plugins
 from forecastbox.domain.plugin.store import join_stores_thread, submit_initialize_stores
+from forecastbox.domain.preset.seed import seed_presets
 from forecastbox.utility.config import config
 from forecastbox.utility.tunnel import shutdown as shutdown_tunnels
 
@@ -50,6 +51,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         module = importlib.import_module(f"forecastbox.schemata.{module_info.name}")
         if hasattr(module, "create_db_and_tables"):
             await module.create_db_and_tables()  # type: ignore[call-non-callable] # NOTE no module protocol
+    await seed_presets()
     if config.backend.allow_scheduler:
         start_scheduler()
     release_time, release_version = get_local_release()
