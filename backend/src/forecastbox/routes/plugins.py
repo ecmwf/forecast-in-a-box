@@ -14,7 +14,7 @@ Contains:
  - complete CRUD+List routes for the Plugin entity.
 """
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import Response
@@ -152,7 +152,7 @@ class PluginVersions(FiabBaseModel):
 
 
 @router.get("/versions")
-def get_plugin_versions(pluginCompositeId: PluginCompositeId) -> PluginVersions:
+def get_plugin_versions(pluginCompositeId: Annotated[PluginCompositeId, Depends()]) -> PluginVersions:
     """Return available PyPI versions of a plugin that are compatible with the installed ``fiab-core``.
 
     Compatibility is defined as equal major version.  Only versions published
