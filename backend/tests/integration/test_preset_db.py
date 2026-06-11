@@ -54,7 +54,6 @@ async def test_list_presets_with_filters() -> None:
         auth_context=auth_context,
         name="Test Preset",
         description="A test preset for filtering",
-        category="test-category",
         difficulty="beginner",
         tags=["test", "example"],
         builder_template={"blocks": {}},
@@ -66,11 +65,6 @@ async def test_list_presets_with_filters() -> None:
     result = await preset_db.list_presets(published_only=True)
     assert len(result) >= 1
     assert any(p.preset_id == preset_id for p in result)
-
-    # Test category filter
-    result = await preset_db.list_presets(category="test-category")
-    assert len(result) >= 1
-    assert all(p.category == "test-category" for p in result)
 
     # Test difficulty filter
     result = await preset_db.list_presets(difficulty="beginner")
@@ -96,7 +90,6 @@ async def test_count_presets() -> None:
         auth_context=auth_context,
         name="Count Test Preset",
         description="A test preset for counting",
-        category="count-category",
         difficulty="intermediate",
         tags=["count"],
         builder_template={"blocks": {}},
@@ -106,10 +99,6 @@ async def test_count_presets() -> None:
 
     # Test count all published presets
     count = await preset_db.count_presets(published_only=True)
-    assert count >= 1
-
-    # Test count with category filter
-    count = await preset_db.count_presets(category="count-category")
     assert count >= 1
 
     # Test count with difficulty filter
@@ -122,46 +111,6 @@ async def test_count_presets() -> None:
 
 
 @pytest.mark.asyncio
-async def test_list_categories() -> None:
-    """Test list_categories returns distinct categories."""
-    # Create test presets with different categories
-    auth_context = AuthContext(user_id="test_user", is_admin=True)
-
-    await preset_db.insert_preset(
-        auth_context=auth_context,
-        name="Category Test 1",
-        description="Test preset 1",
-        category="weather-forecast",
-        difficulty="beginner",
-        tags=[],
-        builder_template={"blocks": {}},
-        is_published=True,
-        created_by="test_user",
-    )
-
-    await preset_db.insert_preset(
-        auth_context=auth_context,
-        name="Category Test 2",
-        description="Test preset 2",
-        category="climate-dataset",
-        difficulty="beginner",
-        tags=[],
-        builder_template={"blocks": {}},
-        is_published=True,
-        created_by="test_user",
-    )
-
-    # Test list categories
-    categories = await preset_db.list_categories(published_only=True)
-    assert isinstance(categories, list)
-    assert len(categories) >= 2
-    assert "weather-forecast" in categories
-    assert "climate-dataset" in categories
-    # Verify categories are sorted
-    assert categories == sorted(categories)
-
-
-@pytest.mark.asyncio
 async def test_list_presets_published_only() -> None:
     """Test that published_only filter works correctly."""
     auth_context = AuthContext(user_id="test_user", is_admin=True)
@@ -171,7 +120,6 @@ async def test_list_presets_published_only() -> None:
         auth_context=auth_context,
         name="Published Preset",
         description="This is published",
-        category="test",
         difficulty="beginner",
         tags=[],
         builder_template={"blocks": {}},
@@ -184,7 +132,6 @@ async def test_list_presets_published_only() -> None:
         auth_context=auth_context,
         name="Unpublished Preset",
         description="This is not published",
-        category="test",
         difficulty="beginner",
         tags=[],
         builder_template={"blocks": {}},
@@ -215,7 +162,6 @@ async def test_search_in_tags() -> None:
         auth_context=auth_context,
         name="Tagged Preset",
         description="A preset with tags",
-        category="test",
         difficulty="beginner",
         tags=["featured", "quickstart", "example"],
         builder_template={"blocks": {}},
@@ -243,7 +189,6 @@ async def test_patch_preset_publish_status_does_not_increment_version() -> None:
         auth_context=auth_context,
         name="Publish Toggle Test",
         description="A preset for publish toggle testing",
-        category="test",
         difficulty="beginner",
         tags=[],
         builder_template={"blocks": {}},
@@ -290,7 +235,6 @@ async def test_patch_preset_publish_status_version_conflict() -> None:
         auth_context=auth_context,
         name="Version Conflict Publish Test",
         description="desc",
-        category="test",
         difficulty="beginner",
         tags=[],
         builder_template={"blocks": {}},

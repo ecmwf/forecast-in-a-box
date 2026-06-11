@@ -13,22 +13,19 @@ All catalogue / plugin-manager interactions are mocked so these tests run
 without a running server or installed plugins.
 
 Patch targets use the ``value_type_resolver`` module's own namespace because
-``plugins_ready``, ``catalogue_view``, and ``status_brief`` are imported there
-at module level.
+``wait_until_ready`` and ``catalogue_view`` are imported there at module
+level.
 """
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-from forecastbox.domain.preset.value_type_resolver import _wait_for_plugins, resolve_value_type
+from forecastbox.domain.preset.value_type_resolver import resolve_value_type
 
 # Patch targets — the names as they appear in the resolver module's namespace.
-_PLUGINS_READY = "forecastbox.domain.preset.value_type_resolver.plugins_ready"
+_WAIT_UNTIL_READY = "forecastbox.domain.preset.value_type_resolver.wait_until_ready"
 _CATALOGUE_VIEW = "forecastbox.domain.preset.value_type_resolver.catalogue_view"
-_STATUS_BRIEF = "forecastbox.domain.preset.value_type_resolver.status_brief"
 
 
 # ---------------------------------------------------------------------------
@@ -101,7 +98,7 @@ def test_resolves_forecast_option_from_catalogue() -> None:
     )
 
     with (
-        patch(_PLUGINS_READY, return_value=True),
+        patch(_WAIT_UNTIL_READY, return_value=True),
         patch(_CATALOGUE_VIEW, return_value=catalogue),
     ):
         result = resolve_value_type("glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/forecast]")
@@ -120,7 +117,7 @@ def test_resolves_checkpoint_option_from_catalogue() -> None:
     )
 
     with (
-        patch(_PLUGINS_READY, return_value=True),
+        patch(_WAIT_UNTIL_READY, return_value=True),
         patch(_CATALOGUE_VIEW, return_value=catalogue),
     ):
         result = resolve_value_type("glyph[catalogue:ecmwf/ecmwf-base/anemoiSource/checkpoint]")
@@ -139,7 +136,7 @@ def test_case_insensitive_glyph_prefix() -> None:
     )
 
     with (
-        patch(_PLUGINS_READY, return_value=True),
+        patch(_WAIT_UNTIL_READY, return_value=True),
         patch(_CATALOGUE_VIEW, return_value=catalogue),
     ):
         result = resolve_value_type("GLYPH[CATALOGUE:ecmwf/ecmwf-base/operationalForecastSource/forecast]")
@@ -153,10 +150,10 @@ def test_case_insensitive_glyph_prefix() -> None:
 
 
 def test_returns_raw_when_plugins_not_ready() -> None:
-    """When plugins are not ready, the raw glyph string is returned."""
+    """When the updater never finishes within the timeout, raw string is returned."""
     raw = "glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/forecast]"
 
-    with patch(_PLUGINS_READY, return_value=False):
+    with patch(_WAIT_UNTIL_READY, return_value=False):
         result = resolve_value_type(raw)
 
     assert result == raw
@@ -167,7 +164,7 @@ def test_returns_raw_when_catalogue_view_returns_bool() -> None:
     raw = "glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/forecast]"
 
     with (
-        patch(_PLUGINS_READY, return_value=True),
+        patch(_WAIT_UNTIL_READY, return_value=True),
         patch(_CATALOGUE_VIEW, return_value=False),
     ):
         result = resolve_value_type(raw)
@@ -180,7 +177,7 @@ def test_returns_raw_when_plugin_not_in_catalogue() -> None:
     raw = "glyph[catalogue:unknown/plugin/factory/option]"
 
     with (
-        patch(_PLUGINS_READY, return_value=True),
+        patch(_WAIT_UNTIL_READY, return_value=True),
         patch(_CATALOGUE_VIEW, return_value={}),
     ):
         result = resolve_value_type(raw)
@@ -199,7 +196,7 @@ def test_returns_raw_when_factory_not_in_catalogue() -> None:
     raw = "glyph[catalogue:ecmwf/ecmwf-base/missingFactory/option]"
 
     with (
-        patch(_PLUGINS_READY, return_value=True),
+        patch(_WAIT_UNTIL_READY, return_value=True),
         patch(_CATALOGUE_VIEW, return_value={plugin_id: catalogue_obj}),
     ):
         result = resolve_value_type(raw)
@@ -221,7 +218,7 @@ def test_returns_raw_when_option_not_in_factory() -> None:
     raw = "glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/missingOption]"
 
     with (
-        patch(_PLUGINS_READY, return_value=True),
+        patch(_WAIT_UNTIL_READY, return_value=True),
         patch(_CATALOGUE_VIEW, return_value={plugin_id: catalogue_obj}),
     ):
         result = resolve_value_type(raw)
@@ -233,21 +230,7 @@ def test_returns_raw_on_unexpected_exception() -> None:
     """Any unexpected exception during resolution returns the raw string."""
     raw = "glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/forecast]"
 
-    with patch(_PLUGINS_READY, side_effect=RuntimeError("boom")):
-        result = resolve_value_type(raw)
-
-    assert result == raw
-
-
-def test_returns_raw_when_plugins_not_initialized() -> None:
-    """When plugins_ready() returns False (e.g. updater is None), raw string is returned.
-
-    This covers the specific scenario where PluginManager.updater is None
-    (server started but submit_load_plugins has not been called yet).
-    """
-    raw = "glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/forecast]"
-
-    with patch(_PLUGINS_READY, return_value=False):
+    with patch(_WAIT_UNTIL_READY, side_effect=RuntimeError("boom")):
         result = resolve_value_type(raw)
 
     assert result == raw
@@ -269,108 +252,9 @@ def test_leading_trailing_whitespace_is_stripped() -> None:
     )
 
     with (
-        patch(_PLUGINS_READY, return_value=True),
+        patch(_WAIT_UNTIL_READY, return_value=True),
         patch(_CATALOGUE_VIEW, return_value=catalogue),
     ):
         result = resolve_value_type("  glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/forecast]  ")
 
     assert result == "enumClosed[aifs-ens]"
-
-
-# ---------------------------------------------------------------------------
-# Tests: _wait_for_plugins race-condition handling
-# ---------------------------------------------------------------------------
-
-
-def test_wait_for_plugins_returns_true_immediately_when_ready() -> None:
-    """When plugins are already ready, _wait_for_plugins returns True without sleeping."""
-    with patch(_PLUGINS_READY, return_value=True):
-        result = _wait_for_plugins(timeout_s=5.0, poll_s=0.01)
-    assert result is True
-
-
-def test_wait_for_plugins_returns_false_when_not_initialized() -> None:
-    """When the updater thread has not been submitted yet, returns False immediately."""
-    with (
-        patch(_PLUGINS_READY, return_value=False),
-        patch(_STATUS_BRIEF, return_value="not_initialized"),
-    ):
-        result = _wait_for_plugins(timeout_s=5.0, poll_s=0.01)
-    assert result is False
-
-
-def test_wait_for_plugins_returns_false_on_failure_state() -> None:
-    """When the updater is in a failure state, returns False immediately."""
-    with (
-        patch(_PLUGINS_READY, return_value=False),
-        patch(_STATUS_BRIEF, return_value="failure: something went wrong"),
-    ):
-        result = _wait_for_plugins(timeout_s=5.0, poll_s=0.01)
-    assert result is False
-
-
-def test_wait_for_plugins_polls_until_ready() -> None:
-    """When updater is running, _wait_for_plugins polls until plugins become ready."""
-    # First call: not ready (running); second call: ready.
-    ready_sequence = [False, True]
-
-    def _plugins_ready_side_effect() -> bool:
-        return ready_sequence.pop(0) if ready_sequence else True
-
-    with (
-        patch(_PLUGINS_READY, side_effect=_plugins_ready_side_effect),
-        patch(_STATUS_BRIEF, return_value="running"),
-    ):
-        result = _wait_for_plugins(timeout_s=5.0, poll_s=0.01)
-    assert result is True
-
-
-def test_wait_for_plugins_times_out() -> None:
-    """When plugins never become ready within the timeout, returns False."""
-    with (
-        patch(_PLUGINS_READY, return_value=False),
-        patch(_STATUS_BRIEF, return_value="running"),
-    ):
-        # Use a very short timeout so the test doesn't take long.
-        result = _wait_for_plugins(timeout_s=0.05, poll_s=0.01)
-    assert result is False
-
-
-def test_resolve_waits_for_running_plugins_then_resolves() -> None:
-    """When plugins are still loading, resolve_value_type waits and then resolves."""
-    catalogue = _make_catalogue(
-        store="ecmwf",
-        local="ecmwf-base",
-        factory="operationalForecastSource",
-        option="forecast",
-        value_type="enumClosed[aifs-ens,ifs-ens]",
-    )
-
-    # Simulate: first call to plugins_ready returns False (still running),
-    # second call returns True (finished).
-    ready_sequence = [False, True]
-
-    def _plugins_ready_side_effect() -> bool:
-        return ready_sequence.pop(0) if ready_sequence else True
-
-    with (
-        patch(_PLUGINS_READY, side_effect=_plugins_ready_side_effect),
-        patch(_STATUS_BRIEF, return_value="running"),
-        patch(_CATALOGUE_VIEW, return_value=catalogue),
-    ):
-        result = resolve_value_type("glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/forecast]")
-
-    assert result == "enumClosed[aifs-ens,ifs-ens]"
-
-
-def test_resolve_returns_raw_when_wait_times_out() -> None:
-    """When plugins never become ready within the timeout, raw glyph is returned.
-
-    Patches ``_wait_for_plugins`` directly so the test does not actually sleep.
-    """
-    raw = "glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/forecast]"
-
-    with patch("forecastbox.domain.preset.value_type_resolver._wait_for_plugins", return_value=False):
-        result = resolve_value_type(raw)
-
-    assert result == raw

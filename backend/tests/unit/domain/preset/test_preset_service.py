@@ -328,8 +328,12 @@ async def test_advanced_preset_still_validates_builder() -> None:
 
 
 @pytest.mark.asyncio
-async def test_auto_run_false_saves_blueprint_but_does_not_submit_run() -> None:
-    """auto_run=False: blueprint is saved but no run is submitted for any difficulty."""
+async def test_auto_run_false_does_not_save_blueprint_or_submit_run() -> None:
+    """auto_run=False: neither the blueprint is saved nor the run submitted.
+
+    The materialised builder is returned for the caller to open in the editor
+    and save explicitly there.
+    """
     for difficulty in ("beginner", "intermediate", "advanced"):
         db_row = _make_db_row(difficulty=difficulty)
         p_get, p_val, p_save, p_get_bp, p_exec = _patch_collaborators(db_row=db_row)
@@ -342,11 +346,11 @@ async def test_auto_run_false_saves_blueprint_but_does_not_submit_run() -> None:
                 auto_run=False,
             )
 
-        mock_save.assert_awaited_once()
+        mock_save.assert_not_awaited()
         mock_exec.assert_not_awaited()
 
-        assert result.blueprint_id == _BLUEPRINT_ID
-        assert result.blueprint_version == _BLUEPRINT_VERSION
+        assert result.blueprint_id is None
+        assert result.blueprint_version is None
         assert result.run_id is None
         assert result.attempt_count is None
         assert isinstance(result.builder, BlueprintBuilder)
@@ -374,8 +378,8 @@ async def test_auto_run_true_saves_blueprint_and_submits_run() -> None:
 
 
 @pytest.mark.asyncio
-async def test_auto_run_false_blueprint_id_and_version_are_populated() -> None:
-    """auto_run=False: blueprint_id and blueprint_version are set in the result."""
+async def test_auto_run_false_returns_no_ids() -> None:
+    """auto_run=False: blueprint_id, blueprint_version, run_id, and attempt_count are all None."""
     db_row = _make_db_row(difficulty="advanced")
     p_get, p_val, p_save, p_get_bp, p_exec = _patch_collaborators(db_row=db_row)
 
@@ -387,8 +391,8 @@ async def test_auto_run_false_blueprint_id_and_version_are_populated() -> None:
             auto_run=False,
         )
 
-    assert result.blueprint_id == _BLUEPRINT_ID
-    assert result.blueprint_version == _BLUEPRINT_VERSION
+    assert result.blueprint_id is None
+    assert result.blueprint_version is None
     assert result.run_id is None
     assert result.attempt_count is None
 
@@ -755,10 +759,11 @@ async def test_save_builder_display_name_set_for_advanced_preset_with_auto_run()
 
 
 @pytest.mark.asyncio
-async def test_save_builder_not_called_when_auto_run_false_is_false() -> None:
-    """auto_run=False still calls save_builder (blueprint is always saved).
+async def test_save_builder_not_called_when_auto_run_is_false() -> None:
+    """auto_run=False does not save the blueprint or submit a run.
 
-    Regression guard: auto_run=False saves the blueprint but skips the run.
+    The materialised builder is returned for the caller to open in the
+    editor and persist explicitly.
     """
     db_row = _make_db_row(difficulty="advanced", name="Advanced Preset")
     p_get, p_val, p_save, p_get_bp, p_exec = _patch_collaborators(db_row=db_row)
@@ -771,7 +776,5 @@ async def test_save_builder_not_called_when_auto_run_false_is_false() -> None:
             auto_run=False,
         )
 
-    # Blueprint is saved even when auto_run=False.
-    mock_save.assert_awaited_once()
-    # But no run is submitted.
+    mock_save.assert_not_awaited()
     mock_exec.assert_not_awaited()
