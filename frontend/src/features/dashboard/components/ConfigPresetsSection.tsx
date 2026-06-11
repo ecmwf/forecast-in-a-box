@@ -42,10 +42,10 @@ export function ConfigPresetsSection({
           <P className="mt-1 text-muted-foreground">{t('presets.subtitle')}</P>
         </div>
         <Link
-          to="/presets"
+          to="/presets/mine"
           className="inline-flex shrink-0 items-center text-sm font-medium text-primary hover:underline"
         >
-          {t('presets.viewAll')}
+          {t('presets.viewMine')}
           <ChevronRight className="ml-0.5 h-3 w-3" />
         </Link>
       </div>
