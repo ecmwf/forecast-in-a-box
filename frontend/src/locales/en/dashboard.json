@@ -62,40 +62,15 @@
     "title": "Getting Started Presets",
     "subtitle": "Choose how to start your forecast configuration",
     "recommended": "Recommended",
-    "startFromScratch": {
-      "title": "Start from Scratch",
-      "description": "Build a forecast from scratch with full control over every parameter.",
-      "tags": {
-        "canvas": "Blank Canvas",
-        "control": "Full Control"
-      }
+    "launchingAriaLabel": "Launching…",
+    "loading": {
+      "ariaLabel": "Loading featured presets"
     },
-    "ecmwfOpenData": {
-      "title": "ECMWF Open Data",
-      "description": "Ensemble-mean 2 m temperature maps from ECMWF IFS Open Data.",
-      "tags": {
-        "source": "IFS Open Data",
-        "statistic": "Ensemble Mean",
-        "format": "PNG Maps"
-      }
-    },
-    "aifsForecast": {
-      "title": "AIFS 72h Forecast",
-      "description": "72-hour AIFS Open Data forecast with global PDF and European PNG map plots.",
-      "tags": {
-        "source": "AIFS Open Data",
-        "leadTime": "72 h",
-        "format": "PNG + PDF"
-      }
-    },
-    "aifsDataset": {
-      "title": "AIFS Ensemble Dataset",
-      "description": "10-member AIFS Open Data ensemble exported as a GRIB file.",
-      "tags": {
-        "source": "AIFS Open Data",
-        "members": "10 Members",
-        "format": "GRIB Export"
-      }
+    "unavailable": {
+      "title": "Presets unavailable",
+      "description": "Could not load featured presets. Start from scratch or try again later.",
+      "newConfigurationTitle": "New Configuration",
+      "newConfigurationDescription": "Start with an empty canvas and build your forecast pipeline from scratch."
     }
   },
   "journal": {
@@ -123,6 +98,7 @@
     "title": "My Configuration Presets",
     "subtitle": "Your saved forecast configurations",
     "viewAll": "View all presets",
+    "viewMine": "View my presets",
     "load": "Use this Preset",
     "delete": "Delete",
     "bookmark": "Bookmark",
@@ -130,6 +106,11 @@
     "renameTitle": "Rename Preset",
     "renameDescription": "Update the title and comments for this preset.",
     "searchPlaceholder": "Search presets...",
+    "tabs": {
+      "label": "Presets navigation",
+      "templates": "Templates",
+      "myConfigurations": "My Configurations"
+    },
     "filters": {
       "all": "All",
       "bookmarked": "Bookmarked"
@@ -147,6 +128,57 @@
       "previous": "Previous",
       "next": "Next",
       "page": "Page {{current}} of {{total}}"
+    }
+  },
+  "presetGallery": {
+    "useThisPreset": "Use This Preset",
+    "openInEditor": "Open in Editor",
+    "page": {
+      "title": "Preset Gallery",
+      "description": "Browse and launch pre-built forecast configurations"
+    },
+    "search": {
+      "placeholder": "Search presets…",
+      "ariaLabel": "Search presets by name, description or tag"
+    },
+    "filters": {
+      "allCategories": "All Categories",
+      "allDifficulties": "All Difficulties",
+      "categoriesGroupLabel": "Filter by category",
+      "difficulty": {
+        "label": "Filter by difficulty"
+      }
+    },
+    "difficulty": {
+      "beginner": {
+        "name": "Beginner",
+        "hint": "One-click execution — no configuration needed"
+      },
+      "intermediate": {
+        "name": "Intermediate",
+        "hint": "Configure a few parameters, then run"
+      },
+      "advanced": {
+        "name": "Advanced",
+        "hint": "Full editor access — customise every detail"
+      }
+    },
+    "card": {
+      "difficultyLabel": "Difficulty: {{difficulty}}",
+      "categoryLabel": "Category: {{category}}"
+    },
+    "empty": {
+      "title": "No presets found",
+      "description": "No published presets are available yet.",
+      "filteredTitle": "No presets match your filters",
+      "filteredDescription": "Try clearing the search or selecting a different category or difficulty."
+    },
+    "loading": {
+      "ariaLabel": "Loading presets"
+    },
+    "error": {
+      "title": "Could not load presets",
+      "description": "There was a problem fetching the preset gallery. Please try again later."
     }
   },
   "notification": {

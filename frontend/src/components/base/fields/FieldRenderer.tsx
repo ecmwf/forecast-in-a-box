@@ -9,6 +9,8 @@
  */
 
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
+import { AlertCircle } from 'lucide-react'
 import { DateTimeField } from './fields/DateTimeField'
 import { EnumField } from './fields/EnumField'
 import { EnumListField } from './fields/EnumListField'
@@ -18,6 +20,11 @@ import { StringField } from './fields/StringField'
 import { parseValueType } from './value-type-parser'
 import type { ParsedValueType } from './value-type-parser'
 import { Label } from '@/components/ui/label'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 export interface FieldRendererProps {
@@ -48,6 +55,7 @@ export function FieldRenderer({
   className,
   inputClassName,
 }: FieldRendererProps) {
+  const { t } = useTranslation('common')
   const parsedType = useMemo(() => parseValueType(valueType), [valueType])
 
   const inputElement = renderField(
@@ -59,6 +67,7 @@ export function FieldRenderer({
     placeholder,
     disabled,
     inputClassName,
+    t,
   )
 
   return (
@@ -82,9 +91,10 @@ function renderField(
   configKey: string,
   value: string,
   onChange: (value: string) => void,
-  placeholder?: string,
-  disabled?: boolean,
-  className?: string,
+  placeholder: string | undefined,
+  disabled: boolean | undefined,
+  className: string | undefined,
+  t: (key: string) => string,
 ): React.ReactNode {
   switch (parsedType.type) {
     case 'string':
@@ -99,6 +109,38 @@ function renderField(
           disabled={disabled}
           className={className}
         />
+      )
+
+    case 'unresolvedCatalogue':
+      return (
+        <div className="space-y-1">
+          <StringField
+            id={id}
+            configKey={configKey}
+            value={value}
+            onChange={onChange}
+            placeholder={placeholder}
+            disabled={disabled}
+            className={className}
+          />
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <p className="flex cursor-default items-center gap-1 text-xs text-amber-600 dark:text-amber-400" />
+              }
+            >
+              <AlertCircle className="h-3 w-3 shrink-0" />
+              <span>{t('field.unresolvedCatalogueLabel')}</span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-80 break-all">
+              {t('field.unresolvedCatalogueHint')}
+              <br />
+              <span className="mt-1 block font-mono text-xs opacity-70">
+                {parsedType.raw}
+              </span>
+            </TooltipContent>
+          </Tooltip>
+        </div>
       )
 
     case 'int':

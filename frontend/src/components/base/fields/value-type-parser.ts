@@ -26,6 +26,8 @@
  * - list[enumClosed[a,b,c]] → multi-select restricted to the listed items
  * - list[enum[a,b,c]] → multi-select with suggestions, accept any string
  * - optional[T] → same widget as T, with optional=true flag
+ * - glyph[catalogue:…] → unresolved catalogue reference (plugins not ready);
+ *   rendered as a plain text input with a hint
  *
  * `enum`/`enumList` carry `closed: boolean` (closed vs open) for forward
  * compat; no first-party factory emits the open form yet.
@@ -53,6 +55,17 @@ export type ParsedValueType =
       options: Array<string>
       /** `list[enumClosed[…]]` ⇒ true; `list[enum[…]]` ⇒ false. */
       closed: boolean
+      optional?: boolean
+    }
+  | {
+      /**
+       * The backend returned a `glyph[catalogue:…]` reference that could not
+       * be resolved (plugins not yet ready / not installed). The frontend
+       * falls back to a plain text input and surfaces a hint to the user.
+       */
+      type: 'unresolvedCatalogue'
+      /** The full original `glyph[catalogue:…]` string for diagnostics. */
+      raw: string
       optional?: boolean
     }
   | { type: 'unknown'; raw: string; optional?: boolean }
@@ -133,6 +146,13 @@ export function parseValueType(valueType: string | undefined): ParsedValueType {
     }
   }
 
+  // Unresolved catalogue glyph: glyph[catalogue:<store>/<local>/<factory>/<option>]
+  // The backend returns this verbatim when plugins are not yet ready. Treat it
+  // as a distinct type so the UI can show a helpful hint instead of a raw string.
+  if (/^glyph\[catalogue:/i.test(trimmed)) {
+    return { type: 'unresolvedCatalogue', raw: trimmed }
+  }
+
   return { type: 'unknown', raw: trimmed }
 }
 
@@ -178,6 +198,8 @@ export function getDefaultValueForType(parsedType: ParsedValueType): string {
     case 'enum':
       return parsedType.options[0] ?? ''
     case 'enumList':
+      return ''
+    case 'unresolvedCatalogue':
       return ''
     case 'unknown':
       return ''

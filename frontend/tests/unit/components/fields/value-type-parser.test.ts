@@ -173,6 +173,51 @@ describe('parseValueType', () => {
     })
   })
 
+  describe('unresolvedCatalogue types', () => {
+    it('returns unresolvedCatalogue for a glyph[catalogue:...] string', () => {
+      const raw =
+        'glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/forecast]'
+      expect(parseValueType(raw)).toEqual({
+        type: 'unresolvedCatalogue',
+        raw,
+      })
+    })
+
+    it('is case-insensitive for the glyph[catalogue:...] prefix', () => {
+      const raw =
+        'GLYPH[CATALOGUE:ecmwf/ecmwf-base/operationalForecastSource/forecast]'
+      expect(parseValueType(raw)).toEqual({
+        type: 'unresolvedCatalogue',
+        raw,
+      })
+    })
+
+    it('handles a different catalogue path', () => {
+      const raw = 'glyph[catalogue:ecmwf/ecmwf-base/anemoiSource/checkpoint]'
+      expect(parseValueType(raw)).toEqual({
+        type: 'unresolvedCatalogue',
+        raw,
+      })
+    })
+
+    it('does NOT treat a non-catalogue glyph as unresolvedCatalogue', () => {
+      // glyph[something_else] should still fall through to unknown
+      expect(parseValueType('glyph[something_else]')).toEqual({
+        type: 'unknown',
+        raw: 'glyph[something_else]',
+      })
+    })
+
+    it('trims whitespace before matching', () => {
+      const inner =
+        'glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/forecast]'
+      expect(parseValueType(`  ${inner}  `)).toEqual({
+        type: 'unresolvedCatalogue',
+        raw: inner,
+      })
+    })
+  })
+
   describe('optional types', () => {
     it('parses optional[int] as int with optional flag', () => {
       expect(parseValueType('optional[int]')).toEqual({
@@ -317,5 +362,14 @@ describe('getDefaultValueForType', () => {
 
   it('returns empty string for unknown type', () => {
     expect(getDefaultValueForType({ type: 'unknown', raw: 'xyz' })).toBe('')
+  })
+
+  it('returns empty string for unresolvedCatalogue type', () => {
+    expect(
+      getDefaultValueForType({
+        type: 'unresolvedCatalogue',
+        raw: 'glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/forecast]',
+      }),
+    ).toBe('')
   })
 })

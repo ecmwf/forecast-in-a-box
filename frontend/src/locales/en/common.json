@@ -123,6 +123,7 @@
     "plugins": "Plugins",
     "artifacts": "Artifacts",
     "globalVariables": "Global Variables",
+    "presets": "Presets",
     "signOut": "Sign Out",
     "timezoneDialogTitle": "Application timezone",
     "timezoneDialogDescription": "All dates and times — including forecast base times — are shown and entered in this timezone. Defaults to UTC."
@@ -187,7 +188,9 @@
   "field": {
     "selectPlaceholder": "Select an option...",
     "addItemPlaceholder": "Add item...",
-    "noMatches": "No matches"
+    "noMatches": "No matches",
+    "unresolvedCatalogueLabel": "Dynamic options unavailable — plugins not ready",
+    "unresolvedCatalogueHint": "Could not resolve options from the plugin catalogue. Enter a value manually. The dropdown will appear once plugins are loaded."
   },
   "notificationBanner": {
     "dismiss": "Dismiss notification"
