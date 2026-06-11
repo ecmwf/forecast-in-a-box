@@ -32,10 +32,7 @@ import { useCallback, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import type { HighLevelPreset } from '@/api/types/preset.types'
-import {
-  presetKeys,
-  useInstantiatePreset,
-} from '@/api/hooks/usePresets'
+import { presetKeys, useInstantiatePreset } from '@/api/hooks/usePresets'
 import { showToast } from '@/lib/toast'
 
 // ---------------------------------------------------------------------------

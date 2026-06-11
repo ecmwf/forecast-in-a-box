@@ -192,7 +192,12 @@ function IconPicker({ value, onChange }: IconPickerProps) {
 
   // Resolve the current icon component for preview
   const CurrentIcon = value
-    ? ((LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string }> | undefined>)[value] ?? null)
+    ? ((
+        LucideIcons as unknown as Record<
+          string,
+          React.ComponentType<{ className?: string }> | undefined
+        >
+      )[value] ?? null)
     : null
 
   return (
@@ -238,12 +243,12 @@ function IconPicker({ value, onChange }: IconPickerProps) {
         <div className="rounded-md border border-border bg-muted/30 p-3">
           {/* Search */}
           <div className="relative mb-3">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('form.icon.search')}
-              className="pl-8 h-8 text-sm"
+              className="h-8 pl-8 text-sm"
             />
           </div>
 
@@ -251,7 +256,10 @@ function IconPicker({ value, onChange }: IconPickerProps) {
           <div className="grid grid-cols-8 gap-1 sm:grid-cols-10">
             {filtered.map((name) => {
               const Icon = (
-                LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string }> | undefined>
+                LucideIcons as unknown as Record<
+                  string,
+                  React.ComponentType<{ className?: string }> | undefined
+                >
               )[name]
               if (!Icon) return null
               return (
@@ -381,7 +389,7 @@ function ParameterRow({
             value={param.glyph_key}
             onChange={(e) => update('glyph_key', e.target.value)}
             placeholder={t('form.parameters.fields.glyphKeyPlaceholder')}
-            className="h-8 text-sm font-mono"
+            className="h-8 font-mono text-sm"
           />
         </div>
 
@@ -412,7 +420,7 @@ function ParameterRow({
             value={param.value_type}
             onChange={(e) => update('value_type', e.target.value)}
             placeholder={t('form.parameters.fields.valueTypePlaceholder')}
-            className="h-8 text-sm font-mono"
+            className="h-8 font-mono text-sm"
           />
         </div>
 
@@ -580,7 +588,8 @@ function buildFormErrors(
   const paramErrors: FormErrors['parameters'] = {}
   parameters.forEach((p, i) => {
     const rowErrors: Partial<Record<keyof PresetParameter, string>> = {}
-    if (!p.glyph_key.trim()) rowErrors.glyph_key = messages.paramGlyphKeyRequired
+    if (!p.glyph_key.trim())
+      rowErrors.glyph_key = messages.paramGlyphKeyRequired
     if (!p.label.trim()) rowErrors.label = messages.paramLabelRequired
     if (Object.keys(rowErrors).length > 0) paramErrors[i] = rowErrors
   })
@@ -649,9 +658,7 @@ export function PresetFormDialog({
       setIcon(preset.icon)
       setTags([...preset.tags])
       setParameters(preset.parameters.map((p) => ({ ...p })))
-      setBuilderTemplateRaw(
-        JSON.stringify(preset.builder_template, null, 2),
-      )
+      setBuilderTemplateRaw(JSON.stringify(preset.builder_template, null, 2))
       setIsPublished(preset.is_published)
     } else {
       setName('')
@@ -689,7 +696,10 @@ export function PresetFormDialog({
     setParameters((prev) => {
       const next = [...prev]
       // Swap index-1 and index — bounds already checked above.
-      ;[next[index - 1], next[index]] = [next[index], next[index - 1]] as [PresetParameter, PresetParameter]
+      ;[next[index - 1], next[index]] = [next[index], next[index - 1]] as [
+        PresetParameter,
+        PresetParameter,
+      ]
       return next
     })
   }, [])
@@ -699,7 +709,10 @@ export function PresetFormDialog({
       if (index >= prev.length - 1) return prev
       const next = [...prev]
       // Swap index and index+1 — bounds already checked above.
-      ;[next[index], next[index + 1]] = [next[index + 1], next[index]] as [PresetParameter, PresetParameter]
+      ;[next[index], next[index + 1]] = [next[index + 1], next[index]] as [
+        PresetParameter,
+        PresetParameter,
+      ]
       return next
     })
   }, [])
@@ -820,9 +833,7 @@ export function PresetFormDialog({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={
-          isEditing ? t('form.editTitle') : t('form.createTitle')
-        }
+        aria-label={isEditing ? t('form.editTitle') : t('form.createTitle')}
         className="fixed inset-y-0 right-0 z-50 flex w-full max-w-3xl flex-col bg-background shadow-xl"
       >
         {/* ── Header ── */}
@@ -1134,11 +1145,7 @@ export function PresetFormDialog({
             >
               {t('form.actions.cancel')}
             </Button>
-            <Button
-              type="submit"
-              form="preset-form"
-              disabled={isSaving}
-            >
+            <Button type="submit" form="preset-form" disabled={isSaving}>
               {isSaving ? (
                 <>
                   <Loader2

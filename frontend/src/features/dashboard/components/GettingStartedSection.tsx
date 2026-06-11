@@ -76,7 +76,8 @@ function resolveIcon(name: string): LucideIcons.LucideIcon {
  */
 const ACCENT_COLOURS: Array<{ iconColor: string; borderColor: string }> = [
   {
-    iconColor: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400',
+    iconColor:
+      'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400',
     borderColor: 'border-border hover:border-blue-400',
   },
   {
@@ -142,7 +143,9 @@ function UnavailableFallback() {
       <GettingStartedCard
         icon={<Layers className="h-5 w-5" />}
         title={t('gettingStarted.unavailable.newConfigurationTitle')}
-        description={t('gettingStarted.unavailable.newConfigurationDescription')}
+        description={t(
+          'gettingStarted.unavailable.newConfigurationDescription',
+        )}
         tags={[]}
         isRecommended
         onClick={() => void navigate({ to: '/configure' })}
@@ -151,7 +154,9 @@ function UnavailableFallback() {
       {/* Unavailable notice card */}
       <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border p-5 text-center text-muted-foreground md:col-span-1 lg:col-span-3">
         <LayoutGrid className="h-8 w-8 opacity-40" aria-hidden="true" />
-        <p className="text-sm font-medium">{t('gettingStarted.unavailable.title')}</p>
+        <p className="text-sm font-medium">
+          {t('gettingStarted.unavailable.title')}
+        </p>
         <p className="text-xs">{t('gettingStarted.unavailable.description')}</p>
       </div>
     </div>
@@ -168,7 +173,11 @@ interface PresetCardsProps {
   loadingPresetId: string | null
 }
 
-function PresetCards({ presets, onSelectPreset, loadingPresetId }: PresetCardsProps) {
+function PresetCards({
+  presets,
+  onSelectPreset,
+  loadingPresetId,
+}: PresetCardsProps) {
   // Track which card is in a loading state so we can show a spinner.
   // We use local state to wrap the async call and clear it when done.
   const [localLoadingId, setLocalLoadingId] = useState<string | null>(null)
@@ -238,12 +247,18 @@ export function GettingStartedSection({
 
   // Determine which content to render
   const showSkeleton = isLoading
-  const showFallback = !isLoading && (isError || (featured !== undefined && featured.length === 0))
+  const showFallback =
+    !isLoading && (isError || (featured !== undefined && featured.length === 0))
   const showCards = !isLoading && !isError && featured && featured.length > 0
 
   // ── Preset selection orchestration ───────────────────────────────────────
-  const { selectPreset, loadingPresetId, wizardPreset, wizardOpen, setWizardOpen } =
-    usePresetSelection()
+  const {
+    selectPreset,
+    loadingPresetId,
+    wizardPreset,
+    wizardOpen,
+    setWizardOpen,
+  } = usePresetSelection()
 
   // ── Render ────────────────────────────────────────────────────────────────
   const content = (

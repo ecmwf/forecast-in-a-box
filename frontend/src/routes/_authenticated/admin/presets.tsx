@@ -26,9 +26,21 @@
 
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { Edit2, Eye, EyeOff, Loader2, Plus, Sliders, Trash2 } from 'lucide-react'
+import {
+  Edit2,
+  Eye,
+  EyeOff,
+  Loader2,
+  Plus,
+  Sliders,
+  Trash2,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { HighLevelPreset, PresetListItem, PresetListResponse } from '@/api/types/preset.types'
+import type {
+  HighLevelPreset,
+  PresetListItem,
+  PresetListResponse,
+} from '@/api/types/preset.types'
 import { getPreset } from '@/api/endpoints/preset'
 import {
   useDeletePreset,
@@ -239,9 +251,7 @@ function DeleteButton({ preset }: DeleteButtonProps) {
           <Trash2 className="h-4 w-4" aria-hidden="true" />
         )}
         <span className="ml-1.5 hidden sm:inline">
-          {isPending
-            ? t('admin.actions.deleting')
-            : t('admin.actions.delete')}
+          {isPending ? t('admin.actions.deleting') : t('admin.actions.delete')}
         </span>
       </AlertDialogTrigger>
 

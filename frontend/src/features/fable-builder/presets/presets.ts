@@ -259,7 +259,8 @@ function aifsForecastPreset(): FablePreset {
   return {
     id: 'aifs-forecast',
     name: 'AIFS 72h Forecast',
-    description: '72-hour AIFS Open Data forecast with global PDF and European PNG map plots',
+    description:
+      '72-hour AIFS Open Data forecast with global PDF and European PNG map plots',
     fable: {
       blocks: {
         source_1: {

@@ -105,7 +105,9 @@ export async function updatePreset(
  * Soft-delete a preset (admin-only).
  * Uses optimistic locking via ``version``.
  */
-export async function deletePreset(request: PresetDeleteRequest): Promise<void> {
+export async function deletePreset(
+  request: PresetDeleteRequest,
+): Promise<void> {
   return apiClient.post(API_ENDPOINTS.preset.delete, request)
 }
 

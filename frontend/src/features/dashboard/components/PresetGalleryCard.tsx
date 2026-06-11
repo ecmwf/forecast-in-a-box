@@ -108,7 +108,9 @@ export function PresetGalleryCard({
 
   const Icon = resolveIcon(preset.icon)
   const difficultyBadge = DIFFICULTY_BADGE[preset.difficulty]
-  const difficultyLabel = t(`presetGallery.difficulty.${preset.difficulty}.name`)
+  const difficultyLabel = t(
+    `presetGallery.difficulty.${preset.difficulty}.name`,
+  )
   const difficultyHint = t(`presetGallery.difficulty.${preset.difficulty}.hint`)
 
   return (
@@ -136,9 +138,7 @@ export function PresetGalleryCard({
               >
                 {difficultyLabel}
               </TooltipTrigger>
-              <TooltipContent side="top">
-                {difficultyHint}
-              </TooltipContent>
+              <TooltipContent side="top">{difficultyHint}</TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </div>
@@ -183,7 +183,10 @@ export function PresetGalleryCard({
         >
           {isLoading ? (
             <>
-              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+              <Loader2
+                className="mr-2 h-3.5 w-3.5 animate-spin"
+                aria-hidden="true"
+              />
               Launching…
             </>
           ) : (

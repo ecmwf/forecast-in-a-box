@@ -115,18 +115,20 @@ export function usePreset(presetId: string | null | undefined) {
 export function useInstantiatePreset() {
   const queryClient = useQueryClient()
 
-  return useMutation<PresetInstantiateResponse, Error, PresetInstantiateRequest>(
-    {
-      mutationFn: instantiatePreset,
-      onSuccess: (_data, variables) => {
-        // Invalidate the detail cache for the instantiated preset so callers
-        // always see fresh data if they re-fetch after instantiation.
-        queryClient.invalidateQueries({
-          queryKey: presetKeys.detail(variables.preset_id),
-        })
-      },
+  return useMutation<
+    PresetInstantiateResponse,
+    Error,
+    PresetInstantiateRequest
+  >({
+    mutationFn: instantiatePreset,
+    onSuccess: (_data, variables) => {
+      // Invalidate the detail cache for the instantiated preset so callers
+      // always see fresh data if they re-fetch after instantiation.
+      queryClient.invalidateQueries({
+        queryKey: presetKeys.detail(variables.preset_id),
+      })
     },
-  )
+  })
 }
 
 // ---------------------------------------------------------------------------

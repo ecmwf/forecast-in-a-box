@@ -36,7 +36,11 @@ import { AlertCircle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { PresetParameterInput } from './PresetParameterInput'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
-import type { HighLevelPreset, PresetDifficulty, PresetParameter } from '@/api/types/preset.types'
+import type {
+  HighLevelPreset,
+  PresetDifficulty,
+  PresetParameter,
+} from '@/api/types/preset.types'
 import { useFableValidation } from '@/api/hooks/useFable'
 import { useInstantiatePreset } from '@/api/hooks/usePresets'
 import { parseValueType } from '@/components/base/fields/value-type-parser'
@@ -348,7 +352,9 @@ export function PresetWizardDialog({
         {/* ── Difficulty info badge ── */}
         <div className="flex items-center gap-2">
           <Badge variant={difficultyBadgeVariant}>{difficultyName}</Badge>
-          <span className="text-xs text-muted-foreground">{difficultyHint}</span>
+          <span className="text-xs text-muted-foreground">
+            {difficultyHint}
+          </span>
         </div>
 
         {/* ── Step indicator (multi-step only) ── */}

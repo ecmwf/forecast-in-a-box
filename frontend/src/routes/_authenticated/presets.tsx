@@ -41,7 +41,8 @@ const tabClass = cn(
   'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
 )
 
-const activeTabClass = 'bg-background text-foreground shadow-sm hover:bg-background'
+const activeTabClass =
+  'bg-background text-foreground shadow-sm hover:bg-background'
 
 function PresetsTabs() {
   const { t } = useTranslation('dashboard')

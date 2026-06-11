@@ -260,8 +260,7 @@ export function FableBuilderPage({
         // here), do NOT reset it.  We detect this by checking that the fable
         // has blocks AND is marked dirty (isDirty is always true after
         // setFableFromPresetInstance, whereas a freshly-reset store is clean).
-        const { fable: currentFable, isDirty } =
-          useFableBuilderStore.getState()
+        const { fable: currentFable, isDirty } = useFableBuilderStore.getState()
         const hasPresetBuilder =
           Object.keys(currentFable.blocks).length > 0 && isDirty
         if (!hasPresetBuilder) {

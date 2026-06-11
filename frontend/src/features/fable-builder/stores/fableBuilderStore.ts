@@ -153,7 +153,10 @@ interface FableBuilderState {
    * `isDirty` is true, and `step` is set to `'edit'` so the user lands
    * directly in the canvas rather than the setup wizard.
    */
-  setFableFromPresetInstance: (builder: FableBuilderV1, presetName: string) => void
+  setFableFromPresetInstance: (
+    builder: FableBuilderV1,
+    presetName: string,
+  ) => void
   newFable: () => void
   addBlock: (
     factoryId: PluginBlockFactoryId,
