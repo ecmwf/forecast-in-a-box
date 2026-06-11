@@ -44,6 +44,13 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
+try:
+    import skinnywms
+
+    is_skinny_available = True
+except ModuleNotFoundError:
+    is_skinny_available = False
+
 
 class LensInstanceDetailResponse(FiabBaseModel):
     """API response model for a lens instance detail. Mirrors LensInstanceDetail fields
@@ -75,6 +82,8 @@ class SupportedLensDetail(FiabBaseModel):
 @router.post("/start/skinnyWMS")
 def start_skinny_wms_endpoint(local_path: str) -> LensInstanceId:
     """Start a skinnyWMS lens instance serving data from the given local path."""
+    if not is_skinny_available:
+        raise HTTPException(status_code=400, detail="SkinnyWMS installation not found")
     try:
         if not pathlib.Path(local_path).exists():
             raise HTTPException(status_code=400, detail="Provided path does not exist")
@@ -115,10 +124,13 @@ def list_lenses() -> list[LensInstanceDetailResponse]:
 @router.get("/supported")
 def list_supported_lenses() -> list[SupportedLensDetail]:
     """List all supported lens types with their start route and parameters."""
-    return [
-        SupportedLensDetail(
-            name="skinnyWMS",
-            route=f"{PREFIX}/start/skinnyWMS",
-            params={"local_path": "Absolute path to the data directory or file to serve"},
+    supported = []
+    if is_skinny_available:
+        supported.append(
+            SupportedLensDetail(
+                name="skinnyWMS",
+                route=f"{PREFIX}/start/skinnyWMS",
+                params={"local_path": "Absolute path to the data directory or file to serve"},
+            )
         )
-    ]
+    return supported
