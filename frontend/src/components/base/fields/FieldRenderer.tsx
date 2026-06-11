@@ -58,17 +58,48 @@ export function FieldRenderer({
   const { t } = useTranslation('common')
   const parsedType = useMemo(() => parseValueType(valueType), [valueType])
 
-  const inputElement = renderField(
-    parsedType,
-    id,
-    configKey,
-    value,
-    onChange,
-    placeholder,
-    disabled,
-    inputClassName,
-    t,
-  )
+  const inputElement =
+    parsedType.type === 'unresolvedCatalogue' ? (
+      <div className="space-y-1">
+        <StringField
+          id={id}
+          configKey={configKey}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          disabled={disabled}
+          className={inputClassName}
+        />
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <p className="flex cursor-default items-center gap-1 text-xs text-amber-600 dark:text-amber-400" />
+            }
+          >
+            <AlertCircle className="h-3 w-3 shrink-0" />
+            <span>{t('field.unresolvedCatalogueLabel')}</span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-80 break-all">
+            {t('field.unresolvedCatalogueHint')}
+            <br />
+            <span className="mt-1 block font-mono text-xs opacity-70">
+              {parsedType.raw}
+            </span>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    ) : (
+      renderField(
+        parsedType,
+        id,
+        configKey,
+        value,
+        onChange,
+        placeholder,
+        disabled,
+        inputClassName,
+      )
+    )
 
   return (
     <div className={cn('space-y-1.5', className)}>
@@ -91,10 +122,9 @@ function renderField(
   configKey: string,
   value: string,
   onChange: (value: string) => void,
-  placeholder: string | undefined,
-  disabled: boolean | undefined,
-  className: string | undefined,
-  t: (key: string) => string,
+  placeholder?: string,
+  disabled?: boolean,
+  className?: string,
 ): React.ReactNode {
   switch (parsedType.type) {
     case 'string':
@@ -112,36 +142,9 @@ function renderField(
       )
 
     case 'unresolvedCatalogue':
-      return (
-        <div className="space-y-1">
-          <StringField
-            id={id}
-            configKey={configKey}
-            value={value}
-            onChange={onChange}
-            placeholder={placeholder}
-            disabled={disabled}
-            className={className}
-          />
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <p className="flex cursor-default items-center gap-1 text-xs text-amber-600 dark:text-amber-400" />
-              }
-            >
-              <AlertCircle className="h-3 w-3 shrink-0" />
-              <span>{t('field.unresolvedCatalogueLabel')}</span>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="max-w-80 break-all">
-              {t('field.unresolvedCatalogueHint')}
-              <br />
-              <span className="mt-1 block font-mono text-xs opacity-70">
-                {parsedType.raw}
-              </span>
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      )
+      // Handled in the FieldRenderer body (needs the i18n `t` function in
+      // scope); this branch should never be reached from the inline switch.
+      return null
 
     case 'int':
       return (

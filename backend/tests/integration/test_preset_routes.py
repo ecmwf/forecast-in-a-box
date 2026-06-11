@@ -51,7 +51,6 @@ def _make_create_body(
     *,
     name: str = "Test Preset",
     description: str = "A test preset",
-    category: str = "test-category",
     difficulty: str = "beginner",
     tags: list[str] | None = None,
     is_published: bool = True,
@@ -63,7 +62,6 @@ def _make_create_body(
         "name": name,
         "description": description,
         "long_description": None,
-        "category": category,
         "difficulty": difficulty,
         "tags": tags or [],
         "icon": icon,
@@ -110,65 +108,7 @@ def non_admin_client(backend_client: httpx.Client) -> Generator[httpx.Client, No
     client.close()
 
 
-# ===========================================================================
-# /categories — read-only, any authenticated user
-# ===========================================================================
-
-
-def test_categories_empty_initially(backend_client_with_auth: httpx.Client) -> None:
-    """GET /presets/categories returns an empty list when no published presets exist."""
-    resp = backend_client_with_auth.get("/presets/categories")
-    assert resp.is_success, resp.text
-    data = resp.json()
-    assert "categories" in data
-    assert isinstance(data["categories"], list)
-
-
-def test_categories_returns_distinct_sorted_values(backend_client_with_auth: httpx.Client) -> None:
-    """After creating presets in different categories, /categories reflects them sorted."""
-    # Create two presets in distinct categories.
-    cat_a = "zz-alpha-category"
-    cat_b = "aa-beta-category"
-    created_ids: list[tuple[str, int]] = []
-    for cat in (cat_a, cat_b):
-        resp = backend_client_with_auth.post(
-            "/presets/create",
-            json=_make_create_body(name=f"Cat test {cat}", category=cat, is_published=True),
-        )
-        assert resp.is_success, resp.text
-        d = resp.json()
-        created_ids.append((d["preset_id"], d["version"]))
-
-    resp = backend_client_with_auth.get("/presets/categories")
-    assert resp.is_success, resp.text
-    categories = resp.json()["categories"]
-    assert cat_a in categories
-    assert cat_b in categories
-    # Must be sorted alphabetically.
-    assert categories == sorted(categories)
-
-    # Clean up.
-    for pid, ver in created_ids:
-        backend_client_with_auth.post("/presets/delete", json={"preset_id": pid, "version": ver})
-
-
-def test_categories_excludes_unpublished(backend_client_with_auth: httpx.Client) -> None:
-    """Unpublished presets must not contribute to /categories."""
-    unique_cat = "unpublished-only-category-xyz"
-    resp = backend_client_with_auth.post(
-        "/presets/create",
-        json=_make_create_body(name="Unpublished cat test", category=unique_cat, is_published=False),
-    )
-    assert resp.is_success, resp.text
-    d = resp.json()
-    pid, ver = d["preset_id"], d["version"]
-
-    resp = backend_client_with_auth.get("/presets/categories")
-    assert resp.is_success, resp.text
-    assert unique_cat not in resp.json()["categories"]
-
-    # Clean up.
-    backend_client_with_auth.post("/presets/delete", json={"preset_id": pid, "version": ver})
+# Category filter / endpoint removed — presets are tagged, not categorised.
 
 
 # ===========================================================================
@@ -196,7 +136,7 @@ def test_list_pagination_page_and_page_size(backend_client_with_auth: httpx.Clie
     for i in range(3):
         resp = backend_client_with_auth.post(
             "/presets/create",
-            json=_make_create_body(name=f"Pagination preset {i}", category="pagination-test", is_published=True),
+            json=_make_create_body(name=f"Pagination preset {i}", is_published=True),
         )
         assert resp.is_success, resp.text
         d = resp.json()
@@ -233,27 +173,6 @@ def test_list_invalid_pagination_returns_422(backend_client_with_auth: httpx.Cli
 
     resp = backend_client_with_auth.get("/presets/list", params={"page_size": 0})
     assert resp.status_code == 422
-
-
-def test_list_filter_by_category(backend_client_with_auth: httpx.Client) -> None:
-    """The category filter returns only presets in that category."""
-    unique_cat = "filter-by-cat-unique"
-    resp = backend_client_with_auth.post(
-        "/presets/create",
-        json=_make_create_body(name="Cat filter preset", category=unique_cat, is_published=True),
-    )
-    assert resp.is_success, resp.text
-    d = resp.json()
-    pid, ver = d["preset_id"], d["version"]
-
-    resp = backend_client_with_auth.get("/presets/list", params={"category": unique_cat})
-    assert resp.is_success, resp.text
-    data = resp.json()
-    assert data["total"] >= 1
-    assert all(p["category"] == unique_cat for p in data["presets"])
-
-    # Clean up.
-    backend_client_with_auth.post("/presets/delete", json={"preset_id": pid, "version": ver})
 
 
 def test_list_filter_by_difficulty(backend_client_with_auth: httpx.Client) -> None:
@@ -303,11 +222,11 @@ def test_list_filter_by_search(backend_client_with_auth: httpx.Client) -> None:
     backend_client_with_auth.post("/presets/delete", json={"preset_id": pid, "version": ver})
 
 
-def test_list_omits_builder_template(backend_client_with_auth: httpx.Client) -> None:
-    """List items must not include builder_template (use /get for full detail)."""
+def test_list_includes_builder_template(backend_client_with_auth: httpx.Client) -> None:
+    """List items expose ``builder_template`` so the gallery can render a mini preview without a per-card /get round-trip."""
     resp = backend_client_with_auth.post(
         "/presets/create",
-        json=_make_create_body(name="No-template list test", is_published=True),
+        json=_make_create_body(name="Template list test", is_published=True),
     )
     assert resp.is_success, resp.text
     d = resp.json()
@@ -316,8 +235,11 @@ def test_list_omits_builder_template(backend_client_with_auth: httpx.Client) -> 
     resp = backend_client_with_auth.get("/presets/list")
     assert resp.is_success, resp.text
     items = resp.json()["presets"]
+    assert items, "Should have at least one preset"
     for item in items:
-        assert "builder_template" not in item, "List items must not expose builder_template"
+        assert "builder_template" in item, "List items expose builder_template for previews"
+        # Parameters are still elided from /list — use /get for those.
+        assert "parameters" not in item
 
     # Clean up.
     backend_client_with_auth.post("/presets/delete", json={"preset_id": pid, "version": ver})
@@ -335,7 +257,6 @@ def test_crud_lifecycle(backend_client_with_auth: httpx.Client) -> None:
     create_body = _make_create_body(
         name="CRUD Lifecycle Preset",
         description="Initial description",
-        category="crud-lifecycle",
         difficulty="intermediate",
         tags=["crud", "lifecycle"],
         is_published=True,
@@ -355,7 +276,6 @@ def test_crud_lifecycle(backend_client_with_auth: httpx.Client) -> None:
     assert got["version"] == 1
     assert got["name"] == "CRUD Lifecycle Preset"
     assert got["description"] == "Initial description"
-    assert got["category"] == "crud-lifecycle"
     assert got["difficulty"] == "intermediate"
     assert got["tags"] == ["crud", "lifecycle"]
     assert got["is_published"] is True
@@ -364,7 +284,7 @@ def test_crud_lifecycle(backend_client_with_auth: httpx.Client) -> None:
     assert "parameters" in got
 
     # --- LIST (verify it appears) ---
-    resp = backend_client_with_auth.get("/presets/list", params={"category": "crud-lifecycle"})
+    resp = backend_client_with_auth.get("/presets/list", params={"search": "CRUD Lifecycle"})
     assert resp.is_success, resp.text
     list_data = resp.json()
     assert list_data["total"] >= 1
@@ -378,7 +298,6 @@ def test_crud_lifecycle(backend_client_with_auth: httpx.Client) -> None:
         "name": "CRUD Lifecycle Preset v2",
         "description": "Updated description",
         "long_description": "A longer description added in v2",
-        "category": "crud-lifecycle",
         "difficulty": "advanced",
         "tags": ["crud", "lifecycle", "updated"],
         "icon": "Cloud",
@@ -417,7 +336,7 @@ def test_crud_lifecycle(backend_client_with_auth: httpx.Client) -> None:
     assert resp.status_code == 404
 
     # After deletion, it must not appear in the list.
-    resp = backend_client_with_auth.get("/presets/list", params={"category": "crud-lifecycle"})
+    resp = backend_client_with_auth.get("/presets/list", params={"search": "CRUD Lifecycle"})
     assert resp.is_success, resp.text
     ids_after = [p["preset_id"] for p in resp.json()["presets"]]
     assert preset_id not in ids_after
@@ -534,7 +453,6 @@ def test_update_non_admin_returns_403(non_admin_client: httpx.Client, backend_cl
         "version": ver,
         "name": "Should be rejected",
         "description": "desc",
-        "category": "test-category",
         "difficulty": "beginner",
         "tags": [],
         "icon": "Cloud",
@@ -556,7 +474,6 @@ def test_update_nonexistent_preset_returns_404(backend_client_with_auth: httpx.C
         "version": 1,
         "name": "Ghost update",
         "description": "desc",
-        "category": "test-category",
         "difficulty": "beginner",
         "tags": [],
         "icon": "Cloud",
@@ -584,7 +501,6 @@ def test_update_version_conflict_returns_409(backend_client_with_auth: httpx.Cli
         "version": 1,
         "name": "Version conflict test v2",
         "description": "desc",
-        "category": "test-category",
         "difficulty": "beginner",
         "tags": [],
         "icon": "Cloud",
@@ -648,7 +564,6 @@ def test_delete_version_conflict_returns_409(backend_client_with_auth: httpx.Cli
         "version": 1,
         "name": "Delete conflict test v2",
         "description": "desc",
-        "category": "test-category",
         "difficulty": "beginner",
         "tags": [],
         "icon": "Cloud",
@@ -719,13 +634,14 @@ def test_instantiate_advanced_with_default_auto_run_creates_blueprint_and_run(
     backend_client_with_auth.post("/presets/delete", json={"preset_id": pid, "version": ver})
 
 
-def test_instantiate_with_auto_run_false_saves_blueprint_but_no_run(
+def test_instantiate_with_auto_run_false_returns_builder_only(
     backend_client_with_auth: httpx.Client,
 ) -> None:
-    """auto_run=False: /instantiate saves the blueprint but does not submit a run.
+    """auto_run=False: /instantiate returns the materialised builder only.
 
-    blueprint_id and blueprint_version are populated; run_id and attempt_count
-    are None.  Works for any difficulty tier.
+    No persistence happens server-side — the caller is expected to open
+    the builder in the editor and save explicitly. blueprint_id,
+    blueprint_version, run_id, and attempt_count are all None.
     """
     pid, ver = _create_preset_for_instantiate(backend_client_with_auth, difficulty="advanced")
 
@@ -736,8 +652,8 @@ def test_instantiate_with_auto_run_false_saves_blueprint_but_no_run(
     assert resp.is_success, resp.text
     data = resp.json()
     assert "builder" in data
-    assert data["blueprint_id"] is not None, "blueprint_id should be set when auto_run=False"
-    assert data["blueprint_version"] is not None, "blueprint_version should be set when auto_run=False"
+    assert data["blueprint_id"] is None, "blueprint_id should be None when auto_run=False"
+    assert data["blueprint_version"] is None, "blueprint_version should be None when auto_run=False"
     assert data["run_id"] is None, "run_id should be None when auto_run=False"
     assert data["attempt_count"] is None, "attempt_count should be None when auto_run=False"
 
@@ -876,33 +792,6 @@ def test_instantiate_non_admin_can_call(non_admin_client: httpx.Client, backend_
 # ===========================================================================
 
 
-def test_create_multiple_presets_same_category(backend_client_with_auth: httpx.Client) -> None:
-    """Multiple presets in the same category all appear in /list and /categories."""
-    cat = "multi-preset-category"
-    created: list[tuple[str, int]] = []
-    for i in range(3):
-        resp = backend_client_with_auth.post(
-            "/presets/create",
-            json=_make_create_body(name=f"Multi preset {i}", category=cat, is_published=True),
-        )
-        assert resp.is_success, resp.text
-        d = resp.json()
-        created.append((d["preset_id"], d["version"]))
-
-    resp = backend_client_with_auth.get("/presets/list", params={"category": cat})
-    assert resp.is_success, resp.text
-    data = resp.json()
-    assert data["total"] >= 3
-
-    resp = backend_client_with_auth.get("/presets/categories")
-    assert resp.is_success, resp.text
-    assert cat in resp.json()["categories"]
-
-    # Clean up.
-    for pid, ver in created:
-        backend_client_with_auth.post("/presets/delete", json={"preset_id": pid, "version": ver})
-
-
 def test_get_specific_version_after_update(backend_client_with_auth: httpx.Client) -> None:
     """After updating, both version 1 and version 2 are retrievable by explicit version."""
     resp = backend_client_with_auth.post(
@@ -918,7 +807,6 @@ def test_get_specific_version_after_update(backend_client_with_auth: httpx.Clien
         "version": 1,
         "name": "Version history test v2",
         "description": "Updated",
-        "category": "test-category",
         "difficulty": "beginner",
         "tags": [],
         "icon": "Cloud",
@@ -950,29 +838,29 @@ def test_get_specific_version_after_update(backend_client_with_auth: httpx.Clien
 
 def test_list_total_reflects_published_count(backend_client_with_auth: httpx.Client) -> None:
     """The total field in /list reflects only published presets."""
-    unique_cat = "total-count-test-cat"
+    unique_search = "total-count-test-unique-xyz"
 
     # Record baseline.
-    resp = backend_client_with_auth.get("/presets/list", params={"category": unique_cat})
+    resp = backend_client_with_auth.get("/presets/list", params={"search": unique_search})
     assert resp.is_success, resp.text
     baseline_total = resp.json()["total"]
 
     # Add one published and one unpublished preset.
     resp_pub = backend_client_with_auth.post(
         "/presets/create",
-        json=_make_create_body(name="Published count test", category=unique_cat, is_published=True),
+        json=_make_create_body(name=f"Published count test {unique_search}", is_published=True),
     )
     assert resp_pub.is_success, resp_pub.text
     d_pub = resp_pub.json()
 
     resp_unp = backend_client_with_auth.post(
         "/presets/create",
-        json=_make_create_body(name="Unpublished count test", category=unique_cat, is_published=False),
+        json=_make_create_body(name=f"Unpublished count test {unique_search}", is_published=False),
     )
     assert resp_unp.is_success, resp_unp.text
     d_unp = resp_unp.json()
 
-    resp = backend_client_with_auth.get("/presets/list", params={"category": unique_cat})
+    resp = backend_client_with_auth.get("/presets/list", params={"search": unique_search})
     assert resp.is_success, resp.text
     new_total = resp.json()["total"]
     # Only the published one should have incremented the count.
@@ -1019,7 +907,8 @@ def test_instantiate_all_three_difficulty_tiers_with_auto_run_false(
 ) -> None:
     """Smoke-test all three difficulty tiers with auto_run=False.
 
-    All tiers should return blueprint_id but no run_id when auto_run=False.
+    No persistence happens server-side for any tier: the response only
+    contains the materialised builder.
     """
     results: dict[str, Any] = {}
     created: list[tuple[str, int]] = []
@@ -1035,9 +924,10 @@ def test_instantiate_all_three_difficulty_tiers_with_auto_run_false(
         assert resp.is_success, f"instantiate failed for {difficulty}: {resp.text}"
         results[difficulty] = resp.json()
 
-    # All tiers: blueprint is saved but no run when auto_run=False.
+    # All tiers: nothing persisted, builder returned only.
     for tier in ("beginner", "intermediate", "advanced"):
-        assert results[tier]["blueprint_id"] is not None, f"{tier} should have blueprint_id"
+        assert results[tier]["builder"] is not None, f"{tier} should have a materialised builder"
+        assert results[tier]["blueprint_id"] is None, f"{tier} should have no blueprint_id"
         assert results[tier]["run_id"] is None, f"{tier} should have no run_id"
 
     # Clean up.
@@ -1157,7 +1047,6 @@ def test_publish_toggle_is_independent_of_update(backend_client_with_auth: httpx
         "version": 1,
         "name": "Publish after update test v2",
         "description": "Updated description",
-        "category": "test-category",
         "difficulty": "beginner",
         "tags": [],
         "icon": "Cloud",

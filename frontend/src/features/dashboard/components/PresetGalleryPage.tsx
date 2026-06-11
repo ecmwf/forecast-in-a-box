@@ -30,13 +30,14 @@
 import { useMemo, useState } from 'react'
 import { LayoutGrid } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { usePresetList } from '@/api/hooks/usePresets'
+import { PresetGalleryCard } from './PresetGalleryCard'
 import type {
   HighLevelPreset,
   PresetDifficulty,
   PresetListItem,
   PresetListResponse,
 } from '@/api/types/preset.types'
+import { usePresetList } from '@/api/hooks/usePresets'
 import { useDebounce } from '@/hooks/useDebounce'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
@@ -45,7 +46,6 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { PresetWizardDialog } from '@/features/fable-builder/components/PresetWizardDialog'
-import { PresetGalleryCard } from './PresetGalleryCard'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -108,9 +108,11 @@ function filterPresets(
 function GallerySkeletonGrid() {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {Array.from({ length: 8 }).map((_, i) => (
-        // eslint-disable-next-line react/no-array-index-key
-        <div key={i} className="flex flex-col gap-3 rounded-xl border p-6">
+      {Array.from({ length: 8 }, (_, i) => i).map((i) => (
+        <div
+          key={`skeleton-${i}`}
+          className="flex flex-col gap-3 rounded-xl border p-6"
+        >
           <div className="flex items-start gap-3">
             <Skeleton className="h-10 w-10 shrink-0 rounded-lg" />
             <div className="flex-1 space-y-2">

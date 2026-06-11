@@ -15,8 +15,8 @@
  */
 
 import { useTranslation } from 'react-i18next'
-import type { ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
+import type { ReactNode } from 'react'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
 import { FableMiniFlow } from '@/features/journal/components/FableMiniFlow'
 import { H3, P } from '@/components/base/typography'
