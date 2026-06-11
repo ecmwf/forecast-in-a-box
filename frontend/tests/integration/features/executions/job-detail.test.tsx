@@ -184,8 +184,8 @@ describe('RunDetailPage Integration', () => {
   describe('outputs panel', () => {
     it('shows available output count for completed job with outputs', async () => {
       const screen = await renderDetailPage('job-completed-001')
-      // job-completed-001 has 3 available outputs (task-out-1, task-out-2, task-out-3)
-      await expect.element(screen.getByText(/Generated: 3/)).toBeVisible()
+      // job-completed-001 has 4 available outputs (task-out-1 … task-out-4)
+      await expect.element(screen.getByText(/Generated: 4/)).toBeVisible()
     })
 
     it('shows pending count for running job with unavailable outputs', async () => {

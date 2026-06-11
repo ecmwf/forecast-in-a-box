@@ -16,6 +16,7 @@
 
 import { registerFirstPartySniffers } from '../firstPartySniffers'
 import { registerOutputAdapter } from '../registry'
+import { gribStoredAdapter } from './grib'
 import { imageRasterAdapter } from './image'
 import { imageVectorAdapter } from './svg'
 import { pdfAdapter } from './pdf'
@@ -28,5 +29,6 @@ export function registerFirstPartyAdapters(): void {
   registerOutputAdapter(imageRasterAdapter)
   registerOutputAdapter(imageVectorAdapter)
   registerOutputAdapter(pdfAdapter)
+  registerOutputAdapter(gribStoredAdapter)
   registerFirstPartySniffers()
 }

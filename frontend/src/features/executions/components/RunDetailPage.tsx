@@ -300,6 +300,13 @@ export function RunDetailPage() {
               value="outputs"
               className={cn(WIDE_TAB_CONTENT, 'space-y-4')}
             >
+              {fableData?.builder && catalogue && (
+                <StoredOutputsCard
+                  fable={fableData.builder}
+                  catalogue={catalogue}
+                  storedOutputs={jobData.outputs?.stored}
+                />
+              )}
               <OutputsPanel
                 jobId={jobId}
                 status={jobData.status}
@@ -308,13 +315,6 @@ export function RunDetailPage() {
                 plannedBlockIds={jobData.planned_block_ids}
                 toolbarSlot={toolbarSlot}
               />
-              {fableData?.builder && catalogue && (
-                <StoredOutputsCard
-                  fable={fableData.builder}
-                  catalogue={catalogue}
-                  storedOutputs={jobData.outputs?.stored}
-                />
-              )}
             </TabsContent>
             <TabsContent value="logs" className={WIDE_TAB_CONTENT}>
               <LogsPanel jobId={jobId} status={jobData.status} />

@@ -166,10 +166,21 @@
       "pdfPageCount_other": "{{count}} pages"
     },
     "adapters": {
-      "generic": { "label": "File" },
-      "image-raster": { "label": "Image" },
-      "image-vector": { "label": "SVG" },
-      "pdf": { "label": "PDF" }
+      "generic": {
+        "label": "File"
+      },
+      "image-raster": {
+        "label": "Image"
+      },
+      "image-vector": {
+        "label": "SVG"
+      },
+      "pdf": {
+        "label": "PDF"
+      },
+      "grib-stored": {
+        "label": "GRIB"
+      }
     }
   },
   "compilation": {
@@ -212,10 +223,11 @@
     "starting": "Starting SkinnyWMS…",
     "lensFailed": "Could not start SkinnyWMS",
     "close": "Close",
-    "closeAndStop": "Close & Stop WMS Server",
     "fileMissing": "File not yet written by the run",
     "externalTitle": "Use this WMS in another tool",
-    "externalHint": "The same data is available over standard WMS — paste this URL into QGIS, ArcGIS, or any other WMS-aware client to inspect it there. The server stays running until you close this panel."
+    "externalHint": "Copies a standard WMS GetCapabilities URL — paste it into QGIS, ArcGIS, or any other WMS-aware client to inspect the data there. The server keeps running until you stop it on this row.",
+    "running": "WMS running",
+    "stop": "Stop"
   },
   "activeLenses": {
     "title": "Active lenses",

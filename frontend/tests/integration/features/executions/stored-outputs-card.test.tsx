@@ -14,8 +14,8 @@
  * Exercises the disk-written-sink card against the MSW lens handlers:
  * - row derivation (server-authoritative `stored` map vs fable-walk fallback)
  * - unavailable files disable the lens actions
- * - the "Copy WMS URL" flow: start lens → poll until running → surface the
- *   GetCapabilities URL → close stops the instance
+ * - the copy action: start lens → poll until running → row shows the
+ *   running badge with port → Stop tears the instance down
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -103,19 +103,20 @@ beforeEach(() => {
 describe('StoredOutputsCard', () => {
   it('prefers server-reported paths and skips path-less sinks', async () => {
     const screen = await renderCard(storedAvailable)
-    await expect
-      .element(screen.getByText('/data/out/run-1__2t.grib2'))
-      .toBeVisible()
-    expect(screen.getByText('GRIB Sink').elements()).toHaveLength(1)
-    // mapPlotSink has no path config and no stored entry — not listed
+    // Path renders split: emphasized filename + dimmed directory.
+    await expect.element(screen.getByText('run-1__2t.grib2')).toBeVisible()
+    await expect.element(screen.getByText('/data/out/')).toBeVisible()
+    expect(screen.getByText('GRIB', { exact: true }).elements()).toHaveLength(1)
+    // mapPlotSink has no path config and no stored entry — not listed.
     expect(screen.getByText('Map Plot').elements()).toHaveLength(0)
   })
 
   it('falls back to the fable-configured path without server data', async () => {
     const screen = await renderCard()
     await expect
-      .element(screen.getByText('/tmp/run-1__[shortName].grib2'))
+      .element(screen.getByText('run-1__[shortName].grib2'))
       .toBeVisible()
+    await expect.element(screen.getByText('/tmp/')).toBeVisible()
   })
 
   it('disables lens actions when the file is reported missing', async () => {
@@ -126,24 +127,22 @@ describe('StoredOutputsCard', () => {
     await expect.element(openButton).toBeDisabled()
   })
 
-  it('runs the Copy-WMS-URL flow: start, poll to running, surface URL, stop on close', async () => {
+  it('copy starts the lens, the row shows a running badge, Stop tears it down', async () => {
     const screen = await renderCard(storedAvailable)
 
     await screen.getByRole('button', { name: /copy wms url/i }).click()
 
-    // Lens starts in `starting`, flips to running on a later poll; the
-    // GetCapabilities URL for the first mock port then appears.
-    await expect
-      .element(screen.getByText(/:54300\/wms\?service=WMS/))
-      .toBeVisible()
+    // Lens starts in `starting`, flips to running on a later poll; the row
+    // badge then reports the assigned port.
+    await expect.element(screen.getByText(/WMS running :54300/)).toBeVisible()
     expect(listMockLenses()).toHaveLength(1)
     expect(listMockLenses()[0].status).toBe('running')
 
-    await screen.getByRole('button', { name: /close & stop/i }).click()
+    await screen.getByRole('button', { name: /^stop$/i }).click()
     await expect
-      .element(screen.getByText(/:54300\/wms\?service=WMS/))
+      .element(screen.getByText(/WMS running/))
       .not.toBeInTheDocument()
-    // The stop request is fired on close but settles asynchronously.
+    // The stop request settles asynchronously after the badge clears.
     await expect.poll(() => listMockLenses()).toHaveLength(0)
   })
 })

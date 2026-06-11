@@ -61,8 +61,20 @@ const seedExecutions: Array<JobExecutionDetail> = [
           original_block: 'sink_wind_map',
           is_available: true,
         },
+        // GribSink marker output: the payload is the written directory path,
+        // tagged with the plugin's GRIB_MIME (see grib-stored adapter).
+        'task-out-4': {
+          mime_type: 'text/plain; fiab-format=gribdir',
+          original_block: 'block_sink_1',
+          is_available: true,
+        },
       },
-      stored: {},
+      stored: {
+        block_sink_1: {
+          path: '/data/output/job-completed-001__[shortName].grib2',
+          is_available: true,
+        },
+      },
     },
     // Cache is popped on terminal status; both arrays come back null.
     completed_block_ids: null,
