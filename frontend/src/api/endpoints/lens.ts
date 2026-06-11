@@ -68,11 +68,15 @@ export async function listSupportedLenses(): Promise<
   })
 }
 
-/** Lens binds to 127.0.0.1:<port> in the pod — route WMS through the backend proxy. */
+/**
+ * A lens binds to 127.0.0.1:<port> next to the backend, so the browser can
+ * reach it only when it runs on the backend's host (local / single-host
+ * deployments). Build the direct URL on the backend host at the lens port.
+ */
 export function buildLensBaseUrl(port: number): string {
   const backendBase = getBackendBaseUrl()
-  const base = backendBase || window.location.origin
-  return `${base.replace(/\/$/, '')}/api/v1/lens/proxy/${port}`
+  const base = new URL(backendBase || window.location.origin)
+  return `${base.protocol}//${base.hostname}:${port}`
 }
 
 /**
