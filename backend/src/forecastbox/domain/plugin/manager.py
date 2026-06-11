@@ -36,12 +36,14 @@ from cascade.low.func import assert_never
 from fiab_core.fable import BlockFactoryCatalogue, PluginCompositeId
 from fiab_core.plugin import Plugin
 from packaging.specifiers import SpecifierSet
+from packaging.version import Version
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
+from forecastbox.domain.plugin.compatibility import install_plugin_compatibly
 from forecastbox.utility.concurrent import delayed_thread, timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginsSettings, config, config_edit_lock
-from forecastbox.utility.packages import try_import, try_install, try_updatedate, try_version
+from forecastbox.utility.packages import try_import, try_updatedate, try_version
 from forecastbox.utility.pydantic import FiabBaseModel
 
 logger = logging.getLogger(__name__)
@@ -88,11 +90,11 @@ def load_plugins(plugins: PluginsSettings) -> None:
             # NOTE consider running all pip invocations at once -- worse error reporting but better perf
             if pluginSettings.update_strategy == "auto":
                 logger.info(f"auto-updating {pluginSettings.module_name}")
-                try_install(pluginSettings.pip_source)
+                install_plugin_compatibly(pluginSettings.pip_source, None)
             else:
                 if try_import(pluginSettings.module_name) is None:
                     logger.info(f"installing {pluginSettings.module_name} for the first time")
-                    try_install(pluginSettings.pip_source)
+                    install_plugin_compatibly(pluginSettings.pip_source, None)
 
             if pluginKey in lookup:
                 errors[pluginKey] = f"plugin {pluginKey} is provided by more than just {pluginSettings.pip_source}"
@@ -123,10 +125,10 @@ def load_plugins(plugins: PluginsSettings) -> None:
             PluginManager.updater_error = repr(e)
 
 
-def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, specifier_set: SpecifierSet | None) -> None:
+def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, install: bool, version: Version | None) -> None:
     try:
-        if specifier_set is not None:
-            try_install(pluginSettings.pip_source, specifier_set)
+        if install:
+            install_plugin_compatibly(pluginSettings.pip_source, version)
         # NOTE we need to recommend in the docs to re-launch app after this change, this wont cover all cases
         importlib.reload(importlib.import_module(pluginSettings.module_name))
         plugin_impl = try_import(pluginSettings.module_name)
@@ -229,7 +231,7 @@ def catalogue_view() -> dict[PluginCompositeId, BlockFactoryCatalogue] | bool:
             return {plugin_id: plugin.catalogue for plugin_id, plugin in PluginManager.plugins.items()}
 
 
-def submit_update_single(pluginId: PluginCompositeId, specifier_set: SpecifierSet | None) -> str:
+def submit_update_single(pluginId: PluginCompositeId, install: bool, version: Version | None) -> str:
     pluginSettings = config.external.plugins.get(pluginId, None)
     if pluginSettings is None:
         return f"plugin {pluginId} not configured"
@@ -246,7 +248,7 @@ def submit_update_single(pluginId: PluginCompositeId, specifier_set: SpecifierSe
                 else:
                     PluginManager.updater.join(0)
                     # we join despite thread not being alive to ensure resource collection
-            PluginManager.updater = threading.Thread(target=update_single, args=(pluginId, pluginSettings, specifier_set))
+            PluginManager.updater = threading.Thread(target=update_single, args=(pluginId, pluginSettings, install, version))
             PluginManager.updater.start()
     return ""
 
@@ -271,7 +273,7 @@ def modify_enabled(pluginId: PluginCompositeId, isEnabled: bool) -> None:
     if not isEnabled:
         unload_single(pluginId)
     else:
-        submit_update_single(pluginId, specifier_set=None)
+        submit_update_single(pluginId, install=False, version=None)
 
 
 def join_updater_thread(timeout_sec: int) -> None:

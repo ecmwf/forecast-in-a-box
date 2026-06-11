@@ -23,16 +23,11 @@ from collections.abc import Iterator
 from types import ModuleType
 
 import httpx
+import orjson
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
 logger = logging.getLogger(__name__)
-
-
-def get_fiabcore_version() -> Version:
-    """Return the currently installed version of ``fiab-core`` as a ``Version`` object."""
-    raw = importlib.metadata.version("fiab-core")
-    return Version(raw)
 
 
 def get_package_versions(pip_source: str) -> Iterator[str]:
@@ -105,33 +100,39 @@ def try_updatedate(pip_source: str) -> str:
         return "unknown"
 
 
-def try_install(pip_source: str, specifier_set: SpecifierSet | None = None) -> None:
-    """Run ``uv pip install --upgrade`` for the given ``pip_source``.
-
-    The currently installed ``fiab-core`` version is pinned in the install
-    command to prevent accidental core upgrades or downgrades.
-    # TODO -- include the whole pylock.toml
-
-    If ``specifier_set`` is provided and ``pip_source`` is not an editable
-    install, the specifier is appended to the package argument to constrain
-    which version is installed (e.g. ``"my-plugin>=1,<2"``).
-    Editable installs (``-e ...``) are version-agnostic; the specifier is
-    silently ignored for them.
-    """
-    fiabcore_pin = f"fiab-core=={get_fiabcore_version()}"
-    is_editable = pip_source.startswith("-e")
-    if is_editable:
-        base_args = pip_source.split(" ", 1)
-        package_arg = base_args  # specifier_set not applicable for editable installs
-    else:
-        package_spec = pip_source if specifier_set is None else f"{pip_source}{specifier_set}"
-        package_arg = [package_spec]
-    install_command = ["uv", "pip", "install", "--upgrade"] + package_arg + [fiabcore_pin]
+def try_install(packages: list[str]) -> None:
+    """Run ``uv pip install`` with the given pkg specs."""
+    install_command = ["uv", "pip", "install"] + packages
     try:
         result = subprocess.run(install_command, check=False, capture_output=True)
     except FileNotFoundError as ex:
-        logger.error(f"installing {pip_source} failure: {repr(ex)}")
+        logger.error(f"installing {packages} failure: {repr(ex)}")
         return
     if result.returncode != 0:
-        msg = f"installing {pip_source} failure: {result.returncode}. Stderr: {result.stderr}, Stdout: {result.stdout}, Args: {result.args}"
+        msg = f"installing {packages} failure: {result.returncode}. Stderr: {result.stderr}, Stdout: {result.stdout}, Args: {result.args}"
         logger.error(msg)
+
+
+def get_existing_install_pin(distname: str) -> list[str]:
+    """If the distname's install is detected to be editable,
+    we return `-e path`, otherwise we return `distname==currentVersion`.
+    """
+    # NOTE: This block is for 3.14+
+    distribution = importlib.metadata.distribution(distname)
+    if hasattr(distribution, "origin"):
+        origin = distribution.origin
+        if hasattr(origin, "url") and isinstance(origin.url, str) and origin.url.startswith("file://"):
+            # NOTE this doesnt work well for non-std layout but again we can restrict to only that
+            return ["-e ", origin.url[len("file://") :]]
+
+    # NOTE: pre 3.14, eventually remove
+    direct_url_text = distribution.read_text("direct_url.json")
+    if direct_url_text:
+        info = orjson.loads(direct_url_text)
+        if info.get("dir_info", {}).get("editable"):
+            url = info.get("url", "")
+            if url.startswith("file://"):
+                return ["-e ", url[len("file://") :]]
+
+    version = importlib.metadata.version(distname)
+    return [f"{distname}=={version}"]

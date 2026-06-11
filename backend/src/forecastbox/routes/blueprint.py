@@ -52,10 +52,10 @@ from forecastbox.domain.glyphs import global_db
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples
 from forecastbox.domain.glyphs.jinja_interpolation import get_custom_functions
 from forecastbox.domain.glyphs.types import GlobalGlyphId
+from forecastbox.domain.plugin.compatibility import get_fiabcore_version
 from forecastbox.domain.plugin.manager import catalogue_view, plugins_ready
 from forecastbox.schemata.jobs import GlobalGlyph
 from forecastbox.utility.auth import AuthContext
-from forecastbox.utility.packages import get_fiabcore_version
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
 
