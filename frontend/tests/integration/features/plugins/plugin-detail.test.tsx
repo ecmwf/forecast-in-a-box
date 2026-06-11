@@ -119,7 +119,9 @@ describe('Plugin Detail Page', () => {
       // matching descriptions that contain similar text (vitest browser
       // mode uses case-insensitive getByText)
       await expect
-        .element(screen.getByRole('heading', { name: 'Earthkit Data Source' }))
+        .element(
+          screen.getByRole('heading', { name: 'Operational forecast source' }),
+        )
         .toBeInTheDocument()
       await expect
         .element(screen.getByRole('heading', { name: 'Ensemble Statistics' }))
@@ -139,7 +141,9 @@ describe('Plugin Detail Page', () => {
 
       // Wait for blocks to render
       await expect
-        .element(screen.getByRole('heading', { name: 'Earthkit Data Source' }))
+        .element(
+          screen.getByRole('heading', { name: 'Operational forecast source' }),
+        )
         .toBeInTheDocument()
 
       // The source block button should be enabled

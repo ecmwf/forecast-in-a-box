@@ -43,9 +43,9 @@ function seedSourceBlock() {
       source1: {
         factory_id: {
           plugin: { store: 'ecmwf', local: 'ecmwf-base' },
-          factory: 'ekdSource',
+          factory: 'operationalForecastSource',
         },
-        configuration_values: { source: 'mars', expver: '0001' },
+        configuration_values: { source: 'mars', forecast: 'aifs-ens' },
         input_ids: {},
       },
     },

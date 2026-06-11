@@ -10,7 +10,7 @@
 
 import type { FableBuilderV1 } from '@/api/types/fable.types'
 import type { PluginCompositeId } from '@/api/types/plugins.types'
-import { getAppTimeZone, todayInZone, yesterdayInZone } from '@/lib/datetime'
+import { getAppTimeZone, yesterdayInZone } from '@/lib/datetime'
 import i18n from '@/lib/i18n'
 
 export type PresetId =
@@ -36,11 +36,6 @@ function pluginId(store: string, local: string): PluginCompositeId {
   return { store, local }
 }
 
-/** Today's calendar date in the application timezone, evaluated per call. */
-function today(): string {
-  return todayInZone(getAppTimeZone())
-}
-
 /** Yesterday's calendar date in the application timezone, evaluated per call. */
 function yesterday(): string {
   return yesterdayInZone(getAppTimeZone())
@@ -61,12 +56,12 @@ function quickStartPreset(): FablePreset {
         source_1: {
           factory_id: {
             plugin: pluginId('ecmwf', 'ecmwf-base'),
-            factory: 'ekdSource',
+            factory: 'operationalForecastSource',
           },
           configuration_values: {
             source: 'ecmwf-open-data',
-            date: today(),
-            expver: '0001',
+            forecast: 'aifs-ens',
+            base_time: yesterdayBaseTime(),
             param: '2t',
             step: '0',
             number: '1,2,3,4,5,6',
@@ -113,12 +108,12 @@ function standardPreset(): FablePreset {
         source_1: {
           factory_id: {
             plugin: pluginId('ecmwf', 'ecmwf-base'),
-            factory: 'ekdSource',
+            factory: 'operationalForecastSource',
           },
           configuration_values: {
             source: 'mars',
-            date: today(),
-            expver: '0001',
+            forecast: 'aifs-ens',
+            base_time: yesterdayBaseTime(),
             param: '2t',
             step: '0',
             number: '0',
@@ -151,12 +146,12 @@ function datasetPreset(): FablePreset {
         source_1: {
           factory_id: {
             plugin: pluginId('ecmwf', 'ecmwf-base'),
-            factory: 'ekdSource',
+            factory: 'operationalForecastSource',
           },
           configuration_values: {
             source: 'ecmwf-open-data',
-            date: today(),
-            expver: '0001',
+            forecast: 'aifs-ens',
+            base_time: yesterdayBaseTime(),
             param: '2t',
             step: '0',
             number: '0',
@@ -178,12 +173,12 @@ function ecmwfOpenDataPreset(): FablePreset {
         source_1: {
           factory_id: {
             plugin: pluginId('ecmwf', 'ecmwf-base'),
-            factory: 'ekdSource',
+            factory: 'operationalForecastSource',
           },
           configuration_values: {
             source: 'ecmwf-open-data',
-            date: yesterday(),
-            expver: '1',
+            forecast: 'aifs-ens',
+            base_time: yesterdayBaseTime(),
             param: '2t',
             step: '24,48,72,360',
             number: '1,2,3,4,5,6',
@@ -245,32 +240,20 @@ function aifsForecastPreset(): FablePreset {
           },
           input_ids: {},
         },
-        transform_1: {
-          factory_id: {
-            plugin: pluginId('ecmwf', 'ecmwf-base'),
-            factory: 'selectSteps',
-          },
-          configuration_values: {
-            step: '6,12,18,24,30,36,42,48,54,60,66,72',
-          },
-          input_ids: {
-            dataset: 'source_1',
-          },
-        },
         sink_1: {
           factory_id: {
             plugin: pluginId('ecmwf', 'ecmwf-base'),
             factory: 'mapPlotSink',
           },
           configuration_values: {
-            param: '10u,10v',
+            param: '10u',
             domain: 'europe',
             format: 'png',
             groupby: 'none',
-            splitby: 'none',
+            splitby: 'step',
           },
           input_ids: {
-            dataset: 'transform_1',
+            dataset: 'source_1',
           },
         },
         sink_2: {
@@ -283,10 +266,10 @@ function aifsForecastPreset(): FablePreset {
             domain: 'global',
             format: 'pdf',
             groupby: 'none',
-            splitby: 'none',
+            splitby: 'step',
           },
           input_ids: {
-            dataset: 'transform_1',
+            dataset: 'source_1',
           },
         },
       },
@@ -318,10 +301,10 @@ function aifsDatasetPreset(): FablePreset {
         sink_1: {
           factory_id: {
             plugin: pluginId('ecmwf', 'ecmwf-base'),
-            factory: 'zarrSink',
+            factory: 'gribSink',
           },
           configuration_values: {
-            path: '/tmp/${runId}__${attemptCount}.zarr',
+            path: '/tmp/${runId}__${attemptCount}.grib2',
           },
           input_ids: {
             dataset: 'source_1',

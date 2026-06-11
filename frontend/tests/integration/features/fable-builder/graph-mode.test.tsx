@@ -53,12 +53,12 @@ function createMultiBlockFable(): FableBuilderV1 {
       source1: {
         factory_id: {
           plugin: { store: 'ecmwf', local: 'ecmwf-base' },
-          factory: 'ekdSource',
+          factory: 'operationalForecastSource',
         },
         configuration_values: {
           source: 'mars',
-          date: '2026-01-01',
-          expver: '0001',
+          forecast: 'aifs-ens',
+          base_time: '2026-01-01T00:00:00',
         },
         input_ids: {},
       },
@@ -94,12 +94,12 @@ function createSourceOnlyFable(): FableBuilderV1 {
       source1: {
         factory_id: {
           plugin: { store: 'ecmwf', local: 'ecmwf-base' },
-          factory: 'ekdSource',
+          factory: 'operationalForecastSource',
         },
         configuration_values: {
           source: 'mars',
-          date: '2026-01-01',
-          expver: '0001',
+          forecast: 'aifs-ens',
+          base_time: '2026-01-01T00:00:00',
         },
         input_ids: {},
       },
@@ -139,7 +139,7 @@ describe('Graph Mode - Utility Functions', () => {
       const nodes = fableToNodes(fable, mockCatalogue)
 
       const sourceNode = nodes.find((n) => n.id === 'source1')
-      expect(sourceNode?.data.label).toBe('Earthkit Data Source')
+      expect(sourceNode?.data.label).toBe('Operational forecast source')
       expect(sourceNode?.data.instanceId).toBe('source1')
       expect(sourceNode?.data.factory.kind).toBe('source')
     })
@@ -363,11 +363,11 @@ describe('Graph Mode - Builder Integration', () => {
 
     // In graph mode, the ConfigPanel sidebar shows the factory title
     await expect
-      .element(screen.getByText('Earthkit Data Source').first())
+      .element(screen.getByText('Operational forecast source').first())
       .toBeVisible()
 
-    // Configuration fields should appear (use Expver, a text input, to avoid enum combobox)
-    await expect.element(screen.getByLabelText('Expver')).toBeVisible()
+    // Configuration fields should appear (Base time's labelled control is a date input)
+    await expect.element(screen.getByLabelText('Base time')).toBeVisible()
   })
 
   it('shows "Select a block to configure" when no block is selected', async () => {

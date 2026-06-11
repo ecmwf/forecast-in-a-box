@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithRouter } from '@tests/utils/render'
 import { FableBuilderPage } from '@/features/fable-builder/components/FableBuilderPage'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
+import { useUiStore } from '@/stores/uiStore'
 
 // Mock useMedia to simulate desktop layout
 vi.mock('@/hooks/useMedia', () => ({
@@ -43,12 +44,12 @@ function setupValidFableWithSink(): void {
       source1: {
         factory_id: {
           plugin: { store: 'ecmwf', local: 'ecmwf-base' },
-          factory: 'ekdSource',
+          factory: 'operationalForecastSource',
         },
         configuration_values: {
           source: 'mars',
-          date: '2026-01-01',
-          expver: '0001',
+          forecast: 'aifs-ens',
+          base_time: '2026-01-01T00:00:00',
         },
         input_ids: {},
       },
@@ -98,7 +99,7 @@ describe('Fable Builder Form Mode', () => {
 
     // Add a source block via the palette
     const addSourceButton = screen.getByRole('button', {
-      name: /Earthkit Data Source/i,
+      name: /Operational forecast source/i,
     })
     await expect.element(addSourceButton).toBeVisible()
     await addSourceButton.click()
@@ -110,10 +111,10 @@ describe('Fable Builder Form Mode', () => {
     // Block should be auto-selected after adding
     expect(state.selectedBlockId).toBeTruthy()
 
-    // Configuration fields should be visible (FieldRenderer uses Label with htmlFor)
-    // Source is an enum (combobox), Date and Expver are text inputs
-    await expect.element(screen.getByLabelText('Date')).toBeVisible()
-    await expect.element(screen.getByLabelText('Expver')).toBeVisible()
+    // Configuration fields should be visible (FieldRenderer uses Label with htmlFor).
+    // Source/Forecast model are enums; Base time's labelled control is a date input.
+    await expect.element(screen.getByLabelText('Base time')).toBeVisible()
+    await expect.element(screen.getByLabelText('Parameters')).toBeVisible()
 
     // Fable should be marked as dirty
     expect(useFableBuilderStore.getState().isDirty).toBe(true)
@@ -128,28 +129,28 @@ describe('Fable Builder Form Mode', () => {
   })
 
   it('allows configuring block parameters via form fields', async () => {
+    useUiStore.setState({ timeZone: 'UTC' })
     const screen = await renderWithRouter(<FableBuilderPage />)
 
     // Wait for catalogue
     await expect.element(screen.getByText('Block Palette')).toBeVisible()
 
     // Add a source block via palette
-    await screen.getByRole('button', { name: /Earthkit Data Source/i }).click()
+    await screen
+      .getByRole('button', { name: /Operational forecast source/i })
+      .click()
 
-    // Fill text input configuration fields (Source is an enum/combobox, skip .fill())
-    const dateInput = screen.getByLabelText('Date')
-    await dateInput.fill('2026-01-15')
+    // Fill the Base time date control (Source/Forecast model are enums — skip .fill())
+    const baseTimeInput = screen.getByLabelText('Base time')
+    await baseTimeInput.fill('2026-01-15')
 
-    const expverInput = screen.getByLabelText('Expver')
-    await expverInput.fill('0001')
-
-    // Verify store state was updated
+    // Verify store state was updated. tz is UTC (set above) and the time defaults
+    // to 00:00, so the canonical base_time is exactly midnight UTC.
     const state = useFableBuilderStore.getState()
     const blockId = Object.keys(state.fable.blocks)[0]
     const block = state.fable.blocks[blockId]
 
-    expect(block.configuration_values.date).toBe('2026-01-15')
-    expect(block.configuration_values.expver).toBe('0001')
+    expect(block.configuration_values.base_time).toBe('2026-01-15T00:00:00')
 
     // Fable should be marked as dirty
     expect(state.isDirty).toBe(true)
@@ -162,13 +163,19 @@ describe('Fable Builder Form Mode', () => {
     await expect.element(screen.getByText('Block Palette')).toBeVisible()
 
     // Add a source block
-    await screen.getByRole('button', { name: /Earthkit Data Source/i }).click()
+    await screen
+      .getByRole('button', { name: /Operational forecast source/i })
+      .click()
 
     // The block instance card should show the factory description
     // Use .first() since the description also appears in the palette
     await expect
       .element(
-        screen.getByText('Fetch data from mars or ecmwf open data').first(),
+        screen
+          .getByText(
+            'Fetch operational forecast data from mars or ecmwf open data',
+          )
+          .first(),
       )
       .toBeVisible()
   })
@@ -180,14 +187,16 @@ describe('Fable Builder Form Mode', () => {
     await expect.element(screen.getByText('Block Palette')).toBeVisible()
 
     // Add a source block first so the UI renders the card
-    await screen.getByRole('button', { name: /Earthkit Data Source/i }).click()
+    await screen
+      .getByRole('button', { name: /Operational forecast source/i })
+      .click()
 
     // Now set up missing config to trigger validation errors
     // The block was added to store; clear its config values
     const blockId = Object.keys(useFableBuilderStore.getState().fable.blocks)[0]
     useFableBuilderStore.getState().updateBlockConfig(blockId, 'source', '')
-    useFableBuilderStore.getState().updateBlockConfig(blockId, 'date', '')
-    useFableBuilderStore.getState().updateBlockConfig(blockId, 'expver', '')
+    useFableBuilderStore.getState().updateBlockConfig(blockId, 'forecast', '')
+    useFableBuilderStore.getState().updateBlockConfig(blockId, 'base_time', '')
 
     // Wait for validation to run and produce errors
     await expect
@@ -209,6 +218,7 @@ describe('Fable Builder Form Mode', () => {
   })
 
   it('shows existing blocks with pre-filled configuration values', async () => {
+    useUiStore.setState({ timeZone: 'UTC' })
     const screen = await renderWithRouter(<FableBuilderPage />)
 
     // Wait for catalogue
@@ -220,15 +230,11 @@ describe('Fable Builder Form Mode', () => {
     // Select the source block so its card shows
     useFableBuilderStore.getState().selectBlock('source1')
 
-    // The source block card should show pre-filled config values
-    // Expver field (text input) should have "0001"
-    const expverInput = screen.getByLabelText('Expver')
-    await expect.element(expverInput).toBeVisible()
-    await expect.element(expverInput).toHaveValue('0001')
-
-    // Date field should have the configured date
-    const dateInput = screen.getByLabelText('Date')
-    await expect.element(dateInput).toHaveValue('2026-01-01')
+    // The source block card should show pre-filled config values. The Base time
+    // date control shows the configured date (tz UTC; fixture is midnight UTC).
+    const baseTimeInput = screen.getByLabelText('Base time')
+    await expect.element(baseTimeInput).toBeVisible()
+    await expect.element(baseTimeInput).toHaveValue('2026-01-01')
   })
 
   it('renders pipeline structure sidebar text', async () => {
@@ -256,7 +262,9 @@ describe('Fable Builder Form Mode', () => {
     ).toHaveLength(0)
 
     // Add a source block via the palette
-    await screen.getByRole('button', { name: /Earthkit Data Source/i }).click()
+    await screen
+      .getByRole('button', { name: /Operational forecast source/i })
+      .click()
 
     // Verify block was added to store
     const state = useFableBuilderStore.getState()
@@ -265,10 +273,10 @@ describe('Fable Builder Form Mode', () => {
     // Block should be auto-selected
     expect(state.selectedBlockId).toBeTruthy()
 
-    // The selected block's factory should be ekdSource
+    // The selected block's factory should be operationalForecastSource
     const blockId = state.selectedBlockId!
     const block = state.fable.blocks[blockId]
-    expect(block.factory_id.factory).toBe('ekdSource')
+    expect(block.factory_id.factory).toBe('operationalForecastSource')
     expect(block.factory_id.plugin.local).toBe('ecmwf-base')
   })
 

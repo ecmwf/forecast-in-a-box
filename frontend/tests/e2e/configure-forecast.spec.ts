@@ -84,7 +84,7 @@ test.describe('Fable Builder - Form Mode', () => {
     // Look for add block buttons in the form canvas area
     // In form mode, available block factories appear as "Add" buttons
     const addButtons = page.getByRole('button', {
-      name: /earthkit|ensemble|temporal|zarr/i,
+      name: /operational forecast|ensemble|temporal|zarr/i,
     })
     const addCount = await addButtons.count()
 
@@ -117,7 +117,7 @@ test.describe('Fable Builder - Form Mode', () => {
 
     // Add a block
     const addButtons = page.getByRole('button', {
-      name: /earthkit|ensemble|temporal|zarr/i,
+      name: /operational forecast|ensemble|temporal|zarr/i,
     })
     if ((await addButtons.count()) > 0) {
       await addButtons.first().click()
@@ -145,7 +145,7 @@ test.describe('Fable Builder - Form Mode', () => {
 
     // Add a source block
     const addButtons = page.getByRole('button', {
-      name: /earthkit|ensemble|temporal|zarr/i,
+      name: /operational forecast|ensemble|temporal|zarr/i,
     })
     if ((await addButtons.count()) > 0) {
       await addButtons.first().click()
@@ -180,7 +180,7 @@ test.describe('Fable Builder - Form Mode', () => {
       if (await nextButton.isVisible({ timeout: 3000 }).catch(() => false)) {
         // Add a source block first so we can navigate
         const addButtons = page.getByRole('button', {
-          name: /earthkit|ensemble|temporal|zarr/i,
+          name: /operational forecast|ensemble|temporal|zarr/i,
         })
         if ((await addButtons.count()) > 0) {
           await addButtons.first().click()
@@ -202,7 +202,7 @@ test.describe('Fable Builder - Form Mode', () => {
   test('unsaved badge appears after making changes', async ({ page }) => {
     // Add a block to make changes
     const addButtons = page.getByRole('button', {
-      name: /earthkit|ensemble|temporal|zarr/i,
+      name: /operational forecast|ensemble|temporal|zarr/i,
     })
 
     // Check palette sidebar for blocks
@@ -330,12 +330,12 @@ test.describe('Fable Builder - Graph Mode', () => {
           block_source_1: {
             factory_id: {
               plugin: { store: 'ecmwf', local: 'ecmwf-base' },
-              factory: 'ekdSource',
+              factory: 'operationalForecastSource',
             },
             configuration_values: {
               source: 'mars',
-              date: '2024-01-15',
-              expver: '0001',
+              forecast: 'aifs-ens',
+              base_time: '2024-01-15T00:00:00',
             },
             input_ids: {},
           },

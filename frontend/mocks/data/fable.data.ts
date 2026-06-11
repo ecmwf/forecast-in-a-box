@@ -46,25 +46,42 @@ export const mockCatalogue: BlockFactoryCatalogue = {
   // ECMWF base plugin - matches live backend exactly
   ['ecmwf/ecmwf-base']: {
     factories: {
-      ekdSource: {
+      operationalForecastSource: {
         kind: 'source',
-        title: 'Earthkit Data Source',
-        description: 'Fetch data from mars or ecmwf open data',
+        title: 'Operational forecast source',
+        description:
+          'Fetch operational forecast data from mars or ecmwf open data',
         configuration_options: {
           source: {
             title: 'Source',
             description: 'Top level source for earthkit data',
             value_type: "enumClosed['mars', 'ecmwf-open-data']",
           },
-          date: {
-            title: 'Date',
-            description: 'The date dimension of the data',
-            value_type: 'date',
+          forecast: {
+            title: 'Forecast model',
+            description: 'Name of forecast',
+            value_type: 'enumClosed[aifs-ens,ifs-ens]',
+            default_value: 'aifs-ens',
           },
-          expver: {
-            title: 'Expver',
-            description: 'The expver value of the forecast',
-            value_type: 'str',
+          base_time: {
+            title: 'Base time',
+            description: 'Base time of the forecast',
+            value_type: 'datetime',
+          },
+          param: {
+            title: 'Parameters',
+            description: "Parameters to select and plot (e.g. '2t', 'msl')",
+            value_type: 'list[str]',
+          },
+          step: {
+            title: 'Steps',
+            description: "Forecast steps to select (e.g. '0,6,12,...')",
+            value_type: 'list[int]',
+          },
+          number: {
+            title: 'Ensemble Members',
+            description: "Ensemble members to select (e.g. '1,2,3,...')",
+            value_type: 'list[int]',
           },
         },
         inputs: [],
@@ -194,12 +211,12 @@ export const mockSavedFables: Record<
         block_source_1: {
           factory_id: {
             plugin: pluginId('ecmwf', 'ecmwf-base'),
-            factory: 'ekdSource',
+            factory: 'operationalForecastSource',
           },
           configuration_values: {
             source: 'mars',
-            date: '2024-01-15',
-            expver: '0001',
+            forecast: 'aifs-ens',
+            base_time: '2024-01-15T00:00:00',
           },
           input_ids: {},
         },
@@ -243,12 +260,12 @@ export const mockSavedFables: Record<
         block_source_1: {
           factory_id: {
             plugin: pluginId('ecmwf', 'ecmwf-base'),
-            factory: 'ekdSource',
+            factory: 'operationalForecastSource',
           },
           configuration_values: {
             source: 'ecmwf-open-data',
-            date: '2024-01-14',
-            expver: '0001',
+            forecast: 'aifs-ens',
+            base_time: '2024-01-14T00:00:00',
           },
           input_ids: {},
         },
@@ -292,7 +309,10 @@ export function calculateExpansion(fable: FableBuilderV1): {
   // Available blocks by kind (using new PluginCompositeId format)
   // Only ecmwf-base plugin is loaded
   const sourceBlocks: Array<PluginBlockFactoryId> = [
-    { plugin: pluginId('ecmwf', 'ecmwf-base'), factory: 'ekdSource' },
+    {
+      plugin: pluginId('ecmwf', 'ecmwf-base'),
+      factory: 'operationalForecastSource',
+    },
   ]
   const productBlocks: Array<BlockExpansion> = [
     {

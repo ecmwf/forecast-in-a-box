@@ -90,11 +90,11 @@
     },
     "aifsDataset": {
       "title": "AIFS Ensemble Dataset",
-      "description": "10-member AIFS Open Data ensemble exported as a Zarr archive.",
+      "description": "10-member AIFS Open Data ensemble exported as a GRIB file.",
       "tags": {
         "source": "AIFS Open Data",
         "members": "10 Members",
-        "format": "Zarr Export"
+        "format": "GRIB Export"
       }
     }
   },

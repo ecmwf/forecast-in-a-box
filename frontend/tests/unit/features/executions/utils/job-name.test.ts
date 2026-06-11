@@ -19,9 +19,9 @@ import { useUiStore } from '@/stores/uiStore'
 const CATALOGUE: BlockFactoryCatalogue = {
   'ecmwf/ecmwf-base': {
     factories: {
-      ekdSource: {
+      operationalForecastSource: {
         kind: 'source',
-        title: 'Earthkit Data Source',
+        title: 'Operational forecast source',
         description: '',
         configuration_options: {},
         inputs: [],
@@ -136,11 +136,11 @@ describe('buildDefaultJobName', () => {
   it('drops a missing sink gracefully', () => {
     expect(
       buildDefaultJobName({
-        fable: { blocks: { src_1: source('ekdSource') } },
+        fable: { blocks: { src_1: source('operationalForecastSource') } },
         catalogue: CATALOGUE,
         now: FIXED_NOW,
       }),
-    ).toBe(`Earthkit Data Source · ${TIMESTAMP_LABEL}`)
+    ).toBe(`Operational forecast source · ${TIMESTAMP_LABEL}`)
   })
 
   it('truncates very long names to 72 characters', () => {

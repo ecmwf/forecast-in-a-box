@@ -26,7 +26,7 @@ function makeDraft(overrides: Partial<FableDraft> = {}): FableDraft {
         block_1: {
           factory_id: {
             plugin: { store: 'ecmwf', local: 'base' },
-            factory: 'ekdSource',
+            factory: 'operationalForecastSource',
           },
           configuration_values: { source: 'ecmwf-open-data' },
           input_ids: {},
