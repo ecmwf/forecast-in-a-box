@@ -103,6 +103,7 @@ def try_updatedate(pip_source: str) -> str:
 def try_install(packages: list[str]) -> None:
     """Run ``uv pip install`` with the given pkg specs."""
     install_command = ["uv", "pip", "install"] + packages
+    logger.debug(f"will run {install_command}")
     try:
         result = subprocess.run(install_command, check=False, capture_output=True)
     except FileNotFoundError as ex:
@@ -111,6 +112,7 @@ def try_install(packages: list[str]) -> None:
     if result.returncode != 0:
         msg = f"installing {packages} failure: {result.returncode}. Stderr: {result.stderr}, Stdout: {result.stdout}, Args: {result.args}"
         logger.error(msg)
+    logger.debug(f"install finished with {result.stdout=}, {result.stderr=}")
 
 
 def get_existing_install_pin(distname: str) -> list[str]:

@@ -49,7 +49,7 @@ def plugin_default_specifier() -> SpecifierSet:
     the currently installed ``fiab-core`` (e.g. ``>=1,<2``).
     """
     major = get_fiabcore_version().major
-    return SpecifierSet(f">={major},<{major + 1}")
+    return SpecifierSet(f">={major}.0.0,<{major + 1}.0.0")
 
 
 def get_compatible_versions(plugin_settings: PluginSettings, available_versions: Iterator[str]) -> Iterator[str]:
