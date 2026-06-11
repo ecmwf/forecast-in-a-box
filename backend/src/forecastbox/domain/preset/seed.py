@@ -143,7 +143,7 @@ def _quick_temperature_map() -> HighLevelPreset:
                 glyph_key="model",
                 label="Forecast Model",
                 description="ECMWF Open Data forecast model to retrieve data from.",
-                value_type="glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/forecast]",
+                value_type="ref://catalogue/ecmwf/ecmwf-base/operationalForecastSource/forecast",
                 default_value="aifs-ens",
             ),
         ],
@@ -213,7 +213,7 @@ def _regional_surface_forecast() -> HighLevelPreset:
                 glyph_key="model",
                 label="Forecast Model",
                 description="Model variant to run.",
-                value_type="glyph[catalogue:ecmwf/ecmwf-base/anemoiSource/checkpoint]",
+                value_type="ref://catalogue/ecmwf/ecmwf-base/anemoiSource/checkpoint",
                 default_value="ecmwf:aifs-global-o48",
             ),
             PresetParameter(
@@ -297,7 +297,7 @@ def _global_ensemble_statistics() -> HighLevelPreset:
                 glyph_key="model",
                 label="Forecast Model",
                 description="ECMWF Open Data forecast model to retrieve data from.",
-                value_type="glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/forecast]",
+                value_type="ref://catalogue/ecmwf/ecmwf-base/operationalForecastSource/forecast",
                 default_value="aifs-ens",
             ),
             PresetParameter(
@@ -373,7 +373,7 @@ def _aifs_ensemble_to_grib() -> HighLevelPreset:
                 glyph_key="model",
                 label="Model Checkpoint",
                 description="AIFS global model checkpoint to run.",
-                value_type="glyph[catalogue:ecmwf/ecmwf-base/anemoiSource/checkpoint]",
+                value_type="ref://catalogue/ecmwf/ecmwf-base/anemoiSource/checkpoint",
                 default_value="ecmwf:aifs-global-o48",
             ),
             PresetParameter(

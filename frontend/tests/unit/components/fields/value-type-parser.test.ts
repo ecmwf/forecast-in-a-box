@@ -174,18 +174,18 @@ describe('parseValueType', () => {
   })
 
   describe('unresolvedCatalogue types', () => {
-    it('returns unresolvedCatalogue for a glyph[catalogue:...] string', () => {
+    it('returns unresolvedCatalogue for a ref://catalogue/... string', () => {
       const raw =
-        'glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/forecast]'
+        'ref://catalogue/ecmwf/ecmwf-base/operationalForecastSource/forecast'
       expect(parseValueType(raw)).toEqual({
         type: 'unresolvedCatalogue',
         raw,
       })
     })
 
-    it('is case-insensitive for the glyph[catalogue:...] prefix', () => {
+    it('is case-insensitive for the ref://catalogue/... prefix', () => {
       const raw =
-        'GLYPH[CATALOGUE:ecmwf/ecmwf-base/operationalForecastSource/forecast]'
+        'REF://CATALOGUE/ecmwf/ecmwf-base/operationalForecastSource/forecast'
       expect(parseValueType(raw)).toEqual({
         type: 'unresolvedCatalogue',
         raw,
@@ -193,24 +193,24 @@ describe('parseValueType', () => {
     })
 
     it('handles a different catalogue path', () => {
-      const raw = 'glyph[catalogue:ecmwf/ecmwf-base/anemoiSource/checkpoint]'
+      const raw = 'ref://catalogue/ecmwf/ecmwf-base/anemoiSource/checkpoint'
       expect(parseValueType(raw)).toEqual({
         type: 'unresolvedCatalogue',
         raw,
       })
     })
 
-    it('does NOT treat a non-catalogue glyph as unresolvedCatalogue', () => {
-      // glyph[something_else] should still fall through to unknown
-      expect(parseValueType('glyph[something_else]')).toEqual({
+    it('does NOT treat a non-catalogue ref as unresolvedCatalogue', () => {
+      // ref://something_else/... should still fall through to unknown
+      expect(parseValueType('ref://something_else/foo')).toEqual({
         type: 'unknown',
-        raw: 'glyph[something_else]',
+        raw: 'ref://something_else/foo',
       })
     })
 
     it('trims whitespace before matching', () => {
       const inner =
-        'glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/forecast]'
+        'ref://catalogue/ecmwf/ecmwf-base/operationalForecastSource/forecast'
       expect(parseValueType(`  ${inner}  `)).toEqual({
         type: 'unresolvedCatalogue',
         raw: inner,
@@ -368,7 +368,7 @@ describe('getDefaultValueForType', () => {
     expect(
       getDefaultValueForType({
         type: 'unresolvedCatalogue',
-        raw: 'glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/forecast]',
+        raw: 'ref://catalogue/ecmwf/ecmwf-base/operationalForecastSource/forecast',
       }),
     ).toBe('')
   })

@@ -57,7 +57,7 @@ def _make_catalogue(store: str, local: str, factory: str, option: str, value_typ
 
 
 # ---------------------------------------------------------------------------
-# Tests: pass-through for non-glyph value types
+# Tests: pass-through for non-ref value types
 # ---------------------------------------------------------------------------
 
 
@@ -77,9 +77,9 @@ def test_empty_string_is_returned_unchanged() -> None:
     assert resolve_value_type("") == ""
 
 
-def test_unrelated_glyph_prefix_is_returned_unchanged() -> None:
-    # A glyph[...] that is NOT catalogue: should pass through.
-    assert resolve_value_type("glyph[something_else]") == "glyph[something_else]"
+def test_unrelated_ref_scheme_is_returned_unchanged() -> None:
+    # A ref:// URI that is NOT catalogue/ should pass through.
+    assert resolve_value_type("ref://something_else/foo") == "ref://something_else/foo"
 
 
 # ---------------------------------------------------------------------------
@@ -88,7 +88,7 @@ def test_unrelated_glyph_prefix_is_returned_unchanged() -> None:
 
 
 def test_resolves_forecast_option_from_catalogue() -> None:
-    """Happy path: glyph[catalogue:...] resolves to the catalogue value_type."""
+    """Happy path: ref://catalogue/... resolves to the catalogue value_type."""
     catalogue = _make_catalogue(
         store="ecmwf",
         local="ecmwf-base",
@@ -101,7 +101,7 @@ def test_resolves_forecast_option_from_catalogue() -> None:
         patch(_WAIT_UNTIL_READY, return_value=True),
         patch(_CATALOGUE_VIEW, return_value=catalogue),
     ):
-        result = resolve_value_type("glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/forecast]")
+        result = resolve_value_type("ref://catalogue/ecmwf/ecmwf-base/operationalForecastSource/forecast")
 
     assert result == "enumClosed[aifs-ens,ifs-ens]"
 
@@ -120,13 +120,13 @@ def test_resolves_checkpoint_option_from_catalogue() -> None:
         patch(_WAIT_UNTIL_READY, return_value=True),
         patch(_CATALOGUE_VIEW, return_value=catalogue),
     ):
-        result = resolve_value_type("glyph[catalogue:ecmwf/ecmwf-base/anemoiSource/checkpoint]")
+        result = resolve_value_type("ref://catalogue/ecmwf/ecmwf-base/anemoiSource/checkpoint")
 
     assert result == "enumClosed[ecmwf:aifs-global-o48,ecmwf:aifs-global-o96]"
 
 
-def test_case_insensitive_glyph_prefix() -> None:
-    """The glyph[catalogue:...] prefix is matched case-insensitively."""
+def test_case_insensitive_ref_prefix() -> None:
+    """The ref://catalogue/ prefix is matched case-insensitively."""
     catalogue = _make_catalogue(
         store="ecmwf",
         local="ecmwf-base",
@@ -139,7 +139,7 @@ def test_case_insensitive_glyph_prefix() -> None:
         patch(_WAIT_UNTIL_READY, return_value=True),
         patch(_CATALOGUE_VIEW, return_value=catalogue),
     ):
-        result = resolve_value_type("GLYPH[CATALOGUE:ecmwf/ecmwf-base/operationalForecastSource/forecast]")
+        result = resolve_value_type("REF://CATALOGUE/ecmwf/ecmwf-base/operationalForecastSource/forecast")
 
     assert result == "enumClosed[aifs-ens]"
 
@@ -151,7 +151,7 @@ def test_case_insensitive_glyph_prefix() -> None:
 
 def test_returns_raw_when_plugins_not_ready() -> None:
     """When the updater never finishes within the timeout, raw string is returned."""
-    raw = "glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/forecast]"
+    raw = "ref://catalogue/ecmwf/ecmwf-base/operationalForecastSource/forecast"
 
     with patch(_WAIT_UNTIL_READY, return_value=False):
         result = resolve_value_type(raw)
@@ -161,7 +161,7 @@ def test_returns_raw_when_plugins_not_ready() -> None:
 
 def test_returns_raw_when_catalogue_view_returns_bool() -> None:
     """When catalogue_view() returns False (lock timeout), raw string is returned."""
-    raw = "glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/forecast]"
+    raw = "ref://catalogue/ecmwf/ecmwf-base/operationalForecastSource/forecast"
 
     with (
         patch(_WAIT_UNTIL_READY, return_value=True),
@@ -174,7 +174,7 @@ def test_returns_raw_when_catalogue_view_returns_bool() -> None:
 
 def test_returns_raw_when_plugin_not_in_catalogue() -> None:
     """When the plugin is not found in the catalogue, raw string is returned."""
-    raw = "glyph[catalogue:unknown/plugin/factory/option]"
+    raw = "ref://catalogue/unknown/plugin/factory/option"
 
     with (
         patch(_WAIT_UNTIL_READY, return_value=True),
@@ -193,7 +193,7 @@ def test_returns_raw_when_factory_not_in_catalogue() -> None:
     catalogue_obj = MagicMock()
     catalogue_obj.factories = {}  # no factories
 
-    raw = "glyph[catalogue:ecmwf/ecmwf-base/missingFactory/option]"
+    raw = "ref://catalogue/ecmwf/ecmwf-base/missingFactory/option"
 
     with (
         patch(_WAIT_UNTIL_READY, return_value=True),
@@ -215,7 +215,7 @@ def test_returns_raw_when_option_not_in_factory() -> None:
     catalogue_obj = MagicMock()
     catalogue_obj.factories = {BlockFactoryId("operationalForecastSource"): factory_obj}
 
-    raw = "glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/missingOption]"
+    raw = "ref://catalogue/ecmwf/ecmwf-base/operationalForecastSource/missingOption"
 
     with (
         patch(_WAIT_UNTIL_READY, return_value=True),
@@ -228,7 +228,7 @@ def test_returns_raw_when_option_not_in_factory() -> None:
 
 def test_returns_raw_on_unexpected_exception() -> None:
     """Any unexpected exception during resolution returns the raw string."""
-    raw = "glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/forecast]"
+    raw = "ref://catalogue/ecmwf/ecmwf-base/operationalForecastSource/forecast"
 
     with patch(_WAIT_UNTIL_READY, side_effect=RuntimeError("boom")):
         result = resolve_value_type(raw)
@@ -255,6 +255,6 @@ def test_leading_trailing_whitespace_is_stripped() -> None:
         patch(_WAIT_UNTIL_READY, return_value=True),
         patch(_CATALOGUE_VIEW, return_value=catalogue),
     ):
-        result = resolve_value_type("  glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/forecast]  ")
+        result = resolve_value_type("  ref://catalogue/ecmwf/ecmwf-base/operationalForecastSource/forecast  ")
 
     assert result == "enumClosed[aifs-ens]"

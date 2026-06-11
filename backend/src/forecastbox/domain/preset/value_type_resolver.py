@@ -11,7 +11,7 @@
 
 Preset parameters may declare a ``value_type`` of the form::
 
-    glyph[catalogue:<plugin_id>/<factory_id>/<option_id>]
+    ref://catalogue/<store>/<local>/<factory>/<option>
 
 When the preset ``/get`` endpoint serves a parameter with such a value_type,
 this module resolves it to the concrete ``enumClosed[...]`` (or other) string
@@ -23,13 +23,13 @@ time a new model is added or removed.
 
 Syntax
 ------
-The reference string inside ``glyph[catalogue:...]`` is::
+The URI form is::
 
-    <store>/<local>/<factory>/<option>
+    ref://catalogue/<store>/<local>/<factory>/<option>
 
 For example::
 
-    glyph[catalogue:ecmwf/ecmwf-base/operationalForecastSource/forecast]
+    ref://catalogue/ecmwf/ecmwf-base/operationalForecastSource/forecast
 
 resolves to whatever ``value_type`` the ``forecast`` configuration option of
 the ``operationalForecastSource`` factory in the ``ecmwf/ecmwf-base`` plugin
@@ -38,13 +38,13 @@ currently reports (e.g. ``enumClosed[aifs-ens,ifs-ens]``).
 Fallback behaviour
 ------------------
 If the catalogue is not yet ready, the plugin/factory/option path is not
-found, or any other error occurs, the original ``glyph[catalogue:...]`` string
+found, or any other error occurs, the original ``ref://catalogue/...`` string
 is returned unchanged so the frontend can render a plain text input as a
 graceful degradation.
 
 If the catalogue is still being populated when ``/get`` is called, resolution
 waits on the plugin updater thread (via ``wait_until_ready``) for up to
-``_PLUGINS_READY_TIMEOUT_S`` seconds before falling back to the raw glyph.
+``_PLUGINS_READY_TIMEOUT_S`` seconds before falling back to the raw reference.
 """
 
 from __future__ import annotations
@@ -58,9 +58,9 @@ from forecastbox.domain.plugin.manager import catalogue_view, wait_until_ready
 
 logger = logging.getLogger(__name__)
 
-# Pattern: glyph[catalogue:<store>/<local>/<factory>/<option>]
-_CATALOGUE_GLYPH_RE = re.compile(
-    r"^glyph\[catalogue:([^/\]]+)/([^/\]]+)/([^/\]]+)/([^\]]+)\]$",
+# Pattern: ref://catalogue/<store>/<local>/<factory>/<option>
+_CATALOGUE_REF_RE = re.compile(
+    r"^ref://catalogue/([^/]+)/([^/]+)/([^/]+)/(.+)$",
     re.IGNORECASE,
 )
 
@@ -68,15 +68,15 @@ _PLUGINS_READY_TIMEOUT_S: float = 30.0
 
 
 def resolve_value_type(value_type: str) -> str:
-    """Resolve a ``value_type`` string, expanding any ``glyph[catalogue:...]`` reference.
+    """Resolve a ``value_type`` string, expanding any ``ref://catalogue/...`` reference.
 
-    If ``value_type`` does not match the ``glyph[catalogue:...]`` pattern it is
+    If ``value_type`` does not match the ``ref://catalogue/...`` pattern it is
     returned unchanged.  Resolution failures are logged and the original string
     is returned so callers always receive a valid (if unresolved) value.
 
     When the plugin updater thread is still running this function waits up to
     ``_PLUGINS_READY_TIMEOUT_S`` seconds for it to finish before falling back
-    to the raw glyph string.
+    to the raw reference string.
 
     Args:
         value_type: The raw ``value_type`` string from a ``PresetParameter``.
@@ -85,7 +85,7 @@ def resolve_value_type(value_type: str) -> str:
         The resolved value_type string (e.g. ``enumClosed[aifs-,...]``),
         or the original string if resolution is not applicable or fails.
     """
-    match = _CATALOGUE_GLYPH_RE.match(value_type.strip())
+    match = _CATALOGUE_REF_RE.match(value_type.strip())
     if match is None:
         return value_type
 
@@ -152,7 +152,7 @@ def resolve_value_type(value_type: str) -> str:
 
         resolved: str = str(option_detail.value_type)
         logger.info(
-            "Resolved glyph[catalogue:%s/%s/%s] → %r",
+            "Resolved ref://catalogue/%s/%s/%s → %r",
             plugin_display_key,
             factory,
             option,
