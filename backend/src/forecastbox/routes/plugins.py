@@ -14,17 +14,20 @@ Contains:
  - complete CRUD+List routes for the Plugin entity.
 """
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import Response
 from fiab_core.fable import PluginCompositeId
+from packaging.version import InvalidVersion, Version
 
 from forecastbox.domain.auth.users import UserRead
+from forecastbox.domain.plugin.compatibility import get_compatible_versions
 from forecastbox.domain.plugin.manager import PluginsStatus, modify_enabled, status_full, submit_update_single, uninstall_plugin
 from forecastbox.domain.plugin.store import PluginRemoteInfo, PluginStoreEntry, get_plugins_detail, submit_install_plugin
 from forecastbox.routes.admin import get_admin_user
-from forecastbox.utility.config import config
+from forecastbox.utility.config import PluginSettings, config
+from forecastbox.utility.packages import get_package_versions
 from forecastbox.utility.pydantic import FiabBaseModel
 
 PREFIX = "/api/v1/plugin"
@@ -115,12 +118,63 @@ get_catalogue_redirect = lambda request: Response(status_code=202)
 
 
 @router.post("/update")
-def update_plugin(request: Request, pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)) -> Response:
-    # TODO possibly add optional version parameter
-    result = submit_update_single(pluginCompositeId, isUpdate=True)
+def update_plugin(
+    request: Request,
+    pluginCompositeId: PluginCompositeId,
+    version: str | None = None,
+    admin: UserRead | None = Depends(get_admin_user),
+) -> Response:
+    """Trigger a pip-install update for a plugin.
+
+    If ``version`` is provided it must be a valid PEP 440 version string; the
+    plugin will be pinned to exactly that version (``==version``).
+    If omitted, a compatibility range derived from the current ``fiab-core``
+    major version is used (``>=major,<major+1``), ensuring the installed plugin
+    stays within the same major-version family as the core library.
+    """
+    if version is not None:
+        try:
+            parsed: Version | None = Version(version)
+        except InvalidVersion:
+            raise HTTPException(status_code=422, detail=f"Invalid version string: {version!r}")
+    else:
+        parsed = None
+    result = submit_update_single(pluginCompositeId, install=True, version=parsed)
     if result:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result)
     return get_catalogue_redirect(request)
+
+
+class PluginVersions(FiabBaseModel):
+    versions: list[str]
+    """Compatible versions, sorted newest first."""
+
+
+@router.get("/versions")
+def get_plugin_versions(pluginCompositeId: Annotated[PluginCompositeId, Depends()]) -> PluginVersions:
+    """Return available PyPI versions of a plugin that are compatible with the installed ``fiab-core``.
+
+    Compatibility is defined as equal major version.  Only versions published
+    on PyPI are considered; locally-installed or git-sourced plugins will
+    receive an empty list.
+    """
+    pip_source: str | None = None
+
+    store_detail = get_plugins_detail()
+    if pluginCompositeId in store_detail:
+        store_entry, _ = store_detail[pluginCompositeId]
+        pip_source = store_entry.pip_source
+        plugin_settings = PluginSettings(pip_source=pip_source, module_name=store_entry.module_name)
+    elif pluginCompositeId in config.external.plugins:
+        plugin_settings = config.external.plugins[pluginCompositeId]
+        pip_source = plugin_settings.pip_source
+    else:
+        raise HTTPException(status_code=404, detail=f"Plugin {pluginCompositeId!r} not found")
+
+    available = get_package_versions(pip_source)
+    compatible = get_compatible_versions(plugin_settings, available)
+    sorted_versions = sorted(compatible, key=lambda v: Version(v), reverse=True)
+    return PluginVersions(versions=sorted_versions)
 
 
 @router.post("/install")

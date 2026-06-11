@@ -24,6 +24,7 @@ from sqlalchemy import func, or_, select, update
 import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.domain.blueprint.exceptions import BlueprintAccessDenied, BlueprintNotFound, BlueprintVersionConflict
 from forecastbox.domain.blueprint.types import BlueprintId
+from forecastbox.domain.plugin.compatibility import get_fiabcore_version
 from forecastbox.schemata.jobs import Blueprint, BlueprintSource
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.db import dbRetry, executeAndCommit, querySingle
@@ -38,7 +39,7 @@ async def upsert_blueprint(
     builder: dict | None = None,
     display_name: str | None = None,
     display_description: str | None = None,
-    tags: list[str] | None = None,
+    tags: list[dict] | None = None,
     parent_id: str | None = None,
     expected_version: int | None = None,
 ) -> tuple[BlueprintId, int]:
@@ -97,6 +98,7 @@ async def upsert_blueprint(
                     display_description=display_description,
                     tags=tags,
                     builder=builder,
+                    fiabcore_major=get_fiabcore_version().major,
                     is_deleted=False,
                 )
             )

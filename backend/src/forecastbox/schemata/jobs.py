@@ -63,6 +63,8 @@ class Blueprint(Base):
     # stores the full forecastbox.domain.blueprint.service.BlueprintBuilder as JSON
     builder = Column(JSON, nullable=True)
 
+    fiabcore_major = Column(Integer, nullable=False)
+
     is_deleted = Column(Boolean, nullable=False, default=False)
 
 

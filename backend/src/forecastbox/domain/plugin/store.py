@@ -166,7 +166,7 @@ def submit_install_plugin(plugin_composite_key: PluginCompositeId) -> None:
             )
             config.save_to_file()
 
-    submit_update_single(plugin_composite_key, isUpdate=True)
+    submit_update_single(plugin_composite_key, install=True, version=None)
 
 
 def join_stores_thread(timeout_sec: int) -> None:

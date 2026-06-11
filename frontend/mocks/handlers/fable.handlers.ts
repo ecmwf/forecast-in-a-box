@@ -161,6 +161,11 @@ export const fableHandlers = [
 
     const { builder, display_name, display_description, tags, parent_id } = body
 
+    // Tags are now sent as {key, value} objects; extract the key for internal storage.
+    const storedTags = (tags as Array<string | { key: string }>).map((t) =>
+      typeof t === 'string' ? t : t.key,
+    )
+
     for (const instance of Object.values(builder.blocks)) {
       const factory = getFactory(mockCatalogue, instance.factory_id)
       if (!factory) {
@@ -193,7 +198,7 @@ export const fableHandlers = [
         fable: builder,
         display_name,
         display_description,
-        tags: tags.length > 0 ? tags : existing.tags,
+        tags: storedTags.length > 0 ? storedTags : existing.tags,
         updated_at: now,
       }
 
@@ -211,7 +216,7 @@ export const fableHandlers = [
       name: display_name ?? '',
       display_name,
       display_description,
-      tags,
+      tags: storedTags,
       user_id: 'mock-user-123',
       created_at: now,
       updated_at: now,
@@ -255,7 +260,11 @@ export const fableHandlers = [
       display_name: body.display_name ?? existing.display_name,
       display_description:
         body.display_description ?? existing.display_description,
-      tags: body.tags ?? existing.tags,
+      tags: body.tags
+        ? (body.tags as Array<string | { key: string }>).map((t) =>
+            typeof t === 'string' ? t : t.key,
+          )
+        : existing.tags,
       updated_at: new Date().toISOString(),
     }
 
@@ -277,7 +286,7 @@ export const fableHandlers = [
         version: fableVersions[id] ?? 1,
         display_name: entry.display_name,
         display_description: entry.display_description,
-        tags: entry.tags,
+        tags: entry.tags.map((k) => ({ key: k, value: '' })),
         source: null,
         created_by: entry.user_id,
       }))
@@ -481,7 +490,7 @@ export const fableHandlers = [
       builder: saved.fable,
       display_name: saved.display_name,
       display_description: saved.display_description,
-      tags: saved.tags,
+      tags: saved.tags.map((k) => ({ key: k, value: '' })),
       created_at: saved.created_at,
       updated_at: saved.updated_at,
     })

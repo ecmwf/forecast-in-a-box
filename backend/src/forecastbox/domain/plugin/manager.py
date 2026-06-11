@@ -25,79 +25,28 @@ or when running the initial plugin load -- but inside the updater threads,
 we lock for longer.
 """
 
-import datetime as dt
 import importlib
-import importlib.metadata
 import logging
-import pathlib
-import subprocess
 import threading
 import time
 from concurrent.futures import Future
-from types import ModuleType
 from typing import Iterator, Literal
 
 from cascade.low.func import assert_never
 from fiab_core.fable import BlockFactoryCatalogue, PluginCompositeId
 from fiab_core.plugin import Plugin
+from packaging.specifiers import SpecifierSet
+from packaging.version import Version
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
+from forecastbox.domain.plugin.compatibility import install_plugin_compatibly
 from forecastbox.utility.concurrent import delayed_thread, timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginsSettings, config, config_edit_lock
+from forecastbox.utility.packages import try_import, try_updatedate, try_version
 from forecastbox.utility.pydantic import FiabBaseModel
 
 logger = logging.getLogger(__name__)
-
-
-def _try_import(module_name: str) -> ModuleType | None:
-    try:
-        return importlib.import_module(module_name)
-    except ModuleNotFoundError:
-        return None
-
-
-def _try_version(pluginSettings: PluginSettings) -> str:
-    try:
-        return importlib.metadata.version(pluginSettings.pip_source)
-    except importlib.metadata.PackageNotFoundError:
-        module = _try_import(pluginSettings.module_name)
-        if module is not None:
-            if hasattr(module, "_version"):
-                version = module._version
-                if isinstance(version, str):
-                    return version
-        return "unknown"
-
-
-def _try_updatedate(pluginSettings: PluginSettings) -> str:
-    try:
-        dist = importlib.metadata.distribution(pluginSettings.pip_source)
-    except importlib.metadata.PackageNotFoundError:
-        return "unknown"
-    if dist.files is None:
-        return "unknown"
-    try:
-        mtdf = next(f for f in dist.files if f.name == "METADATA")
-    except StopIteration:
-        return "unknown"
-    try:
-        path = pathlib.Path(mtdf.locate())
-        install_time = dt.datetime.fromtimestamp(path.stat().st_ctime)
-        return install_time.strftime("%Y/%m/%d")
-    except Exception:  # too much could happen -- file not exist, no rights, malformed ts, etc
-        return "unknown"
-
-
-def _try_install(pip_source: str) -> None:
-    install_command = ["uv", "pip", "install", "--upgrade"] + (pip_source.split(" ", 1) if pip_source.startswith("-e") else [pip_source])
-    try:
-        result = subprocess.run(install_command, check=False, capture_output=True)
-    except FileNotFoundError as ex:
-        logger.error(f"installing {pip_source} failure: {repr(ex)}")
-    if result.returncode != 0:
-        msg = f"installing {pip_source} failure: {result.returncode}. Stderr: {result.stderr}, Stdout: {result.stdout}, Args: {result.args}"
-        logger.error(msg)
 
 
 class PluginManager:
@@ -112,7 +61,7 @@ class PluginManager:
 
 def load_single(plugin: PluginSettings) -> Plugin | str:
     errors = []
-    plugin_impl = _try_import(plugin.module_name)
+    plugin_impl = try_import(plugin.module_name)
     if plugin_impl is None:
         errors.append(f"failed to import plugin {plugin.module_name}")
     elif not hasattr(plugin_impl, "plugin"):
@@ -141,11 +90,11 @@ def load_plugins(plugins: PluginsSettings) -> None:
             # NOTE consider running all pip invocations at once -- worse error reporting but better perf
             if pluginSettings.update_strategy == "auto":
                 logger.info(f"auto-updating {pluginSettings.module_name}")
-                _try_install(pluginSettings.pip_source)
+                install_plugin_compatibly(pluginSettings.pip_source, None)
             else:
-                if _try_import(pluginSettings.module_name) is None:
+                if try_import(pluginSettings.module_name) is None:
                     logger.info(f"installing {pluginSettings.module_name} for the first time")
-                    _try_install(pluginSettings.pip_source)
+                    install_plugin_compatibly(pluginSettings.pip_source, None)
 
             if pluginKey in lookup:
                 errors[pluginKey] = f"plugin {pluginKey} is provided by more than just {pluginSettings.pip_source}"
@@ -158,8 +107,8 @@ def load_plugins(plugins: PluginsSettings) -> None:
                     errors[pluginKey] = result
                 else:
                     assert_never(result)
-                versions[pluginKey] = _try_version(pluginSettings)
-                updatedate[pluginKey] = _try_updatedate(pluginSettings)
+                versions[pluginKey] = try_version(pluginSettings.pip_source, pluginSettings.module_name)
+                updatedate[pluginKey] = try_updatedate(pluginSettings.pip_source)
 
         with timed_acquire(PluginManager.lock, 60) as result:
             if not result:
@@ -176,13 +125,13 @@ def load_plugins(plugins: PluginsSettings) -> None:
             PluginManager.updater_error = repr(e)
 
 
-def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, isUpdate: bool) -> None:
+def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, install: bool, version: Version | None) -> None:
     try:
-        if isUpdate:
-            _try_install(pluginSettings.pip_source)
+        if install:
+            install_plugin_compatibly(pluginSettings.pip_source, version)
         # NOTE we need to recommend in the docs to re-launch app after this change, this wont cover all cases
         importlib.reload(importlib.import_module(pluginSettings.module_name))
-        plugin_impl = _try_import(pluginSettings.module_name)
+        plugin_impl = try_import(pluginSettings.module_name)
         result = load_single(pluginSettings)
         logger.debug(f"plugin {pluginId} loaded with success: {isinstance(result, Plugin)}")
         with timed_acquire(PluginManager.lock, 60) as acquire_result:
@@ -194,8 +143,10 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
                 PluginManager.errors = PluginManager.errors.set(pluginId, result)
             else:
                 assert_never(result)
-            PluginManager.versions = PluginManager.versions.set(pluginId, _try_version(pluginSettings))
-            PluginManager.updatedate = PluginManager.updatedate.set(pluginId, _try_updatedate(pluginSettings))
+            PluginManager.versions = PluginManager.versions.set(
+                pluginId, try_version(pluginSettings.pip_source, pluginSettings.module_name)
+            )
+            PluginManager.updatedate = PluginManager.updatedate.set(pluginId, try_updatedate(pluginSettings.pip_source))
         logger.debug(f"single plugin loading finished: {pluginId}")
     except Exception as e:
         logger.exception(f"updating thread failed with {repr(e)}")
@@ -295,7 +246,7 @@ def catalogue_view() -> dict[PluginCompositeId, BlockFactoryCatalogue] | bool:
             return {plugin_id: plugin.catalogue for plugin_id, plugin in PluginManager.plugins.items()}
 
 
-def submit_update_single(pluginId: PluginCompositeId, isUpdate: bool) -> str:
+def submit_update_single(pluginId: PluginCompositeId, install: bool, version: Version | None) -> str:
     pluginSettings = config.external.plugins.get(pluginId, None)
     if pluginSettings is None:
         return f"plugin {pluginId} not configured"
@@ -312,7 +263,7 @@ def submit_update_single(pluginId: PluginCompositeId, isUpdate: bool) -> str:
                 else:
                     PluginManager.updater.join(0)
                     # we join despite thread not being alive to ensure resource collection
-            PluginManager.updater = threading.Thread(target=update_single, args=(pluginId, pluginSettings, isUpdate))
+            PluginManager.updater = threading.Thread(target=update_single, args=(pluginId, pluginSettings, install, version))
             PluginManager.updater.start()
     return ""
 
@@ -337,7 +288,7 @@ def modify_enabled(pluginId: PluginCompositeId, isEnabled: bool) -> None:
     if not isEnabled:
         unload_single(pluginId)
     else:
-        submit_update_single(pluginId, isUpdate=False)
+        submit_update_single(pluginId, install=False, version=None)
 
 
 def join_updater_thread(timeout_sec: int) -> None:
