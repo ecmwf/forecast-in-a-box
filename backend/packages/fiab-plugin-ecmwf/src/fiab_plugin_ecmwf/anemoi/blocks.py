@@ -18,6 +18,7 @@ from earthkit.workflows.plugins.anemoi.types import DATE
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
+    BlockFactory,
     BlockInstanceId,
     BlockInstanceOutput,
     ConfigurationOptionId,
@@ -108,6 +109,19 @@ class AnemoiBuilder:
         )
 
 
+def _checkpoint_option() -> BlockConfigurationOption:
+    """Build the checkpoint BlockConfigurationOption with a live enum of available checkpoints.
+
+    Called at catalogue-build time (inside ``plugin()``) rather than at class-definition
+    time, so that ``ArtifactsProvider`` is already registered when the enum is computed.
+    """
+    return BlockConfigurationOption(
+        title="Anemoi Checkpoint",
+        description="Anemoi checkpoint name",
+        value_type=get_checkpoint_enum_type(),
+    )
+
+
 class AnemoiSource(Source):
     title: str = "Anemoi Model Source"
     description: str = "Get a forecast from an Anemoi checkpoint, initialised from a source."
@@ -117,7 +131,7 @@ class AnemoiSource(Source):
         CHECKPOINT: BlockConfigurationOption(
             title="Anemoi Checkpoint",
             description="Anemoi checkpoint name",
-            value_type=get_checkpoint_enum_type(),
+            value_type="str",  # placeholder; overridden lazily in as_catalogue()
         ),
         INPUT_SOURCE: BlockConfigurationOption(
             title="Input Source",
@@ -142,6 +156,18 @@ class AnemoiSource(Source):
             default_value="1",
         ),
     }
+
+    def as_catalogue(self) -> BlockFactory:
+        """Override to inject the live checkpoint enum at catalogue-build time."""
+        opts = dict(self.configuration_options)
+        opts[CHECKPOINT] = _checkpoint_option()
+        return BlockFactory(
+            kind=self.kind,
+            title=self.title,
+            description=self.description,
+            configuration_options=opts,
+            inputs=self.inputs,
+        )
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         ensemble_members = block.config_as_int(ENSEMBLE, validator=positive)
@@ -187,7 +213,7 @@ class AnemoiInputSource(Source):
         CHECKPOINT: BlockConfigurationOption(
             title="Anemoi Checkpoint",
             description="Anemoi checkpoint name",
-            value_type=get_checkpoint_enum_type(),
+            value_type="str",  # placeholder; overridden lazily in as_catalogue()
         ),
         INPUT_SOURCE: BlockConfigurationOption(
             title="Input Source",
@@ -207,6 +233,18 @@ class AnemoiInputSource(Source):
             default_value="1",
         ),
     }
+
+    def as_catalogue(self) -> BlockFactory:
+        """Override to inject the live checkpoint enum at catalogue-build time."""
+        opts = dict(self.configuration_options)
+        opts[CHECKPOINT] = _checkpoint_option()
+        return BlockFactory(
+            kind=self.kind,
+            title=self.title,
+            description=self.description,
+            configuration_options=opts,
+            inputs=self.inputs,
+        )
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         checkpoint = CheckpointArtifact(block.config_as_str(CHECKPOINT))
@@ -245,7 +283,7 @@ class AnemoiTransform(Transform):
         CHECKPOINT: BlockConfigurationOption(
             title="Anemoi Checkpoint",
             description="Anemoi checkpoint name",
-            value_type=get_checkpoint_enum_type(),
+            value_type="str",  # placeholder; overridden lazily in as_catalogue()
         ),
         LEAD_TIME: BlockConfigurationOption(
             title="Lead time",
@@ -253,6 +291,18 @@ class AnemoiTransform(Transform):
             value_type="int",
         ),
     }
+
+    def as_catalogue(self) -> BlockFactory:
+        """Override to inject the live checkpoint enum at catalogue-build time."""
+        opts = dict(self.configuration_options)
+        opts[CHECKPOINT] = _checkpoint_option()
+        return BlockFactory(
+            kind=self.kind,
+            title=self.title,
+            description=self.description,
+            configuration_options=opts,
+            inputs=self.inputs,
+        )
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         checkpoint = CheckpointArtifact(block.config_as_str(CHECKPOINT))
