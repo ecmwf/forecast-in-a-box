@@ -11,8 +11,14 @@
 import type { FableBuilderV1 } from '@/api/types/fable.types'
 import type { PluginCompositeId } from '@/api/types/plugins.types'
 import { getAppTimeZone, yesterdayInZone } from '@/lib/datetime'
-import i18n from '@/lib/i18n'
 
+/**
+ * @deprecated The hardcoded `PresetId` union is deprecated as of this release.
+ * All presets are now managed as backend high-level presets (HighLevelPreset)
+ * and referenced by their slug-style `preset_id` strings (e.g. "quick-temperature-map").
+ * Use the `hlPreset` URL search param instead of `preset`.
+ * This type will be removed in a future release.
+ */
 export type PresetId =
   | 'quick-start'
   | 'standard'
@@ -21,6 +27,36 @@ export type PresetId =
   | 'ecmwf-open-data'
   | 'aifs-forecast'
   | 'aifs-dataset'
+
+/**
+ * Maps legacy hardcoded preset IDs (used in the `?preset=` URL param) to their
+ * corresponding backend high-level preset IDs (used in the `?hlPreset=` URL param).
+ *
+ * This mapping exists for backward compatibility so that bookmarked URLs such as
+ * `?preset=quick-start` continue to work after the migration to backend-managed
+ * presets.  The `?preset=` param is deprecated and will be removed in a future
+ * release — new links should use `?hlPreset=<backend-preset-id>` directly.
+ *
+ * Mapping rationale:
+ *   quick-start      → global-ensemble-statistics  (ported from quick-start: open data → ensemble stats → zarr)
+ *   standard         → global-ensemble-statistics  (closest equivalent for MARS-based ensemble source)
+ *   custom-model     → blank-canvas                (ported from custom-model: empty pipeline)
+ *   dataset          → global-ensemble-statistics  (open data source, upgraded to full pipeline)
+ *   ecmwf-open-data  → quick-temperature-map       (ported directly from ecmwf-open-data preset)
+ *   aifs-forecast    → regional-surface-forecast   (ported directly from aifs-forecast preset)
+ *   aifs-dataset     → aifs-ensemble-to-grib       (ported directly from aifs-dataset preset)
+ *
+ * @deprecated Will be removed once the `?preset=` search param is dropped.
+ */
+export const LEGACY_PRESET_MAP: Record<string, string> = {
+  'quick-start': 'global-ensemble-statistics',
+  standard: 'global-ensemble-statistics',
+  'custom-model': 'blank-canvas',
+  dataset: 'global-ensemble-statistics',
+  'ecmwf-open-data': 'quick-temperature-map',
+  'aifs-forecast': 'regional-surface-forecast',
+  'aifs-dataset': 'aifs-ensemble-to-grib',
+}
 
 export interface FablePreset {
   id: PresetId
@@ -49,8 +85,8 @@ function yesterdayBaseTime(): string {
 function quickStartPreset(): FablePreset {
   return {
     id: 'quick-start',
-    name: i18n.t('configure:presets.quickStartName'),
-    description: i18n.t('configure:presets.quickStartDescription'),
+    name: 'Quick Start',
+    description: 'Ready to run with optimized defaults',
     fable: {
       blocks: {
         source_1: {
@@ -101,8 +137,8 @@ function quickStartPreset(): FablePreset {
 function standardPreset(): FablePreset {
   return {
     id: 'standard',
-    name: i18n.t('configure:presets.standardName'),
-    description: i18n.t('configure:presets.standardDescription'),
+    name: 'Standard Forecast',
+    description: 'Standard forecast data pipeline',
     fable: {
       blocks: {
         source_1: {
@@ -128,8 +164,8 @@ function standardPreset(): FablePreset {
 function customModelPreset(): FablePreset {
   return {
     id: 'custom-model',
-    name: i18n.t('configure:presets.customModelName'),
-    description: i18n.t('configure:presets.customModelDescription'),
+    name: 'Start from Scratch',
+    description: 'Empty canvas — build a forecast with full control',
     fable: {
       blocks: {},
     },
@@ -139,8 +175,8 @@ function customModelPreset(): FablePreset {
 function datasetPreset(): FablePreset {
   return {
     id: 'dataset',
-    name: i18n.t('configure:presets.datasetName'),
-    description: i18n.t('configure:presets.datasetDescription'),
+    name: 'Open Data Forecast',
+    description: 'Start with ECMWF open data as source',
     fable: {
       blocks: {
         source_1: {
@@ -166,8 +202,8 @@ function datasetPreset(): FablePreset {
 function ecmwfOpenDataPreset(): FablePreset {
   return {
     id: 'ecmwf-open-data',
-    name: i18n.t('configure:presets.ecmwfOpenDataName'),
-    description: i18n.t('configure:presets.ecmwfOpenDataDescription'),
+    name: 'ECMWF Open Data',
+    description: 'Ensemble-mean 2 m temperature maps from ECMWF IFS Open Data',
     fable: {
       blocks: {
         source_1: {
@@ -222,8 +258,8 @@ function ecmwfOpenDataPreset(): FablePreset {
 function aifsForecastPreset(): FablePreset {
   return {
     id: 'aifs-forecast',
-    name: i18n.t('configure:presets.aifsForecastName'),
-    description: i18n.t('configure:presets.aifsForecastDescription'),
+    name: 'AIFS 72h Forecast',
+    description: '72-hour AIFS Open Data forecast with global PDF and European PNG map plots',
     fable: {
       blocks: {
         source_1: {
@@ -280,8 +316,8 @@ function aifsForecastPreset(): FablePreset {
 function aifsDatasetPreset(): FablePreset {
   return {
     id: 'aifs-dataset',
-    name: i18n.t('configure:presets.aifsDatasetName'),
-    description: i18n.t('configure:presets.aifsDatasetDescription'),
+    name: 'AIFS Ensemble Dataset',
+    description: '10-member AIFS Open Data ensemble exported as a GRIB file',
     fable: {
       blocks: {
         source_1: {
