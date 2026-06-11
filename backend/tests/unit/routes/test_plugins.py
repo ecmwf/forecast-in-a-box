@@ -7,10 +7,19 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Unit tests for plugin route helpers — version/specifier parsing logic."""
+"""Unit tests for plugin route helpers — version/specifier parsing logic and /versions route."""
 
+from unittest.mock import patch
+
+import pytest
+from fastapi.exceptions import HTTPException
+from fiab_core.fable import PluginCompositeId, PluginId, PluginStoreId
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
+
+from forecastbox.domain.plugin.store import PluginRemoteInfo, PluginStoreEntry
+from forecastbox.routes.plugins import get_plugin_versions
+from forecastbox.utility.config import PluginSettings
 
 # ---------------------------------------------------------------------------
 # Helpers that mirror the route logic without depending on FastAPI/HTTP stack
@@ -87,3 +96,75 @@ def test_default_specifier_patch_irrelevant() -> None:
     spec_a = _build_default_specifier(Version("1.0.0"))
     spec_b = _build_default_specifier(Version("1.5.3"))
     assert str(spec_a) == str(spec_b)
+
+
+# ---------------------------------------------------------------------------
+# /versions route — get_plugin_versions
+# ---------------------------------------------------------------------------
+
+_COMPOSITE_ID = PluginCompositeId(store=PluginStoreId("ecmwf"), local=PluginId("ecmwf-base"))
+_STORE_ENTRY = PluginStoreEntry(
+    pip_source="fiab-plugin-ecmwf",
+    module_name="fiab_plugin_ecmwf",
+    display_title="ECMWF Plugin",
+    display_description="desc",
+    display_author="ECMWF",
+)
+_REMOTE_INFO = PluginRemoteInfo(version="1.2.0")
+
+
+from unittest.mock import _patch as PatchType
+
+
+def _patch_versions(versions: list[str]) -> PatchType:
+    return patch("forecastbox.routes.plugins.get_package_versions", return_value=iter(versions))
+
+
+def _patch_store(entry: PluginStoreEntry = _STORE_ENTRY) -> PatchType:
+    return patch("forecastbox.routes.plugins.get_plugins_detail", return_value={_COMPOSITE_ID: (entry, _REMOTE_INFO)})
+
+
+def _patch_fiabcore(version_str: str = "1.0.0") -> PatchType:
+    return patch("forecastbox.domain.plugin.compatibility.get_fiabcore_version", return_value=Version(version_str))
+
+
+def test_versions_returns_compatible_sorted_descending() -> None:
+    available = ["1.0.0", "1.2.0", "2.0.0", "1.1.0"]
+    with _patch_store(), _patch_versions(available), _patch_fiabcore("1.0.0"):
+        result = get_plugin_versions(_COMPOSITE_ID)
+    assert result.versions == ["1.2.0", "1.1.0", "1.0.0"]
+
+
+def test_versions_returns_empty_when_nothing_compatible() -> None:
+    available = ["2.0.0", "3.0.0"]
+    with _patch_store(), _patch_versions(available), _patch_fiabcore("1.0.0"):
+        result = get_plugin_versions(_COMPOSITE_ID)
+    assert result.versions == []
+
+
+def test_versions_404_when_plugin_not_in_store_or_config() -> None:
+    unknown_id = PluginCompositeId(store=PluginStoreId("unknown"), local=PluginId("unknown"))
+    with patch("forecastbox.routes.plugins.get_plugins_detail", return_value={}):
+        with patch("forecastbox.routes.plugins.config") as mock_config:
+            mock_config.external.plugins = {}
+            with pytest.raises(HTTPException) as exc_info:
+                get_plugin_versions(unknown_id)
+    assert exc_info.value.status_code == 404
+
+
+def test_versions_falls_back_to_config_when_not_in_store() -> None:
+    plugin_settings = PluginSettings(pip_source="fiab-plugin-ecmwf", module_name="fiab_plugin_ecmwf")
+    available = ["1.0.0", "1.3.0"]
+    with patch("forecastbox.routes.plugins.get_plugins_detail", return_value={}):
+        with patch("forecastbox.routes.plugins.config") as mock_config:
+            mock_config.external.plugins = {_COMPOSITE_ID: plugin_settings}
+            with _patch_versions(available), _patch_fiabcore("1.5.0"):
+                result = get_plugin_versions(_COMPOSITE_ID)
+    assert result.versions == ["1.3.0", "1.0.0"]
+
+
+def test_versions_pip_source_passed_to_get_package_versions() -> None:
+    with _patch_store() as mock_detail, _patch_fiabcore("1.0.0"):
+        with patch("forecastbox.routes.plugins.get_package_versions", return_value=iter([])) as mock_gpv:
+            get_plugin_versions(_COMPOSITE_ID)
+    mock_gpv.assert_called_once_with("fiab-plugin-ecmwf")

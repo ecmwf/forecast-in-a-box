@@ -19,8 +19,10 @@ import importlib.metadata
 import logging
 import pathlib
 import subprocess
+from collections.abc import Iterator
 from types import ModuleType
 
+import httpx
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
@@ -31,6 +33,34 @@ def get_fiabcore_version() -> Version:
     """Return the currently installed version of ``fiab-core`` as a ``Version`` object."""
     raw = importlib.metadata.version("fiab-core")
     return Version(raw)
+
+
+def get_package_versions(pip_source: str) -> Iterator[str]:
+    """Return all versions of *pip_source* available on PyPI.
+
+    Fetches ``https://pypi.org/pypi/{pip_source}/json`` and yields every key
+    from the ``releases`` mapping.  PyPI does not paginate this endpoint, but
+    if a ``next`` link is ever introduced the loop below handles it.
+    """
+    url: str | None = f"https://pypi.org/pypi/{pip_source}/json"
+    with httpx.Client() as client:
+        while url is not None:
+            try:
+                response = client.get(url)
+            except Exception:
+                logger.exception(f"Failed to reach PyPI for {pip_source!r}")
+                return
+            if response.status_code != 200:
+                logger.warning(f"PyPI returned {response.status_code} for {pip_source!r}")
+                return
+            try:
+                data = response.json()
+            except Exception:
+                logger.exception(f"Failed to parse PyPI JSON for {pip_source!r}")
+                return
+            yield from data.get("releases", {}).keys()
+            # PyPI JSON API does not currently paginate; guard for the future.
+            url = data.get("next", None)
 
 
 def try_import(module_name: str) -> ModuleType | None:

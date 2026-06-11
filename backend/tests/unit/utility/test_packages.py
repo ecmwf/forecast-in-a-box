@@ -18,6 +18,7 @@ from packaging.version import Version
 
 from forecastbox.utility.packages import (
     get_fiabcore_version,
+    get_package_versions,
     try_import,
     try_install,
     try_updatedate,
@@ -246,3 +247,61 @@ def test_get_fiabcore_version_current_install() -> None:
     # Smoke test: fiab-core is installed in this environment
     result = get_fiabcore_version()
     assert isinstance(result, Version)
+
+
+# ---------------------------------------------------------------------------
+# get_package_versions
+# ---------------------------------------------------------------------------
+
+
+def _make_pypi_response(releases: dict) -> MagicMock:
+    """Build a fake httpx.Response-like mock for the PyPI JSON API."""
+    mock = MagicMock()
+    mock.status_code = 200
+    mock.json.return_value = {"releases": releases}
+    return mock
+
+
+def test_get_package_versions_returns_all_releases() -> None:
+    releases = {"1.0.0": [], "1.1.0": [], "2.0.0": []}
+    with patch("httpx.Client.get", return_value=_make_pypi_response(releases)):
+        result = list(get_package_versions("some-plugin"))
+    assert set(result) == {"1.0.0", "1.1.0", "2.0.0"}
+
+
+def test_get_package_versions_empty_releases() -> None:
+    with patch("httpx.Client.get", return_value=_make_pypi_response({})):
+        result = list(get_package_versions("some-plugin"))
+    assert result == []
+
+
+def test_get_package_versions_non_200_returns_empty() -> None:
+    mock_resp = MagicMock()
+    mock_resp.status_code = 404
+    with patch("httpx.Client.get", return_value=mock_resp):
+        result = list(get_package_versions("nonexistent-plugin"))
+    assert result == []
+
+
+def test_get_package_versions_network_error_returns_empty() -> None:
+    with patch("httpx.Client.get", side_effect=Exception("network failure")):
+        result = list(get_package_versions("some-plugin"))
+    assert result == []
+
+
+def test_get_package_versions_bad_json_returns_empty() -> None:
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.side_effect = ValueError("not JSON")
+    with patch("httpx.Client.get", return_value=mock_resp):
+        result = list(get_package_versions("some-plugin"))
+    assert result == []
+
+
+def test_get_package_versions_is_iterator() -> None:
+    releases = {"1.0.0": [], "2.0.0": []}
+    with patch("httpx.Client.get", return_value=_make_pypi_response(releases)):
+        result = get_package_versions("some-plugin")
+    import inspect
+
+    assert inspect.isgenerator(result)
