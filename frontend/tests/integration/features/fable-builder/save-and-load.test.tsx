@@ -15,6 +15,7 @@ import { worker } from '@tests/test-extend'
 import { mockSavedFables } from '../../../../mocks/data/fable.data'
 import { FableBuilderPage } from '@/features/fable-builder/components/FableBuilderPage'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
+import { useUiStore } from '@/stores/uiStore'
 import { API_ENDPOINTS } from '@/api/endpoints'
 
 // Mock useMedia to simulate desktop layout (three-column with sidebars)
@@ -47,12 +48,12 @@ function setupFableWithSource(): string {
       source1: {
         factory_id: {
           plugin: { store: 'ecmwf', local: 'ecmwf-base' },
-          factory: 'ekdSource',
+          factory: 'operationalForecastSource',
         },
         configuration_values: {
           source: 'mars',
-          date: '2026-01-01',
-          expver: '0001',
+          forecast: 'aifs-ens',
+          base_time: '2026-01-01T00:00:00',
         },
         input_ids: {},
       },
@@ -188,6 +189,7 @@ describe('Fable Builder Save & Load', () => {
 
   describe('Load configuration from backend', () => {
     it('populates the builder when setFable is called with loaded data', async () => {
+      useUiStore.setState({ timeZone: 'UTC' })
       const screen = await renderWithRouter(<FableBuilderPage />)
 
       // Wait for catalogue to load
@@ -212,13 +214,15 @@ describe('Fable Builder Save & Load', () => {
       // Config panel should show the source block's values
       await expect
         .element(
-          screen.getByRole('heading', { name: 'Earthkit Data Source' }).first(),
+          screen
+            .getByRole('heading', { name: 'Operational forecast source' })
+            .first(),
         )
         .toBeVisible()
 
-      // Expver field (text input) should contain the loaded value
-      const expverInput = screen.getByLabelText('Expver')
-      await expect.element(expverInput).toHaveValue('0001')
+      // Base time date control should contain the loaded date (tz UTC; midnight UTC)
+      const baseTimeInput = screen.getByLabelText('Base time')
+      await expect.element(baseTimeInput).toHaveValue('2024-01-15')
     })
 
     it('handles retrieve error by showing error message', async () => {
@@ -296,7 +300,7 @@ describe('Fable Builder Save & Load', () => {
       useFableBuilderStore.getState().selectBlock('block_source_1')
       useFableBuilderStore
         .getState()
-        .updateBlockConfig('block_source_1', 'expver', '0002')
+        .updateBlockConfig('block_source_1', 'forecast', 'ifs-ens')
 
       // Should now be dirty
       expect(useFableBuilderStore.getState().isDirty).toBe(true)
@@ -350,10 +354,9 @@ describe('Fable Builder Save & Load', () => {
 
       // 2. Add and configure a source block via palette
       await screen
-        .getByRole('button', { name: /Earthkit Data Source/i })
+        .getByRole('button', { name: /Operational forecast source/i })
         .click()
-      await screen.getByLabelText('Date').fill('2026-01-15')
-      await screen.getByLabelText('Expver').fill('0001')
+      await screen.getByLabelText('Base time').fill('2026-01-15')
 
       // 3. First save
       await screen.getByRole('button', { name: /Save Config/i }).click()
@@ -368,7 +371,7 @@ describe('Fable Builder Save & Load', () => {
       expect(firstSaveId).toBeTruthy()
 
       // 4. Modify the configuration
-      await screen.getByLabelText('Expver').fill('0002')
+      await screen.getByLabelText('Base time').fill('2026-02-01')
       expect(useFableBuilderStore.getState().isDirty).toBe(true)
 
       // 5. Re-save (should update existing)

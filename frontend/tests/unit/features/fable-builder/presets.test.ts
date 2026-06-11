@@ -27,7 +27,14 @@ import { getPreset } from '@/features/fable-builder/presets/presets'
 
 // Full set of `configuration_options` keys per block factory (backend mirror).
 const FACTORY_CONFIG_KEYS: Record<string, ReadonlyArray<string>> = {
-  ekdSource: ['source', 'date', 'expver', 'param', 'step', 'number'],
+  operationalForecastSource: [
+    'source',
+    'forecast',
+    'base_time',
+    'param',
+    'step',
+    'number',
+  ],
   ensembleStatistics: ['param', 'statistic'],
   selectSteps: ['step'],
   zarrSink: ['path'],

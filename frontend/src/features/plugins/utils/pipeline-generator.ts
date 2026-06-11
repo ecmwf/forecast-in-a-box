@@ -237,7 +237,6 @@ function findUpstreamBlock(
  */
 const KNOWN_FIELD_DEFAULTS: Record<string, string> = {
   // Common string fields
-  expver: '0001',
   path: '/tmp/output.zarr',
   variable: '2t',
   // Common numeric fields (as strings)
