@@ -25,6 +25,7 @@ from typing import cast
 from forecastbox.domain.blueprint.service import (
     BlueprintBuilder,
     BlueprintSaveCommand,
+    Tag,
     save_builder,
     validate_expand,
 )
@@ -132,7 +133,7 @@ async def instantiate_preset(
 
     # 5a. auto_run=True: save blueprint and submit run immediately.
     if auto_run:
-        save_command = BlueprintSaveCommand(builder=builder, display_name=preset_name, tags=[_ONEOFF_TAG])  # ty:ignore[invalid-argument-type]
+        save_command = BlueprintSaveCommand(builder=builder, display_name=preset_name, tags=[Tag(key=_ONEOFF_TAG)])
         save_result = await save_builder(auth_context=auth_context, payload=save_command)
 
         blueprint = await run_service.get_blueprint_for_execution(save_result.blueprint_id, save_result.blueprint_version)
