@@ -18,18 +18,15 @@ from earthkit.workflows.plugins.anemoi.types import DATE
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
-    BlockInstanceOutput,
     ConfigurationOptionId,
-    ConfigurationOptionRestriction,
     QubedOutput,
 )
 from fiab_core.plugin import BlockValidation, Error
-from fiab_core.tools.blocks import BlockInstanceConfigurationError, Source, Transform
 from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
-from fiab_core.tools.validators import negative, positive
-from fiab_core.types import ClosedEnumType, ListType
+from fiab_core.tools.blocks import Source, Transform
+from fiab_core.tools.validators import positive
 
-from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, dimensions, expand
+from fiab_plugin_ecmwf.qubed_utils import axes, contains, expand
 
 from .utils import (
     CheckpointArtifact,
@@ -47,7 +44,6 @@ CHECKPOINT = ConfigurationOptionId("checkpoint")
 LEAD_TIME = ConfigurationOptionId("lead_time")
 INPUT_SOURCE = ConfigurationOptionId("input_source")
 BASE_TIME = ConfigurationOptionId("base_time")
-DATASET = ConfigurationOptionId("dataset")
 
 
 class AnemoiBuilder:
@@ -207,11 +203,11 @@ class AnemoiInputSource(Source):
         ),
     }
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
         checkpoint = CheckpointArtifact(block.config_as_str(CHECKPOINT))
         number = block.config_as_int(ENSEMBLE, validator=positive)
         if number < 1:
-            return Either.error("Ensemble members must be an int, positive and non zero.")
+            return BlockValidation(Either.error("Ensemble members must be an int, positive and non zero."))
         model_input = checkpoint.combine_if_nested_qube(checkpoint.get_model_input())
         model_input = expand(model_input, {ENSEMBLE: [number]})
 
