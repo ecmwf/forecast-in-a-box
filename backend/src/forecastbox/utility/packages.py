@@ -21,6 +21,7 @@ import pathlib
 import subprocess
 from types import ModuleType
 
+from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
 logger = logging.getLogger(__name__)
@@ -74,16 +75,28 @@ def try_updatedate(pip_source: str) -> str:
         return "unknown"
 
 
-def try_install(pip_source: str) -> None:
+def try_install(pip_source: str, specifier_set: SpecifierSet | None = None) -> None:
     """Run ``uv pip install --upgrade`` for the given ``pip_source``.
 
     The currently installed ``fiab-core`` version is pinned in the install
     command to prevent accidental core upgrades or downgrades.
     # TODO -- include the whole pylock.toml
+
+    If ``specifier_set`` is provided and ``pip_source`` is not an editable
+    install, the specifier is appended to the package argument to constrain
+    which version is installed (e.g. ``"my-plugin>=1,<2"``).
+    Editable installs (``-e ...``) are version-agnostic; the specifier is
+    silently ignored for them.
     """
     fiabcore_pin = f"fiab-core=={get_fiabcore_version()}"
-    base_args = pip_source.split(" ", 1) if pip_source.startswith("-e") else [pip_source]
-    install_command = ["uv", "pip", "install", "--upgrade"] + base_args + [fiabcore_pin]
+    is_editable = pip_source.startswith("-e")
+    if is_editable:
+        base_args = pip_source.split(" ", 1)
+        package_arg = base_args  # specifier_set not applicable for editable installs
+    else:
+        package_spec = pip_source if specifier_set is None else f"{pip_source}{specifier_set}"
+        package_arg = [package_spec]
+    install_command = ["uv", "pip", "install", "--upgrade"] + package_arg + [fiabcore_pin]
     try:
         result = subprocess.run(install_command, check=False, capture_output=True)
     except FileNotFoundError as ex:

@@ -19,12 +19,15 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse, Response
 from fiab_core.fable import PluginCompositeId
+from packaging.specifiers import SpecifierSet
+from packaging.version import InvalidVersion, Version
 
 from forecastbox.domain.auth.users import UserRead
 from forecastbox.domain.plugin.manager import PluginsStatus, modify_enabled, status_full, submit_update_single, uninstall_plugin
 from forecastbox.domain.plugin.store import PluginRemoteInfo, PluginStoreEntry, get_plugins_detail, submit_install_plugin
 from forecastbox.routes.admin import get_admin_user
 from forecastbox.utility.config import config
+from forecastbox.utility.packages import get_fiabcore_version
 from forecastbox.utility.pydantic import FiabBaseModel
 
 PREFIX = "/api/v1/plugin"
@@ -115,9 +118,30 @@ get_catalogue_redirect = lambda request: Response(status_code=202)
 
 
 @router.post("/update")
-def update_plugin(request: Request, pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)) -> Response:
-    # TODO possibly add optional version parameter
-    result = submit_update_single(pluginCompositeId, isUpdate=True)
+def update_plugin(
+    request: Request,
+    pluginCompositeId: PluginCompositeId,
+    version: str | None = None,
+    admin: UserRead | None = Depends(get_admin_user),
+) -> Response:
+    """Trigger a pip-install update for a plugin.
+
+    If ``version`` is provided it must be a valid PEP 440 version string; the
+    plugin will be pinned to exactly that version (``==version``).
+    If omitted, a compatibility range derived from the current ``fiab-core``
+    major version is used (``>=major,<major+1``), ensuring the installed plugin
+    stays within the same major-version family as the core library.
+    """
+    if version is not None:
+        try:
+            parsed = Version(version)
+        except InvalidVersion:
+            raise HTTPException(status_code=422, detail=f"Invalid version string: {version!r}")
+        specifier_set = SpecifierSet(f"=={parsed}")
+    else:
+        major = get_fiabcore_version().major
+        specifier_set = SpecifierSet(f">={major},<{major + 1}")
+    result = submit_update_single(pluginCompositeId, specifier_set=specifier_set)
     if result:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result)
     return get_catalogue_redirect(request)

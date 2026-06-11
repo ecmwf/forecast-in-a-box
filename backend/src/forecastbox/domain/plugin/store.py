@@ -17,6 +17,7 @@ import httpx
 import orjson
 from cascade.low.func import assert_never
 from fiab_core.fable import PluginCompositeId, PluginId
+from packaging.specifiers import SpecifierSet
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 from typing_extensions import Self
@@ -25,6 +26,7 @@ from forecastbox.domain.plugin.manager import submit_update_single
 from forecastbox.utility.concurrent import timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginStoreConfig, PluginStoreId, PluginStoresConfig, config, config_edit_lock
 from forecastbox.utility.httpx import fetch_content
+from forecastbox.utility.packages import get_fiabcore_version
 from forecastbox.utility.pydantic import FiabBaseModel
 
 logger = logging.getLogger(__name__)
@@ -166,7 +168,8 @@ def submit_install_plugin(plugin_composite_key: PluginCompositeId) -> None:
             )
             config.save_to_file()
 
-    submit_update_single(plugin_composite_key, isUpdate=True)
+    major = get_fiabcore_version().major
+    submit_update_single(plugin_composite_key, specifier_set=SpecifierSet(f">={major},<{major + 1}"))
 
 
 def join_stores_thread(timeout_sec: int) -> None:

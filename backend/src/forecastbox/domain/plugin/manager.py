@@ -35,6 +35,7 @@ from typing import Iterator, Literal
 from cascade.low.func import assert_never
 from fiab_core.fable import BlockFactoryCatalogue, PluginCompositeId
 from fiab_core.plugin import Plugin
+from packaging.specifiers import SpecifierSet
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
@@ -122,10 +123,10 @@ def load_plugins(plugins: PluginsSettings) -> None:
             PluginManager.updater_error = repr(e)
 
 
-def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, isUpdate: bool) -> None:
+def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, specifier_set: SpecifierSet | None) -> None:
     try:
-        if isUpdate:
-            try_install(pluginSettings.pip_source)
+        if specifier_set is not None:
+            try_install(pluginSettings.pip_source, specifier_set)
         # NOTE we need to recommend in the docs to re-launch app after this change, this wont cover all cases
         importlib.reload(importlib.import_module(pluginSettings.module_name))
         plugin_impl = try_import(pluginSettings.module_name)
@@ -228,7 +229,7 @@ def catalogue_view() -> dict[PluginCompositeId, BlockFactoryCatalogue] | bool:
             return {plugin_id: plugin.catalogue for plugin_id, plugin in PluginManager.plugins.items()}
 
 
-def submit_update_single(pluginId: PluginCompositeId, isUpdate: bool) -> str:
+def submit_update_single(pluginId: PluginCompositeId, specifier_set: SpecifierSet | None) -> str:
     pluginSettings = config.external.plugins.get(pluginId, None)
     if pluginSettings is None:
         return f"plugin {pluginId} not configured"
@@ -245,7 +246,7 @@ def submit_update_single(pluginId: PluginCompositeId, isUpdate: bool) -> str:
                 else:
                     PluginManager.updater.join(0)
                     # we join despite thread not being alive to ensure resource collection
-            PluginManager.updater = threading.Thread(target=update_single, args=(pluginId, pluginSettings, isUpdate))
+            PluginManager.updater = threading.Thread(target=update_single, args=(pluginId, pluginSettings, specifier_set))
             PluginManager.updater.start()
     return ""
 
@@ -270,7 +271,7 @@ def modify_enabled(pluginId: PluginCompositeId, isEnabled: bool) -> None:
     if not isEnabled:
         unload_single(pluginId)
     else:
-        submit_update_single(pluginId, isUpdate=False)
+        submit_update_single(pluginId, specifier_set=None)
 
 
 def join_updater_thread(timeout_sec: int) -> None:
