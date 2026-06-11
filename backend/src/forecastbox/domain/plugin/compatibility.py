@@ -16,8 +16,10 @@ Centralises the version-compatibility rules between plugins and ``fiab-core``:
 
 Public API
 ----------
-install_specifier(version)
-    Build the ``SpecifierSet`` used when pip-installing a plugin.
+plugin_default_specifier()
+    Build the default ``SpecifierSet`` for a plugin install based on the installed fiab-core major.
+install_plugin_compatibly(pip_source, version)
+    Install a plugin, pinning fiab-core to the currently installed version.
 get_compatible_versions(plugin_settings, available_versions)
     Filter an iterable of version strings to only compatible ones.
 """

@@ -123,7 +123,7 @@ def get_existing_install_pin(distname: str) -> list[str]:
         origin = distribution.origin
         if hasattr(origin, "url") and isinstance(origin.url, str) and origin.url.startswith("file://"):
             # NOTE this doesnt work well for non-std layout but again we can restrict to only that
-            return ["-e ", origin.url[len("file://") :]]
+            return ["-e", origin.url[len("file://") :]]
 
     # NOTE: pre 3.14, eventually remove
     direct_url_text = distribution.read_text("direct_url.json")
@@ -132,7 +132,7 @@ def get_existing_install_pin(distname: str) -> list[str]:
         if info.get("dir_info", {}).get("editable"):
             url = info.get("url", "")
             if url.startswith("file://"):
-                return ["-e ", url[len("file://") :]]
+                return ["-e", url[len("file://") :]]
 
     version = importlib.metadata.version(distname)
     return [f"{distname}=={version}"]

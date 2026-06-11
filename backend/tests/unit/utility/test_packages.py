@@ -13,11 +13,10 @@ from types import ModuleType
 from unittest.mock import MagicMock, patch
 
 import pytest
-from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
+from forecastbox.domain.plugin.compatibility import get_fiabcore_version
 from forecastbox.utility.packages import (
-    get_fiabcore_version,
     get_package_versions,
     try_import,
     try_install,
@@ -140,74 +139,11 @@ def test_try_install_calls_uv_pip_install() -> None:
     fake_result = MagicMock()
     fake_result.returncode = 0
     with patch("subprocess.run", return_value=fake_result) as mock_run:
-        with patch("forecastbox.utility.packages.get_fiabcore_version", return_value=Version("1.2.3")):
-            try_install("some-plugin==2.0.0")
+        try_install(["some-plugin==2.0.0"])
     mock_run.assert_called_once()
     args = mock_run.call_args[0][0]
     assert args[:3] == ["uv", "pip", "install"]
-    assert "--upgrade" in args
     assert "some-plugin==2.0.0" in args
-
-
-def test_try_install_includes_fiabcore_pin() -> None:
-    fake_result = MagicMock()
-    fake_result.returncode = 0
-    with patch("subprocess.run", return_value=fake_result) as mock_run:
-        with patch("forecastbox.utility.packages.get_fiabcore_version", return_value=Version("1.2.3")):
-            try_install("my-plugin")
-    args = mock_run.call_args[0][0]
-    assert "fiab-core==1.2.3" in args
-
-
-def test_try_install_handles_editable_source() -> None:
-    fake_result = MagicMock()
-    fake_result.returncode = 0
-    with patch("subprocess.run", return_value=fake_result) as mock_run:
-        with patch("forecastbox.utility.packages.get_fiabcore_version", return_value=Version("0.0.0")):
-            try_install("-e /path/to/package")
-    args = mock_run.call_args[0][0]
-    assert "-e" in args
-    assert "/path/to/package" in args
-
-
-def test_try_install_appends_specifier_to_package() -> None:
-    fake_result = MagicMock()
-    fake_result.returncode = 0
-    spec = SpecifierSet(">=1,<2")
-    with patch("subprocess.run", return_value=fake_result) as mock_run:
-        with patch("forecastbox.utility.packages.get_fiabcore_version", return_value=Version("1.0.0")):
-            try_install("my-plugin", spec)
-    args = mock_run.call_args[0][0]
-    # package arg must include both the name and the specifier
-    package_args = [a for a in args if a.startswith("my-plugin")]
-    assert len(package_args) == 1
-    assert "my-plugin" in package_args[0]
-    assert "1" in package_args[0]  # the specifier contains version numbers
-
-
-def test_try_install_exact_version_specifier() -> None:
-    fake_result = MagicMock()
-    fake_result.returncode = 0
-    spec = SpecifierSet("==2.5.0")
-    with patch("subprocess.run", return_value=fake_result) as mock_run:
-        with patch("forecastbox.utility.packages.get_fiabcore_version", return_value=Version("1.0.0")):
-            try_install("my-plugin", spec)
-    args = mock_run.call_args[0][0]
-    assert "my-plugin==2.5.0" in args
-
-
-def test_try_install_ignores_specifier_for_editable_source() -> None:
-    fake_result = MagicMock()
-    fake_result.returncode = 0
-    spec = SpecifierSet(">=1,<2")
-    with patch("subprocess.run", return_value=fake_result) as mock_run:
-        with patch("forecastbox.utility.packages.get_fiabcore_version", return_value=Version("1.0.0")):
-            try_install("-e /path/to/package", spec)
-    args = mock_run.call_args[0][0]
-    # specifier should NOT appear in the command for editable installs
-    assert not any(">=1" in a or "<2" in a for a in args)
-    assert "-e" in args
-    assert "/path/to/package" in args
 
 
 def test_try_install_logs_on_failure() -> None:
@@ -217,16 +153,14 @@ def test_try_install_logs_on_failure() -> None:
     fake_result.stdout = b""
     fake_result.args = []
     with patch("subprocess.run", return_value=fake_result):
-        with patch("forecastbox.utility.packages.get_fiabcore_version", return_value=Version("0.0.0")):
-            # Should not raise, only log
-            try_install("bad-package")
+        # Should not raise, only log
+        try_install(["bad-package"])
 
 
 def test_try_install_handles_uv_not_found() -> None:
     with patch("subprocess.run", side_effect=FileNotFoundError("uv not found")):
-        with patch("forecastbox.utility.packages.get_fiabcore_version", return_value=Version("0.0.0")):
-            # Should not raise
-            try_install("some-package")
+        # Should not raise
+        try_install(["some-package"])
 
 
 # ---------------------------------------------------------------------------
