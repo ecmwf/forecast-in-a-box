@@ -22,7 +22,6 @@ import { FableFormCanvas } from './form-mode/FableFormCanvas'
 import { ReviewStep as ReviewStepComponent } from './review/ReviewStep'
 import { PresetWizardDialog } from './PresetWizardDialog'
 import type { TFunction } from 'i18next'
-import type { PresetId } from '@/features/fable-builder/presets/presets'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import { useURLStateSync } from '@/features/fable-builder/hooks/useURLStateSync'
 import {
@@ -30,7 +29,6 @@ import {
   readDraft,
   useDraftPersistence,
 } from '@/features/fable-builder/hooks/useDraftPersistence'
-import { getPreset } from '@/features/fable-builder/presets/presets'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { hasUnterminatedGlyph } from '@/features/fable-builder/utils/glyph-display'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -91,7 +89,6 @@ function getValidationErrorMessage(
 
 interface FableBuilderPageProps {
   fableId?: string
-  preset?: PresetId
   encodedState?: string
   /** High-level preset ID for deep-linking. When present the preset is fetched
    *  and the wizard dialog is opened automatically (or the preset is
@@ -101,7 +98,6 @@ interface FableBuilderPageProps {
 
 export function FableBuilderPage({
   fableId,
-  preset,
   encodedState,
   hlPreset,
 }: FableBuilderPageProps) {
@@ -250,29 +246,23 @@ export function FableBuilderPage({
       }
       initializedRef.current = true
     } else if (!fableId && !encodedState) {
-      if (preset) {
-        const presetConfig = getPreset(preset)
-        setFable(presetConfig.fable, null)
-        setFableName(presetConfig.name)
-      } else {
-        // If the store already holds a preset-instantiated builder (loaded by
-        // PresetWizardDialog via setFableFromPresetInstance before navigating
-        // here), do NOT reset it.  We detect this by checking that the fable
-        // has blocks AND is marked dirty (isDirty is always true after
-        // setFableFromPresetInstance, whereas a freshly-reset store is clean).
-        const { fable: currentFable, isDirty } = useFableBuilderStore.getState()
-        const hasPresetBuilder =
-          Object.keys(currentFable.blocks).length > 0 && isDirty
-        if (!hasPresetBuilder) {
-          newFable()
-        }
+      // If the store already holds a preset-instantiated builder (loaded by
+      // PresetWizardDialog via setFableFromPresetInstance before navigating
+      // here), do NOT reset it.  We detect this by checking that the fable
+      // has blocks AND is marked dirty (isDirty is always true after
+      // setFableFromPresetInstance, whereas a freshly-reset store is clean).
+      const { fable: currentFable, isDirty } = useFableBuilderStore.getState()
+      const hasPresetBuilder =
+        Object.keys(currentFable.blocks).length > 0 && isDirty
+      if (!hasPresetBuilder) {
+        newFable()
       }
       initializedRef.current = true
     } else if (!fableId && encodedState) {
       // URL state sync will handle this case
       initializedRef.current = true
     }
-  }, [fableId, existingFable, fableRetrieveData, preset, encodedState, t])
+  }, [fableId, existingFable, fableRetrieveData, encodedState, t])
 
   // ── hlPreset deep-link handler ─────────────────────────────────────────────
   // Runs once the preset data has been fetched. Behaviour by difficulty:

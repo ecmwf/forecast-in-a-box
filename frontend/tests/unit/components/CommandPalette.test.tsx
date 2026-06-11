@@ -39,16 +39,7 @@ vi.mock('@tanstack/react-router', async () => {
 const PLACEHOLDER = 'Type a command or search...'
 
 /** Every command label, grouped, for exhaustive presence checks. */
-const ALL_COMMANDS = [
-  'Quick Start',
-  'Standard Forecast',
-  'Custom Model Forecast',
-  'Dataset Forecast',
-  'Dashboard',
-  'Configure',
-  'Executions',
-  'Admin',
-]
+const ALL_COMMANDS = ['Dashboard', 'Configure', 'Executions', 'Admin']
 
 function renderPalette() {
   return renderWithRouter(
@@ -90,8 +81,6 @@ describe('CommandPalette', () => {
 
     await expect.element(screen.getByPlaceholder(PLACEHOLDER)).toBeVisible()
 
-    // Both category headings render.
-    await expect.element(screen.getByText('Getting Started')).toBeVisible()
     await expect.element(screen.getByText('Navigation')).toBeVisible()
 
     // Every command is present as a selectable option.
@@ -135,7 +124,7 @@ describe('CommandPalette', () => {
       .element(screen.getByRole('option', { name: /Dashboard/ }))
       .toBeVisible()
     await expect
-      .element(screen.getByRole('option', { name: /Quick Start/ }))
+      .element(screen.getByRole('option', { name: /Executions/ }))
       .not.toBeInTheDocument()
   })
 
@@ -173,18 +162,6 @@ describe('CommandPalette', () => {
 
     expect(mockNavigate).toHaveBeenCalledWith({ to: '/dashboard' })
     expect(useCommandStore.getState().isOpen).toBe(false)
-  })
-
-  it('passes the preset search param through for Getting Started commands', async () => {
-    useCommandStore.getState().setOpen(true)
-    const screen = await renderPalette()
-
-    await screen.getByRole('option', { name: /Quick Start/ }).click()
-
-    expect(mockNavigate).toHaveBeenCalledWith({
-      to: '/configure',
-      search: { preset: 'quick-start' },
-    })
   })
 
   it('runs the highlighted command when Enter is pressed', async () => {
