@@ -39,7 +39,7 @@ async def upsert_blueprint(
     builder: dict | None = None,
     display_name: str | None = None,
     display_description: str | None = None,
-    tags: list[str] | None = None,
+    tags: list[dict] | None = None,
     parent_id: str | None = None,
     expected_version: int | None = None,
 ) -> tuple[BlueprintId, int]:

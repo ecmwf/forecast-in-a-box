@@ -46,7 +46,7 @@ from forecastbox.domain.blueprint.exceptions import (
     BlueprintNotFound,
     BlueprintVersionConflict,
 )
-from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand, BlueprintValidationExpansion
+from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand, BlueprintValidationExpansion, Tag
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.glyphs import global_db
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples
@@ -65,6 +65,23 @@ router = APIRouter(
     tags=["blueprint"],
     responses={404: {"description": "Not found"}},
 )
+
+_CORE_VERSION_MISMATCH_KEY = "CoreVersionMismatch"
+
+
+def _maybe_append_coreversion_mismatch(tags: list[Tag], entity_coreversion: int, current_coreversion: int) -> None:
+    """Append a ``CoreVersionMismatch`` tag when the stored and current fiab-core major versions differ."""
+    if entity_coreversion != current_coreversion:
+        tags.append(Tag(key=_CORE_VERSION_MISMATCH_KEY, value=f"!{entity_coreversion} != {current_coreversion}"))
+
+
+def _reject_reserved_tags(tags: list[Tag]) -> None:
+    """Raise HTTP 422 if any tag uses a key reserved for system use."""
+    if any(t.key == _CORE_VERSION_MISMATCH_KEY for t in tags):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Tag key {_CORE_VERSION_MISMATCH_KEY!r} is reserved and may not be set by callers.",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +104,7 @@ class BlueprintCreateRequest(FiabBaseModel):
     builder: BlueprintBuilder
     display_name: str | None = None
     display_description: str | None = None
-    tags: list[str] = []
+    tags: list[Tag] = []
     parent_id: str | None = None
 
 
@@ -102,7 +119,7 @@ class BlueprintGetResponse(FiabBaseModel):
     builder: BlueprintBuilder
     display_name: str | None = None
     display_description: str | None = None
-    tags: list[tuple[str, str | None]] = []
+    tags: list[Tag] = []
     parent_id: str | None = None
 
 
@@ -111,7 +128,7 @@ class BlueprintListItem(FiabBaseModel):
     version: int
     display_name: str | None = None
     display_description: str | None = None
-    tags: list[str] | None = None
+    tags: list[Tag] | None = None
     source: str | None = None
     created_by: str | None = None
 
@@ -129,7 +146,7 @@ class BlueprintUpdateRequest(FiabBaseModel):
     builder: BlueprintBuilder
     display_name: str | None = None
     display_description: str | None = None
-    tags: list[str] = []
+    tags: list[Tag] = []
     parent_id: str | None = None
 
 
@@ -232,7 +249,9 @@ async def create_blueprint(
 
     Returns 422 if the builder fails validation (unknown plugins, undefined
     glyphs, config errors, intrinsic glyph key collisions, etc.).
+    Returns 422 if any of the supplied tags has a reserved key.
     """
+    _reject_reserved_tags(request.tags)
     validation = await service.validate_expand(request.builder, auth_context, validate_only=True)
     if validation.global_errors or validation.block_errors:
         raise HTTPException(
@@ -267,10 +286,8 @@ async def get_blueprint(
         retrieved = await service.load_builder(spec.blueprint_id, spec.version)
     except BlueprintNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-    tags: list[tuple[str, str | None]] = [(t, None) for t in retrieved.tags]
-    current_fiabcore_major = get_fiabcore_version().major
-    if retrieved.fiabcore_major != current_fiabcore_major:
-        tags.append(("CoreVersionMismatch", f"!{retrieved.fiabcore_major} != {current_fiabcore_major}"))
+    tags = list(retrieved.tags)
+    _maybe_append_coreversion_mismatch(tags, retrieved.fiabcore_major, get_fiabcore_version().major)
     return BlueprintGetResponse(
         blueprint_id=retrieved.blueprint_id,
         version=retrieved.blueprint_version,
@@ -291,18 +308,23 @@ async def list_blueprints(
     total = await db.count_blueprints(auth_context=auth_context)
     start = pagination.start()
     page_defs = list(await db.list_blueprints(auth_context=auth_context, offset=start, limit=pagination.page_size))
-    items = [
-        BlueprintListItem(
-            blueprint_id=BlueprintId(str(defn.blueprint_id)),  # ty:ignore[invalid-argument-type]
-            version=cast(int, defn.version),
-            display_name=cast(str | None, defn.display_name),
-            display_description=cast(str | None, defn.display_description),
-            tags=cast(list[str] | None, defn.tags),
-            source=cast(str | None, defn.source),
-            created_by=cast(str | None, defn.created_by),
+    current_fiabcore_major = get_fiabcore_version().major
+    items = []
+    for defn in page_defs:
+        raw_tags: list[dict] = cast(list[dict], defn.tags) or []
+        tags = [Tag.model_validate(t) for t in raw_tags]
+        _maybe_append_coreversion_mismatch(tags, cast(int, defn.fiabcore_major), current_fiabcore_major)
+        items.append(
+            BlueprintListItem(
+                blueprint_id=BlueprintId(str(defn.blueprint_id)),  # ty:ignore[invalid-argument-type]
+                version=cast(int, defn.version),
+                display_name=cast(str | None, defn.display_name),
+                display_description=cast(str | None, defn.display_description),
+                tags=tags,
+                source=cast(str | None, defn.source),
+                created_by=cast(str | None, defn.created_by),
+            )
         )
-        for defn in page_defs
-    ]
     return BlueprintListResponse(blueprints=items, total=total, page=pagination.page, page_size=pagination.page_size)
 
 
@@ -316,8 +338,10 @@ async def update_blueprint(
     ``version`` must match the current latest version; returns 409 if it does not.
     Returns 422 if the builder fails validation (unknown plugins, undefined
     glyphs, config errors, intrinsic glyph key collisions, etc.).
+    Returns 422 if any of the supplied tags has a reserved key.
     Returns the new version number on success.
     """
+    _reject_reserved_tags(request.tags)
     validation = await service.validate_expand(request.builder, auth_context, validate_only=True)
     if validation.global_errors or validation.block_errors:
         raise HTTPException(
