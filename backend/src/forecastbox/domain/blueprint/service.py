@@ -36,6 +36,7 @@ from fiab_core.fable import (
     PluginBlockExpansion,
     PluginBlockFactoryId,
 )
+from pydantic import Field
 
 from forecastbox.domain.blueprint import db
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
@@ -70,7 +71,7 @@ class BlueprintBuilder(FiabBaseModel):
     # NOTE warning -- this class is used by the web api. Be careful about changes here
     blocks: dict[BlockInstanceId, BlockInstance]
     environment: EnvironmentSpecification | None = None
-    local_glyphs: dict[str, str] = {}
+    local_glyphs: dict[str, str] = Field(default_factory=dict)
 
 
 class BlueprintSaveResult(FiabBaseModel):
@@ -88,7 +89,7 @@ class BlueprintRetrieveResult(FiabBaseModel):
     builder: BlueprintBuilder
     display_name: str | None = None
     display_description: str | None = None
-    tags: list[Tag] = []
+    tags: list[Tag] = Field(default_factory=list)
     parent_id: str | None = None
     fiabcore_major: int
 
@@ -100,9 +101,9 @@ class BlueprintValidationExpansion(FiabBaseModel):
     block_errors: dict[BlockInstanceId, list[str]]
     possible_sources: list[PluginBlockFactoryId]
     possible_expansions: dict[BlockInstanceId, list[PluginBlockExpansion]]
-    configuration_restrictions: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
-    resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
-    missing_glyphs: dict[BlockInstanceId, dict[ConfigurationOptionId, list[str]]] = {}
+    configuration_restrictions: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = Field(default_factory=dict)
+    resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = Field(default_factory=dict)
+    missing_glyphs: dict[BlockInstanceId, dict[ConfigurationOptionId, list[str]]] = Field(default_factory=dict)
 
 
 class BlueprintSaveCommand(FiabBaseModel):
@@ -111,7 +112,7 @@ class BlueprintSaveCommand(FiabBaseModel):
     builder: BlueprintBuilder
     display_name: str | None = None
     display_description: str | None = None
-    tags: list[Tag] = []
+    tags: list[Tag] = Field(default_factory=list)
     parent_id: str | None = None
 
 
@@ -263,7 +264,9 @@ async def validate_expand(
             continue
 
         inputs = {input_id: outputs[source_id] for input_id, source_id in blockInstance.input_ids.items()}
-        output_or_error, restrictions = plugin.validator(blockInstance, inputs)
+        validation = plugin.validator(blockInstance, inputs)
+        output_or_error = validation.result
+        restrictions = validation.restrictions
         if not validate_only and restrictions:
             configuration_restrictions[blockId] = {k: v.serialize() for k, v in restrictions.items()}
         if output_or_error.t is None:

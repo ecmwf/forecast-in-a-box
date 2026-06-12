@@ -373,16 +373,29 @@ class Select(Transform):
         except BlockInstanceConfigurationError as exc:
             return BlockValidation(Either.error(str(exc)), restrict)
 
-        axis_values = axes(input_dataset).get(dimension)
-        if axis_values is not None:
-            input_values = _axis_value_strings(axis_values)
-            if input_values:
-                restrict[VALUES] = ListType(ClosedEnumType(input_values))
+        input_axes = axes(input_dataset)
+        axis_values = input_axes.get(dimension)
+        if axis_values is None:
+            return BlockValidation(
+                Either.error(f"dimension {dimension} is not in the input dimensions: {input_dimensions}"),
+                restrict,
+            )
+
+        input_values = _axis_value_strings(axis_values)
+        if input_values:
+            restrict[VALUES] = ListType(ClosedEnumType(input_values))
 
         try:
             selected_values = [_parse_axis_value(value) for value in self._selected_values(block)]
         except BlockInstanceConfigurationError as exc:
             return BlockValidation(Either.error(str(exc)), restrict)
+
+        missing_values = [value for value in selected_values if value not in axis_values]
+        if missing_values:
+            return BlockValidation(
+                Either.error(f"values {missing_values} are not in dimension {dimension}: {input_values}"),
+                restrict,
+            )
 
         output = select(input_dataset, {dimension: selected_values})
 
@@ -507,20 +520,29 @@ class MapPlotSink(Sink):
 
         restrict: ConfigurationOptionRestriction = {}
 
-        param_values = [value for value in axes(input_dataset).get(PARAM, set()) if isinstance(value, str)]
+        input_axes = axes(input_dataset)
+        input_param_values = input_axes.get(PARAM, set())
+        param_values = [value for value in input_param_values if isinstance(value, str)]
         if param_values:
             restrict[PARAM] = ListType(ClosedEnumType(sorted(param_values)))
 
         common = common_dimensions(input_dataset).intersection({PARAM, STEP, ENSEMBLE, LEVEL})
-        splitby = [x for x in common if len(axes(input_dataset)[x]) > 1]
+        splitby = [x for x in common if len(input_axes[x]) > 1]
         restrict[SPLITBY] = ListType(ClosedEnumType(sorted(splitby) + ["none"]))
 
         try:
-            block.config_as_list(PARAM, str, allow_empty=False)
+            params = block.config_as_list(PARAM, str, allow_empty=False)
             splitby_value = block.config_as_list(SPLITBY, str, allow_empty=True)
             fmt = block.config_as_str(FORMAT)
         except BlockInstanceConfigurationError as exc:
             return BlockValidation(Either.error(str(exc)), restrict)
+
+        missing_params = [param for param in params if param not in input_param_values]
+        if missing_params:
+            return BlockValidation(
+                Either.error(f"params {missing_params} are not in the input parameters: {_axis_value_strings(input_param_values)}"),
+                restrict,
+            )
 
         if "none" in splitby_value and len(splitby_value) != 1:
             return BlockValidation(

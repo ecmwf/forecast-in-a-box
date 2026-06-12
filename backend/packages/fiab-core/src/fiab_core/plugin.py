@@ -11,8 +11,8 @@
 Types pertaining to declaring FIAB Plugins, in particular their Fable-based interface.
 """
 
-from dataclasses import dataclass
-from typing import Callable, NamedTuple
+from dataclasses import dataclass, field
+from typing import Callable
 
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
@@ -29,9 +29,10 @@ from fiab_core.fable import (
 Error = str
 
 
-class BlockValidation(NamedTuple):
+@dataclass(frozen=True, eq=True, slots=True)
+class BlockValidation:
     result: Either[BlockInstanceOutput, Error]  # type:ignore[invalid-argument] # semigroup
-    restrictions: ConfigurationOptionRestriction = {}
+    restrictions: ConfigurationOptionRestriction = field(default_factory=dict)
 
     def get_or_raise(self) -> BlockInstanceOutput:
         return self.result.get_or_raise()
