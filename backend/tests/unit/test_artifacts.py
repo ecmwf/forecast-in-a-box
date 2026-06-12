@@ -7,6 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+import importlib.metadata
 import json
 import subprocess
 import tempfile
@@ -19,6 +20,7 @@ import httpx
 import pytest
 from cascade.low.exceptions import CascadeInternalError
 from fiab_core.artifacts import AnemoiCheckpoint, ArtifactLocalId, ArtifactResolved, ArtifactStoreId
+from packaging.version import Version
 from pyrsistent import pmap
 
 from forecastbox.domain.artifact.base import (
@@ -196,16 +198,28 @@ def test_get_artifacts_catalog_from_git_tag(sample_checkpoint: Any) -> None:
         ),
     }
 
+    core_version = Version(importlib.metadata.version("fiab-core"))
+    mock_versions = [
+        f"c{core_version.major}.{core_version.minor}.{core_version.micro}.0",
+        f"c{core_version.major}.{core_version.minor}.{core_version.micro}.1",
+        f"c{core_version.major + 1}.{core_version.minor}.{core_version.micro}.0",
+        f"c{core_version.major + 1}.{core_version.minor}.{core_version.micro}.1",
+    ]
+    if core_version == Version("0.0.0"):
+        expected_version = mock_versions[3]
+    else:
+        mock_versions.append(f"v{core_version.major - 1}.{core_version.minor}.{core_version.micro}.0")
+        expected_version = mock_versions[1]
     with patch("httpx.Client") as mock_client_class:
         mock_client = MagicMock()
         mock_client_class.return_value.__enter__.return_value = mock_client
-        with patch("forecastbox.domain.artifact.catalog.get_all_repo_tags", return_value=iter(["v1.2.3", "c0.0.7.0", "c0.0.8.0"])):
+        with patch("forecastbox.domain.artifact.catalog.get_all_repo_tags", return_value=iter(mock_versions)):
             with patch("forecastbox.domain.artifact.catalog.fetch_content") as mock_fetch:
                 mock_fetch.return_value = json.dumps(store_data).encode()
 
                 catalog = get_artifacts_catalog(config)
 
-    expected_url = "https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/tags/c0.0.8.0/install/artifacts.json"
+    expected_url = f"https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/tags/{expected_version}/install/artifacts.json"
     mock_fetch.assert_called_once_with(expected_url, mock_client)
     assert len(catalog) == 1
     composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1"))
