@@ -137,6 +137,7 @@
     }
   },
   "presetGallery": {
+    "corePresets": "Core Presets",
     "useThisPreset": "Use This Preset",
     "openInEditor": "Open in Editor",
     "launching": "Launching…",

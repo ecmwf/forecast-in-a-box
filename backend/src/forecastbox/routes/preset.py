@@ -30,6 +30,7 @@ from typing import Annotated, Literal, cast
 
 from fastapi import APIRouter, Depends
 from fastapi.exceptions import HTTPException
+from fiab_core.presets import PluginPresetDefinition
 
 from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint.service import BlueprintBuilder
@@ -40,6 +41,11 @@ from forecastbox.domain.preset.exceptions import (
     PresetInstantiationValidationError,
     PresetNotFound,
     PresetVersionConflict,
+)
+from forecastbox.domain.preset.plugin_presets import (
+    convert_to_builder,
+    find_plugin_preset,
+    get_all_plugin_presets,
 )
 from forecastbox.domain.preset.types import PresetId
 from forecastbox.domain.preset.value_type_resolver import resolve_value_type
@@ -75,6 +81,9 @@ class PresetLookup(FiabBaseModel):
 PresetDifficultyLiteral = Literal["beginner", "intermediate", "advanced"]
 """Difficulty level for a preset, expressed as a Literal for stable contract serialisation."""
 
+PresetSourceLiteral = Literal["plugin", "user"]
+"""Origin of a preset: ``"plugin"`` for plugin-provided presets, ``"user"`` for DB-backed presets."""
+
 
 class PresetParameterContract(FiabBaseModel):
     """A single user-facing parameter exposed by a preset.
@@ -106,6 +115,8 @@ class PresetListItem(FiabBaseModel):
     difficulty: PresetDifficultyLiteral
     tags: list[str] = []
     icon: str
+    source: PresetSourceLiteral
+    plugin_id: str | None = None
     builder_template: BlueprintBuilder
     is_published: bool
     created_by: str | None = None
@@ -133,6 +144,8 @@ class PresetGetResponse(FiabBaseModel):
     difficulty: PresetDifficultyLiteral
     tags: list[str] = []
     icon: str
+    source: PresetSourceLiteral
+    plugin_id: str | None = None
     # NOTE: BlueprintBuilder is used directly here — it is an explicitly marked
     # exception to the route-local contract rule (see routes/__init__.py).
     builder_template: BlueprintBuilder
@@ -252,6 +265,103 @@ class PresetInstantiateResponse(FiabBaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Plugin-preset conversion helpers
+# ---------------------------------------------------------------------------
+
+
+def _plugin_preset_to_list_item(preset_def: PluginPresetDefinition, *, plugin_id: str) -> PresetListItem:
+    """Convert a :class:`~fiab_core.presets.PluginPresetDefinition` to a
+    :class:`PresetListItem` suitable for the list endpoint response.
+
+    Plugin presets are always treated as published (``is_published=True``) and
+    have no database-backed ownership metadata (``created_by``, ``created_at``,
+    ``updated_at`` are all ``None``).  Version is fixed at ``1`` since plugin
+    presets are immutable from the API's perspective.
+    """
+    builder = BlueprintBuilder(blocks=dict(preset_def.blocks))
+    return PresetListItem(
+        preset_id=PresetId(preset_def.preset_id),
+        version=1,
+        name=preset_def.name,
+        description=preset_def.description,
+        difficulty=cast(PresetDifficultyLiteral, preset_def.difficulty),
+        tags=list(preset_def.tags),
+        icon=preset_def.icon,
+        source="plugin",
+        plugin_id=plugin_id,
+        builder_template=builder,
+        is_published=True,
+        created_by=None,
+        created_at=None,
+        updated_at=None,
+    )
+
+
+async def _plugin_preset_to_get_response(preset_def: PluginPresetDefinition, *, plugin_id: str) -> PresetGetResponse:
+    """Convert a :class:`~fiab_core.presets.PluginPresetDefinition` to a
+    :class:`PresetGetResponse` suitable for the get endpoint response.
+
+    Parameter ``value_type`` strings are resolved via :func:`resolve_value_type`
+    (offloaded to a thread to avoid blocking the event loop on a cold start).
+    """
+    builder = convert_to_builder(preset_def)
+    raw_parameters = preset_def.parameters
+    resolved_value_types = await asyncio.to_thread(lambda: [resolve_value_type(p.value_type) for p in raw_parameters])
+    return PresetGetResponse(
+        preset_id=PresetId(preset_def.preset_id),
+        version=1,
+        name=preset_def.name,
+        description=preset_def.description,
+        long_description=preset_def.long_description,
+        difficulty=cast(PresetDifficultyLiteral, preset_def.difficulty),
+        tags=list(preset_def.tags),
+        icon=preset_def.icon,
+        source="plugin",
+        plugin_id=plugin_id,
+        builder_template=builder,
+        parameters=[
+            PresetParameterContract(
+                glyph_key=p.glyph_key,
+                label=p.label,
+                description=p.description,
+                value_type=resolved_vt,
+                default_value=p.default_value,
+            )
+            for p, resolved_vt in zip(raw_parameters, resolved_value_types, strict=True)
+        ],
+        is_published=True,
+        created_by=None,
+        created_at=None,
+        updated_at=None,
+    )
+
+
+def _matches_filters(
+    item: PresetListItem,
+    *,
+    difficulty: PresetDifficultyLiteral | None,
+    search: str | None,
+) -> bool:
+    """Return ``True`` when *item* passes the given list-endpoint filters.
+
+    Mirrors the filtering logic applied by the DB query so that plugin presets
+    and DB presets are filtered consistently before being merged.
+
+    - ``difficulty``: exact match (case-sensitive, matching the DB behaviour).
+    - ``search``: case-insensitive substring match across ``name``,
+      ``description``, and each entry in ``tags``.
+    """
+    if difficulty is not None and item.difficulty != difficulty:
+        return False
+    if search is not None:
+        needle = search.lower()
+        haystack = " ".join([item.name, item.description] + item.tags).lower()
+        if needle not in haystack:
+            return False
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Read endpoints
 # ---------------------------------------------------------------------------
 
@@ -273,24 +383,44 @@ async def list_presets(
 
     By default only published presets are returned.  ``builder_template`` and
     ``parameters`` are omitted; use ``/get`` to retrieve the full preset.
+
+    Results are drawn from two sources and merged before pagination:
+    - **Plugin presets**: in-memory, read-only presets provided by loaded plugins.
+      They are always treated as published and appear first in the merged list.
+    - **DB presets**: user-managed presets stored in the database.
     """
     # Non-admin callers may never bypass the published filter.
     if not published_only and not auth_context.has_admin():
         raise HTTPException(status_code=403, detail="Only admins may list unpublished presets.")
 
-    total = await db.count_presets(
-        difficulty=difficulty,
-        search=search,
-        published_only=published_only,
-    )
+    # --- Plugin presets (always published; apply filters in-process) ----------
+    # Collect plugin presets in a thread so the event loop is not blocked by
+    # the plugin-manager lock acquisition.
+    raw_plugin_presets = await asyncio.to_thread(get_all_plugin_presets)
+    plugin_items: list[PresetListItem] = [
+        item
+        for plugin_id, preset_def in raw_plugin_presets
+        if _matches_filters(
+            item := _plugin_preset_to_list_item(preset_def, plugin_id=f"{plugin_id.store}/{plugin_id.local}"),
+            difficulty=difficulty,
+            search=search,
+        )
+    ]
+
+    # --- DB presets -----------------------------------------------------------
+    # TODO(perf): offset=0, limit=None fetches all matching DB rows into memory
+    # so they can be merged with plugin presets before pagination. This won't
+    # scale past ~1k presets. Fix: add a DB count query and compute the DB
+    # offset/limit accounting for the number of plugin presets that precede
+    # the requested page window.
     rows = await db.list_presets(
         difficulty=difficulty,
         search=search,
-        offset=pagination.start(),
-        limit=pagination.page_size,
+        offset=0,
+        limit=None,  # fetch all matching rows; pagination applied after merge
         published_only=published_only,
     )
-    items = [
+    db_items = [
         PresetListItem(
             preset_id=PresetId(cast(str, row.preset_id)),
             version=cast(int, row.version),
@@ -299,6 +429,7 @@ async def list_presets(
             difficulty=cast(PresetDifficultyLiteral, row.difficulty),
             tags=cast(list[str], row.tags) if row.tags is not None else [],
             icon=cast(str, row.icon),
+            source="user",
             builder_template=BlueprintBuilder.model_validate(cast(dict, row.builder_template)),
             is_published=cast(bool, row.is_published),
             created_by=cast(str | None, row.created_by),
@@ -307,8 +438,17 @@ async def list_presets(
         )
         for row in rows
     ]
+
+    # --- Merge, count, and paginate ------------------------------------------
+    # Plugin presets are listed first (they are the canonical, curated set),
+    # followed by DB-backed user presets.
+    all_items = plugin_items + db_items
+    total = len(all_items)
+    start = pagination.start()
+    page_items = all_items[start : start + pagination.page_size]
+
     return PresetListResponse(
-        presets=items,
+        presets=page_items,
         total=total,
         page=pagination.page,
         page_size=pagination.page_size,
@@ -322,9 +462,19 @@ async def get_preset(
 ) -> PresetGetResponse:
     """Return the full detail of a preset, including ``builder_template`` and ``parameters``.
 
-    Returns the latest non-deleted version when ``version`` is omitted.
+    Plugin presets are checked first; if no plugin preset matches the given ID
+    the lookup falls back to the database.  Returns the latest non-deleted DB
+    version when ``version`` is omitted.
     Returns 404 if the preset does not exist or has been soft-deleted.
     """
+    # --- Plugin preset fast-path ---------------------------------------------
+    # find_plugin_preset acquires the plugin-manager lock; offload to a thread.
+    result = await asyncio.to_thread(find_plugin_preset, str(spec.preset_id))
+    if result is not None:
+        plugin_id, preset_def = result
+        return await _plugin_preset_to_get_response(preset_def, plugin_id=f"{plugin_id.store}/{plugin_id.local}")
+
+    # --- DB fallback ---------------------------------------------------------
     try:
         row = await db.get_preset(spec.preset_id, spec.version)
     except PresetNotFound as e:
@@ -346,6 +496,7 @@ async def get_preset(
         difficulty=cast(PresetDifficultyLiteral, row.difficulty),
         tags=cast(list[str], row.tags) if row.tags is not None else [],
         icon=cast(str, row.icon),
+        source="user",
         builder_template=BlueprintBuilder.model_validate(row.builder_template),
         parameters=[
             PresetParameterContract(
@@ -407,11 +558,13 @@ async def update_preset(
 
     Admin-only.  Uses optimistic locking: ``body.version`` must match the
     current latest version in the database.
-    Returns 403 for non-admin callers, 404 if the preset does not exist,
-    and 409 on a version conflict.
+    Returns 403 for non-admin callers or when the preset is plugin-provided,
+    404 if the preset does not exist, and 409 on a version conflict.
     """
     if not auth_context.has_admin():
         raise HTTPException(status_code=403, detail="Only admins may update presets.")
+    if await asyncio.to_thread(find_plugin_preset, str(body.preset_id)) is not None:
+        raise HTTPException(status_code=403, detail="Cannot modify plugin-provided presets.")
 
     try:
         preset_id, version = await db.add_preset_version(
@@ -447,11 +600,13 @@ async def delete_preset(
 
     Admin-only.  Uses optimistic locking: ``body.version`` must match the
     current latest version in the database.
-    Returns 403 for non-admin callers, 404 if the preset does not exist,
-    and 409 on a version conflict.
+    Returns 403 for non-admin callers or when the preset is plugin-provided,
+    404 if the preset does not exist, and 409 on a version conflict.
     """
     if not auth_context.has_admin():
         raise HTTPException(status_code=403, detail="Only admins may delete presets.")
+    if await asyncio.to_thread(find_plugin_preset, str(body.preset_id)) is not None:
+        raise HTTPException(status_code=403, detail="Cannot modify plugin-provided presets.")
 
     try:
         await db.soft_delete_preset(
@@ -484,11 +639,13 @@ async def publish_preset(
     counter.  Uses optimistic locking: ``body.version`` must match the current
     latest version in the database.
 
-    Returns 403 for non-admin callers, 404 if the preset does not exist,
-    and 409 on a version conflict.
+    Returns 403 for non-admin callers or when the preset is plugin-provided,
+    404 if the preset does not exist, and 409 on a version conflict.
     """
     if not auth_context.has_admin():
         raise HTTPException(status_code=403, detail="Only admins may change preset publish status.")
+    if await asyncio.to_thread(find_plugin_preset, str(body.preset_id)) is not None:
+        raise HTTPException(status_code=403, detail="Cannot modify plugin-provided presets.")
 
     try:
         await db.patch_preset_publish_status(

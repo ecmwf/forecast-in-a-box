@@ -63,6 +63,8 @@ export const HighLevelPresetSchema = z.object({
   difficulty: PresetDifficultySchema,
   tags: z.array(z.string()).default([]),
   icon: z.string(),
+  source: z.enum(['plugin', 'user']).default('user'),
+  plugin_id: z.string().nullable().default(null),
   builder_template: FableBuilderV1Schema,
   parameters: z.array(PresetParameterSchema).default([]),
   is_published: z.boolean(),
@@ -80,6 +82,8 @@ export interface HighLevelPreset {
   difficulty: PresetDifficulty
   tags: Array<string>
   icon: string
+  source: 'plugin' | 'user'
+  plugin_id: string | null
   builder_template: FableBuilderV1
   parameters: Array<PresetParameter>
   is_published: boolean
@@ -101,6 +105,8 @@ export const PresetListItemSchema = z.object({
   difficulty: PresetDifficultySchema,
   tags: z.array(z.string()).default([]),
   icon: z.string(),
+  source: z.enum(['plugin', 'user']).default('user'),
+  plugin_id: z.string().nullable().default(null),
   builder_template: FableBuilderV1Schema,
   is_published: z.boolean(),
   created_by: z.string().nullable().optional(),
@@ -116,6 +122,8 @@ export interface PresetListItem {
   difficulty: PresetDifficulty
   tags: Array<string>
   icon: string
+  source: 'plugin' | 'user'
+  plugin_id: string | null
   builder_template: FableBuilderV1
   is_published: boolean
   created_by: string | null

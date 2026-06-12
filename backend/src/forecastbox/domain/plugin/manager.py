@@ -35,6 +35,7 @@ from typing import Iterator, Literal
 from cascade.low.func import assert_never
 from fiab_core.fable import BlockFactoryCatalogue, PluginCompositeId
 from fiab_core.plugin import Plugin
+from fiab_core.presets import PluginPresetDefinition
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 from pyrsistent import pmap
@@ -244,6 +245,14 @@ def catalogue_view() -> dict[PluginCompositeId, BlockFactoryCatalogue] | bool:
             return False
         else:
             return {plugin_id: plugin.catalogue for plugin_id, plugin in PluginManager.plugins.items()}
+
+
+def presets_view() -> list[tuple[PluginCompositeId, list[PluginPresetDefinition]]] | bool:
+    with timed_acquire(PluginManager.lock, 1.0) as result:
+        if not result:
+            return False
+        else:
+            return [(plugin_id, plugin.presets) for plugin_id, plugin in PluginManager.plugins.items() if plugin.presets]
 
 
 def submit_update_single(pluginId: PluginCompositeId, install: bool, version: Version | None) -> str:

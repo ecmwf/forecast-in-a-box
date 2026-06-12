@@ -136,6 +136,8 @@ function buildPreviewPreset(
     difficulty,
     tags,
     icon,
+    source: 'user',
+    plugin_id: null,
     builder_template: builderTemplate,
     parameters: parameters.map(({ id, ...param }) => param),
     is_published: false,

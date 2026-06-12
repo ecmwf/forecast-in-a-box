@@ -209,18 +209,17 @@ export function PluginCard({
       <div className="mt-auto flex items-center gap-2">
         {plugin.isInstalled ? (
           <>
-            {plugin.hasUpdate ? (
+            <Button
+              variant="outline"
+              className={plugin.hasUpdate ? undefined : 'flex-1'}
+              onClick={() => onViewDetails?.(plugin)}
+            >
+              {t('actions.viewDetails')}
+            </Button>
+            {plugin.hasUpdate && (
               <Button className="flex-1" onClick={() => onUpdate(plugin.id)}>
                 <Download className="mr-1 h-4 w-4" />
                 {t('actions.update')}
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => onViewDetails?.(plugin)}
-              >
-                {t('actions.viewDetails')}
               </Button>
             )}
             <Switch

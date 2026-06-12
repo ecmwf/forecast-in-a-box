@@ -391,6 +391,8 @@ function AdminPresetsPage() {
   )
 
   const presets = data?.presets ?? []
+  // TODO: Add server-side source=user filter to avoid client-side filtering
+  const editablePresets = presets.filter((p) => p.source !== 'plugin')
   const total = data?.total ?? 0
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -467,7 +469,7 @@ function AdminPresetsPage() {
         />
 
         {/* Empty state */}
-        {presets.length === 0 ? (
+        {editablePresets.length === 0 ? (
           <div className="flex min-h-[300px] items-center justify-center rounded-lg border border-border">
             <EmptyState
               icon={Sliders}
@@ -490,7 +492,7 @@ function AdminPresetsPage() {
 
             {/* Presets table */}
             <PresetsTable
-              presets={presets}
+              presets={editablePresets}
               onEdit={(row) => void handleEdit(row)}
             />
 

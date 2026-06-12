@@ -19,6 +19,7 @@ exceptions (``PresetNotFound``, ``PresetInstantiationValidationError``) to HTTP
 responses.
 """
 
+import asyncio
 import logging
 from typing import cast
 
@@ -33,6 +34,7 @@ from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.preset import db as preset_db
 from forecastbox.domain.preset.exceptions import PresetInstantiationValidationError, PresetNotFound
 from forecastbox.domain.preset.models import PresetParameter
+from forecastbox.domain.preset.plugin_presets import convert_to_builder, find_plugin_preset
 from forecastbox.domain.preset.types import PresetId
 from forecastbox.domain.run import service as run_service
 from forecastbox.domain.run.types import RunId
@@ -105,16 +107,33 @@ async def instantiate_preset(
         PresetInstantiationValidationError: The materialised builder fails
             blueprint validation.
     """
-    # 1. Load preset from DB.
-    db_row = await preset_db.get_preset(preset_id)
-    if db_row is None:
-        raise PresetNotFound(f"No Preset with id={preset_id!r}.")
+    # 1. Load preset — check plugin presets first, then fall back to DB.
+    plugin_result = await asyncio.to_thread(find_plugin_preset, str(preset_id))
+    if plugin_result is not None:
+        _plugin_id, plugin_preset = plugin_result
+        # Plugin preset: convert blocks to a BlueprintBuilder and use its parameters directly.
+        builder_template = convert_to_builder(plugin_preset)
+        parameters: list[PresetParameter] = [
+            PresetParameter(
+                glyph_key=p.glyph_key,
+                label=p.label,
+                description=p.description,
+                value_type=p.value_type,
+                default_value=p.default_value,
+            )
+            for p in plugin_preset.parameters
+        ]
+        preset_name: str = plugin_preset.name
+    else:
+        # DB preset: deserialise the stored JSON columns into typed domain objects.
+        db_row = await preset_db.get_preset(preset_id)
+        if db_row is None:
+            raise PresetNotFound(f"No Preset with id={preset_id!r}.")
 
-    # Deserialise the stored JSON columns into typed domain objects.
-    builder_template = BlueprintBuilder.model_validate(cast(dict, db_row.builder_template))
-    raw_parameters: list[dict] = cast(list, db_row.parameters) or []
-    parameters: list[PresetParameter] = [PresetParameter.model_validate(p) for p in raw_parameters]
-    preset_name: str = cast(str, db_row.name)
+        builder_template = BlueprintBuilder.model_validate(cast(dict, db_row.builder_template))
+        raw_parameters: list[dict] = cast(list, db_row.parameters) or []
+        parameters = [PresetParameter.model_validate(p) for p in raw_parameters]
+        preset_name = cast(str, db_row.name)
 
     # 2. Deep-copy the builder template so the original is never mutated.
     builder = builder_template.model_copy(deep=True)

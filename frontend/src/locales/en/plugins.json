@@ -126,6 +126,9 @@
     "loadingBlockFactories": "Loading block factories...",
     "enableToViewBlockFactories": "Enable this plugin to view block factories.",
     "installToViewBlockFactories": "Install this plugin to view block factories.",
+    "presets": "Presets",
+    "noPresets": "This plugin does not provide any presets.",
+    "loadingPresets": "Loading presets...",
     "notFound": "Plugin not found: {{id}}",
     "versionSuffix": " · v{{version}}"
   },

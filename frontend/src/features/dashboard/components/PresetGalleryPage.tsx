@@ -37,6 +37,8 @@ import type {
   PresetListItem,
   PresetListResponse,
 } from '@/api/types/preset.types'
+import { useBlockCatalogue } from '@/api/hooks/useFable'
+import { usePlugins } from '@/api/hooks/usePlugins'
 import { usePresetList } from '@/api/hooks/usePresets'
 import { useDebounce } from '@/hooks/useDebounce'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -183,6 +185,18 @@ export function PresetGalleryPage({
   // typing, keeping the UI responsive on large lists.
   const debouncedSearch = useDebounce(searchInput, 300)
 
+  // ── Plugin name resolution ────────────────────────────────────────────────
+  const { data: catalogue } = useBlockCatalogue()
+  const { plugins } = usePlugins(catalogue)
+
+  const pluginNameMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const p of plugins) {
+      map.set(p.displayId, p.name)
+    }
+    return map
+  }, [plugins])
+
   // ── Data fetching ─────────────────────────────────────────────────────────
   // Fetch the full list without server-side filters so client-side filtering
   // is instant (no extra round-trips on every keystroke).
@@ -199,6 +213,24 @@ export function PresetGalleryPage({
     () => filterPresets(allPresets, debouncedSearch, selectedDifficulty),
     [allPresets, debouncedSearch, selectedDifficulty],
   )
+
+  const groupedPresets = useMemo(() => {
+    const groups = new Map<string, Array<PresetItem>>()
+    for (const preset of filteredPresets) {
+      const key = preset.plugin_id ?? '__core__'
+      const group = groups.get(key) ?? []
+      group.push(preset)
+      groups.set(key, group)
+    }
+    // Sort so __core__ always comes last
+    return new Map(
+      [...groups.entries()].sort(([a], [b]) => {
+        if (a === '__core__') return 1
+        if (b === '__core__') return -1
+        return 0
+      }),
+    )
+  }, [filteredPresets])
 
   const isLoading = isLoadingList
   const hasActiveFilters =
@@ -284,18 +316,29 @@ export function PresetGalleryPage({
           }
         />
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filteredPresets.map((preset) => (
-            <PresetGalleryCard
-              key={preset.preset_id}
-              // Cast: the Zod-inferred type marks optional fields as
-              // `string | null | undefined`; the PresetListItem interface
-              // uses `string | null`.  The values are runtime-compatible.
-              preset={preset as PresetListItem}
-              onSelect={handleSelectPreset}
-              builderTemplate={(preset as PresetListItem).builder_template}
-              isLoading={loadingPresetId === preset.preset_id}
-            />
+        <div className="space-y-8">
+          {Array.from(groupedPresets.entries()).map(([groupKey, groupPresets]) => (
+            <div key={groupKey} className="space-y-3">
+              <h3 className="text-base font-semibold text-foreground">
+                {groupKey === '__core__'
+                  ? t('presetGallery.corePresets')
+                  : pluginNameMap.get(groupKey) ?? groupKey}
+              </h3>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {groupPresets.map((preset) => (
+                  <PresetGalleryCard
+                    key={preset.preset_id}
+                    // Cast: the Zod-inferred type marks optional fields as
+                    // `string | null | undefined`; the PresetListItem interface
+                    // uses `string | null`.  The values are runtime-compatible.
+                    preset={preset as PresetListItem}
+                    onSelect={handleSelectPreset}
+                    builderTemplate={(preset as PresetListItem).builder_template}
+                    isLoading={loadingPresetId === preset.preset_id}
+                  />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
