@@ -146,7 +146,9 @@ export function usePresetSelection(): UsePresetSelectionReturn {
             showToast.dismiss(loadingToastId)
             showToast.error(
               t('presetGallery.toast.failedToLaunch'),
-              err instanceof Error ? err.message : i18n.t('errors:toast.tryAgain'),
+              err instanceof Error
+                ? err.message
+                : i18n.t('errors:toast.tryAgain'),
             )
           }
         } else {

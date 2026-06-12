@@ -195,7 +195,7 @@ export function PluginDetailPage({ plugin, catalogue }: PluginDetailPageProps) {
       {/* Presets */}
       {plugin.isInstalled && plugin.isEnabled && (
         <div>
-          <H2 className="text-lg font-semibold mb-4">
+          <H2 className="mb-4 text-lg font-semibold">
             {t('detail.presets')}
             {pluginPresets.length > 0 && (
               <span className="ml-1.5 text-muted-foreground">

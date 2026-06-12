@@ -667,7 +667,9 @@ export function PresetFormDialog({
       setDifficulty(preset.difficulty)
       setIcon(preset.icon)
       setTags([...preset.tags])
-      setParameters(preset.parameters.map((p) => ({ ...p, id: crypto.randomUUID() })))
+      setParameters(
+        preset.parameters.map((p) => ({ ...p, id: crypto.randomUUID() })),
+      )
       setBuilderTemplateRaw(JSON.stringify(preset.builder_template, null, 2))
       setIsPublished(preset.is_published)
     } else {

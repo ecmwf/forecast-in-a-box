@@ -317,29 +317,33 @@ export function PresetGalleryPage({
         />
       ) : (
         <div className="space-y-8">
-          {Array.from(groupedPresets.entries()).map(([groupKey, groupPresets]) => (
-            <div key={groupKey} className="space-y-3">
-              <h3 className="text-base font-semibold text-foreground">
-                {groupKey === '__core__'
-                  ? t('presetGallery.corePresets')
-                  : pluginNameMap.get(groupKey) ?? groupKey}
-              </h3>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {groupPresets.map((preset) => (
-                  <PresetGalleryCard
-                    key={preset.preset_id}
-                    // Cast: the Zod-inferred type marks optional fields as
-                    // `string | null | undefined`; the PresetListItem interface
-                    // uses `string | null`.  The values are runtime-compatible.
-                    preset={preset as PresetListItem}
-                    onSelect={handleSelectPreset}
-                    builderTemplate={(preset as PresetListItem).builder_template}
-                    isLoading={loadingPresetId === preset.preset_id}
-                  />
-                ))}
+          {Array.from(groupedPresets.entries()).map(
+            ([groupKey, groupPresets]) => (
+              <div key={groupKey} className="space-y-3">
+                <h3 className="text-base font-semibold text-foreground">
+                  {groupKey === '__core__'
+                    ? t('presetGallery.corePresets')
+                    : (pluginNameMap.get(groupKey) ?? groupKey)}
+                </h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {groupPresets.map((preset) => (
+                    <PresetGalleryCard
+                      key={preset.preset_id}
+                      // Cast: the Zod-inferred type marks optional fields as
+                      // `string | null | undefined`; the PresetListItem interface
+                      // uses `string | null`.  The values are runtime-compatible.
+                      preset={preset as PresetListItem}
+                      onSelect={handleSelectPreset}
+                      builderTemplate={
+                        (preset as PresetListItem).builder_template
+                      }
+                      isLoading={loadingPresetId === preset.preset_id}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            ),
+          )}
         </div>
       )}
 

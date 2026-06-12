@@ -201,84 +201,84 @@ export function GlyphReferencePanel({
       {/* Panel body — hidden when collapsed */}
       {panelOpen && (
         <>
-      {/* Local section */}
-      <LocalGlyphSection
-        title={t('panel.local')}
-        tooltip={t('panel.localTooltip')}
-        open={localOpen}
-        onToggle={() => setLocalOpen(!localOpen)}
-        glyphs={localGlyphList}
-        onCopy={handleCopy}
-        exampleLabel={t('panel.example')}
-      />
-
-      {/* Global section */}
-      <GlyphSection
-        title={t('panel.global')}
-        open={globalOpen}
-        onToggle={() => setGlobalOpen(!globalOpen)}
-        action={
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <button
-                  type="button"
-                  aria-label={t('panel.addGlobal')}
-                  onClick={() => {
-                    setGlobalOpen(true)
-                    setCreateGlobalOpen(true)
-                  }}
-                  className="shrink-0 rounded p-1 text-primary hover:bg-primary/10"
-                />
-              }
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {t('panel.addGlobal')}
-            </TooltipContent>
-          </Tooltip>
-        }
-      >
-        {globalGlyphs.length > 0 ? (
-          globalGlyphs.map((g) => (
-            <GlyphRow
-              key={g.name}
-              glyph={g}
-              onCopy={handleCopy}
-              exampleLabel={t('panel.example')}
-            />
-          ))
-        ) : (
-          <div className="px-3 pb-2 text-sm text-muted-foreground">
-            {t('panel.noGlobal')}
-          </div>
-        )}
-      </GlyphSection>
-
-      {/* Intrinsic section */}
-      <GlyphSection
-        title={t('panel.intrinsic')}
-        open={intrinsicOpen}
-        onToggle={() => setIntrinsicOpen(!intrinsicOpen)}
-      >
-        {intrinsicGlyphs.map((g) => (
-          <GlyphRow
-            key={g.name}
-            glyph={g}
+          {/* Local section */}
+          <LocalGlyphSection
+            title={t('panel.local')}
+            tooltip={t('panel.localTooltip')}
+            open={localOpen}
+            onToggle={() => setLocalOpen(!localOpen)}
+            glyphs={localGlyphList}
             onCopy={handleCopy}
             exampleLabel={t('panel.example')}
           />
-        ))}
-      </GlyphSection>
 
-      {/* Helpers section — Jinja filters/globals from /blueprint/glyphs/functions */}
-      <HelperSection
-        open={helpersOpen}
-        onToggle={() => setHelpersOpen(!helpersOpen)}
-        helpers={helperFunctions}
-        onCopy={handleCopyHelper}
-      />
+          {/* Global section */}
+          <GlyphSection
+            title={t('panel.global')}
+            open={globalOpen}
+            onToggle={() => setGlobalOpen(!globalOpen)}
+            action={
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <button
+                      type="button"
+                      aria-label={t('panel.addGlobal')}
+                      onClick={() => {
+                        setGlobalOpen(true)
+                        setCreateGlobalOpen(true)
+                      }}
+                      className="shrink-0 rounded p-1 text-primary hover:bg-primary/10"
+                    />
+                  }
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {t('panel.addGlobal')}
+                </TooltipContent>
+              </Tooltip>
+            }
+          >
+            {globalGlyphs.length > 0 ? (
+              globalGlyphs.map((g) => (
+                <GlyphRow
+                  key={g.name}
+                  glyph={g}
+                  onCopy={handleCopy}
+                  exampleLabel={t('panel.example')}
+                />
+              ))
+            ) : (
+              <div className="px-3 pb-2 text-sm text-muted-foreground">
+                {t('panel.noGlobal')}
+              </div>
+            )}
+          </GlyphSection>
+
+          {/* Intrinsic section */}
+          <GlyphSection
+            title={t('panel.intrinsic')}
+            open={intrinsicOpen}
+            onToggle={() => setIntrinsicOpen(!intrinsicOpen)}
+          >
+            {intrinsicGlyphs.map((g) => (
+              <GlyphRow
+                key={g.name}
+                glyph={g}
+                onCopy={handleCopy}
+                exampleLabel={t('panel.example')}
+              />
+            ))}
+          </GlyphSection>
+
+          {/* Helpers section — Jinja filters/globals from /blueprint/glyphs/functions */}
+          <HelperSection
+            open={helpersOpen}
+            onToggle={() => setHelpersOpen(!helpersOpen)}
+            helpers={helperFunctions}
+            onCopy={handleCopyHelper}
+          />
         </>
       )}
 

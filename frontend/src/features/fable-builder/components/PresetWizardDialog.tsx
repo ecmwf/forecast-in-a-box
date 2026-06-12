@@ -100,9 +100,7 @@ function buildResolvedConfigForWizard(
     string,
     { configuration_values?: Record<string, string> }
   >,
-  resolvedByBlock:
-    | Record<string, Record<string, string>>
-    | undefined,
+  resolvedByBlock: Record<string, Record<string, string>> | undefined,
 ): Record<string, string> | null {
   if (!resolvedByBlock) return null
   const result: Record<string, string> = {}
@@ -112,8 +110,8 @@ function buildResolvedConfigForWizard(
       const raw = block.configuration_values ?? {}
       for (const [configKey, rawValue] of Object.entries(raw)) {
         if (rawValue !== marker) continue
-        const resolved = resolvedByBlock[blockId]?.[configKey]
-        if (resolved !== undefined && resolved !== marker) {
+        const resolved = resolvedByBlock[blockId][configKey]
+        if (resolved && resolved !== marker) {
           result[param.glyph_key] = resolved
           break
         }
@@ -227,9 +225,7 @@ function mapBlockErrorsToParams(
       const glyphKey = configToGlyph.get(`${blockId}:${configKey}`)
       if (glyphKey) {
         for (const name of glyphNames) {
-          ;(fieldErrors[glyphKey] ??= []).push(
-            `Unknown variable: ${name}`,
-          )
+          ;(fieldErrors[glyphKey] ??= []).push(`Unknown variable: ${name}`)
         }
       } else {
         for (const name of glyphNames) {
@@ -509,7 +505,10 @@ export function PresetWizardDialog({
 
           {/* ── Step indicator (multi-step only) ── */}
           {stepLabel && (
-            <p className="mt-4 text-xs text-muted-foreground" aria-live="polite">
+            <p
+              className="mt-4 text-xs text-muted-foreground"
+              aria-live="polite"
+            >
               {stepLabel}
             </p>
           )}
