@@ -29,11 +29,22 @@ let lensState: Record<string, MockLensInstance> = {}
 /** Polls before a freshly started lens reports `running`. */
 let pollsUntilRunning = 1
 
-export function resetLensState(options?: { pollsUntilRunning?: number }): void {
+/** Mirrors deployments without the optional SkinnyWMS package installed. */
+let skinnyWmsInstalled = true
+
+export function resetLensState(options?: {
+  pollsUntilRunning?: number
+  skinnyWmsInstalled?: boolean
+}): void {
   lensIdCounter = 1
   portCounter = 54300
   lensState = {}
   pollsUntilRunning = options?.pollsUntilRunning ?? 1
+  skinnyWmsInstalled = options?.skinnyWmsInstalled ?? true
+}
+
+export function isSkinnyWmsInstalled(): boolean {
+  return skinnyWmsInstalled
 }
 
 export function startMockLens(localPath: string): string {

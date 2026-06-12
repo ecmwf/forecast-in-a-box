@@ -41,26 +41,13 @@ export const RunOutputMetadataSchema = z.object({
   is_available: z.boolean(),
 })
 
-/** routes/run.py: StoredOutputDetail — sinks that wrote to a filesystem path. */
-export const StoredOutputDetailSchema = z.object({
-  path: z.string(),
-  is_available: z.boolean(),
-})
-
-/** routes/run.py: RunOutputsResponse — `outputs` is the streamed-output map keyed
- * by taskId; `stored` is the disk-written-file map keyed by block_id. */
+/** routes/run.py: RunOutputsResponse — backend wraps the dict in `{ outputs: ... }`;
+ * we flatten on parse so consumers can access `details.outputs[taskId]` directly. */
 export const RunOutputsSchema = z
   .object({
     outputs: z.record(z.string(), RunOutputMetadataSchema),
-    stored_outputs: z
-      .record(z.string(), StoredOutputDetailSchema)
-      .optional()
-      .default({}),
   })
-  .transform((wrapper) => ({
-    byTask: wrapper.outputs,
-    stored: wrapper.stored_outputs,
-  }))
+  .transform((wrapper) => wrapper.outputs)
 
 /** routes/run.py: JobExecutionDetail. `*_block_ids` are only set on
  * /run/get and clear to `null` on terminal status, so both `null` and

@@ -11,17 +11,19 @@
 import { HardDrive } from 'lucide-react'
 import type { OutputAdapter } from '../types'
 
+/** `GRIB_MIME` in the ecmwf plugin — tags GribSink marker outputs. */
+export const GRIB_DIR_MIME = 'text/plain; fiab-format=gribdir'
+
 /**
- * GRIB sink marker outputs. The sink writes the actual GRIB file(s) to its
- * configured filesystem path and streams back only the parent directory as
- * ASCII text, tagged `text/plain; fiab-format=gribdir` (`GRIB_MIME` in the
- * ecmwf plugin). The downloadable payload is that path string — not GRIB
- * data — so the card offers no actions; the files themselves are reachable
- * through the "Stored outputs" card (WMS viewer / external WMS URL).
+ * GRIB sink marker outputs. The sink writes the actual GRIB file(s) into its
+ * output directory and streams back only that directory as ASCII text,
+ * tagged {@link GRIB_DIR_MIME}. The downloadable payload is that path string
+ * — not GRIB data — so the card offers no actions; the files themselves are
+ * reachable through the "Stored outputs" card (WMS viewer / external WMS URL).
  */
 export const gribStoredAdapter: OutputAdapter = {
   id: 'grib-stored',
-  mimeTypes: ['text/plain; fiab-format=gribdir'],
+  mimeTypes: [GRIB_DIR_MIME],
   icon: HardDrive,
   label: (t) => t('outputs.adapters.grib-stored.label'),
   shortLabel: () => 'GRIB',

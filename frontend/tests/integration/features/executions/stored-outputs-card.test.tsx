@@ -11,11 +11,12 @@
 /**
  * StoredOutputsCard Integration Tests
  *
- * Exercises the disk-written-sink card against the MSW lens handlers:
- * - row derivation (server-authoritative `stored` map vs fable-walk fallback)
- * - unavailable files disable the lens actions
- * - the copy action: start lens → poll until running → row shows the
- *   running badge with port → Stop tears the instance down
+ * Exercises the disk-written-sink card against the MSW job + lens handlers:
+ * - rows derive from GribSink marker outputs (one per sink block, deduped
+ *   across that sink's tasks) with the directory resolved from the payload
+ * - unavailable markers disable the lens actions
+ * - the copy action: start lens on the resolved directory → poll until
+ *   running → row shows the running badge with port → Stop tears it down
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -23,120 +24,116 @@ import { render } from 'vitest-browser-react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { I18nextProvider } from 'react-i18next'
 import { listMockLenses, resetLensState } from '@tests/../mocks/data/lens.data'
-import type {
-  BlockFactoryCatalogue,
-  FableBuilderV1,
-} from '@/api/types/fable.types'
+import { resetJobsState } from '@tests/../mocks/data/job.data'
 import type { RunOutputs } from '@/api/types/job.types'
 import { StoredOutputsCard } from '@/features/executions/components/StoredOutputsCard'
 import i18n from '@/lib/i18n'
 
-const catalogue: BlockFactoryCatalogue = {
-  'ecmwf/ecmwf-base': {
-    factories: {
-      gribSink: {
-        kind: 'sink',
-        title: 'GRIB Sink',
-        description: 'Write dataset to a GRIB file',
-        configuration_options: {
-          path: { title: 'Path', description: 'Path', value_type: 'str' },
-        },
-        inputs: ['dataset'],
-      },
-      mapPlotSink: {
-        kind: 'sink',
-        title: 'Map Plot',
-        description: 'Render a map',
-        configuration_options: {},
-        inputs: ['dataset'],
-      },
-    },
+// Matches the job-completed-001 seed: its `task-out-grib` marker output's
+// payload resolves to /data/output/job-completed-001_1 (mockBlobForMime).
+const GRIB_DIR_MIME = 'text/plain; fiab-format=gribdir'
+
+const outputsWithMarkers: RunOutputs = {
+  'task-out-1': {
+    mime_type: 'image/png',
+    original_block: 'sink_temperature_map',
+    is_available: true,
+  },
+  // Two marker tasks of the same sink block — must collapse into one row.
+  'task-out-grib': {
+    mime_type: GRIB_DIR_MIME,
+    original_block: 'block_sink_1',
+    is_available: true,
+  },
+  'task-out-grib-2': {
+    mime_type: GRIB_DIR_MIME,
+    original_block: 'block_sink_1',
+    is_available: true,
   },
 }
 
-const fable: FableBuilderV1 = {
-  blocks: {
-    sink_grib: {
-      factory_id: {
-        plugin: { store: 'ecmwf', local: 'ecmwf-base' },
-        factory: 'gribSink',
-      },
-      configuration_values: { path: '/tmp/run-1__[shortName].grib2' },
-      input_ids: { dataset: 'source_1' },
-    },
-    sink_plot: {
-      factory_id: {
-        plugin: { store: 'ecmwf', local: 'ecmwf-base' },
-        factory: 'mapPlotSink',
-      },
-      configuration_values: {},
-      input_ids: { dataset: 'source_1' },
-    },
-  },
-}
-
-const storedAvailable: RunOutputs['stored'] = {
-  sink_grib: { path: '/data/out/run-1__2t.grib2', is_available: true },
-}
-
-async function renderCard(storedOutputs?: RunOutputs['stored']) {
+async function renderCard(outputs: RunOutputs | null) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
   return await render(
     <QueryClientProvider client={queryClient}>
       <I18nextProvider i18n={i18n}>
-        <StoredOutputsCard
-          fable={fable}
-          catalogue={catalogue}
-          storedOutputs={storedOutputs}
-        />
+        <StoredOutputsCard jobId="job-completed-001" outputs={outputs} />
       </I18nextProvider>
     </QueryClientProvider>,
   )
 }
 
 beforeEach(() => {
+  resetJobsState()
   resetLensState()
 })
 
 describe('StoredOutputsCard', () => {
-  it('prefers server-reported paths and skips path-less sinks', async () => {
-    const screen = await renderCard(storedAvailable)
-    // Path renders split: emphasized filename + dimmed directory.
-    await expect.element(screen.getByText('run-1__2t.grib2')).toBeVisible()
-    await expect.element(screen.getByText('/data/out/')).toBeVisible()
-    expect(screen.getByText('GRIB', { exact: true }).elements()).toHaveLength(1)
-    // mapPlotSink has no path config and no stored entry — not listed.
-    expect(screen.getByText('Map Plot').elements()).toHaveLength(0)
+  it('renders one row per sink block and resolves the directory from the payload', async () => {
+    const screen = await renderCard(outputsWithMarkers)
+    await expect.element(screen.getByText('job-completed-001_1')).toBeVisible()
+    // Two marker tasks, one sink block — exactly one row.
+    expect(screen.getByText('block_sink_1').elements()).toHaveLength(1)
+    // Non-marker outputs are not listed.
+    expect(screen.getByText('sink_temperature_map').elements()).toHaveLength(0)
   })
 
-  it('falls back to the fable-configured path without server data', async () => {
-    const screen = await renderCard()
-    await expect
-      .element(screen.getByText('run-1__[shortName].grib2'))
-      .toBeVisible()
-    await expect.element(screen.getByText('/tmp/')).toBeVisible()
-  })
-
-  it('disables lens actions when the file is reported missing', async () => {
+  it('renders nothing without marker outputs', async () => {
     const screen = await renderCard({
-      sink_grib: { path: '/data/out/gone.grib2', is_available: false },
+      'task-out-1': {
+        mime_type: 'image/png',
+        original_block: 'sink_temperature_map',
+        is_available: true,
+      },
     })
+    expect(screen.getByText('Stored outputs').elements()).toHaveLength(0)
+  })
+
+  it('disables lens actions while the marker output is unavailable', async () => {
+    const screen = await renderCard({
+      'task-out-grib': {
+        mime_type: GRIB_DIR_MIME,
+        original_block: 'block_sink_1',
+        is_available: false,
+      },
+    })
+    await expect
+      .element(screen.getByText('File not yet written by the run'))
+      .toBeVisible()
+    await expect
+      .element(screen.getByRole('button', { name: /^open/i }))
+      .toBeDisabled()
+  })
+
+  it('disables lens actions when SkinnyWMS is not installed on the server', async () => {
+    resetLensState({ skinnyWmsInstalled: false })
+    const screen = await renderCard(outputsWithMarkers)
+    // Rows still render (the path is useful information on its own) …
+    await expect.element(screen.getByText('job-completed-001_1')).toBeVisible()
+    // … but the lens actions are disabled with an explanatory title.
     const openButton = screen.getByRole('button', { name: /^open/i })
     await expect.element(openButton).toBeDisabled()
+    await expect
+      .element(openButton)
+      .toHaveAttribute('title', expect.stringContaining('not available'))
   })
 
-  it('copy starts the lens, the row shows a running badge, Stop tears it down', async () => {
-    const screen = await renderCard(storedAvailable)
+  it('copy starts the lens on the directory, the row shows a running badge, Stop tears it down', async () => {
+    const screen = await renderCard(outputsWithMarkers)
+    // Wait for the payload-resolved directory (enables the actions).
+    await expect.element(screen.getByText('job-completed-001_1')).toBeVisible()
 
     await screen.getByRole('button', { name: /copy wms url/i }).click()
 
-    // Lens starts in `starting`, flips to running on a later poll; the row
-    // badge then reports the assigned port.
     await expect.element(screen.getByText(/WMS running :54300/)).toBeVisible()
     expect(listMockLenses()).toHaveLength(1)
     expect(listMockLenses()[0].status).toBe('running')
+    // The lens serves the run-private directory from the payload.
+    expect(listMockLenses()[0].lens_params.local_path).toBe(
+      '/data/output/job-completed-001_1',
+    )
 
     await screen.getByRole('button', { name: /^stop$/i }).click()
     await expect

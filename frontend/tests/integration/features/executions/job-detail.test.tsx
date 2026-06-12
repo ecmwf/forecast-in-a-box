@@ -133,14 +133,18 @@ describe('RunDetailPage Integration', () => {
     it('renders tab buttons', async () => {
       const screen = await renderDetailPage('job-completed-001')
 
-      await expect.element(screen.getByText('Outputs')).toBeVisible()
+      await expect
+        .element(screen.getByRole('tab', { name: 'Outputs' }))
+        .toBeVisible()
       await expect.element(screen.getByText('Logs')).toBeVisible()
       await expect.element(screen.getByText('Specification')).toBeVisible()
     })
 
     it('defaults to outputs tab', async () => {
       const screen = await renderDetailPage('job-completed-001')
-      await expect.element(screen.getByText('Outputs')).toBeVisible()
+      await expect
+        .element(screen.getByRole('tab', { name: 'Outputs' }))
+        .toBeVisible()
     })
   })
 

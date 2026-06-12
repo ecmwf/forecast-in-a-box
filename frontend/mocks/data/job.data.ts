@@ -45,35 +45,26 @@ const seedExecutions: Array<JobExecutionDetail> = [
     progress: '100',
     cascade_job_id: 'cascade-001',
     outputs: {
-      byTask: {
-        'task-out-1': {
-          mime_type: 'image/png',
-          original_block: 'sink_temperature_map',
-          is_available: true,
-        },
-        'task-out-2': {
-          mime_type: 'application/pdf',
-          original_block: 'sink_temperature_map',
-          is_available: true,
-        },
-        'task-out-3': {
-          mime_type: 'image/svg+xml',
-          original_block: 'sink_wind_map',
-          is_available: true,
-        },
-        // GribSink marker output: the payload is the written directory path,
-        // tagged with the plugin's GRIB_MIME (see grib-stored adapter).
-        'task-out-4': {
-          mime_type: 'text/plain; fiab-format=gribdir',
-          original_block: 'block_sink_1',
-          is_available: true,
-        },
+      'task-out-1': {
+        mime_type: 'image/png',
+        original_block: 'sink_temperature_map',
+        is_available: true,
       },
-      stored: {
-        block_sink_1: {
-          path: '/data/output/job-completed-001__[shortName].grib2',
-          is_available: true,
-        },
+      'task-out-2': {
+        mime_type: 'application/pdf',
+        original_block: 'sink_temperature_map',
+        is_available: true,
+      },
+      'task-out-3': {
+        mime_type: 'image/svg+xml',
+        original_block: 'sink_wind_map',
+        is_available: true,
+      },
+      // GribSink marker: payload is the run-private output directory.
+      'task-out-grib': {
+        mime_type: 'text/plain; fiab-format=gribdir',
+        original_block: 'block_sink_1',
+        is_available: true,
       },
     },
     // Cache is popped on terminal status; both arrays come back null.
@@ -92,14 +83,11 @@ const seedExecutions: Array<JobExecutionDetail> = [
     progress: '45',
     cascade_job_id: 'cascade-002',
     outputs: {
-      byTask: {
-        'task-out-4': {
-          mime_type: 'image/png',
-          original_block: 'sink_precipitation',
-          is_available: false,
-        },
+      'task-out-4': {
+        mime_type: 'image/png',
+        original_block: 'sink_precipitation',
+        is_available: false,
       },
-      stored: {},
     },
     completed_block_ids: ['block_source_1'],
     planned_block_ids: ['block_source_1', 'block_product_1', 'block_sink_1'],
@@ -115,7 +103,7 @@ const seedExecutions: Array<JobExecutionDetail> = [
     error: 'Worker process exited with code 137 (OOM killed)',
     progress: '62',
     cascade_job_id: 'cascade-003',
-    outputs: { byTask: {}, stored: {} },
+    outputs: {},
     completed_block_ids: null,
     planned_block_ids: null,
   },
@@ -149,19 +137,16 @@ export const mixedAvailabilityExecution: JobExecutionDetail = {
   progress: '70',
   cascade_job_id: 'cascade-005',
   outputs: {
-    byTask: {
-      'task-out-5a': {
-        mime_type: 'image/png',
-        original_block: 'sink_available',
-        is_available: true,
-      },
-      'task-out-5b': {
-        mime_type: 'image/png',
-        original_block: 'sink_pending',
-        is_available: false,
-      },
+    'task-out-5a': {
+      mime_type: 'image/png',
+      original_block: 'sink_available',
+      is_available: true,
     },
-    stored: {},
+    'task-out-5b': {
+      mime_type: 'image/png',
+      original_block: 'sink_pending',
+      is_available: false,
+    },
   },
 }
 
@@ -181,14 +166,11 @@ export const opaqueMimeExecution: JobExecutionDetail = {
   progress: '100',
   cascade_job_id: 'cascade-006',
   outputs: {
-    byTask: {
-      'task-out-6': {
-        mime_type: 'application/octet-stream',
-        original_block: 'sink_opaque',
-        is_available: true,
-      },
+    'task-out-6': {
+      mime_type: 'application/octet-stream',
+      original_block: 'sink_opaque',
+      is_available: true,
     },
-    stored: {},
   },
   completed_block_ids: null,
   planned_block_ids: null,
@@ -300,9 +282,7 @@ export function setMockOutputAvailable(
   // `noUncheckedIndexedAccess`), so cast to surface the runtime undefined.
   const exec = executionsState[executionId] as JobExecutionDetail | undefined
   if (!exec?.outputs) return false
-  const meta = exec.outputs.byTask[taskId] as
-    | { is_available: boolean }
-    | undefined
+  const meta = exec.outputs[taskId] as { is_available: boolean } | undefined
   if (!meta) return false
   meta.is_available = isAvailable
   return true
@@ -484,6 +464,10 @@ export function createMockSvgBlob(): Blob {
  * sniff-promotion path stays exercised; unknown mimes also fall back to PNG. */
 export function mockBlobForMime(mimeType: string): Blob {
   switch (mimeType) {
+    case 'text/plain; fiab-format=gribdir':
+      return new Blob(['/data/output/job-completed-001_1'], {
+        type: 'text/plain',
+      })
     case 'application/pdf':
       return createMockPdfBlob()
     case 'image/svg+xml':

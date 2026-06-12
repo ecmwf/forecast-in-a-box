@@ -85,9 +85,6 @@ class RunOutputCharacteristic(FiabBaseModel):
 
 class RunOutputs(FiabBaseModel):
     outputs: dict[TaskId, RunOutputCharacteristic]
-    # block_id → filesystem path for sinks that write to disk (Zarr, GRIB, NetCDF…).
-    # Populated at compile time by walking sink blocks' `path`/`dir` config keys.
-    stored_outputs: dict[BlockInstanceId, str] = {}
 
 
 def execute_cascade(spec: ExecutionSpecification) -> SubmitJobResponse:

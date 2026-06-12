@@ -16,12 +16,10 @@ Contains three categories of routes:
 """
 
 import asyncio
-import glob
 import io
 import logging
 import os
 import pathlib
-import re
 import zipfile
 from typing import Annotated, cast
 
@@ -87,14 +85,8 @@ class RunOutputDetail(FiabBaseModel):
     is_available: bool
 
 
-class StoredOutputDetail(FiabBaseModel):
-    path: str
-    is_available: bool
-
-
 class RunOutputsResponse(FiabBaseModel):
     outputs: dict[TaskId, RunOutputDetail]
-    stored_outputs: dict[BlockInstanceId, StoredOutputDetail] = {}
 
 
 class RunDetailResponse(FiabBaseModel):
@@ -160,19 +152,6 @@ class CompilationDetailResponse(FiabBaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _stored_output_available(path: str) -> bool:
-    """Whether a stored sink output exists on disk.
-
-    GribSink writes one file per field via an earthkit file-pattern, so its
-    stored path is a template like ``…_[shortName].grib2`` that never exists
-    literally — fall back to globbing the ``*``-expanded pattern. Mirrors the
-    expansion in ``domain.lens.manager._pattern_to_glob``.
-    """
-    if os.path.exists(path):
-        return True
-    return bool(glob.glob(re.sub(r"\[[^\]]*\]", "*", path)))
-
-
 def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
     outputs_response: RunOutputsResponse | None = None
     if domain_detail.outputs is not None:
@@ -186,14 +165,7 @@ def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
                     is_available=task_id in available,
                 )
                 for task_id, char in run_outputs.outputs.items()
-            },
-            stored_outputs={
-                block_id: StoredOutputDetail(
-                    path=path,
-                    is_available=_stored_output_available(path),
-                )
-                for block_id, path in run_outputs.stored_outputs.items()
-            },
+            }
         )
     maybe_list = lambda s: list(s) if s is not None else None
     return RunDetailResponse(

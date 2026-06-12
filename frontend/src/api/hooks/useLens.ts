@@ -9,10 +9,14 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { LensInstanceDetailResponse } from '@/api/types/lens.types'
+import type {
+  LensInstanceDetailResponse,
+  SupportedLensDetail,
+} from '@/api/types/lens.types'
 import {
   getLensStatus,
   listLenses,
+  listSupportedLenses,
   startSkinnyWms,
   stopLens,
 } from '@/api/endpoints/lens'
@@ -21,6 +25,25 @@ export const lensKeys = {
   all: ['lens'] as const,
   list: () => [...lensKeys.all, 'list'] as const,
   status: (id: string) => [...lensKeys.all, 'status', id] as const,
+  supported: () => [...lensKeys.all, 'supported'] as const,
+}
+
+/**
+ * Whether SkinnyWMS is available on this deployment (the backend omits it
+ * from /lens/supported where the package is not installed, e.g. linux/arm).
+ * `undefined` while loading or on error — treat as "assume available" so the
+ * actions don't flash disabled; a failing start still surfaces as a toast.
+ */
+export function useSkinnyWmsAvailable(): boolean | undefined {
+  const query = useQuery<Array<SupportedLensDetail>>({
+    queryKey: lensKeys.supported(),
+    queryFn: () => listSupportedLenses(),
+    staleTime: Infinity,
+    retry: 1,
+    refetchOnWindowFocus: false,
+  })
+  if (!query.data) return undefined
+  return query.data.some((lens) => lens.name === 'skinnyWMS')
 }
 
 export function useLensList() {

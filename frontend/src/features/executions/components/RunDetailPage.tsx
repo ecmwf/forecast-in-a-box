@@ -300,13 +300,12 @@ export function RunDetailPage() {
               value="outputs"
               className={cn(WIDE_TAB_CONTENT, 'space-y-4')}
             >
-              {fableData?.builder && catalogue && (
-                <StoredOutputsCard
-                  fable={fableData.builder}
-                  catalogue={catalogue}
-                  storedOutputs={jobData.outputs?.stored}
-                />
-              )}
+              <StoredOutputsCard
+                jobId={jobId}
+                outputs={jobData.outputs}
+                fable={fableData?.builder}
+                catalogue={catalogue}
+              />
               <OutputsPanel
                 jobId={jobId}
                 status={jobData.status}

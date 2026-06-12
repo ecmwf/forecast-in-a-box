@@ -9,12 +9,14 @@
  */
 
 /**
- * Lists sink blocks that wrote a file/directory to a configured filesystem
- * path. Each row can launch a SkinnyWMS lens for its file: "Open" mounts the
- * in-app WMS viewer, the copy action copies the GetCapabilities URL for
- * external WMS clients (QGIS, ArcGIS, …). The lens lifecycle is explicit on
- * the row: a running server shows a status badge with its port and a Stop
- * control; closing the viewer sheet does not stop the server.
+ * Lists sink outputs written to disk, derived from the run's own outputs:
+ * GribSink streams its (run-private, glyph-resolved) output directory as a
+ * `GRIB_DIR_MIME` payload, which this card fetches and serves to a SkinnyWMS
+ * lens. "Open" mounts the in-app WMS viewer, the copy action copies the
+ * GetCapabilities URL for external WMS clients (QGIS, ArcGIS, …). The lens
+ * lifecycle is explicit on the row: a running server shows a status badge
+ * with its port and a Stop control; closing the viewer sheet does not stop
+ * the server.
  */
 
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
@@ -22,25 +24,28 @@ import {
   Copy,
   FolderOpen,
   Loader2,
-  Map,
+  Map as MapIcon,
   Maximize2,
   Minimize2,
   X,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useQuery } from '@tanstack/react-query'
 import type {
   BlockFactoryCatalogue,
-  BlockInstance,
   FableBuilderV1,
 } from '@/api/types/fable.types'
 import type { RunOutputs } from '@/api/types/job.types'
 import { getFactory } from '@/api/types/fable.types'
 import {
   useLensStatus,
+  useSkinnyWmsAvailable,
   useStartSkinnyWms,
   useStopLens,
 } from '@/api/hooks/useLens'
 import { buildLensBaseUrl, buildWmsCapabilitiesUrl } from '@/api/endpoints/lens'
+import { getJobResultHead } from '@/api/endpoints/job'
+import { GRIB_DIR_MIME } from '@/features/executions/outputs/adapters/grib'
 import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -62,69 +67,56 @@ import { P } from '@/components/base/typography'
 
 const WmsViewer = lazy(() => import('./WmsViewer'))
 
-const PATH_KEYS = ['path', 'dir'] as const
+/** The directory payload is a short path — cap the fetch defensively. */
+const DIR_PAYLOAD_BYTES = 1024
 
-/** Format pill per file extension; mirrors the output-card chip palette. */
-const FORMAT_CHIPS: ReadonlyArray<{
-  re: RegExp
-  label: string
-  chipClass: string
-}> = [
-  {
-    re: /\.grib2?$/i,
-    label: 'GRIB',
-    chipClass:
-      'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
-  },
-  {
-    re: /\.zarr\/?$/i,
-    label: 'ZARR',
-    chipClass:
-      'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300',
-  },
-  {
-    re: /\.nc$/i,
-    label: 'NETCDF',
-    chipClass: 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300',
-  },
-]
+const GRIB_CHIP_CLASS =
+  'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
 
-const FALLBACK_CHIP = {
-  label: 'FILE',
-  chipClass:
-    'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
-}
-
-function chipFor(path: string): { label: string; chipClass: string } {
-  return FORMAT_CHIPS.find((c) => c.re.test(path)) ?? FALLBACK_CHIP
-}
-
-/** Split "/a/b/name.ext" into the dimmed directory and emphasized filename. */
+/** Split "/a/b/dirname" into the dimmed parent and emphasized last segment. */
 function splitPath(path: string): { dir: string; name: string } {
-  const idx = path.lastIndexOf('/')
-  if (idx < 0) return { dir: '', name: path }
-  return { dir: path.slice(0, idx + 1), name: path.slice(idx + 1) }
+  const trimmed = path.replace(/\/$/, '')
+  const idx = trimmed.lastIndexOf('/')
+  if (idx < 0) return { dir: '', name: trimmed }
+  return { dir: trimmed.slice(0, idx + 1), name: trimmed.slice(idx + 1) }
+}
+
+/** Resolve the lens directory for a marker output: its payload holds the
+ * glyph-resolved output directory as plain text, written by the backend. */
+function useStoredDirPath(jobId: string, taskId: string, enabled: boolean) {
+  return useQuery<string>({
+    queryKey: ['job-result', 'stored-dir', jobId, taskId],
+    queryFn: async () => {
+      const head = await getJobResultHead(jobId, taskId, DIR_PAYLOAD_BYTES)
+      return new TextDecoder().decode(head).trim()
+    },
+    enabled,
+    staleTime: Infinity,
+    retry: 1,
+  })
 }
 
 interface StoredOutputsCardProps {
-  fable: FableBuilderV1
-  catalogue: BlockFactoryCatalogue
-  /** Server-authoritative path map from `run.outputs.stored`. When present,
-   * overrides the fable-walk and contributes `is_available` for each file. */
-  storedOutputs?: RunOutputs['stored']
+  jobId: string
+  outputs: RunOutputs | null
+  /** Optional: resolve human-readable sink titles from the run's fable. */
+  fable?: FableBuilderV1
+  catalogue?: BlockFactoryCatalogue
 }
 
 interface StoredOutputRow {
   blockId: string
-  factoryTitle: string
-  path: string
+  /** Representative marker task for this sink block (payload source). */
+  taskId: string
+  title: string
   isAvailable: boolean
 }
 
 export function StoredOutputsCard({
+  jobId,
+  outputs,
   fable,
   catalogue,
-  storedOutputs,
 }: StoredOutputsCardProps) {
   const { t } = useTranslation('executions')
   const [viewer, setViewer] = useState<{
@@ -132,21 +124,30 @@ export function StoredOutputsCard({
     title: string
   } | null>(null)
 
+  // One row per sink block — a sink fans out to one marker task per cascade
+  // branch (e.g. per ensemble member), all pointing at the same directory.
   const rows = useMemo<Array<StoredOutputRow>>(() => {
-    const out: Array<StoredOutputRow> = []
-    for (const [blockId, instance] of Object.entries(fable.blocks)) {
-      const factory = getFactory(catalogue, instance.factory_id)
-      if (!factory || factory.kind !== 'sink') continue
-      const stored = storedOutputs?.[blockId]
-      const path = stored?.path ?? pickPath(instance)
-      if (!path) continue
-      // Server reports is_available via os.path.exists; fall back to true when
-      // we're sourcing from the fable spec alone (no run-side knowledge).
-      const isAvailable = stored?.is_available ?? true
-      out.push({ blockId, factoryTitle: factory.title, path, isAvailable })
+    if (!outputs) return []
+    const byBlock = new Map<string, StoredOutputRow>()
+    for (const [taskId, meta] of Object.entries(outputs)) {
+      if (meta.mime_type !== GRIB_DIR_MIME) continue
+      const existing = byBlock.get(meta.original_block)
+      // Prefer an available marker so the payload fetch can succeed.
+      if (existing && (existing.isAvailable || !meta.is_available)) continue
+      const blockInstance = fable?.blocks[meta.original_block]
+      const factory =
+        catalogue && blockInstance
+          ? getFactory(catalogue, blockInstance.factory_id)
+          : undefined
+      byBlock.set(meta.original_block, {
+        blockId: meta.original_block,
+        taskId,
+        title: factory?.title ?? meta.original_block,
+        isAvailable: meta.is_available,
+      })
     }
-    return out
-  }, [fable, catalogue, storedOutputs])
+    return Array.from(byBlock.values())
+  }, [outputs, fable, catalogue])
 
   if (rows.length === 0) return null
 
@@ -161,8 +162,9 @@ export function StoredOutputsCard({
           {rows.map((row) => (
             <StoredOutputRowItem
               key={row.blockId}
+              jobId={jobId}
               row={row}
-              onOpenViewer={(lensId) => setViewer({ lensId, title: row.path })}
+              onOpenViewer={(lensId, title) => setViewer({ lensId, title })}
             />
           ))}
         </ul>
@@ -181,15 +183,21 @@ export function StoredOutputsCard({
 }
 
 function StoredOutputRowItem({
+  jobId,
   row,
   onOpenViewer,
 }: {
+  jobId: string
   row: StoredOutputRow
-  onOpenViewer: (lensId: string) => void
+  onOpenViewer: (lensId: string, title: string) => void
 }) {
   const { t } = useTranslation('executions')
+  // false only when the backend reports SkinnyWMS as not installed.
+  const wmsUnavailable = useSkinnyWmsAvailable() === false
   const startMutation = useStartSkinnyWms()
   const stopMutation = useStopLens()
+  const dirQuery = useStoredDirPath(jobId, row.taskId, row.isAvailable)
+  const dirPath = dirQuery.data
   // The row owns its lens instance; the viewer sheet only displays it.
   const [lensId, setLensId] = useState<string | null>(null)
   const statusQuery = useLensStatus(lensId ?? undefined)
@@ -225,14 +233,15 @@ function StoredOutputRowItem({
     setLensId(null)
   }, [failed])
 
-  /** Start the lens if needed, then hand the instance id to `then`. */
+  /** Start the lens on the resolved directory, then hand the id to `then`. */
   const ensureLens = (then?: (id: string) => void) => {
     if (lensId) {
       then?.(lensId)
       return
     }
+    if (!dirPath) return
     startMutation.mutate(
-      { localPath: row.path },
+      { localPath: dirPath },
       {
         onSuccess: (id) => {
           setLensId(id)
@@ -246,7 +255,7 @@ function StoredOutputRowItem({
     )
   }
 
-  const open = () => ensureLens((id) => onOpenViewer(id))
+  const open = () => ensureLens((id) => onOpenViewer(id, dirPath ?? row.title))
 
   const copy = () => {
     if (running) {
@@ -266,12 +275,14 @@ function StoredOutputRowItem({
     setLensId(null)
   }
 
-  const disabled = startMutation.isPending || !row.isAvailable
-  const unavailableTitle = row.isAvailable
-    ? undefined
-    : t('storedOutputs.fileMissing')
-  const chip = chipFor(row.path)
-  const { dir, name } = splitPath(row.path)
+  const disabled =
+    startMutation.isPending || !row.isAvailable || !dirPath || wmsUnavailable
+  const unavailableTitle = wmsUnavailable
+    ? t('storedOutputs.wmsUnavailable')
+    : row.isAvailable
+      ? undefined
+      : t('storedOutputs.fileMissing')
+  const { dir, name } = dirPath ? splitPath(dirPath) : { dir: '', name: '' }
   const starting = !!lensId && !running
 
   return (
@@ -279,23 +290,32 @@ function StoredOutputRowItem({
       <span
         className={cn(
           'mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-xs font-semibold',
-          chip.chipClass,
+          GRIB_CHIP_CLASS,
         )}
       >
-        {chip.label}
+        GRIB
       </span>
       <div className="min-w-0 flex-1">
-        <P className="truncate font-mono text-sm font-medium" title={row.path}>
-          {name}
-        </P>
-        {dir && (
-          <P className="truncate font-mono text-xs text-muted-foreground">
+        <P className="truncate text-sm font-medium">{row.title}</P>
+        {dirPath ? (
+          <P
+            className="truncate font-mono text-xs text-muted-foreground"
+            title={dirPath}
+          >
             {dir}
+            <span className="text-foreground/80">{name}</span>
           </P>
-        )}
-        {!row.isAvailable && (
+        ) : row.isAvailable ? (
+          <P className="font-mono text-xs text-muted-foreground">…</P>
+        ) : (
           <P className="text-xs text-muted-foreground italic">
             {t('storedOutputs.fileMissing')}
+          </P>
+        )}
+        {/* Inline note: disabled buttons can't surface a title/tooltip. */}
+        {wmsUnavailable && (
+          <P className="text-xs text-muted-foreground italic">
+            {t('storedOutputs.wmsUnavailable')}
           </P>
         )}
         {lensId && (
@@ -334,7 +354,7 @@ function StoredOutputRowItem({
           {startMutation.isPending || starting ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (
-            <Map className="h-3.5 w-3.5" />
+            <MapIcon className="h-3.5 w-3.5" />
           )}
           {t('storedOutputs.open')}
         </Button>
@@ -355,11 +375,17 @@ function StoredOutputRowItem({
           </TooltipTrigger>
           <TooltipContent>
             <P className="max-w-xs text-xs">
-              <span className="font-medium">
-                {t('storedOutputs.externalTitle')}
-              </span>
-              <br />
-              {t('storedOutputs.externalHint')}
+              {wmsUnavailable ? (
+                t('storedOutputs.wmsUnavailable')
+              ) : (
+                <>
+                  <span className="font-medium">
+                    {t('storedOutputs.externalTitle')}
+                  </span>
+                  <br />
+                  {t('storedOutputs.externalHint')}
+                </>
+              )}
             </P>
           </TooltipContent>
         </Tooltip>
@@ -457,12 +483,4 @@ function LensViewerSheet({
       </SheetContent>
     </Sheet>
   )
-}
-
-function pickPath(instance: BlockInstance): string | null {
-  for (const key of PATH_KEYS) {
-    const value = instance.configuration_values[key]
-    if (typeof value === 'string' && value.trim() !== '') return value
-  }
-  return null
 }

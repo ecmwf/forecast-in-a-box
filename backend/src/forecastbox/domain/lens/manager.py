@@ -16,13 +16,9 @@ Synchronization uses a single lock protecting the LensInstanceManager's instance
 Pyrsistent immutable structures allow safe lock-free reads.
 """
 
-import glob
 import logging
 import os
-import re
-import shutil
 import subprocess
-import tempfile
 import threading
 import uuid
 from dataclasses import dataclass
@@ -57,10 +53,6 @@ class LensInstance:
     lens_params: dict[str, Any]
     lens_name: LensName
     ports: set[int]
-    # Per-instance temp directory containing a symlink to the user-supplied file,
-    # set when local_path is a single file (SkinnyWMS only accepts a directory).
-    # `None` when local_path is already a directory. Removed on stop.
-    staging_dir: str | None = None
 
 
 class LensInstanceManager:
@@ -83,33 +75,6 @@ def _compute_status(instance: LensInstance) -> LensInstanceDetail:
         assert_never(instance.lens_name)
 
     return LensInstanceDetail(status=status, lens_name=instance.lens_name, lens_params=instance.lens_params, ports=instance.ports)
-
-
-def _pattern_to_glob(path: str) -> str:
-    """Turn an earthkit file-pattern path (``…_[shortName].grib2``) into a glob
-    by replacing each ``[token]`` with ``*``."""
-    return re.sub(r"\[[^\]]*\]", "*", path)
-
-
-def _expand_local_path(local_path: str) -> list[str]:
-    """Resolve ``local_path`` to the concrete file(s) SkinnyWMS should serve.
-
-    - an existing single file → ``[local_path]``
-    - a GribSink file-pattern (``[shortName]``) → every glob match
-    - an existing directory → ``[]`` (caller serves the directory directly)
-    """
-    if os.path.isfile(local_path):
-        return [local_path]
-    if os.path.isdir(local_path):
-        return []
-    return sorted(glob.glob(_pattern_to_glob(local_path)))
-
-
-def local_path_available(local_path: str) -> bool:
-    """True if `local_path` resolves to something SkinnyWMS can serve: an
-    existing directory, a single file, or a file-pattern (e.g. a GribSink
-    `…_[shortName].grib2`) matching ≥1 file on disk."""
-    return os.path.isdir(local_path) or bool(_expand_local_path(local_path))
 
 
 def start_skinny_wms(local_path: str) -> LensInstanceId:
@@ -135,41 +100,15 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
             raise TimeoutError("Failed to acquire lens manager lock")
         LensInstanceManager.instances = LensInstanceManager.instances.set(instance_id, instance)
 
-    # SkinnyWMS only accepts a directory as SKINNYWMS_DATA_PATH. Stage the
-    # caller's file(s) inside a private temp directory so SkinnyWMS sees only
-    # those — and we don't expose siblings (other runs' files in the same
-    # output dir) to the WMS server. Symlinks avoid copying the data.
-    #
-    # A GribSink path is an earthkit file-pattern (e.g. `…_[shortName].grib2`)
-    # that fans out to one file per field at write time, so the literal path
-    # never exists — `_expand_local_path` globs it to every written file.
-    staging_dir: str | None = None
-    staged_files = _expand_local_path(local_path)
-    if staged_files:
-        staging_dir = tempfile.mkdtemp(prefix="fiab-lens-stage-")
-        for staged in staged_files:
-            os.symlink(staged, os.path.join(staging_dir, os.path.basename(staged)))
-        data_path = staging_dir
-    else:
-        data_path = local_path
-
     failed: str | None = None
     try:
-        cmd = [
-            "uv",
-            "run",
-            "gunicorn",
-            "--bind",
-            f"127.0.0.1:{port}",
-            "skinnywms.wmssvr:application",
-        ]
+        cmd = ["uv", "run", "gunicorn", "--bind", f"127.0.0.1:{port}", "skinnywms.wmssvr:application"]
         env = {
             **os.environ,
-            "SKINNYWMS_DATA_PATH": data_path,
-            # Browser-based clients (our React WMS viewer + crossOrigin tile
-            # requests) need CORS on every endpoint. SkinnyWMS honours this
-            # env var via flask-cors with `r"/*"` resource matching, which
-            # covers /wms, /legend, and static assets uniformly.
+            "SKINNYWMS_DATA_PATH": local_path,
+            # Browser clients (the in-app WMS viewer, crossOrigin tile requests)
+            # call the lens directly on its own port, i.e. cross-origin.
+            # SkinnyWMS honours this via flask-cors on all endpoints.
             "SKINNYWMS_CORS_ORIGINS": "*",
         }
         process: subprocess.Popen[bytes] = subprocess.Popen(
@@ -183,31 +122,23 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
         failed = repr(e)
         logger.error(f"failed to start skinny wms: {failed}")
 
-    def _drop_staging() -> None:
-        if staging_dir is not None:
-            shutil.rmtree(staging_dir, ignore_errors=True)
-
     with timed_acquire(LensInstanceManager.lock, timeout_acquire) as acquired:
         if not acquired:
             shutdown_popen(process)
             FreePortsManager.release_port(port)
-            _drop_staging()
             raise TimeoutError("Failed to acquire lens manager lock for update")
         if instance_id not in LensInstanceManager.instances:
             shutdown_popen(process)
             FreePortsManager.release_port(port)
-            _drop_staging()
             raise RuntimeError(f"Lens instance {instance_id} was removed during startup")
         if failed is not None:
             FreePortsManager.release_port(port)
-            _drop_staging()
             raise RuntimeError(f"Lens instance {instance_id} failed to start with {failed}")
         updated = LensInstance(
             process=process,
             lens_params=instance.lens_params,
             lens_name=instance.lens_name,
             ports=instance.ports,
-            staging_dir=staging_dir,
         )
         LensInstanceManager.instances = LensInstanceManager.instances.set(instance_id, updated)
 
@@ -249,8 +180,6 @@ def stop_instance(instance_id: LensInstanceId) -> None:
         if instance is not None:
             for port in instance.ports:
                 FreePortsManager.release_port(port)
-            if instance.staging_dir is not None:
-                shutil.rmtree(instance.staging_dir, ignore_errors=True)
 
 
 def shutdown_all_lens_instances() -> None:

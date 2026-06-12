@@ -14,6 +14,7 @@
 
 import { HttpResponse, delay, http } from 'msw'
 import {
+  isSkinnyWmsInstalled,
   listMockLenses,
   pollMockLens,
   startMockLens,
@@ -24,6 +25,12 @@ import { API_ENDPOINTS } from '@/api/endpoints'
 export const lensHandlers = [
   http.post(API_ENDPOINTS.lens.startSkinnyWms, async ({ request }) => {
     await delay(50)
+    if (!isSkinnyWmsInstalled()) {
+      return HttpResponse.json(
+        { detail: 'SkinnyWMS installation not found' },
+        { status: 400 },
+      )
+    }
     const localPath = new URL(request.url).searchParams.get('local_path')
     if (!localPath) {
       return HttpResponse.json(
@@ -66,6 +73,7 @@ export const lensHandlers = [
 
   http.get(API_ENDPOINTS.lens.supported, async () => {
     await delay(50)
+    if (!isSkinnyWmsInstalled()) return HttpResponse.json([])
     return HttpResponse.json([
       {
         name: 'skinnyWMS',
