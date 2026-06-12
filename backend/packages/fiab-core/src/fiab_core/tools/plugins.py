@@ -1,3 +1,12 @@
+# (C) Copyright 2024- ECMWF.
+#
+# This software is licensed under the terms of the Apache Licence Version 2.0
+# which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# In applying this licence, ECMWF does not waive the privileges and immunities
+# granted to it by virtue of its status as an intergovernmental organisation
+# nor does it submit to any jurisdiction.
+
 import importlib.metadata
 import json
 import os
@@ -17,6 +26,7 @@ from fiab_core.fable import (
     QubedOutput,
 )
 from fiab_core.plugin import Error, Plugin
+from fiab_core.presets import PluginPresetDefinition
 from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich, QubedBlockBuilder
 
 
@@ -48,9 +58,15 @@ def _detect_editable_install(distname: str) -> str:
 
 
 class QubedPluginBuilder:
-    def __init__(self, block_builders: dict[BlockFactoryId, QubedBlockBuilder], base_environment: list[str]) -> None:
+    def __init__(
+        self,
+        block_builders: dict[BlockFactoryId, QubedBlockBuilder],
+        base_environment: list[str],
+        presets: list[PluginPresetDefinition] | None = None,
+    ) -> None:
         self.block_builders = block_builders
         self.base_environment = [_detect_editable_install(e) for e in base_environment]
+        self.presets = presets or []
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
         """Given a block instance corresponding to this plugin's Factory and its inputs, either provide error or determine what it outputs"""
@@ -106,4 +122,5 @@ class QubedPluginBuilder:
             validator=_generic_validate,
             expander=_generic_expand,
             compiler=self.compile,
+            presets=self.presets,
         )

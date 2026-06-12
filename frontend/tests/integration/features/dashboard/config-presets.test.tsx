@@ -122,12 +122,12 @@ describe('ConfigPresetsSection', () => {
       .toBeVisible()
   })
 
-  it('shows "View all presets" link', async () => {
+  it('shows "View my presets" link', async () => {
     useBlueprintListHandler()
 
     const screen = await renderWithRouter(<ConfigPresetsSection />)
 
-    await expect.element(screen.getByText('View all presets')).toBeVisible()
+    await expect.element(screen.getByText('View my presets')).toBeVisible()
   })
 
   it('shows at most 4 preset cards on the dashboard', async () => {

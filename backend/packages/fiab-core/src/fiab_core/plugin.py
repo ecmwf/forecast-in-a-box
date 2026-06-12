@@ -11,7 +11,7 @@
 Types pertaining to declaring FIAB Plugins, in particular their Fable-based interface.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable
 
 from cascade.low.func import Either
@@ -25,6 +25,7 @@ from fiab_core.fable import (
     BlockInstanceId,
     BlockInstanceOutput,
 )
+from fiab_core.presets import PluginPresetDefinition
 
 Error = str
 Validator = Callable[[BlockInstance, dict[str, BlockInstanceOutput]], Either[BlockInstanceOutput, Error]]  # type:ignore[invalid-argument] # semigroup
@@ -51,3 +52,4 @@ class Plugin:
     validator: Validator
     expander: Expander
     compiler: Compiler
+    presets: list[PluginPresetDefinition] = field(default_factory=list)

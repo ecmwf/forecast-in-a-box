@@ -24,6 +24,7 @@ from fiab_plugin_ecmwf.blocks import (
     TemporalStatistics,
     ZarrSink,
 )
+from fiab_plugin_ecmwf.presets import ECMWF_PRESETS
 
 blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
     BlockFactoryId("operationalForecastSource"): OperationalForecastSource(),
@@ -57,4 +58,4 @@ blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
     BlockFactoryId("mapPlotSink"): MapPlotSink(),
 }
 
-plugin = QubedPluginBuilder(block_builders=blocks, base_environment=["fiab-plugin-ecmwf"]).as_plugin()
+plugin = QubedPluginBuilder(block_builders=blocks, base_environment=["fiab-plugin-ecmwf"], presets=ECMWF_PRESETS).as_plugin()

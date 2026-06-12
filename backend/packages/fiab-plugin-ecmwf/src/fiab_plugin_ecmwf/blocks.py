@@ -195,6 +195,11 @@ class OperationalForecastSource(Source):
                                         )
                                     ],
                                 },
+                                metadata={
+                                    "environment": [
+                                        "ecmwf-opendata" if block.config_as_str(SOURCE) == "ecmwf-open-data" else "ecmwf-api-client"
+                                    ]
+                                },
                             )
                             for p in datacube[PARAM]
                         ]

@@ -101,7 +101,7 @@ def map_plot(
     for group_val, group_fields in grouped_data.items():
         logger.debug("map_plot: plotting group %s (%d fields)", group_val, len(group_fields))
         subplot = figure.add_map(domain=resolved_domain)
-        _plot_fields(subplot, group_fields, quickplot=dict(interpolate=True))  # type: ignore[reportArgumentType]
+        _plot_fields(subplot, group_fields)  # type: ignore[reportArgumentType]
         try:
             subplot.title("{variable_name}" + (f" over {domain}" if resolved_domain else "") + " at {time:%H:%M UTC on %-d %B %Y}")
         except Exception as err:

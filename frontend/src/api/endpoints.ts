@@ -168,6 +168,26 @@ export const API_ENDPOINTS = {
   },
 
   /**
+   * High-level preset endpoints
+   */
+  preset: {
+    /** GET - List presets (query: page, page_size, difficulty?, search?, published_only?) */
+    list: `${API_PREFIX}/presets/list`,
+    /** GET - Get a single preset (query: preset_id) */
+    get: `${API_PREFIX}/presets/get`,
+    /** POST - Instantiate a preset into a builder (body: PresetInstantiateRequest) */
+    instantiate: `${API_PREFIX}/presets/instantiate`,
+    /** POST - Create a new preset (admin-only, body: PresetCreateRequest) */
+    create: `${API_PREFIX}/presets/create`,
+    /** POST - Update an existing preset (admin-only, body: PresetUpdateRequest) */
+    update: `${API_PREFIX}/presets/update`,
+    /** POST - Soft-delete a preset (admin-only, body: PresetDeleteRequest) */
+    delete: `${API_PREFIX}/presets/delete`,
+    /** POST - Update publish status in-place without incrementing version (admin-only, body: PresetPublishRequest) */
+    publish: `${API_PREFIX}/presets/publish`,
+  },
+
+  /**
    * Schedule management endpoints
    */
   schedule: {

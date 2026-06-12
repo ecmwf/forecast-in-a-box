@@ -13,19 +13,11 @@ import { z } from 'zod'
 import { FableBuilderPage } from '@/features/fable-builder/components/FableBuilderPage'
 
 const searchSchema = z.object({
-  preset: z
-    .enum([
-      'quick-start',
-      'standard',
-      'custom-model',
-      'dataset',
-      'ecmwf-open-data',
-      'aifs-forecast',
-      'aifs-dataset',
-    ])
-    .optional(),
   state: z.string().optional(),
   fableId: z.string().optional(),
+  /** Deep-link to a high-level preset by its slug. Opens the wizard dialog
+   *  (or instantiates directly for beginner presets) when the page loads. */
+  hlPreset: z.string().optional(),
 })
 
 export type ConfigureSearch = z.infer<typeof searchSchema>
@@ -36,13 +28,14 @@ export const Route = createFileRoute('/_authenticated/configure')({
 })
 
 function ConfigurePage() {
-  const { preset, state, fableId } = Route.useSearch()
+  const { state, fableId, hlPreset } = Route.useSearch()
+
   return (
     <FableBuilderPage
       key={fableId}
       fableId={fableId}
-      preset={preset}
       encodedState={state}
+      hlPreset={hlPreset}
     />
   )
 }

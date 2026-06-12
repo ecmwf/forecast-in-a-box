@@ -85,7 +85,7 @@ async def test_jobs_blueprint_insert_and_get(mem_session_maker_both: async_sessi
         created_by="user1",
         display_name="My job",
         builder={"blocks": {"source1": {}}, "environment": None, "local_glyphs": {}},
-        tags=["tag1"],
+        tags=[{"name": "tag1"}],
     )
     assert v1 == 1
 
@@ -95,7 +95,7 @@ async def test_jobs_blueprint_insert_and_get(mem_session_maker_both: async_sessi
     assert result.version == 1
     assert result.source == "user_defined"
     assert result.display_name == "My job"
-    assert result.tags == ["tag1"]
+    assert result.tags == [{"name": "tag1"}]
 
 
 @pytest.mark.asyncio
@@ -166,6 +166,26 @@ async def test_jobs_list_blueprints_ownership_filter(mem_session_maker_both: asy
 
     admin_defs = {d.blueprint_id for d in await blueprint_db.list_blueprints(auth_context=_admin)}
     assert {id_u1, id_u2, id_tmpl}.issubset(admin_defs)
+
+
+@pytest.mark.asyncio
+async def test_jobs_list_blueprints_excludes_preset_source(mem_session_maker_both: async_sessionmaker[AsyncSession]) -> None:
+    """Blueprints with source='preset' are excluded from list_blueprints and count_blueprints."""
+    id_user, _ = await blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
+    id_preset, _ = await blueprint_db.upsert_blueprint(auth_context=_admin, source="preset", created_by="admin")
+
+    # list_blueprints must not return the preset blueprint for any caller
+    admin_defs = {d.blueprint_id for d in await blueprint_db.list_blueprints(auth_context=_admin)}
+    assert id_user in admin_defs
+    assert id_preset not in admin_defs
+
+    user_defs = {d.blueprint_id for d in await blueprint_db.list_blueprints(auth_context=_user1)}
+    assert id_user in user_defs
+    assert id_preset not in user_defs
+
+    # count_blueprints must not count the preset blueprint
+    assert await blueprint_db.count_blueprints(auth_context=_admin) == 1
+    assert await blueprint_db.count_blueprints(auth_context=_user1) == 1
 
 
 @pytest.mark.asyncio

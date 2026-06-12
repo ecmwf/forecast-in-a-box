@@ -147,6 +147,16 @@ interface FableBuilderState {
 
   setFable: (fable: FableBuilderV1, id?: string | null) => void
   setFableName: (name: string) => void
+  /**
+   * Initialise the editor with a preset-instantiated builder.
+   * The fable is treated as a brand-new unsaved document: `fableId` is null,
+   * `isDirty` is true, and `step` is set to `'edit'` so the user lands
+   * directly in the canvas rather than the setup wizard.
+   */
+  setFableFromPresetInstance: (
+    builder: FableBuilderV1,
+    presetName: string,
+  ) => void
   newFable: () => void
   addBlock: (
     factoryId: PluginBlockFactoryId,
@@ -348,6 +358,24 @@ export const useFableBuilderStore = create<FableBuilderState>()(
             }),
 
           setFableName: (name) => set({ fableName: name, isDirty: true }),
+
+          setFableFromPresetInstance: (builder, presetName) =>
+            set({
+              fable: builder,
+              fableId: null,
+              fableVersion: null,
+              fableName: presetName,
+              isDirty: true,
+              step: 'edit',
+              selectedBlockId: null,
+              validationState: null,
+              blockConfigurationRestrictions: {},
+              // A preset-instantiated fable starts with a clean history.
+              past: [],
+              future: [],
+              _historyMeta: { key: null, t: 0 },
+              _currentTransactionKey: null,
+            }),
 
           newFable: () =>
             set({

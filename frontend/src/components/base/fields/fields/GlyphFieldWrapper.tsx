@@ -120,14 +120,36 @@ export function GlyphFieldWrapper({
       : fieldErrors[0]
     : null
 
-  // No glyphs / glyph mode disabled → render children directly, only adding
-  // an error ring + inline error text when the field is invalid.
-  if (!hasGlyphs || !allowGlyphMode) {
+  // Glyph mode disabled (e.g. EnumField passes a <Select> that isn't
+  // InputGroup-compatible) → render children directly with just an error ring.
+  if (!allowGlyphMode) {
     if (!hasFieldError) return <>{children}</>
     return (
       <div>
         <div className="rounded-md ring-1 ring-destructive">{children}</div>
         <p className="mt-1 truncate text-xs text-destructive">{errorMessage}</p>
+      </div>
+    )
+  }
+
+  // No glyphs in context → wrap children in a plain InputGroup so multi-part
+  // fields (date+time, prefix+input, etc.) keep their inline layout. The
+  // glyph-toggle button is omitted; children are expected to use
+  // InputGroupInput / data-slot="input-group-control".
+  if (!hasGlyphs) {
+    return (
+      <div>
+        <InputGroup
+          data-disabled={disabled || undefined}
+          className={cn(hasFieldError && 'border-destructive')}
+        >
+          {children}
+        </InputGroup>
+        {errorMessage && (
+          <p className="mt-1 truncate text-xs text-destructive">
+            {errorMessage}
+          </p>
+        )}
       </div>
     )
   }

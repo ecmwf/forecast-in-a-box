@@ -123,6 +123,7 @@
     "plugins": "Plugins",
     "artifacts": "Artifacts",
     "globalVariables": "Global Variables",
+    "presets": "Presets",
     "signOut": "Sign Out",
     "timezoneDialogTitle": "Application timezone",
     "timezoneDialogDescription": "All dates and times — including forecast base times — are shown and entered in this timezone. Defaults to UTC."
@@ -138,24 +139,7 @@
     "esc": "Esc"
   },
   "commands": {
-    "categoryGettingStarted": "Getting Started",
     "categoryNavigation": "Navigation",
-    "quickStart": {
-      "label": "Quick Start",
-      "description": "Start with AIFS model preset"
-    },
-    "standard": {
-      "label": "Standard Forecast",
-      "description": "Choose model, 120h forecast"
-    },
-    "customModel": {
-      "label": "Custom Model Forecast",
-      "description": "Blank canvas, full control"
-    },
-    "dataset": {
-      "label": "Dataset Forecast",
-      "description": "Use AIFS data from external source"
-    },
     "dashboard": {
       "label": "Dashboard",
       "description": "Go to dashboard"
@@ -187,7 +171,9 @@
   "field": {
     "selectPlaceholder": "Select an option...",
     "addItemPlaceholder": "Add item...",
-    "noMatches": "No matches"
+    "noMatches": "No matches",
+    "unresolvedCatalogueLabel": "Dynamic options unavailable — plugins not ready",
+    "unresolvedCatalogueHint": "Could not resolve options from the plugin catalogue. Enter a value manually. The dropdown will appear once plugins are loaded."
   },
   "notificationBanner": {
     "dismiss": "Dismiss notification"

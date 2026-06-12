@@ -21,7 +21,7 @@ import type { ReactNode } from 'react'
 /**
  * Command category for grouping in the palette
  */
-export type CommandCategory = 'Getting Started' | 'Navigation'
+export type CommandCategory = 'Navigation'
 
 /**
  * Command definition
@@ -67,7 +67,7 @@ export function groupCommandsByCategory(
   }
 
   // Return in preferred order
-  const order: Array<CommandCategory> = ['Getting Started', 'Navigation']
+  const order: Array<CommandCategory> = ['Navigation']
 
   return order
     .filter((category) => grouped.has(category))

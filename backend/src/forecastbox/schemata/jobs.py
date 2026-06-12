@@ -26,7 +26,7 @@ from sqlalchemy.orm import DeclarativeBase
 
 from forecastbox.utility.config import config
 
-BlueprintSource = Literal["plugin_template", "user_defined", "oneoff_execution"]
+BlueprintSource = Literal["plugin_template", "user_defined", "oneoff_execution", "preset"]
 ExperimentType = Literal["cron_schedule", "batch_execution", "external_trigger"]
 RunStatus = Literal["submitted", "preparing", "running", "completed", "failed"]
 
@@ -179,6 +179,33 @@ class Run(Base):
         ForeignKeyConstraint(
             ["blueprint_id", "blueprint_version"],
             ["blueprint.blueprint_id", "blueprint.version"],
+        ),
+    )
+
+
+class PresetMetadata(Base):
+    """Preset-specific metadata side-table linked to a Blueprint row.
+
+    Each preset blueprint has exactly one ``PresetMetadata`` row keyed by
+    ``blueprint_id``.  The row stores display/discovery metadata that is
+    specific to the preset concept (difficulty, long description, icon,
+    parameter schema, publication state) and is not part of the generic
+    ``Blueprint`` table.
+    """
+
+    __tablename__ = "preset_metadata"
+
+    blueprint_id = Column(String(255), primary_key=True, nullable=False)
+    difficulty = Column(String(64), nullable=False)
+    long_description = Column(String(4096), nullable=True)
+    icon = Column(String(255), nullable=False, default="Cloud")
+    parameters = Column(JSON, nullable=True)
+    is_published = Column(Boolean, nullable=False, default=False)
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["blueprint_id"],
+            ["blueprint.blueprint_id"],
         ),
     )
 

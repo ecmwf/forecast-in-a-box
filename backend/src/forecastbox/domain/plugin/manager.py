@@ -35,6 +35,7 @@ from typing import Iterator, Literal
 from cascade.low.func import assert_never
 from fiab_core.fable import BlockFactoryCatalogue, PluginCompositeId
 from fiab_core.plugin import Plugin
+from fiab_core.presets import PluginPresetDefinition
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 from pyrsistent import pmap
@@ -193,6 +194,8 @@ def status_brief() -> str:
     # NOTE this may be called without locking, we don't risk collection mutation during iteration
     if PluginManager.updater_error is not None:
         return f"failure: {PluginManager.updater_error}"
+    elif PluginManager.updater is None:
+        return "not_initialized"
     elif PluginManager.updater.is_alive():
         return "running"
     else:
@@ -201,6 +204,19 @@ def status_brief() -> str:
 
 def plugins_ready() -> bool:
     return status_brief() == "ok"
+
+
+def wait_until_ready(timeout_s: float) -> bool:
+    """Block until the plugin updater thread finishes, or ``timeout_s`` elapses.
+
+    Returns ``True`` iff plugins are ready when this returns. If the updater
+    has not been submitted yet, or has already terminated in a failure state,
+    returns immediately without waiting.
+    """
+    updater = PluginManager.updater
+    if updater is not None and updater.is_alive():
+        updater.join(timeout_s)
+    return plugins_ready()
 
 
 def status_full() -> PluginsStatus:
@@ -229,6 +245,14 @@ def catalogue_view() -> dict[PluginCompositeId, BlockFactoryCatalogue] | bool:
             return False
         else:
             return {plugin_id: plugin.catalogue for plugin_id, plugin in PluginManager.plugins.items()}
+
+
+def presets_view() -> list[tuple[PluginCompositeId, list[PluginPresetDefinition]]] | bool:
+    with timed_acquire(PluginManager.lock, 1.0) as result:
+        if not result:
+            return False
+        else:
+            return [(plugin_id, plugin.presets) for plugin_id, plugin in PluginManager.plugins.items() if plugin.presets]
 
 
 def submit_update_single(pluginId: PluginCompositeId, install: bool, version: Version | None) -> str:

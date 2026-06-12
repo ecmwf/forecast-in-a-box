@@ -26,6 +26,7 @@ import {
   Monitor,
   Moon,
   Settings,
+  Sliders,
   Sun,
   User,
   Variable,
@@ -321,6 +322,10 @@ export function AuthenticatedHeader() {
                     <DropdownMenuItem render={<Link to="/admin/variables" />}>
                       <Variable className="mr-2 h-4 w-4" />
                       {t('userMenu.globalVariables')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem render={<Link to="/admin/presets" />}>
+                      <Sliders className="mr-2 h-4 w-4" />
+                      {t('userMenu.presets')}
                     </DropdownMenuItem>
                   </DropdownMenuGroup>
                 </>

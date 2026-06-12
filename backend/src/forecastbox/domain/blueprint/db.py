@@ -159,6 +159,7 @@ async def list_blueprints(*, auth_context: AuthContext, offset: int = 0, limit: 
                     subq,
                     (Blueprint.blueprint_id == subq.c.blueprint_id) & (Blueprint.version == subq.c.max_version),
                 )
+                .where(Blueprint.source != "preset")
                 .order_by(Blueprint.created_at.desc())
                 .offset(offset)
             )
@@ -182,7 +183,10 @@ async def count_blueprints(*, auth_context: AuthContext) -> int:
 
     async def function(i: int) -> int:
         async with _jobs_module.async_session_maker() as session:
-            subq = select(func.count(func.distinct(Blueprint.blueprint_id))).where(Blueprint.is_deleted.is_(False))
+            subq = select(func.count(func.distinct(Blueprint.blueprint_id))).where(
+                Blueprint.is_deleted.is_(False),
+                Blueprint.source != "preset",
+            )
             if not auth_context.has_admin():
                 subq = subq.where(
                     or_(

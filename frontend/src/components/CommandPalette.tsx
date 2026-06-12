@@ -70,7 +70,6 @@ export function CommandPalette() {
 
   // Category headings are union values used for grouping; map them to labels.
   const categoryLabels: Record<CommandCategory, string> = {
-    'Getting Started': t('commands.categoryGettingStarted'),
     Navigation: t('commands.categoryNavigation'),
   }
 

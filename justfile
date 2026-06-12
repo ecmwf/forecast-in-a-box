@@ -7,17 +7,24 @@ drun-mongo:
 drun:
     docker run --rm -it --network host --name forecast-in-a-box forecast-in-a-box
 
-fiabwheel:
+build-frontend:
     #!/usr/bin/env bash
-    set -euo pipefail
     pushd frontend
     npm ci
     npm run prodbuild
     popd
 
+copy-static:
+    #!/usr/bin/env bash
+    rm -rf backend/src/forecastbox/static
+    ln -s ./../../../frontend/dist backend/src/forecastbox/static
+
+fiabwheel:
+    #!/usr/bin/env bash
+    just build-frontend
+    just copy-static
+
     pushd backend
-    rm -rf src/forecastbox/static
-    ln -s ../../../frontend/dist src/forecastbox/static
     find src/forecastbox/static/ -type f | sed 's/.*/include &/' > MANIFEST.in
     python -m build --installer uv .
 
@@ -54,5 +61,8 @@ f2:
 
 dev:
     #!/usr/bin/env bash
-    if [[ ! -d backend/src/forecastbox/static ]] ; then just fiabwheel ; fi
+    if [[ ! -d backend/src/forecastbox/static ]] ; then 
+        just build-frontend ; 
+        just copy-static ; 
+    fi
     just -f backend/justfile -d backend dev

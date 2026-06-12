@@ -14,7 +14,7 @@
  * Full-page view of plugin details with block factories grid.
  */
 
-import { ArrowLeft, Search } from 'lucide-react'
+import { ArrowLeft, BookOpen, Search } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
@@ -28,14 +28,30 @@ import type {
   PluginBlockFactoryId,
 } from '@/api/types/fable.types'
 import type { PluginCapability, PluginInfo } from '@/api/types/plugins.types'
+import type { PresetListItem } from '@/api/types/preset.types'
 import { BLOCK_KIND_ORDER, getFactory } from '@/api/types/fable.types'
 import { toPluginDisplayId } from '@/api/types/plugins.types'
+import { usePresetList } from '@/api/hooks/usePresets'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { encodeFableToURL } from '@/features/fable-builder/utils/url-state'
 import { H1, H2, P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
+
+function difficultyVariant(
+  difficulty: PresetListItem['difficulty'],
+): 'default' | 'secondary' | 'outline' {
+  switch (difficulty) {
+    case 'beginner':
+      return 'secondary'
+    case 'intermediate':
+      return 'default'
+    case 'advanced':
+      return 'outline'
+  }
+}
 
 export interface PluginDetailPageProps {
   plugin: PluginInfo
@@ -63,6 +79,15 @@ export function PluginDetailPage({ plugin, catalogue }: PluginDetailPageProps) {
   }, [])
 
   const pluginDisplayId = toPluginDisplayId(plugin.id)
+  const { data: presetData } = usePresetList(undefined, 1, 100)
+  const pluginPresets = useMemo(() => {
+    if (!presetData?.presets) return []
+    return presetData.presets.filter(
+      (preset) =>
+        preset.source === 'plugin' && preset.plugin_id === pluginDisplayId,
+    )
+  }, [presetData, pluginDisplayId])
+
   const pluginCatalogue = catalogue?.[pluginDisplayId]
   const blockCount = pluginCatalogue
     ? Object.keys(pluginCatalogue.factories).length
@@ -166,6 +191,53 @@ export function PluginDetailPage({ plugin, catalogue }: PluginDetailPageProps) {
       )}
 
       <Separator />
+
+      {/* Presets */}
+      {plugin.isInstalled && plugin.isEnabled && (
+        <div>
+          <H2 className="mb-4 text-lg font-semibold">
+            {t('detail.presets')}
+            {pluginPresets.length > 0 && (
+              <span className="ml-1.5 text-muted-foreground">
+                ({pluginPresets.length})
+              </span>
+            )}
+          </H2>
+          {pluginPresets.length > 0 ? (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {pluginPresets.map((preset) => (
+                <div
+                  key={preset.preset_id}
+                  className="rounded-lg border border-border p-4"
+                >
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">{preset.name}</span>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {preset.description}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <Badge variant={difficultyVariant(preset.difficulty)}>
+                      {preset.difficulty}
+                    </Badge>
+                    {preset.tags.map((tag) => (
+                      <Badge key={tag} variant="outline" className="text-xs">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-4 text-center text-muted-foreground">
+              {t('detail.noPresets')}
+            </div>
+          )}
+          <Separator className="mt-6" />
+        </div>
+      )}
 
       {/* Block Factories */}
       <div>

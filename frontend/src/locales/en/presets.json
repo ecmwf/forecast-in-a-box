@@ -1,0 +1,319 @@
+{
+  "gallery": {
+    "page": {
+      "title": "Preset Gallery",
+      "subtitle": "Browse and launch pre-built forecast configurations"
+    },
+    "search": {
+      "placeholder": "Search presets…",
+      "ariaLabel": "Search presets by name, description or tag"
+    },
+    "filters": {
+      "categories": {
+        "label": "Filter by category",
+        "all": "All Categories"
+      },
+      "difficulty": {
+        "label": "Filter by difficulty",
+        "all": "All Difficulties",
+        "beginner": "Beginner",
+        "intermediate": "Intermediate",
+        "advanced": "Advanced"
+      }
+    },
+    "card": {
+      "useThisPreset": "Use This Preset",
+      "openInEditor": "Open in Editor",
+      "difficultyLabel": "Difficulty: {{difficulty}}",
+      "categoryLabel": "Category: {{category}}"
+    },
+    "empty": {
+      "title": "No presets found",
+      "description": "No published presets are available yet.",
+      "filteredTitle": "No presets match your filters",
+      "filteredDescription": "Try clearing the search or selecting a different category or difficulty."
+    },
+    "loading": {
+      "ariaLabel": "Loading presets"
+    },
+    "error": {
+      "title": "Could not load presets",
+      "description": "There was a problem fetching the preset gallery. Please try again later."
+    }
+  },
+  "mine": {
+    "page": {
+      "title": "My Configurations",
+      "description": "Your saved forecast configurations"
+    },
+    "search": {
+      "placeholder": "Search presets…"
+    },
+    "filters": {
+      "all": "All",
+      "bookmarked": "Bookmarked"
+    },
+    "actions": {
+      "load": "Use this Preset",
+      "delete": "Delete",
+      "bookmark": "Bookmark",
+      "removeBookmark": "Remove bookmark",
+      "rename": "Rename"
+    },
+    "rename": {
+      "title": "Rename Preset",
+      "description": "Update the title and comments for this preset.",
+      "titleLabel": "Title",
+      "commentsLabel": "Comments",
+      "cancel": "Cancel",
+      "save": "Save"
+    },
+    "empty": {
+      "title": "No saved presets yet",
+      "description": "Save a configuration from the Fable Builder to see it here.",
+      "filtered": "No presets match your search."
+    },
+    "pagination": {
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {{current}} of {{total}}"
+    }
+  },
+  "tabs": {
+    "label": "Presets navigation",
+    "gallery": "Templates",
+    "mine": "My Configurations"
+  },
+  "gettingStarted": {
+    "section": {
+      "title": "Getting Started Presets",
+      "subtitle": "Choose how to start your forecast configuration"
+    },
+    "loading": {
+      "ariaLabel": "Loading featured presets"
+    },
+    "recommended": "Recommended",
+    "browseAll": "Browse all presets",
+    "startFromScratch": {
+      "title": "Start from Scratch",
+      "description": "Build a forecast from scratch with full control over every parameter.",
+      "tags": {
+        "canvas": "Blank Canvas",
+        "control": "Full Control"
+      }
+    },
+    "unavailable": {
+      "title": "Presets unavailable",
+      "description": "Could not load featured presets. Start from scratch or try again later."
+    }
+  },
+  "admin": {
+    "page": {
+      "title": "Manage Presets",
+      "description": "Create, publish, and delete high-level forecast presets."
+    },
+    "actions": {
+      "createNew": "Create New Preset",
+      "edit": "Edit",
+      "publish": "Publish",
+      "unpublish": "Unpublish",
+      "delete": "Delete",
+      "publishing": "Publishing…",
+      "unpublishing": "Unpublishing…",
+      "deleting": "Deleting…"
+    },
+    "table": {
+      "name": "Name",
+      "category": "Category",
+      "difficulty": "Difficulty",
+      "status": "Status",
+      "version": "Version",
+      "createdBy": "Created By",
+      "actions": "Actions"
+    },
+    "status": {
+      "published": "Published",
+      "unpublished": "Unpublished"
+    },
+    "difficulty": {
+      "beginner": "Beginner",
+      "intermediate": "Intermediate",
+      "advanced": "Advanced"
+    },
+    "empty": {
+      "title": "No presets yet",
+      "description": "Create your first preset to get started."
+    },
+    "delete": {
+      "title": "Delete Preset",
+      "description": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
+      "confirm": "Delete",
+      "cancel": "Cancel"
+    },
+    "toast": {
+      "publishSuccess": "Preset published successfully.",
+      "unpublishSuccess": "Preset unpublished successfully.",
+      "publishError": "Failed to update preset status.",
+      "loadError": "Failed to load preset.",
+      "deleteSuccess": "Preset deleted successfully.",
+      "deleteError": "Failed to delete preset."
+    }
+  },
+  "form": {
+    "createTitle": "Create New Preset",
+    "editTitle": "Edit Preset",
+    "createSubtitle": "Fill in the details below to create a new high-level forecast preset.",
+    "editSubtitle": "Editing \"{{name}}\"",
+    "close": "Close",
+    "sections": {
+      "basicInfo": "Basic Information",
+      "basicInfoDesc": "The name and description shown to users in the preset gallery.",
+      "metadata": "Metadata",
+      "metadataDesc": "Category, difficulty, icon and tags used for filtering and display.",
+      "parameters": "Parameters",
+      "parametersDesc": "Define the configurable inputs users will see in the preset wizard.",
+      "template": "Builder Template",
+      "templateDesc": "The raw Fable Builder JSON template that will be instantiated when a user runs this preset."
+    },
+    "fields": {
+      "name": "Name",
+      "nameHint": "Short, descriptive title shown in the gallery (max 120 characters).",
+      "namePlaceholder": "e.g. Global Temperature Forecast",
+      "description": "Short Description",
+      "descriptionHint": "One or two sentences summarising what this preset does.",
+      "descriptionPlaceholder": "e.g. Runs a global temperature forecast using ERA5 data.",
+      "longDescription": "Long Description",
+      "longDescriptionHint": "Optional extended description shown on the preset detail page. Supports plain text.",
+      "longDescriptionPlaceholder": "Provide additional context, usage notes, or expected outputs…",
+      "category": "Category",
+      "categoryHint": "Free-form category string. Start typing to see existing categories.",
+      "categoryPlaceholder": "e.g. Climate, NWP, Seasonal",
+      "difficulty": "Difficulty",
+      "icon": "Icon",
+      "iconHint": "Lucide icon name displayed next to the preset title.",
+      "tags": "Tags",
+      "tagsHint": "Press Enter or comma to add a tag. Tags help users filter presets.",
+      "tagsPlaceholder": "Add tags…",
+      "published": "Published",
+      "publishedHint": "Published presets are visible to all users in the gallery."
+    },
+    "icon": {
+      "placeholder": "e.g. Cloud, Sun, Wind…",
+      "browse": "Browse",
+      "search": "Search icons…",
+      "noResults": "No icons match your search."
+    },
+    "category": {
+      "placeholder": "e.g. Climate"
+    },
+    "parameters": {
+      "empty": "No parameters defined. Add one below.",
+      "add": "Add Parameter",
+      "paramLabel": "Parameter {{index}}",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "remove": "Remove parameter",
+      "fields": {
+        "glyphKey": "Glyph Key",
+        "glyphKeyPlaceholder": "e.g. start_date",
+        "label": "Label",
+        "labelPlaceholder": "e.g. Start Date",
+        "description": "Description",
+        "descriptionPlaceholder": "e.g. The first date of the forecast period.",
+        "valueType": "Value Type",
+        "valueTypePlaceholder": "e.g. string, integer, date",
+        "defaultValue": "Default Value",
+        "defaultValuePlaceholder": "e.g. 2024-01-01"
+      }
+    },
+    "template": {
+      "hint": "Paste or edit the Fable Builder JSON template. Use the Format button to pretty-print.",
+      "placeholder": "{ \"version\": 1, \"blocks\": [], \"connections\": [] }",
+      "format": "Format JSON"
+    },
+    "preview": {
+      "button": "Preview Wizard",
+      "disabledHint": "Preview is only available for intermediate/advanced presets with at least one parameter."
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "create": "Create Preset",
+      "update": "Save Changes",
+      "saving": "Saving…"
+    },
+    "validation": {
+      "nameRequired": "Name is required.",
+      "descriptionRequired": "Short description is required.",
+      "categoryRequired": "Category is required.",
+      "iconRequired": "Icon name is required.",
+      "templateRequired": "Builder template is required.",
+      "templateInvalidJson": "Builder template must be valid JSON.",
+      "paramGlyphKeyRequired": "Glyph key is required.",
+      "paramLabelRequired": "Label is required.",
+      "parametersHaveErrors": "One or more parameters have missing required fields."
+    },
+    "toast": {
+      "createSuccess": "Preset created successfully.",
+      "updateSuccess": "Preset updated successfully.",
+      "saveError": "Failed to save preset. Please try again."
+    }
+  },
+  "wizard": {
+    "title": "Configure: {{name}}",
+    "subtitle": "Customise the preset parameters before running.",
+    "stepIndicator": "Step {{current}} of {{total}}",
+    "difficulty": {
+      "label": "Difficulty",
+      "beginner": {
+        "name": "Beginner",
+        "hint": "One-click execution — no configuration needed."
+      },
+      "intermediate": {
+        "name": "Intermediate",
+        "hint": "Configure a few parameters, then run immediately."
+      },
+      "advanced": {
+        "name": "Advanced",
+        "hint": "Full editor access — customise every detail before running."
+      }
+    },
+    "steps": {
+      "review": "Review",
+      "configure": "Configure",
+      "submit": "Submit"
+    },
+    "actions": {
+      "back": "Back",
+      "next": "Next",
+      "cancel": "Cancel",
+      "runForecast": "Run",
+      "runningForecast": "Running…",
+      "submittingForecast": "Submitting…",
+      "openInEditor": "Open in Editor",
+      "openingInEditor": "Opening…",
+      "launch": "Launch Forecast",
+      "launching": "Launching…"
+    },
+    "runForecastDisabledHint": "Fill in all required parameters to run the forecast.",
+    "previewModeHint": "Preview only — save the preset to enable this action.",
+    "review": {
+      "title": "Review Configuration",
+      "description": "Check the preset details before proceeding.",
+      "difficulty": "Difficulty",
+      "category": "Category",
+      "tags": "Tags",
+      "estimatedRuntime": "Estimated runtime"
+    },
+    "success": {
+      "title": "Forecast submitted",
+      "description": "Your forecast job has been queued successfully.",
+      "viewJob": "View Job"
+    },
+    "error": {
+      "title": "Instantiation failed",
+      "description": "Could not configure the preset. Please try again.",
+      "retry": "Retry",
+      "validationTitle": "Validation errors"
+    }
+  }
+}

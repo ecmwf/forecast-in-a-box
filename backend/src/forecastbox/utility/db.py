@@ -47,6 +47,18 @@ async def executeAndCommit(stmt: Any, session_maker: Any) -> None:
     await dbRetry(func)
 
 
+async def executeAndCommitReturningRowcount(stmt: Any, session_maker: Any) -> int:
+    """Execute *stmt*, commit, and return the number of rows affected."""
+
+    async def func(i: int) -> int:
+        async with session_maker() as session:
+            result = await session.execute(stmt)
+            await session.commit()
+            return result.rowcount  # type: ignore[union-attr]
+
+    return await dbRetry(func)
+
+
 async def addAndCommit(entity: Any, session_maker: Any) -> None:
     async def func(i: int) -> None:
         async with session_maker() as session:
