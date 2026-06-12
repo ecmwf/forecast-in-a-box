@@ -382,7 +382,7 @@ async def create_preset(
     if not auth_context.has_admin():
         raise HTTPException(status_code=403, detail="Only admins may create presets.")
 
-    preset_id, version = await db.insert_preset(
+    preset_id, version = await db.create_preset(
         auth_context=auth_context,
         name=body.name,
         description=body.description,
@@ -414,9 +414,9 @@ async def update_preset(
         raise HTTPException(status_code=403, detail="Only admins may update presets.")
 
     try:
-        preset_id, version = await db.insert_preset(
-            auth_context=auth_context,
+        preset_id, version = await db.add_preset_version(
             preset_id=body.preset_id,
+            auth_context=auth_context,
             expected_version=body.version,
             name=body.name,
             description=body.description,

@@ -31,6 +31,8 @@
 import { useCallback, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
+import i18n from 'i18next'
 import type { HighLevelPreset } from '@/api/types/preset.types'
 import { presetKeys, useInstantiatePreset } from '@/api/hooks/usePresets'
 import { showToast } from '@/lib/toast'
@@ -76,6 +78,7 @@ export interface UsePresetSelectionReturn {
 // ---------------------------------------------------------------------------
 
 export function usePresetSelection(): UsePresetSelectionReturn {
+  const { t } = useTranslation('dashboard')
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { mutateAsync: instantiate, isPending } = useInstantiatePreset()
@@ -111,7 +114,9 @@ export function usePresetSelection(): UsePresetSelectionReturn {
 
         if (preset.difficulty === 'beginner') {
           // ── Beginner: instant instantiation, no wizard ─────────────────
-          const loadingToastId = showToast.loading('Launching forecast…')
+          const loadingToastId = showToast.loading(
+            t('presetGallery.toast.launchingForecast'),
+          )
 
           try {
             const result = await instantiate({
@@ -122,23 +127,26 @@ export function usePresetSelection(): UsePresetSelectionReturn {
             showToast.dismiss(loadingToastId)
 
             if (result.run_id) {
-              showToast.success('Forecast launched', preset.name)
+              showToast.success(
+                t('presetGallery.toast.forecastLaunched'),
+                preset.name,
+              )
               void navigate({
                 to: '/executions/$jobId',
                 params: { jobId: result.run_id },
               })
             } else {
               showToast.warning(
-                'Preset instantiated',
-                'No run ID returned — check the executions list.',
+                t('presetGallery.toast.presetInstantiated'),
+                t('presetGallery.toast.noRunIdReturned'),
               )
               void navigate({ to: '/executions' })
             }
           } catch (err) {
             showToast.dismiss(loadingToastId)
             showToast.error(
-              'Failed to launch forecast',
-              err instanceof Error ? err.message : 'Please try again.',
+              t('presetGallery.toast.failedToLaunch'),
+              err instanceof Error ? err.message : i18n.t('errors:toast.tryAgain'),
             )
           }
         } else {
@@ -148,8 +156,8 @@ export function usePresetSelection(): UsePresetSelectionReturn {
         }
       } catch (err) {
         showToast.error(
-          'Could not load preset',
-          err instanceof Error ? err.message : 'Please try again.',
+          t('presetGallery.toast.couldNotLoad'),
+          err instanceof Error ? err.message : i18n.t('errors:toast.tryAgain'),
         )
       } finally {
         pendingRef.current = null

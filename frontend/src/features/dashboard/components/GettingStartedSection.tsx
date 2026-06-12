@@ -27,6 +27,7 @@ import * as LucideIcons from 'lucide-react'
 import { Box, ChevronRight, Layers, LayoutGrid } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from '@tanstack/react-router'
+import type { TFunction } from 'i18next'
 import { GettingStartedCard } from './GettingStartedCard'
 import type { PresetListItem } from '@/api/types/preset.types'
 import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
@@ -173,11 +174,34 @@ interface PresetCardsProps {
   loadingPresetId: string | null
 }
 
+/**
+ * Hardcoded "Start from Scratch" card that navigates directly to the fable
+ * builder.  Always rendered as the first card in the grid.
+ */
+function StartFromScratchCard({ t }: { t: TFunction<'dashboard'> }) {
+  const navigate = useNavigate()
+  return (
+    <GettingStartedCard
+      icon={<Layers className="h-5 w-5" aria-hidden="true" />}
+      title={t('gettingStarted.startFromScratch.title')}
+      description={t('gettingStarted.startFromScratch.description')}
+      tags={[
+        t('gettingStarted.startFromScratch.tagBlankCanvas'),
+        t('gettingStarted.startFromScratch.tagFullControl'),
+      ]}
+      isRecommended
+      onClick={() => void navigate({ to: '/configure' })}
+    />
+  )
+}
+
 function PresetCards({
   presets,
   onSelectPreset,
   loadingPresetId,
 }: PresetCardsProps) {
+  const { t } = useTranslation('dashboard')
+
   // Track which card is in a loading state so we can show a spinner.
   // We use local state to wrap the async call and clear it when done.
   const [localLoadingId, setLocalLoadingId] = useState<string | null>(null)
@@ -198,9 +222,13 @@ function PresetCards({
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Hardcoded "Start from Scratch" — always first */}
+      <StartFromScratchCard t={t} />
+
       {presets.map((preset, index) => {
         const Icon = resolveIcon(preset.icon)
-        const accent = ACCENT_COLOURS[index % ACCENT_COLOURS.length]
+        // Offset accent colours by 1 since the first slot is the static card
+        const accent = ACCENT_COLOURS[(index + 1) % ACCENT_COLOURS.length]
         const isLoading = effectiveLoadingId === preset.preset_id
 
         return (
@@ -237,13 +265,10 @@ export function GettingStartedSection({
   const { data: presets, isLoading, isError } = usePresetList(undefined, 1, 100)
 
   const featured = presets?.presets
-    .filter((p) => p.tags.includes('featured'))
-    .sort((a, b) => {
-      if (a.preset_id === 'blank-canvas') return -1
-      if (b.preset_id === 'blank-canvas') return 1
-      return 0
-    })
-    .slice(0, 4)
+    .filter(
+      (p) => p.tags.includes('featured') && p.preset_id !== 'blank-canvas',
+    )
+    .slice(0, 3)
 
   // Determine which content to render
   const showSkeleton = isLoading

@@ -50,7 +50,7 @@ async def test_list_presets_with_filters() -> None:
     # Create a test preset
     auth_context = AuthContext(user_id="test_user", is_admin=True)
 
-    preset_id, version = await preset_db.insert_preset(
+    preset_id, version = await preset_db.create_preset(
         auth_context=auth_context,
         name="Test Preset",
         description="A test preset for filtering",
@@ -86,7 +86,7 @@ async def test_count_presets() -> None:
     # Create a test preset
     auth_context = AuthContext(user_id="test_user", is_admin=True)
 
-    preset_id, version = await preset_db.insert_preset(
+    preset_id, version = await preset_db.create_preset(
         auth_context=auth_context,
         name="Count Test Preset",
         description="A test preset for counting",
@@ -116,7 +116,7 @@ async def test_list_presets_published_only() -> None:
     auth_context = AuthContext(user_id="test_user", is_admin=True)
 
     # Create a published preset
-    published_id, _ = await preset_db.insert_preset(
+    published_id, _ = await preset_db.create_preset(
         auth_context=auth_context,
         name="Published Preset",
         description="This is published",
@@ -128,7 +128,7 @@ async def test_list_presets_published_only() -> None:
     )
 
     # Create an unpublished preset
-    unpublished_id, _ = await preset_db.insert_preset(
+    unpublished_id, _ = await preset_db.create_preset(
         auth_context=auth_context,
         name="Unpublished Preset",
         description="This is not published",
@@ -158,7 +158,7 @@ async def test_search_in_tags() -> None:
     auth_context = AuthContext(user_id="test_user", is_admin=True)
 
     # Create a preset with specific tags
-    preset_id, _ = await preset_db.insert_preset(
+    preset_id, _ = await preset_db.create_preset(
         auth_context=auth_context,
         name="Tagged Preset",
         description="A preset with tags",
@@ -185,7 +185,7 @@ async def test_patch_preset_publish_status_does_not_increment_version() -> None:
     """patch_preset_publish_status updates is_published in place without creating a new version."""
     auth_context = AuthContext(user_id="test_user", is_admin=True)
 
-    preset_id, version = await preset_db.insert_preset(
+    preset_id, version = await preset_db.create_preset(
         auth_context=auth_context,
         name="Publish Toggle Test",
         description="A preset for publish toggle testing",
@@ -231,7 +231,7 @@ async def test_patch_preset_publish_status_version_conflict() -> None:
 
     auth_context = AuthContext(user_id="test_user", is_admin=True)
 
-    preset_id, version = await preset_db.insert_preset(
+    preset_id, version = await preset_db.create_preset(
         auth_context=auth_context,
         name="Version Conflict Publish Test",
         description="desc",

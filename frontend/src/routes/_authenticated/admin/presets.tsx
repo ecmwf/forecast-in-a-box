@@ -408,7 +408,7 @@ function AdminPresetsPage() {
       setEditingPreset(full)
       setFormOpen(true)
     } catch {
-      showToast.error(t('admin.toast.publishError'))
+      showToast.error(t('admin.toast.loadError'))
     } finally {
       setLoadingEditId(null)
     }

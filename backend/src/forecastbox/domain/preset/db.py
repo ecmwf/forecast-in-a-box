@@ -25,13 +25,106 @@ from forecastbox.domain.preset.exceptions import PresetAccessDenied, PresetNotFo
 from forecastbox.domain.preset.types import PresetId
 from forecastbox.schemata.jobs import HighLevelPreset
 from forecastbox.utility.auth import AuthContext
-from forecastbox.utility.db import dbRetry, executeAndCommit, querySingle
+from forecastbox.utility.db import dbRetry, executeAndCommit, executeAndCommitReturningRowcount, querySingle
 
 
-async def insert_preset(
+async def _insert_preset_row(
+    *,
+    preset_id: PresetId,
+    new_version: int,
+    name: str,
+    description: str,
+    long_description: str | None,
+    difficulty: str,
+    tags: list[str],
+    icon: str,
+    builder_template: dict,
+    parameters: list[dict],
+    is_published: bool,
+    created_by: str,
+    ref_time: dt.datetime,
+) -> None:
+    """Private helper: insert a new preset row into the database.
+
+    This function handles the actual database insertion without any
+    validation, authorization, or version checking. It should only be
+    called by create_preset or add_preset_version.
+    """
+
+    async def function(i: int) -> None:
+        async with _jobs_module.async_session_maker() as session:
+            session.add(
+                HighLevelPreset(
+                    preset_id=preset_id,
+                    version=new_version,
+                    name=name,
+                    description=description,
+                    long_description=long_description,
+                    difficulty=difficulty,
+                    tags=tags,
+                    icon=icon,
+                    builder_template=builder_template,
+                    parameters=parameters,
+                    is_published=is_published,
+                    created_by=created_by,
+                    created_at=ref_time,
+                    updated_at=ref_time,
+                    is_deleted=False,
+                )
+            )
+            await session.commit()
+
+    await dbRetry(function)
+
+
+async def create_preset(
     *,
     auth_context: AuthContext,
-    preset_id: PresetId | None = None,
+    name: str,
+    description: str,
+    long_description: str | None = None,
+    difficulty: str,
+    tags: list[str] | None = None,
+    icon: str = "Cloud",
+    builder_template: dict,
+    parameters: list[dict] | None = None,
+    is_published: bool = False,
+    created_by: str,
+) -> tuple[PresetId, int]:
+    """Create a brand new preset with version 1.
+
+    Generates a new UUID for the preset_id and always creates version 1.
+    No authorization checks are performed beyond those in auth_context.
+
+    Returns:
+        Tuple of (preset_id, version) where version is always 1.
+    """
+    preset_id = PresetId(str(uuid.uuid4()))
+    ref_time = dt.datetime.now()
+
+    await _insert_preset_row(
+        preset_id=preset_id,
+        new_version=1,
+        name=name,
+        description=description,
+        long_description=long_description,
+        difficulty=difficulty,
+        tags=tags or [],
+        icon=icon,
+        builder_template=builder_template,
+        parameters=parameters or [],
+        is_published=is_published,
+        created_by=created_by,
+        ref_time=ref_time,
+    )
+
+    return preset_id, 1
+
+
+async def add_preset_version(
+    *,
+    preset_id: PresetId,
+    auth_context: AuthContext,
     name: str,
     description: str,
     long_description: str | None = None,
@@ -44,72 +137,80 @@ async def insert_preset(
     created_by: str,
     expected_version: int | None = None,
 ) -> tuple[PresetId, int]:
-    """Insert a new version of a HighLevelPreset and return ``(preset_id, version)``.
+    """Add a new version to an existing preset.
 
-    If ``preset_id`` is omitted a fresh UUID is generated (version 1).
-    If ``preset_id`` is supplied the next version is derived from the DB;
-    raises ``PresetNotFound`` if it does not exist yet,
-    ``PresetAccessDenied`` if the actor is not the owner or an admin, and
-    ``PresetVersionConflict`` if ``expected_version`` is provided and does not
-    match the current maximum version.
+    Derives the next version number from the database and performs
+    authorization and version conflict checks.
+
+    Args:
+        preset_id: The ID of the existing preset to add a version to.
+        auth_context: Authorization context for ownership checks.
+        expected_version: If provided, must match the current maximum version.
+        Other parameters: Content for the new version.
+
+    Returns:
+        Tuple of (preset_id, version) with the newly created version number.
+
+    Raises:
+        PresetNotFound: If no preset with the given ID exists.
+        PresetAccessDenied: If the user is not the owner or an admin.
+        PresetVersionConflict: If expected_version doesn't match current version.
     """
-    id_provided = preset_id is not None
-    preset_id = preset_id if preset_id is not None else PresetId(str(uuid.uuid4()))
     ref_time = dt.datetime.now()
 
     async def function(i: int) -> int:
         async with _jobs_module.async_session_maker() as session:
+            # Get the current maximum version
             result = await session.execute(select(func.max(HighLevelPreset.version)).where(HighLevelPreset.preset_id == preset_id))
             max_version: int | None = result.scalar()
 
-            if id_provided:
-                if max_version is None:
-                    raise PresetNotFound(f"No Preset with id={preset_id!r} exists; cannot add a new version.")
-                if expected_version is not None and max_version != expected_version:
-                    raise PresetVersionConflict(
-                        f"Version conflict for Preset {preset_id!r}: expected version {expected_version}, current is {max_version}."
-                    )
-                # Ownership check on the latest (non-deleted) version.
-                owner_query = (
-                    select(HighLevelPreset.created_by)
-                    .where(
-                        HighLevelPreset.preset_id == preset_id,
-                        HighLevelPreset.is_deleted.is_(False),
-                    )
-                    .order_by(HighLevelPreset.version.desc())
-                    .limit(1)
-                )
-                owner_result = await session.execute(owner_query)
-                row = owner_result.first()
-                if row is not None:
-                    owner: str = row[0]
-                    if not auth_context.allowed(owner):
-                        raise PresetAccessDenied(f"User {auth_context.user_id!r} is not allowed to modify Preset {preset_id!r}.")
+            # Validate preset exists
+            if max_version is None:
+                raise PresetNotFound(f"No Preset with id={preset_id!r} exists; cannot add a new version.")
 
-            new_version = (max_version or 0) + 1
-            session.add(
-                HighLevelPreset(
-                    preset_id=preset_id,
-                    version=new_version,
-                    name=name,
-                    description=description,
-                    long_description=long_description,
-                    difficulty=difficulty,
-                    tags=tags or [],
-                    icon=icon,
-                    builder_template=builder_template,
-                    parameters=parameters or [],
-                    is_published=is_published,
-                    created_by=created_by,
-                    created_at=ref_time,
-                    updated_at=ref_time,
-                    is_deleted=False,
+            # Check for version conflict
+            if expected_version is not None and max_version != expected_version:
+                raise PresetVersionConflict(
+                    f"Version conflict for Preset {preset_id!r}: expected version {expected_version}, current is {max_version}."
                 )
+
+            # Check ownership on the latest (non-deleted) version
+            owner_query = (
+                select(HighLevelPreset.created_by)
+                .where(
+                    HighLevelPreset.preset_id == preset_id,
+                    HighLevelPreset.is_deleted.is_(False),
+                )
+                .order_by(HighLevelPreset.version.desc())
+                .limit(1)
             )
-            await session.commit()
-            return new_version
+            owner_result = await session.execute(owner_query)
+            row = owner_result.first()
+            if row is not None:
+                owner: str = row[0]
+                if not auth_context.allowed(owner):
+                    raise PresetAccessDenied(f"User {auth_context.user_id!r} is not allowed to modify Preset {preset_id!r}.")
+
+            return max_version + 1
 
     new_version = await dbRetry(function)
+
+    await _insert_preset_row(
+        preset_id=preset_id,
+        new_version=new_version,
+        name=name,
+        description=description,
+        long_description=long_description,
+        difficulty=difficulty,
+        tags=tags or [],
+        icon=icon,
+        builder_template=builder_template,
+        parameters=parameters or [],
+        is_published=is_published,
+        created_by=created_by,
+        ref_time=ref_time,
+    )
+
     return preset_id, new_version
 
 
@@ -309,7 +410,11 @@ async def patch_preset_publish_status(
         )
         .values(is_published=is_published, updated_at=dt.datetime.now())
     )
-    await executeAndCommit(stmt, _jobs_module.async_session_maker)
+    rowcount = await executeAndCommitReturningRowcount(stmt, _jobs_module.async_session_maker)
+    if rowcount == 0:
+        raise PresetVersionConflict(
+            f"Concurrent modification: Preset {preset_id!r} version {expected_version} was changed before the update could be applied."
+        )
 
 
 async def soft_delete_preset(preset_id: PresetId, *, expected_version: int, auth_context: AuthContext) -> None:
@@ -330,4 +435,6 @@ async def soft_delete_preset(preset_id: PresetId, *, expected_version: int, auth
     if not auth_context.allowed(typing_cast(str, existing.created_by)):
         raise PresetAccessDenied(f"User {auth_context.user_id!r} is not allowed to delete Preset {preset_id!r}.")
     stmt = update(HighLevelPreset).where(HighLevelPreset.preset_id == preset_id).values(is_deleted=True)
-    await executeAndCommit(stmt, _jobs_module.async_session_maker)
+    rowcount = await executeAndCommitReturningRowcount(stmt, _jobs_module.async_session_maker)
+    if rowcount == 0:
+        raise PresetNotFound(f"Concurrent modification: Preset {preset_id!r} was deleted before the update could be applied.")

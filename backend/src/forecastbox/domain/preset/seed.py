@@ -386,9 +386,9 @@ def _aifs_ensemble_to_grib() -> HighLevelPreset:
             PresetParameter(
                 glyph_key="base_time",
                 label="Base Time",
-                description="Forecast initialisation date-time (ISO 8601). Pick a date and 00z run before submitting.",
+                description="Forecast initialisation date-time (ISO 8601). Defaults to today at midnight UTC.",
                 value_type="datetime",
-                default_value="",
+                default_value="${submitDatetime | floor_day}",
             ),
         ],
         is_published=True,
@@ -444,11 +444,9 @@ SEED_PRESETS: list[HighLevelPreset] = [
 async def _insert_seed_preset(preset: HighLevelPreset) -> None:
     """Directly insert a single seed preset at version 1.
 
-    This bypasses the version-check logic in ``preset_db.insert_preset``,
-    which is designed for *updating* an existing preset (adding a new version)
-    and raises ``PresetNotFound`` when the preset does not yet exist.  For
-    seeding we always want to create a fresh row with a stable slug ID and
-    version 1.
+    This bypasses ``preset_db.create_preset`` to use a stable preset_id from
+    the seed data rather than generating a new UUID. For seeding we always
+    want to create a fresh row with a stable slug ID and version 1.
     """
     import forecastbox.schemata.jobs as _jobs_module
     from forecastbox.schemata.jobs import HighLevelPreset as HighLevelPresetRow

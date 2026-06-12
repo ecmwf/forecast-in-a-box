@@ -45,6 +45,10 @@ import { useFableValidation } from '@/api/hooks/useFable'
 import { useInstantiatePreset } from '@/api/hooks/usePresets'
 import { parseValueType } from '@/components/base/fields/value-type-parser'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
+import { GlyphContext } from '@/features/fable-builder/context/GlyphContext'
+import { BlockValidationProvider } from '@/features/fable-builder/context/BlockValidationContext'
+import { useAllGlyphs } from '@/features/fable-builder/hooks/useAllGlyphs'
+import { GlyphReferencePanel } from '@/features/fable-builder/components/shared/GlyphReferencePanel'
 import { createLogger } from '@/lib/logger'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -80,6 +84,44 @@ function buildInitialValues(
     values[param.glyph_key] = param.default_value
   }
   return values
+}
+
+/**
+ * Build a glyph_key → resolved-value map for the "resolves to" preview by
+ * scanning every block's resolved configuration. A parameter's resolved value
+ * is the resolved value of any block config whose raw expression was exactly
+ * `${<glyph_key>}` — i.e. the block uses the parameter verbatim. Parameters
+ * referenced only inside larger expressions won't appear here, which is fine:
+ * the preview is best-effort and omits what it can't match cleanly.
+ */
+function buildResolvedConfigForWizard(
+  parameters: ReadonlyArray<PresetParameter>,
+  builderBlocks: Record<
+    string,
+    { configuration_values?: Record<string, string> }
+  >,
+  resolvedByBlock:
+    | Record<string, Record<string, string>>
+    | undefined,
+): Record<string, string> | null {
+  if (!resolvedByBlock) return null
+  const result: Record<string, string> = {}
+  for (const param of parameters) {
+    const marker = `\${${param.glyph_key}}`
+    for (const [blockId, block] of Object.entries(builderBlocks)) {
+      const raw = block.configuration_values ?? {}
+      for (const [configKey, rawValue] of Object.entries(raw)) {
+        if (rawValue !== marker) continue
+        const resolved = resolvedByBlock[blockId]?.[configKey]
+        if (resolved !== undefined && resolved !== marker) {
+          result[param.glyph_key] = resolved
+          break
+        }
+      }
+      if (param.glyph_key in result) break
+    }
+  }
+  return result
 }
 
 /** Split an array into chunks of at most `size` elements. */
@@ -124,6 +166,80 @@ function isFormValid(
         return true
     }
   })
+}
+
+/**
+ * Map block-level validation errors back to preset parameter glyph keys.
+ *
+ * The `/validate` endpoint returns errors keyed by block ID. For each block
+ * config key whose raw value is exactly `${<glyph_key>}`, we attribute the
+ * block's errors to that parameter. Errors that can't be attributed are
+ * returned as `unmapped`.
+ */
+function mapBlockErrorsToParams(
+  parameters: ReadonlyArray<PresetParameter>,
+  blocks: Record<string, { configuration_values?: Record<string, string> }>,
+  blockErrors: Record<string, ReadonlyArray<string>>,
+  missingGlyphs: Record<string, Record<string, ReadonlyArray<string>>>,
+): {
+  fieldErrors: Record<string, Array<string>>
+  unmapped: Array<string>
+} {
+  const fieldErrors: Record<string, Array<string>> = {}
+  const unmapped: Array<string> = []
+
+  // Build a reverse map: blockId+configKey → glyph_key
+  const configToGlyph = new Map<string, string>()
+  for (const param of parameters) {
+    const marker = `\${${param.glyph_key}}`
+    for (const [blockId, block] of Object.entries(blocks)) {
+      const raw = block.configuration_values ?? {}
+      for (const [configKey, rawValue] of Object.entries(raw)) {
+        if (rawValue === marker) {
+          configToGlyph.set(`${blockId}:${configKey}`, param.glyph_key)
+        }
+      }
+    }
+  }
+
+  // Map block errors — try to attribute to a parameter
+  for (const [blockId, errors] of Object.entries(blockErrors)) {
+    for (const error of errors) {
+      // Try to extract config key from known error patterns
+      const missingMatch = error.match(
+        /^Block contains missing config:\s*\{['"]([\w]+)['"]\}$/,
+      )
+      if (missingMatch) {
+        const configKey = missingMatch[1]
+        const glyphKey = configToGlyph.get(`${blockId}:${configKey}`)
+        if (glyphKey) {
+          ;(fieldErrors[glyphKey] ??= []).push(error)
+          continue
+        }
+      }
+      unmapped.push(error)
+    }
+  }
+
+  // Map missing glyphs — these are directly keyed by config key per block
+  for (const [blockId, configKeys] of Object.entries(missingGlyphs)) {
+    for (const [configKey, glyphNames] of Object.entries(configKeys)) {
+      const glyphKey = configToGlyph.get(`${blockId}:${configKey}`)
+      if (glyphKey) {
+        for (const name of glyphNames) {
+          ;(fieldErrors[glyphKey] ??= []).push(
+            `Unknown variable: ${name}`,
+          )
+        }
+      } else {
+        for (const name of glyphNames) {
+          unmapped.push(`Unknown variable "${name}" in ${configKey}`)
+        }
+      }
+    }
+  }
+
+  return { fieldErrors, unmapped }
 }
 
 // ---------------------------------------------------------------------------
@@ -229,6 +345,38 @@ export function PresetWizardDialog({
     Object.keys(validation.block_errors).length === 0
 
   const canRunForecast = isClientValid && isBackendValid
+
+  // Glyph context — feed it the wizard's current parameter values as local
+  // glyphs so the toggle is available and the reference panel shows them.
+  const { glyphs } = useAllGlyphs(values)
+
+  // Best-effort glyph_key → resolved-value mapping for the "resolves to"
+  // preview rendered by GlyphFieldWrapper.
+  const resolvedConfigForWizard = useMemo(
+    () =>
+      buildResolvedConfigForWizard(
+        preset.parameters,
+        preset.builder_template.blocks,
+        validation?.resolved_configuration_options,
+      ),
+    [preset.parameters, preset.builder_template.blocks, validation],
+  )
+
+  // Map block-level validation errors to parameter glyph keys so the
+  // individual field inputs can show inline error messages.
+  const { fieldErrors: fieldErrorsForWizard, unmapped: unmappedErrors } =
+    useMemo(
+      () =>
+        validation
+          ? mapBlockErrorsToParams(
+              preset.parameters,
+              preset.builder_template.blocks,
+              validation.block_errors,
+              validation.missing_glyphs,
+            )
+          : { fieldErrors: {}, unmapped: [] as Array<string> },
+      [preset.parameters, preset.builder_template.blocks, validation],
+    )
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleChange = useCallback((glyphKey: string, value: string) => {
@@ -343,47 +491,81 @@ export function PresetWizardDialog({
       // Prevent dismissal via outside click while a request is in-flight.
       disablePointerDismissal={isPending}
     >
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{t('wizard.title', { name: preset.name })}</DialogTitle>
           <DialogDescription>{t('wizard.subtitle')}</DialogDescription>
         </DialogHeader>
 
-        {/* ── Difficulty info badge ── */}
-        <div className="flex items-center gap-2">
-          <Badge variant={difficultyBadgeVariant}>{difficultyName}</Badge>
-          <span className="text-xs text-muted-foreground">
-            {difficultyHint}
-          </span>
+        {/* ── Scrollable body ── */}
+        <div className="-mx-6 flex-1 overflow-y-auto px-6">
+          {/* ── Difficulty info badge ── */}
+          <div className="flex items-center gap-2">
+            <Badge variant={difficultyBadgeVariant}>{difficultyName}</Badge>
+            <span className="text-xs text-muted-foreground">
+              {difficultyHint}
+            </span>
+          </div>
+
+          {/* ── Step indicator (multi-step only) ── */}
+          {stepLabel && (
+            <p className="mt-4 text-xs text-muted-foreground" aria-live="polite">
+              {stepLabel}
+            </p>
+          )}
+
+          {/* ── Parameter form ──
+              GlyphContext + BlockValidationProvider mirror the block-config
+              surface so each field renders the glyph toggle, autocomplete and
+              "resolves to" preview. Only the params shown on the current step
+              are rendered; the reference panel below covers the full set. */}
+          <GlyphContext.Provider value={glyphs}>
+            <BlockValidationProvider
+              fieldErrors={fieldErrorsForWizard}
+              resolvedConfig={resolvedConfigForWizard}
+            >
+              <div className="mt-4 flex flex-col gap-4">
+                {currentParams.map((param) => (
+                  <PresetParameterInput
+                    key={param.glyph_key}
+                    parameter={param}
+                    value={values[param.glyph_key] ?? ''}
+                    onChange={handleChange}
+                  />
+                ))}
+              </div>
+              <GlyphReferencePanel
+                className="mt-6"
+                defaultCollapsed
+                localGlyphOverrides={values}
+              />
+            </BlockValidationProvider>
+          </GlyphContext.Provider>
+
+          {/* ── Error banner ── */}
+          {errorMessage && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertCircle className="h-4 w-4" aria-hidden="true" />
+              <AlertTitle>{t('wizard.error.title')}</AlertTitle>
+              <AlertDescription>{errorMessage}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* ── Unmapped block errors ── */}
+          {unmappedErrors.length > 0 && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertCircle className="h-4 w-4" aria-hidden="true" />
+              <AlertTitle>{t('wizard.error.validationTitle')}</AlertTitle>
+              <AlertDescription>
+                <ul className="list-inside list-disc">
+                  {unmappedErrors.map((err, i) => (
+                    <li key={i}>{err}</li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
-
-        {/* ── Step indicator (multi-step only) ── */}
-        {stepLabel && (
-          <p className="text-xs text-muted-foreground" aria-live="polite">
-            {stepLabel}
-          </p>
-        )}
-
-        {/* ── Parameter form ── */}
-        <div className="flex flex-col gap-4">
-          {currentParams.map((param) => (
-            <PresetParameterInput
-              key={param.glyph_key}
-              parameter={param}
-              value={values[param.glyph_key] ?? ''}
-              onChange={handleChange}
-            />
-          ))}
-        </div>
-
-        {/* ── Error banner ── */}
-        {errorMessage && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" aria-hidden="true" />
-            <AlertTitle>{t('wizard.error.title')}</AlertTitle>
-            <AlertDescription>{errorMessage}</AlertDescription>
-          </Alert>
-        )}
 
         {/* ── Footer ── */}
         <DialogFooter className="gap-2 sm:gap-0">

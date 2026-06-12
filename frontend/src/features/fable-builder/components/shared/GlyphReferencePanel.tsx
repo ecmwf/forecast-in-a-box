@@ -51,13 +51,33 @@ import { cn, copyToClipboard } from '@/lib/utils'
 
 const EMPTY_GLYPHS: Record<string, string> = {}
 
-export function GlyphReferencePanel({ className }: { className?: string }) {
+export function GlyphReferencePanel({
+  className,
+  defaultCollapsed = false,
+  localGlyphOverrides,
+}: {
+  className?: string
+  /**
+   * When `true` the entire panel starts collapsed behind a single toggle
+   * header.  Useful in compact contexts like the preset wizard where the
+   * full reference list would dominate the dialog.
+   */
+  defaultCollapsed?: boolean
+  /**
+   * When provided, these local glyphs are used instead of reading from the
+   * fable builder store. Used by the preset wizard where parameter values
+   * live in local component state rather than the global store.
+   */
+  localGlyphOverrides?: Record<string, string>
+}) {
   const { t } = useTranslation('glyphs')
-  const localGlyphs =
+  const storeLocalGlyphs =
     useFableBuilderStore((state) => state.fable.local_glyphs) ?? EMPTY_GLYPHS
+  const localGlyphs = localGlyphOverrides ?? storeLocalGlyphs
   const { glyphs, isLoading } = useAllGlyphs(localGlyphs)
   const { data: functionsResponse } = useGlyphFunctions()
   const helperFunctions = functionsResponse?.functions ?? []
+  const [panelOpen, setPanelOpen] = useState(!defaultCollapsed)
   const [intrinsicOpen, setIntrinsicOpen] = useState(false)
   const [globalOpen, setGlobalOpen] = useState(true)
   const [localOpen, setLocalOpen] = useState(true)
@@ -98,8 +118,20 @@ export function GlyphReferencePanel({ className }: { className?: string }) {
       )}
     >
       {/* Header — icon-only actions so the row stays readable in a
-          narrow sidebar. Labels are preserved via tooltips. */}
-      <div className="flex items-center gap-1.5 p-3 pb-0">
+          narrow sidebar. Labels are preserved via tooltips.
+          When `defaultCollapsed` is set the header doubles as a disclosure
+          toggle for the entire panel body. */}
+      <button
+        type="button"
+        onClick={() => setPanelOpen((o) => !o)}
+        className="flex w-full items-center gap-1.5 p-3 pb-0"
+      >
+        {defaultCollapsed &&
+          (panelOpen ? (
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          ))}
         <Braces className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         <span className="truncate text-sm font-medium text-muted-foreground">
           {t('panel.title')}
@@ -107,8 +139,10 @@ export function GlyphReferencePanel({ className }: { className?: string }) {
         <Tooltip>
           <TooltipTrigger
             render={
-              <button
-                type="button"
+              <span
+                role="button"
+                tabIndex={-1}
+                onClick={(e) => e.stopPropagation()}
                 className="shrink-0 text-muted-foreground/60 hover:text-muted-foreground"
               />
             }
@@ -122,43 +156,51 @@ export function GlyphReferencePanel({ className }: { className?: string }) {
             {t('panel.help')}
           </TooltipContent>
         </Tooltip>
-        <div className="ml-auto flex items-center gap-0.5">
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <button
-                  type="button"
-                  aria-label={t('panel.addGlobal')}
-                  onClick={() => setCreateGlobalOpen(true)}
-                  className="shrink-0 rounded p-1 text-primary hover:bg-primary/10"
-                />
-              }
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {t('panel.addGlobal')}
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Link
-                  to="/admin/variables"
-                  aria-label={t('panel.manageAll')}
-                  className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                />
-              }
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {t('panel.manageAll')}
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      </div>
+        {panelOpen && (
+          <div
+            className="ml-auto flex items-center gap-0.5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    aria-label={t('panel.addGlobal')}
+                    onClick={() => setCreateGlobalOpen(true)}
+                    className="shrink-0 rounded p-1 text-primary hover:bg-primary/10"
+                  />
+                }
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {t('panel.addGlobal')}
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Link
+                    to="/admin/variables"
+                    aria-label={t('panel.manageAll')}
+                    className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  />
+                }
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {t('panel.manageAll')}
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        )}
+      </button>
 
+      {/* Panel body — hidden when collapsed */}
+      {panelOpen && (
+        <>
       {/* Local section */}
       <LocalGlyphSection
         title={t('panel.local')}
@@ -237,6 +279,8 @@ export function GlyphReferencePanel({ className }: { className?: string }) {
         helpers={helperFunctions}
         onCopy={handleCopyHelper}
       />
+        </>
+      )}
 
       {/* Inline create-variable dialog: stays on the canvas; mutation invalidates
           fableKeys.globalGlyphsBase so the panel refetches automatically. */}

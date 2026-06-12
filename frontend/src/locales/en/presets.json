@@ -154,6 +154,7 @@
       "publishSuccess": "Preset published successfully.",
       "unpublishSuccess": "Preset unpublished successfully.",
       "publishError": "Failed to update preset status.",
+      "loadError": "Failed to load preset.",
       "deleteSuccess": "Preset deleted successfully.",
       "deleteError": "Failed to delete preset."
     }
@@ -311,7 +312,8 @@
     "error": {
       "title": "Instantiation failed",
       "description": "Could not configure the preset. Please try again.",
-      "retry": "Retry"
+      "retry": "Retry",
+      "validationTitle": "Validation errors"
     }
   }
 }

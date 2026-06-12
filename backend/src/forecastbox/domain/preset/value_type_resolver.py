@@ -49,6 +49,7 @@ waits on the plugin updater thread (via ``wait_until_ready``) for up to
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 
@@ -77,6 +78,21 @@ def resolve_value_type(value_type: str) -> str:
     When the plugin updater thread is still running this function waits up to
     ``_PLUGINS_READY_TIMEOUT_S`` seconds for it to finish before falling back
     to the raw reference string.
+
+    .. warning::
+       **BLOCKING OPERATION**: This function may block for up to 30 seconds
+       waiting for plugins to initialize via ``wait_until_ready()``.
+
+       **DO NOT** call this function directly from async code as it will block
+       the event loop.
+
+       When calling from async contexts, use::
+
+           await async_resolve_value_type(value_type)
+
+       or explicitly wrap in a thread::
+
+           await asyncio.to_thread(resolve_value_type, value_type)
 
     Args:
         value_type: The raw ``value_type`` string from a ``PresetParameter``.
@@ -166,3 +182,23 @@ def resolve_value_type(value_type: str) -> str:
             value_type,
         )
         return value_type
+
+
+async def async_resolve_value_type(value_type: str) -> str:
+    """Async wrapper for ``resolve_value_type`` that safely runs it in a thread pool.
+
+    This function is the recommended way to call ``resolve_value_type`` from async
+    code, as it prevents blocking the event loop during the potentially long wait
+    for plugin initialization.
+
+    Args:
+        value_type: The raw ``value_type`` string from a ``PresetParameter``.
+
+    Returns:
+        The resolved value_type string (e.g. ``enumClosed[aifs-,...]``),
+        or the original string if resolution is not applicable or fails.
+
+    See Also:
+        :func:`resolve_value_type` for details on the resolution logic.
+    """
+    return await asyncio.to_thread(resolve_value_type, value_type)

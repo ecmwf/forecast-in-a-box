@@ -250,7 +250,7 @@ export interface FableUpsertRequest {
  * downstream code continues to work with plain strings.
  */
 const TagApiSchema = z
-  .object({ key: z.string(), value: z.string().optional() })
+  .object({ key: z.string(), value: z.string().nullable().optional() })
   .transform((t) => t.key)
 
 /** routes/blueprint.py: BlueprintListItem */

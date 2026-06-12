@@ -78,9 +78,17 @@ const EMPTY_BUILDER_TEMPLATE: FableBuilderV1 = {
   blocks: {},
 }
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+/** PresetParameter extended with a stable unique id for React keys. */
+type PresetParameterWithId = PresetParameter & { id: string }
+
 /** Empty parameter entry for the "add parameter" action. */
-function emptyParameter(): PresetParameter {
+function emptyParameter(): PresetParameterWithId {
   return {
+    id: crypto.randomUUID(),
     glyph_key: '',
     label: '',
     description: '',
@@ -116,7 +124,7 @@ function buildPreviewPreset(
   difficulty: PresetDifficulty,
   tags: Array<string>,
   icon: string,
-  parameters: Array<PresetParameter>,
+  parameters: Array<PresetParameterWithId>,
   builderTemplate: FableBuilderV1,
 ): HighLevelPreset {
   return {
@@ -129,7 +137,7 @@ function buildPreviewPreset(
     tags,
     icon,
     builder_template: builderTemplate,
-    parameters,
+    parameters: parameters.map(({ id, ...param }) => param),
     is_published: false,
     created_by: null,
     created_at: null,
@@ -301,9 +309,9 @@ function IconPicker({ value, onChange }: IconPickerProps) {
 
 interface ParameterRowProps {
   index: number
-  param: PresetParameter
+  param: PresetParameterWithId
   total: number
-  onChange: (index: number, updated: PresetParameter) => void
+  onChange: (index: number, updated: PresetParameterWithId) => void
   onRemove: (index: number) => void
   onMoveUp: (index: number) => void
   onMoveDown: (index: number) => void
@@ -562,7 +570,7 @@ function buildFormErrors(
   description: string,
   icon: string,
   builderTemplateRaw: string,
-  parameters: Array<PresetParameter>,
+  parameters: Array<PresetParameterWithId>,
   messages: {
     nameRequired: string
     descriptionRequired: string
@@ -636,7 +644,7 @@ export function PresetFormDialog({
   const [difficulty, setDifficulty] = useState<PresetDifficulty>('beginner')
   const [icon, setIcon] = useState('Cloud')
   const [tags, setTags] = useState<Array<string>>([])
-  const [parameters, setParameters] = useState<Array<PresetParameter>>([])
+  const [parameters, setParameters] = useState<Array<PresetParameterWithId>>([])
   const [builderTemplateRaw, setBuilderTemplateRaw] = useState(
     JSON.stringify(EMPTY_BUILDER_TEMPLATE, null, 2),
   )
@@ -657,7 +665,7 @@ export function PresetFormDialog({
       setDifficulty(preset.difficulty)
       setIcon(preset.icon)
       setTags([...preset.tags])
-      setParameters(preset.parameters.map((p) => ({ ...p })))
+      setParameters(preset.parameters.map((p) => ({ ...p, id: crypto.randomUUID() })))
       setBuilderTemplateRaw(JSON.stringify(preset.builder_template, null, 2))
       setIsPublished(preset.is_published)
     } else {
@@ -681,7 +689,7 @@ export function PresetFormDialog({
   }, [])
 
   const handleChangeParameter = useCallback(
-    (index: number, updated: PresetParameter) => {
+    (index: number, updated: PresetParameterWithId) => {
       setParameters((prev) => prev.map((p, i) => (i === index ? updated : p)))
     },
     [],
@@ -697,8 +705,8 @@ export function PresetFormDialog({
       const next = [...prev]
       // Swap index-1 and index — bounds already checked above.
       ;[next[index - 1], next[index]] = [next[index], next[index - 1]] as [
-        PresetParameter,
-        PresetParameter,
+        PresetParameterWithId,
+        PresetParameterWithId,
       ]
       return next
     })
@@ -710,8 +718,8 @@ export function PresetFormDialog({
       const next = [...prev]
       // Swap index and index+1 — bounds already checked above.
       ;[next[index], next[index + 1]] = [next[index + 1], next[index]] as [
-        PresetParameter,
-        PresetParameter,
+        PresetParameterWithId,
+        PresetParameterWithId,
       ]
       return next
     })
@@ -770,6 +778,8 @@ export function PresetFormDialog({
     setErrors({})
 
     const template = parseBuilderTemplate(builderTemplateRaw)!
+    // Strip the client-side `id` field before sending to backend
+    const parametersForBackend = parameters.map(({ id, ...param }) => param)
 
     try {
       if (isEditing) {
@@ -783,7 +793,7 @@ export function PresetFormDialog({
           tags,
           icon: icon.trim(),
           builder_template: template,
-          parameters,
+          parameters: parametersForBackend,
           is_published: isPublished,
         })
         showToast.success(t('form.toast.updateSuccess'))
@@ -796,7 +806,7 @@ export function PresetFormDialog({
           tags,
           icon: icon.trim(),
           builder_template: template,
-          parameters,
+          parameters: parametersForBackend,
           is_published: isPublished,
         })
         showToast.success(t('form.toast.createSuccess'))
@@ -1038,7 +1048,7 @@ export function PresetFormDialog({
                 ) : (
                   parameters.map((param, i) => (
                     <ParameterRow
-                      key={i}
+                      key={param.id}
                       index={i}
                       param={param}
                       total={parameters.length}

@@ -187,7 +187,7 @@ export function PresetGalleryCard({
                 className="mr-2 h-3.5 w-3.5 animate-spin"
                 aria-hidden="true"
               />
-              Launching…
+              {t('presetGallery.launching')}
             </>
           ) : (
             t('presetGallery.useThisPreset')

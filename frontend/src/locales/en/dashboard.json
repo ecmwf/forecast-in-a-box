@@ -63,6 +63,12 @@
     "subtitle": "Choose how to start your forecast configuration",
     "recommended": "Recommended",
     "launchingAriaLabel": "Launching…",
+    "startFromScratch": {
+      "title": "Start from Scratch",
+      "description": "Build a forecast from scratch with full control over every parameter.",
+      "tagBlankCanvas": "Blank Canvas",
+      "tagFullControl": "Full Control"
+    },
     "loading": {
       "ariaLabel": "Loading featured presets"
     },
@@ -133,6 +139,7 @@
   "presetGallery": {
     "useThisPreset": "Use This Preset",
     "openInEditor": "Open in Editor",
+    "launching": "Launching…",
     "page": {
       "title": "Preset Gallery",
       "description": "Browse and launch pre-built forecast configurations"
@@ -179,6 +186,14 @@
     "error": {
       "title": "Could not load presets",
       "description": "There was a problem fetching the preset gallery. Please try again later."
+    },
+    "toast": {
+      "launchingForecast": "Launching forecast…",
+      "forecastLaunched": "Forecast launched",
+      "presetInstantiated": "Preset instantiated",
+      "noRunIdReturned": "No run ID returned — check the executions list.",
+      "failedToLaunch": "Failed to launch forecast",
+      "couldNotLoad": "Could not load preset"
     }
   },
   "notification": {
