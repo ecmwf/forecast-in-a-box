@@ -304,7 +304,8 @@ function aifsDatasetPreset(): FablePreset {
             factory: 'gribSink',
           },
           configuration_values: {
-            path: '/tmp/${runId}__${attemptCount}.grib2',
+            // Run-private directory: the WMS lens serves the parent dir.
+            path: '/tmp/${runId}__${attemptCount}/[shortName].grib2',
           },
           input_ids: {
             dataset: 'source_1',
