@@ -7,6 +7,6 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-import typing
+from forecastbox.domain.blueprint.types import BlueprintId
 
-PresetId = typing.NewType("PresetId", str)
+PresetId = BlueprintId

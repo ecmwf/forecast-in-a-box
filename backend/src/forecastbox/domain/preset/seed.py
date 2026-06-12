@@ -25,13 +25,12 @@ plugins and are not defined here.
 
 from __future__ import annotations
 
-import datetime as dt
 import logging
 
 from forecastbox.domain.blueprint.service import BlueprintBuilder
+from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.preset import db as preset_db
 from forecastbox.domain.preset.models import HighLevelPreset, PresetDifficulty
-from forecastbox.domain.preset.types import PresetId
 from forecastbox.utility.auth import PASSTHROUGH_USER_ID, AuthContext
 
 logger = logging.getLogger(__name__)
@@ -60,7 +59,7 @@ def _blank_canvas() -> HighLevelPreset:
     """
     builder = BlueprintBuilder(blocks={})
     return HighLevelPreset(
-        preset_id=PresetId("blank-canvas"),
+        preset_id=BlueprintId("blank-canvas"),
         version=1,
         name="Blank Canvas",
         description="Start with an empty pipeline and build your own Fable from scratch.",
@@ -97,19 +96,15 @@ Plugin-specific presets are seeded separately by each plugin.
 
 
 async def _insert_seed_preset(preset: HighLevelPreset) -> None:
-    """Directly insert a single seed preset at version 1.
+    """Insert a single seed preset via ``preset_db.create_preset``.
 
-    This bypasses ``preset_db.create_preset`` to use a stable preset_id from
-    the seed data rather than generating a new UUID. For seeding we always
-    want to create a fresh row with a stable slug ID and version 1.
+    Passes the stable slug-style ``preset_id`` (e.g. ``"blank-canvas"``) so
+    that the blueprint row is stored with a predictable, human-readable ID
+    rather than a generated UUID.
     """
-    import forecastbox.schemata.jobs as _jobs_module
-    from forecastbox.schemata.jobs import HighLevelPreset as HighLevelPresetRow
-
-    ref_time = dt.datetime.now()
-    row = HighLevelPresetRow(
+    await preset_db.create_preset(
+        auth_context=_SEED_AUTH,
         preset_id=preset.preset_id,
-        version=1,
         name=preset.name,
         description=preset.description,
         long_description=preset.long_description,
@@ -120,13 +115,7 @@ async def _insert_seed_preset(preset: HighLevelPreset) -> None:
         parameters=[p.model_dump(mode="json") for p in preset.parameters],
         is_published=preset.is_published,
         created_by=_SEED_AUTHOR,
-        created_at=ref_time,
-        updated_at=ref_time,
-        is_deleted=False,
     )
-    async with _jobs_module.async_session_maker() as session:
-        session.add(row)
-        await session.commit()
 
 
 async def seed_core_presets() -> None:

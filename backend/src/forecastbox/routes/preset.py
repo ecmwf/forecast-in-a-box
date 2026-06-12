@@ -33,21 +33,20 @@ from fastapi.exceptions import HTTPException
 from fiab_core.presets import PluginPresetDefinition
 
 from forecastbox.domain.auth.users import get_auth_context
+from forecastbox.domain.blueprint.exceptions import (
+    BlueprintAccessDenied,
+    BlueprintNotFound,
+    BlueprintVersionConflict,
+)
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.preset import db, service
-from forecastbox.domain.preset.exceptions import (
-    PresetAccessDenied,
-    PresetInstantiationValidationError,
-    PresetNotFound,
-    PresetVersionConflict,
-)
+from forecastbox.domain.preset.exceptions import PresetInstantiationValidationError
 from forecastbox.domain.preset.plugin_presets import (
     convert_to_builder,
     find_plugin_preset,
     get_all_plugin_presets,
 )
-from forecastbox.domain.preset.types import PresetId
 from forecastbox.domain.preset.value_type_resolver import resolve_value_type
 from forecastbox.domain.run.types import RunId
 from forecastbox.utility.auth import AuthContext
@@ -74,7 +73,7 @@ class PresetLookup(FiabBaseModel):
     request body field on endpoints that address a specific preset.
     """
 
-    preset_id: PresetId
+    preset_id: BlueprintId
     version: int | None = None
 
 
@@ -108,7 +107,7 @@ class PresetListItem(FiabBaseModel):
     still omitted; use the /get endpoint to retrieve those.
     """
 
-    preset_id: PresetId
+    preset_id: BlueprintId
     version: int
     name: str
     description: str
@@ -136,7 +135,7 @@ class PresetListResponse(FiabBaseModel):
 class PresetGetResponse(FiabBaseModel):
     """Full preset detail, including the builder template and parameters."""
 
-    preset_id: PresetId
+    preset_id: BlueprintId
     version: int
     name: str
     description: str
@@ -174,7 +173,7 @@ class PresetCreateRequest(FiabBaseModel):
 class PresetCreateResponse(FiabBaseModel):
     """Returned after successfully creating a preset."""
 
-    preset_id: PresetId
+    preset_id: BlueprintId
     version: int
 
 
@@ -185,7 +184,7 @@ class PresetUpdateRequest(FiabBaseModel):
     concurrency lock; the request is rejected with 409 if it does not match.
     """
 
-    preset_id: PresetId
+    preset_id: BlueprintId
     version: int
     name: str
     description: str
@@ -202,7 +201,7 @@ class PresetUpdateRequest(FiabBaseModel):
 class PresetUpdateResponse(FiabBaseModel):
     """Returned after successfully updating a preset (new version number)."""
 
-    preset_id: PresetId
+    preset_id: BlueprintId
     version: int
 
 
@@ -212,7 +211,7 @@ class PresetDeleteRequest(FiabBaseModel):
     ``version`` must match the current latest version to prevent races.
     """
 
-    preset_id: PresetId
+    preset_id: BlueprintId
     version: int
 
 
@@ -223,7 +222,7 @@ class PresetPublishRequest(FiabBaseModel):
     a new version.  ``version`` acts as an optimistic concurrency lock.
     """
 
-    preset_id: PresetId
+    preset_id: BlueprintId
     version: int
     is_published: bool
 
@@ -239,7 +238,7 @@ class PresetInstantiateRequest(FiabBaseModel):
     returned for the caller to open in the editor (``False``).
     """
 
-    preset_id: PresetId
+    preset_id: BlueprintId
     parameter_values: dict[str, str] = {}
     auto_run: bool = True
 
@@ -280,7 +279,7 @@ def _plugin_preset_to_list_item(preset_def: PluginPresetDefinition, *, plugin_id
     """
     builder = BlueprintBuilder(blocks=dict(preset_def.blocks))
     return PresetListItem(
-        preset_id=PresetId(preset_def.preset_id),
+        preset_id=BlueprintId(preset_def.preset_id),
         version=1,
         name=preset_def.name,
         description=preset_def.description,
@@ -308,7 +307,7 @@ async def _plugin_preset_to_get_response(preset_def: PluginPresetDefinition, *, 
     raw_parameters = preset_def.parameters
     resolved_value_types = await asyncio.to_thread(lambda: [resolve_value_type(p.value_type) for p in raw_parameters])
     return PresetGetResponse(
-        preset_id=PresetId(preset_def.preset_id),
+        preset_id=BlueprintId(preset_def.preset_id),
         version=1,
         name=preset_def.name,
         description=preset_def.description,
@@ -422,7 +421,7 @@ async def list_presets(
     )
     db_items = [
         PresetListItem(
-            preset_id=PresetId(cast(str, row.preset_id)),
+            preset_id=BlueprintId(cast(str, row.preset_id)),
             version=cast(int, row.version),
             name=cast(str, row.name),
             description=cast(str, row.description),
@@ -477,7 +476,7 @@ async def get_preset(
     # --- DB fallback ---------------------------------------------------------
     try:
         row = await db.get_preset(spec.preset_id, spec.version)
-    except PresetNotFound as e:
+    except BlueprintNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     if row is None:
         raise HTTPException(status_code=404, detail=f"Preset {spec.preset_id!r} not found.")
@@ -488,7 +487,7 @@ async def get_preset(
     raw_parameters = cast(list[dict], row.parameters) if row.parameters is not None else []
     resolved_value_types = await asyncio.to_thread(lambda: [resolve_value_type(p["value_type"]) for p in raw_parameters])
     return PresetGetResponse(
-        preset_id=PresetId(cast(str, row.preset_id)),
+        preset_id=BlueprintId(cast(str, row.preset_id)),
         version=cast(int, row.version),
         name=cast(str, row.name),
         description=cast(str, row.description),
@@ -582,11 +581,11 @@ async def update_preset(
             is_published=body.is_published,
             created_by=auth_context.user_id,
         )
-    except PresetNotFound as e:
+    except BlueprintNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except PresetVersionConflict as e:
+    except BlueprintVersionConflict as e:
         raise HTTPException(status_code=409, detail=str(e))
-    except PresetAccessDenied as e:
+    except BlueprintAccessDenied as e:
         raise HTTPException(status_code=403, detail=str(e))
     return PresetUpdateResponse(preset_id=preset_id, version=version)
 
@@ -614,11 +613,11 @@ async def delete_preset(
             expected_version=body.version,
             auth_context=auth_context,
         )
-    except PresetNotFound as e:
+    except BlueprintNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except PresetVersionConflict as e:
+    except BlueprintVersionConflict as e:
         raise HTTPException(status_code=409, detail=str(e))
-    except PresetAccessDenied as e:
+    except BlueprintAccessDenied as e:
         raise HTTPException(status_code=403, detail=str(e))
 
 
@@ -654,11 +653,11 @@ async def publish_preset(
             expected_version=body.version,
             auth_context=auth_context,
         )
-    except PresetNotFound as e:
+    except BlueprintNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except PresetVersionConflict as e:
+    except BlueprintVersionConflict as e:
         raise HTTPException(status_code=409, detail=str(e))
-    except PresetAccessDenied as e:
+    except BlueprintAccessDenied as e:
         raise HTTPException(status_code=403, detail=str(e))
 
 
@@ -694,7 +693,7 @@ async def instantiate_preset(
             auth_context=auth_context,
             auto_run=body.auto_run,
         )
-    except PresetNotFound as e:
+    except BlueprintNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     except PresetInstantiationValidationError as e:
         raise HTTPException(

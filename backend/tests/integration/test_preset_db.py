@@ -226,8 +226,8 @@ async def test_patch_preset_publish_status_does_not_increment_version() -> None:
 
 @pytest.mark.asyncio
 async def test_patch_preset_publish_status_version_conflict() -> None:
-    """patch_preset_publish_status raises PresetVersionConflict on stale version."""
-    from forecastbox.domain.preset.exceptions import PresetVersionConflict
+    """patch_preset_publish_status raises BlueprintVersionConflict on stale version."""
+    from forecastbox.domain.blueprint.exceptions import BlueprintVersionConflict
 
     auth_context = AuthContext(user_id="test_user", is_admin=True)
 
@@ -242,7 +242,7 @@ async def test_patch_preset_publish_status_version_conflict() -> None:
         created_by="test_user",
     )
 
-    with pytest.raises(PresetVersionConflict):
+    with pytest.raises(BlueprintVersionConflict):
         await preset_db.patch_preset_publish_status(
             preset_id,
             is_published=False,
@@ -253,13 +253,12 @@ async def test_patch_preset_publish_status_version_conflict() -> None:
 
 @pytest.mark.asyncio
 async def test_patch_preset_publish_status_not_found() -> None:
-    """patch_preset_publish_status raises PresetNotFound for unknown preset_id."""
-    from forecastbox.domain.preset.exceptions import PresetNotFound
-    from forecastbox.domain.preset.types import PresetId
+    """patch_preset_publish_status raises BlueprintNotFound for unknown preset_id."""
+    from forecastbox.domain.blueprint.exceptions import BlueprintNotFound
 
     auth_context = AuthContext(user_id="test_user", is_admin=True)
 
-    with pytest.raises(PresetNotFound):
+    with pytest.raises(BlueprintNotFound):
         await preset_db.patch_preset_publish_status(
             PresetId("does-not-exist"),
             is_published=False,

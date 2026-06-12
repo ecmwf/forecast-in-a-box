@@ -16,7 +16,7 @@ from enum import Enum
 from pydantic import Field
 
 from forecastbox.domain.blueprint.service import BlueprintBuilder
-from forecastbox.domain.preset.types import PresetId
+from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.utility.pydantic import FiabBaseModel
 
 
@@ -42,7 +42,7 @@ class PresetParameter(FiabBaseModel):
 class HighLevelPreset(FiabBaseModel):
     """A curated, high-level preset that wraps a BlueprintBuilder with metadata."""
 
-    preset_id: PresetId
+    preset_id: BlueprintId
     version: int
     name: str
     description: str

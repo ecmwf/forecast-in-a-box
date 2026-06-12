@@ -9,21 +9,14 @@
 
 """Domain exceptions for the preset layer.
 
-Raised by domain.preset.db and domain.preset.service; translated to
-HTTP responses at the router boundary.
+Raised by domain.preset.service; translated to HTTP responses at the
+router boundary.
+
+Note: ``BlueprintNotFound``, ``BlueprintAccessDenied``, and
+``BlueprintVersionConflict`` from ``domain.blueprint.exceptions`` are
+propagated directly from the preset DB/service layer and caught at the
+route boundary — no preset-specific duplicates are needed.
 """
-
-
-class PresetNotFound(Exception):
-    """Raised when a requested Preset does not exist (or has been soft-deleted)."""
-
-
-class PresetAccessDenied(Exception):
-    """Raised when the actor lacks permission to mutate a Preset."""
-
-
-class PresetVersionConflict(Exception):
-    """Raised when the provided version does not match the current version in the database."""
 
 
 class PresetInstantiationValidationError(Exception):

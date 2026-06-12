@@ -26,7 +26,7 @@ from sqlalchemy.orm import DeclarativeBase
 
 from forecastbox.utility.config import config
 
-BlueprintSource = Literal["plugin_template", "user_defined", "oneoff_execution"]
+BlueprintSource = Literal["plugin_template", "user_defined", "oneoff_execution", "preset"]
 ExperimentType = Literal["cron_schedule", "batch_execution", "external_trigger"]
 RunStatus = Literal["submitted", "preparing", "running", "completed", "failed"]
 
@@ -183,32 +183,31 @@ class Run(Base):
     )
 
 
-class HighLevelPreset(Base):
-    """A curated, high-level preset that wraps a BlueprintBuilder with metadata.
+class PresetMetadata(Base):
+    """Preset-specific metadata side-table linked to a Blueprint row.
 
-    Immutable once written; a new version is appended for each save.
-    The composite primary key is (preset_id, version).  `builder_template`
-    stores the BlueprintBuilder as JSON, and `parameters` stores the list
-    of PresetParameter objects as JSON.
+    Each preset blueprint has exactly one ``PresetMetadata`` row keyed by
+    ``blueprint_id``.  The row stores display/discovery metadata that is
+    specific to the preset concept (difficulty, long description, icon,
+    parameter schema, publication state) and is not part of the generic
+    ``Blueprint`` table.
     """
 
-    __tablename__ = "high_level_preset"
+    __tablename__ = "preset_metadata"
 
-    preset_id = Column(String(255), primary_key=True, nullable=False)
-    version = Column(Integer, primary_key=True, nullable=False)
-    name = Column(String(255), nullable=False)
-    description = Column(String(1024), nullable=False)
-    long_description = Column(String(4096), nullable=True)
+    blueprint_id = Column(String(255), primary_key=True, nullable=False)
     difficulty = Column(String(64), nullable=False)
-    tags = Column(JSON, nullable=True)
+    long_description = Column(String(4096), nullable=True)
     icon = Column(String(255), nullable=False, default="Cloud")
-    builder_template = Column(JSON, nullable=False)
     parameters = Column(JSON, nullable=True)
     is_published = Column(Boolean, nullable=False, default=False)
-    created_by = Column(String(255), nullable=False)
-    created_at = Column(DateTime, nullable=False)
-    updated_at = Column(DateTime, nullable=False)
-    is_deleted = Column(Boolean, nullable=False, default=False)
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["blueprint_id"],
+            ["blueprint.blueprint_id"],
+        ),
+    )
 
 
 class ExperimentNext(Base):

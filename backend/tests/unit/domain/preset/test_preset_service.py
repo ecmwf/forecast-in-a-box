@@ -25,13 +25,14 @@ import pytest
 from cascade.low.func import Either
 
 import forecastbox.domain.preset.service as preset_service
+from forecastbox.domain.blueprint.exceptions import BlueprintNotFound
 from forecastbox.domain.blueprint.service import (
     BlueprintBuilder,
     BlueprintSaveResult,
     BlueprintValidationExpansion,
 )
 from forecastbox.domain.blueprint.types import BlueprintId
-from forecastbox.domain.preset.exceptions import PresetInstantiationValidationError, PresetNotFound
+from forecastbox.domain.preset.exceptions import PresetInstantiationValidationError
 from forecastbox.domain.preset.service import InstantiateResult, instantiate_preset
 from forecastbox.domain.preset.types import PresetId
 from forecastbox.domain.run.service import ExecuteResult
@@ -494,12 +495,12 @@ async def test_partial_parameter_values_mix_provided_and_defaults() -> None:
 
 @pytest.mark.asyncio
 async def test_invalid_preset_id_raises_preset_not_found() -> None:
-    """When get_preset returns None, PresetNotFound is raised."""
+    """When get_preset returns None, BlueprintNotFound is raised."""
     with patch(
         "forecastbox.domain.preset.service.preset_db.get_preset",
         new=AsyncMock(return_value=None),
     ):
-        with pytest.raises(PresetNotFound):
+        with pytest.raises(BlueprintNotFound):
             await instantiate_preset(
                 preset_id=PresetId("does-not-exist"),
                 parameter_values={},

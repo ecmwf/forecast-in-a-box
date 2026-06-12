@@ -15,14 +15,14 @@ Owns:
   and submitting a run (controlled by the ``auto_run`` flag).
 
 No HTTP exceptions are raised here; callers are responsible for mapping domain
-exceptions (``PresetNotFound``, ``PresetInstantiationValidationError``) to HTTP
+exceptions (``BlueprintNotFound``, ``PresetInstantiationValidationError``) to HTTP
 responses.
 """
 
 import asyncio
 import logging
-from typing import cast
 
+from forecastbox.domain.blueprint.exceptions import BlueprintNotFound
 from forecastbox.domain.blueprint.service import (
     BlueprintBuilder,
     BlueprintSaveCommand,
@@ -32,10 +32,9 @@ from forecastbox.domain.blueprint.service import (
 )
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.preset import db as preset_db
-from forecastbox.domain.preset.exceptions import PresetInstantiationValidationError, PresetNotFound
+from forecastbox.domain.preset.exceptions import PresetInstantiationValidationError
 from forecastbox.domain.preset.models import PresetParameter
 from forecastbox.domain.preset.plugin_presets import convert_to_builder, find_plugin_preset
-from forecastbox.domain.preset.types import PresetId
 from forecastbox.domain.run import service as run_service
 from forecastbox.domain.run.types import RunId
 from forecastbox.utility.auth import AuthContext
@@ -66,7 +65,7 @@ class InstantiateResult(FiabBaseModel):
 
 
 async def instantiate_preset(
-    preset_id: PresetId,
+    preset_id: BlueprintId,
     parameter_values: dict[str, str],
     auth_context: AuthContext,
     *,
@@ -75,7 +74,7 @@ async def instantiate_preset(
     """Materialise a preset template and optionally submit a run.
 
     Steps:
-    1. Load the preset from the database; raise ``PresetNotFound`` if absent.
+    1. Load the preset from the database; raise ``BlueprintNotFound`` if absent.
     2. Deep-copy the ``builder_template`` so the stored template is never mutated.
     3. Inject parameter values (falling back to each parameter's ``default_value``
        when the caller omits a key) into ``builder.local_glyphs``.
@@ -103,7 +102,7 @@ async def instantiate_preset(
         An ``InstantiateResult`` describing the outcome.
 
     Raises:
-        PresetNotFound: The preset does not exist or has been soft-deleted.
+        BlueprintNotFound: The preset does not exist or has been soft-deleted.
         PresetInstantiationValidationError: The materialised builder fails
             blueprint validation.
     """
@@ -128,12 +127,11 @@ async def instantiate_preset(
         # DB preset: deserialise the stored JSON columns into typed domain objects.
         db_row = await preset_db.get_preset(preset_id)
         if db_row is None:
-            raise PresetNotFound(f"No Preset with id={preset_id!r}.")
+            raise BlueprintNotFound(f"No Preset with id={preset_id!r}.")
 
-        builder_template = BlueprintBuilder.model_validate(cast(dict, db_row.builder_template))
-        raw_parameters: list[dict] = cast(list, db_row.parameters) or []
-        parameters = [PresetParameter.model_validate(p) for p in raw_parameters]
-        preset_name = cast(str, db_row.name)
+        builder_template = BlueprintBuilder.model_validate(db_row.builder_template)
+        parameters = [PresetParameter.model_validate(p) for p in db_row.parameters]
+        preset_name = db_row.name
 
     # 2. Deep-copy the builder template so the original is never mutated.
     builder = builder_template.model_copy(deep=True)
