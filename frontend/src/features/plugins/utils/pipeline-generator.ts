@@ -238,7 +238,7 @@ function findUpstreamBlock(
 const KNOWN_FIELD_DEFAULTS: Record<string, string> = {
   // Common string fields
   path: '/tmp/output.zarr',
-  variable: '2t',
+  param: '2t',
   // Common numeric fields (as strings)
   lead_time: '24',
   ensemble_members: '4',

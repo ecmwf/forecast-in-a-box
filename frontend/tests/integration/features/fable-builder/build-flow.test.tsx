@@ -51,9 +51,6 @@ function setupValidFableWithSink(): void {
           source: 'mars',
           forecast: 'aifs-ens',
           base_time: '2026-01-01T00:00:00',
-          param: '2t',
-          step: '0',
-          number: '1',
         },
         input_ids: {},
       },
@@ -162,11 +159,10 @@ describe('Fable Builder Integration', () => {
       )
       .toBeVisible()
 
-    // Configuration fields should be visible with their titles as labels
-    // These come from mockCatalogue configuration_options for operationalForecastSource
-    // Source and Forecast model are enums; Base time is a datetime input
+    // Configuration fields should be visible with their titles as labels.
+    // Source and Forecast model are enums; Base time is a datetime input.
     await expect.element(screen.getByLabelText('Base time')).toBeVisible()
-    await expect.element(screen.getByLabelText('Parameters')).toBeVisible()
+    await expect.element(screen.getByLabelText('Forecast model')).toBeVisible()
   })
 
   it('allows configuring a block via input fields', async () => {
@@ -325,20 +321,11 @@ describe('Fable Builder Integration', () => {
     useFableBuilderStore
       .getState()
       .updateBlockConfig(sourceBlockIdForConfig, 'source', 'mars')
-    // operationalForecastSource exposes 6 options; fill the rest so the fable
-    // validates (isValid) for the review step below.
+    // Fill the remaining required source enum so the fable validates for the
+    // review step below.
     useFableBuilderStore
       .getState()
       .updateBlockConfig(sourceBlockIdForConfig, 'forecast', 'aifs-ens')
-    useFableBuilderStore
-      .getState()
-      .updateBlockConfig(sourceBlockIdForConfig, 'param', '2t')
-    useFableBuilderStore
-      .getState()
-      .updateBlockConfig(sourceBlockIdForConfig, 'step', '0')
-    useFableBuilderStore
-      .getState()
-      .updateBlockConfig(sourceBlockIdForConfig, 'number', '1')
 
     // 4. Add a connected sink block programmatically for review eligibility
     const sourceBlockId = Object.keys(
