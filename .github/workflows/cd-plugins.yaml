@@ -25,40 +25,19 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-tags: true
       - uses: astral-sh/setup-uv@v7
       - uses: extractions/setup-just@v3
       - run: |
-          set -euo pipefail
-          if [ "${{ inputs.testpypi }}" = "true" ] ; then
-            set -x
-          fi
-          git fetch --tags origin
+          source .github/workflows/scripts.sh
+          setupBash "${{ inputs.testpypi }}" 
 
           TAG_PREF="c"
-          TAG_FULL="${{ inputs.tag }}"
-          if [ -n "$TAG_FULL" ] ; then
-            echo "$TAG_FULL" | grep -Eq '^c[0-9]+\.[0-9]+\.[0-9]+$' || {
-              echo "expected tag in the form cX.Y.Z" >&2
-              exit 1
-            }
-          else
-            LATEST_BASE=$(
-              git tag -l 'c*' \
-              | sed -nE 's/^c([0-9]+\.[0-9]+\.[0-9]+)(\.[0-9]+)?$/\1/p' \
-              | sort -V \
-              | tail -n1
-            )
-            if [ -z "$LATEST_BASE" ] ; then
-              LATEST_BASE="0.0.0"
-            fi
-            IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST_BASE"
-            NEW_PATCH=$((PATCH + 1))
-            TAG_FULL="${TAG_PREF}${MAJOR}.${MINOR}.${NEW_PATCH}"
-            echo "determined tag = $TAG_FULL"
-          fi
+          TAG=$(tagFromInputOrLatest "${{ inputs.tag }}" $TAG_PREF)
+          TAG="${TAG}.0"
 
-          TAG="${TAG_FULL}.0"
-          export SETUPTOOLS_SCM_PRETEND_VERSION=${TAG_FULL#$TAG_PREF}
+          preparePythonWheelVersion $TAG
 
           cd backend
           uv venv venv && source venv/bin/activate
@@ -71,20 +50,10 @@ jobs:
               popd
           done
           rm -rf packagesDist/fiab_mcp_server* # lets not be releasing this one just yet
-          twine check ./packagesDist/*
 
-          # upload
-          if [ "${{ inputs.testpypi }}" = "true" ] ; then
-            export TWINE_PASSWORD="$TWINE_PASSWORD_TEST"
-            TARGET="--repository testpypi"
-          else
-            export TWINE_PASSWORD="$TWINE_PASSWORD_PROD"
-            TARGET=""
-          fi
-          twine upload --verbose $TARGET packagesDist/*
+          uploadPypi "${{ inputs.test_pypi }}" 'packagesDist/*'
+          gitTagAndPush $TAG
 
-          git tag "$TAG"
-          git push origin "$TAG"
         env:
           TWINE_PASSWORD_PROD: ${{ secrets.PYPI_API_TOKEN }}
           TWINE_PASSWORD_TEST: ${{ secrets.PYPI_TEST_API_TOKEN }}
