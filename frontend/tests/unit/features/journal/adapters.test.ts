@@ -63,6 +63,7 @@ const blueprint: FableRetrieveResponse = {
   display_name: 'Europe Forecast',
   display_description: null,
   tags: ['europe', ONEOFF_TAG],
+  coreVersionMismatch: null,
 }
 
 const baseRun: JobExecutionDetail = {

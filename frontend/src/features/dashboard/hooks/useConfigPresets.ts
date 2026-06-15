@@ -32,6 +32,8 @@ export interface PresetEntry {
   displayName: string | null
   displayDescription: string | null
   tags: Array<string>
+  /** Version-mismatch detail when built on a different fiab-core major, else null. */
+  coreVersionMismatch: string | null
   version: number
   isFavourite: boolean
   /** First source block's title — derived from the blueprint builder. */
@@ -81,6 +83,7 @@ export function useConfigPresets() {
           displayName: bp.display_name,
           displayDescription: bp.display_description,
           tags: stripSystemTags(bp.tags),
+          coreVersionMismatch: bp.coreVersionMismatch,
           version: bp.version,
           isFavourite: !!favourites[bp.blueprint_id],
           modelLabel: canDerive ? deriveModelLabel(builder, catalogue) : null,

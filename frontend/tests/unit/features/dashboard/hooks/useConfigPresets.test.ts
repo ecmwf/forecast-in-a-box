@@ -61,15 +61,17 @@ const DEFAULT_BLUEPRINTS: Array<BlueprintListItem> = [
     tags: ['prod'],
     source: 'user_defined',
     created_by: null,
+    coreVersionMismatch: null,
   },
   {
     blueprint_id: 'bp-002',
     version: 2,
     display_name: 'Second Config',
     display_description: null,
-    tags: null,
+    tags: [],
     source: 'user_defined',
     created_by: null,
+    coreVersionMismatch: null,
   },
   {
     blueprint_id: 'bp-003',
@@ -79,6 +81,7 @@ const DEFAULT_BLUEPRINTS: Array<BlueprintListItem> = [
     tags: ['test', 'europe'],
     source: 'user_defined',
     created_by: null,
+    coreVersionMismatch: null,
   },
 ]
 
@@ -167,6 +170,7 @@ describe('useConfigPresets', () => {
           tags: ['europe', ONEOFF_TAG],
           source: 'user_defined',
           created_by: null,
+          coreVersionMismatch: null,
         },
       ]
 
@@ -186,9 +190,10 @@ describe('useConfigPresets', () => {
           version: 1,
           display_name: 'Plugin Template',
           display_description: null,
-          tags: null,
+          tags: [],
           source: 'plugin_template',
           created_by: null,
+          coreVersionMismatch: null,
         },
       ]
 
@@ -210,6 +215,7 @@ describe('useConfigPresets', () => {
           tags: [ONEOFF_TAG],
           source: 'user_defined',
           created_by: null,
+          coreVersionMismatch: null,
         },
       ]
 
