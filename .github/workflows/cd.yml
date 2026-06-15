@@ -24,26 +24,17 @@ jobs:
     # permissions:
     #   contents: write # we need to commit & push at some point
     steps:
-      # - uses: actions/checkout@v4
-      #   with:
-      #     fetch-tags: true
-      #     token: ${{ secrets.GH_REPO_READ_TOKEN }}
-      #     persist-credentials: true
+      - uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+          # token: ${{ secrets.GH_REPO_READ_TOKEN }}
+          # persist-credentials: true
       - uses: extractions/setup-just@v3
+      - uses: astral-sh/setup-uv@v7
       - uses: actions/setup-node@v4
       - run: |
-          set -euo pipefail
-          if [ "${{ inputs.testpypi }}" = "true" ] ; then
-            set -x
-          fi
-
-          # git config -- manual clone remnant of auth troubleshooting
-          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
-          git clone -b $BRANCH --single-branch https://$GH_USER:$GH_TOKEN@github.com/ecmwf/forecast-in-a-box.git .
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin https://$GH_USER:$GH_TOKEN@github.com/ecmwf/forecast-in-a-box.git
-          git fetch --tags origin
+          source .github/workflows/scripts.sh
+          setupBash "${{ inputs.testpypi }}" 
 
           # derive the tag
           if [ "${{ inputs.testpypi }}" = "true" ] ; then
@@ -51,27 +42,15 @@ jobs:
           else
             TAG_PREF="v"
           fi
-          if [ -n "${{ inputs.tag }}" ] ; then
-            TAG="${{ inputs.tag }}"
-            # TODO some verification, like starts with pref, does not exist, etc
-          else
-            LATEST_TAG=$(git describe --tags --abbrev=0 --match "${TAG_PREF}*" 2>/dev/null || echo "${TAG_PREF}0.0.0")
-            VERSION_NUMBERS=${LATEST_TAG#$TAG_PREF}
-            IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION_NUMBERS"
-            NEW_PATCH=$((PATCH + 1))
-            TAG="${TAG_PREF}${MAJOR}.${MINOR}.${NEW_PATCH}"
-            echo "determined tag = $TAG"
-          fi
+          TAG=$(tagFromInputOrLatest "${{ inputs.tag }}" $TAG_PREF)
+          preparePythonWheelVersion $TAG
 
           # prereqs
-          curl -LsSf https://astral.sh/uv/install.sh | sh
           uv venv venv && source venv/bin/activate
           export UV_PROJECT_ENVIRONMENT=$(pwd)/venv
           uv pip install twine build
 
           # build
-          # we dirty the repo with the frontend build, scm would not pick the tag correctly on its own
-          export SETUPTOOLS_SCM_PRETEND_VERSION=${TAG#$TAG_PREF}
           just fiabwheel
           pushd backend
           # NOTE checking packagesDist disabled for now
@@ -93,21 +72,14 @@ jobs:
           popd
 
           # upload
-          if [ "${{ inputs.testpypi }}" = "true" ] ; then
-            export TWINE_PASSWORD="$TWINE_PASSWORD_TEST"
-            TARGET="--repository testpypi"
-          else
-            export TWINE_PASSWORD="$TWINE_PASSWORD_PROD"
-            TARGET=""
-          fi
-          twine upload --verbose $TARGET backend/dist/* # backend/prereqs/* # NOTE uploading prereqs disabled for now
+          uploadPypi "${{ inputs.testpypi }}" 'backend/dist/*'
 
           # commit & tag
           git add install/pylock.toml
           git commit -m "Release $TAG" --allow-empty
           git push
-          git tag $TAG
-          git push origin $TAG
+
+          gitTagAndPush $TAG
 
         env:
           TWINE_PASSWORD_PROD: ${{ secrets.PYPI_API_TOKEN }}
