@@ -98,11 +98,7 @@ function quickStartPreset(): FablePreset {
         source_1: operationalForecastSourceBlock('ecmwf-open-data'),
         select_param_1: selectBlock('source_1', 'param', '2t'),
         select_step_1: selectBlock('select_param_1', 'step', '0'),
-        select_number_1: selectBlock(
-          'select_step_1',
-          'number',
-          '1,2,3,4,5,6',
-        ),
+        select_number_1: selectBlock('select_step_1', 'number', '1,2,3,4,5,6'),
         product_1: {
           factory_id: {
             plugin: ecmwfBasePlugin(),
@@ -185,16 +181,8 @@ function ecmwfOpenDataPreset(): FablePreset {
       blocks: {
         source_1: operationalForecastSourceBlock('ecmwf-open-data'),
         select_param_1: selectBlock('source_1', 'param', '2t'),
-        select_step_1: selectBlock(
-          'select_param_1',
-          'step',
-          '24,48,72,360',
-        ),
-        select_number_1: selectBlock(
-          'select_step_1',
-          'number',
-          '1,2,3,4,5,6',
-        ),
+        select_step_1: selectBlock('select_param_1', 'step', '24,48,72,360'),
+        select_number_1: selectBlock('select_step_1', 'number', '1,2,3,4,5,6'),
         product_1: {
           factory_id: {
             plugin: ecmwfBasePlugin(),
