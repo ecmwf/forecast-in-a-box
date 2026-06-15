@@ -19,7 +19,7 @@ from qubed import Qube
 
 from fiab_plugin_ecmwf import plugin
 from fiab_plugin_ecmwf.anemoi.blocks import AnemoiInputSource, AnemoiSource, AnemoiTransform
-from fiab_plugin_ecmwf.anemoi.utils import get_checkpoint_enum_type
+from fiab_plugin_ecmwf.anemoi.utils import CheckpointArtifact, get_checkpoint_enum_type
 from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, expand
 
 # ---------------------------------------------------------------------------
@@ -140,6 +140,16 @@ def anemoi_source_ensemble_output(anemoi_source_ensemble_configuration: BlockIns
 @pytest.fixture
 def anemoi_input_source_output(anemoi_input_source_configuration: BlockInstance) -> QubedOutput:
     return AnemoiInputSource().validate(block=anemoi_input_source_configuration, inputs={}).get_or_raise()  # type: ignore[return-value]
+
+
+class TestCheckpointArtifact:
+    def test_model_output_selects_multiple_steps_with_metadata(self, six_hour_dummy_checkpoint: str) -> None:
+        output = CheckpointArtifact(six_hour_dummy_checkpoint).get_model_output(lead_time=48)
+
+        assert isinstance(output, Qube)
+        selected = output.select({"step": lambda step: step in {6, 12, 30, 24}})
+        assert axes(selected)["step"] == {6, 12, 24, 30}
+        assert list(selected.leaves(metadata=True))
 
 
 # ===================================================================

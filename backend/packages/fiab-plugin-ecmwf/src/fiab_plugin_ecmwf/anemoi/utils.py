@@ -13,7 +13,7 @@ from copy import deepcopy
 from functools import reduce
 from operator import or_
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fiab_core.artifacts import AnemoiCheckpoint, ArtifactsProvider, CompositeArtifactId
 from fiab_core.fable import QubedOutput
@@ -114,7 +114,8 @@ class CheckpointArtifact:
         steps = list(map(lambda x: x // 3600, range(model_step_seconds, lead_time_seconds + model_step_seconds, model_step_seconds)))
 
         if isinstance(qube, dict):
-            return {key: expand(q, {"step": steps}) for key, q in qube.items()}  # type: ignore
+            nested_qube = cast(dict[str, Qube], qube)
+            return {key: expand(q, {"step": steps}) for key, q in nested_qube.items()}
         return expand(qube, {"step": steps})
 
     def get_additional_kwargs(self) -> dict[str, Any]:
