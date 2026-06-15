@@ -51,8 +51,8 @@ jobs:
           done
           rm -rf packagesDist/fiab_mcp_server* # lets not be releasing this one just yet
 
-          uploadPypi "${{ inputs.test_pypi }}" 'packagesDist/*'
-          gitTagAndPush $TAG
+          uploadPypi "${{ inputs.testpypi }}" 'packagesDist/*'
+          gitTagAndPush "${{ inputs.testpypi }}" $TAG
 
         env:
           TWINE_PASSWORD_PROD: ${{ secrets.PYPI_API_TOKEN }}

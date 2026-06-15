@@ -37,11 +37,7 @@ jobs:
           setupBash "${{ inputs.testpypi }}" 
 
           # derive the tag
-          if [ "${{ inputs.testpypi }}" = "true" ] ; then
-            TAG_PREF="d"
-          else
-            TAG_PREF="v"
-          fi
+          TAG_PREF="v"
           TAG=$(tagFromInputOrLatest "${{ inputs.tag }}" $TAG_PREF)
           preparePythonWheelVersion $TAG
 
@@ -79,7 +75,7 @@ jobs:
           git commit -m "Release $TAG" --allow-empty
           git push
 
-          gitTagAndPush $TAG
+          gitTagAndPush "${{ inputs.testpypi }}" $TAG
 
         env:
           TWINE_PASSWORD_PROD: ${{ secrets.PYPI_API_TOKEN }}
