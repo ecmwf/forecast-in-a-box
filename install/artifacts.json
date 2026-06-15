@@ -4,7 +4,7 @@
         "aifs-global-o48": {
             "artifact_type": "AnemoiCheckpoint",
             "store_info": {
-                "url": "https://sites.ecmwf.int/repository/fiab/testing/aifs-global-o48.ckpt",
+                "url": "https://sites.ecmwf.int/repository/fiab/testing/checkpoints/aifs-global-o48.ckpt",
                 "display_name": "AIFS Global o48 Testing",
                 "display_author": "ECMWF",
                 "display_description": "",
@@ -25,7 +25,7 @@
         "aifs-single-mse-1.1_w_flash_attn": {
             "artifact_type": "AnemoiCheckpoint",
             "store_info": {
-                "url": "https://sites.ecmwf.int/repository/fiab/aifs/aifs-single-mse-1.1.ckpt",
+                "url": "https://sites.ecmwf.int/repository/fiab/ecmwf/checkpoints/aifs-single-mse-1.1.ckpt",
                 "display_name": "AIFS Single MSE 1.1",
                 "display_author": "ECMWF",
                 "display_description": "",
@@ -52,7 +52,7 @@
         "aifs-single-mse-1.1_w_sdpa": {
             "artifact_type": "AnemoiCheckpoint",
             "store_info": {
-                "url": "https://sites.ecmwf.int/repository/fiab/aifs/aifs-single-mse-1.1_sdpa.ckpt",
+                "url": "https://sites.ecmwf.int/repository/fiab/ecmwf/checkpoints/aifs-single-mse-1.1_sdpa.ckpt",
                 "display_name": "AIFS Single MSE 1.1",
                 "display_author": "ECMWF",
                 "display_description": "",
@@ -78,7 +78,7 @@
         "aifs-ens-crps-1.0_w_flash_attn": {
             "artifact_type": "AnemoiCheckpoint",
             "store_info": {
-                "url": "https://sites.ecmwf.int/repository/fiab/aifs/aifs-ens-crps-1.0.ckpt",
+                "url": "https://sites.ecmwf.int/repository/fiab/ecmwf/checkpoints/aifs-ens-crps-1.0.ckpt",
                 "display_name": "AIFS ENS CRPS 1.0",
                 "display_author": "ECMWF",
                 "display_description": "",
@@ -104,7 +104,7 @@
         "aifs-ens-crps-1.0_w_sdpa": {
             "artifact_type": "AnemoiCheckpoint",
             "store_info": {
-                "url": "https://sites.ecmwf.int/repository/fiab/aifs/aifs-ens-crps-1.0_sdpa.ckpt",
+                "url": "https://sites.ecmwf.int/repository/fiab/ecmwf/checkpoints/aifs-ens-crps-1.0_sdpa.ckpt",
                 "display_name": "AIFS ENS CRPS 1.0",
                 "display_author": "ECMWF",
                 "display_description": "",
@@ -130,7 +130,7 @@
         "imerg-gt": {
             "artifact_type": "AnemoiCheckpoint",
             "store_info": {
-                "url": "https://sites.ecmwf.int/repository/fiab/aifs/imerg-gt.ckpt",
+                "url": "https://sites.ecmwf.int/repository/fiab/ecmwf/checkpoints/imerg-gt.ckpt",
                 "display_name": "IMERG GT",
                 "display_author": "ECMWF",
                 "display_description": "",
