@@ -21,21 +21,21 @@ jobs:
     name: "Build, upload and tag"
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # permissions:
-    #   contents: write # we need to commit & push at some point
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-tags: true
-          # token: ${{ secrets.GH_REPO_READ_TOKEN }}
-          # persist-credentials: true
       - uses: extractions/setup-just@v3
       - uses: astral-sh/setup-uv@v7
       - uses: actions/setup-node@v4
       - run: |
+          # NOTE dont use action checkout, doesnt coop with auth
+          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
+          git clone -b $BRANCH --single-branch https://$GH_USER:$GH_TOKEN@github.com/ecmwf/forecast-in-a-box.git .
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://$GH_USER:$GH_TOKEN@github.com/ecmwf/forecast-in-a-box.git
+          git fetch --tags origin # NOTE dont use with: fetch-tags: true, the clone is still shallow
+
           source .github/workflows/scripts.sh
           setupBash "${{ inputs.testpypi }}" 
-          git fetch --tags origin # NOTE dont use with: fetch-tags: true, the clone is still shallow
 
           # derive the tag
           TAG_PREF="v"
