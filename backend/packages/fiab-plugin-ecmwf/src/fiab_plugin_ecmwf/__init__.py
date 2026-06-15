@@ -11,16 +11,13 @@ from fiab_core.fable import BlockFactoryId
 from fiab_core.tools.blocks import QubedBlockBuilder
 from fiab_core.tools.plugins import QubedPluginBuilder
 
-from fiab_plugin_ecmwf.anemoi.blocks import DATASET, AnemoiInputSource, AnemoiSource, AnemoiTransform
+from fiab_plugin_ecmwf.anemoi.blocks import AnemoiInputSource, AnemoiSource, AnemoiTransform
 from fiab_plugin_ecmwf.blocks import (
-    ENSEMBLE,
-    PARAM,
-    STEP,
     EnsembleStatistics,
     GribSink,
     MapPlotSink,
     OperationalForecastSource,
-    SelectDimension,
+    Select,
     TemporalStatistics,
     ZarrSink,
 )
@@ -29,31 +26,12 @@ blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
     BlockFactoryId("operationalForecastSource"): OperationalForecastSource(),
     BlockFactoryId("ensembleStatistics"): EnsembleStatistics(),
     BlockFactoryId("temporalStatistics"): TemporalStatistics(),
-    BlockFactoryId("selectParameters"): SelectDimension(
-        option_id=PARAM,
-        item_python_type=str,
-        selection_label="parameters",
-    ),
-    BlockFactoryId("selectSteps"): SelectDimension(
-        option_id=STEP,
-        item_python_type=int,
-        selection_label="steps",
-    ),
-    BlockFactoryId("selectMembers"): SelectDimension(
-        option_id=ENSEMBLE,
-        item_python_type=int,
-        selection_label="members",
-    ),
+    BlockFactoryId("select"): Select(),
     BlockFactoryId("zarrSink"): ZarrSink(),
     BlockFactoryId("gribSink"): GribSink(),
     BlockFactoryId("anemoiSource"): AnemoiSource(),
     BlockFactoryId("anemoiInputSource"): AnemoiInputSource(),
     BlockFactoryId("anemoiTransform"): AnemoiTransform(),
-    BlockFactoryId("selectDataset"): SelectDimension(
-        option_id=DATASET,
-        item_python_type=str,
-        selection_label="dataset",
-    ),
     BlockFactoryId("mapPlotSink"): MapPlotSink(),
 }
 

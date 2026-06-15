@@ -214,6 +214,10 @@ export const FableValidationExpansionSchema = z.object({
   block_errors: z.record(z.string(), z.array(z.string())),
   possible_sources: z.array(PluginBlockFactoryIdSchema),
   possible_expansions: z.record(z.string(), z.array(BlockExpansionSchema)),
+  configuration_restrictions: z
+    .record(z.string(), z.record(z.string(), z.string()))
+    .optional()
+    .default({}),
   resolved_configuration_options: z
     .record(z.string(), z.record(z.string(), z.string()))
     .optional()
@@ -319,6 +323,8 @@ export interface BlockValidationState {
    * `factoryIdToKey(childId)`; inner maps option id → FableType (e.g.
    * `mapPlotSink → { param: "list[enumClosed[…]]" }`). */
   possibleExpansionRestrictions: Record<string, Record<string, string>>
+  /** Config restrictions for this block's own fields. */
+  configurationRestrictions: Record<string, string>
   /** Unknown glyph names per option, from /blueprint/expand. */
   missingGlyphs: Record<string, Array<string>>
 }
@@ -608,11 +614,13 @@ export function toValidationState(
   catalogue?: BlockFactoryCatalogue,
 ): FableValidationState {
   const blockStates: Record<BlockInstanceId, BlockValidationState> = {}
+  const configurationRestrictionsByBlock = expansion.configuration_restrictions
   const missingRequiredByBlock =
     fable && catalogue ? getMissingRequiredConfigErrors(fable, catalogue) : {}
   const allBlockIds = new Set<string>([
     ...Object.keys(expansion.block_errors),
     ...Object.keys(expansion.possible_expansions),
+    ...Object.keys(configurationRestrictionsByBlock),
     ...Object.keys(missingRequiredByBlock),
     ...Object.keys(expansion.missing_glyphs),
   ])
@@ -632,6 +640,8 @@ export function toValidationState(
       possibleExpansions: toPluginFactoryIds(possibleExpansions),
       possibleExpansionRestrictions:
         toExpansionRestrictionMap(possibleExpansions),
+      configurationRestrictions:
+        configurationRestrictionsByBlock[blockId] ?? {},
       missingGlyphs,
     }
   }
@@ -700,6 +710,8 @@ export function getBlockConfigurationRestrictions(
 
     Object.assign(restrictions, sourceRestrictions)
   }
+  const blockState = getRecordItem(validationState.blockStates, blockId)
+  Object.assign(restrictions, blockState?.configurationRestrictions)
   return restrictions
 }
 

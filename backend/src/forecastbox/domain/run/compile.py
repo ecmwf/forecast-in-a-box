@@ -110,7 +110,7 @@ def compile_builder(
             raise ValueError(f"compile failed at {blockId=} with {converted_values.e}")
         blockInstance.configuration_values = converted_values.t
         with PayloadBuildingContext(blockId=blockId):
-            result = plugin.compiler(action_lookup, blockId, blockInstance)
+            result = plugin.compiler(action_lookup, blockInstance)
         if result.t is None:
             raise ValueError(f"compile failed at {blockId=} with {result.e}")
         action_lookup[blockId] = result.t
@@ -122,7 +122,7 @@ def compile_builder(
             input_name: block_outputs[source_id] for input_name, source_id in blockInstance.input_ids.items() if source_id in block_outputs
         }
         try:
-            validated = plugin.validator(blockInstance, validator_inputs)
+            validated = plugin.validator(blockInstance, validator_inputs).result
             if validated.t is None:
                 raise ValueError(f"compile failed at {blockId=} with {validated.e}")
             block_outputs[blockId] = validated.t

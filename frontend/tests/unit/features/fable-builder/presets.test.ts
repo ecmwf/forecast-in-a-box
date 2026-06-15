@@ -27,16 +27,9 @@ import { getPreset } from '@/features/fable-builder/presets/presets'
 
 // Full set of `configuration_options` keys per block factory (backend mirror).
 const FACTORY_CONFIG_KEYS: Record<string, ReadonlyArray<string>> = {
-  operationalForecastSource: [
-    'source',
-    'forecast',
-    'base_time',
-    'param',
-    'step',
-    'number',
-  ],
+  operationalForecastSource: ['source', 'forecast', 'base_time'],
   ensembleStatistics: ['param', 'statistic'],
-  selectSteps: ['step'],
+  select: ['dimension', 'values'],
   zarrSink: ['path'],
   gribSink: ['path'],
   mapPlotSink: ['param', 'domain', 'format', 'groupby', 'splitby'],
@@ -59,6 +52,31 @@ const PRESET_IDS: ReadonlyArray<PresetId> = [
   'aifs-dataset',
 ]
 
+const OPERATIONAL_PRESET_SELECTS: Partial<
+  Record<PresetId, ReadonlyArray<Readonly<[string, string]>>>
+> = {
+  'quick-start': [
+    ['param', '2t'],
+    ['step', '0'],
+    ['number', '1,2,3,4,5,6'],
+  ],
+  standard: [
+    ['param', '2t'],
+    ['step', '0'],
+    ['number', '0'],
+  ],
+  dataset: [
+    ['param', '2t'],
+    ['step', '0'],
+    ['number', '0'],
+  ],
+  'ecmwf-open-data': [
+    ['param', '2t'],
+    ['step', '24,48,72,360'],
+    ['number', '1,2,3,4,5,6'],
+  ],
+}
+
 describe('config presets match the block factory schema', () => {
   it.each(PRESET_IDS)('preset %s has schema-complete block configs', (id) => {
     const { fable } = getPreset(id)
@@ -78,4 +96,19 @@ describe('config presets match the block factory schema', () => {
       ).toEqual([...expected].sort())
     }
   })
+
+  it.each(Object.entries(OPERATIONAL_PRESET_SELECTS))(
+    'preset %s applies operational source selections with select blocks',
+    (id, expectedSelects) => {
+      const { fable } = getPreset(id as PresetId)
+      const selectConfigs = Object.values(fable.blocks)
+        .filter((block) => block.factory_id.factory === 'select')
+        .map((block) => [
+          block.configuration_values.dimension,
+          block.configuration_values.values,
+        ])
+
+      expect(selectConfigs).toEqual(expectedSelects)
+    },
+  )
 })

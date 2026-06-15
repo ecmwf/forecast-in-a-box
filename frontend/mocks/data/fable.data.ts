@@ -68,32 +68,35 @@ export const mockCatalogue: BlockFactoryCatalogue = {
             description: 'Base time of the forecast',
             value_type: 'datetime',
           },
-          param: {
-            title: 'Parameters',
-            description: "Parameters to select and plot (e.g. '2t', 'msl')",
-            value_type: 'list[str]',
-          },
-          step: {
-            title: 'Steps',
-            description: "Forecast steps to select (e.g. '0,6,12,...')",
-            value_type: 'list[int]',
-          },
-          number: {
-            title: 'Ensemble Members',
-            description: "Ensemble members to select (e.g. '1,2,3,...')",
-            value_type: 'list[int]',
-          },
         },
         inputs: [],
+      },
+      select: {
+        kind: 'transform',
+        title: 'Select',
+        description: 'Select values from one dimension of the input dataset',
+        configuration_options: {
+          dimension: {
+            title: 'Dimension',
+            description: 'Dimension to select from the dataset',
+            value_type: 'str',
+          },
+          values: {
+            title: 'Values',
+            description: 'Values to select from the chosen dimension',
+            value_type: 'list[str]',
+          },
+        },
+        inputs: ['dataset'],
       },
       ensembleStatistics: {
         kind: 'product',
         title: 'Ensemble Statistics',
         description: 'Computes ensemble mean or standard deviation',
         configuration_options: {
-          variable: {
-            title: 'Variable',
-            description: "Variable name like '2t'",
+          param: {
+            title: 'Parameter',
+            description: "Parameter name like '2t'",
             value_type: 'str',
           },
           statistic: {
@@ -109,9 +112,9 @@ export const mockCatalogue: BlockFactoryCatalogue = {
         title: 'Temporal Statistics',
         description: 'Computes temporal statistics',
         configuration_options: {
-          variable: {
-            title: 'Variable',
-            description: "Variable name like '2t'",
+          param: {
+            title: 'param',
+            description: "Param name like '2t'",
             value_type: 'str',
           },
           statistic: {
@@ -226,7 +229,7 @@ export const mockSavedFables: Record<
             factory: 'ensembleStatistics',
           },
           configuration_values: {
-            variable: '2t',
+            param: '2t',
             statistic: 'mean',
           },
           input_ids: {
@@ -314,7 +317,12 @@ export function calculateExpansion(fable: FableBuilderV1): {
       factory: 'operationalForecastSource',
     },
   ]
-  const productBlocks: Array<BlockExpansion> = [
+  const qubedBlocks: Array<BlockExpansion> = [
+    {
+      plugin: pluginId('ecmwf', 'ecmwf-base'),
+      factory: 'select',
+      restrictions: {},
+    },
     {
       plugin: pluginId('ecmwf', 'ecmwf-base'),
       factory: 'ensembleStatistics',
@@ -363,8 +371,8 @@ export function calculateExpansion(fable: FableBuilderV1): {
     }
 
     // Calculate possible expansions based on block kind
-    if (factory.kind === 'source') {
-      possible_expansions[blockId] = productBlocks
+    if (factory.kind === 'source' || factory.kind === 'transform') {
+      possible_expansions[blockId] = qubedBlocks
     } else if (factory.kind === 'product') {
       possible_expansions[blockId] = sinkBlocks
     }

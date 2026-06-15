@@ -12,11 +12,10 @@ from fiab_core.fable import (
     BlockFactoryCatalogue,
     BlockFactoryId,
     BlockInstance,
-    BlockInstanceId,
     BlockInstanceOutput,
     QubedOutput,
 )
-from fiab_core.plugin import Error, Plugin
+from fiab_core.plugin import BlockValidation, Error, Plugin
 from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich, QubedBlockBuilder
 
 
@@ -52,27 +51,26 @@ class QubedPluginBuilder:
         self.block_builders = block_builders
         self.base_environment = [_detect_editable_install(e) for e in base_environment]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        """Given a block instance corresponding to this plugin's Factory and its inputs, either provide error or determine what it outputs"""
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
+        """Given a block instance and its inputs, return either error or output and configuration restrictions."""
         factory = self.block_builders[block.factory_id.factory]
         rich_block = BlockInstanceRich.from_block(block, factory.configuration_options)
         try:
             return factory.validate(rich_block, inputs)
         except BlockInstanceConfigurationError as exc:
-            return Either.error(str(exc))
+            return BlockValidation(Either.error(str(exc)))
 
-    def expand(self, block: QubedOutput) -> list[BlockExpansion]:
+    def expand(self, output: QubedOutput) -> list[BlockExpansion]:
         """Given a block instance output (including from other plugin), provide which block factories from this plugin can expand it"""
         expansions: list[BlockExpansion] = []
         for factory_id, factory in self.block_builders.items():
-            if factory.intersect(block):
-                expansions.append(BlockExpansion(factory=factory_id, restrictions=factory.restrictions(block)))
+            if factory.intersect(output):
+                expansions.append(BlockExpansion(factory=factory_id))
         return expansions
 
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         """Given a cascade builder and a block instance corresponding to this plugin's Factory, either update the builder with corresponding tasks or provide error"""
@@ -80,7 +78,7 @@ class QubedPluginBuilder:
             factory = self.block_builders[block.factory_id.factory]
             rich_block = BlockInstanceRich.from_block(block, factory.configuration_options)
             try:
-                return factory.compile(inputs, block_id, rich_block)
+                return factory.compile(inputs, rich_block)
             except BlockInstanceConfigurationError as exc:
                 return Either.error(str(exc))
 
@@ -91,10 +89,10 @@ class QubedPluginBuilder:
             else:
                 return []
 
-        def _generic_validate(block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+        def _generic_validate(block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> BlockValidation:
             invalid = [f"{key}->{value.__class__.__name__}" for key, value in inputs.items() if not isinstance(value, QubedOutput)]
             if any(invalid):
-                return Either.error(f"Expected only QubedOutputs in inputs, gotten {','.join(invalid)}")
+                return BlockValidation(Either.error(f"Expected only QubedOutputs in inputs, gotten {','.join(invalid)}"))
             else:
                 inputs_validated = cast(dict[str, QubedOutput], inputs)
                 return self.validate(block, inputs_validated)

@@ -13,13 +13,12 @@ from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
     BlockInstance,
-    BlockInstanceId,
     BlockInstanceOutput,
     ConfigurationOptionId,
     NoOutput,
     QubedOutput,
 )
-from fiab_core.plugin import Error
+from fiab_core.plugin import BlockValidation, Error
 from fiab_core.tools.blocks import Product, Sink, Transform
 
 DIR = ConfigurationOptionId("dir")
@@ -30,16 +29,15 @@ class _DemoTransform(Transform):
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {}
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
         dataset = inputs.get("dataset")
         if dataset is None:
-            return Either.error("Missing input 'dataset'")
-        return Either.ok(dataset)
+            return BlockValidation(Either.error("Missing input 'dataset'"))
+        return BlockValidation(Either.ok(dataset))
 
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         return Either.ok(inputs[block.input_ids["dataset"]])
@@ -52,16 +50,15 @@ class _DemoProduct(Product):
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {}
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
         dataset = inputs.get("dataset")
         if dataset is None:
-            return Either.error("Missing input 'dataset'")
-        return Either.ok(dataset)
+            return BlockValidation(Either.error("Missing input 'dataset'"))
+        return BlockValidation(Either.ok(dataset))
 
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         return Either.ok(inputs[block.input_ids["dataset"]])
@@ -74,15 +71,14 @@ class _DemoSink(Sink):
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {}
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
         if "dataset" not in inputs:
-            return Either.error("Missing input 'dataset'")
-        return Either.ok(NoOutput())
+            return BlockValidation(Either.error("Missing input 'dataset'"))
+        return BlockValidation(Either.ok(NoOutput()))
 
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         return Either.ok(inputs[block.input_ids["dataset"]])

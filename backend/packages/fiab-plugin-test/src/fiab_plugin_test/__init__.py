@@ -11,13 +11,13 @@ from fiab_core.fable import (
     BlockFactoryCatalogue,
     BlockFactoryId,
     BlockInstance,
-    BlockInstanceId,
     BlockInstanceOutput,
     ConfigurationOptionId,
+    ConfigurationOptionRestriction,
     NoOutput,
     RawOutput,
 )
-from fiab_core.plugin import Error, Plugin
+from fiab_core.plugin import BlockValidation, Error, Plugin
 from fiab_core.types import FableType
 
 TEXT = ConfigurationOptionId("text")
@@ -104,15 +104,18 @@ catalogue = lambda: BlockFactoryCatalogue(
 )
 
 
-def validator(instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+def validator(instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> BlockValidation:
+    restrictions: ConfigurationOptionRestriction = {}
+    if instance.factory_id.factory == BlockFactoryId("transform_increment"):
+        restrictions = {AMOUNT: FableType.parse("enumClosed[1,2,3]")}
     if instance.factory_id.factory in ("sink_file",):
-        return Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain"))
+        return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain")), restrictions)
     elif instance.factory_id.factory in ("sink_image",):
-        return Either.ok(RawOutput(type_fqn="bytes", mime_type="image/png"))
+        return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type="image/png")), restrictions)
     elif instance.factory_id.factory in ("source_sleep", "source_text", "source_filesize"):
-        return Either.ok(RawOutput(type_fqn="str", mime_type="text/plain"))
+        return BlockValidation(Either.ok(RawOutput(type_fqn="str", mime_type="text/plain")), restrictions)
     elif instance.factory_id.factory in ("source_42", "transform_increment", "product_join"):
-        return Either.ok(RawOutput(type_fqn="int"))
+        return BlockValidation(Either.ok(RawOutput(type_fqn="int")), restrictions)
     else:
         raise TypeError(f"unexpected factory {instance.factory_id.factory}")
 
@@ -134,7 +137,7 @@ def expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
     return []
 
 
-def compiler(lookup: ActionLookup, bid: BlockInstanceId, instance: BlockInstance) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
+def compiler(lookup: ActionLookup, instance: BlockInstance) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
     with PayloadBuildingContext(environment=[f"-e {pathlib.Path(__file__).parent.parent.parent}"]):
         # with PayloadBuildingContext(environment=["-e /home/dev/src/fiab-plugin-test"]): # TODO handle the ssh:// scenario intelligently
         if instance.factory_id.factory == "source_42":

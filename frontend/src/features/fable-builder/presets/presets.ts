@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-import type { FableBuilderV1 } from '@/api/types/fable.types'
+import type { BlockInstance, FableBuilderV1 } from '@/api/types/fable.types'
 import type { PluginCompositeId } from '@/api/types/plugins.types'
 import { getAppTimeZone, yesterdayInZone } from '@/lib/datetime'
 import i18n from '@/lib/i18n'
@@ -36,6 +36,48 @@ function pluginId(store: string, local: string): PluginCompositeId {
   return { store, local }
 }
 
+function ecmwfBasePlugin(): PluginCompositeId {
+  return pluginId('ecmwf', 'ecmwf-base')
+}
+
+function operationalForecastSourceBlock(
+  source: string,
+  forecast = 'aifs-ens',
+): BlockInstance {
+  return {
+    factory_id: {
+      plugin: ecmwfBasePlugin(),
+      factory: 'operationalForecastSource',
+    },
+    configuration_values: {
+      source,
+      forecast,
+      base_time: yesterdayBaseTime(),
+    },
+    input_ids: {},
+  }
+}
+
+function selectBlock(
+  inputId: string,
+  dimension: string,
+  values: string,
+): BlockInstance {
+  return {
+    factory_id: {
+      plugin: ecmwfBasePlugin(),
+      factory: 'select',
+    },
+    configuration_values: {
+      dimension,
+      values,
+    },
+    input_ids: {
+      dataset: inputId,
+    },
+  }
+}
+
 /** Yesterday's calendar date in the application timezone, evaluated per call. */
 function yesterday(): string {
   return yesterdayInZone(getAppTimeZone())
@@ -53,24 +95,13 @@ function quickStartPreset(): FablePreset {
     description: i18n.t('configure:presets.quickStartDescription'),
     fable: {
       blocks: {
-        source_1: {
-          factory_id: {
-            plugin: pluginId('ecmwf', 'ecmwf-base'),
-            factory: 'operationalForecastSource',
-          },
-          configuration_values: {
-            source: 'ecmwf-open-data',
-            forecast: 'aifs-ens',
-            base_time: yesterdayBaseTime(),
-            param: '2t',
-            step: '0',
-            number: '1,2,3,4,5,6',
-          },
-          input_ids: {},
-        },
+        source_1: operationalForecastSourceBlock('ecmwf-open-data'),
+        select_param_1: selectBlock('source_1', 'param', '2t'),
+        select_step_1: selectBlock('select_param_1', 'step', '0'),
+        select_number_1: selectBlock('select_step_1', 'number', '1,2,3,4,5,6'),
         product_1: {
           factory_id: {
-            plugin: pluginId('ecmwf', 'ecmwf-base'),
+            plugin: ecmwfBasePlugin(),
             factory: 'ensembleStatistics',
           },
           configuration_values: {
@@ -78,12 +109,12 @@ function quickStartPreset(): FablePreset {
             statistic: 'mean',
           },
           input_ids: {
-            dataset: 'source_1',
+            dataset: 'select_number_1',
           },
         },
         sink_1: {
           factory_id: {
-            plugin: pluginId('ecmwf', 'ecmwf-base'),
+            plugin: ecmwfBasePlugin(),
             factory: 'zarrSink',
           },
           configuration_values: {
@@ -105,21 +136,10 @@ function standardPreset(): FablePreset {
     description: i18n.t('configure:presets.standardDescription'),
     fable: {
       blocks: {
-        source_1: {
-          factory_id: {
-            plugin: pluginId('ecmwf', 'ecmwf-base'),
-            factory: 'operationalForecastSource',
-          },
-          configuration_values: {
-            source: 'mars',
-            forecast: 'aifs-ens',
-            base_time: yesterdayBaseTime(),
-            param: '2t',
-            step: '0',
-            number: '0',
-          },
-          input_ids: {},
-        },
+        source_1: operationalForecastSourceBlock('mars'),
+        select_param_1: selectBlock('source_1', 'param', '2t'),
+        select_step_1: selectBlock('select_param_1', 'step', '0'),
+        select_number_1: selectBlock('select_step_1', 'number', '0'),
       },
     },
   }
@@ -143,21 +163,10 @@ function datasetPreset(): FablePreset {
     description: i18n.t('configure:presets.datasetDescription'),
     fable: {
       blocks: {
-        source_1: {
-          factory_id: {
-            plugin: pluginId('ecmwf', 'ecmwf-base'),
-            factory: 'operationalForecastSource',
-          },
-          configuration_values: {
-            source: 'ecmwf-open-data',
-            forecast: 'aifs-ens',
-            base_time: yesterdayBaseTime(),
-            param: '2t',
-            step: '0',
-            number: '0',
-          },
-          input_ids: {},
-        },
+        source_1: operationalForecastSourceBlock('ecmwf-open-data'),
+        select_param_1: selectBlock('source_1', 'param', '2t'),
+        select_step_1: selectBlock('select_param_1', 'step', '0'),
+        select_number_1: selectBlock('select_step_1', 'number', '0'),
       },
     },
   }
@@ -170,24 +179,13 @@ function ecmwfOpenDataPreset(): FablePreset {
     description: i18n.t('configure:presets.ecmwfOpenDataDescription'),
     fable: {
       blocks: {
-        source_1: {
-          factory_id: {
-            plugin: pluginId('ecmwf', 'ecmwf-base'),
-            factory: 'operationalForecastSource',
-          },
-          configuration_values: {
-            source: 'ecmwf-open-data',
-            forecast: 'aifs-ens',
-            base_time: yesterdayBaseTime(),
-            param: '2t',
-            step: '24,48,72,360',
-            number: '1,2,3,4,5,6',
-          },
-          input_ids: {},
-        },
+        source_1: operationalForecastSourceBlock('ecmwf-open-data'),
+        select_param_1: selectBlock('source_1', 'param', '2t'),
+        select_step_1: selectBlock('select_param_1', 'step', '24,48,72,360'),
+        select_number_1: selectBlock('select_step_1', 'number', '1,2,3,4,5,6'),
         product_1: {
           factory_id: {
-            plugin: pluginId('ecmwf', 'ecmwf-base'),
+            plugin: ecmwfBasePlugin(),
             factory: 'ensembleStatistics',
           },
           configuration_values: {
@@ -195,12 +193,12 @@ function ecmwfOpenDataPreset(): FablePreset {
             statistic: 'mean',
           },
           input_ids: {
-            dataset: 'source_1',
+            dataset: 'select_number_1',
           },
         },
         sink_1: {
           factory_id: {
-            plugin: pluginId('ecmwf', 'ecmwf-base'),
+            plugin: ecmwfBasePlugin(),
             factory: 'mapPlotSink',
           },
           configuration_values: {
@@ -239,6 +237,19 @@ function aifsForecastPreset(): FablePreset {
             number: '1',
           },
           input_ids: {},
+        },
+        transform_1: {
+          factory_id: {
+            plugin: pluginId('ecmwf', 'ecmwf-base'),
+            factory: 'select',
+          },
+          configuration_values: {
+            dimension: 'step',
+            values: '6,12,18,24,30,36,42,48,54,60,66,72',
+          },
+          input_ids: {
+            dataset: 'source_1',
+          },
         },
         sink_1: {
           factory_id: {

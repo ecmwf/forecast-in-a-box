@@ -19,16 +19,15 @@ from earthkit.workflows.nodetree import nodetree_dimensions, nodetree_new_dimens
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
-    BlockInstanceId,
     BlockInstanceOutput,
     ConfigurationOptionId,
     ConfigurationOptionRestriction,
     QubedOutput,
     RawOutput,
 )
-from fiab_core.plugin import Error
+from fiab_core.plugin import BlockValidation, Error
+from fiab_core.tools.blocks import BlockInstanceConfigurationError, Product, Sink, Source, Transform
 from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
-from fiab_core.tools.blocks import Product, Sink, Source, Transform
 from fiab_core.types import ClosedEnumType, ListType
 from qubed import Qube
 
@@ -46,6 +45,8 @@ ENSEMBLE = ConfigurationOptionId("number")
 STEP = ConfigurationOptionId("step")
 LEVTYPE = ConfigurationOptionId("levtype")
 LEVEL = ConfigurationOptionId("levelist")
+DIMENSION = ConfigurationOptionId("dimension")
+VALUES = ConfigurationOptionId("values")
 GROUPBY = ConfigurationOptionId("groupby")
 SPLITBY = ConfigurationOptionId("splitby")
 FORECAST = ConfigurationOptionId("forecast")
@@ -70,6 +71,38 @@ PLOT_FORMAT_TO_MIME: dict[str, str] = {
 FORECAST_DATASETS = load_datasets()
 
 
+def _extract_dataset(inputs: dict[str, QubedOutput], name: str) -> QubedOutput:
+    input_dataset = inputs.get(name)
+    if not isinstance(input_dataset, QubedOutput):
+        actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
+        raise BlockInstanceConfigurationError(f"Unsupported input type for '{name}': expected QubedOutput, got {actual_type}")
+    return input_dataset
+
+
+def _restriction_value_strings(axis_values: set[Any], item_python_type: type[str] | type[int]) -> list[str]:
+    if item_python_type is str:
+        return sorted(value for value in axis_values if isinstance(value, str))
+    if item_python_type is int:
+        return [str(value) for value in sorted(value for value in axis_values if type(value) is int)]
+    raise TypeError(f"Unsupported select value type {item_python_type!r}")
+
+
+def _axis_value_strings(axis_values: set[Any]) -> list[str]:
+    if all(isinstance(value, str) for value in axis_values):
+        return _restriction_value_strings(axis_values, str)
+    if all(type(value) is int for value in axis_values):
+        return _restriction_value_strings(axis_values, int)
+    return sorted(str(value) for value in axis_values)
+
+
+def _parse_axis_value(value: str) -> str | int:
+    try:
+        int_value = int(value)
+    except ValueError:
+        return value
+    return int_value if str(int_value) == value else value
+
+
 class OperationalForecastSource(Source):
     title: str = "Operational forecast source"
     description: str = "Fetch operational forecast data from mars or ecmwf open data"
@@ -90,81 +123,37 @@ class OperationalForecastSource(Source):
             description="Base time of the forecast",
             value_type="datetime",
         ),
-        PARAM: BlockConfigurationOption(
-            title="Parameters",
-            description="Parameters to select and plot (e.g. '2t', 'msl')",
-            value_type="list[str]",
-        ),
-        STEP: BlockConfigurationOption(
-            title="Steps",
-            description="Forecast steps to select (e.g. '0,6,12,...')",
-            value_type="list[int]",
-        ),
-        ENSEMBLE: BlockConfigurationOption(
-            title="Ensemble Members",
-            description="Ensemble members to select (e.g. '1,2,3,...')",
-            value_type="list[int]",
-        ),
     }
     inputs: list[str] = []
 
     def _convert_time(cls, time: int) -> str:
         return f"{time:02d}00"
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
         forecast = block.config_as_str(FORECAST)
         basetime = block.config_as_datetime(BASETIME)
         time = self._convert_time(basetime.time().hour)
-        params = block.config_as_list(PARAM, str, allow_empty=False)
-        steps = block.config_as_list(STEP, int, allow_empty=False)
-        numbers = block.config_as_list(ENSEMBLE, int, allow_empty=False)
 
         ifs_qoutput = QubedOutput(dataqube=FORECAST_DATASETS[forecast].as_qube(ens_dim=ENSEMBLE, include_member_zero=True))
         if not contains(ifs_qoutput, {"time": time}):
-            return Either.error(f"Invalid time: must be in {axes(ifs_qoutput)['time']}")
+            return BlockValidation(Either.error(f"Invalid time: must be in {axes(ifs_qoutput)['time']}"))
 
-        ifs_qoutput = select(ifs_qoutput, {"time": time})
-        for param in params:
-            if not contains(ifs_qoutput, {PARAM: param}):
-                return Either.error(f"Invalid {PARAM}: must be in {axes(ifs_qoutput)[PARAM]}")
-            param_qoutput = select(ifs_qoutput, {PARAM: param})
-            for dim, config in [(STEP, steps), (ENSEMBLE, numbers)]:
-                if not contains(param_qoutput, {dim: config}):
-                    return Either.error(f"Invalid {dim}: must be in {axes(param_qoutput)[dim]} for param {param}")
-                param_qoutput = select(param_qoutput, {dim: config})
-
-        select_dims: dict[str, Any] = {
-            PARAM: params,
-            ENSEMBLE: numbers,
-            STEP: steps,
-        }
-        output = select(ifs_qoutput, select_dims)
-        return Either.ok(output)
+        return BlockValidation(Either.ok(select(ifs_qoutput, {"time": time})))
 
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         forecast = block.config_as_str(FORECAST)
         fc_preset = FORECAST_DATASETS[forecast]
         fc_qube = fc_preset.as_qube(ens_dim=ENSEMBLE)
 
-        param = block.config_as_list(PARAM, str, allow_empty=False)
-        step = block.config_as_list(STEP, int, allow_empty=False)
-        number = block.config_as_list(ENSEMBLE, int, allow_empty=False)
         basetime = block.config_as_datetime(BASETIME)
         date = basetime.date().isoformat()
         time = self._convert_time(basetime.time().hour)
 
-        select_dims: dict[str, Any] = {
-            PARAM: param,
-            ENSEMBLE: number,
-            STEP: step,
-            "time": time,
-        }
-        subqube = fc_qube.select(select_dims)
+        subqube = fc_qube.select({"time": time})
         actions = {}
         for levtype in subqube.axes()[LEVTYPE]:
             path = f"levtype={levtype}"
@@ -205,7 +194,7 @@ class OperationalForecastSource(Source):
             merged = merge(**levtype_actions)
             for branch in ens_branches:
                 merged = merged.combine_branches(dim=ENSEMBLE, path=branch)
-            actions[path] = merged.combine_branches(dim=PARAM)
+            actions[path] = merged
         final_action = merge(**actions)
         return Either.ok(final_action)
 
@@ -223,20 +212,19 @@ class EnsembleStatistics(Product):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_dataset = inputs["dataset"]
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
+        input_dataset = _extract_dataset(inputs, "dataset")
 
         param = block.config_as_str(PARAM)
         if not contains(input_dataset, {PARAM: param}):
-            return Either.error(f"param {param} is not in the input parameters: {axes(input_dataset).get(PARAM, [])}")
+            return BlockValidation(Either.error(f"param {param} is not in the input parameters: {axes(input_dataset).get(PARAM, [])}"))
 
         output = coxpand(input_dataset, [PARAM, ENSEMBLE], {PARAM: [param]})
-        return Either.ok(output)
+        return BlockValidation(Either.ok(output))
 
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
@@ -268,19 +256,18 @@ class TemporalStatistics(Product):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_dataset = inputs["dataset"]
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
+        input_dataset = _extract_dataset(inputs, "dataset")
 
         param = block.config_as_str(PARAM)
         if not contains(input_dataset, {PARAM: param}):
-            return Either.error(f"param {param} is not in the input parameters: {axes(input_dataset).get(PARAM, [])}")
+            return BlockValidation(Either.error(f"param {param} is not in the input parameters: {axes(input_dataset).get(PARAM, [])}"))
         output = coxpand(input_dataset, [PARAM, STEP], {PARAM: [param]})
-        return Either.ok(output)
+        return BlockValidation(Either.ok(output))
 
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
@@ -315,13 +302,13 @@ class ZarrSink(Sink):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        return Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain"))
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
+        _extract_dataset(inputs, "dataset")
+        return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain")))
 
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
@@ -346,89 +333,87 @@ class ZarrSink(Sink):
         return bool(dimensions(other))
 
 
-SelectAxisValue = str | int
-
-
-class SelectDimension(Transform):
+class Select(Transform):
+    title: str = "Select"
+    description: str = "Select values from one dimension of the input dataset"
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
+        DIMENSION: BlockConfigurationOption(
+            title="Dimension",
+            description="Dimension to select from the dataset",
+            value_type="str",
+        ),
+        VALUES: BlockConfigurationOption(
+            title="Values",
+            description="Values to select from the chosen dimension",
+            value_type="list[str]",
+        ),
+    }
     inputs: list[str] = ["dataset"]
 
-    def __init__(
-        self,
-        *,
-        option_id: ConfigurationOptionId,
-        item_python_type: type[str] | type[int],
-        selection_label: str,
-    ) -> None:
-        label_title = selection_label.title()
-        label_sentence = selection_label[:1].upper() + selection_label[1:]
+    def _selected_dimension(self, block: BlockInstance) -> ConfigurationOptionId:
+        dimension = ConfigurationOptionId(block.config_as_str(DIMENSION))
+        if not dimension:
+            raise BlockInstanceConfigurationError(f"Configuration option '{DIMENSION}' must be provided")
+        return dimension
 
-        self.title = f"Select {label_title}"
-        self.description = f"Select {selection_label} from the input dataset"
-        self.option_id = option_id
-        self.item_python_type = item_python_type
-        self.selection_label = selection_label
-        self.configuration_options = {
-            option_id: BlockConfigurationOption(
-                title=label_title,
-                description=f"{label_sentence} to select from the dataset",
-                value_type=f"list[{self._value_type_name()}]",
-            )
-        }
+    def _selected_values(self, block: BlockInstance) -> list[str]:
+        return block.config_as_list(VALUES, str, allow_empty=False)
 
-    def _value_type_name(self) -> str:
-        if self.item_python_type is str:
-            return "str"
-        if self.item_python_type is int:
-            return "int"
-        raise TypeError(f"Unsupported select value type {self.item_python_type!r}")
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
+        input_dataset = _extract_dataset(inputs, "dataset")
 
-    def _selected_values(self, block: BlockInstance) -> list[SelectAxisValue]:
-        if self.item_python_type is str:
-            return cast(list[SelectAxisValue], block.config_as_list(self.option_id, str, allow_empty=False))
-        if self.item_python_type is int:
-            return cast(list[SelectAxisValue], block.config_as_list(self.option_id, int, allow_empty=False))
-        raise TypeError(f"Unsupported select value type {self.item_python_type!r}")
+        restrict: ConfigurationOptionRestriction = {}
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_dataset = inputs.get("dataset")
-        if not isinstance(input_dataset, QubedOutput):
-            actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
-            return Either.error(f"Unsupported input type for 'dataset': expected QubedOutput, got {actual_type}")
+        input_dimensions = sorted(dimensions(input_dataset))
+        if input_dimensions:
+            restrict[DIMENSION] = ClosedEnumType(input_dimensions)
 
-        selected_values = self._selected_values(block)
-        if not contains(input_dataset, {self.option_id: selected_values}):
-            return Either.error(
-                f"{self.selection_label} {selected_values} are not in the input "
-                f"{self.selection_label}: {axes(input_dataset).get(self.option_id, [])}"
+        try:
+            dimension = self._selected_dimension(block)
+        except BlockInstanceConfigurationError as exc:
+            return BlockValidation(Either.error(str(exc)), restrict)
+
+        input_axes = axes(input_dataset)
+        axis_values = input_axes.get(dimension)
+        if axis_values is None:
+            return BlockValidation(
+                Either.error(f"dimension {dimension} is not in the input dimensions: {input_dimensions}"),
+                restrict,
             )
 
-        output = select(input_dataset, {self.option_id: selected_values})
-        return Either.ok(output)
+        input_values = _axis_value_strings(axis_values)
+        if input_values:
+            restrict[VALUES] = ListType(ClosedEnumType(input_values))
+
+        try:
+            selected_values = [_parse_axis_value(value) for value in self._selected_values(block)]
+        except BlockInstanceConfigurationError as exc:
+            return BlockValidation(Either.error(str(exc)), restrict)
+
+        missing_values = [value for value in selected_values if value not in axis_values]
+        if missing_values:
+            return BlockValidation(
+                Either.error(f"values {missing_values} are not in dimension {dimension}: {input_values}"),
+                restrict,
+            )
+
+        output = select(input_dataset, {dimension: selected_values})
+
+        return BlockValidation(Either.ok(output), restrict)
 
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
-        selected_values = self._selected_values(block)
-        selected = inputs[input_task].select({self.option_id: selected_values if len(selected_values) > 1 else selected_values[0]})
+        dimension = self._selected_dimension(block)
+        values = [_parse_axis_value(value) for value in self._selected_values(block)]
+        selected = inputs[input_task].select({dimension: values if len(values) > 1 else values[0]})
         return Either.ok(selected)
 
-    def _restriction_value_strings(self, axis_values: set[Any]) -> list[str]:
-        if self.item_python_type is str:
-            return sorted(value for value in axis_values if isinstance(value, str))
-        if self.item_python_type is int:
-            return [str(value) for value in sorted(value for value in axis_values if type(value) is int)]
-        raise TypeError(f"Unsupported select value type {self.item_python_type!r}")
-
-    def restrictions(self, other: QubedOutput) -> ConfigurationOptionRestriction:
-        values = self._restriction_value_strings(axes(other).get(self.option_id, set()))
-        return {self.option_id: ListType(ClosedEnumType(values))} if values else {}
-
     def intersect(self, other: QubedOutput) -> bool:
-        return contains(other, self.option_id)
+        return bool(dimensions(other))
 
 
 class GribSink(Sink):
@@ -446,21 +431,17 @@ class GribSink(Sink):
     def _find_template_values(cls, path: str) -> list[str]:
         return re.findall(r"\[(.*?)\]", path)
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_dataset = inputs.get("dataset")
-        if not isinstance(input_dataset, QubedOutput):
-            actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
-            return Either.error(f"Unsupported input type for 'dataset': expected QubedOutput, got {actual_type}")
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
+        _extract_dataset(inputs, "dataset")  # check format of input and existence of dataset
         path = block.config_as_str(PATH)
         dirname = os.path.dirname(path)
         if len(self._find_template_values(dirname)) != 0:
-            return Either.error(f"Invalid filepath: directory path can not contain template values")
-        return Either.ok(RawOutput(type_fqn="bytes", mime_type=GRIB_MIME))
+            return BlockValidation(Either.error(f"Invalid filepath: directory path can not contain template values"))
+        return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type=GRIB_MIME)))
 
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
@@ -534,31 +515,48 @@ class MapPlotSink(Sink):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> Either[BlockInstanceOutput, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_dataset = inputs.get("dataset")
-        if not isinstance(input_dataset, QubedOutput):
-            actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
-            return Either.error(f"Unsupported input type for 'dataset': expected QubedOutput, got {actual_type}")
+    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
+        input_dataset = _extract_dataset(inputs, "dataset")
 
-        params = block.config_as_list(PARAM, str, allow_empty=False)
-        missing = [p for p in params if not contains(input_dataset, {PARAM: p})]
-        if missing:
-            return Either.error(f"params {missing} are not in the input parameters: {axes(input_dataset).get(PARAM, [])}")
+        restrict: ConfigurationOptionRestriction = {}
 
-        splitby_value = block.config_as_list(SPLITBY, str, allow_empty=True)
+        input_axes = axes(input_dataset)
+        input_param_values = input_axes.get(PARAM, set())
+        param_values = [value for value in input_param_values if isinstance(value, str)]
+        if param_values:
+            restrict[PARAM] = ListType(ClosedEnumType(sorted(param_values)))
+
+        common = common_dimensions(input_dataset).intersection({PARAM, STEP, ENSEMBLE, LEVEL})
+        splitby = [x for x in common if len(input_axes[x]) > 1]
+        restrict[SPLITBY] = ListType(ClosedEnumType(sorted(splitby) + ["none"]))
+
+        try:
+            params = block.config_as_list(PARAM, str, allow_empty=False)
+            splitby_value = block.config_as_list(SPLITBY, str, allow_empty=True)
+            fmt = block.config_as_str(FORMAT)
+        except BlockInstanceConfigurationError as exc:
+            return BlockValidation(Either.error(str(exc)), restrict)
+
+        missing_params = [param for param in params if param not in input_param_values]
+        if missing_params:
+            return BlockValidation(
+                Either.error(f"params {missing_params} are not in the input parameters: {_axis_value_strings(input_param_values)}"),
+                restrict,
+            )
+
         if "none" in splitby_value and len(splitby_value) != 1:
-            return Either.error(f"Invalid splitby value: if none is selected, no other dimensions can be present")
+            return BlockValidation(
+                Either.error(f"Invalid splitby value: if none is selected, no other dimensions can be present"), restrict
+            )
 
-        fmt = block.config_as_str(FORMAT)
         mime_type = PLOT_FORMAT_TO_MIME.get(fmt)
         if mime_type is None:
-            return Either.error(f"Unsupported output format: {fmt}")
-        return Either.ok(RawOutput(type_fqn="bytes", mime_type=mime_type))
+            return BlockValidation(Either.error(f"Unsupported output format: {fmt}"), restrict)
+        return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type=mime_type)), restrict)
 
     def compile(
         self,
         inputs: ActionLookup,
-        block_id: BlockInstanceId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
@@ -589,18 +587,6 @@ class MapPlotSink(Sink):
             )
         )
         return Either.ok(action)
-
-    def restrictions(self, other: QubedOutput) -> ConfigurationOptionRestriction:
-        restrict = {}
-
-        param_values = [value for value in axes(other).get(PARAM, set()) if isinstance(value, str)]
-        if param_values:
-            restrict[PARAM] = ListType(ClosedEnumType(sorted(param_values)))
-
-        common = common_dimensions(other).intersection({PARAM, STEP, ENSEMBLE, LEVEL})
-        splitby = [x for x in common if len(axes(other)[x]) > 1]
-        restrict[SPLITBY] = ListType(ClosedEnumType(sorted(splitby) + ["none"]))
-        return restrict
 
     def intersect(self, other: QubedOutput) -> bool:
         return contains(other, PARAM)

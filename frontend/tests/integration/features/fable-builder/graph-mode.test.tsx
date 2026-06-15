@@ -68,7 +68,7 @@ function createMultiBlockFable(): FableBuilderV1 {
           factory: 'ensembleStatistics',
         },
         configuration_values: {
-          variable: '2t',
+          param: '2t',
           statistic: 'mean',
         },
         input_ids: { dataset: 'source1' },

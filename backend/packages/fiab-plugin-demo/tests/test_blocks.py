@@ -9,7 +9,7 @@
 
 import pytest
 from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId, NoOutput, PluginBlockFactoryId, PluginCompositeId, QubedOutput
-from fiab_core.tools.blocks import QubedBlockBuilder
+from fiab_core.tools.blocks import BlockInstanceRich, QubedBlockBuilder
 
 from fiab_plugin_demo import plugin
 from fiab_plugin_demo.blocks import (
@@ -45,6 +45,10 @@ def _block(factory_id: BlockFactoryId) -> BlockInstance:
     )
 
 
+def _rich_block(factory_id: BlockFactoryId, builder: QubedBlockBuilder) -> BlockInstanceRich:
+    return BlockInstanceRich.from_block(_block(factory_id), builder.configuration_options)
+
+
 @pytest.fixture
 def dummy_output() -> QubedOutput:
     return QubedOutput()
@@ -75,7 +79,7 @@ def test_demo_blocks_pass_through_dataset(
     builder: QubedBlockBuilder,
     dummy_output: QubedOutput,
 ) -> None:
-    block = _block(factory_id)
+    block = _rich_block(factory_id, builder)
     validated = builder.validate(block=block, inputs={"dataset": dummy_output}).get_or_raise()
     assert validated is dummy_output
 
@@ -88,7 +92,7 @@ def test_demo_blocks_pass_through_dataset(
     ],
 )
 def test_demo_sinks_return_no_output(factory_id: BlockFactoryId, builder: QubedBlockBuilder, dummy_output: QubedOutput) -> None:
-    block = _block(factory_id)
+    block = _rich_block(factory_id, builder)
     validated = builder.validate(block=block, inputs={"dataset": dummy_output}).get_or_raise()
     assert isinstance(validated, NoOutput)
 
@@ -108,7 +112,7 @@ def test_demo_sinks_return_no_output(factory_id: BlockFactoryId, builder: QubedB
     ],
 )
 def test_demo_blocks_require_dataset(factory_id: BlockFactoryId, builder: QubedBlockBuilder) -> None:
-    block = _block(factory_id)
+    block = _rich_block(factory_id, builder)
     result = builder.validate(block=block, inputs={})
     with pytest.raises(Exception, match="Missing input 'dataset'"):
         result.get_or_raise()

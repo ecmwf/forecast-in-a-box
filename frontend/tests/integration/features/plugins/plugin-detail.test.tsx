@@ -115,7 +115,7 @@ describe('Plugin Detail Page', () => {
         <PluginDetailPage plugin={mockPlugin} catalogue={mockCatalogue} />,
       )
 
-      // ecmwf/ecmwf-base has 4 factories — use heading role to avoid
+      // Use heading role to avoid
       // matching descriptions that contain similar text (vitest browser
       // mode uses case-insensitive getByText)
       await expect

@@ -326,11 +326,12 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
 
 
 def test_blueprint_expand_restrictions(backend_client_with_auth: httpx.Client) -> None:
-    """The expand endpoint carries non-empty restrictions from the test plugin expander.
+    """The expand endpoint carries non-empty restrictions from test plugin hooks.
 
     The test plugin returns enumClosed[1,2,3] as a restriction on the 'amount'
     configuration option when expanding an int-producing block to transform_increment.
-    This test verifies the restriction survives the full route round-trip.
+    It also returns the same restriction for transform_increment's own configuration.
+    This test verifies both restrictions survive the full route round-trip.
     """
     source_42 = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_42")),
@@ -346,6 +347,21 @@ def test_blueprint_expand_restrictions(backend_client_with_auth: httpx.Client) -
     assert increment_expansion["restrictions"] == {"amount": "enumClosed[1,2,3]"}, (
         "transform_increment expansion must carry an enumClosed[1,2,3] restriction on 'amount'"
     )
+
+    transform_increment = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("transform_increment")),
+        configuration_values=_config({"amount": "2"}),
+        input_ids={"a": BlockInstanceId("source_42")},
+    )
+    builder = BlueprintBuilder(
+        blocks={
+            BlockInstanceId("source_42"): source_42,
+            BlockInstanceId("transform_increment"): transform_increment,
+        }
+    )
+    response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
+    assert response.is_success, response.text
+    assert response.json()["configuration_restrictions"]["transform_increment"] == {"amount": "enumClosed[1,2,3]"}
 
 
 def test_blueprint_expand_missing_glyph_warnings(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:

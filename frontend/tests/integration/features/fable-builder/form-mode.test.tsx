@@ -114,7 +114,7 @@ describe('Fable Builder Form Mode', () => {
     // Configuration fields should be visible (FieldRenderer uses Label with htmlFor).
     // Source/Forecast model are enums; Base time's labelled control is a date input.
     await expect.element(screen.getByLabelText('Base time')).toBeVisible()
-    await expect.element(screen.getByLabelText('Parameters')).toBeVisible()
+    await expect.element(screen.getByLabelText('Forecast model')).toBeVisible()
 
     // Fable should be marked as dirty
     expect(useFableBuilderStore.getState().isDirty).toBe(true)

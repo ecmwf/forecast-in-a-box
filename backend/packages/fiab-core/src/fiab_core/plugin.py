@@ -11,7 +11,7 @@
 Types pertaining to declaring FIAB Plugins, in particular their Fable-based interface.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable
 
 from cascade.low.func import Either
@@ -22,20 +22,37 @@ from fiab_core.fable import (
     BlockExpansion,
     BlockFactoryCatalogue,
     BlockInstance,
-    BlockInstanceId,
     BlockInstanceOutput,
+    ConfigurationOptionRestriction,
 )
 
 Error = str
-Validator = Callable[[BlockInstance, dict[str, BlockInstanceOutput]], Either[BlockInstanceOutput, Error]]  # type:ignore[invalid-argument] # semigroup
-"""Given a block instance corresponding to this plugin's Factory and its inputs, either provide error or determine what it outputs"""
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class BlockValidation:
+    result: Either[BlockInstanceOutput, Error]  # type:ignore[invalid-argument] # semigroup
+    restrictions: ConfigurationOptionRestriction = field(default_factory=dict)
+
+    def get_or_raise(self) -> BlockInstanceOutput:
+        return self.result.get_or_raise()
+
+    @property
+    def t(self) -> BlockInstanceOutput | None:
+        return self.result.t
+
+    @property
+    def e(self) -> Error | None:
+        return self.result.e
+
+
+Validator = Callable[[BlockInstance, dict[str, BlockInstanceOutput]], BlockValidation]
+"""Given a block instance and its inputs, return either error or output and configuration restrictions"""
 
 Expander = Callable[[BlockInstanceOutput], list[BlockExpansion]]
 """Given a block instance output (including from other plugin), provide which block factories from this plugin can expand it"""
 
-Compiler = Callable[
-    [ActionLookup, BlockInstanceId, BlockInstance], Either[Action, Error]  # type:ignore[invalid-argument] # semigroup
-]
+Compiler = Callable[[ActionLookup, BlockInstance], Either[Action, Error]]  # type:ignore[invalid-argument] # semigroup
 """Given a cascade builder, represented as lookup of fluent actions, and a block instance corresponding to this plugin's Factory, either return the fluent action resulting from this block or an error"""
 
 

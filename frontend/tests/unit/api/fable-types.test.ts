@@ -14,7 +14,10 @@ import type {
   FableBuilderV1,
   FableValidationExpansion,
 } from '@/api/types/fable.types'
-import { toValidationState } from '@/api/types/fable.types'
+import {
+  getBlockConfigurationRestrictions,
+  toValidationState,
+} from '@/api/types/fable.types'
 
 const mockCatalogue: BlockFactoryCatalogue = {
   'ecmwf/base': {
@@ -68,6 +71,7 @@ describe('toValidationState', () => {
       block_errors: {},
       possible_sources: [],
       possible_expansions: {},
+      configuration_restrictions: {},
       resolved_configuration_options: {},
       missing_glyphs: {},
     }
@@ -87,6 +91,7 @@ describe('toValidationState', () => {
       block_errors: {},
       possible_sources: [],
       possible_expansions: {},
+      configuration_restrictions: {},
       resolved_configuration_options: {},
       missing_glyphs: {
         sink_file: {
@@ -113,6 +118,7 @@ describe('toValidationState', () => {
       block_errors: {},
       possible_sources: [],
       possible_expansions: {},
+      configuration_restrictions: {},
       resolved_configuration_options: {},
       missing_glyphs: { sink_file: {} },
     }
@@ -137,6 +143,7 @@ describe('toValidationState', () => {
           },
         ],
       },
+      configuration_restrictions: {},
       resolved_configuration_options: {},
       missing_glyphs: {},
     }
@@ -152,5 +159,40 @@ describe('toValidationState', () => {
     expect(result.blockStates.b1.possibleExpansionRestrictions).toEqual({
       'ecmwf/base:sink': { amount: 'enumClosed[1,2,3]' },
     })
+  })
+
+  it('exposes configuration restrictions for a block itself', () => {
+    const fable: FableBuilderV1 = {
+      blocks: {
+        b1: {
+          factory_id: {
+            plugin: { store: 'ecmwf', local: 'base' },
+            factory: 'source',
+          },
+          configuration_values: { required: 'ifs-ens', optional: '' },
+          input_ids: {},
+        },
+      },
+    }
+    const expansion: FableValidationExpansion = {
+      global_errors: [],
+      block_errors: {},
+      possible_sources: [],
+      possible_expansions: {},
+      configuration_restrictions: {
+        b1: { param: 'list[enumClosed[2t,msl]]' },
+      },
+      resolved_configuration_options: {},
+      missing_glyphs: {},
+    }
+
+    const validationState = toValidationState(expansion, fable, mockCatalogue)
+
+    expect(validationState.blockStates.b1.configurationRestrictions).toEqual({
+      param: 'list[enumClosed[2t,msl]]',
+    })
+    expect(
+      getBlockConfigurationRestrictions(fable, validationState, 'b1'),
+    ).toEqual({ param: 'list[enumClosed[2t,msl]]' })
   })
 })

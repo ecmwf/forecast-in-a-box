@@ -120,6 +120,9 @@ describe('expandFable', () => {
           },
         ],
       },
+      configuration_restrictions: {
+        'block-1': { param1: "enumClosed['value1','value2']" },
+      },
       missing_glyphs: {},
     }
 
@@ -132,6 +135,9 @@ describe('expandFable', () => {
     const result = await expandFable(mockFable)
     expect(result.global_errors).toEqual([])
     expect(result.block_errors).toEqual({})
+    expect(result.configuration_restrictions).toEqual({
+      'block-1': { param1: "enumClosed['value1','value2']" },
+    })
   })
 
   it('sends fable as JSON body', async () => {
