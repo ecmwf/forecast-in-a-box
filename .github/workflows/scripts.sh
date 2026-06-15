@@ -16,27 +16,33 @@ function uploadPypi() {
     # $2 <path> => directory/glob where wheels are expected
     # env
     # TWINE_PASSWORD_TEST, TWINE_PASSWORD_PROD
-    testypi=$1
+    testpypi=$1
     wheelhouse=$2
+    # NOTE we need wheelhouse to glob
     # shellcheck disable=SC2086
     twine check $wheelhouse
-    if [ "$testypi" = "true" ] ; then
+    if [ "$testpypi" = "true" ] ; then
         TWINE_PASSWORD="$TWINE_PASSWORD_TEST"
-        REPOSITORY="--repository testpypi"
+        REPOSITORY="--repository testpypi --skip-existing"
     else
         TWINE_PASSWORD="$TWINE_PASSWORD_PROD"
         REPOSITORY=""
     fi
+    # NOTE we need wheelhouse to glob, and repository to expand
     # shellcheck disable=SC2086
-    TWINE_PASSWORD=$TWINE_PASSWORD twine upload --disable-progress-bar --verbose --non-interactive "$REPOSITORY" $wheelhouse
+    TWINE_PASSWORD=$TWINE_PASSWORD twine upload --disable-progress-bar --verbose --non-interactive $REPOSITORY $wheelhouse
 }
 
 function gitTagAndPush() {
     # args
-    # $1 <tag>
-    tag=$1
-    git tag "$tag"
-    git push origin "$tag"
+    # $1 true => testpypi (no tag&push), false => regular pypi (do tag&push)
+    # $2 <tag>
+    testypi=$1
+    tag=$2
+    if [ "$testypi" = "false" ] ; then
+        git tag "$tag"
+        git push origin "$tag"
+    fi
 }
 
 function getLatestTagAndIncrement() {
