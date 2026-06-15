@@ -103,7 +103,14 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
     failed: str | None = None
     try:
         cmd = ["uv", "run", "gunicorn", "--bind", f"127.0.0.1:{port}", "skinnywms.wmssvr:application"]
-        env = {**os.environ, "SKINNYWMS_DATA_PATH": local_path}
+        env = {
+            **os.environ,
+            "SKINNYWMS_DATA_PATH": local_path,
+            # Browser clients (the in-app WMS viewer, crossOrigin tile requests)
+            # call the lens directly on its own port, i.e. cross-origin.
+            # SkinnyWMS honours this via flask-cors on all endpoints.
+            "SKINNYWMS_CORS_ORIGINS": "*",
+        }
         process: subprocess.Popen[bytes] = subprocess.Popen(
             cmd,
             env=env,

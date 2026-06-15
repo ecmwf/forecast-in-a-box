@@ -13,6 +13,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getRouteApi } from '@tanstack/react-router'
+import { ActiveLensesCard } from './ActiveLensesCard'
 import type { ForecastRunViewModel, RunFilter } from '@/features/journal/types'
 import type { GroupBy } from '@/features/journal/grouping/group-runs'
 import { useJobsStatus } from '@/api/hooks/useJobs'
@@ -107,6 +108,8 @@ export function RunListPage() {
   return (
     <ListPageContainer>
       <PageHeader title={t('page.title')} description={t('page.description')} />
+
+      <ActiveLensesCard />
 
       <ForecastRunList
         runs={filtered}

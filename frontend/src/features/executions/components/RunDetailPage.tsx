@@ -33,6 +33,7 @@ import { RunStatusHeader } from './RunStatusHeader'
 import { LogsPanel } from './LogsPanel'
 import { OutputsPanel } from './OutputsPanel'
 import { SpecificationPanel } from './SpecificationPanel'
+import { StoredOutputsCard } from './StoredOutputsCard'
 import { RunMetadataDialog } from '@/features/journal/components/RunMetadataDialog'
 import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
 import { showToast } from '@/lib/toast'
@@ -300,7 +301,16 @@ export function RunDetailPage() {
                 activeTab !== 'outputs' && 'hidden',
               )}
             />
-            <TabsContent value="outputs" className={WIDE_TAB_CONTENT}>
+            <TabsContent
+              value="outputs"
+              className={cn(WIDE_TAB_CONTENT, 'space-y-4')}
+            >
+              <StoredOutputsCard
+                jobId={jobId}
+                outputs={jobData.outputs}
+                fable={fableData?.builder}
+                catalogue={catalogue}
+              />
               <OutputsPanel
                 jobId={jobId}
                 status={jobData.status}

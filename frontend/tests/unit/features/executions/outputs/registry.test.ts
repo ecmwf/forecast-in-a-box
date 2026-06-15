@@ -11,6 +11,7 @@
 import { Box } from 'lucide-react'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { OutputAdapter } from '@/features/executions/outputs/types'
+import { gribStoredAdapter } from '@/features/executions/outputs/adapters/grib'
 import {
   GENERIC_ADAPTER,
   _resetRegistryForTests,
@@ -69,5 +70,13 @@ describe('output adapter registry', () => {
     expect(() =>
       registerOutputAdapter(makeAdapter({ id: 'second', mimeTypes: ['m/x'] })),
     ).toThrow(/m\/x/)
+  })
+
+  it('resolves the GribSink marker mime to the GRIB adapter, not the generic fallback', () => {
+    registerOutputAdapter(gribStoredAdapter)
+    const adapter = resolveAdapter('text/plain; fiab-format=gribdir')
+    expect(adapter.id).toBe('grib-stored')
+    // The streamed payload is a directory path, not GRIB bytes — no actions.
+    expect(adapter.actions).toHaveLength(0)
   })
 })

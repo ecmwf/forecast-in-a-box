@@ -133,14 +133,18 @@ describe('RunDetailPage Integration', () => {
     it('renders tab buttons', async () => {
       const screen = await renderDetailPage('job-completed-001')
 
-      await expect.element(screen.getByText('Outputs')).toBeVisible()
+      await expect
+        .element(screen.getByRole('tab', { name: 'Outputs' }))
+        .toBeVisible()
       await expect.element(screen.getByText('Logs')).toBeVisible()
       await expect.element(screen.getByText('Specification')).toBeVisible()
     })
 
     it('defaults to outputs tab', async () => {
       const screen = await renderDetailPage('job-completed-001')
-      await expect.element(screen.getByText('Outputs')).toBeVisible()
+      await expect
+        .element(screen.getByRole('tab', { name: 'Outputs' }))
+        .toBeVisible()
     })
   })
 
@@ -184,8 +188,8 @@ describe('RunDetailPage Integration', () => {
   describe('outputs panel', () => {
     it('shows available output count for completed job with outputs', async () => {
       const screen = await renderDetailPage('job-completed-001')
-      // job-completed-001 has 3 available outputs (task-out-1, task-out-2, task-out-3)
-      await expect.element(screen.getByText(/Generated: 3/)).toBeVisible()
+      // job-completed-001 has 4 available outputs (task-out-1 … task-out-4)
+      await expect.element(screen.getByText(/Generated: 4/)).toBeVisible()
     })
 
     it('shows pending count for running job with unavailable outputs', async () => {

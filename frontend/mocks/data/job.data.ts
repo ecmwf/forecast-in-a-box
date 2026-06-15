@@ -60,6 +60,12 @@ const seedExecutions: Array<JobExecutionDetail> = [
         original_block: 'sink_wind_map',
         is_available: true,
       },
+      // GribSink marker: payload is the run-private output directory.
+      'task-out-grib': {
+        mime_type: 'text/plain; fiab-format=gribdir',
+        original_block: 'block_sink_1',
+        is_available: true,
+      },
     },
     // Cache is popped on terminal status; both arrays come back null.
     completed_block_ids: null,
@@ -458,6 +464,10 @@ export function createMockSvgBlob(): Blob {
  * sniff-promotion path stays exercised; unknown mimes also fall back to PNG. */
 export function mockBlobForMime(mimeType: string): Blob {
   switch (mimeType) {
+    case 'text/plain; fiab-format=gribdir':
+      return new Blob(['/data/output/job-completed-001_1'], {
+        type: 'text/plain',
+      })
     case 'application/pdf':
       return createMockPdfBlob()
     case 'image/svg+xml':
