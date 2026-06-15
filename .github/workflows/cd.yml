@@ -35,6 +35,7 @@ jobs:
       - run: |
           source .github/workflows/scripts.sh
           setupBash "${{ inputs.testpypi }}" 
+          git fetch --tags origin # NOTE dont use with: fetch-tags: true, the clone is still shallow
 
           # derive the tag
           TAG_PREF="v"

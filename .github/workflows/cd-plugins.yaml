@@ -25,13 +25,12 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-tags: true
       - uses: astral-sh/setup-uv@v7
       - uses: extractions/setup-just@v3
       - run: |
           source .github/workflows/scripts.sh
           setupBash "${{ inputs.testpypi }}" 
+          git fetch --tags origin # NOTE dont use with: fetch-tags: true, the clone is still shallow
 
           TAG_PREF="c"
           TAG=$(tagFromInputOrLatest "${{ inputs.tag }}" $TAG_PREF)
